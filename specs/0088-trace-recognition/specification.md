@@ -1,6 +1,6 @@
 # Trace recognition: text and shapes from traced outlines
 
-Status: Draft (backlog, not scheduled)
+Status: Ready (Part A; Part B is later)
 Priority: Could
 Origin: Customer idea 2026-10-28 (the split into parts A and B and all tolerances were Proposals, now decided, see below)
 
@@ -18,6 +18,19 @@ practical synergy with the glyph table."
 - Frage 71 REC-TEXT-ENGINE: A for now: glyph-outline matching against our own fonts, no model. The customer is unsure; the `ocrs` option stays documented below as a possible later decision (it would change 0025 Frage 58).
 - Frage 72 REC-MEANING: A. Both operations are explicit, undoable, run on a selection, never automatic, and leave the path alone when unsure.
 - Frage 73 REC-TOL: A, adjustable tolerance (default 0.3 mm for text, 0.2 mm for shapes); he restated it for shapes.
+
+## Decided by the customer (2026-10-31)
+- Frage 101 REC-PARTIAL = C: uncertain letters are guessed (best match) and marked, not left as paths. Marking uses
+  existing UI only, no canvas overlay: the result notice lists the guessed letters with their positions, the new texts
+  are selected, and the Glyph table and Text tool highlight them while the session lasts. A line with fewer than
+  50 % sure letters stays paths (Proposal guard against turning noise into text).
+- Frage 102 REC-FACES = B with the customer's tier order: (1) fonts used in the document, (2) favourites, (3) fonts the
+  maker installed (Curvyo fonts folder), (4) included fonts, (5) all other installed system fonts. The search stops at
+  the first tier with a match within tolerance. The 80 % per-line threshold for "a match" and the 64-face cap per tier are Proposals.
+- Frage 103 REC-NEAREST = A: replace only within tolerance. Otherwise nothing changes and the notice names the nearest face and its deviation.
+- Frage 104 REC-ENTRY = A: a "Recognise text" button in the Select bar chooses the Recognise tool, whose bar holds the tolerance and the Recognise button.
+- Frage 105 REC-SCOPE = A: a readout of the face sources, no selector; the result names the tier that matched.
+- Frage 106 REC-MARK = B: no dashed outline of leftovers; affected letters are selected and reported in words.
 
 ## Builds on
 - 0025 raster trace: its output paths are the input. Recognition runs on traced paths only, never on pixels.
@@ -51,11 +64,23 @@ object (0074) in the library font (0075) whose glyphs match best, keeping positi
 1. Given letters traced from a rendered line "Curvyo 2026" in an installed face at 24 mm cap height, when
    Recognise text runs, then one text object with the content "Curvyo 2026" and that face results.
 2. The text object's glyph outlines deviate from the traced outlines by at most the tolerance (default 0.3 mm) everywhere (checked by comparison).
-3. Given text in a face we do not have, then the nearest installed face is chosen and the result names it and its
-   deviation; the maker can pick another face from the 0062 list.
-4. Given outlines that match no glyph within tolerance, then they stay paths; nothing is guessed silently.
+3. Given text in a face we do not have, when a face within tolerance exists in some tier, then the nearest such face is
+   used and the result names it, its tier and its largest deviation; the maker can pick another face from the 0062 list.
+4. Given a line where no face reaches 50 % sure letters within tolerance (REC-NEAREST A), then the line stays paths,
+   nothing changes in the document, and the notice reads "No text within <tol> mm; nearest face <name>, <dev> mm."
 5. Nothing is sent over the network; recognition works with the network disabled.
 6. The tolerance is a setting in mm (default 0.3 mm), shown in the options bar; the original paths are restored by one undo step.
+7. Given a line where a letter is uncertain (outside tolerance or no clear margin) but at least 50 % of the line's
+   letters are sure (REC-PARTIAL C), then the text object contains the best-match letter, and the result notice lists
+   each guessed letter with its 1-based position ("2 letters guessed: e (5), l (9)"; more than 5 are cut with "and N more").
+   The reported largest deviation covers the sure letters only. No canvas overlay or dashed outline appears; the new
+   texts are selected and the Glyph table and Text tool highlight the guessed characters until the first edit of that text.
+8. Given a document where the line's face is in tier 1 (used in the document), then no later tier is searched and no
+   system font file is read (REC-FACES B). Given a face only in the system fonts, then it is found in tier 5 and the
+   notice names "system fonts". A face in several tiers counts in its earliest tier.
+9. Given two tiers that both reach 80 % sure letters on a line, then the earlier tier wins even if the later one deviates less.
+10. The Recognise bar shows a readout of the face sources before a run ("5 face sources", tooltip lists the order);
+    it has no selector. After a run the notice names the tier that matched (REC-SCOPE A).
 
 ## Part B: shape recognition on traced outlines (later)
 Meaning (confirmed): **Recognise shapes** replaces a selected closed traced path by the primitive
@@ -94,10 +119,10 @@ Meaning (confirmed): **Recognise shapes** replaces a selected closed traced path
 - Font identification from the web, installing missing fonts.
 
 ## UX notes
-(filled in by ux-engineer before Ready)
+See `ux-notes.md` (Ready, aligned 2026-10-31). Technical decisions: `adrs.md`.
 
 ## Questions for the customer
-None open. Frage 70 to 73 are decided (2026-10-28, see above).
+None open. Frage 70 to 73 are decided (2026-10-28), Frage 101 to 106 (2026-10-31), see above.
 
 ## Links
 Requirements: to be added when scheduled  PR: none
