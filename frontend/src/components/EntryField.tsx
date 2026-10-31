@@ -15,6 +15,8 @@ interface EntryFieldProps {
   messageId: string;
   value: string;
   placeholder?: string;
+  /** Shows a value that cannot be typed over, such as a measured Reference dimension. */
+  readOnly?: boolean;
   inputRef?: Ref<HTMLInputElement>;
   onChange: (text: string) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -38,6 +40,7 @@ export function EntryField({
   messageId,
   value,
   placeholder,
+  readOnly,
   inputRef,
   onChange,
   onKeyDown,
@@ -67,6 +70,7 @@ export function EntryField({
         aria-describedby={invalid ? messageId : undefined}
         value={value}
         placeholder={placeholder}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
@@ -85,7 +89,11 @@ export function EntryField({
       />
       <span
         aria-hidden
-        className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-xs"
+        // The degree sign is a raised glyph a third of the size of "mm" at the same font size:
+        // it gets the size that matches "mm" visually (`0066` UX notes revision 2 review, 5c).
+        className={`pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 ${
+          suffix === "°" ? "text-base leading-none" : "text-xs"
+        }`}
         style={{ opacity: 0.7 }}
       >
         {suffix}

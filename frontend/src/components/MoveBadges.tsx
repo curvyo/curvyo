@@ -1,4 +1,4 @@
-import { Minus, MoveHorizontal, MoveVertical, Plus } from "lucide-react";
+import { Minus, MoveDiagonal, MoveHorizontal, MoveVertical, Plus } from "lucide-react";
 import { useLayoutEffect, useState } from "react";
 
 import type { MoveBadgeState } from "@/hooks/useEditorSession";
@@ -94,6 +94,9 @@ export function MoveBadges({ badges, containerRef }: MoveBadgesProps) {
               <Minus size={8} strokeWidth={1.5} absoluteStrokeWidth />
             ) : kind === "lock-x" ? (
               <MoveHorizontal size={12} strokeWidth={1.5} absoluteStrokeWidth />
+            ) : kind === "lock-angle" ? (
+              // A Sketch drawing direction locked by Ctrl (`0066` UX notes revision 2, section 5).
+              <MoveDiagonal size={10} strokeWidth={1.5} absoluteStrokeWidth />
             ) : (
               <MoveVertical size={12} strokeWidth={1.5} absoluteStrokeWidth />
             )}
