@@ -434,8 +434,26 @@ test("0089E tester c21: the Mask view equals the mask computed from the picture,
       return [b.cx, b.cy];
     };
     await zoomUntil(s, scale, where, 4);
+    // The bar has the 36 px analysis row of slice F and is taller than it was: pan until the whole
+    // 64 x 64 source (its top row is 8 source rows above the black box) lies below the bar and
+    // inside the canvas, so every one of the 4096 pixels is still sampled.
+    for (let i = 0; i < 12; i++) {
+      const bb = await blackBox();
+      const sy0 = (bb.y1 - bb.y0 + 1) / 48;
+      const [, cy, , ch] = await canvasRect(s);
+      const top = bb.y0 - 8 * sy0;
+      const bottom = bb.y0 + 56 * sy0;
+      if (top >= (await barBottom(s)) + 2 && bottom <= cy + ch - 2) break;
+      const [x, y] = await where();
+      await s.send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: top < (await barBottom(s)) + 2 ? -120 : 120 });
+      await sleep(400);
+    }
     await savePng(s, "c21-image-view.png");
     const b = await blackBox();
+    {
+      const sy1 = (b.y1 - b.y0 + 1) / 48;
+      assert.ok(b.y0 - 8 * sy1 >= (await barBottom(s)), "the whole source is below the bar");
+    }
     const sx = (b.x1 - b.x0 + 1) / 56;
     const sy = (b.y1 - b.y0 + 1) / 48;
     console.log(`source pixel on screen: ${sx.toFixed(2)} x ${sy.toFixed(2)}, black box ${JSON.stringify(b)}`);
@@ -671,9 +689,19 @@ const pathsNow = async (s: S, n: number, ms = 15_000) =>
     throw new Error(`${e.message}; counts "${await counts(s)}", status "${await s.statusText()}"`);
   });
 
+/** Slice F: the analysis may already have chosen another method for a new image; these two tests need the
+ * Threshold, so the precondition is set by hand (a manual change, which the analysis never overrides). */
+const ensureBrightness = async (s: S) => {
+  const now = (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]')?.textContent ?? ''`)) as string;
+  if (!/Brightness/.test(now)) {
+    await pickMethod(s, "Brightness");
+  }
+};
+
 test("0089E tester c23: an answer for stale settings arrives late and is dropped; the preview equals what Enter creates; one history step", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "blocks3.png", BLOCKS3);
+    await ensureBrightness(s);
     await typeInto(s, "Threshold", "60");
     await pathsNow(s, 2);
     // A (25 %: one path) is answered 3 s late; B (85 %: three paths) is typed 0.9 s after it and answered at once.
@@ -715,6 +743,7 @@ test("0089E tester c23: an answer for stale settings arrives late and is dropped
 test("0089E tester c23: in the Mask view a stale mask arriving late is dropped", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "blocks3.png", BLOCKS3);
+    await ensureBrightness(s);
     await typeInto(s, "Threshold", "60");
     await pathsNow(s, 2);
     await clickView(s, "Image");
@@ -775,6 +804,21 @@ test("0089E tester c13 / Frage 85 B: stored settings of 0025 and damaged ones ar
   const reload = `;(() => { const add = EventTarget.prototype.addEventListener; EventTarget.prototype.addEventListener = function (t, ...r) { if (t === "beforeunload") return undefined; return add.call(this, t, ...r); }; window.onbeforeunload = null; })();`;
   await withApp(async (s) => {
     const failures: string[] = [];
+    // Slice F (Frage 83 B, 86 A): a new image gets its Method and Colour tolerance from the analysis, so
+    // a stored Method or Colour tolerance no longer shows. The analysis is deterministic (criterion 34):
+    // blocks3.png with no stored settings gives the reference, and every seed must show exactly that.
+    await s.send("Page.navigate", { url: `${ORIGIN}/` });
+    await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
+    await s.evaluate(`localStorage.removeItem('curvyo.trace-values')`);
+    await s.send("Page.navigate", { url: `${ORIGIN}/` });
+    await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
+    await sleep(1000);
+    await openOn(s, "blocks3.png", BLOCKS3);
+    const analysed = {
+      method: (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]')?.textContent ?? ''`)) as string,
+      colourTolerance: await fieldValue(s, "Colour tolerance"),
+    };
+    console.log("analysed reference:", JSON.stringify(analysed));
     for (const seed of SEEDS) {
       await s.send("Page.navigate", { url: `${ORIGIN}/` });
       await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
@@ -798,8 +842,8 @@ test("0089E tester c13 / Frage 85 B: stored settings of 0025 and damaged ones ar
       const bad: string[] = [];
       if (seed.preset && !seed.preset.test(read.preset)) bad.push(`preset "${read.preset}"`);
       for (const k of ["smooth", "tolerance", "specks", "corners"] as const) if (seed[k] !== undefined && Number(read[k]) !== Number(seed[k])) bad.push(`${k} ${read[k]} (want ${seed[k]})`);
-      if (seed.colourTolerance !== undefined && read.colourTolerance !== seed.colourTolerance) bad.push(`Colour tolerance ${read.colourTolerance} (want ${seed.colourTolerance})`);
-      if (seed.method && !seed.method.test(read.method)) bad.push(`method "${read.method}"`);
+      if (read.method !== analysed.method) bad.push(`method "${read.method}" (the analysis chose "${analysed.method}")`);
+      if (read.colourTolerance !== analysed.colourTolerance) bad.push(`Colour tolerance ${read.colourTolerance} (the analysis chose ${analysed.colourTolerance})`);
       if (read.legacy) bad.push("a Node limit or Full-size preview control is shown");
       if (seed.ranges) {
         const g = JSON.parse(read.groups) as number[];
