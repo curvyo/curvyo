@@ -34,9 +34,9 @@ const SELF_APART: f64 = 1.0;
 /// The cell size of the pair search, px.
 const CELL_PX: f64 = 4.0;
 
-/// The flattened points of a closed outline (its first point not repeated), each with the index
-/// of the segment it starts a piece of.
-fn flatten(outline: &[Seg]) -> Vec<(Point, u32)> {
+/// The flattened points of an outline (a closed one's first point not repeated, an open one's
+/// end point last), each with the index of the segment it starts a piece of.
+fn flatten(outline: &[Seg], open: bool) -> Vec<(Point, u32)> {
     let mut points = Vec::new();
     for (index, seg) in outline.iter().enumerate() {
         let index = u32::try_from(index).unwrap_or(u32::MAX);
@@ -56,6 +56,15 @@ fn flatten(outline: &[Seg]) -> Vec<(Point, u32)> {
                 }
             }
         }
+    }
+    if open && let Some(last) = outline.last() {
+        let index = u32::try_from(outline.len() - 1).unwrap_or(u32::MAX);
+        points.push((
+            match *last {
+                Seg::Line(_, b) | Seg::Cubic(_, _, _, b) => b,
+            },
+            index,
+        ));
     }
     points
 }
@@ -91,8 +100,9 @@ struct Flat {
 }
 
 /// Whether two flattened segments conflict; `lengths` holds each outline's segment count and
-/// arc length.
-fn conflict(one: &Flat, other: &Flat, lengths: &[(u32, f64)]) -> bool {
+/// arc length; between two `open` parts only a crossing counts (shared edges of a multicolour
+/// trace end on common junctions and may touch).
+fn conflict(one: &Flat, other: &Flat, lengths: &[(u32, f64)], open: bool) -> bool {
     let (a, b, c, d) = (one.a, one.b, other.a, other.b);
     let shared = a == c || a == d || b == c || b == d;
     let crossing = crosses(a, b, c, d);
@@ -111,24 +121,36 @@ fn conflict(one: &Flat, other: &Flat, lengths: &[(u32, f64)]) -> bool {
     }
     // Pixel borders touch where pixels meet at a corner, both turning there: a shared end
     // point. Any other touch may cross once mapped to millimetres.
-    crossing || (!shared && gap(a, b, c, d) < GAP)
+    crossing || (!open && !shared && gap(a, b, c, d) < GAP)
 }
 
 /// For every outline (closed, in pixels), the indices of its segments that conflict with
 /// another part of it or another outline, ascending.
 pub(crate) fn conflicts(outlines: &[Vec<Seg>]) -> Vec<Vec<usize>> {
+    find(outlines, false)
+}
+
+/// For every open part (the fitted spans of a multicolour trace's edges, in pixels), the
+/// indices of its segments that cross another part, or cross or touch itself.
+pub(crate) fn crossings(parts: &[Vec<Seg>]) -> Vec<Vec<usize>> {
+    find(parts, true)
+}
+
+/// [`conflicts`] of closed outlines, or [`crossings`] of `open` parts.
+fn find(outlines: &[Vec<Seg>], open: bool) -> Vec<Vec<usize>> {
     let mut flats = Vec::new();
     let mut lengths: Vec<(u32, f64)> = Vec::with_capacity(outlines.len());
     for (o, outline) in outlines.iter().enumerate() {
         // Repeated points (a zero-length piece) are left out, so neighbours stay neighbours.
-        let mut points = flatten(outline);
+        let mut points = flatten(outline, open);
         points.dedup_by(|b, a| a.0 == b.0);
-        while points.len() > 1 && points[0].0 == points[points.len() - 1].0 {
+        while !open && points.len() > 1 && points[0].0 == points[points.len() - 1].0 {
             points.pop();
         }
         let n = points.len();
         let mut at = 0.0;
-        for i in 0..n {
+        let pieces = if open { n.saturating_sub(1) } else { n };
+        for i in 0..pieces {
             let ((a, seg), (b, _)) = (points[i], points[(i + 1) % n]);
             flats.push(Flat {
                 outline: u32::try_from(o).unwrap_or(u32::MAX),
@@ -171,7 +193,7 @@ pub(crate) fn conflicts(outlines: &[Vec<Seg>]) -> Vec<Vec<usize>> {
         for a in i..j {
             for b in a + 1..j {
                 let (s, t) = (&flats[keys[a].2 as usize], &flats[keys[b].2 as usize]);
-                if conflict(s, t, &lengths) {
+                if conflict(s, t, &lengths, open) {
                     bad[s.outline as usize].push(s.seg as usize);
                     bad[t.outline as usize].push(t.seg as usize);
                 }

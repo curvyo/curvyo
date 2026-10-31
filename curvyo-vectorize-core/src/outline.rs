@@ -84,6 +84,20 @@ struct Span {
     tangents: (Option<Vec2>, Option<Vec2>),
 }
 
+impl Span {
+    /// A span that was not made (not wanted).
+    fn empty() -> Self {
+        Self {
+            raw: Vec::new(),
+            smoothed: Vec::new(),
+            tols: Vec::new(),
+            room: Vec::new(),
+            slots: Vec::new(),
+            tangents: (None, None),
+        }
+    }
+}
+
 /// The contour before simplification: the spans between corners, or one closed chain.
 #[derive(Debug, Clone)]
 pub(crate) struct Contour {
@@ -193,9 +207,48 @@ impl Chain {
         }
     }
 
+    /// A closed chain whose vertices at `pins` (indices, ascending) are fixed nodes: corners
+    /// placed exactly at their vertex, which end the spans beside them (the junctions of a
+    /// multicolour loop, `specs/0089` adrs.md §10); a structural corner within one scale unit
+    /// of a pin gives way to it.
+    pub(crate) fn pinned(
+        vertices: Vec<Point>,
+        pins: &[usize],
+        corner_cos: f64,
+        unit: usize,
+    ) -> Self {
+        let mut chain = Self::new(vertices, corner_cos, unit);
+        if pins.is_empty() {
+            return chain;
+        }
+        let n = chain.vertices.len();
+        let near = |k: usize, p: usize| {
+            let d = k.abs_diff(p);
+            d.min(n - d) <= unit
+        };
+        chain
+            .corners
+            .retain(|c| pins.iter().all(|&p| !near(c.vertex, p)));
+        chain.corners.extend(pins.iter().map(|&p| Corner {
+            vertex: p,
+            at: chain.vertices[p],
+            zone: 0.0,
+            ahead: None,
+            behind: None,
+        }));
+        chain.corners.sort_by_key(|c| c.vertex);
+        chain.start = 0;
+        chain
+    }
+
     #[allow(clippy::cast_precision_loss)] // 1 or 2
     fn scale(&self) -> f64 {
         self.unit as f64
+    }
+
+    /// Traced pixels per source pixel.
+    pub(crate) fn unit(&self) -> usize {
+        self.unit
     }
 
     /// The unit edges of the chain.
@@ -213,6 +266,12 @@ impl Chain {
     /// Whether the chain is its pixel border whatever the settings.
     pub(crate) fn is_tiny(&self) -> bool {
         self.vertices.len() <= TINY_EDGES
+    }
+
+    /// The vertex each span starts at (its corner's), in span order; empty for a corner-free
+    /// chain.
+    pub(crate) fn span_starts(&self) -> Vec<usize> {
+        self.corners.iter().map(|c| c.vertex).collect()
     }
 
     /// The spans the outline is fitted in: one per corner, one for a corner-free chain.
@@ -272,10 +331,24 @@ impl Chain {
         bound: Bound<'_>,
         at_vertex: &[bool],
     ) -> Contour {
-        self.contour_on(geometry, clearance, bound, at_vertex, false)
+        self.contour_on(geometry, clearance, bound, at_vertex, false, &[])
     }
 
-    /// [`Self::contour`], on the pixel corners when `on_corners`.
+    /// [`Self::contour`] with only the spans flagged in `wanted` smoothed (the others empty,
+    /// for [`Self::fitted_where`] with the same flags; a corner-free chain is always made).
+    pub(crate) fn contour_where(
+        &self,
+        geometry: &Geometry,
+        clearance: &[f64],
+        bound: Bound<'_>,
+        at_vertex: &[bool],
+        wanted: &[bool],
+    ) -> Contour {
+        self.contour_on(geometry, clearance, bound, at_vertex, false, wanted)
+    }
+
+    /// [`Self::contour`], on the pixel corners when `on_corners`, the spans not in `wanted` (when
+    /// given) left empty.
     fn contour_on(
         &self,
         geometry: &Geometry,
@@ -283,6 +356,7 @@ impl Chain {
         bound: Bound<'_>,
         at_vertex: &[bool],
         on_corners: bool,
+        wanted: &[bool],
     ) -> Contour {
         let room = Room {
             clearance,
@@ -305,6 +379,9 @@ impl Chain {
         let count = self.corners.len();
         let spans = (0..count)
             .map(|i| {
+                if !wanted.get(i).copied().unwrap_or(true) {
+                    return Span::empty();
+                }
                 let (mut from, mut to) = (self.corners[i], self.corners[(i + 1) % count]);
                 for (corner, k) in [(&mut from, i), (&mut to, (i + 1) % count)] {
                     if at_vertex.get(k).copied().unwrap_or(false) {
@@ -440,6 +517,19 @@ impl Chain {
         free: &Contour,
         clamped: &Contour,
     ) -> Vec<Vec<Seg>> {
+        self.fitted_where(geometry, levels, free, clamped, &[])
+    }
+
+    /// [`Self::fitted`] for the spans `wanted` names (empty: all); the others stay empty (the
+    /// spans a multicolour loop takes from its neighbours).
+    pub(crate) fn fitted_where(
+        &self,
+        geometry: &Geometry,
+        levels: &[u8],
+        free: &Contour,
+        clamped: &Contour,
+        wanted: &[bool],
+    ) -> Vec<Vec<Seg>> {
         if self.is_tiny() {
             return vec![self.pixel_border()];
         }
@@ -475,6 +565,9 @@ impl Chain {
             .enumerate()
             .map(|(i, (f, c))| {
                 let mut out = Vec::new();
+                if !wanted.get(i).copied().unwrap_or(true) {
+                    return out;
+                }
                 match level(i) {
                     0 => fit_span(f, &f.tols, &rules, chords, &mut out),
                     1 => fit_span(c, &c.tols, &rules, chords, &mut out),

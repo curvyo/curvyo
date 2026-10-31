@@ -17,9 +17,12 @@
 mod background;
 mod boundary;
 mod clearance;
+mod colour_map;
+mod colour_trace;
 mod contour;
 mod corner_place;
 mod corners;
+mod edges;
 mod filter;
 mod fit;
 mod guard;
@@ -27,13 +30,16 @@ mod guarded;
 mod line;
 mod method;
 mod outline;
+mod palette;
 mod params;
 mod picker;
 mod progress;
 mod raster;
 mod regions;
 mod schema;
+mod segment;
 mod select;
+mod shared_fit;
 mod smooth;
 mod trace;
 
@@ -47,6 +53,10 @@ extern crate self as curvyo_vectorize_core;
 mod test_common;
 
 pub use background::{sample_colour, suggest_background};
+pub use colour_trace::{
+    ColourLayer, ColourMask, ColourParams, ColourTrace, PaletteEntry, colour_mask, trace_colours,
+};
+pub use palette::{DEFAULT_COLOURS, MAX_COLOURS, MIN_COLOURS};
 pub use params::{
     Denoise, MAX_SWATCHES, PRESETS, PixelLength, Preset, Rgb8, Selection, Swatches, TraceParams,
     UPSCALE_AUTO_BELOW_PX, Upscale,

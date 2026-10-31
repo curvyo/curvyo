@@ -210,7 +210,7 @@ fn sample(inside: &Inside, scale: f64, w4: usize, h4: usize) -> Vec<bool> {
 }
 
 /// The samples of `paths` (1x pixels, scaled by `scale`) filled even-odd on the 4x grid.
-fn fill_even_odd(paths: &[BezPath], scale: f64, w4: usize, h4: usize) -> Vec<bool> {
+pub fn fill_even_odd(paths: &[BezPath], scale: f64, w4: usize, h4: usize) -> Vec<bool> {
     let mut edges: Vec<(Point, Point)> = Vec::new();
     for path in paths {
         let scaled = Affine::scale(scale * 4.0) * path.clone();

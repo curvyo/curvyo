@@ -24,7 +24,7 @@ impl Artefact {
     /// Applies the artefact to `picture` drawn at `scale` (texture sizes follow the scale).
     pub fn apply(self, picture: &mut Picture, scale: f64) {
         match self {
-            Self::Jpeg50 => jpeg50(picture),
+            Self::Jpeg50 => jpeg(picture, 50),
             Self::ScanNoise { amplitude, seed } => scan_noise(picture, amplitude, seed),
             Self::PaperTexture { seed } => paper_texture(picture, scale, seed),
             Self::Shadow => shade(picture, |x, y| {
@@ -149,6 +149,13 @@ const CHROMA_Q: [f64; 64] = [
     99., 99., 99., 99., 99., 99., 99.,
 ];
 
+/// `table` (the quality 50 table) scaled to JPEG `quality` (the IJG rule).
+fn scaled(table: &[f64; 64], quality: u32) -> [f64; 64] {
+    let q = quality.clamp(1, 100);
+    let s = if q < 50 { 5000 / q } else { 200 - 2 * q };
+    table.map(|v| ((v * f64::from(s) + 50.0) / 100.0).floor().max(1.0))
+}
+
 /// Quantises every 8 x 8 block of `plane` (`w` x `h`, edge pixels repeated) with `table`.
 fn quantise_plane(plane: &mut [f64], w: usize, h: usize, table: &[f64; 64]) {
     let basis: Vec<f64> = (0..64)
@@ -198,7 +205,9 @@ fn quantise_plane(plane: &mut [f64], w: usize, h: usize, table: &[f64; 64]) {
     }
 }
 
-fn jpeg50(picture: &mut Picture) {
+/// Baseline JPEG at `quality` (4:2:0 chroma, the standard tables scaled; the entropy coding is
+/// lossless and left out).
+pub fn jpeg(picture: &mut Picture, quality: u32) {
     let (w, h) = (picture.width as usize, picture.height as usize);
     let (cw, ch) = (w.div_ceil(2), h.div_ceil(2));
     let mut luma = vec![0.0; w * h];
@@ -219,9 +228,10 @@ fn jpeg50(picture: &mut Picture) {
             cr[cy * cw + cx] *= 4.0 / n as f64;
         }
     }
-    quantise_plane(&mut luma, w, h, &LUMA_Q);
-    quantise_plane(&mut cb, cw, ch, &CHROMA_Q);
-    quantise_plane(&mut cr, cw, ch, &CHROMA_Q);
+    let (luma_q, chroma_q) = (scaled(&LUMA_Q, quality), scaled(&CHROMA_Q, quality));
+    quantise_plane(&mut luma, w, h, &luma_q);
+    quantise_plane(&mut cb, cw, ch, &chroma_q);
+    quantise_plane(&mut cr, cw, ch, &chroma_q);
     for (i, px) in picture.rgba.as_chunks_mut::<4>().0.iter_mut().enumerate() {
         let c = ((i / w) / 2) * cw + (i % w) / 2;
         let (y, b, r) = (luma[i], cb[c] - 128.0, cr[c] - 128.0);

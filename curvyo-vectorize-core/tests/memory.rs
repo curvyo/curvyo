@@ -100,3 +100,54 @@ fn a_16_mpx_trace_stays_within_16_bytes_per_pixel() {
     assert!(peak > peak_before, "the trace set the peak");
     assert!(per_pixel <= 16.0, "{per_pixel} bytes per pixel");
 }
+
+/// `specs/0089` slice M (adrs.md §8): the peak memory of a multicolour trace of the slowest
+/// real photo (`customer-photo-fox-2` where the local images are present, else
+/// `photo-still-life`), in bytes per pixel besides the picture; reported, not asserted (the
+/// 16 B/px budget is single colour's, `docs/technical-debt.md`).
+#[test]
+#[ignore = "memory: run in release"]
+fn multicolour_peak_of_the_slowest_photo_is_reported() {
+    use std::ops::ControlFlow;
+
+    use curvyo_vectorize_core::{
+        ColourParams, DEFAULT_BACKGROUND_TOLERANCE, Selection, TraceParams, suggest_background,
+        trace_colours,
+    };
+
+    let image = common::quality::real::customer_images()
+        .into_iter()
+        .find(|i| i.id == "customer-photo-fox-2")
+        .or_else(|| {
+            common::quality::real::real_images()
+                .into_iter()
+                .find(|i| i.id == "photo-still-life")
+        })
+        .unwrap();
+    let picture = image.picture;
+    let params = ColourParams::new(TraceParams {
+        selection: Selection::RemoveBackground {
+            background: suggest_background(picture.raster()),
+            tolerance: DEFAULT_BACKGROUND_TOLERANCE,
+        },
+        ..TraceParams::with_threshold(128)
+    });
+    let before = ALLOCATOR.allocated();
+    let peak_before = ALLOCATOR.max_allocated();
+    let mut go = |_| ControlFlow::Continue(());
+    let result = trace_colours(picture.raster(), common::at_96_dpi(), &params, &mut go).unwrap();
+    let peak = ALLOCATOR.max_allocated();
+    let pixels = f64::from(picture.width) * f64::from(picture.height);
+    println!(
+        "{} {} x {}: {} colours, {} paths; picture {} MB, peak before {} MB, trace peak {:.2} B/px",
+        image.id,
+        picture.width,
+        picture.height,
+        result.palette.len(),
+        result.counts.paths,
+        before / 1_000_000,
+        peak_before / 1_000_000,
+        (peak - before) as f64 / pixels
+    );
+    assert!(peak > peak_before, "the trace set the peak");
+}
