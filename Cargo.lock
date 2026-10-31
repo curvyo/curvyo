@@ -3,6 +3,18 @@
 version = 4
 
 [[package]]
+name = "acs-solver"
+version = "0.1.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "555f6fed480fff490325368c3fa2380ba71e63c722914f29af2768c52fbc6743"
+dependencies = [
+ "nalgebra",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -65,6 +77,15 @@ name = "append-only-bytes"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac436601d6bdde674a0d7fb593e829ffe7b3387c351b356dd20e2d40f5bf3ee5"
+
+[[package]]
+name = "approx"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "arbitrary"
@@ -647,6 +668,8 @@ dependencies = [
 name = "curvyo-document-core"
 version = "0.1.0"
 dependencies = [
+ "curvyo-sketch-core",
+ "kurbo",
  "loro",
  "rustix",
  "serde",
@@ -666,12 +689,14 @@ dependencies = [
  "curvyo-document-core",
  "curvyo-image-core",
  "curvyo-render-core",
+ "curvyo-sketch-core",
  "curvyo-text-core",
  "curvyo-ui-core",
  "image",
  "kurbo",
  "loro",
  "rustix",
+ "serde",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -708,6 +733,17 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "lyon",
+]
+
+[[package]]
+name = "curvyo-sketch-core"
+version = "0.1.0"
+dependencies = [
+ "acs-solver",
+ "kurbo",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -760,6 +796,7 @@ dependencies = [
  "curvyo-document-core",
  "curvyo-geometry-core",
  "curvyo-image-core",
+ "curvyo-sketch-core",
  "curvyo-svg-core",
  "curvyo-text-core",
  "curvyo-vectorize-core",
@@ -2820,6 +2857,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "matrixmultiply"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f607c237553f086e7043417a51df26b2eb899d3caff94e6a67592ff992fedc7"
+dependencies = [
+ "autocfg",
+ "rawpointer",
+]
+
+[[package]]
 name = "md5"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2953,6 +3000,33 @@ dependencies = [
  "indexmap 2.14.2",
  "rustc-hash 1.1.0",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "nalgebra"
+version = "0.33.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d43ddcacf343185dfd6de2ee786d9e8b1c2301622afab66b6c73baf9882abfd"
+dependencies = [
+ "approx",
+ "matrixmultiply",
+ "nalgebra-macros",
+ "num-complex",
+ "num-rational",
+ "num-traits",
+ "simba",
+ "typenum",
+]
+
+[[package]]
+name = "nalgebra-macros"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "254a5372af8fc138e36684761d3c0cdb758a4410e938babcff1c860ce14ddbfc"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -3391,6 +3465,12 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "percent-encoding"
@@ -3852,6 +3932,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
+name = "rawpointer"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
+
+[[package]]
 name = "read-fonts"
 version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4052,6 +4138,15 @@ dependencies = [
  "quick-error 1.2.3",
  "tempfile",
  "wait-timeout",
+]
+
+[[package]]
+name = "safe_arch"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b02de82ddbe1b636e6170c21be622223aea188ef2e139be0a5b219ec215323"
+dependencies = [
+ "bytemuck",
 ]
 
 [[package]]
@@ -4364,6 +4459,19 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "simba"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c99284beb21666094ba2b75bbceda012e610f5479dfcc2d6e2426f53197ffd95"
+dependencies = [
+ "approx",
+ "num-complex",
+ "num-traits",
+ "paste",
+ "wide",
+]
 
 [[package]]
 name = "simd-adler32"
@@ -5877,6 +5985,16 @@ dependencies = [
  "raw-window-handle",
  "static_assertions",
  "web-sys",
+]
+
+[[package]]
+name = "wide"
+version = "0.7.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ce5da8ecb62bcd8ec8b7ea19f69a51275e91299be594ea5cc6ef7819e16cd03"
+dependencies = [
+ "bytemuck",
+ "safe_arch",
 ]
 
 [[package]]
