@@ -110,6 +110,8 @@ mod select_gesture;
 mod select_readout;
 mod select_view;
 mod shapes;
+mod sketch;
+pub use sketch::{SketchTool, Workbench};
 #[cfg(test)]
 mod single_line_tests;
 mod snapping;
@@ -305,6 +307,7 @@ pub enum Tool {
 /// One open document's whole editing session.
 pub struct Session {
     document: Document,
+    sketch: sketch::SketchState,
     /// The version of the document that the last Save, Save as, Open or New left (`project.rs`).
     saved: DocumentVersion,
     /// The version that went into the bytes of a save whose write has not been reported yet.
@@ -487,6 +490,7 @@ impl Session {
             poly_star: PolygonStarTool::new(),
             select: SelectTool::new(),
             selection: ObjectSelection::new(),
+            sketch: sketch::SketchState::default(),
             // Select is the launch default for New and Open alike
             // (acceptance criterion 13; `specs/0004-canvas-navigation-and-
             // selection/adrs.md`: "Select is the launch tool for New and
@@ -573,6 +577,7 @@ impl Session {
             poly_star: PolygonStarTool::new(),
             select: SelectTool::new(),
             selection: ObjectSelection::new(),
+            sketch: sketch::SketchState::default(),
             tool: Tool::Select,
             style: StyleEditor::default(),
             formats: Self::builtin_formats(),
@@ -740,6 +745,10 @@ impl Session {
             }
             this.pointer_position = Some(point);
             this.held.shift = shift;
+            if this.workbench() == Workbench::Sketch {
+                this.sketch_pointer_down(point);
+                return;
+            }
             this.page_view.press(&this.document.pages(), point);
 
             // Same flush as `set_tool`'s own doc comment explains: a canvas
@@ -831,6 +840,10 @@ impl Session {
         self.hovered_object = None;
         self.held.shift = shift;
         self.held.ctrl = constrain;
+        if self.workbench() == Workbench::Sketch {
+            self.sketch_pointer_hover(point);
+            return;
+        }
         if self.colour_pick_move(point) || self.trace_pick_move(point) {
             return;
         }
@@ -878,6 +891,10 @@ impl Session {
             self.end_snapping_drag();
         }
         self.pointer_position = None;
+        self.sketch.hover = None;
+        if !self.button_down {
+            self.sketch.preview = None;
+        }
         self.hovered = None;
     }
 
@@ -925,6 +942,10 @@ impl Session {
             this.pointer_position = Some(point);
             this.held.shift = shift;
             this.held.ctrl = constrain;
+            if this.workbench() == Workbench::Sketch {
+                this.sketch_pointer_up(point);
+                return;
+            }
             if this.page_drag_end(point) {
                 return;
             }
@@ -977,6 +998,11 @@ impl Session {
             let Some(point) = sanitized_point(point) else {
                 return DoubleClickHint::None;
             };
+            if this.workbench() == Workbench::Sketch {
+                // A dimension's text opens the entry box there (AC31, AC33).
+                this.sketch_edit_dimension_at(point);
+                return DoubleClickHint::None;
+            }
             // On the position handle of a text on path: its entry box (`0080`, customer
             // 2026-10-24).
             if matches!(this.tool, Tool::Select | Tool::Text) && this.open_text_path_entry_at(point)

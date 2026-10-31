@@ -104,6 +104,7 @@ fn one_rect() -> Session {
 fn left_edge_x(s: &Session) -> f64 {
     let d = reread(s);
     match d.object(d.object_ids()[0]).unwrap() {
+        curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -842,8 +843,34 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
         };
         let rows: serde_json::Value = serde_json::from_str(&s.history_rows_json(0, 5000)).unwrap();
         let rows = rows.as_array().unwrap();
+        // These fixtures use explicit step headers, whose default timestamp can also be zero.
+        // Keep the legacy coalescing oracle for every pre-existing fixture.
+        let name = path.file_name().unwrap().to_str().unwrap();
+        let explicit_steps = matches!(
+            name,
+            "sketch_plate_v28.curvyo"
+                | "sketch_dangling_v28.curvyo"
+                | "sketch_slot_v28.curvyo"
+                | "sketch_converted_v28.curvyo"
+                | "sketch_checkpoint_invalid_v28.curvyo"
+                | "sketch_record_invalid_v28.curvyo"
+                | "sketch_page_owner_v28.curvyo"
+                | "sketch_page_claim_invalid_v28.curvyo"
+                | "sketch_page_assignment_invalid_v28.curvyo"
+                | "sketch_dimension_label_v28.curvyo"
+                | "sketch_label_invalid_v28.curvyo"
+        );
+        if name == "sketch_dangling_v28.curvyo" {
+            let clones: Vec<_> = rows
+                .iter()
+                .filter(|r| r["label"] == "linked_clone")
+                .collect();
+            assert_eq!(clones.len(), 2, "two distinct linked-clone commands");
+            assert_ne!(clones[0]["step"], clones[1]["step"]);
+            assert_ne!(clones[0]["id"], clones[1]["id"]);
+        }
         for pair in rows.windows(2) {
-            if pair[0]["time"] == 0 && pair[1]["time"] == 0 {
+            if !explicit_steps && pair[0]["time"] == 0 && pair[1]["time"] == 0 {
                 assert_ne!(pair[0]["label"], pair[1]["label"], "{path:?}: {pair:?}");
             }
         }

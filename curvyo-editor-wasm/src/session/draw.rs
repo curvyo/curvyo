@@ -58,6 +58,9 @@ impl Session {
     #[must_use]
     #[allow(clippy::too_many_lines)] // Explicit layer ordering keeps overlays auditable.
     pub fn draw_list(&self) -> DrawList {
+        if self.workbench() == super::Workbench::Sketch {
+            return self.sketch_draw_list();
+        }
         let view = self.view();
         // The document is read once per frame and every step below works on
         // that read: reading the objects out of the document is by far the
@@ -276,7 +279,8 @@ impl Session {
                         .unwrap_or(original)
                         .clone(),
                 ),
-                ObjectSnapshot::Primitive(_)
+                ObjectSnapshot::Sketch(_)
+                | ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Clone(_)
                 | ObjectSnapshot::Text(_)
                 | ObjectSnapshot::Image(_) => object.clone(),

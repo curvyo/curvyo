@@ -195,6 +195,7 @@ impl Session {
     /// told) and new objects go into the entered group. Reads nothing from the document at the
     /// root, so a drawing tool pays nothing for groups.
     pub(super) fn sync_context(&mut self) {
+        self.sync_sketch();
         let live = self.context_group();
         if self.context.last().copied() != live {
             let chain = self.context_chain();

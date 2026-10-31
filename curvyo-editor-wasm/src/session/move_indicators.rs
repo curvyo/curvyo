@@ -42,6 +42,11 @@ impl Session {
             remove_badge: false,
             lock: None,
         };
+        // Sketch has no Vector move or marquee: Ctrl locks a drawing direction there, shown by
+        // the angle lock badge (`Session::sketch_angle_lock_badge`).
+        if self.workbench() == super::Workbench::Sketch {
+            return none;
+        }
         if self.tool == Tool::Node {
             // The lock badge of a segment bend (`0031` criterion 13).
             // The minus badge of a Ctrl node marquee (`0053` UX notes).
