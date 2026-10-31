@@ -139,6 +139,7 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
         // The oriented line box, so the box does not jump as letters with and without
         // descenders are typed (`specs/0074-text-objects`, UX notes §5).
         ObjectSnapshot::Text(text) => crate::text_box::line_box_oriented(text),
+        ObjectSnapshot::Sketch(sketch) => path_oriented_bounds(&sketch.resolved),
         ObjectSnapshot::Image(image) => crate::image_frame::frame_oriented(image),
     }
 }

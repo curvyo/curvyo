@@ -144,6 +144,7 @@ mod tests {
             .map(|&id| match snapshot(&document, id) {
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+                ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
                 ObjectSnapshot::Clone(clone) => map_clone(&clone, g, None),
                 other @ ObjectSnapshot::Primitive(_) => other,
@@ -194,6 +195,7 @@ mod tests {
             .map(|&id| match snapshot(&document, id) {
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
+                ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
                 ObjectSnapshot::Clone(clone) => map_clone(&clone, g, None),
                 other @ ObjectSnapshot::Primitive(_) => other,

@@ -433,6 +433,14 @@ pub fn triangle(center: Point, size_mm: f64, color: RgbaColor) -> DrawList {
     list
 }
 
+/// One filled triangle with the corners `a`, `b` and `c`.
+#[must_use]
+pub(crate) fn filled_triangle(a: Point, b: Point, c: Point, color: RgbaColor) -> DrawList {
+    let mut list = DrawList::default();
+    list.push_triangle(a, b, c, color);
+    list
+}
+
 /// A thin rectangle running from `a` to `b`, `width_mm` wide — a handle
 /// line. Empty when `a` and `b` coincide (nothing to draw, not a
 /// division by zero).
@@ -451,6 +459,36 @@ pub fn thick_line(a: Point, b: Point, width_mm: f64, color: RgbaColor) -> DrawLi
         a.translated(normal.negated()),
         color,
     );
+    list
+}
+
+/// A dashed line from `from` to `to`: dashes `on_mm` long with `off_mm` gaps, `width_mm` wide.
+/// Empty when the two ends coincide.
+#[must_use]
+pub(crate) fn dashed_line(
+    from: Point,
+    to: Point,
+    width_mm: f64,
+    (on_mm, off_mm): (f64, f64),
+    color: RgbaColor,
+) -> DrawList {
+    let mut list = DrawList::default();
+    let length = from.vector_to(to).length();
+    if !length.is_finite() || length <= 0.0 || on_mm + off_mm <= 0.0 {
+        return list;
+    }
+    let step = from.vector_to(to).scaled(1.0 / length);
+    let mut at = 0.0;
+    while at < length {
+        let end = (at + on_mm).min(length);
+        list.extend(thick_line(
+            from.translated(step.scaled(at)),
+            from.translated(step.scaled(end)),
+            width_mm,
+            color,
+        ));
+        at += on_mm + off_mm;
+    }
     list
 }
 

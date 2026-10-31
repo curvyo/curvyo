@@ -160,6 +160,7 @@ fn dragging_a_member_moves_the_whole_group() {
         assert!((moved.rotation.as_radians()).abs() < 1e-12);
     }
     let bounds = |id: NodeId| match rig.document.object(id).unwrap() {
+        ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),

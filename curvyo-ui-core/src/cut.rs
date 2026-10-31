@@ -98,6 +98,7 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
         }
         ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_) => None,
         ObjectSnapshot::Primitive(primitive) => {

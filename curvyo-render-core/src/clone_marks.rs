@@ -137,7 +137,7 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<curvyo_document_core::Anchor
         | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
             Some(path)
         }
-        ObjectSnapshot::Text(_) => object.drawn_path(),
+        ObjectSnapshot::Text(_) | ObjectSnapshot::Sketch(_) => object.drawn_path(),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Image(_) => None,
     };
     match (path, object) {

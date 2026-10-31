@@ -89,6 +89,9 @@ pub fn build_artwork_with_guides(
             }) => {
                 draw_path(&mut list, path, view, &mut budgets);
             }
+            ObjectSnapshot::Sketch(sketch) => {
+                draw_path(&mut list, &sketch.resolved, view, &mut budgets);
+            }
             ObjectSnapshot::Primitive(primitive) => {
                 draw_primitive(&mut list, primitive, view, &mut budgets);
             }
@@ -136,7 +139,7 @@ fn draw_guide(
         }
         // An image is never a guide (ADR 0019); it draws as itself.
         ObjectSnapshot::Image(image) => list.push_image(image),
-        ObjectSnapshot::Text(_) => {
+        ObjectSnapshot::Text(_) | ObjectSnapshot::Sketch(_) => {
             if let Some(path) = object.drawn_path() {
                 let outlines: Vec<OutlineRef<'_>> = path
                     .subpaths()

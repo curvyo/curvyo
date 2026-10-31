@@ -47,6 +47,7 @@ pub fn objects_summary(shapes: &[ObjectShape]) -> Option<String> {
     if shapes.iter().all(|shape| *shape == first) {
         let (one, many) = match first {
             ObjectShape::Path => ("path", "paths"),
+            ObjectShape::Sketch => ("sketch", "sketches"),
             ObjectShape::Rectangle => ("rectangle", "rectangles"),
             ObjectShape::Ellipse => ("ellipse", "ellipses"),
             ObjectShape::Polygon => ("polygon", "polygons"),

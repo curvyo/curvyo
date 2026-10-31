@@ -115,7 +115,9 @@ fn stroked_outlines(object: &ObjectSnapshot) -> (Vec<(Vec<OutlineTriple>, bool)>
                 (outlines, markers)
             })
         }
-        ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => (Vec::new(), false),
+        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
+            (Vec::new(), false)
+        }
     }
 }
 
@@ -222,7 +224,10 @@ pub fn plan_stroke_to_path(
     let leaves = candidates(objects, selected, skipped);
     let text_ids: Vec<NodeId> = leaves
         .iter()
-        .filter(|object| matches!(object, ObjectSnapshot::Text(_)) && draws_stroke(object.style()))
+        .filter(|object| {
+            matches!(object, ObjectSnapshot::Sketch(_) | ObjectSnapshot::Text(_))
+                && draws_stroke(object.style())
+        })
         .map(|object| object.id())
         .collect();
     let conversions = if text_ids.is_empty() {
