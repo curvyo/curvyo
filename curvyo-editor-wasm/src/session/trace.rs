@@ -9,11 +9,13 @@ use curvyo_document_core::{AssetHash, DrawingNode, ImageSnapshot, NodeId, Object
 use curvyo_image_core::WorkingImage;
 use curvyo_render_core::PreviewAnchor;
 use curvyo_ui_core::{
-    TraceStatus, TraceTarget, TraceWire, hit_test_objects, plan_trace, read_trace_wire,
+    TraceLayerWire, TracePaletteWire, TraceStatus, TraceTarget, TraceWire, hit_test_objects,
+    plan_trace, read_trace_wire,
 };
 
 use super::select::DoubleClickHint;
-use super::trace_draw::{TraceViewMode, filled_result, preview_anchors};
+use super::trace_colours::{PaletteView, filled_layers};
+use super::trace_draw::{TraceViewMode, preview_anchors};
 use super::trace_mesh::MeshCache;
 use super::{Session, Tool};
 
@@ -26,9 +28,14 @@ pub(super) struct TracePreview {
     pub(super) boxes: Vec<(Point, Point)>,
     /// A stopped job left it out of date: drawn at half strength.
     pub(super) stale: bool,
-    /// The result as Create paths would write it, black and filled, for the Trace view
-    /// (criterion 51); built once per result.
-    pub(super) fill: curvyo_document_core::PathSnapshot,
+    /// The result as Create paths would write it, filled (black, or one path per colour), for
+    /// the Trace view (criterion 51); built once per result and palette view.
+    pub(super) fills: Vec<curvyo_document_core::PathSnapshot>,
+    /// A multicolour result's layers and palette (`specs/0089` slice M); empty for one colour.
+    pub(super) layers: Vec<TraceLayerWire>,
+    pub(super) palette: Vec<TracePaletteWire>,
+    /// Colour regions joined to a neighbour.
+    pub(super) joined: usize,
     /// The tessellated hollow outline, kept across frames (criterion 56).
     pub(super) outline_mesh: MeshCache,
     /// The tessellated filled result of the Trace view, kept across frames (criterion 56).
@@ -54,6 +61,8 @@ pub(super) struct TraceState {
     pub(super) pick: super::trace_pick::TracePick,
     /// The mask of the Mask view (`trace_mask.rs`).
     pub(super) mask: super::trace_mask::TraceMaskState,
+    /// Recolours and Isolate of a multicolour preview (`trace_colours.rs`).
+    pub(super) palette_view: PaletteView,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).
@@ -113,6 +122,8 @@ pub enum TraceCreateOutcome {
         paths: usize,
         /// Anchors written.
         nodes: usize,
+        /// Colour paths written (multicolour, `specs/0089` slice M); 0 for black paths.
+        colours: usize,
     },
 }
 
@@ -198,13 +209,16 @@ impl Session {
             boxes.push((Point::new(b.x0, b.y0), Point::new(b.x1, b.y1)));
             outlines.push(preview_anchors(path));
         }
-        let fill = filled_result(image, &outlines);
+        let fills = filled_layers(image, &outlines, &read.layers, &self.trace.palette_view);
         self.trace.preview = Some(TracePreview {
             image,
             outlines,
             boxes,
             stale: false,
-            fill,
+            fills,
+            layers: read.layers,
+            palette: read.palette,
+            joined: read.joined,
             outline_mesh: MeshCache::default(),
             fill_mesh: MeshCache::default(),
         });
@@ -240,8 +254,9 @@ impl Session {
         self.trace = TraceState::default();
     }
 
-    /// Create paths (criteria 13, 14, 46): for every selected image with a full-size result, one
-    /// group "Trace of" and the image name with one black compound path directly above it, all in one step
+    /// Create paths (criteria 13, 14, 46; `specs/0089` criterion 29): for every selected image
+    /// with a full-size result, one group "Trace of" and the image name with one black compound
+    /// path (or one filled compound path per colour, recoloured) directly above it, all in one step
     /// "Trace image"; the groups are selected and the Select tool is chosen. The images stay.
     pub fn create_traced_paths(&mut self) -> TraceCreateOutcome {
         self.recording(|this| -> TraceCreateOutcome {
@@ -270,6 +285,7 @@ impl Session {
                     image: image.id,
                     name,
                     outlines: wire.outlines.clone(),
+                    colours: this.trace.palette_view.colours(&wire.layers),
                 });
             }
             let plan = plan_trace(&targets, &mut this.minter);
@@ -301,6 +317,7 @@ impl Session {
                 images,
                 paths: plan.paths,
                 nodes: plan.nodes,
+                colours: plan.colours,
             }
         })
     }
