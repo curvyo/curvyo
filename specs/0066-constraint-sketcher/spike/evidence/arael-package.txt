@@ -1,0 +1,8 @@
+arael-sketch-solver #constraint-solver #sketch #cad #2d #optimization
+2D constraint-based sketch solver: entities, constraints, and optimization
+version: 0.9.3
+license: MIT
+rust-version: unknown
+documentation: https://docs.rs/arael-sketch-solver/0.9.3
+repository: https://github.com/harakas/arael
+crates.io: https://crates.io/crates/arael-sketch-solver/0.9.3

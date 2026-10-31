@@ -1012,6 +1012,25 @@ selection, node editing and tool state have no accessible representation
 strategy (DOM overlays for handles and text, keyboard-only node editing)
 before the first canvas story, and UI review checks it.
 
+## Sketch solver transitively uses unmaintained paste
+
+[ADR 0025](adr/0025-sketch-core-and-solver.md) pins ACS 0.1.19 after native/WASM
+geometry, hard-constraint and pointer-performance validation for story 0066.
+Its dependency chain is `acs-solver 0.1.19 -> nalgebra 0.33.3 -> simba 0.9.1 ->
+paste 1.0.15`. [RustSec RUSTSEC-2024-0436](https://rustsec.org/advisories/RUSTSEC-2024-0436.html)
+classifies paste as informationally unmaintained and lists no patched version.
+The pinned nalgebra requires Simba 0.9, which unconditionally requires paste 1.0;
+newer Simba 0.10 cannot replace it within those version constraints. Disabling
+features does not remove this dependency.
+
+**Resolution:** acknowledge only this advisory ID in `deny.toml`, consistent with
+the existing informational-transitive policy below. Licence, source, wildcard
+and other advisory checks remain active. Revisit on ACS/nalgebra upgrades and
+remove the exception when their compatible dependency tree replaces paste.
+Changing the numerical backend requires repeating the independent constraints,
+native/WASM parity and performance evidence; a local fork is not introduced for
+this maintenance advisory. Any future vulnerability advisory is checked normally.
+
 ## Four transitive dependencies are unmaintained, with no safe upgrade
 
 `cargo deny`'s first real run (`project-file-foundation`, the first slice to
@@ -1443,6 +1462,8 @@ built-in list.
 - **`session/mod.rs` is over 500 lines** (537 non-test lines before the slice; 571 after `0020`; `session/keys.rs` has 506); split the glue calls out
   when the next slice touches it. *2026-10-19 (`0072`):* `session/mod.rs` is at 1391 lines in
   total after `0072` (it gained the Pen entry field and its press routing).
+  *2026-10-31 (`0066` revision 2):* `session/mod.rs` (1643 lines in total, +1) and
+  `session/keys.rs` (1141, +3) grew again for the Alt mode cycle and the Ctrl lock state.
 - **The Select bar overlaps the properties panel below about 600 px window width** (UX review of `0040`, found at 420 px; below the 800 x 600 minimum, so not fixed there).
 
 ## The click on a reference mark is decided in TypeScript (0047)
@@ -1796,3 +1817,12 @@ so one such run can hold some tens of MB.
 
 **Resolution:** open; drop faces the document does not use after a run, or bound the store, when
 memory use shows it.
+
+## Sketch constraint glyphs are redrawn FreeCAD icons (`0066` revision 2, 2026-10-31)
+
+The Constraints rail card and the canvas constraint symbols use single-colour redrawings of the
+FreeCAD Sketcher constraint icons (LGPL-2.1-or-later, `docs/third-party-assets.md`), kept in one
+file, `frontend/src/components/sketch/icons/constraintIcons.tsx`, as the UX notes ask.
+
+**Resolution:** open; replace with Curvyo's own icon set when the design system gets one, and
+drop the attribution entry then.
