@@ -1,5 +1,13 @@
 # Independent Session, runtime and full-gate acceptance
 
+Scope: **historical original implementation at `222e3df1`**, before the customer-requested
+UI/interaction revision. Current acceptance is in
+[acceptance-revision-report.md](acceptance-revision-report.md). The original host analyzer
+computed its warm maximum from rows 3 onward; the older wording below claiming every
+frame after the first was not enforced by that oracle. The revision explicitly checks
+all rows 1–19 and retains the first frame separately. Historical counts and UI/Alt/New
+behaviour below must not be presented as current revision acceptance.
+
 Status: **independent functional/runtime/performance acceptance and full CLAUDE §7 gate PASS**, 2026-10-30.
 Final workspace nextest9702/9702 passed (126 skipped); frontend641 passed/74 skipped,
 TypeScript and oxlint exit0 (57 warnings, not warning-free). Exact final stages below.

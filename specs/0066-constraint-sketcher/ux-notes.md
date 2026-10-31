@@ -1,6 +1,9 @@
 # Constraint sketcher — revised UX study
 
-Status: Production source/artifact UX review APPROVE; independent browser acceptance and full gate passed. Customer story acceptance remains pending.
+Status: Customer requested interaction/UI revision after trying PR #228. Earlier production
+source/artifact review and gate results remain historical checks, not customer acceptance.
+Customer now authorizes revision implementation; revised product acceptance remains pending.
+See [revision plan](revision-ux-plan.md), especially its finite mode/inference handoff.
 Authority: latest customer screenshot correction relayed by the lead. Sketch is its own
 workbench **inside the existing Curvyo UI**, not a new application frame. The customer
 accepted named parameters/formulas and the revised static demo, and requested implementation.
@@ -9,11 +12,135 @@ inside the Sketches Properties tab, never in an extra bottom area or the app sta
 The previous app header, breadcrumb/Finish controls and separate constraint bar are obsolete.
 Interaction details not explicitly requested below remain **(Proposal)**.
 
-Visual artifacts: [demo](demo/index.html), [parameter view](demo/sketcher.png),
-[conflict view](demo/sketcher-conflict.png). These are scripted UI studies, not a solver or
-application integration; screenshots may show an earlier revision until regenerated.
+## Current revision authority (supersedes older conflicting notes below)
+
+One Sketch object belongs to each page, with its initial local origin at the page centre.
+There is no New sketch button or sketch picker. Entering Sketch edits that page's sketch;
+human-readable object naming replaces generated suffixes. Sketch has no snapping: only
+axis inference (x = 0 / y = 0), structural endpoint connectivity and explicitly requested
+mode relations. Alt cycles active construction modes once per press without losing the
+pending chain; Select Alt retains its existing behavior. Tab enters/cycles numeric input.
+The exact mode cycle, eligibility, inference and numeric cancellation rules are recorded
+in the revision plan's handoff table for implementation.
+
+Standalone Arc has two proposed variants: Three points (Start → Through → End) and
+Centre, start, end (Centre → Start → End direction). See the revision plan's finite Arc
+table for radius applicability and cancellation. Mode switching preserves pending spatial
+picks and explicitly relabels their roles; it never moves them or committed geometry.
+Radius is editable only after Centre and before Start; otherwise it is derived. Invalid
+final picks retain the earlier picks for correction rather than silently resetting them.
+
+Use existing styled workbench menus, left geometry/constraint tool groups and the single
+top options bar. Sketches inspects existing constraints/status; named parameters/formulas
+have a separate fx tab. No new header, extra toolbar or bottom state/diagnostic surface.
+`demo/index.html` is the revised static study, with scripted line/arc continuation, radius,
+Tab, Alt and cancellation scenarios; its limitation and scenario controls appear only
+inside Properties. This study is not a solver, a complete tool implementation, or customer
+acceptance. Root owns browser capture and review; no browser/build check claimed here.
+
+Static revision follow-up: the lead subsequently delegated exclusive demo-browser review.
+Chromium check `target/0066-browser/ux-demo-check.cjs` passed the declared scripted chain,
+Alt/Tab/Shift+Tab, Escape/right-click, endpoint resume, radius, menu/focus, collapse and fx
+flows without page errors, plus 1000×650 overflow check. Screenshot review confirms the
+lean shell and separate parameter pane; Page 1 and Add parameter icon were polished.
+This supersedes only the no-demo-browser statement above. Production implementation,
+solver behavior and customer acceptance remain unverified by this static check.
+
+### Revised production frontend: initial source review
+
+Bounded source review found the intended styled workbench primitive, no New/picker UI,
+constraint-tool entry points in the left rail, one contextual options bar, lean existing-
+relationship inspector and separate parameter tab. This is not a browser/layout verdict.
+Reported fixes: collapsed workbench menu needs end alignment to remain inside the viewport;
+full Arc/Polyline variant names must fit so left/right modes remain distinguishable.
+The producer reports both addressed in source; runtime evidence remains pending.
+
+Further items sent to the producer: numeric failures need a mounted, visible associated
+error even when Properties is collapsed or another tab is active; mode switches must not
+silently reinterpret a Length draft as Radius; the proposed discoverable selected-endpoint
+Resume action is not yet present in the reviewed toolbar/inspector. Canvas Tab routing,
+numeric Tab/Shift+Tab and draft Escape paths exist in source. Numeric prefill is still
+being completed by the producer. No production edits, builds or browser runs were made
+for this review, and no revised production UX approval is claimed.
+
+Current visual artifacts: [demo](demo/index.html), [Sketch view](demo/sketcher.png),
+[Parameters view](demo/sketcher-parameters.png), [compact view](demo/sketcher-compact.png).
+These are scripted UI studies, not a solver or application integration. The older
+`sketcher-conflict.png` is a historical study, not the revised product layout.
 
 ## Existing shell, workbench-specific content
+
+### Revision review checkpoint (2026-10-30)
+
+**CHANGES REQUESTED for the reviewed parameter controls; live UI review pending.**
+This checkpoint reviews current source and the refreshed `revision-host.png` and
+`revision-dimension.png` production artifacts. It does not replace the historical
+source/artifact verdicts below with an interaction approval.
+
+1. `SketchParameters.tsx` uses native unit selects in both existing parameter rows
+   and the Add parameter form. This violates the design system's explicit
+   no-popups-in-Properties rule. Use the existing inline segmented-choice pattern
+   for Length (mm), Angle (rad) and Scalar, with one keyboard group and named
+   selected state; retain the same unit semantics and commit/cancel behavior.
+2. The Workbench and Arc triggers in the artifacts resemble bordered native fields.
+   Current source proves they are custom `TracePresetMenu` buttons; appearance is
+   not evidence of a stale build. Their open menus, surrounding surface, focus and
+   compact alignment still need direct comparison with Vector controls and the
+   accepted study. Component reuse alone is not visual acceptance.
+
+The saved artifacts preserve the existing rulers, workbench-specific left rail,
+one options bar, separate fx tab and Properties-only diagnosis, without New/picker
+or extra bottom chrome. Local `ui-ux-pro-max` search for keyboard focus, Escape and
+compact semantics reinforced visible focus and correct control state; the existing
+desktop design system takes precedence over generic web/mobile guidance. No browser,
+build, test or product-source operation was performed for this checkpoint.
+
+### Revision live-browser review (2026-10-30)
+
+**CHANGES REQUESTED: two bounded presentation fixes.** The exclusively owned browser
+review ran `target/0066-browser/ux-revision/check.cjs` against the fresh production
+preview at port 1421. Captures and `report.json` are in that script's directory.
+This is a UX check, not a repeat of solver or independent feature acceptance.
+
+1. Retain the parameter-unit finding above: the actual Add parameter form exposes
+   one native combobox. Replace both add/existing-row unit selects with inline
+   segmented choices, using the existing panel choice/focus pattern.
+2. Give the Workbench selector its chrome surface. Its surrounding unstyled flex
+   column currently exposes the white application background, making a flush white
+   field/strip above the grey panel. The accepted study uses a grey inset strip.
+   Wrap only this selector in `--toolbar-bg`, with the study's 4px vertical/7px
+   horizontal inset when expanded; keep compact horizontal padding zero and the
+   existing collapsed width. Preserve the custom menu behavior and menu tokens.
+
+The actual Workbench and Arc open menus use the expected grey chrome, selected mark,
+blue focus ring and readable full names. Arc menus visually match the existing
+`TracePresetMenu` primitive in Vector's Trace bar. Escape returns focus to the Arc
+trigger. Keyboard Enter/End/Enter selects Sketch. At 1000×650, the Arc menu and top
+bar fit; the collapsed Workbench menu bounds are x=768, width=232, ending exactly at
+the viewport edge. No document horizontal overflow or page errors occurred. The
+single options bar, existing left rail, right tab strip and fx tab remain intact.
+Only the supported current light theme was reviewed; no invented dark-theme pass.
+No production code or builds were changed. Browser closed and ownership released.
+
+### Revision presentation fixes: closure
+
+**APPROVE for the two bounded presentation corrections.** Passive re-review of
+current `SketchParameters.tsx`, `PropertiesPanel.tsx` and the refreshed
+`fixed-workbench.png`, `fixed-parameter-form.png`, `fixed-parameter-row.png` and
+`fixed-collapsed.png` closes both findings above. Add and existing parameter rows
+now use the established inline `ToggleGroup` for mm/rad/Scalar, with visible blue
+selected state. The Workbench selector now sits on the panel's grey chrome with
+the requested inset. At 1000×650 collapsed, S and its chevron are visible in the
+32px strip and the open menu stays within the viewport. Scoped compact padding
+avoids changing the existing menu primitive for other users.
+
+The producer reports keyboard unit creation/editing and menu/focus checks passed;
+this closure independently inspects source and refreshed rendered artifacts,
+without rerunning that producer interaction check. It complements this reviewer's
+earlier actual-browser keyboard/menu/compact review. No remaining concrete UX
+blocker was identified in the reviewed scope; independent feature acceptance,
+runtime parity/performance, the final gate and customer acceptance retain their
+own evidence requirements. No browser/build/product changes were performed here.
 
 ```text
 +--+---------------------------------------------------+-------------------+

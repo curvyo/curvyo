@@ -2,6 +2,15 @@
 
 2026-10-30. Customer authorized implementation after the view review; the bottom
 status/demo bar is removed. Status and diagnosis belong in Sketches Properties.
+The authorized interaction revision supersedes multiple-sketch creation: one
+owning Sketch object per page, centred initial local origin, direct workbench
+entry, separate fx parameters, no Sketch snapping, Alt drawing-mode cycling and
+Tab numeric entry. Detailed lifecycle/collision rules are proposals in ADR 0026.
+The latest customer direction gives each original a dedicated source page;
+composition elsewhere uses linked clones. Automatic dedicated-page creation when
+entering Sketch from a populated Vector page remains the pending question's
+recommended proposal, not an assumed answer. Independent original-copy APIs do
+not define the normal product composition flow.
 Earlier pending-scope statements in planning files need reconciliation by their
 owners with the accepted plan; they do not revoke the latest authorization.
 

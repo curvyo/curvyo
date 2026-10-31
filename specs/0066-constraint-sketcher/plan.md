@@ -326,3 +326,305 @@ Exact methodology, disjoint worst-frame timings, evidence paths and affected che
 - [x] Cache ruler static layers/dimensions; exact draw-order and60 browser pixel comparisons passed.
 - [x] Remove duplicate private input validation/contact decoding; core19+8 tests passed.
 - [x] Independent actual-frame confirmation: warm15.626ms, cold32.884ms. Earlier producer15.781/33.762ms and failing traces remain historical evidence in host-performance.md.
+
+## Customer-requested interaction revision (2026-10-30)
+
+Status: implementation authorized by the customer; production start awaits the lead's
+explicit slot handoff and updated architecture/UX notes. This checklist supersedes the
+old multiple-sketch/New/picker, Sketch snapping and right-pane action-grid workflow.
+Earlier green checks describe the previous revision, not acceptance of this interaction.
+Source orientation used bounded known files after the lead reported Atlas refresh_required466.
+No source changes, builds, tests or browser runs were performed during this preparation.
+
+### Accepted boundaries
+
+One owning Sketch object per page; page-centred initial local origin; no New/picker.
+Sketch never calls the Vector snapping engine: only visible, committed axis inference,
+explicit endpoint identity reuse and explicitly requested mode relations apply.
+Tab enters/cycles numeric input (A); Alt cycles applicable drawing modes once per press;
+selection Alt and native text/AltGr behavior remain separate. Keep the existing shell,
+left rail and single options bar; constraints are tools, fx owns parameter editing.
+The prior source-scaling question is not silently answered by this revision.
+
+### Ordered implementation tasks
+
+1. [ ] **Ownership and first commit (AC1/8–12/19) — document/core tests first.** Implement the approved
+   page-owner contract in `curvyo-document-core/src/sketch_commands.rs`, snapshot/codec and
+   page/history/copy/clone boundaries identified by the architecture update. Entering or
+   cancelling an empty page sketch must not write history; first valid geometry creates
+   its owner and graph atomically. Test differently sized/offset pages, page switching,
+   first-step undo/redo, delete/recreate, conversion, copy/paste, clones and concurrent
+   creation according to the approved deterministic policy. Preserve malformed-record,
+   checkpoint provenance and per-record peer-edit guards. Update current-format goldens
+   only as specified by the architecture; do not invent migration obligations.
+2. [ ] **Session lifecycle and cancellation (AC19/20) — actual event-path tests first.** Refactor
+   `session/sketch/{state,lifecycle,commands,creation,keys}.rs` and `session/pages.rs` around
+   the active page and transient empty sketch. Centralize unfinished-step cancellation;
+   cover press, drag, every multipick phase, preview, numeric draft, tool/page/workbench
+   switch, undo and Escape twice. Add explicit secondary-button routing in the thin
+   WASM/host boundary: right press/release/contextmenu cancels once, never creates a point;
+   idle context menus and Vector actions retain their behavior.
+3. [ ] **Axis inference replaces snapping (AC21) — independent core/session assertions.** Remove
+   Sketch dependencies on `session/sketch/snapping.rs` and shared snapping state/markers;
+   retain Vector snapping unchanged. Implement the documented screen-space axis tolerance,
+   preview marks and solver-valid explicit coordinate relations at commit. Test X/Y/both,
+   zoom, displaced page origin, constraint inspection/removal and rejection without writes.
+   Global snapping enabled/kind/axis settings must have no Sketch effect. Mode-requested
+   tangent/perpendicular relations and endpoint connectivity remain distinct from inference.
+4. [ ] **Continuous mixed polyline and endpoint resume (AC1/2/20/21).** Extend concrete construction
+   APIs and session chain state for the finalized line/arc mode table. Keep stable shared
+   endpoints, previous analytic direction and one operation prefix across each preview.
+   Test line→tangent arc→line, perpendicular modes, explicit angle, both arc directions,
+   closure, selected-endpoint continuation, ambiguous junction refusal and mode changes
+   mid-preview. Alt repeat/AltGr must not commit or multiply cycles. Each confirmed segment
+   is one history step; cancel keeps previous segments and no unfinished geometry.
+5. [ ] **Selection and relation tools (AC2–7/17/22/23).** Extend `curvyo-ui-core/src/sketch.rs` and session
+   selection with nearest eligible hits, overlap cycling, preselection and existing
+   containment/crossing marquee modifiers. Keep helpers nonselectable and current-ID
+   filtering for stale fallback geometry. Relation tools collect/validate references without
+   dragging them; preselection remains visible when incompatible. Context dimension derives
+   line length, point distance, line angle or explicit circle radius/diameter in Rust;
+   annotation placement/value confirmation creates one relation. References remain measured
+   read-only; repeated Edit focus and conflict repair stay covered.
+6. [ ] **Numeric entry and thin host wiring (AC3/16/18/20/23).** Extend `session/sketch/{numeric,input,view}.rs`
+   and `wasm_sketch.rs` with concrete current-step entry data/actions; Rust owns units,
+   formulas, dimensions, eligibility and geometry. Tab selects the current relevant value,
+   follows visible field order, and Enter commits one valid step then resumes construction.
+   Test invalid drafts, native undo, Escape-to-canvas versus next Escape cancellation,
+   right-click draft cancellation and key-only mode changes without pointer movement.
+7. [ ] **Existing-shell UI revision (AC13–18/19–23).** Update `useSketch`, `useEditorSession`, `Canvas`,
+   Sketch components, `PropertiesPanel` and `PanelStrip` using the finalized UX notes.
+   Replace native workbench selector with existing styled primitives, preserve compact
+   collapsed mode, remove New/picker/internal-ID labels, move creation actions to the left
+   grouped rail/top bar, retain lean relationship/status inspection and add the fx tab.
+   Keep one options owner, independent annotation/cursor subscriptions and stable focus;
+   no extra toolbar, header or diagnostic footer. Test accessible keyboard equivalents.
+8. [ ] **Review and final verification (AC1–23).** Run only affected core/document/UI/session tests,
+   format, Clippy, current WASM build, frontend type/tests/lint and actual revised browser
+   journeys during implementation. Preserve known-answer solver/outline/clone/parity and
+   full updated-frame CPU oracles. Hand off to independent tester/UX/architect; run the
+   repository gate once at final integration, not after every milestone. Update obsolete
+   acceptance expectations through the tester, never weaken them in production work.
+
+### Dependencies to resolve in the incoming architecture/UX notes
+
+- ADR0026 now defines the page-owner root register, original page-ID provenance, lazy
+  atomic graph/object/claim, conditional claim cleanup, nonowning clones, occupied-page
+  copy refusal and retained diagnosed concurrent losers. Apply that contract to persistence;
+  current `create_sketch` has no page owner. Keep format28 and extend current goldens.
+- Axis inference needs a supported point-to-local-axis relation: existing Horizontal/Vertical
+  relations target a line. Choose the explicit domain representation in architecture,
+  not hidden host coordinate edits or arbitrary helper geometry.
+- Final mode table defines tangent/perpendicular arc construction and reference-pick stages;
+  current chain state stores only first/last point IDs and has no preceding-curve identity.
+- Current host forwards secondary presses through the generic pointer API, and Sketch keys
+  have no Tab entry action. These are concrete cross-boundary changes, not styling alone.
+
+No new dependency or framework is planned. These are internal milestones of the same
+end-to-end story/PR; all accepted geometry, formula, persistence and repair behavior remains.
+
+### Revision ownership milestone (2026-10-30)
+
+- Implemented `Document::{page_sketch, sketch_page, create_page_sketch,
+  sketch_ownership_conflict}` and explicit `duplicate_objects_to_page` lower-level copy API.
+  Normal Workbench routing is deliberately still pending; raw `create_sketch` remains for
+  lower-level unowned fixtures. Customer's dedicated-source-page/linked-clone composition
+  steering means the new independent copy API is not a promised composition UI action.
+- Original graph provenance and the page claim are separate atomic registers. First geometry
+  and claim share one history step at the global page centre. Concurrent losers remain
+  readable/diagnosed but refuse graph edits. Delete/conversion clear only their own claim.
+- Copies remap entity, constraint, parameter, expression and checkpoint identities; linked
+  clones never claim a page. Copy preflight refuses occupied/missing destinations before writes.
+- Present malformed claims/provenance fail import; dangling valid references remain repairable.
+  Added current-v28 owner, malformed-claim and malformed-assignment goldens. No version bump.
+- Object-only conversion undo initially failed (shape restored without claim). It now carries
+  only historical page-claim registers naming that original through existing fieldwise restore;
+  unrelated root registers and peer-winning claims remain protected.
+- Passed `cargo test -p curvyo-document-core --test sketch_pages` (6 tests),
+  `cargo test -p curvyo-sketch-core --test remap` (1 test), and current owned-page golden test
+  (1 test, three files, rerun without fixture-write mode). Core/document all-test Clippy and
+  downstream `cargo check -p curvyo-editor-wasm` passed. Evidence: `target/0066-runtime/revision-*`.
+- Pending: independent ownership acceptance; actual Session lazy entry/cancel and paste routing;
+  axis relation/inference, mixed modes, selection/numeric entry and the revised host surface.
+  The entry policy for a page already containing Vector artwork awaits the customer's answer.
+
+### Revision Session/axis checkpoint (2026-10-30)
+
+- Lazy Session context now holds an empty graph and page-centred placement without a stored
+  object. `sketch_construct` creates its original/claim only with completed geometry, in one
+  undo step. Page activation cancels pending picks and chooses that page's elected original.
+  Clone re-entry activates its original's source page using existing reveal behavior.
+- **Proposal A:** entering Sketch on a populated Vector page creates/activates a dedicated
+  page without moving or converting content. Existing source-page navigation writes nothing.
+  The lower-level `new_sketch` remains temporarily for old callers/tests until the revised
+  host removes its action; it now uses page ownership and cannot create a second owner.
+- `Relation::OnAxis { point, axis }` uses immutable local X/y=0 and Y/x=0 equations, original
+  IDs, strict Point references, ordinary hard residual validation and no reference mode.
+  It participates in graph reference traversal, copy remapping and diagnostic labels.
+- Sketch creation and drag no longer invoke Vector snapping or extend its target index.
+  **Proposal:** axis inference uses a six-screen-pixel band. Only picked newly created points
+  receive explicit axis records, never unrelated hidden helper points. Augmented preview
+  candidates are independently validated before display; commit remains independently guarded.
+- Empty-page preview draws transient subpaths and point glyphs without a fake stored object;
+  fixed local axes remain visible and inferred axes receive distinct emphasis.
+- `Session::sketch_secondary_press` cancels unfinished state without history. Thin WASM and
+  host secondary press/release routing were added; host generated bindings/browser validation
+  are pending. Escape after cancellation returns to Sketch Select.
+- Passed `cargo test -p curvyo-editor-wasm --lib page_tests` (7), core axis tests (2), full
+  affected sketch-core tests (58 before the second axis case was added; both axis cases then
+  rerun), affected Rust library Clippy and formatting. Logs: `target/0066-runtime/revision-*`.
+- This is not complete revision acceptance: independent Session/axis checks come next;
+  continuous mixed modes, Alt cycling, improved selection/context dimension, Tab entry,
+  actual host replacement of New/picker and fx panel are still pending. Existing tests that
+  explicitly require creation Alt snapping or the old global-origin/New UI need tester-owned
+  expectation updates against the revised criteria, not assertion removal.
+
+### Lazy typed edits follow-up
+
+- Independent R02 exposed numeric construction still requiring a stored snapshot. Numeric
+  parsing now reads the virtual/current intent graph, then uses the same validated atomic
+  materialization as pointer construction. Parameter-first and origin-release edits use this
+  path too. Invalid parameter drafts and unchanged fixed-origin edits remain history-free.
+- Added `SketchDelta::apply_to` for explicit record edits to caller-owned virtual intent;
+  complete graph validation still happens before `create_page_sketch` writes anything.
+- Own page/lazy tests: 9/9 passed (`revision-lazy-edits-final.log`). Independent 4/5 currently:
+  R02 now passes numeric Point/Circle/radius/undo checks and reaches a formerly unexecuted
+  placement oracle incorrectly requiring standalone Point in resolved path anchors. Lead
+  confirmed existing Point edit-glyph/output semantics remain; tester owns correction to
+  transformed analytic Point assertion. No independent assertion edited by implementation.
+- Latest follow-up has not yet rerun Clippy; short independent tester slot follows.
+
+### Mixed-mode / revised host milestone (independent verification next)
+
+- [x] AC13/20: all six continuation modes, shared endpoint closure and reverse endpoint
+  continuation; explicit original-ID `PerpendicularAt` relations for curved endpoints.
+  Standalone Three-points Arc resumes Line/Arc endpoints. Centre/start/end Arc preserves
+  pinned picks, projects final direction and accepts radius only before Start is fixed.
+- [x] AC21: axis inference avoids conservatively proven implied line-axis relations; free
+  aligned seed coordinates do not imply constraints. Existing user relations remain intact.
+- [x] AC22: nearest geometry/overlap cycling, containment/crossing marquee, placed geometry
+  query and Alt stroke selection with Shift add/Ctrl remove; selection never writes geometry.
+- [x] AC23: dimension label position is finite local metadata keyed by ConstraintId, outside
+  the solver fingerprint. Dimension plus position commits once; invalid placement is rejected
+  before any write. Copy/delete/convert and current-ID filtering preserve metadata semantics.
+- [x] Revised host source: no New/picker; styled workbench selector including collapsed
+  alignment, separate fx tab, constraint/dimension tools, mode menus, selected-endpoint Resume,
+  on-demand Rust numeric values, Tab/Escape/right-click draft lifecycle and associated errors.
+  Numeric drafts reset on selected-entity changes without pointer-rate root presentation updates.
+- [x] Own focused evidence: `cargo test -p curvyo-sketch-core` 67/67;
+  `cargo test -p curvyo-editor-wasm --lib session::sketch` 42/42;
+  UI selection 3/3; document label 1/1; regenerated strict sketch golden cases 4/4.
+  Four affected crates `cargo clippy ... --lib --tests -- -D warnings` passed.
+  Logs: `target/0066-runtime/revision-{core-final,session-regression,final-clippy}.log`.
+- Independent earlier milestones remain document 9/9 and revised Session 8/8. New mode,
+  metadata and selection implementation has not yet received independent acceptance.
+- New label goldens: `sketch_dimension_label_v28.curvyo` (valid),
+  `sketch_label_invalid_v28.curvyo` (invalid); tester owns strict inventory classification.
+- [x] Circle dimension preference is ephemeral Rust state: Radius/Diameter changes the
+  pending annotation, typed value and committed action consistently without document writes.
+- [x] Independent native analytic mode corpus, label metadata and selection tests:
+  core 4/4, document 11/11 and Session 11/11; exact evidence is in
+  `acceptance-revision-report.md`.
+- [ ] Complete independent revised browser journeys and UX review, including numeric
+  focus, menu/Alt/Escape, source-page composition and actual rendered controls.
+- [ ] Fresh native/WASM parity and actual moving 100-entity complete-frame CPU evidence,
+  independent UX/architecture review and final gate. No baseline result substitutes for these.
+
+- Final bounded host checks before tester handoff: `npm run build:wasm`,
+  `npx tsc -b --noEmit`, `npm test` (109 test files passed, Node 26.12 summary),
+  `npx oxlint` (exit 0, existing warning output), `cargo fmt --all --check`,
+  `cargo clippy --target wasm32-unknown-unknown -p curvyo-editor-wasm -- -D warnings`
+  all completed successfully. A misplaced bridge documentation comment discovered during
+  WASM build was corrected; subsequent strict WASM Clippy passed.
+  An isolated intentional `assert.fail` Node test exited 1, confirming assertion failures
+  propagate despite the file-level summary (`target/0066-runtime/probes/assertion-failure.log`).
+  Current logs: `revision-{wasm-final,tsc-final,oxlint-final,frontend-final-tests,wasm-clippy}.log`.
+  No actual browser, final performance or full gate was run in this bounded milestone.
+
+### Revised production-host verification
+
+- Independent revised mode/document/Session corpus passed 4/11/11 cases plus both strict
+  fixture sweeps; exact oracles and criteria are in `acceptance-revision-report.md`.
+- Reference preference is scoped to dimensional commands and inputs. Subsequent ordinary
+  drawing stays editable, and geometric constraints never receive a reference-only flag.
+- Actual browser test `frontend/tests/browser/sketch-revision-host.cjs` verifies Radius preview,
+  Reference commit, Reference→Fixed, Reference→Point, Tab/Escape, Arc Alt/right cancellation,
+  two empty-page draft scopes and parameter-first fx editing. The empty-page assertion first
+  failed (`123 mm` survived Add page); page commands now publish the complete editor view,
+  not only Document-panel state. The unchanged assertion then passed.
+- Screenshot inspection exposed an offscreen source-page origin despite a thin visible frame
+  strip. Sketch page changes now reveal an offscreen frame centre; Vector activation rules
+  and same-page workbench camera remain unchanged. Focused test first failed at screen
+  x=1302.803 for a 1100px canvas; current tests also preserve intentional same-page pan.
+- Current affected Rust evidence: Session 44/44, existing pages 7/7, strict native editor
+  lib/tests Clippy pass. Fresh WASM/TS/Vite builds and frontend 109-file tests passed before
+  the final source-reveal change; final regenerated host artifact follows below.
+- Browser execution is initial implementation evidence, not independent final acceptance.
+  Performance, current native/WASM parity, remaining independent host matrix and final gate
+  remain required. No tolerance, iteration budget or acceptance criterion was relaxed.
+- Final production artifact regenerated after the reveal fix: `npm run build:wasm`,
+  `npx tsc -b --noEmit`, `npx vite build`, strict editor WASM Clippy and formatting passed.
+  Complete host regression passed again against that build. Viewed screenshots:
+  `target/0066-browser/revision-dimension.png` (actual radius-reference and Fixed rows),
+  `target/0066-browser/revision-host.png` (parameter-first new source page, visible centred
+  local origin). Production preview localhost:1421; browser runtime under target/browser-check.
+  Logs: `revision-reveal-{wasm,tsc,vite,wasm-clippy}.log`,
+  `revision-source-reveal-{red,green}.log` and `target/0066-browser/revision-host.log`.
+
+### Bounded UX consistency correction
+
+- Parameter units now reuse the existing keyboard-operable ToggleGroup (mm/rad/Scalar)
+  for drafts and persisted rows; the same Rust commands and validation remain authoritative.
+- Workbench selector wrapper uses toolbar chrome with expanded4px vertical/7px horizontal
+  inset. Collapsed wrapper remains32px with no inset; narrowed button padding preserves
+  the V/S initial beside its chevron. Existing gray menu/focus behavior is unchanged.
+- `npx tsc -b --noEmit`, `npm test` (109 files), `npx oxlint` (exit0), and fresh Vite build
+  passed. No Rust changes required WASM regeneration. Logs: target/0066-runtime/revision-ux-*.
+- Actual browser PASS: keyboard draft unit selection, persisted Scalar2→Length2mm edit,
+  absence of native select, expanded/collapsed menu bounds and Escape focus return.
+  Radix arrow selection is scheduled: the probe holds key-down through the observable
+  selection update before key-up; an instantaneous synthetic press raced that update.
+  Generic ToggleGroup behavior was not changed to accommodate the probe.
+- Viewed refreshed artifacts under target/0066-browser/ux-revision/fixed-*.png;
+  producer-check.cjs and producer-check.log record the exact local browser checks.
+  Final production preview remains localhost1421. No parity/performance/full gate run here.
+
+### Actual body-drag performance correction — 2026-10-31
+
+- [x] Diagnose retained strict host RED: actual final-segment body has two coherent point goals;
+  single-point native measurements did not exercise that path. Preserve picking/workload.
+- [x] Add bounded exact contiguous-suffix certificate with complete hard validation, every raw
+  goal checked, deterministic whole-pose branch choice, and unchanged ACS fallback.
+- [x] Tests first: body certificate RED then 80 core tests PASS; strict core all-target Clippy PASS.
+  Mirrored/reversal analytic witnesses, malformed goals and unsupported topology are covered.
+- [x] Architecture source review APPROVE including all-goal finite preflight.
+- [x] Fresh browser bindings, TypeScript and production Vite build; unchanged complete-frame
+  trace cold11.502ms / all19post-first max7.192ms (`target/0066-browser/revision-suffix`).
+- [ ] Independent fresh native/WASM parity, strict host replay and final gate (tester ownership).
+
+### Standalone Arc host first-pick repair — 2026-10-31
+
+- [x] Reproduce unchanged independent `sketch-revision-final-host.cjs` standalone RED.
+  The click target was the canvas, not an annotation. A diagnostic-only 700ms pause made
+  both endpoint cases pass, identifying stale double-click history across tool changes.
+- [x] Reset host press history only when tool/workbench/page/active Sketch/mode values change.
+  Pointer-rate view identity and selection do not reset normal same-context double clicks.
+- [x] Fresh TypeScript/Vite build; unchanged no-delay standalone phase PASS for Line and Arc
+  endpoints, shared IDs, centres and radii (`target/0066-runtime/arc-route-fixed.log`).
+- [x] Real dimension annotation double-click plus repeated Edit focus PASS
+  (`target/0066-runtime/arc-dimension-smoke.log`); frontend 109 test files PASS; oxlint exit0
+  with existing warnings outside the changed hook. No Rust/WASM change in this repair.
+- [ ] Independent tester replay and final gate.
+
+### Final revised full gate — 2026-10-31
+
+- [x] Full CLAUDE §7 gate on the local checkout (tester VM unavailable), all stages run with
+  `--no-fail-fast`: fmt, workspace Clippy, Nextest 9789/9790 with 130 skipped, ten WASM builds
+  and WASM Clippy, cargo deny, rustdoc, frontend WASM/TypeScript/641 tests/oxlint passed.
+  The single failure was `acceptance_0050_tester::the_strip_has_layers_fourth_and_never_dimmed`,
+  whose tab list predated the accepted fx `parameters` tab (AC7); the list was extended like
+  the 0043/0051 lists, nothing else changed. ui-core 2027/2027 then passed.
+  Logs: `target/0066-revision-gate/run2/`.
+- [x] Rebased onto main 54c74ccf (test/CI-only commits); workspace Clippy, editor-wasm/ui-core/app
+  Nextest 6020/6020, TypeScript and frontend 641 tests passed again.
+- [ ] Customer acceptance of the story PR.

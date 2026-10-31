@@ -175,6 +175,9 @@ solver tests passing; architect inspected source only, without rerunning tests.
 
 ## Frontend handoff Rust API review
 
+This section records the earlier handoff; the customer-authorized interaction
+revision has a separate source verdict below.
+
 Source-only review of `inspection.rs`, `inspect_links.rs`, `numeric.rs`,
 `construction_preview.rs`, `lifecycle.rs` and `wasm_sketch.rs`: inspection uses
 current authoritative IDs and a finite iterative parameter dependency closure,
@@ -195,3 +198,108 @@ No remaining blocker was identified in this bounded Rust API review.
 
 Architect ran no build, test or browser. The frontend handoff's reported checks
 remain attributed to the producer; full story acceptance remains separate.
+
+## Customer interaction revision: bounded architecture verdict
+
+**APPROVE the reviewed Rust/domain/document API subset.** Page ownership uses
+explicit live claims and provenance, with read-only conflict diagnosis and
+matching-owner deletion guards. Object-only history retains only relevant claim
+keys while preserving fieldwise peer guards. Independent copy remaps graph and
+presentation identities; linked clones remain derived artwork, not new owners.
+Raw document creation remains infrastructure; normal Session creation is page-aware.
+
+`OnAxis` binds to fixed local frame coordinates, not the movable origin entity.
+`PerpendicularAt` validates actual shared endpoints and maps to exact equations
+over existing point variables; normalized residuals remain independently checked.
+Continuation stores the relation in intent before solving. Centre-defined and
+shared-endpoint arcs retain canonical analytic records. Axis implication uses
+explicit fixed coordinates/relations rather than treating free seed alignment as
+authority; augmented inferred candidates now pass independent validation.
+
+Empty previews remain Session/render data without fabricated document objects.
+Dimension label metadata is separate from solver intent/checkpoint fingerprints;
+read-cache reuse refreshes positions, current graph IDs filter orphan metadata,
+copy remaps keys and deletion/conversion clean up records. The previously flagged
+finite-position gap is closed: local-coordinate conversion rejects nonfinite
+values and dimension commit checks the saved position before its writing batch.
+This matters because batching groups history but does not roll back failed writes.
+
+The reviewed core dependency boundary is unchanged; no new dependency is required
+by this revision. Existing long typed-dispatch/lifecycle functions need their PR
+justifications, not a late behavior refactor. Architect performed source inspection
+only. Lead reports independent core/document/Session checks and fixture sweeps;
+producer reports 67 core and 43 Session tests plus affected native/WASM Clippy.
+These reports were not rerun here. This approval does not establish final browser
+journeys, revised host performance/parity, full gate or customer acceptance.
+
+## Proposed feasible-chain certificate
+
+**Source design APPROVE for a bounded experiment, not implementation acceptance.**
+For the existing certified simple positive-hard-distance chain and a single free
+endpoint goal, split its previous feasible pose at a deterministic interior joint.
+Intersect circles whose radii are the two current subchain chords; proper rigid
+rotations of the subchains can reach the unchanged raw endpoint goal while
+preserving their internal distances. A fully validated candidate reaching that
+goal within the existing explicit residual tolerance attains the positional
+objective's zero lower bound numerically. Do not claim symbolic exact arithmetic.
+
+Compare both valid intersections using whole-chain displacement from the previous
+seed and deterministic ties. Degenerate chords/intersections, unsupported goals
+or any failed full original-intent validation fall through to unchanged ACS;
+failure of this restricted construction is not proof of infeasibility. Preserve
+disconnected geometry, fixed intent, checkpoint seeds and the existing unreachable
+reach certificate. No entity-count branch, clipped goal, new unknown, relaxed
+tolerance or reduced solver budget is authorized. Repeated branch/reversal,
+degeneracy, additional-constraint and fallback tests plus native/WASM parity and
+the unchanged actual-host budget still need implementation evidence.
+
+### Feasible-chain source follow-up
+
+**APPROVE the implemented certificate subset.** `drag_reach::candidate` dispatches
+only the existing single-goal/simple-chain case; `drag_chords::candidate` uses a
+deterministic interior split and both proper-rotation intersections. It compares
+whole-pose displacement with stable branch ordering. Scale-aware conditioning
+checks reject zero chords, coincident centres and near-tangent intersections;
+unsupported cases return to the unchanged ACS path. No clipped target or new
+unknown is introduced. Each result must have finite displacement, endpoint error
+at most 1e-6 mm and pass complete `validate_candidate`; the outer original-intent
+guard in `solve_seeded` remains. Nonpath records and contact seeds stay unchanged.
+The previous unreachable reach-bound certificate remains intact.
+
+Producer reports the existing core suite and six focused certificate cases
+passing. Architect inspected current source only, without running those tests.
+Independent oracles, native/WASM parity and actual-host performance still require
+their own execution; this source approval does not establish their results.
+
+### Proposed coherent-tail extension
+
+**Design APPROVE for a bounded experiment; source review still required.** Actual
+host picking selected the final segment body, producing two positional goals.
+Do not change picking or the workload to force a single point. A certified simple
+distance chain may admit the same construction when its complete goal-ID set is
+exactly a contiguous suffix and all targets request one coherent translation of
+the previous pose. Solve the prefix to its first goal using the two rotations,
+then translate the remaining suffix rigidly, moving the shared joint only once.
+
+Validate the combined full graph, never a prefix with tail constraints discarded.
+Check every original raw target within the existing explicit goal tolerance;
+meeting all goals attains the sum-squared objective's zero lower bound numerically.
+Compare complete-pose displacement for both branches and retain deterministic
+ties. Fixed tail geometry, extra constraints, incoherent/noncontiguous/foreign
+goals, handles and degeneracies must either satisfy all original guards or fall
+through unchanged ACS. No goal-count or benchmark-specific condition is permitted.
+Test two- and longer-goal suffixes plus invalid eligibility/fixed/crosslink cases;
+rerun native/WASM parity and the unchanged actual-host workload before acceptance.
+
+### Coherent-tail initial source review
+
+**Finite-target finding closed; source APPROVE for the certificate subset.**
+`drag_chords::translated_tail` now rejects any nonfinite raw x/y coordinate before
+membership, coherence or distance comparisons. Malformed goals cannot exploit
+NaN comparison behavior; ordinary adapter finite-goal rejection remains in place
+after certificate refusal. The focused regression covers first/later goals,
+both coordinates and NaN/positive/negative infinity. Per-goal residual checks,
+exact suffix membership, combined transforms, whole-pose branch cost and full
+hard validation remain intact. Producer reports 80 core tests and strict
+all-target Clippy passing; architect inspected source/tests without execution.
+Independent test execution, native/WASM parity and host performance remain pending.

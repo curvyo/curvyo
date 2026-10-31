@@ -1,10 +1,11 @@
 # Production host pointer performance
 
-Status: Independent complete updated-frame workload PASS when warm; cold first frame reported separately. Full CLAUDE §7 repository gate passed; see acceptance-session-report.md.
+Status: Historical original-head measurements below. The customer-authorized UI/interaction revision requires fresh native/WASM parity, a genuinely moving page-owned 100-entity production-host trace and the final CLAUDE §7 gate before these results can be claimed for the revision. See acceptance-revision-report.md for current verification scope.
 
-The final independent production Chromium trace captured20 actual pointer inputs.
-Every frame after the cold first frame was below16ms; warm maximum15.626ms,
-cold32.884ms. The oracle sums nonoverlapping renderer-main task thread CPU through
+The original independent production Chromium trace captured20 actual pointer inputs.
+Its analyzer reported warm maximum15.626ms from rows3 onward and cold32.884ms;
+it did not enforce the older claim that every frame after the first was below16ms.
+The revision uses the stricter rows1–19 oracle. The oracle sums nonoverlapping renderer-main task thread CPU through
 the first paint after both matching canvas rendering and annotation publication;
 it subtracts no idle cost. This does not claim that cold interaction meets16ms.
 Reproduction, fresh native/WASM parity and saved hard-constraint checks are in
@@ -183,3 +184,73 @@ the independent hard-length/endpoint validator: endpoint(241.15007349650062,
 Latest disjoint trace breakdown: `target/0066-browser/host-frame-worst-ruler-breakdown.json`.
 Formatting and diff whitespace checks passed. Execution slot released for independent
 Reference/keyboard/modifier/frame replay; no full gate run during this bounded correction.
+
+## Revised page-owned workload: certified feasible-chain correction (2026-10-31)
+
+The independent strict trace under `target/0066-browser/revision-final-runtime` failed:
+frame14 used20.094ms thread CPU, cold frame32.253ms; all19 frames after the first were
+counted. Frame14 consists of one disjoint task: pointermove17.210ms, rendering callback
+1.293ms, style0.394ms, layout0.119ms and Paint about0.11ms (nested costs are not added
+again). Saved geometry independently proved real movement and all49 hard lengths.
+
+A diagnostic100µs CPU profile of the unchanged20-move workload is saved under
+`target/0066-browser/revision-profile`. Sample attribution: solve_sketch_json201.506ms,
+solve_with_goals181.673ms, eigen decomposition103.122ms inclusive and SVD51.108ms
+inclusive. These are nested wall-sampling attributions, NOT acceptance CPU measurements.
+They justify targeting numerical matrix work instead of weakening the paint boundary.
+
+**(Proposal)** `drag_chords` extends the existing certified simple-distance-chain shortcut.
+For one positional goal, two current chain chords define two circle intersections. Proper
+rigid rotations of the two subchains preserve their internal geometry. Both branches are
+checked; the valid candidate with least whole-chain squared displacement from the previous
+seed wins, with deterministic tie breaking. Acceptance requires complete original hard
+validation and raw endpoint error at most the existing1e-6mm residual tolerance. Thus it
+attains the primary positional objective's zero lower bound within numerical tolerance.
+No target projection, solver iteration change, arbitrary entity count or workload ID occurs.
+
+Zero/ill-conditioned chords, tangent/coincident/nonintersecting circles, branching chains,
+multiple goals and candidates rejected by any extra equation fall through to unchanged ACS.
+Disconnected records/contact seeds remain unchanged. Existing unreachable-chain certificate
+and outer original-intent checkpoint validation remain. Architecture approved actual source;
+six focused own cases cover branch/reversal, the independent5+5 analytic witness, proper
+signed area, fixed/extra-axis equations, parameter changes, zero chords and eligibility.
+Fresh native/host measurements follow; the failed baseline is retained, not discarded.
+
+### 2026-10-31: body-goal certificate correction (Proposal)
+
+The first chord certificate improved the native single-point drag but did not certify the
+actual browser segment-body gesture: the saved authoritative records showed both p48 and
+p49 translated equally. The fresh browser WASM was verified (`BA8bKYKw`); it still used ACS
+for the two-goal operation. The preserved `target/0066-browser/revision-chords` trace remained
+RED (cold 30.427 ms, strict post-first maximum 18.791 ms). Picking and the workload were not
+changed to select a point instead.
+
+The bounded extension accepts only a coherent translated, complete contiguous suffix of a
+certified distance chain. Two proper rotations place the prefix joint; the remaining suffix
+translates rigidly. Both branch candidates are compared by total point displacement. Every
+raw goal must be finite and reached within 1e-6 mm, and the complete original hard system
+must validate. Foreign, missing, incoherent, fixed or cross-linked targets fall back to ACS.
+The unreachable single-point bound is not generalized to multiple goals.
+
+Producer evidence: the new suffix test first failed with no certified candidate; the full
+`cargo test --offline -p curvyo-sketch-core` suite then passed, as did strict all-target core
+Clippy. Cases include two/three goals, the independent five-millimetre mirrored/reversal
+witness, gaps/foreign goals, fixed suffix and crosslinks, input immutability, and malformed
+first/later goal coordinates (NaN and both infinities). Logs: `target/0066-runtime/suffix-*`.
+Fresh complete-frame browser evidence follows separately; these checks do not establish
+performance acceptance.
+
+Fresh producer replay after this correction: `npm run build:wasm`, TypeScript check and
+Vite production build completed, then the unchanged independent frame runner/analyzer ran
+once against the actual page-owned chain and normal body picking. Evidence folder:
+`target/0066-browser/revision-suffix`. Cold complete-frame thread CPU: **11.502 ms**;
+maximum of **all 19 frames after the first: 7.192 ms**. Every frame includes updated
+canvas, overlay and the following Paint; no idle subtraction or frame exclusion. This is
+producer evidence; independent fresh parity/performance acceptance remains required.
+
+The unchanged native saved-artifact verifier also passed:
+`CURVYO_0066_HOST_ARTIFACT="$PWD/target/0066-browser/revision-suffix/chain-host.curvyo" cargo test --offline --release -p curvyo-editor-wasm --test acceptance_0066_chain s15_actual_host -- --ignored --nocapture`.
+It confirmed genuine committed endpoint `(241.1502548462392, 13.799699194431902)`, fixed
+anchor and all 49 lengths; log `target/0066-runtime/suffix-host-geometry.log`. Production
+WASM asset is `curvyo_editor_wasm_bg-CS2Enjed.wasm`. Format check passed. Execution/source
+slot released for independent verification; no full gate was run by the producer.
