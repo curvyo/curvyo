@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <text id="text1" xml:space="preserve" x="31.75" y="3.704167" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="31.75" y="3.704167">Quadric bezier curves drawn with commands:</tspan></text>
+    <path id="compound1" d="M 3.96875 5.291667 C 6.614583 22.930556 16.756944 23.8125 34.395833 7.9375 M 47.625 21.166667 C 34.395833 3.527778 20.020139 -1.763889 4.497917 5.291667 Z" sodipodi:nodetypes="cccc" fill="none" stroke="#0000ff" stroke-width="0.79375"/>
+    <text id="text2" xml:space="preserve" x="21.166667" y="22.754167" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="21.166667" y="22.754167">M, Q, M, q, z</tspan></text>
+    <rect id="rect1" x="3.439583" y="4.7625" width="1.058333" height="1.058333" fill="#00c000" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect2" x="33.866667" y="7.408333" width="1.058333" height="1.058333" fill="#00c000" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect3" x="47.095833" y="20.6375" width="1.058333" height="1.058333" fill="#00c000" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect4" x="3.96875" y="4.7625" width="1.058333" height="1.058333" fill="#00c000" stroke="none" fill-rule="nonzero"/>
+    <path id="compound2" d="M 98.425 34.395833 C 80.786111 20.284722 85.195833 9.701389 111.654167 2.645833 Z M 116.945833 34.395833 C 125.765278 7.9375 118.709722 0 95.779167 10.583333 Z" sodipodi:nodetypes="cccc" fill="#ffff00" stroke="#0000cf" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+    <text id="text3" xml:space="preserve" x="93.133333" y="39.6875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="93.133333" y="39.6875">m, q, z, m, q, z</tspan></text>
+    <rect id="rect5" x="97.895833" y="33.866667" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect6" x="111.125" y="2.116667" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect7" x="116.416667" y="33.866667" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect8" x="95.25" y="10.054167" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <path id="path1" d="M 59.266667 27.252083 C 61.030556 6.967361 68.086111 0.79375 80.433333 8.73125 Z" sodipodi:nodetypes="cc" fill="none" stroke="#00ffff" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+    <text id="text4" xml:space="preserve" x="50.8" y="9.525" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="50.8" y="9.525">M, Q, Z</tspan></text>
+    <rect id="rect9" x="58.7375" y="26.722917" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect10" x="79.904167" y="8.202083" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <path id="path2" d="M 55.033333 44.45 C 63.852778 62.088889 72.672222 62.088889 81.491667 44.45 C 90.311111 26.811111 85.901389 22.401389 68.2625 31.220833 C 45.331944 25.929167 40.922222 30.338889 55.033333 44.45 L 55.033333 44.45 Z" sodipodi:nodetypes="czccc" fill="#00c000" stroke="#000000" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+    <text id="text5" xml:space="preserve" x="81.491667" y="49.741667" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="81.491667" y="49.741667">M, Q, T, Q, z</tspan></text>
+    <rect id="rect11" x="54.504167" y="43.920833" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect12" x="80.9625" y="43.920833" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect13" x="67.733333" y="30.691667" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect14" x="54.504167" y="54.504167" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <path id="path3" d="M 15.875 26.458333 C -1.763889 35.277778 -1.763889 44.097222 15.875 52.916667 C 33.513889 44.097222 33.513889 35.277778 15.875 26.458333 L 15.875 26.458333 Z" sodipodi:nodetypes="cccc" fill="#00cf00" stroke="none" fill-rule="nonzero"/>
+    <text id="text6" xml:space="preserve" x="21.166667" y="52.916667" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="21.166667" y="52.916667">M, Q, Q, z</tspan></text>
+    <rect id="rect15" x="15.345833" y="25.929167" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect16" x="15.345833" y="52.3875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect17" x="15.345833" y="25.929167" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <path id="path4" d="M 63.5 78.316667 C 67.909722 60.677778 72.054861 60.677778 75.935417 78.316667 C 79.815972 95.955556 83.961111 95.955556 88.370833 78.316667 C 92.780556 60.677778 96.925694 60.677778 100.80625 78.316667 C 104.686806 95.955556 108.831944 95.955556 113.241667 78.316667 C 117.651389 60.677778 121.796528 60.677778 125.677083 78.316667 Z" sodipodi:nodetypes="czzzzc" fill="none" stroke="#40dd20" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+    <text id="text7" xml:space="preserve" x="100.541667" y="62.441667" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="100.541667" y="62.441667">M, q, t, t, t, t, z</tspan></text>
+    <rect id="rect18" x="62.970833" y="77.7875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect19" x="75.40625" y="77.7875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect20" x="87.841667" y="77.7875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect21" x="100.277083" y="77.7875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect22" x="112.7125" y="77.7875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect23" x="125.147917" y="77.7875" width="1.058333" height="1.058333" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <path id="path5" d="M 45.508333 51.064583 C 27.869444 59.884028 27.869444 64.29375 45.508333 64.29375 C 27.869444 64.29375 27.869444 68.703472 45.508333 77.522917 C 63.147222 68.703472 63.147222 64.29375 45.508333 64.29375 C 63.147222 64.29375 63.147222 59.884028 45.508333 51.064583 L 45.508333 51.064583 Z" sodipodi:nodetypes="cccccc" fill="#0000c0" stroke="#00cf00" stroke-width="0.529167" fill-rule="nonzero" curvyo:stroke-width="0.5291666666666667"/>
+    <text id="text8" xml:space="preserve" x="12.7" y="74.083333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="3.175" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="2.0827999999999998" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="12.7" y="74.083333">M, q, Q, q, Q, z</tspan></text>
+    <rect id="rect24" x="44.979167" y="50.535417" width="1.058333" height="1.058333" fill="#40dd20" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect25" x="44.979167" y="63.764583" width="1.058333" height="1.058333" fill="#40dd20" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect26" x="44.979167" y="76.99375" width="1.058333" height="1.058333" fill="#40dd20" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect27" x="44.979167" y="63.764583" width="1.058333" height="1.058333" fill="#40dd20" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect28" x="44.979167" y="50.535417" width="1.058333" height="1.058333" fill="#40dd20" stroke="none" fill-rule="nonzero"/>
+  </g>
+  <g id="g2">
+    <text id="text9" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect29" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

@@ -1,0 +1,493 @@
+{
+  "format_version": 30,
+  "size": {
+    "width": 210.0,
+    "height": 297.0
+  },
+  "pages": [
+    {
+      "id": "first",
+      "name": "Page 1",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "size": {
+        "width": 210.0,
+        "height": 297.0
+      }
+    }
+  ],
+  "display_unit": "mm",
+  "background": {
+    "paint": "solid",
+    "color": [
+      232,
+      232,
+      235,
+      1.0
+    ]
+  },
+  "snapping": {
+    "enabled": false,
+    "objects": true,
+    "guides": true,
+    "nodes": true,
+    "page": true,
+    "x": true,
+    "y": true,
+    "capture_px": 8.0,
+    "release_px": 14.0
+  },
+  "objects": [
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 7
+      },
+      "objects": [
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 10
+          },
+          "closed": false,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.25,
+              "color": {
+                "r": 204,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000000",
+              "point": {
+                "x": 20.0,
+                "y": 120.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 40.0,
+                "y": -40.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000001",
+              "point": {
+                "x": 140.0,
+                "y": 120.0
+              },
+              "handle_in": {
+                "x": -40.0,
+                "y": 40.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0,
+          "name": "Wave"
+        },
+        {
+          "shape": "text",
+          "id": {
+            "peer": "32",
+            "counter": 28
+          },
+          "string": "CURVYO",
+          "font": {
+            "family": "Source Sans 3",
+            "style": "Regular",
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0
+          },
+          "size": 5.248,
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          "style": {
+            "stroke": {
+              "enabled": false,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": true,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          }
+        },
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 44
+          },
+          "closed": false,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": true,
+              "color": {
+                "r": 238,
+                "g": 238,
+                "b": 238
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000002",
+              "point": {
+                "x": 20.0,
+                "y": 220.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": -40.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000003",
+              "point": {
+                "x": 140.0,
+                "y": 220.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": -40.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0,
+          "name": "Arch"
+        },
+        {
+          "shape": "text",
+          "id": {
+            "peer": "32",
+            "counter": 64
+          },
+          "string": "Below",
+          "font": {
+            "family": "Source Sans 3",
+            "style": "Regular",
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0
+          },
+          "size": 3.936,
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          "style": {
+            "stroke": {
+              "enabled": false,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": true,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          }
+        }
+      ],
+      "name": "Text"
+    },
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 80
+      },
+      "objects": [
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 83
+          },
+          "closed": true,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 170,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000004",
+              "point": {
+                "x": 150.0,
+                "y": 50.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": -22.0914
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 22.091399999999993
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000005",
+              "point": {
+                "x": 110.0,
+                "y": 90.0
+              },
+              "handle_in": {
+                "x": 22.091399999999993,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": -22.091399999999993,
+                "y": 0.0
+              },
+              "kind": "symmetric"
+            },
+            {
+              "id": "00000000000000200000000000000006",
+              "point": {
+                "x": 70.0,
+                "y": 50.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 22.091399999999993
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": -22.0914
+              },
+              "kind": "symmetric"
+            },
+            {
+              "id": "00000000000000200000000000000007",
+              "point": {
+                "x": 110.0,
+                "y": 10.0
+              },
+              "handle_in": {
+                "x": -22.091399999999993,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 22.091399999999993,
+                "y": 0.0
+              },
+              "kind": "symmetric"
+            }
+          ],
+          "rotation": 0.0,
+          "guide": true
+        }
+      ],
+      "name": "Guides"
+    },
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 114
+      },
+      "objects": [
+        {
+          "shape": "text",
+          "id": {
+            "peer": "32",
+            "counter": 117
+          },
+          "string": "ON THE RING",
+          "font": {
+            "family": "Source Sans 3",
+            "style": "Regular",
+            "face_hash": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+            "face_index": 0
+          },
+          "size": 5.248,
+          "placement": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          "style": {
+            "stroke": {
+              "enabled": false,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": true,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          }
+        }
+      ],
+      "name": "On guide"
+    }
+  ]
+}

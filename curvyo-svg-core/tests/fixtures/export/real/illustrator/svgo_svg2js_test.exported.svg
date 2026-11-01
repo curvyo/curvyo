@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="42.333333mm" height="42.333333mm" viewBox="0 0 42.333333 42.333333" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <g id="g2">
+      <circle id="circle1" cx="21.166667" cy="21.166667" r="17.638889" fill="#ff0000" stroke="none" fill-rule="nonzero"/>
+      <text id="text1" xml:space="preserve" x="0" y="0" font-family="'Source Sans 3'" font-weight="400" font-style="normal" font-size="5.644444" fill="#ff0000" stroke="none" fill-rule="nonzero" curvyo:size="3.7027555555555556" curvyo:face="Source Sans 3|Regular|08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6"><tspan sodipodi:role="line" x="0" y="0">test</tspan></text>
+    </g>
+  </g>
+</svg>

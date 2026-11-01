@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#ffffff" inkscape:pageopacity="0"/>
+  <g id="layer1" inkscape:groupmode="layer" inkscape:label="Layer 1">
+    <text id="text1" xml:space="preserve" inkscape:label="flow1" x="20" y="35.64444" font-family="'Source Sans 3'" font-weight="400" font-style="normal" font-size="5.64444" line-height="1.25" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.7027526400000004" curvyo:face="Source Sans 3|Regular|08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6"><tspan sodipodi:role="line" x="20" y="35.64444">The quick brown fox</tspan><tspan sodipodi:role="line" x="20" y="42.69999">jumps over the lazy dog</tspan><tspan sodipodi:role="line" x="20" y="49.75554">and keeps on running far</tspan><tspan sodipodi:role="line" x="20" y="56.81109">away.</tspan><tspan sodipodi:role="line" x="20" y="63.86664">Second paragraph.</tspan></text>
+    <text id="text2" xml:space="preserve" inkscape:label="flow2" x="140" y="35.64444" font-family="'Source Sans 3'" font-weight="400" font-style="normal" font-size="5.64444" text-anchor="middle" line-height="1.25" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.7027526400000004" curvyo:face="Source Sans 3|Regular|08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6"><tspan sodipodi:role="line" x="140" y="35.64444">Centred flowed text that</tspan><tspan sodipodi:role="line" x="140" y="42.69999">needs to wrap more than</tspan><tspan sodipodi:role="line" x="140" y="49.75554">once in its box.</tspan></text>
+  </g>
+</svg>

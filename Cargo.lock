@@ -695,6 +695,7 @@ dependencies = [
  "image",
  "kurbo",
  "loro",
+ "proptest",
  "rustix",
  "serde",
  "serde_json",

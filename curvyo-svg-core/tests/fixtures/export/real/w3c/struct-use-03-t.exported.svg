@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <text id="text1" xml:space="preserve" x="31.75" y="15.875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" text-anchor="middle" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="31.75" y="15.875">Reference</tspan></text>
+    <text id="text2" xml:space="preserve" x="95.25" y="15.875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" text-anchor="middle" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="95.25" y="15.875">&lt;use&gt;</tspan></text>
+    <g id="g2">
+      <rect id="rect1" x="18.520833" y="31.75" width="26.458333" height="26.458333" transform="rotate(45 31.75 44.979167)" fill="#00ffff" stroke="#0000ff" stroke-width="5.291667" fill-rule="nonzero" curvyo:frame="31.750000000000007 44.979166666666664 26.458333333333332 26.458333333333332 0.7853981633974483" curvyo:stroke-width="5.291666666666667"/>
+    </g>
+    <g id="g3">
+      <rect id="rect2" x="82.020833" y="31.75" width="26.458333" height="26.458333" transform="rotate(45 95.25 44.979167)" fill="#00ffff" stroke="#0000ff" stroke-width="5.291667" fill-rule="nonzero" curvyo:frame="95.25 44.97916666666666 26.458333333333332 26.458333333333332 0.7853981633974483" curvyo:stroke-width="5.291666666666667"/>
+    </g>
+  </g>
+  <g id="g4">
+    <text id="text3" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect3" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

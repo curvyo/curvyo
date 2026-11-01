@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="nv" inkscape:document-units="mm"/>
+  <g id="l1" inkscape:groupmode="layer" inkscape:label="Curved">
+    <path d="M 60 50 C 58.798041 53.13121 57.110728 56.053722 55 58.660254 C 51.687313 59.184932 48.312687 59.184932 45 58.660254 C 42.889272 56.053722 41.201959 53.13121 40 50 C 41.201959 46.86879 42.889272 43.946278 45 41.339746 C 48.312687 40.815068 51.687313 40.815068 55 41.339746 C 57.110728 43.946278 58.798041 46.86879 60 50 Z" curvyo:kind="polygon" curvyo:frame="50 50 10 6 0 0 0.3" fill="none" stroke="#000000" stroke-width="0.25"/>
+    <rect x="100" y="20" width="40" height="20" rx="2" ry="2" fill="#ffcc00" stroke="none"/>
+  </g>
+</svg>

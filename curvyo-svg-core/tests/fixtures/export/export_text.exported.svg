@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="layer1" inkscape:groupmode="layer" inkscape:label="Text">
+    <text id="text1" xml:space="preserve" x="20" y="30" font-family="'Source Sans 3'" font-weight="700" font-style="normal" font-size="10.5833" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="6.9003116" curvyo:face="Source Sans 3|Bold|7776ddb9f3eb58683e59f28d558d8896b768c2d0c80799fb3f1c56c54dfd98c9"><tspan sodipodi:role="line" x="20" y="30">Boho</tspan></text>
+    <text id="text2" xml:space="preserve" x="100" y="60" font-family="'Source Sans 3'" font-weight="400" font-style="normal" font-size="7.05556" text-anchor="middle" line-height="1.25" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="4.62844736" curvyo:face="Source Sans 3|Regular|08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6"><tspan sodipodi:role="line" x="100" y="60">Three</tspan><tspan sodipodi:role="line" x="100" y="68.81945">centred</tspan><tspan sodipodi:role="line" x="100" y="77.6389">lines</tspan></text>
+    <text id="text3" xml:space="preserve" x="20" y="100" font-family="'Source Sans 3'" font-weight="300" font-style="italic" font-size="7.05556" letter-spacing="0.5" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="4.64961404" curvyo:face="Source Sans 3|Light Italic|abd8f5b080ec26a9592a77285b921a8e296b688f479232a721c7129bf068c64a"><tspan sodipodi:role="line" x="20" y="100">Light Italic</tspan></text>
+    <text id="text4" xml:space="preserve" x="20" y="120" font-family="Lobster" font-weight="400" font-style="normal" font-size="7.05556" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="4.62844736" curvyo:face="Lobster|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="20" y="120">No face</tspan></text>
+    <text id="text5" xml:space="preserve" transform="matrix(0.8660254037844387 0.49999999999999994 -0.49999999999999994 0.8660254037844387 110 140)" x="0" y="0" font-family="'Source Sans 3'" font-weight="400" font-style="normal" font-size="7.05556" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="4.62844736" curvyo:face="Source Sans 3|Regular|08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6"><tspan sodipodi:role="line" x="0" y="0">Turned</tspan></text>
+  </g>
+</svg>

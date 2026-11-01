@@ -138,6 +138,7 @@ mod stroke_to_path;
 mod stroke_to_path_tests;
 mod style;
 mod style_view;
+mod svg_export;
 mod svg_import;
 mod text;
 mod text_bar;
@@ -256,6 +257,7 @@ pub use trace_pick::TracePickMode;
 pub use weld::WeldOutcome;
 
 pub use open_error::map_open_error;
+pub use svg_export::SvgExportResult;
 #[cfg(target_arch = "wasm32")]
 pub use svg_import::SvgImportOutcome;
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <text id="text1" xml:space="preserve" x="2.645833" y="10.583333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="9.525" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="6.2484" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="10.583333">Basic paint: stroke properties.</tspan></text>
+    <rect id="rect1" x="23.8125" y="18.520833" width="79.375" height="13.229167" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect2" x="23.8125" y="50.270833" width="79.375" height="13.229167" fill="#0000ff" stroke="#008000" stroke-width="5.291667" fill-rule="nonzero" curvyo:stroke-width="5.291666666666667"/>
+    <text id="text2" xml:space="preserve" x="37.041667" y="39.6875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="7.9375" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.207" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="37.041667" y="39.6875">stroke=&quot;none&quot;</tspan></text>
+    <text id="text3" xml:space="preserve" x="39.158333" y="74.083333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="7.9375" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.207" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="39.158333" y="74.083333">stroke=&quot;green&quot;</tspan></text>
+  </g>
+  <g id="g2">
+    <text id="text4" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect3" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

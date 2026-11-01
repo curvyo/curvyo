@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <g id="g2">
+      <text id="text1" xml:space="preserve" x="5.291667" y="7.9375" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="7.9375">open</tspan></text>
+      <text id="text2" xml:space="preserve" x="5.291667" y="12.7" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="12.7">join=round</tspan></text>
+      <text id="text3" xml:space="preserve" x="5.291667" y="17.4625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="17.4625">cap=butt</tspan></text>
+      <text id="text4" xml:space="preserve" x="5.291667" y="22.225" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="22.225">M, L</tspan></text>
+      <g id="g3">
+        <path id="path1" d="M 59.53125 2.645833 L 59.53125 23.8125 L 33.072917 13.229167 L 59.53125 2.645833" sodipodi:nodetypes="cccc" fill="#008000" stroke="#3399dd" stroke-width="3.96875" stroke-linejoin="round" fill-rule="nonzero"/>
+      </g>
+    </g>
+    <g id="g4">
+      <text id="text5" xml:space="preserve" x="5.291667" y="35.71875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="35.71875">open</tspan></text>
+      <text id="text6" xml:space="preserve" x="5.291667" y="40.48125" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="40.48125">join=bevel</tspan></text>
+      <text id="text7" xml:space="preserve" x="5.291667" y="45.24375" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="45.24375">cap=round</tspan></text>
+      <text id="text8" xml:space="preserve" x="5.291667" y="50.00625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="50.00625">m, l</tspan></text>
+      <g id="g5">
+        <path id="path2" d="M 59.53125 30.427083 L 59.53125 51.59375 L 33.072917 41.010417 L 59.53125 30.427083" sodipodi:nodetypes="cccc" fill="#008000" stroke="#3399dd" stroke-width="3.96875" stroke-linecap="round" stroke-linejoin="bevel" fill-rule="nonzero"/>
+      </g>
+    </g>
+    <g id="g6">
+      <text id="text9" xml:space="preserve" x="5.291667" y="63.5" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="63.5">open</tspan></text>
+      <text id="text10" xml:space="preserve" x="5.291667" y="68.2625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="68.2625">join=miter</tspan></text>
+      <text id="text11" xml:space="preserve" x="5.291667" y="73.025" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="73.025">cap=square</tspan></text>
+      <text id="text12" xml:space="preserve" x="5.291667" y="77.7875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="5.291667" y="77.7875">M, L</tspan></text>
+      <g id="g7">
+        <path id="path3" d="M 59.53125 58.208333 L 59.53125 79.375 L 33.072917 68.791667 L 59.53125 58.208333" sodipodi:nodetypes="cccc" fill="#008000" stroke="#3399dd" stroke-width="3.96875" stroke-linecap="square" fill-rule="nonzero"/>
+      </g>
+    </g>
+    <g id="g8">
+      <text id="text13" xml:space="preserve" x="99.21875" y="7.9375" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="7.9375">closed</tspan></text>
+      <text id="text14" xml:space="preserve" x="99.21875" y="12.7" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="12.7">join=round</tspan></text>
+      <text id="text15" xml:space="preserve" x="99.21875" y="17.4625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="17.4625">cap=butt</tspan></text>
+      <text id="text16" xml:space="preserve" x="99.21875" y="22.225" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="22.225">M, L, Z</tspan></text>
+      <g id="g9">
+        <path id="path4" d="M 66.145833 2.645833 L 92.604167 13.229167 L 66.145833 23.8125 Z" sodipodi:nodetypes="ccc" fill="#008000" stroke="#3399dd" stroke-width="3.96875" stroke-linejoin="round" fill-rule="nonzero"/>
+      </g>
+    </g>
+    <g id="g10">
+      <text id="text17" xml:space="preserve" x="99.21875" y="35.71875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="35.71875">closed</tspan></text>
+      <text id="text18" xml:space="preserve" x="99.21875" y="40.48125" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="40.48125">join=bevel</tspan></text>
+      <text id="text19" xml:space="preserve" x="99.21875" y="45.24375" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="45.24375">cap=round</tspan></text>
+      <text id="text20" xml:space="preserve" x="99.21875" y="50.00625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="50.00625">m, l, z</tspan></text>
+      <g id="g11">
+        <path id="path5" d="M 66.145833 30.427083 L 92.604167 41.010417 L 66.145833 51.59375 Z" sodipodi:nodetypes="ccc" fill="#008000" stroke="#3399dd" stroke-width="3.96875" stroke-linecap="round" stroke-linejoin="bevel" fill-rule="nonzero"/>
+      </g>
+    </g>
+    <g id="g12">
+      <text id="text21" xml:space="preserve" x="99.21875" y="63.5" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="63.5">closed</tspan></text>
+      <text id="text22" xml:space="preserve" x="99.21875" y="68.2625" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="68.2625">join=miter</tspan></text>
+      <text id="text23" xml:space="preserve" x="99.21875" y="73.025" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="73.025">cap=square</tspan></text>
+      <text id="text24" xml:space="preserve" x="99.21875" y="77.7875" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="4.7625" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.1242" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="99.21875" y="77.7875">M, L, Z</tspan></text>
+      <g id="g13">
+        <path id="path6" d="M 66.145833 58.208333 L 92.604167 68.791667 L 66.145833 79.375 Z" sodipodi:nodetypes="ccc" fill="#008000" stroke="#3399dd" stroke-width="3.96875" stroke-linecap="square" fill-rule="nonzero"/>
+      </g>
+    </g>
+  </g>
+  <g id="g14">
+    <text id="text25" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect1" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

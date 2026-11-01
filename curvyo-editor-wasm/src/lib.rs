@@ -102,6 +102,8 @@ mod wasm_split;
 #[cfg(target_arch = "wasm32")]
 mod wasm_stroke_to_path;
 #[cfg(target_arch = "wasm32")]
+mod wasm_svg_export;
+#[cfg(target_arch = "wasm32")]
 mod wasm_svg_import;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text;
@@ -120,6 +122,7 @@ pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
+pub use session::SvgExportResult;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,

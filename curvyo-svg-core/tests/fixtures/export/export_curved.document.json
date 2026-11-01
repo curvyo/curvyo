@@ -1,0 +1,156 @@
+{
+  "format_version": 30,
+  "size": {
+    "width": 210.0,
+    "height": 297.0
+  },
+  "pages": [
+    {
+      "id": "first",
+      "name": "Page 1",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "size": {
+        "width": 210.0,
+        "height": 297.0
+      }
+    }
+  ],
+  "display_unit": "mm",
+  "background": {
+    "paint": "solid",
+    "color": [
+      232,
+      232,
+      235,
+      1.0
+    ]
+  },
+  "snapping": {
+    "enabled": false,
+    "objects": true,
+    "guides": true,
+    "nodes": true,
+    "page": true,
+    "x": true,
+    "y": true,
+    "capture_px": 8.0,
+    "release_px": 14.0
+  },
+  "objects": [
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 7
+      },
+      "objects": [
+        {
+          "shape": "polygon",
+          "id": {
+            "peer": "32",
+            "counter": 10
+          },
+          "frame": {
+            "center": {
+              "x": 50.0,
+              "y": 50.0
+            },
+            "radius": 10.0,
+            "angle": 0.0
+          },
+          "point_count": 6,
+          "curve": 0.3,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "rotation": 0.0
+        },
+        {
+          "shape": "rect",
+          "id": {
+            "peer": "32",
+            "counter": 17
+          },
+          "bounds": {
+            "origin": {
+              "x": 100.0,
+              "y": 20.0
+            },
+            "width": 40.0,
+            "height": 20.0
+          },
+          "corner_radii": {
+            "tl": 2.0,
+            "tr": 2.0,
+            "br": 2.0,
+            "bl": 2.0
+          },
+          "style": {
+            "stroke": {
+              "enabled": false,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": true,
+              "color": {
+                "r": 255,
+                "g": 204,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "rotation": 0.0
+        }
+      ],
+      "name": "Curved"
+    }
+  ]
+}

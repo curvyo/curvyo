@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="nv" inkscape:document-units="mm"/>
+  <g id="l1" inkscape:groupmode="layer" inkscape:label="Text">
+    <text xml:space="preserve" x="20" y="30" style="font-size:10.5833px;font-family:'Source Sans 3';font-weight:bold">Boho</text>
+    <text xml:space="preserve" x="100" y="60" style="font-size:7.05556px;line-height:1.25;font-family:'Source Sans 3';text-anchor:middle"><tspan sodipodi:role="line" x="100" y="60">Three</tspan><tspan sodipodi:role="line" x="100" y="68.8194">centred</tspan><tspan sodipodi:role="line" x="100" y="77.6389">lines</tspan></text>
+    <text xml:space="preserve" x="20" y="100" style="font-size:7.05556px;font-family:'Source Sans 3';font-weight:300;font-style:italic;letter-spacing:0.5px">Light Italic</text>
+    <text xml:space="preserve" x="20" y="120" style="font-size:7.05556px;font-family:'Lobster'">No face</text>
+    <text xml:space="preserve" x="0" y="0" transform="translate(110,140) rotate(30)" style="font-size:7.05556px;font-family:'Source Sans 3'">Turned</text>
+  </g>
+</svg>

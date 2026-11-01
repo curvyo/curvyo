@@ -1,0 +1,140 @@
+{
+  "format_version": 30,
+  "size": {
+    "width": 210.0,
+    "height": 297.0
+  },
+  "pages": [
+    {
+      "id": "first",
+      "name": "Page 1",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "size": {
+        "width": 210.0,
+        "height": 297.0
+      }
+    }
+  ],
+  "display_unit": "mm",
+  "background": {
+    "paint": "solid",
+    "color": [
+      232,
+      232,
+      235,
+      1.0
+    ]
+  },
+  "snapping": {
+    "enabled": false,
+    "objects": true,
+    "guides": true,
+    "nodes": true,
+    "page": true,
+    "x": true,
+    "y": true,
+    "capture_px": 8.0,
+    "release_px": 14.0
+  },
+  "objects": [
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 7
+      },
+      "objects": [
+        {
+          "shape": "image",
+          "id": {
+            "peer": "32",
+            "counter": 10
+          },
+          "asset": "300491311ae033d8adad8ff30c2dc9185f9a4d5b2a9b2c512bde8ff5a789cf2c",
+          "placement": [
+            20.0,
+            0.0,
+            0.0,
+            20.0,
+            10.0,
+            10.0
+          ],
+          "name": "PNG with alpha"
+        },
+        {
+          "shape": "image",
+          "id": {
+            "peer": "32",
+            "counter": 15
+          },
+          "asset": "06635b6a20da2e92a7cbca6c8982dda1ad05fa357623dca05eac29c4d21f7757",
+          "placement": [
+            40.0,
+            0.0,
+            0.0,
+            20.0,
+            40.0,
+            10.0
+          ],
+          "name": "JPEG"
+        },
+        {
+          "shape": "image",
+          "id": {
+            "peer": "32",
+            "counter": 20
+          },
+          "asset": "a093450faac8da89484c17fd4db03d91a2826be2f0d04364acbf0e8bb7bf9627",
+          "placement": [
+            40.0,
+            0.0,
+            0.0,
+            20.0,
+            90.0,
+            10.0
+          ],
+          "name": "WebP"
+        },
+        {
+          "shape": "image",
+          "id": {
+            "peer": "32",
+            "counter": 25
+          },
+          "asset": "300491311ae033d8adad8ff30c2dc9185f9a4d5b2a9b2c512bde8ff5a789cf2c",
+          "placement": [
+            17.320508075688775,
+            9.999999999999998,
+            -9.999999999999998,
+            17.320508075688775,
+            30.0,
+            60.0
+          ],
+          "name": "PNG rotated"
+        },
+        {
+          "shape": "image",
+          "id": {
+            "peer": "32",
+            "counter": 30
+          },
+          "asset": "06635b6a20da2e92a7cbca6c8982dda1ad05fa357623dca05eac29c4d21f7757",
+          "placement": [
+            -40.0,
+            0.0,
+            0.0,
+            20.0,
+            120.0,
+            60.0
+          ],
+          "name": "JPEG mirrored",
+          "opacity": 0.5
+        }
+      ],
+      "name": "Pictures"
+    }
+  ]
+}

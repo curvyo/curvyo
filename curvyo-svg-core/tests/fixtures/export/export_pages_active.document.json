@@ -1,0 +1,166 @@
+{
+  "format_version": 30,
+  "size": {
+    "width": 100.0,
+    "height": 100.0
+  },
+  "pages": [
+    {
+      "id": "first",
+      "name": "Front",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "size": {
+        "width": 100.0,
+        "height": 100.0
+      }
+    },
+    {
+      "id": "32-svg1",
+      "name": "Coaster",
+      "origin": {
+        "x": 120.0,
+        "y": 0.0
+      },
+      "size": {
+        "width": 100.0,
+        "height": 50.0
+      }
+    }
+  ],
+  "display_unit": "mm",
+  "background": {
+    "paint": "solid",
+    "color": [
+      232,
+      232,
+      235,
+      1.0
+    ]
+  },
+  "snapping": {
+    "enabled": false,
+    "objects": true,
+    "guides": true,
+    "nodes": true,
+    "page": true,
+    "x": true,
+    "y": true,
+    "capture_px": 8.0,
+    "release_px": 14.0
+  },
+  "objects": [
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 14
+      },
+      "objects": [
+        {
+          "shape": "rect",
+          "id": {
+            "peer": "32",
+            "counter": 17
+          },
+          "bounds": {
+            "origin": {
+              "x": 10.0,
+              "y": 10.0
+            },
+            "width": 10.0,
+            "height": 10.0
+          },
+          "corner_radii": {
+            "tl": 0.0,
+            "tr": 0.0,
+            "br": 0.0,
+            "bl": 0.0
+          },
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.25,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "rotation": 0.0
+        },
+        {
+          "shape": "ellipse",
+          "id": {
+            "peer": "32",
+            "counter": 26
+          },
+          "frame": {
+            "center": {
+              "x": 170.0,
+              "y": 25.0
+            },
+            "rx": 15.0,
+            "ry": 15.0
+          },
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.5,
+              "color": {
+                "r": 255,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "rotation": 0.0
+        }
+      ],
+      "name": "Cut"
+    }
+  ]
+}
