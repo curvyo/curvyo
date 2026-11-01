@@ -456,3 +456,60 @@ Decision: typed Angle and ellipse radii (recommendation, no customer question).
   coding, the implementer confirms ACS 0.1.19 has an ellipse major/minor radius relation; if it
   has none, the residual is encoded through an operand distance (centre to an operand point on
   the axis) and the finding goes back to the architect before an alternative is chosen.
+
+## Revision 4 review (2026-10-31)
+
+Scope: commits f892f448 (`curvyo-sketch-core`/`curvyo-document-core`: `HorizontalDistance`,
+`VerticalDistance`, format 29, v29 goldens), e6037854 (`curvyo-ui-core`: axis distance actions,
+projected dimension layout) and 5038d599 (`curvyo-editor-wasm`: return to Select, rail tools).
+Source read only, nothing built or run.
+
+**Verdict: CHANGES REQUESTED.**
+
+What holds:
+- Format: the bump 28 -> 29 is required (28 shipped with PR #228) and correctly documented at
+  `curvyo-document-core/src/document.rs:289-296`; no record changes shape, migration is none.
+  The plate golden carries both new variants (`sketch_fixtures.rs:124-148`), all eleven current
+  goldens were regenerated as v29, and `format_28_sketch_goldens_still_open`
+  (`sketch_fixtures.rs:377`) keeps every v28 golden, including `slot_sweeps`, opening or refused
+  as before. ADR 0026 carries a dated note.
+- One sign convention end to end: `measure.rs:32-37` (`b - a`), ACS 0.1.19
+  `horizontal_distance`/`vertical_distance` (`Difference`, residual `p2 - p1 - value`), and the
+  independent residual check, which goes through `measure` for every expression relation.
+- Validation: both operands must be points (`validation.rs:260-263`); driving values must be
+  `>= 0` for axis distances only (`validation.rs:51-57`), other lengths stay `> 0`. Remap and
+  references go through `entity_ids`/`entity_ids_mut`/`expression_mut` (`references.rs:51-52,
+  90-91,119-120,136-137,156-157`), so copies and the round trip are covered
+  (`tests/axis_distance.rs:142`).
+- Creation stores the left or lower point first (`sketch_actions.rs:153-160`), tested in both
+  pick orders; display uses `abs` (`annotations.rs:276-280`).
+- Boundaries: no dependency change; the new core code is pure and wasm32-safe; no production
+  `unwrap`/`expect`, no new trait, generic or crate. `tool_return.rs` has one responsibility.
+
+Required changes:
+1. `curvyo-editor-wasm/src/session/sketch/input.rs:236-244` (AC46, keep the side): a reference
+   axis distance follows the geometry, so after a drag its signed measure can be negative while
+   the text shows `abs`. Turning it into a driving dimension (or entering a value) with that
+   positive text makes the solver flip the points to the other side. When the relation is an
+   axis distance and `measure` on the current solution is negative, swap `a` and `b` before
+   storing. Add a session test: reference horizontal distance, drag `b` left of `a`, make it
+   driving at the shown value, assert `b` stays left.
+2. `curvyo-editor-wasm/src/session/sketch/annotations.rs:361-450` (§5 function ~60 lines):
+   `dimension_geometry` grew to 89 lines. Move the new arm (395-410) into
+   `fn axis_distance_geometry(..)` and, if still over, the radius/diameter arms likewise.
+3. `curvyo-ui-core/src/sketch_dimension_layout.rs` (504 non-test lines, was 435) and
+   `curvyo-editor-wasm/src/session/sketch/annotations.rs` (522 non-test lines, was ~496) crossed
+   or grew past 500 (§5 module size). Move the `Projected` layout (`sketch_dimension_layout.rs:
+   163ff`) into its own `#[path]` module as `sketch_dimension_text.rs` already is, and move
+   `value_text`/`kind_name` out of `annotations.rs`; or justify both in the PR description and
+   add one entry to `docs/technical-debt.md`.
+
+Recommended (not blocking):
+- `curvyo-sketch-core/src/validation.rs:260`: refuse `a == b` for axis distances. Picking the
+  origin and the matching axis yields `(origin, origin)` (`sketch_actions.rs:140-145`), a record
+  that is vacuous at 0 and unsolvable otherwise; reject it in `sketch_relation` too.
+- `curvyo-document-core/tests/fixtures`: add one damaged v29 golden with a negative axis
+  distance value, so the new `>= 0` rule is guarded at the file level, not only in
+  `tests/axis_distance.rs:114`.
+- `curvyo-sketch-core/src/validation.rs:54`: name the zero bound
+  (`value >= 0.0` is a domain bound, not a geometric comparison; a one-line comment suffices).
