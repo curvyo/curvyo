@@ -176,3 +176,10 @@ saved, and its downloaded geometry must pass the explicit native host verifier.
 `sketch-rev2-m2.cjs` (0066 revision 2, M2) checks there is no Sketch options bar, the mode
 label through six Alt presses, the Tab entry box, the Ctrl lock with its pending Horizontal and
 the endpoint capture closing a chain. Screenshots go to `target/0066-browser/rev2-m2/`.
+
+### Drag right after a click (fix/drag-after-click)
+
+`drag-after-click.cjs` starts its own dev server on port 5181 (or uses `CURVYO_BROWSER_URL`),
+selects a rectangle with a click and at once (one CDP burst, within the double-click interval)
+drags it 100 px: it must move. A real double-click must still enter node editing on a path and
+text editing on a text. Screenshots and saved projects go to `target/drag-after-click-browser/`.
