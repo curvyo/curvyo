@@ -315,7 +315,9 @@ fn field_label(relation: &Relation) -> &'static str {
     match relation {
         Relation::Radius { .. } | Relation::EllipseRadius { .. } => "Radius",
         Relation::Diameter { .. } => "Diameter",
-        Relation::Distance { .. } => "Distance",
+        Relation::Distance { .. }
+        | Relation::HorizontalDistance { .. }
+        | Relation::VerticalDistance { .. } => "Distance",
         Relation::Angle { .. } | Relation::Sweep { .. } | Relation::AxisAngle { .. } => "Angle",
         _ => "Length",
     }

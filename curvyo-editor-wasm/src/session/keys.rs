@@ -450,27 +450,7 @@ impl Session {
     /// drag is cancelled (criterion 49).
     pub fn escape(&mut self) -> EscapeStep {
         if self.workbench() == super::Workbench::Sketch {
-            let pending = self.sketch.drag.is_some()
-                || self.sketch.preview.is_some()
-                || self.sketch.dimension_position.is_some()
-                || self.sketch.marquee.is_some()
-                || self.sketch.lasso.is_some()
-                || !self.sketch.picks.is_empty()
-                || self.sketch.edit_constraint.is_some()
-                || self.sketch.label_drag.is_some()
-                || self.sketch.canvas_edit.is_some()
-                || self.button_down;
-            self.sketch_revert_refused();
-            self.sketch.cancel();
-            if !pending {
-                self.sketch.tool = super::SketchTool::Select;
-                self.sketch.constraint_tool = None;
-                self.sketch.entities.clear();
-                self.sketch.constraints.clear();
-            }
-            self.end_snapping_drag();
-            self.button_down = false;
-            return EscapeStep::ClearedState;
+            return self.sketch_escape();
         }
         if self.page_drag.take().is_some() {
             return EscapeStep::ClearedState;

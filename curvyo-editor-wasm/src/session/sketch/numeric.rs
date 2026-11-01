@@ -40,12 +40,18 @@ impl Session {
     ) -> Result<bool, SketchEditError> {
         let refusal = self.sketch_field_refusal([first, second]);
         let fields = self.sketch_entry_field_count();
+        let before = self.sketch_entity_ids();
         let result = if self.sketch.tool == SketchTool::Fillet {
             self.sketch_preview_fillet_text(first)
                 .and_then(|()| self.sketch_commit_preview())
         } else {
             self.sketch_numeric_inner(first, second)
         };
+        // A typed arc radius only fixes the next pick; every other entry commits a shape.
+        if result.is_ok() && self.sketch.tool != SketchTool::ArcCenter {
+            let open = self.sketch.tool == SketchTool::Polyline;
+            self.sketch_shape_committed(&before, open);
+        }
         // The box marks the field at fault and says why; values refused only together mark
         // the field of a one-field box (UX notes revision 2 review, change 5).
         let result = result.map_err(|error| {

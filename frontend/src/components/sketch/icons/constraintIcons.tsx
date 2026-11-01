@@ -3,9 +3,10 @@
  * set used in the rail (20px), and in the canvas symbol badges (12px). Single-colour line
  * redrawings in a 16px grid of the FreeCAD Sketcher constraint icons. This file as a whole is
  * licensed under LGPL-2.1-or-later (not AGPL-3.0-or-later), text in `docs/licenses/LGPL-2.1.txt`;
- * source, files and licence are recorded in `docs/third-party-assets.md`. Midpoint, On axis and the
- * generic Dimension ruler follow FreeCAD's `Constraint_PointOnMidPoint`, `Constraint_PointOnObject`
- * and `Constraint_Length`.
+ * source, files and licence are recorded in `docs/third-party-assets.md`. Midpoint, On axis, the
+ * aligned Dimension ruler and the Horizontal and Vertical distance rulers follow FreeCAD's
+ * `Constraint_PointOnMidPoint`, `Constraint_PointOnObject`, `Constraint_Length`,
+ * `Constraint_HorizontalDistance` and `Constraint_VerticalDistance`.
  */
 import type { ReactNode } from "react";
 
@@ -33,7 +34,11 @@ const GLYPHS: Record<string, ReactNode> = {
     <path d="M3 14A11 11 0 0 1 14 3" />
     <circle cx="6.2" cy="6.2" r="2" fill="currentColor" stroke="none" />
   </>,
-  dimension: <path d="M2 4v8M14 4v8M3 8h10M5 6 3 8l2 2M11 6l2 2-2 2" />,
+  // FreeCAD's Constraint_Length is the aligned (diagonal) distance; Constraint_HorizontalDistance
+  // and Constraint_VerticalDistance measure along one axis (AC44).
+  dimension: <path d="M1.5 10.5l4 4M10.5 1.5l4 4M4.5 11.5l7-7M7 11.5H4.5V9M9 4.5h2.5V7" />,
+  "horizontal-distance": <path d="M2 4v8M14 4v8M3 8h10M5 6 3 8l2 2M11 6l2 2-2 2" />,
+  "vertical-distance": <path d="M4 2h8M4 14h8M8 3v10M6 5l2-2 2 2M6 11l2 2 2-2" />,
 };
 // A point on a line, circle, arc or ellipse is FreeCAD's PointOnObject, as on axis (AC37).
 GLYPHS["point-on"] = GLYPHS["on-axis"];

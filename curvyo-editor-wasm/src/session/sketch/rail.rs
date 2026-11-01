@@ -41,8 +41,8 @@ impl Session {
     }
 
     /// Presses a rail tool: applies it to an eligible selection (one history step, selection
-    /// kept), arms it keeping a valid start as its first picks, or arms it without picks and
-    /// names on the canvas what it needs (AC40).
+    /// kept, back in Select, AC43), arms it keeping a valid start as its first picks, or arms it
+    /// without picks and names on the canvas what it needs (AC40).
     /// # Errors
     /// Reports a refused constraint without a history step.
     pub fn sketch_rail_press(&mut self, tool: &str) -> Result<bool, SketchEditError> {
@@ -50,13 +50,18 @@ impl Session {
         let graph = self.sketch_snapshot_for_edit()?.graph;
         let selected = self.sketch.entities.iter().cloned().collect::<Vec<_>>();
         match curvyo_ui_core::sketch_tool_use(tool, &graph, &selected) {
-            SketchToolUse::Apply if tool == "dimension" => self.sketch_dimension_selection(),
+            SketchToolUse::Apply if tool == "dimension" => self.sketch_dimension_selection(None),
+            SketchToolUse::Apply if axis_distance(tool) => {
+                self.sketch_dimension_selection(Some(tool))
+            }
             SketchToolUse::Apply => {
                 if self.sketch.constraint_tool.as_deref() == Some("dimension") {
                     self.set_sketch_tool(SketchTool::Select);
                 }
-                self.sketch.entities = selected.into_iter().collect();
-                self.sketch_apply_action(tool, "", false)
+                self.sketch.entities = selected.iter().cloned().collect();
+                let applied = self.sketch_apply_action(tool, "", false)?;
+                self.sketch_applied_select(selected.into_iter().collect());
+                Ok(applied)
             }
             SketchToolUse::Arm => {
                 let kept = self.sketch.entities.clone();
@@ -91,12 +96,16 @@ impl Session {
 
     /// Dimensions the selection at once with its measured value, as a driving dimension at the
     /// default label place, in one history step; the entry box opens on it so the value can be
-    /// typed right away (AC40, lead decision 2026-10-31). The tool state is unchanged.
-    fn sketch_dimension_selection(&mut self) -> Result<bool, SketchEditError> {
+    /// typed right away (AC40, lead decision 2026-10-31), back in Select (AC43).
+    /// `kind` names a Horizontal or Vertical distance tool; `None` is the smart Dimension.
+    fn sketch_dimension_selection(&mut self, kind: Option<&str>) -> Result<bool, SketchEditError> {
         let snapshot = self.sketch_snapshot_for_edit()?;
-        let kind = self
-            .sketch_dimension_action()
-            .ok_or_else(|| SketchEditError(super::relation_tools::DIMENSION_NEEDS.into()))?;
+        let kind = match kind {
+            Some(kind) => kind,
+            None => self
+                .sketch_dimension_action()
+                .ok_or_else(|| SketchEditError(super::relation_tools::DIMENSION_NEEDS.into()))?,
+        };
         let selected = self.sketch.entities.iter().cloned().collect::<Vec<_>>();
         let unit = if kind == "angle" {
             curvyo_sketch_core::Quantity::angle(1.0)
@@ -108,8 +117,17 @@ impl Session {
         let mut relation =
             curvyo_ui_core::sketch_relation(kind, &snapshot.graph, &selected, Some(&probe))
                 .map_err(SketchEditError)?;
-        let measured = curvyo_sketch_core::measure(&snapshot.solution, &relation)
+        let mut measured = curvyo_sketch_core::measure(&snapshot.solution, &relation)
             .map_err(|e| SketchEditError(e.to_string()))?;
+        // An axis distance keeps the side the solved geometry has: the value is its size.
+        if measured.value() < 0.0
+            && let curvyo_sketch_core::Relation::HorizontalDistance { a, b, .. }
+            | curvyo_sketch_core::Relation::VerticalDistance { a, b, .. } = &mut relation
+        {
+            std::mem::swap(a, b);
+            measured = curvyo_sketch_core::Quantity::length(-measured.value())
+                .map_err(|e| SketchEditError(e.to_string()))?;
+        }
         if let Some(value) = relation.expression_mut() {
             *value = curvyo_sketch_core::Expression::Literal(measured);
         }
@@ -118,7 +136,10 @@ impl Session {
             id.clone(),
             curvyo_sketch_core::Constraint::driving(relation),
         )?;
+        self.sketch_applied_select(selected.iter().cloned().collect());
         self.sketch_edit_dimension(&id);
+        // The entry selects the dimension's points; the geometry picked for it stays (AC43).
+        self.sketch.entities = selected.into_iter().collect();
         Ok(changed)
     }
 
@@ -159,12 +180,12 @@ impl Session {
         self.set_sketch_tool(SketchTool::Select);
         self.sketch.entities = picks;
         // A refusal is shown by `sketch_dimension_selection` itself (`sketch.error`).
-        let _ = self.sketch_dimension_selection();
+        let _ = self.sketch_dimension_selection(None);
         true
     }
 
-    /// With an armed constraint tool, applies it once the picks are complete, then clears the
-    /// picks and stays armed.
+    /// With an armed constraint tool, applies it once the picks are complete, then returns to
+    /// Select with the picks selected (AC43).
     pub(super) fn sketch_apply_armed(&mut self) {
         let Some(tool) = self.sketch.constraint_tool.clone() else {
             return;
@@ -179,8 +200,13 @@ impl Session {
         if curvyo_ui_core::sketch_tool_use(&tool, &snapshot.graph, &picks) != SketchToolUse::Apply {
             return;
         }
+        if axis_distance(&tool) {
+            // Measured at once with its entry open, as a complete preselection (AC44).
+            let _ = self.sketch_dimension_selection(Some(&tool));
+            return;
+        }
         if self.sketch_apply_action(&tool, "", false).is_ok() {
-            self.sketch.entities.clear();
+            self.sketch_applied_select(picks.into_iter().collect());
         }
     }
 }
@@ -197,8 +223,15 @@ pub(super) fn label(tool: &str) -> &'static str {
         "fixed" => "Fixed",
         "symmetric" => "Symmetric",
         "midpoint" => "Midpoint",
+        "horizontal-distance" => "Horizontal distance",
+        "vertical-distance" => "Vertical distance",
         _ => "Dimension",
     }
+}
+
+/// Whether `tool` is the Horizontal or the Vertical distance tool (AC44).
+fn axis_distance(tool: &str) -> bool {
+    matches!(tool, "horizontal-distance" | "vertical-distance")
 }
 
 fn lowercase_first(text: &str) -> String {

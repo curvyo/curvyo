@@ -16,8 +16,9 @@ const out='target/0066-browser/rev2-m3';
   await page.getByRole('menuitemradio',{name:'Sketch',exact:true}).click();
   const tools=page.getByRole('navigation',{name:'Sketch tools'});
   const card=page.getByRole('toolbar',{name:'Constraints'});
-  // AC24: eleven constraint tools in their own card, none of them in the geometry card.
-  assert.equal(await card.getByRole('button').count(),11);
+  // AC24: eleven constraint tools in their own card, none of them in the geometry card;
+  // 0066 revision 4 (AC44) adds Horizontal and Vertical distance.
+  assert.equal(await card.getByRole('button').count(),13);
   await page.screenshot({path:`${out}/rail-card.png`,clip:{x:0,y:0,width:240,height:620}});
   const tool=name=>tools.getByRole('button',{name,exact:true});
   const rail=name=>card.locator(`[data-sketch-rail="${name}"]`);

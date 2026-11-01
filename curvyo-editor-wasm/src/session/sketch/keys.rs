@@ -1,6 +1,6 @@
 //! Sketch keyboard routing protects vector tools from analytic editing shortcuts.
 use super::{Session, SketchTool};
-use crate::session::{KeyInput, KeyOutcome};
+use crate::session::{EscapeStep, KeyInput, KeyOutcome};
 
 impl Session {
     /// Cancels an unfinished Sketch action on a secondary press without committing it.
@@ -18,6 +18,46 @@ impl Session {
         self.sketch.cancel();
         self.button_down = false;
         pending
+    }
+
+    /// The Sketch Escape cascade: an open chain ends in Select with the chain (AC42); a pending
+    /// step is cancelled; otherwise the tool returns to Select (AC20).
+    pub(in crate::session) fn sketch_escape(&mut self) -> EscapeStep {
+        // Escape ends an open Polyline chain: back in Select with the chain (AC42).
+        if self.sketch_end_chain() {
+            self.end_snapping_drag();
+            self.button_down = false;
+            return EscapeStep::ClearedState;
+        }
+        let pending = self.sketch.drag.is_some()
+            || self.sketch.preview.is_some()
+            || self.sketch.dimension_position.is_some()
+            || self.sketch.marquee.is_some()
+            || self.sketch.lasso.is_some()
+            || !self.sketch.picks.is_empty()
+            || self.sketch.edit_constraint.is_some()
+            || self.sketch.label_drag.is_some()
+            || self.sketch.canvas_edit.is_some()
+            || self.button_down;
+        self.sketch_revert_refused();
+        self.sketch.cancel();
+        if !pending {
+            // A drawing tool returns to Select with the previous selection (AC20, AC42);
+            // Select and an armed constraint tool clear it.
+            let drawing = !matches!(
+                self.sketch.tool,
+                SketchTool::Select | SketchTool::Constraints
+            );
+            self.sketch.tool = SketchTool::Select;
+            self.sketch.constraint_tool = None;
+            if !drawing {
+                self.sketch.entities.clear();
+                self.sketch.constraints.clear();
+            }
+        }
+        self.end_snapping_drag();
+        self.button_down = false;
+        EscapeStep::ClearedState
     }
 
     pub(in crate::session) fn sketch_key(&mut self, input: KeyInput<'_>) -> KeyOutcome {
@@ -60,6 +100,10 @@ impl Session {
             "Enter" => {
                 if let Some(id) = self.sketch.constraints.iter().next().cloned() {
                     self.sketch_inspect_constraint(&id, true);
+                    return KeyOutcome::Consumed;
+                }
+                // Enter finishes an open Polyline chain: back in Select with the chain (AC42).
+                if self.sketch_end_chain() {
                     return KeyOutcome::Consumed;
                 }
                 self.sketch.cancel();

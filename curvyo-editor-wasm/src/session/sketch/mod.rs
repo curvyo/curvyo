@@ -9,6 +9,7 @@ mod commands;
 mod construction_preview;
 mod creation;
 mod cursor;
+mod dimension_geometry;
 mod dimension_placement;
 mod drag;
 mod draw;
@@ -31,10 +32,17 @@ mod relation_tools;
 mod selection;
 mod state;
 mod symbols;
+mod tool_return;
 mod typed_dimensions;
 mod view;
 pub(super) use state::SketchState;
 pub use state::{SketchTool, Workbench};
+#[cfg(test)]
+mod rev4_apply_tests;
+#[cfg(test)]
+mod rev4_hv_tests;
+#[cfg(test)]
+mod rev4_return_tests;
 #[cfg(test)]
 mod tests;
 

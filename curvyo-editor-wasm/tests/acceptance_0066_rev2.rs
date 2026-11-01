@@ -104,6 +104,10 @@ fn draw_line(s: &mut Session, a: (f64, f64), b: (f64, f64)) {
     click(s, a.0, a.1);
     click(s, b.0, b.1);
     s.escape();
+    // AC42 (revision 4): a finished shape returns to Select with it selected; restore the
+    // tool and the empty selection this helper ended with before.
+    s.escape();
+    s.set_sketch_tool(SketchTool::Polyline);
 }
 fn relations(g: &sk::Sketch) -> Vec<String> {
     g.constraints
@@ -180,7 +184,8 @@ fn cross(a: (f64, f64), b: (f64, f64)) -> f64 {
 
 // ---------------------------------------------------------------- AC24 rail
 
-const RAIL: [&str; 11] = [
+// AC44 (revision 4) adds Horizontal distance and Vertical distance after Dimension.
+const RAIL: [&str; 13] = [
     "coincident",
     "horizontal",
     "vertical",
@@ -192,6 +197,8 @@ const RAIL: [&str; 11] = [
     "symmetric",
     "midpoint",
     "dimension",
+    "horizontal-distance",
+    "vertical-distance",
 ];
 
 #[test]
@@ -234,10 +241,11 @@ fn ac24_each_tool_applies_with_a_valid_preselection() {
         s.set_sketch_tool(SketchTool::Circle);
         click(&mut s, 250.0, 250.0);
         click(&mut s, 275.0, 250.0);
-        s.set_sketch_tool(SketchTool::Point);
-        click(&mut s, 300.0, 100.0);
-        click(&mut s, 340.0, 130.0);
-        click(&mut s, 400.0, 100.0);
+        // AC42 (revision 4): a finished shape returns to Select with it selected.
+        for (x, y) in [(300.0, 100.0), (340.0, 130.0), (400.0, 100.0)] {
+            s.set_sketch_tool(SketchTool::Point);
+            click(&mut s, x, y);
+        }
         s.set_sketch_tool(SketchTool::Select);
         let g = graph(&s);
         let ls = lines(&g);
@@ -874,9 +882,12 @@ fn ac27_nearest_endpoint_wins_when_several_are_in_range() {
     click(&mut s, 100.0, 100.0);
     click(&mut s, 100.0, 160.0);
     s.escape();
+    // AC42 (revision 4): a finished shape returns to Select with it selected.
+    s.set_sketch_tool(SketchTool::Polyline);
     click(&mut s, 100.0 + gap, 100.0);
     click(&mut s, 100.0 + gap, 160.0);
     s.escape();
+    s.set_sketch_tool(SketchTool::Polyline);
     let g0 = graph(&s);
     let b_id = free_points(&g0)
         .into_iter()
@@ -1780,8 +1791,9 @@ fn ac32_scales_constant_screen_size_symbol_positions_follow_zoom_not_size() {
 
 fn crowded(n: usize) -> Session {
     let mut s = session();
-    s.set_sketch_tool(SketchTool::Polyline);
     for i in 0..n {
+        // AC42 (revision 4): each finished line returns to Select.
+        s.set_sketch_tool(SketchTool::Polyline);
         let (col, row) = (i % 12, i / 12);
         let (x, y) = (40.0 + 45.0 * col as f64, 40.0 + 18.0 * row as f64);
         ctrl(&mut s, true);
@@ -2164,6 +2176,8 @@ fn line_and_point() -> (Session, sk::EntityId, sk::EntityId) {
     s.set_sketch_tool(SketchTool::Point);
     click(&mut s, 130.0, 160.0);
     s.set_sketch_tool(SketchTool::Select);
+    // AC42 (revision 4): a finished shape returns to Select with it selected.
+    s.escape();
     let g = graph(&s);
     let l = lines(&g)[0].0.clone();
     let p = free_points(&g).last().unwrap().clone();

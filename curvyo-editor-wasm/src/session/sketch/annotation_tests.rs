@@ -86,7 +86,7 @@ fn screen_point(s: &Session, annotation: &Value) -> Point {
 }
 
 #[test]
-fn the_rail_lists_eleven_tools_and_classifies_the_selection() {
+fn the_rail_lists_thirteen_tools_and_classifies_the_selection() {
     let (mut s, id) = sketch_with(&[
         line((20.0, 20.0), (40.0, 30.0)),
         line((20.0, 50.0), (40.0, 60.0)),
@@ -97,7 +97,8 @@ fn the_rail_lists_eleven_tools_and_classifies_the_selection() {
         .iter()
         .map(|t| t["name"].as_str().unwrap().to_owned())
         .collect();
-    assert_eq!(names.len(), 11);
+    // Revision 4 adds Horizontal distance and Vertical distance (AC44).
+    assert_eq!(names.len(), 13);
     assert!(
         s.sketch_view()["rail"]
             .as_array()
@@ -170,7 +171,7 @@ fn an_unavailable_tool_applies_nothing_and_says_what_it_needs_on_the_canvas() {
 }
 
 #[test]
-fn an_armed_tool_applies_on_the_last_pick_and_stays_armed() {
+fn an_armed_tool_applies_on_the_last_pick_and_returns_to_select() {
     let (mut s, id) = sketch_with(&[
         line((20.0, 20.0), (60.0, 30.0)),
         line((20.0, 50.0), (60.0, 70.0)),
@@ -181,11 +182,9 @@ fn an_armed_tool_applies_on_the_last_pick_and_stays_armed() {
     assert!(!kinds(&s, id).contains(&"parallel"));
     click(&mut s, 40.0, 60.0);
     assert!(kinds(&s, id).contains(&"parallel"), "{:?}", kinds(&s, id));
-    assert!(s.sketch.entities.is_empty());
-    assert_eq!(s.sketch.constraint_tool.as_deref(), Some("parallel"));
-    // Escape disarms to Select.
-    s.escape();
-    s.escape();
+    // AC43 (revision 4): back in Select with both lines selected.
+    assert_eq!(s.sketch.entities.len(), 2);
+    assert_eq!(s.sketch.constraint_tool, None);
     assert_eq!(s.sketch_tool(), SketchTool::Select);
 }
 

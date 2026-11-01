@@ -111,6 +111,9 @@ pub(in crate::session) struct SketchState {
     pub pick_start: Option<PickStart>,
     /// Sizes typed into the entry box for the shape being drawn, by field (AC39).
     pub(super) typed_dimensions: Vec<(super::entry::EntryField, curvyo_sketch_core::Expression)>,
+    /// Everything the open Polyline chain created so far; selected when the chain ends (AC42).
+    /// Not cleared by [`SketchState::cancel`], which runs after every committed segment.
+    pub chain_created: BTreeSet<EntityId>,
 }
 
 /// The selection a constraint tool was armed with (AC40).

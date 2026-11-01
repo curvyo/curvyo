@@ -1,10 +1,10 @@
 //! Dimension annotations: what each driving or reference dimension measures and where its marks go (AC31).
 use super::Session;
-use curvyo_document_core::{Affine, DisplayUnit, Point, SketchSnapshot, Vec2, ViewTransform};
+use curvyo_document_core::{DisplayUnit, Point, SketchSnapshot, ViewTransform};
 use curvyo_sketch_core::{
-    Constraint, ConstraintId, Dimension, Entity, EntityId, Expression, Position, Relation, Sketch,
+    Constraint, ConstraintId, Dimension, Expression, Position, Relation, Sketch,
 };
-use curvyo_ui_core::{DimensionGeometry, DimensionItem, DimensionMarks};
+use curvyo_ui_core::{DimensionItem, DimensionMarks};
 
 /// Under this many screen pixels of measured geometry a dimension draws only while hovered or
 /// selected (UX notes revision 2, section 7, "Small spans").
@@ -151,8 +151,11 @@ impl Session {
         constraint: &Constraint,
     ) -> Option<(DimensionItem, PendingRecord)> {
         let expression = constraint.relation.expression()?;
-        let (geometry, span) =
-            dimension_geometry(solution, &constraint.relation, snapshot.placement)?;
+        let (geometry, span) = super::dimension_geometry::dimension_geometry(
+            solution,
+            &constraint.relation,
+            snapshot.placement,
+        )?;
         let selected = self.sketch.constraints.contains(id);
         let hovered = self.sketch.annotation_hover.as_ref() == Some(id);
         if span * self.view().scale() < HIDDEN_BELOW_PX && !selected && !hovered {
@@ -259,18 +262,26 @@ fn dimension_texts(
 }
 
 /// The value as the canvas shows it: the display unit, at most the panel's precision, trailing
-/// zeros trimmed, with "R " for a radius and "⌀ " for a diameter.
+/// zeros trimmed, with "R " for a radius, "⌀ " for a diameter and "↔ " / "↕ " for a horizontal
+/// or vertical distance, shown as its size whatever side the geometry is on.
 fn value_text(relation: &Relation, value: f64, dimension: Dimension, unit: DisplayUnit) -> String {
     if dimension == Dimension::Angle {
         return format!("{}°", trimmed(value.to_degrees(), 2));
     }
     let decimals = if unit == DisplayUnit::Mm { 2 } else { 3 };
-    let number = trimmed(value / unit.mm_per_unit(), decimals);
     let prefix = match relation {
         Relation::Radius { .. } | Relation::EllipseRadius { .. } => "R ",
         Relation::Diameter { .. } => "⌀ ",
+        Relation::HorizontalDistance { .. } => "↔ ",
+        Relation::VerticalDistance { .. } => "↕ ",
         _ => "",
     };
+    let value = if prefix.starts_with(['↔', '↕']) {
+        value.abs()
+    } else {
+        value
+    };
+    let number = trimmed(value / unit.mm_per_unit(), decimals);
     format!("{prefix}{number} {}", unit.symbol())
 }
 
@@ -291,207 +302,14 @@ fn trimmed(value: f64, decimals: usize) -> String {
 fn kind_name(relation: &Relation) -> &'static str {
     match relation {
         Relation::Distance { .. } => "Distance",
+        Relation::HorizontalDistance { .. } => "Horizontal distance",
+        Relation::VerticalDistance { .. } => "Vertical distance",
         Relation::Length { .. } => "Length",
         Relation::Radius { .. } | Relation::EllipseRadius { .. } => "Radius",
         Relation::Diameter { .. } => "Diameter",
         Relation::Angle { .. } | Relation::Sweep { .. } | Relation::AxisAngle { .. } => "Angle",
         _ => "Dimension",
     }
-}
-
-fn point(solution: &Sketch, id: &EntityId, placement: Affine) -> Option<Point> {
-    let p = solution.point(id).ok()?;
-    Some(placement.apply_point(Point::new(p.x.0, p.y.0)))
-}
-
-/// A round curve's centre, document radius and default leader direction.
-fn round(solution: &Sketch, id: &EntityId, placement: Affine) -> Option<(Point, f64, Vec2)> {
-    let (center, radius, toward) = match solution.entities.get(id)? {
-        Entity::Circle { center, radius, .. } => (center, radius.0, Vec2::new(1.0, -1.0)),
-        Entity::Arc {
-            center,
-            radius,
-            start_angle,
-            end_angle,
-            ..
-        } => {
-            let mut sweep = end_angle.0 - start_angle.0;
-            if sweep < 0.0 {
-                sweep += std::f64::consts::TAU;
-            }
-            // Three quarters along the arc: its middle carries the arc's symbols.
-            let leader = start_angle.0 + sweep * 0.75;
-            (center, radius.0, Vec2::new(leader.cos(), leader.sin()))
-        }
-        _ => return None,
-    };
-    let c = solution.point(center).ok()?;
-    let local = Point::new(c.x.0, c.y.0);
-    let doc_center = placement.apply_point(local);
-    let rim = placement.apply_point(Point::new(local.x + radius, local.y));
-    Some((
-        doc_center,
-        doc_center.vector_to(rim).length(),
-        placement.apply_vector(toward),
-    ))
-}
-
-fn line(solution: &Sketch, id: &EntityId, placement: Affine) -> Option<(Point, Point)> {
-    match solution.entities.get(id)? {
-        Entity::Line { start, end } => Some((
-            point(solution, start, placement)?,
-            point(solution, end, placement)?,
-        )),
-        _ => None,
-    }
-}
-
-/// The geometry a dimension measures, in document coordinates, and its size for the
-/// small-span rule; `None` for relations that are not dimensions.
-fn dimension_geometry(
-    solution: &Sketch,
-    relation: &Relation,
-    placement: Affine,
-) -> Option<(DimensionGeometry, f64)> {
-    let linear = |from: Point, to: Point| {
-        Some((
-            DimensionGeometry::Linear { from, to },
-            from.vector_to(to).length(),
-        ))
-    };
-    match relation {
-        Relation::Length { curve, .. } => {
-            if let Some((from, to)) = line(solution, curve, placement) {
-                return linear(from, to);
-            }
-            let (center, radius, toward) = round(solution, curve, placement)?;
-            Some((radius_geometry(center, radius, toward), radius * 2.0))
-        }
-        Relation::Distance { a, b, .. } => {
-            let from = point(solution, a, placement)?;
-            if let Some((s, e)) = line(solution, b, placement) {
-                let along = s.vector_to(e);
-                let length = along.length();
-                let t = if length > 0.0 {
-                    (s.vector_to(from).x * along.x + s.vector_to(from).y * along.y)
-                        / (length * length)
-                } else {
-                    0.0
-                };
-                return linear(from, s.translated(along.scaled(t)));
-            }
-            linear(from, point(solution, b, placement)?)
-        }
-        Relation::Radius { curve, .. } => {
-            let (center, radius, toward) = round(solution, curve, placement)?;
-            Some((radius_geometry(center, radius, toward), radius * 2.0))
-        }
-        Relation::Diameter { curve, .. } => {
-            let (center, radius, toward) = round(solution, curve, placement)?;
-            Some((
-                DimensionGeometry::Diameter {
-                    center,
-                    radius: curvyo_document_core::Length::from_mm(radius),
-                    toward,
-                },
-                radius * 2.0,
-            ))
-        }
-        Relation::Angle { a, b, .. } => {
-            let (a0, a1) = line(solution, a, placement)?;
-            let (b0, b1) = line(solution, b, placement)?;
-            angle_geometry(a0, a1, b0, b1)
-        }
-        Relation::AxisAngle { line: id, .. } => {
-            let (start, end) = line(solution, id, placement)?;
-            let along = start.vector_to(end);
-            Some((
-                DimensionGeometry::Angle {
-                    vertex: start,
-                    first: placement.apply_vector(Vec2::new(1.0, 0.0)),
-                    second: along,
-                },
-                along.length(),
-            ))
-        }
-        Relation::EllipseRadius { curve, axis, .. } => {
-            let (center, radius, toward) = semi_axis(solution, curve, *axis, placement)?;
-            Some((radius_geometry(center, radius, toward), radius * 2.0))
-        }
-        // A sweep is the structural half turn of a slot cap or arc, not a maker's dimension.
-        _ => None,
-    }
-}
-
-/// An ellipse's centre, one semi-axis's document length and that semi-axis's direction.
-fn semi_axis(
-    solution: &Sketch,
-    id: &EntityId,
-    axis: curvyo_sketch_core::EllipseAxis,
-    placement: Affine,
-) -> Option<(Point, f64, Vec2)> {
-    let Entity::Ellipse {
-        center,
-        focus,
-        minor_radius,
-        ..
-    } = solution.entities.get(id)?
-    else {
-        return None;
-    };
-    let (c, f) = (solution.point(center).ok()?, solution.point(focus).ok()?);
-    let focal = c.distance(f).0;
-    let major = if focal > 0.0 {
-        Vec2::new((f.x.0 - c.x.0) / focal, (f.y.0 - c.y.0) / focal)
-    } else {
-        Vec2::new(1.0, 0.0)
-    };
-    let (direction, radius) = match axis {
-        curvyo_sketch_core::EllipseAxis::Major => (major, focal.hypot(minor_radius.0)),
-        curvyo_sketch_core::EllipseAxis::Minor => (Vec2::new(-major.y, major.x), minor_radius.0),
-    };
-    let local = Point::new(c.x.0, c.y.0);
-    let doc_center = placement.apply_point(local);
-    let rim = placement.apply_point(local.translated(direction.scaled(radius)));
-    let toward = doc_center.vector_to(rim);
-    Some((doc_center, toward.length(), toward))
-}
-
-fn radius_geometry(center: Point, radius: f64, toward: Vec2) -> DimensionGeometry {
-    DimensionGeometry::Radius {
-        center,
-        radius: curvyo_document_core::Length::from_mm(radius),
-        toward,
-    }
-}
-
-/// The angle between two lines: at their intersection, each ray toward the line's far part.
-fn angle_geometry(a0: Point, a1: Point, b0: Point, b1: Point) -> Option<(DimensionGeometry, f64)> {
-    let (da, db) = (a0.vector_to(a1), b0.vector_to(b1));
-    let cross = da.x * db.y - da.y * db.x;
-    let size = da.length().min(db.length());
-    if cross.abs() <= f64::EPSILON * da.length() * db.length() {
-        return None;
-    }
-    let t = (a0.vector_to(b0).x * db.y - a0.vector_to(b0).y * db.x) / cross;
-    let vertex = a0.translated(da.scaled(t));
-    let ray = |s: Point, e: Point, d: Vec2| {
-        let mid = Point::new(f64::midpoint(s.x, e.x), f64::midpoint(s.y, e.y));
-        let toward = vertex.vector_to(mid);
-        if toward.length() > size * 1e-6 {
-            toward
-        } else {
-            d
-        }
-    };
-    Some((
-        DimensionGeometry::Angle {
-            vertex,
-            first: ray(a0, a1, da),
-            second: ray(b0, b1, db),
-        },
-        size,
-    ))
 }
 
 #[cfg(test)]

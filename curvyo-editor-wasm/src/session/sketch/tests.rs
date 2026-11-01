@@ -151,7 +151,7 @@ fn numeric_creation_and_inspection_view_use_real_domain_values() {
     assert_eq!(snapshot.graph.entities.len(), 9);
     let value: serde_json::Value = serde_json::from_str(&session.sketch_view_json()).unwrap();
     assert_eq!(value["constraints"].as_array().unwrap().len(), 4);
-    assert_eq!(value["actions"].as_array().unwrap().len(), 15);
+    assert_eq!(value["actions"].as_array().unwrap().len(), 17);
     assert_eq!(value["workbench"], "sketch");
     assert_ne!(session.draw_list().triangles.len(), 0);
 }

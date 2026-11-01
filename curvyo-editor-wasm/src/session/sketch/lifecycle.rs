@@ -218,11 +218,14 @@ impl Session {
             return;
         }
         self.sketch.cancel();
+        self.sketch.chain_created.clear();
         self.end_snapping_drag();
         self.sketch.tool = tool;
         self.sketch.constraint_tool = None;
         self.sketch.mode = curvyo_sketch_core::ContinuationMode::FreeLine;
-        if matches!(tool, SketchTool::Polyline | SketchTool::Arc) {
+        // Only a selected open endpoint resumes; any other leftover selection (a free point the
+        // Point tool left selected) is no continuation start and stays silent.
+        if matches!(tool, SketchTool::Polyline | SketchTool::Arc) && self.sketch_can_resume() {
             self.resume_sketch_endpoint();
         }
     }

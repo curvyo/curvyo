@@ -15,6 +15,7 @@ const h=require('./sketch-rev2-support.cjs');
   assert.equal(await page.getByRole('form',{name:'Sketch tool options'}).count(),0,'no options bar');
   await h.tool(page,'Circle');await page.mouse.click(400,300);
   await h.typeEntry(page,[['Sketch Radius','6 mm']]);
+  await page.keyboard.press('Escape'); // 0066 revision 4 (AC42): the circle returns selected; clear it so Dimension arms.
   // Nothing selected: Dimension arms (a selection would apply at once, 0066 revision 3); pick the circle on its outline.
   await h.rail(page,'dimension').click();await page.mouse.click(423,300);await page.mouse.move(520,360);
   await page.keyboard.press('Alt'); // Diameter (default) -> Radius
@@ -50,6 +51,8 @@ const h=require('./sketch-rev2-support.cjs');
   await page.keyboard.press('Escape');await page.keyboard.press('Escape');
   assert.equal(await page.locator('[data-sketch-entry]').count(),0);
   // Arc: Alt picks the variant before the first pick; after it Alt only hints; right-click cancels.
+  // 0066 revision 4 (AC42): the typed point above is still selected; clear it (see the rev4 report finding on the Arc centre hint).
+  await h.tool(page,'Select');await page.mouse.click(760,620);
   await h.tool(page,'Arc');await page.mouse.move(650,500);await h.pump(page);
   assert.equal(await label(),'Arc, 3 points');
   assert.equal(await h.alt(page),'Arc, centre');

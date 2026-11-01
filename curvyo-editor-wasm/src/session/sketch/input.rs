@@ -2,7 +2,7 @@
 use super::Session;
 use curvyo_document_core::SketchEditError;
 use curvyo_sketch_core::{
-    Constraint, ConstraintId, Dimension, Expression, Parameter, ParameterId, Quantity,
+    Constraint, ConstraintId, Dimension, Expression, Parameter, ParameterId, Quantity, Relation,
 };
 
 /// A typed dimension that contradicts other constraints (UX notes revision 2 review, change 6).
@@ -23,7 +23,12 @@ impl Session {
         // A dimension placed on the canvas is typed into its entry box.
         let boxed = self.sketch.constraint_tool.as_deref() == Some("dimension")
             && self.sketch.dimension_position.is_some();
+        let picks = self.sketch.entities.clone();
         let result = self.sketch_action_inner(action, text, reference);
+        // A placed dimension, once entered, returns to Select with its geometry (AC43).
+        if boxed && result.is_ok() {
+            self.sketch_applied_select(picks);
+        }
         self.sketch.error = result.as_ref().err().map(ToString::to_string);
         if boxed {
             match &result {
@@ -82,7 +87,13 @@ impl Session {
         let snapshot = self.sketch_snapshot_for_edit()?;
         let value = if matches!(
             action,
-            "distance" | "length" | "radius" | "diameter" | "angle"
+            "distance"
+                | "horizontal-distance"
+                | "vertical-distance"
+                | "length"
+                | "radius"
+                | "diameter"
+                | "angle"
         ) {
             Some(parse_value(
                 text,
@@ -230,8 +241,23 @@ impl Session {
         if let Some(value) = constraint.relation.expression_mut() {
             *value = expression;
         }
+        keep_axis_side(&snapshot.solution, &mut constraint.relation);
         constraint.reference = reference;
         self.sketch_set_constraint(id.clone(), constraint)
+    }
+}
+
+/// Orders an axis distance's points so the solved geometry measures it non-negative (AC46).
+///
+/// A reference axis distance follows the geometry, so a drag can leave its signed measure
+/// negative while the text shows the size; a value entered then keeps that side.
+fn keep_axis_side(solution: &curvyo_sketch_core::Sketch, relation: &mut Relation) {
+    let negative = curvyo_sketch_core::measure(solution, relation).is_ok_and(|q| q.value() < 0.0);
+    if negative
+        && let Relation::HorizontalDistance { a, b, .. } | Relation::VerticalDistance { a, b, .. } =
+            relation
+    {
+        std::mem::swap(a, b);
     }
 }
 
