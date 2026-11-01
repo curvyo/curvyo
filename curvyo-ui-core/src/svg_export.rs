@@ -383,6 +383,9 @@ pub(crate) fn shape_leaf(
             shadow.markers = stroke_shadow.markers;
             Some((kind, style, shadow))
         }
-        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => None,
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => None,
     }
 }

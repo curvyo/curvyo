@@ -1,5 +1,6 @@
 //! The SVG export's options, guides, markers, images and plain-SVG fallback
-//! (`specs/0024-svg-import-export` criteria 61, 130, 131, 137, 141, 143, 144, 145 and 146).
+//! (`specs/0024-svg-import-export` criteria 61, 130, 131, 137, 141, 143, 144, 145 and 146), and
+//! no dimension in it (`specs/0070-measure-and-dimension` criterion 9).
 #![allow(
     clippy::unwrap_used,
     clippy::float_cmp,
@@ -10,9 +11,10 @@
 use std::sync::Arc;
 
 use curvyo_document_core::{
-    AnchorId, AnchorKind, Angle, CornerRadii, DashPattern, Document, DocumentSize, DrawingAnchor,
-    DrawingNode, DrawingOutline, DrawingPage, DrawingPageFrame, DrawingRegisters, Length,
-    MarkerPlace, MarkerShape, NodeId, Point, RectBounds, Shape, Style, Vec2,
+    AnchorId, AnchorKind, Angle, CornerRadii, DashPattern, DimensionKind, DimensionPlace,
+    DimensionSlots, Document, DocumentSize, DrawingAnchor, DrawingNode, DrawingOutline,
+    DrawingPage, DrawingPageFrame, DrawingRegisters, Length, MarkerPlace, MarkerShape, NodeId,
+    Point, PointSlot, RectBounds, Shape, Style, Vec2,
 };
 use curvyo_text_core::FaceStore;
 use curvyo_ui_core::{
@@ -366,6 +368,32 @@ fn ac145_the_grid_and_origin_corner_change_nothing() {
     let mut grid = doc.pages()[0].grid;
     grid.shown = !grid.shown;
     let _ = doc.set_page_grid(&page, grid);
+    let (_, after) = export_with(&doc, SvgExportOptions::default(), &[], 0);
+    assert_eq!(before, after);
+}
+
+#[test]
+fn a_dimension_is_not_exported() {
+    let nodes = vec![line(
+        (10.0, 10.0),
+        (60.0, 10.0),
+        Style::default(),
+        named("l"),
+    )];
+    let doc = document(&nodes, Vec::new(), &[]);
+    let (_, before) = export_with(&doc, SvgExportOptions::default(), &[], 0);
+    let path = doc.object_ids()[0];
+    let anchor = |n| PointSlot::Anchor {
+        node: path,
+        anchor: AnchorId::new(9, n),
+    };
+    doc.add_dimension(
+        DimensionKind::Aligned,
+        DimensionSlots::Points(vec![anchor(0), anchor(1)]),
+        DimensionPlace::at_offset(Length::from_mm(5.0)),
+    )
+    .unwrap();
+    assert_eq!(doc.object_ids().len(), 2);
     let (_, after) = export_with(&doc, SvgExportOptions::default(), &[], 0);
     assert_eq!(before, after);
 }
