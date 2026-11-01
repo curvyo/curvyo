@@ -8,6 +8,9 @@ use curvyo_document_core::{Length, Point, Vec2, ViewTransform};
 #[path = "sketch_dimension_text.rs"]
 mod text;
 use text::{break_around_text, free_text, text_half_px};
+#[path = "sketch_dimension_projected.rs"]
+mod projected;
+use projected::projected;
 
 /// Gap between the measured geometry and the start of an extension line.
 const EXTENSION_GAP_PX: f64 = 4.0;
@@ -45,6 +48,16 @@ pub enum DimensionGeometry {
         from: Point,
         /// Second measured point.
         to: Point,
+    },
+    /// A horizontal or vertical distance between two points, measured along a fixed direction:
+    /// the dimension line runs along it, the extension lines stand perpendicular to it.
+    Projected {
+        /// First measured point.
+        from: Point,
+        /// Second measured point.
+        to: Point,
+        /// The measured direction (the sketch's X or Y axis in document coordinates).
+        along: Vec2,
     },
     /// A circle or arc radius, with the default leader direction.
     Radius {
@@ -123,7 +136,10 @@ pub fn layout_dimensions(items: &[DimensionItem], view: ViewTransform) -> Vec<Di
                     marks.text = free;
                     break;
                 }
-                if !matches!(item.geometry, DimensionGeometry::Linear { .. }) {
+                if !matches!(
+                    item.geometry,
+                    DimensionGeometry::Linear { .. } | DimensionGeometry::Projected { .. }
+                ) {
                     break;
                 }
                 rank += 1;
@@ -147,6 +163,9 @@ fn layout_dimension(
     let text = text_half_px(item.text_chars);
     match item.geometry {
         DimensionGeometry::Linear { from, to } => linear(from, to, label, rank, px),
+        DimensionGeometry::Projected { from, to, along } => {
+            projected((from, to), along, label, rank, px)
+        }
         DimensionGeometry::Radius {
             center,
             radius,

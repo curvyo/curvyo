@@ -257,3 +257,69 @@ fn the_dimension_line_breaks_around_a_centred_text_and_still_reaches_both_arrows
     assert!(close(dimension[0].0.x, 0.0) && close(dimension[0].1.x, 25.0 - half_gap));
     assert!(close(dimension[1].0.x, 25.0 + half_gap) && close(dimension[1].1.x, 50.0));
 }
+
+/// A horizontal distance (0066 AC45): the dimension line runs along X beyond the outer point,
+/// both extension lines stand perpendicular to it, the arrows point along X.
+#[test]
+fn a_projected_dimension_runs_along_its_axis_with_perpendicular_extension_lines() {
+    let scale = 4.0;
+    let from = Point::new(0.0, 0.0);
+    let to = Point::new(30.0, -20.0);
+    let item = DimensionItem {
+        geometry: DimensionGeometry::Projected {
+            from,
+            to,
+            along: Vec2::new(1.0, 0.0),
+        },
+        label: None,
+        text_chars: 7,
+    };
+    let marks = &layout_dimensions(&[item], view(scale))[0];
+    // Extension lines: vertical, from 4px off each point to 4px past the line 24px above `to`.
+    let level = -20.0 - 24.0 / scale;
+    for (base, (start, end)) in [from, to].into_iter().zip(&marks.lines[..2]) {
+        assert!(
+            close(start.x, base.x) && close(end.x, base.x),
+            "{start:?} {end:?}"
+        );
+        assert!(close(start.y, base.y - 4.0 / scale), "{start:?}");
+        assert!(close(end.y, level - 4.0 / scale), "{end:?}");
+    }
+    // The dimension line (broken around the text) lies on that level, arrows along X.
+    for (a, b) in &marks.lines[2..] {
+        assert!(close(a.y, level) && close(b.y, level), "{a:?} {b:?}");
+    }
+    assert_eq!(marks.arrows.len(), 2);
+    assert!(close(marks.arrows[0].tip.x, 0.0) && close(marks.arrows[1].tip.x, 30.0));
+    assert!(close(marks.arrows[0].back.x.abs(), 1.0) && close(marks.arrows[0].back.y, 0.0));
+    assert!(close(marks.text.x, 15.0) && close(marks.text.y, level));
+}
+
+/// A vertical distance stands left of the leftmost point; a dragged label sets its level.
+#[test]
+fn a_vertical_projected_dimension_stands_left_and_follows_its_label() {
+    let item = |label| DimensionItem {
+        geometry: DimensionGeometry::Projected {
+            from: Point::new(10.0, 0.0),
+            to: Point::new(0.0, -100.0),
+            along: Vec2::new(0.0, -1.0),
+        },
+        label,
+        text_chars: 7,
+    };
+    let marks = &layout_dimensions(&[item(None)], view(1.0))[0];
+    assert!(
+        close(marks.text.x, -24.0) && close(marks.text.y, -50.0),
+        "{:?}",
+        marks.text
+    );
+    let dragged = &layout_dimensions(&[item(Some(Point::new(40.0, -5.0)))], view(1.0))[0];
+    assert!(
+        close(dragged.text.x, 40.0) && close(dragged.text.y, -5.0),
+        "{:?}",
+        dragged.text
+    );
+    for arrow in &dragged.arrows {
+        assert!(close(arrow.tip.x, 40.0));
+    }
+}

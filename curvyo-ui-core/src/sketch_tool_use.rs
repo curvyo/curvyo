@@ -16,6 +16,8 @@ pub const SKETCH_RAIL_TOOLS: &[&str] = &[
     "symmetric",
     "midpoint",
     "dimension",
+    "horizontal-distance",
+    "vertical-distance",
 ];
 
 /// The dimension kinds the smart dimension tool chooses between.
@@ -53,11 +55,16 @@ pub fn sketch_tool_use(tool: &str, graph: &Sketch, selected: &[EntityId]) -> Ske
     if selected.is_empty() {
         return SketchToolUse::Arm;
     }
-    match sketch_relations(tool, graph, selected, None) {
+    match sketch_relations(tool, graph, selected, probe().as_ref()) {
         Ok(_) => SketchToolUse::Apply,
         Err(_) if completes(tool, graph, selected) => SketchToolUse::Arm,
         Err(reason) => SketchToolUse::Unavailable(reason),
     }
+}
+
+/// A stand-in length for the dimension tools' eligibility; relations ignore it.
+fn probe() -> Option<Expression> {
+    Quantity::length(1.0).ok().map(Expression::Literal)
 }
 
 /// The first dimension kind the selection supports, in the smart tool's order.
@@ -95,7 +102,7 @@ fn completes(tool: &str, graph: &Sketch, selected: &[EntityId]) -> bool {
     let fits = |extra: &[&EntityId]| {
         let mut picks = selected.to_vec();
         picks.extend(extra.iter().map(|id| (*id).clone()));
-        sketch_relations(tool, graph, &picks, None).is_ok()
+        sketch_relations(tool, graph, &picks, probe().as_ref()).is_ok()
     };
     candidates
         .iter()
@@ -208,6 +215,47 @@ mod tests {
         let three = ids(&["r:line0", "r:line1", "r:line2"]);
         assert!(matches!(
             sketch_tool_use("dimension", &graph, &three),
+            SketchToolUse::Unavailable(_)
+        ));
+    }
+
+    /// Horizontal and Vertical distance apply to two points, a point and the origin or the
+    /// matching axis, and one line; one point arms them (0066 AC44, AC48).
+    #[test]
+    fn axis_distances_apply_to_points_a_line_or_a_point_and_an_axis() {
+        let graph = graph();
+        for tool in ["horizontal-distance", "vertical-distance"] {
+            for selection in [
+                ids(&["r:p0", "r:p2"]),
+                ids(&["r:line0"]),
+                ids(&["r:p0", "origin"]),
+            ] {
+                assert_eq!(
+                    sketch_tool_use(tool, &graph, &selection),
+                    SketchToolUse::Apply,
+                    "{tool} {selection:?}"
+                );
+            }
+            assert_eq!(
+                sketch_tool_use(tool, &graph, &ids(&["r:p0"])),
+                SketchToolUse::Arm
+            );
+            assert!(matches!(
+                sketch_tool_use(tool, &graph, &ids(&["r:p0", "r:p1", "r:p2"])),
+                SketchToolUse::Unavailable(_)
+            ));
+        }
+        let point_and = |axis: &str| ids(&["r:p0", axis]);
+        assert_eq!(
+            sketch_tool_use("horizontal-distance", &graph, &point_and(SKETCH_AXIS_Y)),
+            SketchToolUse::Apply
+        );
+        assert_eq!(
+            sketch_tool_use("vertical-distance", &graph, &point_and(SKETCH_AXIS_X)),
+            SketchToolUse::Apply
+        );
+        assert!(matches!(
+            sketch_tool_use("horizontal-distance", &graph, &point_and(SKETCH_AXIS_X)),
             SketchToolUse::Unavailable(_)
         ));
     }

@@ -100,6 +100,11 @@ pub(super) fn free_text(
             let (along, _, length) = linear_frame(from, to);
             (along, length / 3.0)
         }
+        DimensionGeometry::Projected { from, to, along } => {
+            let along = along.normalized_to(1.0);
+            let span = from.vector_to(to);
+            (along, (span.x * along.x + span.y * along.y).abs() / 3.0)
+        }
         _ => return None,
     };
     (1..=6)
