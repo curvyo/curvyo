@@ -84,6 +84,25 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0056-mirror-and-negative-scale` criterion 29.
     ("flip_horizontal", "Flip horizontally"),
     ("flip_vertical", "Flip vertically"),
+    // `specs/0061-align-and-distribute` criterion 12.
+    ("align_left", "Align left"),
+    ("align_centre_h", "Align horizontal centres"),
+    ("align_right", "Align right"),
+    ("align_top", "Align top"),
+    ("align_centre_v", "Align vertical centres"),
+    ("align_bottom", "Align bottom"),
+    ("distribute_h", "Distribute horizontally"),
+    ("distribute_v", "Distribute vertically"),
+    // `specs/0061-align-and-distribute` criteria 17 and 21.
+    ("align_left_page", "Align left to page"),
+    ("align_centre_h_page", "Align horizontal centres to page"),
+    ("align_right_page", "Align right to page"),
+    ("align_top_page", "Align top to page"),
+    ("align_centre_v_page", "Align vertical centres to page"),
+    ("align_bottom_page", "Align bottom to page"),
+    ("distribute_h_page", "Distribute horizontally on page"),
+    ("distribute_v_page", "Distribute vertically on page"),
+    ("arrange_grid", "Arrange in a grid"),
     ("set_corner_radius", "Change corner radius"),
     ("set_corner_radii", "Change corner radius"),
     // `specs/0021-ellipse-arcs-and-shaping` criterion 59.
@@ -185,6 +204,31 @@ mod tests {
     fn the_guide_commands_are_named_guide_and_template() {
         assert_eq!(operation_name("set_guide"), "Guide");
         assert_eq!(operation_name("load_template"), "Template");
+    }
+
+    #[test]
+    fn the_align_and_distribute_commands_are_named() {
+        assert_eq!(operation_name("align_left"), "Align left");
+        assert_eq!(operation_name("align_centre_h"), "Align horizontal centres");
+        assert_eq!(operation_name("distribute_v"), "Distribute vertically");
+    }
+
+    #[test]
+    fn the_page_and_grid_commands_are_named() {
+        assert_eq!(operation_name("align_left_page"), "Align left to page");
+        assert_eq!(
+            operation_name("align_centre_v_page"),
+            "Align vertical centres to page"
+        );
+        assert_eq!(
+            operation_name("distribute_h_page"),
+            "Distribute horizontally on page"
+        );
+        assert_eq!(
+            operation_name("distribute_v_page"),
+            "Distribute vertically on page"
+        );
+        assert_eq!(operation_name("arrange_grid"), "Arrange in a grid");
     }
 
     #[test]
