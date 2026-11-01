@@ -44,6 +44,22 @@ mod page_grid;
 mod pages;
 pub use page_grid::{GridMode, GridScale, OriginCorner, PageGrid, PageGridError};
 pub use pages::{FIRST_PAGE_ID, Page, PageError};
+mod dimension_codec;
+mod dimension_commands;
+mod dimension_keep;
+mod dimension_model;
+mod dimension_read;
+pub use dimension_commands::{ConvertedPath, DimensionConversion};
+pub use dimension_model::{
+    CONVERT_DIMENSION_COMMIT_LABEL, CREATE_DIMENSION_COMMIT_LABEL, CurveSlot, DimensionKind,
+    DimensionPlace, DimensionSlots, DimensionSnapshot, DimensionValue,
+    EDIT_DIMENSION_NODES_COMMIT_LABEL, MOVE_DIMENSION_COMMIT_LABEL, Measured, PointSlot,
+    ShapeFeature, staying_dimensions,
+};
+pub use dimension_read::{
+    CIRCLE_TOLERANCE, angle_rays, arc_circle, cubic_at, measure, resolve as resolve_dimension,
+    resolve_dimensions_in, resolve_into as resolve_dimension_into, segment, shape_point,
+};
 mod drawing_above;
 mod drawing_check;
 mod drawing_content;

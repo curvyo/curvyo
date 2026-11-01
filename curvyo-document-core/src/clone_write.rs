@@ -120,6 +120,7 @@ pub(crate) fn origin_is_live(tree: &LoroTree, origin: NodeId) -> bool {
             !matches!(
                 crate::shape_codec::leaf_kind(&origin_meta),
                 crate::shape_codec::LeafKind::Primitive(_)
+                    | crate::shape_codec::LeafKind::Dimension
             )
         })
 }

@@ -238,7 +238,8 @@ impl Document {
             | ObjectSnapshot::Path(_)
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_) => None,
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => None,
         }
     }
 
@@ -539,6 +540,12 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
     }
     if crate::image_codec::is_image_meta(&meta) {
         return crate::image_codec::read_image_snapshot(id, &meta).map(ObjectSnapshot::Image);
+    }
+    if crate::dimension_codec::is_dimension_meta(&meta) {
+        return crate::dimension_codec::read_dimension_snapshot(id, &meta).map(|mut dimension| {
+            crate::dimension_read::resolve_into(&mut dimension, |_| None);
+            ObjectSnapshot::Dimension(Box::new(dimension))
+        });
     }
     match shape_codec::read_shape_tag(&meta) {
         Some(shape) if shape == "sketch" => crate::sketch_read::read(id, &meta)

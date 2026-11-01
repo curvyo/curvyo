@@ -115,6 +115,7 @@ fn sources(document: &Document, ids: &[NodeId], start: u64) -> Vec<CopySource> {
             let count = match document.object(id).unwrap() {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Path(path) => path.anchors.len(),
                 ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => 0,
@@ -132,6 +133,7 @@ fn reidentified(object: &ObjectSnapshot, id: NodeId, anchor_ids: &[AnchorId]) ->
     match object {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => {
             let mut path = path.clone();

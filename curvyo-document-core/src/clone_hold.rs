@@ -113,9 +113,10 @@ impl Document {
             ObjectSnapshot::Path(path) => Some(path.clone()),
             ObjectSnapshot::Sketch(sketch) => Some(sketch.resolved.clone()),
             ObjectSnapshot::Clone(clone) => Some(clone.resolved.clone()),
-            ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => {
-                None
-            }
+            ObjectSnapshot::Primitive(_)
+            | ObjectSnapshot::Text(_)
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => None,
         };
         let moved: Vec<(NodeId, Affine)> = results
             .iter()

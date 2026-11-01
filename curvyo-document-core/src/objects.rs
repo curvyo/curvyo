@@ -193,11 +193,13 @@ impl Document {
         } else {
             self.moved_clone_matrices(&ids, transform)?
         };
+        let staying = self.staying_dimensions(&ids.iter().copied().collect::<HashSet<NodeId>>());
         for (meta, id) in metas.iter().zip(&ids) {
             match clones.get(id) {
                 Some(&(origin, matrix)) => {
                     crate::clone_write::write_matrix(meta, origin, matrix);
                 }
+                None if staying.contains(id) => {}
                 None => translate_meta(meta, offset),
             }
         }
@@ -278,7 +280,8 @@ impl Document {
                 }
                 ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Text(_)
-                | ObjectSnapshot::Image(_) => None,
+                | ObjectSnapshot::Image(_)
+                | ObjectSnapshot::Dimension(_) => None,
             })
             .collect();
         self.clone_limits_hold(&links, &changed)
@@ -436,6 +439,7 @@ impl Document {
         crate::clone_copy::relink_copied_clones(&tree, &copying.made, offset);
         crate::text_carrier::relink_copied_texts(&tree, &copying.made, text_shifts);
         crate::text_clone_commands::relink_copied_text_clones(&tree, &copying.made);
+        crate::dimension_commands::relink_copied_dimensions(self, &tree, &copying.made, offset);
         self.assign_sketch_copies(&copying.made, &sketch_claims);
         self.commit_with_label("duplicate_objects");
         Ok(created
@@ -808,6 +812,9 @@ pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
         shape_codec::LeafKind::Clone => {}
         shape_codec::LeafKind::Text => crate::text_codec::translate_text_meta(meta, offset),
         shape_codec::LeafKind::Image => crate::image_codec::translate_image_meta(meta, offset),
+        shape_codec::LeafKind::Dimension => {
+            crate::dimension_codec::translate_dimension_meta(meta, offset);
+        }
     }
 }
 

@@ -300,7 +300,17 @@ impl DocumentVersion {
 /// the defaults and opening writes nothing; a malformed one is refused as damaged.
 /// Golden: `grid_v30.curvyo`. Older files open with the defaults; old-file compatibility
 /// waived (customer, 2026-10-30).
-pub const CURRENT_FORMAT_VERSION: u32 = 30;
+///
+/// Bumped to 31 in `measure-and-dimension` (ADR 0027, `specs/0070-measure-and-dimension`): a new
+/// leaf kind, `shape = "dimension"`, with the registers `dimension_kind`, `dimension_ref_a` to
+/// `dimension_ref_c`, `dimension_place` and `dimension_kept` (`crate::dimension_codec`). A build
+/// that stops at version 30 reads the tag as an unknown primitive and could output a guide as
+/// artwork, so it must refuse every file of this build as too new. Migration from version 30 is
+/// none: a file without dimensions opens unchanged and is not rewritten. Damage: an unknown kind,
+/// a slot count that does not fit the kind, a malformed slot, a value that is not finite. The
+/// number is provisional by the rule above. Goldens: `dimension_v31.curvyo` and
+/// `dimension_*_v31.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 31;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -722,6 +732,15 @@ enum ObjectJson {
         id: crate::path_model::NodeId,
         objects: Vec<NodeJson>,
     },
+    /// A dimension (`specs/0070-measure-and-dimension`, ADR 0027): kind, slots, place and the
+    /// last measured value; no geometry of its own.
+    Dimension {
+        id: crate::path_model::NodeId,
+        kind: crate::dimension_model::DimensionKind,
+        slots: crate::dimension_model::DimensionSlots,
+        place: crate::dimension_model::DimensionPlace,
+        kept: crate::dimension_model::Measured,
+    },
     /// A linked clone (`specs/0049-linked-clone` criterion 40): the original it follows and its
     /// matrix `[a, b, c, d, e, f]`, no outline. Listed whether or not its chain resolves. The
     /// override flags are listed only when set, and `style` only with `own_style`; its own
@@ -829,6 +848,13 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 graph: sketch.graph,
                 placement: sketch.placement,
                 style: sketch.style,
+            },
+            ObjectSnapshot::Dimension(dimension) => Self::Dimension {
+                id: dimension.id,
+                kind: dimension.kind,
+                slots: dimension.slots,
+                place: dimension.place,
+                kept: dimension.kept,
             },
             ObjectSnapshot::Path(path) => Self::Path {
                 id: path.id,

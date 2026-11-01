@@ -123,6 +123,12 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
         return crate::image_codec::read_image_snapshot(id, meta)
             .map_or(RawLeaf::Unreadable(id), RawLeaf::Image);
     }
+    if crate::dimension_codec::is_dimension_meta(meta) {
+        return crate::dimension_codec::read_dimension_snapshot(id, meta)
+            .map_or(RawLeaf::Unreadable(id), |dimension| {
+                RawLeaf::Dimension(Box::new(dimension))
+            });
+    }
     if read_shape_tag(meta).as_deref() == Some("sketch") {
         return crate::sketch_read::read(id, meta).map_or(RawLeaf::Unreadable(id), |sketch| {
             RawLeaf::Sketch(Box::new(sketch))

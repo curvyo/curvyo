@@ -34,7 +34,8 @@ impl Document {
                         | crate::ObjectSnapshot::Path(_)
                         | crate::ObjectSnapshot::Clone(_)
                         | crate::ObjectSnapshot::Text(_)
-                        | crate::ObjectSnapshot::Image(_) => true,
+                        | crate::ObjectSnapshot::Image(_)
+                        | crate::ObjectSnapshot::Dimension(_) => true,
                     };
                     (o.orientation(), closed)
                 })

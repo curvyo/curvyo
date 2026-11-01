@@ -67,6 +67,8 @@ pub enum ObjectShape {
     Text,
     /// An image (`specs/0058-bitmap-import`).
     Image,
+    /// A dimension (`specs/0070-measure-and-dimension`).
+    Dimension,
 }
 
 /// The outcome for one object.

@@ -66,7 +66,7 @@ pub fn carrier_curve(object: &ObjectSnapshot, outline: u32) -> Option<CarrierCur
             })
         }
         // Neither a text nor an image is a carrier (ADR 0022, `specs/0058-bitmap-import/adrs.md`).
-        ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => None,
+        ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => None,
     }
 }
 

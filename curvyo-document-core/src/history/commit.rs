@@ -48,6 +48,10 @@ pub(crate) struct CommitState {
     warm: Cell<bool>,
     /// The document has a keyring (see `Document::mark_shared`).
     shared: Cell<bool>,
+    /// The version after this session's last commit, when that commit found no dimension
+    /// (`crate::dimension_keep`): a commit right after it adds one only through the writers
+    /// that forget this.
+    pub(crate) no_dimensions_at: RefCell<Option<loro::Frontiers>>,
 }
 
 /// Ends a [`Document::batch`] even when the closure panics.
@@ -181,11 +185,14 @@ impl Document {
     /// or `None` when nothing was pending (no step is added).
     pub(crate) fn commit_step(&self, label: &str, extra: &[(&str, String)]) -> Option<StepRef> {
         let state = &self.commit_state;
-        let pending = self.loro().get_pending_txn_len();
-        if pending == 0 {
+        if self.loro().get_pending_txn_len() == 0 {
             state.continue_next.set(false);
             return None;
         }
+        // The last value of each linked dimension joins the step that changed its geometry
+        // (ADR 0027 §4).
+        let without_dimensions = self.refresh_dimension_kept();
+        let pending = self.loro().get_pending_txn_len();
         // `continue_step` checked that nothing else was committed or merged since the last step.
         let joined = state
             .continue_next
@@ -199,6 +206,12 @@ impl Document {
         }
         let header = self.next_header(label, extra);
         let step = self.finish_commit(&header.format(), None, pending);
+        let version = state
+            .last
+            .borrow()
+            .as_ref()
+            .map(|last| last.version.clone());
+        *state.no_dimensions_at.borrow_mut() = version.filter(|_| without_dimensions);
         state.own.borrow_mut().push(OwnStep {
             step,
             label: label.to_owned(),
@@ -217,6 +230,18 @@ impl Document {
             .map(|(key, value)| ((*key).to_owned(), value.clone()))
             .collect();
         header
+    }
+
+    /// Whether this session's last commit found no dimension and nothing was committed or
+    /// merged since: only the pending writes are new (`crate::dimension_keep`).
+    pub(crate) fn dimension_free_since_last_commit(&self) -> bool {
+        let state = &self.commit_state;
+        let at = state.no_dimensions_at.borrow();
+        let last = state.last.borrow();
+        match (at.as_ref(), last.as_ref()) {
+            (Some(at), Some(last)) => last.version == *at && self.only_own_since(last),
+            _ => false,
+        }
     }
 
     /// Whether nothing but this peer's own pending writes happened since `last`: no commit of

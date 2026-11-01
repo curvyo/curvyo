@@ -82,6 +82,7 @@ fn kind(d: &Document, id: NodeId) -> &'static str {
     match d.object(id).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(_) => "path",
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => "primitive",
@@ -102,6 +103,7 @@ fn a_conversion_keeps_id_position_and_style_in_one_commit() {
     let style_before = match d.object(s).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
         ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),

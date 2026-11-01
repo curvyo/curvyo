@@ -61,6 +61,7 @@ fn style_of(doc: &Document, id: curvyo_document_core::NodeId) -> Style {
     match doc.object(id).expect("object exists") {
         ObjectSnapshot::Sketch(s) => s.style,
         ObjectSnapshot::Image(i) => i.style,
+        ObjectSnapshot::Dimension(d) => d.style,
         ObjectSnapshot::Text(t) => t.style,
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
@@ -186,6 +187,7 @@ fn legacy() -> Legacy {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(_) => linear_path = Some(id),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
@@ -237,6 +239,7 @@ fn legacy_gradient_file_opens_without_error_and_keeps_geometry_and_stroke() {
     match l.doc.object(l.linear_path).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => {
             assert_eq!(p.anchors.len(), 3);
@@ -583,6 +586,11 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "grid_shown_type_v30.curvyo",
         "snapping_grid_point_unknown_v30.curvyo",
         "grid_origin_unknown_v30.curvyo",
+        // Intentionally malformed 0070 dimension registers.
+        "dimension_kind_unknown_v31.curvyo",
+        "dimension_slots_count_v31.curvyo",
+        "dimension_slot_malformed_v31.curvyo",
+        "dimension_value_nan_v31.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

@@ -232,6 +232,8 @@ impl Document {
             (KEY_OBJECT, encode_node(src)),
             (KEY_VERSION, version.encode()),
         ];
+        // A copied version may hold a dimension.
+        self.forget_dimension_scan();
         self.commit_step(LABEL_CLONE_VERSION, &extra);
         Ok(node_id(created))
     }

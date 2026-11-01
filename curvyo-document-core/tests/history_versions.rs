@@ -30,6 +30,9 @@ fn stroke(d: &Document, id: NodeId) -> f64 {
     match d.object(id).unwrap() {
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+            unreachable!("no dimension in this test")
+        }
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         curvyo_document_core::ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),

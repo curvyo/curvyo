@@ -113,7 +113,7 @@ fn ac1_new_document_page_has_the_stated_default_grid() {
 
 #[test]
 fn ac1_format_version_went_up_by_one_to_30() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 30);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 30);
 }
 
 #[test]
