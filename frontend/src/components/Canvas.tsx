@@ -1,3 +1,4 @@
+import { MeasureOverlay } from "@/components/MeasureOverlay";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
 import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanvasChips";
@@ -165,6 +166,9 @@ export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
       </NodeContextMenu>
       <PageFrames getSession={editor.getSession} />
       <SketchAnnotations sketch={sketch} />
+      {sketch.view.workbench !== "sketch" && (
+        <MeasureOverlay getSession={editor.getSession} measuring={editor.tool === "measure"} />
+      )}
       <SketchModeLabel sketch={sketch} containerRef={editor.containerRef} />
       <SketchEntryBox sketch={sketch} containerRef={editor.containerRef} />
       {/* The drop cue: a 2px dashed accent outline inside the viewport while files hover over the

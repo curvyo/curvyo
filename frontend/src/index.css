@@ -159,6 +159,8 @@
     --dim-driving: #BF2933;
     --dim-reference: var(--panel-muted-fg);
     --dim-halo: var(--canvas-bg);
+    /* A Vector dimension (`specs/0070-measure-and-dimension`): the guide green, solid. */
+    --dim-guide: var(--guide);
     --sketch-solved: #12733A;
     --sketch-symbol-bg: rgb(255 255 255 / 85%);
 

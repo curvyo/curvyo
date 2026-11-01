@@ -59,6 +59,15 @@ Columns, the "Must be 1 or more." refusal, 2 x 3 with gap 5 in reading order), p
 names. Use the Playwright/runtime environment above; screenshots and the saved projects go to
 `target/0061-browser/`.
 
+### Measure and dimension (0070)
+
+`measure.cjs` starts its own dev server on port 5179 (or uses `CURVYO_BROWSER_URL`), draws an L
+path, a rectangle and a circle, selects the Measure tool with M, measures (readout, nothing
+stored), leaves an aligned, horizontal, vertical, radius, diameter (Alt) and angle dimension with
+Shift, moves the rectangle and sees its dimensions follow, deletes the path (the angle shows
+unlinked) and undoes it, converts a dimension with the Guide button and undoes that. Screenshots
+go to `target/0070-browser/`.
+
 ### Sketch workbench independent acceptance (0066)
 
 `sketch-acceptance.cjs` exercises real annotation editing, native text undo, conflict

@@ -243,7 +243,7 @@ function Editor() {
               textPath={textPath}
               onSetTextOrientation={editor.text.setOrientation}
               strokeToPath={{
-                shown: editor.flipEnabled,
+                shown: editor.flipEnabled && editor.selectBar.strokeToPathShown,
                 enabled: editor.selectBar.strokeToPathEnabled,
                 onPress: editor.strokeToPath.apply,
                 notice: editor.strokeToPath.notice,

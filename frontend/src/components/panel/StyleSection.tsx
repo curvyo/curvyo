@@ -212,8 +212,13 @@ export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps
     <div ref={body} className="relative flex flex-col gap-2" {...press}>
       {notice}
       <OriginLine clones={clones} onReturnFocus={onReturnFocus} onPressedAt={pressedAt} />
-      <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
-      {fill}
+      {/* A selection of dimensions only has nothing to edit here (`0070` UI review item 3). */}
+      {panel.view.sectionsShown ? (
+        <>
+          <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
+          {fill}
+        </>
+      ) : null}
     </div>
   );
 }

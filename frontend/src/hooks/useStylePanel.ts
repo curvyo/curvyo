@@ -96,6 +96,8 @@ export interface StyleView {
   /** The Fill section is in the tree: false while every edited object is a single-line text
    * (`specs/0076-single-line-fonts` criterion 8). */
   fillShown: boolean;
+  /** Stroke and Fill are shown: false while only dimensions are selected (`0070` UI review). */
+  sectionsShown: boolean;
   fillColorMixed: boolean;
   fillColor: number;
   fillHex: string;
@@ -158,6 +160,7 @@ const DISABLED_VIEW: StyleView = {
   fillPaint: "off",
   fillRows: false,
   fillShown: true,
+  sectionsShown: true,
   fillColorMixed: false,
   fillColor: 0,
   fillHex: "#000000FF",
@@ -226,6 +229,7 @@ function readView(session: WasmSession | null): StyleView {
     fillPaint: raw.fill_paint as StyleView["fillPaint"],
     fillRows: raw.fill_rows,
     fillShown: raw.fill_shown,
+    sectionsShown: raw.sections_shown,
     fillColorMixed: raw.fill_color_mixed,
     fillColor: raw.fill_color,
     fillHex: raw.fill_hex,
