@@ -52,6 +52,7 @@ A decision too small for a full ADR gets a short dated note in that feature's
 | [0024](0024-spatial-pages.md) | Spatial pages in one document plane (shared object tree, per-field page registers, format 26; no old-file compatibility required; spec 0059) | workspace | Spatial model accepted by customer 2026-10-17; old-file compatibility waived by customer 2026-10-29; implementation choices Proposal |
 | [0025](0025-sketch-core-and-solver.md) | Sketch core and solver boundary | workspace | Proposed; ACS 0.1.19 provisional adapter reviewed, end-to-end acceptance pending |
 | [0026](0026-parametric-sketch-nodes-and-workbench.md) | Parametric sketch nodes and workbench state | workspace | Proposed implementation record; authorized graph/persistence, needs-customer only for original-sketch scaling |
+| [0027](0027-linked-dimension-objects.md) | Linked dimension objects (leaf kind `dimension`, a guide by kind; point and curve slots referencing node + `AnchorId` or shape feature, or a free point; value derived on read, last number kept by the `commit_step` funnel; references never cleared, undo relinks; convert to paths + text; never output; extends 0015 §1 to five references and 0019 §2; next `format_version`; asked by spec 0070) | workspace | Accepted 2026-11-01 (customer: DIM-STORE A) |
 
 ## Customer sign-off, 2026-10-02
 
