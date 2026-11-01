@@ -91,7 +91,7 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
    to the trace's compound path, since the main trace no longer covers those pixels. The preview
    shows the same result (ADR 0023 §4: preview equals result).
 
-7. **Switches (107 A, 108 A).** "Recognise text" in Trace Advanced, on by default, an app setting
+7. **Switches (107 A, 108 A).** "Recognise text" in Trace Advanced, off by default (customer 2026-11-01; on by default before), an app setting
    like the other trace settings (not in the document). "Recognise shapes" appears with Part B of
    `0088` (shapes come later, 108 A); until then it is not shown (Proposal; the product owner may
    prefer a disabled switch). Turning text off skips decisions 1 to 6 and traces exactly as today.

@@ -14,7 +14,7 @@ trace, and one line in the Advanced status line. Nothing is announced when it wo
   `TraceToggle` look: 28 x 28, `ICON_BUTTON_CLASS`, pressed = `--toolbar-icon-active-bg` / `-fg`, no label drawn, 4 px gap).
   Icon: Lucide `ScanText` 16 px, 1.5 px stroke (not `Type`: that is the Text tool). Name and tooltip "Recognise text" (400 ms,
   `side="bottom"`), `aria-pressed`. State by fill and `aria-pressed`, not colour alone (as the other two).
-- On by default, an app setting like the other Trace settings, never in the document (criterion 17).
+- **Off by default** (customer, Frage 116 B a, 2026-11-01), an app setting like the other Trace settings, never in the document (criterion 17).
 - "Recognise shapes" is **not drawn** until 0088 Part B: no disabled twin, no placeholder, no hint label.
 - While Multicolour is on, the switch "Recognise text" is **not drawn** in slice 1 (a control that cannot be honoured is not
   drawn; slice 2 brings it). The setting keeps its value and returns when Multicolour is turned off. (Proposal, lead 2026-11-01)
@@ -44,8 +44,8 @@ The OCR is a stage of the first preview of an image in the session (ADR 0091 dec
 once per image. It reuses the existing slot, not a new surface.
 
 - **Inside the blue Trace button**, the "running" slot as built: the bar fill and the tabular percent, the X stop button, the
-  button stays 75 px wide. During the OCR the percent is the OCR's own progress (stages and lines, from `poll`), then the
-  trace's. **(Proposal)** the percent may restart at 0 for the trace stage; it never runs backwards inside a stage.
+  button stays 75 px wide. The percent is one progress from 0 to 100 % over the whole job (reading, font fit, trace; customer,
+  Frage 116 B b, 2026-11-01, criterion 25). It never runs backwards and does not restart at 0 for the trace stage.
 - The progressbar's `aria-label` is "Reading text" during the OCR stage and "Tracing" after (a state name, not a hint). The
   first fetch of the weights, if it is visible at all (bundled, so about 0.2 s), uses the existing "Loading" state.
 - Advanced status line (muted, while running only): "Reading text". Gone when the stage ends. Nothing in the bar's notice row;
@@ -150,7 +150,7 @@ only the group is selected as today).
 
 ## 12. Review checklist (for the UI review)
 
-Switch present, third in the options row, on by default, absent "Recognise shapes"; Trace view shows text objects at their
+Switch present, third in the options row, off by default, absent "Recognise shapes"; Trace view shows text objects at their
 final place and no letter holes; Mask pixel-equal except the grey left-out pixels; the OCR percent in the Trace button with
 stop working and nothing cached after stop; no notice when nothing is guessed and none after Create paths; the warning wording
 of section 5; one undo removes group and texts; Tab order and Escape; main bar identical at 800 x 600; contrast of the grey

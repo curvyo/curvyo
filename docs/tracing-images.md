@@ -180,7 +180,7 @@ shown only when it has something to say:
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
 - **Drop border shapes**: drops the shapes that touch the border of the picture.
-- **Recognise text** (on by default, remembered): reads the text first; see "Recognise text"
+- **Recognise text** (off by default, remembered): reads the text first; see "Recognise text"
   below.
 
 - **Denoise** (Off, Low, High): a median filter on the brightness before the Threshold; Low takes
@@ -195,7 +195,7 @@ Invert and Drop border shapes start off with each start of the app.
 
 ## Recognise text
 
-With **Recognise text** on (Advanced, on by default, a setting of the app) Trace reads the text in
+With **Recognise text** on (Advanced, off by default, a setting of the app) Trace reads the text in
 a black and white trace before it traces the rest (`specs/0091-trace-text-recognition`):
 
 - The first preview of a picture reads its text once, offline, with the model shipped in the app

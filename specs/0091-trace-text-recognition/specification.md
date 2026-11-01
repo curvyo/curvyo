@@ -23,7 +23,10 @@ threshold per text line, text kept out of the main trace, fonts matched by our o
 - **Text pass**: the step of Trace that runs before the outline trace when "Recognise text" is on.
 - **Line**: a run of text that the OCR found, with a position, a string and a confidence per letter.
 - **Accepted line**: a line with mean letter confidence of at least 0.6 and at least one letter or
-  digit (Proposal, adrs.md decision 2). Other lines are traced as paths as usual.
+  digit (Proposal, adrs.md decision 2) that also passes the garbage filter (Frage 115 B / 117 B):
+  with a sure letter, accepted; without one, at least 2 characters, most of them letters or digits,
+  line confidence at or above the threshold, not one short pattern repeated. Other lines are traced
+  as paths as usual.
 - **Sure / guessed letter**: as in 0088. Sure: the font's glyph matches within the tolerance.
   Guessed: best match, outside tolerance or without a clear margin.
 - **Tolerance**: the Recognise text tolerance of 0088 (default 0.3 mm).
@@ -31,7 +34,7 @@ threshold per text line, text kept out of the main trace, fonts matched by our o
   trace, so the traced paths contain no letter shapes and a shape under the text stays whole.
 
 ## Decided by the customer (2026-10-31)
-- Frage 107 A: switch "Recognise text" in Trace Advanced, on by default. The switch "Recognise shapes"
+- Frage 107 A: switch "Recognise text" in Trace Advanced (default changed to off by 116 B a, 2026-11-01). The switch "Recognise shapes"
   is not drawn in this story: a control that cannot be honoured is not drawn. It arrives with
   0088 Part B.
 - Frage 108 A: text first, shapes later.
@@ -44,10 +47,25 @@ threshold per text line, text kept out of the main trace, fonts matched by our o
 - Frage 113 A: text on a filled shape: the shape stays whole, the text lies on top.
 - Frage 114 B: no font within tolerance: the read text is set in the nearest font anyway, the letters
   marked as guessed.
+- Customer answers of 2026-11-01 (Frage 115 B, 116 B, 117 B): "a wrong font is better than paths;
+  paths can still be made."
+  - 115 B / 117 B: a line the OCR reads becomes text in the nearest font, letters outside tolerance
+    marked guessed, even with no sure letter. This supersedes lead decision 1 of 2026-11-01 ("needs a
+    sure letter"). Garbage filter (Proposal, lead): a line without any sure letter needs at least 2
+    characters, most of them letters or digits, an OCR line confidence at or above a threshold
+    (Proposal: 0.8, tuned on the fixtures and recorded in adrs.md), and must not be one short pattern
+    repeated (the 0025 ring "O" and the dot grid "TOTOTO" stay shapes).
+  - 116 B: everything below is in this slice; PR #244 stays the slice.
+    a. Recognise text is OFF by default (criterion 17).
+    b. One progress 0 to 100 % over the whole job (reading, fit, trace); the trace runs once, lines
+       are decided before the main trace (criterion 25).
+    c. Font-fit tolerance scales with the picture (criterion 26).
+    d. Single-line (stroke) fonts are matched by centre line (criterion 27).
+    e. Speed idea (Proposal, customer idea): candidate regions from a coarse trace (criterion 28).
 - Lead decisions (2026-11-01, after the slice 1 tester pass):
-  1. Which lines become text: a line becomes a text object only if it has at least one sure letter;
-     a one-character line only if that letter is sure. Otherwise the line stays traced shapes. Reason:
-     the 0025 ring was read as "O" at 0.80 and a dot grid lost nodes. (Proposal, lead 2026-11-01)
+  1. (Superseded by Frage 115 B / 117 B, see above.) Formerly: a line becomes a text object only if
+     it has at least one sure letter. Reason then: the 0025 ring was read as "O" at 0.80 and a dot
+     grid lost nodes; the garbage filter now covers this.
   2. "The app's licence list" (Frage 112) means `docs/third-party-assets.md` plus `model.toml`; there is
      no in-app licence page and none is added in this story. (Proposal, lead 2026-11-01)
   3. The switch "Recognise text" is not drawn while Multicolour is on in slice 1; slice 2 brings it.
@@ -87,8 +105,10 @@ Slice 1
 4. Given a line in a font we do not have, when no font within tolerance has 50 % sure letters (0088
    tiers) but the line has at least one sure letter in the nearest font, then the read text is set
    in the nearest font anyway (114 B), its other letters are guessed, and the Glyph table and Text
-   tool highlight it as in 0088 until the first edit. A line with no sure letter at all stays traced
-   paths and becomes no text object (lead decision 1).
+   tool highlight it as in 0088 until the first edit. Also a line with no sure letter at all becomes
+   text in the nearest font, all letters guessed (115 B / 117 B), if it passes the garbage filter
+   (Terms, "Accepted line"). Given a line that fails the filter (one character, mostly symbols,
+   confidence under the threshold, or a repeated short pattern), then it stays traced paths.
 5. Given at least one guessed letter, then one warning names them as in 0088 ("2 letters guessed:
    e (5), l (9)."). Given no guessed letter, then no notice appears (no success notice).
 6. Given the poster with a text line on a filled shape, then the trace has the shape whole (no
@@ -120,14 +140,37 @@ Slice 1
     weights with the same licence and source. There is no in-app licence page in this story.
 16. Given a second Trace of the same image after changing only a Trace setting, then the OCR is not
     run again (same cached lines; the preview updates without the OCR time).
-17. Given the switch "Recognise text" in Trace Advanced, then it is on by default, is kept as an app
+17. Given the switch "Recognise text" in Trace Advanced, then it is off by default (116 B a), is kept as an app
     setting like the other Trace settings, is not stored in the document, and no "Recognise shapes"
     switch and no hint text appears. While Multicolour is on (slice 1) the switch is not drawn.
 18. Given a picture with no text (a plain shape), a plain ring, or a dot grid, then the trace result
-    is identical to Recognise text off and no notice appears. A line with no sure letter, or a
-    one-character line whose letter is not sure, stays traced shapes.
+    is identical to Recognise text off and no notice appears: the ring (read as "O") and the dot grid
+    (read as "TOTOTO") fail the garbage filter and stay shapes, with Recognise text on.
 19. Given a cancel during OCR, then the Trace dialog returns to its state before, with no document
     change.
+
+25. Given Recognise text on, when Create paths or a preview runs, then the progress in the Trace
+    button is one value from 0 to 100 % over the whole job (reading, font fit, trace), never
+    running backwards, and the main trace runs exactly once: the lines are decided before it, so
+    there is no second trace without the dropped lines (checked by a trace-call counter of 1 per
+    run in a test).
+26. Given the font fit, then its tolerance is measured in picture pixels relative to the line's
+    x-height, not a fixed 0.3 mm. Given the customer's screenshot
+    `curvyo-ocr-core/tests/fixtures/customer/font-manager-screenshot.png` (Curvyo font manager:
+    large lines in Anak Gedong, EMS Allure, EMS Readability (single-line), Great Vibes; small UI
+    labels, 13 px at 96 dpi, in a sans), then every line the OCR reads becomes a text object, and
+    the Anak Gedong and EMS Allure lines are set in those fonts with sure letters. Small UI labels
+    may get sure letters; none is required.
+27. Given a single-line (stroke) font, then the fit compares the traced strokes' centre line
+    (skeleton) with the font's stroke, not outline against outline. Given the EMS Readability line
+    of the screenshot, then it is set in EMS Readability.
+28. Given the OCR, then the PR reports the measured detection time and recognition time on the
+    reference poster and the screenshot (Proposal, customer idea). If detection dominates, text
+    candidate regions are found from a coarse trace (letter-sized shapes in rows, generous margin
+    toward false positives) and only those crops go to the OCR, with the full-picture detection
+    kept where candidates are unclear. Whichever path is kept must not lose a line that the full
+    detection finds on the reference posters and the screenshot (checked by a test comparing the
+    line sets). If detection does not dominate, nothing is built and the numbers are the result.
 
 Speed and memory (Proposals; thread CPU time in the wasm worker, 2000 x 2000 px; reported, not
 blocking: a miss is a `docs/technical-debt.md` entry, never a blocker; the PR reports the measured
