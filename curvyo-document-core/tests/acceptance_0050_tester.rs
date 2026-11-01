@@ -731,10 +731,13 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             );
             assert!(n.registers.visible && !n.registers.locked, "{name}");
             assert_eq!(n.registers.opacity.get(), 1.0, "{name}");
-            // These intentionally named current-format 28 goldens are not earlier nameless files.
+            // These intentionally named format 28 and 29 goldens are not earlier nameless files.
             let named_current_sketch = matches!(
                 name.as_str(),
-                "sketch_page_owner_v28.curvyo" | "sketch_dimension_label_v28.curvyo"
+                "sketch_page_owner_v28.curvyo"
+                    | "sketch_dimension_label_v28.curvyo"
+                    | "sketch_page_owner_v29.curvyo"
+                    | "sketch_dimension_label_v29.curvyo"
             ) && matches!(
                 n.kind,
                 NodeKind::Leaf(curvyo_document_core::ObjectSnapshot::Sketch(_))

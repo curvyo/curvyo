@@ -48,6 +48,8 @@ impl Relation {
             | Self::Tangent(a, b)
             | Self::Equal(a, b)
             | Self::Distance { a, b, .. }
+            | Self::HorizontalDistance { a, b, .. }
+            | Self::VerticalDistance { a, b, .. }
             | Self::Angle { a, b, .. } => vec![a, b],
             Self::Symmetric {
                 source,
@@ -85,6 +87,8 @@ impl Relation {
             | Self::Tangent(a, b)
             | Self::Equal(a, b)
             | Self::Distance { a, b, .. }
+            | Self::HorizontalDistance { a, b, .. }
+            | Self::VerticalDistance { a, b, .. }
             | Self::Angle { a, b, .. } => vec![a, b],
             Self::Symmetric {
                 source,
@@ -112,6 +116,8 @@ impl Relation {
         match self {
             Self::Sweep { value, .. }
             | Self::Distance { value, .. }
+            | Self::HorizontalDistance { value, .. }
+            | Self::VerticalDistance { value, .. }
             | Self::Length { value, .. }
             | Self::Radius { value, .. }
             | Self::Diameter { value, .. }
@@ -127,6 +133,8 @@ impl Relation {
         match self {
             Self::Sweep { value, .. }
             | Self::Distance { value, .. }
+            | Self::HorizontalDistance { value, .. }
+            | Self::VerticalDistance { value, .. }
             | Self::Length { value, .. }
             | Self::Radius { value, .. }
             | Self::Diameter { value, .. }
@@ -145,6 +153,8 @@ impl Relation {
                 Some(Dimension::Angle)
             }
             Self::Distance { .. }
+            | Self::HorizontalDistance { .. }
+            | Self::VerticalDistance { .. }
             | Self::Length { .. }
             | Self::Radius { .. }
             | Self::Diameter { .. }
