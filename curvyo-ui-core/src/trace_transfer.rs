@@ -24,7 +24,7 @@ pub enum TraceStatus {
 }
 
 impl TraceStatus {
-    fn code(self) -> f64 {
+    pub(crate) fn code(self) -> f64 {
         match self {
             Self::Traced => 0.0,
             Self::TooDetailed => 1.0,
@@ -66,6 +66,8 @@ pub struct TraceWire {
     pub layers: Vec<TraceLayerWire>,
     /// Colour regions below Ignore below joined to a neighbour (multicolour).
     pub joined: usize,
+    /// The text pass's lines (`specs/0091`); empty without OCR lines.
+    pub texts: crate::trace_text_wire::TraceTexts,
 }
 
 /// One palette colour of a multicolour result, as the strip shows it.
@@ -125,7 +127,7 @@ const LABELLING_PERCENT: u32 = 30;
 /// Where a job is, in whole percent (the progress pill, `specs/0025-raster-trace` criterion 10):
 /// the passes over the mask fill the first 30 %, the outlines the rest. A pass restarts its rows,
 /// so the caller keeps the highest value.
-fn job_percent(progress: Progress) -> u8 {
+pub(crate) fn job_percent(progress: Progress) -> u8 {
     let share = |part: u32, done: u32, total: u32| {
         if total == 0 {
             part
@@ -355,13 +357,13 @@ pub fn trace_colour_mask_job(
     .map(|(mask, _)| mask)
 }
 
-fn status_only(status: TraceStatus) -> Vec<f64> {
+pub(crate) fn status_only(status: TraceStatus) -> Vec<f64> {
     let mut wire = vec![0.0; TRACE_WIRE_HEADER];
     wire[0] = status.code();
     wire
 }
 
-fn write_outline(wire: &mut Vec<f64>, outline: &BezPath) {
+pub(crate) fn write_outline(wire: &mut Vec<f64>, outline: &BezPath) {
     let elements = outline.elements();
     #[allow(clippy::cast_precision_loss)]
     wire.push(elements.len() as f64);
@@ -392,7 +394,7 @@ fn write_outline(wire: &mut Vec<f64>, outline: &BezPath) {
 }
 
 /// A count read from the wire: a whole, non-negative, finite number.
-fn count(value: f64) -> Option<usize> {
+pub(crate) fn count(value: f64) -> Option<usize> {
     // invariant: checked whole and in range before the cast.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     (value.is_finite() && value >= 0.0 && value.fract() == 0.0 && value < 9.0e15)
@@ -410,15 +412,46 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         _ => return None,
     };
     let mut at = TRACE_WIRE_HEADER;
+    let outline_count = count(header[6])?;
+    let outlines = read_outlines(wire, &mut at, outline_count)?;
+    // `specs/0091`: the text section, when the job had OCR lines.
+    let texts = if wire.get(at) == Some(&crate::trace_text_wire::TEXT_MARK) {
+        let (texts, used) = crate::trace_text_wire::read_texts(&wire[at..])?;
+        at += used;
+        texts
+    } else {
+        crate::trace_text_wire::TraceTexts::default()
+    };
+    let (palette, layers, joined) = if at == wire.len() {
+        (Vec::new(), Vec::new(), 0)
+    } else {
+        read_colour_tail(&wire[at..], outline_count)?
+    };
+    Some(TraceWire {
+        status,
+        paths: count(header[1])?,
+        nodes: count(header[2])?,
+        specks_removed: count(header[3])?,
+        foreground_pixels: u64::try_from(count(header[4])?).ok()?,
+        covers_whole_image: header[5] != 0.0,
+        outlines,
+        palette,
+        layers,
+        joined,
+        texts,
+    })
+}
+
+/// `n` outlines of the numbers of [`write_outline`] from `wire[*at..]`; `at` moves past them.
+pub(crate) fn read_outlines(wire: &[f64], at: &mut usize, n: usize) -> Option<Vec<BezPath>> {
     let mut next = || -> Option<f64> {
-        let value = *wire.get(at)?;
-        at += 1;
+        let value = *wire.get(*at)?;
+        *at += 1;
         value.is_finite().then_some(value)
     };
     let point = |next: &mut dyn FnMut() -> Option<f64>| Some(Point::new(next()?, next()?));
-    let outline_count = count(header[6])?;
-    let mut outlines = Vec::with_capacity(outline_count.min(wire.len()));
-    for _ in 0..outline_count {
+    let mut outlines = Vec::with_capacity(n.min(wire.len()));
+    for _ in 0..n {
         let elements = count(next()?)?;
         let mut path = BezPath::new();
         for _ in 0..elements {
@@ -438,23 +471,7 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         }
         outlines.push(path);
     }
-    let (palette, layers, joined) = if at == wire.len() {
-        (Vec::new(), Vec::new(), 0)
-    } else {
-        read_colour_tail(&wire[at..], outline_count)?
-    };
-    Some(TraceWire {
-        status,
-        paths: count(header[1])?,
-        nodes: count(header[2])?,
-        specks_removed: count(header[3])?,
-        foreground_pixels: u64::try_from(count(header[4])?).ok()?,
-        covers_whole_image: header[5] != 0.0,
-        outlines,
-        palette,
-        layers,
-        joined,
-    })
+    Some(outlines)
 }
 
 /// The palette, layers and joined regions after a multicolour result's outlines; `None` unless

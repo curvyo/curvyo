@@ -36,7 +36,7 @@ pub(super) struct TraceMaskState {
 
 impl Session {
     /// Keeps the worker's mask of `image` for the Mask view: `width` x `height` bits (row-major,
-    /// non-zero for content), or for a multicolour trace four bytes per pixel, the segmented
+    /// non-zero for content, `LEFT_OUT_LEVEL` for pixels left out for text), or for a multicolour trace four bytes per pixel, the segmented
     /// palette in straight RGBA with the background transparent; `false` when the bytes match
     /// neither size.
     pub fn set_trace_mask(&mut self, image: NodeId, width: u32, height: u32, bits: &[u8]) -> bool {
@@ -50,12 +50,11 @@ impl Session {
         let (rgba, colours) = if bits.len() == count {
             let rgba = bits
                 .iter()
-                .flat_map(|&bit| {
-                    if bit == 0 {
-                        [255, 255, 255, 255]
-                    } else {
-                        [0, 0, 0, 255]
-                    }
+                .flat_map(|&bit| match bit {
+                    0 => [255, 255, 255, 255],
+                    // `specs/0091` UX notes §2: the pixels left out for text, flat mid grey.
+                    curvyo_ui_core::LEFT_OUT_LEVEL => [128, 128, 128, 255],
+                    _ => [0, 0, 0, 255],
                 })
                 .collect();
             (rgba, None)

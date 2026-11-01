@@ -36,6 +36,8 @@ pub(super) struct TracePreview {
     pub(super) palette: Vec<TracePaletteWire>,
     /// Colour regions joined to a neighbour.
     pub(super) joined: usize,
+    /// Text lines set and found (`specs/0091` UX notes §4).
+    pub(super) text_counts: (usize, usize),
     /// The tessellated hollow outline, kept across frames (criterion 56).
     pub(super) outline_mesh: MeshCache,
     /// The tessellated filled result of the Trace view, kept across frames (criterion 56).
@@ -49,7 +51,7 @@ pub(super) struct TraceState {
     last_clicked: Option<NodeId>,
     pub(super) preview: Option<TracePreview>,
     /// The full-size results Create paths writes, per image.
-    results: Vec<(NodeId, TraceWire)>,
+    pub(super) results: Vec<(NodeId, TraceWire)>,
     /// The chosen view; Overlay on every entry into the tool (UX notes section 13).
     pub(super) view_mode: TraceViewMode,
     /// `\` is held: the Image view shows until it is released (criterion 51).
@@ -202,9 +204,30 @@ impl Session {
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
-        let mut outlines = Vec::with_capacity(read.outlines.len());
-        let mut boxes = Vec::with_capacity(read.outlines.len());
-        for path in &read.outlines {
+        // `specs/0091`: until the lines are fitted, their own outlines stand where their texts
+        // will be.
+        let paths: Vec<kurbo::BezPath> = read
+            .outlines
+            .iter()
+            .chain(read.texts.lines.iter().flat_map(|l| &l.outlines))
+            .cloned()
+            .collect();
+        self.show_trace_preview(image, read, &paths, false);
+        true
+    }
+
+    /// Shows `paths` (document millimetres) as the preview of `image` with the palette, layers
+    /// and counts of `read`, out of date with `stale`.
+    pub(super) fn show_trace_preview(
+        &mut self,
+        image: NodeId,
+        read: TraceWire,
+        paths: &[kurbo::BezPath],
+        stale: bool,
+    ) {
+        let mut outlines = Vec::with_capacity(paths.len());
+        let mut boxes = Vec::with_capacity(paths.len());
+        for path in paths {
             let b = kurbo::Shape::bounding_box(path);
             boxes.push((Point::new(b.x0, b.y0), Point::new(b.x1, b.y1)));
             outlines.push(preview_anchors(path));
@@ -214,15 +237,15 @@ impl Session {
             image,
             outlines,
             boxes,
-            stale: false,
+            stale,
             fills,
             layers: read.layers,
             palette: read.palette,
             joined: read.joined,
+            text_counts: (read.texts.lines.len(), read.texts.found),
             outline_mesh: MeshCache::default(),
             fill_mesh: MeshCache::default(),
         });
-        true
     }
 
     /// Marks the preview and the mask out of date (a stopped job) or current again.
@@ -241,17 +264,29 @@ impl Session {
         };
         self.trace.results.retain(|(id, _)| *id != image);
         self.trace.results.push((image, read));
+        self.drop_trace_fit();
         true
+    }
+
+    /// The text lines of the shown preview: set and found (`specs/0091` UX notes §4).
+    #[must_use]
+    pub fn trace_text_counts(&self) -> (usize, usize) {
+        self.trace
+            .preview
+            .as_ref()
+            .map_or((0, 0), |p| p.text_counts)
     }
 
     /// Forgets the full-size results (a value changed).
     pub fn clear_trace_results(&mut self) {
         self.trace.results.clear();
+        self.drop_trace_fit();
     }
 
     /// Drops everything the tool keeps (leaving it, criterion 7).
     pub(super) fn leave_trace_tool(&mut self) {
         self.trace = TraceState::default();
+        self.drop_trace_fit();
     }
 
     /// Create paths (criteria 13, 14, 46; `specs/0089` criterion 29): for every selected image
@@ -268,6 +303,7 @@ impl Session {
                 return TraceCreateOutcome::Ignored;
             }
             let names = Arc::clone(&this.document_read().nodes);
+            let fitted = this.trace_text.fitted.clone().unwrap_or_default();
             let mut targets = Vec::with_capacity(images.len());
             for image in &images {
                 let Some((_, wire)) = this.trace.results.iter().find(|(id, _)| *id == image.id)
@@ -281,29 +317,66 @@ impl Session {
                     .iter()
                     .find(|node| node.id == image.id)
                     .and_then(|node| node.registers.name.clone());
+                // `specs/0091` decision 6: the lines' outlines no text replaces join the paths;
+                // without a fit, all of them do.
+                let mut outlines = wire.outlines.clone();
+                match fitted.iter().find(|f| f.image == image.id) {
+                    Some(found) => outlines.extend(found.leftovers.iter().cloned()),
+                    None => outlines.extend(
+                        wire.texts
+                            .lines
+                            .iter()
+                            .flat_map(|l| l.outlines.iter().cloned()),
+                    ),
+                }
                 targets.push(TraceTarget {
                     image: image.id,
                     name,
-                    outlines: wire.outlines.clone(),
+                    outlines,
                     colours: this.trace.palette_view.colours(&wire.layers),
                 });
             }
             let plan = plan_trace(&targets, &mut this.minter);
-            if plan.items.is_empty() {
+            let has_texts = fitted.iter().any(|f| !f.texts.is_empty());
+            if plan.items.is_empty() && !has_texts {
                 return TraceCreateOutcome::Ignored;
             }
-            let Ok(groups) = this
-                .document
-                .insert_drawing_above(&plan.items, &plan.anchor_ids)
-            else {
-                // invariant: the images were just read and the ids are fresh.
+            let written =
+                this.document
+                    .batch(curvyo_document_core::TRACE_IMAGE_COMMIT_LABEL, |document| {
+                        let groups = if plan.items.is_empty() {
+                            Vec::new()
+                        } else {
+                            document
+                                .insert_drawing_above(&plan.items, &plan.anchor_ids)
+                                .ok()?
+                        };
+                        let above: Vec<(NodeId, NodeId)> = images
+                            .iter()
+                            .map(|image| {
+                                let group = plan
+                                    .items
+                                    .iter()
+                                    .zip(&groups)
+                                    .find(|((id, _), _)| *id == image.id)
+                                    .map_or(image.id, |(_, &g)| g);
+                                (image.id, group)
+                            })
+                            .collect();
+                        let texts = super::trace_text::write_texts(document, &fitted, &above)?;
+                        Some((groups, texts))
+                    });
+            let Some((groups, texts)) = written else {
+                // invariant: the images were just read and the ids are fresh; a failed write is
+                // reverted by the history as a whole.
                 debug_assert!(false, "a planned trace could not be written");
                 return TraceCreateOutcome::Ignored;
             };
-            let leaves: Vec<NodeId> = groups
+            let mut leaves: Vec<NodeId> = groups
                 .iter()
                 .flat_map(|&group| this.document.leaves_of(group))
                 .collect();
+            leaves.extend(texts.iter().map(|t| t.0));
             let images = plan.items.len();
             for (&group, (_, node)) in groups.iter().zip(&plan.items) {
                 let (paths, nodes) = drawn_counts(node);
@@ -313,6 +386,7 @@ impl Session {
             this.set_tool(Tool::Select);
             this.selection.set(&leaves);
             this.hovered_object = None;
+            this.record_trace_texts(&texts);
             TraceCreateOutcome::Created {
                 images,
                 paths: plan.paths,

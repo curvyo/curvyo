@@ -188,6 +188,9 @@ mod trace_mesh;
 mod trace_pick;
 #[cfg(test)]
 mod trace_tests;
+mod trace_text;
+#[cfg(test)]
+mod trace_text_tests;
 mod transform_entry;
 mod weld;
 #[cfg(test)]
@@ -254,6 +257,7 @@ pub use text_style::StyleOutcome;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
 pub use trace_draw::TraceViewMode;
 pub use trace_pick::TracePickMode;
+pub use trace_text::TracedText;
 pub use weld::WeldOutcome;
 
 pub use open_error::map_open_error;
@@ -511,6 +515,8 @@ pub struct Session {
     traced_groups: trace::TracedGroups,
     /// The Recognise text run and its record of guessed letters (`recognise.rs`).
     recognise: recognise::RecogniseState,
+    /// Trace's OCR lines per picture and the font fit of its results (`trace_text.rs`).
+    trace_text: trace_text::TraceTextState,
 }
 
 impl Session {
@@ -601,6 +607,7 @@ impl Session {
             trace: trace::TraceState::default(),
             traced_groups: Vec::new(),
             recognise: recognise::RecogniseState::default(),
+            trace_text: trace_text::TraceTextState::default(),
         }
     }
 
@@ -687,6 +694,7 @@ impl Session {
             trace: trace::TraceState::default(),
             traced_groups: Vec::new(),
             recognise: recognise::RecogniseState::default(),
+            trace_text: trace_text::TraceTextState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();

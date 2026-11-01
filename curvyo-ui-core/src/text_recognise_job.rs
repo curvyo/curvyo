@@ -21,6 +21,10 @@ use crate::font_match::{FaceMatch, FontBlock, ListedFace, match_face};
 /// The most faces one tier searches (Proposal, `adrs.md` decision 5).
 pub const TIER_CAP: usize = 64;
 
+/// One line of a job: its outline set, its line there, and the face that came nearest on it
+/// (listing index, deviation in mm).
+pub type LineNearest = (usize, usize, Option<(usize, f64)>);
+
 /// The tiers, searched in this order (Frage 102 B).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FaceTier {
@@ -172,6 +176,8 @@ pub enum JobStep {
 /// A line that became text.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AcceptedLine {
+    /// The outline set it is from (0 for a selection; the OCR line for Trace, `specs/0091`).
+    pub source: usize,
     /// The tier its face is from.
     pub tier: FaceTier,
     /// Its face, an index into the listing.
@@ -200,7 +206,12 @@ struct Near {
 /// One Recognise text run over a selection: the lines, the tiers and the decisions so far.
 #[derive(Debug, Clone)]
 pub struct RecogniseJob {
-    recogniser: Recogniser,
+    /// One per outline set: a selection has one, Trace one per OCR line (`specs/0091`).
+    recognisers: Vec<Recogniser>,
+    /// Every line to decide: its recogniser and its line there.
+    order: Vec<(usize, usize)>,
+    /// Per line of `order`: the face that came nearest on it (listing index, deviation).
+    line_nearest: Vec<Option<(usize, f64)>>,
     tiers: Tiers,
     line: usize,
     tier: usize,
@@ -217,8 +228,30 @@ impl RecogniseJob {
     /// A job over `outlines` (one closed subpath each, document millimetres).
     #[must_use]
     pub fn new(outlines: &[BezPath], tolerance: Mm, tiers: Tiers) -> Self {
+        Self::of(vec![Recogniser::new(outlines, tolerance)], tolerance, tiers)
+    }
+
+    /// A job over Trace's OCR lines (`specs/0091` `adrs.md` decision 4): per line its outlines
+    /// (one closed subpath each, document millimetres) and the string the OCR read, the hint.
+    #[must_use]
+    pub fn with_hints(lines: &[(Vec<BezPath>, String)], tolerance: Mm, tiers: Tiers) -> Self {
+        let recognisers = lines
+            .iter()
+            .map(|(outlines, text)| Recogniser::with_hint(outlines, tolerance, text))
+            .collect();
+        Self::of(recognisers, tolerance, tiers)
+    }
+
+    fn of(recognisers: Vec<Recogniser>, tolerance: Mm, tiers: Tiers) -> Self {
+        let order: Vec<(usize, usize)> = recognisers
+            .iter()
+            .enumerate()
+            .flat_map(|(r, rec)| (0..rec.line_count()).map(move |l| (r, l)))
+            .collect();
         Self {
-            recogniser: Recogniser::new(outlines, tolerance),
+            line_nearest: vec![None; order.len()],
+            recognisers,
+            order,
             tiers,
             line: 0,
             tier: 0,
@@ -233,7 +266,24 @@ impl RecogniseJob {
     /// The number of lines found.
     #[must_use]
     pub fn lines(&self) -> usize {
-        self.recogniser.line_count()
+        self.order.len()
+    }
+
+    /// The outline sets' recognisers, in order.
+    #[must_use]
+    pub fn recognisers(&self) -> &[Recogniser] {
+        &self.recognisers
+    }
+
+    /// Per line: its outline set, its line there, and the face that came nearest on it
+    /// (listing index, deviation in mm).
+    #[must_use]
+    pub fn line_nearest(&self) -> Vec<LineNearest> {
+        self.order
+            .iter()
+            .zip(&self.line_nearest)
+            .map(|(&(r, l), near)| (r, l, *near))
+            .collect()
     }
 
     /// The lines that became text, in line order.
@@ -265,6 +315,7 @@ impl RecogniseJob {
             && let Some(run) = best.found.run
         {
             self.accepted.push(AcceptedLine {
+                source: self.order[self.line].0,
                 tier: best.tier,
                 face: best.face,
                 run,
@@ -283,6 +334,10 @@ impl RecogniseJob {
             // without a margin: lines of several glyphs judged over the tolerance name the
             // nearest face when there are any (the notice's deviation is then over it).
             let deviation = near.max_deviation.get();
+            let own = &mut self.line_nearest[self.line];
+            if own.is_none_or(|(_, d)| deviation < d) {
+                *own = Some((listed[near.face], deviation));
+            }
             let candidate = Near {
                 face: listed[near.face],
                 deviation,
@@ -351,7 +406,8 @@ impl RecogniseJob {
                 };
             }
             let faces: Vec<&Face> = ready.iter().map(|(_, f)| f.as_ref()).collect();
-            let found = self.recogniser.match_line(self.line, &faces);
+            let (r, l) = self.order[self.line];
+            let found = self.recognisers[r].match_line(l, &faces);
             let listed: Vec<usize> = ready.iter().map(|(index, _)| *index).collect();
             self.record(tier, &listed, found);
             return JobStep::Running {
