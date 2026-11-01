@@ -125,12 +125,22 @@ mod style_edit;
 mod style_entry;
 mod style_panel;
 mod style_scope;
+mod svg_export;
+mod svg_export_leaf;
+mod svg_export_notices;
+mod svg_export_parts;
+mod svg_export_pens;
+mod svg_export_shapes;
+mod svg_export_sketch;
+mod svg_export_text;
 mod svg_font_match;
 mod svg_import;
 mod svg_import_arcs;
 mod svg_import_faces;
 mod svg_import_images;
 mod svg_import_match;
+mod svg_import_pages;
+mod svg_import_shadow;
 mod svg_import_shapes;
 mod svg_import_style;
 mod svg_import_text;
@@ -430,6 +440,11 @@ pub use style_panel::{
 pub use style_scope::{
     StyleScope, StyleTool, is_single_line_text, object_kind_name, owns_style, skipped_clones,
     skipped_single_line_texts, style_scope, style_scope_in,
+};
+pub use svg_export::{ExportScope, SvgExportOptions, SvgExportOutcome, svg_export, svg_export_of};
+pub use svg_export_notices::{
+    NOTHING_SELECTED_NOTICE, SVG_EXPORT_BUSY_OBJECTS, svg_export_busy_notice, svg_export_name,
+    svg_export_notice, svg_export_notice_ms,
 };
 pub use svg_font_match::{GENERIC_CURSIVE, GENERIC_SANS, GENERIC_SERIF, SvgFace, svg_face};
 pub use svg_import::{

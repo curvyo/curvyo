@@ -17,7 +17,8 @@ use crate::svg_font_match::FaceMemo;
 use crate::svg_text_flow::flowed;
 
 use crate::svg_text_layout::{
-    ImportFaces, Resolved, Targets, advances, line_height_user, resolve, spacing, targets,
+    ImportFaces, Resolved, Targets, advances, line_height_user, resolve, resolve_by_reference,
+    spacing, targets,
 };
 
 /// The smallest kern written, mm: below it the file's own rounding.
@@ -33,6 +34,9 @@ pub(crate) struct TextPiece {
     pub(crate) bounds: Option<Rect>,
 }
 
+/// How far the scale of a text's matrix may be from 1 and still count as 1 (rounding of a turn).
+const UNIT_SCALE_TOLERANCE: f64 = 1e-12;
+
 /// The text objects of `text`, in order; empty when no face can draw it or it skips (a matrix
 /// without area, criterion 84).
 pub(crate) fn convert_text(
@@ -41,13 +45,25 @@ pub(crate) fn convert_text(
     memo: &FaceMemo<'_>,
 ) -> Vec<TextPiece> {
     let s = text.matrix.determinant().abs().sqrt();
+    // A turn or a flip has a factor of 1 within rounding: exactly 1, so a turned text keeps its
+    // Size to the last digit (criterion 152, as `0074`'s own rule for the size register).
+    let s = if (s - 1.0).abs() <= UNIT_SCALE_TOLERANCE {
+        1.0
+    } else {
+        s
+    };
     if !(s.is_finite() && s > 0.0) {
         return Vec::new();
     }
     let resolved: Vec<Option<Resolved<'_>>> = text
         .styles
         .iter()
-        .map(|style| resolve(style, fonts, memo, s))
+        .map(|style| {
+            text.face
+                .as_deref()
+                .and_then(|face| resolve_by_reference(style, (face, text.size), fonts, s))
+                .or_else(|| resolve(style, fonts, memo, s))
+        })
         .collect();
     // A text path whose target is not drawn is straight (criterion 95).
     let mut chars: Vec<SvgChar> = text

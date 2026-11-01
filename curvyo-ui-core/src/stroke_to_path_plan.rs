@@ -122,6 +122,42 @@ fn stroked_outlines(object: &ObjectSnapshot) -> (Vec<(Vec<OutlineTriple>, bool)>
     }
 }
 
+/// The kernel's stroke outline of `outlines` (point, handle in, handle out; closed) in `style`,
+/// markers drawn when `markers`: what Stroke to path makes of them, for the SVG export's
+/// Strokes as paths (`specs/0024-svg-import-export` criterion 146). `None` when the stroke paints
+/// nothing or is out of range.
+pub(crate) fn stroke_outline_anchors(
+    outlines: &[(Vec<OutlineTriple>, bool)],
+    style: &Style,
+    markers: bool,
+) -> Option<Vec<Vec<OffsetAnchor>>> {
+    let stroke = &style.stroke;
+    let shape = StrokeShape {
+        width: stroke.width,
+        join: stroke.join,
+        cap: stroke.cap,
+        dash: stroke.dash.clone(),
+        markers: if markers {
+            stroke.markers
+        } else {
+            curvyo_document_core::Markers::default()
+        },
+    };
+    let borrowed: Vec<Outline<'_>> = outlines
+        .iter()
+        .map(|(anchors, closed)| Outline::new(anchors, *closed))
+        .collect();
+    let result = stroke_outline(&borrowed, &shape, BOOLEAN_TOLERANCE).ok()?;
+    Some(result.outlines().to_vec())
+}
+
+/// The outlines of `object` as the canvas strokes them and whether its markers are drawn.
+pub(crate) fn stroked_outlines_of(
+    object: &ObjectSnapshot,
+) -> (Vec<(Vec<OutlineTriple>, bool)>, bool) {
+    stroked_outlines(object)
+}
+
 /// The kernel's stroke outline of `outlines` in `style`, with fresh anchor ids.
 fn outline_of(
     outlines: &[(Vec<OutlineTriple>, bool)],

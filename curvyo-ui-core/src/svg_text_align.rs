@@ -101,6 +101,8 @@ impl Context<'_, '_> {
             }
             byte += c.len_utf8();
         }
+        let vertical =
+            snapshot.layout.writing_mode != curvyo_document_core::TextWritingMode::Horizontal;
         let mut offset: Option<Vec2> = None;
         for (byte, i) in first_of_line {
             let Some(glyph) = layout
@@ -111,9 +113,22 @@ impl Context<'_, '_> {
             else {
                 return false;
             };
-            let actual = frame * glyph.origin;
+            // SVG turns a glyph about its origin, the canvas about its centre: compare where the
+            // canvas puts the turned origin (the kerns correct the same pivot, criterion 87).
+            let turned = if vertical {
+                glyph.origin
+            } else {
+                let centre = Point::new(glyph.centre_x.0, glyph.centre_y.0);
+                kurbo::Affine::rotate_about(glyph.rotation_rad, centre) * glyph.origin
+            };
+            let actual = frame * turned;
             let wanted = (self.targets.at[i] - origin) * self.s;
-            let residual = actual.to_vec2() - wanted;
+            let mut residual = actual.to_vec2() - wanted;
+            if vertical {
+                // A column's origin sits on the file's pen across the line, as for a text
+                // anchored at its start; only the alignment along the column moves it.
+                residual.x = 0.0;
+            }
             match offset {
                 None => offset = Some(residual),
                 Some(o) if (o - residual).hypot() > ALIGN_TOLERANCE_MM => return false,
@@ -121,7 +136,8 @@ impl Context<'_, '_> {
             }
         }
         if let Some(o) = offset {
-            *moved = origin + o / self.s;
+            // The placement is `translate(origin) * scale(1 / s)`: the glyphs move with the origin.
+            *moved = origin - o / self.s;
         }
         true
     }

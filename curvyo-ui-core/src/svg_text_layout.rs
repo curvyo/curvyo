@@ -89,6 +89,79 @@ pub(crate) fn resolve<'a>(
     })
 }
 
+/// The longest style name a `curvyo:face` reference is used with (the reader's font-name cut).
+const MAX_STYLE_NAME_CHARS: usize = 128;
+
+/// The style `style` resolved by the face reference `face` (`curvyo:face`, criteria 132 and
+/// 135) and the exact Size `size` (`curvyo:size`), when they agree with the standard values next
+/// to them: the family is the first named family, weight and slant are those of the reference's
+/// style name (a name the engine parses, at most [`MAX_STYLE_NAME_CHARS`] characters), and the
+/// font size gives the Size within 1e-6 mm, inside the Size limits. `None` when they disagree;
+/// the lookup by name then applies.
+pub(crate) fn resolve_by_reference<'a>(
+    style: &TextStyle,
+    (face, size): (&str, Option<f64>),
+    fonts: &ImportFaces<'a>,
+    s: f64,
+) -> Option<Resolved<'a>> {
+    let mut parts = face.splitn(3, '|');
+    let (family, style_name, hash) = (parts.next()?, parts.next()?, parts.next()?);
+    let named = match style.families.first()? {
+        curvyo_svg_core::FontFamily::Named(name) => name.as_str(),
+        _ => return None,
+    };
+    if style_name.chars().count() > MAX_STYLE_NAME_CHARS {
+        return None;
+    }
+    let wanted = curvyo_text_core::FaceStyle::parse(style_name)?;
+    if named != family || wanted.weight != style.weight || wanted.is_slanted() != style.italic {
+        return None;
+    }
+    let listed = fonts
+        .faces
+        .iter()
+        .find(|listed| listed.key.is_some_and(|key| key.hash.to_hex() == hash));
+    let (key, font) = match listed.and_then(|l| l.key.map(|key| (l, key))) {
+        Some((listed, key)) if fonts.store.get(&key).is_some() => (
+            key,
+            FontRef {
+                family: family.to_owned(),
+                style: style_name.to_owned(),
+                face_hash: hash.to_owned(),
+                face_index: key.index,
+                kind: listed.kind,
+            },
+        ),
+        _ => {
+            let mut font = missing(family, style_name);
+            if curvyo_text_core::FaceHash::from_hex(hash).is_some() {
+                hash.clone_into(&mut font.face_hash);
+            }
+            (fonts.substitute?, font)
+        }
+    };
+    let face = fonts.store.get(&key)?;
+    let standard = style.font_size * s * face.metrics().cap_height;
+    let size = match size {
+        Some(exact)
+            if (exact - standard).abs() <= 1e-6
+                && clamp_text_size(Length::from_mm(exact)) == Length::from_mm(exact) =>
+        {
+            Length::from_mm(exact)
+        }
+        Some(_) => return None,
+        None => clamp_text_size(Length::from_mm(standard)),
+    };
+    Some(Resolved {
+        face,
+        font,
+        size,
+        style: model_style(&style.paint),
+        writing_mode: style.writing_mode,
+        orientation: style.orientation,
+    })
+}
+
 fn missing(family: &str, style: &str) -> FontRef {
     FontRef {
         family: family.to_owned(),
