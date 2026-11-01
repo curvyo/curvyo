@@ -174,7 +174,8 @@ impl Document {
                         ObjectSnapshot::Sketch(_)
                         | ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Text(_)
-                        | ObjectSnapshot::Image(_) => return None,
+                        | ObjectSnapshot::Image(_)
+                        | ObjectSnapshot::Dimension(_) => return None,
                     };
                     path.id = *target;
                     let (first, rest) = outlines.split_first()?;

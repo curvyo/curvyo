@@ -61,6 +61,7 @@ fn link(d: &Document, original: NodeId) -> NodeId {
 fn drawn(d: &Document, id: NodeId) -> PathSnapshot {
     match d.object(id).unwrap() {
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Path(path) => path,
@@ -133,6 +134,7 @@ fn mapped_results(d: &Document, ids: &[NodeId], g: Affine) -> Vec<ObjectSnapshot
     ids.iter()
         .map(|&id| match d.object(id).unwrap() {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),

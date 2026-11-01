@@ -84,11 +84,13 @@ impl Document {
     pub fn guide_marking(&self, ids: &[NodeId]) -> GuideMarking {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let leaves = self.markable_leaves(ids);
+        // A dimension is a guide by kind (ADR 0027 §1): the button shows pressed on it.
         let guides = leaves
             .iter()
             .filter(|&&leaf| {
-                tree.get_meta(leaf)
-                    .is_ok_and(|meta| read_registers(&meta).guide)
+                tree.get_meta(leaf).is_ok_and(|meta| {
+                    read_registers(&meta).guide || crate::dimension_codec::is_dimension_meta(&meta)
+                })
             })
             .count();
         GuideMarking {
@@ -118,8 +120,11 @@ impl Document {
             // invariant: every leaf was confirmed live by `markable_leaves`, so its meta map exists.
             #[allow(clippy::unwrap_used)]
             let meta = tree.get_meta(leaf).unwrap();
-            // A node already in the asked state is not written, so the step names only changes.
-            if read_registers(&meta).guide != guide {
+            // A node already in the asked state is not written, so the step names only changes;
+            // a dimension carries no flag (it is converted, `Document::convert_dimensions`).
+            if read_registers(&meta).guide != guide
+                && !crate::dimension_codec::is_dimension_meta(&meta)
+            {
                 write_guide(&meta, guide);
             }
         }
@@ -145,6 +150,8 @@ pub(crate) fn effective_guide(
         | crate::primitive_model::ObjectSnapshot::Primitive(_)
         | crate::primitive_model::ObjectSnapshot::Text(_)
         | crate::primitive_model::ObjectSnapshot::Image(_) => own(object.id()),
+        // A dimension is a guide by kind (ADR 0027 §1).
+        crate::primitive_model::ObjectSnapshot::Dimension(_) => true,
     }
 }
 

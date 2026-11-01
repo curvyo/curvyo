@@ -240,6 +240,7 @@ impl Document {
                 // An image is never an original (`specs/0058-bitmap-import` criterion 38).
                 if crate::text_codec::is_text_meta(&meta)
                     || crate::image_codec::is_image_meta(&meta)
+                    || crate::dimension_codec::is_dimension_meta(&meta)
                 {
                     return Err(CloneError::NotClonable);
                 }

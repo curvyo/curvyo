@@ -79,6 +79,7 @@ pub fn clone_previews(
                 ObjectSnapshot::Clone(clone) => RawLeaf::of_clone(clone),
                 ObjectSnapshot::Text(text) => RawLeaf::Text(text.clone()),
                 ObjectSnapshot::Image(image) => RawLeaf::Image(image.clone()),
+                ObjectSnapshot::Dimension(dimension) => RawLeaf::Dimension(dimension.clone()),
             }
         })
         .collect();

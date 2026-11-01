@@ -43,7 +43,8 @@ impl TemplateNode {
             ObjectSnapshot::Primitive(_)
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_) => 0,
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => 0,
         }
     }
 }
@@ -68,7 +69,14 @@ impl Document {
                     NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
                         ObjectSnapshot::Path(clone.resolved)
                     }
-                    NodeKind::Leaf(object) if !matches!(object, ObjectSnapshot::Image(_)) => object,
+                    NodeKind::Leaf(object)
+                        if !matches!(
+                            object,
+                            ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_)
+                        ) =>
+                    {
+                        object
+                    }
                     // A picture is no outline to trace by hand and its bytes stay in the other
                     // project (ADR 0019: a template is guides).
                     NodeKind::Leaf(_) | NodeKind::Layer | NodeKind::Group => return None,
@@ -148,7 +156,7 @@ impl Document {
                 return Some(id);
             }
             ObjectSnapshot::Text(text) => return Some(self.create_text_uncommitted(text)),
-            ObjectSnapshot::Image(_) => return None,
+            ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => return None,
             ObjectSnapshot::Sketch(sketch) => &sketch.resolved,
             ObjectSnapshot::Path(path) => path,
             ObjectSnapshot::Clone(clone) => &clone.resolved,

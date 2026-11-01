@@ -31,6 +31,11 @@ enum Planned<'a> {
         meta: loro::LoroMap,
         placement: crate::affine::Affine,
     },
+    /// A dimension: its kept and free points move (ADR 0027 §5); linked slots follow on read.
+    Dimension {
+        meta: loro::LoroMap,
+        result: &'a ObjectSnapshot,
+    },
     Primitive {
         meta: loro::LoroMap,
         current: Shape,
@@ -134,28 +139,27 @@ impl Document {
         self.clone_limits_hold(&links, results)
             .map_err(ObjectEditError::CloneOutOfRange)?;
         let hold = self.hold_for_results(&links, results)?;
+        let staying = self.staying_dimensions(
+            &results
+                .iter()
+                .map(ObjectSnapshot::id)
+                .collect::<std::collections::HashSet<_>>(),
+        );
         for plan in &planned {
+            if let Planned::Dimension { result, .. } = plan
+                && staying.contains(&result.id())
+            {
+                continue;
+            }
+            if write_frame_only(plan) {
+                continue;
+            }
             let (meta, result) = match plan {
                 Planned::Sketch { meta, result } => {
                     write_sketch(meta, result)?;
                     (meta, result)
                 }
-                Planned::Clone { meta, result } => {
-                    if let ObjectSnapshot::Clone(clone) = result {
-                        crate::clone_write::write_matrix(
-                            meta,
-                            clone.chain.origin,
-                            clone.chain.matrix,
-                        );
-                    }
-                    // A clone has no rotation and no stroke of its own.
-                    continue;
-                }
-                Planned::Image { meta, placement } => {
-                    if crate::image_codec::read_placement(meta) != Some(*placement) {
-                        crate::image_codec::write_placement(meta, *placement);
-                    }
-                    // An image has no rotation and no stroke.
+                Planned::Clone { .. } | Planned::Dimension { .. } | Planned::Image { .. } => {
                     continue;
                 }
                 Planned::Text { meta, result } => {
@@ -206,7 +210,8 @@ impl Document {
                         | ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Clone(_)
                         | ObjectSnapshot::Text(_)
-                        | ObjectSnapshot::Image(_) => true,
+                        | ObjectSnapshot::Image(_)
+                        | ObjectSnapshot::Dimension(_) => true,
                     };
                     shape_codec::write_converted_path_fields(meta, anchors, closed);
                     (meta, result)
@@ -222,6 +227,32 @@ impl Document {
         self.write_hold(&tree, hold);
         self.commit_with_label("transform_objects");
         Ok(())
+    }
+}
+
+/// Writes a plan whose kind has no rotation register and no stroke of its own: a clone's
+/// matrix, an image's placement, a dimension's kept and free points. `false` for every other plan.
+fn write_frame_only(plan: &Planned<'_>) -> bool {
+    match plan {
+        Planned::Clone { meta, result } => {
+            if let ObjectSnapshot::Clone(clone) = result {
+                crate::clone_write::write_matrix(meta, clone.chain.origin, clone.chain.matrix);
+            }
+            true
+        }
+        Planned::Dimension { meta, result } => {
+            if let ObjectSnapshot::Dimension(dimension) = result {
+                crate::dimension_codec::write_moved(meta, dimension);
+            }
+            true
+        }
+        Planned::Image { meta, placement } => {
+            if crate::image_codec::read_placement(meta) != Some(*placement) {
+                crate::image_codec::write_placement(meta, *placement);
+            }
+            true
+        }
+        _ => false,
     }
 }
 
@@ -306,6 +337,12 @@ fn plan_one<'a>(
     }
     if crate::clone_codec::is_clone_meta(&meta) {
         return plan_clone(tree, meta, result);
+    }
+    if crate::dimension_codec::is_dimension_meta(&meta) {
+        return match result {
+            ObjectSnapshot::Dimension(_) => Ok(Planned::Dimension { meta, result }),
+            _ => Err(ObjectEditError::NoSuchObject),
+        };
     }
     if crate::image_codec::is_image_meta(&meta) {
         return match result {
@@ -414,7 +451,8 @@ fn plan_clone<'a>(
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Primitive(_)
         | ObjectSnapshot::Text(_)
-        | ObjectSnapshot::Image(_) => Err(ObjectEditError::NoSuchObject),
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => Err(ObjectEditError::NoSuchObject),
     }
 }
 
@@ -474,6 +512,7 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
         ObjectSnapshot::Clone(clone) => rotation && clone.chain.matrix.is_finite(),
         ObjectSnapshot::Text(text) => text.placement.is_finite() && text.size.as_mm().is_finite(),
         ObjectSnapshot::Image(image) => image.placement.is_finite(),
+        ObjectSnapshot::Dimension(dimension) => dimension.kept.is_finite(),
         ObjectSnapshot::Sketch(sketch) => sketch.placement.is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation

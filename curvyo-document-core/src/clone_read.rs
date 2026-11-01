@@ -30,6 +30,8 @@ pub(crate) enum RawLeaf {
     TextClone(Box<crate::text_clone_codec::TextCloneParts>),
     /// An image: never an original.
     Image(crate::image_model::ImageSnapshot),
+    /// A dimension: never an original; resolved after every other leaf (ADR 0027 §3).
+    Dimension(Box<crate::dimension_model::DimensionSnapshot>),
     /// A leaf whose registers cannot be read (merge residue of a text): left out.
     Unreadable(NodeId),
 }
@@ -51,6 +53,7 @@ impl RawLeaf {
             Self::Primitive(primitive) => primitive.id,
             Self::Text(text) => text.id,
             Self::Image(image) => image.id,
+            Self::Dimension(dimension) => dimension.id,
             Self::TextClone(parts) => parts.id,
             Self::Clone(id, ..) | Self::BrokenClone(id) | Self::Unreadable(id) => *id,
         }
@@ -206,6 +209,7 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
             | RawLeaf::BrokenClone(_)
             | RawLeaf::Text(_)
             | RawLeaf::Image(_)
+            | RawLeaf::Dimension(_)
             | RawLeaf::TextClone(_)
             | RawLeaf::Unreadable(_) => State::NotOrigin,
             RawLeaf::Clone(..) => State::Pending,
@@ -340,6 +344,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
             RawLeaf::Primitive(primitive) => Some(ObjectSnapshot::Primitive(primitive)),
             RawLeaf::Text(text) => Some(ObjectSnapshot::Text(text)),
             RawLeaf::Image(image) => Some(ObjectSnapshot::Image(image)),
+            RawLeaf::Dimension(dimension) => Some(ObjectSnapshot::Dimension(dimension)),
             RawLeaf::TextClone(parts) => {
                 text_clones.push((i, *parts));
                 None
@@ -367,8 +372,15 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         result.clones_of.entry(source).or_default().push(clone);
     }
     result.orphans.extend(filled.orphans);
-    result.texts_on = crate::text_carrier::resolve_carriers(&mut result.leaves);
+    resolve_followers(&mut result);
     result
+}
+
+/// The leaves that follow other leaves, once every other leaf is read: every text on path its
+/// carrier (ADR 0022 §3), then every dimension what it measures (ADR 0027 §3).
+fn resolve_followers(result: &mut Resolution) {
+    result.texts_on = crate::text_carrier::resolve_carriers(&mut result.leaves);
+    crate::dimension_read::resolve_dimensions(&mut result.leaves);
 }
 
 /// Whether every point and handle of `path` is a finite number.

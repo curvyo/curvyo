@@ -95,6 +95,7 @@ fn style_of(doc: &Document, id: NodeId) -> Style {
     match doc.object(id).expect("object exists") {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.style,
         ObjectSnapshot::Primitive(p) => p.style,
@@ -484,6 +485,7 @@ fn object_to_path_gives_a_path_without_markers() {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => assert_eq!(p.style.stroke.markers, Markers::default()),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("converted"),
@@ -557,6 +559,7 @@ fn splitting_an_open_path_keeps_the_settings_on_both_halves() {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(path) => assert!(!path.closed),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),
@@ -635,6 +638,7 @@ fn closing_a_path_onto_itself_keeps_its_settings() {
     match doc.object(id).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => assert!(path.closed),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!(),

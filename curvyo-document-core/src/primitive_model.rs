@@ -315,6 +315,9 @@ pub enum ObjectSnapshot {
     /// An image object (`specs/0058-bitmap-import`, ADR 0017 §1): one asset in a mapped unit
     /// square. It has no outline, so every command that needs one matches on the kind.
     Image(crate::image_model::ImageSnapshot),
+    /// A linked dimension (`specs/0070-measure-and-dimension`, ADR 0027): a guide by kind with no
+    /// outline; drawn by its own marks, never output.
+    Dimension(Box<crate::dimension_model::DimensionSnapshot>),
 }
 
 impl ObjectSnapshot {
@@ -327,6 +330,7 @@ impl ObjectSnapshot {
             Self::Clone(snapshot) => &snapshot.resolved.style,
             Self::Text(snapshot) => &snapshot.style,
             Self::Image(snapshot) => &snapshot.style,
+            Self::Dimension(snapshot) => &snapshot.style,
             Self::Sketch(snapshot) => &snapshot.resolved.style,
         }
     }
@@ -340,6 +344,7 @@ impl ObjectSnapshot {
             Self::Clone(snapshot) => &mut snapshot.resolved.style,
             Self::Text(snapshot) => &mut snapshot.style,
             Self::Image(snapshot) => &mut snapshot.style,
+            Self::Dimension(snapshot) => &mut snapshot.style,
             Self::Sketch(snapshot) => &mut snapshot.resolved.style,
         }
     }
@@ -354,7 +359,7 @@ impl ObjectSnapshot {
             Self::Sketch(snapshot) => Some(&snapshot.resolved),
             Self::Clone(clone) => Some(&clone.resolved),
             Self::Text(text) => text.outline.as_deref().map(|outline| &outline.glyphs),
-            Self::Primitive(_) | Self::Image(_) => None,
+            Self::Primitive(_) | Self::Image(_) | Self::Dimension(_) => None,
         }
     }
 
@@ -367,6 +372,7 @@ impl ObjectSnapshot {
             Self::Clone(snapshot) => snapshot.id(),
             Self::Text(snapshot) => snapshot.id,
             Self::Image(snapshot) => snapshot.id,
+            Self::Dimension(snapshot) => snapshot.id,
             Self::Sketch(snapshot) => snapshot.id,
         }
     }
@@ -388,6 +394,7 @@ impl ObjectSnapshot {
             Self::Image(snapshot) => {
                 Angle::from_radians(snapshot.placement.b.atan2(snapshot.placement.a))
             }
+            Self::Dimension(_) => Angle::from_radians(0.0),
         }
     }
 
@@ -453,6 +460,9 @@ impl ObjectSnapshot {
             Self::Image(image) => {
                 Self::Image(image.mapped_by(Affine::rotation_about(pivot, angle)))
             }
+            Self::Dimension(dimension) => Self::Dimension(Box::new(
+                dimension.mapped_by(Affine::rotation_about(pivot, angle)),
+            )),
         }
     }
 
@@ -486,6 +496,9 @@ impl ObjectSnapshot {
             Self::Clone(clone) => Self::Clone(clone.mapped_by(Affine::translation(offset))),
             Self::Text(text) => Self::Text(Box::new(text.mapped_by(Affine::translation(offset)))),
             Self::Image(image) => Self::Image(image.mapped_by(Affine::translation(offset))),
+            Self::Dimension(dimension) => {
+                Self::Dimension(Box::new(dimension.mapped_by(Affine::translation(offset))))
+            }
         }
     }
 }

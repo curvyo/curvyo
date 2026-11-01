@@ -30,6 +30,7 @@ fn body(d: &Document, id: NodeId) -> String {
     match d.object(id) {
         Some(ObjectSnapshot::Sketch(_)) => unreachable!("no sketch in this test"),
         Some(ObjectSnapshot::Image(_)) => unreachable!("no image in this test"),
+        Some(ObjectSnapshot::Dimension(_)) => unreachable!("no dimension in this test"),
         Some(ObjectSnapshot::Text(_)) => unreachable!("no text in this test"),
         Some(ObjectSnapshot::Primitive(p)) => {
             format!("{:?}|{:?}|{:?}", p.shape, p.style, p.rotation)
