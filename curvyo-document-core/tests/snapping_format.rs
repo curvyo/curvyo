@@ -182,6 +182,7 @@ fn golden_document() -> Document {
         page: true,
         capture_px: 6.0,
         release_px: 20.0,
+        ..DocumentSnapping::DEFAULT
     }));
     document
 }
@@ -379,6 +380,7 @@ fn every_edit_is_one_commit_labelled_set_document_snapping() {
         page: false,
         capture_px: 6.0,
         release_px: 20.0,
+        ..DocumentSnapping::DEFAULT
     }));
     let after = labels(&document);
     assert_eq!(after.len(), before + 1, "nine registers in one commit");
@@ -413,6 +415,7 @@ fn every_register_survives_save_and_open_exactly() {
         page: false,
         capture_px: 6.0,
         release_px: 20.0,
+        ..DocumentSnapping::DEFAULT
     };
     assert!(document.set_snapping(value));
     let reopened = unpack(2, &pack(&document, "t").unwrap()).unwrap();
@@ -541,6 +544,7 @@ fn the_golden_reads_back_and_opening_it_writes_nothing() {
             page: true,
             capture_px: 6.0,
             release_px: 20.0,
+            ..DocumentSnapping::DEFAULT
         }
     );
     let mut archive = zip::ZipArchive::new(Cursor::new(&bytes)).unwrap();

@@ -40,7 +40,9 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod page_grid;
 mod pages;
+pub use page_grid::{GridMode, GridScale, OriginCorner, PageGrid, PageGridError};
 pub use pages::{FIRST_PAGE_ID, Page, PageError};
 mod drawing_above;
 mod drawing_check;
@@ -211,7 +213,7 @@ pub use ring_curve::{
 };
 pub use shapes::ShapeEditError;
 pub use smooth_handles::smooth_corner_handles;
-pub use snapping::DocumentSnapping;
+pub use snapping::{DocumentSnapping, GridSnapPoint};
 pub use stroke_to_path_write::{
     STROKE_TO_PATH_COMMIT_LABEL, StrokeOutlineWrite, StrokeSubject, StrokeToPath,
     stroke_outline_style,

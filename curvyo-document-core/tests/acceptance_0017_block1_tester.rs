@@ -575,6 +575,14 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "snapping_y_type_v27.curvyo",
         "snapping_objects_container_v27.curvyo",
         "snapping_release_nan_v27.curvyo",
+        // Intentionally malformed 0090 grid registers.
+        "grid_spacing_zero_v30.curvyo",
+        "grid_subdivision_one_v30.curvyo",
+        "grid_mode_unknown_v30.curvyo",
+        "grid_angle_nan_v30.curvyo",
+        "grid_shown_type_v30.curvyo",
+        "snapping_grid_point_unknown_v30.curvyo",
+        "grid_origin_unknown_v30.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

@@ -182,8 +182,8 @@ fn ac2_ac77_a_document_from_a_drawing_has_no_step() {
     let bytes = curvyo_document_core::pack(&document, "test").unwrap();
     let reopened = curvyo_document_core::unpack(5, &bytes).unwrap();
     assert_eq!(reopened.read_objects().objects.len(), 3);
-    // No format change of its own (criterion 77); `0058` took 25 for images, `0059` took 26 for pages, `0060` 27 for snapping, `0066` 28 and 29 for sketches.
-    assert!((24..=29).contains(&CURRENT_FORMAT_VERSION));
+    // No format change of its own (criterion 77); `0058` took 25 for images, `0059` took 26 for pages, `0060` 27 for snapping, `0066` 28 and 29 for sketches, `0090` 30 for grids.
+    assert!((24..=30).contains(&CURRENT_FORMAT_VERSION));
 }
 
 fn drawing_text(string: &str, hash: &str) -> curvyo_document_core::DrawingText {
