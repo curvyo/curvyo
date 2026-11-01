@@ -1211,3 +1211,113 @@ Checks run: red first for R1, a == b (both crates) and finding 1; `cargo fmt --c
 4449/4449, editor-wasm 4159/4159 (three partitions); frontend `build:wasm`, `tsc -b --noEmit`,
 `npm test` 658 passed / 96 skipped, `oxlint` exit 0; browser (Vite :1421) `sketch-rev4.cjs`,
 `sketch-rev3.cjs` pass.
+
+## Customer revision 5 (2026-11-01)
+
+Source: `specification.md` "Customer revision 5" (AC49-AC52; defaults R5-PICK A = 10 px,
+R5-SYMCENTRE A), customer screenshots `target/0066-rev5/customer-glitch.png` and
+`customer-symmetry.png`. Affected: `curvyo-ui-core` (pick order, Symmetric centre, dimension
+text placement), `curvyo-editor-wasm` (`session/sketch`: axis picks, Alt cycle, rail picks,
+edited annotation). Tests drive pointer, key and rail events on `Session` (AC41).
+
+Root causes found by reproducing the screenshots (browser `sketch-rev5.cjs`, before build):
+- AC49 stray segment: a stored text position (placed or dragged) was kept along the dimension
+  line wherever it was; after the geometry moved (here by the Symmetric below) the text stood far
+  outside the extension lines and the dimension line ran out to it (263 stray pixels before).
+  A text near an end, or a span narrower than its text, also put the text box over an extension
+  line, which the text break then cut.
+- AC49 line break: the line kept its gap for the text while the entry box hid that text, so the
+  vertical line broke at the text's place next to the origin (24 rows missing before).
+- AC52: the local axes were picked only on bare canvas. A press on an axis where a dimension
+  line crosses it selected the dimension (and its points) instead, so the Symmetric was refused or
+  ignored; near the origin the origin point was taken, and three points made a point symmetry
+  whose centre came from the id order of the selection set (the customer's screenshot: the right
+  point moved to the midpoint of the left point and the origin). Axis-only selections on bare
+  canvas already worked in both flows.
+- AC51: the selection is a set; "the last point is the centre" read the last id, not the last pick.
+
+- [x] 1. AC50 (ui-core `sketch.rs`): points within 10 px (10/6 of the 6 px edge tolerance the
+  callers pass) win over edges, nearest first; `sketch_pick_order` lists points, then edges.
+  Tests: `a_point_within_ten_pixels_wins_over_a_nearer_edge`,
+  `the_pick_order_lists_the_edge_after_the_point`; session
+  `a_point_within_ten_pixels_wins_over_a_nearer_edge_at_every_zoom` (25/100/400 %),
+  `of_two_points_within_reach_the_nearer_wins`, `alt_cycling_still_reaches_the_edge_under_a_winning_point`.
+- [x] 2. AC51 (ui-core `sketch_actions.rs`): three points selected first take the point nearest
+  the midpoint of the other two; a tie within 1e-6 mm is refused naming the ambiguity. Rail picks
+  (`rail.rs`): the last picked point is the centre; the Symmetric reason says so. Tests:
+  `the_symmetric_centre_is_the_point_nearest_the_midpoint_of_the_others`,
+  `an_ambiguous_symmetric_centre_is_refused_with_its_reason`; session
+  `three_selected_points_take_the_middle_one_as_centre_in_every_order`,
+  `rail_picks_take_the_last_point_as_centre`, `an_ambiguous_centre_is_refused_with_a_hint`.
+- [x] 3. AC52 (`axes.rs`, `annotation_input.rs`, `selection.rs`): an axis within reach wins over
+  a dimension line crossing it; Alt-click cycles points, edges, then the axes (the origin's
+  axes are reachable). Tests: `symmetric_about_an_axis_or_a_line_works_in_both_flows` (Y axis,
+  X axis, construction line, drawn line; selection first and rail picks; target last and first;
+  one step, Select, DOF minus two, mirrored within 1e-6 mm after a drag, undo),
+  `two_points_and_a_circle_are_refused_with_the_hint`,
+  `the_axes_stay_pickable_under_a_dimension_line_and_at_the_origin`.
+- [x] 4. AC49 (ui-core layout): one text rule for linear and axis distances: between the
+  extension lines, clamped clear of them and the arrowheads, when the span holds the arrows and
+  the text; else beside the end nearer the stored place, one 12 px tail out (the leader). A text
+  of no characters (entry open) breaks nothing. Geometry oracle per case
+  (`sketch_dimension_glitch_tests.rs`: customer geometry, stored text beyond either end, line on
+  either side and between, origin and axis points, small spans, ticks, zero value, 10-1000 %
+  zoom, entry open); session `an_edited_dimension_line_has_no_gap_where_its_hidden_text_was`.
+  Pixel oracle in the browser (`sketch-rev5.cjs`): no dimension-coloured pixel off the expected
+  marks; the edited line has no gap.
+- [x] 5. Browser `sketch-rev5.cjs`, before/after screenshots `target/0066-rev5/{before,after}-*.png`.
+
+Choices **(Proposal)**:
+- The local axes come after points and edges in the Alt cycle; a plain press on bare canvas
+  still picks the axis directly.
+- An axis within its 6 px reach wins over a dimension *line*, not over a dimension text or a
+  constraint symbol (those stay draggable and selectable on the axis).
+- The Symmetric reason reads "...; picked one by one, the last point is the centre".
+
+Tests changed because a revision 5 criterion supersedes them:
+- `curvyo-ui-core/tests/sketch_revision.rs` `nearer_line_wins_over_more_distant_point_inside_hit_band`
+  becomes `a_point_within_reach_wins_over_a_nearer_line_and_the_line_wins_beyond` (AC50).
+- `sketch_dimension_layout_tests.rs` `a_stored_label_sets_offset_and_text_position` and
+  `a_vertical_projected_dimension_stands_left_and_follows_its_label`: a stored text beyond or at
+  an end is kept between the extension lines (AC49).
+- `acceptance_0066_revision_runtime.rs` `suffix_native_body_drag_full_target_vector_and_fixture`
+  zooms in before its body press, which lay 2 px from a point at 100 % (AC50).
+
+Checks run: red first for the AC49 oracle, AC50/AC51 ui-core tests and the AC49/50/51/52
+session tests (`the_axes_stay_pickable...`, `rail_picks...`, `alt_cycling...`,
+`an_edited_dimension_line...`); `cargo fmt --check`; clippy `-D warnings` host all targets and
+wasm32 for ui-core and editor-wasm; `cargo doc -D warnings`; `cargo deny check`; nextest
+ui-core 2082/2082, editor-wasm lib 640/640 and all integration binaries 3529/3529; frontend
+`build:wasm`, `tsc -b --noEmit`, `npm test` 662 passed / 114 skipped, `oxlint` exit 0; browser
+(Vite :1421) `sketch-rev5.cjs` (before build: 24-row gap, 263 stray pixels, Y-axis Symmetric
+missing; after: pass), `sketch-rev4.cjs` pass.
+
+### Revision 5 architecture review and acceptance follow-up (2026-11-01)
+
+- [x] Review change 1: `sketch_hit`, `sketch_hits` and `sketch_pick_order` take `px` (one
+  screen pixel in document mm); `curvyo-ui-core` owns `SKETCH_EDGE_PICK_PX = 6.0` and
+  `SKETCH_POINT_PICK_PX = 10.0`; the session passes `1 / scale` and the repeated `6.0`
+  literals are gone (AC50).
+- [x] Review change 2: `sketch_symmetric_about` in `sketch_actions.rs` is the one
+  Symmetric-about-a-point rule; the selection-first centre and the rail's last pick both use it
+  (AC51).
+- [x] Review change 3: `CENTRE_TIE: Length`, scores kept as `Length`.
+- [x] Acceptance finding 1: armed Symmetric states "picked one by one, the last point is the
+  centre" in its rail tooltip and as the mode label hint, also with nothing selected (AC51).
+- [x] Acceptance finding 2: an armed pick after which the picks can no longer fit is refused:
+  the pick is undone and the tool's hint shows (AC52, rail flow two points + circle).
+- [x] `frontend/tests/browser/sketch-workbench.cjs` (implementer script) follows the current
+  rail: Dimension applies at once to a fitting selection and opens its entry box (AC40).
+
+Not done (recommended item): `drag.rs` keeps cycling `sketch_hits` on a repeated plain press;
+switching it to `sketch_pick_order` would make a second click on a point select the edge
+underneath, and `sketch_hits` is used by an acceptance test, so it stays public.
+
+Tests changed because the API meaning changed (tolerance to pixel size):
+`curvyo-ui-core/tests/sketch_revision.rs` passes `Length(1.0)` and `Length(0.5)` px.
+
+Checks run: `cargo fmt --check`; clippy `-D warnings` host all targets and wasm32 for
+ui-core and editor-wasm; wasm32 build; `cargo doc -D warnings`; nextest ui-core 2087/2087,
+editor-wasm 4155/4155 (all but the slow untouched `c30_` test); frontend `build:wasm`,
+`tsc -b --noEmit`, `npm test` 662 pass / 0 fail, `oxlint` exit 0; browser (Vite :5173)
+`sketch-rev5.cjs`, `sketch-rev4.cjs`, `sketch-workbench.cjs` pass.
