@@ -1,5 +1,5 @@
 //! The document's snapping settings: whether snapping is on, which target kinds
-//! contribute, and the two zone sizes, stored as nine registers in the
+//! contribute, and the two zone sizes, stored as root registers in the
 //! document root (`specs/0060-snapping`, `adrs.md` decisions 1 and 2).
 //!
 //! Snapping is a property of the document, not of the user or the session: the
@@ -24,6 +24,10 @@ const KEY_GUIDES: &str = "snapping_guides";
 const KEY_NODES: &str = "snapping_nodes";
 /// The root register for the page fractions. Absent means on.
 const KEY_PAGE: &str = "snapping_page";
+/// The root register for the page grids (`specs/0090-grid` criterion 10). Absent means on.
+const KEY_GRID: &str = "snapping_grid";
+/// The root register for the grid snap point (criterion 11). Absent means centre.
+const KEY_GRID_POINT: &str = "snapping_grid_point";
 const KEY_X: &str = "snapping_x";
 const KEY_Y: &str = "snapping_y";
 /// The root register for the capture zone in screen pixels. Absent means
@@ -32,6 +36,39 @@ const KEY_CAPTURE_PX: &str = "snapping_capture_px";
 /// The root register for the release zone in screen pixels. Absent means
 /// [`DocumentSnapping::DEFAULT_RELEASE_PX`].
 const KEY_RELEASE_PX: &str = "snapping_release_px";
+
+/// Which part of a moved selection snaps to a grid (`specs/0090-grid` criterion 11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GridSnapPoint {
+    /// The centre of the moving selection's box.
+    Centre,
+    /// The nine reference points of the box; the nearest wins.
+    Box,
+    /// The moving anchors of paths; an object without anchors snaps by its box centre.
+    Nodes,
+}
+
+impl GridSnapPoint {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Centre => "centre",
+            Self::Box => "box",
+            Self::Nodes => "nodes",
+        }
+    }
+
+    /// Parses the stored and host spelling (`"centre"`, `"box"`, `"nodes"`).
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "centre" => Some(Self::Centre),
+            "box" => Some(Self::Box),
+            "nodes" => Some(Self::Nodes),
+            _ => None,
+        }
+    }
+}
 
 /// The document's snapping settings (`specs/0060-snapping` criterion 1).
 ///
@@ -53,6 +90,10 @@ pub struct DocumentSnapping {
     pub nodes: bool,
     /// Snap to the six page fractions on each axis.
     pub page: bool,
+    /// Snap to shown page grids (`specs/0090-grid` criterion 10).
+    pub grid: bool,
+    /// Which part of a moved selection snaps to a grid.
+    pub grid_point: GridSnapPoint,
     /// Allow correction of the horizontal coordinate.
     pub x: bool,
     /// Allow correction of the vertical coordinate.
@@ -78,6 +119,8 @@ impl DocumentSnapping {
         guides: true,
         nodes: true,
         page: true,
+        grid: true,
+        grid_point: GridSnapPoint::Centre,
         x: true,
         y: true,
         capture_px: Self::DEFAULT_CAPTURE_PX,
@@ -118,10 +161,26 @@ pub(crate) struct SnappingJson {
     guides: bool,
     nodes: bool,
     page: bool,
+    /// Left out at its default (on), like a node's registers, so the export of a file
+    /// without grid snapping registers is unchanged.
+    #[serde(skip_serializing_if = "is_true")]
+    grid: bool,
+    #[serde(skip_serializing_if = "is_centre")]
+    grid_point: GridSnapPoint,
     x: bool,
     y: bool,
     capture_px: f64,
     release_px: f64,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Serde's skip predicate takes a reference.
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // Serde's skip predicate takes a reference.
+fn is_centre(value: &GridSnapPoint) -> bool {
+    *value == GridSnapPoint::Centre
 }
 
 impl From<DocumentSnapping> for SnappingJson {
@@ -132,6 +191,8 @@ impl From<DocumentSnapping> for SnappingJson {
             guides: snapping.guides,
             nodes: snapping.nodes,
             page: snapping.page,
+            grid: snapping.grid,
+            grid_point: snapping.grid_point,
             x: snapping.x,
             y: snapping.y,
             capture_px: snapping.capture_px,
@@ -143,6 +204,13 @@ impl From<DocumentSnapping> for SnappingJson {
 fn bool_of(value: &LoroValue) -> Option<bool> {
     match value {
         LoroValue::Bool(value) => Some(*value),
+        _ => None,
+    }
+}
+
+fn grid_point_of(value: &LoroValue) -> Option<GridSnapPoint> {
+    match value {
+        LoroValue::String(text) => GridSnapPoint::parse(text),
         _ => None,
     }
 }
@@ -186,6 +254,12 @@ pub(crate) fn snapping_of_root(root: &LoroMap) -> DocumentSnapping {
         guides: boolean(KEY_GUIDES, true),
         nodes: boolean(KEY_NODES, true),
         page: boolean(KEY_PAGE, true),
+        grid: boolean(KEY_GRID, true),
+        grid_point: plain(root, KEY_GRID_POINT)
+            .ok()
+            .flatten()
+            .and_then(|value| grid_point_of(&value))
+            .unwrap_or(GridSnapPoint::Centre),
         x: boolean(KEY_X, true),
         y: boolean(KEY_Y, true),
         capture_px: zone(KEY_CAPTURE_PX, DocumentSnapping::DEFAULT_CAPTURE_PX),
@@ -208,6 +282,8 @@ pub(crate) fn validate(loro: &LoroDoc) -> bool {
         && ok(KEY_GUIDES, |value| bool_of(value).is_some())
         && ok(KEY_NODES, |value| bool_of(value).is_some())
         && ok(KEY_PAGE, |value| bool_of(value).is_some())
+        && ok(KEY_GRID, |value| bool_of(value).is_some())
+        && ok(KEY_GRID_POINT, |value| grid_point_of(value).is_some())
         && ok(KEY_X, |value| bool_of(value).is_some())
         && ok(KEY_Y, |value| bool_of(value).is_some())
         && ok(KEY_CAPTURE_PX, |value| zone_of(value).is_some())
@@ -259,6 +335,12 @@ impl Document {
         }
         if value.page != current.page {
             set(KEY_PAGE, LoroValue::Bool(value.page));
+        }
+        if value.grid != current.grid {
+            set(KEY_GRID, LoroValue::Bool(value.grid));
+        }
+        if value.grid_point != current.grid_point {
+            set(KEY_GRID_POINT, LoroValue::from(value.grid_point.as_str()));
         }
         if value.x != current.x {
             set(KEY_X, LoroValue::Bool(value.x));

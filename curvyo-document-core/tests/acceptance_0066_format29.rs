@@ -137,7 +137,7 @@ fn v28_goldens_still_open_unchanged() {
 
 #[test]
 fn a_file_with_axis_distances_is_too_new_for_a_version_28_reader() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 29);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 29);
     let doc = Document::new(9321);
     let mut sketch = Sketch::new("origin".into());
     for (id, x) in [("a", 10.0), ("b", 40.0)] {
@@ -176,10 +176,8 @@ fn a_file_with_axis_distances_is_too_new_for_a_version_28_reader() {
     }
     assert!(matches!(
         unpack(9322, &repack(&parts)),
-        Err(OpenError::FormatTooNew {
-            found: 30,
-            supported: 29
-        })
+        Err(OpenError::FormatTooNew { found, supported })
+            if found == CURRENT_FORMAT_VERSION + 1 && supported == CURRENT_FORMAT_VERSION
     ));
 }
 

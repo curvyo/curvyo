@@ -293,7 +293,14 @@ impl DocumentVersion {
 /// must refuse every file of this build as too new. Migration from version 28 is none: no
 /// version-28 record changes shape, and the version-28 goldens still open. Goldens:
 /// `sketch_*_v29.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 29;
+///
+/// Bumped to 30 in `grid` (`specs/0090-grid`, `adrs.md` decisions 1 and 2): each page keeps
+/// its grid as independent `page.<id>.grid_*` registers, and snapping gains the
+/// `snapping_grid` target switch and the `snapping_grid_point` choice. Absent registers mean
+/// the defaults and opening writes nothing; a malformed one is refused as damaged.
+/// Golden: `grid_v30.curvyo`. Older files open with the defaults; old-file compatibility
+/// waived (customer, 2026-10-30).
+pub const CURRENT_FORMAT_VERSION: u32 = 30;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -467,6 +474,7 @@ impl Document {
         if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
             || !crate::document_background::validate(&loro)
             || !crate::snapping::validate(&loro)
+            || !crate::page_grid::validate(&loro)
         {
             return Err(OpenError::Damaged);
         }

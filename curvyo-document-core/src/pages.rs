@@ -1,8 +1,9 @@
 //! Ordered spatial page frames stored as independent root registers.
 use crate::document::{KEY_HEIGHT_MM, KEY_WIDTH_MM, ROOT_MAP};
 use crate::document_size::{MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side};
+use crate::page_grid::{PageGrid, grid_of_fields, grid_of_root, write_non_default};
 use crate::{Document, DocumentSize, DocumentSizeError, NodeId, ObjectEditError, Point, Vec2};
-use loro::{LoroMap, LoroValue};
+use loro::{LoroMap, LoroValue, ValueOrContainer};
 use serde::Serialize;
 
 /// Stable identity of the initial page.
@@ -20,6 +21,10 @@ pub struct Page {
     pub origin: Point,
     /// Frame dimensions.
     pub size: DocumentSize,
+    /// The page's grid settings (`specs/0090-grid` criterion 1); left out of
+    /// `document.json` at its default, like a node's registers.
+    #[serde(skip_serializing_if = "PageGrid::is_default")]
+    pub grid: PageGrid,
 }
 impl Page {
     /// Whether a global point lies within the frame, including its edge.
@@ -90,12 +95,24 @@ pub(crate) fn initialize(root: &LoroMap) {
 }
 pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
     let mut ids = std::collections::BTreeSet::new();
-    root.for_each(|name, _| {
-        if let Some(id) = name
-            .strip_prefix("page.")
-            .and_then(|s| s.strip_suffix(".name"))
-        {
+    // The grid registers are gathered in the same pass, so a page without any (a grid never
+    // touched) costs no keyed read per frame (`specs/0090-grid` criterion 9).
+    let mut grids: std::collections::HashMap<String, Vec<(String, LoroValue)>> =
+        std::collections::HashMap::new();
+    root.for_each(|name, value| {
+        let Some(rest) = name.strip_prefix("page.") else {
+            return;
+        };
+        if let Some(id) = rest.strip_suffix(".name") {
             ids.insert(id.to_owned());
+        } else if let Some((id, field)) = rest.rsplit_once('.')
+            && field.starts_with("grid_")
+            && let ValueOrContainer::Value(value) = value
+        {
+            grids
+                .entry(id.to_owned())
+                .or_default()
+                .push((field.to_owned(), value));
         }
     });
     let mut pages: Vec<_> = ids
@@ -116,6 +133,14 @@ pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
                 name: string(root, &id, "name")?,
                 origin: Point::new(number(root, &id, "x")?, number(root, &id, "y")?),
                 size,
+                grid: grids.get(&id).map_or(PageGrid::DEFAULT, |fields| {
+                    grid_of_fields(|field| {
+                        fields
+                            .iter()
+                            .find(|(name, _)| name == field)
+                            .map(|(_, value)| value.clone())
+                    })
+                }),
                 id,
             };
             Some(page)
@@ -139,6 +164,7 @@ pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
             name: "Page 1".into(),
             origin: Point::new(0.0, 0.0),
             size: Document::size_of_root(root),
+            grid: grid_of_root(root, FIRST_PAGE_ID),
         }));
     }
     pages
@@ -190,6 +216,7 @@ impl Document {
             name: format!("Page {n}"),
             origin,
             size: last.size,
+            grid: last.grid,
         };
         let root = self.loro().get_map(ROOT_MAP);
         write(&root, &last.id, "deleted", false);
@@ -206,6 +233,7 @@ impl Document {
         ] {
             write(&root, &page.id, field, value);
         }
+        write_non_default(&root, &page.id, page.grid);
         self.commit_with_label("add_page");
         page
     }

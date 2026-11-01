@@ -17,6 +17,7 @@ fn ac1_ac14_defaults_roundtrip_and_reads_do_not_create_operations() {
         page: true,
         capture_px: 0.25,
         release_px: 1234.5,
+        ..DocumentSnapping::DEFAULT
     };
     assert!(d.set_snapping(stored));
     let restored = unpack(602, &pack(&d, "acceptance").unwrap()).unwrap();
