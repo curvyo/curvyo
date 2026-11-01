@@ -63,6 +63,10 @@ async function waitFor(url) {
     const rail = p.getByRole('button', { name: /^Measure tool/ });
     assert.equal(await rail.getAttribute('aria-pressed'), 'true');
     assert.equal(await p.getByRole('toolbar', { name: 'More tools' }).count(), 1);
+    // Customer feedback on PR #243: a plain crosshair and no chip before the first pick.
+    await move(300, 780); await settle();
+    assert.equal(await p.locator('canvas[data-state]').evaluate((e) => getComputedStyle(e).cursor), 'crosshair');
+    assert.equal(await p.locator('[data-measure-chip]').count(), 0, 'no chip before a pick');
 
     // Criterion 1: a measurement writes nothing and shows the readout.
     await click(500, 300); await move(650, 300); await click(700, 300); await settle();
@@ -134,8 +138,54 @@ async function waitFor(url) {
     await p.keyboard.press('Control+z'); await settle();
     assert.equal(await labels().count(), 6);
     await shot('07-undone');
+
+    // Customer feedback on PR #243: primitives measure by their edges, vertices, centres and
+    // axis ends; a right click does nothing.
+    await tool('Ellipse');
+    await move(750, 560); await p.mouse.down(); await move(950, 640); await p.mouse.up(); await settle();
+    await tool('Polygon/star');
+    await move(300, 700); await p.mouse.down(); await move(380, 780); await p.mouse.up(); await settle();
+    await tool('Measure');
+    const chip = async () => ((await readout.count()) ? (await readout.innerText()).split('\n')[0].trim() : '');
+    await click(820, 430); await move(830, 470); await settle(); // the moved rectangle's top edge
+    const side = await chip();
+    assert.match(side, /^39\.6\d* mm, (0|180)°$/, side);
+    await p.keyboard.press('Escape'); await settle();
+    await click(950, 600); await move(750, 600); await click(750, 600); await settle(); // ellipse ends
+    const across = await chip();
+    assert.match(across, /^52\.9\d* mm, 180°$/, across);
+    await p.keyboard.press('Escape'); await settle();
+    await click(850, 560); await p.keyboard.down('Shift'); await click(850, 640); await p.keyboard.up('Shift');
+    // Placed right of the ellipse, its text over the east handle (950, 600) of the ellipse's box.
+    await move(953, 600); await settle(); await click(953, 600); await settle();
+    assert.equal(await labels().count(), 7, 'a dimension between two axis ends');
+    await click(300, 740); await move(330, 760); await settle(); // centre of the polygon
+    const centre = await chip();
+    await p.keyboard.press('Escape'); await settle();
+    assert.match(centre, /^\d/, centre);
+    const count = await labels().count();
+    await move(600, 800); await p.mouse.down({ button: 'right' }); await p.mouse.up({ button: 'right' });
+    await move(650, 830); await settle();
+    assert.equal(await p.locator('[data-measure-chip]').count(), 0, 'a right click starts nothing');
+    await p.keyboard.down('Shift'); await move(820, 430);
+    await p.mouse.down({ button: 'right' }); await p.mouse.up({ button: 'right' }); await p.keyboard.up('Shift');
+    await move(850, 470); await settle();
+    assert.equal(await p.locator('[data-measure-chip]').count(), 0, 'a right click on an edge picks nothing');
+    assert.equal(await labels().count(), count, 'a right click leaves no dimension');
+    await shot('08-primitives');
+
+    // Customer feedback on PR #243: a resize handle wins over a dimension on it.
+    await tool('Select');
+    await click(750, 600); await settle(); // the ellipse, by its west end
+    const textAt = async () => (await labels().last().boundingBox()).x;
+    const before7 = await textAt();
+    await move(950, 600); await p.mouse.down(); await move(1010, 600); await p.mouse.up(); await settle();
+    assert.equal(await p.getByRole('button', { name: 'Guide', exact: true }).getAttribute('aria-pressed'), 'false', 'the ellipse stays selected');
+    const moved = (await textAt()) - before7;
+    assert.ok(Math.abs(moved - 30) < 4, `the dimension follows the scaled ellipse's centre: ${moved}`);
+    await shot('09-handle-wins');
     assert.deepEqual(errors, []);
-    console.log('PASS browser 0070: M and rail; measurement and readout; aligned, horizontal, vertical, radius, diameter, angle dimensions; follow; unlink and relink; convert and undo; no page errors');
+    console.log('PASS browser 0070: M and rail; measurement and readout; aligned, horizontal, vertical, radius, diameter, angle dimensions; follow; unlink and relink; convert and undo; crosshair and no chip before a pick; rectangle edge, ellipse axis ends, polygon centre; right click does nothing; resize handle wins over a dimension; no page errors');
   } finally {
     await browser.close();
     if (vite?.pid) { try { process.kill(-vite.pid, 'SIGKILL'); } catch { /* gone */ } }

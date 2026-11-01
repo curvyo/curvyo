@@ -41,7 +41,7 @@ No bar, no panel. Everything is on the canvas.
 
 | Phase | Canvas shows |
 |---|---|
-| Idle, pointer on canvas | `crosshair`; mode label at the pointer; hover highlight on a pickable target (§6) |
+| Idle, pointer on canvas | plain `crosshair` as the Rectangle tool; no chip until the first pick (customer, PR #243); hover highlight on a pickable target (§6) |
 | Anchor A set | filled 6px dot at A (`--preview-new`, 1px white casing), kept until the end |
 | A to B, pointer moving | measure line + readout chip (§3), or the green dimension preview with Shift (§5) |
 | B set (Shift not held) | the measurement stays pinned: blue line, anchor dots, readout chip at B. Nothing stored |
@@ -53,10 +53,13 @@ click A, click B; or mixed. A press without movement over 4px is a click. **A pi
 on the next press, Escape, a tool change, an undo or redo, any document edit; pan and zoom keep it
 (it is anchored in document coordinates).
 
-**Pick sources** (what a press can hit), in priority: (1) a snap point (node, centre, midpoint) within
+**Pick sources** (what a press can hit, primary button only: a secondary press does nothing, customer
+feedback on PR #243), in priority: (1) a snap point (node, centre, midpoint, rectangle corner,
+polygon or star vertex, and the four axis ends of a whole ellipse that is not a circle) within
 the snapping tolerance of `0060`; (2) the outline of a circle, ellipse that is a circle, arc or rounded
 corner (`0013`) within the 8px Select hit tolerance: a **curve pick**; (3) the body of a straight
-segment: a **segment pick**; (4) empty canvas: a **free point** (only while snapping is off or nothing
+segment or a straight primitive edge (rectangle side between its box corners, polygon or star
+side between its vertices): a **segment pick**; (4) empty canvas: a **free point** (only while snapping is off or nothing
 is near; a free point is not a dimension anchor, see §7). Hidden objects are not picked; locked
 objects can be measured. Existing dimensions are not pick targets.
 
@@ -113,7 +116,7 @@ centre through the pick point, tick at the outline.
 Chip, `pointer-events: none`, `aria-hidden`, at most 22 characters, Title case: the kind alone while
 measuring, **"Dimension, " plus the kind while Shift is held or in the placement phase**:
 "Aligned", "Horizontal", "Vertical", "Angle", "Radius", "Diameter"; "Dimension, aligned" and so on
-(longest "Dimension, horizontal", 21). Before the first pick: "Measure" (Shift: "Dimension"). Placement and
+(longest "Dimension, horizontal", 21). Before the first pick: no label (customer feedback on PR #243). Placement and
 quadrant flip as 0066 §2 (S = A once set, else the pointer). The word is the non-colour cue for
 measure versus dimension. A visually hidden polite live region says the label on each change and
 once when the tool opens.
@@ -288,7 +291,7 @@ polish and consistency, none blocks the demo except where marked.
   within the toolbar. Tooltip "Measure tool (M)", and "Measure tool (Esc, M)" while an object is selected.
   `M` selects the tool (also with the Select tool and nothing selected).
 - Measurement: readout chip "29.581 mm, 26.565°" / "Δ 26.458, 13.229 mm", blue line with dots, nothing
-  stored (no history step). Mode label "Measure" before the first pick, then "Aligned".
+  stored (no history step). No mode label before the first pick, then "Aligned".
 - Shift swaps the blue drawing and chip for the green dimension and the label to "Dimension, aligned" in
   the same frame. Placement regions give "Dimension, horizontal / vertical", curve pick gives radius,
   Alt keydown switches to diameter, two segments give angle. Layers speech and rows match.

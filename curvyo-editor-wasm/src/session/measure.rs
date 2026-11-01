@@ -480,3 +480,7 @@ mod tests;
 #[cfg(test)]
 #[path = "measure_review_tests.rs"]
 mod review_tests;
+
+#[cfg(test)]
+#[path = "measure_feedback_tests.rs"]
+mod feedback_tests;

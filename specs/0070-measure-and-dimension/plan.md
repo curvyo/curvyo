@@ -142,6 +142,35 @@ Select-with-a-selection; `0070` criterion 2 makes M the Measure tool there. The 
 - [x] 32. The first anchor's dot stays under the Shift preview (`measure_open_anchor`) (item 6,
   criterion 4).
 
+### Customer feedback on PR #243 (2026-11-01)
+
+Reproduced first in Chromium (scratch script, then `frontend/tests/browser/measure.cjs`): a click
+on a rectangle side, an ellipse axis end or its rim measured from a free point; a right click
+started a measurement; the canvas cursor was the arrow and the chip "Measure" showed on
+activation.
+
+- [x] 33. Primitives (criteria 3, 6): a rectangle side, a polygon or star side is a segment pick
+  between its `ShapePoint` corners or vertices (`measure_pick::edge_near`); corners, vertices and
+  centres stay point picks, a rounded corner stays a radius, a circle keeps radius and diameter.
+  **(Proposal)** A whole ellipse that is not a circle offers its centre and its four axis ends
+  (`ShapeFeature::Vertex(0..4)`, east, south, west, north, resolved by `shape_point` from its
+  outline; no format change, the codec already writes `vertex`); two of them give an aligned
+  distance; its rim between them is no pick (no radius kind for ellipses); a circle shows no axis
+  ends so its rim keeps the radius. A curved polygon or star side is no segment pick.
+  Tests: `curvyo-ui-core` `measure_pick::shape_tests`, `dimension_read_tests`
+  `an_ellipse_vertex_is_an_axis_end`, session `measure::feedback_tests` (through
+  `pointer_down`/`pointer_up`).
+- [x] 34. A secondary press and release in the Measure tool reach no tool (`useEditorSession`,
+  as the creation tools): no measure, no pick, no dimension (browser check).
+- [x] 35. In the Select tool a handle of the drawn selection box under the pointer wins over a
+  dimension's text and lines (`Session::selection_handle_under_pointer` in
+  `dimension_pointer_down`); test `a_resize_handle_wins_over_a_dimension_on_it` and the browser
+  check.
+- [x] 36. Measure shows the plain crosshair of the Rectangle tool (`Canvas.tsx`) and no chip
+  until the first pick (`measure_mode_chip`); tester assertions c2 and c3 in
+  `acceptance_0070_tester.rs` and `measure-tester.cjs` follow the customer's change (to be
+  re-verified by the tester).
+
 ## Validation
 
 - Unit tests per module (test first), goldens and damaged fixtures, native/wasm32 build of

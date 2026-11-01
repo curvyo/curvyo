@@ -19,7 +19,7 @@ impl Session {
     /// A Select-tool press on a dimension's text or line: selects it (Shift adds) and starts a
     /// drag of its text. Returns whether a dimension took the press.
     pub(super) fn dimension_pointer_down(&mut self, point: Point, shift: bool) -> bool {
-        if self.tool != Tool::Select {
+        if self.tool != Tool::Select || self.selection_handle_under_pointer() {
             return false;
         }
         let Some(record) = self.dimension_at(point) else {
