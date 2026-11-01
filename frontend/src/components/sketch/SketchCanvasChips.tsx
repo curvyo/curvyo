@@ -14,6 +14,12 @@ const ENTRY_OFFSET_PX = 14;
 /** The Pen entry chip's field widths and label paddings (`docs/design-system.md`). */
 const FIELD_PX = [154, 150];
 const LABEL_PX = [48, 44];
+/**
+ * A box with one field shows no label, as the mode label or the dimension already names the
+ * value; the field is wider so a value is never clipped (customer polish of revision 5).
+ */
+const SINGLE_FIELD_PX = 168;
+const SINGLE_FIELD_PAD_PX = 8;
 const MODIFIER_KEYS = new Set(["Shift", "Control", "Meta", "Alt"]);
 
 type ContainerRef = React.RefObject<HTMLDivElement | null>;
@@ -152,6 +158,7 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
   };
   // Rust names the refused field; typing again hides the message until the next Enter.
   const refusal = dismissed ? null : entry.error ?? null;
+  const single = entry.fields.length === 1;
   return <div ref={ref} role="group" aria-label={entry.group} data-sketch-entry
     className="absolute z-30 rounded-[8px] p-1.5"
     style={{ left: at.left, top: at.top, background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)", color: "var(--toolbar-icon)" }}
@@ -159,8 +166,9 @@ function EntryBox({ sketch, entry, containerRef }: { sketch: SketchApi; entry: S
     // The pointer on the box leaves the canvas: the box stays where it is (UX notes, section 3).
     onPointerEnter={() => { if (!frozen) setFrozen(live); }}>
     <div className="flex items-center gap-1">
-      {entry.fields.map((field, index) => <EntryField key={field.label} label={field.label} width={FIELD_PX[index] ?? FIELD_PX[0]}
-        labelWidth={LABEL_PX[index] ?? LABEL_PX[0]} suffix={field.suffix} ariaLabel={field.name} invalid={refusal?.field === index} messageId={messageId}
+      {entry.fields.map((field, index) => <EntryField key={field.label} label={single ? "" : field.label}
+        width={single ? SINGLE_FIELD_PX : FIELD_PX[index] ?? FIELD_PX[0]}
+        labelWidth={single ? SINGLE_FIELD_PAD_PX : LABEL_PX[index] ?? LABEL_PX[0]} suffix={field.suffix} ariaLabel={field.name} invalid={refusal?.field === index} messageId={messageId}
         value={reference && !editing ? field.value : texts[index] ?? ""} readOnly={reference && !editing}
         inputRef={node => { inputs.current[index] = node; }}
         onChange={text => {
