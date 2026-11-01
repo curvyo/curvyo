@@ -80,6 +80,14 @@ Horizontal distance (40 mm) and Vertical distance (15 mm) to two points selected
 the aligned Dimension to the same two points selected by marquee, and checks the "↔"/"↕" texts
 and the saved signed relations. Screenshots go to `target/0066-browser/rev4/`.
 
+`sketch-rev5.cjs` (0066 customer revision 5) draws the customer's quadrilateral with a
+horizontal and a vertical distance, checks that the edited dimension line has no gap, runs a
+pixel oracle (no dimension-coloured pixel off the expected marks, text boxes masked), drags the
+horizontal text far beyond its right point (it stays between the extension lines), then applies
+Symmetric about the Y axis picked where the dimension line crosses it and, by rail picks, about
+the X axis. `REV5_PHASE=before` only takes screenshots (for a build before the fix).
+Screenshots go to `target/0066-rev5/<phase>-*.png`.
+
 `sketch-host-cpu.cjs` opens the generated100-entity `target/0066-runtime/chain.curvyo`
 fixture through File/Open and drives real pointer events. Build the frontend with
 `npx vite build`, serve with `npx vite preview --host 127.0.0.1 --port 1421`, and use
