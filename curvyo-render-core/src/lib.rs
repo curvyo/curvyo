@@ -79,7 +79,7 @@ pub use select_box::{SelectDecorationInput, SelectionBox};
 pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph};
 pub use shape_preview::build_shape_live_preview;
 pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};
-pub use theme::{CANVAS_BG, CHECKER_A, CHECKER_B, PASTEBOARD_BG};
+pub use theme::{CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, PASTEBOARD_BG};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};
 
@@ -181,8 +181,14 @@ mod tests {
 mod snap_marker;
 pub use snap_marker::{SnapMarkerSegment, build_snap_marker};
 
-mod sketch_annotation_marks;
-pub use sketch_annotation_marks::{SketchDimensionMarks, build_sketch_dimension};
+mod dimension_marks;
+mod measure_marks;
+pub use dimension_marks::{
+    DimensionLook, DimensionMarkDrawing, build_dimension_marks, dimension_arrow_outline,
+};
+pub use measure_marks::{
+    build_measure_dots, build_measure_line, build_measure_radius, build_pick_band,
+};
 mod sketch_overlay;
 pub use sketch_overlay::{
     SketchAxisState, SketchPointGlyph, build_sketch_axes, build_sketch_capture_marker,

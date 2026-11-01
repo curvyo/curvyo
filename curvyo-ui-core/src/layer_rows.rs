@@ -37,6 +37,8 @@ pub enum RowKind {
     Text,
     /// An image object (`specs/0058-bitmap-import`).
     Image,
+    /// A dimension object (`specs/0070-measure-and-dimension`).
+    Dimension,
 }
 
 impl RowKind {
@@ -50,6 +52,7 @@ impl RowKind {
             NodeKind::Leaf(ObjectSnapshot::Clone(_)) => Self::Clone,
             NodeKind::Leaf(ObjectSnapshot::Text(_)) => Self::Text,
             NodeKind::Leaf(ObjectSnapshot::Image(_)) => Self::Image,
+            NodeKind::Leaf(ObjectSnapshot::Dimension(_)) => Self::Dimension,
             NodeKind::Leaf(ObjectSnapshot::Primitive(primitive)) => match primitive.shape {
                 Shape::Rect { .. } => Self::Rectangle,
                 Shape::Ellipse { .. } => Self::Ellipse,
@@ -75,6 +78,7 @@ impl RowKind {
             Self::Clone => "Clone",
             Self::Text => "Text",
             Self::Image => "Image",
+            Self::Dimension => "Dimension",
         }
     }
 
@@ -94,6 +98,7 @@ impl RowKind {
             Self::Clone => "clone",
             Self::Text => "text",
             Self::Image => "image",
+            Self::Dimension => "dimension",
         }
     }
 }
@@ -158,6 +163,9 @@ pub struct LayerRow {
     pub name: String,
     /// Whether the name is the node's own.
     pub named: bool,
+    /// The text the row shows: the name, except for a dimension without a name of its own, whose
+    /// Ruler glyph names the kind: "⌀ 26.458 mm", "90° · not linked" (`0070` UI review item 1).
+    pub text: String,
     /// The node's own flags.
     pub own: Flags,
     /// The flags through its ancestors.
@@ -272,9 +280,58 @@ fn shown_name(read: &NodeRead, kind: RowKind) -> (String, bool) {
             curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) => {
                 (text.default_name(), false)
             }
+            // "Dimension 12.5 mm", "not linked" appended (`0070` criterion 17); in millimetres
+            // (Proposal: the row has no display unit at hand).
+            curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Dimension(dimension)) => (
+                dimension_row_name(dimension, curvyo_document_core::DisplayUnit::Mm),
+                false,
+            ),
             _ => (format!("{} {}", kind.word(), read.id.short_id()), false),
         },
     }
+}
+
+/// The default name of a dimension's row and of its announcement.
+#[must_use]
+pub fn dimension_row_name(
+    dimension: &curvyo_document_core::DimensionSnapshot,
+    unit: curvyo_document_core::DisplayUnit,
+) -> String {
+    format!(
+        "Dimension {}{}",
+        dimension_value_text(dimension, unit),
+        if dimension.linked { "" } else { " not linked" }
+    )
+}
+
+/// The text the row of a dimension without a name of its own shows: its value, "· not linked"
+/// appended when unlinked.
+fn dimension_row_text(
+    dimension: &curvyo_document_core::DimensionSnapshot,
+    unit: curvyo_document_core::DisplayUnit,
+) -> String {
+    format!(
+        "{}{}",
+        dimension_value_text(dimension, unit),
+        if dimension.linked {
+            ""
+        } else {
+            " · not linked"
+        }
+    )
+}
+
+/// A dimension's value as its text shows it: "⌀ 26.458 mm".
+fn dimension_value_text(
+    dimension: &curvyo_document_core::DimensionSnapshot,
+    unit: curvyo_document_core::DisplayUnit,
+) -> String {
+    crate::dimension_text(
+        dimension.kind,
+        dimension.shown.value,
+        unit,
+        crate::VECTOR_DECIMALS,
+    )
 }
 
 /// "Clone of " and the name of the clone's direct original: its own name, or for a clone without
@@ -443,6 +500,12 @@ impl<'a> Tree<'a> {
             kind,
             name: self.names[at].0.clone(),
             named: self.names[at].1,
+            text: match &read.kind {
+                NodeKind::Leaf(ObjectSnapshot::Dimension(dimension)) if !self.names[at].1 => {
+                    dimension_row_text(dimension, curvyo_document_core::DisplayUnit::Mm)
+                }
+                _ => self.names[at].0.clone(),
+            },
             own: Flags {
                 visible: read.registers.visible,
                 locked: read.registers.locked,
@@ -477,6 +540,29 @@ pub struct LayerRows {
 }
 
 impl LayerRows {
+    /// Names the rows of dimensions without a name of their own in `unit` (`0070` criterion 17):
+    /// the rows are built without the document's display unit.
+    #[must_use]
+    pub fn with_dimension_unit(
+        mut self,
+        nodes: &[NodeRead],
+        unit: curvyo_document_core::DisplayUnit,
+    ) -> Self {
+        for row in self
+            .rows
+            .iter_mut()
+            .filter(|r| r.kind == RowKind::Dimension && !r.named)
+        {
+            if let Some(NodeKind::Leaf(ObjectSnapshot::Dimension(dimension))) =
+                nodes.iter().find(|n| n.id == row.id).map(|n| &n.kind)
+            {
+                row.name = dimension_row_name(dimension, unit);
+                row.text = dimension_row_text(dimension, unit);
+            }
+        }
+        self
+    }
+
     /// The rows of `nodes` (a pre-order read, back to front) under `expansion` and `facts`.
     #[must_use]
     pub fn build(nodes: &[NodeRead], expansion: &Expansion, facts: RowFacts<'_>) -> Self {

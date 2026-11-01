@@ -154,7 +154,8 @@ fn mirrored_primitive_of(primitive: &PrimitiveSnapshot, mirror: Mirror) -> Primi
         | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Text(_)
-        | ObjectSnapshot::Image(_) => primitive.clone(),
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => primitive.clone(),
     }
 }
 

@@ -67,6 +67,9 @@ fn style_of(document: &Document, id: NodeId) -> curvyo_document_core::Style {
     match document.object(id).unwrap() {
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+            unreachable!("no dimension in this test")
+        }
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Path(p) => p.style,
         curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style,
@@ -631,6 +634,9 @@ fn a_gesture_on_one_object_is_not_applied_to_another() {
     let opacity = |o: &curvyo_document_core::ObjectSnapshot| match o {
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+            unreachable!("no dimension in this test")
+        }
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style.stroke.opacity,
         curvyo_document_core::ObjectSnapshot::Clone(p) => p.resolved.style.stroke.opacity,
@@ -741,6 +747,9 @@ fn a_width_preview_of_zero_is_drawn_as_no_stroke_and_only_the_commit_stores_it()
     match &objs[0] {
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+            unreachable!("no dimension in this test")
+        }
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => {

@@ -156,7 +156,8 @@ fn shapes_of<'a>(
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_) => None,
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => None,
         })
 }
 
@@ -277,7 +278,8 @@ pub fn select_bar_state(
         ratio,
         object_to_path: !ids_of_kind(objects, selection, ObjectKind::Primitive).is_empty()
             || !ids_of_kind(objects, selection, ObjectKind::Text).is_empty(),
-        scale_switches_shown: !only_clones(objects, selection),
+        scale_switches_shown: !only_clones(objects, selection)
+            && !only_dimensions(objects, selection),
         ellipse: ellipse_bar_state(objects, selection),
         curve: curve_bar_state(objects, selection, preview),
     }
@@ -290,6 +292,18 @@ fn only_clones(objects: &[ObjectSnapshot], selection: &ObjectSelection) -> bool 
         && held
             .iter()
             .all(|object| matches!(object, ObjectSnapshot::Clone(_)))
+}
+
+/// Whether the selection holds at least one object and every one is a dimension
+/// (`specs/0070-measure-and-dimension` UI review item 3): no style, clone or scale control
+/// applies to it.
+#[must_use]
+pub fn only_dimensions(objects: &[ObjectSnapshot], selection: &ObjectSelection) -> bool {
+    let held = objects_with_ids(objects, selection.ids());
+    !held.is_empty()
+        && held
+            .iter()
+            .all(|object| matches!(object, ObjectSnapshot::Dimension(_)))
 }
 
 #[cfg(test)]

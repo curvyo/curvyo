@@ -518,6 +518,16 @@ fn resize_by_box(
                 });
                 (ObjectSnapshot::Clone(clone.mapped_by(g)), 1.0)
             }
+            // A dimension's kept and free points are mapped; linked slots follow on read.
+            ObjectSnapshot::Dimension(dimension) => {
+                let g = crate::clone_gesture::affine_of(dimension.id, &|path: &PathSnapshot| {
+                    path.scaled(pivot, resized.sx, resized.sy)
+                });
+                (
+                    ObjectSnapshot::Dimension(Box::new(dimension.mapped_by(g))),
+                    1.0,
+                )
+            }
             // An image is stretched freely; its frame is mapped, never converted (`0058` 32, 33).
             ObjectSnapshot::Image(image) => {
                 let g = crate::clone_gesture::affine_of(image.id, &|path: &PathSnapshot| {
@@ -598,6 +608,13 @@ pub(crate) fn skewed_unchecked(
             });
             return ObjectSnapshot::Clone(clone.mapped_by(g));
         }
+        (ObjectSnapshot::Dimension(dimension), _) => {
+            let fixed = frame.fixed_point;
+            let g = crate::clone_gesture::affine_of(dimension.id, &|path: &PathSnapshot| {
+                path.sheared(fixed, ku, kv)
+            });
+            return ObjectSnapshot::Dimension(Box::new(dimension.mapped_by(g)));
+        }
         // An image is skewed by its frame and never converts (`0058` criterion 32).
         (ObjectSnapshot::Image(image), _) => {
             let fixed = frame.fixed_point;
@@ -633,6 +650,9 @@ pub(crate) fn scale_stroke(object: &mut ObjectSnapshot, factor: f64) {
         }
         // A clone shows its root's stroke width, never scaled (`0049` criterion 9); an image has
         // no stroke (`0058` criterion 32).
-        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Clone(_) | ObjectSnapshot::Image(_) => {}
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => {}
     }
 }

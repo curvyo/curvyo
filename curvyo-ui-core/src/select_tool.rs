@@ -1313,6 +1313,7 @@ mod tests {
                 assert_ne!(after, before, "{direction:?}: the resize happened");
                 let width = |o: &ObjectSnapshot| match o {
                     ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                    ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                     ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                     ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                     ObjectSnapshot::Primitive(p) => p.style.stroke.width,

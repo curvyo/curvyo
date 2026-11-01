@@ -100,7 +100,8 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
-        | ObjectSnapshot::Image(_) => None,
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);

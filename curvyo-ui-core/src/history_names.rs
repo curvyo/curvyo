@@ -164,6 +164,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("delete_layer", "Delete layer"),
     // `specs/0046-document-shapes` criterion 28.
     ("set_guide", "Guide"),
+    ("create_dimension", "Dimension"),
+    ("move_dimension", "Move dimension"),
+    ("edit_dimension_nodes", "Edit nodes"),
+    ("convert_dimension", "Convert to path"),
     ("load_template", "Template"),
 ];
 

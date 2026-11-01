@@ -78,7 +78,8 @@ fn paths_among(ids: &[NodeId], objects: &[ObjectSnapshot]) -> Vec<NodeId> {
             ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Primitive(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_) => false,
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => false,
         })
         .map(ObjectSnapshot::id)
         .collect()
@@ -235,6 +236,7 @@ fn kind_name(object: &ObjectSnapshot) -> (&'static str, &'static str) {
         ObjectSnapshot::Clone(_) => ("Clone", "clones"),
         ObjectSnapshot::Text(_) => ("Text", "texts"),
         ObjectSnapshot::Image(_) => ("Image", "images"),
+        ObjectSnapshot::Dimension(_) => ("Dimension", "dimensions"),
         ObjectSnapshot::Sketch(_) => ("Sketch", "sketches"),
         ObjectSnapshot::Primitive(PrimitiveSnapshot { shape, .. }) => match shape {
             Shape::Rect { .. } => ("Rectangle", "rectangles"),

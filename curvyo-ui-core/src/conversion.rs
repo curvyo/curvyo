@@ -285,6 +285,7 @@ mod tests {
         });
         let with_rotation = |id: NodeId, radians: f64| match document.object(id).unwrap() {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {
@@ -309,6 +310,7 @@ mod tests {
         assert!(!converts_on_stretch(&with_rotation(ellipse, 0.5), zero));
         let wider = match document.object(ellipse).unwrap() {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Primitive(p) => ObjectSnapshot::Primitive(PrimitiveSnapshot {

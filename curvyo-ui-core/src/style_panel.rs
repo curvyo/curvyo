@@ -315,7 +315,8 @@ fn markers_panel(
             ObjectSnapshot::Primitive(_)
             | ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_) => None,
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => None,
         })
         .collect();
     // A compound path draws no markers (`0016` criterion 38b, `0054` criterion 5): with one in

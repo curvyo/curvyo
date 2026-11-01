@@ -561,6 +561,7 @@ fn first_path_points(d: &Document) -> Vec<(f64, f64)> {
         .filter_map(|id| match d.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => Some(p),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
