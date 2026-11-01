@@ -1,15 +1,17 @@
 //! `Session`'s ruler layout for the live view and the display unit
-//! (`specs/0015-document-size-and-rulers/` criteria 1 to 9). The frontend
+//! (`specs/0015-document-size-and-rulers/` criteria 1 to 9), counting from the
+//! active page's origin corner (`specs/0090-grid` criterion 17). The frontend
 //! draws; every number and every label comes from here.
 
-use curvyo_ui_core::{RulerAxis, RulerLayout, ruler_layout};
+use curvyo_ui_core::{RulerAxis, RulerDirection, RulerLayout, ruler_layout_in};
 
 use super::Session;
 
 impl Session {
     /// The tick layout of the ruler along `axis`, `length_px` long, for the
     /// live view, in the display unit. `digit_px` and `minus_px` are the
-    /// widest digit's and the minus sign's advance in the label font.
+    /// widest digit's and the minus sign's advance in the label font. The 0 is
+    /// at the active page's origin corner and values count into the page.
     #[must_use]
     pub fn ruler_layout(
         &self,
@@ -18,18 +20,37 @@ impl Session {
         digit_px: f64,
         minus_px: f64,
     ) -> RulerLayout {
-        ruler_layout(
-            curvyo_document_core::ViewTransform::new(self.view().scale(), {
-                let origin = self.view().screen_to_document(0.0, 0.0);
-                let page = self.active_page();
-                curvyo_document_core::Point::new(origin.x - page.origin.x, origin.y - page.origin.y)
-            }),
+        let page = self.active_page();
+        let zero = page.zero_point();
+        let origin = self.view().screen_to_document(0.0, 0.0);
+        let reversed = match axis {
+            RulerAxis::Horizontal => page.grid.origin.x_reversed(),
+            RulerAxis::Vertical => page.grid.origin.y_reversed(),
+        };
+        ruler_layout_in(
+            curvyo_document_core::ViewTransform::new(
+                self.view().scale(),
+                curvyo_document_core::Point::new(origin.x - zero.x, origin.y - zero.y),
+            ),
             axis,
+            if reversed {
+                RulerDirection::Reversed
+            } else {
+                RulerDirection::Forward
+            },
             length_px,
             self.display_unit(),
             digit_px,
             minus_px,
         )
+    }
+
+    /// The pointer at canvas pixel `(x, y)` as the rulers measure it: from the active page's
+    /// origin corner, positive into the page (`specs/0090-grid` criteria 17 and 19), for the
+    /// status bar's cursor readout.
+    #[must_use]
+    pub fn ruler_position(&self, x: f64, y: f64) -> curvyo_document_core::Vec2 {
+        self.active_page().measured(self.screen_to_document(x, y))
     }
 }
 
@@ -66,6 +87,75 @@ mod tests {
         let label = layout.labels.iter().find(|l| l.text == "100").unwrap();
         let document = session.screen_to_document(label.tick_px, 0.0);
         assert!((document.x - 100.0).abs() < 1e-9, "{document:?}");
+    }
+
+    /// `specs/0090-grid` criterion 17: with a bottom-left origin the vertical
+    /// ruler shows 0 at the page's bottom edge and counts upward; a top-right
+    /// origin puts the horizontal 0 at the right edge and counts to the left.
+    #[test]
+    fn the_rulers_count_into_the_page_from_its_origin_corner() {
+        let mut session = Session::new(1);
+        session.show_default_view();
+        let page = session.active_page();
+        let (w, h) = (page.size.width.as_mm(), page.size.height.as_mm());
+        assert!(session.set_active_page_origin("bottom_left"));
+        let vertical = session.ruler_layout(RulerAxis::Vertical, 4000.0, 7.0, 7.0);
+        let (_, bottom) = session.view().document_to_screen(Point::new(0.0, h));
+        assert!((vertical.origin_px.unwrap() - bottom).abs() < 1e-9);
+        let label = vertical.labels.iter().find(|l| l.text == "100").unwrap();
+        let document = session.screen_to_document(0.0, label.tick_px);
+        assert!((document.y - (h - 100.0)).abs() < 1e-9, "{document:?}");
+        let horizontal = session.ruler_layout(RulerAxis::Horizontal, 4000.0, 7.0, 7.0);
+        assert!((horizontal.origin_px.unwrap() - 128.0).abs() < 1e-9);
+
+        assert!(session.set_active_page_origin("top_right"));
+        let horizontal = session.ruler_layout(RulerAxis::Horizontal, 4000.0, 7.0, 7.0);
+        let (right, _) = session.view().document_to_screen(Point::new(w, 0.0));
+        assert!((horizontal.origin_px.unwrap() - right).abs() < 1e-9);
+        let label = horizontal.labels.iter().find(|l| l.text == "100").unwrap();
+        let document = session.screen_to_document(label.tick_px, 0.0);
+        assert!((document.x - (w - 100.0)).abs() < 1e-9, "{document:?}");
+        let vertical = session.ruler_layout(RulerAxis::Vertical, 4000.0, 7.0, 7.0);
+        assert!((vertical.origin_px.unwrap() - 128.0).abs() < 1e-9);
+    }
+
+    /// `specs/0090-grid` criterion 17: switching the active page switches the
+    /// rulers to that page's corner at once.
+    #[test]
+    fn switching_the_active_page_switches_the_ruler_corner() {
+        let mut session = Session::new(1);
+        session.resize_viewport(4000.0, 4000.0);
+        let first = session.active_page().id;
+        let second = session.add_page();
+        assert!(session.set_active_page_origin("bottom_right"));
+        let page = session.active_page();
+        let zero = page.zero_point();
+        let layout = session.ruler_layout(RulerAxis::Horizontal, 4000.0, 7.0, 7.0);
+        let (x, _) = session.view().document_to_screen(zero);
+        assert!((layout.origin_px.unwrap() - x).abs() < 1e-9);
+        assert!(session.activate_page(&first));
+        let first_page = session.active_page();
+        let layout = session.ruler_layout(RulerAxis::Horizontal, 4000.0, 7.0, 7.0);
+        let (x, _) = session.view().document_to_screen(first_page.origin);
+        assert!((layout.origin_px.unwrap() - x).abs() < 1e-9);
+        assert_ne!(first, second);
+    }
+
+    /// `specs/0090-grid` criterion 19: the cursor readout measures like the rulers, from the
+    /// active page's origin corner and positive into the page.
+    #[test]
+    fn the_cursor_readout_measures_from_the_origin_corner() {
+        let mut session = Session::new(1);
+        session.show_default_view();
+        let h = session.active_page().size.height.as_mm();
+        let (sx, sy) = session
+            .view()
+            .document_to_screen(Point::new(30.0, h - 20.0));
+        let top_left = session.ruler_position(sx, sy);
+        assert!((top_left.x - 30.0).abs() < 1e-9 && (top_left.y - (h - 20.0)).abs() < 1e-9);
+        assert!(session.set_active_page_origin("bottom_left"));
+        let bottom_left = session.ruler_position(sx, sy);
+        assert!((bottom_left.x - 30.0).abs() < 1e-9 && (bottom_left.y - 20.0).abs() < 1e-9);
     }
 
     /// The unit follows the document: in inches the corner, the texts and the

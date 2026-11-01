@@ -9,7 +9,7 @@ use curvyo_document_core::{DisplayUnit, Orientation};
 use wasm_bindgen::prelude::*;
 
 use crate::session::{
-    DocumentPresetsRecord, DocumentSide, FitOutcome, PanelTabsRecord, SizeOutcome,
+    DocumentPresetsRecord, DocumentSide, FitOutcome, GridRecord, PanelTabsRecord, SizeOutcome,
     SnappingSettingsRecord, SnappingToolbarRecord,
 };
 use crate::wasm_api::WasmSession;
@@ -258,5 +258,52 @@ impl WasmSession {
     /// Toggles snapping enabled state. Returns the new state.
     pub fn toggle_snapping(&mut self) -> bool {
         self.session.toggle_snapping()
+    }
+
+    /// Sets the Grid snapping target (`specs/0090-grid` criterion 10).
+    pub fn set_snapping_grid(&mut self, grid: bool) -> bool {
+        self.session.set_snapping_grid(grid)
+    }
+
+    /// Sets the grid snap point: `"centre"`, `"box"` or `"nodes"` (criterion 11).
+    pub fn set_snapping_grid_point(&mut self, name: &str) -> bool {
+        self.session.set_snapping_grid_point(name)
+    }
+
+    /// The active page's grid for the Grid panel and rail entry (criteria 2 and 3).
+    pub fn active_page_grid(&self) -> GridRecord {
+        self.session.active_page_grid()
+    }
+
+    /// Shift+click on the Grid entry: shows or hides the active page's grid. Returns the new
+    /// state.
+    pub fn toggle_active_page_grid(&mut self) -> bool {
+        self.session.toggle_active_page_grid()
+    }
+
+    /// The Grid panel's switch.
+    pub fn set_active_page_grid_shown(&mut self, shown: bool) -> bool {
+        self.session.set_active_page_grid_shown(shown)
+    }
+
+    /// The Mode radios: `"adaptive"` or `"fixed"`.
+    pub fn set_active_page_grid_mode(&mut self, mode: &str) -> bool {
+        self.session.set_active_page_grid_mode(mode)
+    }
+
+    /// The Scale radios: `"linear"` or `"log"`.
+    pub fn set_active_page_grid_scale(&mut self, scale: &str) -> bool {
+        self.session.set_active_page_grid_scale(scale)
+    }
+
+    /// The origin corner buttons (`specs/0090-grid` criterion 18): `"top_left"`, `"top_right"`,
+    /// `"bottom_left"` or `"bottom_right"`.
+    pub fn set_active_page_origin(&mut self, corner: &str) -> bool {
+        self.session.set_active_page_origin(corner)
+    }
+
+    /// A typed Grid panel field: `"committed"`, `"unchanged"` or `"invalid:<key>"`.
+    pub fn set_active_page_grid_field(&mut self, field: &str, text: &str) -> String {
+        self.session.set_active_page_grid_field(field, text)
     }
 }

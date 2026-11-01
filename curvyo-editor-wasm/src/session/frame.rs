@@ -1,9 +1,11 @@
 //! The list the host submits each frame: the document's own area (its
 //! background) under everything `Session::draw_list` builds
 //! (`specs/0015-document-size-and-rulers/` criterion 28,
-//! `specs/0040-document-background` criterion 13).
+//! `specs/0040-document-background` criterion 13), each shown page grid over its
+//! page's area (`specs/0090-grid` criterion 4).
 
-use curvyo_render_core::{DrawList, build_page_areas};
+use curvyo_document_core::Page;
+use curvyo_render_core::{DrawList, GridStroke, build_page_areas, build_page_areas_with_grids};
 
 use super::Session;
 
@@ -30,11 +32,15 @@ impl Session {
             ));
             return list;
         }
-        let mut list = build_page_areas(
-            &self.shown_pages(),
-            self.shown_background(),
+        let pages = self.shown_pages();
+        let background = self.shown_background();
+        let grids = self.grid_lists(&pages, background);
+        let mut list = build_page_areas_with_grids(
+            &pages,
+            background,
             self.view(),
             self.device_pixel_ratio,
+            &grids,
         );
         // An object preview draws the object only as it was at the version, in its place: its
         // current drawing, selection box and handles are left out (criterion 17).
@@ -58,6 +64,41 @@ impl Session {
         }
         list.extend(self.draw_list());
         list
+    }
+
+    /// The grid lines of every page, in page order: empty for a hidden grid or a page off the
+    /// canvas. Bounded by the canvas size (criterion 9).
+    fn grid_lists(
+        &self,
+        pages: &[Page],
+        background: curvyo_document_core::DocumentBackground,
+    ) -> Vec<DrawList> {
+        if pages.iter().all(|page| !page.grid.shown) {
+            return Vec::new();
+        }
+        let view = self.view();
+        let (w, h) = self.viewport.canvas_size();
+        let visible = (
+            view.screen_to_document(0.0, 0.0),
+            view.screen_to_document(w, h),
+        );
+        let ink = curvyo_render_core::grid_ink(background);
+        pages
+            .iter()
+            .map(|page| {
+                let strokes: Vec<GridStroke> = curvyo_ui_core::grid_layout(page, view, visible)
+                    .lines
+                    .into_iter()
+                    .map(|line| GridStroke {
+                        start: line.start,
+                        end: line.end,
+                        emphasis: line.emphasis,
+                        alpha: line.alpha,
+                    })
+                    .collect();
+                curvyo_render_core::build_grid_lines(&strokes, ink, view, self.device_pixel_ratio)
+            })
+            .collect()
     }
 }
 

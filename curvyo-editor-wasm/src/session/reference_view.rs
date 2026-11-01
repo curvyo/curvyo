@@ -94,6 +94,7 @@ impl Session {
                 this.select.cancel_entry();
                 return EntryOutcome::Unchanged;
             }
+            this.measure_move_entry_from_active_page();
             this.select.commit_move_entry_at(
                 &this.document,
                 &mut this.selection,

@@ -2,7 +2,7 @@
 //! (`specs/0010-edit-interaction-polish/specification.md`, criteria 15 to 25, 56;
 //! `specs/0047-transform-polish/` Part C): the move chip's view for the DOM and its commit. All
 //! rules (parsing, relative and absolute reading, the tight bounds, the reference point, the
-//! coordinate limit) live in `curvyo_ui_core::MoveEntry`; the DOM holds the text, the mode switch
+//! coordinate limit, the origin corner it measures from) live in `curvyo_ui_core::MoveEntry`; the DOM holds the text, the mode switch
 //! and the focus, and passes the mode with the commit.
 
 use curvyo_document_core::Point;
@@ -49,11 +49,12 @@ impl Session {
         let box_ = entry.start_box();
         let relative = |index: usize| entry.fields()[index].prefill.clone();
         let (min, max) = entry.bounds();
+        let page = self.active_page();
         Some(MoveEntryView {
             center: box_.to_document(box_.local_center()),
             relative_prefill: [relative(0), relative(1)],
             absolute_prefills: ReferencePoint::ALL
-                .map(|reference| entry.absolute_prefill_for(reference)),
+                .map(|reference| entry.absolute_prefill_from(reference, &page)),
             reference: entry.reference(),
             box_bottom: Point::new(f64::midpoint(min.x, max.x), max.y),
             copy_preset: entry.copy_preset(),
@@ -78,6 +79,7 @@ impl Session {
             if mode.copy {
                 this.sync_select_units();
             }
+            this.measure_move_entry_from_active_page();
             this.select.commit_move_entry(
                 &this.document,
                 &mut this.selection,
@@ -86,5 +88,14 @@ impl Session {
                 mode,
             )
         })
+    }
+
+    /// Absolute positions measure from the active page's origin corner (`specs/0090-grid`
+    /// criterion 19); set on the open entry right before it resolves typed values.
+    pub(super) fn measure_move_entry_from_active_page(&mut self) {
+        let page = self.active_page();
+        if let Some(entry) = self.select.move_entry_mut() {
+            entry.measure_from(&page);
+        }
     }
 }

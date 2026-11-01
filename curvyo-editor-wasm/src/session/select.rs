@@ -381,19 +381,52 @@ impl Session {
             );
         };
         let probe = SnapProbe::box_edges(min, max);
-        let direction = self
+        let live = self
             .select
-            .live_move(pointer, self.held.shift, self.held.ctrl)
+            .live_move(pointer, self.held.shift, self.held.ctrl);
+        let direction = live
+            .as_ref()
             .and_then(|live| live.axis)
             .map(|axis| match axis {
                 curvyo_ui_core::Axis::X => curvyo_document_core::Vec2::new(1.0, 0.0),
                 curvyo_ui_core::Axis::Y => curvyo_document_core::Vec2::new(0.0, 1.0),
             });
-        let result = self.resolve_snapping_direction(&probe, direction);
+        let offset = live.map_or(curvyo_document_core::Vec2::ZERO, |live| live.offset);
+        let grid_points = self.move_grid_points(min, max, offset);
+        let result = self.resolve_snapping_grid(&probe, &grid_points, direction);
         if result.is_empty() {
             None
         } else {
             Some(result.offset)
+        }
+    }
+}
+
+impl Session {
+    /// The points of a moved selection that snap to a grid (`specs/0090-grid` criterion 11):
+    /// the box centre, the nine reference points of the box, or the moving nodes (`offset` is the
+    /// live move since the press).
+    fn move_grid_points(
+        &self,
+        min: curvyo_document_core::Point,
+        max: curvyo_document_core::Point,
+        offset: curvyo_document_core::Vec2,
+    ) -> Vec<curvyo_document_core::Point> {
+        use curvyo_document_core::{GridSnapPoint, Point};
+        let xs = [min.x, f64::midpoint(min.x, max.x), max.x];
+        let ys = [min.y, f64::midpoint(min.y, max.y), max.y];
+        match self.document.snapping().grid_point {
+            GridSnapPoint::Centre => vec![Point::new(xs[1], ys[1])],
+            GridSnapPoint::Box => xs
+                .iter()
+                .flat_map(|&x| ys.iter().map(move |&y| Point::new(x, y)))
+                .collect(),
+            GridSnapPoint::Nodes => self
+                .snapping
+                .grid_nodes()
+                .iter()
+                .map(|p| p.translated(offset))
+                .collect(),
         }
     }
 }

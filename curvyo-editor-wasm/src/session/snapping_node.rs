@@ -43,7 +43,18 @@ impl Session {
         if points.is_empty() {
             return Vec2::ZERO;
         }
-        self.resolve_snapping(&SnapProbe::points(&points)).offset
+        // The pressed anchor snaps to the grid (`specs/0090-grid` criterion 11); a handle drag
+        // has only its own point.
+        let dragged: Vec<_> = if self.node.snapping_handles_only() {
+            points.clone()
+        } else {
+            self.node
+                .snapping_pressed_point(point)
+                .into_iter()
+                .collect()
+        };
+        self.resolve_snapping_grid(&SnapProbe::points(&points), &dragged, None)
+            .offset
     }
     pub(super) fn snapped_node_pointer(&self, point: Point) -> Point {
         point.translated(self.snap_result().map_or(Vec2::ZERO, |r| r.offset))

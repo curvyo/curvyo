@@ -469,6 +469,7 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test compound_node_editing_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test placement_frame_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test font_preview_budget -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test grid_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test acceptance_0066_session --test acceptance_0066_chain -- --nocapture --test-threads=1
 
   # The tracer's quality harness, its 2000 x 2000 px budget, its 16 Mpx memory test

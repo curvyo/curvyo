@@ -173,6 +173,7 @@ impl PanelTabsRecord {
             PanelContent::History => "history",
             PanelContent::Fonts => "fonts",
             PanelContent::Snapping => "snapping",
+            PanelContent::Grid => "grid",
             PanelContent::Sketches => "sketches",
             PanelContent::Parameters => "parameters",
             PanelContent::Empty => "empty",
@@ -259,7 +260,8 @@ mod tests {
         assert_eq!(
             record.tab_names,
             [
-                "file", "document", "style", "layers", "history", "fonts", "snapping", "sketches"
+                "file", "document", "style", "layers", "history", "fonts", "snapping", "grid",
+                "sketches"
             ]
         );
         assert_eq!(record.tab_enabled[at(&record, "style")], 0);

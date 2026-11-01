@@ -201,15 +201,24 @@ impl WasmSession {
 
     /// Converts canvas-relative CSS pixels to a document point
     /// (`specs/0004-canvas-navigation-and-selection/adrs.md`: "all
-    /// screen↔document conversion happens in Rust") — the host's own
-    /// status-bar cursor-position readout calls this instead of
-    /// dividing by a fixed scale itself.
+    /// screen↔document conversion happens in Rust").
     #[must_use]
     pub fn screen_to_document(&self, x: f64, y: f64) -> DocumentPoint {
         let point = self.session.screen_to_document(x, y);
         DocumentPoint {
             x: point.x,
             y: point.y,
+        }
+    }
+
+    /// Canvas-relative CSS pixels as the rulers measure them, from the active page's origin
+    /// corner (`specs/0090-grid` criterion 19), for the status-bar cursor readout.
+    #[must_use]
+    pub fn screen_to_ruler(&self, x: f64, y: f64) -> DocumentPoint {
+        let position = self.session.ruler_position(x, y);
+        DocumentPoint {
+            x: position.x,
+            y: position.y,
         }
     }
 
