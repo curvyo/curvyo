@@ -513,3 +513,49 @@ Recommended (not blocking):
   `tests/axis_distance.rs:114`.
 - `curvyo-sketch-core/src/validation.rs:54`: name the zero bound
   (`value >= 0.0` is a domain bound, not a geometric comparison; a one-line comment suffices).
+
+## Revision 5 review (2026-11-01)
+
+Scope: commits 2e44daf3 (`curvyo-ui-core`: point pick priority, `sketch_pick_order`, Symmetric
+centre, dimension text between extension lines) and 300bc2c1 (`curvyo-editor-wasm`: axes over
+dimension lines, last rail pick is the Symmetric centre). Source read only, nothing built or run.
+
+**Verdict: CHANGES REQUESTED.**
+
+What holds:
+- Boundaries: no dependency, crate, trait, generic or format change (format stays 29); new core
+  code is pure and wasm32-safe; no production `unwrap`/`expect`.
+- Annotation glitch (AC49): `text_along` is shared by the linear and projected layouts, the
+  re-layout at `sketch_dimension_layout.rs:139` stays inside the bounded 4-pass loop, and
+  `sketch_dimension_layout.rs` is at 471 non-test lines.
+- Axis picking (AC52): `sketch_axes_at` replaces the inline test in `sketch_axis_press`, and
+  `sketch_annotation_yields` puts the hover and press rule in one place.
+- `sketch_pick_order` is acceptable: it shares `ranked` with `sketch_hits`, has one caller
+  (`selection.rs:50`) and a different job (all candidates for the Alt cycle, not the winners).
+
+Required changes:
+1. `curvyo-ui-core/src/sketch.rs:14-16,90` (point reach as 10/6 of the caller's tolerance): not
+   acceptable. It hides a caller convention (every caller passes 6 px) inside a public core API:
+   a caller passing another tolerance silently gets another point reach (the tests at
+   `sketch.rs:285,296` already pass 0.1 mm), and the 10 px that AC50 names appears nowhere.
+   Fix, without a new type and with the same arity, following `layout_dimensions` (`px` = mm per
+   screen pixel): `sketch_hit`, `sketch_hits` and `sketch_pick_order` take `px: Length` (one
+   screen pixel in document mm); `curvyo-ui-core` owns `SKETCH_EDGE_PICK_PX = 6.0` and
+   `SKETCH_POINT_PICK_PX = 10.0`. The callers pass `Length(1.0 / self.view().scale())`, which also
+   removes the repeated `6.0` literal (`drag.rs:49,165`, `cursor.rs:41`,
+   `annotation_input.rs:106`, `selection.rs:54,87`).
+2. `curvyo-editor-wasm/src/session/sketch/rail.rs:167-206` (CLAUDE.md §6, domain logic in core):
+   the armed rule (three points, the last is the centre, building `SymmetricPoint`) lives in
+   `-wasm`, while the preselection rule lives in `curvyo-ui-core/src/sketch_actions.rs:344`.
+   That gives two Symmetric rules in two crates. Move the relation building into
+   `sketch_actions.rs` as one function (e.g.
+   `pub fn sketch_symmetric_about(graph: &Sketch, picks: &[EntityId], centre: &EntityId) -> Option<Relation>`)
+   with a unit test. The session keeps only the check on the tool and the apply.
+3. `curvyo-ui-core/src/sketch_actions.rs:306,363` (§5 units are newtypes): `CENTRE_TIE_MM: f64`
+   is compared against `.distance(..).0`. Use `const CENTRE_TIE: Length = Length(1e-6)` and keep
+   the scores as `Length`.
+
+Recommended (not blocking):
+- `curvyo-editor-wasm/src/session/sketch/drag.rs:45-66` cycles through `sketch_hits` (ties
+  only), and `selection.rs:50` cycles through `sketch_pick_order`. If AC34 means one cycle,
+  use `sketch_pick_order` in both places and drop `sketch_hits` from the public API.

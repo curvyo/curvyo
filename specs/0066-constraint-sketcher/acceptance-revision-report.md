@@ -803,3 +803,37 @@ selection holds the created curves (rectangle/slot members, circle, arc, chain l
 defining points and centres; free points are selected when the shape is a point. Tests assert this
 reading (AC22 keeps points and edges distinct targets). Observation: an unknown extra field in a
 relation record is ignored on open for all kinds (pre-existing, not revision 4).
+
+## Revision 5 acceptance (2026-11-01)
+
+Verdict: FAIL on two minor points (tool hint and silent rail refusal); AC49, AC50, AC51 (rule), AC52 (mechanics) PASS.
+Tests were written from the specification before the diff was read: `curvyo-editor-wasm/tests/acceptance_0066_rev5.rs`
+(17 tests, real pointer/key/rail event path, screen-px geometry so zoom 10/25/100/400/1000 % is exact) and
+`curvyo-ui-core/tests/acceptance_0066_rev5.rs` (layout oracle, proptest 512 cases, negative controls).
+
+| AC | Test | Result |
+|---|---|---|
+| 49 | `ac49_customer_quadrilateral_origin_inside_every_zoom_and_side` (customer quad, H outer-left to outer-right, V top to bottom, 5 zooms x text dragged to both sides); draw-list oracle: every driving-colour triangle within 1.25 px of the expected extension lines / dimension line (3.3 px at the arrowheads), extension lines and dimension line (outside the text box) fully covered | PASS |
+| 49 | `ac49_span_crossing_the_axes_the_origin_and_another_point`, `ac49_measured_points_on_the_axes`, `ac49_zero_value_and_short_spans` (16/40/70 px spans, zero value), `ac49_oracle_negative_control_detects_a_stray_segment` | PASS |
+| 49 | ui-core: `customer_quadrilateral_every_zoom_and_side`, `zero_value_short_spans_and_points_on_a_line`, `any_geometry_draws_only_the_anatomy` (proptest), `oracle_negative_control_rejects_tampered_marks` | PASS |
+| 50 | `ac50_point_within_10_px_beats_a_nearer_edge_at_every_zoom` (6 px point/1 px edge, 9 px point, 13 px point -> edge; zoom 10-1000 %), `ac50_of_two_points_inside_10_px_the_nearer_wins`, `ac50_alt_still_reaches_the_edge_underneath`, `ac50_constraint_and_dimension_tools_pick_the_point_too` (Dimension, Coincident) | PASS |
+| 51 | `ac51_selection_first_centre_is_independent_of_the_order` (6 orders, centre C), `ac51_a_tie_for_the_centre_refuses_...` (hint names the ambiguity, nothing applied), `ac51_rail_flow_the_last_picked_point_is_the_centre` (A,B,C / C,A,B / B,C,A), `ac51_the_constraint_is_the_same_in_both_flows`; one history step, tool returns to Select | PASS |
+| 51 | `ac51_tool_hint_says_the_last_picked_point_is_the_centre` | FAIL |
+| 52 | `ac52_two_points_and_an_axis_or_a_line_in_every_flow` (Y axis, X axis, drawn line, construction line x selection first, rail points first, rail mirror first, rail mirror between: relation kind, 1 constraint, 1 step, Select, DOF -2, mirror within 1e-6 mm after a drag, save/reopen), `ac52_undo_after_the_application_removes_exactly_the_constraint` | PASS |
+| 52 | `ac52_two_points_and_a_circle_is_refused_with_the_hint_and_nothing_applied` | FAIL (rail flow only) |
+
+Finding 1 (minor, AC51 "the tool hint says so"): the last-picked-is-centre rule is only in the tooltip while the rail button is
+`unavailable` with a partial selection. With nothing selected (state `arm`) the tooltip is "Symmetric" and, once armed, neither the
+tooltip nor `canvas.mode_label` says anything. Repro: new sketch, rail Symmetric; read `rail[symmetric].tooltip` and `canvas.mode_label`.
+Finding 2 (minor, AC52 refused selection): selection first refuses two points plus a circle with the AC40 hint, but in the rail flow
+(Symmetric, point, point, circle edge) the circle is silently added to the selection: no constraint, no hint (`mode_label` null).
+Observations: `sketch-workbench.cjs` (original frontend script) fails waiting for the rail group "Dimension" (stale since revision 2, not rev 5);
+`acceptance_0020_tester_more::c30_...` takes 296 s in the debug gate (passes; slow under load, not touched by this story).
+
+Browser (Chromium, vite :5173, rebuilt wasm, logs `target/0066-revision-gate/run12/browser/`): `sketch-rev5` (incl. pixel oracle, saved
+SymmetricAxis X/Y), rev4, rev3, rev2-m2, rev2-m3, rev2-plate, acceptance, clone-acceptance, field-alt, frame-trace, geometry-oracles,
+remaining-acceptance, revision-host, revision-final-host, revision-independent, snapping-acceptance all PASS; `sketch-workbench` stale (above).
+
+Gate run12 (`target/0066-revision-gate/run12`): fmt, clippy host, wasm32 build and clippy (10 packages), deny, rustdoc, build:wasm, tsc,
+npm test (662 pass, 0 fail), oxlint (warnings only) exit 0. nextest (env -u WEBKIT_DISABLE_DMABUF_RENDERER, --no-fail-fast, other crates +
+editor-wasm in 4 partitions): 6069 + 4186 run; the only failures are the two findings above.

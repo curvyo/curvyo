@@ -1,6 +1,6 @@
 # Constraint sketcher: construct geometry from constraints, dimensions and formulas
 
-Status: Done (PR #228); revision 4 follow-up in progress
+Status: Done (PR #228, #237); revision 5 follow-up in progress
 Priority: Should
 Origin: Customer (2026-10-17; expanded and accepted 2026-10-30).
 
@@ -178,6 +178,26 @@ Origin: Customer feedback after PR #228 was merged. Decisions R4-SELECT (A) and 
 
 - **R4-SELECT:** A. After a completed shape, a dimension or a constraint, the tool returns to Select with the new geometry selected; Polyline only at the end of its chain (AC42, AC43).
 - **R4-HV:** C. Horizontal distance and Vertical distance are new tools in the Constraints card; Dimension stays aligned distance; annotations "↔"/"↕" style, UX defines (AC44-AC48).
+
+## Customer revision 5 (2026-11-01)
+
+Origin: Customer feedback on the revision 4 build (screenshots `target/0066-rev5/customer-glitch.png`, `customer-symmetry.png`). AC49 and AC52 are defects against AC45 and AC37; AC50 and AC51 contain Proposals, which stay out of Ready until the customer accepts them. Field reference: FreeCAD picks points before edges and uses the last picked point as the Symmetric centre for three points; SolveSpace picks points before edges; Inkscape and LightBurn have no constraints.
+
+49. (R5-GLITCH) Given a horizontal or vertical distance annotation (AC45), then it draws, per UX notes Revision 2 section 7, exactly: two extension lines that start at the measured points (with the gap defined there) and end at the dimension line, one dimension line with arrowheads between the extension lines, and the value text; no other segment. This holds in every case: text inside the dimension line, text outside because the span is too short, the dimension line placed on either side, the span crossing the origin, the sketch X or Y axis or another point, the measured point on an axis, a zero value, and zoom from 10 % to 1000 %. In the customer's screenshot the horizontal text sits outside the extension line with a stray line segment, and the vertical line breaks near another point and the origin; both must be gone. Tests: a geometry oracle per case lists the drawn segments (count, endpoints within 0.5 screen px, no segment outside the hull of the two extension lines plus text leader) and a pixel oracle renders each case and asserts that no coloured pixel lies outside the expected segments' 1 px neighbourhood, with the text box masked out.
+50. (R5-PICK, Proposal) Given Sketch Select, a constraint tool or the Dimension tools, when the pointer is within 10 screen px of a point and also within reach of an edge, then the point is picked, even when the edge is nearer; an edge is picked only when no point is within 10 screen px. The point radius is in screen px, independent of zoom. Tests (real event path): a click 6 px from a point and 1 px from an edge selects the point; a click 14 px from the point and 1 px from the edge selects the edge; with two points inside 10 px the nearer wins; this holds at 25 % and 400 % zoom. Alt cycling (AC34) still reaches the edge underneath.
+51. (R5-SYMCENTRE, Proposal) Given three points and the Symmetric tool, then the middle point is the centre and the other two are mirrored about it. Rule: with selection first (AC40) the centre is the point nearest to the midpoint of the other two, independent of selection order, and a tie within 1e-6 mm refuses with the hint of AC40 naming the ambiguity; with the rail pick flow the last picked point is the centre (as in FreeCAD) and the tool hint says so. The resulting constraint is the same in both flows. Tests: points A(0,0), B(10,0), C(4,0) selected in all six orders create a constraint with C as the centre; the same three picked in the rail flow in order A, B, C and in order C, A, B give centres C and B respectively; each application is one history step and the tool returns to Select (AC43).
+52. (R5-SYMAXIS) Given two points and a sketch axis (X or Y) or a line, then Symmetric about an axis or a line works in the real UI in both flows (AC37, AC41): by selection first (two points plus the line or axis, then the tool) and by rail picks (tool, first point, second point, then the line or axis, and the line or axis first in any order). The result is one constraint, one history step, the tool returns to Select, the DOF drops as for the same constraint made through the model, and undo, save and reopen keep it. The customer's current build refuses or ignores this; the cause is found and fixed, not worked around. Tests drive the real event path (no direct model calls): (a) two points and the Y axis, (b) two points and the X axis, (c) two points and a construction line, (d) two points and a drawn line, each in both flows, asserting the constraint kind, the mirrored position within 1e-6 mm after dragging one point, DOF, and a refused selection (two points and a circle) showing the hint of AC40 with nothing applied.
+
+### Superseded or extended in revision 5
+
+- AC45: AC49 makes its annotation drawing testable per case.
+- AC22, AC40: AC50 sets the point pick radius; AC51 and AC52 fix the Symmetric inputs for both flows.
+- AC37: not replaced; AC52 adds the end-to-end tests it lacked.
+
+### Open questions for the customer (revision 5)
+
+- **R5-PICK:** point pick radius. A: 10 screen px (recommended). B: 6 px. C: 14 px. Default: A.
+- **R5-SYMCENTRE:** A: geometric centre for selection first, last pick for rail picks (recommended). B: last pick only. C: geometric rule only. Default: A.
 
 ## Model and solver readiness
 
