@@ -25,6 +25,10 @@ pub struct SvgText {
     pub flow: Option<FlowBox>,
     /// `textLength` of the `<text>` element in user units (criterion 88).
     pub text_length: Option<f64>,
+    /// `curvyo:face` as written, when the profile is on (criterion 132).
+    pub face: Option<String>,
+    /// `curvyo:size` in millimetres, when the profile is on and it reads (criterion 132).
+    pub size: Option<f64>,
 }
 
 /// One character with the values the file gives it.

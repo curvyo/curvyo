@@ -32,6 +32,9 @@ pub const MAX_CLONE_CHAIN: usize = 8;
 /// The largest coordinate (millimetres) a leaf may reach after all transforms.
 pub const MAX_COORDINATE_MM: f64 = 1e7;
 
+/// The most `inkscape:page` elements read as pages; the rest are ignored (criterion 129).
+pub const MAX_PAGES: usize = 1000;
+
 /// The page side limits (`0015`): a page from the file is clamped to them.
 pub const PAGE_MM: (f64, f64) = (1.0, 100_000.0);
 

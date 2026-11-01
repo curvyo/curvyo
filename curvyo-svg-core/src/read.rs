@@ -76,6 +76,7 @@ pub fn read_svg(bytes: &[u8]) -> Result<SvgDrawing, SvgError> {
         at_root: true,
     };
     let mut reader = Reader::new(&doc, cascade, &ids, plain_names);
+    reader.profile = crate::shadow::profile_on(root);
     let nodes = reader.children(root, &ctx);
     let originals: BTreeMap<usize, usize> = reader
         .pending
@@ -93,12 +94,15 @@ pub fn read_svg(bytes: &[u8]) -> Result<SvgDrawing, SvgError> {
         .page
         .or_else(|| content_page(&nodes))
         .map(|(w, h)| (w.clamp(PAGE_MM.0, PAGE_MM.1), h.clamp(PAGE_MM.0, PAGE_MM.1)));
+    let (pages, pages_cut) = crate::page::inkscape_pages(root, view.matrix);
     Ok(SvgDrawing {
         page,
         display_unit: display_unit(root),
         background: background(root),
         nodes,
-        truncated: checked.truncated || reader.stopped,
+        truncated: checked.truncated || reader.stopped || pages_cut,
+        pages,
+        profile: reader.profile,
     })
 }
 

@@ -22,6 +22,22 @@ pub struct SvgDrawing {
     pub nodes: Vec<SvgNode>,
     /// Whether a limit stopped the reading (everything before it is kept).
     pub truncated: bool,
+    /// Every `inkscape:page` in file order, in millimetres of the drawing (criterion 129); empty
+    /// when the file has none.
+    pub pages: Vec<SvgPage>,
+    /// Whether the root declares the `curvyo:` profile v1 (`curvyo:format="1"`): the file was
+    /// written by Curvyo's export, and a closed outline whose last segment ends on its first node
+    /// ends there (the writer's form of a curved closing segment).
+    pub profile: bool,
+}
+
+/// One `inkscape:page`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SvgPage {
+    /// `inkscape:label`, when present.
+    pub name: Option<String>,
+    /// The page in the drawing's millimetres.
+    pub rect: Rect,
 }
 
 /// A display unit the file names.
@@ -45,6 +61,7 @@ pub enum PageBackground {
 }
 
 /// The node registers every node carries.
+#[allow(clippy::struct_excessive_bools)] // independent registers of the file
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeState {
     /// `inkscape:label` as written (or a layer's `id` or "Layer N"); not cleaned.
@@ -60,6 +77,8 @@ pub struct NodeState {
     /// The Inkscape object it is, from `sodipodi:type`, when the importer names it after one
     /// (criteria 119 to 121).
     pub inkscape: Option<InkscapeObject>,
+    /// A top-level layer with `curvyo:guides="1"` (criterion 144): its children are guides.
+    pub guides_layer: bool,
 }
 
 /// An Inkscape object that has no primitive and is imported as paths (slice 3).
@@ -82,6 +101,7 @@ impl Default for NodeState {
             opacity: 1.0,
             guide: false,
             inkscape: None,
+            guides_layer: false,
         }
     }
 }
@@ -129,6 +149,10 @@ pub struct SvgLeaf {
     pub kind: LeafKind,
     /// The style; a clone shows its original's and ignores this one.
     pub style: LeafStyle,
+    /// The `curvyo:` values next to it as written (criterion 57); empty without the profile.
+    pub shadow: crate::export::Shadow,
+    /// Whether `marker-start`, `marker-mid` and `marker-end` reference a marker (criterion 142).
+    pub marker_refs: [bool; 3],
 }
 
 /// The geometry of a leaf. Primitives keep their own numbers (user units) and the matrix from

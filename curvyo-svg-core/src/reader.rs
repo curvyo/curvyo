@@ -65,6 +65,8 @@ pub(crate) struct Reader<'a, 'd, 'input> {
     pub(crate) carriers: Vec<(usize, usize, u32)>,
     /// Nodes to place before the next node read (a text's new guide carrier, criterion 94).
     pub(crate) before: Vec<SvgNode>,
+    /// Whether the root declares the `curvyo:` profile v1 (criterion 57).
+    pub(crate) profile: bool,
 }
 
 impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
@@ -92,6 +94,7 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
             texts: 0,
             carriers: Vec::new(),
             before: Vec::new(),
+            profile: false,
         }
     }
 
@@ -221,6 +224,7 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
                 Some("inkscape:box3dside") => Some(InkscapeObject::Box3dSide),
                 _ => None,
             },
+            guides_layer: false,
         }
     }
 
@@ -229,6 +233,9 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
         let layer = may_be_layer
             && node.attribute((INKSCAPE_NS, "groupmode")).map(str::trim) == Some("layer");
         let mut state = Self::state(node, &ctx.style, false);
+        state.guides_layer = layer
+            && self.profile
+            && crate::shadow::curvyo(node, "guides").map(str::trim) == Some("1");
         if layer {
             self.layers += 1;
             if state.name.is_none() {
@@ -293,7 +300,16 @@ impl<'a, 'd, 'input> Reader<'a, 'd, 'input> {
         }
         SvgNode::Leaf {
             state: Self::state(node, &ctx.style, true),
-            leaf: SvgLeaf { kind, style },
+            leaf: SvgLeaf {
+                kind,
+                style,
+                shadow: if self.profile {
+                    crate::shadow::read_shadow(node)
+                } else {
+                    crate::export::Shadow::default()
+                },
+                marker_refs: crate::shadow::marker_refs(node),
+            },
         }
     }
 }
