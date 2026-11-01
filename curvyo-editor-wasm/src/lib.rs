@@ -139,6 +139,7 @@ pub use session::{TextPathPress, TextPathView};
 pub use session::{
     TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
 };
+pub use session::{align_command_from_code, distribute_from_code};
 pub use trace_analysis_glue::analysis_json as trace_analysis_json;
 pub use trace_glue::{
     hex as trace_hex, trace_colour_settings, trace_params_json, trace_presets_json, trace_settings,

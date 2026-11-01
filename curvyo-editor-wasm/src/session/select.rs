@@ -185,6 +185,11 @@ impl Session {
         // Ctrl and Alt are the cached state (the host sends them with the
         // press); Alt decides at this press whether the drag is a lasso.
         let modifiers = Modifiers { shift, ..self.held };
+        // A Ctrl-press on an already selected object marks or clears the key
+        // object before the press runs (`specs/0061-align-and-distribute/`
+        // criterion 5): the click itself commits nothing, so the mark is the
+        // only effect a Ctrl-click has.
+        self.key_object_press(point, shift);
         self.select.pointer_down(
             &objects,
             &mut self.selection,

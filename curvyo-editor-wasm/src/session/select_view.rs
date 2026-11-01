@@ -182,12 +182,14 @@ impl Session {
                     .collect();
                 merged_corners(&corners).map(|shown| (id, shown))
             });
+        let key = self.key_mark_in(objects);
         SelectDecorationInput {
             selected,
             hovered,
             history_hovered,
             device_pixel_ratio: self.device_pixel_ratio,
             skew_guide: self.skew_guide_now(),
+            key,
         }
     }
 

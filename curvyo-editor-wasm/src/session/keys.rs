@@ -500,6 +500,12 @@ impl Session {
         if self.button_down {
             return EscapeStep::Nothing;
         }
+        // The key object of the align and distribute commands is cleared
+        // first and keeps the selection (`specs/0061-align-and-distribute/`
+        // criterion 5).
+        if self.tool == Tool::Select && self.key_object.take().is_some() {
+            return EscapeStep::ClearedState;
+        }
         // The first Escape in text edit mode ends it and keeps the text: the one step of the
         // cascade that writes (`specs/0074-text-objects` criterion 7).
         if self.finish_text_edit() {
