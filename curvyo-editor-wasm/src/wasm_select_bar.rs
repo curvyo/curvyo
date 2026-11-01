@@ -5,11 +5,12 @@
 //! `curvyo-ui-core`'s rules.
 
 use curvyo_ui_core::{
-    BarValue, EntryOutcome, FlipAxis, FlipOutcome, InvalidReason, SelectBarState, clamped_ratio,
+    AlignOutcome, AlignReference, BarValue, EntryOutcome, FlipAxis, FlipOutcome, InvalidReason,
+    SelectBarState, clamped_ratio,
 };
 use wasm_bindgen::prelude::*;
 
-use crate::session::GuideButtonState;
+use crate::session::{GuideButtonState, align_command_from_code, distribute_from_code};
 use crate::wasm_api::WasmSession;
 
 /// `wasm-bindgen`'s JS-facing mirror of [`curvyo_ui_core::SelectBarState`]:
@@ -166,6 +167,76 @@ impl WasmSession {
         flip_code(self.session.flip_selection(FlipAxis::Vertical))
     }
 
+    /// Whether the Align and Distribute groups are in the Select bar
+    /// (`specs/0061-align-and-distribute/` criteria 1, 15, 16): the Select
+    /// tool, in every selection state.
+    #[must_use]
+    pub fn align_shown(&self) -> bool {
+        self.session.align_group_shown()
+    }
+
+    /// What an align press acts on now: `"page-objects"` (nothing selected),
+    /// `"page"` (one object) or `"selection"`.
+    #[must_use]
+    pub fn align_reference(&self) -> String {
+        reference_code(self.session.align_reference())
+    }
+
+    /// What a distribute press acts on now: `"page-objects"` (nothing
+    /// selected), `"page"` (one or two objects) or `"selection"`.
+    #[must_use]
+    pub fn distribute_reference(&self) -> String {
+        reference_code(self.session.distribute_reference())
+    }
+
+    /// The number of selected objects (groups count once) the Arrange in a
+    /// grid group works on; the group is shown from two (criterion 18).
+    #[must_use]
+    pub fn grid_count(&self) -> u32 {
+        u32::try_from(self.session.grid_count()).unwrap_or(u32::MAX)
+    }
+
+    /// A key that changes with the selected objects: the grid fields keep
+    /// their values until it does (criterion 21).
+    #[must_use]
+    pub fn grid_selection_key(&self) -> String {
+        self.session.grid_selection_key().to_string()
+    }
+
+    /// An Arrange in a grid press (criteria 20, 21). Returns `"aligned"`,
+    /// `"unchanged"`, `"too-few-cells"` (criterion 19) or `"nothing"`.
+    pub fn arrange_grid(&mut self, rows: u32, columns: u32, gap_mm: f64) -> String {
+        align_code(self.session.arrange_grid(rows, columns, gap_mm))
+    }
+
+    /// Shows or hides the page cue: the active page's frame marked while a
+    /// button whose reference is the page is hovered or focused (UX notes,
+    /// "Canvas cue").
+    pub fn set_page_cue(&mut self, on: bool) {
+        self.session.set_page_cue(on);
+    }
+
+    /// An align press: `command` is one of `"left"`, `"centre-h"`, `"right"`,
+    /// `"top"`, `"centre-v"`, `"bottom"`. Returns `"aligned"`, `"unchanged"`
+    /// (criterion 3) or `"nothing"`, also for an unknown code.
+    pub fn align(&mut self, command: &str) -> String {
+        match align_command_from_code(command) {
+            Some(command) => align_code(self.session.align_selection(command)),
+            None => align_code(AlignOutcome::NothingSelected),
+        }
+    }
+
+    /// A distribute press: `code` is one of `"h-gaps"`, `"h-centres"`,
+    /// `"v-gaps"`, `"v-centres"`; `gap_mm` is the typed gap of criterion 8,
+    /// `None` keeps the ends. Returns `"aligned"`, `"unchanged"` (criterion 7)
+    /// or `"nothing"`, also for an unknown code.
+    pub fn distribute(&mut self, code: &str, gap_mm: Option<f64>) -> String {
+        match distribute_from_code(code) {
+            Some((axis, mode)) => align_code(self.session.distribute_selection(axis, mode, gap_mm)),
+            None => align_code(AlignOutcome::NothingSelected),
+        }
+    }
+
     /// The Guide button (`specs/0046-document-shapes` criteria 9, 10 and 34): `"disabled"` when
     /// nothing selected can be a guide, `"pressed"` when everything that can is one,
     /// `"pressed-inert"` when only linked clones of guides are selected, else `"off"`.
@@ -252,6 +323,27 @@ fn flip_code(outcome: FlipOutcome) -> String {
         FlipOutcome::Flipped => "flipped",
         FlipOutcome::LooksTheSame => "unchanged",
         FlipOutcome::NothingSelected => "nothing",
+    }
+    .to_string()
+}
+
+/// The wasm code of an align or distribute outcome.
+fn align_code(outcome: AlignOutcome) -> String {
+    match outcome {
+        AlignOutcome::Aligned => "aligned",
+        AlignOutcome::Unchanged => "unchanged",
+        AlignOutcome::NothingSelected => "nothing",
+        AlignOutcome::TooFewCells => "too-few-cells",
+    }
+    .to_string()
+}
+
+/// The wasm code of an align or distribute reference.
+fn reference_code(reference: AlignReference) -> String {
+    match reference {
+        AlignReference::PageObjects => "page-objects",
+        AlignReference::Page => "page",
+        AlignReference::Selection => "selection",
     }
     .to_string()
 }

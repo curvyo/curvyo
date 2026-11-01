@@ -226,6 +226,9 @@ impl Session {
         let units = self.units();
         self.select.set_units(units);
         self.select.set_pickable(Some(self.pickable_objects()));
+        // The key object is only meaningful while its unit is selected
+        // (`specs/0061-align-and-distribute/` UX notes).
+        self.drop_detached_key_object();
     }
 
     /// Makes `chain` the entered groups and starts from an empty selection and no hover.

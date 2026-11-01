@@ -20,8 +20,15 @@
 //! methods join this type's `impl Session` the same way any other
 //! `impl` block in the same crate would.
 
+mod align;
+#[cfg(test)]
+mod align_test_support;
+#[cfg(test)]
+mod align_tests;
 #[cfg(test)]
 mod arc_tests;
+#[cfg(test)]
+mod arrange_grid_tests;
 mod background;
 mod background_view;
 mod boolean;
@@ -38,6 +45,8 @@ mod combine;
 mod context;
 mod corner_readout;
 mod cut;
+#[cfg(test)]
+mod distribute_tests;
 mod document;
 mod document_presets;
 mod drag_swap;
@@ -187,6 +196,7 @@ use curvyo_ui_core::{
     PolygonStarTool, RectangleTool, SelectTool, StyleEditor, Viewport,
 };
 
+pub use align::{align_command_from_code, distribute_from_code};
 #[cfg(target_arch = "wasm32")]
 pub use background_view::BackgroundView;
 pub use boolean::BooleanOutcome;
@@ -415,6 +425,15 @@ pub struct Session {
     /// The announcement of the last resize that mirrored ("Resized. Mirrored left to
     /// right."), until the host takes it (`specs/0056-mirror-and-negative-scale/`).
     transform_announcement: Option<String>,
+    /// The key object of the align and distribute commands (`specs/0061-align-and-
+    /// distribute/` criterion 5): the selected unit a Ctrl-click marked, as its unit
+    /// id. View state — never in the document, never undoable; forgotten when its unit
+    /// leaves the selection or on Escape.
+    key_object: Option<NodeId>,
+    /// Whether the active page's frame is drawn in the key object's mark: while an align or
+    /// distribute button whose reference is the page is hovered or focused
+    /// (`specs/0061-align-and-distribute/` UX notes, "Canvas cue"). View state only.
+    page_cue: bool,
     /// The Pen's end-node cache and the target of the press in flight (`0034`).
     pen_cue: pen::PenCueState,
     /// The maker's undo and redo stacks of this session (`history.rs`).
@@ -532,6 +551,8 @@ impl Session {
             command_refusal: None,
             transform_notice: None,
             transform_announcement: None,
+            key_object: None,
+            page_cue: false,
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,
@@ -612,6 +633,8 @@ impl Session {
             command_refusal: None,
             transform_notice: None,
             transform_announcement: None,
+            key_object: None,
+            page_cue: false,
             pen_cue: pen::PenCueState::default(),
             history: history::HistoryState::new(),
             nudge_run: None,
