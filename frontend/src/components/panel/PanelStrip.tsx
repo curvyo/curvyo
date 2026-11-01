@@ -5,6 +5,7 @@ import {
   Droplet,
   File,
   FolderOpen,
+  Grid3x3,
   History,
   Info,
   Layers,
@@ -37,6 +38,7 @@ const GLYPHS: Record<string, Glyph> = {
   history: History,
   fonts: CaseSensitive,
   snapping: Magnet,
+  grid: Grid3x3,
   sketches: Shapes,
   parameters: Variable,
   "trace-info": Info,
@@ -66,6 +68,10 @@ interface PanelStripProps {
   fileDirty: boolean;
   snappingEnabled: boolean;
   onToggleSnapping: () => boolean;
+  /** Whether the active page's grid is shown (`specs/0090-grid` criterion 2). */
+  gridShown?: boolean;
+  /** Shift+click on the Grid entry. Returns the new state. */
+  onToggleGrid?: () => boolean;
   /** The collapse control was pressed. */
   onToggle: (event: React.MouseEvent<HTMLButtonElement>) => void;
   /** A tab was pressed or chosen from the keyboard: the body is shown with it. */
@@ -101,6 +107,8 @@ export function PanelStrip({
   fileDirty,
   snappingEnabled,
   onToggleSnapping,
+  gridShown = false,
+  onToggleGrid = () => false,
   desktop = false,
   onToggle,
   onActivate,
@@ -117,6 +125,27 @@ export function PanelStrip({
     }
   }, [active]);
   const Collapse = open ? PanelRightClose : PanelRightOpen;
+  const [status, setStatus] = useState("");
+  // The two entries a Shift gesture toggles instead of opening: Snapping and Grid.
+  const toggles: Record<string, { on: boolean; toggle: () => void; description: string; tooltip: string; name?: string }> = {
+    snapping: {
+      on: snappingEnabled,
+      toggle: () => {
+        onToggleSnapping();
+      },
+      description: snappingEnabled ? "On" : "Off",
+      tooltip: `Snapping — ${snappingEnabled ? "on" : "off"}. Shift-click or Shift+Enter/Space to toggle.`,
+    },
+    grid: {
+      on: gridShown,
+      toggle: () => {
+        setStatus(onToggleGrid() ? "Grid shown" : "Grid hidden");
+      },
+      description: gridShown ? "Shown" : "Hidden",
+      tooltip: `Grid & Rulers — ${gridShown ? "on" : "off"}`,
+      name: "Grid and rulers",
+    },
+  };
   return (
     <div
       onKeyDown={(event) => {
@@ -162,28 +191,29 @@ export function PanelStrip({
         {tabs.map((tab) => {
           const Glyph = GLYPHS[tab.name];
           const dot = tab.name === "file" && fileDirty;
+          const toggle = toggles[tab.name];
           const trigger = (
             <TabsTrigger
               value={tab.name}
-              aria-label={dot ? `${tab.label}, unsaved changes` : tab.label}
+              aria-label={dot ? `${tab.label}, unsaved changes` : (toggle?.name ?? tab.label)}
               aria-selected={open && tab.name === active}
               disabled={!tab.enabled}
               aria-disabled={tab.enabled ? undefined : true}
-              aria-description={tab.name === "snapping" ? (snappingEnabled ? "On" : "Off") : undefined}
+              aria-description={toggle?.description}
               onMouseDown={(event) => {
-                if (tab.name === "snapping" && event.shiftKey) event.preventDefault();
+                if (toggle && event.shiftKey) event.preventDefault();
               }}
               onKeyDown={(event) => {
-                if (tab.name === "snapping" && event.shiftKey && (event.key === "Enter" || event.key === " ")) {
+                if (toggle && event.shiftKey && (event.key === "Enter" || event.key === " ")) {
                   event.preventDefault();
                   event.stopPropagation();
-                  if (!event.repeat) onToggleSnapping();
+                  if (!event.repeat) toggle.toggle();
                 }
               }}
               onClick={(event) => {
-                if (tab.name === "snapping" && event.shiftKey) {
+                if (toggle && event.shiftKey) {
                   event.preventDefault();
-                  onToggleSnapping();
+                  toggle.toggle();
                   if (event.detail > 0) onReturnFocus();
                   return;
                 }
@@ -193,10 +223,10 @@ export function PanelStrip({
                   onReturnFocus();
                 }
               }}
-              className={`${TAB_CLASS} ${tab.name === "snapping" && snappingEnabled ? "bg-[var(--editor-accent-hover)] !text-[var(--editor-accent)] aria-selected:!text-[var(--toolbar-icon-active-fg)]" : ""}`}
+              className={`${TAB_CLASS} ${toggle?.on ? "bg-[var(--editor-accent-hover)] !text-[var(--editor-accent)] aria-selected:!text-[var(--toolbar-icon-active-fg)]" : ""}`}
             >
               {Glyph && <Glyph size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />}
-              {tab.name === "snapping" && snappingEnabled && <Check size={8} aria-hidden className="absolute right-px top-px bg-[var(--panel-bg)] group-aria-selected:bg-[var(--toolbar-icon-active-bg)]"/>}
+              {toggle?.on && <Check size={8} aria-hidden className="absolute right-px top-px bg-[var(--panel-bg)] group-aria-selected:bg-[var(--toolbar-icon-active-bg)]"/>}
               {dot ? (
                 // A shape badge in the glyph's colour, inside the 28 px box so the strip's scroll
                 // area never clips it; the casing has the ground's colour (the pressed ground
@@ -210,12 +240,13 @@ export function PanelStrip({
             </TabsTrigger>
           );
           return (
-            <Tooltip key={tab.name} side="left" content={tab.name === "snapping" ? `Snapping — ${snappingEnabled ? "on" : "off"}. Shift-click or Shift+Enter/Space to toggle.` : tooltipText(tab.tooltip, desktop)}>
+            <Tooltip key={tab.name} side="left" content={toggle ? toggle.tooltip : tooltipText(tab.tooltip, desktop)}>
               {tab.enabled ? trigger : <span className="inline-flex">{trigger}</span>}
             </Tooltip>
           );
         })}
       </TabsList>
+      <span role="status" className="sr-only">{status}</span>
     </div>
   );
 }
