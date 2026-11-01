@@ -402,14 +402,14 @@ impl Session {
         Some(ChipJson { lines, x, y })
     }
 
-    /// The mode label at the pointer while the Measure tool is active (UX notes §4).
+    /// The mode label at the pointer once the Measure tool has a first pick (UX notes §4).
     fn measure_mode_chip(&self) -> Option<ChipJson> {
-        if self.tool != Tool::Measure {
+        // No chip before the first pick: only the crosshair (customer feedback on PR #243).
+        if self.tool != Tool::Measure || !self.measure_active() {
             return None;
         }
         let pointer = self.pointer_position?;
-        let dimension =
-            self.measure_leaves_dimension() || (!self.measure_active() && self.held.shift);
+        let dimension = self.measure_leaves_dimension();
         let kind = self.measuring(pointer).map(|m| m.kind);
         let (x, y) = self.view().document_to_screen(pointer);
         Some(ChipJson {

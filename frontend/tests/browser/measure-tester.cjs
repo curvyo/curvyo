@@ -92,9 +92,10 @@ async function waitFor(url) {
     await tool('Select'); await click(1300, 900); await p.keyboard.press('Escape'); await settle();
     await ensureMeasure();
     await move(200, 200); await settle();
-    check('c2 mode label "Measure" before a pick', (await modeChip.innerText().catch(() => '')).trim() === 'Measure', await modeChip.innerText().catch(() => 'none'));
+    // Customer feedback on PR #243: no chip before the first pick, with or without Shift.
+    check('c2 no mode label before a pick', (await modeChip.count()) === 0, await modeChip.innerText().catch(() => 'none'));
     await p.keyboard.down('Shift'); await move(201, 201); await settle();
-    check('c2 mode label "Dimension" with Shift before a pick', (await modeChip.innerText().catch(() => '')).trim() === 'Dimension', await modeChip.innerText().catch(() => 'none'));
+    check('c2 no mode label with Shift before a pick', (await modeChip.count()) === 0, await modeChip.innerText().catch(() => 'none'));
     await p.keyboard.up('Shift'); await settle();
     await click(200, 200); await move(320, 360); await settle();
     const live = (await readout.innerText().catch(() => '')).split('\n').map((s) => s.trim()).filter(Boolean);

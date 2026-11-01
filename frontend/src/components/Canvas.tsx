@@ -107,9 +107,11 @@ export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
                     : "canvas-cursor-pen"
               : editor.tool === "rectangle" ||
                   editor.tool === "ellipse" ||
-                  editor.tool === "polygon-star"
-                ? // The creation tools show their crosshair everywhere, over
-                  // existing objects too (`unified-object-editing` criterion 25).
+                  editor.tool === "polygon-star" ||
+                  editor.tool === "measure"
+                ? // The creation tools and Measure show their crosshair everywhere, over
+                  // existing objects too (`unified-object-editing` criterion 25, customer
+                  // feedback on PR #243).
                   "cursor-crosshair"
                 : editor.tool === "text"
                   ? // The I-beam everywhere in the Text tool (`0074`, UX notes §1).

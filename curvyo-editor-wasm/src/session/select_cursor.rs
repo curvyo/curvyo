@@ -14,6 +14,14 @@ use super::{Session, Tool};
 impl Session {
     /// The handle the cursor and hint describe: the one being dragged, else
     /// the one under the pointer.
+    /// Whether a handle of the drawn selection box is under the pointer: it wins over a
+    /// dimension's text and lines there (customer feedback on PR #243).
+    pub(super) fn selection_handle_under_pointer(&self) -> bool {
+        let objects =
+            self.without_selected_dimensions(std::borrow::Cow::Owned(self.objects().to_vec()));
+        self.select_cursor_handle(&objects).is_some()
+    }
+
     fn select_cursor_handle(&self, objects: &[ObjectSnapshot]) -> Option<EditHandle> {
         self.select.dragging_handle().or_else(|| {
             if self.selection.ids().len() >= 2 {

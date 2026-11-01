@@ -2083,10 +2083,14 @@ export function useEditorSession(
 
       // A secondary press in a creation tool creates nothing and starts no placement; during a
       // placement the window listener of `usePlacement` has cancelled it (`0052` criterion 7).
+      // In the Measure tool it measures, picks and places nothing (customer feedback on PR #243).
       const pressedTool = session.tool();
       if (
         event.button === 2 &&
-        (pressedTool === "rectangle" || pressedTool === "ellipse" || pressedTool === "polygon-star")
+        (pressedTool === "rectangle" ||
+          pressedTool === "ellipse" ||
+          pressedTool === "polygon-star" ||
+          pressedTool === "measure")
       ) {
         return;
       }
@@ -2248,6 +2252,8 @@ export function useEditorSession(
         return;
       }
       if (event.button === 2 && sketchWorkbenchRef.current) return;
+      // The Measure tool ignores the secondary button (customer feedback on PR #243).
+      if (event.button === 2 && session.tool() === "measure") return;
       const { x, y } = canvasPoint(event);
 
       if (panningRef.current) {

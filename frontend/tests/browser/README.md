@@ -65,8 +65,10 @@ names. Use the Playwright/runtime environment above; screenshots and the saved p
 path, a rectangle and a circle, selects the Measure tool with M, measures (readout, nothing
 stored), leaves an aligned, horizontal, vertical, radius, diameter (Alt) and angle dimension with
 Shift, moves the rectangle and sees its dimensions follow, deletes the path (the angle shows
-unlinked) and undoes it, converts a dimension with the Guide button and undoes that. Screenshots
-go to `target/0070-browser/`.
+unlinked) and undoes it, converts a dimension with the Guide button and undoes that. The PR #243
+feedback part checks the crosshair and no chip before a pick, a rectangle side, two ellipse axis
+ends and a polygon centre as picks, a right click that does nothing, and a resize handle that wins
+over a dimension on it. Screenshots go to `target/0070-browser/`.
 
 ### Sketch workbench independent acceptance (0066)
 

@@ -250,12 +250,14 @@ fn c2_m_is_the_measure_tool_except_in_select_with_a_selection() {
 }
 
 #[test]
-fn c2_the_mode_label_reads_measure_before_a_pick_and_dimension_with_shift() {
+fn c2_no_mode_label_or_readout_before_a_pick() {
+    // Customer feedback on PR #243 (2026-11-01): only the crosshair until the first pick; it
+    // replaced the label "Measure" ("Dimension" with Shift) before a pick.
     let (mut s, _) = measuring(false);
     hover(&mut s, pt(100.0, 100.0), NONE);
-    assert_eq!(mode(&s).as_deref(), Some("Measure"));
+    assert_eq!(mode(&s), None);
     hover(&mut s, pt(100.0, 100.0), SHIFT);
-    assert_eq!(mode(&s).as_deref(), Some("Dimension"));
+    assert_eq!(mode(&s), None);
     assert!(readout(&s).is_none(), "no readout before a pick");
 }
 
@@ -478,7 +480,11 @@ fn c3_a_curve_pick_is_radius_and_a_segment_pick_gives_its_length() {
         100.0 + 25.0 * (0.4_f64).sin(),
     );
     hover(&mut s, on, NONE);
-    assert_eq!(mode(&s).as_deref(), Some("Measure"));
+    assert_eq!(
+        mode(&s),
+        None,
+        "no label before a pick (customer feedback on PR #243)"
+    );
     click(&mut s, on, SHIFT);
     hover(&mut s, pt(150.0, 150.0), NONE);
     assert_eq!(mode(&s).as_deref(), Some("Dimension, radius"));
