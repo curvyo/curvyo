@@ -12,15 +12,9 @@ impl Session {
     /// A press near the local X or Y axis selects that axis as a constraint target (AC37, AC40):
     /// toggled into the picks of an armed constraint tool, else the selection (Shift adds).
     pub(super) fn sketch_axis_press(&mut self, local: Position) -> bool {
-        let tolerance = AXIS_PICK_PX / self.view().scale();
-        let axis = if local.y.0.abs() <= tolerance {
-            curvyo_ui_core::SKETCH_AXIS_X
-        } else if local.x.0.abs() <= tolerance {
-            curvyo_ui_core::SKETCH_AXIS_Y
-        } else {
+        let Some(id) = self.sketch_axes_at(local).into_iter().next() else {
             return false;
         };
-        let id = curvyo_sketch_core::EntityId::from(axis);
         if self.sketch.tool == super::SketchTool::Constraints {
             self.sketch_armed_pick(&id);
         } else if self.held.shift {
@@ -33,9 +27,22 @@ impl Session {
         true
     }
 
+    /// The local axes within pick reach of `local`, X first: both at the origin.
+    pub(super) fn sketch_axes_at(&self, local: Position) -> Vec<curvyo_sketch_core::EntityId> {
+        let tolerance = AXIS_PICK_PX / self.view().scale();
+        [
+            (local.y.0, curvyo_ui_core::SKETCH_AXIS_X),
+            (local.x.0, curvyo_ui_core::SKETCH_AXIS_Y),
+        ]
+        .into_iter()
+        .filter(|(across, _)| across.abs() <= tolerance)
+        .map(|(_, axis)| axis.into())
+        .collect()
+    }
+
     pub(super) fn infer_sketch_axes(&self, mut point: Position) -> Position {
         // Proposal: a six-screen-pixel band, independent of Vector snap settings.
-        let tolerance = 6.0 / self.view().scale();
+        let tolerance = curvyo_ui_core::SKETCH_EDGE_PICK_PX / self.view().scale();
         if point.x.0.abs() <= tolerance {
             point.x.0 = 0.0;
         }

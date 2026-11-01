@@ -200,10 +200,12 @@ impl Session {
         let label = self
             .sketch_label_for(snapshot, id)
             .map(|p| snapshot.placement.apply_point(Point::new(p.x.0, p.y.0)));
+        // While its entry box is open the text is hidden: the line is drawn whole (AC49).
+        let editing = self.sketch.canvas_edit.as_ref() == Some(id);
         let item = DimensionItem {
             geometry,
             label,
-            text_chars: text.chars().count(),
+            text_chars: if editing { 0 } else { text.chars().count() },
         };
         let pending = PendingRecord {
             id: id.clone(),

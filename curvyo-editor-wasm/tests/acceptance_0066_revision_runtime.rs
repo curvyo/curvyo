@@ -300,6 +300,11 @@ fn suffix_native_body_drag_full_target_vector_and_fixture() {
     s.set_workbench(Workbench::Sketch);
     assert!(s.enter_sketch(id));
     s.set_sketch_tool(curvyo_editor_wasm::SketchTool::Select);
+    // 0066 AC50 (revision 5): a point within 10 screen px wins over the body, and the point
+    // at (9, 4) is 2 mm from the press; zoomed in until it lies beyond that reach.
+    while s.view().scale() < 8.0 {
+        s.wheel(0.0, -100.0, 0.0, 0.0, false, true);
+    }
     s.pointer_down(placement.apply_point(Point::new(9.5, 2.0)), false);
     s.pointer_hover(placement.apply_point(Point::new(7.5, 2.0)), false, false);
     suffix_witness(s.sketch_preview().unwrap());

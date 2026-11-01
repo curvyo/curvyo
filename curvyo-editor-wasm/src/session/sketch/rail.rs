@@ -2,6 +2,7 @@
 use super::state::PickStart;
 use super::{Session, SketchTool};
 use curvyo_document_core::SketchEditError;
+use curvyo_sketch_core::EntityId;
 use curvyo_ui_core::{SKETCH_RAIL_TOOLS, SketchToolUse};
 use serde_json::{Value, json};
 
@@ -21,7 +22,13 @@ impl Session {
                     let label = label(tool);
                     let (name, tooltip) = match &state {
                         SketchToolUse::Apply => ("apply", label.to_owned()),
-                        SketchToolUse::Arm => ("arm", label.to_owned()),
+                        SketchToolUse::Arm => (
+                            "arm",
+                            pick_rule(tool).map_or_else(
+                                || label.to_owned(),
+                                |rule| format!("{label}: {rule}"),
+                            ),
+                        ),
                         SketchToolUse::Unavailable(reason) => (
                             "unavailable",
                             format!("{label}: {}", lowercase_first(reason)),
@@ -144,20 +151,72 @@ impl Session {
     }
 
     /// An armed constraint tool's pick of `entity`: a refused selection is replaced, a valid
-    /// start is completed (AC40); the pick toggles and the tool applies once the picks fit.
-    pub(super) fn sketch_armed_pick(&mut self, entity: &curvyo_sketch_core::EntityId) {
+    /// start is completed (AC40); the pick toggles and the tool applies once the picks fit. A
+    /// pick after which the picks can no longer fit is refused with the tool's hint (AC52).
+    pub(super) fn sketch_armed_pick(&mut self, entity: &EntityId) {
         self.sketch.constraint_hint = None;
         let start = self.sketch.pick_start.take();
         if start == Some(PickStart::Replaced) {
             self.sketch.entities.clear();
         }
+        let before = self.sketch.entities.clone();
         if !self.sketch.entities.insert(entity.clone()) {
             self.sketch.entities.remove(entity);
         }
         if start == Some(PickStart::Kept) && self.sketch_complete_dimension_start() {
             return;
         }
+        if self.sketch_symmetric_about_last_pick(entity) {
+            return;
+        }
+        if let Some(reason) = self.sketch_armed_refusal() {
+            self.sketch.entities = before;
+            self.sketch.constraint_hint = Some(reason);
+            return;
+        }
         self.sketch_apply_armed();
+    }
+
+    /// Armed Symmetric with three picked points: the last pick is the centre, the other two are
+    /// mirrored about it, as `FreeCAD` does (0066 AC51); one step, back in Select. `false` when the
+    /// picks are not three points ending on `last`.
+    fn sketch_symmetric_about_last_pick(&mut self, last: &EntityId) -> bool {
+        if self.sketch.constraint_tool.as_deref() != Some("symmetric") {
+            return false;
+        }
+        let Ok(snapshot) = self.sketch_snapshot_for_edit() else {
+            return false;
+        };
+        let picks = self.sketch.entities.iter().cloned().collect::<Vec<_>>();
+        let Some(relation) = curvyo_ui_core::sketch_symmetric_about(&snapshot.graph, &picks, last)
+        else {
+            return false;
+        };
+        let id: curvyo_sketch_core::ConstraintId = self.minter.mint().to_hex().into();
+        let result =
+            self.sketch_set_constraint(id, curvyo_sketch_core::Constraint::driving(relation));
+        self.sketch.error = result.as_ref().err().map(ToString::to_string);
+        if result.is_ok() {
+            self.sketch_applied_select(picks.into_iter().collect());
+        }
+        true
+    }
+
+    /// Why the armed tool's picks can no longer become a valid target, as the canvas hint
+    /// (AC40, AC52); `None` while they fit or may still fit. The Dimension tool collects its own.
+    fn sketch_armed_refusal(&self) -> Option<String> {
+        let tool = self.sketch.constraint_tool.as_deref()?;
+        if tool == "dimension" {
+            return None;
+        }
+        let graph = self.sketch_snapshot_for_edit().ok()?.graph;
+        let picks = self.sketch.entities.iter().cloned().collect::<Vec<_>>();
+        match curvyo_ui_core::sketch_tool_use(tool, &graph, &picks) {
+            SketchToolUse::Unavailable(reason) => {
+                Some(format!("{}: {}", label(tool), lowercase_first(&reason)))
+            }
+            SketchToolUse::Apply | SketchToolUse::Arm => None,
+        }
     }
 
     /// A Dimension press with one selected point, completed by a pick: dimensioned at once as
@@ -227,6 +286,12 @@ pub(super) fn label(tool: &str) -> &'static str {
         "vertical-distance" => "Vertical distance",
         _ => "Dimension",
     }
+}
+
+/// What an armed tool's picks mean beyond its name, said in its tooltip and on the canvas: the
+/// last picked point is the Symmetric centre (AC51).
+pub(super) fn pick_rule(tool: &str) -> Option<&'static str> {
+    (tool == "symmetric").then_some("picked one by one, the last point is the centre")
 }
 
 /// Whether `tool` is the Horizontal or the Vertical distance tool (AC44).

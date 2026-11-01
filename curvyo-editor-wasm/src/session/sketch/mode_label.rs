@@ -67,7 +67,11 @@ impl Session {
             "y": sy,
             "away_x": away,
             "away_y": away,
-            "hint": self.sketch.variant_hint.then_some(VARIANT_HINT),
+            "hint": self
+                .sketch
+                .variant_hint
+                .then_some(VARIANT_HINT)
+                .or_else(|| self.sketch_pick_rule()),
             "error": self.sketch_canvas_refusal(),
         })
     }
@@ -90,19 +94,35 @@ impl Session {
         })
     }
 
-    /// An armed constraint tool's name while it says what it needs (AC40).
+    /// An armed constraint tool's name while it says what it needs (AC40) or how its picks
+    /// count (AC51).
     fn sketch_constraint_label(&self) -> Option<&'static str> {
-        self.sketch.constraint_hint.as_ref()?;
+        if self.sketch.constraint_hint.is_none() && self.sketch_pick_rule().is_none() {
+            return None;
+        }
         self.sketch
             .constraint_tool
             .as_deref()
             .map(super::rail::label)
     }
 
+    /// How the armed constraint tool counts its picks, if it has such a rule (AC51).
+    pub(super) fn sketch_pick_rule(&self) -> Option<&'static str> {
+        if self.sketch.tool != SketchTool::Constraints {
+            return None;
+        }
+        self.sketch
+            .constraint_tool
+            .as_deref()
+            .and_then(super::rail::pick_rule)
+    }
+
     /// Where a constraint tool's hint stands while the pointer is off the canvas (on the rail
     /// button just pressed): at the first selected geometry, else at the sketch origin (AC40).
     fn sketch_hint_anchor(&self) -> Option<Position> {
-        self.sketch.constraint_hint.as_ref()?;
+        if self.sketch.constraint_hint.is_none() && self.sketch_pick_rule().is_none() {
+            return None;
+        }
         let solution = self.sketch_snapshot_for_edit().ok()?.solution;
         let at = |id: &EntityId| match solution.entities.get(id)? {
             Entity::Point { position, .. } => Some(*position),
