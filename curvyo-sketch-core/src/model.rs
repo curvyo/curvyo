@@ -227,6 +227,26 @@ pub enum Relation {
         /// Required semi-axis length.
         value: Expression,
     },
+    /// Distance along the local X axis, signed: `b.x - a.x` equals the value, so a creator that
+    /// names the left point first keeps that side for every new value.
+    HorizontalDistance {
+        /// Point the distance starts from.
+        a: EntityId,
+        /// Point the distance ends at.
+        b: EntityId,
+        /// Required non-negative distance.
+        value: Expression,
+    },
+    /// Distance along the local Y axis, signed: `b.y - a.y` equals the value, so a creator that
+    /// names the lower point first keeps that side for every new value.
+    VerticalDistance {
+        /// Point the distance starts from.
+        a: EntityId,
+        /// Point the distance ends at.
+        b: EntityId,
+        /// Required non-negative distance.
+        value: Expression,
+    },
 }
 
 /// One user-visible relation, including reference-only dimension annotations.

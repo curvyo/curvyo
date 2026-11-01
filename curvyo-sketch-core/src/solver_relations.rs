@@ -73,6 +73,8 @@ pub(crate) fn append(
             Relation::Distance { a, b, .. } => {
                 json!({"type":"distance","a":input.id(a),"b":input.id(b),"value":value})
             }
+            Relation::HorizontalDistance { a, b, .. } => axis(input, "horizontal", a, b, value),
+            Relation::VerticalDistance { a, b, .. } => axis(input, "vertical", a, b, value),
             Relation::Length { curve, .. } => {
                 json!({"type":"length","curve":input.id(curve),"value":value})
             }
@@ -105,6 +107,12 @@ pub(crate) fn append(
     }
     Ok(())
 }
+/// A signed distance along the local X (`horizontal`) or Y (`vertical`) axis: ACS's `b - a`
+/// coordinate difference, so the stored point order keeps the side.
+fn axis(input: &Input, direction: &str, a: &EntityId, b: &EntityId, value: Option<f64>) -> Value {
+    json!({"type":format!("{direction}_distance"),"a":input.id(a),"b":input.id(b),"value":value})
+}
+
 /// Symmetry, point alignment and point-on relations, with their operand-only helpers.
 fn point_relation(
     s: &Sketch,

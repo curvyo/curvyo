@@ -29,6 +29,12 @@ pub fn measure(s: &Sketch, r: &Relation) -> Result<Quantity, SketchError> {
             };
             (d, Dimension::Length)
         }
+        Relation::HorizontalDistance { a, b, .. } => {
+            (s.point(b)?.x.0 - s.point(a)?.x.0, Dimension::Length)
+        }
+        Relation::VerticalDistance { a, b, .. } => {
+            (s.point(b)?.y.0 - s.point(a)?.y.0, Dimension::Length)
+        }
         Relation::Length { curve, .. } => (length(s, curve)?, Dimension::Length),
         Relation::Radius { curve, .. } => (radius(s, curve)?, Dimension::Length),
         Relation::Diameter { curve, .. } => (2.0 * radius(s, curve)?, Dimension::Length),

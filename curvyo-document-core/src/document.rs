@@ -286,7 +286,14 @@ impl DocumentVersion {
 /// Bumped to 28 in `constraint-sketcher`: parametric objects keep atomic intent records
 /// and independently validated solution checkpoints (ADR 0026).
 /// Goldens: `sketch_*_v28.curvyo`; older readers refuse this format.
-pub const CURRENT_FORMAT_VERSION: u32 = 28;
+///
+/// Bumped to 29 in `constraint-sketcher` customer revision 4 (`specs/0066-constraint-sketcher/
+/// adrs.md`, 2026-10-31): sketch relations gain `HorizontalDistance` and `VerticalDistance`.
+/// A version-28 reader does not know them and would refuse the sketch record as damaged, so it
+/// must refuse every file of this build as too new. Migration from version 28 is none: no
+/// version-28 record changes shape, and the version-28 goldens still open. Goldens:
+/// `sketch_*_v29.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 29;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

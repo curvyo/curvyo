@@ -39,13 +39,22 @@ pub(crate) fn validate(sketch: &Sketch) -> Result<(), SketchError> {
         {
             let value = expression.evaluate(&values)?;
             if value.dimension() != dimension
-                || (dimension == Dimension::Length && value.value() <= 0.0)
+                || (dimension == Dimension::Length
+                    && !allowed_length(&constraint.relation, value.value()))
             {
                 return Err(invalid(&format!("{}: invalid dimension value", id.0)));
             }
         }
     }
     Ok(())
+}
+/// A length dimension is positive; an axis distance may also be zero (aligned points).
+fn allowed_length(relation: &Relation, value: f64) -> bool {
+    match relation {
+        // A domain bound on the stored size, not a geometric comparison: no tolerance.
+        Relation::HorizontalDistance { .. } | Relation::VerticalDistance { .. } => value >= 0.0,
+        _ => value > 0.0,
+    }
 }
 /// Entity IDs are non-empty; the `@` prefix is reserved for selection-only references such as
 /// the local axes, so a record can never shadow one.
@@ -248,6 +257,13 @@ fn dimension(s: &Sketch, r: &Relation) -> Result<(), SketchError> {
             if !matches!(s.entities.get(curve), Some(Entity::Ellipse { .. })) {
                 return Err(invalid("ellipse radius needs an ellipse"));
             }
+        }
+        Relation::HorizontalDistance { a, b, .. } | Relation::VerticalDistance { a, b, .. } => {
+            if a == b {
+                return Err(invalid("axis distance needs two different points"));
+            }
+            s.point(a)?;
+            s.point(b)?;
         }
         Relation::Distance { a, b, .. } => {
             s.point(a)?;
