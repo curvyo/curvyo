@@ -158,6 +158,20 @@ pub struct DrawingPage {
     pub display_unit: Option<DisplayUnit>,
     /// The background, when the drawing gives one.
     pub background: Option<DocumentBackground>,
+    /// The pages in list order (`specs/0024-svg-import-export` criterion 129); empty gives one
+    /// page of `size` at the origin. The first one is the active page.
+    pub pages: Vec<DrawingPageFrame>,
+}
+
+/// One page of a drawing that becomes a new document.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DrawingPageFrame {
+    /// Its name.
+    pub name: String,
+    /// Its top-left corner in document millimetres.
+    pub origin: Point,
+    /// Its size, within the document limits.
+    pub size: DocumentSize,
 }
 
 impl DrawingNode {
@@ -431,7 +445,8 @@ impl Document {
         anchor_ids: &[AnchorId],
         assets: &[Arc<[u8]>],
     ) -> Result<Self, ObjectEditError> {
-        let document = Self::blank(peer, page.size);
+        let first_size = page.pages.first().map_or(page.size, |p| p.size);
+        let document = Self::blank(peer, first_size);
         let tree = document.loro().get_tree(OBJECTS_TREE);
         crate::drawing_check::validate(&document, &tree, nodes, anchor_ids, 0, assets)?;
         document.uncommitted(|document| {
@@ -441,6 +456,7 @@ impl Document {
             if let Some(background) = page.background {
                 let _ = document.set_background(background);
             }
+            crate::pages::write_drawing_pages(document, &page.pages);
             tree.enable_fractional_index(0);
             let mut writer = Writer {
                 document,

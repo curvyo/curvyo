@@ -163,7 +163,7 @@ pub use document_size::{
 pub use drawing_above::TRACE_IMAGE_COMMIT_LABEL;
 pub use drawing_content::DrawingText;
 pub use drawing_insert::{
-    DrawingAnchor, DrawingNode, DrawingOutline, DrawingPage, DrawingRegisters,
+    DrawingAnchor, DrawingNode, DrawingOutline, DrawingPage, DrawingPageFrame, DrawingRegisters,
     IMPORT_SVG_COMMIT_LABEL,
 };
 pub use ellipse_arc::{

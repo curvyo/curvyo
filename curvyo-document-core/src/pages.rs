@@ -93,6 +93,36 @@ pub(crate) fn initialize(root: &LoroMap) {
         write(root, FIRST_PAGE_ID, field, 0.0);
     }
 }
+/// Writes the pages of a drawing that becomes a new document, without a commit: the first page
+/// takes the first frame's name and corner, every further frame becomes a page after it
+/// (`specs/0024-svg-import-export` criterion 129).
+pub(crate) fn write_drawing_pages(
+    document: &Document,
+    frames: &[crate::drawing_insert::DrawingPageFrame],
+) {
+    let root = document.loro().get_map(ROOT_MAP);
+    let peer = document.loro().peer_id();
+    for (index, frame) in frames.iter().enumerate() {
+        let id = if index == 0 {
+            FIRST_PAGE_ID.to_owned()
+        } else {
+            format!("{peer}-svg{index}")
+        };
+        write(&root, &id, "name", frame.name.clone());
+        #[allow(clippy::cast_precision_loss)] // page counts are far below 2^52
+        let order = index as f64;
+        for (field, value) in [
+            ("x", frame.origin.x),
+            ("y", frame.origin.y),
+            ("width", frame.size.width.as_mm()),
+            ("height", frame.size.height.as_mm()),
+            ("order", order),
+        ] {
+            write(&root, &id, field, value);
+        }
+    }
+}
+
 pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
     let mut ids = std::collections::BTreeSet::new();
     // The grid registers are gathered in the same pass, so a page without any (a grid never

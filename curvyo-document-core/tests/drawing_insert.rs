@@ -159,6 +159,7 @@ fn ac2_ac77_a_document_from_a_drawing_has_no_step() {
         size: DocumentSize::from_mm(100.0, 50.0),
         display_unit: Some(DisplayUnit::In),
         background: None,
+        pages: Vec::new(),
     };
     let mut nodes = drawing();
     nodes.insert(
@@ -312,4 +313,28 @@ fn ac78_ac94_ac104_texts_and_images_in_the_one_commit() {
         Err(ObjectEditError::NoSuchObject),
         "a carrier must be a drawn leaf"
     );
+}
+
+#[test]
+fn ac129_a_document_from_a_drawing_has_its_pages_in_order() {
+    let frame = |name: &str, x: f64, w: f64| curvyo_document_core::DrawingPageFrame {
+        name: name.to_owned(),
+        origin: curvyo_document_core::Point::new(x, 20.0),
+        size: DocumentSize::from_mm(w, 50.0),
+    };
+    let page = DrawingPage {
+        size: DocumentSize::from_mm(100.0, 50.0),
+        display_unit: None,
+        background: None,
+        pages: vec![frame("Front", -50.0, 100.0), frame("Coaster", 70.0, 80.0)],
+    };
+    let document = Document::from_drawing(7, &page, &[], &[], &[]).unwrap();
+    let pages = document.pages();
+    assert_eq!(pages.len(), 2);
+    assert_eq!(pages[0].name, "Front");
+    assert_eq!(pages[0].origin.x, -50.0);
+    assert_eq!(pages[1].name, "Coaster");
+    assert_eq!(pages[1].origin.x, 70.0);
+    assert_eq!(pages[1].size.width.as_mm(), 80.0);
+    assert_eq!(document.own_step_count(), 0);
 }
