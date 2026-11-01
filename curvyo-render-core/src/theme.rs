@@ -502,3 +502,16 @@ pub const DIM_REFERENCE: RgbaColor = RgbaColor::opaque(0x5A, 0x5A, 0x5F);
 
 /// `--sketch-solved`: the stroke of sketch geometry the solver reports fully constrained.
 pub const SKETCH_SOLVED: RgbaColor = RgbaColor::opaque(0x12, 0x73, 0x3A);
+
+/// `--grid-ink` (`specs/0090-grid`, UX notes §4, `docs/design-system.md` row "Grid"): the page
+/// grid's ink on a light page ground, `--toolbar-icon`.
+pub const GRID_INK: RgbaColor = RgbaColor::opaque(0x3A, 0x3A, 0x3F);
+
+/// `--grid-ink-on-dark`: the page grid's ink on a dark page ground.
+pub const GRID_INK_ON_DARK: RgbaColor = RgbaColor::WHITE;
+
+/// `--grid-minor`: the opacity of a minor grid line's ink, 20 %.
+pub const GRID_MINOR_OPACITY: f64 = 0.20;
+
+/// `--grid-major`: the opacity of a major grid line's ink, 42 %.
+pub const GRID_MAJOR_OPACITY: f64 = 0.42;

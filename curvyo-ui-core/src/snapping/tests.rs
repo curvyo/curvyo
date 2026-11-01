@@ -11,6 +11,7 @@ fn settings(capture: f64, release: f64) -> SnapSettings {
         guides: true,
         nodes: true,
         page: true,
+        grid: false,
         capture,
         release: release.max(capture),
     }
@@ -280,6 +281,7 @@ fn page_fractions_are_exact_thirds_on_both_axes() {
         page: true,
         capture: 1.0,
         release: 1.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &[],
@@ -317,6 +319,7 @@ fn page_fractions_follow_a_resize_with_nothing_stored() {
         page: true,
         capture: 1.0,
         release: 1.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &[],
@@ -398,6 +401,7 @@ fn gather_excludes_hidden_objects_and_keeps_locked_ones() {
         page: false,
         capture: 8.0,
         release: 14.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &reads,
@@ -445,6 +449,7 @@ fn gather_skips_the_dragged_object() {
         page: false,
         capture: 8.0,
         release: 14.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &reads,
@@ -490,6 +495,7 @@ fn a_guide_clone_and_its_anchors_are_targets() {
         page: false,
         capture: 8.0,
         release: 14.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &reads,
@@ -536,6 +542,7 @@ fn the_node_tool_can_add_its_own_path_anchors_but_not_the_dragged_one() {
         page: false,
         capture: 8.0,
         release: 14.0,
+        grid: false,
     };
     let reads = document.read_nodes();
     let mut excluded = HashSet::new();
@@ -578,6 +585,7 @@ fn gather_excludes_one_dragged_anchor_from_an_otherwise_included_path() {
         page: false,
         capture: 8.0,
         release: 14.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &reads,
@@ -612,6 +620,7 @@ fn a_box_move_snaps_by_its_edges_and_centre_lines() {
         page: false,
         capture: 8.0,
         release: 14.0,
+        grid: false,
     };
     let targets = SnapTargets::gather(
         &reads,

@@ -149,6 +149,21 @@ pub fn build_page_areas(
     view: ViewTransform,
     device_pixel_ratio: f64,
 ) -> DrawList {
+    build_page_areas_with_grids(pages, background, view, device_pixel_ratio, &[])
+}
+
+/// [`build_page_areas`] with each page's grid lines (`specs/0090-grid` criterion 4) as their own
+/// artwork layer right after that page's area, so a grid lies over its page's background and
+/// under every object, and crossing lines paint a pixel once. `grids[i]` belongs to `pages[i]`;
+/// a missing entry draws no grid.
+#[must_use]
+pub fn build_page_areas_with_grids(
+    pages: &[curvyo_document_core::Page],
+    background: DocumentBackground,
+    view: ViewTransform,
+    device_pixel_ratio: f64,
+    grids: &[DrawList],
+) -> DrawList {
     let areas: Vec<_> = pages
         .iter()
         .map(|p| build_area_at(p.size, background, p.origin, view, device_pixel_ratio))
@@ -161,10 +176,14 @@ pub fn build_page_areas(
     if !list.triangles.is_empty() {
         list.close_checker_prefix();
     }
-    for area in areas {
+    for (index, area) in areas.into_iter().enumerate() {
         list.triangles
             .extend_from_slice(&area.triangles[area.checker_end()..]);
         list.close_layer();
+        if let Some(grid) = grids.get(index) {
+            list.triangles.extend_from_slice(&grid.triangles);
+            list.close_layer();
+        }
     }
     list
 }

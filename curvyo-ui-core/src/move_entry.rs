@@ -6,9 +6,10 @@
 //! selection), the centre until another is chosen. The mode is the chip's (the DOM holds it
 //! and passes it with every commit), the chosen point is view state of this entry, so the rule
 //! exists once, here. The DOM chip only holds the text, the caret and the focus
-//! (`adrs.md`, decision 3).
+//! (`adrs.md`, decision 3). Absolute positions are measured from the active page's origin corner,
+//! positive into the page (`specs/0090-grid` criterion 19).
 
-use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, Vec2};
+use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Page, Point, Vec2};
 
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::group_box::GroupSelection;
@@ -48,6 +49,23 @@ pub struct MoveEntry {
     /// Whether the chip opens with its Copy check on: Ctrl was held at the
     /// second press of the double-click (criterion 23).
     copy_preset: bool,
+    /// Where Absolute measures from: the document point of 0, 0 and the direction of each axis
+    /// (`1` along the document axis, `-1` against it); the document origin until
+    /// [`MoveEntry::measure_from`] names a page.
+    zero: (Point, (f64, f64)),
+}
+
+/// The fields' texts of `at` measured from `zero`.
+fn measured_prefill(at: Point, (origin, (sx, sy)): (Point, (f64, f64))) -> [String; 2] {
+    [
+        format_mm((at.x - origin.x) * sx),
+        format_mm((at.y - origin.y) * sy),
+    ]
+}
+
+/// Where a page's positions are measured from: its origin corner and its counting directions.
+fn zero_of(page: &Page) -> (Point, (f64, f64)) {
+    (page.zero_point(), page.grid.origin.signs())
 }
 
 impl MoveEntry {
@@ -83,7 +101,14 @@ impl MoveEntry {
             reference: ReferencePoint::Centre,
             radio_hover: None,
             copy_preset: false,
+            zero: (Point::new(0.0, 0.0), (1.0, 1.0)),
         }
+    }
+
+    /// Absolute measures from `page`'s origin corner, positive into the page
+    /// (`specs/0090-grid` criterion 19).
+    pub fn measure_from(&mut self, page: &Page) {
+        self.zero = zero_of(page);
     }
 
     /// The same entry opening with its Copy check on or off: on when Ctrl was
@@ -139,8 +164,14 @@ impl MoveEntry {
     /// mark (criterion 44).
     #[must_use]
     pub fn absolute_prefill_for(&self, reference: ReferencePoint) -> [String; 2] {
-        let at = reference.point(self.bounds);
-        [format_mm(at.x), format_mm(at.y)]
+        measured_prefill(reference.point(self.bounds), self.zero)
+    }
+
+    /// [`MoveEntry::absolute_prefill_for`] measured from `page`'s origin corner: what the chip
+    /// shows before a commit has called [`MoveEntry::measure_from`].
+    #[must_use]
+    pub fn absolute_prefill_from(&self, reference: ReferencePoint, page: &Page) -> [String; 2] {
+        measured_prefill(reference.point(self.bounds), zero_of(page))
     }
 
     /// The chosen reference point of Absolute: the centre until another is chosen.
@@ -209,7 +240,10 @@ impl MoveEntry {
         let (min, max) = self.bounds;
         let (origin, far) = ([min.x, min.y], [max.x, max.y]);
         let at = reference.point(self.bounds);
-        let current = [at.x, at.y];
+        let (zero, (sx, sy)) = self.zero;
+        // The current position as measured, and the document direction of each measured axis.
+        let current = [(at.x - zero.x) * sx, (at.y - zero.y) * sy];
+        let signs = [sx, sy];
         let absolute_prefill = self.absolute_prefill_for(reference);
         let mut offset = [0.0_f64; 2];
         for index in 0..2 {
@@ -225,7 +259,7 @@ impl MoveEntry {
                 .filter(|value| value.abs() <= MAX_COORDINATE_MM)
                 .ok_or((index, InvalidReason::NotANumber))?;
             offset[index] = if absolute {
-                value - current[index]
+                (value - current[index]) * signs[index]
             } else {
                 value
             };
@@ -771,6 +805,57 @@ mod tests {
             (centre.x - 11.160_254).abs() < 1e-5 && (centre.y - 9.330_127).abs() < 1e-5,
             "{centre:?}"
         );
+    }
+
+    /// `specs/0090-grid` criterion 19: Absolute measures from the page's origin corner,
+    /// positive into the page: from a bottom-left corner y counts upward, from a top-right
+    /// corner x counts to the left; Relative is unchanged.
+    #[test]
+    fn absolute_measures_from_the_page_origin_corner() {
+        use curvyo_document_core::{DocumentSize, OriginCorner};
+        let document = Document::new(1);
+        // A 30 x 40 rectangle with its top-left at (10, 20) on a 200 x 100 page at (0, 0).
+        let id = rect(&document, 10.0, 20.0, 30.0, 40.0);
+        let mut page = document.pages()[0].clone();
+        page.size = DocumentSize::from_mm(200.0, 100.0);
+        for (corner, prefill, typed_top_left) in [
+            // Bottom left: the top-left corner is 80 mm above the bottom edge.
+            (
+                OriginCorner::BottomLeft,
+                ["10.0", "80.0"],
+                Point::new(100.0, 50.0),
+            ),
+            // Top right: the top-left corner is 190 mm left of the right edge.
+            (
+                OriginCorner::TopRight,
+                ["190.0", "20.0"],
+                Point::new(100.0, 50.0),
+            ),
+        ] {
+            page.grid.origin = corner;
+            let mut entry = entry_of(&document, id);
+            assert_eq!(
+                entry.absolute_prefill_from(ReferencePoint::TopLeft, &page),
+                prefill,
+                "{corner:?}"
+            );
+            entry.measure_from(&page);
+            assert_eq!(entry.absolute_prefill(), prefill, "{corner:?}");
+            assert_eq!(entry.resolve(prefill, true), Ok(None));
+            // Typed 100 and 50: the top-left corner lands 100 and 50 mm into the page.
+            let offset = entry.resolve(["100", "50"], true).unwrap().unwrap();
+            let moved = Point::new(10.0 + offset.x, 20.0 + offset.y);
+            let expected = page.placed(Vec2::new(typed_top_left.x, typed_top_left.y));
+            assert!(
+                moved.vector_to(expected).length() < 1e-9,
+                "{corner:?}: {moved:?}"
+            );
+            // Relative keeps the document directions.
+            assert_eq!(
+                entry.resolve(["5", "-3"], false),
+                Ok(Some(Vec2::new(5.0, -3.0)))
+            );
+        }
     }
 
     /// Criterion 45: the coordinate limit is checked on all four edges, so it is the same for

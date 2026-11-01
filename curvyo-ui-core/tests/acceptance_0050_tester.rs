@@ -56,6 +56,7 @@ fn the_strip_has_layers_fourth_and_never_dimmed() {
                     "history",
                     "fonts",
                     "snapping",
+                    "grid",
                     "sketches",
                     "parameters"
                 ]

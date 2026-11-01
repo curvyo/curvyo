@@ -22,6 +22,8 @@ pub enum PanelTab {
     Fonts,
     /// Document snapping settings, retained across selection changes.
     Snapping,
+    /// The active page's grid (`specs/0090-grid` criterion 2), retained across selection changes.
+    Grid,
     /// Parametric sketch editing and diagnostics.
     Sketches,
     /// Named sketch parameters and formulas.
@@ -40,6 +42,7 @@ impl PanelTab {
             Self::History => "history",
             Self::Fonts => "fonts",
             Self::Snapping => "snapping",
+            Self::Grid => "grid",
             Self::Sketches => "sketches",
             Self::Parameters => "parameters",
         }
@@ -60,6 +63,8 @@ impl PanelTab {
             Self::History => "History",
             Self::Fonts => "Fonts",
             Self::Snapping => "Snapping",
+            // The panel and its rail entry also carry the rulers' origin corner (criterion 18).
+            Self::Grid => "Grid & Rulers",
             Self::Sketches => "Sketches",
             Self::Parameters => "Parameters",
         }
@@ -77,6 +82,7 @@ impl PanelTab {
             // part in brackets there (UX notes §4).
             (Self::Fonts, _) => "Fonts (Shift+Ctrl+T)",
             (Self::Snapping, _) => "Snapping",
+            (Self::Grid, _) => "Grid & Rulers",
             (Self::Sketches, _) => "Sketches",
             (Self::Parameters, _) => "Parameters",
         }
@@ -108,7 +114,7 @@ impl StyleBlocker {
 
 /// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
 /// built; the order never changes.
-const TABS: [PanelTab; 9] = [
+const TABS: [PanelTab; 10] = [
     PanelTab::File,
     PanelTab::Document,
     PanelTab::Style,
@@ -116,6 +122,7 @@ const TABS: [PanelTab; 9] = [
     PanelTab::History,
     PanelTab::Fonts,
     PanelTab::Snapping,
+    PanelTab::Grid,
     PanelTab::Sketches,
     PanelTab::Parameters,
 ];
@@ -371,7 +378,7 @@ mod tests {
 
     /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_nine_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_ten_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
@@ -384,6 +391,7 @@ mod tests {
                 ("history", "History"),
                 ("fonts", "Fonts"),
                 ("snapping", "Snapping"),
+                ("grid", "Grid & Rulers"),
                 ("sketches", "Sketches"),
                 ("parameters", "Parameters")
             ]

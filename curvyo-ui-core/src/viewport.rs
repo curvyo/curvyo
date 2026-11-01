@@ -13,7 +13,7 @@
 //! only ever sees the plain `ViewTransform` ([`Viewport::view`]) — it
 //! cannot depend on this crate (ADR 0011 §3).
 
-use curvyo_document_core::{Point, Vec2, ViewTransform};
+use curvyo_document_core::{Length, Point, Vec2, ViewTransform};
 
 /// Screen pixels per document millimetre at 100% zoom: CSS's own "1in ==
 /// 96px" convention expressed per millimetre (`96 / 25.4`) — the
@@ -23,6 +23,25 @@ use curvyo_document_core::{Point, Vec2, ViewTransform};
 /// limits below are defined in terms of it, so it belongs where they do,
 /// not in the host.
 pub const PX_PER_MM_AT_100: f64 = 96.0 / 25.4;
+
+/// A distance on screen in CSS pixels (`specs/0090-grid`, `adrs.md` decision 3): a newtype so a
+/// screen threshold is never confused with a document length.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub(crate) struct ScreenPx(pub f64);
+
+impl ScreenPx {
+    /// The CSS-pixel value.
+    #[must_use]
+    pub const fn px(self) -> f64 {
+        self.0
+    }
+
+    /// The document length this distance covers at `scale` screen pixels per millimetre.
+    #[must_use]
+    pub fn to_length(self, scale: f64) -> Length {
+        Length::from_mm(self.0 / scale)
+    }
+}
 
 /// A validated zoom factor — a dimensionless multiple of 100%, clamped to
 /// `2% ..= 8000%` (acceptance criteria 7, 8). `1.0` is 100%, matching

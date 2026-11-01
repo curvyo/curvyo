@@ -109,6 +109,7 @@ pub fn resolve_along(
             lines,
             cross: Some(end),
         },
+        grid: false,
     }
 }
 fn permitted_direction(settings: &SnapSettings, direction: Vec2) -> Option<Vec2> {
