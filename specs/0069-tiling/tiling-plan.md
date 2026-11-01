@@ -1,6 +1,8 @@
 # Plan for Tiling (0069)
 
-Status: Draft plan (2026-11-01), waiting for the customer's release and his answers to Frage 18 to 23. Nothing is implemented.
+Status: Draft plan (2026-11-01). Customer answers of 2026-11-01: TILE-LIVE **B**, TILE-HOME-UI A, TILE-SOURCE A, TILE-SPACING A, TILE-EXTRAS A, TILE-RESULT-GROUP A. Spec, ADRs and UX notes follow; the build starts after the customer releases the plan. Nothing is implemented.
+
+**Consequence of TILE-LIVE B:** a tiling is a stored, reopenable object (source, options, seed): a new node kind, a `format_version` bump and a new ADR. Section 4 and the format line in section 3 change accordingly; the stored tiling is also the base `0071` pattern fill can build on.
 
 `specification.md` is a sketch of 2026-10-17 with 11 criteria and one open question (TILE-LIVE). Since then linked clones (`0049`), clone overrides with own placement, own style and Spread colours (`0057`), linked text clones (`0080`), the Select bar with Align and Distribute (`0061`), click-to-create placement (`0052`), pages (`0059`) and the grid (`0090`) are built. This plan lists what the sketch already settles, what is missing, how the work is cut and what the customer decides first.
 
