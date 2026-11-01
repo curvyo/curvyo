@@ -75,6 +75,7 @@ fn rotate_object_about_center(d: &Document, index: usize, radians: f64) {
     let c = match &o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -1567,6 +1568,7 @@ fn select_set(s: &mut Session, indices: &[usize]) {
         let p = match d.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)[0].point,

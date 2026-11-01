@@ -921,6 +921,7 @@ fn ac8_stroke_stays_positive_for_every_object_kind_when_collapsed() {
         let stroke = match d.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => p.style.stroke.width.as_mm(),
             ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
@@ -2069,6 +2070,7 @@ fn ac24_scaled_and_rotated_objects_round_trip_exactly() {
             match d.object(id).unwrap() {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => {
@@ -2861,6 +2863,7 @@ fn assert_all_finite_and_reopenable(session: &Session) {
         match doc.object(id).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => {

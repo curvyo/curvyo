@@ -102,6 +102,7 @@ fn path(d: &Document, id: NodeId) -> Option<PathSnapshot> {
     match d.object(id)? {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => Some(p),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,

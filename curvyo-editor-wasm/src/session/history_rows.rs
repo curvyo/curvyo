@@ -29,6 +29,7 @@ fn shape_word(shape: ObjectShape) -> &'static str {
         ObjectShape::Clone => "clone",
         ObjectShape::Text => "text",
         ObjectShape::Image => "image",
+        ObjectShape::Dimension => "dimension",
     }
 }
 
@@ -99,6 +100,7 @@ fn shape_name(shape: ObjectShape) -> &'static str {
         ObjectShape::Clone => "Clone",
         ObjectShape::Text => "Text",
         ObjectShape::Image => "Image",
+        ObjectShape::Dimension => "Dimension",
     }
 }
 

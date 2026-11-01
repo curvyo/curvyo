@@ -263,42 +263,31 @@ fn dimension_texts(
     (text, name)
 }
 
-/// The value as the canvas shows it: the display unit, at most the panel's precision, trailing
-/// zeros trimmed, with "R " for a radius, "⌀ " for a diameter and "↔ " / "↕ " for a horizontal
-/// or vertical distance, shown as its size whatever side the geometry is on.
+/// The value as the canvas shows it, through the shared formatter (`0070` DIM-TEXT): the
+/// display unit, at most the panel's precision, trailing zeros trimmed.
 fn value_text(relation: &Relation, value: f64, dimension: Dimension, unit: DisplayUnit) -> String {
-    if dimension == Dimension::Angle {
-        return format!("{}°", trimmed(value.to_degrees(), 2));
-    }
-    let decimals = if unit == DisplayUnit::Mm { 2 } else { 3 };
-    let prefix = match relation {
-        Relation::Radius { .. } | Relation::EllipseRadius { .. } => "R ",
-        Relation::Diameter { .. } => "⌀ ",
-        Relation::HorizontalDistance { .. } => "↔ ",
-        Relation::VerticalDistance { .. } => "↕ ",
-        _ => "",
+    use curvyo_document_core::DimensionKind;
+    let kind = match relation {
+        _ if dimension == Dimension::Angle => DimensionKind::Angle,
+        Relation::Radius { .. } | Relation::EllipseRadius { .. } => DimensionKind::Radius,
+        Relation::Diameter { .. } => DimensionKind::Diameter,
+        Relation::HorizontalDistance { .. } => DimensionKind::Horizontal,
+        Relation::VerticalDistance { .. } => DimensionKind::Vertical,
+        _ => DimensionKind::Aligned,
     };
-    let value = if prefix.starts_with(['↔', '↕']) {
-        value.abs()
+    let decimals = if dimension == Dimension::Angle || unit == DisplayUnit::Mm {
+        2
     } else {
-        value
+        3
     };
-    let number = trimmed(value / unit.mm_per_unit(), decimals);
-    format!("{prefix}{number} {}", unit.symbol())
-}
-
-fn trimmed(value: f64, decimals: usize) -> String {
-    let text = format!("{value:.decimals$}");
-    let text = if text.contains('.') {
-        text.trim_end_matches('0').trim_end_matches('.')
+    let value = if kind == DimensionKind::Angle {
+        curvyo_document_core::DimensionValue::Angle(curvyo_document_core::Angle::from_radians(
+            value,
+        ))
     } else {
-        &text
+        curvyo_document_core::DimensionValue::Length(curvyo_document_core::Length::from_mm(value))
     };
-    if text == "-0" {
-        "0".into()
-    } else {
-        text.into()
-    }
+    curvyo_ui_core::dimension_text(kind, value, unit, decimals)
 }
 
 fn kind_name(relation: &Relation) -> &'static str {

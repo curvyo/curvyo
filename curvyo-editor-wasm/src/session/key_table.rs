@@ -74,6 +74,11 @@ pub(super) enum KeyAction {
     OpenPenEntry,
     /// The key is taken from the page and does nothing (`0072` criterion 14).
     Consume,
+    /// Alt in the Measure tool: switches Radius and Diameter while a radius is placed (`0070`
+    /// criterion 6).
+    MeasureAlt,
+    /// Enter in the Measure tool: places the selection's dimension (`0070` criterion 5).
+    MeasureEnter,
 }
 
 /// What Tab does: in the Pen with a path in progress it opens the entry chip or, with a button
@@ -137,6 +142,8 @@ fn enter_action(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         KeyAction::Ignore
     } else if state.tool == Tool::Pen && state.pen_open {
         KeyAction::FinishPen
+    } else if state.tool == Tool::Measure && !input.repeat && !input.dom_blocked {
+        KeyAction::MeasureEnter
     } else if offset_enter_acts(input, state) {
         KeyAction::OpenOffsetChip
     } else if placement_enter_acts(input, state) {
@@ -215,7 +222,9 @@ pub(super) fn decide(input: &KeyInput<'_>, state: KeyState) -> KeyAction {
         // Alt during an Offset corner drag steps its corner style; held Alt steps once
         // (`specs/0038-path-offset` criterion 13). Elsewhere Alt is not intercepted.
         "Alt" => {
-            return if state.offset_dragging && !input.repeat {
+            return if state.tool == Tool::Measure && !input.dom_blocked {
+                KeyAction::MeasureAlt
+            } else if state.offset_dragging && !input.repeat {
                 KeyAction::StepOffsetCornerStyle
             } else {
                 KeyAction::Ignore
@@ -286,7 +295,9 @@ fn letter_action(input: &KeyInput<'_>, state: KeyState, letter: Option<char>) ->
         (_, "*") => Binding::Tool(Tool::PolygonStar),
         (Some('r'), _) => Binding::Entry(EntryKey::Angle, Tool::Rectangle),
         (Some('s'), _) => Binding::Entry(EntryKey::Size, Tool::Select),
-        (Some('m'), _) => Binding::EntryOnly(EntryKey::Move),
+        // M is the Measure tool, and the move entry in the Select tool with a selection
+        // (`specs/0070-measure-and-dimension` criterion 2).
+        (Some('m'), _) => Binding::Entry(EntryKey::Move, Tool::Measure),
         (Some('k'), _) => Binding::EntryOnly(if input.shift {
             EntryKey::SkewY
         } else {

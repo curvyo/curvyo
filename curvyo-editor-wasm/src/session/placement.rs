@@ -404,7 +404,13 @@ const fn placement_kind(tool: Tool) -> Option<PlacementKind> {
         Tool::Rectangle => Some(PlacementKind::Rect),
         Tool::Ellipse => Some(PlacementKind::Ellipse),
         Tool::PolygonStar => Some(PlacementKind::PolyStar),
-        Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => None,
+        Tool::Select
+        | Tool::Pen
+        | Tool::Node
+        | Tool::Offset
+        | Tool::Text
+        | Tool::Trace
+        | Tool::Measure => None,
     }
 }
 

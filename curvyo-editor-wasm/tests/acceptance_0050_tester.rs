@@ -2213,6 +2213,9 @@ fn ac19_the_eyedropper_skips_hidden_nodes_and_samples_locked_ones() {
                 unreachable!("no sketch in this test")
             }
             curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+                unreachable!("no dimension in this test")
+            }
             curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             curvyo_document_core::ObjectSnapshot::Path(p) => p.style.fill.color,
             curvyo_document_core::ObjectSnapshot::Primitive(p) => p.style.fill.color,

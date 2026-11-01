@@ -45,6 +45,9 @@ mod combine;
 mod context;
 mod corner_readout;
 mod cut;
+mod dimension_edit;
+mod dimension_nodes;
+mod dimension_view;
 #[cfg(test)]
 mod distribute_tests;
 mod document;
@@ -87,6 +90,7 @@ mod layers_panel_tests;
 #[cfg(test)]
 mod layers_tests;
 mod layers_toolbar;
+mod measure;
 mod move_entry;
 mod move_indicators;
 mod navigation;
@@ -317,6 +321,9 @@ pub enum Tool {
     /// The Trace tool (`specs/0025-raster-trace` criteria 1 to 3): key `I` or the Select bar's
     /// Trace button; a press selects, the preview and Create paths act on the selected images.
     Trace,
+    /// The Measure tool (`specs/0070-measure-and-dimension` criteria 1 to 6): key `M`, measures
+    /// on the canvas and with Shift leaves a dimension.
+    Measure,
 }
 
 /// One open document's whole editing session.
@@ -456,6 +463,14 @@ pub struct Session {
     /// The Offset tool: its bar's values (session memory), drag and preview
     /// (`specs/0038-path-offset`).
     offset: offset::OffsetTool,
+    /// The Measure tool (`specs/0070-measure-and-dimension`).
+    measure: measure::MeasureState,
+    /// A Select-tool drag of a dimension's text.
+    dimension_drag: Option<dimension_view::DimensionDrag>,
+    /// A Node-tool drag of an unlinked dimension's kept point: the dimension, the point, where.
+    kept_point_drag: Option<(NodeId, usize, Point)>,
+    /// The dimensions as the last frame laid them out: the overlay's texts and the hit targets.
+    dimension_labels: std::cell::RefCell<Vec<dimension_view::DimensionRecord>>,
     /// Snapping state: the stored settings and the drag in flight (`specs/0060-snapping`).
     snapping: snapping::SnappingState,
     /// The notice of the orphan repair after the Open, until the host has taken it
@@ -563,6 +578,10 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            measure: measure::MeasureState::default(),
+            dimension_drag: None,
+            kept_point_drag: None,
+            dimension_labels: std::cell::RefCell::new(Vec::new()),
             snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
@@ -645,6 +664,10 @@ impl Session {
             layers: layers::LayerState::default(),
             panel: layers_panel::PanelState::default(),
             offset: offset::OffsetTool::default(),
+            measure: measure::MeasureState::default(),
+            dimension_drag: None,
+            kept_point_drag: None,
+            dimension_labels: std::cell::RefCell::new(Vec::new()),
             snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
@@ -741,6 +764,7 @@ impl Session {
                 this.node_announcement = None;
                 this.leave_offset_tool();
                 this.leave_trace_tool();
+                this.measure_reset();
             }
             this.tool = tool;
         });
@@ -812,8 +836,11 @@ impl Session {
             this.button_down = true;
             match this.tool {
                 Tool::Select => {
-                    this.select_pointer_down(point, shift);
+                    if !this.dimension_pointer_down(point, shift) {
+                        this.select_pointer_down(point, shift);
+                    }
                 }
+                Tool::Measure => this.measure_pointer_down(point),
                 Tool::Pen => {
                     // A frozen entry chip takes the press (`0072` criterion 20).
                     if !this.pen_entry_press() {
@@ -821,6 +848,9 @@ impl Session {
                     }
                 }
                 Tool::Node => {
+                    if this.kept_point_pointer_down(point) {
+                        return;
+                    }
                     let paths = this.node_paths();
                     let tolerances = this.hit_tolerances();
                     this.node_announcement = None;
@@ -880,9 +910,15 @@ impl Session {
         }
         match self.tool {
             Tool::Select => {
-                self.select_hover(point, self.held);
+                if !self.dimension_pointer_move(point) {
+                    self.select_hover(point, self.held);
+                }
             }
+            Tool::Measure => self.measure_pointer_move(point),
             Tool::Node => {
+                if self.kept_point_pointer_move(point) {
+                    return;
+                }
                 // A bend or a marquee in flight follows the pointer; no hover test runs during
                 // any drag (`0031` criterion 17, `0053` criterion 10).
                 let paths = self.node_paths();
@@ -982,14 +1018,19 @@ impl Session {
             this.page_view.press(&this.document.pages(), point);
             match this.tool {
                 Tool::Select => {
-                    this.select_pointer_up(point, shift, constrain);
+                    if !this.dimension_pointer_up(point) {
+                        this.select_pointer_up(point, shift, constrain);
+                    }
                 }
+                Tool::Measure => this.measure_pointer_up(point),
                 Tool::Pen => {
                     let point = this.pen_handle_point(point, constrain);
                     this.pen_pointer_up(point);
                 }
                 Tool::Node => {
-                    this.node_pointer_up(point, Modifiers::new(shift, constrain));
+                    if !this.kept_point_pointer_up(point) {
+                        this.node_pointer_up(point, Modifiers::new(shift, constrain));
+                    }
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
                     this.shape_pointer_up(point, Modifiers::new(shift, constrain));
@@ -1044,7 +1085,7 @@ impl Session {
                 Tool::Offset => return this.offset_double_click(point, shift, ctrl),
                 Tool::Text => this.text_double_click(point),
                 Tool::Trace => return this.trace_double_click(point),
-                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {}
+                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Measure => {}
             }
             DoubleClickHint::None
         })

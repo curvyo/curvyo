@@ -101,6 +101,9 @@ impl Session {
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);
         let mut list = self.artwork_list(&artwork_objects, fill_at, &guides, view);
+        // The dimensions over the artwork, following a drag in the same frame (`0070`).
+        list.extend(self.dimension_layer(&artwork_objects));
+        list.extend(self.kept_point_list());
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
@@ -145,6 +148,8 @@ impl Session {
         list.extend(reference_box_list(view, reference.as_ref()));
         list.extend(self.snap_marker_list());
         let live_objects = Self::live_objects_in(&objects, live.as_ref());
+        // A selected dimension has no box and no handles (`0070` UX notes §7).
+        let live_objects = self.without_selected_dimensions(live_objects);
         list.extend(build_select_draw_list(
             view,
             &self.select_decoration_input_in(&live_objects),
@@ -283,7 +288,8 @@ impl Session {
                 | ObjectSnapshot::Primitive(_)
                 | ObjectSnapshot::Clone(_)
                 | ObjectSnapshot::Text(_)
-                | ObjectSnapshot::Image(_) => object.clone(),
+                | ObjectSnapshot::Image(_)
+                | ObjectSnapshot::Dimension(_) => object.clone(),
             })
             .collect()
     }

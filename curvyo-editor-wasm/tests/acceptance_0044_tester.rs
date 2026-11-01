@@ -105,6 +105,7 @@ fn origin_of(o: &ObjectSnapshot) -> Point {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -1448,6 +1449,7 @@ fn edge_node_tool_drag_twice_without_a_frame_in_between() {
         let path = match &objects(&s)[0] {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => p.clone(),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path"),

@@ -138,6 +138,7 @@ fn styles(s: &Session) -> Vec<Style> {
         .map(|o| match o {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Path(p) => p.style,
             ObjectSnapshot::Primitive(p) => p.style,

@@ -71,6 +71,7 @@ fn frame_centre(o: &ObjectSnapshot) -> Point {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -188,6 +189,7 @@ fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => p.rotation.as_radians(),
@@ -203,6 +205,7 @@ fn style_debug(o: &ObjectSnapshot) -> String {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
         ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),
@@ -214,6 +217,7 @@ fn stroke_width(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
@@ -225,6 +229,7 @@ fn dash_debug(o: &ObjectSnapshot) -> String {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.style.stroke.dash),
         ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style.stroke.dash),
@@ -270,6 +275,7 @@ fn flat(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
@@ -1867,6 +1873,7 @@ fn ac53_3_shown_angle_polygon_and_star_convert_to_the_stretched_outline() {
             match &before[i] {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => match p.shape {
@@ -2193,6 +2200,7 @@ fn all_points(o: &ObjectSnapshot) -> Vec<(Point, Vec2, Vec2)> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p
             .subpaths()

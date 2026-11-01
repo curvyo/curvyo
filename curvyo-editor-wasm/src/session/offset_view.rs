@@ -63,7 +63,9 @@ impl Session {
                     object.drawn_path().map_or(0, |p| p.all_anchors().count())
                 }
                 ObjectSnapshot::Primitive(_) => PRIMITIVE_NODES,
-                ObjectSnapshot::Sketch(_) | ObjectSnapshot::Image(_) => 0,
+                ObjectSnapshot::Sketch(_)
+                | ObjectSnapshot::Image(_)
+                | ObjectSnapshot::Dimension(_) => 0,
             })
             .sum();
         nodes > PREVIEW_NODE_LIMIT

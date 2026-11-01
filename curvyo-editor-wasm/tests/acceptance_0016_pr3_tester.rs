@@ -404,6 +404,7 @@ fn style_of(o: &ObjectSnapshot) -> curvyo_document_core::Style {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.style.clone(),
         ObjectSnapshot::Primitive(p) => p.style.clone(),
