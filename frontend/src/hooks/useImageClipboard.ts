@@ -91,7 +91,7 @@ export function useImageClipboard(
           if (local.length > 0) {
             depsRef.current.pasteFiles(local, at);
           } else {
-            notice(clipboard_notice("nothing", 0, ""));
+            notice(clipboard_notice("nothing", ""));
           }
         });
       });
@@ -113,11 +113,10 @@ export function useImageClipboard(
       }
       event.preventDefault();
       const { width, height } = copy;
-      const count = copy.selected_images;
       const rgba = copy.rgba;
       copy.free();
       if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-        notice(clipboard_notice("newer-browser", 0, ""), true);
+        notice(clipboard_notice("newer-browser", ""), true);
         return;
       }
       runnerRef.current ??= createTraceRunner();
@@ -127,20 +126,27 @@ export function useImageClipboard(
       try {
         item = new ClipboardItem({ "image/png": png });
       } catch (error) {
-        notice(clipboard_notice("failed", 0, copyFailureReason(error)), true);
+        notice(clipboard_notice("failed", copyFailureReason(error)), true);
         return;
       }
       let done = false;
+      let copyingShown = false;
       const slow = window.setTimeout(() => {
         if (!done) {
-          notice(clipboard_notice("copying", 0, ""));
+          copyingShown = true;
+          notice(clipboard_notice("copying", ""));
         }
       }, COPYING_AFTER_MS);
       navigator.clipboard
         .write([item])
         .then(
-          () => notice(clipboard_notice("copied", count, "")),
-          (error: unknown) => notice(clipboard_notice("failed", 0, copyFailureReason(error)), true),
+          // No notice for a successful copy (customer rule of 2026-10-31); only the busy line goes.
+          () => {
+            if (copyingShown) {
+              depsRef.current.editor.showHistoryNotice("", 1);
+            }
+          },
+          (error: unknown) => notice(clipboard_notice("failed", copyFailureReason(error)), true),
         )
         .finally(() => {
           done = true;

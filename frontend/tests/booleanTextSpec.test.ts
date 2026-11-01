@@ -11,7 +11,6 @@ import {
   operationRule,
   refusalOutlinesObjects,
   refusalText,
-  successText,
   tooltipNote,
 } from "../src/lib/booleanText.ts";
 
@@ -83,31 +82,6 @@ test("criterion 17: empty refusals, each followed by Nothing was changed.", () =
   );
 });
 
-test("criterion 29: success notices", () => {
-  assert.equal(
-    successText("union", { kind: "applied", count: 3, of: 3, compound: false }),
-    "Union: 3 objects became 1 path.",
-  );
-  assert.equal(
-    successText("difference", { kind: "applied", count: 2, of: 2, compound: true }),
-    "Difference: 2 objects became 1 compound path.",
-  );
-  // one line
-  for (const op of BOOLEAN_OPS) {
-    const text = successText(op, { kind: "applied", count: 5, of: 5, compound: true });
-    assert.ok(text !== null && !text.includes("\n"));
-  }
-});
-
-test("a refusal is never a success text and vice versa; ignored results say nothing", () => {
-  for (const kind of ["ignored", "needs_two", "applied"]) {
-    assert.equal(refusalText("union", { kind, count: 2, of: 2, compound: false }), null, kind);
-  }
-  for (const kind of ["empty", "no_area", "ignored", "needs_two", "out_of_range"]) {
-    assert.equal(successText("union", { kind, count: 2, of: 2, compound: false }), null, kind);
-  }
-});
-
 test("criterion 16: which refusals outline objects", () => {
   const r = (kind: string) => refusalOutlinesObjects({ kind, count: 1, of: 2, compound: false });
   assert.equal(r("open_paths"), false, "0054: no open-path refusal");
@@ -125,5 +99,12 @@ test("every refusal text ends with Nothing was changed. and has no placeholder l
       assert.ok(text.endsWith("Nothing was changed."), text);
       assert.doesNotMatch(text, /undefined|NaN|\$\{|<Op>|<Operation>/);
     }
+  }
+});
+
+// No success text since the customer rule of 2026-10-31: a result that is no refusal says nothing.
+test("ignored, needs_two and applied results have no refusal text", () => {
+  for (const kind of ["ignored", "needs_two", "applied"]) {
+    assert.equal(refusalText("union", { kind, count: 2, of: 2, compound: false }), null, kind);
   }
 });

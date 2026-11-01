@@ -10,7 +10,7 @@ import { favouritesAmong } from "@/hooks/fontLibraryPage";
 import { listedFileBytes } from "@/hooks/useText";
 import type { FontFace } from "@/lib/textText";
 import {
-  appliedText,
+  guessedWarning,
   facesReadout,
   noticeMs,
   nothingText,
@@ -29,7 +29,7 @@ export type RecogniseSlot =
   | { kind: "stopped" }
   | { kind: "failed"; text: string };
 
-/** The notice under the Select bar's button after a run that wrote text. */
+/** The warning under the Select bar's button after a run that guessed letters. */
 export interface RecogniseBarNotice {
   id: number;
   text: string;
@@ -53,7 +53,7 @@ export interface RecogniseApi {
   slot: RecogniseSlot;
   /** The bar's notice row ("No text within ..."), empty when none. */
   notice: string;
-  /** The notice under the Select bar's button after text was written. */
+  /** The guessed-letters warning under the Select bar's button; null for a clean run. */
   barNotice: RecogniseBarNotice | null;
   run: () => void;
   stop: () => void;
@@ -233,11 +233,11 @@ export function useRecognise(
             return;
           }
           if (outcome.kind === "applied") {
-            const text = appliedText(outcome);
+            const text = guessedWarning(outcome);
             counter.current += 1;
             setOpen(false);
             setSlot({ kind: "none" });
-            setBarNotice({ id: counter.current, text });
+            setBarNotice(text === null ? null : { id: counter.current, text });
             onChange();
             containerRef.current?.focus({ preventScroll: true });
             return;

@@ -89,11 +89,12 @@ export function useGrouping(
 
   const show = useCallback(
     (result: GroupingResult) => {
-      if (result.kind === "ignored" || result.notice === "") {
+      // Only a refusal is a notice: a successful Group or Ungroup shows its result on the canvas
+      // (customer rule of 2026-10-31).
+      if (result.kind !== "refused" || result.notice === "") {
         return;
       }
-      const refused = result.kind === "refused";
-      showNotice(result.notice, refused ? GROUP_REFUSAL_MS : undefined, "canvas", refused ? "alert" : "status");
+      showNotice(result.notice, GROUP_REFUSAL_MS, "canvas", "alert");
     },
     [showNotice],
   );

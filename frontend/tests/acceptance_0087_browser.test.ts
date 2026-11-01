@@ -298,9 +298,14 @@ test("0087 in Chromium: paste event, nothing to paste, text field, Ctrl+C read b
       return true;
     })()`);
     await s.key("c", 67, 2);
-    const copied = await waitFor("the copy notice", async () => {
+    // No "Image copied." notice (customer rule of 2026-10-31): the copy is seen on the clipboard.
+    const copied = await waitFor("the copied image", async () => {
       const t = await s.statusText();
-      return t.includes("Image copied.") || t.includes("Could not copy") ? t : null;
+      if (t.includes("Could not copy")) {
+        return t;
+      }
+      const has = await s.evaluate(`navigator.clipboard.read().then((i) => i.some((x) => x.types.includes("image/png")), () => false)`);
+      return has ? "on the clipboard" : null;
     }, 15_000).catch(async (error: Error) => {
       const bar = await s.evaluate(`document.querySelector('[data-context-bar]')?.textContent ?? ''`);
       const rows = await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=row][aria-selected=true]')].map((r) => r.getAttribute('aria-label')))`);
@@ -308,7 +313,8 @@ test("0087 in Chromium: paste event, nothing to paste, text field, Ctrl+C read b
       const clipLog = await s.evaluate(`JSON.stringify(window.__clipLog.slice(0, 30))`);
       throw new Error(`${error.message}; log ${clipLog}; bar ${bar}; selected ${rows}; clipboard ${clip}; focus ${await s.evaluate("document.hasFocus()")}`);
     });
-    assert.ok(copied.includes("Image copied."), copied);
+    assert.equal(copied, "on the clipboard");
+    assert.ok(!(await s.statusText()).includes("copied"), "no copy notice");
     const readBack = JSON.parse((await s.evaluate(`(async () => {
       const items = await navigator.clipboard.read();
       const item = items.find((i) => i.types.includes("image/png"));

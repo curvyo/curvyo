@@ -9,11 +9,10 @@ import { test } from "node:test";
 
 import {
   combineRefusalText,
-  combineSuccessText,
+  combineWarning,
   commandNote,
   noticeMs,
   splitRefusalText,
-  splitSuccessText,
 } from "../src/lib/pathText.ts";
 import {
   CHIP_REST_MS,
@@ -91,39 +90,6 @@ test("0034 criterion 20: the Close path notices and their durations", () => {
   assert.equal(closeNoticeText({ closed: 0, skipped: 0 }), null);
 });
 
-test("0035 criterion 7: the Combine notice", () => {
-  const base = {
-    kind: "applied",
-    count: 4,
-    of: 4,
-    holes: 3,
-    open: 0,
-    touching: 0,
-    touchingHoles: 0,
-    singleNodesRemoved: 0,
-    markers: false,
-    stylesDiffer: false,
-  };
-  assert.equal(
-    combineSuccessText(base),
-    "Combine: 4 objects became 1 compound path with 3 holes.",
-  );
-  assert.equal(
-    combineSuccessText({ ...base, holes: 1 }),
-    "Combine: 4 objects became 1 compound path with 1 hole.",
-  );
-  assert.equal(
-    combineSuccessText({ ...base, holes: 0 }),
-    "Combine: 4 objects became 1 compound path.",
-  );
-  assert.equal(
-    combineSuccessText({ ...base, stylesDiffer: true }),
-    "Combine: 4 objects became 1 compound path with 3 holes. It uses the style of the lowest object.",
-  );
-  assert.equal(noticeMs("x".repeat(70)), undefined);
-  assert.equal(noticeMs("x".repeat(71)), 5000);
-});
-
 test("0035 criteria 9, 10, 10a withdrawn by 0054 criterion 8: those refusals have no text", () => {
   const r = (kind: string, count: number, of: number) =>
     combineRefusalText({
@@ -141,38 +107,6 @@ test("0035 criteria 9, 10, 10a withdrawn by 0054 criterion 8: those refusals hav
   for (const kind of ["open_paths", "touching", "self_touching"]) {
     assert.equal(r(kind, 1, 3), null, kind);
   }
-});
-
-test("0035 criteria 16 and 17 as renamed by 0048: Split notices and refusals", () => {
-  const ok = { kind: "applied", compounds: 1, pieces: 3, withHoles: false, leftAlone: 0 };
-  assert.equal(splitSuccessText(ok), "Split: 1 compound path became 3 objects.");
-  assert.equal(
-    splitSuccessText({ ...ok, compounds: 2, pieces: 5 }),
-    "Split: 2 compound paths became 5 objects.",
-  );
-  assert.equal(
-    splitSuccessText({ ...ok, withHoles: true }),
-    "Split: 1 compound path became 3 objects. Holes stayed with their piece.",
-  );
-  assert.equal(
-    splitSuccessText({ ...ok, leftAlone: 1 }),
-    "Split: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
-  );
-  assert.equal(
-    splitSuccessText({ ...ok, leftAlone: 2 }),
-    "Split: 1 compound path became 3 objects. 2 compound paths are one piece each and were left as they are.",
-  );
-  const no = (kind: string, compounds: number) =>
-    splitRefusalText({ kind, compounds, pieces: 0, withHoles: true, leftAlone: 0 });
-  assert.equal(no("no_compound", 0), "Split needs a compound path. Nothing was changed.");
-  assert.equal(
-    no("one_piece", 1),
-    "Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. Nothing was changed.",
-  );
-  assert.equal(
-    no("one_piece", 2),
-    "Nothing to split. The 2 selected compound paths are one piece each, with their holes. Use Break apart to release the holes. Nothing was changed.",
-  );
 });
 
 test("0035 criterion 2: tooltip notes, first match wins", () => {
@@ -195,4 +129,46 @@ test("0035 criterion 2: tooltip notes, first match wins", () => {
     "Use the Select tool.",
   );
   assert.equal(commandNote("split", st({}), true), "Replaces the selection.");
+});
+
+// No Combine or Split success notice since the customer rule of 2026-10-31; refusals stay.
+test("0035 criteria 16 and 17 as renamed by 0048: Split refusals", () => {
+  const no = (kind: string, compounds: number) =>
+    splitRefusalText({ kind, compounds, pieces: 0, withHoles: true, leftAlone: 0 });
+  assert.equal(no("no_compound", 0), "Split needs a compound path. Nothing was changed.");
+  assert.equal(
+    no("one_piece", 1),
+    "Nothing to split. The compound path is one piece with its holes. Use Break apart to release the holes. Nothing was changed.",
+  );
+  assert.equal(
+    no("one_piece", 2),
+    "Nothing to split. The 2 selected compound paths are one piece each, with their holes. Use Break apart to release the holes. Nothing was changed.",
+  );
+});
+
+test("a Combine warns only about holes that touch or cross", () => {
+  const base = {
+    kind: "applied",
+    count: 4,
+    of: 4,
+    holes: 3,
+    open: 0,
+    touching: 0,
+    touchingHoles: 0,
+    singleNodesRemoved: 0,
+    markers: false,
+    stylesDiffer: false,
+  };
+  assert.equal(combineWarning(base), null);
+  assert.equal(combineWarning({ ...base, touchingHoles: 1 }), null);
+  assert.equal(
+    combineWarning({ ...base, touchingHoles: 2 }),
+    "2 holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole.",
+  );
+  assert.equal(combineWarning({ ...base, touchingHoles: 2, kind: "out_of_range" }), null);
+});
+
+test("a notice over 70 characters lasts 5 seconds", () => {
+  assert.equal(noticeMs("x".repeat(70)), undefined);
+  assert.equal(noticeMs("x".repeat(71)), 5000);
 });

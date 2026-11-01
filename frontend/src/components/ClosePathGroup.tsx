@@ -66,7 +66,10 @@ export function ClosePathGroup({
                   }
                   const result = onClose(button.join);
                   const text = closeNoticeText(result);
-                  if (text !== null) {
+                  // A clean success has no notice: the closed outline is the feedback (customer
+                  // rule of 2026-10-31). Skipped paths are worth a line.
+                  const partial = result.skipped > 0 || (result.skippedOutlines ?? 0) > 0;
+                  if (text !== null && partial) {
                     show("success", text, closeNoticeMs(text));
                   }
                   // `detail` is 0 for keyboard activation, 1 or more for a mouse click.

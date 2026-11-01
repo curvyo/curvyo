@@ -5,7 +5,7 @@
  * rules, tooltip notes and notices. Rust sends codes and counts; the sentences are written here, once.
  */
 
-import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
+import { NOTHING_CHANGED, sharedRefusalText } from "./booleanText.ts";
 import { textRefusalOutlines, textRefusalText } from "./textText.ts";
 
 /** The commands of the Path card, in the card's order. */
@@ -158,48 +158,14 @@ export function noticeMs(text: string): number | undefined {
   return text.length > 70 ? 5000 : undefined;
 }
 
-/** "1 outline with a single node was removed." (`0054` criteria 10 and 18), or "" for none. */
-function singleNodesSentence(count: number): string {
-  if (!(count > 0)) {
-    return "";
-  }
-  return count === 1
-    ? " 1 outline with a single node was removed."
-    : ` ${count} outlines with a single node were removed.`;
-}
-
-/** The notice after a Combine, or `null` if nothing was done (`0035` criterion 7, `0054`
- * criteria 10, 12 and 14). Sentences in the order of the `0054` UX notes: the result, the touch
- * count, the crossing holes, the removed single nodes, the style, the markers. */
-export function combineSuccessText(result: CombineResult): string | null {
-  if (result.kind !== "applied") {
+/** The warning after a Combine, or `null`: the compound path is the feedback of a success
+ * (customer rule of 2026-10-31); only holes that touch or cross need a look, as Union may merge
+ * them first (`0054` criterion 12). */
+export function combineWarning(result: CombineResult): string | null {
+  if (result.kind !== "applied" || result.touchingHoles <= 1) {
     return null;
   }
-  const parts: string[] = [];
-  if (result.holes > 0) {
-    parts.push(plural(result.holes, "hole", "holes"));
-  }
-  if (result.open > 0) {
-    parts.push(plural(result.open, "open outline", "open outlines"));
-  }
-  const with_ = parts.length === 0 ? "" : ` with ${parts.join(" and ")}`;
-  let text = `Combine: ${result.count} objects became 1 compound path${with_}.`;
-  if (result.touching === 1) {
-    text += " 1 closed outline touches or crosses itself.";
-  } else if (result.touching > 1) {
-    text += ` ${result.touching} closed outlines touch or cross.`;
-  }
-  if (result.touchingHoles > 1) {
-    text += ` ${result.touchingHoles} holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole.`;
-  }
-  text += singleNodesSentence(result.singleNodesRemoved);
-  if (result.stylesDiffer) {
-    text += " It uses the style of the lowest object.";
-  }
-  if (result.markers) {
-    text += " Markers are not drawn on compound paths.";
-  }
-  return text;
+  return `${result.touchingHoles} holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole.`;
 }
 
 /** The notice after a refused Combine (`0035` criterion 11, `0054` criterion 10), or `null` for a
@@ -222,24 +188,6 @@ export function combineOutlinesObjects(result: CombineResult): boolean {
 }
 
 const NO_COMPOUND = "needs a compound path.";
-
-/** The notice after a Split, or `null` if nothing was done (`0048` criterion 8). */
-export function splitSuccessText(result: SplitResult): string | null {
-  if (result.kind !== "applied") {
-    return null;
-  }
-  const compounds = plural(result.compounds, "compound path", "compound paths");
-  let text = `Split: ${compounds} became ${result.pieces} objects.`;
-  if (result.withHoles) {
-    text += " Holes stayed with their piece.";
-  }
-  if (result.leftAlone === 1) {
-    text += " 1 compound path is one piece and was left as it is.";
-  } else if (result.leftAlone > 1) {
-    text += ` ${result.leftAlone} compound paths are one piece each and were left as they are.`;
-  }
-  return text;
-}
 
 /** The notice after a refused Split (`0048` criteria 7 and 9), or `null` for a result that is
  * no refusal. A compound path of one piece outlines nothing; a group is the whole selection's
@@ -275,17 +223,6 @@ export function splitRefusalText(result: SplitResult): string | null {
   }
 }
 
-/** The notice after a Break apart, or `null` if nothing was done (`0048` criterion 12, `0054`
- * criterion 18: the removed single nodes come after the count). */
-export function breakApartSuccessText(result: BreakApartResult): string | null {
-  if (result.kind !== "applied") {
-    return null;
-  }
-  const compounds = plural(result.compounds, "compound path", "compound paths");
-  const text = `Break apart: ${compounds} became ${result.pieces} objects.${singleNodesSentence(result.singleNodesRemoved)}`;
-  return result.withHoles ? `${text} Holes became filled shapes.` : text;
-}
-
 /** The notice after a refused Break apart (`0048` criterion 13), or `null` for a result that is
  * no refusal. */
 export function breakApartRefusalText(result: BreakApartResult): string | null {
@@ -301,20 +238,6 @@ export function breakApartRefusalText(result: BreakApartResult): string | null {
     default:
       return null;
   }
-}
-
-/** The notice after a Cut, or `null` if nothing was done (`0036` criterion 7). */
-export function cutSuccessText(result: CutResult): string | null {
-  if (result.kind !== "applied") {
-    return null;
-  }
-  const paths = plural(result.count, "path", "paths");
-  // Closed paths cut once each give as many pieces as paths: the picture does not change, so the
-  // notice says what happened to them.
-  if (result.pieces === result.count) {
-    return result.count === 1 ? "Cut: 1 path was cut open." : `Cut: ${paths} were cut open.`;
-  }
-  return `Cut: ${paths} became ${plural(result.pieces, "piece", "pieces")}.`;
 }
 
 /** The notice after a refused Cut (`0036` criteria 8 to 10), or `null` for a result that is no

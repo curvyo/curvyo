@@ -386,6 +386,15 @@ const notice = async (s: Session, needle: string, ms = 15_000) =>
     const t = await texts(s);
     return t.includes(needle) ? t : null;
   }, ms);
+/** Ctrl+C on the canvas and the wait for the image on the clipboard. There is no "Image copied."
+ * notice since the customer rule of 2026-10-31 (criteria 11 and 13 are superseded): the clipboard
+ * itself is read, and no copy notice may show. */
+const copyKey = async (s: Session) => {
+  await s.evaluate(`navigator.clipboard.writeText("sentinel")`);
+  await s.key("c", 67, 2);
+  await waitFor("the image on the clipboard", async () => ((await readClipboard(s)).types.includes("image/png") ? true : null));
+  assert.ok(!(await texts(s)).toLowerCase().includes("copied"), `no copy notice: ${await texts(s)}`);
+};
 const noNetwork = (s: Session, base: number) => assert.equal(s.requests.length, base, `requests since load: ${s.requests.slice(base).join(", ")}`);
 
 // --- criteria 1, 2, 10: where it lands -------------------------------------------------------
@@ -619,9 +628,7 @@ test("0087 tester: Ctrl+C puts the stored pixels on the clipboard as PNG, flip d
     await waitFor("row", async () => ((await pastedRows(s)) === 1 ? true : null));
     const check = async (what: string) => {
       await s.evaluate(focusCanvas);
-      await s.key("c", 67, 2);
-      const text = await notice(s, "Image copied.");
-      assert.ok(text.includes("Image copied."), text);
+      await copyKey(s);
       const got = await readClipboard(s);
       assert.deepEqual(got.types, ["image/png"], `${what}: only a PNG`);
       const decoded = decodePng(Buffer.from(got.png!, "base64"));
@@ -659,9 +666,7 @@ test("0087 tester: several images say how many, the topmost is copied; other sel
     await s.evaluate(`navigator.clipboard.writeText("sentinel")`);
     await s.evaluate(focusCanvas);
     await s.key("a", 65, 2);
-    await s.key("c", 67, 2);
-    const text = await notice(s, "Copied 1 of 3 images.");
-    assert.ok(text.includes("Copied 1 of 3 images."), text);
+    await copyKey(s);
     const got = await readClipboard(s);
     const decoded = decodePng(Buffer.from(got.png!, "base64"));
     assert.deepEqual([decoded.width, decoded.height], [40, 20], "the topmost is the last pasted, the 40 x 20 marker");
@@ -713,8 +718,7 @@ test("0087 tester: the text editor and the panel fields keep copy and paste", { 
     await s.evaluate(pasteEventOf([{ b64: PATTERN.toString("base64"), type: "image/png" }]));
     await waitFor("row", async () => ((await pastedRows(s)) === 1 ? true : null));
     // Ctrl+C on the canvas: the image is on the clipboard.
-    await s.key("c", 67, 2);
-    await notice(s, "Image copied.");
+    await copyKey(s);
     assert.ok((await readClipboard(s)).types.includes("image/png"));
     await sleep(3300);
 
@@ -729,8 +733,7 @@ test("0087 tester: the text editor and the panel fields keep copy and paste", { 
     assert.ok(field, "the Document width field is reachable");
     await s.tab("Layers");
     await s.evaluate(focusCanvas);
-    await s.key("c", 67, 2);
-    await notice(s, "Image copied.");
+    await copyKey(s);
     await s.tab("Document");
     assert.equal(await s.evaluate(`(() => { const i = document.querySelector('input[aria-label="Document width"]'); i.focus(); i.select(); return document.activeElement === i; })()`), true);
     await chord(s, "v", 86, ["paste"]);

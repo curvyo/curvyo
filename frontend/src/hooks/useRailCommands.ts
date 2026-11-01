@@ -5,17 +5,13 @@ import { type ActionNotice, useActionNotice } from "@/hooks/useActionNotice";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import {
   breakApartRefusalText,
-  breakApartSuccessText,
   combineOutlinesObjects,
   combineRefusalText,
-  combineSuccessText,
+  combineWarning,
   commandDimmed,
   cutOutlinesObjects,
   cutRefusalText,
-  cutSuccessText,
-  noticeMs,
   splitRefusalText,
-  splitSuccessText,
   type PathAvailabilityState,
   type PathCommand,
 } from "@/lib/pathText";
@@ -24,20 +20,17 @@ import {
   type BooleanOp,
   refusalOutlinesObjects,
   refusalText,
-  successText,
 } from "@/lib/booleanText";
 import {
   type BooleanCardCommand,
   isStackCommand,
   stackRefusalOutlinesObjects,
   stackRefusalText,
-  stackSuccessText,
 } from "@/lib/stackText";
 import {
   type WeldAvailabilityState,
   weldRefusalOutlines,
   weldRefusalText,
-  weldSuccessText,
 } from "@/lib/weldText";
 
 export interface BooleanCommands {
@@ -196,18 +189,18 @@ export function useRailCommands(editor: EditorSession): RailCommands {
   }, [getSession]);
   const { notice, show } = useActionNotice(tool, selectionCount, clearOutline);
 
-  /** `text` with the sentence of the clone repair the command made, if any
-   * (`specs/0049-linked-clone` criterion 31: "Union: 3 objects became 1 path. 2 clones became
-   * paths."). */
-  const withRepair = useCallback(
-    (text: string | null): string | null => {
-      const repaired = getSession()?.take_clone_repair_notice() ?? "";
-      if (text === null || repaired === "") {
-        return text;
+  /** Shows the refusal or warning of a command, if any. A success has no notice: its result on
+   * the canvas and the History step are the feedback (customer rule of 2026-10-31). The sentence
+   * of a clone repair (`specs/0049-linked-clone` criterion 31) is taken so that it does not wait
+   * for the next command. */
+  const showRefusal = useCallback(
+    (text: string | null, anchor?: ActionNotice["anchor"]) => {
+      getSession()?.take_clone_repair_notice();
+      if (text !== null) {
+        show("refusal", text, undefined, anchor);
       }
-      return `${text} ${repaired}`;
     },
-    [getSession],
+    [getSession, show],
   );
 
   /** Runs `run` after the busy state has reached the screen, then shows its notice. */
@@ -238,13 +231,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         runBusy(() => {
           const result = applyWeld();
           outlinedRef.current = weldRefusalOutlines(result);
-          const applied = result.kind === "applied";
-          const text = applied
-            ? withRepair(weldSuccessText(result))
-            : weldRefusalText(result);
-          if (text !== null) {
-            show(applied ? "success" : "refusal", text, applied ? noticeMs(text) : undefined);
-          }
+          showRefusal(weldRefusalText(result));
         });
         return;
       }
@@ -255,13 +242,7 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         runBusy(() => {
           const result = applyStack(command);
           outlinedRef.current = stackRefusalOutlinesObjects(result);
-          const applied = result.kind === "applied";
-          const text = applied
-            ? withRepair(stackSuccessText(command, result))
-            : stackRefusalText(command, result);
-          if (text !== null) {
-            show(applied ? "success" : "refusal", text, applied ? noticeMs(text) : undefined);
-          }
+          showRefusal(stackRefusalText(command, result));
         });
         return;
       }
@@ -269,27 +250,10 @@ export function useRailCommands(editor: EditorSession): RailCommands {
       runBusy(() => {
         const result = applyBoolean(op);
         outlinedRef.current = refusalOutlinesObjects(result);
-        const applied = result.kind === "applied";
-        const text = applied ? withRepair(successText(op, result)) : refusalText(op, result);
-        if (text !== null) {
-          show(applied ? "success" : "refusal", text, applied ? noticeMs(text) : undefined);
-        }
+        showRefusal(refusalText(op, result));
       });
     },
-    [applyBoolean, applyStack, applyWeld, runBusy, show, withRepair],
-  );
-
-  /** The notice of a Path command: the success sentence, else the refusal sentence. */
-  const showPath = useCallback(
-    (success: string | null, refusal: string | null) => {
-      if (success !== null) {
-        const text = withRepair(success) ?? success;
-        show("success", text, noticeMs(text), "path");
-      } else if (refusal !== null) {
-        show("refusal", refusal, undefined, "path");
-      }
-    },
-    [show, withRepair],
+    [applyBoolean, applyStack, applyWeld, runBusy, showRefusal],
   );
 
   const applyPath = useCallback(
@@ -301,26 +265,26 @@ export function useRailCommands(editor: EditorSession): RailCommands {
         if (command === "combine") {
           const result = applyCombine();
           outlinedRef.current = combineOutlinesObjects(result);
-          showPath(combineSuccessText(result), combineRefusalText(result));
+          showRefusal(combineRefusalText(result) ?? combineWarning(result), "path");
         } else if (command === "split") {
           const result = applySplit();
           outlinedRef.current =
             result.kind === "groups" ||
             result.kind === "out_of_range" ||
             textRefusalOutlines(result.kind);
-          showPath(splitSuccessText(result), splitRefusalText(result));
+          showRefusal(splitRefusalText(result), "path");
         } else if (command === "break_apart") {
           const result = applyBreakApart();
           outlinedRef.current = result.kind === "groups" || textRefusalOutlines(result.kind);
-          showPath(breakApartSuccessText(result), breakApartRefusalText(result));
+          showRefusal(breakApartRefusalText(result), "path");
         } else {
           const result = applyCut();
           outlinedRef.current = cutOutlinesObjects(result);
-          showPath(cutSuccessText(result), cutRefusalText(result));
+          showRefusal(cutRefusalText(result), "path");
         }
       });
     },
-    [applyBreakApart, applyCombine, applyCut, applySplit, runBusy, showPath],
+    [applyBreakApart, applyCombine, applyCut, applySplit, runBusy, showRefusal],
   );
 
   return {

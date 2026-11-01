@@ -18,7 +18,6 @@ import {
   projectName,
   projectStatus,
   projectTitle,
-  savedNotice,
 } from "../src/lib/projectText.ts";
 
 type Server = {
@@ -122,11 +121,6 @@ test("c25 the sentence for every replacing action, named and untitled", () => {
 });
 
 // ---------------------------------------------------------------- criterion 19: notice
-
-test("c19 the saved notice, desktop and browser", () => {
-  assert.equal(savedNotice("Poster.curvyo", false), "Saved Poster.curvyo.");
-  assert.equal(savedNotice("poster.curvyo", true), "Downloaded poster.curvyo.");
-});
 
 // ---------------------------------------------------------------- criterion 10: persistence
 
@@ -468,11 +462,3 @@ test("c24 a File tab without a check has no popup, menu, dialog or listbox role"
 });
 
 import { noticeDurationMs } from "../src/lib/historyText.ts";
-
-// Criterion 19 says the "Saved <file name>." notice stays 3 s. The notice slot lengthens any text
-// over 70 characters to 5 s (`0016` criterion 29), so a long file name gets 5 s.
-test("c19 the saved notice stays 3 s whatever the file name", () => {
-  for (const name of ["a.curvyo", "x".repeat(80) + ".curvyo"]) {
-    assert.equal(noticeDurationMs(savedNotice(name, false)), 3000, name);
-  }
-});

@@ -1,8 +1,7 @@
 // The words of the Offset tool (`specs/0038-path-offset` criteria 12, 15, 24, 29, 32 and
-// `ux-rework.md`): the readout lines, the notice after a release or the chip's Enter and the
-// refusal sentences. Pure, so they are tested without a session.
+// `ux-rework.md`): the readout lines, the refusal sentences after a release or the chip's Enter. Pure, so they are tested without a session.
 
-import { NOTHING_CHANGED, plural, sharedRefusalText } from "./booleanText.ts";
+import { NOTHING_CHANGED, sharedRefusalText } from "./booleanText.ts";
 import { textRefusalText } from "./textText.ts";
 
 export type OffsetDirectionName = "out" | "in" | "both";
@@ -139,33 +138,6 @@ export function stepChipDistance(
   const step = keys.ctrl ? 0.01 : keys.shift ? 1 : 0.1;
   const stepped = Math.round((mm + direction * step) / step) * step;
   return Math.min(1000, Math.max(0.01, Math.round(stepped * 100) / 100));
-}
-
-/** The notice after a release or the chip's Enter (criterion 24), or `null` if nothing was written. */
-export function offsetSuccessText(outcome: OffsetOutcome): string | null {
-  if (outcome.kind !== "applied") {
-    return null;
-  }
-  const side =
-    outcome.direction === "both"
-      ? "both sides"
-      : outcome.direction === "in"
-        ? "inward"
-        : "outward";
-  const d = `${formatDistance(outcome.distanceMm)} mm ${side}`;
-  let what: string;
-  if (outcome.changed > 0 && outcome.added > 0) {
-    what = `changed ${plural(outcome.changed, "shape", "shapes")} and added ${outcome.added}`;
-  } else if (outcome.changed > 0) {
-    what = `changed ${plural(outcome.changed, "shape", "shapes")}`;
-  } else {
-    what = `added ${plural(outcome.added, "shape", "shapes")}`;
-  }
-  let text = `Offset: ${what}, ${d}.`;
-  if (outcome.vanished > 0) {
-    text += ` ${outcome.vanished} of ${outcome.of} shapes vanished.`;
-  }
-  return text;
 }
 
 /** The refusal after a release or the chip's Enter (criteria 29, 32), or `null` for no refusal. */

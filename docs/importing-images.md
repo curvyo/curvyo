@@ -145,8 +145,6 @@ apart, Cut, Fracture, Flatten, Weld, Offset and Stroke to path refuse a selectio
 - Images can't be used with this command. Nothing was changed.
 - Nothing to paste: the clipboard has no image.
 - Pasting image...
-- Image copied.
-- Copied 1 of 3 images.
 - Copying...
 - Could not copy the image: <short reason>.
 - Copying images needs a newer browser.

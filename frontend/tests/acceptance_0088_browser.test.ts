@@ -195,17 +195,17 @@ test("0088 in Chromium: Recognise text from the Select bar, its bar, the notice 
     assert.match(b.faces, /^\d face sources?$/, b.faces);
     assert.match(b.tolerance, /^0\.30 millimetres$/, b.tolerance);
 
-    // Criteria 1, 3, 10: Enter on the canvas runs; one text, the notice under the Select bar's
-    // button names the face, its source and the deviation.
+    // Criteria 1, 3, 10: Enter on the canvas runs; one text. A clean run has no notice (customer
+    // rule of 2026-10-31); the Select bar shows the new text's face.
     await s.evaluate(`document.querySelector('[data-context-bar] button[data-recognise-slot]')?.click()`);
     b = await waitFor("the result", async () => {
       const got = await bar();
-      return got.notice.startsWith("Recognised") ? got : null;
+      return got.name === "" ? got : null;
     }, 60_000);
-    assert.match(b.notice, /^Recognised 7 letters as Source Sans 3 Regular \(included fonts\), largest deviation 0\.\d\d mm\.$/, b.notice);
+    assert.equal(b.notice, "", "no success notice");
     assert.equal(b.name, "", "the Select bar is back");
-    // The new text is selected: the Select bar shows its face; the History names the step.
-    assert.ok(b.text.includes("Source Sans 3"), b.text);
+    // The new text is selected (the Select bar shows the group); the History names the step.
+    assert.ok(b.text.includes("Group of 7 objects") || b.text.includes("Stroke to path"), b.text);
     await tab("History");
     assert.ok(((await s.evaluate(`document.body.innerText`)) as string).includes("Recognise text"), "the History row");
     await tab("Layers");

@@ -11,7 +11,6 @@ import {
   stackName,
   stackRefusalText,
   stackRule,
-  stackSuccessText,
 } from "../src/lib/stackText.ts";
 
 function result(fields: Partial<StackResult>): StackResult {
@@ -35,21 +34,6 @@ test("criterion 1: buttons six and seven with their names and rule lines", () =>
   assert.equal(stackRule("fracture"), "Cuts overlapping shapes into pieces.");
   assert.equal(stackName("flatten"), "Flatten");
   assert.equal(stackRule("flatten"), "Trims each shape to what shows.");
-});
-
-test("criteria 9, 11 and 13: success notices", () => {
-  assert.equal(
-    stackSuccessText("fracture", result({ of: 3, removed: 3, pieces: 7 })),
-    "Fracture: 3 objects became 7 pieces.",
-  );
-  assert.equal(
-    stackSuccessText("flatten", result({ of: 2, removed: 1, hidden: 1 })),
-    "Flatten: 2 objects became 1. 1 hidden object was removed.",
-  );
-  assert.equal(
-    stackSuccessText("flatten", result({ of: 2, removed: 1, pieces: 1, strokesFollow: true })),
-    "Flatten: 2 objects became 2. Strokes follow the trimmed outlines.",
-  );
 });
 
 test("criteria 2 to 4: refusals", () => {

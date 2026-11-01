@@ -9,8 +9,6 @@ import {
   BOOLEAN_OPS,
   type BooleanOp,
   NOTHING_CHANGED,
-  openOutlineSentences,
-  plural,
   sharedRefusalText,
 } from "./booleanText.ts";
 
@@ -76,27 +74,6 @@ export function stackName(command: StackCommand): string {
 /** The second tooltip line. */
 export function stackRule(command: StackCommand): string {
   return RULES[command];
-}
-
-/** The notice after a success (criteria 9 and 11, UX notes), or `null` if nothing was done. */
-export function stackSuccessText(command: StackCommand, result: StackResult): string | null {
-  if (result.kind !== "applied") {
-    return null;
-  }
-  const open = openOutlineSentences(result.closedOpen, result.removedOpen);
-  if (command === "fracture") {
-    return `Fracture: ${plural(result.removed, "object", "objects")} became ${plural(result.pieces, "piece", "pieces")}.${open}`;
-  }
-  let text = `Flatten: ${plural(result.of, "object", "objects")} became ${result.of - result.hidden}.`;
-  if (result.hidden === 1) {
-    text += " 1 hidden object was removed.";
-  } else if (result.hidden > 1) {
-    text += ` ${result.hidden} hidden objects were removed.`;
-  }
-  if (result.strokesFollow) {
-    text += " Strokes follow the trimmed outlines.";
-  }
-  return `${text}${open}`;
 }
 
 /** The notice after a refusal (criteria 2 to 4), or `null` for a result that is no refusal. */

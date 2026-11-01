@@ -6,9 +6,9 @@ import { test } from "node:test";
 
 import {
   TOLERANCE_KEY,
-  appliedText,
   facesReadout,
   guessedText,
+  guessedWarning,
   noticeMs,
   nothingText,
   parseOutcome,
@@ -26,37 +26,6 @@ const line = {
   deviation: 0.123,
 };
 const none = { images: 0, open_paths: 0, others: 0 };
-
-test("criteria 3 and 10: one face, its source and the largest deviation", () => {
-  assert.equal(
-    appliedText({ kind: "applied", lines: [line], left: 0, skipped: none }),
-    "Recognised 12 letters as Source Sans 3 Bold (included fonts), largest deviation 0.12 mm.",
-  );
-});
-
-test("criterion 7: guessed letters with their positions, cut after five", () => {
-  assert.equal(
-    appliedText({ kind: "applied", lines: [{ ...line, guessed: [["e", 5], ["l", 9]] }], left: 0, skipped: none }),
-    "Recognised 12 letters as Source Sans 3 Bold (included fonts), largest deviation 0.12 mm; 2 letters guessed: e (5), l (9).",
-  );
-  assert.equal(
-    guessedText([["e", 5], ["l", 9], ["t", 12], ["a", 14], ["r", 20], ["x", 21], ["y", 22], ["z", 23]]),
-    "8 letters guessed: e (5), l (9), t (12), a (14), r (20) and 3 more",
-  );
-  assert.equal(guessedText([["l", 9]]), "1 letter guessed: l (9)");
-});
-
-test("several lines and faces, leftovers and skipped objects", () => {
-  const second = { ...line, face: "Great Vibes Regular", tier: "favourites", letters: 16, deviation: 0.14 };
-  assert.equal(
-    appliedText({ kind: "applied", lines: [{ ...line, tier: "document" }, { ...line, tier: "document", letters: 16, deviation: 0.14 }], left: 0, skipped: none }),
-    "Recognised 28 letters in 2 lines as Source Sans 3 Bold (document fonts), largest deviation 0.14 mm.",
-  );
-  assert.equal(
-    appliedText({ kind: "applied", lines: [{ ...line, tier: "document" }, second], left: 3, skipped: { images: 1, open_paths: 2, others: 0 } }),
-    "Recognised 28 letters in 2 lines, 2 faces (Source Sans 3 Bold, document fonts; Great Vibes Regular, favourites), largest deviation 0.14 mm; 3 outlines left as paths. 1 image and 2 open paths were left as they are.",
-  );
-});
 
 test("criterion 4: nothing within the tolerance names the nearest face", () => {
   const nothing = { kind: "nothing" as const, no_lines: false, nearest: { face: "Source Serif 4 Regular", deviation: 0.844 }, searched: "system" };
@@ -95,4 +64,19 @@ test("the outcome JSON and the notice life", () => {
 test("lead decision 2026-10-31: the bar's words for a selection without a closed path", async () => {
   const { RECOGNISE_NOT_PATHS } = await import("../src/lib/recogniseText.ts");
   assert.equal(RECOGNISE_NOT_PATHS, "No closed paths selected.");
+});
+
+// No "Recognised N letters as ..." notice since the customer rule of 2026-10-31: the written text
+// is the feedback. Only guessed letters (criterion 7) are warned about.
+test("criterion 7: a clean run has no notice, guessed letters are a warning", () => {
+  assert.equal(guessedWarning({ kind: "applied", lines: [line], left: 0, skipped: none }), null);
+  assert.equal(
+    guessedWarning({ kind: "applied", lines: [{ ...line, guessed: [["e", 5], ["l", 9]] }], left: 0, skipped: none }),
+    "2 letters guessed: e (5), l (9).",
+  );
+  assert.equal(
+    guessedText([["e", 5], ["l", 9], ["t", 12], ["a", 14], ["r", 20], ["x", 21], ["y", 22], ["z", 23]]),
+    "8 letters guessed: e (5), l (9), t (12), a (14), r (20) and 3 more",
+  );
+  assert.equal(guessedText([["l", 9]]), "1 letter guessed: l (9)");
 });

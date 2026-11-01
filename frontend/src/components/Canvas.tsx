@@ -67,7 +67,7 @@ interface CanvasProps {
 export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
-    editor.showHistoryNotice(clipboard_notice("link", 0, ""), 5000, "canvas", "alert"),
+    editor.showHistoryNotice(clipboard_notice("link", ""), 5000, "canvas", "alert"),
   );
   return (
     <div

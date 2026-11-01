@@ -43,22 +43,13 @@ export function checkSentence(fileName: string | null, kind: ReplacingKind): str
   return `${subject} unsaved changes. Save them before you ${ENDS[kind]}? Discarded changes cannot be brought back.`;
 }
 
-/** The line in the canvas notice slot after a save. */
-export function savedNotice(fileName: string, browser: boolean): string {
-  return `${browser ? "Downloaded" : "Saved"} ${shortName(fileName)}.`;
-}
-
-/** The longest name a notice shows whole: with its words the line stays under the 70 characters
- * after which the notice slot keeps a text for 5 s instead of 3 s (criterion 19). */
-const NOTICE_NAME_MAX = 56;
-
 /** The longest name the check's sentence shows whole: the sentence keeps within the four lines
  * reserved for it. */
 const SENTENCE_NAME_MAX = 40;
 
-/** `name`, cut in the middle with an ellipsis when it is longer than the notice shows; the end
+/** `name`, cut in the middle with an ellipsis when it is longer than `max`; the end
  * (the extension) stays. */
-function shortName(name: string, max: number = NOTICE_NAME_MAX): string {
+function shortName(name: string, max: number): string {
   if (name.length <= max) {
     return name;
   }
