@@ -10,6 +10,14 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## Tiling places text instances straight (`0069`, 2026-11-02)
+
+`specs/0069-tiling` criterion 23 (Proposal, accepted by the architect review): a text copy or text
+clone instance is placed by its cell's affine and laid out straight; a source text on a path loses
+its carrier in the copies and instances. Keeping the path needs the carrier cloned as an extra
+member and text-on-path clone support, which ADR 0022 does not have. Resolved by a story that adds
+text-on-path clones.
+
 ## A dimension cannot be left without a keyboard
 
 `specs/0070-measure-and-dimension` (MEAS-KEEP A, customer 2026-11-01): Shift at the second pick
@@ -1957,3 +1965,16 @@ in Shapes mode, closed pieces on outlines with thousands of fine spikes), which 
 that would have been fast. Resolved by a wasm thread-CPU measurement of the same cases and, if
 the refusals bother the customer, generation off the UI thread (a worker), after which the limit
 can be raised.
+
+## Tiling Apply of 10,000 instances is near its 500 ms target (`0069` criterion 40, 2026-11-02)
+
+An Apply that creates 10,000 instances with every variance channel on costs about 300 ms of thread
+CPU locally and 507 ms on the CI runner (release build): about 170 ms are the Loro writes of the
+instances (clone, own placement, own style, cell key, tree node) and about 110 ms the session's
+read of the new document after the command. A seed change on 10,000 costs about 294 ms locally
+after the duplicate reads were removed. The 500 ms targets are Proposals, so
+`curvyo-editor-wasm/tests/tiling_budget.rs` reports them without asserting; the preview budget
+(50 ms, measured 6 ms) stays asserted.
+
+**Resolution:** open; candidates are writing own style only for the varied fields and a cheaper
+post-command read for large groups. Decide with the customer whether a hard target is wanted.
