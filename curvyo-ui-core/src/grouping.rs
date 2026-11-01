@@ -1,5 +1,5 @@
 //! The Group and Ungroup commands as the maker meets them: when the rail buttons and the chords
-//! act, and the words of their notices (`specs/0023-groups` criteria 2, 3, 5, 6 and 28, the UX notes
+//! act, and the words of their refusals and announcements (`specs/0023-groups` criteria 2, 3, 5, 6 and 28, the UX notes
 //! "Group and Ungroup" and "Selecting, hovering, entering, leaving"). The writes are
 //! `Document::group_objects` and `Document::ungroup`; the session calls them.
 
@@ -28,25 +28,6 @@ pub fn grouping_availability(units: &Units, selection: &ObjectSelection) -> Grou
 
 /// The refusal of Group that would nest groups too deep (criterion 5).
 pub const TOO_DEEP_NOTICE: &str = "Groups can be nested 32 levels deep. Nothing was changed.";
-
-/// "Grouped 3 objects." (criterion 6).
-#[must_use]
-pub fn grouped_notice(objects: usize) -> String {
-    format!(
-        "Grouped {objects} {}.",
-        plural(objects, "object", "objects")
-    )
-}
-
-/// "Ungrouped 2 groups into 7 objects." (criterion 6).
-#[must_use]
-pub fn ungrouped_notice(groups: usize, objects: usize) -> String {
-    format!(
-        "Ungrouped {groups} {} into {objects} {}.",
-        plural(groups, "group", "groups"),
-        plural(objects, "object", "objects"),
-    )
-}
 
 /// "Union does not work on groups. Ungroup first. Nothing was changed." (criterion 28, the refusal
 /// style of `0016` criterion 15).
@@ -142,9 +123,6 @@ mod tests {
 
     #[test]
     fn the_notices_are_the_sentences_of_the_spec() {
-        assert_eq!(grouped_notice(3), "Grouped 3 objects.");
-        assert_eq!(ungrouped_notice(2, 7), "Ungrouped 2 groups into 7 objects.");
-        assert_eq!(ungrouped_notice(1, 1), "Ungrouped 1 group into 1 object.");
         assert_eq!(
             groups_refusal_notice("Union"),
             "Union does not work on groups. Ungroup first. Nothing was changed."

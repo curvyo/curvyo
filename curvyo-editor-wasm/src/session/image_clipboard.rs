@@ -15,8 +15,6 @@ pub struct ImageCopy {
     pub height: u32,
     /// The working image: RGBA8, straight alpha, upright, without the object's transform.
     pub rgba: Vec<u8>,
-    /// How many images the selection holds, the copied one included (criterion 13).
-    pub selected_images: usize,
 }
 
 impl Session {
@@ -39,7 +37,6 @@ impl Session {
             width: working.width,
             height: working.height,
             rgba: working.pixels.clone(),
-            selected_images: images.len(),
         })
     }
 

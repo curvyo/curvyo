@@ -273,7 +273,8 @@ fn ac1_ctrl_g_binds_the_selection_and_selects_only_the_group() {
     assert_eq!(ctrl_g(&mut s), KeyOutcome::Group);
     let r = s.take_grouping_result().expect("a result");
     assert_eq!(r.kind, GroupingKind::Grouped);
-    assert_eq!(r.notice, "Grouped 2 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(r.notice, "");
     assert!(s.take_grouping_result().is_none(), "taken once");
     let d2 = doc_of(&s);
     let rt = d2.children(None);
@@ -302,7 +303,8 @@ fn ac1_the_button_and_the_key_do_the_same_and_say_the_same() {
     shift_click(&mut s, top(2));
     let r = s.group_selection();
     assert_eq!(r.kind, GroupingKind::Grouped);
-    assert_eq!(r.notice, "Grouped 3 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(r.notice, "");
     assert_eq!(r.code(), "grouped");
     let d2 = doc_of(&s);
     assert_eq!(d2.children(None).len(), 1);
@@ -408,7 +410,8 @@ fn ac3_ungroup_releases_each_selected_group_and_keeps_everything_selected() {
     assert_eq!(ctrl_shift_g(&mut s), KeyOutcome::Ungroup);
     let r = s.take_grouping_result().unwrap();
     assert_eq!(r.kind, GroupingKind::Ungrouped);
-    assert_eq!(r.notice, "Ungrouped 2 groups into 4 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(r.notice, "");
     let d2 = doc_of(&s);
     assert_eq!(d2.children(None), ids, "released at their place, in order");
     assert!(!d2.contains_node(g1) && !d2.contains_node(g2));
@@ -432,10 +435,8 @@ fn ac3_a_nested_group_stays_a_group_and_ungroup_goes_one_level() {
     assert!(!d2.contains_node(outer));
     assert!(d2.is_group(inner));
     assert_eq!(d2.children(None), vec![inner, ids[2], ids[3]]);
-    assert_eq!(
-        s.take_grouping_result().unwrap().notice,
-        "Ungrouped 1 group into 2 objects."
-    );
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(s.take_grouping_result().unwrap().notice, "");
 }
 
 #[test]
@@ -516,11 +517,13 @@ fn ac6_notices_name_what_happened_and_say_nothing_about_undo() {
     shift_click(&mut s, top(2));
     ctrl_g(&mut s);
     let n = s.take_grouping_result().unwrap().notice;
-    assert_eq!(n, "Grouped 3 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(n, "");
     assert!(!n.contains("undo"));
     ctrl_shift_g(&mut s);
     let n = s.take_grouping_result().unwrap().notice;
-    assert_eq!(n, "Ungrouped 1 group into 3 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(n, "");
     assert!(!n.to_lowercase().contains("undo"));
     let _ = ids;
 }
@@ -1926,10 +1929,8 @@ fn large_document_5000_leaves_groups_selects_moves_and_ungroups() {
     let t = std::time::Instant::now();
     assert_eq!(ctrl_g(&mut s), KeyOutcome::Group);
     let t_group = t.elapsed();
-    assert_eq!(
-        s.take_grouping_result().unwrap().notice,
-        "Grouped 5000 objects."
-    );
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(s.take_grouping_result().unwrap().notice, "");
     let t = std::time::Instant::now();
     click(&mut s, pt(5.0, 0.0));
     let t_click = t.elapsed();

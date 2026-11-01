@@ -67,7 +67,8 @@ fn group_binds_the_selection_and_says_so() {
     session.selection.set(&[ids[0], ids[2]]);
     let result = session.group_selection();
     assert_eq!(result.kind, GroupingKind::Grouped);
-    assert_eq!(result.notice, "Grouped 2 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(result.notice, "");
     let roots = session.document.children(None);
     assert_eq!(roots.len(), 2);
     assert_eq!(
@@ -113,7 +114,8 @@ fn ungroup_releases_the_children_one_level_and_selects_them() {
     assert!(session.grouping_availability().ungroup);
     let result = session.ungroup_selection();
     assert_eq!(result.kind, GroupingKind::Ungrouped);
-    assert_eq!(result.notice, "Ungrouped 1 group into 2 objects.");
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(result.notice, "");
     assert!(!session.document.contains_node(group));
     assert_eq!(
         session.document.children(None),
@@ -161,16 +163,12 @@ fn the_chords_group_and_ungroup_and_leave_the_page_alone_when_they_cannot_act() 
     });
     assert_eq!(repeat, KeyOutcome::Ignored, "a held chord does not repeat");
     assert_eq!(chord(&mut session, "g", false), KeyOutcome::Group);
-    assert_eq!(
-        session.take_grouping_result().unwrap().notice,
-        "Grouped 2 objects."
-    );
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(session.take_grouping_result().unwrap().notice, "");
     assert_eq!(session.document.children(None).len(), 1);
     assert_eq!(chord(&mut session, "G", true), KeyOutcome::Ungroup);
-    assert_eq!(
-        session.take_grouping_result().unwrap().notice,
-        "Ungrouped 1 group into 2 objects."
-    );
+    // No success notice after Group or Ungroup: the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions").
+    assert_eq!(session.take_grouping_result().unwrap().notice, "");
     assert_eq!(session.document.children(None), ids.to_vec());
     session.set_tool(Tool::Rectangle);
     assert_eq!(

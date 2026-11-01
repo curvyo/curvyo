@@ -2,9 +2,7 @@
 //! context they act in is in `context.rs`.
 
 use curvyo_document_core::{NodeId, ObjectEditError};
-use curvyo_ui_core::{
-    GroupingAvailability, TOO_DEEP_NOTICE, grouped_notice, grouping_availability, ungrouped_notice,
-};
+use curvyo_ui_core::{GroupingAvailability, TOO_DEEP_NOTICE, grouping_availability};
 
 use super::{Session, Tool};
 
@@ -27,7 +25,7 @@ pub enum GroupingKind {
 pub struct GroupingResult {
     /// What happened.
     pub kind: GroupingKind,
-    /// The sentence to show; empty for [`GroupingKind::Ignored`].
+    /// The sentence to show: only a refusal has one (no success notice, customer rule of 2026-10-31).
     pub notice: String,
 }
 
@@ -93,7 +91,7 @@ impl Session {
                     this.hovered_object = None;
                     GroupingResult {
                         kind: GroupingKind::Grouped,
-                        notice: grouped_notice(ids.len()),
+                        notice: String::new(),
                     }
                 }
                 Err(ObjectEditError::TooDeep) => GroupingResult {
@@ -138,7 +136,7 @@ impl Session {
             this.hovered_object = None;
             GroupingResult {
                 kind: GroupingKind::Ungrouped,
-                notice: ungrouped_notice(groups.len(), released.len()),
+                notice: String::new(),
             }
         })
     }

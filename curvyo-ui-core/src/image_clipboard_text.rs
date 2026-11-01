@@ -1,13 +1,11 @@
 //! The words of the image clipboard and of a drop (`specs/0087-image-clipboard-and-drop` criteria
-//! 5, 11, 13, 14, 15 and 21; UX notes §2 to §4). The user page `docs/importing-images.md` quotes the same strings
+//! 5, 14, 15 and 21; UX notes §2 to §4). The user page `docs/importing-images.md` quotes the same strings
 //! (criterion 18).
 
 /// A paste with no image on the clipboard (criterion 5).
 pub const NOTHING_TO_PASTE_NOTICE: &str = "Nothing to paste: the clipboard has no image.";
 /// The busy line of a large paste (UX notes §2).
 pub const PASTING_NOTICE: &str = "Pasting image...";
-/// One image put on the clipboard (criterion 11).
-pub const IMAGE_COPIED_NOTICE: &str = "Image copied.";
 /// A copy that has not finished after 400 ms (criterion 14).
 pub const COPYING_NOTICE: &str = "Copying...";
 /// A browser without `ClipboardItem` (criterion 15).
@@ -18,16 +16,6 @@ pub const LINK_DROP_NOTICE: &str = "That drop is a link, not an image. Nothing w
 
 /// The longest notice of a failed copy in characters (criterion 15).
 const MAX_FAILED_CHARS: usize = 70;
-
-/// "Image copied." for one selected image, "Copied 1 of 3 images." for three (criterion 13).
-#[must_use]
-pub fn copied_notice(selected_images: usize) -> String {
-    if selected_images > 1 {
-        format!("Copied 1 of {selected_images} images.")
-    } else {
-        IMAGE_COPIED_NOTICE.to_owned()
-    }
-}
 
 /// `"Could not copy the image: <reason>."` with the reason's trailing full stop dropped and the
 /// reason cut with "..." so that the notice has at most 70 characters (criterion 15).
@@ -53,9 +41,6 @@ mod tests {
     #[test]
     fn the_notices_have_the_spec_lengths() {
         assert_eq!(NOTHING_TO_PASTE_NOTICE.chars().count(), 45);
-        assert_eq!(copied_notice(3), "Copied 1 of 3 images.");
-        assert_eq!(copied_notice(1), "Image copied.");
-        assert_eq!(copied_notice(0), "Image copied.");
     }
 
     #[test]

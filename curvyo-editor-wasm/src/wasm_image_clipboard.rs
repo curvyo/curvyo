@@ -17,8 +17,6 @@ pub struct ImageCopyJs {
     /// Straight-alpha RGBA8, top row first.
     #[wasm_bindgen(getter_with_clone)]
     pub rgba: Vec<u8>,
-    /// How many images the selection holds.
-    pub selected_images: u32,
 }
 
 #[wasm_bindgen]
@@ -39,7 +37,6 @@ impl WasmSession {
             width: copy.width,
             height: copy.height,
             rgba: copy.rgba,
-            selected_images: u32::try_from(copy.selected_images).unwrap_or(u32::MAX),
         })
     }
 }
@@ -63,11 +60,11 @@ pub fn paste_rank(bytes: &[u8], mime: &str) -> u8 {
     crate::clipboard_glue::paste_rank_code(bytes, mime)
 }
 
-/// A notice of the image clipboard by `kind` (`"nothing"`, `"pasting"`, `"copied"` with `count`,
-/// `"copying"`, `"failed"` with `reason`, `"newer-browser"`, `"link"`; criteria 5, 11, 13 to 15,
+/// A notice of the image clipboard by `kind` (`"nothing"`, `"pasting"`,
+/// `"copying"`, `"failed"` with `reason`, `"newer-browser"`, `"link"`; criteria 5, 14, 15,
 /// 21).
 #[wasm_bindgen]
 #[must_use]
-pub fn clipboard_notice(kind: &str, count: u32, reason: &str) -> String {
-    crate::clipboard_glue::clipboard_notice(kind, count, reason)
+pub fn clipboard_notice(kind: &str, reason: &str) -> String {
+    crate::clipboard_glue::clipboard_notice(kind, reason)
 }

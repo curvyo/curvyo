@@ -4,7 +4,7 @@
 
 use curvyo_ui_core::{
     COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, LINK_DROP_NOTICE, NOTHING_TO_PASTE_NOTICE,
-    PASTING_NOTICE, PasteRank, copied_notice, copy_failed_notice,
+    PASTING_NOTICE, PasteRank, copy_failed_notice,
 };
 
 /// The PNG of `rgba` (`width` x `height`, straight alpha) for the clipboard (criteria 12 and 14).
@@ -34,16 +34,14 @@ pub fn paste_rank_code(bytes: &[u8], mime: &str) -> u8 {
     }
 }
 
-/// A notice of the image clipboard by `kind`: `"nothing"` (criterion 5), `"pasting"`, `"copied"`
-/// with the `count` of selected images (criteria 11 and 13), `"copying"` (criterion 14),
+/// A notice of the image clipboard by `kind`: `"nothing"` (criterion 5), `"pasting"`, `"copying"` (criterion 14),
 /// `"failed"` with its `reason`, `"newer-browser"` (criterion 15) and `"link"` (a dropped link,
 /// criterion 21); empty for another kind.
 #[must_use]
-pub fn clipboard_notice(kind: &str, count: u32, reason: &str) -> String {
+pub fn clipboard_notice(kind: &str, reason: &str) -> String {
     match kind {
         "nothing" => NOTHING_TO_PASTE_NOTICE.to_owned(),
         "pasting" => PASTING_NOTICE.to_owned(),
-        "copied" => copied_notice(count as usize),
         "copying" => COPYING_NOTICE.to_owned(),
         "failed" => copy_failed_notice(reason),
         "newer-browser" => COPY_NEEDS_NEWER_BROWSER_NOTICE.to_owned(),
@@ -58,15 +56,15 @@ mod tests {
 
     #[test]
     fn every_kind_has_its_notice() {
-        assert_eq!(clipboard_notice("copied", 3, ""), "Copied 1 of 3 images.");
-        assert_eq!(clipboard_notice("copied", 1, ""), "Image copied.");
+        // No success notice after a copy: the customer rule of 2026-10-31.
+        assert_eq!(clipboard_notice("copied", ""), "");
         assert_eq!(
-            clipboard_notice("failed", 0, "Write permission denied."),
+            clipboard_notice("failed", "Write permission denied."),
             "Could not copy the image: Write permission denied."
         );
-        assert_eq!(clipboard_notice("other", 0, ""), "");
+        assert_eq!(clipboard_notice("other", ""), "");
         for kind in ["nothing", "pasting", "copying", "newer-browser", "link"] {
-            assert!(!clipboard_notice(kind, 0, "").is_empty(), "{kind}");
+            assert!(!clipboard_notice(kind, "").is_empty(), "{kind}");
         }
     }
 
