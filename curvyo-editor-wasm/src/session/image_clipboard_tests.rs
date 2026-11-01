@@ -167,13 +167,13 @@ fn ac12_the_copy_is_the_stored_pixels_without_the_objects_transform() {
     paste(&mut s, None, &marker_png(), "");
     s.flip_selection(FlipAxis::Horizontal);
     let copy = s.image_copy().unwrap();
-    assert_eq!((copy.width, copy.height, copy.selected_images), (40, 20, 1));
+    assert_eq!((copy.width, copy.height), (40, 20));
     assert_eq!(&copy.rgba[..4], &[255, 0, 0, 255]);
     assert_eq!(&copy.rgba[(39 * 4)..(40 * 4)], &[255, 255, 255, 255]);
 }
 
 #[test]
-fn ac13_the_topmost_selected_image_is_copied_and_the_images_are_counted() {
+fn ac13_the_topmost_selected_image_is_copied() {
     let mut s = session();
     paste(&mut s, None, PNG, "");
     paste(&mut s, None, &marker_png(), "");
@@ -181,9 +181,9 @@ fn ac13_the_topmost_selected_image_is_copied_and_the_images_are_counted() {
     let ids: Vec<_> = images(&s).iter().map(|i| i.id).collect();
     s.selection.set(&ids[..2]);
     let copy = s.image_copy().unwrap();
-    assert_eq!((copy.width, copy.height, copy.selected_images), (40, 20, 2));
+    assert_eq!((copy.width, copy.height), (40, 20));
     s.selection.set(&ids);
-    assert_eq!(s.image_copy().unwrap().selected_images, 3);
+    assert!(s.image_copy().is_some(), "three images selected");
     s.selection.set(&[]);
     assert_eq!(s.image_copy(), None);
 }

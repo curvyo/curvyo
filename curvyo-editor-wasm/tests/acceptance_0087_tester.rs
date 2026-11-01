@@ -489,7 +489,6 @@ fn ac13_one_image_among_other_objects_copies_it_and_counts_one() {
     });
     assert!(s.selected_object_count() >= 2);
     let copy = s.image_copy().unwrap();
-    assert_eq!(copy.selected_images, 1);
     assert_eq!((copy.width, copy.height), (40, 20));
 }
 

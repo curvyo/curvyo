@@ -248,8 +248,8 @@ pub use group_box::{
 };
 pub use group_entry::GroupEntry;
 pub use grouping::{
-    GroupingAvailability, TOO_DEEP_NOTICE, context_announcement, grouped_notice,
-    grouping_availability, groups_refusal_notice, selection_announcement, ungrouped_notice,
+    GroupingAvailability, TOO_DEEP_NOTICE, context_announcement, grouping_availability,
+    groups_refusal_notice, selection_announcement,
 };
 pub use history_branch_text::{
     BRANCH_STATUS_WORD, branch_header_text, branch_lane_name, cloned_notice, more_branches_text,
@@ -269,8 +269,8 @@ pub use history_notice::{
 pub use hit_test::{Hit, hit_test};
 pub use hit_test_object::{hit_test_object, hit_test_objects, hit_test_objects_along};
 pub use image_clipboard_text::{
-    COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, IMAGE_COPIED_NOTICE, LINK_DROP_NOTICE,
-    NOTHING_TO_PASTE_NOTICE, PASTING_NOTICE, copied_notice, copy_failed_notice,
+    COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, LINK_DROP_NOTICE, NOTHING_TO_PASTE_NOTICE,
+    PASTING_NOTICE, copy_failed_notice,
 };
 pub use image_import::{PlannedImage, plan_image_import};
 pub use image_import_text::{

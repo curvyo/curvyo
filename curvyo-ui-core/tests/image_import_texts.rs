@@ -55,8 +55,8 @@ fn every_notice_is_quoted_in_the_user_page() {
 #[test]
 fn every_clipboard_notice_is_quoted_in_the_user_page() {
     use curvyo_ui_core::{
-        COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, IMAGE_COPIED_NOTICE, LINK_DROP_NOTICE,
-        NOTHING_TO_PASTE_NOTICE, PASTING_NOTICE, copied_notice, copy_failed_notice,
+        COPY_NEEDS_NEWER_BROWSER_NOTICE, COPYING_NOTICE, LINK_DROP_NOTICE, NOTHING_TO_PASTE_NOTICE,
+        PASTING_NOTICE, copy_failed_notice,
     };
     let page = std::fs::read_to_string(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/importing-images.md"),
@@ -65,8 +65,6 @@ fn every_clipboard_notice_is_quoted_in_the_user_page() {
     let texts = [
         NOTHING_TO_PASTE_NOTICE.to_owned(),
         PASTING_NOTICE.to_owned(),
-        IMAGE_COPIED_NOTICE.to_owned(),
-        copied_notice(3),
         COPYING_NOTICE.to_owned(),
         copy_failed_notice("<short reason>"),
         COPY_NEEDS_NEWER_BROWSER_NOTICE.to_owned(),
