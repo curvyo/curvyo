@@ -1,10 +1,19 @@
-//! Revised picking prioritizes actual geometric distance over point kind.
+//! Revised picking: a point within 10 px wins over a nearer edge (0066 AC50), else the nearest edge.
 #![allow(clippy::unwrap_used)]
 use curvyo_sketch_core::{Entity, Length, Position, Sketch};
 #[test]
-fn nearer_line_wins_over_more_distant_point_inside_hit_band() {
+fn a_point_within_reach_wins_over_a_nearer_line_and_the_line_wins_beyond() {
+    // Superseded by 0066 AC50 (revision 5): the point 5 px away now wins over the line under
+    // the pointer; a point 11 px away leaves the line (1 mm = 1 px, edge tolerance 6 px).
     let mut graph = Sketch::new("o".into());
-    for (id, x, y) in [("a", 10.0, 10.0), ("b", 30.0, 10.0), ("p", 20.0, 15.0)] {
+    for (id, x, y) in [
+        ("a", 10.0, 10.0),
+        ("b", 30.0, 10.0),
+        ("p", 20.0, 15.0),
+        ("r", 40.0, 30.0),
+        ("s", 80.0, 30.0),
+        ("q", 60.0, 41.0),
+    ] {
         graph.entities.insert(
             id.into(),
             Entity::Point {
@@ -13,16 +22,23 @@ fn nearer_line_wins_over_more_distant_point_inside_hit_band() {
             },
         );
     }
-    graph.entities.insert(
-        "line".into(),
-        Entity::Line {
-            start: "a".into(),
-            end: "b".into(),
-        },
-    );
-    let hit =
-        curvyo_ui_core::sketch_hit(&graph, &graph, Position::mm(20.0, 10.0), Length(6.0)).unwrap();
-    assert_eq!(hit.entity.0, "line");
+    for (id, start, end) in [("line", "a", "b"), ("far", "r", "s")] {
+        graph.entities.insert(
+            id.into(),
+            Entity::Line {
+                start: start.into(),
+                end: end.into(),
+            },
+        );
+    }
+    let hit = |x: f64, y: f64| {
+        curvyo_ui_core::sketch_hit(&graph, &graph, Position::mm(x, y), Length(1.0))
+            .unwrap()
+            .entity
+            .0
+    };
+    assert_eq!(hit(20.0, 10.0), "p");
+    assert_eq!(hit(60.0, 30.0), "far");
 }
 
 #[test]
@@ -101,7 +117,7 @@ fn equidistant_overlapping_curves_have_stable_cycle_candidates() {
             },
         );
     }
-    let hits = curvyo_ui_core::sketch_hits(&graph, &graph, Position::mm(20.0, 10.0), Length(2.0));
+    let hits = curvyo_ui_core::sketch_hits(&graph, &graph, Position::mm(20.0, 10.0), Length(0.5));
     assert_eq!(
         hits.iter().map(|h| h.entity.0.as_str()).collect::<Vec<_>>(),
         ["line-a", "line-b"]

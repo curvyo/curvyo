@@ -74,10 +74,17 @@ fn a_stored_label_sets_offset_and_text_position() {
         )],
         view(4.0),
     )[0];
-    assert!(close(marks.text.x, 70.0) && close(marks.text.y, 30.0));
-    // Below the line now, and the dimension line reaches the text box (half width 25.5px + gap).
+    // Below the line now; along it the text stays between the extension lines, clear of the
+    // arrowhead (half width 25.5px with its gap, 8px arrow; 0066 AC49 supersedes the text
+    // beyond the extension line), and the line breaks around it.
+    let x = 50.0 - (25.5 + 8.0) / 4.0;
+    assert!(
+        close(marks.text.x, x) && close(marks.text.y, 30.0),
+        "{:?}",
+        marks.text
+    );
     let (a, b) = marks.lines[2];
-    assert!(close(a.y, 30.0) && close(a.x, 0.0) && close(b.x, 70.0 - 25.5 / 4.0));
+    assert!(close(a.y, 30.0) && close(a.x, 0.0) && close(b.x, x - 25.5 / 4.0));
 }
 
 #[test]
@@ -313,9 +320,11 @@ fn a_vertical_projected_dimension_stands_left_and_follows_its_label() {
         "{:?}",
         marks.text
     );
+    // Dragged 5px from the end, the text keeps clear of the arrowhead (12px box, 8px arrow;
+    // 0066 AC49).
     let dragged = &layout_dimensions(&[item(Some(Point::new(40.0, -5.0)))], view(1.0))[0];
     assert!(
-        close(dragged.text.x, 40.0) && close(dragged.text.y, -5.0),
+        close(dragged.text.x, 40.0) && close(dragged.text.y, -20.0),
         "{:?}",
         dragged.text
     );

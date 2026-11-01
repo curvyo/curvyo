@@ -1,5 +1,5 @@
 //! Sketch action applicability is derived from current analytic selection types.
-use curvyo_sketch_core::{Axis, Entity, EntityId, Expression, Relation, Sketch};
+use curvyo_sketch_core::{Axis, Entity, EntityId, Expression, Length, Position, Relation, Sketch};
 
 /// User-visible geometric constraints and dimensions, in toolbar order.
 pub const SKETCH_ACTIONS: &[&str] = &[
@@ -106,7 +106,7 @@ pub fn sketch_relation(
             binary(action, &selected[0], first, &selected[1], second, value)
         }
         (None, [_, _]) if action == "coincident" => on_axis(selected, &entries),
-        (_, [_, _, _]) if action == "symmetric" => symmetry(selected, &entries),
+        (_, [_, _, _]) if action == "symmetric" => return symmetry(graph, selected, &entries),
         _ => None,
     };
     result.ok_or_else(|| reason(action).to_owned())
@@ -302,9 +302,12 @@ fn point_pair(
     }
 }
 
-/// Two points mirrored about a third point (its centre), a line or an axis, in any order;
-/// with three points the last picked is the centre.
-fn symmetry(selected: &[EntityId], entries: &[Target]) -> Option<Relation> {
+/// Below this difference two points are equally near the middle of the others.
+const CENTRE_TIE: Length = Length(1e-6);
+
+/// Two points mirrored about a third point (its centre), a line or an axis, in any order.
+fn symmetry(graph: &Sketch, selected: &[EntityId], entries: &[Target]) -> Result<Relation, String> {
+    let refused = || reason("symmetric").to_owned();
     let mut points = Vec::new();
     let mut mirror = None;
     for (id, entry) in selected.iter().zip(entries) {
@@ -313,22 +316,16 @@ fn symmetry(selected: &[EntityId], entries: &[Target]) -> Option<Relation> {
             Target::Entity(Entity::Line { .. }) | Target::Axis(_) if mirror.is_none() => {
                 mirror = Some((id.clone(), *entry));
             }
-            _ => return None,
+            _ => return Err(refused()),
         }
     }
     if mirror.is_none() && points.len() == 3 {
-        let center = points.pop()?;
-        return Some(Relation::SymmetricPoint {
-            source: points[0].clone(),
-            image: points[1].clone(),
-            center,
-        });
+        return symmetric_centre(graph, &points);
     }
-    let [source, image] = points.as_slice() else {
-        return None;
+    let ([source, image], Some((axis_id, entry))) = (points.as_slice(), mirror) else {
+        return Err(refused());
     };
-    let (axis_id, entry) = mirror?;
-    Some(match entry {
+    Ok(match entry {
         Target::Axis(axis) => Relation::SymmetricAxis {
             source: source.clone(),
             image: image.clone(),
@@ -342,6 +339,63 @@ fn symmetry(selected: &[EntityId], entries: &[Target]) -> Option<Relation> {
     })
 }
 
+/// Three points selected first: the centre is the one nearest the midpoint of the other two,
+/// whatever the selection order (0066 AC51); an equal distance is refused as ambiguous.
+fn symmetric_centre(graph: &Sketch, points: &[EntityId]) -> Result<Relation, String> {
+    let position = |id: &EntityId| graph.point(id).map_err(|e| e.to_string());
+    let mut scored = Vec::with_capacity(3);
+    for (i, centre) in points.iter().enumerate() {
+        let others = points
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| *j != i)
+            .map(|(_, id)| id)
+            .collect::<Vec<_>>();
+        let (a, b, c) = (
+            position(others[0])?,
+            position(others[1])?,
+            position(centre)?,
+        );
+        let middle = Position::mm(f64::midpoint(a.x.0, b.x.0), f64::midpoint(a.y.0, b.y.0));
+        scored.push((c.distance(middle), i));
+    }
+    scored.sort_by(|a, b| a.0.0.total_cmp(&b.0.0));
+    if scored[1].0.0 - scored[0].0.0 <= CENTRE_TIE.0 {
+        return Err(AMBIGUOUS_CENTRE.to_owned());
+    }
+    sketch_symmetric_about(graph, points, &points[scored[0].1])
+        .ok_or_else(|| reason("symmetric").to_owned())
+}
+
+/// The one Symmetric-about-a-point rule (0066 AC51): three points, `centre` among them, the
+/// other two mirrored about it (stored in id order). `None` for any other picks.
+#[must_use]
+pub fn sketch_symmetric_about(
+    graph: &Sketch,
+    picks: &[EntityId],
+    centre: &EntityId,
+) -> Option<Relation> {
+    let point = |id: &EntityId| matches!(graph.entities.get(id), Some(Entity::Point { .. }));
+    if picks.len() != 3 || !picks.iter().all(point) || !picks.contains(centre) {
+        return None;
+    }
+    let mut others = picks
+        .iter()
+        .filter(|id| *id != centre)
+        .cloned()
+        .collect::<Vec<_>>();
+    others.sort();
+    let [source, image] = <[EntityId; 2]>::try_from(others).ok()?;
+    Some(Relation::SymmetricPoint {
+        source,
+        image,
+        center: centre.clone(),
+    })
+}
+
+/// Why three points selected first give no Symmetric (0066 AC51).
+const AMBIGUOUS_CENTRE: &str = "The centre is ambiguous: two of the points are equally near the middle of the others; arm Symmetric and pick the centre last";
+
 fn reason(action: &str) -> &str {
     match action {
         "coincident" => "Select two points, or a point and a line, circle, arc, ellipse or axis",
@@ -351,7 +405,9 @@ fn reason(action: &str) -> &str {
         "equal" => "Select two or more segments or circles/arcs",
         "tangent" => "Select two tangent-capable curves",
         "fixed" => "Select one or more entities",
-        "symmetric" => "Select two points and a centre point, a line or an axis",
+        "symmetric" => {
+            "Select two points and a centre point, a line or an axis; picked one by one, the last point is the centre"
+        }
         "midpoint" => "Select one point and one segment",
         "distance" => "Select two points or a point and segment",
         "horizontal-distance" => "Select two points, one line, or a point and the Y axis",
@@ -365,7 +421,7 @@ fn reason(action: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_sketch_core::{Constraint, Length, Position, Quantity};
+    use curvyo_sketch_core::{Constraint, Quantity};
 
     /// The side at creation is kept: the left (lower) point is stored first (0066 AC46).
     #[test]
@@ -472,5 +528,86 @@ mod tests {
             candidate.validate().unwrap();
             assert!(sketch_relation(action, &graph, &[], None).is_err());
         }
+    }
+
+    fn three_points(c: (f64, f64)) -> Sketch {
+        let mut graph = Sketch::new("origin".into());
+        for (id, (x, y)) in [("a", (0.0, 0.0)), ("b", (10.0, 0.0)), ("c", c)] {
+            graph.entities.insert(
+                id.into(),
+                Entity::Point {
+                    position: Position::mm(x, y),
+                    fixed: false,
+                },
+            );
+        }
+        graph
+    }
+
+    /// 0066 AC51: three selected points take the one nearest the midpoint of the other two as
+    /// the centre, whatever the order.
+    #[test]
+    fn the_symmetric_centre_is_the_point_nearest_the_midpoint_of_the_others() {
+        let graph = three_points((4.0, 0.0));
+        let orders: [[&str; 3]; 6] = [
+            ["a", "b", "c"],
+            ["a", "c", "b"],
+            ["b", "a", "c"],
+            ["b", "c", "a"],
+            ["c", "a", "b"],
+            ["c", "b", "a"],
+        ];
+        for order in orders {
+            let ids = order.iter().map(|n| EntityId::from(*n)).collect::<Vec<_>>();
+            assert_eq!(
+                sketch_relation("symmetric", &graph, &ids, None),
+                Ok(Relation::SymmetricPoint {
+                    source: "a".into(),
+                    image: "b".into(),
+                    center: "c".into(),
+                }),
+                "{order:?}"
+            );
+        }
+    }
+
+    /// 0066 AC51: picked one by one, the named centre wins whatever the geometry; anything but
+    /// three points with the centre among them gives no relation.
+    #[test]
+    fn symmetric_about_the_named_centre_needs_three_points_including_it() {
+        let mut graph = three_points((4.0, 0.0));
+        let ids = ["c", "b", "a"].map(EntityId::from).to_vec();
+        assert_eq!(
+            sketch_symmetric_about(&graph, &ids, &"a".into()),
+            Some(Relation::SymmetricPoint {
+                source: "b".into(),
+                image: "c".into(),
+                center: "a".into(),
+            })
+        );
+        assert_eq!(sketch_symmetric_about(&graph, &ids[..2], &"a".into()), None);
+        assert_eq!(sketch_symmetric_about(&graph, &ids, &"z".into()), None);
+        graph.entities.insert(
+            "l".into(),
+            Entity::Line {
+                start: "a".into(),
+                end: "b".into(),
+            },
+        );
+        let with_line = ["a", "b", "l"].map(EntityId::from).to_vec();
+        assert_eq!(
+            sketch_symmetric_about(&graph, &with_line, &"l".into()),
+            None
+        );
+    }
+
+    /// 0066 AC51: an equal distance within 1e-6 mm names the ambiguity instead of guessing.
+    #[test]
+    fn an_ambiguous_symmetric_centre_is_refused_with_its_reason() {
+        let graph = three_points((5.0, 75.0_f64.sqrt()));
+        let ids = ["a", "b", "c"].map(EntityId::from).to_vec();
+        let reason = sketch_relation("symmetric", &graph, &ids, None).unwrap_err();
+        assert!(reason.contains("centre"), "{reason}");
+        assert!(reason.contains("ambiguous"), "{reason}");
     }
 }

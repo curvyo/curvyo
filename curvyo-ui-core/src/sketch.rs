@@ -11,28 +11,73 @@ pub struct SketchHit {
     pub point: bool,
 }
 
-/// Picks the nearest geometry, preferring points only at equal distance.
-/// Current intent filters stale last-valid topology out of the editable hit set.
+/// How far from an edge, in screen pixels, a press still picks it.
+pub const SKETCH_EDGE_PICK_PX: f64 = 6.0;
+
+/// How far from a point, in screen pixels, a press picks it before any edge (0066 AC50).
+pub const SKETCH_POINT_PICK_PX: f64 = 10.0;
+
+/// Picks the winning geometry: a point within reach before any edge, else the nearest edge.
+/// `px` is one screen pixel in document mm. Current intent filters stale last-valid topology
+/// out of the editable hit set.
 #[must_use]
 pub fn sketch_hit(
     intent: &Sketch,
     solution: &Sketch,
     pointer: Position,
-    tolerance: Length,
+    px: Length,
 ) -> Option<SketchHit> {
-    sketch_hits(intent, solution, pointer, tolerance)
+    sketch_hits(intent, solution, pointer, px)
         .into_iter()
         .next()
 }
 
-/// Eligible hits ordered by geometric distance, points winning only equal-distance ties.
+/// The winning hits: the nearest points within [`SKETCH_POINT_PICK_PX`], else the nearest edges
+/// within [`SKETCH_EDGE_PICK_PX`] (`px` is one screen pixel in document mm); several only on an
+/// equal-distance tie.
 #[must_use]
 pub fn sketch_hits(
     intent: &Sketch,
     solution: &Sketch,
     pointer: Position,
-    tolerance: Length,
+    px: Length,
 ) -> Vec<SketchHit> {
+    let order = ranked(intent, solution, pointer, px);
+    let Some(&(nearest, point, _)) = order.first() else {
+        return Vec::new();
+    };
+    order
+        .into_iter()
+        .filter(|candidate| candidate.1 == point && candidate.0 <= nearest + 1e-9)
+        .map(|(_, point, entity)| SketchHit { entity, point })
+        .collect()
+}
+
+/// Every hit in pick order: points within reach nearest first, then edges within reach nearest
+/// first (`px` is one screen pixel in document mm), so Alt cycling reaches the edge under a winning point (AC34, AC50).
+#[must_use]
+pub fn sketch_pick_order(
+    intent: &Sketch,
+    solution: &Sketch,
+    pointer: Position,
+    px: Length,
+) -> Vec<SketchHit> {
+    ranked(intent, solution, pointer, px)
+        .into_iter()
+        .map(|(_, point, entity)| SketchHit { entity, point })
+        .collect()
+}
+
+/// Candidates as (distance, is point, id): points within reach first, then edges, each nearest
+/// first, ties by id.
+fn ranked(
+    intent: &Sketch,
+    solution: &Sketch,
+    pointer: Position,
+    px: Length,
+) -> Vec<(f64, bool, EntityId)> {
+    let point_reach = Length(px.0 * SKETCH_POINT_PICK_PX);
+    let tolerance = Length(px.0 * SKETCH_EDGE_PICK_PX);
     let internal_focus = solution
         .entities
         .values()
@@ -41,46 +86,28 @@ pub fn sketch_hits(
             _ => None,
         })
         .collect::<std::collections::BTreeSet<_>>();
-    let mut points = Vec::new();
-    let mut bodies = Vec::new();
+    let mut candidates = Vec::new();
     for (id, entity) in &solution.entities {
         if !intent.entities.contains_key(id) {
             continue;
         }
         if let Entity::Point { position, .. } = entity {
-            if internal_focus.contains(id) {
-                continue;
+            let distance = position.distance(pointer).0;
+            if !internal_focus.contains(id) && distance <= point_reach.0 {
+                candidates.push((distance, true, id.clone()));
             }
-            points.push((position.distance(pointer).0, id.clone()));
-        } else if let Some(distance) = distance_to_entity(solution, entity, pointer, tolerance) {
-            bodies.push((distance, id.clone()));
+        } else if let Some(distance) = distance_to_entity(solution, entity, pointer, tolerance)
+            && distance <= tolerance.0
+        {
+            candidates.push((distance, false, id.clone()));
         }
     }
-    let mut candidates = points
-        .into_iter()
-        .map(|(distance, id)| (distance, true, id))
-        .chain(
-            bodies
-                .into_iter()
-                .map(|(distance, id)| (distance, false, id)),
-        )
-        .filter(|(distance, _, _)| *distance <= tolerance.0)
-        .collect::<Vec<_>>();
     candidates.sort_by(|a, b| {
-        if (a.0 - b.0).abs() <= 1e-9 {
-            b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2))
-        } else {
-            a.0.total_cmp(&b.0)
-        }
+        b.1.cmp(&a.1)
+            .then_with(|| a.0.total_cmp(&b.0))
+            .then_with(|| a.2.cmp(&b.2))
     });
-    let nearest = candidates
-        .first()
-        .map_or(f64::INFINITY, |candidate| candidate.0);
     candidates
-        .into_iter()
-        .filter(|candidate| candidate.0 <= nearest + 1e-9)
-        .map(|(_, point, entity)| SketchHit { entity, point })
-        .collect()
 }
 
 /// Picks selected curve axes independently of internal focus-point records.
@@ -200,6 +227,57 @@ pub fn sketch_snap_points(intent: &Sketch, solution: &Sketch) -> Vec<(EntityId, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn line_and_point() -> Sketch {
+        let graph = curvyo_sketch_core::create_polyline(
+            &Sketch::new("origin".into()),
+            "l",
+            &[Position::mm(100.0, 0.0), Position::mm(200.0, 0.0)],
+            false,
+        )
+        .unwrap();
+        let mut graph = graph;
+        graph.entities.insert(
+            "q".into(),
+            Entity::Point {
+                position: Position::mm(108.0, 4.0),
+                fixed: false,
+            },
+        );
+        graph
+    }
+
+    fn first(graph: &Sketch, x: f64, y: f64) -> SketchHit {
+        sketch_hit(graph, graph, Position::mm(x, y), Length(1.0)).unwrap()
+    }
+
+    /// 0066 AC50: a point within 10 screen px wins over a nearer edge; the edge only without
+    /// one. Here 1 mm is 1 screen px.
+    #[test]
+    fn a_point_within_ten_pixels_wins_over_a_nearer_edge() {
+        let graph = line_and_point();
+        let near = (36.0_f64 - 1.0).sqrt();
+        let hit = first(&graph, 200.0 - near, 1.0);
+        assert_eq!(hit.entity.0, "l:p1");
+        assert!(hit.point);
+        let far = (196.0_f64 - 1.0).sqrt();
+        assert_eq!(first(&graph, 200.0 - far, 1.0).entity.0, "l:line0");
+        // Two points within 10 px: the nearer one.
+        assert_eq!(first(&graph, 104.5, 1.0).entity.0, "l:p0");
+        assert_eq!(first(&graph, 105.5, 2.0).entity.0, "q");
+    }
+
+    /// 0066 AC50, AC34: the full pick order still reaches the edge under a winning point.
+    #[test]
+    fn the_pick_order_lists_the_edge_after_the_point() {
+        let graph = line_and_point();
+        let order = sketch_pick_order(&graph, &graph, Position::mm(195.0, 1.0), Length(1.0));
+        let ids = order
+            .iter()
+            .map(|h| h.entity.0.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, ["l:p1", "l:line0"]);
+    }
     #[test]
     fn ellipse_body_hit_retains_analytic_identity_and_stale_ids_are_excluded() {
         let graph = curvyo_sketch_core::create_ellipse(

@@ -3,7 +3,7 @@
 //! The text is a DOM label placed by Rust; its box is estimated from the character count
 //! (UX notes revision 2, section 7: "the line does not run under the digits").
 use super::{DimensionGeometry, DimensionItem, DimensionMarks, at, linear_frame};
-use curvyo_document_core::Point;
+use curvyo_document_core::{Point, Vec2};
 
 /// Text box estimate: width per character plus padding, and the box height (12px text).
 const TEXT_CHAR_PX: f64 = 7.0;
@@ -21,9 +21,23 @@ pub(super) fn text_half_px(chars: usize) -> (f64, f64) {
     (width / 2.0, TEXT_HEIGHT_PX / 2.0)
 }
 
+/// How far, in millimetres, the text box plus its gap reaches along the unit direction `along`
+/// from its centre; nothing for a text of no characters (hidden while its entry box is open).
+pub(super) fn text_clear(chars: usize, along: Vec2, px: f64) -> f64 {
+    if chars == 0 {
+        return 0.0;
+    }
+    let (w, h) = text_half_px(chars);
+    (along.x.abs() * (w + TEXT_GAP_PX) + along.y.abs() * (h + TEXT_GAP_PX)) * px
+}
+
 /// Cuts every line where it would run under the text box plus its gap, so the value is never
 /// struck through (UX notes revision 2, section 7: "the line does not run under the digits").
+/// A text of no characters, hidden while its entry box is open, cuts nothing (0066 AC49).
 pub(super) fn break_around_text(marks: &mut DimensionMarks, chars: usize, px: f64) {
+    if chars == 0 {
+        return;
+    }
     let (w, h) = text_half_px(chars);
     let (w, h) = ((w + TEXT_GAP_PX) * px, (h + TEXT_GAP_PX) * px);
     let c = marks.text;
