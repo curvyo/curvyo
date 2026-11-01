@@ -51,8 +51,8 @@ interface Painted {
   scale: number;
   originX: number;
   originY: number;
-  pageX: number;
-  pageY: number;
+  /** The active page's origin corner and its position (`specs/0090-grid` criterion 17). */
+  rulerOrigin: string;
   unit: string;
   dpr: number;
   width: number;
@@ -69,8 +69,7 @@ function samePainted(a: Painted | null, b: Painted): boolean {
     a.scale === b.scale &&
     a.originX === b.originX &&
     a.originY === b.originY &&
-    a.pageX === b.pageX &&
-    a.pageY === b.pageY &&
+    a.rulerOrigin === b.rulerOrigin &&
     a.unit === b.unit &&
     a.dpr === b.dpr &&
     a.width === b.width &&
@@ -204,8 +203,7 @@ export function Rulers({ editor, unit }: RulersProps) {
         scale: session.view_scale(),
         originX: session.view_origin_x(),
         originY: session.view_origin_y(),
-        pageX: session.active_page_x(),
-        pageY: session.active_page_y(),
+        rulerOrigin: session.ruler_origin_key(),
         unit: unitRef.current,
         dpr: window.devicePixelRatio || 1,
         ...sizes,

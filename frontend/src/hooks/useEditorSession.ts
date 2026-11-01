@@ -1236,7 +1236,7 @@ export function useEditorSession(
     const session = sessionRef.current;
     const at = lastPointerRef.current;
     if (session && at) {
-      onCursorMove(readDocumentPoint(session.screen_to_document(at.x, at.y)));
+      onCursorMove(readDocumentPoint(session.screen_to_ruler(at.x, at.y)));
     }
   }, [onCursorMove]);
 
@@ -1413,7 +1413,7 @@ export function useEditorSession(
       session.wheel(deltaX, deltaY, x, y, event.shiftKey, event.ctrlKey || event.metaKey);
       setZoomPercent(session.zoom_percent());
       // A pan or zoom moves the document under a still pointer.
-      onCursorMove(readDocumentPoint(session.screen_to_document(x, y)));
+      onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
       if (entryOpenRef.current) {
         syncEntry(session);
       }
@@ -2161,13 +2161,13 @@ export function useEditorSession(
       const { x, y } = canvasPoint(event);
       lastPointerRef.current = { x, y };
       if (session) {
-        onCursorMove(readDocumentPoint(session.screen_to_document(x, y)));
+        onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
       }
       if (panningRef.current) {
         session?.pan_to(x, y);
         if (session) {
           // The pan moved the document under the pointer: read it again.
-          onCursorMove(readDocumentPoint(session.screen_to_document(x, y)));
+          onCursorMove(readDocumentPoint(session.screen_to_ruler(x, y)));
         }
         if (entryOpenRef.current && session) {
           syncEntry(session);

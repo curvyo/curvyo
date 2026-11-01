@@ -1,4 +1,5 @@
 import { EntryField } from "@/components/panel/EntryField";
+import { PanelRadioGroup } from "@/components/panel/PanelRadioGroup";
 import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { SnappingApi } from "@/hooks/useSnapping";
@@ -10,6 +11,8 @@ const TARGETS = [
   ["page", "Page", "Snap to the page's 25 %, 33.3 %, 50 %, 66.6 %, 75 % and 100 % lines."],
 ] as const;
 const MESSAGES = { number: "Enter a non-negative number" };
+const GRID_POINTS = [["centre", "Centre"], ["box", "Box corners and edges"], ["nodes", "Nodes"]] as const;
+const TOGGLE_CLASS = "h-7 rounded border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm hover:bg-[var(--editor-accent-hover)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]";
 
 /** Document-owned snapping controls in their own Properties pane. */
 export function SnappingSection({ snapping, onReturnFocus }: {
@@ -23,15 +26,22 @@ export function SnappingSection({ snapping, onReturnFocus }: {
       <legend className="mb-2 text-sm">Snap targets</legend>
       <div className="grid grid-cols-2 gap-1">
         {TARGETS.map(([key, label, tooltip]) => <Tooltip key={key} side="left" content={tooltip}>
-          <button type="button" aria-pressed={view[key]} className="h-7 rounded border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm hover:bg-[var(--editor-accent-hover)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]"
+          <button type="button" aria-pressed={view[key]} className={TOGGLE_CLASS}
             onClick={(event) => {
               const next = { ...view, [key]: !view[key] };
               snapping.setTargets(next.objects, next.guides, next.nodes, next.page);
               if (event.detail > 0) onReturnFocus();
             }}>{label}</button>
         </Tooltip>)}
+        <button type="button" aria-pressed={view.grid} className={TOGGLE_CLASS}
+          onClick={(event) => {
+            snapping.setGrid(!view.grid);
+            if (event.detail > 0) onReturnFocus();
+          }}>Grid</button>
       </div>
     </fieldset>
+    <PanelRadioGroup legend="Grid snaps with" options={GRID_POINTS} value={view.gridPoint} stacked
+      onChange={(point) => snapping.setGridPoint(point)} onReturnFocus={onReturnFocus} />
     <fieldset className="min-w-0">
       <legend className="mb-2 text-sm">Snap axes</legend>
       <div className="grid grid-cols-2 gap-1">

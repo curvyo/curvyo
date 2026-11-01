@@ -11,11 +11,18 @@ export interface SnappingToolbarView {
   guides: boolean;
   nodes: boolean;
   page: boolean;
+  /** Whether shown page grids pull (`specs/0090-grid` criterion 10). */
+  grid: boolean;
+  /** Which part of a moved selection snaps to a grid (criterion 11). */
+  gridPoint: GridSnapPoint;
   x: boolean;
   y: boolean;
   capturePx: number;
   releasePx: number;
 }
+
+/** The grid snap point choices. */
+export type GridSnapPoint = "centre" | "box" | "nodes";
 
 /** Snapping API for the toolbar. */
 export interface SnappingApi {
@@ -27,6 +34,10 @@ export interface SnappingApi {
   /** Updates capture and release distances (screen pixels). */
   setAxes: (x: boolean, y: boolean) => boolean;
   setZones: (capturePx: number, releasePx: number) => boolean;
+  /** Sets the Grid target switch. */
+  setGrid: (grid: boolean) => boolean;
+  /** Sets the grid snap point. */
+  setGridPoint: (point: GridSnapPoint) => boolean;
 }
 
 /** Reads the current snapping state from the session. */
@@ -40,6 +51,8 @@ function readToolbar(session: WasmSession | null): SnappingToolbarView {
       guides: true,
       nodes: true,
       page: true,
+      grid: true,
+      gridPoint: "centre",
       x: true,
       y: true,
       capturePx: 8,
@@ -55,6 +68,8 @@ function readToolbar(session: WasmSession | null): SnappingToolbarView {
     guides: raw.guides,
     nodes: raw.nodes,
     page: raw.page,
+    grid: raw.grid,
+    gridPoint: raw.grid_point === "box" || raw.grid_point === "nodes" ? raw.grid_point : "centre",
     x: raw.x,
     y: raw.y,
     capturePx: raw.capture_px,
@@ -145,11 +160,29 @@ export function useSnapping(editor: EditorHandle): SnappingApi {
     [getSession, sync],
   );
 
+  const setGrid = useCallback((grid: boolean): boolean => {
+    const session = getSession();
+    if (!session) return false;
+    const changed = session.set_snapping_grid(grid);
+    sync();
+    return changed;
+  }, [getSession, sync]);
+
+  const setGridPoint = useCallback((point: GridSnapPoint): boolean => {
+    const session = getSession();
+    if (!session) return false;
+    const changed = session.set_snapping_grid_point(point);
+    sync();
+    return changed;
+  }, [getSession, sync]);
+
   return {
     view,
     toggle,
     setTargets,
     setAxes,
     setZones,
+    setGrid,
+    setGridPoint,
   };
 }
