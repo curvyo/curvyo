@@ -11,8 +11,10 @@
 mod assemble;
 mod blobs;
 mod candidates;
+mod confusable;
 mod descriptor;
 mod distance;
+mod fit;
 mod lines;
 mod reference;
 mod sample;
@@ -122,6 +124,8 @@ pub struct Recogniser {
     lines: Vec<Line>,
     skipped: Vec<usize>,
     tolerance: f64,
+    /// The characters a hinted line may hold (`specs/0091` `adrs.md` decision 4); `None`: all.
+    hint: Option<Vec<char>>,
 }
 
 fn sample(path: &BezPath, tolerance: f64) -> Option<Vec<sample::Ring>> {
@@ -155,6 +159,19 @@ impl Recogniser {
             lines,
             skipped,
             tolerance,
+            hint: None,
+        }
+    }
+
+    /// As [`Recogniser::new`], with the string an OCR read there as a hint: every line is matched
+    /// against the characters of `text` and their look-alikes only (`specs/0091` `adrs.md`
+    /// decision 4). Size, baseline, spacing and the tolerance check are unchanged; the matcher
+    /// decides, the hint only narrows.
+    #[must_use]
+    pub fn with_hint(outlines: &[BezPath], tolerance: Mm, text: &str) -> Self {
+        Self {
+            hint: Some(confusable::hint_chars(text)),
+            ..Self::new(outlines, tolerance)
         }
     }
 
@@ -207,7 +224,12 @@ impl Recogniser {
             tier.iter().map(|face| face.reference_glyphs()).collect();
         let frame = candidates::levelled(found.frame, &found.blobs, &self.blobs, &self.loops);
         let prepared = prepare(frame, &found.blobs, &self.blobs, &self.loops, spacing, cap);
-        let (fits, nearest) = fits_of(&prepared, &references, tolerance, spacing);
+        let (fits, nearest) = fits_of(
+            &prepared,
+            &references,
+            (tolerance, spacing),
+            self.hint.as_deref(),
+        );
         let Some(best) = fits.into_iter().next() else {
             return LineMatch { nearest, ..empty };
         };
@@ -251,6 +273,11 @@ impl Recogniser {
         let Some(found) = self.lines.get(line) else {
             return (best, prepared);
         };
+        // A hinted line with fewer than half its letters sure becomes no run whatever its
+        // direction; its text is set in the nearest face (`specs/0091` decision 5).
+        if self.hint.is_some() && 2 * best.sure() < best.counted() {
+            return (best, prepared);
+        }
         let glyphs = &references.glyphs;
         for _ in 0..REFITS {
             let Some(direction) = origin_direction(&best, prepared.height) else {
@@ -270,14 +297,18 @@ impl Recogniser {
                 u: u / length,
             };
             let again = prepare(turned, &found.blobs, &self.blobs, &self.loops, spacing, cap);
-            let refit = rank_faces(&again, std::slice::from_ref(references))
-                .into_iter()
-                .next()
-                .and_then(|(_, _, lists)| {
-                    let mut fit = fit_face(&again, best.face, glyphs, &lists, tolerance, spacing)?;
-                    resolve_coinciding(&mut fit, glyphs);
-                    Some(fit)
-                });
+            let refit = rank_faces(
+                &again,
+                std::slice::from_ref(references),
+                self.hint.as_deref(),
+            )
+            .into_iter()
+            .next()
+            .and_then(|(_, _, lists)| {
+                let mut fit = fit_face(&again, best.face, glyphs, &lists, tolerance, spacing)?;
+                resolve_coinciding(&mut fit, glyphs);
+                Some(fit)
+            });
             match refit {
                 Some(refit) if refit.sure() >= best.sure() && refit.counted() >= best.counted() => {
                     best = refit;
@@ -295,10 +326,10 @@ impl Recogniser {
 fn fits_of(
     prepared: &candidates::Prepared,
     references: &[Arc<ReferenceGlyphs>],
-    tolerance: f64,
-    spacing: f64,
+    (tolerance, spacing): (f64, f64),
+    allowed: Option<&[char]>,
 ) -> (Vec<FaceFit>, Option<NearestFace>) {
-    let ranked = rank_faces(prepared, references);
+    let ranked = rank_faces(prepared, references, allowed);
     let mut fits: Vec<FaceFit> = Vec::new();
     // The descriptor sum of the first face that had every letter sure.
     let mut all_sure: Option<f64> = None;
