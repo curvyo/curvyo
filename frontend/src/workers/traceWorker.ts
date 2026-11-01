@@ -5,7 +5,22 @@
 // criterion 21). A stale or stopped job is ended by the page
 // terminating this worker; a synchronous wasm call cannot be interrupted otherwise.
 
-import { encode_png, initSync, trace_analyse, trace_auto_threshold, trace_job, trace_mask_job, trace_suggest_background } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import {
+  encode_png,
+  fit_add_face,
+  fit_start,
+  fit_step,
+  initSync,
+  ocr_job,
+  ocr_load,
+  trace_analyse,
+  trace_auto_threshold,
+  trace_job,
+  trace_mask_job,
+  trace_suggest_background,
+  trace_text_job,
+  trace_text_mask_job,
+} from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 import type { TraceRequest, TraceResponse } from "@/lib/traceJobs";
 
@@ -38,7 +53,11 @@ scope.onmessage = (event) => {
     }
     if (request.type === "mask") {
       // The Mask view (`specs/0089` criterion 21): the mask of the same code path as the trace.
-      const mask = trace_mask_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings);
+      const map = new Float64Array(request.map);
+      const mask =
+        request.lines === ""
+          ? trace_mask_job(request.rgba, request.width, request.height, map, request.settings)
+          : trace_text_mask_job(request.rgba, request.width, request.height, map, request.settings, request.lines);
       const reply = mask
         ? { width: mask.width, height: mask.height, bits: mask.bits }
         : { width: 0, height: 0, bits: new Uint8Array(0) };
@@ -46,19 +65,47 @@ scope.onmessage = (event) => {
       scope.postMessage({ id: request.id, kind: "mask", ...reply, ms: performance.now() - started }, [reply.bits.buffer]);
       return;
     }
+    if (request.type === "fit" || request.type === "fit-faces") {
+      // The font fit runs here, off the main thread; the faces stay for the worker's life.
+      const sink = { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) };
+      let reply: string;
+      if (request.type === "fit") {
+        reply = fit_start(request.request, sink);
+      } else {
+        for (const face of request.faces) {
+          fit_add_face(face.file, face.index, face.bytes);
+        }
+        reply = fit_step(sink);
+      }
+      scope.postMessage({ id: request.id, kind: "fit", reply, ms: performance.now() - started });
+      return;
+    }
+    if (request.type === "ocr") {
+      // The weights are loaded once per worker (ADR 0027 §5); a later read skips the load.
+      const error = ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
+      const lines =
+        error === ""
+          ? ocr_job(request.rgba, request.width, request.height, {
+              report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }),
+            })
+          : "";
+      // The pixels go back to the page for the trace that follows.
+      scope.postMessage(
+        { id: request.id, kind: "ocr", lines, error: error === "" && lines === "" ? "unreadable" : error, rgba: request.rgba, ms: performance.now() - started },
+        [request.rgba.buffer],
+      );
+      return;
+    }
     if (request.type === "png") {
       const png = encode_png(request.rgba, request.width, request.height);
       scope.postMessage({ id: request.id, kind: "png", png, ms: performance.now() - started }, [png.buffer]);
       return;
     }
-    const wire = trace_job(
-      request.rgba,
-      request.width,
-      request.height,
-      new Float64Array(request.map),
-      request.settings,
-      { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) },
-    );
+    const sink = { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) };
+    const wire =
+      request.lines === ""
+        ? trace_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, sink)
+        : trace_text_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, request.lines, sink);
     scope.postMessage({ id: request.id, kind: "trace", wire, ms: performance.now() - started }, [wire.buffer]);
   } catch (error) {
     scope.postMessage(

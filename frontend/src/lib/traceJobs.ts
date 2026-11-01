@@ -17,9 +17,17 @@ export type TraceRequest =
       map: number[];
       /** The settings JSON of `settingsJson` in `traceText`. */
       settings: string;
+      /** The OCR lines JSON of the picture (`specs/0091`), empty without text recognition. */
+      lines: string;
     }
   /** The mask the same trace would walk, for the Mask view (`specs/0089` criterion 21). */
-  | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string }
+  | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
+  /** The font fit of the read lines (`specs/0091` decision 4): the session's request. */
+  | { type: "fit"; id: number; request: string }
+  /** The faces a fit asked for, as `[file, index, bytes]`; the fit goes on. */
+  | { type: "fit-faces"; id: number; faces: FitFace[] }
+  /** The text lines of a picture, read once (`specs/0091` decision 1), with the weights. */
+  | { type: "ocr"; id: number; rgba: Uint8Array; width: number; height: number; weights: OcrWeights }
   /** The PNG of a copied image (`specs/0087-image-clipboard-and-drop` criterion 14). */
   | { type: "png"; id: number; rgba: Uint8Array; width: number; height: number };
 
@@ -32,11 +40,37 @@ export type TraceResponse =
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
   | { id: number; kind: "png"; png: Uint8Array; ms: number }
+  /** A fit's answer: `{kind: "need", faces}` or `{kind: "finished", lines}` as JSON. */
+  | { id: number; kind: "fit"; reply: string; ms: number }
+  /** The OCR lines JSON; empty with `error` set when the reader could not be used. */
+  | { id: number; kind: "ocr"; lines: string; error: string; rgba: Uint8Array; ms: number }
   /** A mask: 255 for content, 0 for the rest, row by row; `width` 0 when the picture cannot be traced. */
   | { id: number; kind: "mask"; width: number; height: number; bits: Uint8Array; ms: number }
   | { id: number; kind: "error"; message: string }
   /** The answer to `init` (id 0): `error` is empty when the module was instantiated. */
   | { id: 0; kind: "ready"; error: string };
+
+/** The text reader's three files (ADR 0027 §5), fetched same-origin once per page. */
+export interface OcrWeights {
+  detector: Uint8Array;
+  recogniser: Uint8Array;
+  alphabet: string;
+}
+
+/** A font file face handed to the worker's fit. */
+export interface FitFace {
+  file: string;
+  index: number;
+  bytes: Uint8Array;
+}
+
+/** The OCR read failed (the weights could not be loaded or read). */
+export class OcrFailed extends Error {
+  constructor(reason: string) {
+    super(`text recognition failed: ${reason}`);
+    this.name = "OcrFailed";
+  }
+}
 
 /** The pixels of one job. */
 export interface TracePixels {
@@ -205,7 +239,7 @@ export class TraceRunner {
 
   /** One trace of `pixels` with `settings` (the JSON of `settingsJson`); the pixels are handed
    * over to the worker; `onProgress` hears each higher whole percent. */
-  async trace(pixels: TracePixels, settings: string, onProgress?: (percent: number) => void): Promise<TraceOutput> {
+  async trace(pixels: TracePixels, settings: string, onProgress?: (percent: number) => void, lines = ""): Promise<TraceOutput> {
     const response = await this.send(
       (id) => ({
         type: "trace",
@@ -215,6 +249,7 @@ export class TraceRunner {
         height: pixels.height,
         map: pixels.map,
         settings,
+        lines,
       }),
       [pixels.rgba.buffer],
       onProgress,
@@ -227,15 +262,53 @@ export class TraceRunner {
 
   /** The mask a trace of `pixels` with `settings` would walk (`specs/0089` criterion 21), or
    * `null` when the picture cannot be traced; the pixels are handed over. */
-  async mask(pixels: TracePixels, settings: string): Promise<TraceMask | null> {
+  async mask(pixels: TracePixels, settings: string, lines = ""): Promise<TraceMask | null> {
     const response = await this.send(
-      (id) => ({ type: "mask", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings }),
+      (id) => ({ type: "mask", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings, lines }),
       [pixels.rgba.buffer],
     );
     if (response.kind !== "mask") {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
     }
     return response.width > 0 ? { width: response.width, height: response.height, bits: response.bits } : null;
+  }
+
+  /** The text lines of `pixels` read with `weights` (`specs/0091` decision 1): the OCR lines
+   * JSON and, handed back, the pixels (so the trace that follows needs no second copy out of the
+   * session, 0025 criterion 58); `error` is set, and `lines` empty, when the reader could not be
+   * used. `onProgress` hears each higher whole percent. */
+  async ocr(pixels: TracePixels, weights: OcrWeights, onProgress?: (percent: number) => void): Promise<{ lines: string; error: string; rgba: Uint8Array }> {
+    const response = await this.send(
+      (id) => ({ type: "ocr", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, weights }),
+      [pixels.rgba.buffer],
+      onProgress,
+    );
+    if (response.kind !== "ocr") {
+      throw new OcrFailed(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    return { lines: response.lines, error: response.error, rgba: response.rgba };
+  }
+
+  /** The font fit of `request` (the session's `trace_fit_request`) in the worker, off the main
+   * thread (`specs/0091` decision 4): the faces it asks for are read by `loadFaces` and handed
+   * in, as often as it asks; the finished result JSON. Cancelled like every job. */
+  async fit(
+    request: string,
+    loadFaces: (faces: [string, number][]) => Promise<FitFace[]>,
+    onProgress?: (percent: number) => void,
+  ): Promise<string> {
+    let response = await this.send((id) => ({ type: "fit", id, request }), [], onProgress);
+    for (;;) {
+      if (response.kind !== "fit") {
+        throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+      }
+      const reply = JSON.parse(response.reply) as { kind: string; faces?: [string, number][] };
+      if (reply.kind !== "need") {
+        return response.reply;
+      }
+      const faces = await loadFaces(reply.faces ?? []);
+      response = await this.send((id) => ({ type: "fit-faces", id, faces }), [], onProgress);
+    }
   }
 
   /** The PNG of `rgba` (`width` x `height`, straight alpha), made in the worker; the pixels are
@@ -307,6 +380,31 @@ export function editorModule(): Promise<WebAssembly.Module> {
     throw error;
   });
   return compiled;
+}
+
+let weights: Promise<OcrWeights> | null = null;
+
+/** The folder of the shipped weights (ADR 0027 §5): the app's own files, no download. */
+export const OCR_MODEL_DIR = "models/paddleocr-latin/";
+
+/** The text reader's files, fetched same-origin once per page (ADR 0027 §5); a failed fetch is
+ * tried again by the next call. */
+export function ocrWeights(fetchFile: (path: string) => Promise<Response> = (path) => fetch(`${import.meta.env.BASE_URL}${path}`)): Promise<OcrWeights> {
+  weights ??= (async () => {
+    const read = async (name: string) => {
+      const response = await fetchFile(`${OCR_MODEL_DIR}${name}`);
+      if (!response.ok) {
+        throw new OcrFailed(`${name}: ${response.status}`);
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    };
+    const [detector, recogniser, alphabet] = await Promise.all([read("det.onnx"), read("rec.onnx"), read("dict.txt")]);
+    return { detector, recogniser, alphabet: new TextDecoder().decode(alphabet) };
+  })().catch((error: unknown) => {
+    weights = null;
+    throw error;
+  });
+  return weights;
 }
 
 /** A runner over the real worker. */

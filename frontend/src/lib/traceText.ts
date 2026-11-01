@@ -41,7 +41,7 @@ export const FAILED = "Failed";
 export type TraceSlot =
   | { kind: "none" }
   /** A job past 400 ms; `percent` is `null` before its first report or while the picture loads. */
-  | { kind: "running"; percent: number | null }
+  | { kind: "running"; percent: number | null; label?: string }
   | { kind: "stopped" }
   /** `text` is the sentence of `failureText`. */
   | { kind: "failed"; text: string };
@@ -268,6 +268,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Remove: takes a picked colour out of the palette.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
+  "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
@@ -312,6 +313,8 @@ export interface TraceValues {
   denoise: number;
   invert: boolean;
   ignoreBackground: boolean;
+  /** Recognise text in Advanced (`specs/0091` criterion 17): an app setting, on by default. */
+  recogniseText: boolean;
   /** The selection method: `BRIGHTNESS`, `REMOVE_BACKGROUND` or `PICK_COLOURS`. */
   method: number;
   /** The Colour tolerance of Remove background and of Pick colours, 0 to 100, each its own. */
@@ -626,6 +629,7 @@ export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALL
     ...first.values,
     invert: false,
     ignoreBackground: false,
+    recogniseText: true,
     method: BRIGHTNESS,
     backgroundTolerance: DEFAULT_BACKGROUND_TOLERANCE,
     pickTolerance: DEFAULT_PICK_TOLERANCE,
@@ -722,6 +726,7 @@ export function readChoice(
       pickTolerance?: unknown;
       output?: unknown;
       colours?: unknown;
+      recogniseText?: unknown;
     };
     // The method and its tolerances are app settings too (`specs/0089` criterion 20); a missing
     // method reads as Brightness.
@@ -755,6 +760,8 @@ export function readChoice(
         pickTolerance: tolerance(stored.pickTolerance, first.values.pickTolerance),
         // Output and Colours are app settings too (`specs/0089` criterion 25, UX notes §7).
         output: stored.output === MULTICOLOUR ? MULTICOLOUR : SINGLE_COLOUR,
+        // `specs/0091` criterion 17: on unless the maker turned it off.
+        recogniseText: stored.recogniseText !== false,
         colours:
           typeof stored.colours === "number" && Number.isFinite(stored.colours)
             ? Math.min(MAX_COLOURS, Math.max(MIN_COLOURS, Math.round(stored.colours)))
@@ -786,6 +793,7 @@ export function writeChoice(choice: TraceChoice, storage: ValueStorage | undefin
         pickTolerance: choice.values.pickTolerance,
         output: choice.values.output,
         colours: choice.values.colours,
+        recogniseText: choice.values.recogniseText,
       }),
     );
   } catch {
@@ -822,6 +830,9 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
   if (values.ignoreBackground) {
     changed.push("Drop border shapes");
   }
+  if (!values.recogniseText) {
+    changed.push(RECOGNISE_TEXT);
+  }
   if (values.denoise !== dflt("denoise")) {
     changed.push("Denoise");
   }
@@ -835,4 +846,26 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
     changed.push(OUTPUT);
   }
   return changed.length > 0 ? `Changed: ${changed.join(", ")}` : null;
+}
+
+/** The Recognise text switch (`specs/0091` UX notes §9). */
+export const RECOGNISE_TEXT = "Recognise text";
+/** The progress label while the text is read (UX notes §3). */
+export const READING_TEXT = "Reading text";
+
+/** Whether a trace with `values` reads text: the switch on and one colour (slice 1). */
+export function readsText(values: TraceValues): boolean {
+  return values.recogniseText && values.output !== MULTICOLOUR;
+}
+
+/** The muted line's text-line segment (UX notes §4): "3 text lines set", "3 of 5 text lines set",
+ * "1 text line set"; empty when no line was found. */
+export function textLinesText(set: number, found: number): string {
+  if (found === 0) {
+    return "";
+  }
+  if (set === found) {
+    return `${set} text ${set === 1 ? "line" : "lines"} set`;
+  }
+  return `${set} of ${found} text lines set`;
 }

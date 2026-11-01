@@ -11,6 +11,9 @@ import {
   failureReason,
   failureText,
   previewIsReduced,
+  READING_TEXT,
+  readsText,
+  textLinesText,
   type TraceChoice,
   type TraceSlot,
   type TraceStatusText,
@@ -38,8 +41,12 @@ import {
   applyAnalysis,
   readAnalysis,
 } from "@/lib/traceAnalysis";
-import { TraceCancelled, type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
-import { trace_auto_threshold, trace_suggest_background } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { type FitFace, OcrFailed, TraceCancelled, type TracePixels, type TraceRunner, createTraceRunner, ocrWeights } from "@/lib/traceJobs";
+import { readTolerance } from "@/lib/recogniseText";
+import { favouritesAmong } from "@/hooks/fontLibraryPage";
+import { listedFileBytes } from "@/hooks/useText";
+import type { FontFace } from "@/lib/textText";
+import { trace_auto_threshold, trace_suggest_background, trace_text_failed_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import type { TraceApi } from "./traceApi";
 import { useTraceMask } from "./useTraceMask";
@@ -58,6 +65,13 @@ const REDUCED_SIDE = 1000;
 /** "Analysing..." shows after this long, like the trace's progress (UX notes §3). */
 const ANALYSING_AFTER_MS = 400;
 
+/** What text recognition in Trace needs from the editor (`specs/0091`): the listed faces (for the
+ * favourites tier) and where the guessed-letters warning goes after Create paths. */
+export interface TraceTextOptions {
+  faces: readonly FontFace[];
+  onNotice: (text: string) => void;
+}
+
 
 export function useTrace(
   getSession: () => WasmSession | null,
@@ -65,6 +79,7 @@ export function useTrace(
   syncRevision: number,
   tool: string,
   returnFocus: () => void,
+  textOptions?: TraceTextOptions,
 ): TraceApi {
   const active = tool === "trace";
   const params = useMemo(() => loadParams(), []);
@@ -112,6 +127,18 @@ export function useTrace(
   const viewRef = useRef(view);
   /** Reads the palette of a new preview (`useTracePalette`, set once it exists). */
   const paletteRefresh = useRef<() => void>(() => undefined);
+  /** The text is being read (`specs/0091` UX notes §3: "Reading text"). */
+  const [reading, setReading] = useState(false);
+  /** Counts the reads, so a stopped one does not clear the label of the next. */
+  const readingCall = useRef(0);
+  /** The images whose text could not be read: traced without text until the tool is left. */
+  const ocrFailed = useRef(new Set<string>());
+  /** The text lines of the shown preview: set and found (UX notes §4). */
+  const [textCounts, setTextCounts] = useState<[number, number]>([0, 0]);
+  const textOptionsRef = useRef(textOptions);
+  useEffect(() => {
+    textOptionsRef.current = textOptions;
+  }, [textOptions]);
 
   const { busy, percent, setPercent, startTimers, clearTimers } = useTraceProgress(getSession, onChange);
 
@@ -134,8 +161,63 @@ export function useTrace(
     clearTimers();
   }, [clearTimers]);
 
+  // The settings, and whether the text is read (`specs/0091`): a kept result is reused only for
+  // both.
   const key = (threshold: number, v: TraceValues, id: string) =>
     settingsJson(v, threshold, backgrounds.current.get(id) ?? "");
+  const resultKey = (settings: string, v: TraceValues) => `${settings}|${readsText(v) ? "text" : ""}`;
+
+  /** The OCR lines JSON of image `id` (`specs/0091` decision 1): kept by the session, or read
+   * once in the worker; empty when the text is not read or the reader failed (then the bar says
+   * so and the trace runs without text, UX notes §3). A stop (`stale`) while the weights load or
+   * the lines are read keeps nothing: the stop may come before the worker has a job to cancel, or
+   * after it answered (`specs/0091` criterion 19). */
+  const textLines = useCallback(
+    async (session: WasmSession, id: string, v: TraceValues, onProgress: (p: number) => void, pixels: TracePixels, stale: () => boolean): Promise<string> => {
+      if (!readsText(v) || ocrFailed.current.has(id)) {
+        return "";
+      }
+      const kept = session.trace_ocr_lines(id);
+      if (kept !== "") {
+        return kept;
+      }
+      // A stopped read ends after a newer one started (Retry): only the newest clears the label.
+      const read = ++readingCall.current;
+      setReading(true);
+      try {
+        // `pixels` (the full picture the trace takes next) go to the worker and come back.
+        const weights = await ocrWeights();
+        if (stale()) {
+          throw new TraceCancelled();
+        }
+        const found = await runner().ocr(pixels, weights, onProgress);
+        pixels.rgba = found.rgba;
+        if (stale()) {
+          throw new TraceCancelled();
+        }
+        if (found.error !== "") {
+          ocrFailed.current.add(id);
+          return "";
+        }
+        session.set_trace_ocr_lines(id, found.lines);
+        return session.trace_ocr_lines(id);
+      } catch (error) {
+        // Only the reader failing (its weights not fetched, or not read) traces without text; a
+        // stop, or a worker that died, ends the trace itself (Failed, Retry reads again; `0025`
+        // criterion 54).
+        if (!(error instanceof OcrFailed || error instanceof TypeError)) {
+          throw error;
+        }
+        ocrFailed.current.add(id);
+        return "";
+      } finally {
+        if (read === readingCall.current) {
+          setReading(false);
+        }
+      }
+    },
+    [runner],
+  );
 
   /** A failed job (criterion 54): "Failed" with a plain reason in the slot; values and document
    * stay. */
@@ -227,6 +309,77 @@ export function useTrace(
     [runner],
   );
 
+  /** Fits the kept results' text lines to the faces in the trace worker (`specs/0091` decision
+   * 4; the main thread only reads font files), the percent in the Trace button; the session then
+   * shows the texts. `false` when a newer job took over (`stale`). */
+  const fitTexts = useCallback(
+    async (session: WasmSession, stale: () => boolean): Promise<boolean> => {
+      const faces = textOptionsRef.current?.faces ?? [];
+      const favourites = JSON.stringify([...favouritesAmong([...new Set(faces.map((f) => f.family))])]);
+      const tolerance = readTolerance(typeof localStorage === "undefined" ? null : localStorage);
+      const request = session.trace_fit_request(tolerance, favourites);
+      if (request === "") {
+        return true;
+      }
+      const loadFaces = async (wanted: [string, number][]): Promise<FitFace[]> => {
+        const read = await Promise.allSettled(wanted.map(([file, index]) => listedFileBytes(file).then((bytes) => ({ file, index, bytes: new Uint8Array(bytes) }))));
+        return read.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+      };
+      const result = await runner().fit(request, loadFaces, (p) => {
+        if (!stale()) {
+          setPercent(p);
+        }
+      });
+      if (stale()) {
+        return false;
+      }
+      getSession()?.set_trace_fit(request, result);
+      return true;
+    },
+    [getSession, runner, setPercent],
+  );
+
+  /** The full-size result of `pixels` (the full picture) with the read `lines`, kept for Create paths (and shown when
+   * `preview`), and the fit of its lines; when the fit set no text for some lines (`specs/0091`
+   * lead decision 1) the picture is traced again with those lines left in the paths, and the rest
+   * fitted again. `null` when a newer job took over (`stale`). */
+  const traceAndFit = useCallback(
+    async (session: WasmSession, id: string, pixels: TracePixels, settings: string, lines: string, onProgress: (p: number) => void, stale: () => boolean, preview: boolean) => {
+      const keep = (wire: Float64Array) => {
+        if (preview) {
+          session.set_trace_preview(id, wire);
+        }
+        session.set_trace_result(id, wire);
+      };
+      let out = await runner().trace(pixels, settings, onProgress, lines);
+      if (stale()) {
+        return null;
+      }
+      keep(out.wire);
+      if (lines === "") {
+        return out;
+      }
+      if (!(await fitTexts(session, stale))) {
+        return null;
+      }
+      if (session.trace_fit_dropped() === 0) {
+        return out;
+      }
+      // The first trace handed its pixels to the worker: a fresh copy for the second.
+      const again = pixelsOf(session, id, false);
+      if (!again) {
+        return out;
+      }
+      out = await runner().trace(again, settings, onProgress, session.trace_ocr_lines(id));
+      if (stale()) {
+        return null;
+      }
+      keep(out.wire);
+      return (await fitTexts(session, stale)) ? out : null;
+    },
+    [runner, fitTexts],
+  );
+
   /** The preview of the shown image: the reduced copy first, the full size after (criterion 10). */
   const runPreview = useCallback(
     async (fullAfter: boolean) => {
@@ -272,6 +425,23 @@ export function useTrace(
           setLoading(true);
           return;
         }
+        const lines = await textLines(session, id, v, onProgress, full, stale);
+        if (stale()) {
+          return;
+        }
+        const failedText = readsText(v) && ocrFailed.current.has(id);
+        let textSet = 0;
+        const counts = () => {
+          const [set, found] = session.trace_text_counts();
+          textSet = set;
+          setTextCounts([set, found]);
+        };
+        // A picture of text only traces to no path and is still something to create
+        // (`specs/0091`); a failed read says so in the bar (UX notes §3).
+        const withText = (s: TraceStatusText): TraceStatusText => {
+          const created = textSet > 0 && !s.canCreate && s.message === "" ? { ...s, line: "", canCreate: true } : s;
+          return failedText && created.line === "" ? { ...created, line: trace_text_failed_notice() } : created;
+        };
         setPxPerMm(1 / Math.sqrt(Math.abs(full.map[0] * full.map[3] - full.map[1] * full.map[2])));
         pixels = full.width * full.height;
         // Over 4 Mpx the preview is the reduced copy only; Create paths traces at full size
@@ -284,19 +454,20 @@ export function useTrace(
         if (!small) {
           const reduced = pixelsOf(session, id, true);
           if (reduced) {
-            await maskStep(id, true, settings, stale);
+            await maskStep(id, true, settings, stale, lines);
             if (stale()) {
               return;
             }
             const reducedPixels = reduced.width * reduced.height;
-            const out = await runner().trace(reduced, settings, onProgress);
+            const out = await runner().trace(reduced, settings, onProgress, lines);
             if (stale()) {
               return;
             }
             session.set_trace_preview(id, out.wire);
             paletteRefresh.current();
+            counts();
             if (reducedOnly) {
-              setStatus(statusText(readSummary(out.wire), out.seconds, reducedPixels, true, zeroPathsLine(v), colourCounts(session)));
+              setStatus(withText(statusText(readSummary(out.wire), out.seconds, reducedPixels, true, zeroPathsLine(v), colourCounts(session))));
             }
           }
           if (!fullAfter || reducedOnly) {
@@ -305,19 +476,27 @@ export function useTrace(
             return;
           }
         }
-        await maskStep(id, false, settings, stale);
+        await maskStep(id, false, settings, stale, lines);
         if (stale()) {
           return;
         }
-        const out = await runner().trace(full, settings, onProgress);
-        if (stale()) {
+        // UX notes §2: the Trace view shows the texts in their faces, fitted after the trace.
+        const out = await traceAndFit(session, id, full, settings, lines, onProgress, stale, true);
+        if (out === null) {
           return;
         }
-        session.set_trace_preview(id, out.wire);
-        session.set_trace_result(id, out.wire);
+        const traced = session.trace_ocr_lines(id);
+        if (lines !== "" && traced !== lines) {
+          // Lines the fit set no text for are back in the paths, and in the Mask view.
+          await maskStep(id, false, settings, stale, traced);
+          if (stale()) {
+            return;
+          }
+        }
         paletteRefresh.current();
-        results.current.set(id, settings);
-        setStatus(statusText(readSummary(out.wire), out.seconds, full.width * full.height, false, zeroPathsLine(v), colourCounts(session)));
+        counts();
+        results.current.set(id, resultKey(settings, v));
+        setStatus(withText(statusText(readSummary(out.wire), out.seconds, full.width * full.height, false, zeroPathsLine(v), colourCounts(session))));
         clearTimers();
         onChange();
       } catch (error) {
@@ -326,7 +505,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep, textLines, traceAndFit],
   );
 
   const schedule = useCallback(
@@ -550,7 +729,8 @@ export function useTrace(
           if (v.method === PICK_COLOURS && !backgrounds.current.has(id)) {
             await thresholdOf(session, id);
           }
-          const wanted = key(threshold, v, id);
+          const settings = key(threshold, v, id);
+          const wanted = resultKey(settings, v);
           if (results.current.get(id) === wanted) {
             continue;
           }
@@ -568,21 +748,35 @@ export function useTrace(
             startTimers(true);
           }
           setStatus((s) => ({ ...s, line: "", canCreate: false }));
-          const out = await runner().trace(full, wanted, (p) => {
+          const progress = (p: number) => {
             if (mine === generation.current) {
               setPercent(p);
             }
-          });
+          };
+          const lines = await textLines(session, id, v, progress, full, () => mine !== generation.current);
           if (mine !== generation.current) {
             return;
           }
-          session.set_trace_result(id, out.wire);
+          if ((await traceAndFit(session, id, full, settings, lines, progress, () => mine !== generation.current, false)) === null) {
+            return;
+          }
           results.current.set(id, wanted);
+        }
+        // `specs/0091` decision 4: the read lines fitted to the faces (done by the preview
+        // already, unless a value changed since); then the texts go with the paths in one step.
+        if (readsText(v) && !session.trace_text_fitted() && !(await fitTexts(session, () => mine !== generation.current))) {
+          return;
         }
         const outcome = session.create_traced_paths();
         // No notice after creating paths: the new group being selected is the feedback (decided by
         // the customer, 2026-10-31).
         outcome.free();
+        // Only a warning when letters are guessed; none when all are sure (`specs/0091`
+        // criterion 5).
+        const warning = session.trace_created_warning();
+        if (warning !== "") {
+          textOptionsRef.current?.onNotice(warning);
+        }
         clearTimers();
         setCreating(false);
         onChange();
@@ -595,7 +789,7 @@ export function useTrace(
         }
       }
     })();
-  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, runner, thresholdOf, onChange, returnFocus, fail, setPercent]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, traceAndFit]);
 
   // Leaving the tool ends every job.
   useEffect(() => {
@@ -605,6 +799,8 @@ export function useTrace(
       setStopped(false);
       setFailure(null);
       setLoading(false);
+      setReading(false);
+      ocrFailed.current.clear();
     }
   }, [active, cancelAll]);
 
@@ -621,9 +817,11 @@ export function useTrace(
         return;
       }
       const mine = generation.current;
-      maskStep(id, source.reduced, key(threshold, choiceRef.current.values, id), () => mine !== generation.current).catch(() => undefined);
+      const session = getSession();
+      const lines = session && readsText(choiceRef.current.values) ? session.trace_ocr_lines(id) : "";
+      maskStep(id, source.reduced, key(threshold, choiceRef.current.values, id), () => mine !== generation.current, lines).catch(() => undefined);
     },
-    [maskStep, maskSource],
+    [maskStep, maskSource, getSession],
   );
   const { viewMode, setViewMode } = useTraceViewMode(active, getSession, onChange, onViewMode);
   const { setPicking, setMethod, setColourTolerance, setBackgroundAuto } = useTraceMethod({
@@ -680,9 +878,9 @@ export function useTrace(
       : stopped
         ? { kind: "stopped" }
         : busy
-          ? { kind: "running", percent: loading ? null : percent }
+          ? { kind: "running", percent: loading ? null : percent, label: reading ? READING_TEXT : undefined }
           : { kind: "none" };
-  const advancedStatus = advancedStatusOf(status, palette.note);
+  const advancedStatus = advancedStatusOf(status, palette.note, reading ? READING_TEXT : textLinesText(...textCounts));
   // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
   // has no paths.
   const traceBlocked =
@@ -747,6 +945,8 @@ function colourCounts(session: WasmSession): { colours: number; joined: number }
 
 /** The Advanced status line (`ux-notes.md` §22.2): the result counts or the message that replaces
  * them, and in the muted line the specks, the joined regions and what a palette action did. */
-function advancedStatusOf(status: TraceStatusText, note: string): { text: string; muted: string } {
-  return { text: status.message || status.counts, muted: [status.countsMuted, note].filter((t) => t !== "").join(", ") };
+function advancedStatusOf(status: TraceStatusText, note: string, text: string): { text: string; muted: string } {
+  const muted = [status.countsMuted, note].filter((t) => t !== "").join(", ");
+  // `specs/0091` UX notes §4: the text lines after the existing segments, joined by " · ".
+  return { text: status.message || status.counts, muted: [muted, text].filter((t) => t !== "").join(" · ") };
 }
