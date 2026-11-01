@@ -1,4 +1,13 @@
 //! Host-facing snapshots of document snapping settings.
+
+/// The host spelling of a grid snap point.
+const fn grid_point_name(point: curvyo_document_core::GridSnapPoint) -> &'static str {
+    match point {
+        curvyo_document_core::GridSnapPoint::Centre => "centre",
+        curvyo_document_core::GridSnapPoint::Box => "box",
+        curvyo_document_core::GridSnapPoint::Nodes => "nodes",
+    }
+}
 /// Snapping settings as a flat record the host reads.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Debug, Clone, PartialEq)]
@@ -14,6 +23,11 @@ pub struct SnappingSettingsRecord {
     pub nodes: bool,
     /// Whether objects snap to page fractions.
     pub page: bool,
+    /// Whether shown page grids pull (`specs/0090-grid` criterion 10).
+    pub grid: bool,
+    /// Which part of a moved selection snaps to a grid: `"centre"`, `"box"` or `"nodes"`.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub grid_point: String,
     /// Whether the horizontal coordinate may snap.
     pub x: bool,
     /// Whether the vertical coordinate may snap.
@@ -34,6 +48,8 @@ impl SnappingSettingsRecord {
             guides: snapping.guides,
             nodes: snapping.nodes,
             page: snapping.page,
+            grid: snapping.grid,
+            grid_point: grid_point_name(snapping.grid_point).to_owned(),
             x: snapping.x,
             y: snapping.y,
             capture_px: snapping.capture_px,
@@ -61,6 +77,11 @@ pub struct SnappingToolbarRecord {
     pub nodes: bool,
     /// Whether objects snap to page fractions.
     pub page: bool,
+    /// Whether shown page grids pull (`specs/0090-grid` criterion 10).
+    pub grid: bool,
+    /// Which part of a moved selection snaps to a grid: `"centre"`, `"box"` or `"nodes"`.
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+    pub grid_point: String,
     /// Whether the horizontal coordinate may snap.
     pub x: bool,
     /// Whether the vertical coordinate may snap.
@@ -87,6 +108,8 @@ impl SnappingToolbarRecord {
             guides: stored.guides,
             nodes: stored.nodes,
             page: stored.page,
+            grid: stored.grid,
+            grid_point: grid_point_name(stored.grid_point).to_owned(),
             x: stored.x,
             y: stored.y,
             capture_px: stored.capture_px,

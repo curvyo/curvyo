@@ -17,6 +17,11 @@ pub struct SnappingDrag {
     settings: SnapSettings,
     /// The flat list built once at the press, kept for the drag's whole life.
     targets: SnapTargets,
+    /// The pages read at the press (and after a version change), for grid snapping: no
+    /// document read per frame (`specs/0090-grid` criterion 15).
+    pages: Vec<Page>,
+    /// The moving selection's grid snap points for the Nodes choice, at the press.
+    grid_nodes: Vec<Point>,
     /// The one held target per axis, ephemeral.
     state: SnapState,
     /// The last resolved result, for the marker.
@@ -49,6 +54,8 @@ impl SnappingDrag {
         Self {
             settings,
             targets,
+            pages: pages.to_vec(),
+            grid_nodes: Vec::new(),
             state: SnapState::default(),
             last_result: SnapResult::default(),
             nodes_only: false,
@@ -114,6 +121,11 @@ impl SnappingState {
         self.drag.as_ref().map(SnappingDrag::last_result)
     }
 
+    /// The moving selection's grid snap points for the Nodes choice, at the press.
+    pub(super) fn grid_nodes(&self) -> &[Point] {
+        self.drag.as_ref().map_or(&[], |drag| &drag.grid_nodes)
+    }
+
     pub(super) fn set_nodes_only(&mut self, enabled: bool) {
         if let Some(drag) = &mut self.drag {
             drag.nodes_only = enabled;
@@ -151,6 +163,9 @@ impl super::Session {
         self.snapping.update_stored(self.document.snapping());
         self.snapping
             .begin_drag(&read, &pages, mm_per_px, exclusions);
+        if let Some(drag) = &mut self.snapping.drag {
+            drag.grid_nodes = curvyo_ui_core::grid_snap_nodes(&read.nodes, &excluded_boxes);
+        }
         self.snapping.version = Some(self.document.version());
     }
 
@@ -201,6 +216,24 @@ impl super::Session {
         probe: &curvyo_ui_core::SnapProbe,
         direction: Option<curvyo_document_core::Vec2>,
     ) -> curvyo_ui_core::SnapResult {
+        // Creation, resize and single points snap the point under the pointer to the grid
+        // (`specs/0090-grid` criterion 11): every real point of the probe.
+        let grid_points: Vec<Point> = probe
+            .points
+            .iter()
+            .filter_map(|&(x, y)| Some(Point::new(probe.x.get(x)?.value, probe.y.get(y)?.value)))
+            .collect();
+        self.resolve_snapping_grid(probe, &grid_points, direction)
+    }
+
+    /// Resolves snapping for `probe` against the indexed targets and for `grid_points` against
+    /// the page grids (`specs/0090-grid` criteria 11 to 15).
+    pub(super) fn resolve_snapping_grid(
+        &mut self,
+        probe: &curvyo_ui_core::SnapProbe,
+        grid_points: &[Point],
+        direction: Option<curvyo_document_core::Vec2>,
+    ) -> curvyo_ui_core::SnapResult {
         self.snapping.update_stored(self.document.snapping());
         let version = self.document.version();
         if self.snapping.drag.is_some() && self.snapping.version.as_ref() != Some(&version) {
@@ -226,6 +259,7 @@ impl super::Session {
                     },
                 );
                 drag.state.clear();
+                drag.pages = pages;
             }
             self.snapping.version = Some(version);
         }
@@ -237,21 +271,25 @@ impl super::Session {
                 drag.settings.objects = false;
                 drag.settings.guides = false;
                 drag.settings.page = false;
+                drag.settings.grid = false;
             }
             drag.settings.enabled = effective_enabled;
         }
+        let scale = self.view().scale();
         if let Some(drag) = &mut self.snapping.drag {
-            let result = if let Some(direction) = direction {
-                curvyo_ui_core::resolve_probe_along(
-                    &drag.settings,
-                    &drag.targets,
-                    probe,
-                    direction,
-                    &mut drag.state,
-                )
-            } else {
-                curvyo_ui_core::resolve(&drag.settings, &drag.targets, probe, &mut drag.state)
+            let grid = curvyo_ui_core::GridSnapInput {
+                pages: &drag.pages,
+                points: grid_points,
+                scale,
             };
+            let result = curvyo_ui_core::resolve_with_grid(
+                &drag.settings,
+                &drag.targets,
+                probe,
+                &grid,
+                direction,
+                &mut drag.state,
+            );
             drag.last_result = result.clone();
             result
         } else {
@@ -329,6 +367,26 @@ impl super::Session {
         settings.enabled = !settings.enabled;
         self.set_snapping(settings);
         self.document.snapping().enabled
+    }
+
+    /// Sets the Grid target switch (`specs/0090-grid` criterion 10). Returns whether anything
+    /// changed.
+    pub fn set_snapping_grid(&mut self, grid: bool) -> bool {
+        let settings = self.document.snapping();
+        self.set_snapping(curvyo_document_core::DocumentSnapping { grid, ..settings })
+    }
+
+    /// Sets the grid snap point, `"centre"`, `"box"` or `"nodes"` (criterion 11). Returns
+    /// whether anything changed; an unknown name changes nothing.
+    pub fn set_snapping_grid_point(&mut self, name: &str) -> bool {
+        let Some(grid_point) = curvyo_document_core::GridSnapPoint::parse(name) else {
+            return false;
+        };
+        let settings = self.document.snapping();
+        self.set_snapping(curvyo_document_core::DocumentSnapping {
+            grid_point,
+            ..settings
+        })
     }
 
     /// Sets snapping target kinds. Returns whether anything changed.

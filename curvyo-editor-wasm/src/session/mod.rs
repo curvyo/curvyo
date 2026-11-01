@@ -48,6 +48,9 @@ mod formats;
 mod fracture;
 mod frame;
 mod glyph_insert;
+mod grid;
+#[cfg(test)]
+mod grid_tests;
 mod group_view;
 mod grouping;
 #[cfg(test)]
@@ -196,6 +199,8 @@ pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};
 pub use fracture::StackOutcome;
+#[cfg(target_arch = "wasm32")]
+pub use grid::GridRecord;
 pub use grouping::{GroupingKind, GroupingResult};
 #[cfg(target_arch = "wasm32")]
 pub use guides::GuideButtonState;

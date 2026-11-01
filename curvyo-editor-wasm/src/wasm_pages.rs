@@ -7,13 +7,13 @@ impl WasmSession {
     pub fn pages_json(&self) -> String {
         self.session.pages_json()
     }
-    /// Ruler origin in global millimetres.
-    pub fn active_page_x(&self) -> f64 {
-        self.session.active_page().origin.x
-    }
-    /// Ruler origin in global millimetres.
-    pub fn active_page_y(&self) -> f64 {
-        self.session.active_page().origin.y
+    /// What the rulers count from: the active page's origin corner, as
+    /// `"<x>,<y>,<corner>"` with the corner's global position in millimetres
+    /// (`specs/0090-grid` criterion 17). The host repaints the rulers when it changes.
+    pub fn ruler_origin_key(&self) -> String {
+        let page = self.session.active_page();
+        let zero = page.zero_point();
+        format!("{},{},{}", zero.x, zero.y, page.grid.origin.as_str())
     }
     /// Activates an existing page.
     pub fn activate_page(&mut self, id: &str) -> bool {
