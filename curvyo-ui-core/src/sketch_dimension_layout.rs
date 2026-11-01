@@ -7,7 +7,7 @@ use curvyo_document_core::{Length, Point, Vec2, ViewTransform};
 
 #[path = "sketch_dimension_text.rs"]
 mod text;
-use text::{break_around_text, free_text, text_half_px};
+use text::{break_around_text, free_text, text_clear, text_half_px};
 #[path = "sketch_dimension_projected.rs"]
 mod projected;
 use projected::projected;
@@ -20,14 +20,15 @@ const EXTENSION_OVERRUN_PX: f64 = 4.0;
 const FIRST_RANK_PX: f64 = 24.0;
 /// The distance between two stacked ranks.
 const RANK_STEP_PX: f64 = 20.0;
-/// Below this span the arrows flip outside and the text moves beside the line end.
+/// Below this span the arrows flip outside and the text moves beside the line end; a longer
+/// span also needs room for the text between the arrowheads.
 const INSIDE_ARROWS_MIN_PX: f64 = 56.0;
 /// Below this span the arrows become ticks.
 const ARROWS_MIN_PX: f64 = 24.0;
 /// Length of the outside part of a flipped dimension line.
 const FLIPPED_TAIL_PX: f64 = 12.0;
-/// Distance of the text centre beyond the line end on a small span.
-const BESIDE_TEXT_PX: f64 = 30.0;
+/// Room an arrowhead takes at each end of the dimension line, kept free of the text.
+const ARROW_ROOM_PX: f64 = 8.0;
 /// Half length of a tick on a very small span.
 const TICK_HALF_PX: f64 = 3.0;
 /// Clearance between the circle and the nearest edge of a radius or diameter text box.
@@ -133,7 +134,11 @@ pub fn layout_dimensions(items: &[DimensionItem], view: ViewTransform) -> Vec<Di
         if item.label.is_none() {
             for _ in 0..4 {
                 if let Some(free) = free_text(item, &marks, &out[..index], items, px) {
-                    marks.text = free;
+                    if free != marks.text {
+                        // Laid out again at the free place: kept between the extension lines.
+                        marks = layout_dimension(item, Some(free), rank, px);
+                        marks.rank = rank;
+                    }
                     break;
                 }
                 if !matches!(
@@ -162,9 +167,11 @@ fn layout_dimension(
 ) -> DimensionMarks {
     let text = text_half_px(item.text_chars);
     match item.geometry {
-        DimensionGeometry::Linear { from, to } => linear(from, to, label, rank, px),
+        DimensionGeometry::Linear { from, to } => {
+            linear((from, to), label, (rank, item.text_chars), px)
+        }
         DimensionGeometry::Projected { from, to, along } => {
-            projected((from, to), along, label, rank, px)
+            projected((from, to), along, label, (rank, item.text_chars), px)
         }
         DimensionGeometry::Radius {
             center,
@@ -210,7 +217,12 @@ fn linear_frame(from: Point, to: Point) -> (Vec2, Vec2, f64) {
     (along, normal, from.vector_to(to).length())
 }
 
-fn linear(from: Point, to: Point, label: Option<Point>, rank: usize, px: f64) -> DimensionMarks {
+fn linear(
+    (from, to): (Point, Point),
+    label: Option<Point>,
+    (rank, chars): (usize, usize),
+    px: f64,
+) -> DimensionMarks {
     let (along, normal, length) = linear_frame(from, to);
     #[allow(clippy::cast_precision_loss)] // a rank is a small count
     let offset = label.map_or((FIRST_RANK_PX + RANK_STEP_PX * rank as f64) * px, |l| {
@@ -228,19 +240,9 @@ fn linear(from: Point, to: Point, label: Option<Point>, rank: usize, px: f64) ->
             ));
         }
     }
-    let span = length / px;
-    let beside = at(b, along, BESIDE_TEXT_PX * px);
-    let mut text = label.map_or_else(
-        || {
-            if span < INSIDE_ARROWS_MIN_PX {
-                beside
-            } else {
-                at(a, along, length / 2.0)
-            }
-        },
-        |l| at(a, along, dot(from.vector_to(l), along)),
-    );
-    let t = dot(a.vector_to(text), along);
+    let stored = label.map(|l| dot(from.vector_to(l), along));
+    let t = text_along(length, stored, text_clear(chars, along, px), px);
+    let mut text = at(a, along, t);
     let arrows = span_marks(&mut lines, (a, b), (along, normal), (length, t), px);
     if !text.x.is_finite() || !text.y.is_finite() {
         text = a;
@@ -250,6 +252,24 @@ fn linear(from: Point, to: Point, label: Option<Point>, rank: usize, px: f64) ->
         arrows,
         text,
         rank,
+    }
+}
+
+/// Where the text centre sits along a dimension line of `length` from its first end: between
+/// the extension lines, at the `stored` place kept clear of them and of the arrowheads, when the
+/// span holds the arrows and the text; else beside the end nearer the stored place (the second
+/// by default) one tail out, so the line's own continuation is its leader (0066 AC49). `clear`
+/// is how far the text box reaches along the line.
+fn text_along(length: f64, stored: Option<f64>, clear: f64, px: f64) -> f64 {
+    let room = clear + ARROW_ROOM_PX * px;
+    if length / px >= INSIDE_ARROWS_MIN_PX && length >= 2.0 * room {
+        return stored.map_or(length / 2.0, |t| t.clamp(room, length - room));
+    }
+    let beside = FLIPPED_TAIL_PX * px + clear;
+    if stored.is_some_and(|t| t < length / 2.0) {
+        -beside
+    } else {
+        length + beside
     }
 }
 
@@ -452,3 +472,7 @@ fn shared_line_rank(items: &[DimensionItem], index: usize, px: f64) -> usize {
 #[cfg(test)]
 #[path = "sketch_dimension_layout_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "sketch_dimension_glitch_tests.rs"]
+mod glitch_tests;

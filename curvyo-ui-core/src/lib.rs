@@ -482,11 +482,15 @@ mod pages;
 pub use pages::PageViewState;
 
 mod sketch;
-pub use sketch::{SketchHit, sketch_handle_hit, sketch_hit, sketch_hits, sketch_snap_points};
+pub use sketch::{
+    SKETCH_EDGE_PICK_PX, SKETCH_POINT_PICK_PX, SketchHit, sketch_handle_hit, sketch_hit,
+    sketch_hits, sketch_pick_order, sketch_snap_points,
+};
 
 mod sketch_actions;
 pub use sketch_actions::{
     SKETCH_ACTIONS, SKETCH_AXIS_X, SKETCH_AXIS_Y, sketch_axis, sketch_relation, sketch_relations,
+    sketch_symmetric_about,
 };
 
 mod sketch_dimension_layout;

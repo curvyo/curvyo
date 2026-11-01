@@ -1,7 +1,7 @@
 //! Lays out a horizontal or vertical distance: the dimension line beyond the outer point.
 use super::{
-    BESIDE_TEXT_PX, DimensionMarks, EXTENSION_GAP_PX, EXTENSION_OVERRUN_PX, FIRST_RANK_PX,
-    INSIDE_ARROWS_MIN_PX, RANK_STEP_PX, at, dot, linear_frame, span_marks, unit,
+    DimensionMarks, EXTENSION_GAP_PX, EXTENSION_OVERRUN_PX, FIRST_RANK_PX, RANK_STEP_PX, at, dot,
+    linear_frame, span_marks, text_along, text_clear, unit,
 };
 use curvyo_document_core::{Point, Vec2};
 
@@ -11,7 +11,7 @@ pub(super) fn projected(
     (from, to): (Point, Point),
     direction: Vec2,
     label: Option<Point>,
-    rank: usize,
+    (rank, chars): (usize, usize),
     px: f64,
 ) -> DimensionMarks {
     let reference = from.translated(direction);
@@ -38,17 +38,9 @@ pub(super) fn projected(
     let span = a.vector_to(b);
     let length = span.length();
     let line_along = unit(span, along);
-    let mut text = label.map_or_else(
-        || {
-            if length / px < INSIDE_ARROWS_MIN_PX {
-                at(b, line_along, BESIDE_TEXT_PX * px)
-            } else {
-                at(a, line_along, length / 2.0)
-            }
-        },
-        |l| at(a, line_along, dot(a.vector_to(l), line_along)),
-    );
-    let t = dot(a.vector_to(text), line_along);
+    let stored = label.map(|l| dot(a.vector_to(l), line_along));
+    let t = text_along(length, stored, text_clear(chars, line_along, px), px);
+    let mut text = at(a, line_along, t);
     let arrows = span_marks(&mut lines, (a, b), (line_along, normal), (length, t), px);
     if !text.x.is_finite() || !text.y.is_finite() {
         text = a;
