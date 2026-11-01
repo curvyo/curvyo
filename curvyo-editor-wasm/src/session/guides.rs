@@ -121,6 +121,16 @@ impl Session {
         }
         self.select.cancel_entry();
         let ids = self.selection.ids().to_vec();
+        let read = self.document_read();
+        let (dimensions, others): (Vec<_>, Vec<_>) = ids.iter().partition(|id| {
+            read.leaves.iter().any(|o| {
+                o.id() == **id && matches!(o, curvyo_document_core::ObjectSnapshot::Dimension(_))
+            })
+        });
+        // Guide off on dimensions converts them (`specs/0070-measure-and-dimension` criterion 10).
+        if marking.all_guides() && !dimensions.is_empty() {
+            return self.convert_selected_dimensions(&others);
+        }
         self.recording(|this| this.document.set_guide(&ids, !marking.all_guides()).is_ok())
     }
 

@@ -1011,6 +1011,9 @@ fn origin_of(s: &Session, index: usize) -> (f64, f64) {
     match d.object(d.object_ids()[index]).unwrap() {
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+            unreachable!("no dimension in this test")
+        }
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Clone(_) => panic!("no clone here"),
         curvyo_document_core::ObjectSnapshot::Primitive(p) => match p.shape {

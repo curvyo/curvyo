@@ -228,6 +228,7 @@ impl Session {
             Tool::Ellipse => self.ellipse.drag_in_flight(),
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
+            Tool::Measure => self.dimension_drag_in_flight(),
             Tool::Pen | Tool::Text | Tool::Trace => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
@@ -348,6 +349,8 @@ impl Session {
                 }
             }
             KeyAction::Consume => KeyOutcome::Consumed,
+            KeyAction::MeasureAlt => self.measure_key(true, &input),
+            KeyAction::MeasureEnter => self.measure_key(false, &input),
             KeyAction::FinishPen => {
                 self.finish_pen();
                 KeyOutcome::PenFinished
@@ -430,6 +433,7 @@ impl Session {
                 }
                 self.cancel_offset_drag() || marquee
             }
+            Tool::Measure => self.measure_escape(),
             Tool::Pen | Tool::Text | Tool::Trace => false,
         }
     }
@@ -476,7 +480,10 @@ impl Session {
         if self.cancel_text_path_drag() {
             return EscapeStep::CancelledDrag;
         }
-        if self.cancel_drag_in_flight() {
+        if self.cancel_drag_in_flight()
+            || self.cancel_dimension_drag()
+            || self.cancel_kept_point_drag()
+        {
             return EscapeStep::CancelledDrag;
         }
         // Pick mode ends before the selection clears (`0080` UX notes §2).
@@ -517,6 +524,7 @@ impl Session {
             | Tool::Ellipse
             | Tool::PolygonStar
             | Tool::Text
+            | Tool::Measure
             | Tool::Trace => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
@@ -587,6 +595,7 @@ impl Session {
                 | Tool::PolygonStar
                 | Tool::Offset
                 | Tool::Text
+                | Tool::Measure
                 | Tool::Trace => {}
             }
         });
@@ -871,6 +880,8 @@ mod tests {
                         (Tool::Select, Selected::One | Selected::Many) => {
                             KeyAction::OpenEntry(entry)
                         }
+                        // M is the Measure tool everywhere else (`0070` criterion 2).
+                        _ if entry == EntryKey::Move => KeyAction::SetTool(Tool::Measure),
                         _ => KeyAction::Hint(KeyHint::SelectFirst),
                     };
                     assert_eq!(

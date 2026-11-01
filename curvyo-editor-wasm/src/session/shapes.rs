@@ -38,7 +38,13 @@ impl Session {
             Tool::Rectangle => self.rectangle.pointer_down(point),
             Tool::Ellipse => self.ellipse.pointer_down(point),
             Tool::PolygonStar => self.poly_star.pointer_down(point),
-            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {}
+            Tool::Select
+            | Tool::Pen
+            | Tool::Node
+            | Tool::Offset
+            | Tool::Text
+            | Tool::Trace
+            | Tool::Measure => {}
         }
     }
 
@@ -100,7 +106,13 @@ impl Session {
             Tool::PolygonStar => self
                 .poly_star
                 .pointer_move_snapped(point, modifiers, snap_offset),
-            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {}
+            Tool::Select
+            | Tool::Pen
+            | Tool::Node
+            | Tool::Offset
+            | Tool::Text
+            | Tool::Trace
+            | Tool::Measure => {}
         }
     }
 
@@ -129,9 +141,13 @@ impl Session {
                 self.poly_star
                     .pointer_up_snapped(&self.document, point, modifiers, snap_offset)
             }
-            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {
-                CreateOutcome::NoOp
-            }
+            Tool::Select
+            | Tool::Pen
+            | Tool::Node
+            | Tool::Offset
+            | Tool::Text
+            | Tool::Trace
+            | Tool::Measure => CreateOutcome::NoOp,
         };
         self.end_snapping_drag();
         if let CreateOutcome::Created(id) = outcome {
@@ -147,9 +163,13 @@ impl Session {
             Tool::Rectangle => self.rectangle.escape(),
             Tool::Ellipse => self.ellipse.escape(),
             Tool::PolygonStar => self.poly_star.escape(),
-            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => {
-                false
-            }
+            Tool::Select
+            | Tool::Pen
+            | Tool::Node
+            | Tool::Offset
+            | Tool::Text
+            | Tool::Trace
+            | Tool::Measure => false,
         };
         if had_drag {
             self.end_snapping_drag();
@@ -204,7 +224,13 @@ impl Session {
             Tool::Rectangle => self.rectangle.live_shape(),
             Tool::Ellipse => self.ellipse.live_shape(),
             Tool::PolygonStar => self.poly_star.live_shape(),
-            Tool::Select | Tool::Pen | Tool::Node | Tool::Offset | Tool::Text | Tool::Trace => None,
+            Tool::Select
+            | Tool::Pen
+            | Tool::Node
+            | Tool::Offset
+            | Tool::Text
+            | Tool::Trace
+            | Tool::Measure => None,
         }
     }
 

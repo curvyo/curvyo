@@ -58,7 +58,11 @@ impl WasmSession {
             lock: match indicators.lock {
                 Some(Axis::X) => "x",
                 Some(Axis::Y) => "y",
-                None if self.session.sketch_angle_lock_badge() => "angle",
+                None if self.session.sketch_angle_lock_badge()
+                    || self.session.measure_angle_lock_badge() =>
+                {
+                    "angle"
+                }
                 None => "",
             },
         }

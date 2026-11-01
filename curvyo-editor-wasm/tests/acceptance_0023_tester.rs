@@ -920,6 +920,7 @@ fn ac13_ctrl_drag_copies_the_group_with_new_ids_for_everything() {
     let moved = copy_leaves.iter().any(|id| match d2.object(*id).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(pr) => format!("{:?}", pr.shape).contains("120"),

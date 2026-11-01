@@ -33,6 +33,12 @@ impl Session {
         state
     }
 
+    /// Whether the selection holds only dimensions: no style, clone or scale control applies
+    /// (`specs/0070-measure-and-dimension` UI review item 3).
+    pub(super) fn selection_only_dimensions(&self) -> bool {
+        curvyo_ui_core::only_dimensions(&self.objects(), &self.selection)
+    }
+
     /// Commits a slider edit still pending, against the objects it was
     /// started on, before anything that can change the selection (a released
     /// slider outside its element never fires its own release): a tool switch,

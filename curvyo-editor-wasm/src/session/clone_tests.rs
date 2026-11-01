@@ -21,6 +21,7 @@ fn kind_of(session: &Session, id: NodeId) -> &'static str {
         Some(ObjectSnapshot::Clone(_)) => "clone",
         Some(ObjectSnapshot::Primitive(_)) => "primitive",
         Some(ObjectSnapshot::Image(_)) => unreachable!("no image in this test"),
+        Some(ObjectSnapshot::Dimension(_)) => unreachable!("no dimension in this test"),
         Some(ObjectSnapshot::Text(_)) => "text",
         Some(ObjectSnapshot::Sketch(_)) => "sketch",
         None => "none",

@@ -61,6 +61,7 @@ fn rotate_about_centre(d: &Document, id: NodeId, radians: f64) {
     let c = match &o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -155,6 +156,7 @@ fn outline_point(d: &Document, index: usize) -> Point {
     match d.object(id).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
@@ -252,6 +254,7 @@ fn rect_of(o: &ObjectSnapshot) -> (RectBounds, f64) {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -266,6 +269,7 @@ fn ellipse_of(o: &ObjectSnapshot) -> (EllipseFrame, f64) {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -280,6 +284,7 @@ fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => p.rotation.as_radians(),
@@ -291,6 +296,7 @@ fn path_points(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p.anchors.iter().map(|a| a.point).collect(),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => panic!("path expected"),
@@ -301,6 +307,7 @@ fn path_handles(o: &ObjectSnapshot) -> Vec<(Vec2, Vec2)> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p
             .anchors
@@ -440,6 +447,7 @@ fn ac2_stroke_width_is_not_part_of_the_group_box() {
     match &mut o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width = Length::from_mm(10.0),
         ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width = Length::from_mm(10.0),
@@ -938,6 +946,7 @@ fn ac26_every_kind_turns_rigidly_with_rotation_added() {
         let (bs, br) = match &before[i] {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => (p.shape, p.rotation.as_radians()),
@@ -946,6 +955,7 @@ fn ac26_every_kind_turns_rigidly_with_rotation_added() {
         let (as_, ar) = match &after[i] {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => (p.shape, p.rotation.as_radians()),
@@ -965,6 +975,7 @@ fn ac26_every_kind_turns_rigidly_with_rotation_added() {
     let centre_of = |o: &ObjectSnapshot| match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(_) => pt(0.0, 0.0),
@@ -1583,6 +1594,7 @@ fn style_width(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.style.stroke.width.as_mm(),
         ObjectSnapshot::Clone(p) => p.resolved.style.stroke.width.as_mm(),
@@ -1837,13 +1849,16 @@ fn ac37_ac40_skew_key_on_a_mixed_selection() {
 fn ac37_keys_with_nothing_selected() {
     let (d, _) = two_squares();
     let mut s = open(&d);
-    for k in ["m", "k"] {
-        assert_eq!(
-            key(&mut s, k, false),
-            KeyOutcome::Hint(KeyHint::SelectFirst),
-            "{k}"
-        );
-    }
+    assert_eq!(
+        key(&mut s, "k", false),
+        KeyOutcome::Hint(KeyHint::SelectFirst),
+        "k"
+    );
+    // M is the Measure tool outside Select-with-a-selection since `0070` criterion 2 (customer,
+    // 2026-11-01); it no longer hints "Select an object first".
+    assert_eq!(key(&mut s, "m", false), KeyOutcome::ToolChanged, "m");
+    assert_eq!(s.tool(), Tool::Measure);
+    s.set_tool(Tool::Select);
     click(&mut s, pt(55.0, 50.0));
     assert_eq!(key(&mut s, "r", false), KeyOutcome::EntryOpened);
 }
@@ -1856,6 +1871,7 @@ fn radii_of(o: &ObjectSnapshot) -> [f64; 4] {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -2160,6 +2176,7 @@ fn all_points(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => p
             .subpaths()
@@ -3098,6 +3115,7 @@ fn ac51_style_fields_are_untouched() {
             .map(|o| match o {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Primitive(p) => format!("{:?}", p.style),
                 ObjectSnapshot::Clone(p) => format!("{:?}", p.resolved.style),
@@ -3331,6 +3349,7 @@ fn ac21_ctrl_corner_drag_is_proportional() {
         let get = |o: &ObjectSnapshot| match o {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => match p.shape {
@@ -3381,6 +3400,7 @@ fn all_finite(s: &Session) -> bool {
     objects(s).iter().all(|o| match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(p) => {

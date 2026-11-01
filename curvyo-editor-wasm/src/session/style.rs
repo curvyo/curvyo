@@ -32,7 +32,8 @@ impl Session {
             | Tool::PolygonStar
             | Tool::Offset
             | Tool::Text
-            | Tool::Trace => StyleTool::Other,
+            | Tool::Trace
+            | Tool::Measure => StyleTool::Other,
         }
     }
 
@@ -132,6 +133,8 @@ impl Session {
         view.pick_target = self
             .colour_pick_target()
             .map_or_else(String::new, |target| target.name().to_string());
+        // A dimension has no stroke or fill to edit (`0070` UI review item 3).
+        view.sections_shown = !self.selection_only_dimensions();
         view
     }
 

@@ -176,6 +176,7 @@ fn rotate_doc_object(d: &Document, radians: f64) {
     let c = match &o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => match p.shape {
@@ -523,6 +524,7 @@ fn tight_of(o: &ObjectSnapshot) -> (f64, f64, f64, f64) {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(p) => {
@@ -1223,6 +1225,7 @@ fn ctr_of(o: &ObjectSnapshot) -> Point {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Path(p) => path_bx(p).c,
@@ -1651,6 +1654,7 @@ fn c21_absolute_puts_the_top_left_of_the_tight_drawn_outline_at_x_y_for_every_ki
             let on = match obj_of(&s, 0) {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Path(p) => p.anchors[0].point,
                 ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => on,
@@ -2216,14 +2220,16 @@ fn c59_hints_when_nothing_is_selected_or_the_tool_is_not_select() {
     // nothing selected, Select tool
     let mut s = open_in_session(&d);
     let before = snapshot_bytes(&s);
-    for outcome in [
-        press(&mut s, "m"),
-        press(&mut s, "k"),
-        press_shift(&mut s, "K"),
-    ] {
+    // M is the Measure tool outside Select-with-a-selection since `0070` criterion 2 (customer,
+    // 2026-11-01); `session::measure::tests` covers it.
+    for outcome in [press(&mut s, "k"), press_shift(&mut s, "K")] {
         assert_eq!(outcome, KeyOutcome::Hint(KeyHint::SelectFirst));
     }
     assert_eq!(s.tool(), Tool::Select);
+    assert_eq!(snapshot_bytes(&s), before);
+    // `0070` criterion 2: M switches to the Measure tool here and writes nothing.
+    assert_eq!(press(&mut s, "m"), KeyOutcome::ToolChanged);
+    assert_eq!(s.tool(), Tool::Measure);
     assert_eq!(snapshot_bytes(&s), before);
     // outside the Select tool, even with a selection (the selection survives
     // the tool switch)
@@ -2235,16 +2241,16 @@ fn c59_hints_when_nothing_is_selected_or_the_tool_is_not_select() {
         Tool::PolygonStar,
     ] {
         s.set_tool(tool);
-        for outcome in [
-            press(&mut s, "m"),
-            press(&mut s, "k"),
-            press_shift(&mut s, "K"),
-        ] {
+        for outcome in [press(&mut s, "k"), press_shift(&mut s, "K")] {
             assert_eq!(outcome, KeyOutcome::Hint(KeyHint::SelectFirst), "{tool:?}");
         }
         assert_eq!(s.tool(), tool, "{tool:?}: tool unchanged");
         assert!(s.move_entry().is_none());
         assert!(s.transform_entry().is_none());
+        // `0070` criterion 2: M is the Measure tool in every tool but Select with a selection.
+        assert_eq!(press(&mut s, "m"), KeyOutcome::ToolChanged, "{tool:?}");
+        assert_eq!(s.tool(), Tool::Measure, "{tool:?}");
+        assert!(s.move_entry().is_none());
     }
     assert_eq!(snapshot_bytes(&s), before);
 }
@@ -2597,6 +2603,7 @@ fn c57a_key_s_equals_a_shift_drag_of_the_se_corner_for_rect_ellipse_path_at_seve
                 let on = match obj_of(&a, 0) {
                     ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                     ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                    ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                     ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                     ObjectSnapshot::Path(p) => p.anchors[0].point,
                     ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => {
@@ -2607,6 +2614,9 @@ fn c57a_key_s_equals_a_shift_drag_of_the_se_corner_for_rect_ellipse_path_at_seve
                         let (x0, y0, x1, y1) = frame_centre_box(match &o {
                             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                            ObjectSnapshot::Dimension(_) => {
+                                unreachable!("no dimension in this test")
+                            }
                             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                             ObjectSnapshot::Clone(_) => panic!("no clone here"),
                             ObjectSnapshot::Primitive(p) => p,
@@ -2623,6 +2633,7 @@ fn c57a_key_s_equals_a_shift_drag_of_the_se_corner_for_rect_ellipse_path_at_seve
                 let bx = match &o {
                     ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                     ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                    ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                     ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                     ObjectSnapshot::Clone(_) => panic!("no clone here"),
                     ObjectSnapshot::Path(p) => path_bx(p),
@@ -2882,6 +2893,7 @@ fn c57_s_and_r_chips_open_at_the_bottom_right_resize_and_top_right_rotate_corner
         let (c, hw, hh) = match &o {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Path(p) => {

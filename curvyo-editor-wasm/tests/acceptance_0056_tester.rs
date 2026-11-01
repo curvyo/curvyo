@@ -144,6 +144,7 @@ fn outline_pts(o: &ObjectSnapshot) -> Vec<Point> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)
             .iter()
@@ -166,6 +167,7 @@ fn rotation_of(o: &ObjectSnapshot) -> f64 {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => p.rotation.as_radians(),
         ObjectSnapshot::Path(p) => p.rotation.as_radians(),
@@ -343,6 +345,7 @@ fn id_of(o: &ObjectSnapshot) -> String {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => format!("{:?}", p.id),
         ObjectSnapshot::Path(p) => format!("{:?}", p.id),
@@ -724,6 +727,7 @@ fn tbb(o: &ObjectSnapshot) -> (Point, Point) {
     let anchors = match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation),
         ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => panic!("primitives only"),
@@ -1594,6 +1598,7 @@ fn nums(o: &ObjectSnapshot) -> Vec<f64> {
     match o {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Primitive(p) => {
             for q in outline_of_rotated(&p.shape, p.rotation) {
@@ -1661,6 +1666,7 @@ fn ac28_flip_properties_on_mixed_selection() {
         let (l, h) = match o {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(_) => tbb(o),
             ObjectSnapshot::Path(_) => path_tbb(o),
@@ -1850,6 +1856,7 @@ fn ac26_file_round_trip_no_negative_lengths() {
         match o {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Primitive(p) => match p.shape {
                 Shape::Rect {

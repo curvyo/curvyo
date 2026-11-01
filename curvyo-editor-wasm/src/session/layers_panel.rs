@@ -82,6 +82,7 @@ struct RowsKey {
     selected: Vec<NodeId>,
     active: Option<NodeId>,
     entered: Option<NodeId>,
+    unit: curvyo_document_core::DisplayUnit,
 }
 
 impl PartialEq for RowsKey {
@@ -91,6 +92,7 @@ impl PartialEq for RowsKey {
             && self.selected == other.selected
             && self.active == other.active
             && self.entered == other.entered
+            && self.unit == other.unit
     }
 }
 
@@ -143,6 +145,7 @@ impl Session {
             selected: self.selected_units(),
             active: self.active_layer(),
             entered: self.context_group(),
+            unit: self.document.display_unit(),
         };
         if let Some((held, rows)) = self.panel.rows.borrow().as_ref()
             && *held == key
@@ -150,15 +153,18 @@ impl Session {
             return Arc::clone(rows);
         }
         let selected: HashSet<NodeId> = key.selected.iter().copied().collect();
-        let rows = Arc::new(LayerRows::build(
-            &key.nodes,
-            &key.expansion,
-            RowFacts {
-                selected: &selected,
-                active_layer: key.active,
-                entered: key.entered,
-            },
-        ));
+        let rows = Arc::new(
+            LayerRows::build(
+                &key.nodes,
+                &key.expansion,
+                RowFacts {
+                    selected: &selected,
+                    active_layer: key.active,
+                    entered: key.entered,
+                },
+            )
+            .with_dimension_unit(&key.nodes, key.unit),
+        );
         *self.panel.rows.borrow_mut() = Some((key, Arc::clone(&rows)));
         rows
     }
@@ -477,6 +483,7 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         "kind": row.kind.code(),
         "name": row.name,
         "named": row.named,
+        "text": row.text,
         "visible": row.own.visible,
         "locked": row.own.locked,
         "effectiveVisible": row.effective.visible,

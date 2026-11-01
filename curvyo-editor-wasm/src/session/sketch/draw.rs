@@ -130,12 +130,16 @@ impl Session {
                 .iter()
                 .map(|a| (a.tip, a.back))
                 .collect::<Vec<_>>();
-            list.extend(curvyo_render_core::build_sketch_dimension(
-                &curvyo_render_core::SketchDimensionMarks {
+            list.extend(curvyo_render_core::build_dimension_marks(
+                &curvyo_render_core::DimensionMarkDrawing {
                     lines: &record.marks.lines,
                     arrows: &arrows,
-                    reference: record.reference,
-                    redundant: record.redundant,
+                    look: if record.reference {
+                        curvyo_render_core::DimensionLook::Reference
+                    } else {
+                        curvyo_render_core::DimensionLook::Driving
+                    },
+                    dashed: record.redundant,
                     hovered: record.hovered,
                     selected: record.selected,
                 },

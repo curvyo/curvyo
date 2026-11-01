@@ -42,6 +42,13 @@ impl Session {
         move |id| inert.contains(&id) || guides.contains(&id)
     }
 
+    /// Whether the Stroke to path button is in the Select bar: something is selected and not only
+    /// dimensions (`specs/0070-measure-and-dimension` UI review item 3).
+    #[must_use]
+    pub fn stroke_to_path_shown(&self) -> bool {
+        !self.selection.is_empty() && !self.selection_only_dimensions()
+    }
+
     /// Whether the Stroke to path button is enabled: the Select tool is active and some selected
     /// leaf draws a stroke (criterion 1).
     #[must_use]

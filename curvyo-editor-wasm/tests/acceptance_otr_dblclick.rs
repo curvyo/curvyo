@@ -434,6 +434,9 @@ fn double_click_on_a_converted_polygons_segment_hands_off_without_inserting_a_no
                 curvyo_document_core::ObjectSnapshot::Image(_) => {
                     unreachable!("no image in this test")
                 }
+                curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+                    unreachable!("no dimension in this test")
+                }
                 curvyo_document_core::ObjectSnapshot::Text(_) => {
                     unreachable!("no text in this test")
                 }

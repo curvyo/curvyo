@@ -86,6 +86,7 @@ impl Session {
         self.tool == Tool::Select
             && linked_clone_shown(&self.selection, &self.units())
             && !self.selection_holds_image()
+            && !self.selection_only_dimensions()
     }
 
     /// Linked clone (criteria 1 to 3, 5, 52): one clone above each selected object in one commit,

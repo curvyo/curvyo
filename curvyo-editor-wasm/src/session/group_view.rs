@@ -277,6 +277,12 @@ impl Session {
             return String::new();
         }
         if let [only] = self.selection.ids() {
+            let read = self.document_read();
+            if let Some(ObjectSnapshot::Dimension(dimension)) =
+                read.leaves.iter().find(|o| o.id() == *only)
+            {
+                return curvyo_ui_core::dimension_row_name(dimension, self.document.display_unit());
+            }
             return self.clone_announcement(*only);
         }
         let objects = self.objects();

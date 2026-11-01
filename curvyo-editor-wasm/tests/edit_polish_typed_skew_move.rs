@@ -363,7 +363,9 @@ fn the_skew_chip_refuses_out_of_range_text_and_writes_nothing() {
 fn the_entry_keys_that_cannot_act_give_the_hints() {
     // Nothing selected.
     let mut session = session_of(&rect_document());
-    for (k, shift) in [("m", false), ("k", false), ("k", true)] {
+    // M is the Measure tool outside Select-with-a-selection since `0070` criterion 2 (customer,
+    // 2026-11-01); `session::measure::tests` covers it.
+    for (k, shift) in [("k", false), ("k", true)] {
         assert_eq!(
             key(&mut session, k, shift),
             KeyOutcome::Hint(KeyHint::SelectFirst),
@@ -371,16 +373,25 @@ fn the_entry_keys_that_cannot_act_give_the_hints() {
         );
     }
     assert_eq!(session.tool(), Tool::Select);
+    // `0070` criterion 2: M is the Measure tool here.
+    assert_eq!(key(&mut session, "m", false), KeyOutcome::ToolChanged);
+    assert_eq!(session.tool(), Tool::Measure);
     // Another tool, even with an object selected in the Select tool before.
     let mut session = selected(&rect_document(), pt(40.0, 20.0));
     session.set_tool(Tool::Rectangle);
-    for k in ["m", "k"] {
+    {
+        let k = "k";
         let before = session.pack("0.1.0").unwrap();
         assert_eq!(
             key(&mut session, k, false),
             KeyOutcome::Hint(KeyHint::SelectFirst)
         );
         assert_eq!(session.tool(), Tool::Rectangle, "no tool change");
+        assert_eq!(session.pack("0.1.0").unwrap(), before);
+        // `0070` criterion 2: M switches to Measure, no move entry, nothing written.
+        assert_eq!(key(&mut session, "m", false), KeyOutcome::ToolChanged);
+        assert_eq!(session.tool(), Tool::Measure);
+        assert!(session.move_entry().is_none());
         assert_eq!(session.pack("0.1.0").unwrap(), before);
     }
     // A non-path opens the skew chip (`0047` criterion 6).
