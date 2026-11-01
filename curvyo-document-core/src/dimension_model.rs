@@ -105,7 +105,8 @@ pub enum ShapeFeature {
     Center,
     /// Corner `i` of a rectangle's box, clockwise from the top-left (rotated with the shape).
     Corner(u32),
-    /// Anchor `i` of the shape's outline (a polygon or star vertex).
+    /// Anchor `i` of the shape's outline: a polygon or star vertex, or an axis end of a whole
+    /// ellipse (east, south, west, north before rotation).
     Vertex(u32),
     /// The middle of outline segment `i` (from anchor `i` to the next).
     EdgeMid(u32),

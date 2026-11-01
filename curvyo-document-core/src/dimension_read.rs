@@ -234,7 +234,7 @@ pub fn shape_point(primitive: &PrimitiveSnapshot, feature: ShapeFeature) -> Opti
         ShapeFeature::Center => Some(shape_center(&primitive.shape)),
         ShapeFeature::Corner(i) => rect_corners(primitive)?.get(index(i)?).copied(),
         ShapeFeature::Vertex(i) => match primitive.shape {
-            Shape::Polygon { .. } | Shape::Star { .. } => {
+            Shape::Polygon { .. } | Shape::Star { .. } | Shape::Ellipse { arc: None, .. } => {
                 let outline = crate::outline_of_rotated(&primitive.shape, primitive.rotation);
                 outline.anchors.get(index(i)?).map(|a| a.point)
             }
