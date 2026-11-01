@@ -50,6 +50,10 @@ pub struct SelectDecorationInput {
     /// lies on this line is not drawn where the guide covers it: the guide
     /// replaces the box's own dashes there, so it reads alone.
     pub skew_guide: Option<(Point, Point)>,
+    /// The key object's box (`specs/0061-align-and-distribute/` criterion 5):
+    /// the align/distribute reference, drawn as the selection box at twice
+    /// the line width.
+    pub key: Option<SelectionBox>,
 }
 
 /// How one box edge is cut into dashes: `count` dashes of `dash_px` with
@@ -372,6 +376,22 @@ pub fn build(view: ViewTransform, input: &SelectDecorationInput) -> DrawList {
             theme::HOVER_BOX_CASING,
         ));
         list.extend(quad_outline(corners, width_mm, theme::HOVER_BOX));
+    }
+    // The key object's mark: the selection box's own dashes and casing, at
+    // twice the line width, so it reads as the reference at a glance
+    // (`specs/0061-align-and-distribute/` criterion 5).
+    if let Some(corners) = input.key {
+        let screen = ScreenBox::new(view, corners, ratio);
+        let width = screen.width_px * 2.0;
+        for (color, factor) in [
+            (theme::SELECTION_CASING, theme::CASING_WIDTH_FACTOR),
+            (theme::ACCENT, 1.0),
+        ] {
+            for i in 0..4 {
+                let (from, to) = (screen.corners[i], screen.corners[(i + 1) % 4]);
+                list.extend(dashed_edge(view, from, to, width, &[], color, factor));
+            }
+        }
     }
     list
 }
