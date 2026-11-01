@@ -1,5 +1,6 @@
-// 0066 Sketch workbench journey on the revised interaction (customer revisions 1 and 2): rectangle,
+// 0066 Sketch workbench journey on the revised interaction (customer revisions 1 to 5): rectangle,
 // formulas, dimensions typed in the on-canvas entry box, field drafts, conversion and undo.
+// The rail applies Dimension to a fitting selection at once and opens its entry box (AC40).
 // Run from the repository root with the isolated Playwright runtime on NODE_PATH.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -20,8 +21,7 @@ const h=require('./sketch-rev2-support.cjs');
  await page.getByLabel('New parameter name').fill('plate_width');await page.getByLabel('New parameter expression').fill('80 mm');
  await page.getByRole('button',{name:'Add',exact:true}).click();
  await (await h.geometry(page)).getByRole('button',{name:/line/}).first().click();
- await h.rail(page,'dimension').click();
- await page.mouse.click(500,150); // places the dimension text; the entry box opens at it
+ await h.rail(page,'dimension').click(); // applies at once; the entry box opens on it (AC40)
  const box=page.getByRole('group',{name:'Dimension',exact:true});await box.waitFor();
  await box.getByRole('textbox').first().fill('plate_width');await page.keyboard.press('Enter');
  await page.getByLabel('Sketch annotations').getByRole('button',{name:/^Length /}).waitFor();
@@ -30,8 +30,7 @@ const h=require('./sketch-rev2-support.cjs');
  await h.tool(page,'Circle');await page.mouse.click(450,280);await page.mouse.click(480,280);
  await (await h.geometry(page)).getByRole('button',{name:/circle/}).click();
  await h.rail(page,'dimension').click();
- await page.mouse.move(560,330);
- await page.mouse.click(560,330);
+ await box.waitFor();
  await box.getByRole('textbox',{name:'Sketch Diameter',exact:true}).fill('12');await page.keyboard.press('Enter');
  await page.getByLabel('Sketch annotations').locator('[data-sketch-dimension-text]').filter({hasText:/^\u2300 12 mm$/}).first().waitFor();
  await page.keyboard.press('Escape');await page.keyboard.press('Escape');
