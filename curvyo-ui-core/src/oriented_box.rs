@@ -141,6 +141,15 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
         ObjectSnapshot::Text(text) => crate::text_box::line_box_oriented(text),
         ObjectSnapshot::Sketch(sketch) => path_oriented_bounds(&sketch.resolved),
         ObjectSnapshot::Image(image) => crate::image_frame::frame_oriented(image),
+        ObjectSnapshot::Dimension(_) => {
+            let (min, max) = crate::object_bounds::object_bounds(object);
+            OrientedBox {
+                min,
+                max,
+                angle: Angle::from_radians(0.0),
+                pivot: Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y)),
+            }
+        }
     }
 }
 

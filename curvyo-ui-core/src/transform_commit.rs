@@ -173,7 +173,8 @@ pub(crate) fn commit_resize(
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Text(_)
-        | ObjectSnapshot::Image(_) => {
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => {
             let _ = commit_group(
                 document,
                 std::slice::from_ref(result),
@@ -285,6 +286,15 @@ fn numbers_of(object: &ObjectSnapshot) -> (Vec<f64>, f64) {
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Text(_) => (Vec::new(), 0.0),
         ObjectSnapshot::Image(image) => (image.placement.to_array().to_vec(), 0.0),
+        ObjectSnapshot::Dimension(dimension) => (
+            dimension
+                .kept
+                .points
+                .iter()
+                .flat_map(|p| [p.x, p.y])
+                .collect(),
+            0.0,
+        ),
         ObjectSnapshot::Primitive(p) => {
             let mut v = vec![p.style.stroke.width.as_mm()];
             v.extend(shape_numbers(&p.shape));

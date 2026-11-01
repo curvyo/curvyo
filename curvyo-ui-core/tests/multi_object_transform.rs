@@ -406,6 +406,7 @@ fn a_typed_angle_and_its_negative_restore_the_selection() {
             match old {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => p.shape,
@@ -414,6 +415,7 @@ fn a_typed_angle_and_its_negative_restore_the_selection() {
             match &new {
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Clone(_) => panic!("no clone here"),
                 ObjectSnapshot::Primitive(p) => p.shape,

@@ -70,6 +70,7 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         // The selection box of a text is its line box (`specs/0074-text-objects`, UX notes §5).
         ObjectSnapshot::Text(text) => crate::text_box::line_box_bounds(text),
         ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
+        ObjectSnapshot::Dimension(dimension) => dimension_bounds(dimension),
         ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
             if let Some(path) = object.drawn_path() =>
         {
@@ -80,6 +81,22 @@ pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
         }
         ObjectSnapshot::Primitive(primitive) => shape_frame_bounds(&primitive.shape),
     }
+}
+
+/// The box of the points a dimension shows: it has no outline of its own.
+fn dimension_bounds(dimension: &curvyo_document_core::DimensionSnapshot) -> (Point, Point) {
+    dimension.shown.points.iter().fold(
+        (
+            Point::new(f64::INFINITY, f64::INFINITY),
+            Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY),
+        ),
+        |(min, max), p| {
+            (
+                Point::new(min.x.min(p.x), min.y.min(p.y)),
+                Point::new(max.x.max(p.x), max.y.max(p.y)),
+            )
+        },
+    )
 }
 
 /// The tight bounds of the outline `object` is drawn with, in document space
@@ -95,6 +112,7 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
             crate::text_box::line_box_bounds(text)
         }
         ObjectSnapshot::Image(image) => crate::image_frame::frame_bounds(image),
+        ObjectSnapshot::Dimension(dimension) => dimension_bounds(dimension),
         ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Path(_)
         | ObjectSnapshot::Clone(_)

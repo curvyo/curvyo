@@ -342,6 +342,9 @@ fn as_path(document: &Document, id: NodeId) -> PathSnapshot {
     match document.object(id).expect("object exists") {
         curvyo_document_core::ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         curvyo_document_core::ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        curvyo_document_core::ObjectSnapshot::Dimension(_) => {
+            unreachable!("no dimension in this test")
+        }
         curvyo_document_core::ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         curvyo_document_core::ObjectSnapshot::Path(path) => path,
         curvyo_document_core::ObjectSnapshot::Primitive(_)

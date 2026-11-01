@@ -1,14 +1,14 @@
-//! Places a sketch dimension's extension lines, dimension line, arrows and text at screen-constant sizes (AC31).
+//! Places a dimension's extension lines, dimension line, arrows and text at screen-constant sizes (AC31).
 //!
 //! Input and output are document points; every size below is in screen pixels and is turned into
 //! millimetres with the view scale, so the marks keep their size at every zoom (UX notes revision 2,
 //! section 7, "Dimension anatomy").
 use curvyo_document_core::{Length, Point, Vec2, ViewTransform};
 
-#[path = "sketch_dimension_text.rs"]
+#[path = "dimension_layout_text.rs"]
 mod text;
 use text::{break_around_text, free_text, text_clear, text_half_px};
-#[path = "sketch_dimension_projected.rs"]
+#[path = "dimension_layout_projected.rs"]
 mod projected;
 use projected::projected;
 
@@ -470,9 +470,9 @@ fn shared_line_rank(items: &[DimensionItem], index: usize, px: f64) -> usize {
 }
 
 #[cfg(test)]
-#[path = "sketch_dimension_layout_tests.rs"]
+#[path = "dimension_layout_tests.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "sketch_dimension_glitch_tests.rs"]
+#[path = "dimension_layout_glitch_tests.rs"]
 mod glitch_tests;

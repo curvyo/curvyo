@@ -255,6 +255,7 @@ fn a_corner_drag_is_free_and_ctrl_keeps_the_proportions() {
         let Shape::Rect { bounds, .. } = (match rig.document.object(rect).unwrap() {
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
             ObjectSnapshot::Primitive(p) => p.shape,

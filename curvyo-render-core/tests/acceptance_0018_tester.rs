@@ -969,6 +969,7 @@ fn a_closed_path_has_no_start_or_end_marker_and_keeps_the_settings() {
     match obj(&doc, p) {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(path) => {
             assert_eq!(path.style.stroke.markers.start, Shape::Arrow);
@@ -1459,6 +1460,7 @@ fn a_primitive_snapshot_with_marker_settings_draws_no_marker() {
     match &mut snap {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
@@ -1613,6 +1615,7 @@ fn compound_paths_get_markers_per_outline() {
     let (nodes_total, subpaths, first_closed) = match doc.object(id).unwrap() {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+        ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => {
             let n: usize = p.subpaths().map(|s| s.anchors.len()).sum();

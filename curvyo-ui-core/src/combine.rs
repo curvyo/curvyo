@@ -140,7 +140,8 @@ fn contours_of(owner: usize, object: &ObjectSnapshot) -> Vec<Contour> {
         | ObjectSnapshot::Clone(_)
         | ObjectSnapshot::Sketch(_)
         | ObjectSnapshot::Text(_)
-        | ObjectSnapshot::Image(_) => Vec::new(),
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => Vec::new(),
         ObjectSnapshot::Primitive(primitive) => {
             let placeholder = AnchorId::new(0, 0);
             vec![Contour {

@@ -61,7 +61,8 @@ fn shapes<'a>(objects: &'a [ObjectSnapshot], ids: &'a [NodeId]) -> Vec<&'a Shape
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_) => None,
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => None,
         })
         .collect()
 }

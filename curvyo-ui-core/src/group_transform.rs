@@ -68,6 +68,14 @@ pub(crate) fn apply(
     if let ObjectSnapshot::Image(image) = object {
         return ObjectSnapshot::Image(image.mapped_by(map_affine(image.id, map)));
     }
+    // A dimension takes every map whole into its free slots and kept points; its linked slots
+    // follow their geometry, and the writers hold a linked one whose referents stay
+    // (`specs/0070-measure-and-dimension`, ADR 0027 §5).
+    if let ObjectSnapshot::Dimension(dimension) = object {
+        return ObjectSnapshot::Dimension(Box::new(
+            dimension.mapped_by(map_affine(dimension.id, map)),
+        ));
+    }
     // A text takes every map whole: a uniform scale into its size, the rest into its placement
     // (`specs/0074-text-objects` criterion 26); it never converts.
     if let ObjectSnapshot::Text(text) = object {
@@ -95,7 +103,8 @@ pub(crate) fn apply(
                     ObjectSnapshot::Sketch(_)
                     | ObjectSnapshot::Clone(_)
                     | ObjectSnapshot::Text(_)
-                    | ObjectSnapshot::Image(_),
+                    | ObjectSnapshot::Image(_)
+                    | ObjectSnapshot::Dimension(_),
                     _,
                 ) => object.clone(),
             }
@@ -152,7 +161,8 @@ fn scale_by_magnitudes(
             ObjectSnapshot::Sketch(_)
             | ObjectSnapshot::Clone(_)
             | ObjectSnapshot::Text(_)
-            | ObjectSnapshot::Image(_),
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_),
             _,
         ) => object.clone(),
         (ObjectSnapshot::Primitive(_), Some(path)) if is_stretch(sx, sy) => {
@@ -939,6 +949,7 @@ mod tests {
         let points = |object: &ObjectSnapshot| -> Vec<Point> {
             match object {
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Primitive(p) => outline_of_rotated(&p.shape, p.rotation)

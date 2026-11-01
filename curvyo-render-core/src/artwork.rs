@@ -105,6 +105,9 @@ pub fn build_artwork_with_guides(
             // An image is a layer of its own that the host fills with its texture
             // (`specs/0058-bitmap-import` criterion 27).
             ObjectSnapshot::Image(image) => list.push_image(image),
+            // A dimension is drawn by its marks over the artwork, laid out for the view by the
+            // session (`specs/0070-measure-and-dimension`, ADR 0027); it is never artwork.
+            ObjectSnapshot::Dimension(_) => {}
         }
     }
     list
@@ -139,6 +142,8 @@ fn draw_guide(
         }
         // An image is never a guide (ADR 0019); it draws as itself.
         ObjectSnapshot::Image(image) => list.push_image(image),
+        // A dimension's marks are drawn by the session, over the artwork.
+        ObjectSnapshot::Dimension(_) => {}
         ObjectSnapshot::Text(_) | ObjectSnapshot::Sketch(_) => {
             if let Some(path) = object.drawn_path() {
                 let outlines: Vec<OutlineRef<'_>> = path

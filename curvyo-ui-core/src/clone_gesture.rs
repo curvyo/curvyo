@@ -143,6 +143,7 @@ mod tests {
             .iter()
             .map(|&id| match snapshot(&document, id) {
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),
@@ -194,6 +195,7 @@ mod tests {
             .iter()
             .map(|&id| match snapshot(&document, id) {
                 ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+                ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
                 ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
                 ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
                 ObjectSnapshot::Path(path) => ObjectSnapshot::Path(path.mapped(g)),

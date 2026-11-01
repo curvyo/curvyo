@@ -249,7 +249,10 @@ fn outline_of(object: &ObjectSnapshot) -> Option<&curvyo_document_core::PathSnap
         ObjectSnapshot::Path(path) => Some(path),
         ObjectSnapshot::Sketch(sketch) => Some(&sketch.resolved),
         ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
-        ObjectSnapshot::Primitive(_) | ObjectSnapshot::Text(_) | ObjectSnapshot::Image(_) => None,
+        ObjectSnapshot::Primitive(_)
+        | ObjectSnapshot::Text(_)
+        | ObjectSnapshot::Image(_)
+        | ObjectSnapshot::Dimension(_) => None,
     }
 }
 

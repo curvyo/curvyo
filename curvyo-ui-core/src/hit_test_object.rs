@@ -94,7 +94,11 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
                 || point.y < hull.1 - margin
                 || point.y > hull.3 + margin
         }
-        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => true,
+        // A dimension is hit on its screen-constant marks by the session, never here.
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Dimension(_) => true,
         ObjectSnapshot::Primitive(primitive) => {
             let (min, max) = shape_frame_bounds(&primitive.shape);
             let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
@@ -147,7 +151,10 @@ pub(crate) fn distance_to_object(
                 })
                 .min_by(f64::total_cmp)
         }
-        ObjectSnapshot::Sketch(_) | ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => None,
+        ObjectSnapshot::Sketch(_)
+        | ObjectSnapshot::Path(_)
+        | ObjectSnapshot::Clone(_)
+        | ObjectSnapshot::Dimension(_) => None,
         ObjectSnapshot::Primitive(primitive) => {
             let outline = outline_of_rotated(&primitive.shape, primitive.rotation);
             nearest_distance_on_run(outline.len(), outline.closed, point, tolerance, |i| {
@@ -181,6 +188,7 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
                 .collect()
         }
         ObjectSnapshot::Image(image) => crate::image_frame::frame_outline(image),
+        ObjectSnapshot::Dimension(_) => Vec::new(),
         // Marquee and lasso take a text by its line box (criterion 25).
         ObjectSnapshot::Text(text) => vec![(
             crate::text_box::line_box_corners(text)

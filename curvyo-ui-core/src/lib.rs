@@ -302,7 +302,8 @@ pub use image_import_text::{
 pub use image_placement::{ImagePlacement, ImageTarget, STAGGER_MM, natural_size_mm, place_image};
 pub use layer_move::{Reorder, move_refusal_text, reorder_plans, unchanged_text};
 pub use layer_rows::{
-    Cause, Container, Expansion, Flags, LayerRow, LayerRows, RowFacts, RowKind, RowMark, percent,
+    Cause, Container, Expansion, Flags, LayerRow, LayerRows, RowFacts, RowKind, RowMark,
+    dimension_row_name, percent,
 };
 pub use layer_text::{
     DUPLICATE_FAILED_NOTICE, NothingToSelect, OpacityTarget, delete_locked_layer_notice,
@@ -382,7 +383,8 @@ pub use ruler::{
 };
 pub use segment_bend::{BendResolution, segment_is_bendable};
 pub use select_bar::{
-    BarPreview, BarValue, ObjectKind, SelectBarState, ids_of_kind, select_bar_state,
+    BarPreview, BarValue, ObjectKind, SelectBarState, ids_of_kind, only_dimensions,
+    select_bar_state,
 };
 pub use select_bar_arc::{CurveBarState, EllipseBarState, GreyReason};
 pub use select_tool::{
@@ -515,8 +517,22 @@ pub use sketch_actions::{
     sketch_symmetric_about,
 };
 
-mod sketch_dimension_layout;
-pub use sketch_dimension_layout::{
+mod measure_pick;
+pub use measure_pick::{MeasurePick, arc_through, measure_pick, pick_node};
+mod measure_tool;
+pub use measure_tool::{
+    AnglePicks, CurveKind, SelectionDimension, angle_picks, angle_sector, free_pick,
+    mode_label as measure_mode_label, pick_point, radius_readout, readout_lines,
+    selection_dimension, selection_pick, two_point_kind,
+};
+mod vector_dimension;
+pub use vector_dimension::{dimension_geometry, dimension_item, label_point, place_at};
+mod dimension_text;
+pub use dimension_text::{
+    VECTOR_DECIMALS, dimension_speech, dimension_text, length_text, trimmed as trimmed_number,
+};
+mod dimension_layout;
+pub use dimension_layout::{
     DimensionArrow, DimensionGeometry, DimensionItem, DimensionMarks, layout_dimensions,
 };
 

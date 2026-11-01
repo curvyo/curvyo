@@ -68,7 +68,7 @@ impl SelectTool {
         snap_offset: Vec2,
     ) -> Option<LiveEdit> {
         let mut copy = false;
-        let resolved: Vec<ObjectSnapshot> =
+        let mut resolved: Vec<ObjectSnapshot> =
             if let Some(live) = self.live_move_snapped(pointer, shift, ctrl, snap_offset) {
                 copy = live.copy;
                 let selected: HashSet<NodeId> = selection.ids().iter().copied().collect();
@@ -112,6 +112,9 @@ impl SelectTool {
             };
         let committed: HashMap<NodeId, &ObjectSnapshot> =
             objects.iter().map(|object| (object.id(), object)).collect();
+        if !copy {
+            hold_staying_dimensions(&mut resolved, &committed);
+        }
         let changed = resolved.iter().any(|new| {
             committed
                 .get(&new.id())
@@ -304,5 +307,31 @@ impl SelectTool {
             frame.fixed_point.translated(half.negated()),
             frame.fixed_point.translated(half),
         ))
+    }
+}
+
+/// Puts back, as committed, every linked dimension of `resolved` that the edit leaves in place:
+/// the same decision the document's writers take ([`curvyo_document_core::staying_dimensions`]),
+/// so the preview shows what the release writes.
+fn hold_staying_dimensions(
+    resolved: &mut [ObjectSnapshot],
+    committed: &HashMap<NodeId, &ObjectSnapshot>,
+) {
+    let staying = curvyo_document_core::staying_dimensions(
+        &resolved
+            .iter()
+            .map(ObjectSnapshot::id)
+            .collect::<HashSet<NodeId>>(),
+        |id| match committed.get(&id) {
+            Some(ObjectSnapshot::Dimension(dimension)) => Some((**dimension).clone()),
+            _ => None,
+        },
+    );
+    for object in resolved.iter_mut() {
+        if staying.contains(&object.id())
+            && let Some(&start) = committed.get(&object.id())
+        {
+            *object = start.clone();
+        }
     }
 }

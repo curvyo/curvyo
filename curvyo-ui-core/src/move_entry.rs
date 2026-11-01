@@ -789,6 +789,7 @@ mod tests {
         assert_eq!(outcome, EntryOutcome::Committed);
         let centre = match document.object(id).expect("exists") {
             ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
+            ObjectSnapshot::Dimension(_) => unreachable!("no dimension in this test"),
             ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
             ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
             ObjectSnapshot::Clone(_) => panic!("no clone here"),
