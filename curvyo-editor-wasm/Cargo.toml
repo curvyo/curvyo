@@ -36,6 +36,10 @@ zip.workspace = true
 # (`specs/0025-raster-trace` criterion 58); the workspace's own decoder crate, no new package.
 image.workspace = true
 
+# `tests/svg_export_property.rs` runs criterion 151's property test of the SVG export over random
+# documents (`specs/0024-svg-import-export`); the workspace's own property-test crate.
+proptest.workspace = true
+
 # `tests/cpu_time/` times budget tests by the thread's CPU time, so a busy CI runner does not
 # fail them (the marquee frame of `specs/0053-node-marquee-selection/` crit. 25, the template
 # load of `specs/0046-document-shapes`).

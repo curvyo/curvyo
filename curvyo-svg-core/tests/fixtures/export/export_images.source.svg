@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     width="210mm" height="297mm" viewBox="0 0 210 297">
+  <g id="l1" inkscape:groupmode="layer" inkscape:label="Pictures">
+    <image inkscape:label="PNG with alpha" x="10" y="10" width="20" height="20" preserveAspectRatio="none" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR42mP4z8AAQg0MMAYAPlkG+70LYWUAAAAASUVORK5CYII="/>
+    <image inkscape:label="JPEG" x="40" y="10" width="40" height="20" preserveAspectRatio="none" xlink:href="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAB//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKcAclB//9k="/>
+    <image inkscape:label="WebP" x="90" y="10" width="40" height="20" preserveAspectRatio="none" xlink:href="data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvA0AAAAdQwML0v/+BiOh/AAA="/>
+    <image inkscape:label="PNG rotated" x="0" y="0" width="20" height="20" preserveAspectRatio="none" transform="translate(30 60) rotate(30)" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR42mP4z8AAQg0MMAYAPlkG+70LYWUAAAAASUVORK5CYII="/>
+    <image inkscape:label="JPEG mirrored" x="0" y="0" width="40" height="20" preserveAspectRatio="none" transform="matrix(-1 0 0 1 120 60)" opacity="0.5" xlink:href="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAQDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAB//EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKcAclB//9k="/>
+  </g>
+</svg>

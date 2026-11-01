@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="203.2mm" height="101.6mm" viewBox="0 0 203.2 101.6" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <rect id="rect1" x="2.645833" y="2.645833" width="25.4" height="12.7" fill="#0000ff" stroke="none" fill-rule="nonzero"/>
+    <rect id="rect2" x="31.75" y="2.645833" width="25.4" height="12.7" fill="none" stroke="#ff0000" stroke-width="0.529167" curvyo:stroke-width="0.5291666666666667"/>
+    <rect id="rect3" x="60.854167" y="2.645833" width="25.4" height="12.7" fill="#00ff00" stroke="#ff0000" stroke-width="0.529167" fill-rule="nonzero" curvyo:stroke-width="0.5291666666666667"/>
+    <rect id="rect4" x="89.958333" y="2.645833" width="25.4" height="12.7" fill="#abcdef" stroke="none" fill-rule="nonzero"/>
+    <g id="g2">
+      <path id="path1" d="M 13.229167 26.458333 L 23.8125 26.458333 L 23.8125 31.75 L 13.229167 31.75 Z" sodipodi:nodetypes="cccc" fill="#808000" stroke="none" fill-rule="nonzero"/>
+      <g id="g3">
+        <path id="path2" d="M 13.229167 26.458333 L 22.394602 31.75 L 19.748769 36.332718 L 10.583333 31.041051 Z" sodipodi:nodetypes="cccc" fill="#808000" stroke="none" fill-rule="nonzero"/>
+        <g id="g4">
+          <path id="path3" d="M 25.654403 36.687192 L 33.761505 43.811946 L 30.827003 48.55545 L 22.7199 41.430696 Z" sodipodi:nodetypes="cccc" fill="#808000" stroke="none" fill-rule="nonzero"/>
+          <path id="path4" d="M 43.911834 56.393561 C 42.801563 57.439855 40.086673 56.693114 37.847959 54.725668 C 35.609245 52.758221 34.694461 50.315101 35.804732 49.268807 C 36.915004 48.222512 39.629893 48.969253 41.868608 50.9367 C 44.107322 52.904146 45.022106 55.347266 43.911834 56.393561 Z" sodipodi:nodetypes="zzzzz" fill="#808000" stroke="none" fill-rule="nonzero"/>
+          <path id="path5" d="M 84.447345 92.017329 C 83.337074 93.063624 80.622184 92.316883 78.38347 90.349436 C 76.144756 88.38199 75.229972 85.93887 76.340243 84.892576 C 77.450515 83.846281 80.165404 84.593022 82.404119 86.560469 C 84.642833 88.527915 85.557617 90.971035 84.447345 92.017329 Z" sodipodi:nodetypes="zzzzz" fill="#808000" stroke="none" fill-rule="nonzero"/>
+        </g>
+      </g>
+    </g>
+    <path id="compound1" d="M 132.291667 26.458333 L 185.208333 26.458333 L 185.208333 79.375 L 132.291667 79.375 Z M 137.583333 74.083333 L 179.916667 74.083333 L 179.916667 31.75 L 137.583333 31.75 Z M 142.875 37.041667 L 174.625 37.041667 L 174.625 68.791667 L 142.875 68.791667 Z" sodipodi:nodetypes="cccccccccccc" fill="#000000" stroke="none" fill-rule="nonzero"/>
+    <path id="path6" d="M 158.75 84.666667 L 164.967708 103.8225 L 148.695833 91.969167 L 168.804167 91.969167 L 152.532292 103.8225 Z" sodipodi:nodetypes="ccccc" fill="#000000" stroke="none" fill-rule="nonzero"/>
+  </g>
+</svg>

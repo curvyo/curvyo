@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1" inkscape:label="Sketch">
+    <path id="path1" sodipodi:type="arc" sodipodi:cx="255" sodipodi:cy="248.5" sodipodi:rx="10" sodipodi:ry="10" sodipodi:start="0" sodipodi:end="1.5707963267948966" sodipodi:arc-type="arc" sodipodi:open="true" d="M 265 248.5 C 265 249.813219 264.741342 251.113578 264.238795 252.326834 C 263.736248 253.54009 262.999654 254.642482 262.071068 255.571068 C 261.142482 256.499654 260.04009 257.236248 258.826834 257.738795 C 257.613578 258.241342 256.313219 258.5 255 258.5" fill="none" stroke="#000000" stroke-width="0.25" curvyo:frame="255 248.5 10 10 0 0 1.5707963267948966"/>
+    <circle id="circle1" cx="205" cy="248.5" r="15" fill="none" stroke="#000000" stroke-width="0.25"/>
+    <path id="path2" d="M 115 158.5 L 155 158.5" sodipodi:nodetypes="cc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    <path id="path3" d="M 155 158.5 L 155 188.5" sodipodi:nodetypes="cc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    <path id="path4" d="M 155 188.5 L 115 188.5" sodipodi:nodetypes="cc" fill="none" stroke="#000000" stroke-width="0.25"/>
+    <path id="path5" d="M 115 188.5 L 115 158.5" sodipodi:nodetypes="cc" fill="none" stroke="#000000" stroke-width="0.25"/>
+  </g>
+</svg>

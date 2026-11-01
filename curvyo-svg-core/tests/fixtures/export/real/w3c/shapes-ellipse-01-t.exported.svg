@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <ellipse id="ellipse1" cx="13.229167" cy="19.84375" rx="7.9375" ry="13.229167" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+    <ellipse id="ellipse2" cx="42.333333" cy="19.84375" rx="7.9375" ry="13.229167" fill="#008000" stroke="none" fill-rule="nonzero"/>
+    <circle id="circle1" cx="71.4375" cy="21.166667" r="9.260417" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+    <circle id="circle2" cx="97.895833" cy="21.166667" r="9.260417" fill="#008000" stroke="none" fill-rule="nonzero"/>
+    <ellipse id="ellipse3" cx="13.229167" cy="58.208333" rx="7.9375" ry="13.229167" fill="none" stroke="#0000ff" stroke-width="2.116667" curvyo:stroke-width="2.1166666666666667"/>
+    <ellipse id="ellipse4" cx="42.333333" cy="58.208333" rx="7.9375" ry="13.229167" fill="#00ff00" stroke="#0000ff" stroke-width="2.116667" fill-rule="nonzero" curvyo:stroke-width="2.1166666666666667"/>
+    <ellipse id="ellipse5" cx="87.3125" cy="58.208333" rx="18.520833" ry="10.583333" fill="#00ff00" stroke="#0000ff" stroke-width="2.116667" fill-rule="nonzero" curvyo:stroke-width="2.1166666666666667"/>
+  </g>
+  <g id="g2">
+    <text id="text1" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect1" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

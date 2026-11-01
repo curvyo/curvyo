@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <g id="g2">
+      <g id="g3">
+        <rect id="rect1" x="29.608723" y="59.205179" width="39.6875" height="1.322917" transform="rotate(29.999999999999993 49.452473 59.866637)" fill="#008000" stroke="none" fill-rule="nonzero" curvyo:frame="49.45247338994067 59.86663686200818 39.6875 1.3229166666666667 0.5235987755982987"/>
+        <rect id="rect2" x="29.202101" y="48.816465" width="1.322917" height="13.229167" transform="rotate(29.999999999999993 29.863559 55.431049)" fill="#ff0000" stroke="none" fill-rule="nonzero" curvyo:frame="29.8635590038048 55.43104851057909 1.3229166666666667 13.229166666666666 0.5235987755982987"/>
+      </g>
+      <text id="text1" xml:space="preserve" x="17.197917" y="48.947917" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="5.291667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.471333333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="17.197917" y="48.947917">rotate+translate</tspan></text>
+      <g id="g4">
+        <rect id="rect3" x="49.927379" y="36.29159" width="39.6875" height="1.322917" transform="rotate(29.999999999999993 69.771129 36.953048)" fill="#0000ff" stroke="none" fill-rule="nonzero" curvyo:frame="69.77112910634744 36.95304805354491 39.6875 1.3229166666666667 0.5235987755982987"/>
+        <rect id="rect4" x="49.520756" y="25.902876" width="1.322917" height="13.229167" transform="rotate(29.999999999999993 50.182215 32.51746)" fill="#ff0000" stroke="none" fill-rule="nonzero" curvyo:frame="50.18221472021158 32.517459702115815 1.3229166666666667 13.229166666666666 0.5235987755982987"/>
+      </g>
+      <text id="text2" xml:space="preserve" x="39.6875" y="26.458333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="5.291667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="3.471333333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="39.6875" y="26.458333">translate+rotate</tspan></text>
+    </g>
+  </g>
+  <g id="g5">
+    <text id="text3" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect5" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

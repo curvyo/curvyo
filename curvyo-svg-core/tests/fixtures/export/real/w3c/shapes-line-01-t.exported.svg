@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="127mm" height="95.25mm" viewBox="0 0 127 95.25" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <g id="g1">
+    <g id="g2">
+      <path id="path1" d="M 9.921875 36.247917 L 29.765625 13.229167" sodipodi:nodetypes="cc" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+      <path id="path2" d="M 29.765625 36.247917 L 49.609375 13.229167" sodipodi:nodetypes="cc" fill="none" stroke="#ffff00" stroke-width="1.322917" curvyo:stroke-width="1.3229166666666667"/>
+      <path id="path3" d="M 49.609375 36.247917 L 69.453125 13.229167" sodipodi:nodetypes="cc" fill="none" stroke="#008000" stroke-width="1.984375"/>
+      <path id="path4" d="M 69.453125 36.247917 L 89.296875 13.229167" sodipodi:nodetypes="cc" fill="none" stroke="#0000ff" stroke-width="2.645833" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path5" d="M 89.296875 36.247917 L 109.140625 13.229167" sodipodi:nodetypes="cc" fill="none" stroke="#ff00ff" stroke-width="3.307292" curvyo:stroke-width="3.3072916666666665"/>
+    </g>
+    <g id="g3">
+      <path id="path6" d="M 44.979167 52.916667 L 58.208333 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#000000" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+      <path id="path7" d="M 58.208333 52.916667 L 58.208333 66.145833" sodipodi:nodetypes="cc" fill="#000000" stroke="#000000" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+      <path id="path8" d="M 58.208333 66.145833 L 71.4375 66.145833" sodipodi:nodetypes="cc" fill="#000000" stroke="#000000" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+      <path id="path9" d="M 71.4375 66.145833 L 71.4375 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#000000" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+      <path id="path10" d="M 71.4375 52.916667 L 84.666667 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#000000" stroke-width="0.264583" fill-rule="nonzero" curvyo:stroke-width="0.26458333333333334"/>
+    </g>
+    <g id="g4">
+      <path id="path11" d="M 6.614583 52.916667 L 19.84375 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#0000ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path12" d="M 19.84375 52.916667 L 19.84375 66.145833" sodipodi:nodetypes="cc" fill="#000000" stroke="#0000ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path13" d="M 19.84375 66.145833 L 33.072917 66.145833" sodipodi:nodetypes="cc" fill="#000000" stroke="#0000ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path14" d="M 33.072917 66.145833 L 33.072917 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#0000ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path15" d="M 33.072917 52.916667 L 46.302083 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#0000ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+    </g>
+    <g id="g5">
+      <path id="path16" d="M 97.895833 66.145833 L 111.125 66.145833" sodipodi:nodetypes="cc" fill="#000000" stroke="#000000" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path17" d="M 111.125 52.916667 L 124.354167 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#ff00ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path18" d="M 84.666667 52.916667 L 97.895833 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#0000ff" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path19" d="M 97.895833 52.916667 L 97.895833 66.145833" sodipodi:nodetypes="cc" fill="#000000" stroke="#008000" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+      <path id="path20" d="M 111.125 66.145833 L 111.125 52.916667" sodipodi:nodetypes="cc" fill="#000000" stroke="#ffa500" stroke-width="2.645833" fill-rule="nonzero" curvyo:stroke-width="2.6458333333333335"/>
+    </g>
+  </g>
+  <g id="g6">
+    <text id="text1" xml:space="preserve" x="2.645833" y="89.958333" font-family="SVGFreeSansASCII" font-weight="400" font-style="normal" font-size="8.466667" fill="#000000" stroke="none" fill-rule="nonzero" curvyo:size="5.554133333333334" curvyo:face="SVGFreeSansASCII|Regular|0000000000000000000000000000000000000000000000000000000000000000"><tspan sodipodi:role="line" x="2.645833" y="89.958333">$Revision: 1.1 $</tspan></text>
+  </g>
+  <rect id="rect1" x="0.264583" y="0.264583" width="126.470833" height="94.720833" fill="none" stroke="#000000" stroke-width="0.264583" curvyo:stroke-width="0.26458333333333334"/>
+</svg>

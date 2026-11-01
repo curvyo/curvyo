@@ -4,9 +4,11 @@
 //! session's cached read, pinned by `object_cache.rs`); the bytes a clone adds to the file are
 //! printed for the PR; the switches of `specs/0057-clone-overrides` for 10,000 clones within
 //! 250 ms each. Budgets are asserted in release builds only; a debug build runs a tenth of
-//! the size and prints the numbers. Every cost is the thread CPU time of the work, so the other
-//! tests of this file running in parallel do not count against it.
-//! Run: `cargo test --release -p curvyo-document-core --test clone_budget -- --nocapture`.
+//! the size and prints the numbers. Every cost is the thread CPU time of the work; the tests of
+//! this file still share caches and memory bandwidth when they run in parallel (the switch took
+//! up to twice as long on CI), so CI runs them one at a time, like the session's clone budget.
+//! Run: `cargo test --release -p curvyo-document-core --test clone_budget -- --nocapture
+//! --test-threads=1`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 

@@ -1,0 +1,456 @@
+{
+  "format_version": 30,
+  "size": {
+    "width": 210.0,
+    "height": 297.0
+  },
+  "pages": [
+    {
+      "id": "first",
+      "name": "Page 1",
+      "origin": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "size": {
+        "width": 210.0,
+        "height": 297.0
+      }
+    }
+  ],
+  "display_unit": "mm",
+  "background": {
+    "paint": "solid",
+    "color": [
+      232,
+      232,
+      235,
+      1.0
+    ]
+  },
+  "snapping": {
+    "enabled": false,
+    "objects": true,
+    "guides": true,
+    "nodes": true,
+    "page": true,
+    "x": true,
+    "y": true,
+    "capture_px": 8.0,
+    "release_px": 14.0
+  },
+  "objects": [
+    {
+      "shape": "layer",
+      "id": {
+        "peer": "32",
+        "counter": 7
+      },
+      "objects": [
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 10
+          },
+          "closed": false,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.5,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "none",
+                "end": "arrow",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000000",
+              "point": {
+                "x": 0.0,
+                "y": 10.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000001",
+              "point": {
+                "x": 100.0,
+                "y": 10.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0
+        },
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 28
+          },
+          "closed": false,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.5,
+              "color": {
+                "r": 204,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 0.5,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "arrow",
+                "mid": "none",
+                "end": "arrow",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000002",
+              "point": {
+                "x": 0.0,
+                "y": 20.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000003",
+              "point": {
+                "x": 100.0,
+                "y": 20.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0
+        },
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 48
+          },
+          "closed": false,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.5,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "arrow",
+                "end": "dot",
+                "mid_place": "nodes",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000004",
+              "point": {
+                "x": 0.0,
+                "y": 30.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000005",
+              "point": {
+                "x": 10.0,
+                "y": 30.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000006",
+              "point": {
+                "x": 10.0,
+                "y": 40.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0
+        },
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 74
+          },
+          "closed": false,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.5,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "none",
+                "mid": "dot",
+                "end": "none",
+                "mid_place": "spaced",
+                "mid_count": 3
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000007",
+              "point": {
+                "x": 0.0,
+                "y": 50.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "00000000000000200000000000000008",
+              "point": {
+                "x": 100.0,
+                "y": 50.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0
+        },
+        {
+          "shape": "path",
+          "id": {
+            "peer": "32",
+            "counter": 93
+          },
+          "closed": true,
+          "style": {
+            "stroke": {
+              "enabled": true,
+              "width": 0.5,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0,
+              "dash": [],
+              "join": "miter",
+              "cap": "butt",
+              "markers": {
+                "start": "arrow",
+                "mid": "none",
+                "end": "arrow",
+                "mid_place": "spaced",
+                "mid_count": 1
+              }
+            },
+            "fill": {
+              "enabled": false,
+              "color": {
+                "r": 0,
+                "g": 0,
+                "b": 0
+              },
+              "opacity": 1.0
+            }
+          },
+          "anchors": [
+            {
+              "id": "00000000000000200000000000000009",
+              "point": {
+                "x": 0.0,
+                "y": 60.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "0000000000000020000000000000000a",
+              "point": {
+                "x": 50.0,
+                "y": 60.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            },
+            {
+              "id": "0000000000000020000000000000000b",
+              "point": {
+                "x": 50.0,
+                "y": 90.0
+              },
+              "handle_in": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "handle_out": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "kind": "corner"
+            }
+          ],
+          "rotation": 0.0
+        }
+      ],
+      "name": "Markers"
+    }
+  ]
+}
