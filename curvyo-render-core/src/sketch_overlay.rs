@@ -115,41 +115,44 @@ pub fn build_sketch_solved(path: &PathSnapshot, view: ViewTransform) -> DrawList
     list
 }
 
-/// Draws the immutable local frame with distinct inferred-axis emphasis.
+/// How one local axis is drawn: as the faint frame, hovered, or selected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SketchAxisState {
+    /// The faint frame line.
+    Idle,
+    /// Under the pointer as a pick target: the geometry hover band behind the frame line.
+    Hovered,
+    /// Picked, selected or inferred: the accent line selected geometry uses.
+    Selected,
+}
+
+/// Draws the immutable local frame, X axis then Y axis, each in its `states` emphasis.
 #[must_use]
 pub fn build_sketch_axes(
     placement: curvyo_document_core::Affine,
     half_size: curvyo_document_core::Vec2,
-    hover: Option<Point>,
+    states: [SketchAxisState; 2],
     view: ViewTransform,
 ) -> DrawList {
     let mut list = DrawList::default();
-    for (a, b, active) in [
-        (
-            Point::new(-half_size.x, 0.0),
-            Point::new(half_size.x, 0.0),
-            hover.is_some_and(|p| p.y.abs() <= 1e-9),
-        ),
-        (
-            Point::new(0.0, -half_size.y),
-            Point::new(0.0, half_size.y),
-            hover.is_some_and(|p| p.x.abs() <= 1e-9),
-        ),
-    ] {
-        list.extend(glyphs::thick_line(
-            placement.apply_point(a),
-            placement.apply_point(b),
-            if active {
-                1.5 / view.scale()
-            } else {
-                0.5 / view.scale()
-            },
-            if active {
-                theme::ACCENT
-            } else {
-                theme::AXIS_GUIDE
-            },
-        ));
+    let ends = [
+        (Point::new(-half_size.x, 0.0), Point::new(half_size.x, 0.0)),
+        (Point::new(0.0, -half_size.y), Point::new(0.0, half_size.y)),
+    ];
+    for ((a, b), state) in ends.into_iter().zip(states) {
+        let (a, b) = (placement.apply_point(a), placement.apply_point(b));
+        let px = 1.0 / view.scale();
+        let lines: &[(f64, crate::color::RgbaColor)] = match state {
+            SketchAxisState::Idle => &[(0.5, theme::AXIS_GUIDE)],
+            SketchAxisState::Hovered => &[
+                (theme::SEGMENT_HOVER_WIDTH_PX, theme::SEGMENT_HOVER),
+                (0.5, theme::AXIS_GUIDE),
+            ],
+            SketchAxisState::Selected => &[(1.5, theme::ACCENT)],
+        };
+        for (width, color) in lines {
+            list.extend(glyphs::thick_line(a, b, width * px, *color));
+        }
     }
     list
 }
@@ -189,6 +192,57 @@ mod tests {
                 .triangles
                 .iter()
                 .all(|v| v.color == theme::SKETCH_LOCK_GUIDE)
+        );
+    }
+
+    /// Revision 5 polish: a hovered axis gets the geometry hover band, a picked or selected
+    /// axis the selection accent; the other axis stays the faint frame line.
+    #[test]
+    fn a_hovered_or_selected_axis_draws_in_the_geometry_highlight() {
+        let view = ViewTransform::new(2.0, Point::new(0.0, 0.0));
+        let half = curvyo_document_core::Vec2::new(50.0, 40.0);
+        let draw =
+            |states| build_sketch_axes(curvyo_document_core::Affine::IDENTITY, half, states, view);
+        let colors = |list: &DrawList| {
+            let mut colors = Vec::new();
+            for v in &list.triangles {
+                if !colors.contains(&v.color) {
+                    colors.push(v.color);
+                }
+            }
+            colors
+        };
+        let idle = draw([SketchAxisState::Idle, SketchAxisState::Idle]);
+        assert_eq!(colors(&idle), [theme::AXIS_GUIDE]);
+        // The hover band is the 4px segment hover band (`--segment-hover`), X axis only.
+        let hovered = draw([SketchAxisState::Hovered, SketchAxisState::Idle]);
+        let reach = |list: &DrawList, color, across: fn(&Point) -> f64| {
+            list.triangles
+                .iter()
+                .filter(|v| v.color == color && across(&v.position) < 10.0)
+                .map(|v| across(&v.position) * 2.0)
+                .fold(0.0, f64::max)
+        };
+        let across_x: fn(&Point) -> f64 = |p| p.y.abs();
+        let across_y: fn(&Point) -> f64 = |p| p.x.abs();
+        assert!((reach(&hovered, theme::SEGMENT_HOVER, across_x) - 2.0).abs() < 1e-9);
+        assert!((reach(&idle, theme::AXIS_GUIDE, across_x) - 0.25).abs() < 1e-9);
+        assert!((reach(&hovered, theme::AXIS_GUIDE, across_y) - 0.25).abs() < 1e-9);
+        let selected = draw([SketchAxisState::Idle, SketchAxisState::Selected]);
+        let accent = selected
+            .triangles
+            .iter()
+            .filter(|v| v.color == theme::ACCENT)
+            .collect::<Vec<_>>();
+        assert_eq!(accent.len(), 6, "one accent quad along the Y axis");
+        assert!(
+            accent
+                .iter()
+                .all(|v| (v.position.x.abs() * 2.0 - 0.75).abs() < 1e-9)
+        );
+        assert!(
+            colors(&selected).contains(&theme::AXIS_GUIDE),
+            "X stays the frame line"
         );
     }
 }

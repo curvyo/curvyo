@@ -44,6 +44,8 @@ mod rev4_hv_tests;
 #[cfg(test)]
 mod rev4_return_tests;
 #[cfg(test)]
+mod rev5_polish_tests;
+#[cfg(test)]
 mod rev5_tests;
 #[cfg(test)]
 mod tests;

@@ -40,6 +40,41 @@ impl Session {
         .collect()
     }
 
+    /// How the X and Y axes are drawn: selected when picked, selected or inferred for the
+    /// hovered point, hovered when a press would pick them (revision 5 polish).
+    pub(super) fn sketch_axis_states(&self) -> [curvyo_render_core::SketchAxisState; 2] {
+        use curvyo_render_core::SketchAxisState;
+        [
+            (
+                curvyo_ui_core::SKETCH_AXIS_X,
+                self.sketch.hover.map(|p| p.y.0),
+            ),
+            (
+                curvyo_ui_core::SKETCH_AXIS_Y,
+                self.sketch.hover.map(|p| p.x.0),
+            ),
+        ]
+        .map(|(axis, across)| {
+            let id = curvyo_sketch_core::EntityId::from(axis);
+            let inferred = !self.sketch_axis_pickable() && across.is_some_and(|a| a.abs() <= 1e-9);
+            if inferred || self.sketch.entities.contains(&id) {
+                SketchAxisState::Selected
+            } else if self.sketch.preselection.as_ref() == Some(&id) {
+                SketchAxisState::Hovered
+            } else {
+                SketchAxisState::Idle
+            }
+        })
+    }
+
+    /// Whether a press on empty canvas can pick an axis: in Select and the Constraints tools.
+    pub(super) fn sketch_axis_pickable(&self) -> bool {
+        matches!(
+            self.sketch.tool,
+            super::SketchTool::Select | super::SketchTool::Constraints
+        )
+    }
+
     pub(super) fn infer_sketch_axes(&self, mut point: Position) -> Position {
         // Proposal: a six-screen-pixel band, independent of Vector snap settings.
         let tolerance = curvyo_ui_core::SKETCH_EDGE_PICK_PX / self.view().scale();

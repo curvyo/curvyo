@@ -150,7 +150,13 @@ impl Session {
                     )
                 })
             })
-            .map(|hit| hit.entity);
+            .map(|hit| hit.entity)
+            // With no geometry under it, the pointer preselects an axis a press would pick.
+            .or_else(|| {
+                self.sketch_local(point)
+                    .filter(|_| self.sketch_axis_pickable())
+                    .and_then(|local| self.sketch_axes_at(local).into_iter().next())
+            });
     }
 
     pub(super) fn sketch_drag_hover(&mut self, point: Point) {

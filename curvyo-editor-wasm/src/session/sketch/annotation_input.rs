@@ -273,21 +273,7 @@ impl Session {
             .into_iter()
             .find(|r| r.id == *id)?;
         let label = field_label(&constraint.relation);
-        let value = match expression {
-            // A plain number is millimetres or degrees in the field, as when the dimension was made.
-            curvyo_sketch_core::Expression::Literal(q) => {
-                let number = if q.dimension() == curvyo_sketch_core::Dimension::Angle {
-                    q.value().to_degrees()
-                } else {
-                    q.value()
-                };
-                let text = format!("{number:.6}");
-                text.trim_end_matches('0').trim_end_matches('.').to_owned()
-            }
-            other => other
-                .display_text(&snapshot.graph.parameters)
-                .unwrap_or_default(),
-        };
+        let value = edit_value(expression, &snapshot.graph.parameters);
         Some(json!({
             "kind": "edit",
             "action": super::view::relation_name(&constraint.relation),
@@ -334,5 +320,23 @@ fn field_label(relation: &Relation) -> &'static str {
         | Relation::VerticalDistance { .. } => "Distance",
         Relation::Angle { .. } | Relation::Sweep { .. } | Relation::AxisAngle { .. } => "Angle",
         _ => "Length",
+    }
+}
+
+/// The text the entry box shows for a dimension's `expression`: a plain number in millimetres or
+/// degrees with at most three decimals, else the expression as written.
+pub(super) fn edit_value(
+    expression: &curvyo_sketch_core::Expression,
+    parameters: &curvyo_sketch_core::Parameters,
+) -> String {
+    match expression {
+        curvyo_sketch_core::Expression::Literal(q) => {
+            super::entry::entry_number(if q.dimension() == curvyo_sketch_core::Dimension::Angle {
+                q.value().to_degrees()
+            } else {
+                q.value()
+            })
+        }
+        other => other.display_text(parameters).unwrap_or_default(),
     }
 }
