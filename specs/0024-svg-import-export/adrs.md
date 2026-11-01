@@ -1,4 +1,4 @@
-# ADRs for "SVG import" (export later)
+# ADRs for "SVG import and export"
 
 Architect review, 2026-10-14, of the Draft specification and its six questions; reworked 2026-10-16 for
 the customer's decisions (see the specification, "Decided (customer, 2026-10-16)"): first slice is the
@@ -222,3 +222,265 @@ first importer (and, later, the first exporter). **One new ADR
 - SVG-EXPORT-LATER A: export is a later slice; the crate and ADR 0018 cover both halves so the
   crate name and boundary do not change. The export slice adds its own `plan.md` and a review of
   criterion 59 against `0049`/`0057` as built then.
+
+## Export (slice 4, architect 2026-11-01)
+
+Source: `export-plan.md` (accepted 2026-11-01: SVG-PAGES A with "Active page only", SVG-TEXT A,
+SVG-MARKERS A, SVG-GUIDES B, SVG-OPTIONS A, one PR), the "Later: export" criteria 4, 52 to 66,
+71 and 72, ADR 0018 and the code of the day. **No new crate, no new dependency, no
+`format_version` change** (confirmed: the export writes no project data; the import additions
+below use registers that exist since `0018`, `0046`, `0059`). Checked against the code: clone
+overrides are `CloneChain::own_placement` / `own_style` (`0057` as built), so criterion 59 (i)
+reads them directly; nothing in criterion 59 needs to change.
+
+**The SVG profile is a file format we write.** `curvyo:format="1"` and the `curvyo:` attribute
+list of criterion 57 (plus `curvyo:origin`, `curvyo:role`, `curvyo:font` below) are frozen once
+merged; a change is `curvyo:format="2"`. The reader ignores every `curvyo:` attribute when
+`curvyo:format` is missing or not `1` (Proposal). ADR 0018 gets a point 9 "Export and the
+`curvyo:` profile v1" with this section's decisions 1, 2, 5 and 9 before the PR (architect).
+
+### 1. Layers of the export (where each part lives)
+
+| Step | Crate / module | Input → output |
+|---|---|---|
+| Writer | `curvyo-svg-core` `export.rs` (types), `write.rs`, `write_style.rs`, `write_text.rs`, `write_number.rs`, `base64.rs` | `&SvgExport` → `String` |
+| Mapping | `curvyo-ui-core` `svg_export.rs`, `svg_export_style.rs`, `svg_export_text.rs` | document + session's laid-out objects → `SvgExport` |
+| Session glue | `curvyo-editor-wasm` `session/svg_export.rs`, `wasm_svg_export.rs` | options → `String` |
+| Desktop file | `curvyo-app` `svg_export.rs` (two commands), `curvyo-storage-io::write_atomic` | text → file |
+| Browser file | `frontend/src/platform/host.ts` (existing download helper) | text → Blob download |
+
+Why the mapping is in `ui-core` (rejected: `document-core`, `editor-wasm`): text outlines,
+"Text as paths" (`text_convert::text_path`), textPath layout and "Strokes as paths" (the
+geometry `stroke_to_path_plan` already calls) are `ui-core` code; `document-core` has no faces
+and must stay without text layout (ADR 0020). `editor-wasm` would make the mapping untestable
+without a session and break the symmetry with `ui-core::svg_import`. The session only supplies
+its laid-out `ObjectRead` (texts with `outline` set by its `fonts`), the selection and the
+active page.
+
+### 2. Writer input `SvgExport` (svg-core, no Curvyo dependency)
+
+Mirrors `SvgDrawing`; reuses the reader's `Rgb`, `Paint`, `Cap`, `Join`, `StarData`, `ArcData`,
+`DisplayUnitName`, `PageBackground`, `TextAnchor` (one definition per SVG concept).
+
+```rust
+pub struct SvgExport {
+    pub pages: Vec<ExportPage>,          // ≥ 1; [0] is the root viewport; mm, relative to `origin`
+    pub origin: (f64, f64),              // global mm of pages[0]'s corner → curvyo:origin
+    pub display_unit: DisplayUnitName,
+    pub background: PageBackground,
+    pub nodes: Vec<ExportNode>,          // top level, z-order, first at the bottom
+    pub guides: Vec<ExportNode>,         // leaves of the "Guides" layer; empty: no layer
+}
+pub struct ExportPage { pub name: String, pub rect: kurbo::Rect }
+pub struct ExportState { pub name: Option<String>, pub hidden: bool, pub locked: bool, pub opacity: f64 }
+pub enum ExportNode {
+    Group { state: ExportState, layer: bool, children: Vec<ExportNode> },
+    Leaf  { state: ExportState, leaf: ExportLeaf },       // takes a leaf number
+    Text  { state: ExportState, text: Box<ExportText> },  // takes a leaf number (textPath, use)
+    Image { state: ExportState, image: Box<ExportImage> },
+}
+pub struct ExportLeaf { pub kind: ExportKind, pub style: ExportStyle, pub shadow: Shadow }
+pub enum ExportKind {
+    Path    { path: BezPath, node_types: String, id_kind: PathIdKind }, // path|compound|polygon|star|rectangle|sketch → id prefix
+    Rect    { rect: Rect, rx: f64, ry: f64, rotation_deg: f64 },
+    Ellipse { center: Point, rx: f64, ry: f64, rotation_deg: f64 },    // <circle> when rx == ry
+    Star    { star: StarData, path: BezPath, node_types: String },
+    Arc     { arc: ArcData, path: BezPath, node_types: String },
+    Use     { original: usize, matrix: Affine },                       // leaf number of the target
+}
+pub struct ExportStyle { pub fill: Option<Paint>, pub stroke: Option<ExportStroke> }
+pub struct ExportStroke { pub paint: Paint, pub width_mm: f64, pub dash_mm: Vec<f64>,
+    pub cap: Cap, pub join: Join, pub start: Option<MarkerShape>, pub mid: Option<MarkerShape>,
+    pub end: Option<MarkerShape> }                                     // only markers SVG can draw
+pub struct Shadow { pub kind: Option<ShadowKind>, pub frame: Option<ShadowFrame>,
+    pub radii: Option<[f64; 4]>, pub dash: Option<Vec<f64>>, pub stroke_width: Option<f64>,
+    pub markers: Option<ShadowMarkers>, pub outlines: Option<Vec<bool>> }
+pub struct ExportImage { pub mime: &'static str, pub bytes: Arc<[u8]>, pub placement: Affine }
+pub fn write_svg(drawing: &SvgExport) -> String;
+pub fn is_isometry(m: Affine) -> bool;   // moved out of uses.rs, see 4
+```
+
+`ExportText` carries the transform, family list, weight, italic, size (mm), anchor, fill/stroke,
+`face_hash`, lines (start `x`/`y`, characters, per-character `dx` and `rotate` from ADR 0021
+marks) and `on_path: Option<{ carrier: usize, start_offset_mm: f64 }>`; field for field what
+`SvgText` reads, so slice 2's reader is the round-trip oracle (Proposal; the implementer may
+rename fields, not add concepts). **`Shadow` is shared with the reader:** `SvgLeaf` gains
+`shadow: Shadow` (raw typed values; svg-core does not judge them), and `ui-core::svg_import`
+applies criterion 57's agreement tolerances. All numbers in `SvgExport` are finite by
+construction of the mapping; the writer writes a non-finite number as `0` behind
+`debug_assert!` (no panic, no `Result`, Proposal).
+
+### 3. Numbers, escaping, ids, order (criteria 53, 54, 57, 60, 72)
+
+- `write_number.rs`: `fn coord(v, out)` = `{:.6}`, trailing zeros and a bare `.` trimmed, `-0` →
+  `0` (coordinates, lengths, `rect`/`ellipse` numbers, page rects, dash in mm, stroke width).
+  `fn exact(v, out)` = Rust `{}` (shortest round trip, never an exponent for `f64`), `-0` → `0`
+  (all `curvyo:` numbers, opacities, angles, ratios, the `use` matrix, text and image transforms).
+  Both are pure Rust formatting: no locale, no libc, same bytes on every target (ADR 0018 §6).
+  `{:.6}` re-reads to the same text, so criterion 63 holds after the first trip.
+- `escape(text, out)`: `& < > " '` as entities; names (criterion 53) also drop C0/C1 controls
+  and bidi controls U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069; text content drops only
+  characters XML 1.0 forbids.
+- Ids are assigned by the writer in one pre-pass in document order (guides layer last), counters
+  per prefix `layer g path compound rect ellipse circle polygon star arc text image use marker`
+  (criterion 53 plus `arc`, `text`, `image`, `marker`); `Use`/textPath targets are leaf numbers,
+  resolved to ids in the second pass, so a `use` may precede its target. No `HashMap` iteration
+  anywhere in writer or mapping; marker defs in order of first use (a `Vec`).
+- Element order: prolog, `<svg>` (namespaces `svg`, `xlink`, `inkscape`, `sodipodi`, `curvyo`,
+  always declared), `sodipodi:namedview` with `inkscape:page` children, `<defs>` only when a
+  marker is used, content, guides layer. Attribute order is fixed per element in `write*.rs`.
+
+### 4. Model mapping (ui-core)
+
+```rust
+pub struct SvgExportOptions { pub text_as_paths: bool, pub strokes_as_paths: bool,
+                              pub selection_only: bool, pub active_page_only: bool }
+pub struct ExportScope<'a> { pub selection: &'a [NodeId], pub active_page: usize }
+pub struct SvgExportOutcome { pub svg: SvgExport, pub objects: usize, pub texts_kept_live: usize }
+pub fn svg_export(document: &Document, laid: &ObjectRead, scope: &ExportScope<'_>,
+                  options: SvgExportOptions) -> SvgExportOutcome;
+```
+
+The four flags are the customer's (SVG-OPTIONS A), not speculative. The walk is
+`document.read_nodes()` for the tree and registers; each leaf's snapshot is taken from `laid`
+by id (texts with outlines). Per kind:
+- **Paths, primitives, arcs, curved sides, sketches:** criteria 54, 55; arcs as
+  `sodipodi:type="arc"` (slice 3 reads them back); curved-side polygon/star and rectangles with
+  unequal radii as `Path` + `curvyo:kind`/`curvyo:frame`; a sketch as one `Path` of
+  `SketchSnapshot::resolved`, constraints dropped (Proposal; imports as a path).
+- **Clones (criterion 59, the import's test):** `svg_core::is_isometry` (moved from `uses.rs`,
+  `ORTHOGONAL_TOLERANCE`, `MAX_COORDINATE_MM`) is the one test in both directions. `Use` when
+  `!own_placement && !own_style && is_isometry(chain.matrix)`, the origin's own `visible`
+  register is on, the origin is written (filters below) and the clone is in `laid.objects`
+  (orphans are not). Otherwise `Path` of `resolved` with its effective style.
+- **Origin shift.** Every absolute placement is pre-multiplied by `T = translate(-origin)`; a
+  clone's relative matrix is written as `T · M · T⁻¹` (same linear part, so the isometry test is
+  unaffected). Open with a valid `curvyo:origin` applies the inverse, so global coordinates and
+  pages come back exactly; Import SVG ignores it (it centres on the view, criterion 3).
+- **Text (SVG-TEXT A):** live `<text>` with `transform`, `font-family` (stored family),
+  `font-weight`, `font-style`, `font-size` (mm), one `<tspan x y>` per line, `dx`/`rotate` only
+  where ADR 0021 marks exist, plus `curvyo:font="<face_hash>"` so slice 2's `match_face` case (a)
+  finds the same face; `MISSING_FACE_HASH` is never written. Text on path: `<textPath
+  xlink:href="#carrier" startOffset>`; the carrier is always written (even outside a filter) and,
+  when it is a primitive, as a `Path` with shadow data, because SVG 1.1 and Inkscape take a path
+  only. "Text as paths" and single-line fonts (always): `text_convert::text_path`, one compound
+  `Path` per text (single-line: open outlines, stroked, no fill). A text drawn with a substitute
+  or missing face stays live and is counted in `texts_kept_live` for the notice (Proposal). A
+  text clone (`0022`) is written as an independent text with its resolved values; the link does
+  not survive the round trip (Proposal, listed as an exception in criterion 62).
+- **Images:** `<image x="0" y="0" width="1" height="1" preserveAspectRatio="none"
+  transform="matrix(T·placement)" xlink:href="data:<mime>;base64,…">` with the stored bytes
+  (`Document::asset`), mime from `curvyo-image-core`'s content identification. Base64 encoder
+  hand-written in svg-core (30 lines; rejected: the `base64` crate for one function).
+- **Markers (SVG-MARKERS A):** one `<marker>` per (shape, start|mid|end, stroke colour,
+  opacity), `markerUnits="strokeWidth"`, `orient="auto"`, start shapes drawn reversed (no SVG 2
+  `auto-start-reverse`), geometry from the renderer's marker constants. `marker-start`/`-end`
+  only on paths whose single open outline the model marks; `marker-mid` only for At nodes.
+  Spaced middle markers and marker cases SVG cannot express are carried by `curvyo:markers`
+  alone (default; question to the PO: other programs then draw no spaced markers). The importer
+  takes `curvyo:markers` only when every standard end it names still has its `marker-*`
+  property (criterion 57's rule).
+- **Guides (SVG-GUIDES B):** every node with `NodeRead::guide` leaves its place and goes, in
+  document order and flat, into `guides`; a group left empty is not written. The writer emits
+  `<g id="layerN" inkscape:groupmode="layer" inkscape:label="Guides" curvyo:role="guides"
+  style="display:none" sodipodi:insensitive="true">` on top. **Import recognition:** a top-level
+  layer with `curvyo:role="guides"` (namespace by URI); its hidden and locked flags are ignored,
+  its leaves come in as top-level objects at its z position with `guide = true` (paths and
+  primitives; ADR 0019 §2). The label is not used, so a renamed or translated layer still works.
+  Round trip compares guides as an ordered set of guide leaves, not by tree position (Proposal).
+- **Strokes as paths:** a stroked leaf becomes its stroke outline (filled with the stroke paint)
+  plus, when filled, its fill path, as a group with the leaf's name (Proposal); `Use` is kept.
+- **Filters.** Selection only: the selected nodes, their descendants and their ancestors as
+  containers. Active page only: leaves whose resolved bounds overlap the page
+  (`Page::overlaps`, the membership rule of ADR 0024), written whole, not clipped; that page is
+  `pages[0]` and the only page. Both together: intersection. A filtered-out clone origin makes
+  the clone a `Path`.
+- **Pages (SVG-PAGES A):** root `width`/`height`/`viewBox="0 0 w h"` = `pages[0]`; with two or
+  more pages each is `<inkscape:page id="pageN" x y width height inkscape:label>` in user units
+  (mm), positions relative to `pages[0]`. The reader gains `SvgDrawing::pages: Vec<SvgPage>` (all
+  `inkscape:page`, not only the first) and `origin`; `DrawingPage` gains the page list so
+  `Document::from_drawing` creates the pages on Open (one doc-core API change, no format change).
+
+### 5. Desktop and browser (criterion 4: whole or nothing)
+
+`wasm_svg_export.rs`: `export_svg(&self, text_as_paths: bool, strokes_as_paths: bool,
+selection_only: bool, active_page_only: bool) -> String` (scalars and a string, ADR 0001 §5),
+plus `export_svg_notice_counts()` for `objects` and `texts_kept_live`. The SVG is built whole in
+memory before anything is written. **Desktop:** `pick_svg_export_path(suggested_name) ->
+Option<String>` (native save dialog, filter `.svg`; the path stays in `AppState`, the page gets
+the file name), then the busy state and `export_svg`, then `write_svg_export(text: String) ->
+Result<String, String>` = `curvyo_storage_io::write_atomic` (temp file + rename, so a failure
+leaves the old file or nothing) to the stored path. A JSON string, not a number array as
+`save_project_bytes` uses (25 MB). **Browser:** `export_svg`, then one `Blob` and the existing
+download helper. Options are remembered per user in the frontend (`localStorage`, try/catch, the
+UX notes' place); they never enter the document.
+
+### 6. Tests
+
+- **Writer goldens (svg-core):** `curvyo-svg-core/tests/write.rs` builds `SvgExport` by hand:
+  criterion 52's skeleton byte for byte, number edge cases (`-0`, 1e-7, 0.1+0.2, ±1e7), escaping,
+  ids, markers, pages; goldens in `curvyo-svg-core/tests/fixtures/export/`.
+- **Exported goldens:** `name.exported.svg` beside each import fixture under
+  `curvyo-svg-core/tests/fixtures/svg_real/` and `inkscape_text/`, written by
+  `curvyo-editor-wasm/tests/svg_export_golden.rs` (Open through the session, so text faces are
+  real), which also checks criteria 63 and 64 (b), (c). `curvyo_all.svg` from the generated
+  document of criterion 62 in the same test. `CURVYO_UPDATE_GOLDEN=1` regenerates (project
+  pattern).
+- **Round-trip property test (criteria 62, 63):** `curvyo-ui-core/tests/svg_round_trip.rs`,
+  `proptest` (already a workspace dev-dependency) with 500 cases: generated `Vec<DrawingNode>`
+  and pages → `Document::from_drawing` → `svg_export` → `write_svg` → `read_svg` → `svg_import`
+  → `from_drawing`, compared on `read_nodes()` with ids dropped, geometry within 1e-6 mm, the
+  rest exact, then the second export byte-compared. Without text (no faces in `ui-core`); text
+  round trips are fixtures in the golden test. Criterion 72's locale run: the same test under
+  `LC_ALL=de_DE.UTF-8` in one case (Rust formatting ignores it; the test proves it).
+- **Criterion 61:** strip the three namespaces from each exported golden and compare outlines
+  with an independent flattener in the test (expands `use`, 0.01 mm).
+- **Budget 71 (export part):** `curvyo-editor-wasm/tests/svg_export_budget.rs`, the 20,000-path
+  document of `svg_import_budget.rs`, `Session::export_svg` timed by thread CPU
+  (`tests/cpu_time/`), asserts < 1.5 s and < 25 MB only when `!cfg!(debug_assertions)`, prints
+  otherwise; one line added to CI's `performance-budgets` job. This replaces the criterion's
+  `#[ignore]` benchmark (project pattern; PO amends the wording).
+- Hand check 65 with the current Inkscape by the tester, version in the PR.
+
+### Risks
+
+- **Reader work is part of the export.** Shadow data, all `inkscape:page`s, `curvyo:origin`, the
+  guides layer and `curvyo:font` are new import code; without them criteria 62 and 63 cannot
+  pass. Plan them first, test-first, against the writer goldens.
+- **Live text fidelity in other programs** depends on their shaping; positions are per line, so
+  Inkscape may set a line a little wider or narrower. Accepted by SVG-TEXT A.
+- **Inkscape page coordinates.** `first_inkscape_page` scales page attributes by the user-unit
+  factor; with `viewBox` in mm the factor is 1. The `inkscape_oracle.py` run confirms that
+  Inkscape 1.2+ places the pages where we wrote them before the goldens are blessed.
+
+### 2026-11-01 (architect review of the build): accepted deviations
+
+The build follows the customer-accepted specification where it is more specific than this
+section; review in `review-export.md`. The frozen profile v1 is ADR 0018 point 9's list, which
+**replaces** the names above: `curvyo:guides="1"` (not `curvyo:role`), `curvyo:face="family|style|hash"`
+plus `curvyo:size` (not `curvyo:font`), and **no `curvyo:origin`** (the export origin is the first
+page's, the pages' union's or the active page's corner; Open puts it at 0,0 and keeps relative page
+positions). Also accepted: `xmlns:xlink` only when needed; exported goldens in
+`curvyo-svg-core/tests/fixtures/export/real/`; writer references by key instead of leaf number;
+extra `curvyo:frame` on turned `<rect>`/`<ellipse>`, arcs and Inkscape stars for byte stability;
+text-on-path carriers keep their element kind (criterion 134); module names `write_leaf.rs`,
+`svg_export_parts.rs`, `svg_export_notices.rs`.
+
+### 2026-11-01 (implementer, review and acceptance fixes; Proposal)
+
+- `rotate` and `line-height` are written as the shortest round-trip text, each chosen as the
+  value next to the model's that the import gives back unchanged (degrees through the canvas's
+  radians; the factor through the 6-decimal `font-size`); arc angles likewise settle through the
+  document's degree register. A uniform radius that `rx` cannot say exactly adds `curvyo:frame`
+  and `curvyo:radii` to the `<rect>`; the import keeps those radii only when all four agree with
+  `rx` within 0.001 mm.
+- The text line anchor is SVG's: the chunk's whole advance (trailing letter spacing included)
+  and the import's upright lead; a turned character's `dx` is measured against the import's own
+  pens (a turned character shaped alone). Three import fixes this needed, in `svg_text_align`:
+  the alignment shift moves the origin by minus the residual (the placement is
+  `translate(origin)`; a centred text with letter spacing was off by half of it); a turned first
+  glyph is compared at its turned origin; a column's origin stays on the file's pen across the
+  column. A text matrix whose scale is 1 within 1e-12 counts as exactly 1.
+- New modules: `svg_export_shapes.rs` (primitives, one function per kind), `svg_export_sketch.rs`
+  (one object per drawn sketch entity, a circle or arc as the primitive its import gives),
+  `svg_export_pens.rs`, `svg_import_pages.rs`; `limits::MAX_PAGES = 1000`.
