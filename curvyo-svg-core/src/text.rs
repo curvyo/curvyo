@@ -274,6 +274,8 @@ impl Reader<'_, '_, '_> {
                                 cap: None,
                                 join: None,
                             },
+                            shadow: crate::export::Shadow::default(),
+                            marker_refs: [false; 3],
                         },
                     });
                     paths.push(SvgTextPath {
@@ -298,6 +300,16 @@ impl Reader<'_, '_, '_> {
                 paths,
                 flow,
                 text_length,
+                face: self
+                    .profile
+                    .then(|| crate::shadow::curvyo(node, "face").map(str::to_owned))
+                    .flatten(),
+                size: self
+                    .profile
+                    .then(|| crate::shadow::curvyo(node, "size"))
+                    .flatten()
+                    .and_then(|t| t.trim().parse::<f64>().ok())
+                    .filter(|v| v.is_finite()),
             }),
         })
     }

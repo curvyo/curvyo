@@ -6,6 +6,7 @@ use kurbo::Affine;
 use roxmltree::{Document, Node};
 
 use crate::drawing::{DisplayUnitName, PageBackground};
+use crate::limits::{MAX_COORDINATE_MM, MAX_PAGES};
 use crate::units::{MM_PER_INCH, Units, aspect, root_size_mm, view_box, view_box_map};
 
 /// The Inkscape namespace.
@@ -126,6 +127,53 @@ fn first_inkscape_page(root: Node<'_, '_>, px: f64) -> Option<(f64, f64)> {
             .filter(|n| n.is_finite() && *n > 0.0)
     };
     Some((side("width")? * px, side("height")? * px))
+}
+
+/// Every `inkscape:page` of the named view in file order, its rectangle in user units mapped
+/// to millimetres by `matrix` (criterion 129), and whether pages were left out for the count
+/// limit. A page without a positive size, or whose mapped rectangle is not finite or reaches
+/// beyond [`MAX_COORDINATE_MM`], is skipped (ADR 0018 point 6); at most [`MAX_PAGES`] are read.
+pub(crate) fn inkscape_pages(
+    root: Node<'_, '_>,
+    matrix: Affine,
+) -> (Vec<crate::drawing::SvgPage>, bool) {
+    let Some(view) = named_view(root) else {
+        return (Vec::new(), false);
+    };
+    let mut pages = Vec::new();
+    for page in view
+        .children()
+        .filter(|n| n.has_tag_name((INKSCAPE_NS, "page")))
+    {
+        if pages.len() == MAX_PAGES {
+            return (pages, true);
+        }
+        pages.extend(inkscape_page(page, matrix));
+    }
+    (pages, false)
+}
+
+/// One `inkscape:page` mapped by `matrix`; `None` when it has no positive size or lies outside
+/// the coordinate limit.
+fn inkscape_page(page: Node<'_, '_>, matrix: Affine) -> Option<crate::drawing::SvgPage> {
+    let number = |name| {
+        page.attribute(name)
+            .and_then(|t| t.trim().parse::<f64>().ok())
+            .filter(|n| n.is_finite())
+    };
+    let (w, h) = (number("width")?, number("height")?);
+    if !(w > 0.0 && h > 0.0) {
+        return None;
+    }
+    let (x, y) = (number("x").unwrap_or(0.0), number("y").unwrap_or(0.0));
+    let rect = matrix.transform_rect_bbox(kurbo::Rect::new(x, y, x + w, y + h));
+    let inside = [rect.x0, rect.y0, rect.x1, rect.y1]
+        .iter()
+        .all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE_MM);
+    inside.then(|| crate::drawing::SvgPage {
+        name: page.attribute((INKSCAPE_NS, "label")).map(str::to_owned),
+        rect,
+    })
 }
 
 /// `inkscape:document-units` when it is mm, cm or in (criterion 20 (b)).

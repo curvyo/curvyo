@@ -215,9 +215,10 @@ impl Reader<'_, '_, '_> {
 }
 
 /// Whether the linear part of `m` is orthogonal (a move, rotation or flip) within
-/// [`ORTHOGONAL_TOLERANCE`] and its translation within the coordinate limit.
+/// 1e-6 (`ORTHOGONAL_TOLERANCE`) and its translation within the coordinate limit.
 #[allow(clippy::many_single_char_names)] // the SVG names of the six entries
-fn is_isometry(m: Affine) -> bool {
+#[must_use]
+pub fn is_isometry(m: Affine) -> bool {
     let [a, b, c, d, e, f] = m.as_coeffs();
     let close = |value: f64, wanted: f64| (value - wanted).abs() <= ORTHOGONAL_TOLERANCE;
     close(a.mul_add(a, b * b), 1.0)

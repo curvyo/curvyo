@@ -33,6 +33,39 @@ fn timed(bytes: &[u8]) -> Result<curvyo_svg_core::SvgDrawing, SvgError> {
     result
 }
 
+const INKSCAPE_NS: &str = r#"xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape""#;
+
+/// Review finding 1 (ADR 0018 point 6): a page whose corner, mapped by the view, is not finite
+/// or beyond the coordinate limit is skipped.
+#[test]
+fn a_page_beyond_the_coordinate_limit_is_skipped() {
+    let svg = format!(
+        r#"<svg {NS} {INKSCAPE_NS} width="1000mm" height="1000mm" viewBox="0 0 1 1"><sodipodi:namedview><inkscape:page x="1e308" y="0" width="1" height="1"/><inkscape:page x="2e4" y="0" width="1" height="1"/><inkscape:page x="0" y="0" width="1" height="1" inkscape:label="kept"/></sodipodi:namedview></svg>"#
+    );
+    let drawing = timed(svg.as_bytes()).unwrap();
+    assert_eq!(drawing.pages.len(), 1, "{:?}", drawing.pages);
+    assert_eq!(drawing.pages[0].name.as_deref(), Some("kept"));
+}
+
+/// Review finding 1: at most `MAX_PAGES` pages are read, and the drawing says it was cut.
+#[test]
+fn pages_stop_at_the_page_limit() {
+    let mut svg = format!(
+        r#"<svg {NS} {INKSCAPE_NS} width="10mm" height="10mm" viewBox="0 0 10 10"><sodipodi:namedview>"#
+    );
+    for k in 0..curvyo_svg_core::limits::MAX_PAGES + 5 {
+        write!(
+            svg,
+            r#"<inkscape:page x="{k}" y="0" width="1" height="1"/>"#
+        )
+        .unwrap();
+    }
+    svg.push_str("</sodipodi:namedview></svg>");
+    let drawing = timed(svg.as_bytes()).unwrap();
+    assert_eq!(drawing.pages.len(), curvyo_svg_core::limits::MAX_PAGES);
+    assert!(drawing.truncated);
+}
+
 #[test]
 fn entity_bombs_and_external_entities_are_refused() {
     let bomb = r#"<?xml version="1.0"?><!DOCTYPE svg [
