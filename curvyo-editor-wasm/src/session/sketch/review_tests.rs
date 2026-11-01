@@ -258,6 +258,8 @@ fn a_dimension_that_leaves_no_valid_shape_keeps_its_box_open_with_the_reason_and
     assert!(s.sketch_apply_action("length", "20", false).unwrap());
     assert!(entry(&s).is_null(), "a solvable value closes the box");
     assert!(s.sketch_select_entity(&edge, false));
+    // The first dimension returned to Select (AC43): arm Dimension again.
+    assert!(s.set_sketch_constraint_tool("dimension"));
     click(&mut s, 10.0, -10.0);
     assert!(s.sketch_apply_action("length", "30", false).unwrap());
     let box_ = entry(&s);

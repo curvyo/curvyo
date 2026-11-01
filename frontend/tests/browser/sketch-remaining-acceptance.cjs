@@ -77,6 +77,8 @@ const deferred=[]; // oracles that failed: reported after the rest of the journe
   if(!process.env.CURVYO_REMAINING_PHASE||process.env.CURVYO_REMAINING_PHASE==='reference'){
    const {page,errors}=await h.fresh(browser);
    await h.tool(page,'Circle');await page.mouse.click(400,300);await page.mouse.click(440,300);
+   // 0066 revision 4 (AC42): the circle returns to Select with it selected; clear it so Dimension arms.
+   await page.keyboard.press('Escape');
    const status=await page.getByLabel('Sketch status').textContent();
    // Nothing selected: Dimension arms (a selection would apply at once, 0066 revision 3); pick the circle on its outline.
    await h.rail(page,'dimension').click();await page.mouse.move(440,300);await page.mouse.click(440,300);await page.mouse.move(560,380);await page.mouse.click(560,380);

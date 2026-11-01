@@ -168,6 +168,8 @@ pub(super) fn relation_name(relation: &Relation) -> &'static str {
         | Relation::SymmetricAxis { .. } => "symmetric",
         Relation::Midpoint { .. } => "midpoint",
         Relation::Distance { .. } => "distance",
+        Relation::HorizontalDistance { .. } => "horizontal-distance",
+        Relation::VerticalDistance { .. } => "vertical-distance",
         Relation::Length { .. } => "length",
         Relation::Radius { .. } | Relation::EllipseRadius { .. } => "radius",
         Relation::Diameter { .. } => "diameter",

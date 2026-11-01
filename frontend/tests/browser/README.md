@@ -64,6 +64,12 @@ a centre-first Arc whose start and end capture the two free endpoints, and check
 graph for four shared arc ends without duplicates; then a point and a segment selected first
 get a point-on Coincident. Screenshots go to `target/0066-browser/rev3/`.
 
+`sketch-rev4.cjs` (0066 customer revision 4) checks the two new rail tools after Dimension,
+that a rectangle, a polyline ended by Enter and two points each return to Select, then applies
+Horizontal distance (40 mm) and Vertical distance (15 mm) to two points selected by Shift-click,
+the aligned Dimension to the same two points selected by marquee, and checks the "↔"/"↕" texts
+and the saved signed relations. Screenshots go to `target/0066-browser/rev4/`.
+
 `sketch-host-cpu.cjs` opens the generated100-entity `target/0066-runtime/chain.curvyo`
 fixture through File/Open and drives real pointer events. Build the frontend with
 `npx vite build`, serve with `npx vite preview --host 127.0.0.1 --port 1421`, and use

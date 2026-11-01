@@ -5,35 +5,35 @@ use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Entity, EntityId, Length, Position};
 
 /// Clickable places of the test geometry (local millimetres).
-const P1: (f64, f64) = (60.0, 60.0);
-const P2: (f64, f64) = (75.0, 65.0);
-const P3: (f64, f64) = (70.0, 80.0);
-const L1: (f64, f64) = (25.0, 22.5);
-const L2: (f64, f64) = (25.0, 45.0);
-const L3: (f64, f64) = (25.0, 66.0);
-const C1: (f64, f64) = (108.0, 30.0);
-const C2: (f64, f64) = (136.0, 30.0);
-const A1: (f64, f64) = (110.0, 70.0);
-const E1: (f64, f64) = (155.0, 80.0);
-const L4: (f64, f64) = (20.0, 90.0);
-const A2: (f64, f64) = (40.0, 95.0);
-const X_AXIS: (f64, f64) = (70.0, 0.0);
-const Y_AXIS: (f64, f64) = (0.0, 70.0);
+pub(super) const P1: (f64, f64) = (60.0, 60.0);
+pub(super) const P2: (f64, f64) = (75.0, 65.0);
+pub(super) const P3: (f64, f64) = (70.0, 80.0);
+pub(super) const L1: (f64, f64) = (25.0, 22.5);
+pub(super) const L2: (f64, f64) = (25.0, 45.0);
+pub(super) const L3: (f64, f64) = (25.0, 66.0);
+pub(super) const C1: (f64, f64) = (108.0, 30.0);
+pub(super) const C2: (f64, f64) = (136.0, 30.0);
+pub(super) const A1: (f64, f64) = (110.0, 70.0);
+pub(super) const E1: (f64, f64) = (155.0, 80.0);
+pub(super) const L4: (f64, f64) = (20.0, 90.0);
+pub(super) const A2: (f64, f64) = (40.0, 95.0);
+pub(super) const X_AXIS: (f64, f64) = (70.0, 0.0);
+pub(super) const Y_AXIS: (f64, f64) = (0.0, 70.0);
 
-fn global(s: &Session, at: (f64, f64)) -> Point {
+pub(super) fn global(s: &Session, at: (f64, f64)) -> Point {
     s.sketch_placement()
         .unwrap()
         .apply_point(Point::new(at.0, at.1))
 }
 
-fn click(s: &mut Session, at: (f64, f64), shift: bool) {
+pub(super) fn click(s: &mut Session, at: (f64, f64), shift: bool) {
     let p = global(s, at);
     s.pointer_hover(p, shift, false);
     s.pointer_down(p, shift);
     s.pointer_up(p, shift, false);
 }
 
-fn session() -> Session {
+pub(super) fn session() -> Session {
     let mut s = Session::new(66_920);
     s.set_workbench(Workbench::Sketch);
     let p = |x: f64, y: f64| Position::mm(x, y);
@@ -85,7 +85,7 @@ fn session() -> Session {
     s
 }
 
-fn kinds(s: &Session) -> Vec<String> {
+pub(super) fn kinds(s: &Session) -> Vec<String> {
     let mut kinds: Vec<String> = s.sketch_view()["constraints"]
         .as_array()
         .unwrap()
@@ -96,7 +96,7 @@ fn kinds(s: &Session) -> Vec<String> {
     kinds
 }
 
-fn added(before: &[String], after: &[String]) -> Vec<String> {
+pub(super) fn added(before: &[String], after: &[String]) -> Vec<String> {
     let mut rest = after.to_vec();
     for kind in before {
         if let Some(i) = rest.iter().position(|k| k == kind) {
@@ -293,11 +293,10 @@ fn an_invalid_selection_applies_nothing_then_takes_fresh_picks() {
     click(&mut s, L1, false);
     assert_eq!(s.undo_len(), steps + 1);
     assert!(kinds(&s).contains(&"midpoint".to_owned()));
+    // AC43 (supersedes AC40's "stays armed"): back in Select with the point and the line.
     let selected: Vec<EntityId> = s.sketch.entities.iter().cloned().collect();
-    assert!(
-        selected.is_empty(),
-        "the armed tool clears its picks after applying"
-    );
+    assert_eq!(selected.len(), 2, "the picks stay selected");
+    assert_eq!(s.sketch.tool, SketchTool::Select);
 }
 
 /// Selects `start`, presses `tool` (it arms: the start is valid but incomplete), clicks
@@ -324,6 +323,16 @@ fn completes(tool: &str, start: &[(f64, f64)], completion: (f64, f64), expected:
     let mut want: Vec<String> = expected.iter().map(|k| (*k).to_owned()).collect();
     want.sort();
     assert_eq!(added(&before, &kinds(&s)), want, "{tool} {start:?}");
+    // AC43: back in Select with the geometry the relationship refers to.
+    assert_eq!(
+        s.sketch.tool,
+        SketchTool::Select,
+        "{tool} {start:?}: Select"
+    );
+    assert!(
+        !s.sketch.entities.is_empty() || completion == X_AXIS || completion == Y_AXIS,
+        "{tool} {start:?}: its geometry stays selected"
+    );
     s.undo();
     assert_eq!(kinds(&s), before, "{tool} {start:?}: undo");
 }

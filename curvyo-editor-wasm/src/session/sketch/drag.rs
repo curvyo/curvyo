@@ -83,6 +83,11 @@ impl Session {
             self.sketch_constraint_pick(&hit.entity);
             return;
         }
+        // Ctrl removes from the selection, as a Ctrl marquee does (AC47).
+        if self.held.ctrl && !self.held.shift {
+            self.sketch.entities.remove(&hit.entity);
+            return;
+        }
         if self.held.shift {
             if !self.sketch.entities.insert(hit.entity.clone()) {
                 self.sketch.entities.remove(&hit.entity);

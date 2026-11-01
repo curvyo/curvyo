@@ -251,6 +251,8 @@ fn a_placed_dimension_keeps_its_entry_when_the_pointer_leaves_the_canvas() {
         .map(|e| e["id"].as_str().unwrap().to_owned())
         .unwrap();
     s.set_sketch_tool(SketchTool::Select);
+    // The drawn circle is selected (AC42); Escape clears it.
+    s.escape();
     // Armed without a selection (a preselected circle is dimensioned at once, AC40), the circle
     // is picked on the canvas and the label placed.
     assert!(s.sketch_rail_press("dimension").unwrap_or(false));

@@ -192,13 +192,16 @@ impl Session {
         }
         let mut relations = step.relation.iter().cloned().collect::<Vec<_>>();
         relations.extend(self.sketch_typed_relations(prefix, &step.command, None));
+        let before = self.sketch_entity_ids();
         match self.sketch_construct_related(prefix, &step.command, &relations, &joins) {
             Ok(_) => {
                 self.sketch.cancel();
-                if self.sketch.tool == SketchTool::Polyline && !closing {
+                let open = self.sketch.tool == SketchTool::Polyline && !closing;
+                if open {
                     self.continue_sketch_chain(prefix, &step.command, chain.as_ref(), step.ends);
                     self.sketch_rejoin_chain_start(&joins, saved_picks.first().copied());
                 }
+                self.sketch_shape_committed(&before, open);
             }
             Err(error) => {
                 self.sketch.picks = saved_picks;

@@ -171,10 +171,18 @@ fn draw_line(s: &mut Session, a: Pt, b: Pt) {
     click(s, a.0, a.1);
     click(s, b.0, b.1);
     s.escape();
+    // AC42 (revision 4): a finished shape returns to Select with it selected; restore the
+    // tool and the empty selection this helper ended with before.
+    s.escape();
+    s.set_sketch_tool(SketchTool::Polyline);
 }
 fn place_point(s: &mut Session, p: Pt) {
     s.set_sketch_tool(SketchTool::Point);
     click(s, p.0, p.1);
+    // AC42 (revision 4): a finished shape returns to Select with it selected; restore the
+    // tool and the empty selection this helper ended with before.
+    s.escape();
+    s.set_sketch_tool(SketchTool::Point);
 }
 fn select(s: &mut Session, ids: &[sk::EntityId]) {
     for (i, id) in ids.iter().enumerate() {
@@ -673,6 +681,8 @@ fn scene() -> Scene {
     s.set_sketch_tool(SketchTool::Circle);
     click(&mut s, 250.0, 250.0);
     click(&mut s, 275.0, 250.0);
+    // AC42 (revision 4): each finished shape returns to Select.
+    s.set_sketch_tool(SketchTool::Circle);
     click(&mut s, 350.0, 250.0);
     click(&mut s, 365.0, 250.0);
     s.set_sketch_tool(SketchTool::Ellipse);
@@ -683,6 +693,7 @@ fn scene() -> Scene {
         place_point(&mut s, q);
     }
     s.set_sketch_tool(SketchTool::Select);
+    s.escape();
     let g = graph(&s);
     let mut l: Vec<_> = lines(&g).into_iter().collect();
     l.sort_by(|a, b| pos(&g, &a.1).1.total_cmp(&pos(&g, &b.1).1));
