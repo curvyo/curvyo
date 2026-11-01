@@ -58,7 +58,8 @@ export type Tool =
   | "polygon-star"
   | "offset"
   | "text"
-  | "trace";
+  | "trace"
+  | "measure";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */
@@ -142,6 +143,8 @@ export interface SelectBarState {
   scaleSwitchesShown: boolean;
   /** Stroke to path is enabled (`specs/0085-stroke-to-path` criterion 1). */
   strokeToPathEnabled: boolean;
+  /** Stroke to path is in the bar: not for a selection of dimensions only (`0070` UI review). */
+  strokeToPathShown: boolean;
 }
 
 const EMPTY_SELECT_BAR_STATE: SelectBarState = {
@@ -162,6 +165,7 @@ const EMPTY_SELECT_BAR_STATE: SelectBarState = {
   objectToPathShown: false,
   scaleSwitchesShown: true,
   strokeToPathEnabled: false,
+  strokeToPathShown: false,
 };
 
 function readSelectBar(raw: {
@@ -186,6 +190,7 @@ function readSelectBar(raw: {
   object_to_path_shown: boolean;
   scale_switches_shown: boolean;
   stroke_to_path_enabled: boolean;
+  stroke_to_path_shown: boolean;
   free(): void;
 }): SelectBarState {
   const state: SelectBarState = {
@@ -208,6 +213,7 @@ function readSelectBar(raw: {
     objectToPathShown: raw.object_to_path_shown,
     scaleSwitchesShown: raw.scale_switches_shown,
     strokeToPathEnabled: raw.stroke_to_path_enabled,
+    strokeToPathShown: raw.stroke_to_path_shown,
   };
   raw.free();
   return state;
@@ -2437,7 +2443,7 @@ export function useEditorSession(
         event.key === "Alt" && !event.ctrlKey && !event.metaKey && !event.getModifierState("AltGraph") &&
         (!sketchWorkbenchRef.current || !isFormControl(event.target)) &&
         lastPointerRef.current !== null &&
-        ["select", "pen", "rectangle", "ellipse", "polygon-star"].includes(
+        ["select", "pen", "rectangle", "ellipse", "polygon-star", "measure"].includes(
           sessionRef.current?.tool() ?? "",
         )
       ) {

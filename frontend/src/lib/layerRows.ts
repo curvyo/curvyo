@@ -33,6 +33,9 @@ export interface LayerRowData {
   kind: string;
   name: string;
   named: boolean;
+  /** What the row shows when it differs from the name: a dimension's value without the kind
+   * word (`0070` UI review); the name when absent. */
+  text?: string;
   visible: boolean;
   locked: boolean;
   effectiveVisible: boolean;

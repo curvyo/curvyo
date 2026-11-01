@@ -13,6 +13,7 @@ import {
   Locate,
   Lock,
   LockOpen,
+  Ruler,
   Spline,
   Square,
   Star,
@@ -56,6 +57,8 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   text: Type,
   // An image object (`specs/0058-bitmap-import` criterion 14).
   image: Image,
+  // A dimension (`specs/0070-measure-and-dimension` UX notes §9).
+  dimension: Ruler,
 };
 
 /** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */
@@ -327,10 +330,10 @@ export function LayerRow({
               className="h-7 min-w-0 flex-1 rounded-[5px] border border-[var(--field-border)] bg-white px-1.5 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
             />
           ) : dragging ? (
-            <span className={nameClass}>{row.name}</span>
+            <span className={nameClass} title={row.name}>{row.text ?? row.name}</span>
           ) : (
             <Tooltip side="left" content={tooltip}>
-              <span className={nameClass}>{row.name}</span>
+              <span className={nameClass} title={row.name}>{row.text ?? row.name}</span>
             </Tooltip>
           )}
           {row.containsSelection ? (

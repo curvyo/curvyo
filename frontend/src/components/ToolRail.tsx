@@ -3,6 +3,7 @@ import {
   MousePointer2,
   MousePointer as SelectIcon,
   PenTool as PenToolIcon,
+  RulerDimensionLine,
   Square,
   Star,
   Type,
@@ -258,7 +259,7 @@ export function ToolRail({
           {/* The Path tools card (`specs/0038-path-offset` criterion 1): tools, not commands. */}
           <div
             role="toolbar"
-            aria-label="Path tools"
+            aria-label="More tools"
             aria-orientation="vertical"
             className={RAIL_CARD_CLASS}
             style={RAIL_CARD_STYLE}
@@ -271,6 +272,18 @@ export function ToolRail({
               shortcut="O"
               hint="Drag a corner handle. Shift: both sides. Ctrl: new object."
               icon={<OffsetGlyph />}
+              onSelect={onSelect}
+              onReturnFocus={onReturnFocus}
+            />
+            {/* The Measure tool (`specs/0070-measure-and-dimension` criterion 2): M, as R, opens
+                the move entry in the Select tool with a selection. */}
+            <ToolButton
+              tool="measure"
+              active={tool === "measure"}
+              label="Measure tool"
+              name={`Measure tool (${letterActsOnSelection ? "Esc, M" : "M"})`}
+              shortcut={letterActsOnSelection ? "Esc, M" : "M"}
+              icon={<RulerDimensionLine size={20} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />
