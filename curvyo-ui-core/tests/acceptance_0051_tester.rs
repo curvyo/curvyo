@@ -252,6 +252,7 @@ fn c45_tabs_found_by_name_order_file_document_style_history() {
                     "history",
                     "fonts",
                     "snapping",
+                    "grid",
                     "sketches",
                     "parameters"
                 ]

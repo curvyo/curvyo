@@ -24,6 +24,7 @@ mod decorations;
 mod document_area;
 mod fill;
 mod glyphs;
+mod grid_lines;
 mod group_box;
 mod guide_style;
 mod history_preview;
@@ -54,9 +55,11 @@ pub use color::RgbaColor;
 pub use context_dim::{CONTEXT_DIM, dim_outside};
 pub use decorations::{DecorationInput, Hovered};
 pub use document_area::{
-    CheckerGrid, background_at, build_document_area, build_page_areas, checker_grid, checker_tone,
+    CheckerGrid, background_at, build_document_area, build_page_areas, build_page_areas_with_grids,
+    checker_grid, checker_tone,
 };
 pub use glyphs::{DrawList, Vertex};
+pub use grid_lines::{GridStroke, build_grid_lines, grid_ink};
 pub use group_box::{GroupBoxKind, GroupDecorationInput};
 pub use history_preview::build_history_preview;
 pub use image_layer::{ImageQuad, build_unreadable_frame};

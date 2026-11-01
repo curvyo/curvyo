@@ -44,6 +44,7 @@ fn c1_the_tabs_in_order_with_names_and_tooltips() {
                     "history",
                     "fonts",
                     "snapping",
+                    "grid",
                     "sketches",
                     "parameters"
                 ]
@@ -59,6 +60,7 @@ fn c1_the_tabs_in_order_with_names_and_tooltips() {
                     "History",
                     "Fonts",
                     "Snapping",
+                    "Grid & Rulers",
                     "Sketches",
                     "Parameters"
                 ]

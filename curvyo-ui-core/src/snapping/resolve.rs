@@ -95,6 +95,7 @@ pub fn resolve(
         held_x,
         held_y,
         marker,
+        grid: false,
     }
 }
 

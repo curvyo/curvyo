@@ -146,6 +146,8 @@ pub struct SnapSettings {
     pub nodes: bool,
     /// Snap to the six page fractions on each axis.
     pub page: bool,
+    /// Snap to shown page grids (`specs/0090-grid` criterion 10).
+    pub grid: bool,
     /// Allow correction of the horizontal coordinate.
     pub x: bool,
     /// Allow correction of the vertical coordinate.
@@ -174,6 +176,7 @@ impl SnapSettings {
             guides: value.guides,
             nodes: value.nodes,
             page: value.page,
+            grid: value.grid,
             x: value.x,
             y: value.y,
             capture,
@@ -331,6 +334,8 @@ pub struct HeldSnap {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SnapState {
     pub(crate) curve: Option<(HeldSnap, HeldSnap)>,
+    /// The held grid feature (`specs/0090-grid`), if the grid won the last frame.
+    pub(crate) grid: Option<crate::grid::HeldGrid>,
     /// The held target on the x axis.
     pub x: Option<HeldSnap>,
     /// The held target on the y axis.
@@ -343,12 +348,13 @@ impl SnapState {
         self.x = None;
         self.y = None;
         self.curve = None;
+        self.grid = None;
     }
 
     /// Whether nothing is held.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.x.is_none() && self.y.is_none()
+        self.x.is_none() && self.y.is_none() && self.grid.is_none()
     }
 }
 
@@ -407,6 +413,8 @@ pub struct SnapResult {
     pub held_y: Option<HeldSnap>,
     /// The marker geometry.
     pub marker: SnapMarker,
+    /// Whether a grid target holds an axis (`specs/0090-grid`).
+    pub grid: bool,
 }
 
 impl Default for SnapResult {
@@ -416,6 +424,7 @@ impl Default for SnapResult {
             held_x: None,
             held_y: None,
             marker: SnapMarker::default(),
+            grid: false,
         }
     }
 }
@@ -424,17 +433,20 @@ impl SnapResult {
     /// Whether nothing holds: the raw position is the result.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.held_x.is_none() && self.held_y.is_none()
+        self.held_x.is_none() && self.held_y.is_none() && !self.grid
     }
 }
 
 mod collection;
 mod compose;
 mod constrained;
+mod grid;
 mod index;
 mod resolve;
 mod targets;
+pub use collection::grid_snap_nodes;
 pub use constrained::{resolve_along, resolve_probe_along};
+pub use grid::resolve_with_grid;
 pub use resolve::resolve;
 pub use targets::{SnapExclusions, SnapTargets};
 #[cfg(test)]

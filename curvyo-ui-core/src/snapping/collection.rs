@@ -1,4 +1,4 @@
-//! Movement exclusions and aggregate group bounds over one resolved read.
+//! What a move touches, over one resolved read.
 use super::{HashSet, NodeId, NodeRead, ObjectSnapshot, Point, object_bounds};
 use std::collections::{HashMap, VecDeque};
 
@@ -61,4 +61,33 @@ pub(super) fn moving_groups(nodes: &[NodeRead], moving: &HashSet<NodeId>) -> Has
         }
     }
     ancestors
+}
+
+/// The grid probe points of a moved selection for the Nodes choice (criterion 11): the anchors
+/// of every moving visible path or clone, and the box centre of every other moving object.
+#[must_use]
+#[allow(clippy::implicit_hasher)] // The session's selection sets use the default hasher.
+pub fn grid_snap_nodes(nodes: &[NodeRead], selected: &HashSet<NodeId>) -> Vec<Point> {
+    let moving = moving(nodes, Some(selected));
+    let mut points = Vec::new();
+    for read in nodes {
+        if !read.visible || !moving.contains(&read.id) {
+            continue;
+        }
+        let Some(object) = read.object() else {
+            continue;
+        };
+        let is_path = matches!(object, ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_));
+        match object.drawn_path() {
+            Some(path) if is_path => points.extend(path.all_anchors().map(|anchor| anchor.point)),
+            _ => {
+                let (min, max) = object_bounds(object);
+                points.push(Point::new(
+                    f64::midpoint(min.x, max.x),
+                    f64::midpoint(min.y, max.y),
+                ));
+            }
+        }
+    }
+    points
 }

@@ -154,6 +154,8 @@ enum Drag {
     Nodes {
         down_at: Point,
         starts: Vec<(NodeId, curvyo_document_core::AnchorId, Point)>,
+        /// The anchor under the press, the grid probe (`specs/0090-grid` criterion 11).
+        pressed: (NodeId, curvyo_document_core::AnchorId),
     },
     /// Dragging one handle (acceptance criterion 9). `down_at` and
     /// `start_value` (the dragged slot's own value at press time) are
@@ -358,7 +360,7 @@ impl NodeTool {
                 } else if !self.selection.contains_node(anchor) {
                     self.selection.select_single_node(path, anchor);
                 }
-                self.begin_node_drag(paths, point);
+                self.begin_node_drag(paths, point, (path, anchor));
                 PointerDownOutcome::Node
             }
             Some(Hit::Segment { path, start, end }) => {
@@ -394,7 +396,12 @@ impl NodeTool {
     /// node keeps the selection, whether it spans one path or several").
     /// A selected node that no longer resolves (deleted since selection,
     /// `ADR 0009 §2`) is silently excluded from `starts`, not dragged.
-    fn begin_node_drag(&mut self, paths: &[PathSnapshot], down_at: Point) {
+    fn begin_node_drag(
+        &mut self,
+        paths: &[PathSnapshot],
+        down_at: Point,
+        pressed: (NodeId, curvyo_document_core::AnchorId),
+    ) {
         let starts = self
             .selection
             .node_pairs()
@@ -407,7 +414,11 @@ impl NodeTool {
                     .map(|a| (path, anchor_id, a.point))
             })
             .collect();
-        self.drag = Drag::Nodes { down_at, starts };
+        self.drag = Drag::Nodes {
+            down_at,
+            starts,
+            pressed,
+        };
     }
 
     /// Records the handle's current value (and its anchor's kind, for
@@ -492,9 +503,9 @@ impl NodeTool {
         cursor: Point,
     ) -> Vec<(NodeId, curvyo_document_core::AnchorId, Point)> {
         match &self.drag {
-            Drag::Nodes { down_at, starts } => {
-                Self::resolve_node_positions(*down_at, starts, cursor)
-            }
+            Drag::Nodes {
+                down_at, starts, ..
+            } => Self::resolve_node_positions(*down_at, starts, cursor),
             Drag::Handle {
                 path,
                 anchor,
@@ -521,6 +532,25 @@ impl NodeTool {
         }
     }
 
+    /// The pressed anchor's raw moved position during a node drag, the grid probe
+    /// (`specs/0090-grid` criterion 11). `None` for any other gesture, or when the press
+    /// deselected that anchor (Shift), so it does not move.
+    #[must_use]
+    pub fn snapping_pressed_point(&self, cursor: Point) -> Option<Point> {
+        let Drag::Nodes {
+            down_at,
+            starts,
+            pressed,
+        } = &self.drag
+        else {
+            return None;
+        };
+        starts
+            .iter()
+            .find(|&&(path, anchor, _)| (path, anchor) == *pressed)
+            .map(|&(_, _, start)| start.translated(down_at.vector_to(cursor)))
+    }
+
     /// Whether an anchor or handle gesture has left its exact press position.
     #[must_use]
     pub fn snapping_moved(&self, cursor: Point) -> bool {
@@ -542,7 +572,9 @@ impl NodeTool {
         match &self.drag {
             Drag::None | Drag::Marquee(_) => None,
             Drag::Bend(bend) => bend.resolve(cursor, shift).map(LiveNodeDrag::Bend),
-            Drag::Nodes { down_at, starts } => Some(LiveNodeDrag::Nodes {
+            Drag::Nodes {
+                down_at, starts, ..
+            } => Some(LiveNodeDrag::Nodes {
                 positions: Self::resolve_node_positions(*down_at, starts, cursor),
             }),
             Drag::Handle {
@@ -632,7 +664,9 @@ impl NodeTool {
                     PointerUpOutcome::NoOp
                 }
             }
-            Drag::Nodes { down_at, starts } => {
+            Drag::Nodes {
+                down_at, starts, ..
+            } => {
                 // A press and release at the exact same point writes
                 // nothing (`specs/0002-path-node-editing/adrs.md`'s dated
                 // architect-review note): under ADR 0009 §3, `point` is
@@ -1095,6 +1129,31 @@ mod tests {
         assert_eq!(moved.point, Point::new(5.0, 7.0));
         assert_eq!(moved.handle_in, Vec2::new(-3.0, 0.0));
         assert_eq!(moved.handle_out, Vec2::new(3.0, 0.0));
+    }
+
+    /// `specs/0090-grid` criterion 11: the grid probe of a node drag is the pressed anchor, not
+    /// a guess among the selected ones.
+    #[test]
+    fn snapping_pressed_point_follows_the_pressed_anchor() {
+        let document = Document::new(1);
+        let a = AnchorId::new(1, 1);
+        let b = AnchorId::new(1, 2);
+        let path = open_two_node_path(&document, a, b);
+        let paths = vec![document.path(path).expect("exists")];
+        let mut tool = NodeTool::new();
+        tool.pointer_down(&paths, Point::new(0.0, 0.0), TOLERANCES, false);
+        tool.pointer_up(&document, Point::new(0.0, 0.0), Modifiers::NONE);
+        let paths = vec![document.path(path).expect("exists")];
+        tool.pointer_down(&paths, Point::new(20.0, 0.0), TOLERANCES, true);
+        tool.pointer_up(&document, Point::new(20.0, 0.0), Modifiers::NONE);
+        assert_eq!(tool.selection().nodes().len(), 2);
+        let paths = vec![document.path(path).expect("exists")];
+        assert_eq!(tool.snapping_pressed_point(Point::new(1.0, 1.0)), None);
+        tool.pointer_down(&paths, Point::new(19.0, 0.5), TOLERANCES, false);
+        assert_eq!(
+            tool.snapping_pressed_point(Point::new(24.0, 3.5)),
+            Some(Point::new(25.0, 3.0))
+        );
     }
 
     /// The bug this run fixes: AC8/10's "update live during the drag"

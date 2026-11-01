@@ -23,6 +23,8 @@ pub enum PanelContent {
     Fonts,
     /// Document snapping controls.
     Snapping,
+    /// The active page's grid controls (`specs/0090-grid`).
+    Grid,
     /// Parametric sketch controls.
     Sketches,
     /// Named sketch parameters and formulas.
@@ -57,6 +59,7 @@ pub fn panel_body(
         PanelTab::File => PanelContent::File,
         PanelTab::Fonts => PanelContent::Fonts,
         PanelTab::Snapping => PanelContent::Snapping,
+        PanelTab::Grid => PanelContent::Grid,
         PanelTab::Sketches => PanelContent::Sketches,
         PanelTab::Parameters => PanelContent::Parameters,
     }

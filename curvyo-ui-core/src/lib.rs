@@ -47,6 +47,7 @@ mod format_form;
 mod format_list_view;
 mod fracture;
 mod glyph_table;
+mod grid;
 mod group_box;
 mod group_entry;
 mod group_transform;
@@ -243,6 +244,10 @@ pub use format_form::{
 pub use format_list_view::{FormatGroupView, FormatListView, FormatRowView, format_list_view};
 pub use fracture::{FRACTURE_COMMIT_LABEL, plan_fracture};
 pub use glyph_table::{GlyphGroup, GlyphTable, MAX_GLYPH_QUERY_CHARS, NO_BLOCK, glyph_table};
+pub use grid::{
+    GridCandidate, GridFeature, GridLayout, GridLine, GridSnapInput, HeldGrid, grid_layout,
+    snap_to_grid,
+};
 pub use group_box::{
     GroupBoxShape, GroupSelection, group_handles, hit_group_handle, is_drawn_group_handle,
 };
@@ -357,7 +362,9 @@ pub use reference_point::{
     shorter_side_px, visible_marks,
 };
 pub use resize_direction::ResizeDirection;
-pub use ruler::{RulerAxis, RulerLabel, RulerLayout, RulerMajor, ruler_layout};
+pub use ruler::{
+    RulerAxis, RulerDirection, RulerLabel, RulerLayout, RulerMajor, ruler_layout, ruler_layout_in,
+};
 pub use segment_bend::{BendResolution, segment_is_bendable};
 pub use select_bar::{
     BarPreview, BarValue, ObjectKind, SelectBarState, ids_of_kind, select_bar_state,
@@ -385,7 +392,7 @@ pub use skew_math::{SkewFrame, skew_angle, skew_factor, skew_frame};
 pub use snapping::{
     AxisProbe, HeldSnap, MarkerLine, PAGE_FRACTIONS, SnapCurve, SnapExclusions, SnapMarker,
     SnapProbe, SnapResult, SnapSettings, SnapState, SnapTarget, SnapTargets, TargetAxis,
-    TargetKind, resolve, resolve_along, resolve_probe_along,
+    TargetKind, grid_snap_nodes, resolve, resolve_along, resolve_probe_along, resolve_with_grid,
 };
 pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
 pub use stack_plan::{MAX_STACK_PIECES, StackPlan, StackRefusal};

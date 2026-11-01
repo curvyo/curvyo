@@ -55,6 +55,26 @@ pub enum RulerAxis {
     Vertical,
 }
 
+/// Which way a ruler counts (`specs/0090-grid` criterion 17): forward counts like the document
+/// axis (x to the right, y downward), reversed counts against it (x to the left, y upward), so a
+/// page's origin corner can count positive into the page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RulerDirection {
+    /// Values grow along the document axis.
+    Forward,
+    /// Values grow against the document axis.
+    Reversed,
+}
+
+impl RulerDirection {
+    const fn sign(self) -> f64 {
+        match self {
+            Self::Forward => 1.0,
+            Self::Reversed => -1.0,
+        }
+    }
+}
+
 /// One major tick: its index (value = index times the step) and its position
 /// along the strip, px.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -141,6 +161,31 @@ pub fn ruler_layout(
     digit_px: f64,
     minus_px: f64,
 ) -> RulerLayout {
+    ruler_layout_in(
+        view,
+        axis,
+        RulerDirection::Forward,
+        length_px,
+        unit,
+        digit_px,
+        minus_px,
+    )
+}
+
+/// [`ruler_layout`] counting in `direction`: a reversed ruler labels the document coordinate
+/// `-c` where a forward one labels `c`, so its 0 stays where the view puts document 0. The major
+/// ticks are ordered along the strip either way.
+#[must_use]
+pub fn ruler_layout_in(
+    view: ViewTransform,
+    axis: RulerAxis,
+    direction: RulerDirection,
+    length_px: f64,
+    unit: DisplayUnit,
+    digit_px: f64,
+    minus_px: f64,
+) -> RulerLayout {
+    let sign = direction.sign();
     let px_per_unit = view.scale() * unit.mm_per_unit();
     if !(length_px > 0.0 && length_px.is_finite() && px_per_unit.is_finite() && px_per_unit > 0.0) {
         return RulerLayout::empty();
@@ -150,18 +195,22 @@ pub fn ruler_layout(
         RulerAxis::Vertical => point.y,
     };
     let to_px = |value: f64| {
-        let mm = Length::from_unit(value, unit).as_mm();
+        let mm = sign * Length::from_unit(value, unit).as_mm();
         let (x, y) = view.document_to_screen(Point::new(mm, mm));
         match axis {
             RulerAxis::Horizontal => x,
             RulerAxis::Vertical => y,
         }
     };
-    let from_px = |px: f64| Length::from_mm(along(view.screen_to_document(px, px))).in_unit(unit);
-    let (start, end) = (from_px(0.0), from_px(length_px));
+    let from_px =
+        |px: f64| sign * Length::from_mm(along(view.screen_to_document(px, px))).in_unit(unit);
+    let span = |a: f64, b: f64| (a.min(b), a.max(b));
+    let (start, end) = span(from_px(0.0), from_px(length_px));
     if !(start.is_finite() && end.is_finite()) {
         return RulerLayout::empty();
     }
+    // The values whose tick can carry a drawn label: the label starts 4 px after its tick.
+    let labelled = span(from_px(-LABEL_OFFSET_PX), from_px(length_px));
 
     let Some(Step {
         mantissa,
@@ -169,19 +218,22 @@ pub fn ruler_layout(
         first,
         last,
         widest,
-    }) = choose_step(px_per_unit, start, end, digit_px, minus_px)
+    }) = choose_step(px_per_unit, (start, end), labelled, digit_px, minus_px)
     else {
         return RulerLayout::empty();
     };
     let step = f64::from(mantissa) * 10f64.powi(exponent);
     let major_px = step * px_per_unit;
 
-    let majors: Vec<RulerMajor> = (first..=last)
+    let mut majors: Vec<RulerMajor> = (first..=last)
         .map(|index| RulerMajor {
             index,
             px: to_px(index_value(index, step)),
         })
         .collect();
+    if direction == RulerDirection::Reversed {
+        majors.reverse();
+    }
     #[allow(clippy::cast_precision_loss)]
     let minors = (first..last)
         .flat_map(|index| {
@@ -244,15 +296,16 @@ struct Step {
 }
 
 /// Picks the smallest step that meets criterion 5 for the visible values
-/// `start..end` (in the display unit). The widest label is the longest text of
+/// `start..end` (in the display unit), where `labelled` are the values whose
+/// tick can carry a drawn label. The widest label is the longest text of
 /// any tick whose label could be drawn, not only those at the edges: "0.5"
 /// steps give ".5" labels one character longer than their neighbours. `None`
 /// when no step fits (a zoom outside any real range) or the strip would hold
 /// more than [`MAX_MAJORS`] ticks.
 fn choose_step(
     px_per_unit: f64,
-    start: f64,
-    end: f64,
+    (start, end): (f64, f64),
+    labelled: (f64, f64),
     digit_px: f64,
     minus_px: f64,
 ) -> Option<Step> {
@@ -273,8 +326,8 @@ fn choose_step(
             // carry a drawn label and must not widen the step.
             #[allow(clippy::cast_possible_truncation)]
             let (labelled_first, labelled_last) = (
-                ((start - LABEL_OFFSET_PX / px_per_unit) / step).ceil() as i64,
-                (end / step).floor() as i64,
+                (labelled.0 / step).ceil() as i64,
+                (labelled.1 / step).floor() as i64,
             );
             let widest = (labelled_first..=labelled_last)
                 .map(|index| text_width(&label_text(index, mantissa, exponent), digit_px, minus_px))

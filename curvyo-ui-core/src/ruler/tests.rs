@@ -429,3 +429,32 @@ fn only_negative_labels_pay_for_the_minus_sign() {
     assert!((text_width("\u{2212}12", 7.0, 10.0) - 24.0).abs() < 1e-9);
     assert!((text_width("\u{2212}0.5", 7.0, 10.0) - 31.0).abs() < 1e-9);
 }
+
+/// `specs/0090-grid` criterion 17: a reversed ruler keeps its 0 where document 0 is and labels
+/// the values left of (above) it positive, so a right or bottom origin corner counts into the page.
+#[test]
+fn a_reversed_ruler_counts_positive_against_the_document_axis() {
+    for axis in [RulerAxis::Horizontal, RulerAxis::Vertical] {
+        // Document 0 sits 700 px into the strip.
+        let view = view_at(100.0, -700.0 / PX_PER_MM_AT_100, -700.0 / PX_PER_MM_AT_100);
+        let forward = ruler_layout(view, axis, 800.0, DisplayUnit::Mm, DIGIT, DIGIT);
+        let reversed = ruler_layout_in(
+            view,
+            axis,
+            RulerDirection::Reversed,
+            800.0,
+            DisplayUnit::Mm,
+            DIGIT,
+            DIGIT,
+        );
+        assert_eq!(reversed.origin_px, forward.origin_px);
+        assert!((reversed.origin_px.unwrap() - 700.0).abs() < 1e-9);
+        assert!((reversed.step() - forward.step()).abs() < 1e-9);
+        // The tick labelled "100" lies 100 mm before the 0, not after it.
+        let label = reversed.labels.iter().find(|l| l.text == "100").unwrap();
+        assert!((label.tick_px - (700.0 - 100.0 * PX_PER_MM_AT_100)).abs() < 1e-9);
+        assert!(reversed.labels.iter().all(|l| !l.text.starts_with(MINUS)));
+        assert!(reversed.majors.windows(2).all(|w| w[0].px < w[1].px));
+        assert_eq!(reversed.minors.len(), (reversed.majors.len() - 1) * 4);
+    }
+}
