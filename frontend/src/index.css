@@ -169,6 +169,9 @@
     --panel-bg: var(--toolbar-bg);
     --panel-muted-fg: #5A5A5F;
     --field-placeholder: #6B6B6F;
+    /* 0061 UI review: a count the field derives (Grid Rows/Columns placeholder), lighter than
+       --panel-muted-fg so it does not read as typed; 4.49:1 on the white field ground. */
+    --field-derived-fg: #737379;
     --field-disabled-bg: #D0D0D4;
     --field-disabled-fg: #58585D;
     --swatch-border: var(--toolbar-icon);

@@ -260,6 +260,7 @@ function Editor() {
               }}
               flipEnabled={editor.flipEnabled}
               flip={editor.flip}
+              align={editor.align}
               guideState={editor.guideState}
               onToggleGuide={editor.toggleGuide}
               arcBar={editor.arcBar}

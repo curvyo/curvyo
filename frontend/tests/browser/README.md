@@ -49,6 +49,16 @@ returns to the unconstrained preview on the next Ctrl tap. It verifies
 stored-state/geometry invariants and native lone-Alt menu suppression. Creation
 screenshots are written to `target/browser-check/creation-*-alt-held.png`.
 
+### Align, distribute and grid (0061)
+
+`align-distribute.cjs` presses the Select bar's arrange buttons in the running dev server and
+reads the positions back from saved projects: align with nothing selected on the second of two
+pages (the first page's object stays), one object onto its page, distribute with nothing (n + 1
+equal gaps), one (centred) and two (thirds) selected, and Arrange in a grid (linked Rows and
+Columns, the "Must be 1 or more." refusal, 2 x 3 with gap 5 in reading order), plus the history
+names. Use the Playwright/runtime environment above; screenshots and the saved projects go to
+`target/0061-browser/`.
+
 ### Sketch workbench independent acceptance (0066)
 
 `sketch-acceptance.cjs` exercises real annotation editing, native text undo, conflict
