@@ -422,9 +422,18 @@ jobs:
           crate="${{ matrix.crate }}"
           tree_output=$(cargo tree --target wasm32-unknown-unknown -p "$crate" -e normal --prefix none --format '{p}')
           # gitoxide is the *project* name (ADR 0011 §6); its crate is `gix`.
-          if echo "$tree_output" | grep -E '^(rayon|tokio|reqwest|keyring|gitoxide|gix|mio|socket2) v'; then
+          if echo "$tree_output" | grep -E '^(tokio|reqwest|keyring|gitoxide|gix|mio|socket2) v'; then
             echo "::error::$crate pulls a banned dependency into its wasm32-unknown-unknown tree (see the match above)"
             exit 1
+          fi
+          # ADR 0027 §4: `rayon` may appear only through the `rten` crates (single-threaded in
+          # wasm); any other crate that depends on it fails.
+          if echo "$tree_output" | grep -qE '^rayon v'; then
+            dependents=$(cargo tree --target wasm32-unknown-unknown -p "$crate" -e normal -i rayon --depth 1 --prefix none --format '{p}' | tail -n +2 | sort -u)
+            if echo "$dependents" | grep -vE '^rten(-[a-z]+)? v'; then
+              echo "::error::$crate pulls rayon through something other than rten (see the match above)"
+              exit 1
+            fi
           fi
           echo "$crate: clean"
 

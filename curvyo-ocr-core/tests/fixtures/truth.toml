@@ -1,0 +1,15 @@
+# The text lines of the reference set (`specs/0091-trace-text-recognition`, reference set),
+# rendered with ImageMagick from the included OFL fonts (Source Sans 3, Source Serif 4) and
+# Liberation Mono (OFL-1.1, a face Curvyo does not include, criterion 4).
+[[images]]
+file = "poster.png"
+lines = ["BÄCKEREI", "SALE", "Müller & Söhne", "Größe 42 mm, Laser 0.2", "Wedding", "FRESH", "Art.-Nr. 0815/ÄÖÜ äöü ß", "small print: est. 1998 in Hamburg"]
+
+[[images]]
+file = "poster_noisy.jpg"
+lines = ["BÄCKEREI", "SALE", "Müller & Söhne", "Größe 42 mm, Laser 0.2", "Wedding", "FRESH", "Art.-Nr. 0815/ÄÖÜ äöü ß", "small print: est. 1998 in Hamburg"]
+
+[[images]]
+file = "rotated.png"
+lines = ["Tilted 15"]
+rotation_degrees = -15.0

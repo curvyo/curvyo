@@ -71,6 +71,10 @@ name = "curvyo-sketch-core"
 
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
+name = "curvyo-ocr-core"
+
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ui-core"
 
 [[licenses.exceptions]]

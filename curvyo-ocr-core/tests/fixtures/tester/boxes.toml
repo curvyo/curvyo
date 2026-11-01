@@ -1,0 +1,33 @@
+# The ink box of each line of poster.png in px (`make_posters.py`).
+
+[[lines]]
+text = "Größe"
+box = [120, 138, 666, 282]
+
+[[lines]]
+text = "Übermaß"
+box = [120, 407, 713, 528]
+
+[[lines]]
+text = "Äpfel & Öl"
+box = [120, 641, 567, 753]
+
+[[lines]]
+text = "Tel. 0421 98765"
+box = [120, 841, 577, 893]
+
+[[lines]]
+text = "Fräsen ab 3 Stück, 12.50 EUR"
+box = [120, 973, 681, 1014]
+
+[[lines]]
+text = "Straße 7"
+box = [170, 1210, 686, 1312]
+
+[[lines]]
+text = "Mono 314 Zoll"
+box = [120, 1569, 822, 1636]
+
+[[lines]]
+text = "Brücke über Täler"
+box = [120, 1786, 779, 1852]
