@@ -23,6 +23,8 @@ pub(in crate::session) struct LabelDrag {
 pub(super) struct AnnotationHit {
     pub id: ConstraintId,
     pub dimension: bool,
+    /// Hit on a dimension's line rather than its text or a symbol.
+    pub line: bool,
 }
 
 impl Session {
@@ -36,6 +38,7 @@ impl Session {
             return Some(AnnotationHit {
                 id: record.id.clone(),
                 dimension: true,
+                line: false,
             });
         }
         let (symbols, _) = self.sketch_symbol_records(&snapshot);
@@ -43,6 +46,7 @@ impl Session {
             return Some(AnnotationHit {
                 id: record.id.clone(),
                 dimension: false,
+                line: false,
             });
         }
         dimensions
@@ -52,6 +56,7 @@ impl Session {
             .map(|r| AnnotationHit {
                 id: r.id.clone(),
                 dimension: true,
+                line: true,
             })
     }
 
@@ -61,8 +66,7 @@ impl Session {
         let Some(hit) = self.sketch_annotation_at(point) else {
             return false;
         };
-        // Geometry under the pointer wins: a text lying over a small sketch never blocks a drag.
-        if self.sketch_geometry_at(point) {
+        if self.sketch_annotation_yields(point, &hit) {
             return false;
         }
         self.sketch.canvas_edit = None;
@@ -77,7 +81,18 @@ impl Session {
         true
     }
 
-    /// Whether sketch geometry is within the 6px pick tolerance of `point`.
+    /// Geometry under the pointer wins over an annotation: a text lying over a small sketch never
+    /// blocks a drag; a local axis wins over a dimension line crossing it, so the axis stays a
+    /// constraint target there (0066 AC52).
+    fn sketch_annotation_yields(&self, point: Point, hit: &AnnotationHit) -> bool {
+        self.sketch_geometry_at(point)
+            || (hit.line
+                && self
+                    .sketch_local(point)
+                    .is_some_and(|local| !self.sketch_axes_at(local).is_empty()))
+    }
+
+    /// Whether sketch geometry is within pick reach of `point`.
     fn sketch_geometry_at(&self, point: Point) -> bool {
         let (Ok(snapshot), Some(local)) =
             (self.sketch_snapshot_for_edit(), self.sketch_local(point))
@@ -88,7 +103,7 @@ impl Session {
             &snapshot.graph,
             &snapshot.solution,
             local,
-            curvyo_sketch_core::Length(6.0 / self.view().scale()),
+            curvyo_sketch_core::Length(1.0 / self.view().scale()),
         )
         .is_some()
     }
@@ -161,11 +176,10 @@ impl Session {
 
     /// Records which annotation the pointer is over, for highlight and cursor.
     pub(super) fn sketch_annotation_hover(&mut self, point: Point) {
-        self.sketch.annotation_hover = if self.sketch_geometry_at(point) {
-            None
-        } else {
-            self.sketch_annotation_at(point).map(|hit| hit.id)
-        };
+        self.sketch.annotation_hover = self
+            .sketch_annotation_at(point)
+            .filter(|hit| !self.sketch_annotation_yields(point, hit))
+            .map(|hit| hit.id);
     }
 
     /// Whether the hovered annotation is a dimension, whose text can be dragged.

@@ -38,18 +38,18 @@ impl Session {
         if snapshot.stale {
             return "default";
         }
-        let tolerance = Length(6.0 / self.view().scale());
+        let px = Length(1.0 / self.view().scale());
         let handle = curvyo_ui_core::sketch_handle_hit(
             &snapshot.graph,
             &snapshot.solution,
             &self.sketch.entities,
             local,
-            tolerance,
+            Length(px.0 * curvyo_ui_core::SKETCH_EDGE_PICK_PX),
         );
         if handle.is_some() {
             return "grab";
         }
-        let hit = curvyo_ui_core::sketch_hit(&snapshot.graph, &snapshot.solution, local, tolerance);
+        let hit = curvyo_ui_core::sketch_hit(&snapshot.graph, &snapshot.solution, local, px);
         match hit {
             Some(hit) if entity_movable(&snapshot, &hit.entity) => "grab",
             _ => "default",

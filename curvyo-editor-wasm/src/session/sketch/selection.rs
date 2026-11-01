@@ -45,13 +45,18 @@ impl Session {
             let Some(local) = self.sketch_local(*start) else {
                 return;
             };
-            let hits = curvyo_ui_core::sketch_hits(
+            // Alt-click cycles through everything in reach: points, edges, then the axes
+            // (AC34, AC50, AC52).
+            let ids = curvyo_ui_core::sketch_pick_order(
                 &snapshot.graph,
                 &snapshot.solution,
                 local,
-                Length(6.0 / self.view().scale()),
-            );
-            let ids = hits.into_iter().map(|h| h.entity).collect::<Vec<_>>();
+                Length(1.0 / self.view().scale()),
+            )
+            .into_iter()
+            .map(|h| h.entity)
+            .chain(self.sketch_axes_at(local))
+            .collect::<Vec<_>>();
             let index = match &self.sketch.hit_cycle {
                 Some((point, old, index))
                     if point.vector_to(*start).length() * self.view().scale() <= 1.0
@@ -79,7 +84,7 @@ impl Session {
             &snapshot.graph,
             &snapshot.solution,
             &local,
-            Length(6.0 / self.view().scale()),
+            Length(curvyo_ui_core::SKETCH_EDGE_PICK_PX / self.view().scale()),
         );
         match curvyo_ui_core::SelectionCombine::from_modifiers(self.held.shift, self.held.ctrl) {
             curvyo_ui_core::SelectionCombine::Replace => self.sketch.entities = found,

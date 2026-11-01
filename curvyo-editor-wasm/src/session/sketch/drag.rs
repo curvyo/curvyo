@@ -33,7 +33,7 @@ impl Session {
             &base.solution,
             &self.sketch.entities,
             local,
-            Length(6.0 / self.view().scale()),
+            Length(curvyo_ui_core::SKETCH_EDGE_PICK_PX / self.view().scale()),
         );
         let hit = handle
             .as_ref()
@@ -46,7 +46,7 @@ impl Session {
                     &base.graph,
                     &base.solution,
                     local,
-                    Length(6.0 / self.view().scale()),
+                    Length(1.0 / self.view().scale()),
                 );
                 let ids = hits
                     .iter()
@@ -126,6 +126,33 @@ impl Session {
         self.sketch_armed_pick(entity);
     }
 
+    /// A move with no drag in progress: annotation hover, the label anchor and the
+    /// preselection under the pointer.
+    fn sketch_idle_hover(&mut self, point: Point) {
+        self.sketch_annotation_hover(point);
+        // The dimension label and a constraint tool's hint sit at the pointer (AC34, AC40).
+        if self.sketch.constraint_tool.as_deref() == Some("dimension")
+            || self.sketch.constraint_hint.is_some()
+            || self.sketch_pick_rule().is_some()
+        {
+            self.sketch.hover = self.sketch_local(point);
+        }
+        self.sketch.preselection = self
+            .sketch_snapshot_for_edit()
+            .ok()
+            .and_then(|snapshot| {
+                self.sketch_local(point).and_then(|local| {
+                    curvyo_ui_core::sketch_hit(
+                        &snapshot.graph,
+                        &snapshot.solution,
+                        local,
+                        Length(1.0 / self.view().scale()),
+                    )
+                })
+            })
+            .map(|hit| hit.entity);
+    }
+
     pub(super) fn sketch_drag_hover(&mut self, point: Point) {
         if self.sketch_label_drag_move(point) {
             return;
@@ -146,27 +173,7 @@ impl Session {
             return;
         }
         if self.sketch.drag.is_none() {
-            self.sketch_annotation_hover(point);
-            // The dimension label and a constraint tool's hint sit at the pointer (AC34, AC40).
-            if self.sketch.constraint_tool.as_deref() == Some("dimension")
-                || self.sketch.constraint_hint.is_some()
-            {
-                self.sketch.hover = self.sketch_local(point);
-            }
-            self.sketch.preselection = self
-                .sketch_snapshot_for_edit()
-                .ok()
-                .and_then(|snapshot| {
-                    self.sketch_local(point).and_then(|local| {
-                        curvyo_ui_core::sketch_hit(
-                            &snapshot.graph,
-                            &snapshot.solution,
-                            local,
-                            Length(6.0 / self.view().scale()),
-                        )
-                    })
-                })
-                .map(|hit| hit.entity);
+            self.sketch_idle_hover(point);
             return;
         }
         let Some(drag) = self.sketch.drag.as_ref() else {
