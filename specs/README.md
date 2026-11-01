@@ -103,6 +103,7 @@ agree for 0001 to 0007 only; see "Spec number versus slice label" below.
 | [0066](0066-constraint-sketcher/) | `constraint-sketcher` | Parametric Sketch workbench; customer-requested revision: one Sketch object per page, centred origin, mixed Polyline modes, axis autoconstraints, Alt/Tab input, left-rail constraint tools and fx Parameters tab. Previous PR #228 gate passed; customer rejected that UI. | Done (#228, #237, #241) | Should | R-EDIT-042 | - |
 | [0061](0061-align-and-distribute/) | `align-and-distribute` | Symbol buttons in the Select bar: align to an edge or centre, distribute with equal gaps or centres; the reference follows from the selection (selection box, key object, or the page for one object), no dialog. Customer request of 2026-10-17. | Done (#239) | Should | R-EDIT-040 | - |
 | [0070](0070-measure-and-dimension/) | `measure-and-dimension` | A Measure tool and dimensions (linear, aligned, angle, radius, diameter) as thin solid green guide objects (guides stay dashed; decided 2026-10-17) that are not output and convert back to paths; the base of driving dimensions in `0066`. Customer request of 2026-10-17. | Done (#243) | Should | R-EDIT-045 | - |
+| [0069](0069-tiling/) | `tiling` | Grid and circular arrays as linked clones or copies, with variance for rotation, scale and offset and a seeded randomizer; options in the top bar. Linked clones by default, core feature (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-EDIT-044 | - |
 
 ### In progress, Ready (next, in the order the lead starts them)
 
@@ -139,7 +140,6 @@ own entry when the customer schedules it.
 | [0064](0064-machine-connector/) | `machine-connector` | A small standalone Rust program next to the machine (first: GRBL over serial, direct on the LAN first; decided 2026-10-17) that the app reaches on the local network or through the sync service; pairing, encryption, start, pause, stop, frame. Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-MFG-011, R-MFG-LASER-002, R-MFG-LASER-003 | - |
 | [0065](0065-extensions-sdk/) | `extensions-sdk` | Write an extension in Rust without TSX: routes compared; decided 2026-10-17: compiled-in as dependencies, no dynamic loading required, a front-end registry for toolboxes, panels and tools, extensions AGPL-3.0-or-later, no marketplace. ADR 0005 item 2 unchanged; the first extension is an open placeholder. Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-EXT-001 to R-EXT-005 | - |
 | [0067](0067-clipping/) | `clipping` | A closed shape clips another object or a bitmap without destroying either (Set clip, Release clip); vector outputs apply it as real geometry; relation to Intersect and to the ignored SVG clip paths of `0024`. Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-EDIT-043 | - |
-| [0069](0069-tiling/) | `tiling` | Grid and circular arrays as linked clones or copies, with variance for rotation, scale and offset and a seeded randomizer; options in the top bar. Linked clones by default, core feature (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-EDIT-044 | - |
 | [0071](0071-pattern-fill/) | `pattern-fill` | Fill a closed shape with generated vector patterns (hatch, grid, dots, honeycomb, motif) as real geometry; Hatch, Grid and Dots are core, further generators extensions (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Could | R-EDIT-046 | - |
 | [0073](0073-parameter-handle-clone/) | `parameter-handle-clone` | Ctrl on a parameter handle (Curve, inner radius, Start, End, corner radius, sides) or an "As copy" check in its entry box makes an ordinary copy at the same place with the new value instead of changing the shape. Customer request of 2026-10-19. | Draft (sketch, 2026-10-19) | Should | R-EDIT-004 | - |
 | [0086](0086-stick-fonts/) | `stick-fonts` | OTF and TTF single-line ("stick") fonts with doubled-back outlines, read as one centre line per stroke; where they appear (Fonts tab or only a workbench) is open. Split from `0062` and `0076` (Frage 19). | Draft (parked 2026-10-26: customer wants to refine it first) | Should | R-FONT-002 | - |
@@ -260,8 +260,8 @@ Slice labels, as in the column above.
 
 ### `format_version` plan
 
-The current story writes `format_version` **30** (0090 grid;
-built on 0066 constraint-sketcher revision 4 format 29, 0066 format 28, 0060 snapping 27 and 0059 multiple-pages 26). The table records the format decisions.
+The current story writes `format_version` **32** (0069 tiling; built on 0070 dimensions 31, 0090 grid 30,
+0066 constraint-sketcher revision 4 format 29, 0066 format 28, 0060 snapping 27 and 0059 multiple-pages 26). The table records the format decisions.
 Each change that alters the on-disk shape takes the next number at merge, and
 a reader refuses a file with a higher number ("saved by a newer version").
 
@@ -298,6 +298,8 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | none | 0072 | No bump: a typed node is an ordinary corner node of the path in progress, written by the existing finish commit |
 | none | 0052, 0053 | No bump: a placement writes the same kinds and fields as a create-drag; the node marquee changes view state only, and Delete and Join use their existing commits |
 | none | 0032 | No bump: a pressure stroke is stored as an ordinary closed path (its Question 2, A); a stored width profile (B) would take the next free number together with 0033 |
+| 31 | 0070 `measure-and-dimension` (a `shape = "dimension"` leaf with references to measured geometry, ADR 0027) | Done. Goldens: `dimension_v31.curvyo`, `dimension_*_v31.curvyo` |
+| 32 | 0069 `tiling` (a group with the `tiling` recipe and `tiling_sources`; instances keyed by `tiling_cell`, members by `tiling_member`; ADR 0028) | In review (PR #247). Golden: `tiling_v32.curvyo`; damaged `tiling_on_a_leaf`, `tiling_layout_unknown`, `tiling_result_unknown`, `tiling_count_zero`, `tiling_count_over_limit`, `tiling_number_nan`, `tiling_sources_malformed`, `tiling_cell_malformed`, `tiling_member_malformed` (`_v32.curvyo`); residue `tiling_residue_v32.curvyo` opens |
 | 27 | 0060 `snapping` (seven document-root registers: enabled, the four target flags, capture and release px) | In progress (2026-10-30). Golden: `snapping_v27.curvyo`; old-file compatibility waived by the customer. |
 
 A spec does not hard-code a version number it does not own; it says "next free
