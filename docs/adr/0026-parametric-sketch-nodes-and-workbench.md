@@ -263,6 +263,15 @@ checkpoint, conflict state, clones and conversion/undo. SID requires no old-file
 migration. Existing readers refuse newer versions: embedded solved geometry
 cannot retrofit fallback into them. Explicit conversion/export provides paths.
 
+Note 2026-10-31: format 28 shipped in `main` with PR #228. Customer revision 4 adds the
+relation variants `HorizontalDistance` and `VerticalDistance` (signed `b - a` along the local
+X or Y axis), so `CURRENT_FORMAT_VERSION` is now **29**. A version-28 reader would refuse the
+new records, so it must refuse the whole file as too new. Migration from 28 is none: no
+version-28 record changes shape. The `sketch_*_v28.curvyo` goldens stay as older-version
+fixtures that still open; current goldens are `sketch_*_v29.curvyo`. Details:
+`specs/0066-constraint-sketcher/adrs.md`. The mentions of "unreleased format 28" above
+record the state before PR #228.
+
 Vector/Sketch workbench choice, active sketch, entity selection, camera and
 unfinished gesture state belong to the session, not shared document registers.
 Leaving cancels the unfinished gesture; committed graph edits stay. The existing

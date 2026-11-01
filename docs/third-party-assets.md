@@ -14,7 +14,9 @@ dependencies are covered by `Cargo.lock`, `frontend/package-lock.json` and `deny
   `Constraint_Vertical.svg`, `Constraint_Parallel.svg`, `Constraint_Perpendicular.svg`,
   `Constraint_Tangent.svg`, `Constraint_EqualLength.svg` (Equal), `Constraint_Lock.svg` (Fixed),
   `Constraint_Symmetric.svg`, `Constraint_PointOnMidPoint.svg` (Midpoint),
-  `Constraint_PointOnObject.svg` (On axis), `Constraint_Length.svg` (Dimension).
+  `Constraint_PointOnObject.svg` (On axis), `Constraint_Length.svg` (Dimension, aligned),
+  `Constraint_HorizontalDistance.svg` (Horizontal distance), `Constraint_VerticalDistance.svg`
+  (Vertical distance; both added 2026-10-31, customer revision 4, AC44).
 - **Authors:** as recorded in each file's metadata: [wmayer] (creator), [agryson] Alexander
   Gryson (contributor); `Constraint_PointOnPoint.svg`: [bitacovir] (creator), [agryson] Alexander
   Gryson and [Abdullah Tahiri] (contributors).
@@ -30,4 +32,5 @@ dependencies are covered by `Cargo.lock`, `frontend/package-lock.json` and `deny
   redrawings of their shapes in a 16px grid (`currentColor`, 1.5px stroke), which as derived works
   remain under LGPL-2.1-or-later.
 - **Checked:** 2026-10-31, by downloading the files at the commit above and reading their
-  metadata.
+  metadata (the two distance files: creator [wmayer], contributor [agryson] Alexander Gryson,
+  "FreeCAD LGPL2+").

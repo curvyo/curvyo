@@ -61,3 +61,9 @@ line, ACS `direction`) and `EllipseRadius` (major or minor semi-axis). Typed lin
 ellipse radii are driving dimensions (AC39). ACS 0.1.19 has no major-radius relation (the major
 radius is derived); it is encoded as an operand point on the major axis end (`ellipse_axis`) at
 the typed distance from the centre. The minor radius uses `equal` on the ellipse's `radmin`.
+
+Note 2026-10-31 (customer revision 4, lead decision A): format 28 shipped in `main` with PR #228,
+so the new relation variants `HorizontalDistance` and `VerticalDistance` (signed `b - a` along the
+local X or Y axis, ACS `horizontal_distance` / `vertical_distance`) bump `CURRENT_FORMAT_VERSION`
+to 29 under the rule in `document.rs`. No version-28 record changes shape; migration is none and
+the version-28 goldens still open. Goldens: `sketch_*_v29.curvyo`.

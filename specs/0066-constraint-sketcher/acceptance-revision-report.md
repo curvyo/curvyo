@@ -757,3 +757,49 @@ Defects
 Note: `dimension_action` in the view stays "distance" after an at-once press (it follows the selection), so it is no arming indicator; the plan's "no longer set" is inexact (my test checks `mode_label` null instead).
 
 Script updates: `sketch-clone-acceptance.cjs` (double-click the existing R 10 text, fill 15 mm), `sketch-rev2-m3.cjs` (segment selected: Dimension applies at once, type into the open box, wait for `Length 25 mm`), `sketch-remaining-acceptance.cjs`, `sketch-revision-host.cjs`, `sketch-revision-final-host.cjs` (nothing selected: Dimension arms, circle picked on its outline; `sketch-revision-host` also accepts `Fixed · Redundant` because the typed radius is now driving). `sketch-workbench`, `sketch-acceptance`, `sketch-rev2-plate`, `sketch-rev3` needed no change.
+
+## Revision 4 acceptance (2026-10-31)
+
+Verdict: PASS (one minor finding, one interpretation for the PO). Production code under test:
+f892f448..5038d599 (head f32c7f0b adds docs only). Tests written from AC42-AC48 before the diff was
+read, all through pointer, key, rail and the host calls (`sketch_complete_fields`,
+`sketch_dimension_text`, `sketch_edit_dimension` as `SketchAnnotations.tsx` calls it on double-click).
+
+| AC | Test | Result |
+|---|---|---|
+| 42 | `acceptance_0066_rev4::ac42_every_drawing_tool_returns_to_select_with_exactly_the_new_geometry` (Point, Rectangle, Slot, Circle x2, Ellipse x2, Arc x2: tool Select, selection replaced by the new shape, drag moves it as its own step, commit = one step) | PASS |
+| 42 | `ac42_fillet_returns_to_select_...` (host Enter on the Fillet entry) | PASS |
+| 42 | `ac42_polyline_stays_while_the_chain_is_open_...`, `..._enter_ends_...`, `..._closing_on_the_start_...`, `ac42_escape_without_a_segment_keeps_the_previous_selection` | PASS |
+| 43 | `ac43_selection_first_apply_returns_to_select_with_the_referred_geometry` (15 tool/selection cases), `ac43_pick_completion_returns_to_select` (5), `ac43_refused_use_leaves_the_tool_active` (7, with hint) | PASS |
+| 44 | `ac44_rail_groups_the_two_axis_tools_after_dimension_with_names`, `ac44_axis_distances_for_points_line_origin_and_axes` (point-point, line, origin, X/Y axis; aligned Dimension unchanged), `ac44_alt_does_not_turn_dimension_into_an_axis_distance` | PASS |
+| 45 | `ac45_horizontal_value_drives_projection_only_and_removes_one_dof` (30 mm, dy unchanged 1e-6, DOF -1, undo), `ac45_vertical_...`, `ac45_annotation_names_the_kind_and_reference_is_parenthesised` (↔/↕, accessible name, "(↔ …)"), `ac45_double_click_opens_the_edit_and_expressions_are_accepted`, `ac45_save_reopen_keeps_..._and_convert_omits_annotations` | PASS |
+| 46 | `ac46_side_is_kept_zero_aligns_negative_and_invalid_refuse` (both kinds, reversed pair, 25 → 0 → 40 keeps side, -5 mm and unknown name refused, no step, entry kept) | PASS |
+| 47 | `ac47_shift_click_selects_two_endpoints_without_the_line` (+ Ctrl marquee removes), `ac47_marquee_selects_exactly_two_points` (no step, no movement) | PASS |
+| 48 | `ac48_three_tools_on_the_same_two_points` (50/40/30 mm, kinds, one step each, Select), `ac48_selection_built_by_shift_click_then_applied_at_once` | PASS |
+| edges | `edge_point_left_of_origin_keeps_its_side_...`, `edge_axis_parallel_to_the_measured_direction_is_refused`, `edge_coincident_points_start_at_zero_and_huge_values_do_not_panic` | PASS |
+| fmt 29 | `curvyo-document-core/tests/acceptance_0066_format29.rs`: v29 goldens open as declared and round-trip, plate holds both kinds; v28 goldens open, re-save writes 29; a file with an axis distance declares 29 (a 28 reader's gate refuses; the gate is proven with 30 → `FormatTooNew`); malformed records written into the Loro snapshot: missing field, unknown kind, null value refuse the file; negative value, line operand, missing point, Angle value open with the sketch stale (same handling as the existing `Distance`) | PASS |
+| 12 | native/wasm solve agreement not re-run for the new kinds (no browser oracle); `sketch-rev4.cjs` checks the saved signed relations | not covered here |
+
+Browser (Chromium, vite dev :5173, rebuilt wasm, logs `target/0066-revision-gate/run10/browser/`): all 17
+Sketch scripts PASS incl. `sketch-rev4` and `sketch-frame-trace`, after test-only updates for AC42/AC44:
+`sketch-rev2-m3` (13 rail buttons), `sketch-remaining-acceptance`, `sketch-revision-final-host`,
+`sketch-revision-host` (clear the returned selection so Dimension arms / Arc starts clean).
+`sketch-host-cpu` not run (stale since revision 3, see above).
+
+Gate run10 (`target/0066-revision-gate/run10`): fmt, clippy host, wasm32 build and clippy (9 core crates +
+editor-wasm), deny, rustdoc, build:wasm, tsc, npm test (754, 658 pass, 96 skipped, 0 fail), oxlint
+(warnings only) exit 0. nextest (env -u WEBKIT_DISABLE_DMABUF_RENDERER, --no-fail-fast; run as
+non-wasm crates + editor-wasm in 4 partitions because one call exceeds the 10 min tool limit):
+10213 run, 10213 passed. `pages two_hundred_pages_cpu_budget`: switch average 4.04 ms (add 15.3 ms, draw 4.96 ms).
+
+Finding 1 (minor, UX): AC42 leaves a new free point selected; choosing Arc and pressing Alt for the
+centre-first variant then shows the error "Choose an open endpoint with one adjoining line or arc"
+in the mode label although the user only switched variant. Repro: Point tool, click; Arc tool;
+hover; Alt → `canvas.mode_label.error` is that text (empty selection: no error). The resume-from-selected-
+endpoint logic runs on a lone point without a curve; it should stay silent there.
+
+Interpretation for PO (AC42 "exactly the new geometry, all entities the commit created"): the
+selection holds the created curves (rectangle/slot members, circle, arc, chain lines), not their
+defining points and centres; free points are selected when the shape is a point. Tests assert this
+reading (AC22 keeps points and edges distinct targets). Observation: an unknown extra field in a
+relation record is ignored on open for all kinds (pre-existing, not revision 4).

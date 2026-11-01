@@ -1,6 +1,6 @@
 # Constraint sketcher: construct geometry from constraints, dimensions and formulas
 
-Status: In progress — customer-authorized UI/interaction revision (2026-10-30); previous gate passed for PR #228, but customer rejected that UI. Revision acceptance and original-sketch scaling decision remain pending.
+Status: Done (PR #228); revision 4 follow-up in progress
 Priority: Should
 Origin: Customer (2026-10-17; expanded and accepted 2026-10-30).
 
@@ -155,6 +155,29 @@ holding the button.
 - **R3-Q1 Point on curve:** A. Coincident also accepts point and circle, arc or ellipse (recommended, FreeCAD parity); B. only point-on-line and axis now. Default if unanswered: A.
 - **R3-Q2 Point on line extent:** A. infinite line (recommended, as FreeCAD); B. segment only. Default if unanswered: A.
 - **R3-Q3 Drag threshold:** A. 4 screen pixels (recommended); B. another value. Default if unanswered: A.
+
+## Customer revision 4 (2026-10-31)
+
+Origin: Customer feedback after PR #228 was merged. Decisions R4-SELECT (A) and R4-HV (C) are the customer's; the annotation look is left to UX notes. Extended earlier criteria: AC13 (Polyline end), AC22 (two-point selection), AC31 (annotations), AC34 (Alt cycling), AC40 (selection first). Field reference: FreeCAD Sketcher has separate Horizontal distance and Vertical distance constraints next to the aligned distance, and returns a tool to idle after use unless continuous mode is on; SolveSpace has one distance and a horizontal/vertical toggle; LightBurn has no constraints. We do better by Vector-like tool return (the new shape is selected and draggable at once) and by naming the kind in the annotation.
+
+42. (R4-SELECT) Given any Sketch drawing tool (Point, Line, Arc, Circle, Ellipse, Rectangle, Slot, Fillet) and a completed shape, when the shape commits, then the active tool becomes Sketch **Select** and exactly the new geometry (all entities the commit created, including slot and rectangle members) is selected, as in Vector. Polyline is the exception while its chain is open: each segment continues the chain and the tool stays Polyline; it returns to Select with the whole chain selected only when the chain ends by closing on the start, by Enter, or by Escape after at least one committed segment. Escape with no committed segment returns to Select with the previous selection (AC20). Tests (real event path, AC41) for each tool: draw, assert tool is Select, assert selection equals the created entities, drag one created entity (AC29), and assert the commit is one history step. The tool-change and the selection add no history step.
+43. (R4-SELECT) Given the Dimension tool or any constraint tool of AC24, when it applies a dimension or constraint (by pick completion or by selection first, AC40), then the tool returns to Select; the selection afterwards is the geometry the relationship refers to (AC22), the new dimension is not left in an edit state unless its value entry is open (AC33), and the application is one history step. Invalid or cancelled use leaves the tool active, as in AC40. A test per tool asserts the tool is Select after a successful apply and unchanged after a refused one.
+44. (R4-HV) Given the Constraints rail card, then it contains two additional dimension tools, **Horizontal distance** and **Vertical distance**, each with a symbol-only button, tooltip and accessible name, grouped with the Dimension tool (AC24). They create driving dimensions measured along the sketch local X axis (horizontal) or Y axis (vertical), as absolute values, for: point and point; point and the origin or the X or Y axis (the distance of the point to that axis along the measured direction); and one line, whose projection length on the axis is dimensioned (the line's two endpoints). Selecting a line and choosing the tool gives its projection length at once (AC40). The existing **Dimension** keeps the aligned (diagonal) distance and is unchanged. Alt is not used to choose horizontal or vertical (AC34 stays for the other kinds).
+45. (R4-HV) Given a horizontal or vertical distance dimension, then its annotation (AC31) shows two extension lines, a dimension line parallel to the measured axis with arrowheads, and a value text that names the kind with a symbol, in the style of "↔ 30 mm" for horizontal and "↕ 30 mm" for vertical (exact glyph and placement decided in UX notes; the kind is not conveyed by colour alone). It is editable by double-click and as an expression (AC3), a reference variant is parenthesised (AC31), and it appears in Sketches with its kind named. Driving: changing the value moves the geometry so that the projection onto that axis equals the value within 1e-6 mm, the other axis free. A test sets "30 mm" on a diagonal line between two points and asserts a 30 mm horizontal projection, an unchanged vertical component, and the DOF reduced by exactly one. Save/reopen (AC10), undo (AC11), solve agreement (AC12) and Convert to paths (AC8, annotations not output) treat it like every other dimension.
+46. (R4-HV) Given a signed solution, then the dimension keeps the side that the geometry had when it was created (a point to the right of another stays to the right); the value is entered as a positive number. A test dimensions two points, enters a new value, and asserts the order is preserved. Zero is allowed (it makes the points vertically or horizontally aligned) and a negative value or an invalid expression refuses with the entry kept, as in AC3.
+47. (R4-HV) Given Sketch Select, then two points can be selected together: Shift-click adds a point to the selection (AC22), a marquee or lasso selects the points inside it together with the edges that qualify under existing Curvyo conventions, and Ctrl removes. Points that are the endpoints of one line may be selected without selecting the line. A test selects two points by Shift-click and another pair by marquee, each in the real event path, and asserts the selection holds exactly those two points.
+48. (R4-HV) Given exactly two points selected, then choosing Dimension creates the aligned (diagonal) distance, choosing Horizontal distance creates the horizontal one and choosing Vertical distance the vertical one, each applied at once (selection first, AC40) in one history step; the tool returns to Select (AC43). Choosing a tool with a selection that does not fit it (for example three points) applies nothing and shows the hint of AC40. A test applies each of the three tools to the same two points and asserts the resulting dimension kinds, values and one history step per application.
+
+### Superseded or extended in revision 4
+
+- AC40: the "leaves the tool's normal state unchanged afterwards" for selection-first application is replaced by AC43 for constraint and dimension tools: they return to Select.
+- AC34: Alt cycles the dimension kinds the selection allows among aligned, radius, diameter and angle; horizontal and vertical distance are separate tools (AC44).
+- AC13, AC20: Polyline ending and Escape behaviour extended by AC42; no other criterion is replaced.
+
+### Customer decisions (revision 4)
+
+- **R4-SELECT:** A. After a completed shape, a dimension or a constraint, the tool returns to Select with the new geometry selected; Polyline only at the end of its chain (AC42, AC43).
+- **R4-HV:** C. Horizontal distance and Vertical distance are new tools in the Constraints card; Dimension stays aligned distance; annotations "↔"/"↕" style, UX defines (AC44-AC48).
 
 ## Model and solver readiness
 

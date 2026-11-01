@@ -1100,3 +1100,114 @@ Checks run: `cargo fmt`; clippy `-D warnings` host all targets and wasm32 for ed
 wasm32 build; nextest editor-wasm 4096/4096; frontend `build:wasm`, `tsc -b --noEmit`,
 `npm test` 650 passed / 94 skipped, `oxlint` exit 0. Browser (Vite :5173): `sketch-rev3`,
 `sketch-rev2-plate`, `sketch-revision-host` pass.
+
+## Customer revision 4 (2026-10-31)
+
+Source: `specification.md` "Customer revision 4" (AC42-AC48); visual conventions `ux-notes.md`
+"Revision 2" (rail card, symbols, dimension anatomy). Affected: `curvyo-sketch-core` (two
+relation variants), `curvyo-document-core` (format 29, goldens), `curvyo-ui-core` (actions,
+eligibility, projected dimension layout), `curvyo-editor-wasm` (`session/sketch`),
+`frontend/src/components/sketch` (glyphs). Every behaviour is tested through pointer and key
+events on `Session` (AC41).
+
+- [x] 1. AC44-AC46 core: `Relation::HorizontalDistance` / `VerticalDistance { a, b, value }`,
+  signed `b - a` along local X / Y (ACS `horizontal_distance` / `vertical_distance`, a linear
+  coordinate difference); the side is kept by storing the left (lower) point first; value 0
+  allowed, negative refused (`validation`); `measure` signed. Tests first
+  (`curvyo-sketch-core/tests/axis_distance.rs`): 30 mm on a diagonal sets the X projection,
+  Y unchanged, DOF minus one; side kept; zero aligns; negative refused; origin; JSON and
+  namespace copy.
+- [x] 2. Format 29 (lead decision A, 2026-10-31; format 28 shipped in `main` with PR #228):
+  `CURRENT_FORMAT_VERSION` 29, new goldens `sketch_*_v29.curvyo` (plate gains a horizontal
+  distance over a line's endpoints and a vertical distance between two points); the v28 goldens
+  stay as older-version fixtures (`format_28_sketch_goldens_still_open`). Recorded in `adrs.md`.
+- [x] 3. AC42: Point, Arc (both), Circle (both), Ellipse, Rectangle, Slot, Fillet and typed
+  shapes return to Select with the new shapes selected, one step, draggable (`tool_return.rs`).
+  Polyline collects its chain (`chain_created`) and returns to Select with it on close, Enter
+  or Escape; Escape with no segment returns to Select with the previous selection.
+  Tests: `rev4_return_tests.rs`.
+- [x] 4. AC43: a constraint applied by picks or by a rail press, and a placed-and-typed or
+  selection-first dimension, return to Select with the referenced geometry selected; a refused
+  use leaves the tool armed. Tests: `rev4_apply_tests.rs`, `completes` in
+  `rev3_constraint_tests.rs`.
+- [x] 5. AC44/AC48 ui-core and session: actions `horizontal-distance` / `vertical-distance`
+  (two points, one line, point + origin, point + the axis across the measured direction);
+  rail order Dimension, Horizontal distance, Vertical distance; applied at once with the measured
+  value and the entry open (selection first, or on the last pick of the armed tool); a selection
+  that does not fit arms with the hint. Tests: `rev4_hv_tests.rs`, ui-core `sketch_actions` /
+  `sketch_tool_use` tests.
+- [x] 6. AC45 annotation: `DimensionGeometry::Projected` (dimension line along the axis beyond
+  the outer point, extension lines perpendicular from each point, arrows along the axis, ranks
+  and label drag as linear); text "↔ 30 mm" / "↕ 30 mm" (size shown, kind named in the
+  accessible name and in Sketches "Horizontal Distance"). Tests: ui-core layout tests,
+  `a_typed_horizontal_distance_drives_only_the_x_projection`.
+- [x] 7. AC47: Shift-click adds a point, marquee and lasso take the points inside (existing),
+  Ctrl-click removes (new, as Ctrl marquee). Test: `two_points_are_selected_by_shift_click_and_by_marquee`.
+- [x] 8. Frontend glyphs and `docs/third-party-assets.md`; browser `sketch-rev4.cjs`.
+
+Choices **(Proposal)**:
+- FreeCAD-like look for the axis distances: extension lines from both points perpendicular to
+  the axis, the dimension line 24 px beyond the outer point, arrows along the axis.
+- After a shape, the selection is the created shapes without their defining points (a drawn line
+  is selected as the line, as in Vector), so a rail tool applies to it at once; a Point tool point
+  is selected itself.
+- A Horizontal distance with the X axis (or Vertical with the Y axis) is refused: the distance
+  to that axis along the measured direction does not exist.
+- The Dimension rail glyph becomes FreeCAD's diagonal `Constraint_Length`, so Dimension,
+  Horizontal distance and Vertical distance read apart; the former horizontal ruler is now the
+  Horizontal distance glyph.
+- A selection-first axis distance keeps the picked geometry selected (a line stays the line,
+  not its endpoints).
+
+Tests changed because a revision 4 criterion supersedes them:
+- Tester `acceptance_0066_rev2.rs`: `RAIL` gains the two tools (AC44); helpers `draw_line`,
+  `line_and_point`, `crowded`, `ac24_each_tool_applies_with_a_valid_preselection` (three points)
+  and `ac27_nearest_endpoint_wins_when_several_are_in_range` re-arm the drawing tool or clear the
+  selection after each shape, restoring the state they were written against (AC42).
+- Tester `acceptance_0066_rev3.rs`: helpers `draw_line`, `place_point` and `scene` likewise (AC42).
+- Format oracles asserting 28 as current (format 29): `acceptance_0024_slice2_tester.rs`
+  `c109_deterministic_and_format_unchanged`, `drawing_insert.rs` version range,
+  `acceptance_0017_block1_tester.rs` damaged-fixture list, `acceptance_0050_tester.rs` named
+  sketch goldens, `acceptance_0020_tester_more.rs` explicit-step goldens (v29 names added).
+- Own: `an_armed_tool_applies_on_the_last_pick_and_returns_to_select` (was "stays armed",
+  AC43), `an_invalid_selection_applies_nothing_then_takes_fresh_picks` (picks stay selected),
+  rail count 13, action count 17, `a_dimension_that_leaves_no_valid_shape...` and
+  `a_placed_dimension_keeps_its_entry...` re-arm or clear the selection (AC42, AC43).
+
+Checks run: red first for the core axis-distance tests (missing variants), AC42 and AC43
+session tests; `cargo fmt --check`; clippy `-D warnings` host all targets and wasm32 for
+sketch-core, ui-core, document-core, render-core, editor-wasm; `cargo doc -D warnings`; nextest
+sketch-core, ui-core, render-core, document-core 4852/4852, editor-wasm lib 628/628 and all
+integration binaries 3504/3504; frontend `build:wasm`, `tsc -b --noEmit`, `npm test` 658 passed /
+96 skipped, `oxlint` exit 0. Browser (Vite :1421): `sketch-rev4.cjs`, `sketch-rev3.cjs`,
+`sketch-rev2-plate.cjs` pass; screenshots in `target/0066-browser/rev4/`.
+
+### Revision 4 architecture review and acceptance follow-up (2026-11-01)
+
+From `review-session-architecture.md` "Revision 4 review" and `acceptance-revision-report.md`
+"Revision 4 acceptance", finding 1.
+
+- [x] R1 (AC46). A value entered on an axis distance orders its points so the solved geometry
+  measures non-negative (`input.rs` `keep_axis_side`): a reference distance dragged past its
+  other point and made driving at the shown value keeps the dragged side. Test first:
+  `a_reference_axis_distance_made_driving_keeps_the_dragged_side`.
+- [x] R2 (§5). `dimension_geometry` moves with its helpers to `session/sketch/dimension_geometry.rs`
+  and is split per kind (distance, axis distance, diameter, axis angle); 37 lines.
+- [x] R3 (§5). The `Projected` layout moves to `curvyo-ui-core/src/sketch_dimension_projected.rs`
+  (`#[path]` module); `sketch_dimension_layout.rs` 451 and `annotations.rs` 314 non-test lines.
+- [x] Recommended. `a == b` axis distances are refused by validation and by `sketch_relation`
+  (origin with the matching axis); damaged v29 golden
+  `sketch_axis_distance_negative_v29.curvyo` opens with the sketch stale; the `>= 0` bound is
+  commented as a domain bound. Tests first: `a_point_measured_to_itself_is_refused`,
+  `axis_distances_store_the_left_or_lower_point_first` (extended),
+  `a_negative_axis_distance_golden_opens_stale`.
+- [x] Finding 1 (AC42/AC27). Choosing Arc or Polyline resumes only from a selected open endpoint
+  (`sketch_can_resume`); a free point left selected by the Point tool stays silent through the
+  tool and Alt variant change. Test first: `a_tool_or_variant_change_does_not_resume_from_a_free_point`.
+
+Checks run: red first for R1, a == b (both crates) and finding 1; `cargo fmt --check`; clippy
+`-D warnings` host all targets and wasm32 for sketch-core, ui-core, document-core, editor-wasm;
+`cargo doc -D warnings`; `cargo deny check`; nextest sketch-core, ui-core, document-core
+4449/4449, editor-wasm 4159/4159 (three partitions); frontend `build:wasm`, `tsc -b --noEmit`,
+`npm test` 658 passed / 96 skipped, `oxlint` exit 0; browser (Vite :1421) `sketch-rev4.cjs`,
+`sketch-rev3.cjs` pass.
