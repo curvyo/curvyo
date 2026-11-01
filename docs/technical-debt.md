@@ -211,6 +211,21 @@ exact arc length as the reference.
 
 ## SVG round-trip is lossy
 
+**Export (slice 4, 2026-11-01).** The export writes every kind of the model; a round trip through
+Open gives the document back except: sketches (a group of their outlines), the link of a text
+clone, the layers guides sat in (they come back in a layer "Guides"), Justify (Left with the same
+outlines), a stroke that is off (its width and colour), an open outline's outer handles (they draw
+nothing). Open point: the import places a column of upright glyphs by one upright lead while
+the engine gives each glyph its own place in its cell, and under a text's own turn a line whose
+SVG pen is not at the anchor (centred, right-aligned) leaves the rest of its 6-decimal position
+in the exact matrix. So an upright column with a turn, an anchor other than its start or
+several lines moves along the column on every trip (by the difference of its glyphs' places in
+their cells, tenths of a millimetre), and a turned centred or right-aligned text changes its
+matrix in the last digits (below a micron); both are not byte-stable after the first trip
+(criterion 152; the generator of `curvyo-editor-wasm/tests/svg_export_property.rs` leaves them
+out). Measured
+budget (release, this VM): 20,000 paths export in 1.03 s, 16 MB.
+
 The import of `0024` (first slice) reads a documented subset ([`svg-import.md`](svg-import.md)):
 paths, the basic shapes (rectangles, ellipses and Inkscape stars stay primitives where exact),
 groups, Inkscape layers, transforms, the simple `<style>` rules, colours and opacities, dashes,
@@ -223,7 +238,7 @@ their perspective; rectangles with `rx ≠ ry` and rounded, randomized or twiste
 Everything else (clip paths,
 masks, filters, markers, gradients beyond their middle colour, linked images, text decorations,
 foreign data such as `inkstitch:`) is ignored silently: there is no loss report and no passthrough bag (customer decisions of 2026-10-16,
-ADR 0018 §5). There is no SVG export yet (the later slice of `0024`), so nothing round-trips.
+ADR 0018 §5).
 
 **Resolution:** driven by real files. Each failing customer file becomes a golden-file fixture
 (`curvyo-ui-core/tests/fixtures/svg/`) and either widens the subset or is accepted as a

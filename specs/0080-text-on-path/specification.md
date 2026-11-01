@@ -168,3 +168,5 @@ See [ux-notes.md](ux-notes.md). Its §0 proposes ten changes to the criteria; al
 
 Requirements: R-EDIT-048 (text objects), R-EDIT-004 (Object to path), R-FONT-009 (laserable lettering); a new requirement for text on path is to be added to `docs/requirements.md` when the customer accepts the definition (Frage 33).
 Companion: `0079-text-layout-controls`. ADRs: 0002, 0015, 0016, 0019, 0020. PR: #190 (slice 1), #193 (slice 2).
+
+**SVG export (2026-11-01):** A text on path is written as `<textPath>` on its carrier; a linked text clone as an independent text (criterion 134); see `specs/0024-svg-import-export`, "Slice 4: export".

@@ -3209,7 +3209,7 @@ fn c143_no_guides_no_layer_and_c144_plain_guides_layer_is_ordinary() {
 // ---------------------------------------------------------------------------------------------
 
 #[test]
-fn c146_width_zero_is_unchanged() {
+fn c146_width_zero_is_read_as_the_default_width_and_split() {
     let mut zero = filled(0, 255, 0);
     zero.stroke.width = Length::from_mm(0.0);
     let d = doc(
@@ -3235,7 +3235,11 @@ fn c146_width_zero_is_unchanged() {
         .into_iter()
         .find(|(_, r)| attr(r, "inkscape:label").as_deref() == Some("zero"))
         .unwrap();
-    assert_eq!(t.0, "rect", "criterion 146: width 0 is unchanged\n{text}");
+    // A stored width of 0 is read as 0.25 mm (`0007`), so the stroke is drawn and split.
+    assert_eq!(
+        t.0, "g",
+        "criterion 146: width 0 reads as 0.25 mm and is split\n{text}"
+    );
 }
 
 #[test]

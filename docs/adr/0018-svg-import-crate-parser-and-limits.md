@@ -83,6 +83,24 @@ files and hostile fixtures pin it).
    in `ui-core`), `<textPath>` to a text on a carrier (ADR 0022), and ignores the rest
    (per-glyph `x`/`rotate` lists, mixed-style runs). An `<image>` with a `data:` URI maps to
    an image node of ADR 0017 once `0058` is built. Neither needs a change to this ADR.
+9. **Export and the `curvyo:` profile v1** (amended 2026-11-01, `specs/0024-svg-import-export`
+   slice 4, `adrs.md` "Export"). `svg-core` also writes: `write_svg(&SvgExport) -> String`, a
+   pure writer whose input mirrors `SvgDrawing` and depends on no Curvyo crate; the mapping from
+   the document is `ui-core::svg_export`, the session supplies its laid-out objects, selection and
+   active page; the desktop writes the text with `storage-io::write_atomic` after the save
+   dialog, the browser downloads one Blob. The profile is a file format: the root carries
+   `xmlns:curvyo="urn:curvyo:svg:1"` and `curvyo:format="1"`; the attributes are exactly
+   `curvyo:dash`, `curvyo:stroke-width`, `curvyo:radii`, `curvyo:kind`, `curvyo:frame`,
+   `curvyo:markers`, `curvyo:size`, `curvyo:face` and `curvyo:guides`, with `curvyo:outlines`
+   reserved and not written (criteria 57 and 149; elements, grammar, units and agreement rules
+   in the [profile v1 reference](../svg-import.md#profile-v1-reference)). A change of
+   any of them is `curvyo:format="2"`. The reader ignores every `curvyo:` attribute unless the
+   root says `curvyo:format="1"`, and keeps a shadow value only when the standard SVG next to it
+   agrees (lengths 1e-6 mm, geometry 1e-3 mm). Under the profile a closed outline whose last
+   node lies exactly on its first is closed by its last segment (the writer's form of a curved
+   closing segment). Numbers: coordinates and lengths `{:.6}` trimmed, `curvyo:` numbers,
+   opacities, ratios (`line-height`), angles (`rotate`, `sodipodi:start`/`end`) and matrices the
+   shortest round-trip text, never an exponent or `-0`.
 
 ## Options considered
 

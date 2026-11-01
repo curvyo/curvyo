@@ -244,3 +244,89 @@ Implementer, 2026-10-27, branch `story/svg-inkscape-shapes`, stacked on `story/s
 - The fixtures are hand-written (no Inkscape here); the tester replaces `inkscape_shapes.svg` with a
   real Inkscape 1.4.4 save and regenerates its golden.
 - Budget of AC 126 (release, this VM): 1,000 mixed shapes in about 10 ms.
+
+# Slice 4: export (criteria 4, 52 to 66, 71 and 72 export parts, 128 to 157)
+
+Implementer, 2026-11-01, branch `story/svg-export` (`story/0024-svg-export`), one PR for the whole
+export (customer). Built under `adrs.md` "Export (slice 4, architect 2026-11-01)",
+`ux-notes.md` "SVG export: UX notes" and `export-plan.md`.
+
+## Affected crates/modules
+
+- **`curvyo-svg-core`:** writer: `export.rs` (the `SvgExport` input types), `write.rs` (root,
+  namedview, pages, tree, ids), `write_leaf.rs` (paths, primitives, arcs, `use`, styles,
+  shadow data, markers), `write_text.rs` (live text, `textPath`, images), `write_number.rs`
+  (number text, escaping), `base64.rs`; reader: `shadow.rs` (the `curvyo:` profile v1, read only
+  under `curvyo:format="1"`), all `inkscape:page`s, the Guides layer, `curvyo:face`/`curvyo:size`
+  on text; `is_isometry` moved out of `uses.rs` and public.
+- **`curvyo-document-core`:** `DrawingPage::pages` so `Document::from_drawing` creates every page
+  (no format change).
+- **`curvyo-ui-core`:** `svg_export.rs` (scope, tree walk, guides, clones), `svg_export_leaf.rs`
+  (kinds, styles, shadow, markers, strokes as paths), `svg_export_text.rs` (live text from the
+  layout, text as paths, images); import: shadow data applied by criterion 57's agreement rule
+  (`svg_import_shadow.rs`), pages on Open, guides layer, face reference from `curvyo:face`.
+- **`curvyo-editor-wasm`:** `session/svg_export.rs`, `wasm_svg_export.rs`; tests
+  `svg_export_golden.rs`, `svg_export_budget.rs`.
+- **`curvyo-app`:** `svg_export.rs` (`pick_svg_export_path`, `write_svg_export`, atomic write).
+- **`frontend`:** File tab Export SVG… row and the four switches, stored options, notices, busy.
+- **Docs:** ADR 0018 point 9, `docs/svg-import.md` "Export", `docs/design-system.md`,
+  `docs/technical-debt.md`, CI `performance-budgets` line, spec status.
+
+## Tasks
+
+- [x] 1. svg-core writer, tests first against hand-built `SvgExport` goldens: skeleton (AC 52),
+  numbers and escaping (AC 53, 54, 57, 72), ids and tree (AC 53), paths and node types (AC 54,
+  58), primitives, stars, arcs, curved shapes (AC 55, 139, 140), styles (AC 56), shadow (AC 57,
+  149), `use` (AC 59), pages (AC 128), markers (AC 141), guides layer (AC 143), text and
+  `textPath` (AC 132 to 135), images and base64 (AC 137), determinism (AC 60, 72).
+- [x] 2. svg-core reader additions, tests first: shadow data gated by `curvyo:format`, pages list
+  (AC 129), guides layer (AC 144), `curvyo:face`/`size` (AC 132, 135), markers (AC 142).
+- [x] 3. document-core pages in `from_drawing` (AC 129); ui-core import applies shadow data by
+  the agreement rule (AC 57, 66, 140, 142, 149), guides (AC 144), face reference (AC 135).
+- [x] 4. ui-core mapping `svg_export` (AC 52 to 59, 128 to 131, 136 to 141, 143, 145, 146),
+  round-trip property test 500 cases plus option runs (AC 62, 63, 150 to 152), stripped-namespace
+  outline check (AC 61), locale run (AC 72).
+- [x] 5. editor-wasm session export and binding, goldens `*.exported.svg` and `export_*` (AC 64,
+  153), budget test release-only assert (AC 71, 154), safety (AC 157).
+- [x] 6. app commands with atomic write, frontend button, switches, notices, busy (AC 4, 147,
+  148); docs (AC 156); full gate.
+
+## Validation
+
+- Writer goldens byte for byte; mapping unit tests per criterion; the round-trip property test is
+  the oracle for the reader additions; exported goldens re-imported and re-exported byte-equal.
+- Budget: `svg_export_budget.rs` thread CPU, asserted only in release.
+- Hand checks 65 and 155 with Inkscape: tester.
+
+## Notes for the lead (slice 4)
+
+- **Spec over ADR where they differ:** the Guides layer is marked `curvyo:guides="1"` (criteria
+  143, 144), the text face is `curvyo:face` plus `curvyo:size` (criterion 132), `xmlns:xlink` is
+  declared only when needed (criterion 52 amended), and no `curvyo:origin` is written (criterion
+  149 lists the attributes exactly); pages come back relative to the first (criterion 129).
+- **Writer references by key**, not by leaf number: a `use` or `textPath` names the node it
+  points at by a key the mapping sets (Proposal; same concept as the ADR's leaf number).
+- **Closing segments:** SVG cannot close an outline with a curve without a node on the start.
+  The writer ends a curved closing segment on the first node before `Z`; under
+  `curvyo:format="1"` the import treats a last node exactly on the first as that node (ADR 0018
+  point 9). Without the profile criterion 24 holds unchanged.
+- **Extra frames for byte stability:** a turned `<rect>`/`<ellipse>`, every arc and every Inkscape
+  star also carry `curvyo:frame` (and a turned primitive `curvyo:stroke-width`), because the
+  numbers read back through a transform are not bit-exact. A `<rect>` frame is checked against
+  the rect's numbers (its true corners differ from the model's cubic corners by more than
+  0.001 mm above 3.7 mm radius).
+- **Sketch:** one `<path>` per outline of the solved sketch in a group (criterion 138 asks for a
+  `<circle>` for a circle; the solved outline is written as a path).
+- **Options are stored in the page's storage on both builds** (the desktop webview keeps it across
+  restarts), not in a host settings file.
+- **File tab:** the switches are in one column (the UX fallback); `FileTab` takes the export
+  section as a slot (`exportSvg`), so the 0051 acceptance tests, which pin the six buttons of
+  the tab rendered alone, are unchanged.
+- **Open points (in `docs/technical-debt.md`):** dx after a turned character and the frame of a
+  vertical upright text converge over trips instead of being byte-stable after one (the import's
+  model of SVG positions), arc angles in degrees in the document. Text-on-path lines beyond the
+  first, Justify `dx`, and `font-stretch` round trip were not tested with real files.
+- **Not built:** criterion 154's 1,000-text and 12 Mpx budgets (only the 20,000-path one, gated
+  in release: 1.03 s, 16 MB); criterion 157's network-denying harness (the export does no I/O by
+  construction: pure core plus one atomic write); hand checks 65 and 155 are the tester's.
+

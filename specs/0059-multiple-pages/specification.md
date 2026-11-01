@@ -82,3 +82,5 @@ Depends on: `specs/0015-document-size-and-rulers/`, `specs/0050-layers-and-objec
 Related: `specs/0043-properties-tabs/`, `specs/0045-document-formats-library/`, `specs/0046-document-shapes/` (shape per page, guides), `specs/0049-linked-clone/`, `specs/0057-clone-overrides/`, `specs/0042-history-branches/`, `specs/0024-svg-import-export/`, `specs/0063-manufacturing-workbenches/`; ADR 0012 (rejected, content reused), ADR 0009, ADR 0002
 ADRs: [ADR 0024](../../docs/adr/0024-spatial-pages.md); see [adrs.md](adrs.md)
 PR: -
+
+**SVG export (2026-11-01):** Pages are written as Inkscape pages; Active page only exports one page (criteria 128 to 130); see `specs/0024-svg-import-export`, "Slice 4: export".
