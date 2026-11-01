@@ -8,6 +8,7 @@ on the customer answers of `specs/0025-raster-trace` (Frage 49 B "VTracer for no
 Frage 50 A black and white only, Frage 55 A no extension seam, Frage 60 B VectorCraft as idea source
 only). Becomes Accepted when the Inkscape baseline is in, step 0 (§7) does not trigger the fallback (§8) and the customer decides. Fills
 the `curvyo-vectorize-core` slot of [ADR 0011](0011-workspace-and-crate-layout.md) §2/§3 (ADR 0003 §6).
+§5 note of 2026-11-01 (text pass before the trace in the same worker job, [ADR 0027](0027-ocr-text-in-trace.md), Proposed).
 
 ## Context
 
@@ -112,7 +113,15 @@ shown). Colour mode, `color_clusters` and VTracer's hierarchical stacking are no
 Both builds trace in one dedicated Web Worker that instantiates the same `curvyo-editor-wasm` module
 (posted `WebAssembly.Module`) and calls `trace_job`. Cancel = `worker.terminate()` and a fresh worker
 from the cached module (a synchronous wasm call cannot receive a message; a `SharedArrayBuffer` flag
-needs COOP/COEP we do not serve). Debounce 150 ms, "Tracing..." after 400 ms and Stop after 1.5 s are
+needs COOP/COEP we do not serve).
+
+> **Note 2026-11-01 ([ADR 0027](0027-ocr-text-in-trace.md), `specs/0091-trace-text-recognition/adrs.md`
+> decisions 1 to 3, architect; in effect when 0027 is accepted):** with Recognise text on, the same
+> worker runs an OCR job once per image (`ocr_job`, lines cached in the editor session) and every
+> trace job runs a text pass first: per OCR line a crop traced with its own Otsu threshold, then the
+> line's text pixels are in-painted from the ring around them before the main trace. `trace()`,
+> `TraceParams` and the cancel-by-terminate rule are unchanged; the worker also loads the OCR
+> weights once per worker. Debounce 150 ms, "Tracing..." after 400 ms and Stop after 1.5 s are
 TypeScript timers. The reduced copy (longest side 1000 px, area-averaged) is a function of
 `curvyo-image-core`. Create paths inserts the worker's full-size results (one per selected image,
 Frage 61) through `editor-wasm` into one `ui-core` command, one history step; the source images stay

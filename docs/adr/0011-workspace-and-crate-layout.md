@@ -1,6 +1,6 @@
 # ADR 0011: Workspace and crate layout
 
-**Status:** Accepted (architect, 2026-10-02 — no customer sign-off required); crate and directory names amended by [ADR 0013](0013-rename-to-curvyo.md) (`vecmanf-*` is now `curvyo-*`); §7 CI note of 2026-10-10 (Windows and macOS host gate nightly only, customer decision 2026-10-09); §2/§3 note of 2026-10-20 (`curvyo-text-core`, ADR 0020); §2/§3 note of 2026-10-26 (`curvyo-svg-core`, ADR 0018); §2 note of 2026-10-31 (text-core matches outlines back to glyphs, `0088`)
+**Status:** Accepted (architect, 2026-10-02 — no customer sign-off required); crate and directory names amended by [ADR 0013](0013-rename-to-curvyo.md) (`vecmanf-*` is now `curvyo-*`); §7 CI note of 2026-10-10 (Windows and macOS host gate nightly only, customer decision 2026-10-09); §2/§3 note of 2026-10-20 (`curvyo-text-core`, ADR 0020); §2/§3 note of 2026-10-26 (`curvyo-svg-core`, ADR 0018); §2 note of 2026-10-31 (text-core matches outlines back to glyphs, `0088`); §2/§6 note of 2026-11-01 (`curvyo-ocr-core` and its scoped `rayon` exception, ADR 0027, Proposed)
 
 This ADR invents no architecture. ADRs 0001–0010 each authorized the crates
 their own decision needed, in the ADR that needed them; this one pulls those
@@ -179,6 +179,12 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > glyphs": the module `recognise/` matches traced outlines to the glyphs of the faces handed in
    > (Recognise text). No edge changes; it stays `curvyo-text-core → (external only)`.
 
+   > **Note 2026-11-01 ([ADR 0027](0027-ocr-text-in-trace.md), architect; in effect when 0027 is
+   > accepted):** new crate `curvyo-ocr-core`. Its responsibility: it reads text lines from an RGBA
+   > raster with model weights handed in as bytes. Edges: `curvyo-ocr-core → (external only)`
+   > (`rten`, `sha2`), never `document-core`; `ui-core → ocr-core`; `editor-wasm` reaches it only
+   > through `ui-core`.
+
    > **Note 2026-10-26 ([ADR 0018](0018-svg-import-crate-parser-and-limits.md), architect):** new crate
    > `curvyo-svg-core`, a pure SVG reader. SVG import/export leaves `document-core`'s row. Edges:
    > `curvyo-svg-core → (external only)`, never `document-core`; `text-core → svg-core` (shared
@@ -219,6 +225,12 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
      nothing for a named ban list: `rayon`, `tokio`, `reqwest`, `keyring`,
      `gitoxide`, `mio`, `socket2`. A build failure says *that* wasm broke; this
      says *which* dependency did it.
+
+     > **Note 2026-11-01 ([ADR 0027](0027-ocr-text-in-trace.md) §4, architect; in effect when 0027
+     > is accepted):** one scoped exception. `rayon` may appear in the wasm32 tree of
+     > `curvyo-ocr-core` and of the crates above it (`ui-core`, `editor-wasm`) only as a dependency
+     > of `rten`; the check for `rayon` becomes "`cargo tree -i rayon` names `rten` as its only
+     > dependent". In wasm it runs on the calling thread; our code spawns no thread.
    - Core crates declare external dependencies with `default-features = false`
      wherever the default pulls `std`-only, `getrandom` or thread paths. Two
      known cases: the RustCrypto signature crates default to `rand_core`, which
