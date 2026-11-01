@@ -38,6 +38,7 @@ mod project;
 #[cfg(target_os = "linux")]
 mod raster;
 mod state;
+mod svg_export;
 #[cfg(target_os = "linux")]
 mod svg_preview;
 
@@ -123,6 +124,8 @@ fn main() {
             project::set_dirty,
             project::save_project_bytes,
             project::quit_app,
+            svg_export::pick_svg_export_path,
+            svg_export::write_svg_export,
             formats::read_formats_file,
             formats::write_formats_file,
             formats::set_formats_file_aside,

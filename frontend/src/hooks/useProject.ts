@@ -12,8 +12,18 @@ import {
 import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
 import { templateOutcome } from "@/lib/guideText";
-import { invoke, isTauri, listen, PLATFORM } from "@/platform/host";
-import { clipboard_notice, import_busy_notice, svg_busy_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { downloadSvg, invoke, isTauri, listen, PLATFORM } from "@/platform/host";
+import { parseSvgExportAnswer, parseTimedNotice, type SvgExportOptions } from "@/lib/svgExport";
+import {
+  clipboard_notice,
+  import_busy_notice,
+  svg_busy_notice,
+  svg_export_busy_notice,
+  svg_export_busy_objects,
+  svg_export_name,
+  svg_export_nothing_selected,
+  svg_export_notice,
+} from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The browser build on a Mac uses Cmd as well. */
 const MAC = isMac(navigator.platform);
@@ -70,6 +80,9 @@ export interface ProjectInfo {
   /** The name Save offers for a project that has no file yet, such as one opened from an SVG
    * ("poster.curvyo", `specs/0024-svg-import-export` criterion 2). */
   suggestedName?: string | null;
+  /** The SVG the project was opened from ("poster.svg"): the name Export SVG… offers
+   * (`specs/0024-svg-import-export` criterion 4). */
+  sourceSvg?: string | null;
 }
 
 export interface ProjectApi {
@@ -101,6 +114,9 @@ export interface ProjectApi {
   discard: () => void;
   /** Cancel or Escape in the check. */
   cancel: () => void;
+  /** Export SVG… (`specs/0024-svg-import-export` criterion 4) with the File tab's switches; `mouse`
+   * when a click pressed it (the focus then goes to the canvas). */
+  exportSvg: (options: SvgExportOptions, mouse: boolean) => void;
 }
 
 interface ProjectDeps {
@@ -115,6 +131,9 @@ interface ProjectDeps {
 
 const SAVE_FAILED = "This project couldn't be saved.";
 const DEFAULT_FILE_NAME = "Untitled.curvyo";
+
+/** The title of the error dialog of Export SVG… (`0024` `ux-notes.md`, "Error dialog"). */
+const EXPORT_FAILED_TITLE = "Can't export drawing";
 
 /** The titles of the error dialog for Open… and Import SVG… (`0024` UX notes). */
 const OPEN_FILE_TITLE = "Can't open file";
@@ -279,7 +298,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         // An SVG is an untitled project that no saved file holds (`0024` criterion 2): the host
         // forgets any path, and Save asks where, offering the SVG's name.
         await invoke("reset_project").catch(() => undefined);
-        setInfo({ fileName: null, path: null, suggestedName: savedNameOf(name) });
+        setInfo({ fileName: null, path: null, suggestedName: savedNameOf(name), sourceSvg: name });
         if (opened.notice !== "") {
           editor.showHistoryNotice(opened.notice);
         }
@@ -404,6 +423,81 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         }
       } catch (error) {
         editor.showHistoryNotice(String(error), 5000, "canvas", "alert");
+      } finally {
+        root.removeAttribute("aria-busy");
+        root.style.cursor = "";
+        busy.leave();
+      }
+    },
+    [busy],
+  );
+
+  const exportSvg = useCallback(
+    async (options: SvgExportOptions, mouse: boolean) => {
+      const { editor, onOpenError } = depsRef.current;
+      const session = editor.getSession();
+      if (!session || !busy.enter()) {
+        return;
+      }
+      const button = () => document.querySelector<HTMLElement>("[data-export-svg]");
+      const settle = () => (mouse ? editor.containerRef.current?.focus() : button()?.focus());
+      const root = document.documentElement;
+      try {
+        // Selection only with nothing selected: no dialog, no file (criterion 131).
+        if (options.selectionOnly && session.selection_count() === 0) {
+          editor.showHistoryNotice(svg_export_nothing_selected(), 3000);
+          return;
+        }
+        const info = infoRef.current;
+        let fileName = svg_export_name(info.sourceSvg ?? "", info.fileName ?? "");
+        if (isTauri) {
+          const picked = await invoke<string | null>("pick_svg_export_path", {
+            suggestedName: fileName,
+          });
+          if (!picked) {
+            // Cancelled: nothing shown, nothing written, the focus stays on the button.
+            button()?.focus();
+            return;
+          }
+          fileName = picked;
+        }
+        const busyState = session.export_object_count() >= svg_export_busy_objects();
+        if (busyState) {
+          editor.showHistoryNotice(svg_export_busy_notice(fileName), 600_000);
+          root.setAttribute("aria-busy", "true");
+          root.style.cursor = "wait";
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }
+        const answer = parseSvgExportAnswer(
+          session.export_svg(
+            options.textAsPaths,
+            options.strokesAsPaths,
+            options.selectionOnly,
+            options.activePageOnly,
+          ),
+        );
+        if (answer.kind === "nothing-selected") {
+          editor.showHistoryNotice(svg_export_nothing_selected(), 3000);
+          return;
+        }
+        if (isTauri) {
+          try {
+            fileName = await invoke<string>("write_svg_export", { text: answer.text });
+          } catch (error) {
+            editor.showHistoryNotice("", 1);
+            onOpenError(String(error), EXPORT_FAILED_TITLE);
+            return;
+          }
+        } else {
+          downloadSvg(fileName, answer.text);
+        }
+        const notice = parseTimedNotice(
+          svg_export_notice(fileName, !isTauri, answer.objects, answer.kept),
+        );
+        editor.showHistoryNotice(notice.text, notice.ms);
+        settle();
+      } catch (error) {
+        onOpenError(String(error), EXPORT_FAILED_TITLE);
       } finally {
         root.removeAttribute("aria-busy");
         root.style.cursor = "";
@@ -737,5 +831,6 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     saveFromCheck: () => void saveFromCheck(),
     discard,
     cancel,
+    exportSvg: (options: SvgExportOptions, mouse: boolean) => void exportSvg(options, mouse),
   };
 }

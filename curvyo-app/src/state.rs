@@ -88,9 +88,26 @@ pub struct AppState {
     pending_open: Mutex<Option<PendingOpen>>,
     dirty: AtomicBool,
     quitting: AtomicBool,
+    /// The file Export SVG… chose, until the page hands over the text (`specs/0024` criterion 4).
+    svg_export_path: Mutex<Option<std::path::PathBuf>>,
 }
 
 impl AppState {
+    /// Keeps the file the export's save dialog chose.
+    pub fn set_svg_export_path(&self, path: Option<std::path::PathBuf>) {
+        if let Ok(mut slot) = self.svg_export_path.lock() {
+            *slot = path;
+        }
+    }
+
+    /// Takes the file the export's save dialog chose.
+    pub fn take_svg_export_path(&self) -> Option<std::path::PathBuf> {
+        self.svg_export_path
+            .lock()
+            .ok()
+            .and_then(|mut slot| slot.take())
+    }
+
     /// Records what the page reported: the project has changes that no saved file holds.
     pub fn set_dirty(&self, dirty: bool) {
         self.dirty.store(dirty, Ordering::SeqCst);

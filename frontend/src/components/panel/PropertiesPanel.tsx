@@ -9,6 +9,7 @@ import { focusCurrentFont, fontsSubject } from "@/lib/textText";
 import { useCallback, useEffect, useId, useRef } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
+import { ExportSvgSection } from "@/components/panel/ExportSvgSection";
 import { FileTab } from "@/components/panel/FileTab";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { LayersTab } from "@/components/panel/LayersTab";
@@ -367,6 +368,7 @@ export function PropertiesPanel({
                 version={appVersion()}
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
+                exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
               />
             ) : doc.view.content === "parameters" ? (
               <SketchParameters key={sketch.view.active ?? sketch.view.page} sketch={sketch} />
