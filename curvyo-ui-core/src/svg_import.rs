@@ -8,17 +8,17 @@
 use std::sync::Arc;
 
 use curvyo_document_core::{
-    Affine, AssetHash, BackgroundPaint, Color, DisplayUnit, DocumentBackground, DocumentSize,
-    DrawingNode, DrawingPage, DrawingRegisters, MAX_GROUP_DEPTH, Opacity, Point, TEXT_NAME_CHARS,
-    clean_name, validated_document_side,
+    Affine, AssetHash, DrawingNode, DrawingPage, DrawingRegisters, MAX_GROUP_DEPTH, Opacity, Point,
+    TEXT_NAME_CHARS, clean_name,
 };
 use curvyo_image_core::WorkingImage;
-use curvyo_svg_core::{
-    DisplayUnitName, InkscapeObject, LeafKind, NodeState, PageBackground, SvgDrawing, SvgNode,
-};
+use curvyo_svg_core::{InkscapeObject, LeafKind, NodeState, SvgDrawing, SvgNode};
 
 use crate::svg_font_match::FaceMemo;
 use crate::svg_import_images::{ImportAssets, frame_bounds};
+use crate::svg_import_pages::merge_closing_nodes;
+pub use crate::svg_import_pages::svg_page;
+use crate::svg_import_shadow::{apply_shadow_style, shadow_primitive};
 use crate::svg_import_shapes::{LeafGeometry, leaf_geometry};
 use crate::svg_import_style::{model_style, rewind_even_odd};
 use crate::svg_text::{TextPiece, convert_text};
@@ -89,10 +89,11 @@ pub fn svg_import(
         matrix,
         keep_layers: placement == SvgPlacement::File,
         max_groups,
+        profile: drawing.profile,
     };
     let mut nodes = Vec::new();
     let mut next = converted.into_iter();
-    mapper.map(&drawing.nodes, 0, &mut next, &mut nodes);
+    mapper.map(&drawing.nodes, (0, false), &mut next, &mut nodes);
     SvgImport {
         page: svg_page(drawing),
         leaves: count_objects(&nodes),
@@ -176,46 +177,6 @@ pub fn read_svg_drawing(bytes: &[u8]) -> Result<SvgDrawing, String> {
     curvyo_svg_core::read_svg(bytes).map_err(crate::svg_refusal_text)
 }
 
-/// The page settings of `drawing`: its page (a new document's size when it gives none), its
-/// display unit and its background.
-#[must_use]
-pub fn svg_page(drawing: &SvgDrawing) -> DrawingPage {
-    let size = drawing
-        .page
-        .and_then(|(w, h)| {
-            Some(DocumentSize::new(
-                validated_document_side(curvyo_document_core::Length::from_mm(w)).ok()?,
-                validated_document_side(curvyo_document_core::Length::from_mm(h)).ok()?,
-            ))
-        })
-        .unwrap_or_default();
-    let display_unit = drawing.display_unit.map(|unit| match unit {
-        DisplayUnitName::Mm => DisplayUnit::Mm,
-        DisplayUnitName::Cm => DisplayUnit::Cm,
-        DisplayUnitName::In => DisplayUnit::In,
-    });
-    let background = drawing.background.map(|paint| match paint {
-        PageBackground::None => DocumentBackground {
-            paint: BackgroundPaint::None,
-            ..DocumentBackground::DEFAULT
-        },
-        PageBackground::Colour(rgb, opacity) => DocumentBackground {
-            paint: BackgroundPaint::Solid,
-            color: Color {
-                r: rgb[0],
-                g: rgb[1],
-                b: rgb[2],
-            },
-            opacity: Opacity::new(opacity).unwrap_or(Opacity::OPAQUE),
-        },
-    });
-    DrawingPage {
-        size,
-        display_unit,
-        background,
-    }
-}
-
 /// The node registers of an imported node; a layer always has a name.
 fn registers(state: &NodeState) -> DrawingRegisters {
     DrawingRegisters {
@@ -261,15 +222,19 @@ struct Mapper {
     keep_layers: bool,
     /// The most groups on one chain; deeper groups merge into their parent (criterion 44).
     max_groups: usize,
+    /// The file is Curvyo's own export (`curvyo:format="1"`).
+    profile: bool,
 }
 
 impl Mapper {
-    /// Maps `nodes` at group depth `depth` into `out`. Every leaf of the reader gives exactly one
-    /// leaf, in order, so clone numbers stay valid.
+    /// Maps `nodes` at group depth `depth` into `out`, as guides inside the Guides layer
+    /// (criterion 144). Every leaf of the reader gives exactly one leaf, in order, so clone
+    /// numbers stay valid.
+    #[allow(clippy::too_many_lines)] // one match over the node kinds
     fn map(
         &self,
         nodes: &[SvgNode],
-        depth: usize,
+        (depth, guides): (usize, bool),
         next: &mut impl Iterator<Item = Converted>,
         out: &mut Vec<DrawingNode>,
     ) {
@@ -281,17 +246,30 @@ impl Mapper {
                     layer,
                     children,
                 } => {
+                    let guides_layer = state.guides_layer && depth == 0;
                     if depth >= self.max_groups {
-                        self.map(children, depth, next, out);
+                        self.map(children, (depth, guides || guides_layer), next, out);
                         continue;
                     }
                     let mut inner = Vec::new();
-                    self.map(children, depth + 1, next, &mut inner);
+                    self.map(
+                        children,
+                        (depth + 1, guides || guides_layer),
+                        next,
+                        &mut inner,
+                    );
                     let layer = *layer && self.keep_layers && depth == 0;
                     if inner.is_empty() && !layer {
                         continue;
                     }
                     let mut registers = registers(state);
+                    if guides_layer {
+                        // Its own hidden and locked state is not applied (criterion 144).
+                        registers = DrawingRegisters {
+                            name: Some("Guides".to_owned()),
+                            ..DrawingRegisters::default()
+                        };
+                    }
                     if layer && registers.name.is_none() {
                         registers.name = Some(format!("Layer {}", index + 1));
                     }
@@ -309,11 +287,25 @@ impl Mapper {
                     if state.inkscape == Some(InkscapeObject::Box3dSide) {
                         faces += 1;
                     }
-                    let geometry = leaf_geometry(&leaf.kind, self.matrix);
-                    if registers.name.is_none() {
+                    let geometry = shadow_primitive(leaf, self.matrix)
+                        .map(|(shape, rotation)| LeafGeometry::Primitive(shape, rotation))
+                        .or_else(|| leaf_geometry(&leaf.kind, self.matrix))
+                        .map(|geometry| match geometry {
+                            LeafGeometry::Path(mut outlines) if self.profile => {
+                                merge_closing_nodes(&mut outlines);
+                                LeafGeometry::Path(outlines)
+                            }
+                            other => other,
+                        });
+                    // Curvyo's own export names what has a name (criterion 62).
+                    if registers.name.is_none() && !self.profile {
                         registers.name = inkscape_name(state, &leaf.kind, geometry.as_ref(), faces);
                     }
-                    let style = model_style(&leaf.style);
+                    if guides && !matches!(leaf.kind, LeafKind::Clone { .. }) {
+                        registers.guide = true;
+                    }
+                    let mut style = model_style(&leaf.style);
+                    apply_shadow_style(leaf, &mut style);
                     out.push(match (&leaf.kind, geometry) {
                         (LeafKind::Clone { original, matrix }, _) => DrawingNode::Clone {
                             registers,
