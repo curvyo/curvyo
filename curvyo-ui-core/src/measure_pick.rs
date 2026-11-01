@@ -1,12 +1,12 @@
 //! What a press of the Measure tool picks (`specs/0070-measure-and-dimension` criteria 3, 6 and 15,
-//! UX notes §2): a point feature (node, segment midpoint, shape centre, corner or vertex), else a
-//! curve outline (circle, circular arc, rounded corner), else a straight segment, else a free
-//! point.
+//! UX notes §2): a point feature (node, segment midpoint, shape centre, corner, vertex or ellipse
+//! axis end), else a curve outline (circle, circular arc, rounded corner), else a straight
+//! segment or primitive edge, else a free point.
 
 use curvyo_document_core::{
     AnchorId, Angle, CurveSlot, Length, NodeId, ObjectSnapshot, PathSnapshot, Point, PointSlot,
     PrimitiveSnapshot, Shape, ShapeFeature, arc_circle, cubic_at, effective_corner_radii,
-    shape_point,
+    outline_of_rotated, shape_point,
 };
 
 /// One pick of the Measure tool.
@@ -104,6 +104,13 @@ fn point_features(object: &ObjectSnapshot) -> Vec<(PointSlot, Point)> {
         });
         features.push(ShapeFeature::EdgeMid(i));
     }
+    // A whole ellipse that is no circle: its four axis ends (Proposal, customer feedback on
+    // PR #243); a circle keeps its rim for the radius.
+    if matches!(primitive.shape, Shape::Ellipse { arc: None, .. })
+        && circle_of_ellipse(primitive).is_none()
+    {
+        features.extend((0..4).map(ShapeFeature::Vertex));
+    }
     features
         .into_iter()
         .filter_map(|feature| {
@@ -163,14 +170,12 @@ fn curve_near(object: &ObjectSnapshot, p: Point, tolerance: f64) -> Option<(f64,
         return None;
     };
     match primitive.shape {
-        Shape::Ellipse { frame, .. }
-            if (frame.rx.as_mm() - frame.ry.as_mm()).abs()
-                <= curvyo_document_core::CIRCLE_TOLERANCE.as_mm() =>
-        {
+        Shape::Ellipse { .. } => {
+            let (center, radius) = circle_of_ellipse(primitive)?;
             near(
                 CurveSlot::Circle { node },
-                frame.center,
-                frame.rx,
+                center,
+                radius,
                 (
                     Angle::from_radians(0.0),
                     Angle::from_radians(std::f64::consts::TAU),
@@ -180,6 +185,16 @@ fn curve_near(object: &ObjectSnapshot, p: Point, tolerance: f64) -> Option<(f64,
         Shape::Rect { .. } => round_corner_near(primitive, p, tolerance),
         _ => None,
     }
+}
+
+/// The centre and radius of an ellipse primitive that is a circle within
+/// [`curvyo_document_core::CIRCLE_TOLERANCE`]; `None` for any other shape.
+fn circle_of_ellipse(primitive: &PrimitiveSnapshot) -> Option<(Point, Length)> {
+    let Shape::Ellipse { frame, .. } = primitive.shape else {
+        return None;
+    };
+    ((frame.rx.as_mm() - frame.ry.as_mm()).abs() <= curvyo_document_core::CIRCLE_TOLERANCE.as_mm())
+        .then_some((frame.center, frame.rx))
 }
 
 fn round_corner_near(
@@ -273,10 +288,57 @@ fn segment_distance(point: Point, start: Point, end: Point) -> f64 {
         .length()
 }
 
-/// The straight path segment of `object` nearest `p` within `tolerance`.
+/// The straight edge of a primitive nearest `p` within `tolerance`, between the corners of a
+/// rectangle's box or two neighbouring vertices of a polygon or star (customer feedback on
+/// PR #243).
+fn edge_near(
+    primitive: &PrimitiveSnapshot,
+    p: Point,
+    tolerance: f64,
+) -> Option<(f64, MeasurePick)> {
+    // Which edges are straight: every side of a rectangle's box; a polygon or star side with no
+    // handles (a curved side has no length to measure).
+    let (straight, corner): (Vec<bool>, fn(u32) -> ShapeFeature) = match primitive.shape {
+        Shape::Rect { .. } => (vec![true; 4], ShapeFeature::Corner),
+        Shape::Polygon { .. } | Shape::Star { .. } => {
+            let anchors = outline_of_rotated(&primitive.shape, primitive.rotation).anchors;
+            let straight = (0..anchors.len())
+                .map(|i| {
+                    anchors[i].handle_out.length() <= DEGENERATE_MM
+                        && anchors[(i + 1) % anchors.len()].handle_in.length() <= DEGENERATE_MM
+                })
+                .collect();
+            (straight, ShapeFeature::Vertex)
+        }
+        Shape::Ellipse { .. } => return None,
+    };
+    let count = u32::try_from(straight.len()).ok()?;
+    let at = |feature| {
+        let slot = PointSlot::ShapePoint {
+            node: primitive.id,
+            feature,
+        };
+        shape_point(primitive, feature).map(|point| (slot, point))
+    };
+    (0..count)
+        .zip(straight)
+        .filter(|(_, straight)| *straight)
+        .filter_map(|(i, _)| {
+            let (start, end) = (at(corner(i))?, at(corner((i + 1) % count))?);
+            let off = segment_distance(p, start.1, end.1);
+            (off <= tolerance && start.1.vector_to(end.1).length() > DEGENERATE_MM)
+                .then_some((off, MeasurePick::Segment { start, end }))
+        })
+        .min_by(|x, y| x.0.total_cmp(&y.0))
+}
+
+/// The straight path segment or primitive edge of `object` nearest `p` within `tolerance`.
 fn segment_near(object: &ObjectSnapshot, p: Point, tolerance: f64) -> Option<(f64, MeasurePick)> {
     let node = object.id();
     let end = |anchor: AnchorId, at: Point| (PointSlot::Anchor { node, anchor }, at);
+    if let ObjectSnapshot::Primitive(primitive) = object {
+        return edge_near(primitive, p, tolerance);
+    }
     let path = anchors_of(object)?;
     path.subpaths()
         .flat_map(|outline| {
@@ -365,188 +427,9 @@ pub fn pick_node(pick: &MeasurePick) -> Option<NodeId> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "measure_pick_tests.rs"]
+mod tests;
 
-    #[test]
-    fn an_arc_sweeps_through_its_middle() {
-        let c = Point::new(0.0, 0.0);
-        let (start, sweep) = arc_through(
-            c,
-            Point::new(1.0, 0.0),
-            Point::new(0.0, 1.0),
-            Point::new(-1.0, 0.0),
-        );
-        assert!(
-            start.as_radians().abs() < 1e-12
-                && (sweep.as_radians() - std::f64::consts::PI).abs() < 1e-12
-        );
-        let (_, back) = arc_through(
-            c,
-            Point::new(1.0, 0.0),
-            Point::new(0.0, -1.0),
-            Point::new(-1.0, 0.0),
-        );
-        assert!((back.as_radians() + std::f64::consts::PI).abs() < 1e-12);
-    }
-    use curvyo_document_core::{Angle, EllipseFrame, Length, NewAnchor, RectBounds, Style, Vec2};
-
-    fn id(n: i32) -> NodeId {
-        // Ids come from the document in real use; the tests take one from a fresh path.
-        let document = curvyo_document_core::Document::new(u64::try_from(n).unwrap());
-        document.create_path(
-            &[
-                NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
-                NewAnchor::corner(AnchorId::new(1, 2), Point::new(1.0, 0.0)),
-            ],
-            false,
-        )
-    }
-
-    fn line(node: NodeId, a: Point, b: Point) -> ObjectSnapshot {
-        ObjectSnapshot::Path(PathSnapshot {
-            id: node,
-            closed: false,
-            style: Style::default(),
-            anchors: vec![
-                NewAnchor::corner(AnchorId::new(1, 1), a),
-                NewAnchor::corner(AnchorId::new(1, 2), b),
-            ],
-            extra_subpaths: Vec::new(),
-            rotation: Angle::from_radians(0.0),
-        })
-    }
-
-    fn circle(node: NodeId) -> ObjectSnapshot {
-        ObjectSnapshot::Primitive(PrimitiveSnapshot {
-            id: node,
-            shape: Shape::Ellipse {
-                frame: EllipseFrame {
-                    center: Point::new(50.0, 50.0),
-                    rx: Length::from_mm(20.0),
-                    ry: Length::from_mm(20.0),
-                },
-                arc: None,
-                curve: curvyo_document_core::Curve::ELLIPSE_DEFAULT,
-            },
-            style: Style::default(),
-            rotation: Angle::from_radians(0.0),
-        })
-    }
-
-    #[test]
-    fn a_node_wins_over_the_segment_and_alt_frees_the_point() {
-        let path = line(id(1), Point::new(0.0, 0.0), Point::new(30.0, 0.0));
-        let objects = [path];
-        let near_node = measure_pick(
-            &objects,
-            Point::new(0.5, 0.5),
-            (Length::from_mm(2.0), Length::from_mm(2.0)),
-        );
-        assert!(matches!(
-            near_node,
-            MeasurePick::Point {
-                slot: PointSlot::Anchor { .. },
-                ..
-            }
-        ));
-        let middle = measure_pick(
-            &objects,
-            Point::new(15.2, 0.3),
-            (Length::from_mm(2.0), Length::from_mm(2.0)),
-        );
-        assert!(matches!(
-            middle,
-            MeasurePick::Point {
-                slot: PointSlot::SegmentMid { .. },
-                ..
-            }
-        ));
-        let body = measure_pick(
-            &objects,
-            Point::new(8.0, 0.5),
-            (Length::from_mm(2.0), Length::from_mm(2.0)),
-        );
-        assert!(matches!(body, MeasurePick::Segment { .. }));
-        let free = measure_pick(
-            &objects,
-            Point::new(0.5, 0.5),
-            (Length::from_mm(0.0), Length::from_mm(2.0)),
-        );
-        assert!(
-            matches!(free, MeasurePick::Segment { .. }),
-            "Alt: no node snap"
-        );
-        let empty = measure_pick(
-            &objects,
-            Point::new(8.0, 9.0),
-            (Length::from_mm(2.0), Length::from_mm(2.0)),
-        );
-        assert!(matches!(
-            empty,
-            MeasurePick::Point {
-                slot: PointSlot::Free { .. },
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn a_circle_outline_is_a_curve_pick_and_its_centre_a_point() {
-        let objects = [circle(id(2))];
-        let outline = measure_pick(
-            &objects,
-            Point::new(70.5, 50.0),
-            (Length::from_mm(2.0), Length::from_mm(2.0)),
-        );
-        assert!(
-            matches!(outline, MeasurePick::Curve { radius, .. } if (radius.as_mm() - 20.0).abs() < 1e-9)
-        );
-        let centre = measure_pick(
-            &objects,
-            Point::new(50.5, 50.0),
-            (Length::from_mm(2.0), Length::from_mm(2.0)),
-        );
-        assert!(matches!(
-            centre,
-            MeasurePick::Point {
-                slot: PointSlot::ShapePoint {
-                    feature: ShapeFeature::Center,
-                    ..
-                },
-                ..
-            }
-        ));
-    }
-
-    #[test]
-    fn a_rounded_corner_is_picked_on_its_quarter() {
-        let rect = ObjectSnapshot::Primitive(PrimitiveSnapshot {
-            id: id(3),
-            shape: Shape::Rect {
-                bounds: RectBounds {
-                    origin: Point::new(0.0, 0.0),
-                    width: Length::from_mm(40.0),
-                    height: Length::from_mm(20.0),
-                },
-                corner_radii: curvyo_document_core::CornerRadii::uniform(Length::from_mm(6.0)),
-            },
-            style: Style::default(),
-            rotation: Angle::from_radians(0.0),
-        });
-        // On the top-left arc, 45° out from its centre (6, 6).
-        let on_arc = Point::new(6.0, 6.0).translated(Vec2::new(-1.0, -1.0).normalized_to(6.0));
-        let pick = measure_pick(
-            &[rect],
-            on_arc,
-            (Length::from_mm(0.5), Length::from_mm(1.0)),
-        );
-        assert!(matches!(
-            pick,
-            MeasurePick::Curve {
-                slot: CurveSlot::RoundCorner { corner: 0, .. },
-                ..
-            }
-        ));
-    }
-}
+#[cfg(test)]
+#[path = "measure_pick_shape_tests.rs"]
+mod shape_tests;

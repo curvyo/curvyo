@@ -210,6 +210,22 @@ fn shape_points_follow_the_rotation_of_the_shape() {
     assert!(shape_point(p, ShapeFeature::Vertex(0)).is_none());
 }
 
+/// Customer feedback on PR #243: the four axis ends of a whole ellipse are its vertices, east,
+/// south, west and north; past them there is none.
+#[test]
+fn an_ellipse_vertex_is_an_axis_end() {
+    let shape = circle(1, 50.0, 50.0, 30.0, 15.0);
+    let ObjectSnapshot::Primitive(p) = &shape else {
+        unreachable!()
+    };
+    let ends = [(80.0, 50.0), (50.0, 65.0), (20.0, 50.0), (50.0, 35.0)];
+    for (i, (x, y)) in (0..).zip(ends) {
+        let at = shape_point(p, ShapeFeature::Vertex(i)).unwrap();
+        assert!(close(at.x, x) && close(at.y, y), "{i}: {at:?}");
+    }
+    assert!(shape_point(p, ShapeFeature::Vertex(4)).is_none());
+}
+
 #[test]
 fn a_circle_measures_its_radius_until_it_is_scaled_unevenly() {
     let slots = DimensionSlots::Curve(CurveSlot::Circle { node: id(1) });
