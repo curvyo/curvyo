@@ -1,4 +1,4 @@
-# SVG import: what is read and what is ignored
+# SVG import and export: what is read, what is ignored, what is written
 
 Open… reads an `.svg` file as a new, untitled project; the Import button of the tool rail (Ctrl+I)
 adds one as a new layer in the middle of the view, or at the point where it is dropped on the
@@ -126,5 +126,72 @@ fetched.
 
 At most 500,000 elements and 5,000,000 path points are read (the rest of a larger file is left
 out); elements nested deeper than 256 levels refuse the file; `use` copies stop at 16 levels and
-100,000 copies; a coordinate beyond 10 km skips its element. A file holds at most 1,000,000 text
+100,000 copies; a coordinate beyond 10 km skips its element (an `inkscape:page` too); at most
+1,000 pages are read. A file holds at most 1,000,000 text
 characters; position lists are read up to 10,000 numbers; a font name is cut at 128 characters.
+
+## Export
+
+Export SVG… in the File tab writes the drawing as one SVG file (`specs/0024-svg-import-export`
+slice 4). One user unit is one millimetre: `width`/`height` in `mm`, `viewBox="0 0 w h"`. The
+export origin is the top-left corner of the first page (one page), of the union of all pages
+(several, each written as an `inkscape:page`), or of the active page (Active page only). Objects
+off the pages keep their coordinates; nothing is clipped. `curvyo:format="1"` marks Curvyo's own
+profile.
+
+| In Curvyo | In the file |
+|---|---|
+| Layer, group | `<g inkscape:groupmode="layer">`, `<g>`; names as `inkscape:label`, hidden `style="display:none"`, locked `sodipodi:insensitive="true"`, `opacity` |
+| Path, compound path | `<path d>` in absolute mm, `M L C Z` only, `sodipodi:nodetypes` from the node kinds; a curved closing segment ends on the first node before `Z` |
+| Rectangle (one radius) | `<rect rx ry>` with `transform="rotate(deg cx cy)"` when turned; `curvyo:frame` when turned, `curvyo:frame` and `curvyo:radii` when `rx` cannot say the radius exactly |
+| Rectangle (four radii) | `<path>` with `curvyo:kind="rectangle"`, `curvyo:frame="cx cy w h rotation"`, `curvyo:radii="tl tr br bl"` |
+| Ellipse, circle | `<ellipse>`, `<circle>`; with a Curve other than 100 % a `<path>` with `curvyo:kind="ellipse"`, `curvyo:frame="cx cy rx ry rotation curve"` |
+| Ellipse arc | `<path sodipodi:type="arc">` with `start`, `end` (radians), `arc-type`, `curvyo:frame="cx cy rx ry rotation start end"`; a pie's `d` starts at the centre (`M cx cy L start C … Z`) |
+| Polygon, star (Curve 0 %) | Inkscape star (`sodipodi:type="star"`) plus `curvyo:frame` |
+| Polygon, star with Curve | `<path>` with `curvyo:kind`, `curvyo:frame="cx cy radius n angle rotation curve [ratio]"` |
+| Linked clone | `<use xlink:href transform="matrix(…)">` when it has no override, its matrix is a move, turn or flip and its original is written and shown; otherwise the path of its outline |
+| Text | live `<text x y>` with one `<tspan sodipodi:role="line" x y>` per line, `font-family`, `font-weight`, `font-style`, `font-size` (Size divided by the face's H ratio), kerns and turns as `dx`, `dy`, `rotate`; `transform="matrix(…)"` only for a turned or skewed text (positions then in its own frame); `curvyo:size` and `curvyo:face="family\|style\|hash"` |
+| Text on path | `<textPath xlink:href startOffset>` on its carrier, which is always written |
+| Single-line text | open paths, stroked, always |
+| Image | `<image>` with the stored bytes as a base64 `data:` URI |
+| Sketch | a group with one element per drawn entity in sketch order: a line as `<path>`, a circle as `<circle>`, an arc as an ellipse arc; constraints and construction geometry are not written |
+| Markers | `<marker>` definitions referenced by `marker-start`, `-mid`, `-end` on open single-outline paths, plus `curvyo:markers`; spaced and closed-path markers only in `curvyo:markers` |
+| Guides | one hidden, locked layer "Guides" with `curvyo:guides="1"` after all layers |
+
+**Options.** Text as paths (outlines of Object to path; a text whose font is missing stays live
+text and is counted in the notice), Strokes as paths (fill part plus the stroke outline of Stroke
+to path), Selection only, Active page only (objects whose box overlaps the page, written whole).
+
+**Not written.** The page grid and origin corner, snapping, the selection, the history, sketch
+constraints and construction geometry, the link of a text clone to its source, fonts.
+
+### Profile v1 reference
+
+Frozen with `curvyo:format="1"` on the root (`xmlns:curvyo="urn:curvyo:svg:1"`); a change of any
+row is `curvyo:format="2"`. Numbers in `curvyo:` attributes are the shortest text that reads back
+to the same `f64` (no exponent, never `-0`), lists are separated by single spaces, lengths are
+millimetres and angles radians. The reader ignores every `curvyo:` attribute without
+`curvyo:format="1"` and keeps a value only by the agreement rule of its row; otherwise the
+standard SVG wins.
+
+| Attribute | On | Value | Kept on import when |
+|---|---|---|---|
+| `curvyo:format` | root `<svg>` | `1` | always (switches the profile on) |
+| `curvyo:dash` | any stroked shape element | dash list in multiples of the stroke width | same count as `stroke-dasharray`, each dash times the width within 1e-6 mm of it |
+| `curvyo:stroke-width` | any stroked shape element (6 decimals not exact, or a turned `<rect>`/`<ellipse>`/`<circle>`/arc/star) | one length | within 1e-6 mm of `stroke-width` |
+| `curvyo:radii` | `<path curvyo:kind="rectangle">`; `<rect>` whose `rx` is not exact in 6 decimals | `tl tr br bl` | on a `<path>`: with its frame (below); on a `<rect>`: all four within 0.001 mm of `rx` |
+| `curvyo:kind` | `<path>` | `rectangle`, `ellipse`, `polygon` or `star` | with `curvyo:frame`, when the primitive draws `d` within 0.001 mm |
+| `curvyo:frame` | `<path curvyo:kind>`; a turned `<rect>`, `<ellipse>`, `<circle>`; a `<rect>` with `curvyo:radii`; every Inkscape arc and star | rectangle `cx cy w h rotation`; ellipse `cx cy rx ry rotation curve`; arc `cx cy rx ry rotation start end`; polygon `cx cy radius n angle rotation curve`; star the same plus `ratio` | the primitive draws the element within 0.001 mm (a `<rect>`: centre, size and turn within 0.001 mm and 1e-6 rad) |
+| `curvyo:markers` | a stroked path or shape with markers | `start=S middle=S place=P count=N end=S` in this order; `S` is `none`, `arrow` or `dot`, `P` is `spaced` or `nodes`, `N` a whole number | the stroke is on; on a single open outline a slot SVG draws whose `marker-*` reference is gone reads `none` |
+| `curvyo:size` | `<text>` | the exact Size | within 1e-6 mm of `font-size` times the face's H ratio, and inside the Size limits |
+| `curvyo:face` | `<text>` | `family\|style\|hash`: the family up to the first `\|`, the style name, 64 hex digits of the face's content hash (64 zeros: missing face) | the family is the first `font-family`, the style name parses and has at most 128 characters, its weight and slant equal `font-weight` and `font-style`; a family that holds a `\|` never matches, so the lookup by name applies |
+| `curvyo:guides` | a top-level layer | `1` | always: its direct children are guides |
+| `curvyo:outlines` | (reserved, not written) | (none) | never read |
+
+Under the profile a closed outline whose last node lies exactly on its first is closed by its
+last segment: the writer's form of a curved closing segment.
+
+**Read back.** Open of an exported file gives the pages, primitives, exact values, markers,
+texts with their face reference and the guides again; the shadow values are used only while the
+standard SVG next to them agrees.
+

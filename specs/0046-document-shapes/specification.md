@@ -143,3 +143,5 @@ Depends on: `specs/0050-layers-and-objects-panel/`, `specs/0051-sidebar-and-no-m
 Related: `specs/0045-document-formats-library/` (formats unchanged), `specs/0016-boolean-operations/`, `0057`, `0058` (unaffected), `0059` and `0060` (drafts: pages, snapping), ADR 0002 (units, SVG at 96 dpi), ADR 0004 §9 (format versioning)
 ADRs: `adrs.md`; [ADR 0019](../../docs/adr/0019-document-template-and-guide-paths.md) (Accepted 2026-10-17)
 PR: https://github.com/curvyo/curvyo/pull/150 (stage 1)
+
+**SVG export (2026-11-01):** Guides are written in one hidden, locked layer "Guides" and come back as guides (criteria 143, 144); see `specs/0024-svg-import-export`, "Slice 4: export".

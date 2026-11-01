@@ -386,3 +386,5 @@ request as made.
 Requirements: R-EDIT-005 (stroke styling), R-EDIT-016 (`docs/requirements.md`)
 Depends on: `specs/0017-style-panel-rework/`
 PR: #78
+
+**SVG export (2026-11-01):** Markers are written as SVG `<marker>` definitions plus `curvyo:markers` (criteria 141, 142); see `specs/0024-svg-import-export`, "Slice 4: export".

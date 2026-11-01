@@ -28,6 +28,11 @@ ux-engineer, 2026-10-26. Condenses and amends the "UX notes" section of `specifi
 - No new chord (R-SYS-009 reviews all later). Tab to the button, Enter or Space. Visible text name equals the accessible name; 2 px `--editor-accent` focus ring; hit target 28 px, 36 px coarse. Nothing animates, so `prefers-reduced-motion` needs no case. Notice text 12 px `--toolbar-icon` on `--toolbar-bg`, contrast as the slot.
 - Large documents: selecting 10,000 imported objects must not freeze the Layers tab (`0050` criteria 48 to 52 cover it).
 
+## Amendment 2026-11-01: own section (customer feedback on PR #242)
+Customer: "Export SVG in the File tab should have its own section. You can't see well that the switches belong to Export SVG." Supersedes the "no visible caption" and "own row" wording above.
+- The export controls form a `<section>` named by a visible heading **SVG export** (12 px semibold `--toolbar-icon`, the style of the Background and Pages block headings), 8 px below the heading the button, then the four switches 8 px below the button. A 25 % `--toolbar-icon` divider, 16 px above and below, separates it from the button block; on the desktop the existing divider before Quit closes it.
+- The group "Export options" stays inside the section (name, roles, `aria-checked`, tab order, stored options and behaviour unchanged). No new tokens. At 800 x 600 the File tab body still fits without scrolling.
+
 ## Rows for `docs/design-system.md` (written by the PR)
 Import SVG… in the File tab (order, tooltip), the busy texts and 1 MiB threshold, the one notice, the refusal titles ("Can't open file", "Can't import SVG").
 
@@ -44,8 +49,8 @@ Supersedes "Where import lives" for Import SVG… ("I don't like the position un
 ux-engineer, 2026-11-01. Replaces "Export UX notes" in `specification.md` ("Later: export") where they differ, and applies the accepted `export-plan.md` (Frage 16 A: an inline row of switches under Export SVG…, no dialog, remembered per user). Customer rules as above: no hint labels, tooltip = the control's name only, no dialog of ours, permit over refuse. Strings marked **(Proposal)** are vetoable at the demo.
 
 ## Placement in the File tab
-- **Rows, top to bottom:** project block, the 100 px button block (New/Open…, Save/Save as…, Close/Template; Import SVG… and Import image… are gone since the tool rail Import button), 12 px, **Export SVG…**, 8 px, **the options**, then the divider, Quit (desktop) and the version line as today.
-- **Export SVG…** sits outside the 100 px block, so the unsaved-changes check never replaces it and nothing below moves. Same look as Open… (outline text button, 118 x 28 px, 36 px coarse), own row, left-aligned with the other buttons. Never dimmed, never hidden, no chord.
+- **Rows, top to bottom:** project block, the 100 px button block (New/Open…, Save/Save as…, Close/Template; Import SVG… and Import image… are gone since the tool rail Import button), a 25 % divider (16 px above and below), the **SVG export section** (heading, **Export SVG…**, **the options**), then on the desktop a second divider, Quit (desktop) and the version line as today.
+- **Export SVG…** sits outside the 100 px block, so the unsaved-changes check never replaces it and nothing below moves. Same look as Open… (outline text button, 118 x 28 px, 36 px coarse), first control of the section, left-aligned with the other buttons. Never dimmed, never hidden, no chord.
 - **Tooltip:** "Export SVG", `side="left"`, 400 ms and on keyboard focus. The spec's sentence "Saves this drawing as an SVG file." is a hint label and is dropped.
 
 ## The options row
@@ -104,7 +109,7 @@ Canvas notice slot (File tab precedent), 12 px `--toolbar-icon` on `--toolbar-bg
 Export SVG… in the File tab (placement outside the check block, tooltip), the switch control and its two-column layout, the stored options, the busy text and 5,000-object threshold, the notices and the "Can't export drawing" title.
 
 ## UI review checklist
-1. Export SVG… is its own row below the button block, 118 x 28 px (36 coarse), tooltip "Export SVG", never dimmed, unaffected by the unsaved-changes check.
+1. Export SVG… is the first control of the "SVG export" section below the button block, 118 x 28 px (36 coarse), tooltip "Export SVG", never dimmed, unaffected by the unsaved-changes check.
 2. Four switches with exactly the labels above, `role="switch"`, `aria-checked`, group "Export options", two columns, no wrap, no scroll at 800 x 600.
 3. All off by default, remembered across restart, not stored in the document, no undo step, no dirty flag.
 4. Selection only with nothing selected: operable; Export shows "Nothing is selected." and opens no dialog. Active page only with one page: operable, no visual disabling.
@@ -114,3 +119,13 @@ Export SVG… in the File tab (placement outside the check block, tooltip), the 
 8. Error dialog: title, reason, "Nothing was written.", focus on OK, focus back on the button.
 9. Focus: keyboard stays on the control; mouse hands focus to the canvas; visible 2 px focus ring on all five controls; Tab order as listed.
 10. Light and dark theme, coarse pointer, `prefers-reduced-motion`.
+
+## UX review, SVG export (2026-11-01)
+
+ux-engineer, browser build, 1280 x 800 and 800 x 600, Playwright. Screenshots in the session scratchpad `ux0024/`. Verdict: **APPROVE**.
+
+Checked and matching the notes: Export SVG… on its own row below the button block, 118 x 28, left-aligned with New (checklist 1); four `role="switch"` in group "Export options" with `aria-checked`, exact labels, 12 px, no wrap, no scroll at 800 x 600; one-column fallback used (24 px rows), as the notes allow (2); all off by default and remembered across reload via `localStorage` (3); Selection only with nothing selected stays operable and Export shows "Nothing is selected." with no download (4); Active page only with one page toggles with no disabled look (4); empty drawing downloads `Untitled.svg` with "Downloaded Untitled.svg. The drawing is empty."; a drawing with a rectangle and a text downloads a valid SVG containing one `<rect>` and one `<text>`, notice "Downloaded Untitled.svg." gone after 3 s, `role="status"` (5, 6); Tab order Export SVG…, Text as paths, Strokes as paths, Selection only, Active page only, then on to the canvas toolbar; 2 px accent focus ring on the switch row; a keyboard press keeps focus on the button, a mouse press hands focus to the canvas (9).
+
+Not verified: busy state at 5,000 objects (7), error dialog (8, no write failure in the browser), coarse pointer, reduced motion, tooltip text "Export SVG" (10 partly). Dark theme: the app has no dark token set yet (`.dark` changes nothing in the File tab), so the dark check is open until the theme work.
+
+Remaining, minor: the switch focus ring spans the whole 256 px row, not just the label and track. Acceptable; tighten when the two-column grid is revisited.
