@@ -20,6 +20,7 @@ import type { HistoryDirection } from "@/lib/historyText";
 import { type NudgeFeedback, useNudgeFeedback } from "@/hooks/useNudgeFeedback";
 import { type BackingBuffer, backingBufferFor, sameBackingBuffer } from "@/lib/canvasSize";
 import { ModifierTracker } from "@/lib/keyModifiers";
+import { isSecondPress, withheldPressIsDrag } from "@/lib/doubleClick";
 import { parseLayerNotice } from "@/lib/layerRows";
 import { FLIP_NOTICE_MS } from "@/lib/flipText";
 import { canvasLeavesKey } from "@/lib/fontPreviewKeys";
@@ -223,33 +224,10 @@ function sameSelectBar(a: SelectBarState, b: SelectBarState): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** A hand-rolled double-click detector (specs/0002-path-node-editing/
- * adrs.md's `PenTool` doc comment: "double-click detection itself is the
- * frontend's job"). A real DOM `dblclick` event fires only after BOTH
- * clicks' own `pointerdown`/`pointerup` pairs have already run — relaying
- * both to the session would place an unwanted extra node (acceptance
- * criterion 3: a finishing double-click is "instead of placing another
- * node", not in addition to it). This tracks press timing/position
- * itself instead, so the second press of a double-click can be withheld
- * from the session entirely and read as one `double_click(x, y)` call
- * once its matching release arrives
- * (`specs/0004-canvas-navigation-and-selection/adrs.md`: "the host
- * detects a double-click... and calls `double_click(x, y)`. `Session`
- * dispatches it" — no more per-tool branching here). The first press
- * still committed normally — exactly the node the maker expects to end
- * up with (matching Inkscape).
- */
 /** How long the "max" notice of a limited typed corner radius stays at its knob
  * (`specs/0013-rectangle-corner-radii/` criterion 6). */
 const LIMIT_NOTICE_MS = 1500;
 
-const DOUBLE_CLICK_MS = 400;
-/** Canvas-relative CSS pixels now (`canvas-navigation-and-selection`: all
- * screen↔document conversion moved into Rust), not document millimetres
- * — comparing in screen space is also exactly right for "did the two
- * presses land close enough to read as one double-click", independent
- * of zoom. */
-const DOUBLE_CLICK_PX = 5;
 /** A press on a mark of the typed move is a click if the pointer moves less than this before the
  * release, px (`specs/0047-transform-polish/` criterion 40); 8 px for a touch or a pen. */
 const MARK_SLOP_PX = 3;
@@ -973,6 +951,7 @@ export function useEditorSession(
     y: number;
     shift: boolean;
     ctrl: boolean;
+    touch: boolean;
   } | null>(null);
   /** Whether a drag-pan gesture is in flight — a ref (not just the
    * mirrored `isPanning` state below) so `onPointerMove`/`onPointerUp`
@@ -1999,6 +1978,65 @@ export function useEditorSession(
     };
   }, []);
 
+  /** A press the session sees: capture, pointer kind, `pointer_down` and the hidden-layer notice.
+   * Also run for a held-back second press that turned into a drag. */
+  const startPress = useCallback(
+    (
+      target: HTMLCanvasElement,
+      event: { pointerId: number; pointerType: string; button: number },
+      x: number,
+      y: number,
+      modifiers: { shift: boolean; ctrl: boolean; alt: boolean },
+    ) => {
+      const session = sessionRef.current;
+      if (!session) {
+        return;
+      }
+      setHandleHint("");
+      // Capture the pointer for every tool, not only for panning: a
+      // transform drag (a rotate swings the pointer in a wide arc) must
+      // keep receiving moves and the release when the pointer leaves the
+      // canvas, instead of losing the release and clearing its readout.
+      if (event.button === 0) {
+        try {
+          target.setPointerCapture(event.pointerId);
+        } catch {
+          // Not capturable (e.g. a synthetic event) — the gesture still
+          // works while the pointer stays over the canvas.
+        }
+      }
+      // A tap is 8 px, a click 3 px (`0052` criteria 1 and 31).
+      notePointer(event.pointerType);
+      session.pointer_down(x, y, modifiers.shift, modifiers.ctrl, modifiers.alt);
+      // Drawing into a hidden or locked layer is refused with a notice (`0050` criterion 23).
+      const layerNotice = parseLayerNotice(session.take_layer_notice());
+      if (layerNotice) {
+        history.showNotice(layerNotice.text, undefined, "canvas", layerNotice.kind);
+      }
+      setCursorHint(session.cursor_hint());
+      syncFromSession();
+    },
+    [history, notePointer, syncFromSession],
+  );
+
+/** A hand-rolled double-click detector (specs/0002-path-node-editing/
+ * adrs.md's `PenTool` doc comment: "double-click detection itself is the
+ * frontend's job"). A real DOM `dblclick` event fires only after BOTH
+ * clicks' own `pointerdown`/`pointerup` pairs have already run — relaying
+ * both to the session would place an unwanted extra node (acceptance
+ * criterion 3: a finishing double-click is "instead of placing another
+ * node", not in addition to it). This tracks press timing/position
+ * itself instead, so the second press of a double-click can be withheld
+ * from the session entirely and read as one `double_click(x, y)` call
+ * once its matching release arrives
+ * (`specs/0004-canvas-navigation-and-selection/adrs.md`: "the host
+ * detects a double-click... and calls `double_click(x, y)`. `Session`
+ * dispatches it" — no more per-tool branching here). The first press
+ * still committed normally — exactly the node the maker expects to end
+ * up with (matching Inkscape). A held-back second press that moves beyond
+ * the drag threshold before its release is a drag after all: it reaches the
+ * session as a press at its own position and drags normally.
+ */
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       if (releasePendingRef.current) {
@@ -2116,14 +2154,7 @@ export function useEditorSession(
       }
 
       const now = performance.now();
-      const last = lastPressRef.current;
-      // Alt-clicks step through overlapping objects (`specs/0014-advanced-selection/`
-      // criterion 5), quickly and at one point: never a double-click.
-      const isDoubleClick =
-        !event.altKey &&
-        last !== null &&
-        now - last.time < DOUBLE_CLICK_MS &&
-        Math.hypot(x - last.x, y - last.y) < DOUBLE_CLICK_PX;
+      const isDoubleClick = isSecondPress(lastPressRef.current, now, x, y, event.altKey);
       lastPressRef.current = { time: now, x, y };
       suppressedPressRef.current = isDoubleClick;
       if (isDoubleClick) {
@@ -2132,40 +2163,17 @@ export function useEditorSession(
           y,
           shift: event.shiftKey,
           ctrl: event.ctrlKey || event.metaKey,
+          touch: event.pointerType !== "mouse",
         };
         return;
       }
-      setHandleHint("");
-      // Capture the pointer for every tool, not only for panning: a
-      // transform drag (a rotate swings the pointer in a wide arc) must
-      // keep receiving moves and the release when the pointer leaves the
-      // canvas, instead of losing the release and clearing its readout.
-      if (event.button === 0) {
-        try {
-          event.currentTarget.setPointerCapture(event.pointerId);
-        } catch {
-          // Not capturable (e.g. a synthetic event) — the gesture still
-          // works while the pointer stays over the canvas.
-        }
-      }
-      // A tap is 8 px, a click 3 px (`0052` criteria 1 and 31).
-      notePointer(event.pointerType);
-      session.pointer_down(
-        x,
-        y,
-        event.shiftKey,
-        event.ctrlKey || event.metaKey,
-        event.altKey,
-      );
-      // Drawing into a hidden or locked layer is refused with a notice (`0050` criterion 23).
-      const layerNotice = parseLayerNotice(session.take_layer_notice());
-      if (layerNotice) {
-        history.showNotice(layerNotice.text, undefined, "canvas", layerNotice.kind);
-      }
-      setCursorHint(session.cursor_hint());
-      syncFromSession();
+      startPress(event.currentTarget, event, x, y, {
+        shift: event.shiftKey,
+        ctrl: event.ctrlKey || event.metaKey,
+        alt: event.altKey,
+      });
     },
-    [canvasPoint, history, isSpaceHeld, notePointer, syncFromSession, syncTrackedModifiers],
+    [canvasPoint, isSpaceHeld, startPress, syncFromSession, syncTrackedModifiers],
   );
 
   const onPointerMove = useCallback(
@@ -2193,6 +2201,19 @@ export function useEditorSession(
           refreshPlacement();
         }
         return;
+      }
+      // A held-back second press that moves beyond the drag threshold is a drag, never a
+      // double-click: the session gets the press now, at its own place, then this move.
+      const withheld = doubleClickPressRef.current;
+      if (suppressedPressRef.current && withheld && withheldPressIsDrag(withheld, x, y)) {
+        suppressedPressRef.current = false;
+        doubleClickPressRef.current = null;
+        lastPressRef.current = null;
+        startPress(event.currentTarget, event, withheld.x, withheld.y, {
+          shift: withheld.shift,
+          ctrl: withheld.ctrl,
+          alt: false,
+        });
       }
       session?.pointer_hover(
         x,
@@ -2238,6 +2259,7 @@ export function useEditorSession(
       syncFromSession,
       refreshPlacement,
       refreshPenEntry,
+      startPress,
     ],
   );
 
