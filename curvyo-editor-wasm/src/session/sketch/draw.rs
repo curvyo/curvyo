@@ -194,7 +194,7 @@ impl Session {
                 page.size.width.as_mm() / 2.0,
                 page.size.height.as_mm() / 2.0,
             ),
-            self.sketch.hover.map(|p| Point::new(p.x.0, p.y.0)),
+            self.sketch_axis_states(),
             self.view(),
         )
     }

@@ -390,17 +390,19 @@ impl Session {
 }
 
 /// A live value shortened to three decimals for the field; typed text is never rounded.
-fn rounded(value: &str) -> String {
-    value.parse::<f64>().map_or_else(
-        |_| value.to_owned(),
-        |number| {
-            let text = format!("{number:.3}");
-            let text = text.trim_end_matches('0').trim_end_matches('.');
-            if text == "-0" {
-                "0".into()
-            } else {
-                text.into()
-            }
-        },
-    )
+pub(super) fn rounded(value: &str) -> String {
+    value
+        .parse::<f64>()
+        .map_or_else(|_| value.to_owned(), entry_number)
+}
+
+/// A number with at most three decimals, trailing zeros trimmed, as the entry box shows it.
+pub(super) fn entry_number(number: f64) -> String {
+    let text = format!("{number:.3}");
+    let text = text.trim_end_matches('0').trim_end_matches('.');
+    if text == "-0" {
+        "0".into()
+    } else {
+        text.into()
+    }
 }

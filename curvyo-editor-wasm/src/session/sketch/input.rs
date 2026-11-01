@@ -24,6 +24,13 @@ impl Session {
         let boxed = self.sketch.constraint_tool.as_deref() == Some("dimension")
             && self.sketch.dimension_position.is_some();
         let picks = self.sketch.entities.clone();
+        // Enter on the measured value the box showed rounded applies it unrounded.
+        let [measured, _] = self.sketch_numeric_values(action);
+        let text = if boxed && super::entry::rounded(&measured) == text.trim() {
+            measured.as_str()
+        } else {
+            text
+        };
         let result = self.sketch_action_inner(action, text, reference);
         // A placed dimension, once entered, returns to Select with its geometry (AC43).
         if boxed && result.is_ok() {
@@ -237,9 +244,16 @@ impl Session {
             .relation
             .dimension()
             .ok_or_else(|| SketchEditError("This relationship has no numeric value".into()))?;
-        let expression = parse_value(text, dimension, &snapshot.graph.parameters)?;
-        if let Some(value) = constraint.relation.expression_mut() {
-            *value = expression;
+        // Enter on the text the box showed keeps the full value it was rounded from.
+        let shown = constraint
+            .relation
+            .expression()
+            .map(|e| super::annotation_input::edit_value(e, &snapshot.graph.parameters));
+        if shown.as_deref() != Some(text.trim()) {
+            let expression = parse_value(text, dimension, &snapshot.graph.parameters)?;
+            if let Some(value) = constraint.relation.expression_mut() {
+                *value = expression;
+            }
         }
         keep_axis_side(&snapshot.solution, &mut constraint.relation);
         constraint.reference = reference;
