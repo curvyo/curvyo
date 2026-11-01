@@ -9,6 +9,12 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 (each names its slice). An entry is removed when its resolution lands, or stays with the note that
 it is accepted for good.
 
+
+## A dimension cannot be left without a keyboard
+
+`specs/0070-measure-and-dimension` (MEAS-KEEP A, customer 2026-11-01): Shift at the second pick
+leaves a dimension; touch and pens without a keyboard can measure but not leave one, except by
+selection first and Enter. Mobile gets no code until a story needs it.
 ## The trace worker has no stage cache
 
 `specs/0089-trace-quality-and-colour` slice E (accepted by the lead 2026-10-30): `adrs.md` §6's
