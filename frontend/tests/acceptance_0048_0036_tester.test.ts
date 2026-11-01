@@ -9,17 +9,14 @@ import { test } from "node:test";
 import {
   PATH_COMMANDS,
   breakApartRefusalText,
-  breakApartSuccessText,
   commandDimmed,
   commandName,
   commandNote,
   commandRule,
   cutOutlinesObjects,
   cutRefusalText,
-  cutSuccessText,
   noticeMs,
   splitRefusalText,
-  splitSuccessText,
   type PathAvailabilityState,
 } from "../src/lib/pathText.ts";
 
@@ -117,34 +114,6 @@ test("States: another tool than Select says 'Use the Select tool.'", () => {
   }
 });
 
-test("0048 c8: Split success notices", () => {
-  assert.equal(
-    splitSuccessText(split("applied", 1, 2)),
-    "Split: 1 compound path became 2 objects.",
-  );
-  assert.equal(
-    splitSuccessText(split("applied", 2, 5)),
-    "Split: 2 compound paths became 5 objects.",
-  );
-  assert.equal(
-    splitSuccessText(split("applied", 1, 2, true)),
-    "Split: 1 compound path became 2 objects. Holes stayed with their piece.",
-  );
-  assert.equal(
-    splitSuccessText(split("applied", 1, 2, false, 1)),
-    "Split: 1 compound path became 2 objects. 1 compound path is one piece and was left as it is.",
-  );
-  assert.equal(
-    splitSuccessText(split("applied", 1, 3, true, 2)),
-    "Split: 1 compound path became 3 objects. Holes stayed with their piece. " +
-      "2 compound paths are one piece each and were left as they are.",
-  );
-  // The long notice stays 5 s.
-  assert.equal(noticeMs(splitSuccessText(split("applied", 1, 2, false, 1)) ?? ""), 5000);
-  assert.equal(noticeMs("Split: 1 compound path became 2 objects."), undefined);
-  assert.equal(splitSuccessText(split("one_piece", 1)), null, "a refusal is no success");
-});
-
 test("0048 c7, c9: Split refusals", () => {
   // A compound path with a hole (0054 criterion 17 keeps this wording for it).
   assert.equal(
@@ -169,15 +138,9 @@ test("0048 c7, c9: Split refusals", () => {
   assert.equal(splitRefusalText(split("ignored")), null);
 });
 
-test("0048 c12, c13: Break apart notices and refusals", () => {
-  assert.equal(
-    breakApartSuccessText(brk("applied", 1, 2)),
-    "Break apart: 1 compound path became 2 objects.",
-  );
-  assert.equal(
-    breakApartSuccessText(brk("applied", 2, 5, true)),
-    "Break apart: 2 compound paths became 5 objects. Holes became filled shapes.",
-  );
+// Success notices of Split, Break apart and Cut are gone (customer rule of 2026-10-31); their
+// refusals stay.
+test("0048 c13: Break apart refusals", () => {
   assert.equal(
     breakApartRefusalText(brk("no_compound")),
     "Break apart needs a compound path. Nothing was changed.",
@@ -189,9 +152,7 @@ test("0048 c12, c13: Break apart notices and refusals", () => {
   assert.equal(breakApartRefusalText(brk("applied", 1, 2)), null);
 });
 
-test("0036 c7 to c10: Cut notices and refusals", () => {
-  assert.equal(cutSuccessText(cut("applied", 2, 0, 9)), "Cut: 2 paths became 9 pieces.");
-  assert.equal(cutSuccessText(cut("applied", 1, 0, 2)), "Cut: 1 path became 2 pieces.");
+test("0036 c8 to c10: Cut refusals", () => {
   assert.equal(
     cutRefusalText(cut("no_crossing")),
     "The selected paths do not cross each other or themselves. Nothing was changed.",
@@ -211,7 +172,6 @@ test("0036 c7 to c10: Cut notices and refusals", () => {
   );
   assert.ok((cutRefusalText(cut("out_of_range", 1, 3)) ?? "").includes("Nothing was changed."));
   assert.equal(cutRefusalText(cut("applied", 2, 0, 4)), null);
-  // Outlines: the offending groups and compound paths, never the no-crossing or limit cases.
   assert.equal(cutOutlinesObjects(cut("compound", 1, 2)), true);
   assert.equal(cutOutlinesObjects(cut("groups", 2, 3)), true);
   assert.equal(cutOutlinesObjects(cut("no_crossing")), false);

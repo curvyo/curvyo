@@ -11,7 +11,6 @@ import {
   operationRule,
   refusalOutlinesObjects,
   refusalText,
-  successText,
   tooltipNote,
   type BooleanResult,
 } from "../src/lib/booleanText.ts";
@@ -52,33 +51,6 @@ test("the tooltip note follows criteria 1 and 2 and 0054 criterion 23", () => {
   const dimmed = { needsTwo: true, open: 0 };
   assert.equal(tooltipNote(dimmed, true), "Select two or more objects.");
   assert.equal(tooltipNote(dimmed, false), "Select two or more objects. Use the Select tool.");
-});
-
-test("a success names the operation and the counts (criterion 29)", () => {
-  assert.equal(
-    successText("union", result("applied", 3, 3, false)),
-    "Union: 3 objects became 1 path.",
-  );
-  assert.equal(
-    successText("difference", result("applied", 2, 2, true)),
-    "Difference: 2 objects became 1 compound path.",
-  );
-  assert.equal(successText("union", result("no_area", 1, 3)), null);
-});
-
-test("0054 criteria 21 and 22: the notice says which open outlines were closed or removed", () => {
-  assert.equal(
-    successText("union", { ...result("applied", 2, 2, true), closedOpen: 1 }),
-    "Union: 2 objects became 1 compound path. 1 open outline was closed with a straight line.",
-  );
-  assert.equal(
-    successText("difference", { ...result("applied", 2, 2, true), closedOpen: 3, removedOpen: 1 }),
-    "Difference: 2 objects became 1 compound path. 3 open outlines were closed with a straight line. 1 open outline enclosed no area and was removed.",
-  );
-  assert.equal(
-    successText("union", { ...result("applied", 2, 2, false), removedOpen: 2 }),
-    "Union: 2 objects became 1 path. 2 open outlines enclosed no area and were removed.",
-  );
 });
 
 test("objects without area are refused with their counts (criterion 16)", () => {

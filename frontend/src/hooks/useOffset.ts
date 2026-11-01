@@ -9,7 +9,6 @@ import {
   type OffsetResultName,
   type OffsetView,
   offsetRefusalText,
-  offsetSuccessText,
 } from "@/lib/offsetText";
 
 /** Where the Offset entry chip is placed from, in canvas CSS pixels (`ux-rework.md` 2.4). */
@@ -118,11 +117,9 @@ export function useOffset(
 
   const announce = useCallback(
     (outcome: OffsetOutcome) => {
-      const success = offsetSuccessText(outcome);
+      // A success has no notice: the new outline is the feedback (customer rule of 2026-10-31).
       const refusal = offsetRefusalText(outcome);
-      if (success !== null) {
-        showNotice(success, 3000, "canvas", "status");
-      } else if (refusal !== null) {
+      if (refusal !== null) {
         showNotice(refusal, REFUSAL_MS, "canvas", "alert");
       }
     },
@@ -156,12 +153,8 @@ export function useOffset(
     }
     const outcome = readOutcome(session.apply_offset(), session.text_refusal_face());
     onChange();
-    const success = offsetSuccessText(outcome);
-    if (success !== null) {
-      showNotice(success, 3000, "canvas", "status");
-    }
     return offsetRefusalText(outcome);
-  }, [getSession, onChange, showNotice]);
+  }, [getSession, onChange]);
 
   const readAnchor = useCallback((): OffsetChipAnchor | null => {
     const raw = getSession()?.offset_chip_anchor();

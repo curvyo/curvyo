@@ -8,7 +8,6 @@ import {
   baseName,
   type ReplacingKind,
   projectTitle,
-  savedNotice,
 } from "@/lib/projectText";
 import { isMac } from "@/lib/historyText";
 import { createBusyGate } from "@/lib/busyGate";
@@ -375,7 +374,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         for (const [index, file] of files.entries()) {
           const busyNotice = import_busy_notice(file.bytes, file.name, index + 1, files.length);
           // A paste has no file name to show (UX notes §2).
-          const notice = busyNotice && from === "paste" ? clipboard_notice("pasting", 0, "") : busyNotice;
+          const notice = busyNotice && from === "paste" ? clipboard_notice("pasting", "") : busyNotice;
           if (notice) {
             editor.showHistoryNotice(notice, 600_000);
           }
@@ -485,7 +484,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         editor.markSaved();
         refreshDirty();
         setInfo({ fileName: outcome.file_name, path: outcome.path });
-        editor.showHistoryNotice(savedNotice(outcome.file_name, !isTauri));
+        // No notice for a successful save: the title and the clean marker are the feedback
+        // (customer rule of 2026-10-31).
         return "saved";
       } catch (error) {
         onSaveError(typeof error === "string" ? error : SAVE_FAILED);

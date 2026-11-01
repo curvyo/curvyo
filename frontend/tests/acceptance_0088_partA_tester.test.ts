@@ -318,7 +318,7 @@ test("0088 Part A tester in Chromium: guessed letters, readout tooltip, progress
       if (got.progress !== null && firstProgress === null) {
         firstProgress = `${Date.now() - started} ms: ${got.progressText}`;
       }
-      return got.notice.startsWith("Recognised") || got.row !== "" ? got : null;
+      return got.notice.includes("guessed") || got.row !== "" ? got : null;
     }, 120_000, 30);
     const took = Date.now() - started;
     console.log(`first run: ${took} ms wall in the page; progress ${firstProgress ?? "not shown"}`);
@@ -326,8 +326,11 @@ test("0088 Part A tester in Chromium: guessed letters, readout tooltip, progress
       assert.ok(firstProgress, `a ${took} ms run shows its progress after 400 ms`);
     }
     scan("notice", b.notice);
-    assert.match(b.notice, /^Recognised \d+ letters as Source Sans 3 Regular \(included fonts\), largest deviation 0\.\d\d mm; 2 letters guessed: H \(1\), a \(2\)/, b.notice);
-    assert.ok(b.text.includes("Source Sans 3"), `the new text is selected: ${b.text}`);
+    // The "Recognised N letters as ..." part is gone (customer rule of 2026-10-31); the guessed
+    // letters stay as a warning.
+    assert.match(b.notice, /^2 letters guessed: H \(1\), a \(2\)\.$/, b.notice);
+    // The face used to show in the bar only through the result notice (gone, customer rule of 2026-10-31).
+    assert.ok(b.text.includes("Stroke to path"), `the new group is selected: ${b.text}`);
 
     // The Glyph table highlights the guessed characters (no canvas overlay).
     // The selection is the new text and the leftover path; the text alone (a part of the run's

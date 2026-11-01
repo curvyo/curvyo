@@ -6,8 +6,6 @@
 
 import {
   closesOpenNote,
-  openOutlineSentences,
-  plural,
   sharedRefusalText,
 } from "./booleanText.ts";
 import { textRefusalOutlines, textRefusalText } from "./textText.ts";
@@ -59,32 +57,6 @@ export function weldTooltipNote(availability: WeldAvailabilityState, selectTool:
     return closesOpenNote(availability.open);
   }
   return "Replaces the selection.";
-}
-
-/** The notice after a success (criterion 21), or `null` if nothing was done. */
-export function weldSuccessText(result: WeldResult): string | null {
-  if (result.kind !== "applied") {
-    return null;
-  }
-  const [one, many] = result.textsOnly ? ["text", "texts"] : ["object", "objects"];
-  const kind = result.compound ? "compound path" : "path";
-  let text = `Weld: ${plural(result.of, one, many)} became 1 ${kind} with ${result.lengthText} of line.`;
-  if (result.hidden === 1) {
-    text += " 1 hidden shape was removed.";
-  } else if (result.hidden > 1) {
-    text += ` ${result.hidden} hidden shapes were removed.`;
-  }
-  text += openOutlineSentences(result.closedOpen, result.removedOpen);
-  if (result.mixedStyles) {
-    text += " It uses the style of the lowest object.";
-  }
-  if (result.fillSwitchedOff) {
-    text += " Fill was switched off.";
-  }
-  if (result.strokeSwitchedOn) {
-    text += " Stroke was switched on.";
-  }
-  return text;
 }
 
 /** The notice after a refusal (criteria 23 and 24), or `null` for a result that is no refusal. */

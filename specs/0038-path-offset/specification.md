@@ -145,7 +145,7 @@ The result is built from the exact offset of each piece of the operand, and the 
 21. Given Change original, then the original keeps its place in the stacking order, its name and its id (linked clones follow it); only its geometry (or, for a primitive, its fields) changes.
 22. Given several operands, then each is offset on its own with the same d, and each gets its own result; results are never merged with each other (Union merges them when wanted).
 23. Given a release, then the tool stays active and the selection is the objects the drag produced or changed (the new objects, the changed originals, or with Shift alone the changed original and its inner copy); unchanged originals are not selected. A second drag therefore offsets the result again: with Ctrl (New object) it gives concentric copies, with the default Change original it changes the same object once more. No preview is shown after the release (criterion 52).
-24. Given a release, then a notice (`role="status"`, bottom centre of the canvas, 3 seconds) names what happened: "Offset: added 1 shape, 2.5 mm outward.", "Offset: changed 1 shape, 2.5 mm inward." or "Offset: changed 1 shape and added 1, 2.5 mm both sides.". Given some operands vanished, it adds "1 of 3 shapes vanished".
+24. Given a release, then a notice (`role="status"`, bottom centre of the canvas, 3 seconds) names what happened: "Offset: added 1 shape, 2.5 mm outward.", "Offset: changed 1 shape, 2.5 mm inward." or "Offset: changed 1 shape and added 1, 2.5 mm both sides.". Given some operands vanished, it adds "1 of 3 shapes vanished". **Superseded by the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions"): no "Offset: ..." notice after a release or Enter; refusals stay.**
 
 ### Keyboard route
 

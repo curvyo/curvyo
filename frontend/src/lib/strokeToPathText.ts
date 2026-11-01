@@ -34,37 +34,14 @@ export interface StrokeToPathNotice {
   alert: boolean;
 }
 
-/** The notice after a press (criterion 22, 25, 26), or `null` if nothing was done. */
+/** The refusal after a press (criterion 25, 26), or `null` if nothing was refused. */
 export function strokeToPathNotice(result: StrokeToPathResult): StrokeToPathNotice | null {
+  // A success has no notice: the outlines on the canvas are the feedback (customer rule of 2026-10-31).
   if (result.kind === "applied") {
-    return { text: strokeToPathSuccessText(result), alert: false };
+    return null;
   }
   const refusal = textRefusalText(result) ?? sharedRefusalText(STROKE_TO_PATH_NAME, result);
   return refusal ? { text: refusal, alert: true } : null;
-}
-
-/** "Stroke to path: 3 strokes became filled outlines." and the sentences that apply, in order. */
-export function strokeToPathSuccessText(result: StrokeToPathResult): string {
-  let text =
-    result.strokes === 1
-      ? "Stroke to path: 1 stroke became a filled outline."
-      : `Stroke to path: ${result.strokes} strokes became filled outlines.`;
-  if (result.unstroked === 1) {
-    text += " 1 object has no stroke and was left as it is.";
-  } else if (result.unstroked > 1) {
-    text += ` ${result.unstroked} objects have no stroke and were left as they are.`;
-  }
-  if (result.texts === 1) {
-    text += " 1 text was converted to paths.";
-  } else if (result.texts > 1) {
-    text += ` ${result.texts} texts were converted to paths.`;
-  }
-  if (result.unlinked === 1) {
-    text += " 1 clone was unlinked.";
-  } else if (result.unlinked > 1) {
-    text += ` ${result.unlinked} clones were unlinked.`;
-  }
-  return text;
 }
 
 /** Whether a key event is Ctrl+Alt+C (Cmd+Alt+C on macOS), not AltGr and not while typing or

@@ -33,31 +33,11 @@ const result = (over: Partial<StrokeToPathResult>): StrokeToPathResult => ({
   ...over,
 });
 
-test("criterion 22: the spec's sentences, in the spec's order", () => {
-  const all = strokeToPathNotice(result({ strokes: 3, unstroked: 2, texts: 2, unlinked: 2 }));
-  assert.deepEqual(all, {
-    text:
-      "Stroke to path: 3 strokes became filled outlines. 2 objects have no stroke and were left as they are. " +
-      "2 texts were converted to paths. 2 clones were unlinked.",
-    alert: false,
-  });
-  assert.equal(strokeToPathNotice(result({}))?.text, "Stroke to path: 1 stroke became a filled outline.");
-  assert.equal(
-    strokeToPathNotice(result({ texts: 1 }))?.text,
-    "Stroke to path: 1 stroke became a filled outline. 1 text was converted to paths.",
-  );
-});
-
-test("criterion 22: the first sentence fits 70 characters, a long notice its sentences 140", () => {
-  for (const strokes of [1, 9, 999_999]) {
-    const text = strokeToPathNotice(result({ strokes, unstroked: 99_999, texts: 9_999, unlinked: 9_999 }))!.text;
-    const sentences = text.split(/(?<=\.) /);
-    assert.ok(sentences[0].length <= 70, sentences[0]);
-    for (const s of sentences) {
-      assert.ok(s.length <= 140, s);
-    }
-    assert.ok(!/[!]/.test(text));
-  }
+// Superseded by the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions"):
+// a successful press has no notice; the filled outlines on the canvas are the feedback.
+test("criterion 22 (superseded): a successful press has no notice", () => {
+  assert.equal(strokeToPathNotice(result({ strokes: 3, unstroked: 2, texts: 2, unlinked: 2 })), null);
+  assert.equal(strokeToPathNotice(result({})), null);
 });
 
 test("criterion 26: the 0016 criterion 17a refusal with Stroke to path as the name", () => {
@@ -291,10 +271,11 @@ test("criteria 1, 2, 3, 19, 21, 22 in Chromium: button, Ctrl+Alt+C, undo, dimmed
     assert.equal(s.buttons[i + 1], "Linked clone", `before Linked clone: ${s.buttons}`);
     const rowsBefore = s.rows.length;
 
-    // Criteria 2, 19, 22: one press, no dialog, a notice, focus back on the canvas.
+    // Criteria 2, 19: one press, no dialog, focus back on the canvas. Criterion 22 is superseded by
+    // the customer rule of 2026-10-31: a successful press has no notice.
     await b.clickSel('[data-select-command="stroke-to-path"]');
     s = await state();
-    assert.ok(s.notices.some((n) => n === "Stroke to path: 1 stroke became a filled outline."), `notice: ${s.notices}`);
+    assert.ok(!s.notices.some((n) => n.startsWith("Stroke to path")), `no success notice: ${s.notices}`);
     assert.equal(await b.evaluate(`!!document.querySelector('[role=dialog]')`), false, "no dialog");
     assert.ok(s.focus.startsWith("CANVAS"), `focus after a mouse press: ${s.focus}`);
     const rowsAfter = s.rows.length;
@@ -309,7 +290,7 @@ test("criteria 1, 2, 3, 19, 21, 22 in Chromium: button, Ctrl+Alt+C, undo, dimmed
     // Criterion 3: Ctrl+Alt+C on the canvas runs the same command.
     await b.key("c", "KeyC", 67, 3);
     s = await state();
-    assert.ok(s.notices.some((n) => n.startsWith("Stroke to path: 1 stroke")), `Ctrl+Alt+C notice: ${s.notices}`);
+    assert.ok(!s.notices.some((n) => n.startsWith("Stroke to path")), `Ctrl+Alt+C: no success notice: ${s.notices}`);
     assert.equal(s.rows.length, rowsAfter);
 
     // Criterion 1: the result has no stroke left (the outline is filled, the fill part, if any,

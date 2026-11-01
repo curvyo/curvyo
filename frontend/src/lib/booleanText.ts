@@ -1,7 +1,7 @@
 /**
  * The words of the boolean operations (`specs/0016-boolean-operations/`
  * criteria 1, 2, 16, 17, 29, 38; `specs/0054-combine-open-paths/` criteria
- * 21 to 23): names, rules, tooltip notes and notices.
+ * 21 to 23): names, rules, tooltip notes and refusals.
  * Rust sends codes and counts; the sentences are written here, once.
  */
 
@@ -103,32 +103,6 @@ export function closesOpenNote(open: number): string {
 
 export function plural(count: number, one: string, many: string): string {
   return count === 1 ? `1 ${one}` : `${count} ${many}`;
-}
-
-/** The notice after a success (criterion 29), or `null` if nothing was done. */
-export function successText(op: BooleanOp, result: BooleanResult): string | null {
-  if (result.kind !== "applied") {
-    return null;
-  }
-  const became = result.compound ? "1 compound path" : "1 path";
-  return `${NAMES[op]}: ${result.count} objects became ${became}.${openOutlineSentences(result.closedOpen, result.removedOpen)}`;
-}
-
-/** The sentences about open outlines a Boolean operation closed (`0054` criteria 21 and 22), each
- * with a leading space, or "" for none. */
-export function openOutlineSentences(closed: number, removed: number): string {
-  let text = "";
-  if (closed === 1) {
-    text += " 1 open outline was closed with a straight line.";
-  } else if (closed > 1) {
-    text += ` ${closed} open outlines were closed with a straight line.`;
-  }
-  if (removed === 1) {
-    text += " 1 open outline enclosed no area and was removed.";
-  } else if (removed > 1) {
-    text += ` ${removed} open outlines enclosed no area and were removed.`;
-  }
-  return text;
 }
 
 /** The refusals the rail commands share (`0016` criteria 16 and 17, `0035` criterion 11): no

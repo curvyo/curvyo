@@ -10,7 +10,6 @@ import {
   projectName,
   projectStatus,
   projectTitle,
-  savedNotice,
 } from "../src/lib/projectText.ts";
 
 test("the platform: the browser build is the browser, whatever the system", () => {
@@ -52,11 +51,6 @@ test("the sentence of the check names the project and the action (criterion 25)"
   assert.match(checkSentence("a.curvyo", "close"), /before you close it\?/);
   assert.match(checkSentence("a.curvyo", "quit"), /before you quit\?/);
   assert.match(checkSentence("a.curvyo", "handover"), /before you open another project\?/);
-});
-
-test("the notice after a save (criterion 19)", () => {
-  assert.equal(savedNotice("Poster.curvyo", false), "Saved Poster.curvyo.");
-  assert.equal(savedNotice("poster.curvyo", true), "Downloaded poster.curvyo.");
 });
 
 test("the title (criterion 30)", () => {

@@ -7,21 +7,18 @@ import { test } from "node:test";
 
 import {
   breakApartRefusalText,
-  breakApartSuccessText,
   combineOutlinesObjects,
   combineRefusalText,
-  combineSuccessText,
+  combineWarning,
   commandDimmed,
   commandName,
   commandNote,
   commandRule,
   cutOutlinesObjects,
   cutRefusalText,
-  cutSuccessText,
   noticeMs,
   PATH_COMMANDS,
   splitRefusalText,
-  splitSuccessText,
   type BreakApartResult,
   type CombineResult,
   type CutResult,
@@ -125,70 +122,6 @@ test("dimming follows the session: only fewer than two objects dim Combine", () 
   }
 });
 
-test("the Combine notice counts the objects and the holes", () => {
-  assert.equal(
-    combineSuccessText(combined({})),
-    "Combine: 4 objects became 1 compound path with 3 holes.",
-  );
-  assert.equal(
-    combineSuccessText(combined({ holes: 1 })),
-    "Combine: 4 objects became 1 compound path with 1 hole.",
-  );
-  assert.equal(
-    combineSuccessText(combined({ holes: 0, count: 2 })),
-    "Combine: 2 objects became 1 compound path.",
-  );
-  assert.equal(combineSuccessText(combined({ kind: "out_of_range" })), null);
-});
-
-test("the Combine notice names the style that was used when the styles differed", () => {
-  assert.equal(
-    combineSuccessText(combined({ stylesDiffer: true })),
-    "Combine: 4 objects became 1 compound path with 3 holes. It uses the style of the lowest object.",
-  );
-});
-
-test("a notice over 70 characters lasts 5 seconds, over 140 8 seconds, a shorter one 3", () => {
-  assert.equal(noticeMs(combineSuccessText(combined({ holes: 0, count: 2 })) ?? ""), undefined);
-  assert.equal(noticeMs(combineSuccessText(combined({ stylesDiffer: true })) ?? ""), 5000);
-  assert.equal(noticeMs("x".repeat(70)), undefined);
-  assert.equal(noticeMs("x".repeat(71)), 5000);
-  assert.equal(noticeMs("x".repeat(140)), 5000);
-  assert.equal(noticeMs("x".repeat(141)), 8000);
-});
-
-test("0054 criterion 12: the Combine notice counts open, touching and crossing outlines", () => {
-  assert.equal(
-    combineSuccessText(combined({ count: 3, holes: 1, open: 2 })),
-    "Combine: 3 objects became 1 compound path with 1 hole and 2 open outlines.",
-  );
-  assert.equal(
-    combineSuccessText(combined({ count: 3, holes: 0, open: 1 })),
-    "Combine: 3 objects became 1 compound path with 1 open outline.",
-  );
-  assert.equal(
-    combineSuccessText(combined({ count: 2, holes: 0, touching: 4 })),
-    "Combine: 2 objects became 1 compound path. 4 closed outlines touch or cross.",
-  );
-  assert.equal(
-    combineSuccessText(combined({ count: 2, holes: 0, touching: 1 })),
-    "Combine: 2 objects became 1 compound path. 1 closed outline touches or crosses itself.",
-  );
-  // 7g: the order of the UX notes, the holes sentence after the touch count.
-  const text = combineSuccessText(
-    combined({ count: 3, holes: 2, touching: 2, touchingHoles: 2, singleNodesRemoved: 1, stylesDiffer: true, markers: true }),
-  );
-  assert.equal(
-    text,
-    "Combine: 3 objects became 1 compound path with 2 holes. 2 closed outlines touch or cross. 2 holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole. 1 outline with a single node was removed. It uses the style of the lowest object. Markers are not drawn on compound paths.",
-  );
-  assert.equal(noticeMs(text ?? ""), 8000);
-  assert.match(
-    combineSuccessText(combined({ singleNodesRemoved: 2 })) ?? "",
-    / 2 outlines with a single node were removed\.$/,
-  );
-});
-
 test("the Combine refusals: range (0035 criterion 11) and single nodes (0054 criterion 10)", () => {
   assert.equal(
     combineRefusalText(combined({ kind: "single_nodes_only" })),
@@ -209,27 +142,6 @@ test("a Combine refusal outlines objects out of range and groups only", () => {
   assert.equal(combineOutlinesObjects(combined({ kind: "single_nodes_only" })), false);
   assert.equal(combineOutlinesObjects(combined({ kind: "applied" })), false);
   assert.equal(combineOutlinesObjects(combined({ kind: "needs_two" })), false);
-});
-
-test("the Split notice counts the pieces and mentions holes and compounds left alone", () => {
-  assert.equal(splitSuccessText(split({})), "Split: 1 compound path became 3 objects.");
-  assert.equal(
-    splitSuccessText(split({ compounds: 2, pieces: 5 })),
-    "Split: 2 compound paths became 5 objects.",
-  );
-  assert.equal(
-    splitSuccessText(split({ withHoles: true })),
-    "Split: 1 compound path became 3 objects. Holes stayed with their piece.",
-  );
-  assert.equal(
-    splitSuccessText(split({ leftAlone: 1 })),
-    "Split: 1 compound path became 3 objects. 1 compound path is one piece and was left as it is.",
-  );
-  assert.equal(
-    splitSuccessText(split({ withHoles: true, leftAlone: 2 })),
-    "Split: 1 compound path became 3 objects. Holes stayed with their piece. 2 compound paths are one piece each and were left as they are.",
-  );
-  assert.equal(splitSuccessText(split({ kind: "one_piece" })), null);
 });
 
 test("the Split refusals are the sentences of criteria 7 and 9", () => {
@@ -261,22 +173,6 @@ test("the Split refusals are the sentences of criteria 7 and 9", () => {
   assert.equal(splitRefusalText(split({ kind: "applied" })), null);
 });
 
-test("the Break apart notice counts the objects and warns when holes became shapes", () => {
-  assert.equal(
-    breakApartSuccessText(broken({})),
-    "Break apart: 1 compound path became 3 objects.",
-  );
-  assert.equal(
-    breakApartSuccessText(broken({ compounds: 2, pieces: 5 })),
-    "Break apart: 2 compound paths became 5 objects.",
-  );
-  assert.equal(
-    breakApartSuccessText(broken({ withHoles: true })),
-    "Break apart: 1 compound path became 3 objects. Holes became filled shapes.",
-  );
-  assert.equal(breakApartSuccessText(broken({ kind: "no_compound" })), null);
-});
-
 test("the Break apart refusals are the sentences of criterion 13", () => {
   assert.equal(
     breakApartRefusalText(broken({ kind: "no_compound" })),
@@ -297,16 +193,6 @@ test("the Cut note: nothing selected, another tool, else the effect", () => {
   assert.equal(commandDimmed("cut", none), true);
   assert.equal(commandDimmed("cut", available({ hasCompound: false })), false, "plain paths enable Cut");
   assert.equal(commandDimmed("split", available({ hasCompound: false })), true);
-});
-
-test("the Cut notice counts the paths and the pieces", () => {
-  assert.equal(cutSuccessText(cut({})), "Cut: 2 paths became 9 pieces.");
-  assert.equal(cutSuccessText(cut({ count: 1, pieces: 4 })), "Cut: 1 path became 4 pieces.");
-  assert.equal(cutSuccessText(cut({ count: 2, pieces: 3 })), "Cut: 2 paths became 3 pieces.");
-  // A closed path cut once is one piece: the picture does not change, the notice says why.
-  assert.equal(cutSuccessText(cut({ count: 1, pieces: 1 })), "Cut: 1 path was cut open.");
-  assert.equal(cutSuccessText(cut({ count: 2, pieces: 2 })), "Cut: 2 paths were cut open.");
-  assert.equal(cutSuccessText(cut({ kind: "no_crossing" })), null);
 });
 
 test("the Cut refusals are the sentences of criteria 8 to 10", () => {
@@ -346,9 +232,21 @@ test("a refused Cut outlines groups, compound paths and objects out of range, no
   }
 });
 
-test("0054 criterion 18: Break apart names removed single-node outlines after the count", () => {
+// No success notice for Combine, Split, Break apart or Cut (customer rule of 2026-10-31); a Combine
+// warns only about holes that touch or cross.
+test("a Combine warns only about holes that touch or cross", () => {
+  assert.equal(combineWarning(combined({})), null);
+  assert.equal(combineWarning(combined({ touchingHoles: 1 })), null);
   assert.equal(
-    breakApartSuccessText(broken({ singleNodesRemoved: 1, withHoles: true })),
-    "Break apart: 1 compound path became 3 objects. 1 outline with a single node was removed. Holes became filled shapes.",
+    combineWarning(combined({ touchingHoles: 2 })),
+    "2 holes touch or cross; where they overlap, it stays filled. Undo and Union them first for one hole.",
   );
+  assert.equal(combineWarning(combined({ touchingHoles: 2, kind: "out_of_range" })), null);
+});
+
+test("a notice over 70 characters lasts 5 seconds, over 140 8 seconds, a shorter one 3", () => {
+  assert.equal(noticeMs("x".repeat(70)), undefined);
+  assert.equal(noticeMs("x".repeat(71)), 5000);
+  assert.equal(noticeMs("x".repeat(140)), 5000);
+  assert.equal(noticeMs("x".repeat(141)), 8000);
 });

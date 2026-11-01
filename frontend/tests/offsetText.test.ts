@@ -10,7 +10,6 @@ import {
   formatDistance,
   offsetReadout,
   offsetRefusalText,
-  offsetSuccessText,
   chipDistanceText,
   clampChipDistance,
   offsetKeyOutcome,
@@ -28,26 +27,6 @@ const outcome = (fields: Partial<OffsetOutcome>): OffsetOutcome => ({
   distanceMm: 2.5,
   direction: "out",
   ...fields,
-});
-
-test("criterion 24: the notice names what was added or changed, the distance and the side", () => {
-  assert.equal(
-    offsetSuccessText(outcome({ added: 1 })),
-    "Offset: added 1 shape, 2.5 mm outward.",
-  );
-  assert.equal(
-    offsetSuccessText(outcome({ changed: 1, direction: "in" })),
-    "Offset: changed 1 shape, 2.5 mm inward.",
-  );
-  assert.equal(
-    offsetSuccessText(outcome({ changed: 1, added: 1, direction: "both" })),
-    "Offset: changed 1 shape and added 1, 2.5 mm both sides.",
-  );
-  assert.equal(
-    offsetSuccessText(outcome({ added: 2, of: 3, vanished: 1, direction: "in" })),
-    "Offset: added 2 shapes, 2.5 mm inward. 1 of 3 shapes vanished.",
-  );
-  assert.equal(offsetSuccessText(outcome({ kind: "ignored" })), null);
 });
 
 test("criteria 29, 32: the refusals", () => {

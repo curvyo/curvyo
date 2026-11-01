@@ -134,51 +134,12 @@ export function guessedText(guessed: [string, number][]): string {
   return more > 0 ? `${head}${listed} and ${more} more` : `${head}${listed}`;
 }
 
-/** "1 image and 2 open paths were left as they are." (UX notes §4, as Stroke to path). */
-function skippedText(skipped: { images: number; open_paths: number; others: number }): string {
-  const parts: string[] = [];
-  if (skipped.images > 0) {
-    parts.push(plural(skipped.images, "image", "images"));
-  }
-  if (skipped.open_paths > 0) {
-    parts.push(plural(skipped.open_paths, "open path", "open paths"));
-  }
-  if (skipped.others > 0) {
-    parts.push(plural(skipped.others, "other object", "other objects"));
-  }
-  if (parts.length === 0) {
-    return "";
-  }
-  const total = skipped.images + skipped.open_paths + skipped.others;
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-  return ` ${list} ${total === 1 ? "was" : "were"} left as ${total === 1 ? "it is" : "they are"}.`;
-}
-
-/** The success notice (criteria 3, 7 and 10; UX notes §4). */
-export function appliedText(outcome: Extract<RecogniseOutcome, { kind: "applied" }>): string {
-  const { lines } = outcome;
-  const letters = lines.reduce((sum, line) => sum + line.letters, 0);
-  const deviation = Math.max(0, ...lines.map((line) => line.deviation)).toFixed(2);
-  const faces: { face: string; tier: string }[] = [];
-  for (const line of lines) {
-    if (!faces.some((f) => f.face === line.face && f.tier === line.tier)) {
-      faces.push({ face: line.face, tier: line.tier });
-    }
-  }
-  const lineWords = lines.length > 1 ? ` in ${lines.length} lines` : "";
-  const faceWords =
-    faces.length === 1
-      ? ` as ${faces[0].face} (${tierName(faces[0].tier)})`
-      : `, ${faces.length} faces (${faces.map((f) => `${f.face}, ${tierName(f.tier)}`).join("; ")})`;
-  let text = `Recognised ${plural(letters, "letter", "letters")}${lineWords}${faceWords}, largest deviation ${deviation} mm`;
-  const guessed = lines.flatMap((line) => line.guessed);
-  if (guessed.length > 0) {
-    text += `; ${guessedText(guessed)}`;
-  }
-  if (outcome.left > 0) {
-    text += `; ${plural(outcome.left, "outline", "outlines")} left as paths`;
-  }
-  return `${text}.${skippedText(outcome.skipped)}`;
+/** The warning after a run that wrote text, or `null` when no letter was guessed: the written text
+ * is the feedback of a success (customer rule of 2026-10-31), only the guessed letters need a look
+ * (criterion 7; UX notes §4). */
+export function guessedWarning(outcome: Extract<RecogniseOutcome, { kind: "applied" }>): string | null {
+  const guessed = outcome.lines.flatMap((line) => line.guessed);
+  return guessed.length > 0 ? `${guessedText(guessed)}.` : null;
 }
 
 /** The notice row when nothing is within the tolerance (criterion 4; UX notes §4). */
@@ -194,7 +155,7 @@ export function searchedReadout(searched: string | null): string | null {
   return searched ? `Searched: ${tierName(searched)}` : null;
 }
 
-/** How long the success notice stays: 8 s past 70 characters, 3 s below (UX notes §4, row
+/** How long the warning stays: 8 s past 70 characters, 3 s below (UX notes §4, row
  * "Action notice"). */
 export function noticeMs(text: string): number {
   return text.length > 70 ? 8000 : 3000;
