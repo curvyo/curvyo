@@ -14,6 +14,8 @@ pub const SKETCH_ACTIONS: &[&str] = &[
     "symmetric",
     "midpoint",
     "distance",
+    "horizontal-distance",
+    "vertical-distance",
     "length",
     "radius",
     "diameter",
@@ -87,6 +89,10 @@ pub fn sketch_relation(
         })
         .collect::<Option<Vec<_>>>()
         .ok_or_else(|| "Selection contains an entity that no longer exists".to_owned())?;
+    if let Some(axis) = measured_axis(action) {
+        return axis_distance(axis, graph, selected, &entries, value)
+            .ok_or_else(|| reason(action).to_owned());
+    }
     let entities = entries
         .iter()
         .map(|target| match target {
@@ -104,6 +110,66 @@ pub fn sketch_relation(
         _ => None,
     };
     result.ok_or_else(|| reason(action).to_owned())
+}
+/// The local axis a Horizontal or Vertical distance measures along.
+fn measured_axis(action: &str) -> Option<Axis> {
+    match action {
+        "horizontal-distance" => Some(Axis::X),
+        "vertical-distance" => Some(Axis::Y),
+        _ => None,
+    }
+}
+
+/// A distance along `axis` between two points, a line's endpoints, or a point and the origin
+/// (picked as the origin or as the axis the distance is measured to). The point with the smaller
+/// coordinate is stored first, so the dimension keeps the side the geometry has (AC46); one point
+/// twice is no distance.
+fn axis_distance(
+    axis: Axis,
+    graph: &Sketch,
+    selected: &[EntityId],
+    entries: &[Target],
+    value: Option<&Expression>,
+) -> Option<Relation> {
+    // The axis a point's distance is measured to: across the measured direction.
+    let to = match axis {
+        Axis::X => Axis::Y,
+        Axis::Y => Axis::X,
+    };
+    let (a, b) = match entries {
+        [Target::Entity(Entity::Line { start, end })] => (start.clone(), end.clone()),
+        [
+            Target::Entity(Entity::Point { .. }),
+            Target::Entity(Entity::Point { .. }),
+        ] => (selected[0].clone(), selected[1].clone()),
+        [Target::Entity(Entity::Point { .. }), Target::Axis(picked)] if *picked == to => {
+            (graph.origin.clone(), selected[0].clone())
+        }
+        [Target::Axis(picked), Target::Entity(Entity::Point { .. })] if *picked == to => {
+            (graph.origin.clone(), selected[1].clone())
+        }
+        _ => return None,
+    };
+    // The origin picked with the matching axis would measure the origin to itself.
+    if a == b {
+        return None;
+    }
+    let coordinate = |id: &EntityId| {
+        graph.point(id).ok().map(|p| match axis {
+            Axis::X => p.x.0,
+            Axis::Y => p.y.0,
+        })
+    };
+    let (a, b) = if coordinate(&a)? > coordinate(&b)? {
+        (b, a)
+    } else {
+        (a, b)
+    };
+    let value = value?.clone();
+    Some(match axis {
+        Axis::X => Relation::HorizontalDistance { a, b, value },
+        Axis::Y => Relation::VerticalDistance { a, b, value },
+    })
 }
 fn on_axis(selected: &[EntityId], entries: &[Target]) -> Option<Relation> {
     match entries {
@@ -288,6 +354,8 @@ fn reason(action: &str) -> &str {
         "symmetric" => "Select two points and a centre point, a line or an axis",
         "midpoint" => "Select one point and one segment",
         "distance" => "Select two points or a point and segment",
+        "horizontal-distance" => "Select two points, one line, or a point and the Y axis",
+        "vertical-distance" => "Select two points, one line, or a point and the X axis",
         "length" => "Select one segment or circular arc",
         "radius" | "diameter" => "Select one circle or circular arc",
         _ => "Unknown sketch action",
@@ -298,8 +366,68 @@ fn reason(action: &str) -> &str {
 mod tests {
     use super::*;
     use curvyo_sketch_core::{Constraint, Length, Position, Quantity};
+
+    /// The side at creation is kept: the left (lower) point is stored first (0066 AC46).
     #[test]
-    fn all_fifteen_actions_resolve_typed_selection_without_solving() {
+    fn axis_distances_store_the_left_or_lower_point_first() {
+        let graph = curvyo_sketch_core::create_polyline(
+            &Sketch::new("origin".into()),
+            "l",
+            &[Position::mm(30.0, 5.0), Position::mm(10.0, 25.0)],
+            false,
+        )
+        .unwrap();
+        let value = Expression::Literal(Quantity::length(1.0).unwrap());
+        let ids = |names: &[&str]| names.iter().map(|n| EntityId::from(*n)).collect::<Vec<_>>();
+        for selection in [
+            ids(&["l:line0"]),
+            ids(&["l:p0", "l:p1"]),
+            ids(&["l:p1", "l:p0"]),
+        ] {
+            assert_eq!(
+                sketch_relation("horizontal-distance", &graph, &selection, Some(&value)),
+                Ok(Relation::HorizontalDistance {
+                    a: "l:p1".into(),
+                    b: "l:p0".into(),
+                    value: value.clone(),
+                })
+            );
+            assert_eq!(
+                sketch_relation("vertical-distance", &graph, &selection, Some(&value)),
+                Ok(Relation::VerticalDistance {
+                    a: "l:p0".into(),
+                    b: "l:p1".into(),
+                    value: value.clone(),
+                })
+            );
+        }
+        // A point and the Y axis: the horizontal distance from the origin.
+        assert_eq!(
+            sketch_relation(
+                "horizontal-distance",
+                &graph,
+                &ids(&[SKETCH_AXIS_Y, "l:p1"]),
+                Some(&value)
+            ),
+            Ok(Relation::HorizontalDistance {
+                a: "origin".into(),
+                b: "l:p1".into(),
+                value: value.clone(),
+            })
+        );
+        // The origin and the matching axis would measure the origin to itself.
+        for (kind, axis) in [
+            ("horizontal-distance", SKETCH_AXIS_Y),
+            ("vertical-distance", SKETCH_AXIS_X),
+        ] {
+            assert!(
+                sketch_relation(kind, &graph, &ids(&["origin", axis]), Some(&value)).is_err(),
+                "{kind}"
+            );
+        }
+    }
+    #[test]
+    fn every_action_resolves_typed_selection_without_solving() {
         let graph = curvyo_sketch_core::create_rectangle(
             &Sketch::new("origin".into()),
             "r",
@@ -315,7 +443,9 @@ mod tests {
                 .unwrap();
         for action in SKETCH_ACTIONS {
             let ids = match *action {
-                "coincident" | "distance" => vec!["r:p0", "r:p1"],
+                "coincident" | "distance" | "horizontal-distance" | "vertical-distance" => {
+                    vec!["r:p0", "r:p2"]
+                }
                 "horizontal" | "vertical" | "fixed" | "length" => vec!["r:line0"],
                 "parallel" | "perpendicular" | "angle" => vec!["r:line0", "r:line1"],
                 "equal" | "tangent" => vec!["c:curve", "d:curve"],
