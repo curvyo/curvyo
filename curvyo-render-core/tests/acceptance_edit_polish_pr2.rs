@@ -95,6 +95,7 @@ fn build(
             history_hovered: Vec::new(),
             device_pixel_ratio: dpr,
             skew_guide: None,
+            key: None,
         },
     )
 }
@@ -837,6 +838,7 @@ fn hostile_non_finite_corners_do_not_panic_or_hang() {
                     history_hovered: Vec::new(),
                     device_pixel_ratio: 1.0,
                     skew_guide: None,
+                    key: None,
                 },
             );
             assert!(start.elapsed().as_secs() < 5);
@@ -860,6 +862,7 @@ fn hostile_non_finite_corners_do_not_panic_or_hang() {
                 history_hovered: Vec::new(),
                 device_pixel_ratio: 2.0,
                 skew_guide: None,
+                key: None,
             },
         );
         assert!(start.elapsed().as_secs() < 5, "scale {scale}");
