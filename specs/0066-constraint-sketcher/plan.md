@@ -1321,3 +1321,19 @@ ui-core and editor-wasm; wasm32 build; `cargo doc -D warnings`; nextest ui-core 
 editor-wasm 4155/4155 (all but the slow untouched `c30_` test); frontend `build:wasm`,
 `tsc -b --noEmit`, `npm test` 662 pass / 0 fail, `oxlint` exit 0; browser (Vite :5173)
 `sketch-rev5.cjs`, `sketch-rev4.cjs`, `sketch-workbench.cjs` pass.
+
+### Revision 5 customer polish (2026-11-01)
+
+Customer feedback on PR #241, polish of revision 5 (no new criteria; AC33, AC37, AC40):
+
+- [x] A local axis a press would pick (Select or a Constraints tool, no geometry under the
+  pointer) is preselected and drawn with the 4px `--segment-hover` band; a picked or selected
+  axis is drawn 1.5px accent, as an inferred axis already was. Rust decides the state
+  (`Session::sketch_axis_states`, `curvyo_render_core::SketchAxisState`); the host renders.
+- [x] Entry box: a box with one field shows no label and a 168px field; boxes with several
+  fields (rectangle width/height, ellipse axes, X/Y) keep their labels. The dimension edit shows
+  at most 3 decimals like every other entry value; Enter on the shown, untyped value keeps the
+  full value (edit and placed dimension), typed text is parsed as typed.
+- Tests: `curvyo-render-core` `a_hovered_or_selected_axis_draws_in_the_geometry_highlight`;
+  `curvyo-editor-wasm` `session/sketch/rev5_polish_tests.rs`.
+
