@@ -65,7 +65,7 @@ object (0074) in the library font (0075) whose glyphs match best, keeping positi
    Recognise text runs, then one text object with the content "Curvyo 2026" and that face results.
 2. The text object's glyph outlines deviate from the traced outlines by at most the tolerance (default 0.3 mm) everywhere (checked by comparison).
 3. Given text in a face we do not have, when a face within tolerance exists in some tier, then the nearest such face is
-   used and the result names it, its tier and its largest deviation; the maker can pick another face from the 0062 list.
+   used and the result names it, its tier and its largest deviation; the maker can pick another face from the 0062 list. **Superseded by the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions"): no result notice naming the face, its tier and the deviation; the written text is the feedback.**
 4. Given a line where no face reaches 50 % sure letters within tolerance (REC-NEAREST A), then the line stays paths,
    nothing changes in the document, and the notice reads "No text within <tol> mm; nearest face <name>, <dev> mm."
    <dev> is the largest per-letter deviation of that face, the one the tolerance judges (lead, 2026-10-31).
@@ -76,7 +76,7 @@ object (0074) in the library font (0075) whose glyphs match best, keeping positi
    letters are sure (REC-PARTIAL C), then the text object contains the best-match letter, and the result notice lists
    each guessed letter with its 1-based position ("2 letters guessed: e (5), l (9)"; more than 5 are cut with "and N more").
    The reported largest deviation covers the sure letters only. No canvas overlay or dashed outline appears; the new
-   texts are selected and the Glyph table and Text tool highlight the guessed characters until the first edit of that text.
+   texts are selected and the Glyph table and Text tool highlight the guessed characters until the first edit of that text. **Superseded by the customer rule of 2026-10-31 (docs/design-system.md, "Interaction conventions"): no "Recognised N letters as ..." notice; only the guessed letters are a warning, as "2 letters guessed: e (5), l (9).".**
 8. Given a document where the line's face is in tier 1 (used in the document), then no later tier is searched and no
    system font file is read (REC-FACES B). Given a face only in the system fonts, then it is found in tier 5 and the
    notice names "system fonts". A face in several tiers counts in its earliest tier.
