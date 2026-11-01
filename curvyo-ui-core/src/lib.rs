@@ -13,6 +13,9 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod align_commit;
+mod align_labels;
+mod align_plan;
 mod anchor_id_minter;
 mod angle_snap;
 mod boolean;
@@ -48,6 +51,7 @@ mod format_list_view;
 mod fracture;
 mod glyph_table;
 mod grid;
+mod grid_arrange;
 mod group_box;
 mod group_entry;
 mod group_transform;
@@ -161,6 +165,16 @@ mod value_scale;
 mod viewport;
 mod weld_plan;
 
+pub use align_commit::{
+    AlignInput, AlignOutcome, AlignReference, BoxedUnits, align_page, align_reference,
+    align_selection, distribute_page, distribute_reference, distribute_selection, page_object_ids,
+    unit_boxes,
+};
+pub use align_labels::distribute_commit_label;
+pub use align_plan::{
+    AlignAxis, AlignBox, AlignCommand, DistributeMode, align_translations,
+    distribute_on_frame_translations, distribute_translations,
+};
 pub use anchor_id_minter::AnchorIdMinter;
 pub use angle_snap::{MAX_SKEW_SNAP_DEG, snap_angle, snap_skew_angle};
 pub use boolean::{
@@ -248,6 +262,7 @@ pub use grid::{
     GridCandidate, GridFeature, GridLayout, GridLine, GridSnapInput, HeldGrid, grid_layout,
     snap_to_grid,
 };
+pub use grid_arrange::{arrange_selection_in_grid, grid_translations};
 pub use group_box::{
     GroupBoxShape, GroupSelection, group_handles, hit_group_handle, is_drawn_group_handle,
 };
