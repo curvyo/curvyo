@@ -1826,3 +1826,11 @@ file, `frontend/src/components/sketch/icons/constraintIcons.tsx`, as the UX note
 
 **Resolution:** open; replace with Curvyo's own icon set when the design system gets one, and
 drop the attribution entry then.
+
+## Snapping pixel zones are bare `f64` (`0060`, found in `0090` ADRs, 2026-10-31)
+
+`DocumentSnapping`'s capture and release zones (`curvyo-document-core/src/snapping.rs`) and the
+resolver's pixel quantities are plain `f64`, against `CLAUDE.md` §5 (units are newtypes).
+`0090` introduces a screen-pixel newtype for the grid.
+
+**Resolution:** open; move the snapping zones onto the same newtype in a `chore/` PR.
