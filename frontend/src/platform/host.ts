@@ -150,6 +150,17 @@ function pickTextFile(): Promise<{ name: string; text: string } | null> {
   });
 }
 
+/** Browser Export SVG… (`specs/0024-svg-import-export` criterion 4): one Blob, downloaded as
+ * `name`. */
+export function downloadSvg(name: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: "image/svg+xml" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 function downloadText(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
   const link = document.createElement("a");
@@ -166,6 +177,12 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   confirm_project_opened: () => undefined,
   reset_project: () => undefined,
   set_dirty: () => undefined,
+  // The browser downloads an export without a dialog (`specs/0024-svg-import-export` criterion 4);
+  // the page calls these two only on the desktop.
+  pick_svg_export_path: (args) => String(args?.suggestedName ?? "Untitled.svg"),
+  write_svg_export: () => {
+    throw new Error("the browser downloads an SVG export");
+  },
   save_project_bytes: (args) =>
     download(args?.bytes as number[], String(args?.fileName ?? DEFAULT_FILE_NAME)),
   read_formats_file: () => readStored(FORMATS_KEY),

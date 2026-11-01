@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import type { FileCommandName, InlineCheck, ProjectApi } from "@/hooks/useProject";
@@ -26,6 +26,9 @@ interface FileTabProps {
   tooltipFor: (command: FileCommandName) => string;
   /** After a mouse press the keyboard goes back to the canvas. */
   onReturnFocus: () => void;
+  /** Export SVG… and its switches (`specs/0024-svg-import-export` criterion 147), its own section
+   * below the button block; the panel passes `ExportSvgSection`. */
+  exportSvg?: ReactNode;
 }
 
 /** What the buttons need besides the project. */
@@ -37,7 +40,14 @@ type ButtonProps = Pick<FileTabProps, "project" | "desktop" | "tooltipFor" | "on
  * action on a project with unsaved changes swaps the six buttons for the inline check, in
  * place and at the same height, so nothing below moves. No popup, no menu, no dialog of its own.
  */
-export function FileTab({ project, desktop, version, tooltipFor, onReturnFocus }: FileTabProps) {
+export function FileTab({
+  project,
+  desktop,
+  version,
+  tooltipFor,
+  onReturnFocus,
+  exportSvg,
+}: FileTabProps) {
   const { info, dirty, check } = project;
   const buttonProps = { project, desktop, tooltipFor, onReturnFocus };
   return (
@@ -50,6 +60,7 @@ export function FileTab({ project, desktop, version, tooltipFor, onReturnFocus }
           <Buttons {...buttonProps} />
         )}
       </div>
+      {exportSvg}
       {desktop ? (
         <>
           <div
