@@ -26,6 +26,8 @@ import { Toggle, Tooltip } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
 import { ArcFieldGroup, CurveGroup, EllipseKindGroup } from "@/components/ArcCurveGroups";
+import { AlignBarGroup, DistributeBarGroup } from "@/components/AlignGroup";
+import { GridBarGroup } from "@/components/GridGroup";
 import { FlipGroup } from "@/components/FlipGroup";
 import { GuideButton } from "@/components/GuideButton";
 import { RatioSlider } from "@/components/RatioSlider";
@@ -36,6 +38,7 @@ import type { CloneBarNotice } from "@/hooks/useClones";
 import type { ArcBarApi } from "@/hooks/useArcBar";
 import type { FlipApi } from "@/hooks/useFlip";
 import type { GuideState } from "@/lib/guideText";
+import type { AlignApi } from "@/hooks/useAlign";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
 export interface SelectToolbarProps {
@@ -116,6 +119,10 @@ export interface SelectToolbarProps {
   /** The Guide button (`specs/0046-document-shapes` criteria 9 and 10). */
   guideState: GuideState;
   onToggleGuide: () => void;
+  /** The Align and Distribute groups (`specs/0061-align-and-distribute/`
+   * criterion 1): shown while something is selected, the distribute group
+   * from two. */
+  align?: AlignApi;
   /** The ellipse group and the Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
   arcBar: ArcBarApi;
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
@@ -497,6 +504,27 @@ function LinkCornersToggle({ linked, onLinkedChange }: LinkCornersToggleProps) {
   );
 }
 
+/** The Convert group and the Linked clone button as one wrap unit of the bar, so Linked clone
+ * never sits alone on a trailing row; only a bar narrower than both splits them, by group, and
+ * the divider between them is hidden when Linked clone starts a line (`0061` UI review item 4). */
+function ConvertAndLinkedClone({ convert, linkedClone }: { convert: React.ReactNode; linkedClone: React.ReactNode }) {
+  const unitRef = useRef<HTMLDivElement>(null);
+  useRowStarts(unitRef);
+  return (
+    <div ref={unitRef} className="flex flex-wrap items-start gap-x-[25px]">
+      {convert}
+      <div className="group/clone relative">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-2 -left-[13px] h-5 w-px group-data-[row-start]/clone:invisible"
+          style={DIVIDER_STYLE}
+        />
+        {linkedClone}
+      </div>
+    </div>
+  );
+}
+
 /** The Linked clone button with its three-line tooltip below (UX notes). */
 function LinkedCloneButton({
   onLinkedClone,
@@ -617,6 +645,7 @@ export function SelectToolbar({
   recognise,
   flipEnabled,
   flip,
+  align,
   guideState,
   onToggleGuide,
   arcBar,
@@ -627,6 +656,16 @@ export function SelectToolbar({
   const objectToPathRef = useRef<HTMLDivElement>(null);
   const objectToPathShift = useNoticeShift(objectToPathRef, objectToPathNotice);
   const groups: React.ReactNode[] = [];
+  // The arrange groups directly after Guide, before the kind groups, in every selection state of
+  // the Select tool, so they do not move with the selection; Grid from two selected objects
+  // (`specs/0061-align-and-distribute/` UX notes, "Placement" and "Grid group").
+  if (align?.shown) {
+    groups.push(<AlignBarGroup key="align" align={align} onReturnFocus={onReturnFocus} />);
+    groups.push(<DistributeBarGroup key="distribute" align={align} onReturnFocus={onReturnFocus} />);
+    if (align.grid.shown) {
+      groups.push(<GridBarGroup key="grid" align={align} onReturnFocus={onReturnFocus} />);
+    }
+  }
   if (bar.radiusShown) {
     groups.push(
       <div key="rectangle" className={GROUP_CLASS}>
@@ -733,9 +772,12 @@ export function SelectToolbar({
   // Object to path and Stroke to path are one group "Convert", 4 px apart, so they wrap together
   // (`specs/0085-stroke-to-path` UX notes, "Button").
   const strokeToPathShown = Boolean(strokeToPath?.shown);
+  const linkedClone = linkedCloneShown ? (
+    <LinkedCloneButton key="linked-clone" onLinkedClone={onLinkedClone} onReturnFocus={onReturnFocus} notice={linkedCloneNotice} />
+  ) : null;
   if (bar.objectToPathShown || strokeToPathShown) {
-    groups.push(
-      <div key="convert" role="group" aria-label="Convert" className="flex items-start gap-1">
+    const convert = (
+      <div role="group" aria-label="Convert" className="flex items-start gap-1">
       {bar.objectToPathShown && (
       <div className="relative">
         <button
@@ -769,20 +811,21 @@ export function SelectToolbar({
           notice={strokeToPath.notice}
         />
       )}
-      </div>,
+      </div>
     );
-  }
-  if (linkedCloneShown) {
+    // Linked clone wraps together with the Convert group, so it never sits alone on a trailing
+    // row (`specs/0061-align-and-distribute/` UI review 2026-11-01, item 4).
+    groups.push(
+      linkedClone ? (
+        <ConvertAndLinkedClone key="convert" convert={convert} linkedClone={linkedClone} />
+      ) : (
+        convert
+      ),
+    );
+  } else if (linkedClone) {
     // Last, in a group of its own, so no earlier control moves (UX notes, "The button in the
     // Select bar"); no link glyph, which the Link corners toggle already uses.
-    groups.push(
-      <LinkedCloneButton
-        key="linked-clone"
-        onLinkedClone={onLinkedClone}
-        onReturnFocus={onReturnFocus}
-        notice={linkedCloneNotice}
-      />,
-    );
+    groups.push(linkedClone);
   }
   if (traceShown && onTrace) {
     // Last, in a group of its own, so no earlier control moves (`0025` UX notes section 1).

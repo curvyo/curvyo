@@ -25,6 +25,8 @@ import { FLIP_NOTICE_MS } from "@/lib/flipText";
 import { canvasLeavesKey } from "@/lib/fontPreviewKeys";
 import { type ArcBarApi, useArcBar } from "@/hooks/useArcBar";
 import { type FlipApi, useFlip } from "@/hooks/useFlip";
+import { type AlignApi, type AlignBarState, useAlign } from "@/hooks/useAlign";
+import { NO_ALIGN_BAR, readAlignBar, sameAlignBar } from "@/lib/alignBar";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openFileSession, openSession } from "@/lib/editorSession";
 import type { WasmSession } from "@/lib/editorSession";
@@ -738,6 +740,7 @@ export interface EditorSession {
   recognise: RecogniseApi;
   /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
   flip: FlipApi;
+  align: AlignApi;
   /** The flip buttons act: something is selected in the Select tool. */
   flipEnabled: boolean;
   /** The Guide button of the Select bar (`specs/0046-document-shapes` criteria 9 and 10). */
@@ -1033,6 +1036,7 @@ export function useEditorSession(
   const [selectionAnnouncementSeq, setSelectionAnnouncementSeq] = useState(0);
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
   const [flipEnabled, setFlipEnabled] = useState(false);
+  const [alignBar, setAlignBar] = useState<AlignBarState>(NO_ALIGN_BAR);
   const [guideState, setGuideState] = useState<GuideState>("disabled");
   const keyHintCounter = useRef(0);
   const nudgeFeedback = useNudgeFeedback();
@@ -1129,6 +1133,8 @@ export function useEditorSession(
     setScaleCornerRadiusState(session.scale_corner_radius());
     setLinkCornersState(session.link_corners());
     setFlipEnabled(session.flip_enabled());
+    const nextAlign = readAlignBar(session);
+    setAlignBar((previous) => (sameAlignBar(previous, nextAlign) ? previous : nextAlign));
     setGuideState(readGuideState(session.guide_state()));
     const nextBar = readSelectBar(session.select_bar_state());
     setSelectBar((previous) => (sameSelectBar(previous, nextBar) ? previous : nextBar));
@@ -1209,6 +1215,7 @@ export function useEditorSession(
   }, [trace.keyDown, trace.create]);
   const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
   const flip = useFlip(getSession, syncFromSession, history.showNotice);
+  const align = useAlign(getSession, syncFromSession, alignBar);
   const { handleKeyOutcome: handleFlipOutcome } = flip;
   // A release or an Enter that set a size to 0.01 mm says so in the canvas notice slot
   // (`0056` criterion 15).
@@ -2833,6 +2840,7 @@ export function useEditorSession(
     trace,
     flip,
     flipEnabled,
+    align,
     guideState,
     toggleGuide,
     loadTemplate,
