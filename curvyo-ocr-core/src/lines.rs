@@ -1,7 +1,7 @@
 //! Groups word boxes into text lines with one quad each.
 //!
 //! Two boxes belong to one line when they run in the same direction, are of similar height, sit
-//! on the same level and the gap between them is at most one line height (Proposals, ADR 0027
+//! on the same level and the gap between them is at most one line height (Proposals, ADR 0028
 //! §3). Fixed order, no hash maps.
 
 use crate::detect::RotatedBox;

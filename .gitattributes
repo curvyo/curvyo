@@ -29,5 +29,5 @@ frontend/public/fonts/**/*.txt -text
 *.pdf binary
 *.curvyo binary
 *.onnx binary
-# The OCR alphabet is hashed byte for byte (ADR 0027 §5).
+# The OCR alphabet is hashed byte for byte (ADR 0028 §5).
 frontend/public/models/**/*.txt -text

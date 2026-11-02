@@ -207,12 +207,19 @@ a black and white trace before it traces the rest (`specs/0091-trace-text-recogn
   pixels are left out of the main trace and filled from their surroundings, so a shape under the
   text stays whole. The Mask view shows the left-out pixels in grey; the Advanced status line
   counts "3 text lines set".
-- Create paths fits each line to the fonts as Recognise text does (fonts in the document,
-  favourites, your fonts, the included fonts, the other installed fonts), with the read string as
-  a hint, and writes one text per line, black, above the "Trace of" group, in the same step. A
-  line no font fits within the tolerance is set in the nearest font anyway, every letter guessed.
-  Guessed letters are named in one warning and highlighted in the Glyph table and the Text tool
-  until the first edit; when all letters are sure, nothing is announced.
+- Before the picture is traced, each line is fitted to the fonts as Recognise text does (fonts
+  in the document, favourites, your fonts, the included fonts, the other installed fonts), with
+  the read string as a hint and a tolerance of 1.5 picture pixels (3 % of the letter height on
+  large text). Thin strokes are also compared by their centre line with the single-line fonts, so
+  a line drawn in EMS Readability is set in EMS Readability. Then the picture is traced once, and
+  the Trace button shows one percent from 0 to 100 for the whole job.
+- Create paths writes one text per line, black, above the "Trace of" group, in the same step
+  (a single-line text as a black stroke of the traced width). A line no font fits within the
+  tolerance is set in the nearest font anyway, every letter guessed: a wrong font is better than
+  paths. Only a line that looks like no text stays paths: a single character, mostly marks, read
+  with less than 0.8 confidence, or one short pattern repeated (a ring read as "O", a dot grid
+  read as "TOTOTO"). Guessed letters are named in one warning and highlighted in the Glyph table
+  and the Text tool until the first edit; when all letters are sure, nothing is announced.
 - With Recognise text off, or with Multicolour (for now), Trace works exactly as before and the
   model is not loaded.
 

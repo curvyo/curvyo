@@ -426,7 +426,7 @@ jobs:
             echo "::error::$crate pulls a banned dependency into its wasm32-unknown-unknown tree (see the match above)"
             exit 1
           fi
-          # ADR 0027 §4: `rayon` may appear only through the `rten` crates (single-threaded in
+          # ADR 0028 §4: `rayon` may appear only through the `rten` crates (single-threaded in
           # wasm); any other crate that depends on it fails.
           if echo "$tree_output" | grep -qE '^rayon v'; then
             dependents=$(cargo tree --target wasm32-unknown-unknown -p "$crate" -e normal -i rayon --depth 1 --prefix none --format '{p}' | tail -n +2 | sort -u)

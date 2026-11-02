@@ -103,7 +103,7 @@ codegen-units = 1
 lto = true
 opt-level = 3
 
-# The text reader's inference (ADR 0027) runs the reference set in the ordinary test run;
+# The text reader's inference (ADR 0028) runs the reference set in the ordinary test run;
 # unoptimised it takes minutes instead of seconds.
 [profile.dev.package.rten]
 opt-level = 3

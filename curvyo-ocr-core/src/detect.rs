@@ -3,7 +3,7 @@
 //! `PaddleOCR`'s DB detector on a copy whose longer side is at most [`DETECTION_SIDE`] px (sides
 //! multiples of 32); the probability map is cut at [`PROBABILITY_CUT`], 4-connected components
 //! of more than [`MIN_PIXELS`] become boxes oriented along their principal axis, grown by DB's
-//! "unclip" ratio, in source pixels (ADR 0027 §3; constants are the spike's, Proposals).
+//! "unclip" ratio, in source pixels (ADR 0028 §3; constants are the spike's, Proposals).
 
 use rten::Model;
 use rten_tensor::prelude::*;

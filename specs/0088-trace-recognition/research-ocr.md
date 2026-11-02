@@ -13,7 +13,7 @@ including ä, ö, ü, ß, Ä, Ö, Ü, needs about 10 MB of weights, takes 0.5 s 
 and 4 to 5 s single-threaded in wasm for a 2000 x 2000 image, and gave the same text and boxes
 native and in wasm. `ocrs` (same author as `rten`) is the easiest crate but its model cannot read
 umlauts and its weights are CC BY-SA 4.0. Tesseract works offline but is C++, has no Rust wasm
-path and complicates packaging. A new crate and ADR 0027 are needed (new crate, new dependency,
+path and complicates packaging. A new crate and ADR 0028 are needed (new crate, new dependency,
 shipped weights).
 
 ## 1. Spike: what was measured
@@ -104,7 +104,7 @@ curvyo-ui-core             trace plan: builds text nodes + remaining paths as on
    browser fetches a same-origin static asset once (the model comes in; the image never leaves).
    One point the ADR must settle: `rten` brings `rayon` (a thread pool on native; none in wasm).
    In the product it runs only in wasm, where it is single-threaded; on native it runs only in
-   the crate's tests. Options for ADR 0027: accept that as the documented exception to "no
+   the crate's tests. Options for ADR 0028: accept that as the documented exception to "no
    threads" in `*-core`, or name the crate `curvyo-ocr-io` and keep only pre/post-processing in
    core. Recommendation: `-core` with the exception written down, because the crate does no
    I/O and the threads are an internal detail of the dependency.
@@ -142,7 +142,7 @@ curvyo-ui-core             trace plan: builds text nodes + remaining paths as on
 
 **New crate and ADR: yes.** `CLAUDE.md` §5 requires an ADR for a new crate; this also adds an
 external dependency family (`rten`, `rten-tensor`, `rten-imageproc` or our own box code) and
-shipped model weights. ADR 0027 "Offline text detection crate, runtime and model weights"
+shipped model weights. ADR 0028 "Offline text detection crate, runtime and model weights"
 (`needs-customer` for shipping the model and the weights' licence), amending 0011's crate table
 and 0023's trace parameters (exclusion mask). The 0088 `adrs.md` trigger in decision 1 ("a later
 `ocrs` decision brings model weights and an inference dependency, which belong in their own

@@ -1,4 +1,4 @@
-# ADR 0027: Offline text recognition in Trace (crate, runtime and model weights)
+# ADR 0028: Offline text recognition in Trace (crate, runtime and model weights)
 
 **Status:** Proposed (architect, 2026-11-01). Its `needs-customer` parts (a shipped model, the
 weights' licence, the download size, data leaving the machine) are already answered by the

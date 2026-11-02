@@ -3,7 +3,7 @@
 //! The line is sampled along its quad at [`LINE_HEIGHT`] px, its width rounded up to a multiple
 //! of [`WIDTH_BUCKET`], at least [`MIN_WIDTH`], and padded with the recogniser's zero (mid grey), then decoded greedily:
 //! per time step the most likely class, repeats and blanks dropped; a character's confidence is
-//! its highest probability over the steps it spans (ADR 0027 §3).
+//! its highest probability over the steps it spans (ADR 0028 §3).
 
 use rten_tensor::prelude::*;
 use rten_tensor::{NdTensor, Tensor};

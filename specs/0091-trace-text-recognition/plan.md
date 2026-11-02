@@ -1,12 +1,12 @@
 # Plan for Trace text recognition, slice 1 (one colour, end to end)
 
 Implementer, 2026-11-01, on `story/trace-ocr` (from `main` `9d990ebf`). Built against
-`specification.md` slice 1 (criteria 1 to 22), `adrs.md` decisions 1 to 10, ADR 0027 and
+`specification.md` slice 1 (criteria 1 to 22), `adrs.md` decisions 1 to 10, ADR 0028 and
 `ux-notes.md`. Everything marked **(Proposal)** is mine and vetoable at the demo.
 
 ## Affected crates/modules
 
-- **`curvyo-ocr-core`** (new, ADR 0027): `model.rs` (SHA-256 check, parse, alphabet), `detect.rs`
+- **`curvyo-ocr-core`** (new, ADR 0028): `model.rs` (SHA-256 check, parse, alphabet), `detect.rs`
   (DB detector at 960 px, components, oriented boxes), `lines.rs` (word boxes to lines with a quad),
   `read.rs` (crop along the quad, width buckets, greedy CTC with per-character confidence),
   `resize.rs` (bilinear sampling, our own, integer-free but fixed order), `lib.rs` (`read_lines`,
@@ -68,7 +68,7 @@ umlauts, wrong sure letters, times; e2e for the toggle and the Create paths step
   with fewer than half its letters sure skips the direction refits. Poster fit 1.4 to 1.5 s thread
   CPU (was 4.6 to 12 s), same accuracy. The fit now runs after each full-size preview, so the
   Trace view shows the texts in their faces; Create paths reuses it.
-- Wasm SIMD on (ADR 0027 note): OCR 3.0 s in wasm (was 5.6 s); native and wasm bit-identical on
+- Wasm SIMD on (ADR 0028 note): OCR 3.0 s in wasm (was 5.6 s); native and wasm bit-identical on
   the poster.
 
 ## Round 3 (2026-11-01)
@@ -102,3 +102,65 @@ umlauts, wrong sure letters, times; e2e for the toggle and the Create paths step
 - [x] `0025` c54: a worker that dies during the read fails the trace (Failed, Retry reads again)
   instead of tracing without text.
 - [x] UX notes §5: the warning and the failed notice live in `curvyo-ui-core::trace_text_notice`.
+
+## Round 5 (2026-11-01, customer round 2: criteria 17, 4, 18, 25 to 28)
+
+- [x] c17: Recognise text off by default, stored under a new key (`recogniseTextOn`), so the "on"
+  earlier builds kept as their default does not turn it on (Proposal).
+- [x] c4/c18 (Frage 115 B / 117 B): `OcrLine::plausible` (garbage filter: 2 characters or more
+  besides spaces, more than half letters or digits, mean confidence 0.8 or more, not a unit of at
+  most 3 characters repeated). The fit keeps a text with no sure letter only for a plausible line;
+  the flag travels in the trace wire's text section. Calibration: on the screenshot UI chrome reads
+  "88+" 0.74, "ye" 0.34, "*1" (marks); real labels 0.89 and up.
+- [x] c26: each line's tolerance is `max(1.5 px, 3 % of its ink height)`; the pixel size travels in
+  the wire (`TraceTextWire::pixel`).
+- [x] c27: `Recogniser::fit_strokes` (`text-core` `recognise/stroke.rs`, grid helpers in
+  `stroke_grid.rs`): the line's shapes filled on a grid of 64 rows per ink height, thinned
+  (Zhang-Suen) to the centre line, the read string set over the centre line's box, each glyph's
+  stroke measured both ways (90 % quantile, best of 81 small shifts); thin lines only (mean stroke
+  width at most 10 % of the ink height). `TraceFit` tries the single-line faces of the listing
+  (at most 16) first and takes the nearest when its score is at most 0.12 of the ink height and a
+  third of its letters, two at least, are sure. Single-line texts are written with a black stroke
+  of the traced width, unfilled.
+- [x] c25: the text pass alone (`trace_text_regions_with`, worker job `regions`) feeds the fit
+  (`trace_fit_request_for`); the trace then runs once with `trace_lines_to_trace`, and
+  `set_trace_result` keeps the fit when the result's lines are the ones it set text for (lines it
+  set none for leave its leftovers). One `JobProgress` over read, fit, reduced preview and trace
+  (`frontend/src/lib/traceTextFlow.ts`); node test counts one trace per run. The tester's native
+  harness (`trace_and_fit`) follows the new flow.
+- [x] c28: detection does not dominate, nothing built (numbers below).
+
+### The customer's screenshot, per line (this machine: no Anak Gedong, no system UI font)
+
+Before = `d45e0369` (0.3 mm, lead decision 1): no line became text; every line without a run was
+set in the nearest face all guessed and then dropped. Why (sure letters at 0.3 / 0.5 / 0.8 mm):
+
+| Line | Why it failed before | After |
+|---|---|---|
+| Anak Gedong card "Embedded Freelancer avi" | font missing here | Source Sans 3 Bold, nearest, all guessed |
+| EMS Allure card "Embeddkd Freelancer available" | single-line face never searched | EMS Allure, 13 of 27 sure |
+| EMS Readability card "Embedded Freelancer avail" | single-line face never searched | EMS Readability, 18 of 23 sure |
+| "EMS Readability" in the list (drawn in the face) | single-line face never searched | EMS Readability, 14 of 14 sure |
+| Great Vibes card | joined script letters: the per-letter cut fails, 0 of 19 at every tolerance | Great Vibes, nearest, all guessed |
+| UI labels, 13 px ("Fonts", "Sans", "Included", "Search fonts", ...) | the UI sans is not a Curvyo font; tolerance not the cause (0.3 to 0.8 mm adds 2 sure letters at most) | nearest face (mostly Source Sans 3), all guessed |
+| Chip rows ("Single line×Script×") | chip borders traced into the line (13 to 19 mm off) | nearest face, all guessed |
+| Marks ("+", "*1", "1", "7", "8", "88+", "O", "y") | not accepted or no sure letter | paths (garbage filter) |
+
+Hinting check (`small_labels.png`, Source Sans 3 drawn by Chromium at 13, 15 and 20 px, its own
+face available): 1 to 9 sure of 20 to 27 letters at any tolerance up to 1.2 mm; the traced
+letters touch and are hinted, so the per-letter cut fails. All lines become text in the nearest
+face. A raster compare per letter was considered and not built: the screenshot's UI font is not
+available to check it against, and the amended criterion 26 asks no sure letter of small labels.
+
+### OCR times (criterion 28)
+
+| | detection | recognition | lines |
+|---|---|---|---|
+| tester poster 2000 x 2000, native 1 thread | 0.32 s | 0.32 s | 8 |
+| screenshot 804 x 698, native 1 thread | 0.10 s | 3.22 s | 78 |
+| tester poster, wasm (Node, SIMD) | 0.85 s | 1.76 s | 8 |
+| screenshot, wasm (Node, SIMD) | 0.35 s | 17.37 s | 78 |
+
+Recognition dominates (each line padded to 1024 px); candidate regions from a coarse trace would
+only shorten detection, so nothing is built. A 320 px pad reads the screenshot in 1.23 s natively
+but loses two umlauts on the poster, so the pad stays (`docs/technical-debt.md`).

@@ -15,7 +15,7 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
 
 ## Depends on
 
-- [ADR 0027](../../docs/adr/0027-ocr-text-in-trace.md) (new, Proposed): crate `curvyo-ocr-core`,
+- [ADR 0028](../../docs/adr/0028-ocr-text-in-trace.md) (new, Proposed): crate `curvyo-ocr-core`,
   `rten`, the shipped weights and their licence record, the scoped `rayon` exception, determinism.
 - [ADR 0023](../../docs/adr/0023-raster-trace-crate-pipeline-and-worker.md) §2, §4, §5 and
   [`0089` adrs.md](../0089-trace-quality-and-colour/adrs.md) §8: `trace()` and `TraceParams` stay
@@ -98,7 +98,7 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
 
 8. **Determinism and harness.** The text pass (crop, Otsu, polarity, in-painting) follows 0089 §8
    (basic operations, integers, fixed order, no hash maps, no threads of our own). OCR follows
-   ADR 0027 §6. Harness as 0089 §11 and 0088 decision 9: `#[ignore]`, `CURVYO_TRACE_LOCAL`, numbers
+   ADR 0028 §6. Harness as 0089 §11 and 0088 decision 9: `#[ignore]`, `CURVYO_TRACE_LOCAL`, numbers
    only into `baseline.json` (`ocr.*`: lines found, characters right, wrong characters accepted,
    lines set in nearest face, thread CPU), the 2000 x 2000 research poster and its noisy variant as
    committed synthetic fixtures (rendered from OFL fonts), +5 % guard.
@@ -128,4 +128,4 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
 - Part B (Recognise shapes): its own dated note before it is built (0088 decision list).
 - Non-Latin scripts and vertical text: out of scope; a second recognition model would be a new
   licence record and a customer question.
-- A mobile v5 detector: not measured; swapping it is a weights change under ADR 0027 §5.
+- A mobile v5 detector: not measured; swapping it is a weights change under ADR 0028 §5.

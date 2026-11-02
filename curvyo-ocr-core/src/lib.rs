@@ -1,9 +1,9 @@
-//! Reads text lines from an RGBA raster with model weights handed in as bytes (ADR 0027).
+//! Reads text lines from an RGBA raster with model weights handed in as bytes (ADR 0028).
 //!
-//! The pipeline is ours (ADR 0027 §3): the `PaddleOCR` detector (DB) finds word boxes on a copy at
+//! The pipeline is ours (ADR 0028 §3): the `PaddleOCR` detector (DB) finds word boxes on a copy at
 //! most [`DETECTION_SIDE`] px long, the boxes are grouped into lines with one quad each (rotated
 //! text allowed), and the Latin recogniser reads each line along its quad with greedy CTC. Only
-//! the inference runs in `rten`; it brings `rayon` (ADR 0027 §4: in wasm everything runs on the
+//! the inference runs in `rten`; it brings `rayon` (ADR 0028 §4: in wasm everything runs on the
 //! calling thread, natively only the tests run it), this crate spawns nothing, keeps no global
 //! state and reads no clock. Pixel space throughout: x right, y down, origin at the raster's top
 //! left corner.
@@ -71,7 +71,7 @@ pub enum OcrError {
 /// Reads the text lines of `rgba` (`width` x `height`, straight alpha, composited on white)
 /// with `model`, top to bottom. `poll` is called before the detector and after each line; a
 /// `Break` ends the read with [`OcrError::Cancelled`]. Deterministic: the same input gives the same
-/// lines (ADR 0027 §6).
+/// lines (ADR 0028 §6).
 ///
 /// # Errors
 /// [`OcrError::Invalid`] for a raster whose size does not match its bytes or that is empty,

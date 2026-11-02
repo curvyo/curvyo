@@ -1694,9 +1694,9 @@ reporting the size they add.
 in the release build (keeping the name section in development builds), and loading the text
 engine as its own wasm module on first use of the Text tool.
 
-## Text recognition in Trace adds a runtime, weights and a thread pool (ADR 0027, 2026-11-01)
+## Text recognition in Trace adds a runtime, weights and a thread pool (ADR 0028, 2026-11-01)
 
-[ADR 0027](adr/0027-ocr-text-in-trace.md) (Proposed, `specs/0091-trace-text-recognition`) accepts
+[ADR 0028](adr/0028-ocr-text-in-trace.md) (Proposed, `specs/0091-trace-text-recognition`) accepts
 these costs; numbers from `specs/0088-trace-recognition/research-ocr.md`, to be re-measured in the
 first slice's PR:
 
@@ -1709,11 +1709,18 @@ first slice's PR:
 - **First OCR of an image costs 4 to 5 s** of worker CPU in wasm (single thread, `+simd128`);
   cached per image for the session only.
 - **OCR is not promised bit-identical between native and wasm** (`rten` picks SIMD kernels per
-  target); golden files are native, the product runs wasm only (ADR 0027 §6).
+  target); golden files are native, the product runs wasm only (ADR 0028 §6).
+
+- **Many short lines read slowly** (2026-11-01, `0091` criterion 28): recognition, not detection,
+  takes the time. Wasm in Node: tester poster (8 lines) detection 0.85 s, recognition 1.76 s; the
+  customer's font manager screenshot (804 x 698 px, 78 lines) detection 0.35 s, recognition
+  17.4 s. Natively on one thread 0.32 / 0.32 s and 0.10 / 3.22 s. Each line is padded to 1024 px
+  for the recogniser; at 320 px the screenshot reads in 1.23 s natively but the poster loses two
+  umlauts (Ä read as Â, Å), so the pad stays.
 
 **Resolution:** open. Levers: OCR as its own wasm module loaded on first use (removes the main-thread
-cost, needs a second `-wasm` crate and an ADR), width buckets and batching in recognition, a
-smaller detector. `rayon` leaves when `rten` makes it optional.
+cost, needs a second `-wasm` crate and an ADR), width buckets and batching in recognition (several
+short lines in one padded input), a smaller detector. `rayon` leaves when `rten` makes it optional.
 
 ## The clone frame budget is not asserted on CI (`0049` criterion 44, 2026-10-24)
 
@@ -1879,10 +1886,10 @@ resolver's pixel quantities are plain `f64`, against `CLAUDE.md` §5 (units are 
 
 ## Text recognition grows the editor wasm by 0.84 MB gzip (`0091`, 2026-11-01)
 
-`specs/0091-trace-text-recognition` slice 1, ADR 0027: `curvyo-ocr-core` with `rten` grows the
+`specs/0091-trace-text-recognition` slice 1, ADR 0028: `curvyo-ocr-core` with `rten` grows the
 editor wasm from 19.56 to 22.92 MB raw (5.88 to 6.72 MB gzip -9, +0.84 MB) for code the main
 thread loads but only the trace worker runs; the weights add 10.3 MB to the installer and the web
-app. With wasm SIMD (ADR 0027 note of 2026-11-01) the OCR of the 2000 x 2000 px reference poster
+app. With wasm SIMD (ADR 0028 note of 2026-11-01) the OCR of the 2000 x 2000 px reference poster
 takes 3.0 s CPU in wasm, the weights load in 0.19 s, peak linear memory 178 MB. No limit is set
 (`CLAUDE.md` §3). Resolved by a worker-only module, if the size ever matters.
 

@@ -13,7 +13,7 @@
 [env]
 RUST_MIN_STACK = "134217728"
 
-# ADR 0027 (dated note 2026-11-01): the wasm build uses wasm SIMD. The text reader's inference
+# ADR 0028 (dated note 2026-11-01): the wasm build uses wasm SIMD. The text reader's inference
 # (`rten`) picks its SIMD kernels with it; WebKitGTK 2.54, Chromium and Firefox all run it.
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "target-feature=+simd128"]

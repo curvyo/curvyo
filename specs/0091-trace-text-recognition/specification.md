@@ -39,7 +39,7 @@ threshold per text line, text kept out of the main trace, fonts matched by our o
   0088 Part B.
 - Frage 108 A: text first, shapes later.
 - Frage 109 B: an OCR model is allowed. Frage 110 A: PaddleOCR mobile weights (ONNX) run by `rten`,
-  our own pre- and post-processing (ADR 0027).
+  our own pre- and post-processing (ADR 0028).
 - Frage 111 A (default applied, unanswered): the weights are bundled in the installer and the web app;
   no download, nothing leaves the machine. Cost: about 10.3 MB.
 - Frage 112 A: the Apache-2.0 weights are accepted without itemised training data; recorded in the
@@ -130,7 +130,7 @@ Slice 1
 12. Given Recognise text off, then the Trace result is path-for-path identical to the result before
     this story, and no weight file is fetched.
 13. Given the same image and settings run twice, then the text objects (content, face, position,
-    size, guessed marks) and the traced paths are identical (determinism, ADR 0027 §6).
+    size, guessed marks) and the traced paths are identical (determinism, ADR 0028 §6).
 14. Given the desktop app and the web app with the network disabled, then recognition works and no
     network request is made (checked in the browser's network log and with the desktop app offline).
     The weight files come from the app's own files.
@@ -212,4 +212,4 @@ See [`ux-notes.md`](ux-notes.md).
 ## Links
 Requirements: to be added when scheduled  PR: none
 Related: 0023 (trace worker), 0025, 0088 (recogniser, tiers, guessed letters), 0089 (trace quality),
-ADR 0027, `specs/0091-trace-text-recognition/adrs.md`, `specs/0088-trace-recognition/research-ocr.md`
+ADR 0028, `specs/0091-trace-text-recognition/adrs.md`, `specs/0088-trace-recognition/research-ocr.md`
