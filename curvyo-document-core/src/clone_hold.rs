@@ -1,7 +1,7 @@
 //! The writes of the held-back rule (ADR 0016 §2, `specs/0057-clone-overrides` criteria 3, 7
 //! and 8): when a transform writer maps objects, every unselected clone with own placement whose
 //! original moves gets the matrix that keeps its drawn outline (a tiling instance: that holds back
-//! the move of its pivot, ADR 0028 §2), or is unlinked in place when that matrix cannot exist.
+//! the move of its pivot, ADR 0030 §2), or is unlinked in place when that matrix cannot exist.
 //!
 //! Every transform writer plans and writes it here, in its own commit: today
 //! `translate_objects`, `rotate_object`, `resize_path` and `transform_objects`. Each one is listed
@@ -43,7 +43,7 @@ pub(crate) struct HoldPlan {
 impl Document {
     /// The clones with own placement and how each holds back its original's change: a tiling
     /// instance (a cell or member key) only the move of its tiling's pivot, every other
-    /// one the whole change (ADR 0016 §2, ADR 0028 §2). Read from the meta maps, plus the sources
+    /// one the whole change (ADR 0016 §2, ADR 0030 §2). Read from the meta maps, plus the sources
     /// of each tiling once; empty, and only the leaves read, in a document without clones.
     #[must_use]
     pub fn own_placement_clones(&self) -> HeldClones {

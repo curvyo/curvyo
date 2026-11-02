@@ -1,4 +1,4 @@
-//! Tester's acceptance tests for `specs/0069-tiling` on the stored tiling (ADR 0028), written from
+//! Tester's acceptance tests for `specs/0069-tiling` on the stored tiling (ADR 0030), written from
 //! the specification before the implementation was read: refusals before the first write
 //! (criterion 4), the result group and the kept source (22 to 24), the registers and the format
 //! (25, 42), re-apply with minimal writes (27), hand edits (28), source edits and deletes (29,

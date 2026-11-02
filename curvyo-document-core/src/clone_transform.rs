@@ -9,7 +9,7 @@
 //! `M_X' = G_X · M_X · T_Y⁻¹`, so its drawn outline is its map applied to the outline it had; an
 //! unselected clone with own placement and original Z gets `M' = M · T_Z⁻¹`, so its drawn outline
 //! stays. A tiling instance holds back only the translation `R` that `T_Z` gives its tiling's
-//! pivot (ADR 0016 §2 amendment, ADR 0028 §2): `M' = M · R⁻¹` and `T_Y = M · R⁻¹ · T_Z · M⁻¹`.
+//! pivot (ADR 0016 §2 amendment, ADR 0030 §2): `M' = M · R⁻¹` and `T_Y = M · R⁻¹ · T_Z · M⁻¹`.
 
 use std::collections::{HashMap, HashSet};
 
@@ -150,7 +150,7 @@ pub(crate) fn clone_matrices_after_maps(
     result
 }
 
-/// The move `t` gives `pivot` (ADR 0028 §2): what a tiling instance holds back, so the rest of
+/// The move `t` gives `pivot` (ADR 0030 §2): what a tiling instance holds back, so the rest of
 /// `t`, `R⁻¹ · T` with `R` this translation, is its linear part about `pivot`.
 fn pivot_shift(t: Affine, pivot: Point) -> Vec2 {
     let moved = t.apply_point(pivot);

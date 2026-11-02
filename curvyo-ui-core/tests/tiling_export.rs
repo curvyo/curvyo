@@ -1,5 +1,5 @@
 //! A tiling exports exactly as the same group of clones without the tiling (`specs/0069-tiling`
-//! criteria 33 and 42, ADR 0028 §9): the SVG of a tiling equals the SVG of the plain group that
+//! criteria 33 and 42, ADR 0030 §9): the SVG of a tiling equals the SVG of the plain group that
 //! Release leaves, and it holds no tiling data.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]

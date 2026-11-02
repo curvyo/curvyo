@@ -1,4 +1,4 @@
-//! The tiling commands (`specs/0069-tiling` criteria 4, 18, 22 to 32, ADR 0028 §3 to §7): Apply
+//! The tiling commands (`specs/0069-tiling` criteria 4, 18, 22 to 32, ADR 0030 §3 to §7): Apply
 //! creates and re-applies a tiling in one commit with minimal writes, refuses before the first
 //! write, and Release, Ungroup and Duplicate handle the tiling registers.
 

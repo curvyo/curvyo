@@ -66,7 +66,7 @@ changed.
 | 22 | `c22_*`, `c17_c22_the_kept_source_is_never_varied` | PASS |
 | 23 | `c23_*` (own placement, primitives converted in one commit, copies, image copy, text clone, sketch clone) | PASS |
 | 24 | `c23_c24_multi_source_with_image_and_text` | PASS |
-| 25 | `c25_*` (registers, format 32, newer file refused, 18 malformed variants Damaged, residue opens) | PASS |
+| 25 | `c25_*` (registers, format 33, newer file refused, 18 malformed variants Damaged, residue opens) | PASS |
 | 26 | `c26_c27_reopen_shows_stored_values_and_edit_is_one_step` (copies tiling) | PASS |
 | 27 | `c27_*`, `c26_c27_*` | PASS |
 | 28 | `c28_*` | PASS |
@@ -91,7 +91,7 @@ changed.
 1. `Document::apply_tiling` accepts a cell whose key lies outside the recipe's layout and
    writes a keyed instance for it. Repro: a 3 x 1 recipe, cells `(5,0)` and `(0,2)`, `apply_tiling`
    returns `Ok(written: true)`; expected `Err(TilingError::Cells)` and an unchanged version
-   (ADR 0028 §3 and `TilingError::Cells` "the cells are not the layout of the recipe"). Only
+   (ADR 0030 §3 and `TilingError::Cells` "the cells are not the layout of the recipe"). Only
    reachable through the API (the session always passes `tiling_layout`), so low severity.
    A non-finite cell affine is refused correctly (`c04_a_non_finite_cell_affine_is_refused`).
    Fixed 2026-11-02.

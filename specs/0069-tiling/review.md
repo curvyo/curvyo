@@ -1,7 +1,7 @@
 # Architect review: 0069 tiling
 
 Date: 2026-11-02. Branch `story/0069-tiling` at `be3e4102`, reviewed read-only against
-[ADR 0028](../../docs/adr/0028-stored-tiling-nodes.md), [`adrs.md`](adrs.md) and `CLAUDE.md`
+[ADR 0030](../../docs/adr/0030-stored-tiling-nodes.md), [`adrs.md`](adrs.md) and `CLAUDE.md`
 §5/§6 (`git diff origin/main...HEAD`; no build, no tests run).
 
 **Verdict: CHANGES REQUESTED.** Two blocking findings. Both are small, local fixes in
@@ -16,7 +16,7 @@ non-blocking.
    holds a tiling (for example a tiling grouped with a frame) silently strips that tiling's
    recipe. Release of a tiling that holds a tiling the maker put into it also strips the inner
    one.
-   Rule: ADR 0028 §7 ("Ungroup **of a tiling group** strips the same registers"). Releasing a
+   Rule: ADR 0030 §7 ("Ungroup **of a tiling group** strips the same registers"). Releasing a
    tiling as a side effect changes the stored model without the maker asking.
    Fix: strip only `group`'s own registers (`tiling`, `tiling_sources`, `tiling_cell`), the
    `tiling_cell` of its direct children, and the `tiling_member` of those children's direct
@@ -27,7 +27,7 @@ non-blocking.
    `curvyo-document-core/src/tiling_write.rs:333-339` deletes every meta key except the tiling
    keys and `name`. That includes `visible`, `locked` and `guide`. A maker who hid or locked a
    text-copy instance loses that on the next Apply whenever the text differs.
-   Rule: ADR 0028 §5. Apply owns placement and the variance's own style, not visibility or
+   Rule: ADR 0030 §5. Apply owns placement and the variance's own style, not visibility or
    lock. The path-copy and image-copy routes keep these registers.
    Fix: remove only the text, style, shape and opacity keys, as `clone_write::clear_clone_keys`
    does for paths. Add a test: lock a text-copy instance, edit the source text, re-apply, and
@@ -139,7 +139,7 @@ non-blocking.
 | Face centre turns instance k by θ<sub>k</sub> − start, so instance 0 is unturned | **Accepted.** It keeps "keep source on" and "off" consistent, and equals criterion 13 at the default start of 0°. PO: reword criterion 13. |
 | Rotation variance runs counterclockwise on screen | **Accepted** for consistency with the circle angles of criterion 11. Note for the demo: the app's rotate readout is clockwise-positive (`design-system.md`). PO: state the direction in criterion 15. |
 | Scale factor clamped to ≥ 0.01 | **Accepted.** Without it a stepped scale gives singular matrices, which `check_cells` would refuse. PO: add it to criterion 16. |
-| A clone instance without `own_placement` still counts as fitting and gets the flag back (ADR §3 says "with own_placement") | **Accepted.** It follows from §5 (Apply owns placement). The architect will reword ADR 0028 §3 after the merge decision. |
+| A clone instance without `own_placement` still counts as fitting and gets the flag back (ADR §3 says "with own_placement") | **Accepted.** It follows from §5 (Apply owns placement). The architect will reword ADR 0030 §3 after the merge decision. |
 | Circle centre stored as `Vec2` relative to the cell box centre (the ADR said `Point`) | **Accepted.** It is the correct type for an offset (criterion 14). |
 
 ## Resolution (implementer, 2026-11-02)
@@ -163,7 +163,7 @@ non-blocking.
 ## Architect review: tiling instances follow a source scale (2026-11-02)
 
 Scope: `curvyo-document-core/src/clone_hold.rs` (`tiling_held_matrix`, `close`,
-`anchor_box_centre`, the `kept` count), ADR 0028 §2 note, tests
+`anchor_box_centre`, the `kept` count), ADR 0030 §2 note, tests
 `tiling_commands.rs::a_scale_of_the_source_reaches_the_instances_and_a_move_or_rotation_does_not`
 and `curvyo-editor-wasm/tests/tiling_source_edits.rs`.
 
@@ -205,10 +205,10 @@ written in the transform's commit, one undo step. Plain own-placement clones are
 3. **ADR 0016 is not amended.** §2 still says `T_Y = identity` for every own-placement clone and
    its Verification says "outline unchanged after move, rotate, scale, skew and flip". Add a dated
    amendment to §2: a tiling instance (cell or member key) holds back only the rigid part about
-   its tiling's centre and passes the rest; its `T_Y` is as in finding 1; reference ADR 0028 §2.
-   The note in ADR 0028 §2 should name the pivot exactly (finding 2) and say what a skew and a
+   its tiling's centre and passes the rest; its `T_Y` is as in finding 1; reference ADR 0030 §2.
+   The note in ADR 0030 §2 should name the pivot exactly (finding 2) and say what a skew and a
    negative determinant do (non-blocking 1, 2). The doc comment of `tiling_held_matrix` cites
-   "ADR 0028 §4" (Refusal); the note is in §2. PO: amend criterion 29 with the scale rule, and
+   "ADR 0030 §4" (Refusal); the note is in §2. PO: amend criterion 29 with the scale rule, and
    add a dated line to `specs/0069-tiling/adrs.md`.
 
 ### Non-blocking
@@ -228,7 +228,7 @@ written in the transform's commit, one undo step. Plain own-placement clones are
    `approx_eq(other, tolerance)` with a named constant and use it in both places.
 5. **Concurrency:** the cell key is read locally at transform time. A peer's concurrent Release
    leaves a plain own-placement clone with a scale-passing matrix; a concurrent Apply contends
-   last-writer-wins on `clone_link` as before. Acceptable; one sentence in ADR 0028 §6.
+   last-writer-wins on `clone_link` as before. Acceptable; one sentence in ADR 0030 §6.
 6. **Tests missing:** non-uniform scale with rotation in one gesture, a flip, a skew, a clone
    chain through an instance (blocking 1), two sources (blocking 2), undo restoring the instance
    matrices, and "re-Apply after a scale writes nothing".

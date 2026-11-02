@@ -1,5 +1,5 @@
 //! A tiling instance follows the linear part of a source transform (`specs/0069-tiling`
-//! criterion 29, ADR 0016 §2 amendment and ADR 0028 §2 of 2026-11-02): one pivot per tiling, the
+//! criterion 29, ADR 0016 §2 amendment and ADR 0030 §2 of 2026-11-02): one pivot per tiling, the
 //! centre of Apply's cell box; the chain rule holds through an instance; flip, skew, a scale
 //! with rotation, undo, re-Apply and a concurrent Release behave as the ADRs say.
 
@@ -331,7 +331,7 @@ fn undo_of_a_scale_restores_the_instances() {
     }
 }
 
-/// Non-blocking 5 (ADR 0028 §6): a peer releases the tiling while this peer scales the source.
+/// Non-blocking 5 (ADR 0030 §6): a peer releases the tiling while this peer scales the source.
 /// The cell key was read here, so after the merge the instance is a plain clone with own
 /// placement whose matrix passed the scale; the next scale holds it fully.
 #[test]

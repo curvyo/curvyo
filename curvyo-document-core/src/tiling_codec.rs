@@ -1,4 +1,4 @@
-//! The stored shape of a tiling (ADR 0028 §1, §2 and §10): the four registers read, written and
+//! The stored shape of a tiling (ADR 0030 §1, §2 and §10): the four registers read, written and
 //! validated here.
 //!
 //! ```text
@@ -416,7 +416,7 @@ pub(crate) fn read_member(meta: &LoroMap) -> Option<NodeId> {
     }
 }
 
-/// The open-file check of one node's tiling registers (ADR 0028 §10): a recipe only on a group
+/// The open-file check of one node's tiling registers (ADR 0030 §10): a recipe only on a group
 /// and well formed; a source list, cell key and member key well formed wherever they are.
 pub(crate) fn registers_are_valid(meta: &LoroMap, is_group: bool) -> bool {
     let recipe_ok = match read_recipe(meta) {

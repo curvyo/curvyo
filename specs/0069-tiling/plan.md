@@ -1,6 +1,6 @@
 # Plan for Tiling (0069)
 
-Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specification.md`
+Implementer, 2026-11-02. Binding: ADR 0030, `adrs.md`, `ux-notes.md`, `specification.md`
 (43 criteria). One PR for the whole feature (customer released the build 2026-11-02).
 
 ## Affected crates/modules
@@ -10,7 +10,7 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
     `Variance`, `Channel`), `CellKey`, `TilingCell` (the per-cell affine and style shift the
     caller hands in), `TilingError`, limits, history labels, `hue_shifted`.
   - `tiling_codec.rs` (new): the four registers `tiling`, `tiling_sources`, `tiling_cell`,
-    `tiling_member`; read, write, open-file validation (damage rules of ADR 0028 §10).
+    `tiling_member`; read, write, open-file validation (damage rules of ADR 0030 §10).
   - `tiling_commands.rs` (new): `Document::apply_tiling` (create and regenerate, minimal
     writes, refusal before the first write), `Document::release_tiling`, `Document::tiling`;
     the strip used by Ungroup and by copy/paste outside a tiling.
@@ -18,7 +18,7 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
     copy, text copy, image copy) and one member.
   - `group_tree.rs` (validation hook), `groups.rs` (Ungroup strips), `objects.rs`
     (duplicate remaps sources and members, strips keys of instances copied out),
-    `document.rs` (`CURRENT_FORMAT_VERSION` 32), `lib.rs`.
+    `document.rs` (`CURRENT_FORMAT_VERSION` 33), `lib.rs`.
 - `curvyo-ui-core`
   - `tiling/pcg32.rs`, `tiling/layout.rs`, `tiling/variance.rs`, `tiling/mod.rs` (new):
     the generator, the grid and circle placements and the variance per cell; pure.
@@ -33,7 +33,7 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
 - `frontend`: `hooks/useTiling.ts`, `components/TilingBar.tsx`, `lib/tilingText.ts`, the Tile,
   Edit tiling and Release tiling buttons in `SelectToolbar.tsx`, mounting in `App.tsx`.
 - Fixtures: `tests/fixtures/tiling/` (PCG32 sequences, layout goldens),
-  `curvyo-document-core/tests/fixtures/tiling_*_v32.curvyo`.
+  `curvyo-document-core/tests/fixtures/tiling_*_v33.curvyo`.
 - Docs: `docs/guides/pcg32.md` (algorithm and seeding), `docs/requirements.md` (R-EDIT-044),
   `specs/README.md` (row, format table), `docs/technical-debt.md` if a budget is missed.
 
@@ -44,7 +44,7 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
 - [x] 2. Recipe model and `tiling_layout`: grid (gap/pitch, mirror, offset, shift), circle
   (count, radius, start, sweep, face centre, relative centre), variance random and stepped in
   the fixed draw order with per-cell jump-ahead; layout goldens (AC 6-13, 15-17, 21, 41).
-- [x] 3. Codec and validation of the four registers, format 32 (AC 25).
+- [x] 3. Codec and validation of the four registers, format 33 (AC 25).
 - [x] 4. `apply_tiling`: refusals before the first write; create (keep source on/off, clones,
   text clones, image copies, copies, multi-source instance groups, own style for colour and
   opacity variance) in one commit "Tile"; regenerate with minimal writes, recreate deleted
@@ -52,7 +52,7 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
   unchanged apply writes nothing, "Edit tiling" (AC 4, 5, 18, 22-24, 27, 28, 32).
 - [x] 5. Release and Ungroup strip; copy/duplicate remap; an instance copied out loses its
   key; delete; dangling source (AC 30-32).
-- [x] 6. File goldens `tiling_*_v32.curvyo`, damage files, residue file; SVG export equals
+- [x] 6. File goldens `tiling_*_v33.curvyo`, damage files, residue file; SVG export equals
   the hand-made group (AC 33, 42).
 - [x] 7. ui-core plan: Tile offered, defaults, request building, preview outlines; history
   names (AC 1, 3, 5, 11, 19, 36, 37).
@@ -94,12 +94,19 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
   (`drag_swap.rs`), and a style preview reaches clones whose style source is previewed
   (`curvyo-ui-core/src/style_edit.rs`). Tests: `session/tiling_live_tests.rs`; frame costs in
   `tests/tiling_budget.rs` (reported, below).
+- [x] 16. Customer 2026-11-02, rotation (AC 29): `Hold::Rigid` becomes `Hold::Translation` in
+  `curvyo-document-core/src/clone_transform.rs`: an instance holds back only the move of the
+  tiling's pivot and follows the whole linear change (rotation, skew included) in place; chain
+  rule, preview and plain own-placement clones unchanged. Tests: rotation drag (Keep source on
+  and off), rotate then scale, a clone of an instance, two sources in
+  `session/tiling_live_tests.rs`; core rotation and skew cases in `tests/tiling_source_scale.rs`
+  and `clone_transform.rs`.
 
 ## Validation
 
 - Golden PCG32 sequences checked against the reference C implementation's output (task 1).
 - Layout goldens with 1e-9 mm / 1e-12 rad tolerance, run on host and as a wasm32 build.
-- File goldens and damage files open or are refused as ADR 0028 §10 lists.
+- File goldens and damage files open or are refused as ADR 0030 §10 lists.
 - Document-version checks after every refusal, Cancel and unchanged Apply.
 - Budgets measured with thread CPU time, asserted in release builds only.
 
@@ -158,4 +165,6 @@ the rest is the resolve and the artwork of 10,000 changed instances. Tracked in
   writer-listing test is covered by tests of Ungroup, Release and Duplicate, not by a scan.
 - Version pins of earlier testers' tests were moved from 31 to 32 or `>=` (`acceptance_0070`,
   `acceptance_0024_slice2`, `drawing_insert`), as at every format bump; the 0024 export
-  document snapshots record format 32.
+  document snapshots record format 32. After the rebase onto `0071` (which took 32) tiling is
+  format 33: goldens `tiling_*_v33.curvyo`, `acceptance_0071` pinned to `>=`, ADR renumbered
+  0030.
