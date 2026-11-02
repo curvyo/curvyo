@@ -22,6 +22,8 @@ export type TraceRequest =
     }
   /** The mask the same trace would walk, for the Mask view (`specs/0089` criterion 21). */
   | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
+  /** The text pass alone (`specs/0091` criterion 25): the read lines' own traces, before the fit. */
+  | { type: "regions"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
   /** The font fit of the read lines (`specs/0091` decision 4): the session's request. */
   | { type: "fit"; id: number; request: string }
   /** The faces a fit asked for, as `[file, index, bytes]`; the fit goes on. */
@@ -37,6 +39,8 @@ export type TraceResponse =
    * analysis JSON (`specs/0089` slice F; empty when it failed). */
   | { id: number; kind: "threshold"; threshold: number; background: string; analysis: string; ms: number }
   | { id: number; kind: "trace"; wire: Float64Array; ms: number }
+  /** The text pass's numbers and, handed back, the pixels (`specs/0091` criterion 25). */
+  | { id: number; kind: "regions"; wire: Float64Array; rgba: Uint8Array; ms: number }
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
   | { id: number; kind: "png"; png: Uint8Array; ms: number }
@@ -50,7 +54,7 @@ export type TraceResponse =
   /** The answer to `init` (id 0): `error` is empty when the module was instantiated. */
   | { id: 0; kind: "ready"; error: string };
 
-/** The text reader's three files (ADR 0027 §5), fetched same-origin once per page. */
+/** The text reader's three files (ADR 0028 §5), fetched same-origin once per page. */
 export interface OcrWeights {
   detector: Uint8Array;
   recogniser: Uint8Array;
@@ -260,6 +264,21 @@ export class TraceRunner {
     return { wire: response.wire, seconds: response.ms / 1000 };
   }
 
+  /** The text pass alone of `pixels` with `settings` and the OCR `lines` (`specs/0091` criterion
+   * 25): the numbers the fit request is made of; the pixels are handed over and come back for the
+   * trace that follows. */
+  async regions(pixels: TracePixels, settings: string, lines: string): Promise<Float64Array> {
+    const response = await this.send(
+      (id) => ({ type: "regions", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings, lines }),
+      [pixels.rgba.buffer],
+    );
+    if (response.kind !== "regions") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    pixels.rgba = response.rgba;
+    return response.wire;
+  }
+
   /** The mask a trace of `pixels` with `settings` would walk (`specs/0089` criterion 21), or
    * `null` when the picture cannot be traced; the pixels are handed over. */
   async mask(pixels: TracePixels, settings: string, lines = ""): Promise<TraceMask | null> {
@@ -384,10 +403,10 @@ export function editorModule(): Promise<WebAssembly.Module> {
 
 let weights: Promise<OcrWeights> | null = null;
 
-/** The folder of the shipped weights (ADR 0027 §5): the app's own files, no download. */
+/** The folder of the shipped weights (ADR 0028 §5): the app's own files, no download. */
 export const OCR_MODEL_DIR = "models/paddleocr-latin/";
 
-/** The text reader's files, fetched same-origin once per page (ADR 0027 §5); a failed fetch is
+/** The text reader's files, fetched same-origin once per page (ADR 0028 §5); a failed fetch is
  * tried again by the next call. */
 export function ocrWeights(fetchFile: (path: string) => Promise<Response> = (path) => fetch(`${import.meta.env.BASE_URL}${path}`)): Promise<OcrWeights> {
   weights ??= (async () => {

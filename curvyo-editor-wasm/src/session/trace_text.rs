@@ -9,6 +9,10 @@ use curvyo_ui_core::{OcrLine, TraceTextWire, TraceWire};
 use kurbo::BezPath;
 
 use super::Session;
+use super::trace_text_write::TracedText;
+
+/// The most single-line faces a fit matches thin strokes against (criterion 27, Proposal).
+const MAX_STROKE_FACES: usize = 16;
 
 /// One text Create paths writes for a traced picture.
 #[derive(Debug, Clone)]
@@ -19,6 +23,8 @@ pub(crate) struct FittedText {
     pub(crate) glyphs: Vec<BezPath>,
     /// Set in the nearest face, every letter guessed (Frage 114 B).
     pub(crate) nearest: bool,
+    /// Set in a single-line face: drawn with a stroke this wide, mm (criterion 27).
+    pub(crate) stroke: Option<f64>,
 }
 
 /// What the fit made of one picture's lines.
@@ -41,13 +47,16 @@ pub(crate) struct TraceTextState {
     /// The finished fit, for Create paths.
     pub(crate) fitted: Option<Vec<FittedImage>>,
     /// The texts the last Create paths wrote.
-    created: Vec<TracedText>,
+    pub(super) created: Vec<TracedText>,
     /// Per picture (its asset), the strings of the accepted lines a fit set no text for (lead
     /// decision 1, 2026-11-01): they are traced as shapes, so the next trace no longer accepts
     /// them.
     dropped: Vec<(AssetHash, String)>,
     /// The lines the last fit set no text for.
     last_dropped: usize,
+    /// Those lines with their picture: once a trace of that picture traced them as shapes, their
+    /// outlines leave the fit's leftovers (criterion 25).
+    dropped_lines: Vec<(NodeId, TraceTextWire)>,
 }
 
 impl Session {
@@ -126,6 +135,49 @@ impl Session {
         self.trace_text.requested.clear();
         self.trace_text.fitted = None;
         self.trace_text.last_dropped = 0;
+        self.trace_text.dropped_lines.clear();
+    }
+
+    /// Takes the new result `read` of `image` into the finished fit (criterion 25: the trace the
+    /// fit decided runs once): when its text lines are the fit's lines of `image` it set text
+    /// for, the fit stays, the lines it set none for (traced as shapes now) leave its leftovers,
+    /// and the preview shows the texts; otherwise the fit is dropped.
+    pub(super) fn keep_trace_fit(&mut self, image: NodeId, read: &TraceWire) {
+        let state = &self.trace_text;
+        let kept: Vec<&TraceTextWire> = state
+            .requested
+            .iter()
+            .filter(|(id, line)| {
+                *id == image
+                    && !state
+                        .dropped_lines
+                        .iter()
+                        .any(|(d, l)| *d == image && l == line)
+            })
+            .map(|(_, line)| line)
+            .collect();
+        let matches = state.fitted.is_some()
+            && kept.len() == read.texts.lines.len()
+            && kept.iter().zip(&read.texts.lines).all(|(a, b)| *a == b);
+        if !matches {
+            self.drop_trace_fit();
+            return;
+        }
+        let gone: Vec<BezPath> = state
+            .dropped_lines
+            .iter()
+            .filter(|(id, _)| *id == image)
+            .flat_map(|(_, line)| line.outlines.iter().cloned())
+            .collect();
+        if let Some(fitted) = self
+            .trace_text
+            .fitted
+            .as_mut()
+            .and_then(|f| f.iter_mut().find(|f| f.image == image))
+        {
+            fitted.leftovers.retain(|path| !gone.contains(path));
+        }
+        self.show_fitted_preview();
     }
 
     /// The font fit of the kept results' text lines for the trace worker (criterion 4, decision
@@ -133,7 +185,6 @@ impl Session {
     /// `trace_fit_glue`, the faces of the tiers by their host file; `None` when no result has a
     /// line, so Create paths can run at once.
     pub fn trace_fit_request(&mut self, tolerance: f64, favourites: &[String]) -> Option<String> {
-        self.drop_trace_fit();
         let (_, images) = self.trace_images();
         let lines: Vec<(NodeId, TraceTextWire)> = images
             .iter()
@@ -142,6 +193,32 @@ impl Session {
                 wire.texts.lines.iter().map(|l| (*id, l.clone()))
             })
             .collect();
+        self.fit_request_of(lines, tolerance, favourites)
+    }
+
+    /// As [`Self::trace_fit_request`] for the lines of `regions` (the text pass alone of selected
+    /// image `image`, `trace_text_regions_with`), before its main trace (criterion 25): the fit
+    /// decides the lines, the trace then runs once with [`Self::trace_lines_to_trace`] and keeps
+    /// the fit.
+    pub fn trace_fit_request_for(
+        &mut self,
+        image: NodeId,
+        regions: &[f64],
+        tolerance: f64,
+        favourites: &[String],
+    ) -> Option<String> {
+        let read = curvyo_ui_core::read_trace_wire(regions)?;
+        let lines = read.texts.lines.into_iter().map(|l| (image, l)).collect();
+        self.fit_request_of(lines, tolerance, favourites)
+    }
+
+    fn fit_request_of(
+        &mut self,
+        lines: Vec<(NodeId, TraceTextWire)>,
+        tolerance: f64,
+        favourites: &[String],
+    ) -> Option<String> {
+        self.drop_trace_fit();
         if lines.is_empty() {
             return None;
         }
@@ -165,6 +242,19 @@ impl Session {
                     .collect()
             })
             .collect();
+        // Criterion 27: the single-line faces a thin-stroked line is matched against.
+        let strokes: Vec<usize> = listed
+            .iter()
+            .enumerate()
+            .filter(|(_, face)| face.kind == FontKind::SingleLine)
+            .take(MAX_STROKE_FACES)
+            .map(|(index, _)| {
+                used.iter().position(|&u| u == index).unwrap_or_else(|| {
+                    used.push(index);
+                    used.len() - 1
+                })
+            })
+            .collect();
         let faces: Vec<serde_json::Value> = used
             .iter()
             .map(|&i| serde_json::json!([listed[i].host_id, listed[i].index]))
@@ -173,9 +263,12 @@ impl Session {
             "tolerance": tolerance,
             "faces": faces,
             "tiers": tiers_json,
+            "strokes": strokes,
             "lines": lines.iter().map(|(_, l)| serde_json::json!({
                 "text": l.text,
                 "direction": [l.direction.x, l.direction.y],
+                "plausible": l.plausible,
+                "pixel": l.pixel,
                 "outlines": l.outlines.iter().map(crate::trace_fit_glue::path_svg).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "listed": used,
@@ -207,12 +300,14 @@ impl Session {
         let faces = self.fonts.faces();
         let mut out: Vec<FittedImage> = Vec::new();
         let mut dropped: Vec<(AssetHash, String)> = Vec::new();
+        let mut dropped_lines: Vec<(NodeId, TraceTextWire)> = Vec::new();
         for ((texts, leftovers), (image, line)) in lines.into_iter().zip(&self.trace_text.requested)
         {
-            if texts.is_empty()
-                && let Some(asset) = self.asset_of(*image)
-            {
-                dropped.push((asset, line.text.clone()));
+            if texts.is_empty() {
+                dropped_lines.push((*image, line.clone()));
+                if let Some(asset) = self.asset_of(*image) {
+                    dropped.push((asset, line.text.clone()));
+                }
             }
             let fitted: Vec<FittedText> = texts
                 .into_iter()
@@ -224,11 +319,12 @@ impl Session {
                             style: face.style.clone(),
                             face_hash: t.hash,
                             face_index: face.index,
-                            kind: FontKind::Outline,
+                            kind: face.kind,
                         },
                         run: t.run,
                         glyphs: t.glyphs,
                         nearest: t.nearest,
+                        stroke: t.stroke.map(curvyo_text_core::Mm::get),
                     })
                 })
                 .collect();
@@ -250,6 +346,7 @@ impl Session {
         }
         self.trace_text.last_dropped = dropped.len();
         self.trace_text.dropped.extend(dropped);
+        self.trace_text.dropped_lines = dropped_lines;
         self.trace_text.fitted = Some(out);
         self.show_fitted_preview();
         true
@@ -258,7 +355,16 @@ impl Session {
     /// Whether a finished fit is kept for the current results, so Create paths need not fit again.
     #[must_use]
     pub fn trace_text_fitted(&self) -> bool {
-        self.trace_text.fitted.is_some()
+        let Some(fitted) = &self.trace_text.fitted else {
+            return false;
+        };
+        // Every kept result with a text line is in the fit (a fit decided per picture covers
+        // only its own).
+        self.trace
+            .results
+            .iter()
+            .filter(|(_, read)| !read.texts.lines.is_empty())
+            .all(|(id, _)| fitted.iter().any(|f| f.image == *id))
     }
 
     /// The preview of the fitted picture with its texts in their faces (UX notes §2): the traced
@@ -286,137 +392,5 @@ impl Session {
         let read = read.clone();
         let stale = self.trace.preview.as_ref().is_some_and(|p| p.stale);
         self.show_trace_preview(image, read, &paths, stale);
-    }
-}
-
-/// One text Create paths wrote: its node, string, guessed positions, size bits (for the guessed
-/// record) and whether it was set in the nearest face.
-pub(crate) type WrittenText = (NodeId, String, Vec<usize>, u64, bool);
-
-/// Writes the texts of `fitted` into `document`, each directly above its picture's entry of
-/// `above` (the "Trace of" group, or the picture when it has no paths), black, no stroke
-/// (decision 6, criterion 10). `None` when a write failed (the caller's step is then reverted).
-pub(super) fn write_texts(
-    document: &curvyo_document_core::Document,
-    fitted: &[FittedImage],
-    above: &[(NodeId, NodeId)],
-) -> Option<Vec<WrittenText>> {
-    use curvyo_document_core::{
-        Affine, Length, MAX_TEXT_SIZE, MIN_TEXT_SIZE, MoveTarget, TextChars, TextLayoutValues,
-    };
-    let range = MIN_TEXT_SIZE.as_mm()..=MAX_TEXT_SIZE.as_mm();
-    let style = curvyo_ui_core::trace_style();
-    let mut out = Vec::new();
-    for image in fitted {
-        let Some(&(_, anchor)) = above.iter().find(|(id, _)| *id == image.image) else {
-            continue;
-        };
-        for text in &image.texts {
-            let run = &text.run;
-            let size = run.size.get();
-            if !range.contains(&size) {
-                continue;
-            }
-            let p = run.placement.as_coeffs();
-            let id = document
-                .create_text_with_chars(
-                    &run.text,
-                    &text.font,
-                    Length::from_mm(size),
-                    Affine::new(p[0], p[1], p[2], p[3], p[4], p[5]),
-                    &TextLayoutValues {
-                        letter_spacing: run.letter_spacing.get() / size,
-                        word_spacing: run.word_spacing.get() / size,
-                        ..TextLayoutValues::DEFAULT
-                    },
-                    &TextChars::default(),
-                )
-                .ok()?;
-            for edit in super::recognise::style_edits(&style) {
-                document.edit_style(&[id], &edit).ok()?;
-            }
-            document
-                .move_nodes(&curvyo_document_core::MovePlan {
-                    nodes: vec![id],
-                    target: MoveTarget::Above(anchor),
-                })
-                .ok()?;
-            out.push((
-                id,
-                run.text.clone(),
-                run.guessed.clone(),
-                Length::from_mm(size).as_mm().to_bits(),
-                text.nearest,
-            ));
-        }
-    }
-    Some(out)
-}
-
-/// One text of the last Create paths as the host words its warning (criterion 5).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TracedText {
-    /// The string.
-    pub string: String,
-    /// The guessed letters: character and its 1-based position.
-    pub guessed: Vec<(char, usize)>,
-    /// Set in the nearest face, every letter guessed (114 B).
-    pub nearest: bool,
-}
-
-impl Session {
-    /// Keeps the guessed letters of the texts Create paths just wrote in the session record the
-    /// Glyph table and the Text tool highlight (criterion 4, `0088` decision 6), and the report of
-    /// [`Session::trace_created_texts`].
-    pub(super) fn record_trace_texts(&mut self, texts: &[WrittenText]) {
-        let record: Vec<(NodeId, Vec<usize>, String, u64)> = texts
-            .iter()
-            .filter(|t| !t.2.is_empty())
-            .map(|(id, string, guessed, size, _)| (*id, guessed.clone(), string.clone(), *size))
-            .collect();
-        if !record.is_empty() {
-            self.recognise.guessed = super::recognise::GuessedRecord {
-                texts: record,
-                selection: self.selection.ids().to_vec(),
-            };
-        }
-        self.trace_text.created = texts
-            .iter()
-            .map(|(_, string, guessed, _, nearest)| {
-                let chars: Vec<char> = string.chars().collect();
-                TracedText {
-                    string: string.clone(),
-                    guessed: guessed
-                        .iter()
-                        .filter_map(|&p| chars.get(p).map(|&c| (c, p + 1)))
-                        .collect(),
-                    nearest: *nearest,
-                }
-            })
-            .collect();
-        self.drop_trace_fit();
-    }
-
-    /// The warning about the guessed letters of the last Create paths (criterion 5, UX notes §5),
-    /// `None` when every letter is sure.
-    #[must_use]
-    pub fn trace_created_warning(&self) -> Option<String> {
-        let texts: Vec<curvyo_ui_core::WarnedText<'_>> = self
-            .trace_text
-            .created
-            .iter()
-            .map(|t| curvyo_ui_core::WarnedText {
-                string: &t.string,
-                guessed: &t.guessed,
-                nearest: t.nearest,
-            })
-            .collect();
-        curvyo_ui_core::traced_text_warning(&texts)
-    }
-
-    /// The texts the last Create paths wrote (criterion 5: the host warns about guessed letters).
-    #[must_use]
-    pub fn trace_created_texts(&self) -> &[TracedText] {
-        &self.trace_text.created
     }
 }

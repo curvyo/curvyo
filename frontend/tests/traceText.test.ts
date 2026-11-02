@@ -240,7 +240,7 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
     denoise: 0,
     invert: false,
     ignoreBackground: false,
-    recogniseText: true,
+    recogniseText: false,
     method: 0,
     backgroundTolerance: 40,
     pickTolerance: 19,
@@ -558,15 +558,19 @@ test("customer 2026-10-30: the finish button reads Trace; its progress shows aft
   assert.equal(progressHoldLeft(1000, 2000), 0);
 });
 
-test("specs/0091 criterion 17: Recognise text is on by default, remembered, and off is a change", () => {
+test("specs/0091 criterion 17 (Frage 116 B a): Recognise text is off by default, remembered, and on is a change", () => {
   const storage = memoryStorage();
-  assert.equal(firstChoice().values.recogniseText, true);
-  const off = editChoice(firstChoice(), "recogniseText", false);
-  assert.equal(off.edited, false, "a switch, not a preset value");
-  writeChoice(off, storage);
+  assert.equal(firstChoice().values.recogniseText, false);
+  const on = editChoice(firstChoice(), "recogniseText", true);
+  assert.equal(on.edited, false, "a switch, not a preset value");
+  writeChoice(on, storage);
+  assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseText, true);
+  assert.equal(changedAdvancedText(on.values), "Changed: Recognise text");
+  assert.equal(changedAdvancedText(firstChoice().values), null);
+  assert.equal(readsText({ ...on.values, output: MULTICOLOUR }), false);
+  // The "on" an earlier build kept as its default does not turn it on.
+  storage.setItem("curvyo.trace-values", JSON.stringify({ recogniseText: true }));
   assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseText, false);
-  assert.equal(changedAdvancedText(off.values), "Changed: Recognise text");
-  assert.equal(readsText({ ...firstChoice().values, output: MULTICOLOUR }), false);
 });
 
 test("specs/0091 UX notes §4: the text-line count", () => {

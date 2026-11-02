@@ -190,7 +190,10 @@ mod trace_pick;
 mod trace_tests;
 mod trace_text;
 #[cfg(test)]
+mod trace_text_screenshot_tests;
+#[cfg(test)]
 mod trace_text_tests;
+mod trace_text_write;
 mod transform_entry;
 mod weld;
 #[cfg(test)]
@@ -257,7 +260,7 @@ pub use text_style::StyleOutcome;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
 pub use trace_draw::TraceViewMode;
 pub use trace_pick::TracePickMode;
-pub use trace_text::TracedText;
+pub use trace_text_write::TracedText;
 pub use weld::WeldOutcome;
 
 pub use open_error::map_open_error;

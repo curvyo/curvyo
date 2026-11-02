@@ -192,7 +192,11 @@ test("0091 slice 1 in Chromium: the switch, reading text offline, the text above
     closeAll = s.close;
     await openTrace(s, ROTATED);
     await openAdvanced(s);
-    // Criterion 17: on by default, the third toggle, no "Recognise shapes", no hint text.
+    // Criterion 17 (Frage 116 B a): off by default, the third toggle, no "Recognise shapes", no
+    // hint text; turned on here.
+    assert.equal(await toggle(s, "Recognise text"), "false");
+    await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').click()`);
+    await sleep(500);
     assert.equal(await toggle(s, "Recognise text"), "true");
     assert.equal(await toggle(s, "Recognise shapes"), "missing");
     const order = (await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} button[aria-pressed]')].map((b) => b.getAttribute('aria-label')))`)) as string;
@@ -210,7 +214,8 @@ test("0091 slice 1 in Chromium: the switch, reading text offline, the text above
     assert.deepEqual(s.requests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith("data:") && !u.startsWith("blob:")), []);
     // Create paths: the group and the text, the text above it, selected; one undo removes both.
     await s.evaluate(`document.querySelector('${BAR}').closest('[data-context-bar]')?.parentElement?.focus?.()`);
-    // The preview fits the line to the fonts after the trace (UX notes §2); then the button rests.
+    // The preview fits the line to the fonts before its one trace (criterion 25); then the button
+    // rests.
     await waitFor("the preview's fit", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=none]')`)) ? true : null), 120_000);
     await s.evaluate(`[...document.querySelectorAll('${BAR} button')].find((b) => b.textContent?.trim() === 'Trace')?.click()`);
     const rows = await waitFor("the text row", async () => {
@@ -269,11 +274,22 @@ test("0091 slice 1 in Chromium: reading and fitting the poster keeps the main th
     await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("poster.png")) ? true : null));
     // Main-thread tasks over 50 ms (0025 criterion 58) from opening Trace to the fitted preview.
     await s.evaluate(`(() => { window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(e.duration); }).observe({ type: 'longtask' }); })()`);
-    const started = Date.now();
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace')?.click()`);
+    // Recognise text is off by default (criterion 17): turned on, which starts the job.
+    await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
+    await waitFor("the first preview", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=none]')`)) ? true : null), 180_000);
+    await openAdvanced(s);
+    // Criterion 25: one percent over the whole job, sampled in the page, never running backwards.
+    await s.evaluate(`(() => { window.__percent = []; window.__sampler = setInterval(() => { const p = document.querySelector('${BAR} [role=progressbar]'); const v = p?.getAttribute('aria-valuenow'); if (v !== null && v !== undefined) window.__percent.push(Number(v)); }, 20); })()`);
+    const started = Date.now();
+    await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').click()`);
     await waitFor("the text lines", async () => ((await s.statusText()).includes("text lines set") ? true : null), 180_000);
     await waitFor("the preview's fit", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=none]')`)) ? true : null), 180_000);
     const seconds = (Date.now() - started) / 1000;
+    const percents = JSON.parse((await s.evaluate(`(clearInterval(window.__sampler), JSON.stringify(window.__percent))`)) as string) as number[];
+    process.stdout.write(`# progress samples: ${percents.length}, first ${percents[0]}, last ${percents.at(-1)}\n`);
+    assert.ok(percents.length > 0, "the progress showed");
+    assert.ok(percents.every((p, i) => i === 0 || p >= percents[i - 1]), `never backwards: ${percents.join(",")}`);
     const long = JSON.parse((await s.evaluate(`JSON.stringify(window.__long)`)) as string) as number[];
     const total = long.reduce((a, b) => a + b, 0);
     process.stdout.write(`# poster: ${seconds.toFixed(1)} s to the fitted preview; main-thread long tasks ${long.length}, longest ${Math.max(0, ...long).toFixed(0)} ms, total ${total.toFixed(0)} ms\n`);

@@ -1,4 +1,4 @@
-# Licence record of the shipped text recognition weights (ADR 0027 §5). The files are the ONNX
+# Licence record of the shipped text recognition weights (ADR 0028 §5). The files are the ONNX
 # conversion, unmodified. Checked by `curvyo-ocr-core/tests/model_record.rs`: every file of this
 # folder but this record and the licence text has an entry, an allowed licence and the SHA-256
 # that `curvyo-ocr-core` expects. Changing a file is a code change (new constants, new harness

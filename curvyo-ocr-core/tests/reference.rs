@@ -2,7 +2,7 @@
 //! committed synthetic posters read with the shipped weights; every line exact, the umlauts kept,
 //! the rotated line within 1 degree, the same lines twice. Prints the numbers and the time.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
 use std::path::{Path, PathBuf};
 
@@ -94,4 +94,55 @@ fn umlauts_are_read() {
 fn a_read_is_deterministic() {
     let model = model();
     assert_eq!(read(&model, "rotated.png"), read(&model, "rotated.png"));
+}
+
+/// Criterion 28: the detection and recognition times of the reference poster, the tester poster
+/// and the customer's screenshot, with the lines each reads. Wall time on one thread
+/// (`RAYON_NUM_THREADS=1`), so it equals the CPU time of the read:
+///
+/// ```text
+/// RAYON_NUM_THREADS=1 cargo test --release -p curvyo-ocr-core --test reference -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore = "harness: prints the numbers of the PR"]
+fn detection_and_recognition_times() {
+    let model = model();
+    for file in [
+        "poster.png",
+        "tester/poster.png",
+        "customer/font-manager-screenshot.png",
+    ] {
+        let bytes = std::fs::read(fixtures().join(file)).unwrap();
+        let image = curvyo_image_core::decode_working(&bytes).unwrap();
+        let started = std::time::Instant::now();
+        let mut detected = None;
+        let lines = read_lines(&model, image.width, image.height, &image.pixels, &mut |p| {
+            if matches!(p, curvyo_ocr_core::OcrProgress::Reading { done: 0, .. }) {
+                detected.get_or_insert(started.elapsed().as_secs_f64());
+            }
+            std::ops::ControlFlow::Continue(())
+        })
+        .unwrap();
+        let total = started.elapsed().as_secs_f64();
+        let detect = detected.unwrap_or(total);
+        println!(
+            "{file} ({} x {}): detection {detect:.2} s, recognition {:.2} s, {} lines",
+            image.width,
+            image.height,
+            total - detect,
+            lines.len()
+        );
+        for line in &lines {
+            let mean = line.confidence.iter().sum::<f32>() / line.confidence.len().max(1) as f32;
+            let q = line.quad;
+            println!(
+                "  {:?} mean {mean:.2} min {:.2} at ({:.0}, {:.0}) h {:.0}",
+                line.text,
+                line.confidence.iter().copied().fold(1.0_f32, f32::min),
+                q[0][0],
+                q[0][1],
+                (q[3][1] - q[0][1]).hypot(q[3][0] - q[0][0])
+            );
+        }
+    }
 }

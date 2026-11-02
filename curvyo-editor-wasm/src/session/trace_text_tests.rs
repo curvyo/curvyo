@@ -36,7 +36,7 @@ fn fonts() -> PathBuf {
     root().join("frontend/public/fonts")
 }
 
-fn model() -> OcrModel {
+pub(super) fn model() -> OcrModel {
     let dir = root().join("frontend/public/models/paddleocr-latin");
     let read = |name: &str| std::fs::read(dir.join(name)).unwrap();
     let alphabet = String::from_utf8(read("dict.txt")).unwrap();
@@ -51,7 +51,7 @@ fn load_wanted(session: &mut Session) {
 }
 
 /// A session with the included fonts listed and `file` imported, selected, in the Trace tool.
-fn session_with(file: &str) -> (Session, NodeId) {
+pub(super) fn session_with(file: &str) -> (Session, NodeId) {
     let bytes = std::fs::read(root().join("curvyo-ocr-core/tests/fixtures").join(file)).unwrap();
     session_with_bytes(&bytes, file)
 }
@@ -72,10 +72,15 @@ fn session_with_bytes(bytes: &[u8], file: &str) -> (Session, NodeId) {
                 face["family"].as_str().unwrap().to_owned(),
                 face["style"].as_str().unwrap().to_owned(),
                 0,
+                if face["kind"] == "single_line" {
+                    curvyo_document_core::FontKind::SingleLine
+                } else {
+                    curvyo_document_core::FontKind::Outline
+                },
             )
         })
         .collect();
-    session.set_font_list(curvyo_ui_core::FontBlock::Included, faces, Vec::new());
+    session.set_font_list_with_kinds(curvyo_ui_core::FontBlock::Included, faces, Vec::new());
     load_wanted(&mut session);
     session.import_begin(None);
     session.import_add(bytes, file);
@@ -114,7 +119,7 @@ fn texts(session: &Session) -> Vec<TextSnapshot> {
 }
 
 /// The fit of `request` as the trace worker runs it (`trace_fit_glue.rs`).
-fn fit(request: &str) -> String {
+pub(super) fn fit(request: &str) -> String {
     let mut worker = crate::trace_fit_glue::FitWorker::default();
     let mut reply = worker.start(request, &mut |_| {});
     loop {
@@ -286,13 +291,12 @@ const POSTER: [&str; 8] = [
     "small print: est. 1998 in Hamburg",
 ];
 
-/// Criteria 8, 11 and 13: the rotated line becomes one text turned within 1 degree, and two runs
-/// give the same texts.
-/// Lead decision 1 (2026-11-01): the `0025` ring, which the OCR reads as "O", has no sure letter
-/// in any face, so the fit sets no text and the line stays traced shapes; the lines handed to the
-/// next trace no longer accept it, and that trace is the trace without text.
+/// Criteria 18 and 25 (Frage 115 B / 117 B): the `0025` ring, which the OCR reads as "O", fails
+/// the garbage filter and has no sure letter, so the fit, run on the text pass alone before the
+/// trace, sets no text; the one trace then takes it as a shape, equals the trace without text, and
+/// keeps the fit.
 #[test]
-fn a_line_without_a_sure_letter_stays_traced_shapes() {
+fn a_ring_read_as_o_is_decided_before_the_one_trace() {
     use image::ImageEncoder;
     let model = model();
     let mut rgba = Vec::new();
@@ -323,29 +327,30 @@ fn a_line_without_a_sure_letter_stays_traced_shapes() {
     );
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let params = TraceParams::with_threshold(128);
-    let traced = |lines: &[curvyo_ui_core::OcrLine]| {
-        trace_text_job_with(
-            &source.rgba,
-            source.width,
-            source.height,
-            source.map,
-            &params,
-            lines,
-            &mut |_| {},
-        )
-    };
-    let wire = traced(&lines);
-    assert!(session.set_trace_result(image, &wire));
-    assert!(session.set_trace_preview(image, &wire));
-    let request = session.trace_fit_request(0.3, &[]).unwrap();
+    let regions = curvyo_ui_core::trace_text_regions_with(
+        &source.rgba,
+        source.width,
+        source.height,
+        source.map,
+        &params,
+        &lines,
+    );
+    let request = session
+        .trace_fit_request_for(image, &regions, 0.3, &[])
+        .unwrap();
     assert!(session.set_trace_fit(&request, &fit(&request)));
     assert_eq!(session.trace_fit_dropped(), 1);
-    let (again, size) = session.trace_lines_to_trace(image).unwrap();
-    assert_eq!(
-        (again.len(), size),
-        (lines.len(), (source.width, source.height))
+    let (decided, _) = session.trace_lines_to_trace(image).unwrap();
+    assert!(decided.iter().all(|l| !l.accepted()));
+    let wire = trace_text_job_with(
+        &source.rgba,
+        source.width,
+        source.height,
+        source.map,
+        &params,
+        &decided,
+        &mut |_| {},
     );
-    assert!(again.iter().all(|l| !l.accepted()));
     let plain = curvyo_ui_core::trace_job_with(
         &source.rgba,
         source.width,
@@ -355,11 +360,62 @@ fn a_line_without_a_sure_letter_stays_traced_shapes() {
         &mut |_| {},
     );
     let (on, off) = (
-        curvyo_ui_core::read_trace_wire(&traced(&again)).unwrap(),
+        curvyo_ui_core::read_trace_wire(&wire).unwrap(),
         curvyo_ui_core::read_trace_wire(&plain).unwrap(),
     );
+    let plain_paths = off.paths;
     assert_eq!((on.outlines, on.nodes), (off.outlines, off.nodes));
-    assert_eq!((on.texts.lines.len(), on.texts.found), (0, lines.len()));
+    assert!(session.set_trace_preview(image, &wire));
+    assert!(session.set_trace_result(image, &wire));
+    assert!(session.trace_text_fitted(), "the one trace keeps the fit");
+    let TraceCreateOutcome::Created { paths, .. } = session.create_traced_paths() else {
+        panic!("nothing created");
+    };
+    assert_eq!(texts(&session).len(), 0);
+    assert_eq!(
+        paths, plain_paths,
+        "the ring once, not again from the fit's leftovers"
+    );
+}
+
+/// Criterion 25: a result whose text lines are not the ones the fit decided drops the fit.
+#[test]
+fn a_trace_with_other_lines_drops_the_fit() {
+    let model = model();
+    let (mut session, image) = session_with("rotated.png");
+    let source = session.trace_source(image, false).unwrap();
+    let lines = trace_read_text(
+        &model,
+        &source.rgba,
+        source.width,
+        source.height,
+        &mut |_| std::ops::ControlFlow::Continue(()),
+    )
+    .unwrap();
+    assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
+    let params = TraceParams::with_threshold(128);
+    let regions = curvyo_ui_core::trace_text_regions_with(
+        &source.rgba,
+        source.width,
+        source.height,
+        source.map,
+        &params,
+        &lines,
+    );
+    let request = session
+        .trace_fit_request_for(image, &regions, 0.3, &[])
+        .unwrap();
+    assert!(session.set_trace_fit(&request, &fit(&request)));
+    let plain = curvyo_ui_core::trace_job_with(
+        &source.rgba,
+        source.width,
+        source.height,
+        source.map,
+        &params,
+        &mut |_| {},
+    );
+    assert!(session.set_trace_result(image, &plain));
+    assert!(!session.trace_text_fitted());
 }
 
 #[test]

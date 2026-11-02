@@ -6,7 +6,7 @@
 //!
 //! The native numbers of the poster are kept in `tests/fixtures/acceptance_0091_tester_native.json`
 //! (`CURVYO_BLESS=1` rewrites it); `frontend/tests/acceptance_0091_tester.test.ts` runs the same
-//! inputs through the editor wasm in Chromium and compares (criterion 13, ADR 0027 §6).
+//! inputs through the editor wasm in Chromium and compares (criterion 13, ADR 0028 §6).
 //!
 //! Timings (release, `#[ignore]`):
 //! `RAYON_NUM_THREADS=1 cargo test --release -p curvyo-editor-wasm --test acceptance_0091_tester
@@ -36,7 +36,7 @@ use curvyo_editor_wasm::{
 };
 use curvyo_ui_core::{
     FontBlock, OcrLine, OcrModel, TraceWire, read_trace_wire, trace_job_with, trace_read_text,
-    trace_text_job_with,
+    trace_text_job_with, trace_text_regions_with,
 };
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
@@ -231,21 +231,43 @@ impl Host {
         (request, reply)
     }
 
-    /// The host's whole flow (`useTrace`): cache `lines`, trace with `settings`, fit; when the fit
-    /// set no text for some lines (lead decision 1), trace again with the session's lines and fit
-    /// again. Returns the last fit's request and reply and the last wire.
+    /// The host's whole flow (`useTrace`, criterion 25 as amended 2026-11-01): cache `lines`,
+    /// the text pass alone, the fit of its lines, then one trace with the lines the fit decided
+    /// (those it set no text for are traced as shapes) that keeps the fit. Returns the fit's
+    /// request and reply (empty without an accepted line) and the wire of the one trace.
     fn trace_and_fit(&mut self, settings: &str, lines: &[OcrLine]) -> (String, String, Vec<f64>) {
         assert!(
             self.s
                 .set_trace_ocr_lines(self.image, lines.to_vec(), (self.width, self.height))
         );
-        let mut wire = self.wire(settings, lines);
-        let (mut request, mut reply) = self.trace_once(&wire);
-        if !request.is_empty() && self.s.trace_fit_dropped() > 0 {
-            let (again, size) = self.s.trace_lines_to_trace(self.image).expect("kept lines");
-            assert_eq!(size, (self.width, self.height));
-            wire = self.wire(settings, &again);
-            (request, reply) = self.trace_once(&wire);
+        let regions = trace_text_regions_with(
+            &self.rgba,
+            self.width,
+            self.height,
+            self.map,
+            &trace_settings(settings),
+            lines,
+        );
+        let (request, reply) =
+            match self
+                .s
+                .trace_fit_request_for(self.image, &regions, TOLERANCE_MM, &[])
+            {
+                Some(request) => {
+                    let reply = fit(&request);
+                    assert!(self.s.set_trace_fit(&request, &reply));
+                    (request, reply)
+                }
+                None => (String::new(), String::new()),
+            };
+        let (decided, size) = self.s.trace_lines_to_trace(self.image).expect("kept lines");
+        assert_eq!(size, (self.width, self.height));
+        // The one main trace of the run.
+        let wire = self.wire(settings, &decided);
+        assert!(self.s.set_trace_preview(self.image, &wire));
+        assert!(self.s.set_trace_result(self.image, &wire));
+        if !request.is_empty() {
+            assert!(self.s.trace_text_fitted(), "the trace keeps the fit");
         }
         (request, reply, wire)
     }
@@ -555,67 +577,67 @@ fn c3_poster_has_no_wrong_sure_letter() {
     assert_eq!(wrong, 0);
 }
 
-/// Criterion 4 as amended (lead decision 1): the line in a face Curvyo does not include has no
-/// sure letter in any included face, so it becomes no text and stays traced paths (its letters are
-/// in the final trace); every text set in the nearest face (114 B) has at least one sure letter,
-/// its other letters guessed and held by the Glyph table / Text tool record.
+/// Criterion 4 as amended by Frage 115 B / 117 B (2026-11-01, replaces "a foreign line stays
+/// paths"): the line in a face Curvyo does not include becomes text in the nearest face, every
+/// letter guessed and held by the Glyph table / Text tool record, and its letters leave the trace.
 #[test]
-fn c4_a_foreign_line_without_a_sure_letter_stays_paths_and_nearest_texts_have_one() {
+fn c4_a_foreign_line_becomes_text_in_the_nearest_face_all_guessed() {
     let model = model();
     let r = run(&model, "poster.png");
     let texts = r.host.texts();
-    assert!(
-        !texts
-            .iter()
-            .any(|t| t.string.to_lowercase() == FOREIGN.to_lowercase()),
-        "the foreign line is no text: {texts:?}"
+    let foreign = texts
+        .iter()
+        .find(|t| t.string.to_lowercase() == FOREIGN.to_lowercase())
+        .unwrap_or_else(|| panic!("the foreign line is text: {texts:?}"));
+    let created = r
+        .created
+        .iter()
+        .find(|c| c.string == foreign.string)
+        .unwrap();
+    let letters = foreign
+        .string
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .count();
+    eprintln!(
+        "foreign line {:?} in {} {}: {} of {letters} guessed, nearest {}",
+        foreign.string,
+        foreign.font.family,
+        foreign.font.style,
+        created.guessed.len(),
+        created.nearest
+    );
+    assert!(created.nearest, "set in the nearest face");
+    assert_eq!(created.guessed.len(), letters, "every letter guessed");
+    assert_eq!(
+        r.host.s.recognise_guessed(foreign.id).map(|h| h.len()),
+        Some(letters),
+        "the Glyph table / Text tool record"
     );
     let ink = ink_box_mm(&r.host, FOREIGN);
-    let wire = traced(&r.wire);
-    let inside = wire
+    let inside = traced(&r.wire)
         .outlines
         .iter()
         .flat_map(subpath_boxes)
         .filter(|b| ink.inflate(0.5, 0.5).contains_rect(*b))
         .count();
     eprintln!("foreign line: {inside} traced outlines inside its ink box");
-    assert!(inside >= 10, "its letters stay traced paths");
-    let mut nearest = 0;
-    for t in &texts {
-        let created = r.created.iter().find(|c| c.string == t.string).unwrap();
-        if !created.nearest {
-            continue;
-        }
-        nearest += 1;
-        let letters = t.string.chars().filter(|c| !c.is_whitespace()).count();
-        eprintln!(
-            "nearest-face text {:?} in {} {}: {} of {letters} guessed",
-            t.string,
-            t.font.family,
-            t.font.style,
-            created.guessed.len()
-        );
-        assert!(created.guessed.len() < letters, "at least one sure letter");
-        assert_eq!(
-            r.host.s.recognise_guessed(t.id).map(|h| h.len()),
-            Some(created.guessed.len()),
-            "the Glyph table / Text tool record"
-        );
-    }
-    eprintln!("{nearest} texts set in the nearest face");
+    assert!(inside < 3, "its letters are not traced paths");
 }
 
-/// Lead decision 1: every text of two or more letters has at least one sure letter (a sure single
-/// letter may be marked guessed, 0088 `MIN_SURE_LETTERS`).
+/// Frage 115 B / 117 B (replaces "every text has a sure letter"): a text with no sure letter
+/// comes from an OCR line that passes the garbage filter (2 characters or more, mostly letters or
+/// digits, confident, no repeated pattern).
 #[test]
-fn c4_every_text_has_a_sure_letter() {
+fn c4_a_text_without_a_sure_letter_comes_from_a_plausible_line() {
     let model = model();
     let r = run(&model, "poster.png");
     for t in r.host.texts() {
         let letters = t.string.chars().filter(|c| !c.is_whitespace()).count();
         let guessed = guessed_of(&r.created, &t.string).len();
-        if letters >= 2 {
-            assert!(guessed < letters, "{:?} has no sure letter", t.string);
+        if guessed == letters {
+            let line = r.lines.iter().find(|l| l.text == t.string).unwrap();
+            assert!(line.plausible(), "{:?} without a sure letter", t.string);
         }
     }
 }
@@ -984,8 +1006,8 @@ fn grey_png(width: u32, height: u32, grey: impl Fn(u32, u32) -> u8) -> Vec<u8> {
     out
 }
 
-/// Criterion 18 as amended, judged on what the host ends with (trace, fit, trace again without
-/// the lines the fit set no text for): a ring (the `0025` browser tests' black annulus, radii 20
+/// Criterion 18 as amended, judged on what the host ends with (the lines decided by the fit, then
+/// one trace without the lines it set no text for): a ring (the `0025` browser tests' black annulus, radii 20
 /// and 60 px in 200 x 200 px) and a dot grid (the `0025` c55 picture, 800 x 800 px of 3 px dots
 /// every 8 px) set no text, and their trace is the trace with Recognise text off.
 #[test]
@@ -1094,7 +1116,7 @@ fn c16_lines_stay_cached_across_a_settings_change() {
     assert_eq!(size, (host.width, host.height));
 }
 
-/// The determinism record for the browser (criterion 13 across builds, ADR 0027 §6): the OCR
+/// The determinism record for the browser (criterion 13 across builds, ADR 0028 §6): the OCR
 /// lines, the trace wire and the fit of the poster natively. `CURVYO_BLESS=1` rewrites it; else it
 /// must match.
 #[test]

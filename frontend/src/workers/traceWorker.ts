@@ -20,6 +20,7 @@ import {
   trace_suggest_background,
   trace_text_job,
   trace_text_mask_job,
+  trace_text_regions_job,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 import type { TraceRequest, TraceResponse } from "@/lib/traceJobs";
@@ -65,6 +66,12 @@ scope.onmessage = (event) => {
       scope.postMessage({ id: request.id, kind: "mask", ...reply, ms: performance.now() - started }, [reply.bits.buffer]);
       return;
     }
+    if (request.type === "regions") {
+      // The text pass alone (`specs/0091` criterion 25); the pixels go back for the trace.
+      const wire = trace_text_regions_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, request.lines);
+      scope.postMessage({ id: request.id, kind: "regions", wire, rgba: request.rgba, ms: performance.now() - started }, [wire.buffer, request.rgba.buffer]);
+      return;
+    }
     if (request.type === "fit" || request.type === "fit-faces") {
       // The font fit runs here, off the main thread; the faces stay for the worker's life.
       const sink = { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) };
@@ -81,7 +88,7 @@ scope.onmessage = (event) => {
       return;
     }
     if (request.type === "ocr") {
-      // The weights are loaded once per worker (ADR 0027 §5); a later read skips the load.
+      // The weights are loaded once per worker (ADR 0028 §5); a later read skips the load.
       const error = ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
       const lines =
         error === ""

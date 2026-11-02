@@ -73,12 +73,12 @@ pub fn trace_job(
 }
 
 thread_local! {
-    /// The text reader of this worker, loaded once (`specs/0091`, ADR 0027 §5).
+    /// The text reader of this worker, loaded once (`specs/0091`, ADR 0028 §5).
     static OCR_MODEL: std::cell::RefCell<Option<curvyo_ui_core::OcrModel>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// Loads the text reader's weights into this worker once (ADR 0027 §5): empty when it is
+/// Loads the text reader's weights into this worker once (ADR 0028 §5): empty when it is
 /// loaded, else why it is not (`"wrong_model"` or the reason).
 #[wasm_bindgen]
 #[must_use]
@@ -182,6 +182,29 @@ pub fn trace_text_job(
         &crate::trace_glue::trace_settings(settings),
         &crate::trace_glue::read_ocr_lines(lines, width),
         &mut report,
+    )
+}
+
+/// The text pass alone with the OCR `lines` (`specs/0091` criterion 25): a result without
+/// outlines and the text section, for the fit that decides the lines before the main trace.
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_text_regions_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+    lines: &str,
+) -> Vec<f64> {
+    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    curvyo_ui_core::trace_text_regions_with(
+        rgba,
+        width,
+        height,
+        map,
+        &crate::trace_glue::trace_settings(settings),
+        &crate::trace_glue::read_ocr_lines(lines, width),
     )
 }
 
@@ -588,6 +611,24 @@ impl WasmSession {
         let favourites: Vec<String> = serde_json::from_str(favourites).unwrap_or_default();
         self.session
             .trace_fit_request(tolerance, &favourites)
+            .unwrap_or_default()
+    }
+
+    /// The request of the font fit of `regions` (the worker's `trace_text_regions_job` of image
+    /// `id`) before its main trace (`specs/0091` criterion 25); empty without a line.
+    pub fn trace_fit_request_for(
+        &mut self,
+        id: &str,
+        regions: &[f64],
+        tolerance: f64,
+        favourites: &str,
+    ) -> String {
+        let Some(id) = id_of(id) else {
+            return String::new();
+        };
+        let favourites: Vec<String> = serde_json::from_str(favourites).unwrap_or_default();
+        self.session
+            .trace_fit_request_for(id, regions, tolerance, &favourites)
             .unwrap_or_default()
     }
 

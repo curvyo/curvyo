@@ -42,6 +42,7 @@ import {
   readAnalysis,
 } from "@/lib/traceAnalysis";
 import { type FitFace, OcrFailed, TraceCancelled, type TracePixels, type TraceRunner, createTraceRunner, ocrWeights } from "@/lib/traceJobs";
+import { type FitInputs, JobProgress, type TraceStage, decideTextLines, traceWithText } from "@/lib/traceTextFlow";
 import { readTolerance } from "@/lib/recogniseText";
 import { favouritesAmong } from "@/hooks/fontLibraryPage";
 import { listedFileBytes } from "@/hooks/useText";
@@ -309,23 +310,31 @@ export function useTrace(
     [runner],
   );
 
-  /** Fits the kept results' text lines to the faces in the trace worker (`specs/0091` decision
-   * 4; the main thread only reads font files), the percent in the Trace button; the session then
-   * shows the texts. `false` when a newer job took over (`stale`). */
+  /** What the font fit needs from the page (`specs/0091` decision 4): the Recognise text
+   * tolerance, the favourites and the font files (the main thread only reads them). */
+  const fitInputs = useCallback((): FitInputs => {
+    const faces = textOptionsRef.current?.faces ?? [];
+    return {
+      tolerance: readTolerance(typeof localStorage === "undefined" ? null : localStorage),
+      favourites: JSON.stringify([...favouritesAmong([...new Set(faces.map((f) => f.family))])]),
+      loadFaces: async (wanted: [string, number][]): Promise<FitFace[]> => {
+        const read = await Promise.allSettled(wanted.map(([file, index]) => listedFileBytes(file).then((bytes) => ({ file, index, bytes: new Uint8Array(bytes) }))));
+        return read.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+      },
+    };
+  }, []);
+
+  /** Fits the kept results' text lines to the faces in the trace worker (several pictures traced
+   * one by one, each with its own fit; Create paths fits them together), the percent in the Trace
+   * button; the session then shows the texts. `false` when a newer job took over (`stale`). */
   const fitTexts = useCallback(
     async (session: WasmSession, stale: () => boolean): Promise<boolean> => {
-      const faces = textOptionsRef.current?.faces ?? [];
-      const favourites = JSON.stringify([...favouritesAmong([...new Set(faces.map((f) => f.family))])]);
-      const tolerance = readTolerance(typeof localStorage === "undefined" ? null : localStorage);
-      const request = session.trace_fit_request(tolerance, favourites);
+      const fit = fitInputs();
+      const request = session.trace_fit_request(fit.tolerance, fit.favourites);
       if (request === "") {
         return true;
       }
-      const loadFaces = async (wanted: [string, number][]): Promise<FitFace[]> => {
-        const read = await Promise.allSettled(wanted.map(([file, index]) => listedFileBytes(file).then((bytes) => ({ file, index, bytes: new Uint8Array(bytes) }))));
-        return read.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
-      };
-      const result = await runner().fit(request, loadFaces, (p) => {
+      const result = await runner().fit(request, fit.loadFaces, (p) => {
         if (!stale()) {
           setPercent(p);
         }
@@ -336,48 +345,7 @@ export function useTrace(
       getSession()?.set_trace_fit(request, result);
       return true;
     },
-    [getSession, runner, setPercent],
-  );
-
-  /** The full-size result of `pixels` (the full picture) with the read `lines`, kept for Create paths (and shown when
-   * `preview`), and the fit of its lines; when the fit set no text for some lines (`specs/0091`
-   * lead decision 1) the picture is traced again with those lines left in the paths, and the rest
-   * fitted again. `null` when a newer job took over (`stale`). */
-  const traceAndFit = useCallback(
-    async (session: WasmSession, id: string, pixels: TracePixels, settings: string, lines: string, onProgress: (p: number) => void, stale: () => boolean, preview: boolean) => {
-      const keep = (wire: Float64Array) => {
-        if (preview) {
-          session.set_trace_preview(id, wire);
-        }
-        session.set_trace_result(id, wire);
-      };
-      let out = await runner().trace(pixels, settings, onProgress, lines);
-      if (stale()) {
-        return null;
-      }
-      keep(out.wire);
-      if (lines === "") {
-        return out;
-      }
-      if (!(await fitTexts(session, stale))) {
-        return null;
-      }
-      if (session.trace_fit_dropped() === 0) {
-        return out;
-      }
-      // The first trace handed its pixels to the worker: a fresh copy for the second.
-      const again = pixelsOf(session, id, false);
-      if (!again) {
-        return out;
-      }
-      out = await runner().trace(again, settings, onProgress, session.trace_ocr_lines(id));
-      if (stale()) {
-        return null;
-      }
-      keep(out.wire);
-      return (await fitTexts(session, stale)) ? out : null;
-    },
-    [runner, fitTexts],
+    [getSession, runner, setPercent, fitInputs],
   );
 
   /** The preview of the shown image: the reduced copy first, the full size after (criterion 10). */
@@ -425,8 +393,27 @@ export function useTrace(
           setLoading(true);
           return;
         }
-        const lines = await textLines(session, id, v, onProgress, full, stale);
+        // `specs/0091` criterion 25: one percent over the whole job; the lines are decided before
+        // the trace, which then runs once.
+        const small = full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE;
+        const reducedOnly = previewIsReduced(full.width, full.height);
+        const text = readsText(v) && !ocrFailed.current.has(id);
+        // The fit decides the lines for the full-size trace only: a reduced preview while a value
+        // is dragged shows the read lines' own shapes, as before.
+        const fullTrace = small || (fullAfter && !reducedOnly);
+        const stages: TraceStage[] = [
+          ...(text && session.trace_ocr_lines(id) === "" ? (["read"] as const) : []),
+          ...(text && fullTrace ? (["fit"] as const) : []),
+          ...(small ? [] : (["reduced"] as const)),
+          ...(fullTrace ? (["trace"] as const) : []),
+        ];
+        const progress = new JobProgress(stages, onProgress);
+        const read = await textLines(session, id, v, progress.stage("read"), full, stale);
         if (stale()) {
+          return;
+        }
+        const lines = fullTrace ? await decideTextLines(session, runner(), id, full, settings, read, fitInputs(), progress.stage("fit"), stale) : read;
+        if (lines === null || stale()) {
           return;
         }
         const failedText = readsText(v) && ocrFailed.current.has(id);
@@ -446,11 +433,9 @@ export function useTrace(
         pixels = full.width * full.height;
         // Over 4 Mpx the preview is the reduced copy only; Create paths traces at full size
         // (criterion 52).
-        const reducedOnly = previewIsReduced(full.width, full.height);
         if (reducedOnly) {
           startTimers(true);
         }
-        const small = full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE;
         if (!small) {
           const reduced = pixelsOf(session, id, true);
           if (reduced) {
@@ -459,7 +444,7 @@ export function useTrace(
               return;
             }
             const reducedPixels = reduced.width * reduced.height;
-            const out = await runner().trace(reduced, settings, onProgress, lines);
+            const out = await runner().trace(reduced, settings, progress.stage("reduced"), lines);
             if (stale()) {
               return;
             }
@@ -480,19 +465,14 @@ export function useTrace(
         if (stale()) {
           return;
         }
-        // UX notes §2: the Trace view shows the texts in their faces, fitted after the trace.
-        const out = await traceAndFit(session, id, full, settings, lines, onProgress, stale, true);
-        if (out === null) {
+        // UX notes §2: the Trace view shows the texts in their faces; the fit decided before the
+        // trace stays with its result.
+        const out = await runner().trace(full, settings, progress.stage("trace"), lines);
+        if (stale()) {
           return;
         }
-        const traced = session.trace_ocr_lines(id);
-        if (lines !== "" && traced !== lines) {
-          // Lines the fit set no text for are back in the paths, and in the Mask view.
-          await maskStep(id, false, settings, stale, traced);
-          if (stale()) {
-            return;
-          }
-        }
+        session.set_trace_preview(id, out.wire);
+        session.set_trace_result(id, out.wire);
         paletteRefresh.current();
         counts();
         results.current.set(id, resultKey(settings, v));
@@ -505,7 +485,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep, textLines, traceAndFit],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep, textLines, fitInputs],
   );
 
   const schedule = useCallback(
@@ -753,13 +733,19 @@ export function useTrace(
               setPercent(p);
             }
           };
-          const lines = await textLines(session, id, v, progress, full, () => mine !== generation.current);
-          if (mine !== generation.current) {
+          // `specs/0091` criterion 25: one percent per picture; the lines decided, then one trace.
+          const stale = () => mine !== generation.current;
+          const text = readsText(v) && !ocrFailed.current.has(id);
+          const job = new JobProgress([...(text && session.trace_ocr_lines(id) === "" ? (["read"] as const) : []), ...(text ? (["fit"] as const) : []), "trace"], progress);
+          const read = await textLines(session, id, v, job.stage("read"), full, stale);
+          if (stale()) {
             return;
           }
-          if ((await traceAndFit(session, id, full, settings, lines, progress, () => mine !== generation.current, false)) === null) {
+          const done = await traceWithText(session, runner(), id, full, settings, read, fitInputs(), job, stale);
+          if (done === null) {
             return;
           }
+          session.set_trace_result(id, done.out.wire);
           results.current.set(id, wanted);
         }
         // `specs/0091` decision 4: the read lines fitted to the faces (done by the preview
@@ -789,7 +775,7 @@ export function useTrace(
         }
       }
     })();
-  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, traceAndFit]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, fitInputs, runner]);
 
   // Leaving the tool ends every job.
   useEffect(() => {

@@ -1,4 +1,4 @@
-//! The shipped weights' licence record (ADR 0027 §5, `specs/0091-trace-text-recognition`
+//! The shipped weights' licence record (ADR 0028 §5, `specs/0091-trace-text-recognition`
 //! criterion 15): every file of `frontend/public/models/paddleocr-latin/` but the record and the
 //! licence text has an entry with an allowed licence, its source and the SHA-256 this crate
 //! expects; the record names the training-data statement.

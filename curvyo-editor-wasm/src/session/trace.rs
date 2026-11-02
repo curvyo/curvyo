@@ -263,8 +263,8 @@ impl Session {
             return false;
         };
         self.trace.results.retain(|(id, _)| *id != image);
-        self.trace.results.push((image, read));
-        self.drop_trace_fit();
+        self.trace.results.push((image, read.clone()));
+        self.keep_trace_fit(image, &read);
         true
     }
 
@@ -363,7 +363,8 @@ impl Session {
                                 (image.id, group)
                             })
                             .collect();
-                        let texts = super::trace_text::write_texts(document, &fitted, &above)?;
+                        let texts =
+                            super::trace_text_write::write_texts(document, &fitted, &above)?;
                         Some((groups, texts))
                     });
             let Some((groups, texts)) = written else {

@@ -95,6 +95,7 @@ fn text_json(text: &curvyo_ui_core::FitText, hash: &str) -> Value {
         "sure": run.sure,
         "letters": run.letters,
         "nearest": text.nearest,
+        "stroke": text.stroke.map(Mm::get),
         "glyphs": text.glyphs.iter().map(path_svg).collect::<Vec<_>>(),
     })
 }
@@ -110,6 +111,8 @@ pub struct FitTextRead {
     pub hash: String,
     /// Set in the nearest face.
     pub nearest: bool,
+    /// Set in a single-line face: its stroke width.
+    pub stroke: Option<Mm>,
     /// The glyphs, document mm.
     pub glyphs: Vec<BezPath>,
 }
@@ -151,6 +154,7 @@ pub fn read_fit_result(json: &str) -> Option<Vec<(Vec<FitTextRead>, Vec<usize>)>
                 face: count("face")?,
                 hash: t.get("hash")?.as_str()?.to_owned(),
                 nearest: t.get("nearest")?.as_bool()?,
+                stroke: t.get("stroke").and_then(Value::as_f64).map(Mm),
                 glyphs: paths(t.get("glyphs")),
             });
         }
@@ -195,6 +199,8 @@ impl FitWorker {
                             text: l.get("text")?.as_str()?.to_owned(),
                             direction: Vec2::new(*d.first()?, *d.get(1)?),
                             outlines: paths(l.get("outlines")),
+                            plausible: l.get("plausible").and_then(Value::as_bool).unwrap_or(false),
+                            pixel: l.get("pixel").and_then(Value::as_f64).unwrap_or(0.0),
                         })
                     })
                     .collect()
@@ -204,7 +210,11 @@ impl FitWorker {
             .get("tolerance")
             .and_then(Value::as_f64)
             .unwrap_or(0.3);
-        self.fit = Some(TraceFit::new(lines, Mm(tolerance), tiers));
+        let strokes = indices(value.get("strokes"))
+            .into_iter()
+            .filter(|&i| i < self.faces.len())
+            .collect();
+        self.fit = Some(TraceFit::new(lines, Mm(tolerance), tiers, strokes));
         self.step(progress)
     }
 

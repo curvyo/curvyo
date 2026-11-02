@@ -313,7 +313,8 @@ export interface TraceValues {
   denoise: number;
   invert: boolean;
   ignoreBackground: boolean;
-  /** Recognise text in Advanced (`specs/0091` criterion 17): an app setting, on by default. */
+  /** Recognise text in Advanced (`specs/0091` criterion 17): an app setting, off by default
+   * (Frage 116 B a). */
   recogniseText: boolean;
   /** The selection method: `BRIGHTNESS`, `REMOVE_BACKGROUND` or `PICK_COLOURS`. */
   method: number;
@@ -629,7 +630,7 @@ export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALL
     ...first.values,
     invert: false,
     ignoreBackground: false,
-    recogniseText: true,
+    recogniseText: false,
     method: BRIGHTNESS,
     backgroundTolerance: DEFAULT_BACKGROUND_TOLERANCE,
     pickTolerance: DEFAULT_PICK_TOLERANCE,
@@ -726,7 +727,7 @@ export function readChoice(
       pickTolerance?: unknown;
       output?: unknown;
       colours?: unknown;
-      recogniseText?: unknown;
+      recogniseTextOn?: unknown;
     };
     // The method and its tolerances are app settings too (`specs/0089` criterion 20); a missing
     // method reads as Brightness.
@@ -760,8 +761,9 @@ export function readChoice(
         pickTolerance: tolerance(stored.pickTolerance, first.values.pickTolerance),
         // Output and Colours are app settings too (`specs/0089` criterion 25, UX notes §7).
         output: stored.output === MULTICOLOUR ? MULTICOLOUR : SINGLE_COLOUR,
-        // `specs/0091` criterion 17: on unless the maker turned it off.
-        recogniseText: stored.recogniseText !== false,
+        // `specs/0091` criterion 17: off unless the maker turned it on (Frage 116 B a; a new key,
+        // so the old default "on" kept by earlier builds does not count as turned on).
+        recogniseText: stored.recogniseTextOn === true,
         colours:
           typeof stored.colours === "number" && Number.isFinite(stored.colours)
             ? Math.min(MAX_COLOURS, Math.max(MIN_COLOURS, Math.round(stored.colours)))
@@ -793,7 +795,7 @@ export function writeChoice(choice: TraceChoice, storage: ValueStorage | undefin
         pickTolerance: choice.values.pickTolerance,
         output: choice.values.output,
         colours: choice.values.colours,
-        recogniseText: choice.values.recogniseText,
+        recogniseTextOn: choice.values.recogniseText,
       }),
     );
   } catch {
@@ -830,7 +832,7 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
   if (values.ignoreBackground) {
     changed.push("Drop border shapes");
   }
-  if (!values.recogniseText) {
+  if (values.recogniseText) {
     changed.push(RECOGNISE_TEXT);
   }
   if (values.denoise !== dflt("denoise")) {

@@ -6,7 +6,7 @@
 // page (14), no second OCR after a setting change (16), the switch as an app setting (17), a stop
 // during the OCR (19), no notice for a clean line (5), the OCR, trace and fit in the editor wasm
 // against the native record of `curvyo-editor-wasm/tests/acceptance_0091_tester.rs` (13 across
-// builds, ADR 0027 §6), and the times: OCR and fit wall time in the worker, main-thread long
+// builds, ADR 0028 §6), and the times: OCR and fit wall time in the worker, main-thread long
 // tasks over the whole recognise and trace (20, 21). Criterion 15 as amended: the record and
 // `docs/third-party-assets.md` (no in-app licence page in this story).
 
@@ -201,16 +201,23 @@ async function importImage(s: S, file: string) {
   })()`);
 }
 
-async function openTrace(s: S) {
-  await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace')?.click()`);
-  await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null), 20_000);
-}
-
 async function openAdvanced(s: S) {
   if (!(await s.evaluate(`!!document.querySelector('${BAR} [aria-label="Recognise text"]')`))) {
     await s.evaluate(`document.querySelector('${BAR} [aria-label="More trace options"]').click()`);
     await sleep(500);
   }
+}
+
+/** Opens the Trace bar and turns Recognise text on (criterion 17 as amended by Frage 116 B a,
+ * 2026-11-01: off by default), which starts the job with text. */
+async function openTrace(s: S) {
+  await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace')?.click()`);
+  await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null), 20_000);
+  await openAdvanced(s);
+  const pressed = () => s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed')`);
+  assert.equal(await pressed(), "false", "criterion 17: off by default");
+  await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').click()`);
+  await waitFor("Recognise text on", async () => ((await pressed()) === "true" ? true : null), 5_000);
 }
 
 const restingSlot = (s: S) => s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=none]')`);
@@ -240,12 +247,13 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
         `trace to the line count ${((linesAt - readEnd) / 1000).toFixed(2)} s; fit until the button rests ${((done - linesAt) / 1000).toFixed(2)} s; ` +
         `all ${((done - t0) / 1000).toFixed(2)} s; main-thread long tasks ${long.length}, longest ${Math.max(0, ...long.map(([, d]) => d)).toFixed(0)} ms, total ${busy.toFixed(0)} ms`,
     );
-    // UX notes §4 with lead decision 1: 8 found, those with a sure letter set; the foreign
-    // Liberation Mono line has none and stays shapes.
+    // UX notes §4 with Frage 115 B / 117 B: 8 found, every plausible line set, the foreign
+    // Liberation Mono line in the nearest face.
     const status = await s.statusText();
-    const setMatch = /(\d+) of 8 text lines set/.exec(status);
+    // "8 text lines set" when every line is set, "n of 8 text lines set" otherwise (UX notes §4).
+    const setMatch = /(?:(\d+) of )?8 text lines set/.exec(status);
     assert.ok(setMatch, status);
-    const set = Number(setMatch[1]);
+    const set = Number(setMatch[1] ?? 8);
     // Criterion 14: the three weight files once each, from the app; nothing leaves the page's origin.
     const models = s.requests.filter((u) => u.includes("/models/"));
     console.log("# model requests:", JSON.stringify(models.map((u) => u.replace(ORIGIN, ""))));
@@ -253,7 +261,7 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
       assert.equal(models.filter((u) => u.endsWith(`/models/paddleocr-latin/${f}`)).length, 1, f);
     }
     assert.deepEqual(s.requests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith("data:") && !u.startsWith("blob:")), []);
-    // Criterion 17: on by default, kept with the Trace settings in local storage.
+    // Criterion 17: turned on above (off by default), kept with the Trace settings in local storage.
     await openAdvanced(s);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').getAttribute('aria-pressed')`), "true");
     assert.equal(await s.evaluate(`!!document.querySelector('[aria-label="Recognise shapes"]')`), false);
@@ -265,7 +273,7 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
     await output("Single colour");
     await sleep(800);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed')`), "true");
-    await waitFor("the single-colour preview", async () => ((await restingSlot(s)) && /of 8 text lines set/.test(await s.statusText()) ? true : null), 180_000);
+    await waitFor("the single-colour preview", async () => ((await restingSlot(s)) && /8 text lines set/.test(await s.statusText()) ? true : null), 180_000);
     const advancedText = (await s.evaluate(`document.querySelector('${BAR}').innerText`)) as string;
     console.log("# Trace bar text with Advanced open:", JSON.stringify(advancedText));
     // Criterion 16: a setting changed: no "Reading text" again, no weight fetched again, a new preview.
@@ -282,32 +290,45 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
     const again = (await log(s)).slice(before);
     assert.ok(!again.some((e) => e[2] === "Reading text"), `no OCR again: ${JSON.stringify(again.map((e) => e[2]))}`);
     assert.equal(s.requests.slice(requestsBefore).filter((u) => u.includes("/models/")).length, 0);
+    const back = (await log(s)).length;
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Drop border shapes"]').click()`);
     await sleep(500);
-    await waitFor("the preview back", async () => ((await restingSlot(s)) ? true : null), 120_000);
+    // The preview of the setting back runs and rests (the fit before the trace makes it longer
+    // than the debounce, so a resting slot alone can be the gap before it).
+    await waitFor("the preview back", async () => {
+      const l = (await log(s)).slice(back);
+      const ran = l.findIndex((e) => e[1] === "running");
+      return ran >= 0 && l.slice(ran).some((e) => e[1] === "none") && (await restingSlot(s)) ? true : null;
+    }, 120_000);
     await sleep(1000);
     const stored = (await s.evaluate(`localStorage.getItem('curvyo.trace-values')`)) as string | null;
-    assert.ok(stored === null || !stored.includes('"recogniseText":false'), stored ?? "");
+    assert.ok(stored !== null && stored.includes('"recogniseTextOn":true'), stored ?? "");
     // Create paths: the texts above the "Trace of" group (criterion 6), one warning (criterion 5).
     const rowsBefore = await s.layerRows();
     await createPaths(s);
     const rows = await waitFor("the text rows", async () => {
       const r = await s.layerRows();
       return r.some((x) => x?.includes("Größe")) ? r : null;
-    }, 180_000);
+    }, 180_000).catch(async (e: unknown) => {
+      throw new Error(`${String(e)}: rows ${JSON.stringify(await s.layerRows())}; status ${await s.statusText()}`);
+    });
     console.log("# layer rows after Create paths:", JSON.stringify(rows));
     const group = rows.findIndex((x) => x?.includes("Trace of"));
     const texts = rows.map((x, i) => [x, i] as const).filter(([x]) => /Größe|Übermaß|Äpfel|Tel\.|Fräsen|Straße|Mono|Brücke/.test(x ?? ""));
     rowsAfterCreate = rows;
-    assert.ok(!rows.some((x) => /Mono/.test(x ?? "")), `the foreign line is no text: ${JSON.stringify(rows)}`);
+    assert.ok(rows.some((x) => /Mono/.test(x ?? "")), `the foreign line is text (115 B): ${JSON.stringify(rows)}`);
     assert.equal(texts.length, set, JSON.stringify(rows));
     assert.ok(group >= 0 && texts.every(([, i]) => i < group), `texts above the group: ${JSON.stringify(rows)}`);
     await sleep(800);
     const notice = await s.statusText();
     console.log("# notices after Create paths:", JSON.stringify(notice));
     selectionAfterCreate = notice;
-    assert.ok(notice.includes("5 letters guessed: a (6), Ä (1), l (3), 2 (8), l (15)."), `the warning of UX notes §5: ${notice}`);
-    assert.ok(!notice.includes("Mono"), `the foreign line is not quoted: ${notice}`);
+    // Frage 115 B / 117 B: the two lines no face fits are set in the nearest face and named.
+    assert.ok(
+      notice.includes('8 letters guessed: Ä (1), l (3), 2 (8), 7 (13), 6 (14) and 3 more. 2 lines set in the nearest font, all letters guessed: "Fräsen ab 3 Stück, 12.50…", "Mono 314 Zoll".'),
+      `the warning of UX notes §5: ${notice}`,
+    );
+
     // Criterion 11: one undo, the document as before.
     await s.evaluate(`document.activeElement?.blur?.()`);
     await s.key("z", 90, 2);
@@ -328,11 +349,11 @@ test(
 );
 
 test(
-  "0091 tester c4, lead decision 1: a line with no sure letter (\"Fräsen ab 3 Stück, 12.50 EUR\", 0 of 23 sure natively) is no text",
+  "0091 tester c4, Frage 115 B / 117 B: a line with no sure letter (\"Fräsen ab 3 Stück, 12.50 EUR\", 0 of 23 sure natively) becomes text in the nearest face",
   { skip: !BROWSER },
   () => {
     assert.ok(rowsAfterCreate, "the end-to-end case ran");
-    assert.ok(!rowsAfterCreate.some((x) => /Fräsen/.test(x ?? "")), JSON.stringify(rowsAfterCreate));
+    assert.ok(rowsAfterCreate.some((x) => /Fräsen/.test(x ?? "")), JSON.stringify(rowsAfterCreate));
   },
 );
 
@@ -472,6 +493,6 @@ test("0091 tester c15: the licence record names the weights' licence and the doc
   assert.match(section.split("\n## ")[0], /Apache-2\.0/);
   const source = /^source_url = "(.*)"$/m.exec(record)?.[1];
   assert.ok(source && section.split("\n## ")[0].includes(source), `the source ${source} is listed`);
-  const adr = readFileSync(path.join(ROOT, "docs", "adr", "0027-ocr-text-in-trace.md"), "utf8");
+  const adr = readFileSync(path.join(ROOT, "docs", "adr", "0028-ocr-text-in-trace.md"), "utf8");
   assert.match(adr, /`rten` MIT OR Apache-2\.0/);
 });
