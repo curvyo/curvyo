@@ -287,6 +287,7 @@ fn wash_over(image: &ImageSnapshot) -> PathSnapshot {
                     b: 255,
                 },
                 opacity: Opacity::new(strength).unwrap_or(Opacity::OPAQUE),
+                ..Fill::default()
             },
         },
         anchors,
@@ -334,6 +335,7 @@ pub(super) fn filled_result(image: NodeId, outlines: &[Vec<PreviewAnchor>]) -> P
                 enabled: true,
                 color: Color { r: 0, g: 0, b: 0 },
                 opacity: Opacity::OPAQUE,
+                ..Fill::default()
             },
         },
         anchors,

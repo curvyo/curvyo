@@ -82,6 +82,8 @@ mod wasm_offset;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pages;
 #[cfg(target_arch = "wasm32")]
+mod wasm_pattern;
+#[cfg(target_arch = "wasm32")]
 mod wasm_pen;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pen_entry;
