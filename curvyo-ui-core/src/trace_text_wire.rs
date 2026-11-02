@@ -3,7 +3,7 @@
 //! main trace walks the filled picture, and the accepted lines follow the outlines.
 
 use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Mask as TraceMask, TraceParams};
+use curvyo_vectorize_core::{Mask as TraceMask, Rgb8, TraceParams};
 use kurbo::{BezPath, Vec2};
 
 use crate::trace_ocr::OcrLine;
@@ -15,6 +15,14 @@ use crate::trace_transfer::{
 
 /// The number that opens the text section (no count is negative).
 pub(crate) const TEXT_MARK: f64 = -1.0;
+
+/// The number that opens the lines' fills after the lines of a multicolour result (slice 2); a
+/// black and white text section has none and is as in slice 1.
+const FILL_MARK: f64 = -2.0;
+
+/// The number that opens the excluded lines after the fills (their count and places); absent when
+/// the maker excluded none of the lines' fills.
+const EXCLUDED_MARK: f64 = -3.0;
 
 /// The level of a left-out pixel in the Mask view (UX notes §2: flat mid grey).
 pub const LEFT_OUT_LEVEL: u8 = 128;
@@ -36,8 +44,31 @@ pub struct TraceTextWire {
     pub pixel: f64,
     /// Where the reader saw each character, mm along the line's unit direction (round 3).
     pub positions: Vec<f64>,
+    /// The text's fill in a multicolour result: the palette or background colour nearest the
+    /// line's text pixels (slice 2, decision 6); `None` in black and white and in the text pass
+    /// alone.
+    pub fill: Option<Rgb8>,
+    /// The maker excluded the line's fill: it is left out, as the shapes of that colour are
+    /// (multicolour only).
+    pub excluded: bool,
     /// The line's own outlines in document millimetres.
     pub outlines: Vec<BezPath>,
+}
+
+impl TraceTextWire {
+    /// Whether `other` is the same line, its fill aside (the text pass alone has none).
+    #[must_use]
+    pub fn same_line(&self, other: &Self) -> bool {
+        Self {
+            fill: None,
+            excluded: false,
+            ..self.clone()
+        } == Self {
+            fill: None,
+            excluded: false,
+            ..other.clone()
+        }
+    }
 }
 
 /// The text section of a result.
@@ -77,12 +108,14 @@ pub fn trace_text_job_with(
     if wire.first() != Some(&0.0) {
         return wire;
     }
-    write_texts(&mut wire, &pass);
+    write_texts(&mut wire, &pass, &[]);
     wire
 }
 
-/// The text section of `pass` after a result's numbers.
-fn write_texts(wire: &mut Vec<f64>, pass: &TextPass) {
+/// The text section of `pass` after a result's numbers; with `fills` (one per line, multicolour:
+/// the colour and whether it is excluded) [`FILL_MARK`] and the colours after the lines, then
+/// [`EXCLUDED_MARK`] and the excluded lines when there are any.
+pub(crate) fn write_texts(wire: &mut Vec<f64>, pass: &TextPass, fills: &[(Rgb8, bool)]) {
     #[allow(clippy::cast_precision_loss)] // counts far below 2^52
     {
         wire.extend([TEXT_MARK, pass.found as f64, pass.regions.len() as f64]);
@@ -102,6 +135,20 @@ fn write_texts(wire: &mut Vec<f64>, pass: &TextPass) {
             wire.extend([region.outlines.len() as f64]);
             for outline in &region.outlines {
                 write_outline(wire, outline);
+            }
+        }
+        if !fills.is_empty() {
+            wire.push(FILL_MARK);
+            for (c, _) in fills {
+                wire.extend([f64::from(c.r), f64::from(c.g), f64::from(c.b)]);
+            }
+            let excluded: Vec<f64> = (0..fills.len())
+                .filter(|&k| fills[k].1)
+                .map(|k| k as f64)
+                .collect();
+            if !excluded.is_empty() {
+                wire.extend([EXCLUDED_MARK, excluded.len() as f64]);
+                wire.extend(excluded);
             }
         }
     }
@@ -128,7 +175,7 @@ pub fn trace_text_regions_with(
         lines,
     );
     let mut wire = status_only(TraceStatus::Traced);
-    write_texts(&mut wire, &pass);
+    write_texts(&mut wire, &pass, &[]);
     wire
 }
 
@@ -208,8 +255,27 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
             plausible,
             pixel,
             positions,
+            fill: None,
+            excluded: false,
             outlines,
         });
+    }
+    if tail.get(at) == Some(&FILL_MARK) {
+        at += 1;
+        let byte = |v: f64| u8::try_from(count(v)?).ok();
+        for line in &mut lines {
+            line.fill = Some(Rgb8::new(
+                byte(next(&mut at)?)?,
+                byte(next(&mut at)?)?,
+                byte(next(&mut at)?)?,
+            ));
+        }
+        if tail.get(at) == Some(&EXCLUDED_MARK) {
+            at += 1;
+            for _ in 0..count(next(&mut at)?)? {
+                lines.get_mut(count(next(&mut at)?)?)?.excluded = true;
+            }
+        }
     }
     Some((TraceTexts { found, lines }, at))
 }

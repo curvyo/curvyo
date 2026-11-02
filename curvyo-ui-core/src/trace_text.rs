@@ -10,10 +10,10 @@
 use std::ops::ControlFlow;
 
 use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Raster, Selection, TraceParams, auto_threshold, trace};
+use curvyo_vectorize_core::{Raster, Rgb8, Selection, TraceParams, auto_threshold, trace};
 use kurbo::{BezPath, Vec2};
 
-use crate::trace_inpaint::inpaint;
+use crate::trace_inpaint::{inpaint, median};
 use crate::trace_ocr::OcrLine;
 
 /// The box of a quad grows by this many pixels on each side (decision 2).
@@ -66,6 +66,11 @@ pub struct TextRegion {
     /// Where the reader saw each character: document millimetres along the line's unit
     /// direction (empty when not known).
     pub positions: Vec<f64>,
+    /// The per-channel lower median of the line's text pixels (`specs/0091` decision 6).
+    pub colour: Rgb8,
+    /// The same median of those pixels once filled from their surroundings: what lies under the
+    /// text (slice 2, the background candidate).
+    pub under: Rgb8,
 }
 
 /// What the text pass hands to the main trace and back to the session.
@@ -193,6 +198,8 @@ pub fn text_pass(
     if rgba.len() != w * h * 4 {
         return pass;
     }
+    // Each region's text pixels, for what lies under them after the filling.
+    let mut inks: Vec<Vec<usize>> = Vec::new();
     for line in lines.iter().filter(|l| l.accepted()) {
         let quad = grown(&line.quad);
         let Some(bounds) = pixel_box(&quad, w, h) else {
@@ -205,6 +212,7 @@ pub fn text_pass(
         // The quad on its own, foreground dark and with its grey kept, white around it.
         let mut crop = vec![255_u8; cw * ch * 4];
         let mut text = vec![false; w * h];
+        let mut inked: Vec<usize> = Vec::new();
         for y in y0..y1 {
             for x in x0..x1 {
                 if !inside(&quad, x, y) {
@@ -215,7 +223,10 @@ pub fn text_pass(
                 let level = if light_text { 255 - luma(px) } else { luma(px) };
                 let c = ((y - y0) * cw + (x - x0)) * 4;
                 crop[c..c + 3].fill(level);
-                text[y * w + x] = foreground(px);
+                if foreground(px) {
+                    text[y * w + x] = true;
+                    inked.push(y * w + x);
+                }
             }
         }
         let own = TraceParams {
@@ -261,6 +272,8 @@ pub fn text_pass(
         let direction = Vec2::new(m[0] * edge.x + m[2] * edge.y, m[1] * edge.x + m[3] * edge.y);
         let edge_px = edge.hypot();
         let positions = reader_positions(&line.positions, &q, m, direction);
+        let ink = median(rgba, &mut inked);
+        inks.push(inked);
         pass.regions.push(TextRegion {
             text: line.text.clone(),
             outlines: result.outlines,
@@ -268,6 +281,8 @@ pub fn text_pass(
             masked,
             plausible: line.plausible(),
             positions,
+            colour: Rgb8::new(ink[0], ink[1], ink[2]),
+            under: Rgb8::new(ink[0], ink[1], ink[2]),
             pixel: if edge_px > 0.0 {
                 direction.hypot() / edge_px
             } else {
@@ -276,7 +291,17 @@ pub fn text_pass(
         });
     }
     inpaint(&mut pass.rgba, w, h, &pass.left_out);
+    set_under(&mut pass.regions, &pass.rgba, &mut inks);
     pass
+}
+
+/// Sets what lies under each of `regions`: the median of its text pixels `inks` in the filled
+/// picture `rgba`.
+fn set_under(regions: &mut [TextRegion], rgba: &[u8], inks: &mut [Vec<usize>]) {
+    for (region, inked) in regions.iter_mut().zip(inks) {
+        let under = median(rgba, inked);
+        region.under = Rgb8::new(under[0], under[1], under[2]);
+    }
 }
 
 /// The reader's character `positions` (pixels along `quad`'s top edge) as document mm along the
@@ -379,6 +404,10 @@ mod tests {
         assert_eq!(at(20, 10), 90);
         assert!(pass.left_out[10 * 40 + 20] && !pass.left_out[3 * 40 + 3]);
         assert_eq!(pass.regions[0].masked, 26 * 6);
+        // Decision 6: the line's colour is its text pixels', white here.
+        assert_eq!(pass.regions[0].colour, Rgb8::new(255, 255, 255));
+        // Slice 2: under the text lies the box's grey.
+        assert_eq!(pass.regions[0].under, Rgb8::new(90, 90, 90));
     }
 
     /// Criterion 9: a line's own outlines lie on its letters in the document: the crop is moved
