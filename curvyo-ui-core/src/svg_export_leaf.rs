@@ -144,9 +144,10 @@ pub(crate) fn paint(color: curvyo_document_core::Color, opacity: f64) -> Paint {
 /// the leaf is one open outline of two or more nodes, so SVG draws its end and node markers.
 #[allow(clippy::float_cmp)] // exactness of the read-back dash list is the question
 pub(crate) fn export_style(style: &Style, svg_markers: bool) -> (ExportStyle, Shadow) {
+    // A pattern fill is written as its pieces beside the region (ADR 0029 §8): `fill="none"`.
     let fill = style
         .fill
-        .enabled
+        .paints_solid()
         .then(|| paint(style.fill.color, style.fill.opacity.get()));
     let s = &style.stroke;
     let width = s.width.as_mm();

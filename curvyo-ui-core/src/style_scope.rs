@@ -39,6 +39,21 @@ impl StyleScope {
     pub fn targets(&self, objects: &[ObjectSnapshot], edit: &StyleEdit) -> Vec<NodeId> {
         if edit.is_marker_edit() {
             paths_among(&self.ids, objects)
+        } else if edit.is_pattern_edit() {
+            // Only outlines take a pattern; texts, images and the rest are skipped
+            // (`specs/0071-pattern-fill` UX notes §2).
+            objects_with_ids(objects, &self.ids)
+                .into_iter()
+                .filter(|object| {
+                    matches!(
+                        object,
+                        ObjectSnapshot::Path(_)
+                            | ObjectSnapshot::Primitive(_)
+                            | ObjectSnapshot::Clone(_)
+                    )
+                })
+                .map(ObjectSnapshot::id)
+                .collect()
         } else if edit.is_fill_edit() {
             objects_with_ids(objects, &self.ids)
                 .into_iter()

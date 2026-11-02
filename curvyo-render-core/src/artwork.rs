@@ -212,7 +212,8 @@ fn draw_object(
 ) {
     // The fill is painted first, with the outline closed by a chord when the
     // path is open; the stroke below keeps the real open path.
-    if style.fill.paints() {
+    // A pattern fill is drawn by the session as its pieces (ADR 0029 §7), never as a colour.
+    if style.fill.paints_solid() {
         draw_fill(list, outlines, style, view);
     }
     if style.stroke.enabled {

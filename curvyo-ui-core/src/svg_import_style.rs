@@ -32,6 +32,7 @@ pub(crate) fn model_style(style: &LeafStyle) -> Style {
             enabled: style.fill.is_some(),
             color: colour(style.fill),
             opacity: opacity(style.fill),
+            ..Fill::default()
         },
         stroke: Stroke {
             enabled: style.stroke.is_some(),

@@ -50,6 +50,12 @@ impl StyleEditor {
         self.pending.as_ref().map(|pending| &pending.edit)
     }
 
+    /// The objects the preview shows on (empty without a preview).
+    #[must_use]
+    pub fn previewed_ids(&self) -> &[NodeId] {
+        self.pending.as_ref().map_or(&[], |pending| &pending.ids)
+    }
+
     /// Whether a preview is showing.
     #[must_use]
     pub const fn is_active(&self) -> bool {

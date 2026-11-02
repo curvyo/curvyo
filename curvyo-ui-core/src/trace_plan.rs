@@ -75,6 +75,7 @@ pub fn trace_style() -> Style {
             enabled: true,
             color: Color::BLACK,
             opacity: Opacity::OPAQUE,
+            ..Fill::default()
         },
     }
 }
