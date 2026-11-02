@@ -18,7 +18,7 @@ interface DashRowsProps {
 }
 
 /**
- * The Dash and Pattern rows (`specs/0017-style-panel-rework` criteria 28 to
+ * The Dash and Dashes rows (`specs/0017-style-panel-rework` criteria 28 to
  * 33): four preset buttons in one group and a text line that shows the same
  * stored list as numbers. A list that equals no preset presses no button.
  */
@@ -38,7 +38,7 @@ export function DashRows({ panel, onReturnFocus }: DashRowsProps) {
           onReturnFocus={onReturnFocus}
         />
       </StyleRow>
-      <StyleRow label="Pattern">
+      <StyleRow label="Dashes">
         <Tooltip side="left" content={PATTERN_TOOLTIP}>
           <div>
             <EntryField

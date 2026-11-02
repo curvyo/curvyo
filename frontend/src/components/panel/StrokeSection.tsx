@@ -25,7 +25,7 @@ interface StrokeSectionProps {
 /**
  * The stroke section (`specs/0017-style-panel-rework` criteria 5 to 10): the
  * Stroke title with its Paint switch on one row, and under it Color, the
- * picker, Opacity, Width, Dash, Pattern, Join and Cap. While every edited
+ * picker, Opacity, Width, Dash, Dashes, Join and Cap. While every edited
  * stroke is off the rows are not in the tree at all; with some on and some off
  * they show their stored values.
  */
