@@ -596,6 +596,34 @@
     "specks_mm": 0.5,
     "threshold": "automatic"
   },
+  "ocr": {
+    "_source": "curvyo-editor-wasm session::trace_text_tests (specs/0091 decision 8), release, 2026-11-01",
+    "poster": {
+      "lines_found": 8,
+      "lines_exact": 8,
+      "lines_nearest_face": 1,
+      "wrong_sure": 0
+    },
+    "poster_noisy": {
+      "lines_found": 8,
+      "lines_exact": 8,
+      "lines_nearest_face": 1,
+      "wrong_sure": 0
+    },
+    "rotated": {
+      "lines_found": 1,
+      "lines_exact": 1,
+      "wrong_sure": 0
+    },
+    "wasm_cpu_s": {
+      "load": 0.19,
+      "ocr_poster": 3.0,
+      "ocr_poster_without_simd": 5.6,
+      "text_pass_and_trace_poster": 0.27
+    },
+    "wasm_peak_linear_memory_mb": 178,
+    "native_fit_poster_thread_cpu_s": 1.51
+  },
   "reference": {
     "engraving": {
       "ai-hatching@0.25x": {"area_error_true_pct":77.7945,"components_extra":0.0,"components_lost":1.0,"connections_extra":5.0,"connections_lost":22.0,"corners":0.0,"cpu_native_ms":9.6515,"cpu_wasm_ms":7.97,"dev_trace_max_px":0.875,"dev_trace_mean_px":0.3138,"dev_truth_max_px":1.9408,"dev_truth_mean_px":0.3622,"group":"ai-drawings","holes_extra":2.0,"holes_lost":0.0,"max_deviation_px":2.2144,"mean_deviation_px":0.2179,"node_density":25.6714,"nodes":1994.0,"paths":261.0,"peak_bytes_per_px":27.1602,"self_intersections":96.0,"truth_components":53.0,"truth_holes":1.0,"wobble":9.7587},
