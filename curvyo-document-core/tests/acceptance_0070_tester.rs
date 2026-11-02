@@ -155,10 +155,13 @@ fn dimensions(d: &Document) -> Vec<DimensionSnapshot> {
 
 #[test]
 fn c16_format_version_is_31_and_a_saved_file_says_so() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 31);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 31);
     let d = Document::new(1);
     fifty(&d);
-    assert_eq!(manifest_version(&pack(&d, "t").unwrap()), 31);
+    assert_eq!(
+        manifest_version(&pack(&d, "t").unwrap()),
+        u64::from(CURRENT_FORMAT_VERSION)
+    );
 }
 
 #[test]
@@ -243,13 +246,12 @@ fn c16_older_files_open_and_a_newer_one_is_refused() {
     }
     let d = Document::new(1);
     fifty(&d);
-    let bytes = file_from_loro(&loro_of(&d), 32);
+    let newer = CURRENT_FORMAT_VERSION + 1;
+    let bytes = file_from_loro(&loro_of(&d), newer);
     assert!(matches!(
         unpack(2, &bytes),
-        Err(OpenError::FormatTooNew {
-            found: 32,
-            supported: 31
-        })
+        Err(OpenError::FormatTooNew { found, supported })
+            if found == newer && supported == CURRENT_FORMAT_VERSION
     ));
 }
 

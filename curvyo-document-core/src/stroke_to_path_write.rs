@@ -76,6 +76,7 @@ pub fn stroke_outline_style(subject: &Style) -> Style {
             enabled: true,
             color: subject.stroke.color,
             opacity: subject.stroke.opacity,
+            ..Fill::default()
         },
     }
 }

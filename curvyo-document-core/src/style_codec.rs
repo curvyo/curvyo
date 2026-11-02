@@ -21,6 +21,8 @@
 //!   fill_enabled   : bool                          absent = false
 //!   fill           : [r, g, b]                     absent = black
 //!   fill_opacity   : f64 in [0, 1]                 absent = 1
+//!   fill_paint     : "colour" | "pattern"          absent = "colour"
+//!   fill_pattern   : one atomic map                absent = none (`pattern_codec`)
 //! ```
 //!
 //! A version-7 file written by a build with gradients may also hold `fill_kind`
@@ -85,6 +87,8 @@ pub(crate) const ALL_STYLE_KEYS: &[&str] = &[
     KEY_FILL_ENABLED,
     KEY_FILL,
     KEY_FILL_OPACITY,
+    crate::pattern_codec::KEY_FILL_PAINT,
+    crate::pattern_codec::KEY_FILL_PATTERN,
 ];
 
 // ---------------------------------------------------------------------------
@@ -220,6 +224,8 @@ pub(crate) fn read_style(meta: &LoroMap) -> Style {
                 && legacy_fill::reads_as_solid(meta),
             color: read_color(meta, KEY_FILL).unwrap_or(default.fill.color),
             opacity: read_opacity(meta, KEY_FILL_OPACITY),
+            paint: crate::pattern_codec::read_paint(meta),
+            pattern: crate::pattern_codec::read_pattern(meta).map(Box::new),
         },
     }
 }
@@ -383,6 +389,11 @@ pub(crate) fn write_changes(meta: &LoroMap, old: &Style, new: &Style) -> bool {
         write_number(meta, KEY_FILL_OPACITY, nf.opacity.get());
         wrote = true;
     }
+    wrote |= crate::pattern_codec::write_changes(
+        meta,
+        (of.paint, of.pattern.as_deref()),
+        (nf.paint, nf.pattern.as_deref()),
+    );
     wrote
 }
 

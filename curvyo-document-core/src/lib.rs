@@ -95,6 +95,11 @@ mod path_reverse;
 mod path_topology;
 mod path_transform;
 mod paths;
+mod pattern_codec;
+mod pattern_convert;
+mod pattern_model;
+mod pattern_schema;
+mod pattern_values;
 mod preset_units;
 mod primitive_model;
 mod primitive_outline;
@@ -212,6 +217,12 @@ pub use path_model::{
 };
 pub use path_reverse::reversed_anchors;
 pub use paths::resolve_handle_pair;
+pub use pattern_convert::{CONVERT_PATTERN_COMMIT_LABEL, PatternConversion};
+pub use pattern_model::{
+    FillPaint, GeneratorKind, PatternCount, PatternFill, PatternFraction, PatternGenerator,
+    PatternMode, PatternParam, PatternParamError, PatternSeed, splitmix64,
+};
+pub use pattern_schema::{MIN_LENGTH_MM, ParamKind, ParamSpec, spec_of, specs as pattern_params};
 pub use preset_units::{AuthoredSize, Orientation, PresetUnit};
 pub use primitive_model::{
     EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, Shape,
