@@ -19,6 +19,9 @@ pub(super) struct DragSwap {
     /// Whether the moved objects are copies: they then go right above their originals, which
     /// stay drawn as themselves and need no ghost.
     copy: bool,
+    /// The tiling instances among the moved objects: they follow their source in their own
+    /// cells and leave no ghost (`specs/0069-tiling` criterion 29, ux-notes 2026-11-02).
+    unghosted: std::collections::HashSet<NodeId>,
 }
 
 impl DragSwap {
@@ -52,14 +55,25 @@ impl DragSwap {
         }
     }
 
+    /// Adds the tiling instances a Node drag edits: drawn as themselves, without a ghost.
+    pub(super) fn add_tiling_instances(&mut self, instances: Vec<ObjectSnapshot>) {
+        self.unghosted
+            .extend(instances.iter().map(ObjectSnapshot::id));
+        self.moved.extend(instances);
+    }
+
     /// The ghost: the outlines of the committed objects the drag moves, from `committed` (the
     /// document read). A copy leaves no ghost.
     pub(super) fn ghost(&self, committed: &[ObjectSnapshot], view: ViewTransform) -> DrawList {
         if self.copy || self.moved.is_empty() {
             return DrawList::default();
         }
-        let moved: std::collections::HashSet<NodeId> =
-            self.moved.iter().map(ObjectSnapshot::id).collect();
+        let moved: std::collections::HashSet<NodeId> = self
+            .moved
+            .iter()
+            .map(ObjectSnapshot::id)
+            .filter(|id| !self.unghosted.contains(id))
+            .collect();
         let old: Vec<ObjectSnapshot> = committed
             .iter()
             .filter(|object| moved.contains(&object.id()))
@@ -84,8 +98,19 @@ impl Session {
             swap.moved.extend(live.objects.iter().cloned());
             // A copy moves nothing that follows the originals.
             if !live.copy {
-                swap.moved
-                    .extend(Self::clone_previews_in(objects, &live.objects, true));
+                let followers = self.clone_previews_in(objects, &live.objects, true);
+                let held = self.own_placement_clones();
+                swap.unghosted = followers
+                    .iter()
+                    .map(ObjectSnapshot::id)
+                    .filter(|id| {
+                        matches!(
+                            held.get(id),
+                            Some(curvyo_document_core::Hold::Translation { .. })
+                        )
+                    })
+                    .collect();
+                swap.moved.extend(followers);
                 swap.moved
                     .extend(self.text_path_followers(objects, &live.objects));
             }
@@ -94,5 +119,22 @@ impl Session {
             swap.moved.push(ObjectSnapshot::Text(Box::new(text)));
         }
         swap
+    }
+
+    /// This frame's [`DragSwap`] with the tiling instances a Node drag edits (`paths`, the
+    /// Node tool's live paths) drawn as themselves (`0069` criterion 29), the blue layer of the
+    /// other clones behind a Node drag and whether a live edit is in the frame
+    /// ([`Session::clone_layers`]).
+    pub(super) fn frame_swap(
+        &self,
+        view: ViewTransform,
+        objects: &[ObjectSnapshot],
+        live: Option<&LiveEdit>,
+        paths: &[curvyo_document_core::PathSnapshot],
+    ) -> (DragSwap, DrawList, bool) {
+        let mut swap = self.drag_swap_in(objects, live);
+        let (blue, previewing, tiled) = self.clone_layers(view, objects, paths, live.is_some());
+        swap.add_tiling_instances(tiled);
+        (swap, blue, previewing)
     }
 }

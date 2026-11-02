@@ -40,8 +40,8 @@
 #   performance-budgets — the performance budgets in a release build, ubuntu only: the boolean
 #                        kernel and the commands of 0035, 0036, 0048, the linked clones of
 #                        0049 (read, frame, commands, hostile sizes, the no-cycle property test),
-#                        Fracture, Flatten and Weld (0037, 0068), and node editing of compound
-#                        paths (0055).
+#                        Fracture, Flatten and Weld (0037, 0068), node editing of compound
+#                        paths (0055), and tiling (0069).
 #   boolean-wasm-golden — the kernel's golden results and the tiling layout goldens (0069) in the
 #                        wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
@@ -463,6 +463,7 @@ jobs:
           cargo test --release -p curvyo-geometry-core --test pattern_cpu_time -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test stroke_to_path_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test weld_budget -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test tiling_budget -- --nocapture
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture

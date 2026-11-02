@@ -47,6 +47,7 @@ mod shared_outline;
 mod stroke;
 mod text_edit_overlay;
 mod theme;
+mod tiling_overlay;
 
 pub use artwork::{build_artwork, build_artwork_with_guides};
 pub use carrier_line::{build_carrier_hover, build_carrier_lines, build_carrier_picked};
@@ -80,6 +81,7 @@ pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, Transf
 pub use shape_preview::build_shape_live_preview;
 pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};
 pub use theme::{CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, PASTEBOARD_BG};
+pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};
 

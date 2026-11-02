@@ -184,7 +184,14 @@ fn replace_loro(container: &[u8], loro: &[u8]) -> Vec<u8> {
 /// A saved document with one multi-source tiling whose nodes `edit` changes through the raw tree.
 fn edited(edit: impl Fn(&loro::LoroTree, &[loro::TreeID])) -> Vec<u8> {
     let document = Document::new(1);
-    let sources = vec![path(&document, 0.0, 1), path(&document, 20.0, 10)];
+    let first = path(&document, 0.0, 1);
+    // A step between the two paths: no two history rows in a row carry one label.
+    let _ = document.create_rect(curvyo_document_core::RectBounds {
+        origin: Point::new(0.0, 40.0),
+        width: Length::from_mm(5.0),
+        height: Length::from_mm(5.0),
+    });
+    let sources = vec![first, path(&document, 20.0, 10)];
     tile(
         &document,
         sources,

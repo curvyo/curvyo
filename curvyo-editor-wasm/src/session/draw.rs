@@ -93,10 +93,23 @@ impl Session {
         let objects = self.objects();
         // Outside an entered group the artwork recedes; the decorations only see the inside.
         let render = self.render_objects();
+        // A reopened tiling hides its instances under the preview (`0069` criterion 34).
+        let render: std::sync::Arc<[ObjectSnapshot]> = if self.tiling_open() {
+            render
+                .iter()
+                .filter(|o| !self.tiling_hides(o.id()))
+                .cloned()
+                .collect()
+        } else {
+            render
+        };
         let live = self.select_live_edit_in(&objects);
         // A Select drag draws what it moves as itself at the pointer (customer 2026-10-27).
-        let swap = self.drag_swap_in(&objects, live.as_ref());
         let paths = self.live_node_drag_paths_in(&objects);
+        // A Node drag: the linked clones behind it in blue, and whether the link marks stay
+        // away (`0049`).
+        let (swap, clone_previews, previewing) =
+            self.frame_swap(view, &objects, live.as_ref(), &paths);
         // The artwork: every object in tree order, paths and primitives
         // interleaved, each with its fill then its stroke
         // (`specs/0007-stroke-and-fill-styling` criterion 26). The Node
@@ -151,10 +164,6 @@ impl Session {
         // `specs/0009-unified-object-editing` criterion 10 was until 2026-10-27: over the
         // artwork, under the boxes and handles.
         list.extend(swap.ghost(&objects, view));
-        // A Node drag: the linked clones behind it in blue, and whether the link marks stay
-        // away (`0049`).
-        let (clone_previews, previewing) =
-            self.clone_layers(view, &objects, &paths, live.is_some());
         list.extend(clone_previews);
         // The texts on a carrier the Node tool drags follow it in the same frame (`0080`
         // criterion 24).
@@ -164,6 +173,8 @@ impl Session {
         // The Offset tool: the blue hollow result, the box and its four handles
         // (`specs/0038-path-offset` criteria 9, 14, 18).
         list.extend(self.offset_draw_list(view));
+        // The open tiling bar: instance outlines, circle path and handles (`0069` criterion 34).
+        list.extend(self.tiling_draw_list(view));
         // The Trace tool's hollow preview outline (`specs/0025-raster-trace` criterion 8).
         self.trace_draw_into(view, &mut list);
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
@@ -191,10 +202,14 @@ impl Session {
         if let Some(group) = self.group_decoration_input_in(&live_objects) {
             list.extend(build_group_draw_list(view, &group));
         }
-        list.extend(build_transform_draw_list(
-            view,
-            &self.select_transform_decoration_input_in(&live_objects),
-        ));
+        // The open tiling bar draws the dashed selection box only: transform handles would
+        // collide with the circle handles (`0069` UX review).
+        if self.tiling.is_none() {
+            list.extend(build_transform_draw_list(
+                view,
+                &self.select_transform_decoration_input_in(&live_objects),
+            ));
+        }
         // The nine marks of the typed move, above the handles.
         list.extend(reference_marks_list(view, reference.as_ref()));
         // The marquee box or lasso line: above the boxes and handles, the
