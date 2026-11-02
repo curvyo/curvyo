@@ -196,7 +196,7 @@ fn trials(
     (scale, baseline): (f64, f64),
     tolerance: f64,
     spacing: f64,
-) -> Vec<Vec<Trial>> {
+) -> (Vec<Vec<Trial>>, Vec<Option<Scaled>>) {
     let coarse_stride = stride(
         0.004 * scale,
         (prepared.height / COARSE_PER_HEIGHT).max(spacing),
@@ -245,7 +245,7 @@ fn trials(
         tried.sort_by(by_mean);
         out.push(tried);
     }
-    out
+    (out, scaled)
 }
 
 /// The candidates of the segmentation with the lowest cost, in line order (a dynamic programme
@@ -292,7 +292,7 @@ fn fit_at(
     tolerance: f64,
     spacing: f64,
 ) -> Option<FaceFit> {
-    let trials = trials(
+    let (trials, mut scaled) = trials(
         prepared,
         glyphs,
         lists,
@@ -306,42 +306,47 @@ fn fit_at(
         (prepared.height / COARSE_PER_HEIGHT).max(spacing),
     );
     let cap = CAP_TOLERANCES * tolerance;
-    let letters = segmentation(prepared, &trials, tolerance)?
-        .into_iter()
-        .map(|index| {
-            let candidate = &prepared.candidates[index];
-            let residual_of = |trial: &Trial| {
-                let glyph = Scaled::new(&glyphs[trial.glyph], scale, coarse_stride, cap);
-                residual(candidate, &glyph, trial.origin)
-            };
-            let tried = &trials[index];
-            let limit = residual_limit(prepared.height);
-            let (first, next) = (residual_of(&tried[0]), tried.get(1).and_then(residual_of));
-            let shapes = Shapes {
-                best: first.is_some_and(|r| r <= limit),
-                second: next.is_some_and(|r| r <= limit),
-                apart: first.is_some_and(|r| next.is_none_or(|n| r <= RESIDUAL_MARGIN * n)),
-            };
-            // Within the tolerance on the fine outlines: coarse points cut a sharp tip (a 'W' at
-            // 36 mm) by more than the tolerance.
-            let fine = Scaled::new(&glyphs[tried[0].glyph], scale, 1, cap);
-            let fixed = Side {
-                points: &candidate.points,
-                grid: &candidate.grid,
-            };
-            let moved = Side {
-                points: &fine.points,
-                grid: &fine.grid,
-            };
-            let fine_max = two_sided(&fixed, &moved, tried[0].origin.to_vec2()).0.max;
-            // However wide the tolerance, a sure letter lies within a share of the line height.
-            let shapes = Shapes {
-                best: shapes.best && fine_max <= SURE_SHARE * prepared.height,
-                ..shapes
-            };
-            judge(index, tried, (tolerance, slack, fine_max), shapes)
-        })
-        .collect();
+    let chosen = segmentation(prepared, &trials, tolerance)?;
+    // Each glyph is scaled once per fit, coarse (shared with the trials) and fine.
+    let mut fine: Vec<Option<Scaled>> = (0..glyphs.len()).map(|_| None).collect();
+    let mut letters = Vec::with_capacity(chosen.len());
+    for index in chosen {
+        let candidate = &prepared.candidates[index];
+        let tried = &trials[index];
+        let mut residual_of = |trial: &Trial| {
+            let glyph = scaled[trial.glyph].get_or_insert_with(|| {
+                Scaled::new(&glyphs[trial.glyph], scale, coarse_stride, cap)
+            });
+            residual(candidate, glyph, trial.origin)
+        };
+        let limit = residual_limit(prepared.height);
+        let first = residual_of(&tried[0]);
+        let next = tried.get(1).and_then(&mut residual_of);
+        let shapes = Shapes {
+            best: first.is_some_and(|r| r <= limit),
+            second: next.is_some_and(|r| r <= limit),
+            apart: first.is_some_and(|r| next.is_none_or(|n| r <= RESIDUAL_MARGIN * n)),
+        };
+        // Within the tolerance on the fine outlines: coarse points cut a sharp tip (a 'W' at
+        // 36 mm) by more than the tolerance.
+        let fine = fine[tried[0].glyph]
+            .get_or_insert_with(|| Scaled::new(&glyphs[tried[0].glyph], scale, 1, cap));
+        let fixed = Side {
+            points: &candidate.points,
+            grid: &candidate.grid,
+        };
+        let moved = Side {
+            points: &fine.points,
+            grid: &fine.grid,
+        };
+        let fine_max = two_sided(&fixed, &moved, tried[0].origin.to_vec2()).0.max;
+        // However wide the tolerance, a sure letter lies within a share of the line height.
+        let shapes = Shapes {
+            best: shapes.best && fine_max <= SURE_SHARE * prepared.height,
+            ..shapes
+        };
+        letters.push(judge(index, tried, (tolerance, slack, fine_max), shapes));
+    }
     Some(FaceFit {
         face,
         scale,

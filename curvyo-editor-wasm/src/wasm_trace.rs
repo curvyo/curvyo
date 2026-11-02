@@ -27,7 +27,14 @@ extern "C" {
     pub type TraceProgressSink;
 
     #[wasm_bindgen(method)]
-    fn report(this: &TraceProgressSink, percent: u8);
+    pub(crate) fn report(this: &TraceProgressSink, percent: u8);
+}
+
+/// The bar notice when the text reader could not be used (`specs/0091` UX notes §3).
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_text_failed_notice() -> String {
+    curvyo_ui_core::TEXT_FAILED_NOTICE.to_owned()
 }
 
 /// One trace for the worker (criterion 17): `rgba` (`width` x `height`, straight alpha) mapped
@@ -63,6 +70,181 @@ pub fn trace_job(
             &mut report,
         ),
     }
+}
+
+thread_local! {
+    /// The text reader of this worker, loaded once (`specs/0091`, ADR 0028 §5).
+    pub(crate) static OCR_MODEL: std::cell::RefCell<Option<curvyo_ui_core::OcrModel>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Loads the text reader's weights into this worker once (ADR 0028 §5): empty when it is
+/// loaded, else why it is not (`"wrong_model"` or the reason).
+#[wasm_bindgen]
+#[must_use]
+pub fn ocr_load(detector: &[u8], recogniser: &[u8], alphabet: &str) -> String {
+    if OCR_MODEL.with(|m| m.borrow().is_some()) {
+        return String::new();
+    }
+    match curvyo_ui_core::OcrModel::load(detector, recogniser, alphabet) {
+        Ok(model) => {
+            OCR_MODEL.with(|m| *m.borrow_mut() = Some(model));
+            String::new()
+        }
+        Err(curvyo_ui_core::OcrError::WrongModel) => "wrong_model".to_string(),
+        Err(error) => error.to_string(),
+    }
+}
+
+/// Whether this worker has the text reader loaded.
+#[wasm_bindgen]
+#[must_use]
+pub fn ocr_loaded() -> bool {
+    OCR_MODEL.with(|m| m.borrow().is_some())
+}
+
+/// Reads the text lines of `rgba` (`width` x `height`) once (`specs/0091` decision 1): the JSON
+/// of `trace_glue::ocr_lines_json`, or empty when the reader is not loaded or failed. `progress`
+/// hears each higher whole percent.
+#[wasm_bindgen]
+#[must_use]
+pub fn ocr_job(rgba: &[u8], width: u32, height: u32, progress: &TraceProgressSink) -> String {
+    OCR_MODEL.with(|m| {
+        let model = m.borrow();
+        let Some(model) = model.as_ref() else {
+            return String::new();
+        };
+        let mut report = |percent| {
+            progress.report(percent);
+            std::ops::ControlFlow::Continue(())
+        };
+        curvyo_ui_core::trace_read_text(model, rgba, width, height, &mut report)
+            .map(|lines| crate::trace_glue::ocr_lines_json(width, height, &lines))
+            .unwrap_or_default()
+    })
+}
+
+thread_local! {
+    /// This worker's faces and font fit (`specs/0091` decision 4), kept for the worker's life.
+    static FIT_WORKER: std::cell::RefCell<crate::trace_fit_glue::FitWorker> =
+        std::cell::RefCell::new(crate::trace_fit_glue::FitWorker::default());
+}
+
+/// Starts the font fit `request` (the session's `trace_fit_request`) in this worker and runs it
+/// until it needs faces (`{kind: "need", faces}`) or is finished (`{kind: "finished", lines}`).
+#[wasm_bindgen]
+#[must_use]
+pub fn fit_start(request: &str, progress: &TraceProgressSink) -> String {
+    let mut report = |percent| progress.report(percent);
+    FIT_WORKER.with(|w| w.borrow_mut().start(request, &mut report))
+}
+
+/// Hands face `index` of the host's font file `file` to this worker; `false` when unreadable.
+#[wasm_bindgen]
+#[must_use]
+pub fn fit_add_face(file: &str, index: u32, bytes: &[u8]) -> bool {
+    FIT_WORKER.with(|w| w.borrow_mut().add_face(file, index, bytes))
+}
+
+/// Ends this worker's share of a fit (`specs/0091` round 2) with every share's nearest face (the
+/// JSON list of their `searched` answers' `nearest`): `{kind: "finished", lines}`.
+#[wasm_bindgen]
+#[must_use]
+pub fn fit_finish(nearest: &str) -> String {
+    FIT_WORKER.with(|w| w.borrow_mut().finish(nearest))
+}
+
+/// Goes on with the fit after the faces it asked for were handed in.
+#[wasm_bindgen]
+#[must_use]
+pub fn fit_step(progress: &TraceProgressSink) -> String {
+    let mut report = |percent| progress.report(percent);
+    FIT_WORKER.with(|w| w.borrow_mut().step(&mut report))
+}
+
+/// As [`trace_job`] with the OCR `lines` (the JSON of [`ocr_job`], scaled to this picture):
+/// the text pass first, the main trace over the filled picture, the text section after
+/// (`specs/0091` decisions 2, 3 and 6). Black and white only; Multicolour traces as
+/// [`trace_job`].
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_text_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+    lines: &str,
+    progress: &TraceProgressSink,
+) -> Vec<f64> {
+    if crate::trace_glue::trace_colour_settings(settings).is_some() {
+        return trace_job(rgba, width, height, map, settings, progress);
+    }
+    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    let mut report = |percent| progress.report(percent);
+    curvyo_ui_core::trace_text_job_with(
+        rgba,
+        width,
+        height,
+        map,
+        &crate::trace_glue::trace_settings(settings),
+        &crate::trace_glue::read_ocr_lines(lines, width),
+        &mut report,
+    )
+}
+
+/// The text pass alone with the OCR `lines` (`specs/0091` criterion 25): a result without
+/// outlines and the text section, for the fit that decides the lines before the main trace.
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_text_regions_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+    lines: &str,
+) -> Vec<f64> {
+    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    curvyo_ui_core::trace_text_regions_with(
+        rgba,
+        width,
+        height,
+        map,
+        &crate::trace_glue::trace_settings(settings),
+        &crate::trace_glue::read_ocr_lines(lines, width),
+    )
+}
+
+/// As [`trace_mask_job`] with the OCR `lines`: the pixels left out for text at 128
+/// (`specs/0091` UX notes §2).
+#[wasm_bindgen]
+#[must_use]
+pub fn trace_text_mask_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+    lines: &str,
+) -> Option<TraceMaskJs> {
+    if crate::trace_glue::trace_colour_settings(settings).is_some() {
+        return trace_mask_job(rgba, width, height, map, settings);
+    }
+    let map6: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    curvyo_ui_core::trace_text_mask_job(
+        rgba,
+        width,
+        height,
+        map6,
+        &crate::trace_glue::trace_settings(settings),
+        &crate::trace_glue::read_ocr_lines(lines, width),
+    )
+    .map(|mask| TraceMaskJs {
+        width: mask.width,
+        height: mask.height,
+        bits: mask.bits,
+    })
 }
 
 /// The mask the trace of the same arguments walks (`specs/0089` criterion 21), for the worker's
@@ -383,6 +565,105 @@ impl WasmSession {
                 ]
             })
             .unwrap_or_default()
+    }
+
+    /// Keeps the OCR lines `json` (of `ocr_job`) of image `id` for the session (`specs/0091`
+    /// decision 1).
+    pub fn set_trace_ocr_lines(&mut self, id: &str, json: &str) -> bool {
+        let Some(id) = id_of(id) else {
+            return false;
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
+            return false;
+        };
+        let side = |name: &str| {
+            value
+                .get(name)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|w| u32::try_from(w).ok())
+                .unwrap_or(0)
+        };
+        let (width, height) = (side("width"), side("height"));
+        let lines = crate::trace_glue::read_ocr_lines(json, width);
+        self.session.set_trace_ocr_lines(id, lines, (width, height))
+    }
+
+    /// The OCR lines a trace of image `id` takes as the JSON of `ocr_job` at the full working
+    /// size (those a fit set no text for no longer accepted), or empty when its picture was not
+    /// read in this session.
+    #[must_use]
+    pub fn trace_ocr_lines(&mut self, id: &str) -> String {
+        let Some(id) = id_of(id) else {
+            return String::new();
+        };
+        // The size kept with the lines: no copy of the picture on the main thread.
+        self.session
+            .trace_lines_to_trace(id)
+            .map(|(lines, (width, height))| {
+                crate::trace_glue::ocr_lines_json(width, height, &lines)
+            })
+            .unwrap_or_default()
+    }
+
+    /// How many lines the last fit set no text for; the host then traces again with
+    /// `trace_ocr_lines` (`specs/0091` lead decision 1).
+    #[must_use]
+    pub fn trace_fit_dropped(&self) -> usize {
+        self.session.trace_fit_dropped()
+    }
+
+    /// The request of the font fit the trace worker runs (`specs/0091` decision 4) with the
+    /// Recognise text `tolerance` in mm and the `favourites` (a JSON list of family names); empty
+    /// when no kept result has a text line.
+    pub fn trace_fit_request(&mut self, tolerance: f64, favourites: &str) -> String {
+        let favourites: Vec<String> = serde_json::from_str(favourites).unwrap_or_default();
+        self.session
+            .trace_fit_request(tolerance, &favourites)
+            .unwrap_or_default()
+    }
+
+    /// The request of the font fit of `regions` (the worker's `trace_text_regions_job` of image
+    /// `id`) before its main trace (`specs/0091` criterion 25); empty without a line.
+    pub fn trace_fit_request_for(
+        &mut self,
+        id: &str,
+        regions: &[f64],
+        tolerance: f64,
+        favourites: &str,
+    ) -> String {
+        let Some(id) = id_of(id) else {
+            return String::new();
+        };
+        let favourites: Vec<String> = serde_json::from_str(favourites).unwrap_or_default();
+        self.session
+            .trace_fit_request_for(id, regions, tolerance, &favourites)
+            .unwrap_or_default()
+    }
+
+    /// Takes the worker's finished fit `result` of `request`; the preview then shows the texts.
+    pub fn set_trace_fit(&mut self, request: &str, result: &str) -> bool {
+        self.session.set_trace_fit(request, result)
+    }
+
+    /// Whether the fit of the kept results is finished (the preview shows the texts; Create
+    /// paths need not fit again).
+    #[must_use]
+    pub fn trace_text_fitted(&self) -> bool {
+        self.session.trace_text_fitted()
+    }
+
+    /// The warning after the last Create paths when letters were guessed (`specs/0091`
+    /// criterion 5, UX notes §5), or empty when every letter is sure (no success notice).
+    #[must_use]
+    pub fn trace_created_warning(&self) -> String {
+        self.session.trace_created_warning().unwrap_or_default()
+    }
+
+    /// The text lines of the shown preview: `[set, found]` (`specs/0091` UX notes §4).
+    #[must_use]
+    pub fn trace_text_counts(&self) -> Vec<u32> {
+        let (set, found) = self.session.trace_text_counts();
+        vec![count(set), count(found)]
     }
 
     /// Create paths over every selected image, one step (criteria 12, 13, 46).

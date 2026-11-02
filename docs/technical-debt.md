@@ -1694,6 +1694,50 @@ reporting the size they add.
 in the release build (keeping the name section in development builds), and loading the text
 engine as its own wasm module on first use of the Text tool.
 
+## Text recognition in Trace adds a runtime, weights and a thread pool (ADR 0028, 2026-11-01)
+
+[ADR 0028](adr/0028-ocr-text-in-trace.md) (Proposed, `specs/0091-trace-text-recognition`) accepts
+these costs; numbers from `specs/0088-trace-recognition/research-ocr.md`, to be re-measured in the
+first slice's PR:
+
+- **Editor wasm about +0.93 MB gzip** (4.45 MB raw) for `rten`, loaded by the main thread too
+  although only the trace worker runs it. No limit (customer, 2026-10-24, see "Editor wasm size").
+- **Installer and web app +10.3 MB** of PaddleOCR weights in `frontend/public/models/` (Frage
+  111 A), also in the repository.
+- **`rayon` in the wasm tree of `curvyo-ocr-core`, `ui-core` and `editor-wasm`**, only through
+  `rten`: a scoped exception to "no threads in `*-core`" and to the ADR 0011 §6 ban list.
+- **First OCR of an image costs 4 to 5 s** of worker CPU in wasm (single thread, `+simd128`);
+  cached per image for the session only.
+- **OCR is not promised bit-identical between native and wasm** (`rten` picks SIMD kernels per
+  target); golden files are native, the product runs wasm only (ADR 0028 §6).
+
+- **Many short lines read slowly** (2026-11-01, `0091` criterion 28): recognition, not detection,
+  takes the time. Wasm in Node: tester poster (8 lines) detection 0.85 s, recognition 1.76 s; the
+  customer's font manager screenshot (804 x 698 px, 78 lines) detection 0.35 s, recognition
+  17.4 s. Natively on one thread 0.32 / 0.32 s and 0.10 / 3.22 s. Each line is padded to 1024 px
+  for the recogniser; at 320 px the screenshot reads in 1.23 s natively but the poster loses two
+  umlauts (Ä read as Â, Å), so the pad stays. Tried 2026-11-02 (`curvyo-ocr-core/tests/padding.rs`
+  guards the strings of the 1024 px read): each line padded to its own width in 64 px buckets and
+  lines of one width batched reads the screenshot in 3.85 s in wasm (0.83 s natively) and the
+  poster in 0.72 s, but changes 23 of 94 strings ("Äpfel" read as "Apfel" on the tester poster;
+  on the screenshot partly better, "Hershey Script"), so it was not kept; any minimum pad below
+  1024 px still loses the "Ä". Batching at 1024 px gains nothing (17.1 s). Next levers: a
+  recogniser that reads short lines alone, or OCR on the user's request only.
+  Since 2026-11-02 the lines are read by a pool of workers (min(cores - 1, 4), each loads the
+  weights once, about 37 MB wasm memory each), strings unchanged: Chromium, 8 cores, "Reading
+  text" on the screenshot 6.6 s (one reader 22.2 s), on the tester poster 2.3 s (3.3 s). The
+  screenshot's text pass and font fit before the trace then take 14 s (78 lines). Profile
+  (native, thread CPU, screenshot): text pass 0.16 s, font fit 9.2 s, of it 8.6 s the tier search
+  and 7.9 s the per-face fits of the matcher (`fits_of`), 0.7 s the single-line fits; no cut in
+  the matcher keeps every result, so the lines are fitted on the same pool (2026-11-02, results
+  byte-identical to one worker): the fit before the trace 15.0 s -> 6.1 s, the whole job 38.9 s
+  -> 14.4 s on the screenshot (tester poster 7.5 s -> 5.2 s). A pool worker holds about 76 MB of
+  wasm memory with the weights, the faces of the tiers and its share.
+
+**Resolution:** open. Levers: OCR as its own wasm module loaded on first use (removes the main-thread
+cost, needs a second `-wasm` crate and an ADR), width buckets and batching in recognition (several
+short lines in one padded input), a smaller detector. `rayon` leaves when `rten` makes it optional.
+
 ## The clone frame budget is not asserted on CI (`0049` criterion 44, 2026-10-24)
 
 The absolute frame budget of 150 ms after the original of 10,000 clones moved (`0049` criterion 44,
@@ -1855,3 +1899,22 @@ resolver's pixel quantities are plain `f64`, against `CLAUDE.md` §5 (units are 
 `0090` introduces a screen-pixel newtype for the grid.
 
 **Resolution:** open; move the snapping zones onto the same newtype in a `chore/` PR.
+
+## Text recognition grows the editor wasm by 0.84 MB gzip (`0091`, 2026-11-01)
+
+`specs/0091-trace-text-recognition` slice 1, ADR 0028: `curvyo-ocr-core` with `rten` grows the
+editor wasm from 19.56 to 22.92 MB raw (5.88 to 6.72 MB gzip -9, +0.84 MB) for code the main
+thread loads but only the trace worker runs; the weights add 10.3 MB to the installer and the web
+app. With wasm SIMD (ADR 0028 note of 2026-11-01) the OCR of the 2000 x 2000 px reference poster
+takes 3.0 s CPU in wasm, the weights load in 0.19 s, peak linear memory 178 MB. No limit is set
+(`CLAUDE.md` §3). Resolved by a worker-only module, if the size ever matters.
+
+## A line no face fits searches every face tier in Trace (`0091`, 2026-11-01)
+
+`specs/0091-trace-text-recognition` slice 1: the font fit runs in the trace worker (the page only
+reads the font files the fit asks for and hands them in), so the main thread is free; the
+8-line reference poster fits in 1.4 to 1.6 s thread CPU natively. A line no face fits (set in the
+nearest face, Frage 114 B) is still searched through every tier, the system fonts included (up to
+64 faces read and prepared in the worker), and a new worker after a stopped job prepares its faces
+again. Resolved by a stage cache that keeps the worker (see "The trace worker has no stage
+cache") and a faster matcher.

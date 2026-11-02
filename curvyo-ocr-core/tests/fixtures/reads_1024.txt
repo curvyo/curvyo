@@ -1,0 +1,94 @@
+tester/poster.png	Größe	0.9997
+tester/poster.png	Übermaß	0.9871
+tester/poster.png	Äpfel & Öl	0.9406
+tester/poster.png	Tel. 0421 98765	0.9998
+tester/poster.png	Fräsen ab 3 Stück, 12.50 EUR	0.9973
+tester/poster.png	Straße 7	0.9986
+tester/poster.png	Mono 314 Zoll	0.9401
+tester/poster.png	Brücke über Täler	0.9993
+poster.png	BÂCKEREI	0.9303
+poster.png	SALE	0.9994
+poster.png	Müller & Söhne	0.9993
+poster.png	Größe 42 mm, Laser 0.2	0.9989
+poster.png	Wedding	0.9999
+poster.png	FRESH	0.9997
+poster.png	Art.-Nr. 0815/ÄÖÜ äöü ß	0.9560
+poster.png	small print: est. 1998 in Hamburg	0.9998
+customer/font-manager-screenshot.png	FontsGlyphs Info	0.9868
+customer/font-manager-screenshot.png	Fonts	0.9993
+customer/font-manager-screenshot.png	. >	0.5893
+customer/font-manager-screenshot.png	×	0.9839
+customer/font-manager-screenshot.png	Embedded Freelancer available	0.9999
+customer/font-manager-screenshot.png	×	0.9895
+customer/font-manager-screenshot.png	Next text: Anak Gedong Regular	0.9985
+customer/font-manager-screenshot.png	Favourites  Cuttable  Single line	0.9676
+customer/font-manager-screenshot.png	All	0.9919
+customer/font-manager-screenshot.png	25 px All · 8	0.9528
+customer/font-manager-screenshot.png	Sizeo	0.9449
+customer/font-manager-screenshot.png	6	0.3456
+customer/font-manager-screenshot.png	Serif	0.9999
+customer/font-manager-screenshot.png	Initials	0.9989
+customer/font-manager-screenshot.png	Sans	1.0000
+customer/font-manager-screenshot.png	Script	0.9999
+customer/font-manager-screenshot.png	0	0.5794
+customer/font-manager-screenshot.png	88+	0.7351
+customer/font-manager-screenshot.png	QSearch fonts	0.9994
+customer/font-manager-screenshot.png	O	0.7510
+customer/font-manager-screenshot.png	Embedded Freelancer avi	0.9730
+customer/font-manager-screenshot.png	Curvyo fonts	0.9943
+customer/font-manager-screenshot.png	—	0.3262
+customer/font-manager-screenshot.png	1	0.9903
+customer/font-manager-screenshot.png	Anak Gedong	0.9707
+customer/font-manager-screenshot.png	3	0.5659
+customer/font-manager-screenshot.png	*	0.9764
+customer/font-manager-screenshot.png	Anak Gedong	0.9999
+customer/font-manager-screenshot.png	+	0.9920
+customer/font-manager-screenshot.png	+	0.9860
+customer/font-manager-screenshot.png	Aa	0.9343
+customer/font-manager-screenshot.png	Reguiar	0.9860
+customer/font-manager-screenshot.png	Included	0.9998
+customer/font-manager-screenshot.png	7	0.9989
+customer/font-manager-screenshot.png	Embeddkd Freelancer available	0.9775
+customer/font-manager-screenshot.png	*1	0.8725
+customer/font-manager-screenshot.png	>EMS Alluwre	0.9051
+customer/font-manager-screenshot.png	+	0.9903
+customer/font-manager-screenshot.png	Single line×Script×	0.9580
+customer/font-manager-screenshot.png	*1	0.7932
+customer/font-manager-screenshot.png	*	0.9373
+customer/font-manager-screenshot.png	EMS Readability	0.9995
+customer/font-manager-screenshot.png	EMS Allure	0.9997
+customer/font-manager-screenshot.png	ye	0.3433
+customer/font-manager-screenshot.png	+	0.9880
+customer/font-manager-screenshot.png	Single line×Sans×	0.9644
+customer/font-manager-screenshot.png	Single lineScript+	0.9969
+customer/font-manager-screenshot.png	Great Vibes	0.9586
+customer/font-manager-screenshot.png	1	0.9625
+customer/font-manager-screenshot.png	y	0.3831
+customer/font-manager-screenshot.png	+	0.9885
+customer/font-manager-screenshot.png	Script×	0.9922
+customer/font-manager-screenshot.png	Embedded Freelancer avail	0.9940
+customer/font-manager-screenshot.png	Hershey Sans 1–strc  1	0.9785
+customer/font-manager-screenshot.png	–	0.4505
+customer/font-manager-screenshot.png	+	0.9858
+customer/font-manager-screenshot.png	Single line×Sans×	0.9770
+customer/font-manager-screenshot.png	*	0.8785
+customer/font-manager-screenshot.png	EMS Readability	0.9999
+customer/font-manager-screenshot.png	Hershey Bcript 1—stroke 1	0.9590
+customer/font-manager-screenshot.png	y	0.2820
+customer/font-manager-screenshot.png	+	0.9878
+customer/font-manager-screenshot.png	Single lineSans×+	0.9747
+customer/font-manager-screenshot.png	Single line×Script×	0.9750
+customer/font-manager-screenshot.png	Source Sans 3	0.9999
+customer/font-manager-screenshot.png	8	0.9961
+customer/font-manager-screenshot.png	y	0.6298
+customer/font-manager-screenshot.png	+	0.9920
+customer/font-manager-screenshot.png	Sans×	0.9928
+customer/font-manager-screenshot.png	Embedded Freelancer available	0.9956
+customer/font-manager-screenshot.png	*4	0.9151
+customer/font-manager-screenshot.png	Source Serif 4	0.9998
+customer/font-manager-screenshot.png	y	0.5663
+customer/font-manager-screenshot.png	+	0.9867
+customer/font-manager-screenshot.png	Serif×	0.9904
+customer/font-manager-screenshot.png	*	0.9551
+customer/font-manager-screenshot.png	Great Vibes	1.0000
+customer/font-manager-screenshot.png	Script ×+	0.8929

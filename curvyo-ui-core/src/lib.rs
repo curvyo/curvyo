@@ -161,7 +161,13 @@ mod text_path_caret;
 mod text_path_edit;
 mod text_recognise_job;
 mod text_recognise_plan;
+mod trace_fit;
+mod trace_inpaint;
+mod trace_ocr;
 mod trace_plan;
+mod trace_text;
+mod trace_text_notice;
+mod trace_text_wire;
 mod trace_transfer;
 mod transform_commit;
 mod transform_drag;
@@ -476,15 +482,31 @@ pub use text_path_edit::{
     rotated_position, shift_along, slid_values, snap_stops, stored_vertical_layout,
 };
 pub use text_recognise_job::{
-    AcceptedLine, FaceState, FaceTier, JobStep, RecogniseJob, TIER_CAP, Tiers, recognise_tiers,
+    AcceptedLine, FaceState, FaceTier, JobStep, NearestFound, RecogniseJob, TIER_CAP, Tiers,
+    recognise_tiers,
 };
 pub use text_recognise_plan::{
     RecogniseSubjects, RecogniseWrite, RecognisedText, plan_recognise_write, recognise_available,
     recognise_subjects,
 };
+pub use trace_fit::{
+    FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY, TOLERANCE_PX, TOLERANCE_SHARE,
+    TraceFit, line_tolerance,
+};
+pub use trace_inpaint::inpaint as trace_inpaint;
+pub use trace_ocr::{
+    LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
+    OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,
+};
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
     trace_group_name, trace_style,
+};
+pub use trace_text::{TextPass, TextRegion, text_pass};
+pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
+pub use trace_text_wire::{
+    LEFT_OUT_LEVEL, TraceTextWire, TraceTexts, trace_text_job_with, trace_text_mask_job,
+    trace_text_regions_with,
 };
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,

@@ -175,11 +175,13 @@ shown only when it has something to say:
 3. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
    the palette's pipette; see "Multicolour" below.
 4. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
-5. The options: two icon buttons (pressed means on, the tooltip names each), then three values.
+5. The options: three icon buttons (pressed means on, the tooltip names each), then three values.
 
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
 - **Drop border shapes**: drops the shapes that touch the border of the picture.
+- **Recognise text** (off by default, remembered): reads the text first; see "Recognise text"
+  below.
 
 - **Denoise** (Off, Low, High): a median filter on the brightness before the Threshold; Low takes
   3 x 3 pixels, High 5 x 5. It removes scan noise and JPEG ringing.
@@ -190,6 +192,36 @@ shown only when it has something to say:
   where the two straight sides meet.
 
 Invert and Drop border shapes start off with each start of the app.
+
+## Recognise text
+
+With **Recognise text** on (Advanced, off by default, a setting of the app) Trace reads the text in
+a black and white trace before it traces the rest (`specs/0091-trace-text-recognition`):
+
+- The first preview of a picture reads its text once, offline, with the model shipped in the app
+  (PaddleOCR Latin, Apache-2.0, about 10 MB; nothing is downloaded and nothing leaves the
+  machine). The Trace button shows the progress as "Reading text" and can stop it; later previews
+  of the same picture in the session reuse the lines.
+- Each line the reader is sure of (mean confidence 0.6 and a letter or digit) gets its own
+  Threshold and polarity (white text on a dark box counts as text), is traced on its own, and its
+  pixels are left out of the main trace and filled from their surroundings, so a shape under the
+  text stays whole. The Mask view shows the left-out pixels in grey; the Advanced status line
+  counts "3 text lines set".
+- Before the picture is traced, each line is fitted to the fonts as Recognise text does (fonts
+  in the document, favourites, your fonts, the included fonts, the other installed fonts), with
+  the read string as a hint and a tolerance of 1.5 picture pixels (3 % of the letter height on
+  large text). Thin strokes are also compared by their centre line with the single-line fonts, so
+  a line drawn in EMS Readability is set in EMS Readability. Then the picture is traced once, and
+  the Trace button shows one percent from 0 to 100 for the whole job.
+- Create paths writes one text per line, black, above the "Trace of" group, in the same step
+  (a single-line text as a black stroke of the traced width). A line no font fits within the
+  tolerance is set in the nearest font anyway, every letter guessed: a wrong font is better than
+  paths. Only a line that looks like no text stays paths: a single character, mostly marks, read
+  with less than 0.8 confidence, or one short pattern repeated (a ring read as "O", a dot grid
+  read as "TOTOTO"). Guessed letters are named in one warning and highlighted in the Glyph table
+  and the Text tool until the first edit; when all letters are sure, nothing is announced.
+- With Recognise text off, or with Multicolour (for now), Trace works exactly as before and the
+  model is not loaded.
 
 ## Multicolour
 
@@ -298,6 +330,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Remove: takes a picked colour out of the palette.
 - Invert: traces what the method leaves out; transparent pixels never become shapes.
 - Drop border shapes: drops shapes that touch the image border.
+- Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.
 - Denoise: smooths out noise in the picture before tracing.
 - Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
 - Corners: higher turns more bends into sharp corners.

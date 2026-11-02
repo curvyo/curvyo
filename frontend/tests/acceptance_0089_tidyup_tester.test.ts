@@ -758,14 +758,14 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
   });
 });
 
-test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, Colours, palette pipette, strip, Invert, Drop border shapes, Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, Colours, palette pipette, strip, Invert, Drop border shapes, Recognise text (0091 ux-notes §7; not drawn in Multicolour, 0091 criterion 17), Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pale.png", PALE, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     const single = await tabStops(s);
     console.log("Brightness, Single, Advanced open:", JSON.stringify(single));
-    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Analyse", "Output", "Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Analyse", "Output", "Invert", "Drop border shapes", "Recognise text", "Denoise", "Upscale", "Corners"]);
     await setOutput(s, "Multicolour");
     await settledCounts(s);
     const multi = await tabStops(s);

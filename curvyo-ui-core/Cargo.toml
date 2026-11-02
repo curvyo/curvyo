@@ -20,6 +20,8 @@ curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 # The raster tracer of the Trace tool (ADR 0023 §1; ADR 0011 §3: ui-core → vectorize-core).
 curvyo-vectorize-core = { path = "../curvyo-vectorize-core", version = "0.1.0" }
+# The text reader of Trace (ADR 0028 §1: ui-core → ocr-core; editor-wasm reaches it only here).
+curvyo-ocr-core = { path = "../curvyo-ocr-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 thiserror.workspace = true

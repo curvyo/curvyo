@@ -1,6 +1,6 @@
 import { createSketchPresentation, type SketchPresentation } from "@/lib/sketchPresentation";
 import { type SketchView } from "@/lib/sketchView";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
@@ -1203,7 +1203,13 @@ export function useEditorSession(
   const strokeToPathReady = sketchView.workbench === "vector" && tool === "select" && selectBar.strokeToPathEnabled;
   const focusCanvas = useCallback(() => containerRef.current?.focus(), []);
   const vectorTool = sketchView.workbench === "vector" ? tool : "select";
-  const trace = useTrace(getSession, syncFromSession, syncRevision, vectorTool, focusCanvas);
+  // `specs/0091`: Trace's guessed-letters warning shows where Recognise text's does.
+  const traceNotice = useRef<(text: string) => void>(() => undefined);
+  const traceText = useMemo(
+    () => ({ faces: text.fonts.faces, onNotice: (notice: string) => traceNotice.current(notice) }),
+    [text.fonts.faces],
+  );
+  const trace = useTrace(getSession, syncFromSession, syncRevision, vectorTool, focusCanvas, traceText);
   const recognise = useRecognise(getSession, syncFromSession, {
     tool: vectorTool,
     selectionCount,
@@ -1211,6 +1217,9 @@ export function useEditorSession(
     faces: text.fonts.faces,
     containerRef,
   });
+  useEffect(() => {
+    traceNotice.current = recognise.showNotice;
+  }, [recognise.showNotice]);
   // Enter and Escape of the Trace tool, and a double-click that creates, reach it through refs so
   // the canvas handlers keep their dependencies (`specs/0025-raster-trace` criterion 12).
   const traceKeyRef = useRef(trace.keyDown);

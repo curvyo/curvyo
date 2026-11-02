@@ -5,7 +5,27 @@
 // criterion 21). A stale or stopped job is ended by the page
 // terminating this worker; a synchronous wasm call cannot be interrupted otherwise.
 
-import { encode_png, initSync, trace_analyse, trace_auto_threshold, trace_job, trace_mask_job, trace_suggest_background } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import {
+  encode_png,
+  fit_add_face,
+  fit_finish,
+  fit_start,
+  fit_step,
+  initSync,
+  ocr_crops,
+  ocr_job,
+  ocr_load,
+  ocr_loaded,
+  ocr_read_crops,
+  trace_analyse,
+  trace_auto_threshold,
+  trace_job,
+  trace_mask_job,
+  trace_suggest_background,
+  trace_text_job,
+  trace_text_mask_job,
+  trace_text_regions_job,
+} from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 import type { TraceRequest, TraceResponse } from "@/lib/traceJobs";
 
@@ -16,11 +36,14 @@ interface WorkerScope {
 
 const scope = self as unknown as WorkerScope;
 
+/** This worker's wasm memory, for the pool's memory report (`specs/0091` round 2). */
+let memory: WebAssembly.Memory | null = null;
+
 scope.onmessage = (event) => {
   const request = event.data;
   try {
     if (request.type === "init") {
-      initSync({ module: request.module });
+      memory = initSync({ module: request.module }).memory;
       // The page waits for this before it trusts the worker (a worker that never starts would
       // otherwise leave every job waiting).
       scope.postMessage({ id: 0, kind: "ready", error: "" });
@@ -38,7 +61,11 @@ scope.onmessage = (event) => {
     }
     if (request.type === "mask") {
       // The Mask view (`specs/0089` criterion 21): the mask of the same code path as the trace.
-      const mask = trace_mask_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings);
+      const map = new Float64Array(request.map);
+      const mask =
+        request.lines === ""
+          ? trace_mask_job(request.rgba, request.width, request.height, map, request.settings)
+          : trace_text_mask_job(request.rgba, request.width, request.height, map, request.settings, request.lines);
       const reply = mask
         ? { width: mask.width, height: mask.height, bits: mask.bits }
         : { width: 0, height: 0, bits: new Uint8Array(0) };
@@ -46,19 +73,78 @@ scope.onmessage = (event) => {
       scope.postMessage({ id: request.id, kind: "mask", ...reply, ms: performance.now() - started }, [reply.bits.buffer]);
       return;
     }
+    if (request.type === "regions") {
+      // The text pass alone (`specs/0091` criterion 25); the pixels go back for the trace.
+      const wire = trace_text_regions_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, request.lines);
+      scope.postMessage({ id: request.id, kind: "regions", wire, rgba: request.rgba, ms: performance.now() - started }, [wire.buffer, request.rgba.buffer]);
+      return;
+    }
+    if (request.type === "fit-finish") {
+      // A share of the fit ends with every share's nearest face (`specs/0091` round 2).
+      scope.postMessage({ id: request.id, kind: "fit", reply: fit_finish(request.nearest), ms: performance.now() - started });
+      return;
+    }
+    if (request.type === "fit" || request.type === "fit-faces") {
+      // The font fit runs here, off the main thread; the faces stay for the worker's life.
+      const sink = { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) };
+      let reply: string;
+      if (request.type === "fit") {
+        reply = fit_start(request.request, sink);
+      } else {
+        for (const face of request.faces) {
+          fit_add_face(face.file, face.index, face.bytes);
+        }
+        reply = fit_step(sink);
+      }
+      scope.postMessage({ id: request.id, kind: "fit", reply, ms: performance.now() - started });
+      return;
+    }
+    if (request.type === "ocr-crops") {
+      // The detection half of the read (`specs/0091` round 2): the pool reads the crops.
+      const error = ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
+      const crops = error === "" ? ocr_crops(request.rgba, request.width, request.height) : undefined;
+      const lines = crops?.lines ?? "";
+      const samples = crops?.samples ?? new Float32Array(0);
+      crops?.free();
+      scope.postMessage(
+        { id: request.id, kind: "ocr-crops", lines, samples, error: error === "" && lines === "" ? "unreadable" : error, rgba: request.rgba, ms: performance.now() - started },
+        [samples.buffer, request.rgba.buffer],
+      );
+      return;
+    }
+    if (request.type === "ocr-read") {
+      // A pool worker: the weights once per worker, then its share of the crops.
+      const error = ocr_loaded() || !request.weights ? "" : ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
+      const reads = error === "" ? ocr_read_crops(request.lines, request.samples, { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) }) : "";
+      scope.postMessage({ id: request.id, kind: "ocr-read", reads, memory: memory?.buffer.byteLength ?? 0, ms: performance.now() - started });
+      return;
+    }
+    if (request.type === "ocr") {
+      // The weights are loaded once per worker (ADR 0028 §5); a later read skips the load.
+      const error = ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
+      const lines =
+        error === ""
+          ? ocr_job(request.rgba, request.width, request.height, {
+              report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }),
+            })
+          : "";
+      // The pixels go back to the page for the trace that follows.
+      scope.postMessage(
+        { id: request.id, kind: "ocr", lines, error: error === "" && lines === "" ? "unreadable" : error, rgba: request.rgba, ms: performance.now() - started },
+        [request.rgba.buffer],
+      );
+      return;
+    }
     if (request.type === "png") {
       const png = encode_png(request.rgba, request.width, request.height);
       scope.postMessage({ id: request.id, kind: "png", png, ms: performance.now() - started }, [png.buffer]);
       return;
     }
-    const wire = trace_job(
-      request.rgba,
-      request.width,
-      request.height,
-      new Float64Array(request.map),
-      request.settings,
-      { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) },
-    );
+    const sink = { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) };
+    const wire =
+      request.lines === ""
+        ? trace_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, sink)
+        : trace_text_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, request.lines, sink);
     scope.postMessage({ id: request.id, kind: "trace", wire, ms: performance.now() - started }, [wire.buffer]);
   } catch (error) {
     scope.postMessage(

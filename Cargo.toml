@@ -8,6 +8,7 @@ members = [
     "curvyo-svg-core",
     "curvyo-image-core",
     "curvyo-vectorize-core",
+    "curvyo-ocr-core",
     "curvyo-ui-core",
     "curvyo-render-core",
     "curvyo-editor-wasm",
@@ -100,4 +101,21 @@ opt-level = 3
 [profile.release]
 codegen-units = 1
 lto = true
+opt-level = 3
+
+# The text reader's inference (ADR 0028) runs the reference set in the ordinary test run;
+# unoptimised it takes minutes instead of seconds.
+[profile.dev.package.rten]
+opt-level = 3
+[profile.dev.package.rten-gemm]
+opt-level = 3
+[profile.dev.package.rten-tensor]
+opt-level = 3
+[profile.dev.package.rten-vecmath]
+opt-level = 3
+[profile.dev.package.rten-simd]
+opt-level = 3
+[profile.dev.package.rten-base]
+opt-level = 3
+[profile.dev.package.curvyo-ocr-core]
 opt-level = 3

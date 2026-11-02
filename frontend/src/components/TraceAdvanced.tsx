@@ -1,4 +1,4 @@
-import { Contrast, ImageMinus, Pipette, type LucideIcon } from "lucide-react";
+import { Contrast, ImageMinus, Pipette, ScanText, type LucideIcon } from "lucide-react";
 import { useRef } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -16,6 +16,7 @@ import {
   OUTPUT,
   PICK_COLOURS,
   PICK_TOOLTIP,
+  RECOGNISE_TEXT,
   TRACE_OUTPUTS,
   type TraceParam,
   type TraceValues,
@@ -306,7 +307,7 @@ export function TraceAdvanced({
           <TracePalette palette={palette} hsvOf={hsvOf} rgbOf={rgbOf} />
         </div>
       ) : null}
-      {/* 5. Options: the two toggles first, then Denoise, Upscale, Corners. */}
+      {/* 5. Options: the three toggles first, then Denoise, Upscale, Corners. */}
       <div className="flex h-9 items-center gap-1">
         {params
           .filter((p) => p.advanced && p.kind === "toggle")
@@ -323,6 +324,17 @@ export function TraceAdvanced({
               />
             ) : null;
           })}
+        {/* `specs/0091` UX notes §1: the third icon toggle; no "Recognise shapes" until 0088 Part B.
+            Not drawn with Multicolour, which slice 1 traces without text (lead decision 3). */}
+        {values.output === MULTICOLOUR ? null : (
+          <TraceToggle
+            label={RECOGNISE_TEXT}
+            icon={ScanText}
+            pressed={values.recogniseText}
+            onChange={(v) => setValue("recogniseText", v)}
+            onReturnFocus={onReturnFocus}
+          />
+        )}
       </div>
       {denoise ? <ChoicePill param={denoise} value={values.denoise} onValue={(v) => setValue("denoise", v)} onReturnFocus={onReturnFocus} /> : null}
       {upscale ? <ChoicePill param={upscale} value={values.upscale} onValue={(v) => setValue("upscale", v)} onReturnFocus={onReturnFocus} /> : null}

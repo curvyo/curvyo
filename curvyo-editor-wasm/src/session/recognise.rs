@@ -464,7 +464,7 @@ impl Session {
 
 /// The edits that give a new text `style` whole, stroke switch last (a stroke edit switches it
 /// on).
-fn style_edits(style: &curvyo_document_core::Style) -> Vec<StyleEdit> {
+pub(super) fn style_edits(style: &curvyo_document_core::Style) -> Vec<StyleEdit> {
     vec![
         StyleEdit::FillRgba(style.fill.color, style.fill.opacity),
         StyleEdit::FillEnabled(style.fill.enabled),

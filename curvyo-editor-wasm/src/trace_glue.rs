@@ -206,6 +206,73 @@ pub fn trace_params_json() -> String {
     serde_json::Value::Array(list).to_string()
 }
 
+/// The OCR lines of a picture `width` x `height` as the host keeps them (`specs/0091`
+/// decision 1): `{width, height, lines: [{quad: [[x, y] x 4], text, confidence: [..]}]}`.
+#[must_use]
+pub fn ocr_lines_json(width: u32, height: u32, lines: &[curvyo_ui_core::OcrLine]) -> String {
+    serde_json::json!({
+        "width": width,
+        "height": height,
+        "lines": lines.iter().map(|l| serde_json::json!({
+            "quad": l.quad,
+            "text": l.text,
+            "confidence": l.confidence,
+        })).collect::<Vec<_>>(),
+    })
+    .to_string()
+}
+
+/// The lines of [`ocr_lines_json`] for a picture `width` px wide (a reduced copy scales the
+/// quads); unreadable lines are dropped, unreadable JSON is no line.
+#[must_use]
+pub fn read_ocr_lines(json: &str, width: u32) -> Vec<curvyo_ui_core::OcrLine> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
+    let source = value
+        .get("width")
+        .and_then(serde_json::Value::as_f64)
+        .filter(|w| *w > 0.0);
+    let Some(source) = source else {
+        return Vec::new();
+    };
+    let factor = f64::from(width) / source;
+    let number = |v: &serde_json::Value| v.as_f64().filter(|n| n.is_finite());
+    value
+        .get("lines")
+        .and_then(serde_json::Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|line| {
+                    let corners = line.get("quad")?.as_array()?;
+                    let mut quad = [[0.0; 2]; 4];
+                    for (corner, out) in corners.iter().zip(quad.iter_mut()) {
+                        let xy = corner.as_array()?;
+                        *out = [number(xy.first()?)?, number(xy.get(1)?)?];
+                    }
+                    if corners.len() != 4 {
+                        return None;
+                    }
+                    let confidence: Vec<f64> = line
+                        .get("confidence")?
+                        .as_array()?
+                        .iter()
+                        .filter_map(number)
+                        .collect();
+                    Some(
+                        curvyo_ui_core::OcrLine {
+                            quad,
+                            text: line.get("text")?.as_str()?.to_owned(),
+                            confidence,
+                        }
+                        .scaled(factor),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,6 +364,20 @@ mod tests {
                 .colours,
             Some(2)
         );
+    }
+
+    /// `specs/0091` decision 1: the lines cross as JSON and scale to a reduced copy.
+    #[test]
+    fn ocr_lines_cross_as_json_and_scale() {
+        let line = curvyo_ui_core::OcrLine {
+            quad: [[0.0, 0.0], [100.0, 0.0], [100.0, 20.0], [0.0, 20.0]],
+            text: "Grüße".to_owned(),
+            confidence: vec![0.9; 5],
+        };
+        let json = ocr_lines_json(200, 100, std::slice::from_ref(&line));
+        assert_eq!(read_ocr_lines(&json, 200), vec![line.clone()]);
+        assert_eq!(read_ocr_lines(&json, 100)[0].quad[2], [50.0, 10.0]);
+        assert_eq!(read_ocr_lines("nonsense", 100).len(), 0);
     }
 
     #[test]

@@ -1,0 +1,33 @@
+# Licence record of the shipped text recognition weights (ADR 0028 §5). The files are the ONNX
+# conversion, unmodified. Checked by `curvyo-ocr-core/tests/model_record.rs`: every file of this
+# folder but this record and the licence text has an entry, an allowed licence and the SHA-256
+# that `curvyo-ocr-core` expects. Changing a file is a code change (new constants, new harness
+# baseline), never a silent swap.
+name = "PaddleOCR Latin (mobile)"
+licence = "Apache-2.0"
+licence_file = "LICENSE"
+source_url = "https://huggingface.co/monkt/paddleocr-onnx"
+upstream_url = "https://github.com/PaddlePaddle/PaddleOCR"
+training_data = "not itemised upstream; accepted by the customer, Frage 112 A, 2026-10-31"
+fetched = "2026-10-31"
+
+[[files]]
+file = "det.onnx"
+role = "detector"
+upstream_model = "PP-OCRv3_mobile_det"
+source_url = "https://huggingface.co/monkt/paddleocr-onnx/resolve/main/detection/v3/det.onnx"
+sha256 = "ee40e80071ba3a320d4efda75f3e22047a7d049e9bf7bcaaf9daea23fc21b935"
+
+[[files]]
+file = "rec.onnx"
+role = "recogniser"
+upstream_model = "latin_PP-OCRv5_mobile_rec"
+source_url = "https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/latin/rec.onnx"
+sha256 = "614ffc2d6d3902d360fad7f1b0dd455ee45e877069d14c4e51a99dc4ef144409"
+
+[[files]]
+file = "dict.txt"
+role = "alphabet"
+upstream_model = "latin_PP-OCRv5_mobile_rec"
+source_url = "https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/latin/dict.txt"
+sha256 = "3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff"

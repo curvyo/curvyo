@@ -4,6 +4,9 @@
  * terminates the worker and the next job starts a fresh one from the cached module.
  */
 
+import { mergeReads, poolPercent, poolSize, readingCost, shareLines } from "./ocrPool.ts";
+
+
 /** A message to the worker. */
 export type TraceRequest =
   | { type: "init"; module: WebAssembly.Module }
@@ -17,9 +20,25 @@ export type TraceRequest =
       map: number[];
       /** The settings JSON of `settingsJson` in `traceText`. */
       settings: string;
+      /** The OCR lines JSON of the picture (`specs/0091`), empty without text recognition. */
+      lines: string;
     }
   /** The mask the same trace would walk, for the Mask view (`specs/0089` criterion 21). */
-  | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string }
+  | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
+  /** The text pass alone (`specs/0091` criterion 25): the read lines' own traces, before the fit. */
+  | { type: "regions"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
+  /** The font fit of the read lines (`specs/0091` decision 4): the session's request. */
+  | { type: "fit"; id: number; request: string }
+  /** A share of the fit ends with every share's nearest face, the JSON list (`specs/0091` round 2). */
+  | { type: "fit-finish"; id: number; nearest: string }
+  /** The faces a fit asked for, as `[file, index, bytes]`; the fit goes on. */
+  | { type: "fit-faces"; id: number; faces: FitFace[] }
+  /** The text lines of a picture detected and cropped for the reading pool (`specs/0091` round 2). */
+  | { type: "ocr-crops"; id: number; rgba: Uint8Array; width: number; height: number; weights: OcrWeights }
+  /** A share of a picture's line crops read by a pool worker; the weights only until it has them. */
+  | { type: "ocr-read"; id: number; lines: string; samples: Float32Array; weights: OcrWeights | null }
+  /** The text lines of a picture, read once (`specs/0091` decision 1), with the weights. */
+  | { type: "ocr"; id: number; rgba: Uint8Array; width: number; height: number; weights: OcrWeights }
   /** The PNG of a copied image (`specs/0087-image-clipboard-and-drop` criterion 14). */
   | { type: "png"; id: number; rgba: Uint8Array; width: number; height: number };
 
@@ -29,14 +48,48 @@ export type TraceResponse =
    * analysis JSON (`specs/0089` slice F; empty when it failed). */
   | { id: number; kind: "threshold"; threshold: number; background: string; analysis: string; ms: number }
   | { id: number; kind: "trace"; wire: Float64Array; ms: number }
+  /** The text pass's numbers and, handed back, the pixels (`specs/0091` criterion 25). */
+  | { id: number; kind: "regions"; wire: Float64Array; rgba: Uint8Array; ms: number }
   /** A running trace reached a higher whole percent (criterion 10). */
   | { id: number; kind: "progress"; percent: number }
   | { id: number; kind: "png"; png: Uint8Array; ms: number }
+  /** A fit's answer: `{kind: "need", faces}` or `{kind: "finished", lines}` as JSON. */
+  | { id: number; kind: "fit"; reply: string; ms: number }
+  /** A picture's line crops (`{lines: [{quad, width}]}` and their samples), the pixels handed back;
+   * `error` set when the reader could not be used. */
+  | { id: number; kind: "ocr-crops"; lines: string; samples: Float32Array; error: string; rgba: Uint8Array; ms: number }
+  /** A share's lines as a JSON array (`null` where nothing was read), empty when it failed; the
+   * worker's wasm memory in bytes. */
+  | { id: number; kind: "ocr-read"; reads: string; memory: number; ms: number }
+  /** The OCR lines JSON; empty with `error` set when the reader could not be used. */
+  | { id: number; kind: "ocr"; lines: string; error: string; rgba: Uint8Array; ms: number }
   /** A mask: 255 for content, 0 for the rest, row by row; `width` 0 when the picture cannot be traced. */
   | { id: number; kind: "mask"; width: number; height: number; bits: Uint8Array; ms: number }
   | { id: number; kind: "error"; message: string }
   /** The answer to `init` (id 0): `error` is empty when the module was instantiated. */
   | { id: 0; kind: "ready"; error: string };
+
+/** The text reader's three files (ADR 0028 §5), fetched same-origin once per page. */
+export interface OcrWeights {
+  detector: Uint8Array;
+  recogniser: Uint8Array;
+  alphabet: string;
+}
+
+/** A font file face handed to the worker's fit. */
+export interface FitFace {
+  file: string;
+  index: number;
+  bytes: Uint8Array;
+}
+
+/** The OCR read failed (the weights could not be loaded or read). */
+export class OcrFailed extends Error {
+  constructor(reason: string) {
+    super(`text recognition failed: ${reason}`);
+    this.name = "OcrFailed";
+  }
+}
 
 /** The pixels of one job. */
 export interface TracePixels {
@@ -98,6 +151,12 @@ export class TraceWorkerFailed extends Error {
 /** Runs trace jobs in a worker; `cancel` ends every running job by terminating it. */
 export class TraceRunner {
   private worker: TraceWorkerLike | null = null;
+  /** The weights went to this worker (a pool worker loads them once, `specs/0091` round 2). */
+  private weightsSent = false;
+  /** The workers that read text lines next to this one, made on the first read. */
+  private readonly pool: TraceRunner[] = [];
+  /** How many workers read text lines (`ocrPool.poolSize`). */
+  private readonly poolWorkers: number;
   private startTimer: ReturnType<typeof setTimeout> | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
@@ -105,10 +164,11 @@ export class TraceRunner {
   private readonly module: () => Promise<WebAssembly.Module>;
   private readonly startMs: number;
 
-  constructor(makeWorker: () => TraceWorkerLike, module: () => Promise<WebAssembly.Module>, startMs = WORKER_START_MS) {
+  constructor(makeWorker: () => TraceWorkerLike, module: () => Promise<WebAssembly.Module>, startMs = WORKER_START_MS, poolWorkers = 1) {
     this.makeWorker = makeWorker;
     this.module = module;
     this.startMs = startMs;
+    this.poolWorkers = poolWorkers;
   }
 
   /** Whether a job is running. */
@@ -145,6 +205,7 @@ export class TraceRunner {
     worker.onerror = (event) => this.fail(worker, new Error(event.message || "trace worker failed"));
     worker.postMessage({ type: "init", module });
     this.worker = worker;
+    this.weightsSent = false;
     this.clearStartTimer();
     this.startTimer = setTimeout(() => this.fail(worker, new TraceWorkerFailed(`no answer in ${this.startMs} ms`)), this.startMs);
     return worker;
@@ -205,7 +266,7 @@ export class TraceRunner {
 
   /** One trace of `pixels` with `settings` (the JSON of `settingsJson`); the pixels are handed
    * over to the worker; `onProgress` hears each higher whole percent. */
-  async trace(pixels: TracePixels, settings: string, onProgress?: (percent: number) => void): Promise<TraceOutput> {
+  async trace(pixels: TracePixels, settings: string, onProgress?: (percent: number) => void, lines = ""): Promise<TraceOutput> {
     const response = await this.send(
       (id) => ({
         type: "trace",
@@ -215,6 +276,7 @@ export class TraceRunner {
         height: pixels.height,
         map: pixels.map,
         settings,
+        lines,
       }),
       [pixels.rgba.buffer],
       onProgress,
@@ -225,17 +287,190 @@ export class TraceRunner {
     return { wire: response.wire, seconds: response.ms / 1000 };
   }
 
+  /** The text pass alone of `pixels` with `settings` and the OCR `lines` (`specs/0091` criterion
+   * 25): the numbers the fit request is made of; the pixels are handed over and come back for the
+   * trace that follows. */
+  async regions(pixels: TracePixels, settings: string, lines: string): Promise<Float64Array> {
+    const response = await this.send(
+      (id) => ({ type: "regions", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings, lines }),
+      [pixels.rgba.buffer],
+    );
+    if (response.kind !== "regions") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    pixels.rgba = response.rgba;
+    return response.wire;
+  }
+
   /** The mask a trace of `pixels` with `settings` would walk (`specs/0089` criterion 21), or
    * `null` when the picture cannot be traced; the pixels are handed over. */
-  async mask(pixels: TracePixels, settings: string): Promise<TraceMask | null> {
+  async mask(pixels: TracePixels, settings: string, lines = ""): Promise<TraceMask | null> {
     const response = await this.send(
-      (id) => ({ type: "mask", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings }),
+      (id) => ({ type: "mask", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings, lines }),
       [pixels.rgba.buffer],
     );
     if (response.kind !== "mask") {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
     }
     return response.width > 0 ? { width: response.width, height: response.height, bits: response.bits } : null;
+  }
+
+  /** The text lines of `pixels` read with `weights` (`specs/0091` decision 1): this worker
+   * detects and crops the lines, the reading pool reads shares of them (round 2: the strings are
+   * those of one worker), and the lines come back in order as the OCR lines JSON; the pixels are
+   * handed back (so the trace that follows needs no second copy out of the session, 0025 criterion
+   * 58). `error` is set, and `lines` empty, when the reader could not be used; a pool worker that
+   * fails fails the read. `onProgress` hears one percent over detection and every line. */
+  async ocr(pixels: TracePixels, weights: OcrWeights, onProgress?: (percent: number) => void): Promise<{ lines: string; error: string; rgba: Uint8Array }> {
+    onProgress?.(0);
+    const response = await this.send(
+      (id) => ({ type: "ocr-crops", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, weights }),
+      [pixels.rgba.buffer],
+    );
+    if (response.kind !== "ocr-crops") {
+      throw new OcrFailed(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    if (response.error !== "") {
+      return { lines: "", error: response.error, rgba: response.rgba };
+    }
+    const crops = (JSON.parse(response.lines) as { lines: { quad: number[][]; width: number; samples: number }[] }).lines;
+    const offsets: number[] = [];
+    let at = 0;
+    for (const crop of crops) {
+      offsets.push(at);
+      at += crop.samples;
+    }
+    const shares = shareLines(
+      crops.map((c) => readingCost(c.width)),
+      this.poolWorkers,
+    );
+    while (this.pool.length < shares.length) {
+      this.pool.push(new TraceRunner(this.makeWorker, this.module, this.startMs));
+    }
+    const done = shares.map(() => 0);
+    onProgress?.(poolPercent(0, crops.length));
+    const reads = await Promise.all(
+      shares.map(async (share, k) => {
+        const samples = new Float32Array(share.reduce((n, i) => n + crops[i].samples, 0));
+        let to = 0;
+        for (const i of share) {
+          const n = crops[i].samples;
+          samples.set(response.samples.subarray(offsets[i], offsets[i] + n), to);
+          to += n;
+        }
+        const lines = JSON.stringify({ lines: share.map((i) => crops[i]) });
+        const read = await this.pool[k].readShare(lines, samples, weights, (percent) => {
+          done[k] = Math.floor((percent * share.length) / 100);
+          onProgress?.(poolPercent(done.reduce((a, b) => a + b, 0), crops.length));
+        });
+        return JSON.parse(read) as unknown[];
+      }),
+    ).catch((error: unknown) => {
+      // One worker failed or the read was stopped: every other share ends too, no partial text.
+      for (const runner of this.pool) {
+        runner.cancel();
+      }
+      throw error;
+    });
+    const lines = mergeReads(shares, reads as (unknown | null)[][]);
+    onProgress?.(100);
+    return { lines: JSON.stringify({ height: pixels.height, lines, width: pixels.width }), error: "", rgba: response.rgba };
+  }
+
+  /** A pool worker's share: `lines` and `samples` as the crops give them; the weights go along
+   * until this worker has them. The JSON array of the share's lines. */
+  private async readShare(lines: string, samples: Float32Array, weights: OcrWeights, onProgress: (percent: number) => void): Promise<string> {
+    const send = this.weightsSent ? null : weights;
+    const response = await this.send((id) => ({ type: "ocr-read", id, lines, samples, weights: send }), [samples.buffer], onProgress);
+    if (response.kind !== "ocr-read") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    if (response.reads === "") {
+      throw new Error("a text reading worker could not read its lines");
+    }
+    this.weightsSent = true;
+    this.lastMemory = response.memory;
+    return response.reads;
+  }
+
+  /** The wasm memory of this worker after its last share, bytes (the pool's memory report). */
+  lastMemory = 0;
+
+  /** The wasm memory of each reading pool worker after its last share, bytes. */
+  get poolMemory(): number[] {
+    return this.pool.map((runner) => runner.lastMemory);
+  }
+
+  /** The font fit of `request` (the session's `trace_fit_request`) in the worker, off the main
+   * thread (`specs/0091` decision 4): the faces it asks for are read by `loadFaces` and handed
+   * in, as often as it asks; the finished result JSON. Cancelled like every job. */
+  async fit(
+    request: string,
+    loadFaces: (faces: [string, number][]) => Promise<FitFace[]>,
+    onProgress?: (percent: number) => void,
+  ): Promise<string> {
+    const parsed = JSON.parse(request) as { lines: { outlines: unknown[] }[] };
+    // Round 2: the lines are fitted on the pool, the costliest (most outlines) dealt first.
+    const shares = shareLines(
+      parsed.lines.map((l) => l.outlines.length),
+      this.poolWorkers,
+    );
+    while (this.pool.length < shares.length) {
+      this.pool.push(new TraceRunner(this.makeWorker, this.module, this.startMs));
+    }
+    const done = shares.map(() => 0);
+    const report = () => onProgress?.(Math.floor(done.reduce((a, b) => a + b, 0) / Math.max(1, parsed.lines.length)));
+    const stopAll = (error: unknown): never => {
+      for (const runner of this.pool) {
+        runner.cancel();
+      }
+      throw error;
+    };
+    const nearest = await Promise.all(
+      shares.map((share, k) =>
+        this.pool[k].fitShare(JSON.stringify({ ...parsed, lines: share.map((i) => parsed.lines[i]), share }), loadFaces, (p) => {
+          done[k] = p * share.length;
+          report();
+        }),
+      ),
+    ).catch(stopAll);
+    const all = JSON.stringify(nearest.filter((n) => n !== null));
+    const finished = await Promise.all(shares.map((_, k) => this.pool[k].finishShare(all))).catch(stopAll);
+    const lines = mergeReads(shares, finished);
+    onProgress?.(100);
+    return JSON.stringify({ kind: "finished", lines });
+  }
+
+  /** A pool worker's share of a fit, until searched: its nearest face (`null` without one). */
+  private async fitShare(request: string, loadFaces: (faces: [string, number][]) => Promise<FitFace[]>, onProgress: (percent: number) => void): Promise<unknown> {
+    let response = await this.send((id) => ({ type: "fit", id, request }), [], onProgress);
+    for (;;) {
+      if (response.kind !== "fit") {
+        throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+      }
+      const reply = JSON.parse(response.reply) as { kind: string; faces?: [string, number][]; nearest?: unknown };
+      if (reply.kind === "searched") {
+        return reply.nearest ?? null;
+      }
+      if (reply.kind !== "need") {
+        throw new Error(`a fitting worker answered ${reply.kind}`);
+      }
+      const faces = await loadFaces(reply.faces ?? []);
+      response = await this.send((id) => ({ type: "fit-faces", id, faces }), [], onProgress);
+    }
+  }
+
+  /** Ends a pool worker's share of a fit with every share's nearest face: its lines. */
+  private async finishShare(nearest: string): Promise<unknown[]> {
+    const response = await this.send((id) => ({ type: "fit-finish", id, nearest }), []);
+    if (response.kind !== "fit") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    const reply = JSON.parse(response.reply) as { kind: string; lines?: unknown[] };
+    if (reply.kind !== "finished" || !reply.lines) {
+      throw new Error("a fitting worker could not finish its lines");
+    }
+    return reply.lines;
   }
 
   /** The PNG of `rgba` (`width` x `height`, straight alpha), made in the worker; the pixels are
@@ -254,6 +489,9 @@ export class TraceRunner {
   /** Ends every running job: the worker is terminated and their promises reject with
    * [`TraceCancelled`]; the next job starts a fresh worker. */
   cancel(): void {
+    for (const runner of this.pool) {
+      runner.cancel();
+    }
     if (this.pending.size === 0) {
       return;
     }
@@ -269,6 +507,9 @@ export class TraceRunner {
   /** Ends the worker for good (the editor unmounts). */
   dispose(): void {
     this.cancel();
+    for (const runner of this.pool) {
+      runner.dispose();
+    }
     this.clearStartTimer();
     this.worker?.terminate();
     this.worker = null;
@@ -309,10 +550,37 @@ export function editorModule(): Promise<WebAssembly.Module> {
   return compiled;
 }
 
+let weights: Promise<OcrWeights> | null = null;
+
+/** The folder of the shipped weights (ADR 0028 §5): the app's own files, no download. */
+export const OCR_MODEL_DIR = "models/paddleocr-latin/";
+
+/** The text reader's files, fetched same-origin once per page (ADR 0028 §5); a failed fetch is
+ * tried again by the next call. */
+export function ocrWeights(fetchFile: (path: string) => Promise<Response> = (path) => fetch(`${import.meta.env.BASE_URL}${path}`)): Promise<OcrWeights> {
+  weights ??= (async () => {
+    const read = async (name: string) => {
+      const response = await fetchFile(`${OCR_MODEL_DIR}${name}`);
+      if (!response.ok) {
+        throw new OcrFailed(`${name}: ${response.status}`);
+      }
+      return new Uint8Array(await response.arrayBuffer());
+    };
+    const [detector, recogniser, alphabet] = await Promise.all([read("det.onnx"), read("rec.onnx"), read("dict.txt")]);
+    return { detector, recogniser, alphabet: new TextDecoder().decode(alphabet) };
+  })().catch((error: unknown) => {
+    weights = null;
+    throw error;
+  });
+  return weights;
+}
+
 /** A runner over the real worker. */
 export function createTraceRunner(): TraceRunner {
   return new TraceRunner(
     () => new Worker(new URL("../workers/traceWorker.ts", import.meta.url), { type: "module" }),
     editorModule,
+    WORKER_START_MS,
+    poolSize(typeof navigator === "undefined" ? undefined : navigator.hardwareConcurrency),
   );
 }

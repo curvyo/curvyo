@@ -52,6 +52,14 @@ safe defaults (end of this file); none touches the document model or a written f
    default. (C) all in `ui-core`: ui-core is interaction logic; outline matching is domain geometry.
    (D) `vectorize-core`: needs a new edge to text-core and would tie recognition to traces only.
 
+   **Note 2026-11-01 (architect): the trigger fired.** The customer allowed an OCR model (Frage 109 B,
+   110 A: PaddleOCR mobile weights on `rten`, not `ocrs`). Model, weights and inference go into the
+   new crate `curvyo-ocr-core` ([ADR 0028](../../docs/adr/0028-ocr-text-in-trace.md), Proposed), used
+   by Trace (`specs/0091-trace-text-recognition`). Recognition itself stays here in
+   `curvyo-text-core::recognise`; it gains an optional OCR hint (`Recogniser::with_hint`, a
+   look-alike table) and `fit_text` for 0091's Frage 114 B. Frage 103 A still holds for this
+   selection-based tool; 114 B applies only to the Trace path.
+
 2. **Modules, one sentence each, each under 500 lines.**
 
    | Module (`curvyo-text-core/src/recognise/`) | One sentence |
