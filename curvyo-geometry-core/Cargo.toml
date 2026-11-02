@@ -13,6 +13,10 @@ workspace = true
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 kurbo.workspace = true
 i_overlay.workspace = true
+# Bit-identical `sin`/`cos` for the pattern generators on every platform and in wasm (ADR 0029 §5;
+# `f64::sin` calls the platform's libm). MIT OR Apache-2.0, rust-lang, pure Rust; already in
+# `Cargo.lock` through the workspace's dependencies.
+libm = { version = "0.2.16", default-features = false }
 thiserror.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
