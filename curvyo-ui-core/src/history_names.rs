@@ -210,6 +210,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("edit_dimension_nodes", "Edit nodes"),
     ("convert_dimension", "Convert to path"),
     ("load_template", "Template"),
+    // `specs/0069-tiling` criterion 37.
+    ("tile", "Tile"),
+    ("edit_tiling", "Edit tiling"),
+    ("release_tiling", "Release tiling"),
 ];
 
 /// The labels the engine writes itself. They are no step of the maker's: the setup of a new

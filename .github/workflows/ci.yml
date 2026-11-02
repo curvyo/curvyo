@@ -42,7 +42,8 @@
 #                        0049 (read, frame, commands, hostile sizes, the no-cycle property test),
 #                        Fracture, Flatten and Weld (0037, 0068), and node editing of compound
 #                        paths (0055).
-#   boolean-wasm-golden — the kernel's golden results in the wasm build, run in Node, ubuntu only.
+#   boolean-wasm-golden — the kernel's golden results and the tiling layout goldens (0069) in the
+#                        wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
 #                        (ADR 0011 §7: not matrixed — it inspects the
 #                        dependency graph, not compiled code, so one run
@@ -541,7 +542,9 @@ jobs:
       - name: Run the golden comparison on wasm32-unknown-unknown
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
-        run: cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden --test weld_golden --test stroke_to_path_golden --test pattern_golden
+        run: |
+          cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden --test weld_golden --test stroke_to_path_golden --test pattern_golden
+          cargo test --target wasm32-unknown-unknown -p curvyo-ui-core --test tiling_golden
 
   # Dependency-graph/license check, not compiled code — one run sees every
   # target deny.toml's [graph] lists (including wasm32-unknown-unknown),

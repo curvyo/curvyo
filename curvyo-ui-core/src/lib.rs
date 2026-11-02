@@ -166,6 +166,7 @@ mod text_path_caret;
 mod text_path_edit;
 mod text_recognise_job;
 mod text_recognise_plan;
+pub mod tiling;
 mod trace_fit;
 mod trace_fit_guess;
 mod trace_inpaint;
