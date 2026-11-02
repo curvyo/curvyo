@@ -173,6 +173,7 @@ mod trace_inpaint;
 mod trace_ocr;
 mod trace_plan;
 mod trace_text;
+mod trace_text_colour;
 mod trace_text_notice;
 mod trace_text_wire;
 mod trace_transfer;
@@ -518,6 +519,7 @@ pub use trace_plan::{
     trace_group_name, trace_style,
 };
 pub use trace_text::{TextPass, TextRegion, text_pass};
+pub use trace_text_colour::{trace_text_colour_job_with, trace_text_colour_mask_job};
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
 pub use trace_text_wire::{
     LEFT_OUT_LEVEL, TraceTextWire, TraceTexts, trace_text_job_with, trace_text_mask_job,

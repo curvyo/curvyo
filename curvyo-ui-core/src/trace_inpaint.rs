@@ -59,7 +59,7 @@ pub fn inpaint(rgba: &mut [u8], width: usize, height: usize, mask: &[bool]) {
 }
 
 /// The per-channel lower median of the pixels `ring`; white when it is empty.
-fn median(rgba: &[u8], ring: &mut [usize]) -> [u8; 4] {
+pub(crate) fn median(rgba: &[u8], ring: &mut [usize]) -> [u8; 4] {
     if ring.is_empty() {
         return [255; 4];
     }

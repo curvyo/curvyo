@@ -229,6 +229,14 @@ pub fn trace_colour_job_with(
 
 /// The numbers of a multicolour result.
 fn colour_wire(result: &ColourTrace) -> Vec<f64> {
+    let mut wire = colour_head(result);
+    write_colour_tail(&mut wire, result);
+    wire
+}
+
+/// The numbers of a multicolour result before its palette: the header and the outlines layer by
+/// layer.
+pub(crate) fn colour_head(result: &ColourTrace) -> Vec<f64> {
     let outlines: usize = result.layers.iter().map(|l| l.outlines.len()).sum();
     #[allow(clippy::cast_precision_loss)] // counts far below 2^52
     let mut wire = vec![
@@ -243,6 +251,12 @@ fn colour_wire(result: &ColourTrace) -> Vec<f64> {
     for outline in result.layers.iter().flat_map(|l| &l.outlines) {
         write_outline(&mut wire, outline);
     }
+    wire
+}
+
+/// The palette, the layers (each colour and its outline count) and the joined regions of a
+/// multicolour result after its outlines (and its text section).
+pub(crate) fn write_colour_tail(wire: &mut Vec<f64>, result: &ColourTrace) {
     let rgb = |c: TraceRgb| [f64::from(c.r), f64::from(c.g), f64::from(c.b)];
     #[allow(clippy::cast_precision_loss)] // counts far below 2^52
     {
@@ -258,7 +272,6 @@ fn colour_wire(result: &ColourTrace) -> Vec<f64> {
         }
         wire.push(result.diagnostics.joined_regions as f64);
     }
-    wire
 }
 
 /// The automatic Threshold of `rgba` (`width` x `height`), for the worker (criterion 9).
