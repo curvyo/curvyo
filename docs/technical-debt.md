@@ -1716,7 +1716,13 @@ first slice's PR:
   customer's font manager screenshot (804 x 698 px, 78 lines) detection 0.35 s, recognition
   17.4 s. Natively on one thread 0.32 / 0.32 s and 0.10 / 3.22 s. Each line is padded to 1024 px
   for the recogniser; at 320 px the screenshot reads in 1.23 s natively but the poster loses two
-  umlauts (Ä read as Â, Å), so the pad stays.
+  umlauts (Ä read as Â, Å), so the pad stays. Tried 2026-11-02 (`curvyo-ocr-core/tests/padding.rs`
+  guards the strings of the 1024 px read): each line padded to its own width in 64 px buckets and
+  lines of one width batched reads the screenshot in 3.85 s in wasm (0.83 s natively) and the
+  poster in 0.72 s, but changes 23 of 94 strings ("Äpfel" read as "Apfel" on the tester poster;
+  on the screenshot partly better, "Hershey Script"), so it was not kept; any minimum pad below
+  1024 px still loses the "Ä". Batching at 1024 px gains nothing (17.1 s). Next levers: a
+  recogniser that reads short lines alone, or OCR on the user's request only.
 
 **Resolution:** open. Levers: OCR as its own wasm module loaded on first use (removes the main-thread
 cost, needs a second `-wasm` crate and an ADR), width buckets and batching in recognition (several
