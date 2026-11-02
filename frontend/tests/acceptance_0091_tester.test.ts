@@ -265,11 +265,14 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
     await openAdvanced(s);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').getAttribute('aria-pressed')`), "true");
     assert.equal(await s.evaluate(`!!document.querySelector('[aria-label="Recognise shapes"]')`), false);
-    // Lead decision 3: not drawn while Multicolour is on (slice 1); back with Single colour.
+    // Criterion 17 as amended by slice 2 (ux-notes §1): drawn in Multicolour too, at the same place
+    // (right after Drop border shapes), keeping its value; and still on with Single colour.
     const output = (name: string) => s.evaluate(`[...document.querySelectorAll('${BAR} [role=radio], ${BAR} button')].find((b) => b.textContent?.trim() === ${JSON.stringify(name)})?.click()`);
     await output("Multicolour");
     await sleep(800);
-    assert.equal(await s.evaluate(`!!document.querySelector('${BAR} [aria-label="Recognise text"]')`), false, "hidden in Multicolour");
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed') ?? null`), "true", "drawn and on in Multicolour (slice 2)");
+    const toggles = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [aria-pressed]')].map((e) => e.getAttribute('aria-label')))`)) as string) as string[];
+    assert.equal(toggles.indexOf("Recognise text"), toggles.indexOf("Drop border shapes") + 1, `the toggle after Drop border shapes: ${JSON.stringify(toggles)}`);
     await output("Single colour");
     await sleep(800);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed')`), "true");
@@ -697,4 +700,104 @@ test("0091 tester r2 times: the whole job on the screenshot and on the poster, a
   for (const file of [SCREENSHOT, POSTER]) {
     console.log(`# ${await timeJob(file)}`);
   }
+});
+
+// ------------------------------------------------------------------ slice 2: Multicolour (criteria 17 as amended, 23, 24)
+
+const COLOUR_POSTER = path.join(FIXTURES, "colour_poster.png");
+const NATIVE_S2 = path.resolve(ROOT, "curvyo-editor-wasm", "tests", "fixtures", "acceptance_0091_slice2_tester_native.json");
+
+test("0091 tester slice 2 c24 with c13 across builds: the editor wasm reads, fits and traces the colour poster in Multicolour as natively", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  const native = JSON.parse(readFileSync(NATIVE_S2, "utf8")) as {
+    width: number; height: number; rgba_fnv32: number; settings: string; map: number[]; ocr: string; fit_request: string; fit_reply: string; decided: string; wire: number[];
+  };
+  await withApp(async (s) => {
+    await s.send("Page.navigate", { url: `${ORIGIN}/` });
+    await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
+    const png = readFileSync(COLOUR_POSTER).toString("base64");
+    const out = JSON.parse(
+      (await s.evaluate(`(async () => {
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        await m.default();
+        const png = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+        ctx.drawImage(bitmap, 0, 0);
+        const rgba = new Uint8Array(ctx.getImageData(0, 0, bitmap.width, bitmap.height).data.buffer);
+        let h = 0x811c9dc5;
+        for (let i = 0; i < rgba.length; i++) { h = Math.imul(h ^ rgba[i], 0x01000193) >>> 0; }
+        const get = async (u) => new Uint8Array(await (await fetch(u)).arrayBuffer());
+        const sink = { report() {} };
+        const loaded = m.ocr_load(await get('/models/paddleocr-latin/det.onnx'), await get('/models/paddleocr-latin/rec.onnx'), new TextDecoder().decode(await get('/models/paddleocr-latin/dict.txt')));
+        const ocr = m.ocr_job(rgba, bitmap.width, bitmap.height, sink);
+        let reply = m.fit_start(${JSON.stringify(native.fit_request)}, sink);
+        for (let i = 0; i < 64; i++) {
+          const v = JSON.parse(reply);
+          if (v.kind === 'finished') break;
+          for (const [file, index] of v.faces) { m.fit_add_face(file, index, await get('/fonts/' + file)); }
+          reply = m.fit_step(sink);
+        }
+        const wire = Array.from(m.trace_text_job(rgba, bitmap.width, bitmap.height, Float64Array.from(${JSON.stringify(native.map)}), ${JSON.stringify(native.settings)}, ${JSON.stringify(native.decided)}, sink));
+        return JSON.stringify({ w: bitmap.width, h: bitmap.height, fnv: h, loaded, ocr, reply, wire });
+      })()`)) as string,
+    ) as { w: number; h: number; fnv: number; loaded: string; ocr: string; reply: string; wire: number[] };
+    assert.deepEqual([out.w, out.h, out.fnv], [native.width, native.height, native.rgba_fnv32], "the same pixels");
+    assert.equal(out.loaded, "");
+    const ocrDiff = compare(JSON.parse(out.ocr), JSON.parse(native.ocr), 1e-3);
+    console.log(
+      `# slice 2 wasm vs native: OCR ${out.ocr === native.ocr ? "identical" : `max diff ${ocrDiff}`}, fit ${out.reply === native.fit_reply ? "identical" : "differs"}, multicolour wire ${JSON.stringify(out.wire) === JSON.stringify(native.wire) ? "identical" : "differs"}`,
+    );
+    // ADR 0028 §6: the trace and the fit from the same lines are bit-identical across builds.
+    assert.equal(out.reply, native.fit_reply, "the fit");
+    assert.deepEqual(out.wire, native.wire, "the multicolour wire with its text section");
+  });
+});
+
+test("0091 tester slice 2 c17 c23 c24 (c6 c11): the colour poster in Multicolour end to end", { skip: !BROWSER, timeout: 600_000 }, async () => {
+  await withApp(async (s) => {
+    await importImage(s, COLOUR_POSTER);
+    await openTrace(s);
+    const output = (name: string) => s.evaluate(`[...document.querySelectorAll('${BAR} [role=radio], ${BAR} button')].find((b) => b.textContent?.trim() === ${JSON.stringify(name)})?.click()`);
+    await waitFor("the single-colour text lines", async () => ((await s.statusText()).includes("text lines set") && (await restingSlot(s)) ? true : null), 180_000);
+    await output("Multicolour");
+    await sleep(800);
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed') ?? null`), "true", "criterion 17 as amended: drawn and on");
+    await waitFor("the multicolour preview", async () => {
+      const swatches = (await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-palette-swatch]').length`)) as number;
+      return swatches > 0 && (await restingSlot(s)) && (await s.statusText()).includes("text lines set") ? true : null;
+    }, 180_000);
+    await sleep(1500);
+    const swatches = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('aria-label')))`)) as string) as string[];
+    const barText = (await s.evaluate(`document.querySelector('${BAR}').innerText`)) as string;
+    console.log("# Multicolour with text: swatches", JSON.stringify(swatches));
+    console.log("# Multicolour with text: bar text", JSON.stringify(barText));
+    // Criterion 23 as amended (lead 2026-11-02): the count line counts the colours only texts use
+    // too, so it equals the strip (before the amendment: "2 colours" beside 4 swatches).
+    const counted = /(\d+) colours?,/.exec(barText);
+    assert.ok(counted, barText);
+    assert.equal(Number(counted[1]), swatches.length, `the count line equals the strip: ${JSON.stringify(swatches)}`);
+    assert.equal(swatches.length, 4, "blue, red and the text-only black and green");
+    // No hint text (design-system, ux-notes §9): nothing like a tip in the bar.
+    assert.ok(!/\b(tip|hint|try|click to|drag to)\b/i.test(barText), `no hint text: ${barText}`);
+    const rowsBefore = await s.layerRows();
+    await createPaths(s);
+    const rows = await waitFor("the text rows", async () => {
+      const r = await s.layerRows();
+      return r.some((x) => x?.includes("Trace of")) && r.some((x) => x?.includes("Straße")) ? r : null;
+    }, 180_000);
+    console.log("# layer rows after Create paths (Multicolour):", JSON.stringify(rows));
+    const group = rows.findIndex((x) => x?.includes("Trace of"));
+    const texts = rows.map((x, i) => [x, i] as const).filter(([x]) => /Größe|Übermaß|Äpfel|Straße|Süße|Brücke/.test(x ?? ""));
+    assert.ok(texts.length >= 5, JSON.stringify(rows));
+    assert.ok(group >= 0 && texts.every(([, i]) => i < group), `texts above the group (criterion 6): ${JSON.stringify(rows)}`);
+    await sleep(800);
+    console.log("# notices after Create paths (Multicolour):", JSON.stringify(await s.statusText()));
+    // Criterion 11: one undo, the document as before.
+    await s.evaluate(`document.activeElement?.blur?.()`);
+    await s.key("z", 90, 2);
+    await waitFor("undo", async () => (JSON.stringify(await s.layerRows()) === JSON.stringify(rowsBefore) ? true : null), 20_000).catch(async (e: unknown) => {
+      throw new Error(`${String(e)}: ${JSON.stringify(await s.layerRows())} vs ${JSON.stringify(rowsBefore)}`);
+    });
+  });
 });
