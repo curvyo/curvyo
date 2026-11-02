@@ -215,7 +215,7 @@ function ProgressSlot({
       <div data-trace-slot="running" className={`${FINISH_CLASS} w-[75px]`}>
         <div
           role="progressbar"
-          aria-label={TRACING}
+          aria-label={slot.label ?? TRACING}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={slot.percent ?? undefined}

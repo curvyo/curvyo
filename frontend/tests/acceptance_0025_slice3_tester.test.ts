@@ -1120,8 +1120,9 @@ test("0025s3 c57 in Chromium: Tab order, arrows, focus rings, hit targets, roles
       if (name.includes("Corners")) break;
     }
     console.log("Tab stops from the expander (open) to Corners:", JSON.stringify(inside));
-    // "Drop border shapes" since `specs/0089` Frage 88 A (customer).
-    const advancedOrder = ["Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"];
+    // "Drop border shapes" since `specs/0089` Frage 88 A (customer); "Recognise text" after it
+    // since `specs/0091` (ux-notes §7).
+    const advancedOrder = ["Invert", "Drop border shapes", "Recognise text", "Denoise", "Upscale", "Corners"];
     let from = -1;
     for (const w of advancedOrder) {
       const idx = inside.findIndex((g, i) => i > from && g.includes(w));

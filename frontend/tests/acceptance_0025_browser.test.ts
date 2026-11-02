@@ -358,7 +358,8 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
         countsFirst: block.children[1] === counts, countsAbove: y(counts) < Math.min(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsFirst: boolean; countsAbove: boolean };
     // `0089` ux-notes §22.3 (2026-10-31, replaces Frage 92 B / UX notes 20.5 here): Output comes first, then the
     // two toggles; the status line (the counts) is the second row, above all controls, after the analysis row.
-    assert.deepEqual(advanced.names, ["Output", "Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"]);
+    // `specs/0091` UX notes §1: Recognise text is the third icon toggle.
+    assert.deepEqual(advanced.names, ["Output", "Invert", "Drop border shapes", "Recognise text", "Denoise", "Upscale", "Corners"]);
     assert.deepEqual(advanced.firstRow.slice(0, 1), ["Output"]);
     assert.ok(advanced.countsFirst && advanced.countsAbove, "the status line is the second row, above the controls");
     // 0089 Frage 84: the expander and the finish button share the last line, the button at the

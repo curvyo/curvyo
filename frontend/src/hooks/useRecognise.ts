@@ -55,6 +55,8 @@ export interface RecogniseApi {
   notice: string;
   /** The guessed-letters warning under the Select bar's button; null for a clean run. */
   barNotice: RecogniseBarNotice | null;
+  /** Shows `text` as that notice (Trace's guessed-letters warning, `specs/0091` criterion 5). */
+  showNotice: (text: string) => void;
   run: () => void;
   stop: () => void;
   /** The Tolerance field, for the focus on a keyboard entry. */
@@ -310,6 +312,11 @@ export function useRecognise(
     };
   }, [barNotice]);
 
+  const showNotice = useCallback((text: string) => {
+    counter.current += 1;
+    setBarNotice({ id: counter.current, text });
+  }, []);
+
   return {
     open,
     enter,
@@ -322,6 +329,7 @@ export function useRecognise(
     slot,
     notice,
     barNotice,
+    showNotice,
     run,
     stop,
     fieldRef,
