@@ -732,6 +732,7 @@ dependencies = [
  "curvyo-document-core",
  "i_overlay",
  "kurbo",
+ "libm",
  "proptest",
  "rustix",
  "thiserror 2.0.21",

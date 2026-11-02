@@ -55,6 +55,26 @@ pub(crate) fn polyline_offset(
     ))
 }
 
+/// A normalized grid region moved inward by `units` grid units with round joins (a pattern's
+/// margin, `specs/0071-pattern-fill` criterion 14): reflex corners keep the distance. Empty when
+/// the region vanishes or a coordinate is out of range.
+pub(crate) fn inset_region(region: &Paths64, units: i64, flatten_tolerance_mm: f64) -> Paths64 {
+    #[allow(clippy::cast_precision_loss)] // |units| <= 10^10
+    let radius_mm = (units as f64 * GRID_MM).abs();
+    let style = IntOutlineStyle::new(-units)
+        .line_join(int_join(OffsetJoin::Round, radius_mm, flatten_tolerance_mm))
+        .miter_min_turn(miter_min_turn(radius_mm))
+        .math(MathMode::Integer);
+    if region.validate_outline(&style).is_err() {
+        return Paths64::new();
+    }
+    let Ok(shapes) = region.outline(&style) else {
+        return Paths64::new();
+    };
+    let raw: Paths64 = shapes.into_iter().flatten().collect();
+    without_flattening_noise(cleanup(&raw), flatten_tolerance_mm)
+}
+
 /// `paths` without the outlines that are on average narrower than the flattening tolerance.
 ///
 /// Where an inset makes two curved outlines meet (a ring shrunk by half its width), the chords of
