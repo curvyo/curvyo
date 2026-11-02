@@ -733,3 +733,55 @@ fn budgets() {
         found.sure, found.letters
     );
 }
+
+/// `specs/0091` decision 4: a misread umlaut in the OCR hint is fitted right by the matcher; the
+/// hint narrows the characters, the outlines decide.
+#[test]
+fn a_hint_with_a_misread_letter_is_fitted_right() {
+    let all = faces();
+    let traced = trace(
+        &all[SANS_BOLD],
+        "BÄCKEREI",
+        24.0,
+        0.0,
+        Point::new(20.0, 50.0),
+        0.05,
+    );
+    let candidates = tier(&all, &[SERIF_REGULAR, SANS_BOLD, SANS_REGULAR]);
+    let recogniser = Recogniser::with_hint(&traced.outlines, Mm(0.3), "BÂCKEREI");
+    assert_eq!(recogniser.line_count(), 1);
+    let found = recogniser.match_line(0, &refs(&candidates));
+    let run = found.run.unwrap();
+    assert_eq!(run.text, "BÄCKEREI");
+    assert!(run.guessed.is_empty(), "{run:#?}");
+}
+
+/// `specs/0091` Frage 114 B: `fit_text` sets the string over its own outlines within the
+/// tolerance in the same face, rotated with the line, every letter guessed.
+#[test]
+fn fit_text_lays_the_string_over_the_outlines() {
+    let all = faces();
+    for degrees in [0.0, 15.0] {
+        let traced = trace(
+            &all[SANS_REGULAR],
+            "Open daily",
+            10.0,
+            degrees,
+            Point::new(20.0, 50.0),
+            0.0,
+        );
+        let recogniser = Recogniser::with_hint(&traced.outlines, Mm(0.3), "Open daily");
+        let direction =
+            (traced.placement * Point::new(1.0, 0.0)) - (traced.placement * Point::ORIGIN);
+        let run = recogniser
+            .fit_text(&all[SANS_REGULAR], "Open daily", direction)
+            .unwrap();
+        assert_eq!(run.guessed, vec![0, 1, 2, 3, 5, 6, 7, 8, 9]);
+        assert!((run.size.get() - 10.0).abs() < 0.2, "{run:#?}");
+        let d = hausdorff(
+            &points_of(&traced.outlines, 0.2),
+            &points_of(&laid_out(&all[SANS_REGULAR], &run), 0.2),
+        );
+        assert!(d < 0.3, "{degrees}: {d}");
+    }
+}
