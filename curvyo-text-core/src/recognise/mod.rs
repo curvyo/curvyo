@@ -21,6 +21,8 @@ mod sample;
 mod shape;
 mod shortlist;
 mod size;
+mod stroke;
+mod stroke_grid;
 mod verify;
 
 use std::sync::Arc;
@@ -28,6 +30,7 @@ use std::sync::Arc;
 use kurbo::{Affine, BezPath};
 
 pub(crate) use reference::ReferenceGlyphs;
+pub use stroke::StrokeFit;
 
 use crate::face::Face;
 use crate::units::Mm;
