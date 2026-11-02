@@ -1927,3 +1927,33 @@ fitting phases stay under 110 ms.
 **Why accepted:** it happens once per Create paths, and the cause is the renderer, not Trace.
 **Resolution:** open; belongs with "Canvas performance on Linux/WebKitGTK" (glyph shapes cached or
 filled in slices).
+
+## Pattern fills reach only the canvas, SVG export and Convert to paths (`0071`, ADR 0029, 2026-11-02)
+
+PNG export and laser and plotter jobs do not exist yet, so `specs/0071-pattern-fill` criteria 26
+and 27 are tested for SVG only. Each of those outputs must read the pieces from
+`curvyo_geometry_core::pattern::pattern_pieces` (ADR 0029 §8), never expand patterns on its own.
+Resolved by the first story that adds PNG export or a machine job, with a pattern golden.
+
+## Pattern fill: previews and edge cases (`0071`, 2026-11-02)
+
+- A refusal check on commit generates the pattern once more to know it fits (one generation, at
+  most tens of ms at the defaults).
+- The history previews and a document preview draw a patterned shape without its pattern
+  (render-core only skips the solid fill): only the live canvas expands pieces.
+- The SVG export writes a linked clone as `<use>` of its source; a clone scaled against its
+  source then shows the source's pattern scaled, while the canvas keeps spacings in mm.
+- "Strokes as paths" leaves Lines pieces as stroked paths.
+Resolved when the previews are taken up (Proposal: with the next Style panel story).
+
+## Pattern fill: the work limit is a measured native budget (`0071`, 2026-11-02)
+
+The work limit (`curvyo_geometry_core::PATTERN_MAX_WORK`, about 100 ms of a native release build,
+lead 2026-11-02) is not a customer limit. Its unit costs (`pattern/cost.rs`, `Step::unit`) are an
+upper envelope fitted to 220 cases measured natively on midna (`plan.md`, "Measurements"); the
+wasm build was not measured and is slower, so a pattern near the limit may hold the browser tab
+longer than 100 ms. The envelope is up to six times above the real cost for some cases (Crosshatch
+in Shapes mode, closed pieces on outlines with thousands of fine spikes), which refuses patterns
+that would have been fast. Resolved by a wasm thread-CPU measurement of the same cases and, if
+the refusals bother the customer, generation off the UI thread (a worker), after which the limit
+can be raised.
