@@ -84,10 +84,17 @@ impl StyleEditor {
     }
 
     /// Replaces the style of the previewed objects in `objects` with the
-    /// previewed one, for drawing.
+    /// previewed one, for drawing, and of the clones that read their style from
+    /// one of them (`specs/0069-tiling` criterion 29, live during the gesture).
     pub fn apply_to(&self, objects: &mut [ObjectSnapshot]) {
         if let Some(Pending { ids, edit }) = &self.pending {
-            for object in objects.iter_mut().filter(|o| ids.contains(&o.id())) {
+            let ids: std::collections::HashSet<NodeId> = ids.iter().copied().collect();
+            let previewed = |object: &ObjectSnapshot| {
+                ids.contains(&object.id())
+                    || matches!(object, ObjectSnapshot::Clone(clone)
+                        if ids.contains(&clone.chain.style_source))
+            };
+            for object in objects.iter_mut().filter(|o| previewed(o)) {
                 // A refused edit (a negative width) previews as nothing.
                 let _ = edit.apply_to(object.style_mut());
                 // A text is drawn through its laid-out glyphs, which carry their own copy of

@@ -4,7 +4,11 @@
 //! rule by the selected count, the units' true boxes, the per-leaf results
 //! and the one commit through the group move writer.
 
-use curvyo_document_core::{Document, Length, NodeId, ObjectSnapshot, Vec2};
+use std::collections::HashMap;
+
+use curvyo_document_core::{
+    Affine, Document, Length, NodeId, ObjectSnapshot, Vec2, clone_matrices_after,
+};
 
 use crate::align_labels::distribute_commit_label;
 use crate::align_plan::{
@@ -149,46 +153,59 @@ pub fn page_object_ids(objects: &[ObjectSnapshot], page: &AlignBox) -> Vec<NodeI
 
 /// The per-unit translation results of `plan`: every leaf of a moved unit is
 /// translated by its unit's delta, so a group moves as one whole (criterion 2).
-/// A linked clone's own matrix takes only the part its link does not already
-/// carry (criterion 11): a clone whose original moves in the same commit
-/// rides along, a clone with own placement (`0057`) never does.
+/// A linked clone's matrix follows the one clone rule (ADR 0016 §2) for the
+/// units moved by the same delta: a clone whose original moves with it rides
+/// along, with or without own placement (`0057`), so a tiling moves as one
+/// object (`specs/0069-tiling` criterion 39).
 fn translated_results(
+    document: &Document,
     objects: &[ObjectSnapshot],
     units: &[SelectedUnit],
     plan: &[Vec2],
 ) -> Vec<ObjectSnapshot> {
-    let deltas: std::collections::HashMap<NodeId, Vec2> = units
+    let moved: Vec<(&SelectedUnit, Vec2)> = units
         .iter()
         .zip(plan)
         .filter(|(_, delta)| **delta != Vec2::ZERO)
-        .map(|(unit, delta)| (unit.id, *delta))
+        .map(|(unit, delta)| (unit, *delta))
         .collect();
-    units
-        .iter()
-        .zip(plan)
-        .filter(|(_, delta)| **delta != Vec2::ZERO)
-        .flat_map(|(unit, delta)| {
-            let deltas = &deltas;
-            unit.leaves.iter().filter_map(move |leaf| {
-                let object = objects.iter().find(|o| o.id() == *leaf)?;
-                let offset = match object {
-                    ObjectSnapshot::Clone(clone) => {
-                        let carried = if clone.chain.own_placement {
-                            Vec2::ZERO
-                        } else {
-                            deltas
-                                .get(&clone.chain.origin)
-                                .copied()
-                                .unwrap_or(Vec2::ZERO)
-                        };
-                        *delta - carried
-                    }
-                    _ => *delta,
-                };
-                (offset != Vec2::ZERO).then(|| object.translated(offset))
-            })
-        })
-        .collect()
+    if moved.is_empty() {
+        return Vec::new();
+    }
+    let links = document.clone_links();
+    let held = document.own_placement_clones();
+    let mut deltas: Vec<Vec2> = Vec::new();
+    for (_, delta) in &moved {
+        if !deltas.contains(delta) {
+            deltas.push(*delta);
+        }
+    }
+    let mut results = Vec::new();
+    for delta in deltas {
+        let leaves: Vec<NodeId> = moved
+            .iter()
+            .filter(|(_, d)| *d == delta)
+            .flat_map(|(unit, _)| unit.leaves.iter().copied())
+            .collect();
+        let g = Affine::translation(delta);
+        let matrices: HashMap<NodeId, Affine> = clone_matrices_after(&links, &held, &leaves, g)
+            .matrices
+            .into_iter()
+            .collect();
+        for leaf in &leaves {
+            let Some(object) = objects.iter().find(|o| o.id() == *leaf) else {
+                continue;
+            };
+            let mut result = object.translated(delta);
+            if let ObjectSnapshot::Clone(clone) = &mut result
+                && let Some(&matrix) = matrices.get(leaf)
+            {
+                clone.chain.matrix = matrix;
+            }
+            results.push(result);
+        }
+    }
+    results
 }
 
 /// Writes `plan` for `units` as one commit named `label`, through the same
@@ -200,7 +217,7 @@ pub(crate) fn commit_plan(
     plan: &[Vec2],
     label: &'static str,
 ) -> AlignOutcome {
-    let results = translated_results(objects, units, plan);
+    let results = translated_results(document, objects, units, plan);
     if results.is_empty() {
         return AlignOutcome::Unchanged;
     }

@@ -32,8 +32,17 @@ toml.workspace = true
 # tests for the resize/rotate drag arithmetic (`CLAUDE.md`'s tester role,
 # "Geometry ... property tests with proptest"). Same crate and version
 # `curvyo-geometry-core` already uses.
-proptest.workspace = true
 serde_json.workspace = true
 # `tests/svg_text_budget.rs` encodes the 12-megapixel JPEG of `specs/0024-svg-import-export`
 # criterion 108 in memory; the workspace's own pinned `image`.
 image.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# Not built for wasm32 (it needs OS facilities there; the wasm build runs the tiling goldens only).
+proptest.workspace = true
+
+# The tiling layout goldens are also compared in the wasm build, in Node, by
+# `wasm-bindgen-test-runner` (`tests/tiling_golden.rs`, `specs/0069-tiling` criterion 41). The
+# version `curvyo-geometry-core` already uses; MIT OR Apache-2.0.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
