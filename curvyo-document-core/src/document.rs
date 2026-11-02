@@ -317,7 +317,17 @@ impl DocumentVersion {
 /// version 31 is none. Damage: an unknown paint or generator, a parameter of the wrong type,
 /// non-finite or out of its range, a seed that is not an integer in u32. Golden:
 /// `pattern_v32.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 32;
+///
+/// Bumped to 33 in `tiling` (ADR 0028, `specs/0069-tiling`): a tiling is a group with the
+/// registers `tiling` (the recipe, one map value) and `tiling_sources`; its instances carry
+/// `tiling_cell` and the members of a multi-source instance `tiling_member`
+/// (`crate::tiling_codec`). A build that stops at version 32 would edit a tiling as a plain group
+/// and lose the link between recipe and instances silently, so it must refuse every file of this
+/// build as too new. Migration from version 32 is none: a file without tilings opens unchanged.
+/// Damage: `tiling` on a node that is not a group, an unknown layout or result, a count of 0 or
+/// over 100,000, a number that is not finite, a malformed source list, cell or member key. The
+/// number is provisional by the rule above. Goldens: `tiling_*_v33.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 33;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

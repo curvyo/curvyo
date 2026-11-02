@@ -132,6 +132,13 @@ mod text_path_commands;
 mod text_path_model;
 mod text_paths;
 mod texts;
+mod tiling_codec;
+mod tiling_commands;
+mod tiling_copy;
+mod tiling_model;
+mod tiling_pivot;
+mod tiling_regenerate;
+mod tiling_write;
 mod transform_objects;
 mod units;
 
@@ -148,7 +155,7 @@ pub use clone_overrides::{
 pub use clone_preview::clone_previews;
 pub use clone_read::ObjectRead;
 pub use clone_repair::CloneRepair;
-pub use clone_transform::{CloneLinks, CloneMatrices, clone_matrices_after};
+pub use clone_transform::{CloneLinks, CloneMatrices, HeldClones, Hold, clone_matrices_after};
 pub use clones::{
     CloneError, LINKED_CLONE_COMMIT_LABEL, REMOVE_ORPHAN_CLONES_COMMIT_LABEL,
     UNLINK_CLONE_COMMIT_LABEL,
@@ -268,6 +275,13 @@ pub use text_path_model::{
 };
 pub use text_paths::TextConversion;
 pub use texts::{TextCharsLabel, TextEditError, TextLayoutLabel};
+pub use tiling_commands::{StoredTiling, TilingOutcome};
+pub use tiling_model::{
+    CellKey, Channel, CircleOptions, EDIT_TILING_COMMIT_LABEL, GridOptions, OffsetLines, Percent,
+    RELEASE_TILING_COMMIT_LABEL, RecipeError, SpacingMode, TILE_COMMIT_LABEL, TILING_GROUP_NAME,
+    TILING_MAX_COUNT, TILING_WARN_COUNT, TilingCell, TilingError, TilingLayout, TilingRecipe,
+    TilingRequest, TilingResult, Variance, hue_shifted,
+};
 pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};
 
 mod sketch_model;

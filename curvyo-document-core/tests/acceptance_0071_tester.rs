@@ -164,12 +164,13 @@ fn good() -> serde_json::Value {
 
 #[test]
 fn format_version_is_32_and_a_saved_file_says_so() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 32);
+    // `0069` took 33 for tilings after this slice merged.
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 32);
     let d = Document::new(1);
     rect(&d);
     let m: serde_json::Value =
         serde_json::from_slice(&member(&pack(&d, "t").unwrap(), "manifest.json")).unwrap();
-    assert_eq!(m["format_version"], 32);
+    assert_eq!(m["format_version"], CURRENT_FORMAT_VERSION);
 }
 
 #[test]
@@ -276,13 +277,12 @@ fn older_files_open_without_patterns_and_a_newer_one_is_refused() {
     }
     let d = Document::new(1);
     rect(&d);
-    let bytes = file_from_loro(&loro_of(&d), 33);
+    let newer = CURRENT_FORMAT_VERSION + 1;
+    let bytes = file_from_loro(&loro_of(&d), newer);
     assert!(matches!(
         unpack(2, &bytes),
-        Err(OpenError::FormatTooNew {
-            found: 33,
-            supported: 32
-        })
+        Err(OpenError::FormatTooNew { found, supported })
+            if found == newer && supported == CURRENT_FORMAT_VERSION
     ));
 }
 

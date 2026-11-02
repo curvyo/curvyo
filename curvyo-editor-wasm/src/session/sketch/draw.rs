@@ -222,6 +222,7 @@ impl Session {
             &all.leaves,
             std::slice::from_ref(&changed),
             usize::MAX,
+            &curvyo_document_core::HeldClones::new(),
             false,
         )
         .unwrap_or_default();

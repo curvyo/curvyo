@@ -202,7 +202,7 @@ impl Document {
             // Every object moves, so no clone is held back (ADR 0016 §2).
             crate::clone_transform::clone_matrices_after(
                 &links,
-                &std::collections::HashSet::new(),
+                &crate::clone_transform::HeldClones::new(),
                 &ids,
                 crate::affine::Affine::translation(offset),
             )

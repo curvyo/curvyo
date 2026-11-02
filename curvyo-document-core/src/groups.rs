@@ -215,6 +215,8 @@ impl Document {
         let mut released = Vec::new();
         let parents: Vec<Option<TreeID>> = groups.iter().map(|&g| group_parent(&tree, g)).collect();
         for group in groups {
+            // Ungroup of a tiling releases it in the same commit (ADR 0028 §7).
+            crate::tiling_copy::strip_tiling(&tree, group);
             let mut after = group;
             for child in children_of(&tree, Some(group)) {
                 // invariant: the child and the group are live; `after` is a sibling of the

@@ -91,6 +91,15 @@ impl Affine {
         )
     }
 
+    /// Whether `self` and `other` differ by at most `tolerance` in every entry.
+    #[must_use]
+    pub fn approx_eq(self, other: Self, tolerance: f64) -> bool {
+        self.to_array()
+            .iter()
+            .zip(other.to_array())
+            .all(|(x, y)| (x - y).abs() <= tolerance)
+    }
+
     /// `p` mapped by the whole map.
     #[must_use]
     pub fn apply_point(self, p: Point) -> Point {

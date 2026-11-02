@@ -241,7 +241,7 @@ fn live_clone_metas<'r>(
 }
 
 /// Removes every style key and `opacity` from a clone node, residue included. Uncommitted.
-fn clear_style_keys(meta: &LoroMap) {
+pub(crate) fn clear_style_keys(meta: &LoroMap) {
     for key in crate::style_codec::ALL_STYLE_KEYS
         .iter()
         .copied()
