@@ -34,3 +34,14 @@ dependencies are covered by `Cargo.lock`, `frontend/package-lock.json` and `deny
 - **Checked:** 2026-10-31, by downloading the files at the commit above and reading their
   metadata (the two distance files: creator [wmayer], contributor [agryson] Alexander Gryson,
   "FreeCAD LGPL2+").
+
+## PaddleOCR Latin text recognition weights
+
+- **Used in:** `frontend/public/models/paddleocr-latin/` (`det.onnx`, `rec.onnx`, `dict.txt`), read
+  by `curvyo-ocr-core` in the trace worker (`specs/0091-trace-text-recognition`, ADR 0028).
+- **Source:** the ONNX conversion <https://huggingface.co/monkt/paddleocr-onnx> (`detection/v3`,
+  `languages/latin`), of PaddleOCR's `PP-OCRv3_mobile_det` and `latin_PP-OCRv5_mobile_rec`,
+  <https://github.com/PaddlePaddle/PaddleOCR>, fetched 2026-10-31, unmodified.
+- **Licence:** Apache-2.0; the text ships next to the files as `LICENSE`. The record with the
+  SHA-256 of each file is `model.toml`, checked by `curvyo-ocr-core/tests/model_record.rs`.
+- **Training data:** not itemised upstream; accepted by the customer (Frage 112 A, 2026-10-31).
