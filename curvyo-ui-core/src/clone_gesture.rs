@@ -69,7 +69,7 @@ pub(crate) fn chain_moves(clone: &CloneSnapshot, starts: &[ObjectSnapshot]) -> b
 /// [`curvyo_document_core::Document::own_placement_clones`].
 pub(crate) fn settle_clone_matrices(
     links: &CloneLinks,
-    held: &std::collections::HashSet<NodeId>,
+    held: &curvyo_document_core::HeldClones,
     results: &mut [ObjectSnapshot],
     g: Affine,
 ) {

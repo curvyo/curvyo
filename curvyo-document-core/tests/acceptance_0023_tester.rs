@@ -601,6 +601,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("layers")
             // `0058-bitmap-import` (format 25) is a later build: its golden holds a group.
             || name.starts_with("image_")
+            // `0069-tiling` (format 33) is a later build: a tiling is a group.
+            || name.starts_with("tiling_")
         {
             continue;
         }

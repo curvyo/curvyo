@@ -591,6 +591,16 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "dimension_slots_count_v31.curvyo",
         "dimension_slot_malformed_v31.curvyo",
         "dimension_value_nan_v31.curvyo",
+        // The damaged-tiling files of `0069-tiling`.
+        "tiling_on_a_leaf_v33.curvyo",
+        "tiling_layout_unknown_v33.curvyo",
+        "tiling_result_unknown_v33.curvyo",
+        "tiling_count_zero_v33.curvyo",
+        "tiling_count_over_limit_v33.curvyo",
+        "tiling_number_nan_v33.curvyo",
+        "tiling_sources_malformed_v33.curvyo",
+        "tiling_cell_malformed_v33.curvyo",
+        "tiling_member_malformed_v33.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

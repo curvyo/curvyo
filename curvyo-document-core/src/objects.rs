@@ -249,7 +249,10 @@ impl Document {
             ));
         }
         let own_placement = if hold_all {
-            links.keys().copied().collect()
+            links
+                .keys()
+                .map(|&id| (id, crate::clone_transform::Hold::Whole))
+                .collect()
         } else {
             self.own_placement_clones()
         };
@@ -440,6 +443,7 @@ impl Document {
         crate::text_carrier::relink_copied_texts(&tree, &copying.made, text_shifts);
         crate::text_clone_commands::relink_copied_text_clones(&tree, &copying.made);
         crate::dimension_commands::relink_copied_dimensions(self, &tree, &copying.made, offset);
+        crate::tiling_copy::relink_copied_tilings(&tree, &copying.made);
         self.assign_sketch_copies(&copying.made, &sketch_claims);
         self.commit_with_label("duplicate_objects");
         Ok(created

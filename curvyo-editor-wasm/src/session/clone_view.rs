@@ -185,11 +185,17 @@ impl Session {
         changed: &[ObjectSnapshot],
         transform: bool,
     ) -> Vec<ObjectSnapshot> {
-        clone_previews(objects, changed, MAX_CLONE_PREVIEWS, transform)
-            .unwrap_or_default()
-            .into_iter()
-            .map(ObjectSnapshot::Path)
-            .collect()
+        clone_previews(
+            objects,
+            changed,
+            MAX_CLONE_PREVIEWS,
+            &curvyo_document_core::HeldClones::new(),
+            transform,
+        )
+        .unwrap_or_default()
+        .into_iter()
+        .map(ObjectSnapshot::Path)
+        .collect()
     }
 
     /// The paths of a Node-tool drag that differ from the read, as changed objects.

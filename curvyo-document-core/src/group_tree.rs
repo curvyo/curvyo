@@ -168,7 +168,9 @@ pub(crate) fn validate_tree(tree: &LoroTree, node_ok: fn(&LoroTree, TreeID) -> b
         let Ok(meta) = tree.get_meta(node) else {
             return false;
         };
-        if !crate::node_registers::registers_are_valid(&meta, meta_is_group(&meta)) {
+        if !crate::node_registers::registers_are_valid(&meta, meta_is_group(&meta))
+            || !crate::tiling_codec::registers_are_valid(&meta, meta_is_group(&meta))
+        {
             return false;
         }
         match meta.get(KEY_GROUP) {

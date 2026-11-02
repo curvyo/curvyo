@@ -4,6 +4,7 @@
 
 use crate::affine::Affine;
 use crate::path_model::PathSnapshot;
+use crate::primitive_model::ObjectSnapshot;
 use crate::units::Point;
 
 /// How far (millimetres, scaled by the outline's extent where it is larger than 1 mm) a mapped
@@ -33,6 +34,25 @@ pub(crate) fn outline_map(before: &PathSnapshot, after: &PathSnapshot) -> Option
         }
     }
     fit(&pairs)
+}
+
+/// The change of an object's drawn outline from `before` to `after` as one affine map, when both
+/// are outlines a clone can follow (a path, a sketch, a clone) and such a map exists: what the
+/// held-back rule reads from a writer's results and a drag's preview from its live objects alike.
+#[must_use]
+pub(crate) fn object_map(before: &ObjectSnapshot, after: &ObjectSnapshot) -> Option<Affine> {
+    fn drawn(object: &ObjectSnapshot) -> Option<&PathSnapshot> {
+        match object {
+            ObjectSnapshot::Path(path) => Some(path),
+            ObjectSnapshot::Sketch(sketch) => Some(&sketch.resolved),
+            ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
+            ObjectSnapshot::Primitive(_)
+            | ObjectSnapshot::Text(_)
+            | ObjectSnapshot::Image(_)
+            | ObjectSnapshot::Dimension(_) => None,
+        }
+    }
+    outline_map(drawn(before)?, drawn(after)?)
 }
 
 /// The least-squares affine map of `pairs`, if it takes every point to its partner within
