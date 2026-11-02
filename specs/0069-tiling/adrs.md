@@ -1,14 +1,14 @@
 # ADRs for "Tiling"
 
 Date: 2026-11-01. How a tiling is stored is a document-model and file-format decision:
-**[ADR 0028](../../docs/adr/0028-stored-tiling-nodes.md), Accepted by the customer decision
+**[ADR 0030](../../docs/adr/0030-stored-tiling-nodes.md), Accepted by the customer decision
 TILE-LIVE B (2026-11-01)**. The behaviour follows TILE-HOME-UI A, TILE-SOURCE A, TILE-SPACING A,
 TILE-EXTRAS A and TILE-RESULT-GROUP A. Everything under "Feature-local decisions" is
 **(Proposal)**, reversible inside the story. No new crate, trait, generic or dependency.
 
 ## Depends on
 
-- [ADR 0028](../../docs/adr/0028-stored-tiling-nodes.md): a tiling is a group with the `tiling`
+- [ADR 0030](../../docs/adr/0030-stored-tiling-nodes.md): a tiling is a group with the `tiling`
   recipe and `tiling_sources`; instances keyed by `tiling_cell`, members by `tiling_member`;
   apply in one commit with minimal writes; refusal before the first write; hand edits last until
   the next apply; Release; merge residue repaired by the next apply; format bump; goldens.
@@ -58,7 +58,7 @@ TILE-EXTRAS A and TILE-RESULT-GROUP A. Everything under "Feature-local decisions
    about the source box centre. Golden layouts: fixed recipes and seeds with expected affines.
 4. **Platforms.** Generator outputs are integers and identical everywhere. `sin`/`cos` may differ
    in the last bit between native and wasm, so layout goldens compare with 1e-9 mm and 1e-12 rad;
-   ADR 0028 §3 writes nothing below 1e-9 mm, so a peer on another platform does not rewrite
+   ADR 0030 §3 writes nothing below 1e-9 mm, so a peer on another platform does not rewrite
    matrices. No `libm` dependency.
 5. **Preview without document writes.** While the bar is open the session recomputes the layout
    on each change and draws the source outline mapped by each affine as an overlay (images as
@@ -82,20 +82,22 @@ TILE-EXTRAS A and TILE-RESULT-GROUP A. Everything under "Feature-local decisions
    radius (`Length`), start angle and sweep (`Angle`), face centre; per channel (rotation, scale
    x, scale y, offset x, offset y, opacity, hue) a random ± and a step per row and per column,
    plus `uniform_scale`; `seed`, `result`, `keep_source`. Absent channel = 0.
-10. **Format and goldens.** `CURRENT_FORMAT_VERSION` 32 (provisional, next free at merge; main is
-   31). Goldens as ADR 0028 Consequences lists, named `tiling_*_v32.curvyo`.
+10. **Format and goldens.** `CURRENT_FORMAT_VERSION` 33 (next free at merge; main took
+   32 for `0071`). Goldens as ADR 0030 Consequences lists, named `tiling_*_v33.curvyo`.
 11. **Instances follow a source scale (2026-11-02).** After the customer finding on PR #247 a
-   tiling instance holds back only the rigid part of a source transform, about one pivot per
-   tiling (the centre of Apply's cell box), decided in the pure `clone_matrices_after` with
-   `Hold::Rigid`; ADR 0028 §2 and ADR 0016 §2 are amended, criterion 29 says it.
+   tiling instance holds back only the move a source transform gives one pivot per tiling (the
+   centre of Apply's cell box) and follows the whole linear change, rotation included, in place
+   (customer on PR #247, same day: "rotation does not work yet with editing the original"),
+   decided in the pure `clone_matrices_after` with `Hold::Translation`; ADR 0030 §2 and ADR 0016
+   §2 are amended, criterion 29 says it.
 
 ## For the product owner
 
-- Criterion 9 (reopen) is now the stored tiling of ADR 0028, for copies too; the out-of-scope
+- Criterion 9 (reopen) is now the stored tiling of ADR 0030, for copies too; the out-of-scope
   line "Persisting the tiling as a live parametric object" goes.
 - The spec must say: hand edits to an instance last until the next apply (deleted cells come
   back); Release keeps them for good. Opacity or hue variance makes instances stop following the
   source's style until the next apply.
 - Sketches tile as linked clones, not copies: they are clonable since ADR 0026. Only images are
   copies. (Proposal; the plan's wording predates it.)
-- Links line: ADRs → ADR 0028.
+- Links line: ADRs → ADR 0030.

@@ -1,4 +1,4 @@
-# ADR 0028: Stored tiling nodes
+# ADR 0030: Stored tiling nodes
 
 **Status:** Accepted 2026-11-01 by the customer decision TILE-LIVE B (document model, file
 format; `needs-customer` answered). Items marked **(Proposal)** are the architect's, vetoable at the demo. Asked by `specs/0069-tiling` (TILE-SOURCE A,
@@ -51,29 +51,30 @@ across a regeneration, and what a peer's concurrent edit does to it.
      clones (ADR 0022). Every generated clone has `own_placement = true` (ADR 0016 §2), so moving
      or rotating a source does not scatter rotated instances; node and style edits of the source
      still flow. Its `clone_link` matrix is the instance's affine `A_cell`. A tiling instance
-     (a clone with a cell or member key) holds back only the rigid part of a source transform
-     and the rest reaches it in its own cell (amended 2026-11-02 after the customer finding on
-     PR #247: a scaled source left its instances unchanged; pivot and chain rule amended the same
-     day after the architect review):
+     (a clone with a cell or member key) holds back only the move a source transform gives the
+     tiling's pivot and the rest, the whole linear change, reaches it in its own cell (amended
+     2026-11-02 after the customer findings on PR #247: a scaled source left its instances
+     unchanged, then a rotated one did; pivot and chain rule amended the same day after the
+     architect review):
      - *Pivot:* one per tiling, the centre of the cell box Apply uses, the union of the selection
        boxes of the sources' leaves before the change (curve extrema, not anchor boxes). All
-       members of a multi-source instance split about it, so they keep their spacing relative to
-       each other, and for a pitch grid without variance the result is what the next Apply
+       members of a multi-source instance change about it, so they keep their spacing relative to
+       each other, and for a pitch grid without variance a scale gives what the next Apply
        writes.
-     - *Split:* the rigid part `R` takes the pivot where the change `T` takes it and, when
-       `det T > 0`, turns by the rotation of the polar decomposition of `T`'s linear part
-       (`atan2(b − c, a + d)`); the instance receives `R⁻¹·T`, its symmetric stretch about the
-       pivot. `M' = M·R⁻¹` and the instance's own change `M·R⁻¹·T·M⁻¹` is what clones downstream
-       of it see (ADR 0016 §2 amendment).
-     - *Flip* (`det T < 0`): no rotation is split off, the whole linear part reaches the
-       instance, including the turn of a one-gesture rotate-and-flip. Splitting a reflection is
-       convention-dependent (a vertical flip is a 180° turn times a horizontal one) and could hold
-       back a half turn.
-     - *Skew:* goes through the polar split: part of it is held as a rotation (`atan2(−k, 2)`
-       for a shear `k`) and the instance receives the symmetric stretch, not the skew.
-     - *Path dependence:* the split is per transform step. A rotation followed by a stretch along
-       the screen axes stretches the instance along axes tilted by the held rotation, and a flip of
-       a rotated source shows as a flip about a tilted axis. The next Apply resets the instance.
+     - *Split:* `R` is the translation that takes the pivot where the change `T` takes it; the
+       instance receives `R⁻¹·T`, `T`'s linear part (scale, stretch, flip, rotation, skew) about
+       the pivot, so every instance turns, scales or flips in place about its own cell position
+       and nothing scatters. `M' = M·R⁻¹` and the instance's own change `M·R⁻¹·T·M⁻¹` is what
+       clones downstream of it see (ADR 0016 §2 amendment). Only a pure translation (`R = T`
+       within the write tolerance) is held back whole and counted as held.
+     - *Superseded the same day:* the first amendment held back a rigid part with the polar
+       rotation of `T` (`atan2(b − c, a + d)`), so a rotated source left its instances unturned
+       and a skew reached them as a symmetric stretch; the customer asked for rotation to follow
+       ("rotation does not work yet with editing the original").
+     - *Path dependence:* the pivot is the current cell box centre, so a rotation about another
+       point followed by the inverse rotation about that point can leave an instance slightly
+       moved in its cell when the cell box centre does not turn with the shape (a triangle's
+       box). Undo restores it exactly; the next Apply resets it.
    - **Own style** is written only when the opacity or hue variance of the recipe is not zero:
      the source's style with the varied opacity or hue, ADR 0016 §1. Such an instance no longer
      follows style edits of its source until the next apply (Proposal; the only per-clone
@@ -137,8 +138,8 @@ across a regeneration, and what a peer's concurrent edit does to it.
 9. **Export and output.** A tiling exports and outputs exactly as the same group of clones and
    copies made by hand: SVG `<g>` of resolved outlines, G-code and job preview from the resolved
    instances. The recipe is never exported (no passthrough, ADR 0018).
-10. **Format.** `format_version` goes up by one, to the next free number at merge (**32** today:
-    main is at 31 since `0070`). An older build would edit a tiling as a plain group and lose
+10. **Format.** `format_version` goes up by one, to the next free number at merge (**33**:
+    main took 32 for `0071` pattern fill). An older build would edit a tiling as a plain group and lose
     the link between recipe and instances silently, so it must refuse the file. Damage: `tiling`
     on a node that is not a group; an unknown `layout` or `result`; a count of zero or over the
     refusal limit; a non-finite number; a malformed `tiling_sources`, `tiling_cell` or
@@ -162,6 +163,6 @@ across a regeneration, and what a peer's concurrent edit does to it.
   trait, generic or dependency. The layout and generator are pure code in `curvyo-ui-core`.
 - `0071` pattern fill can reuse the recipe value and the layout; a boundary or clipping is a new
   register and its own ADR.
-- Goldens: `tiling_v32.curvyo` (grid with hue variance, circle, multi-source instances with an
+- Goldens: `tiling_v33.curvyo` (grid with hue variance, circle, multi-source instances with an
   image copy, `keep_source` on and off, a copies tiling), one damage file per rule, a residue
   file that opens; a tiling's SVG export equals the hand-made group's.

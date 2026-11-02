@@ -1,4 +1,4 @@
-//! The stored shape of tilings (`specs/0069-tiling` criteria 25 and 42, ADR 0028 §10): the golden
+//! The stored shape of tilings (`specs/0069-tiling` criteria 25 and 42, ADR 0030 §10): the golden
 //! `tiling_v33.curvyo` (a grid with hue variance and the source kept, a circle with the source
 //! left out, a multi-source tiling with an image copy, a copies tiling), one damaged file per
 //! damage rule, and a residue file that opens. `CURVYO_WRITE_FIXTURES=1` rewrites the fixtures.
@@ -300,7 +300,7 @@ fn damaged_files() -> Vec<(&'static str, Vec<u8>)> {
     ]
 }
 
-/// Dangling source id, a duplicate cell key and a missing cell (merge residue, ADR 0028 §6).
+/// Dangling source id, a duplicate cell key and a missing cell (merge residue, ADR 0030 §6).
 fn residue_file() -> Vec<u8> {
     edited(|tree, nodes| {
         let group = find(tree, nodes, "tiling_sources");

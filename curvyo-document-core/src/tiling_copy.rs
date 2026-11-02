@@ -1,4 +1,4 @@
-//! Tiling registers of nodes that leave their tiling form (ADR 0028 §6, §7): Release, Ungroup,
+//! Tiling registers of nodes that leave their tiling form (ADR 0030 §6, §7): Release, Ungroup,
 //! copy.
 
 use std::collections::{HashMap, HashSet};
@@ -9,7 +9,7 @@ use crate::group_tree::{children_of, group_parent, meta_is_group, node_id};
 use crate::path_model::NodeId;
 use crate::tiling_codec::read_sources;
 
-/// Removes the tiling registers that `group` owns (ADR 0028 §7): its own, its instances' cell
+/// Removes the tiling registers that `group` owns (ADR 0030 §7): its own, its instances' cell
 /// keys and their members' keys. A tiling nested deeper keeps its recipe. Uncommitted.
 pub(crate) fn strip_tiling(tree: &LoroTree, group: TreeID) {
     let Ok(meta) = tree.get_meta(group) else {
@@ -39,7 +39,7 @@ pub(crate) fn strip_tiling(tree: &LoroTree, group: TreeID) {
     }
 }
 
-/// After a copy (ADR 0028 §6): a copied tiling's source list and member keys point at the
+/// After a copy (ADR 0030 §6): a copied tiling's source list and member keys point at the
 /// copies of the sources where they were copied too; a copied instance or member whose tiling
 /// group was not copied loses its keys. Uncommitted.
 pub(crate) fn relink_copied_tilings(tree: &LoroTree, made: &[(TreeID, TreeID)]) {

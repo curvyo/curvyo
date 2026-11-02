@@ -1,4 +1,4 @@
-//! The tiling commands (ADR 0028 §3, §4, §6 and §7): Apply (create and re-apply), Release, the
+//! The tiling commands (ADR 0030 §3, §4, §6 and §7): Apply (create and re-apply), Release, the
 //! read of a stored tiling, and the strip and remap that Ungroup and the copy writers call.
 
 use std::collections::{HashMap, HashSet};
@@ -222,7 +222,7 @@ impl Document {
         flattened(&tree, &live).into_iter().map(node_id).collect()
     }
 
-    /// Checks everything an Apply needs before its first write (ADR 0028 §4).
+    /// Checks everything an Apply needs before its first write (ADR 0030 §4).
     fn plan_tiling(
         &self,
         request: &TilingRequest,
@@ -267,7 +267,7 @@ impl Document {
         })
     }
 
-    /// Creates or re-applies a tiling in **one commit** (ADR 0028 §3): "Tile" for a new one,
+    /// Creates or re-applies a tiling in **one commit** (ADR 0030 §3): "Tile" for a new one,
     /// "Edit tiling" for a re-apply. The group holds the kept source (lowest) and one instance per
     /// cell of `request.cells`; a re-apply keeps instances whose key stays and rewrites only what
     /// differs, creates missing cells and members, deletes cells that left the layout, leaves

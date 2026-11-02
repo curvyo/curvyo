@@ -85,7 +85,7 @@ fn preview_outline(object: &ObjectSnapshot) -> Option<PathSnapshot> {
 
 /// `recipe` with the count of the layout not in use brought under the limit (review item 8): a
 /// grid of 1,000 x 1,000 left behind after switching to Circle would refuse the Apply and be
-/// damage on open (ADR 0028 §10), so its columns and rows (or the circle count) are cut to the limit.
+/// damage on open (ADR 0030 §10), so its columns and rows (or the circle count) are cut to the limit.
 fn fit_inactive_layout(mut recipe: TilingRecipe) -> TilingRecipe {
     match recipe.layout {
         TilingLayout::Circle => {

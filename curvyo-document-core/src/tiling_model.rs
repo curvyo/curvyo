@@ -1,4 +1,4 @@
-//! The values of a stored tiling (ADR 0028 §1 and §3): the recipe, the cell key and the per-cell
+//! The values of a stored tiling (ADR 0030 §1 and §3): the recipe, the cell key and the per-cell
 //! placement and style shift that the caller computes and the tiling command writes.
 //!
 //! The document never computes a layout (ADR 0011): `curvyo-ui-core`'s `tiling_layout` turns a
@@ -20,13 +20,13 @@ pub const RELEASE_TILING_COMMIT_LABEL: &str = "release_tiling";
 
 /// Above this many instances the bar warns and the preview draws boxes only (criterion 36).
 pub const TILING_WARN_COUNT: u32 = 10_000;
-/// More instances than this are refused (criterion 36, ADR 0028 §4).
+/// More instances than this are refused (criterion 36, ADR 0030 §4).
 pub const TILING_MAX_COUNT: u32 = 100_000;
 /// The name of a tiling group (TILE-RESULT-GROUP A).
 pub const TILING_GROUP_NAME: &str = "Tiling";
 /// Placements and copy geometry closer than this to the stored value are not rewritten
-/// (ADR 0028 §3; a peer whose `sin` differs in the last bit writes nothing), and a tiling
-/// instance whose source change is rigid within it counts as held (ADR 0028 §2).
+/// (ADR 0030 §3; a peer whose `sin` differs in the last bit writes nothing), and a tiling
+/// instance whose source change is rigid within it counts as held (ADR 0030 §2).
 pub(crate) const TILING_WRITE_TOLERANCE_MM: f64 = 1e-9;
 
 /// A percentage (scale variance in percent, opacity variance in percentage points): a newtype,
@@ -185,7 +185,7 @@ impl Default for Variance {
 }
 
 impl Variance {
-    /// Whether the opacity or hue variance is on, so instances get their own style (ADR 0028 §2).
+    /// Whether the opacity or hue variance is on, so instances get their own style (ADR 0030 §2).
     #[must_use]
     pub fn varies_style(&self) -> bool {
         let percent = |c: &Channel<Percent>| {
@@ -200,7 +200,7 @@ impl Variance {
     }
 }
 
-/// The whole recipe of a tiling, one atomic register (ADR 0028 §1). Both layouts keep their
+/// The whole recipe of a tiling, one atomic register (ADR 0030 §1). Both layouts keep their
 /// values, so switching between them loses nothing (criterion 27).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TilingRecipe {
@@ -256,7 +256,7 @@ impl TilingRecipe {
         }
     }
 
-    /// Checks the stored-shape rules of ADR 0028 §10 for both layouts: counts from 1 to the
+    /// Checks the stored-shape rules of ADR 0030 §10 for both layouts: counts from 1 to the
     /// limit and finite numbers. Used at open (damage) and before every apply.
     ///
     /// # Errors
@@ -333,7 +333,7 @@ impl TilingRecipe {
     }
 }
 
-/// The identity of an instance (ADR 0028 §2): grid row and column; a circle uses row 0.
+/// The identity of an instance (ADR 0030 §2): grid row and column; a circle uses row 0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CellKey {
     /// The row (0 for a circle).
@@ -354,7 +354,7 @@ impl CellKey {
 }
 
 /// What the caller computed for one generated cell: where the instance goes and how its style
-/// shifts (ADR 0028 §3).
+/// shifts (ADR 0030 §3).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TilingCell {
     /// The cell.
@@ -384,7 +384,7 @@ pub struct TilingRequest {
     pub conversions: Vec<(NodeId, Vec<crate::path_model::NewAnchor>)>,
 }
 
-/// Why a tiling command refused. Nothing is written in any case (ADR 0028 §4).
+/// Why a tiling command refused. Nothing is written in any case (ADR 0030 §4).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum TilingError {
     /// No source object is left after skipping dimensions.

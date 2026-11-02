@@ -1,4 +1,4 @@
-//! Tiling (`specs/0069-tiling`, ADR 0028): the seeded generator, the layout of the cells and the
+//! Tiling (`specs/0069-tiling`, ADR 0030): the seeded generator, the layout of the cells and the
 //! variance of each cell, all pure; the document writes what they compute.
 
 mod handles;

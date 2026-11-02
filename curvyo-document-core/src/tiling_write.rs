@@ -1,4 +1,4 @@
-//! The writes of one tiling member (ADR 0028 §2 and §3): a new linked clone, text clone or copy of
+//! The writes of one tiling member (ADR 0030 §2 and §3): a new linked clone, text clone or copy of
 //! a source leaf placed by its cell, and the minimal rewrite of an existing one.
 
 use loro::LoroMap;
@@ -112,7 +112,7 @@ pub(crate) fn is_member_of(
     }
 }
 
-/// The node registers a text-copy rewrite keeps (ADR 0028 §5: Apply owns placement and the
+/// The node registers a text-copy rewrite keeps (ADR 0030 §5: Apply owns placement and the
 /// variance's own style, not visibility, lock or guide).
 const KEPT_NODE_REGISTERS: [&str; 5] = [
     crate::node_registers::KEY_NAME,

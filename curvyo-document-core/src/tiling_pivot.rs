@@ -1,4 +1,4 @@
-//! The pivot a tiling instance holds a source change about (ADR 0028 §2, amended 2026-11-02):
+//! The pivot a tiling instance holds a source change about (ADR 0030 §2, amended 2026-11-02):
 //! the centre of the cell box Apply uses, the selection boxes of its sources' leaves before the
 //! change.
 

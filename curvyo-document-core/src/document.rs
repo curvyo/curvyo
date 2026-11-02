@@ -318,7 +318,7 @@ impl DocumentVersion {
 /// non-finite or out of its range, a seed that is not an integer in u32. Golden:
 /// `pattern_v32.curvyo`.
 ///
-/// Bumped to 33 in `tiling` (ADR 0028, `specs/0069-tiling`): a tiling is a group with the
+/// Bumped to 33 in `tiling` (ADR 0030, `specs/0069-tiling`): a tiling is a group with the
 /// registers `tiling` (the recipe, one map value) and `tiling_sources`; its instances carry
 /// `tiling_cell` and the members of a multi-source instance `tiling_member`
 /// (`crate::tiling_codec`). A build that stops at version 32 would edit a tiling as a plain group

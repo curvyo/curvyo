@@ -1,4 +1,4 @@
-//! The children of a tiling group brought in line with the cells of an Apply (ADR 0028 §3 and
+//! The children of a tiling group brought in line with the cells of an Apply (ADR 0030 §3 and
 //! §6): kept, rewritten where they differ, created, replaced or deleted by cell and member key.
 
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ fn create(tree: &LoroTree, parent: TreeID, at: Option<usize>) -> (TreeID, loro::
 }
 
 /// Groups the keyed children of `parent` by key with `read_key`, keeps the lowest id per key and
-/// deletes the other copies (merge residue, ADR 0028 §6). Returns the survivors.
+/// deletes the other copies (merge residue, ADR 0030 §6). Returns the survivors.
 fn keyed<K: Hash + Eq + Copy>(
     tree: &LoroTree,
     parent: TreeID,
