@@ -3,8 +3,8 @@
 
 use std::ops::ControlFlow;
 
-pub use curvyo_ocr_core::{OcrError, OcrModel};
-use curvyo_ocr_core::{OcrProgress, read_lines};
+pub use curvyo_ocr_core::{LINE_HEIGHT, LineCrop, OcrError, OcrModel};
+use curvyo_ocr_core::{OcrProgress, TextLine, crop_lines, read_crop, read_lines};
 
 /// The least mean character confidence of a line Trace sets as text (Proposal, `adrs.md`
 /// decision 2).
@@ -104,14 +104,41 @@ pub fn trace_read_text(
         on_percent(percent)
     };
     let lines = read_lines(model, width, height, rgba, &mut poll)?;
-    Ok(lines
-        .into_iter()
-        .map(|line| OcrLine {
-            quad: line.quad.map(|[x, y]| [f64::from(x), f64::from(y)]),
-            text: line.text,
-            confidence: line.confidence.into_iter().map(f64::from).collect(),
-        })
-        .collect())
+    Ok(lines.into_iter().map(kept).collect())
+}
+
+/// `line` as Trace keeps it.
+fn kept(line: TextLine) -> OcrLine {
+    OcrLine {
+        quad: line.quad.map(|[x, y]| [f64::from(x), f64::from(y)]),
+        text: line.text,
+        confidence: line.confidence.into_iter().map(f64::from).collect(),
+    }
+}
+
+/// The detection half of [`trace_read_text`]: the lines of `rgba` sampled for the recogniser, top
+/// to bottom, so a pool of workers can read them apart (`specs/0091` round 2).
+///
+/// # Errors
+/// As [`curvyo_ocr_core::crop_lines`].
+pub fn trace_crop_text(
+    model: &OcrModel,
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+) -> Result<Vec<LineCrop>, OcrError> {
+    crop_lines(model, width, height, rgba, &mut |_| {
+        ControlFlow::Continue(())
+    })
+}
+
+/// The reading half of [`trace_read_text`] for one crop: the line, or `None` when nothing was
+/// read. The same crop gives the same line in any worker.
+///
+/// # Errors
+/// As [`curvyo_ocr_core::read_crop`].
+pub fn trace_read_crop(model: &OcrModel, crop: &LineCrop) -> Result<Option<OcrLine>, OcrError> {
+    Ok(read_crop(model, crop)?.map(kept))
 }
 
 #[cfg(test)]

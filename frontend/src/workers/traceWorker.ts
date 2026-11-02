@@ -11,8 +11,11 @@ import {
   fit_start,
   fit_step,
   initSync,
+  ocr_crops,
   ocr_job,
   ocr_load,
+  ocr_loaded,
+  ocr_read_crops,
   trace_analyse,
   trace_auto_threshold,
   trace_job,
@@ -32,11 +35,14 @@ interface WorkerScope {
 
 const scope = self as unknown as WorkerScope;
 
+/** This worker's wasm memory, for the pool's memory report (`specs/0091` round 2). */
+let memory: WebAssembly.Memory | null = null;
+
 scope.onmessage = (event) => {
   const request = event.data;
   try {
     if (request.type === "init") {
-      initSync({ module: request.module });
+      memory = initSync({ module: request.module }).memory;
       // The page waits for this before it trusts the worker (a worker that never starts would
       // otherwise leave every job waiting).
       scope.postMessage({ id: 0, kind: "ready", error: "" });
@@ -85,6 +91,26 @@ scope.onmessage = (event) => {
         reply = fit_step(sink);
       }
       scope.postMessage({ id: request.id, kind: "fit", reply, ms: performance.now() - started });
+      return;
+    }
+    if (request.type === "ocr-crops") {
+      // The detection half of the read (`specs/0091` round 2): the pool reads the crops.
+      const error = ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
+      const crops = error === "" ? ocr_crops(request.rgba, request.width, request.height) : undefined;
+      const lines = crops?.lines ?? "";
+      const samples = crops?.samples ?? new Float32Array(0);
+      crops?.free();
+      scope.postMessage(
+        { id: request.id, kind: "ocr-crops", lines, samples, error: error === "" && lines === "" ? "unreadable" : error, rgba: request.rgba, ms: performance.now() - started },
+        [samples.buffer, request.rgba.buffer],
+      );
+      return;
+    }
+    if (request.type === "ocr-read") {
+      // A pool worker: the weights once per worker, then its share of the crops.
+      const error = ocr_loaded() || !request.weights ? "" : ocr_load(request.weights.detector, request.weights.recogniser, request.weights.alphabet);
+      const reads = error === "" ? ocr_read_crops(request.lines, request.samples, { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) }) : "";
+      scope.postMessage({ id: request.id, kind: "ocr-read", reads, memory: memory?.buffer.byteLength ?? 0, ms: performance.now() - started });
       return;
     }
     if (request.type === "ocr") {

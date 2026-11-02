@@ -1723,6 +1723,11 @@ first slice's PR:
   on the screenshot partly better, "Hershey Script"), so it was not kept; any minimum pad below
   1024 px still loses the "Ä". Batching at 1024 px gains nothing (17.1 s). Next levers: a
   recogniser that reads short lines alone, or OCR on the user's request only.
+  Since 2026-11-02 the lines are read by a pool of workers (min(cores - 1, 4), each loads the
+  weights once, about 37 MB wasm memory each), strings unchanged: Chromium, 8 cores, "Reading
+  text" on the screenshot 6.6 s (one reader 22.2 s), on the tester poster 2.3 s (3.3 s). The
+  screenshot's text pass and font fit before the trace then take 14 s (78 lines): the next
+  lever.
 
 **Resolution:** open. Levers: OCR as its own wasm module loaded on first use (removes the main-thread
 cost, needs a second `-wasm` crate and an ADR), width buckets and batching in recognition (several

@@ -27,7 +27,7 @@ extern "C" {
     pub type TraceProgressSink;
 
     #[wasm_bindgen(method)]
-    fn report(this: &TraceProgressSink, percent: u8);
+    pub(crate) fn report(this: &TraceProgressSink, percent: u8);
 }
 
 /// The bar notice when the text reader could not be used (`specs/0091` UX notes §3).
@@ -74,7 +74,7 @@ pub fn trace_job(
 
 thread_local! {
     /// The text reader of this worker, loaded once (`specs/0091`, ADR 0028 §5).
-    static OCR_MODEL: std::cell::RefCell<Option<curvyo_ui_core::OcrModel>> =
+    pub(crate) static OCR_MODEL: std::cell::RefCell<Option<curvyo_ui_core::OcrModel>> =
         const { std::cell::RefCell::new(None) };
 }
 

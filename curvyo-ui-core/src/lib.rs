@@ -494,7 +494,8 @@ pub use trace_fit::{
 };
 pub use trace_inpaint::inpaint as trace_inpaint;
 pub use trace_ocr::{
-    MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE, OcrError, OcrLine, OcrModel, trace_read_text,
+    LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
+    OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,
 };
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,

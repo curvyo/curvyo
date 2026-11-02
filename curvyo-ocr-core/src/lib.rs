@@ -24,6 +24,7 @@ use std::ops::ControlFlow;
 
 pub use detect::DETECTION_SIDE;
 pub use model::{ALPHABET_SHA256, DETECTOR_SHA256, OcrModel, RECOGNISER_SHA256};
+pub use read::{LINE_HEIGHT, LineCrop, read_crop};
 
 /// One line of text the model read.
 #[derive(Debug, Clone, PartialEq)]
@@ -69,9 +70,9 @@ pub enum OcrError {
 }
 
 /// Reads the text lines of `rgba` (`width` x `height`, straight alpha, composited on white)
-/// with `model`, top to bottom. `poll` is called before the detector and after each line; a
-/// `Break` ends the read with [`OcrError::Cancelled`]. Deterministic: the same input gives the same
-/// lines (ADR 0028 §6).
+/// with `model`, top to bottom: [`crop_lines`], then [`read_crop`] of each. `poll` is called
+/// before the detector and after each line; a `Break` ends the read with
+/// [`OcrError::Cancelled`]. Deterministic: the same input gives the same lines (ADR 0028 §6).
 ///
 /// # Errors
 /// [`OcrError::Invalid`] for a raster whose size does not match its bytes or that is empty,
@@ -83,24 +84,41 @@ pub fn read_lines(
     rgba: &[u8],
     poll: &mut dyn FnMut(OcrProgress) -> ControlFlow<()>,
 ) -> Result<Vec<TextLine>, OcrError> {
-    let image = resize::Rgb::from_rgba(width, height, rgba)?;
-    if poll(OcrProgress::Detecting).is_break() {
-        return Err(OcrError::Cancelled);
-    }
-    let boxes = detect::detect(model.detector(), &image)?;
-    let found = lines::group(&boxes);
-    let total = found.len();
+    let crops = crop_lines(model, width, height, rgba, poll)?;
+    let total = crops.len();
     let mut out = Vec::with_capacity(total);
-    for (done, quad) in found.into_iter().enumerate() {
+    for (done, line) in crops.iter().enumerate() {
         if poll(OcrProgress::Reading { done, total }).is_break() {
             return Err(OcrError::Cancelled);
         }
-        if let Some(line) = read::read(model, &image, quad)? {
-            out.push(line);
-        }
+        out.extend(read_crop(model, line)?);
     }
     if poll(OcrProgress::Reading { done: total, total }).is_break() {
         return Err(OcrError::Cancelled);
     }
     Ok(out)
+}
+
+/// The lines `model`'s detector finds in `rgba`, top to bottom, each sampled for the recogniser
+/// (the detection half of [`read_lines`]; the crops can be read apart, `specs/0091` round 2).
+/// `poll` is called before the detector.
+///
+/// # Errors
+/// As [`read_lines`].
+pub fn crop_lines(
+    model: &OcrModel,
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    poll: &mut dyn FnMut(OcrProgress) -> ControlFlow<()>,
+) -> Result<Vec<LineCrop>, OcrError> {
+    let image = resize::Rgb::from_rgba(width, height, rgba)?;
+    if poll(OcrProgress::Detecting).is_break() {
+        return Err(OcrError::Cancelled);
+    }
+    let boxes = detect::detect(model.detector(), &image)?;
+    Ok(lines::group(&boxes)
+        .into_iter()
+        .filter_map(|quad| read::crop(&image, quad))
+        .collect())
 }

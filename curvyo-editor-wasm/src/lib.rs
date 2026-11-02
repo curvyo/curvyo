@@ -23,6 +23,7 @@ mod font_checks_glue;
 mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
+mod ocr_pool_glue;
 mod session;
 mod trace_analysis_glue;
 mod trace_fit_glue;
@@ -75,6 +76,8 @@ mod wasm_navigation;
 #[cfg(target_arch = "wasm32")]
 mod wasm_node_tool;
 #[cfg(target_arch = "wasm32")]
+mod wasm_ocr_pool;
+#[cfg(target_arch = "wasm32")]
 mod wasm_offset;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pages;
@@ -123,6 +126,7 @@ pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
+pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
 pub use session::SvgExportResult;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
