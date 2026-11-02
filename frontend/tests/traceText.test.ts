@@ -9,6 +9,9 @@ import { test } from "node:test";
 
 import {
   BRIGHTNESS,
+  MULTICOLOUR,
+  readsText,
+  textLinesText,
   NO_STATUS,
   pickedCountText,
   TRACE_BAR_DESCRIPTION,
@@ -175,6 +178,7 @@ test("criterion 70: the info page's exact text", () => {
   "Remove: takes a picked colour out of the palette.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
+  "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
@@ -205,6 +209,7 @@ test("criteria 41, 43 (removed): no Node limit and no Full-size preview in the s
     "method",
     "output",
     "pickTolerance",
+    "recogniseText",
     "smooth",
     "specks",
     "swatches",
@@ -235,6 +240,7 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
     denoise: 0,
     invert: false,
     ignoreBackground: false,
+    recogniseText: false,
     method: 0,
     backgroundTolerance: 40,
     pickTolerance: 19,
@@ -550,4 +556,26 @@ test("customer 2026-10-30: the finish button reads Trace; its progress shows aft
   assert.equal(progressHoldLeft(1000, 1050), 250, "shown 50 ms ago: 250 ms more");
   assert.equal(progressHoldLeft(1000, 1300), 0);
   assert.equal(progressHoldLeft(1000, 2000), 0);
+});
+
+test("specs/0091 criterion 17 (Frage 116 B a): Recognise text is off by default, remembered, and on is a change", () => {
+  const storage = memoryStorage();
+  assert.equal(firstChoice().values.recogniseText, false);
+  const on = editChoice(firstChoice(), "recogniseText", true);
+  assert.equal(on.edited, false, "a switch, not a preset value");
+  writeChoice(on, storage);
+  assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseText, true);
+  assert.equal(changedAdvancedText(on.values), "Changed: Recognise text");
+  assert.equal(changedAdvancedText(firstChoice().values), null);
+  assert.equal(readsText({ ...on.values, output: MULTICOLOUR }), false);
+  // The "on" an earlier build kept as its default does not turn it on.
+  storage.setItem("curvyo.trace-values", JSON.stringify({ recogniseText: true }));
+  assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseText, false);
+});
+
+test("specs/0091 UX notes §4: the text-line count", () => {
+  assert.equal(textLinesText(0, 0), "");
+  assert.equal(textLinesText(1, 1), "1 text line set");
+  assert.equal(textLinesText(3, 5), "3 of 5 text lines set");
+  assert.equal(textLinesText(0, 2), "0 of 2 text lines set");
 });

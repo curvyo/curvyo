@@ -21,7 +21,7 @@ export function useTraceMask(getSession: () => WasmSession | null, onChange: () 
   const last = useRef<MaskSource | null>(null);
 
   const maskStep = useCallback(
-    async (id: string, reduced: boolean, settings: string, stale: () => boolean) => {
+    async (id: string, reduced: boolean, settings: string, stale: () => boolean, lines = "") => {
       last.current = { id, reduced };
       const session = getSession();
       if (!session || session.trace_view_mode() !== "mask") {
@@ -31,7 +31,8 @@ export function useTraceMask(getSession: () => WasmSession | null, onChange: () 
       if (!pixels) {
         return;
       }
-      const mask = await runner().mask(pixels, settings);
+      // With text lines the left-out pixels come grey (`specs/0091` UX notes §2).
+      const mask = await runner().mask(pixels, settings, lines);
       if (stale() || !mask) {
         return;
       }
