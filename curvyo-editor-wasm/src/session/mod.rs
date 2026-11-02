@@ -190,6 +190,8 @@ mod trace_pick;
 mod trace_tests;
 mod trace_text;
 #[cfg(test)]
+mod trace_text_colour_tests;
+#[cfg(test)]
 mod trace_text_screenshot_tests;
 #[cfg(test)]
 mod trace_text_tests;

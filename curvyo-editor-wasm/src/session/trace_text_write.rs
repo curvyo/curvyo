@@ -4,6 +4,7 @@
 use curvyo_document_core::NodeId;
 
 use super::Session;
+use super::trace_colours::{PaletteView, color};
 use super::trace_text::FittedImage;
 
 /// One text Create paths wrote: its node, string, guessed positions, size bits (for the guessed
@@ -11,12 +12,14 @@ use super::trace_text::FittedImage;
 pub(crate) type WrittenText = (NodeId, String, Vec<usize>, u64, bool);
 
 /// Writes the texts of `fitted` into `document`, each directly above its picture's entry of
-/// `above` (the "Trace of" group, or the picture when it has no paths), black, no stroke
-/// (decision 6, criterion 10). `None` when a write failed (the caller's step is then reverted).
+/// `above` (the "Trace of" group, or the picture when it has no paths), black or in its
+/// multicolour fill through the maker's recolours `view`, no stroke (decision 6, criteria 10 and
+/// 23). `None` when a write failed (the caller's step is then reverted).
 pub(super) fn write_texts(
     document: &curvyo_document_core::Document,
     fitted: &[FittedImage],
     above: &[(NodeId, NodeId)],
+    view: &PaletteView,
 ) -> Option<Vec<WrittenText>> {
     use curvyo_document_core::{
         Affine, Length, MAX_TEXT_SIZE, MIN_TEXT_SIZE, MoveTarget, TextChars, TextLayoutValues,
@@ -28,7 +31,8 @@ pub(super) fn write_texts(
         let Some(&(_, anchor)) = above.iter().find(|(id, _)| *id == image.image) else {
             continue;
         };
-        for text in &image.texts {
+        // A text whose fill the maker excluded is left out, as its shapes are (slice 2).
+        for text in image.texts.iter().filter(|t| !t.excluded) {
             let run = &text.run;
             let size = run.size.get();
             if !range.contains(&size) {
@@ -50,11 +54,14 @@ pub(super) fn write_texts(
                 )
                 .ok()?;
             let mut own = style.clone();
+            if let Some(fill) = text.fill {
+                own.fill.color = color(view.fill(fill));
+            }
             // Criterion 27: a single-line text is drawn with the traced strokes' width, unfilled.
             if let Some(width) = text.stroke {
                 own.fill.enabled = false;
                 own.stroke.enabled = true;
-                own.stroke.color = curvyo_document_core::Color::BLACK;
+                own.stroke.color = own.fill.color;
                 own.stroke.width = Length::from_mm(width.max(0.01));
             }
             for edit in super::recognise::style_edits(&own) {

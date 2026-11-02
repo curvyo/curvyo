@@ -221,7 +221,7 @@ fn run(model: &OcrModel, file: &str) -> Run {
     out
 }
 
-fn levenshtein(a: &str, b: &str) -> usize {
+pub(super) fn levenshtein(a: &str, b: &str) -> usize {
     let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
     let mut row: Vec<usize> = (0..=b.len()).collect();
     for (i, ca) in a.iter().enumerate() {
@@ -240,7 +240,7 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
 /// Wrong sure letters of `text` against its nearest truth line: positions that differ and are
 /// not guessed (a different length counts every unguessed letter of the difference).
-fn wrong_sure(text: &str, guessed: &[usize], truth: &str) -> usize {
+pub(super) fn wrong_sure(text: &str, guessed: &[usize], truth: &str) -> usize {
     let (t, r): (Vec<char>, Vec<char>) = (text.chars().collect(), truth.chars().collect());
     if t.len() != r.len() {
         return levenshtein(text, truth).min(t.len() - guessed.len().min(t.len()));
@@ -280,7 +280,7 @@ fn report(file: &str, truth: &[&str]) -> (usize, usize, Run) {
     (exact, wrong, run1)
 }
 
-const POSTER: [&str; 8] = [
+pub(super) const POSTER: [&str; 8] = [
     "BÄCKEREI",
     "SALE",
     "Müller & Söhne",

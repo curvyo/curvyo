@@ -1,0 +1,43 @@
+# Each line of the slice 2 posters (`make_colour.py`): file, text, colour, ink box in px.
+
+[[lines]]
+file = "colour_poster.png"
+text = "Größe"
+colour = [200, 30, 30]
+box = [120, 138, 666, 282]
+
+[[lines]]
+file = "colour_poster.png"
+text = "Übermaß"
+colour = [30, 150, 60]
+box = [120, 407, 713, 528]
+
+[[lines]]
+file = "colour_poster.png"
+text = "Äpfel & Öl"
+colour = [0, 0, 0]
+box = [120, 641, 567, 753]
+
+[[lines]]
+file = "colour_poster.png"
+text = "Straße 7"
+colour = [255, 255, 255]
+box = [170, 910, 686, 1012]
+
+[[lines]]
+file = "colour_poster.png"
+text = "Süße Grüße"
+colour = [30, 60, 200]
+box = [120, 1232, 695, 1311]
+
+[[lines]]
+file = "colour_poster.png"
+text = "Brücke über Täler"
+colour = [0, 0, 0]
+box = [120, 1466, 779, 1532]
+
+[[lines]]
+file = "grey_text.png"
+text = "Hellgrau"
+colour = [190, 190, 190]
+box = [100, 174, 777, 338]

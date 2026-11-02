@@ -5,7 +5,7 @@
 
 use curvyo_document_core::{AssetHash, FontKind, FontRef, NodeId};
 use curvyo_text_core::RecognisedRun;
-use curvyo_ui_core::{OcrLine, TraceTextWire, TraceWire};
+use curvyo_ui_core::{OcrLine, TraceRgb, TraceTextWire, TraceWire};
 use kurbo::BezPath;
 
 use super::Session;
@@ -29,6 +29,24 @@ pub(crate) struct FittedText {
     pub(crate) nearest: bool,
     /// Set in a single-line face: drawn with a stroke this wide, mm (criterion 27).
     pub(crate) stroke: Option<f64>,
+    /// Its line in the fit request.
+    pub(crate) line: usize,
+    /// Its fill in a multicolour result (slice 2, decision 6); `None`: black.
+    pub(crate) fill: Option<TraceRgb>,
+    /// The maker excluded its fill: left out, as the shapes of that colour.
+    pub(crate) excluded: bool,
+}
+
+/// An outline of a line that no text replaces: it joins the traced paths.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Leftover {
+    pub(crate) path: BezPath,
+    /// Its line in the fit request.
+    pub(crate) line: usize,
+    /// The line's fill in a multicolour result; `None`: black.
+    pub(crate) fill: Option<TraceRgb>,
+    /// The maker excluded its fill: left out, as the shapes of that colour.
+    pub(crate) excluded: bool,
 }
 
 /// What the fit made of one picture's lines.
@@ -37,7 +55,37 @@ pub(crate) struct FittedImage {
     pub(crate) image: NodeId,
     pub(crate) texts: Vec<FittedText>,
     /// The lines' outlines no text replaces: they join the traced paths.
-    pub(crate) leftovers: Vec<BezPath>,
+    pub(crate) leftovers: Vec<Leftover>,
+}
+
+/// The outlines of `image`'s text lines that join its traced paths, each with its fill (black
+/// without one): the fit's leftovers, or every line's outlines without a fit of `image`; none of
+/// a line whose fill the maker excluded.
+pub(super) fn leftovers_of(
+    fitted: &[FittedImage],
+    image: NodeId,
+    wire: &TraceWire,
+) -> Vec<(BezPath, TraceRgb)> {
+    let black = TraceRgb::new(0, 0, 0);
+    match fitted.iter().find(|f| f.image == image) {
+        Some(found) => found
+            .leftovers
+            .iter()
+            .filter(|l| !l.excluded)
+            .map(|l| (l.path.clone(), l.fill.unwrap_or(black)))
+            .collect(),
+        None => wire
+            .texts
+            .lines
+            .iter()
+            .filter(|l| !l.excluded)
+            .flat_map(|l| {
+                l.outlines
+                    .iter()
+                    .map(move |p| (p.clone(), l.fill.unwrap_or(black)))
+            })
+            .collect(),
+    }
 }
 
 /// The OCR lines of the pictures read in this session and the fit of the kept results.
@@ -148,25 +196,36 @@ impl Session {
     /// and the preview shows the texts; otherwise the fit is dropped.
     pub(super) fn keep_trace_fit(&mut self, image: NodeId, read: &TraceWire) {
         let state = &self.trace_text;
-        let kept: Vec<&TraceTextWire> = state
+        // The requested lines of `image` it set text for, by their place in the request.
+        let kept: Vec<(usize, &TraceTextWire)> = state
             .requested
             .iter()
-            .filter(|(id, line)| {
+            .enumerate()
+            .filter(|(_, (id, line))| {
                 *id == image
                     && !state
                         .dropped_lines
                         .iter()
                         .any(|(d, l)| *d == image && l == line)
             })
-            .map(|(_, line)| line)
+            .map(|(k, (_, line))| (k, line))
             .collect();
+        // Slice 2: the text pass alone has no fill; the result's lines bring it.
         let matches = state.fitted.is_some()
             && kept.len() == read.texts.lines.len()
-            && kept.iter().zip(&read.texts.lines).all(|(a, b)| *a == b);
+            && kept
+                .iter()
+                .zip(&read.texts.lines)
+                .all(|((_, a), b)| a.same_line(b));
         if !matches {
             self.drop_trace_fit();
             return;
         }
+        let fills: Vec<(usize, Option<TraceRgb>, bool)> = kept
+            .iter()
+            .zip(&read.texts.lines)
+            .map(|((k, _), line)| (*k, line.fill, line.excluded))
+            .collect();
         let gone: Vec<BezPath> = state
             .dropped_lines
             .iter()
@@ -179,7 +238,19 @@ impl Session {
             .as_mut()
             .and_then(|f| f.iter_mut().find(|f| f.image == image))
         {
-            fitted.leftovers.retain(|path| !gone.contains(path));
+            fitted.leftovers.retain(|l| !gone.contains(&l.path));
+            let fill_of = |line: usize| {
+                fills
+                    .iter()
+                    .find(|(k, _, _)| *k == line)
+                    .map_or((None, false), |f| (f.1, f.2))
+            };
+            for text in &mut fitted.texts {
+                (text.fill, text.excluded) = fill_of(text.line);
+            }
+            for leftover in &mut fitted.leftovers {
+                (leftover.fill, leftover.excluded) = fill_of(leftover.line);
+            }
         }
         self.show_fitted_preview();
     }
@@ -326,7 +397,10 @@ impl Session {
         let mut out: Vec<FittedImage> = Vec::new();
         let mut dropped: Vec<(AssetHash, String)> = Vec::new();
         let mut dropped_lines: Vec<(NodeId, TraceTextWire)> = Vec::new();
-        for ((texts, leftovers), (image, line)) in lines.into_iter().zip(&self.trace_text.requested)
+        for (k, ((texts, leftovers), (image, line))) in lines
+            .into_iter()
+            .zip(&self.trace_text.requested)
+            .enumerate()
         {
             if texts.is_empty() {
                 dropped_lines.push((*image, line.clone()));
@@ -350,12 +424,22 @@ impl Session {
                         glyphs: t.glyphs,
                         nearest: t.nearest,
                         stroke: t.stroke.map(curvyo_text_core::Mm::get),
+                        line: k,
+                        fill: line.fill,
+                        excluded: line.excluded,
                     })
                 })
                 .collect();
-            let leftovers: Vec<BezPath> = leftovers
+            let leftovers: Vec<Leftover> = leftovers
                 .iter()
-                .filter_map(|&i| line.outlines.get(i).cloned())
+                .filter_map(|&i| {
+                    Some(Leftover {
+                        path: line.outlines.get(i)?.clone(),
+                        line: k,
+                        fill: line.fill,
+                        excluded: line.excluded,
+                    })
+                })
                 .collect();
             match out.iter_mut().find(|f| f.image == *image) {
                 Some(found) => {
@@ -410,12 +494,20 @@ impl Session {
             return;
         };
         let mut paths: Vec<BezPath> = read.outlines.clone();
-        paths.extend(fitted.leftovers.iter().cloned());
-        for text in &fitted.texts {
+        let mut extra = Vec::new();
+        for leftover in fitted.leftovers.iter().filter(|l| !l.excluded) {
+            paths.push(leftover.path.clone());
+            extra.push(super::trace_colours::text_layer(leftover.fill, 1));
+        }
+        for text in fitted.texts.iter().filter(|t| !t.excluded) {
             paths.extend(text.glyphs.iter().cloned());
+            extra.push(super::trace_colours::text_layer(
+                text.fill,
+                text.glyphs.len(),
+            ));
         }
         let read = read.clone();
         let stale = self.trace.preview.as_ref().is_some_and(|p| p.stale);
-        self.show_trace_preview(image, read, &paths, stale);
+        self.show_trace_preview(image, read, &paths, &extra, stale);
     }
 }
