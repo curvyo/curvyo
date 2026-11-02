@@ -20,6 +20,10 @@ impl Session {
             return false;
         };
         let changed = self.page_view.active(&pages).is_none_or(|p| p.id != id);
+        if changed {
+            // A page switch cancels the open tiling bar (`0069` criterion 35).
+            self.tiling = None;
+        }
         self.page_view.active = Some(id.to_owned());
         self.sync_sketch_page();
         let (w, h) = self.viewport.canvas_size();

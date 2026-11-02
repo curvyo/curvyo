@@ -118,6 +118,8 @@ mod wasm_text_layout;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_path;
 #[cfg(target_arch = "wasm32")]
+mod wasm_tiling;
+#[cfg(target_arch = "wasm32")]
 mod wasm_trace;
 #[cfg(target_arch = "wasm32")]
 mod wasm_weld;
@@ -146,6 +148,7 @@ pub use session::{
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
+pub use session::{TilingStatus, circle_handle};
 pub use session::{
     TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
     TracedText,

@@ -66,7 +66,10 @@ impl Session {
         {
             return hint.to_string();
         }
-        if self.tool != Tool::Select {
+        if let Some(hint) = self.tiling_cursor() {
+            return hint;
+        }
+        if self.tool != Tool::Select || self.tiling.is_some() {
             return "default".to_string();
         }
         if self.page_drag.is_some()

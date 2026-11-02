@@ -216,7 +216,7 @@ fn move_handle_glyph(
 /// followers of a radius drag), solid `--accent` ground with a white dot
 /// while dragging (`docs/design-system.md`, "Parameter handle"). Round with a
 /// centre dot is the one silhouette no other canvas glyph has.
-fn parameter_handle_glyph(
+pub(crate) fn parameter_handle_glyph(
     view: ViewTransform,
     center: Point,
     dragging: bool,

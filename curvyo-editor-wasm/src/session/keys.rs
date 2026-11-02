@@ -244,6 +244,26 @@ impl Session {
             || self.select.bar_preview().is_some()
             || self.background_preview.is_some()
             || self.text_path_dragging()
+            // The open tiling bar: a preview is not a history step (`0069` criterion 35).
+            || self.tiling.is_some()
+    }
+
+    /// The open tiling bar keeps every key but a tool key, which cancels it (`0069` criterion
+    /// 35), and C, R, A, S, which open a circle handle's entry box (UX notes §12.4); Enter and
+    /// Escape are the bar's own. `None` while the bar is closed.
+    fn tiling_key(&mut self, input: &KeyInput<'_>) -> Option<KeyOutcome> {
+        self.tiling.as_ref()?;
+        if self.tiling_entry_key(input) {
+            return Some(KeyOutcome::EntryOpened);
+        }
+        Some(match decide(input, self.key_state()) {
+            KeyAction::Ignore => KeyOutcome::Ignored,
+            KeyAction::SetTool(tool) => {
+                self.set_tool(tool);
+                KeyOutcome::ToolChanged
+            }
+            _ => KeyOutcome::Paused,
+        })
     }
 
     pub(super) fn pen_path_open(&self) -> bool {
@@ -316,6 +336,9 @@ impl Session {
         // Enter in pick mode puts the text on the pick set (`0080` criterion 2).
         if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
             return KeyOutcome::Consumed;
+        }
+        if let Some(outcome) = self.tiling_key(&input) {
+            return outcome;
         }
         match decide(&input, self.key_state()) {
             KeyAction::Ignore => KeyOutcome::Ignored,

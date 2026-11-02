@@ -241,6 +241,10 @@ impl Session {
     /// own. `None` otherwise.
     #[must_use]
     pub fn live_readout(&self) -> Option<LiveReadout> {
+        // A circle handle drag of the open tiling bar (`0069` UX notes §5).
+        if let Some(readout) = self.tiling_readout() {
+            return Some(readout);
+        }
         if let Some(readout) = self.text_path_readout() {
             return Some(readout);
         }

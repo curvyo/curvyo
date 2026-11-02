@@ -130,6 +130,12 @@ mod select_readout;
 mod select_view;
 mod shapes;
 mod sketch;
+mod tiling;
+mod tiling_handles;
+mod tiling_json;
+#[cfg(test)]
+mod tiling_live_tests;
+mod tiling_view;
 pub use sketch::{SketchTool, Workbench};
 #[cfg(test)]
 mod single_line_tests;
@@ -260,6 +266,8 @@ pub use text_on_path_options::TextPathView;
 pub use text_on_path_pick::TextPathPress;
 pub use text_path::ObjectToPathOutcome;
 pub use text_style::StyleOutcome;
+pub use tiling::TilingStatus;
+pub use tiling_handles::circle_handle;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
 pub use trace_draw::TraceViewMode;
 pub use trace_pick::TracePickMode;
@@ -468,6 +476,9 @@ pub struct Session {
     patterns: std::cell::RefCell<curvyo_ui_core::PatternCache>,
     /// Why the last pattern commit was refused over a limit, until the host takes it.
     pattern_refusal: Option<curvyo_ui_core::PatternError>,
+    /// How each clone with own placement holds back a change of its original, kept for as long
+    /// as the document read it was made for (`clone_view.rs`).
+    held_clones: clone_view::HeldCache,
     /// What the last Group or Ungroup said, until the host has taken it (`grouping.rs`).
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
@@ -527,6 +538,8 @@ pub struct Session {
     recognise: recognise::RecogniseState,
     /// Trace's OCR lines per picture and the font fit of its results (`trace_text.rs`).
     trace_text: trace_text::TraceTextState,
+    /// The open tiling bar (`tiling.rs`), `None` while it is closed.
+    tiling: Option<tiling::TilingMode>,
 }
 
 impl Session {
@@ -593,6 +606,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             patterns: std::cell::RefCell::default(),
             pattern_refusal: None,
+            held_clones: clone_view::HeldCache::default(),
             grouping_result: None,
             context_announcement: None,
             layers: layers::LayerState::default(),
@@ -620,6 +634,7 @@ impl Session {
             traced_groups: Vec::new(),
             recognise: recognise::RecogniseState::default(),
             trace_text: trace_text::TraceTextState::default(),
+            tiling: None,
         }
     }
 
@@ -682,6 +697,7 @@ impl Session {
             context_cache: context::ContextCache::default(),
             patterns: std::cell::RefCell::default(),
             pattern_refusal: None,
+            held_clones: clone_view::HeldCache::default(),
             grouping_result: None,
             context_announcement: None,
             layers: layers::LayerState::default(),
@@ -709,6 +725,7 @@ impl Session {
             traced_groups: Vec::new(),
             recognise: recognise::RecogniseState::default(),
             trace_text: trace_text::TraceTextState::default(),
+            tiling: None,
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -783,6 +800,8 @@ impl Session {
                 this.selection.clear();
                 this.hovered_object = None;
             }
+            // Switching tool, by any route, cancels the tiling bar (`0069` criterion 35).
+            this.tiling = None;
             if tool != this.tool {
                 this.command_refusal = None;
                 this.node_announcement = None;
@@ -820,6 +839,10 @@ impl Session {
                 return;
             }
             this.pointer_position = Some(point);
+            // The open tiling bar locks canvas selection; a press picks a circle handle only.
+            if this.tiling_press(point) {
+                return;
+            }
             this.held.shift = shift;
             if this.workbench() == Workbench::Sketch {
                 this.sketch_pointer_down(point);
@@ -915,6 +938,9 @@ impl Session {
             return;
         };
         self.pointer_position = Some(point);
+        if self.tiling_drag(point) {
+            return;
+        }
         if self.page_drag_move(point) {
             return;
         }
@@ -1015,6 +1041,9 @@ impl Session {
     pub fn pointer_up(&mut self, point: Point, shift: bool, constrain: bool) {
         self.recording(|this| {
             this.button_down = false;
+            if this.tiling_release_press() {
+                return;
+            }
             if this.colour_pick_release() || this.trace_pick_release() {
                 return;
             }
@@ -1087,6 +1116,13 @@ impl Session {
 
     /// [`Session::double_click`], telling the host which hint to show, if any.
     pub fn double_click_hint(&mut self, point: Point, shift: bool, ctrl: bool) -> DoubleClickHint {
+        if self.tiling.is_some() {
+            // On a circle handle: its entry box (`0069` criterion 14).
+            if let Some(point) = sanitized_point(point) {
+                self.tiling_double_click(point);
+            }
+            return DoubleClickHint::None;
+        }
         self.recording(|this| -> DoubleClickHint {
             let Some(point) = sanitized_point(point) else {
                 return DoubleClickHint::None;
