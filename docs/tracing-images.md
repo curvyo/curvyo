@@ -220,8 +220,12 @@ a black and white trace before it traces the rest (`specs/0091-trace-text-recogn
   with less than 0.8 confidence, or one short pattern repeated (a ring read as "O", a dot grid
   read as "TOTOTO"). Guessed letters are named in one warning and highlighted in the Glyph table
   and the Text tool until the first edit; when all letters are sure, nothing is announced.
-- With Recognise text off, or with Multicolour (for now), Trace works exactly as before and the
-  model is not loaded.
+- With Multicolour the same happens before the colour trace: the palette is the one of the
+  picture as it is (a colour only the text has stays in it), the shapes under the text stay whole,
+  and each text takes the palette colour nearest its letters, or the background colour (white
+  text on a red box is white text above the whole box). Recolouring a palette colour recolours
+  its texts too.
+- With Recognise text off, Trace works exactly as before and the model is not loaded.
 
 ## Multicolour
 

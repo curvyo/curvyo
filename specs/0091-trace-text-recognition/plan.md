@@ -193,3 +193,84 @@ but loses two umlauts on the poster, so the pad stays (`docs/technical-debt.md`)
   a space put in ("Q Search fonts", "Size o", "> EMS Alluwre"; "F onts", "C urvyo fonts",
   "A nak Gedong" where icons or letter-spaced display text leave a wide gap after the first
   letter), 0 cuts (the chip row is read as separate lines here).
+
+# Slice 2: multicolour (criteria 23 and 24)
+
+Implementer, 2026-11-02, on `story/trace-ocr-multicolour` (from `main` after PR #244). Built
+against `specification.md` criteria 23 and 24 (with slice 1's 3, 6, 11, 12 and 13), `adrs.md`
+decision 6, `ux-notes.md` §1 and §2. No new crate, no new dependency, no `format_version` change.
+
+## Approach
+
+- The text pass is the same as in black and white (it decides lines by luma per line), so the
+  regions, the fit and the sure letters do not depend on the output.
+- **The palette is the picture's as it is (Proposal):** the multicolour trace with text first
+  finds the palette of the unfilled picture (the palette Recognise text off shows), then traces
+  the filled picture with exactly that palette (the existing `ColourParams::fixed` with the count
+  of the palette; the fixed marks and pixel counts are reported as without text). So a colour that
+  only the text has (red text on white) stays in the palette and the strip, and the shapes are
+  coloured as with Recognise text off. Pick colours keeps its swatches.
+- **A text's fill (decision 6):** the per-channel lower median of its line's text pixels, mapped
+  to the nearest palette colour or the trace's background colour (Remove background's colour or
+  the suggested background, as the colour trace itself uses; **Proposal**: without it, white text
+  on a box on white paper would take the nearest box colour), then through the maker's Merge into.
+  The maker's recolour in the strip applies to texts as to paths. Black and white stays black.
+- The worker's multicolour job writes the outlines, the text section (each line with its fill) and
+  the palette tail; the text pass alone has no fill, so the session compares lines without the fill
+  when it keeps a fit and takes the fills from the result.
+- Leftover outlines of a line join the layer of its fill (a new colour path when no layer has it).
+
+## Affected crates/modules
+
+- `curvyo-ui-core`: `trace_text.rs` (the line's colour), `trace_text_wire.rs` (fill per line),
+  new `trace_text_colour.rs` (the multicolour job and Mask with text, the fill),
+  `trace_transfer.rs` (the colour numbers split into head and tail).
+- `curvyo-editor-wasm`: `wasm_trace.rs` (Multicolour no longer falls back), `session/trace_text.rs`
+  (fills on texts and leftovers), `session/trace_text_write.rs` (text fill), `session/trace.rs` and
+  `session/trace_colours.rs` (preview fills, leftovers per layer).
+- `frontend`: the switch drawn and honoured with Multicolour (`TraceAdvanced.tsx`, `readsText`).
+- Fixture: `curvyo-ocr-core/tests/fixtures/colour/colour_poster.png` and its crop `colour_small.png`
+  from `make_colour_poster.py`.
+
+## Tasks
+
+1. [x] Plan (this section).
+2. [x] Multicolour poster fixture: coloured boxes, white text on colour, coloured text on white
+   (criteria 23, 24).
+3. [x] ui-core: line colour, fill in the wire, multicolour job with the text pass and the
+   picture's palette, nearest fill, Mask with text; tests first (criteria 23, 24/6, 24/12, 24/13).
+4. [x] session: fills kept through the fit, preview and Create paths with coloured texts above the
+   colour layers, leftovers per layer, one step (criteria 23, 24/11).
+5. [x] wasm and frontend: the switch drawn in Multicolour, the job honoured (criteria 23, 24).
+6. [x] Harness on the posters in Multicolour: 0 wrong sure letters, whole shapes, determinism,
+   timings; native golden for the wasm comparison (criteria 24/3, 24/6, 24/13).
+7. [x] Docs (spec status, UX notes slice 1 line, design system, tracing guide); full gate.
+
+## Validation
+
+Unit tests in `trace_text_colour.rs` (fill nearest, white on a box, red on white keeps red, off
+equals the plain colour job, the same twice); session tests on the multicolour poster (fills,
+whole boxes, one undo, run twice equal, two workers = one through the fit's shares); a native golden
+of the multicolour job compared in Chromium against the editor wasm.
+
+## Results (2026-11-02)
+
+- Multicolour poster (Remove background, white): 5 of 5 lines become texts in their colours (red
+  on white red, white on the red box white, yellow on the blue box yellow, blue and green on white
+  blue and green), 0 wrong sure letters, the four shapes one whole outline each, texts above the
+  group, one step and one undo, the same twice. Research poster in Multicolour: SALE white above
+  the whole green box, FRESH black above the whole grey box, 0 wrong sure letters.
+- Native and editor wasm (Chromium) give the same numbers for the small colour poster's job
+  (`curvyo-editor-wasm/tests/fixtures/trace_text_colour_native.json`); the fit is the same as in
+  black and white (the text pass does not depend on Output), so the shares test of slice 1 covers
+  two workers = one.
+- Times, thread CPU natively (release): colour poster 1600 x 1200 OCR 0.08 s, text pass 0.05 s,
+  fit 0.44 s, multicolour trace with text 0.25 s (off 0.11 s); research poster 2000 x 2000
+  multicolour trace with text 0.54 s (off 0.30 s): the palette of the unfilled picture costs one
+  more labelling pass. Editor wasm, main thread, colour poster: OCR 1.73 s, text pass 0.06 s,
+  multicolour trace with text 0.32 s (off 0.20 s).
+- Tester tests that state slice 1's "not drawn with Multicolour" now fail as intended by slice 2:
+  `frontend/tests/acceptance_0091_tester.test.ts` ("hidden in Multicolour", and the two cases that
+  read its result) and `frontend/tests/acceptance_0089_tidyup_tester.test.ts` c57 (Multicolour Tab
+  order now has "Recognise text" after Drop border shapes). Left for the tester; with the first
+  assertion flipped locally the three 0091 cases pass.
