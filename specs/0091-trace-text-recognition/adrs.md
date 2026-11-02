@@ -91,6 +91,22 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
    to the trace's compound path, since the main trace no longer covers those pixels. The preview
    shows the same result (ADR 0023 §4: preview equals result).
 
+   *Note 2026-11-02 (slice 2, implementer, Proposal):* in a multicolour trace the palette is the one
+   of the picture before the text is filled in (found once more on the unfilled picture), and the
+   filled picture is traced with exactly that palette (`ColourParams::fixed` with its count), so a
+   colour only the text has stays a palette colour. The candidates of "nearest" are the palette and,
+   only for text that lies on a traced shape, the trace's background colour (Remove background's or
+   Pick colours' colour, else the suggested background): what is under the text after the filling
+   decides (nearer a palette colour than the background: on a shape). So white text on a coloured
+   box is white, and pale text on the paper takes a palette colour, never the paper's (lead
+   2026-11-02). The maker's Merge into and recolours apply to texts as to paths; a text whose fill
+   the maker excluded is left out, as the shapes of that colour are (lead 2026-11-02), and the
+   wire names such lines after the fills. The status line's colour count includes the palette
+   colours only texts fill. Leftover outlines of a line join the layer of its
+   fill. The fills travel after the lines of the wire's text section, so a black and white result's
+   numbers are as in slice 1. Module `curvyo-ui-core/src/trace_text_colour.rs`: "The multicolour
+   trace job with OCR lines."
+
 7. **Switches (107 A, 108 A).** "Recognise text" in Trace Advanced, off by default (customer 2026-11-01; on by default before), an app setting
    like the other trace settings (not in the document). "Recognise shapes" appears with Part B of
    `0088` (shapes come later, 108 A); until then it is not shown (Proposal; the product owner may

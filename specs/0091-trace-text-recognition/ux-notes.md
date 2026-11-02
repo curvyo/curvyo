@@ -18,6 +18,7 @@ trace, and one line in the Advanced status line. Nothing is announced when it wo
 - "Recognise shapes" is **not drawn** until 0088 Part B: no disabled twin, no placeholder, no hint label.
 - While Multicolour is on, the switch "Recognise text" is **not drawn** in slice 1 (a control that cannot be honoured is not
   drawn; slice 2 brings it). The setting keeps its value and returns when Multicolour is turned off. (Proposal, lead 2026-11-01)
+  Slice 2 (2026-11-02): drawn and honoured with Multicolour too, same place in the options row and in the Tab order.
 - Not in the main bar, not in presets (**Proposal**: presets stay pure Trace settings; the switch is global like Invert).
 - Turning it on or off marks the preview stale like any setting and re-previews. Turning it on for an image without cached
   lines runs the OCR (section 3); with cached lines it costs no OCR time (criterion 16).

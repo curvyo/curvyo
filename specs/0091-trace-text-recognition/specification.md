@@ -1,6 +1,6 @@
 # Trace text recognition: read the text on the raster first
 
-Status: Slice 1 Done (PR #244, merged 2026-11-02); slice 2 (multicolour) not started
+Status: Slice 1 Done (PR #244, merged 2026-11-02); slice 2 (multicolour) in Build
 Priority: Should
 Origin: Customer (2026-10-31); numbers marked Proposal are the product owner's
 
@@ -84,6 +84,8 @@ threshold per text line, text kept out of the main trace, fonts matched by our o
 2. **Slice 2, multicolour.** The same in the multicolour trace: text takes the nearest palette colour
    of its pixels; text on coloured shapes stays on top of whole shapes.
 3. **Later, own story:** Recognise shapes (0088 Part B) with its switch.
+4. **Later (customer 2026-11-02):** text turned upside down (rotated beyond ±90°) is not read correctly;
+   reading each line also at 180° and keeping the surer read is one way. Not scheduled.
 
 Slice 1 is the MVP cut. Each slice is tried by the customer on his own images.
 
@@ -143,7 +145,8 @@ Slice 1
     run again (same cached lines; the preview updates without the OCR time).
 17. Given the switch "Recognise text" in Trace Advanced, then it is off by default (116 B a), is kept as an app
     setting like the other Trace settings, is not stored in the document, and no "Recognise shapes"
-    switch and no hint text appears. While Multicolour is on (slice 1) the switch is not drawn.
+    switch and no hint text appears. Since slice 2 the switch is drawn and honoured with Multicolour
+    too (in slice 1 it was not drawn while Multicolour was on).
 18. Given a picture with no text (a plain shape), a plain ring, or a dot grid, then the trace result
     is identical to Recognise text off and no notice appears: the ring (read as "O") and the dot grid
     (read as "TOTOTO") fail the garbage filter and stay shapes, with Recognise text on.
@@ -203,7 +206,12 @@ worker.)
 Slice 2
 23. Given the multicolour trace of the poster, then each text object's fill is the nearest palette
     colour of its text pixels (Proposal, adrs.md decision 6), and white text on a coloured box is
-    white text above the whole box.
+    white text above the whole box. The background colour is a candidate only for text that lies
+    on a traced shape (what is under it is nearer a palette colour than the background); text on
+    the background takes the nearest palette colour, so pale grey text on white paper never becomes
+    white (Proposal, lead 2026-11-02). A text whose fill colour the maker excluded is left out, as
+    the shapes of that colour are (Proposal, lead 2026-11-02). The colour count in the status line
+    counts the palette colours only texts use too, so it agrees with the strip.
 24. Slice 1 criteria 3, 6, 11, 12 and 13 hold in the multicolour trace.
 
 ## Out of scope
@@ -227,6 +235,6 @@ None. Frage 111 is answered by default (A applied: weights bundled).
 See [`ux-notes.md`](ux-notes.md).
 
 ## Links
-Requirements: to be added when scheduled  PR: none
+Requirements: to be added when scheduled  PR: #244 (slice 1)
 Related: 0023 (trace worker), 0025, 0088 (recogniser, tiers, guessed letters), 0089 (trace quality),
 ADR 0028, `specs/0091-trace-text-recognition/adrs.md`, `specs/0088-trace-recognition/research-ocr.md`
