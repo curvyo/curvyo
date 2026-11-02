@@ -70,6 +70,16 @@ feedback part checks the crosshair and no chip before a pick, a rectangle side, 
 ends and a polygon centre as picks, a right click that does nothing, and a resize handle that wins
 over a dimension on it. Screenshots go to `target/0070-browser/`.
 
+### Pattern fill (0071)
+
+`pattern-fill.cjs` starts its own dev server on port 5181 (or uses `CURVYO_BROWSER_URL`), draws a
+rectangle with an elliptical hole (Difference), chooses Pattern in the Fill kind group, applies
+each of the ten generators (a screenshot each, `gen-<id>.png`), edits Spacing with Shift+Arrow and
+undoes it, switches Dots and Grid to Shapes and back to Lines, types a margin of 4 mm, exports SVG
+from the File tab (the pieces as paths, no `pattern` element, no generator name; saved as
+`export.svg`), and converts the pattern to paths and undoes that. Use the Playwright/runtime
+environment above; everything goes to `target/0071-browser/`.
+
 ### Sketch workbench independent acceptance (0066)
 
 `sketch-acceptance.cjs` exercises real annotation editing, native text undo, conflict

@@ -250,6 +250,76 @@ function readView(session: WasmSession | null): StyleView {
   return view;
 }
 
+/** One value field of the Pattern block (`PatternFieldJson` in `session/pattern.rs`). */
+export interface PatternFieldView {
+  name: string;
+  label: string;
+  text: string;
+  value: number;
+  mixed: boolean;
+  bar: number;
+  barFrom: number;
+  zero: number | null;
+  unit: string;
+  unitWords: string;
+  valueMin: number;
+  valueMax: number;
+  defaultText: string;
+  resettable: boolean;
+}
+
+/** What the fill kind group and the Pattern block show (`specs/0071-pattern-fill`). */
+export interface PatternView {
+  offered: boolean;
+  kind: "none" | "solid" | "pattern" | "mixed" | "";
+  shown: boolean;
+  generator: string;
+  fields: PatternFieldView[];
+  margin: PatternFieldView | null;
+  seeded: boolean;
+  seed: string;
+  mode: "lines" | "shapes" | "mixed" | "";
+  /** The Whole pieces only row shows (criterion 29). */
+  wholeOffered: boolean;
+  wholePieces: "on" | "off" | "mixed" | "";
+  colourRows: boolean;
+  state: string[];
+  alert: boolean;
+  convert: boolean;
+}
+
+const NO_PATTERN: PatternView = {
+  offered: false,
+  kind: "",
+  shown: false,
+  generator: "",
+  fields: [],
+  margin: null,
+  seeded: false,
+  seed: "",
+  mode: "",
+  wholeOffered: false,
+  wholePieces: "",
+  colourRows: false,
+  state: [],
+  alert: false,
+  convert: false,
+};
+
+function readPattern(session: WasmSession | null): PatternView {
+  if (!session) {
+    return NO_PATTERN;
+  }
+  try {
+    return { ...NO_PATTERN, ...(JSON.parse(session.pattern_panel_json()) as Partial<PatternView>) };
+  } catch {
+    return NO_PATTERN;
+  }
+}
+
+/** The pattern refusal shown in the state line, for 8 s (UX notes §7). */
+export const PATTERN_REFUSAL_MS = 8000;
+
 /** What `setText` answers: `"committed"`, `"unchanged"`, or
  * `"invalid:<code>"` with the code `hex`, `percent`, `width` or `dash`. */
 export type TextOutcome = string;
@@ -265,6 +335,23 @@ export interface StyleSkipNotice {
 
 export interface StylePanelApi {
   view: StyleView;
+  /** The Pattern block (`specs/0071-pattern-fill`). */
+  pattern: PatternView;
+  /** The refusal of the last commit over the limit, for 8 s; empty otherwise. */
+  patternRefusal: string;
+  /** The fill kind group: None, Solid or Pattern; one commit. */
+  setFillKind: (kind: "none" | "solid" | "pattern") => void;
+  setPatternGenerator: (id: string) => void;
+  setPatternMode: (mode: "lines" | "shapes") => void;
+  /** Whole pieces only on or off; one commit. */
+  setPatternWholePieces: (on: boolean) => void;
+  rerollPatternSeed: () => void;
+  setPatternSeedText: (text: string) => TextOutcome;
+  previewPattern: (name: string, p: number, grid: GridName) => void;
+  stepPattern: (name: string, steps: number, grid: GridName) => void;
+  resetPattern: (name: string) => void;
+  setPatternText: (name: string, text: string) => TextOutcome;
+  convertPattern: () => void;
   /** "2 clones show their original's style and were not changed." for 3 s after an edit of the
    * panel (typed, pressed or dragged) that left clones alone; null otherwise. */
   skipNotice: StyleSkipNotice | null;
@@ -312,6 +399,8 @@ export interface StylePanelApi {
 interface EditorHandle {
   getSession: () => WasmSession | null;
   syncRevision: number;
+  /** Re-reads the session's UI state after a command that changed the selection. */
+  sync: () => void;
 }
 
 /**
@@ -321,13 +410,29 @@ interface EditorHandle {
  * gesture bookkeeping is `usePreviewGesture`.
  */
 export function useStylePanel(editor: EditorHandle): StylePanelApi {
-  const { getSession, syncRevision } = editor;
+  const { getSession, syncRevision, sync } = editor;
   const [local, setLocal] = useState(0);
   const refresh = useCallback(() => setLocal((n) => n + 1), []);
   // The snapshot is re-read whenever the session says its UI state changed
   // (`syncRevision`) or this panel changed something (`local`).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const view = useMemo(() => readView(getSession()), [getSession, syncRevision, local]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pattern = useMemo(() => readPattern(getSession()), [getSession, syncRevision, local]);
+  const [patternRefusal, setPatternRefusal] = useState("");
+  const drainRefusal = useCallback((session: WasmSession) => {
+    const text = session.take_pattern_refusal();
+    if (text !== "") {
+      setPatternRefusal(text);
+    }
+  }, []);
+  useEffect(() => {
+    if (patternRefusal === "") {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setPatternRefusal(""), PATTERN_REFUSAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [patternRefusal]);
   // Every commit of the panel reads the notice of criterion 18 right after it, before a sync
   // could hand it to the canvas slot (UX review of 0057, must-fix 4).
   const [skipNotice, setSkipNotice] = useState<StyleSkipNotice | null>(null);
@@ -351,10 +456,11 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
       commit: (session: WasmSession) => {
         session.commit_style_preview();
         drainSkip(session);
+        drainRefusal(session);
       },
       cancel: (session: WasmSession) => session.cancel_style_preview(),
     }),
-    [drainSkip],
+    [drainSkip, drainRefusal],
   );
   const { queue: preview, settle, previewing, cancels } = usePreviewGesture(getSession, refresh, ends);
 
@@ -366,10 +472,11 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
       }
       const result = run(session);
       drainSkip(session);
+      drainRefusal(session);
       refresh();
       return result;
     },
-    [getSession, refresh, drainSkip],
+    [getSession, refresh, drainSkip, drainRefusal],
   );
   const setText = useCallback(
     (field: StyleFieldName, text: string): TextOutcome =>
@@ -393,6 +500,30 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
 
   return {
     view,
+    pattern,
+    patternRefusal,
+    setFillKind: (kind) => run((s) => void s.set_fill_kind(kind)),
+    // A refusal names the old generator's count: another generator drops it, so it never stands
+    // under a pattern it does not describe. Other commands keep it for its time, so the rows do
+    // not move under a double-click (the first click commits).
+    setPatternGenerator: (id) => {
+      setPatternRefusal("");
+      run((s) => void s.set_pattern_generator(id));
+    },
+    setPatternMode: (mode) => run((s) => void s.set_pattern_mode(mode)),
+    setPatternWholePieces: (on) => run((s) => void s.set_pattern_whole_pieces(on)),
+    rerollPatternSeed: () => run((s) => void s.reroll_pattern_seed()),
+    setPatternSeedText: (text) => act((s) => s.set_pattern_seed_text(text), "unchanged"),
+    previewPattern: (name, p, grid) => preview((s) => s.preview_pattern_field(name, p, grid)),
+    stepPattern: (name, steps, grid) => preview((s) => s.step_pattern_field(name, steps, grid)),
+    resetPattern: (name) => run((s) => void s.reset_pattern_field(name)),
+    setPatternText: (name, text) => act((s) => s.set_pattern_field_text(name, text), "unchanged"),
+    // Convert selects the new groups: the canvas, the panel header and the tabs read it again.
+    convertPattern: () => {
+      if (act((s) => s.convert_pattern_to_paths(), false)) {
+        sync();
+      }
+    },
     skipNotice,
     previewing,
     cancels,

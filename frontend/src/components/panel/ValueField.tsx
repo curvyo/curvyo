@@ -1,5 +1,5 @@
 import { RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { EntryField } from "@/components/panel/EntryField";
@@ -8,9 +8,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { gridOf, useValueDrag } from "@/hooks/useValueDrag";
 import type { GridName } from "@/hooks/useStylePanel";
 import { HELP_VALUE_FIELD } from "@/lib/sliderNames";
+import { edgeCrossesText } from "@/lib/valueEdge";
 
 const TOOLTIP_KEY = /Mac|iPhone|iPad/.test(navigator.platform) ? "Cmd" : "Ctrl";
 const HELP = HELP_VALUE_FIELD.replaceAll("Ctrl", TOOLTIP_KEY);
+/** The bar edge over a text: the top and bottom 6 px of the 28 px field, clear of the text row. */
+const EDGE_TICKS =
+  "linear-gradient(to bottom, black 0 6px, transparent 6px calc(100% - 6px), black calc(100% - 6px))";
 
 interface ValueFieldProps {
   /** The visible label inside the field ("Width", "Opacity"). */
@@ -193,6 +197,24 @@ export function ValueField({
   };
 
   const unitText = mixed ? "" : unit;
+  // The bar's edge line: at the bar's left end for a signed bar left of zero, else at its right.
+  const leftEdge = zero !== null && barFrom < zero;
+  const edgeAt = leftEdge ? Math.max(0, barFrom) : Math.min(1, bar);
+  const field = useRef<HTMLDivElement>(null);
+  const labelSpan = useRef<HTMLSpanElement>(null);
+  const valueSpan = useRef<HTMLSpanElement>(null);
+  const [edgeBroken, setEdgeBroken] = useState(false);
+  useLayoutEffect(() => {
+    const box = field.current?.getBoundingClientRect();
+    if (!box) {
+      return;
+    }
+    const spans = [labelSpan.current, valueSpan.current].flatMap((span) => {
+      const r = span?.getBoundingClientRect();
+      return r ? [[r.left - box.left, r.right - box.left] as const] : [];
+    });
+    setEdgeBroken(edgeCrossesText(edgeAt * box.width, spans));
+  }, [edgeAt, label, text, unitText, mixed, typing]);
   return (
     <div className="relative h-7" style={{ width: fieldWidth }}>
       {typing ? (
@@ -228,6 +250,7 @@ export function ValueField({
           note={note}
         >
           <div
+            ref={field}
             role="spinbutton"
             tabIndex={0}
             aria-label={name}
@@ -248,11 +271,22 @@ export function ValueField({
               <span
                 aria-hidden
                 className={`absolute inset-y-0 ${
-                  zero !== null && barFrom < zero ? "border-l-2" : "border-r-2"
+                  edgeBroken ? "" : leftEdge ? "border-l-2" : "border-r-2"
                 } border-[var(--value-edge)] bg-[var(--value-fill)]`}
                 style={{
                   left: `${Math.max(0, barFrom) * 100}%`,
                   width: `${(Math.min(1, bar) - Math.max(0, barFrom)) * 100}%`,
+                }}
+              />
+            )}
+            {!mixed && bar > barFrom && edgeBroken && (
+              // Over a label or a value the edge is two ticks above and below the text row.
+              <span
+                aria-hidden
+                className="absolute inset-y-0 w-[2px] bg-[var(--value-edge)]"
+                style={{
+                  left: leftEdge ? `${edgeAt * 100}%` : `calc(${edgeAt * 100}% - 2px)`,
+                  maskImage: EDGE_TICKS,
                 }}
               />
             )}
@@ -264,6 +298,7 @@ export function ValueField({
               />
             )}
             <span
+              ref={labelSpan}
               aria-hidden
               className="absolute top-1/2 left-2 -translate-y-1/2 text-sm text-[var(--toolbar-icon)]"
             >
@@ -278,6 +313,7 @@ export function ValueField({
               </span>
             )}
             <span
+              ref={valueSpan}
               aria-hidden
               className={`absolute top-1/2 ${noResetSlot ? "right-2" : "right-8"} -translate-y-1/2 text-sm tabular-nums`}
             >

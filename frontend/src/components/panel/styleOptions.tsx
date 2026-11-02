@@ -9,6 +9,7 @@ import {
   NoPaintIcon,
   SolidPaintIcon,
 } from "@/components/panel/StyleIcons";
+import { PatternPaintIcon } from "@/components/panel/PatternIcons";
 import type { ToggleOption } from "@/components/ui/toggle-group";
 import type {
   CapName,
@@ -27,6 +28,12 @@ export const PAINT_OPTIONS: readonly ToggleOption<"none" | "solid">[] = [
 export const FILL_OPTIONS: readonly ToggleOption<"none" | "solid">[] = [
   { value: "none", label: "No fill", tooltip: "No fill", icon: <NoPaintIcon /> },
   { value: "solid", label: "Solid fill", tooltip: "Solid fill", icon: <SolidPaintIcon /> },
+];
+
+/** The fill kind with Pattern (`specs/0071-pattern-fill` UX notes §2). */
+export const FILL_KIND_OPTIONS: readonly ToggleOption<"none" | "solid" | "pattern">[] = [
+  ...FILL_OPTIONS,
+  { value: "pattern", label: "Pattern fill", tooltip: "Pattern fill", icon: <PatternPaintIcon /> },
 ];
 
 export const JOIN_OPTIONS: readonly ToggleOption<JoinName>[] = [

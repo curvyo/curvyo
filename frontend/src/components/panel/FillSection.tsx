@@ -5,7 +5,9 @@ import { useRef } from "react";
 import { ColourBlock } from "@/components/panel/ColourBlock";
 import { ColourPicker } from "@/components/panel/ColourPicker";
 import { PaintRow } from "@/components/panel/PaintRow";
-import { FILL_OPTIONS } from "@/components/panel/styleOptions";
+import { PatternBlock } from "@/components/panel/PatternBlock";
+import { FILL_KIND_OPTIONS, FILL_OPTIONS } from "@/components/panel/styleOptions";
+import { ToggleGroup } from "@/components/ui/toggle-group";
 import { ValueField } from "@/components/panel/ValueField";
 import { useRowsFocus } from "@/components/panel/useRowsFocus";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
@@ -29,18 +31,9 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
   const hex = useRef<HTMLInputElement>(null);
   const hexEntry = useHexEntry(hex, onReturnFocus);
   const rowsFocus = useRowsFocus(view.fillRows, section);
-  return (
-    <div ref={section} data-style-section className="flex flex-col gap-2">
-      <PaintRow
-        title="Fill"
-        groupLabel="Fill paint"
-        options={FILL_OPTIONS}
-        paint={view.fillPaint}
-        onChange={panel.setFillPaint}
-        onReturnFocus={onReturnFocus}
-      />
-      {view.fillRows && (
-        <div className="contents" {...rowsFocus}>
+  const { pattern } = panel;
+  const colourRows = (
+    <div className="contents">
           <ColourBlock
             name="Fill"
             rgb={view.fillColor}
@@ -86,7 +79,43 @@ export function FillSection({ panel, onReturnFocus }: FillSectionProps) {
             onSubmit={(text) => panel.setText("fill-opacity", text)}
             onReturnFocus={onReturnFocus}
           />
+    </div>
+  );
+  const kindRow = pattern.offered ? (
+    <div className="flex h-7 items-center gap-2">
+      <h3 className="w-[60px] shrink-0 text-xs font-semibold text-[var(--toolbar-icon)]">Fill</h3>
+      <ToggleGroup
+        label="Fill paint"
+        options={FILL_KIND_OPTIONS}
+        value={pattern.kind === "" || pattern.kind === "mixed" ? null : pattern.kind}
+        onChange={panel.setFillKind}
+        itemWidth={44}
+        onReturnFocus={onReturnFocus}
+      />
+    </div>
+  ) : (
+    <PaintRow
+      title="Fill"
+      groupLabel="Fill paint"
+      options={FILL_OPTIONS}
+      paint={view.fillPaint}
+      onChange={panel.setFillPaint}
+      onReturnFocus={onReturnFocus}
+    />
+  );
+  return (
+    <div ref={section} data-style-section className="flex flex-col gap-2">
+      {kindRow}
+      {pattern.shown ? (
+        <div className="contents" {...rowsFocus}>
+          <PatternBlock panel={panel} onReturnFocus={onReturnFocus} colourRows={colourRows} />
         </div>
+      ) : (
+        view.fillRows && (
+          <div className="contents" {...rowsFocus}>
+            {colourRows}
+          </div>
+        )
       )}
     </div>
   );
