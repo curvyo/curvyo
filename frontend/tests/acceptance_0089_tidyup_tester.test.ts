@@ -758,7 +758,7 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
   });
 });
 
-test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, Colours, palette pipette, strip, Invert, Drop border shapes, Recognise text (0091 ux-notes §7; not drawn in Multicolour, 0091 criterion 17), Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, Colours, palette pipette, strip, Invert, Drop border shapes, Recognise text (0091 ux-notes §7; drawn in Multicolour too since 0091 slice 2, criterion 17 as amended), Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pale.png", PALE, true);
     await pickMethod(s, "Brightness");
@@ -773,7 +773,7 @@ test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, 
     const tail = multi.slice(multi.indexOf("Trace") + 1);
     const strip = tail.filter((n) => n === "swatch" || n.startsWith("action "));
     assert.ok(strip.length >= 1 && strip.filter((n) => n === "swatch").length === 1, `the strip is one Tab stop: ${JSON.stringify(strip)}`);
-    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Analyse", "Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Analyse", "Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Recognise text", "Denoise", "Upscale", "Corners"]);
     assert.ok(tail.indexOf("swatch") > tail.indexOf("Pick palette colour from the image") && tail.indexOf("swatch") < tail.indexOf("Invert"), "the strip sits between the palette pipette and Invert");
     // Pick colours has its pipette in the bar and none in Advanced.
     await pickMethod(s, "Pick colours");

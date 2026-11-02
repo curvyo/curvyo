@@ -855,9 +855,9 @@ export const RECOGNISE_TEXT = "Recognise text";
 /** The progress label while the text is read (UX notes §3). */
 export const READING_TEXT = "Reading text";
 
-/** Whether a trace with `values` reads text: the switch on and one colour (slice 1). */
+/** Whether a trace with `values` reads text: the switch on, with either Output (slice 2). */
 export function readsText(values: TraceValues): boolean {
-  return values.recogniseText && values.output !== MULTICOLOUR;
+  return values.recogniseText;
 }
 
 /** The muted line's text-line segment (UX notes §4): "3 text lines set", "3 of 5 text lines set",

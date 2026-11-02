@@ -567,7 +567,8 @@ test("specs/0091 criterion 17 (Frage 116 B a): Recognise text is off by default,
   assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseText, true);
   assert.equal(changedAdvancedText(on.values), "Changed: Recognise text");
   assert.equal(changedAdvancedText(firstChoice().values), null);
-  assert.equal(readsText({ ...on.values, output: MULTICOLOUR }), false);
+  // Slice 2: Multicolour reads text too.
+  assert.equal(readsText({ ...on.values, output: MULTICOLOUR }), true);
   // The "on" an earlier build kept as its default does not turn it on.
   storage.setItem("curvyo.trace-values", JSON.stringify({ recogniseText: true }));
   assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseText, false);

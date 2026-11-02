@@ -299,3 +299,127 @@ test("0091 slice 1 in Chromium: reading and fitting the poster keeps the main th
     rmSync(profile, { recursive: true, force: true });
   }
 });
+
+const COLOUR_SMALL = path.resolve(FRONTEND, "..", "curvyo-ocr-core", "tests", "fixtures", "colour", "colour_small.png");
+const COLOUR_POSTER = path.resolve(FRONTEND, "..", "curvyo-ocr-core", "tests", "fixtures", "colour", "colour_poster.png");
+const COLOUR_NATIVE = path.resolve(FRONTEND, "..", "curvyo-editor-wasm", "tests", "fixtures", "trace_text_colour_native.json");
+
+test("0091 slice 2 in Chromium: Recognise text drawn and honoured in Multicolour, coloured texts above the group in one step", { skip: !BROWSER, timeout: 300_000 }, async () => {
+  let vite: ChildProcess | null = null;
+  mkdirSync(SCRATCH, { recursive: true });
+  const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
+  let closeAll: () => Promise<void> = async () => undefined;
+  try {
+    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
+    const s = await session(profile);
+    closeAll = s.close;
+    await openTrace(s, COLOUR_SMALL);
+    await openAdvanced(s);
+    await s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === 'Multicolour').click()`);
+    await sleep(800);
+    // Slice 2 (UX notes §1): the switch is drawn with Multicolour, off by default, then on.
+    assert.equal(await toggle(s, "Recognise text"), "false");
+    await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').click()`);
+    await sleep(500);
+    assert.equal(await toggle(s, "Recognise text"), "true");
+    await waitFor("the text line count", async () => ((await s.statusText()).includes("2 text lines set") ? true : null), 180_000).catch(async (error: unknown) => {
+      throw new Error(`${String(error)}: status ${await s.statusText()}`);
+    });
+    await waitFor("the preview's fit", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=none]')`)) ? true : null), 180_000);
+    await s.evaluate(`[...document.querySelectorAll('${BAR} button')].find((b) => b.textContent?.trim() === 'Trace')?.click()`);
+    const rows = await waitFor("the text rows", async () => {
+      const r = await s.layerRows();
+      return r.some((x) => x?.includes("OFFEN")) && r.some((x) => x?.includes("Rote Farbe")) ? r : null;
+    }, 120_000).catch(async (error: unknown) => {
+      throw new Error(`${String(error)}: rows ${JSON.stringify(await s.layerRows())}; status ${await s.statusText()}`);
+    });
+    // Criterion 24/6: the texts lie above the "Trace of" group (rows are listed top first).
+    const group = rows.findIndex((x) => x?.includes("Trace of"));
+    const texts = [rows.findIndex((x) => x?.includes("OFFEN")), rows.findIndex((x) => x?.includes("Rote Farbe"))];
+    assert.ok(group >= 0 && texts.every((t) => t >= 0 && t < group), rows.join(" | "));
+    // Criterion 24/11: one undo removes the group and both texts.
+    await s.key("z", 90, 2);
+    await waitFor("undo", async () => (JSON.stringify(await s.layerRows()) === JSON.stringify(["colour_small.png, image"]) ? true : null));
+  } finally {
+    await closeAll();
+    vite?.kill();
+    rmSync(profile, { recursive: true, force: true });
+  }
+});
+
+test("0091 slice 2 c24/13 across builds: the editor wasm traces the small colour poster with text as natively", { skip: !BROWSER, timeout: 300_000 }, async () => {
+  const native = JSON.parse(readFileSync(COLOUR_NATIVE, "utf8")) as { width: number; height: number; rgba_fnv32: number; settings: string; map: number[]; ocr: string; wire: number[] };
+  let vite: ChildProcess | null = null;
+  mkdirSync(SCRATCH, { recursive: true });
+  const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
+  let closeAll: () => Promise<void> = async () => undefined;
+  try {
+    vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
+    await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
+    const s = await session(profile);
+    closeAll = s.close;
+    await s.send("Page.navigate", { url: `${ORIGIN}/` });
+    await waitFor("the app", async () => ((await s.evaluate(`!!document.querySelector('[data-import-button]')`)) ? true : null));
+    const png = readFileSync(COLOUR_SMALL).toString("base64");
+    const out = JSON.parse(
+      (await s.evaluate(`(async () => {
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        await m.default();
+        const png = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+        ctx.drawImage(bitmap, 0, 0);
+        const rgba = new Uint8Array(ctx.getImageData(0, 0, bitmap.width, bitmap.height).data.buffer);
+        let h = 0x811c9dc5;
+        for (let i = 0; i < rgba.length; i++) { h = Math.imul(h ^ rgba[i], 0x01000193) >>> 0; }
+        const t = performance.now();
+        const wire = Array.from(m.trace_text_job(rgba, bitmap.width, bitmap.height, Float64Array.from(${JSON.stringify(native.map)}), ${JSON.stringify(native.settings)}, ${JSON.stringify(native.ocr)}, { report() {} }));
+        return JSON.stringify({ w: bitmap.width, h: bitmap.height, fnv: h, wire, ms: performance.now() - t });
+      })()`)) as string,
+    ) as { w: number; h: number; fnv: number; wire: number[]; ms: number };
+    process.stdout.write(`# editor wasm: multicolour trace with text of the small colour poster ${out.ms.toFixed(0)} ms (wall, main thread)\n`);
+    assert.deepEqual([out.w, out.h, out.fnv], [native.width, native.height, native.rgba_fnv32], "the same pixels");
+    assert.deepEqual(out.wire, native.wire, "the same numbers");
+    // The numbers of the PR: the full multicolour poster read and traced in the editor wasm.
+    const big = readFileSync(COLOUR_POSTER).toString("base64");
+    const times = JSON.parse(
+      (await s.evaluate(`(async () => {
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        await m.default();
+        const png = Uint8Array.from(atob(${JSON.stringify(big)}), (c) => c.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const ctx = canvas.getContext('2d', { colorSpace: 'srgb' });
+        ctx.drawImage(bitmap, 0, 0);
+        const rgba = new Uint8Array(ctx.getImageData(0, 0, bitmap.width, bitmap.height).data.buffer);
+        const get = async (u) => new Uint8Array(await (await fetch(u)).arrayBuffer());
+        m.ocr_load(await get('/models/paddleocr-latin/det.onnx'), await get('/models/paddleocr-latin/rec.onnx'), new TextDecoder().decode(await get('/models/paddleocr-latin/dict.txt')));
+        const sink = { report() {} };
+        const map = Float64Array.from([0.25, 0, 0, 0.25, 0, 0]);
+        let t = performance.now();
+        const ocr = m.ocr_job(rgba, bitmap.width, bitmap.height, sink);
+        const ocrMs = performance.now() - t;
+        t = performance.now();
+        const regions = m.trace_text_regions_job(rgba, bitmap.width, bitmap.height, map, ${JSON.stringify(native.settings)}, ocr);
+        const regionsMs = performance.now() - t;
+        t = performance.now();
+        m.trace_text_job(rgba, bitmap.width, bitmap.height, map, ${JSON.stringify(native.settings)}, ocr, sink);
+        const withMs = performance.now() - t;
+        t = performance.now();
+        m.trace_job(rgba, bitmap.width, bitmap.height, map, ${JSON.stringify(native.settings)}, sink);
+        const offMs = performance.now() - t;
+        return JSON.stringify({ lines: JSON.parse(ocr).lines?.length ?? JSON.parse(ocr).length, regions: regions.length, ocrMs, regionsMs, withMs, offMs });
+      })()`)) as string,
+    ) as { ocrMs: number; regionsMs: number; withMs: number; offMs: number };
+    process.stdout.write(
+      `# editor wasm, colour_poster.png 1600 x 1200 (wall, main thread): OCR ${(times.ocrMs / 1000).toFixed(2)} s, text pass ${(times.regionsMs / 1000).toFixed(2)} s, ` +
+        `multicolour trace with text ${(times.withMs / 1000).toFixed(2)} s, off ${(times.offMs / 1000).toFixed(2)} s\n`,
+    );
+  } finally {
+    await closeAll();
+    vite?.kill();
+    rmSync(profile, { recursive: true, force: true });
+  }
+});

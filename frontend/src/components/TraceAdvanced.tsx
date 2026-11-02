@@ -324,17 +324,15 @@ export function TraceAdvanced({
               />
             ) : null;
           })}
-        {/* `specs/0091` UX notes §1: the third icon toggle; no "Recognise shapes" until 0088 Part B.
-            Not drawn with Multicolour, which slice 1 traces without text (lead decision 3). */}
-        {values.output === MULTICOLOUR ? null : (
-          <TraceToggle
-            label={RECOGNISE_TEXT}
-            icon={ScanText}
-            pressed={values.recogniseText}
-            onChange={(v) => setValue("recogniseText", v)}
-            onReturnFocus={onReturnFocus}
-          />
-        )}
+        {/* `specs/0091` UX notes §1: the third icon toggle, with either Output (slice 2); no
+            "Recognise shapes" until 0088 Part B. */}
+        <TraceToggle
+          label={RECOGNISE_TEXT}
+          icon={ScanText}
+          pressed={values.recogniseText}
+          onChange={(v) => setValue("recogniseText", v)}
+          onReturnFocus={onReturnFocus}
+        />
       </div>
       {denoise ? <ChoicePill param={denoise} value={values.denoise} onValue={(v) => setValue("denoise", v)} onReturnFocus={onReturnFocus} /> : null}
       {upscale ? <ChoicePill param={upscale} value={values.upscale} onValue={(v) => setValue("upscale", v)} onReturnFocus={onReturnFocus} /> : null}
