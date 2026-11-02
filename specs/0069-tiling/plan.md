@@ -85,6 +85,15 @@ Implementer, 2026-11-02. Binding: ADR 0028, `adrs.md`, `ux-notes.md`, `specifica
   Grid/Circle icon segments, circle fields reduced to Count and Face centre, notice slot, compact
   Variance with a container query, `TilingEntryChip.tsx` (AC 1, 2, 11, 14, 19, 34, 36).
   Criterion 40 needed no change: the Apply measurements were already reported, not asserted.
+- [x] 15. Customer 2026-11-02, live source edits (AC 29): `clone_previews` in
+  `curvyo-document-core/src/clone_preview.rs` applies the commit's held-back rule
+  (`clone_matrices_after_maps` on `outline_map::object_map`, shared with `hold_for_results`), so
+  a Select drag previews each tiling instance with the matrix the release writes; tiling
+  instances are not counted against the 500 cap; the session caches `own_placement_clones` per
+  document read (`clone_view.rs`), draws instances as themselves in Node drags without a ghost
+  (`drag_swap.rs`), and a style preview reaches clones whose style source is previewed
+  (`curvyo-ui-core/src/style_edit.rs`). Tests: `session/tiling_live_tests.rs`; frame costs in
+  `tests/tiling_budget.rs` (reported, below).
 
 ## Validation
 
@@ -107,6 +116,18 @@ time, one path of 50 segments tiled 100 x 100 with every variance channel on (20
 
 The preview draws only the instances meeting the viewport; the layout of all 10,000 is in the
 number. No target missed, nothing added to `docs/technical-debt.md`.
+
+A frame in the middle of a drag of the source of a stored tiling (keep source on, no variance;
+pointer move plus draw list; target 16 ms, Proposal, reported only, 2026-11-02):
+
+| Frame | 10 x 10 | 100 x 100 |
+|---|---|---|
+| Scale with the Select handle | 1.0 ms | 87 ms |
+| Node drag with the Node tool | 0.6 ms | 80 ms |
+
+Before, the 100 x 100 frame cost about 40 ms with the instances held still (no live preview);
+the rest is the resolve and the artwork of 10,000 changed instances. Tracked in
+`docs/technical-debt.md`.
 
 ## Deviations and open points (for the lead)
 

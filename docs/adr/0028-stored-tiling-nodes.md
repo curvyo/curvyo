@@ -50,7 +50,30 @@ across a regeneration, and what a peer's concurrent edit does to it.
      ADR 0026; the plan's "sketches as copies" predates that, Proposal); texts give linked text
      clones (ADR 0022). Every generated clone has `own_placement = true` (ADR 0016 §2), so moving
      or rotating a source does not scatter rotated instances; node and style edits of the source
-     still flow. Its `clone_link` matrix is the instance's affine `A_cell`.
+     still flow. Its `clone_link` matrix is the instance's affine `A_cell`. A tiling instance
+     (a clone with a cell or member key) holds back only the rigid part of a source transform
+     and the rest reaches it in its own cell (amended 2026-11-02 after the customer finding on
+     PR #247: a scaled source left its instances unchanged; pivot and chain rule amended the same
+     day after the architect review):
+     - *Pivot:* one per tiling, the centre of the cell box Apply uses, the union of the selection
+       boxes of the sources' leaves before the change (curve extrema, not anchor boxes). All
+       members of a multi-source instance split about it, so they keep their spacing relative to
+       each other, and for a pitch grid without variance the result is what the next Apply
+       writes.
+     - *Split:* the rigid part `R` takes the pivot where the change `T` takes it and, when
+       `det T > 0`, turns by the rotation of the polar decomposition of `T`'s linear part
+       (`atan2(b − c, a + d)`); the instance receives `R⁻¹·T`, its symmetric stretch about the
+       pivot. `M' = M·R⁻¹` and the instance's own change `M·R⁻¹·T·M⁻¹` is what clones downstream
+       of it see (ADR 0016 §2 amendment).
+     - *Flip* (`det T < 0`): no rotation is split off, the whole linear part reaches the
+       instance, including the turn of a one-gesture rotate-and-flip. Splitting a reflection is
+       convention-dependent (a vertical flip is a 180° turn times a horizontal one) and could hold
+       back a half turn.
+     - *Skew:* goes through the polar split: part of it is held as a rotation (`atan2(−k, 2)`
+       for a shear `k`) and the instance receives the symmetric stretch, not the skew.
+     - *Path dependence:* the split is per transform step. A rotation followed by a stretch along
+       the screen axes stretches the instance along axes tilted by the held rotation, and a flip of
+       a rotated source shows as a flip about a tilted axis. The next Apply resets the instance.
    - **Own style** is written only when the opacity or hue variance of the recipe is not zero:
      the source's style with the varied opacity or hue, ADR 0016 §1. Such an instance no longer
      follows style edits of its source until the next apply (Proposal; the only per-clone
@@ -100,7 +123,9 @@ across a regeneration, and what a peer's concurrent edit does to it.
      concurrent applies keep one recipe whole and the union of their creations, so a key can
      appear twice and matrices can belong to either recipe; a concurrent delete of an instance
      wins over writes to it; a concurrent Release and apply leave a plain group with extra
-     clones; a concurrent delete of the group removes children created under it. Readers
+     clones; a concurrent delete of the group removes children created under it. A transform
+     reads the cell keys locally, so a source scaled while a peer releases the tiling leaves a
+     plain own-placement clone whose matrix passed the scale; later transforms hold it whole. Readers
      tolerate all of it; reads never repair. The next apply repairs: per key it keeps the child
      with the lowest node id, deletes the other copies of that key and rewrites placements.
 7. **Release** removes `tiling`, `tiling_sources`, every `tiling_cell` and `tiling_member` in one
