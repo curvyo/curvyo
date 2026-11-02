@@ -7,8 +7,11 @@ use curvyo_vectorize_core::{Mask as TraceMask, TraceParams};
 use kurbo::{BezPath, Vec2};
 
 use crate::trace_ocr::OcrLine;
+use crate::trace_text::TextPass;
 use crate::trace_text::text_pass;
-use crate::trace_transfer::{count, read_outlines, trace_job_with, trace_mask_job, write_outline};
+use crate::trace_transfer::{
+    TraceStatus, count, read_outlines, status_only, trace_job_with, trace_mask_job, write_outline,
+};
 
 /// The number that opens the text section (no count is negative).
 pub(crate) const TEXT_MARK: f64 = -1.0;
@@ -25,6 +28,12 @@ pub struct TraceTextWire {
     pub direction: Vec2,
     /// Pixels left out of the main trace for it.
     pub masked: usize,
+    /// The OCR line passes the garbage filter (Frage 115 B / 117 B): it becomes text even
+    /// without a sure letter.
+    pub plausible: bool,
+    /// The size of one picture pixel along the line, document millimetres (the fit's tolerance,
+    /// criterion 26).
+    pub pixel: f64,
     /// The line's own outlines in document millimetres.
     pub outlines: Vec<BezPath>,
 }
@@ -66,6 +75,12 @@ pub fn trace_text_job_with(
     if wire.first() != Some(&0.0) {
         return wire;
     }
+    write_texts(&mut wire, &pass);
+    wire
+}
+
+/// The text section of `pass` after a result's numbers.
+fn write_texts(wire: &mut Vec<f64>, pass: &TextPass) {
     #[allow(clippy::cast_precision_loss)] // counts far below 2^52
     {
         wire.extend([TEXT_MARK, pass.found as f64, pass.regions.len() as f64]);
@@ -77,13 +92,39 @@ pub fn trace_text_job_with(
                 region.direction.x,
                 region.direction.y,
                 region.masked as f64,
+                f64::from(u8::from(region.plausible)),
+                region.pixel,
                 region.outlines.len() as f64,
             ]);
             for outline in &region.outlines {
-                write_outline(&mut wire, outline);
+                write_outline(wire, outline);
             }
         }
     }
+}
+
+/// The text pass alone (`specs/0091` criterion 25: the lines are decided before the main trace):
+/// the numbers of a result without outlines, then the text section of the accepted lines, as
+/// [`trace_text_job_with`] would write it.
+#[must_use]
+pub fn trace_text_regions_with(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceParams,
+    lines: &[OcrLine],
+) -> Vec<f64> {
+    let pass = text_pass(
+        rgba,
+        width,
+        height,
+        Affine::from_array(pixel_map),
+        params,
+        lines,
+    );
+    let mut wire = status_only(TraceStatus::Traced);
+    write_texts(&mut wire, &pass);
     wire
 }
 
@@ -147,12 +188,16 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
         }
         let direction = Vec2::new(next(&mut at)?, next(&mut at)?);
         let masked = count(next(&mut at)?)?;
+        let plausible = next(&mut at)? != 0.0;
+        let pixel = next(&mut at)?;
         let outlines = count(next(&mut at)?)?;
         let outlines = read_outlines(tail, &mut at, outlines)?;
         lines.push(TraceTextWire {
             text,
             direction,
             masked,
+            plausible,
+            pixel,
             outlines,
         });
     }
@@ -203,6 +248,37 @@ mod tests {
         assert_eq!(read.texts.found, 1);
         assert_eq!(read.texts.lines[0].text, "Grüße");
         assert_ne!(read.texts.lines[0].outlines.len(), 0);
+        // Frage 115 B and criterion 26: the garbage filter and the pixel size travel along.
+        assert!(read.texts.lines[0].plausible);
+        assert!((read.texts.lines[0].pixel - 0.1).abs() < 1e-12);
+    }
+
+    /// Criterion 25: the text pass alone gives the text section the full job gives, no outline.
+    #[test]
+    fn the_regions_are_the_text_section_of_the_job() {
+        let params = TraceParams::with_threshold(128);
+        let lines = [line("Grüße")];
+        let full = read_trace_wire(&trace_text_job_with(
+            &picture(),
+            40,
+            20,
+            MAP,
+            &params,
+            &lines,
+            &mut |_| {},
+        ))
+        .unwrap();
+        let regions = read_trace_wire(&trace_text_regions_with(
+            &picture(),
+            40,
+            20,
+            MAP,
+            &params,
+            &lines,
+        ))
+        .unwrap();
+        assert_eq!(regions.texts, full.texts);
+        assert_eq!(regions.outlines.len(), 0);
     }
 
     /// Criteria 12 and 18: no lines, the same numbers as before.

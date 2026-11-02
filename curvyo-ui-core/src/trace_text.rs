@@ -59,6 +59,10 @@ pub struct TextRegion {
     pub direction: Vec2,
     /// Pixels left out of the main trace for it.
     pub masked: usize,
+    /// The OCR line passes the garbage filter ([`OcrLine::plausible`]).
+    pub plausible: bool,
+    /// The size of one picture pixel along the line, document millimetres.
+    pub pixel: f64,
 }
 
 /// What the text pass hands to the main trace and back to the session.
@@ -251,11 +255,19 @@ pub fn text_pass(
         let q = line.quad;
         let edge = Vec2::new(q[1][0] - q[0][0], q[1][1] - q[0][1]);
         let m = pixel_map.to_array();
+        let direction = Vec2::new(m[0] * edge.x + m[2] * edge.y, m[1] * edge.x + m[3] * edge.y);
+        let edge_px = edge.hypot();
         pass.regions.push(TextRegion {
             text: line.text.clone(),
             outlines: result.outlines,
-            direction: Vec2::new(m[0] * edge.x + m[2] * edge.y, m[1] * edge.x + m[3] * edge.y),
+            direction,
             masked,
+            plausible: line.plausible(),
+            pixel: if edge_px > 0.0 {
+                direction.hypot() / edge_px
+            } else {
+                0.0
+            },
         });
     }
     inpaint(&mut pass.rgba, w, h, &pass.left_out);

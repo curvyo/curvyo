@@ -232,12 +232,13 @@ impl RecogniseJob {
     }
 
     /// A job over Trace's OCR lines (`specs/0091` `adrs.md` decision 4): per line its outlines
-    /// (one closed subpath each, document millimetres) and the string the OCR read, the hint.
+    /// (one closed subpath each, document millimetres), the string the OCR read (the hint) and
+    /// the line's own tolerance (criterion 26); `tolerance` ranks the nearest face.
     #[must_use]
-    pub fn with_hints(lines: &[(Vec<BezPath>, String)], tolerance: Mm, tiers: Tiers) -> Self {
+    pub fn with_hints(lines: &[(Vec<BezPath>, String, Mm)], tolerance: Mm, tiers: Tiers) -> Self {
         let recognisers = lines
             .iter()
-            .map(|(outlines, text)| Recogniser::with_hint(outlines, tolerance, text))
+            .map(|(outlines, text, own)| Recogniser::with_hint(outlines, *own, text))
             .collect();
         Self::of(recognisers, tolerance, tiers)
     }

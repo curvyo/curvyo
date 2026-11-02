@@ -488,9 +488,14 @@ pub use text_recognise_plan::{
     RecogniseSubjects, RecogniseWrite, RecognisedText, plan_recognise_write, recognise_available,
     recognise_subjects,
 };
-pub use trace_fit::{FitLine, FitResult, FitText, TraceFit};
+pub use trace_fit::{
+    FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY, TOLERANCE_PX, TOLERANCE_SHARE,
+    TraceFit, line_tolerance,
+};
 pub use trace_inpaint::inpaint as trace_inpaint;
-pub use trace_ocr::{MIN_LINE_CONFIDENCE, OcrError, OcrLine, OcrModel, trace_read_text};
+pub use trace_ocr::{
+    MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE, OcrError, OcrLine, OcrModel, trace_read_text,
+};
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
     trace_group_name, trace_style,
@@ -499,6 +504,7 @@ pub use trace_text::{TextPass, TextRegion, text_pass};
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
 pub use trace_text_wire::{
     LEFT_OUT_LEVEL, TraceTextWire, TraceTexts, trace_text_job_with, trace_text_mask_job,
+    trace_text_regions_with,
 };
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,

@@ -10,6 +10,15 @@ use curvyo_ocr_core::{OcrProgress, read_lines};
 /// decision 2).
 pub const MIN_LINE_CONFIDENCE: f64 = 0.6;
 
+/// The least mean character confidence of a line set as text without a sure letter (Frage 115 B
+/// / 117 B garbage filter; Proposal, calibrated on the customer's screenshot and the posters:
+/// UI chrome read as "88+" is 0.74, "ye" 0.34, real labels 0.89 and up).
+pub const MIN_GUESSED_LINE_CONFIDENCE: f64 = 0.8;
+
+/// A line whose letters repeat a unit of at most this many characters is a pattern, not text
+/// (the `0025` dot grid read as "TOTOTO").
+const MAX_PATTERN_UNIT: usize = 3;
+
 /// The share of the OCR's percentage the detector takes; the lines take the rest.
 const DETECT_PERCENT: usize = 20;
 
@@ -36,6 +45,25 @@ impl OcrLine {
         #[allow(clippy::cast_precision_loss)]
         let mean = self.confidence.iter().sum::<f64>() / self.confidence.len() as f64;
         mean >= MIN_LINE_CONFIDENCE
+    }
+
+    /// Whether the line becomes text even when no face gives it a sure letter (Frage 115 B /
+    /// 117 B, the garbage filter): at least 2 characters besides spaces, more than half of them
+    /// letters or digits, a mean confidence of at least [`MIN_GUESSED_LINE_CONFIDENCE`], and not
+    /// one short unit repeated.
+    #[must_use]
+    pub fn plausible(&self) -> bool {
+        let chars: Vec<char> = self.text.chars().filter(|c| !c.is_whitespace()).collect();
+        let letters = chars.iter().filter(|c| c.is_alphanumeric()).count();
+        if chars.len() < 2 || 2 * letters <= chars.len() || self.confidence.is_empty() {
+            return false;
+        }
+        // invariant: a count of characters, far below 2^52.
+        #[allow(clippy::cast_precision_loss)]
+        let mean = self.confidence.iter().sum::<f64>() / self.confidence.len() as f64;
+        let repeated = (1..=MAX_PATTERN_UNIT.min(chars.len() / 2))
+            .any(|unit| (unit..chars.len()).all(|i| chars[i] == chars[i - unit]));
+        mean >= MIN_GUESSED_LINE_CONFIDENCE && !repeated
     }
 
     /// The line with its quad scaled by `factor` (a reduced copy of the picture read).
@@ -105,5 +133,26 @@ mod tests {
         assert!(!line("--", &[1.0, 1.0]).accepted());
         assert!(!line("", &[]).accepted());
         assert_eq!(line("A", &[1.0]).scaled(0.5).quad[2], [5.0, 2.0]);
+    }
+
+    /// Frage 115 B / 117 B: the garbage filter of a line without a sure letter.
+    #[test]
+    fn the_garbage_filter_keeps_words_and_drops_marks_and_patterns() {
+        assert!(line("Sans", &[0.9; 4]).plausible());
+        assert!(line("Script ×+", &[0.89; 9]).plausible());
+        assert!(line("Aa", &[0.93, 0.93]).plausible());
+        // One character: the 0025 ring read as "O".
+        assert!(!line("O", &[0.8]).plausible());
+        // Mostly marks.
+        assert!(!line("*1", &[0.9, 0.9]).plausible());
+        assert!(!line(". >", &[0.9; 3]).plausible());
+        // Under the threshold.
+        assert!(!line("ye", &[0.34, 0.34]).plausible());
+        assert!(!line("88+", &[0.74; 3]).plausible());
+        // A short unit repeated: the 0025 dot grid read as "TOTOTO".
+        assert!(!line("TOTOTO", &[0.95; 6]).plausible());
+        assert!(!line("O O O", &[0.95; 5]).plausible());
+        assert!(!line("abcabc", &[0.95; 6]).plausible());
+        assert!(line("abcdabce", &[0.95; 8]).plausible());
     }
 }
