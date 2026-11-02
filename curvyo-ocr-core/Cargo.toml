@@ -1,0 +1,27 @@
+[package]
+name = "curvyo-ocr-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo text reader: model weights as bytes and an RGBA8 raster in, text lines with a quad, a string and per-character confidences out (pure, wasm-compatible)."
+
+[lints]
+workspace = true
+
+[dependencies]
+# Pinned exactly (ADR 0028 §1): the inference runtime of the shipped PaddleOCR weights, MIT OR
+# Apache-2.0, pure Rust, builds for wasm32. Without default features: ONNX loading only (no
+# `.rten` format, no `fft`, no `random`). It brings `rayon` (ADR 0028 §4: the scoped exception;
+# in wasm everything runs on the calling thread) and its own `unsafe` SIMD kernels.
+rten = { version = "=0.26.0", default-features = false, features = ["onnx_format"] }
+rten-tensor = { version = "=0.26.0", default-features = false }
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# The record test reads `model.toml` (ADR 0028 §5).
+toml.workspace = true
+serde.workspace = true
+# The reference set renders its posters from the included fonts and decodes PNG (dev only).
+curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }

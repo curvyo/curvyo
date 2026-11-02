@@ -1,0 +1,31 @@
+# Truth of the tester posters (`make_posters.py`). Lines top to bottom. `rotation_degrees` is
+# the line direction in pixel space (x right, y down): a line rising to the right is negative.
+# `foreign` names the line set in a face Curvyo does not include (Liberation Mono Bold).
+[[images]]
+file = "poster.png"
+lines = ["Größe", "Übermaß", "Äpfel & Öl", "Tel. 0421 98765", "Fräsen ab 3 Stück, 12.50 EUR", "Straße 7", "Mono 314 Zoll", "Brücke über Täler"]
+foreign = "Mono 314 Zoll"
+on_shape = "Straße 7"
+
+[[images]]
+file = "rotated_7.png"
+lines = ["Winkel sieben 7"]
+rotation_degrees = -7.0
+
+[[images]]
+file = "rotated_30.png"
+lines = ["Winkel 30 Grad"]
+rotation_degrees = -30.0
+
+[[images]]
+file = "rotated_90.png"
+lines = ["Neunzig 90"]
+rotation_degrees = -90.0
+
+[[images]]
+file = "plain.png"
+lines = []
+
+[[images]]
+file = "clean.png"
+lines = ["Größe"]
