@@ -186,7 +186,7 @@ impl Session {
         self.preview_style_edit(edit);
     }
 
-    fn preview_style_edit(&mut self, edit: StyleEdit) {
+    pub(super) fn preview_style_edit(&mut self, edit: StyleEdit) {
         // The objects are fixed by the first tick of a drag; later ticks skip
         // reading the document for them.
         let ids = if self.style.is_active() {
@@ -204,6 +204,7 @@ impl Session {
     /// objects the drag started on. Writes nothing after Escape. Like a typed edit it notes the
     /// clones it left alone (`specs/0057-clone-overrides` criterion 18).
     pub fn commit_style_preview(&mut self) {
+        self.drop_pattern_preview_over_limit();
         self.recording(|this| {
             // The commit also ends a gesture that Escape cancelled, so it always runs.
             let pending = this.style.is_active();

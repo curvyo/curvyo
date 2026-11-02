@@ -107,6 +107,9 @@ mod open_error;
 mod page_drag;
 mod pages;
 mod panel_tabs;
+mod pattern;
+#[cfg(test)]
+mod pattern_tests;
 mod pen;
 mod pen_entry;
 mod placement;
@@ -461,6 +464,10 @@ pub struct Session {
     /// The objects and units of the context, kept for as long as the document read they were made
     /// from (`grouping.rs`).
     context_cache: context::ContextCache,
+    /// The memo of every shape's pattern pieces (`specs/0071-pattern-fill`, `pattern.rs`).
+    patterns: std::cell::RefCell<curvyo_ui_core::PatternCache>,
+    /// Why the last pattern commit was refused over a limit, until the host takes it.
+    pattern_refusal: Option<curvyo_ui_core::PatternError>,
     /// What the last Group or Ungroup said, until the host has taken it (`grouping.rs`).
     grouping_result: Option<grouping::GroupingResult>,
     /// What a screen reader hears about the context, until the host has taken it.
@@ -584,6 +591,8 @@ impl Session {
             nudge_run: None,
             context: Vec::new(),
             context_cache: context::ContextCache::default(),
+            patterns: std::cell::RefCell::default(),
+            pattern_refusal: None,
             grouping_result: None,
             context_announcement: None,
             layers: layers::LayerState::default(),
@@ -671,6 +680,8 @@ impl Session {
             nudge_run: None,
             context: Vec::new(),
             context_cache: context::ContextCache::default(),
+            patterns: std::cell::RefCell::default(),
+            pattern_refusal: None,
             grouping_result: None,
             context_announcement: None,
             layers: layers::LayerState::default(),

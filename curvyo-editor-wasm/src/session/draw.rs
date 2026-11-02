@@ -20,19 +20,44 @@ use super::{Session, Tool};
 impl Session {
     /// The artwork of `objects`; with `fill_at`, the Trace view's kept mesh of the result where
     /// the image was (`specs/0025-raster-trace` criterion 56).
-    fn artwork_list(
+    pub(super) fn artwork_list(
         &self,
         objects: &[ObjectSnapshot],
         fill_at: Option<usize>,
         guides: &std::collections::HashSet<curvyo_document_core::NodeId>,
         view: ViewTransform,
     ) -> DrawList {
+        // A pattern fill is drawn as its pieces under the shape's stroke (ADR 0029 §7).
+        fn drawn<'o>(session: &Session, part: &'o [ObjectSnapshot]) -> Cow<'o, [ObjectSnapshot]> {
+            if curvyo_ui_core::PatternCache::any_pattern(part) {
+                {
+                    let previewed = session.style.previewed_ids();
+                    Cow::Owned(
+                        session
+                            .patterns
+                            .borrow_mut()
+                            .expand(part, &|id| previewed.contains(&id)),
+                    )
+                }
+            } else {
+                Cow::Borrowed(part)
+            }
+        }
+        // Entries of shapes gone from the read are dropped once, before either part expands, so
+        // the second part never drops the first part's entries (ADR 0029 §6).
+        self.patterns
+            .borrow_mut()
+            .retain_only(&objects.iter().map(ObjectSnapshot::id).collect());
         let Some(at) = fill_at else {
-            return build_artwork_with_guides(objects, guides, view);
+            return build_artwork_with_guides(&drawn(self, objects), guides, view);
         };
-        let mut list = build_artwork_with_guides(&objects[..at], guides, view);
+        let mut list = build_artwork_with_guides(&drawn(self, &objects[..at]), guides, view);
         list.extend(self.trace_fill_mesh(view));
-        list.extend(build_artwork_with_guides(&objects[at..], guides, view));
+        list.extend(build_artwork_with_guides(
+            &drawn(self, &objects[at..]),
+            guides,
+            view,
+        ));
         list
     }
 
