@@ -159,3 +159,76 @@ non-blocking.
 | 11 | Left to the tester (the wasm `c32_*` test already merges two peers). |
 | 12 | Angles and the centre the bar sends back unchanged keep their stored value (`keep_untouched` in `tiling_json.rs`); test `a_field_sent_back_unchanged_keeps_its_stored_value`. |
 | 13 | New `TilingError::IsALayer`. Test: `a_layer_cannot_be_tiled`. |
+
+## Architect review: tiling instances follow a source scale (2026-11-02)
+
+Scope: `curvyo-document-core/src/clone_hold.rs` (`tiling_held_matrix`, `close`,
+`anchor_box_centre`, the `kept` count), ADR 0028 §2 note, tests
+`tiling_commands.rs::a_scale_of_the_source_reaches_the_instances_and_a_move_or_rotation_does_not`
+and `curvyo-editor-wasm/tests/tiling_source_edits.rs`.
+
+**Verdict: CHANGES REQUESTED.**
+
+What is right: the split is the polar decomposition. For `det > 0`,
+`atan2(b − c, a + d)` is the angle of the closest rotation and matches the sense of
+`Affine::rotation_about`; `R = shift(T(p) − p) · Rot_p(θ)` gives `R(p) = T(p)`, so `R⁻¹·T` fixes
+`p` and its linear part is the symmetric stretch `P`; the instance drawn outline `M·R⁻¹·T·o`
+is that stretch about `M(p)`, its own centre. Apply writes `cell.affine` absolutely
+(`tiling_write.rs:332`), never composed with the stored matrix, so the next Apply shows the scale
+once, no double scale; for a single source whose pivot equals Apply's centre the held result
+equals what Apply writes (verified by hand for a scale about a corner). Undo: the matrices are
+written in the transform's commit, one undo step. Plain own-placement clones are untouched.
+
+### Blocking
+
+1. **Chain rule broken: `T_Y = identity` is now false for a tiling instance.**
+   `clone_transform.rs` `Maps::map_of` still treats every held clone as `Identity`
+   (ADR 0016 §2), but a tiling instance now changes by `M·R⁻¹·T·M⁻¹`. Downstream of an instance,
+   (a) an own-placement clone of an instance is not flagged and scales with it (violates `0057`
+   criterion 3), (b) a selected clone of an instance gets `G·M·T_Y⁻¹` with the wrong `T_Y`.
+   Nested tilings happen to come out right, by accident. Rule: ADR 0016 §2 "one pure function
+   decides every write". Fix: move the split into `clone_matrices_after_maps` (pure): pass the
+   held set as `HashMap<NodeId, Hold>` with `enum Hold { Whole, Rigid { pivot: Point } }`
+   (a parameter, no trait), write `M' = M·R⁻¹` there and record `T_Y = M·R⁻¹·T·M⁻¹` in `known`.
+   This also removes the recomputation `change = held⁻¹·matrix` (two extra inverses) and the
+   document read inside the planner. Test: an own-placement clone of an instance keeps its
+   outline when the source is scaled.
+2. **Members of a multi-source instance scale about their own centres.** The pivot is the
+   anchor box of the member's origin leaf, so a two-source tiling whose sources are scaled
+   together gets members that grow in place with unchanged spacing (overlap), unlike both the
+   source set and the next Apply, which scales about the cell box centre `c`
+   (`curvyo-ui-core/src/tiling/layout.rs` `instance_affine`). Fix: one pivot per tiling, the
+   pre-change centre of the union box of its sources' leaves, the same box Apply uses
+   (`cell_box`: `object_bounds`, not anchor boxes). For a single source this also removes the
+   anchor-box vs drawn-bounds mismatch for curves that bulge past their anchors. Test: two
+   sources scaled together, member spacing scales with them; re-Apply afterwards writes nothing.
+3. **ADR 0016 is not amended.** §2 still says `T_Y = identity` for every own-placement clone and
+   its Verification says "outline unchanged after move, rotate, scale, skew and flip". Add a dated
+   amendment to §2: a tiling instance (cell or member key) holds back only the rigid part about
+   its tiling's centre and passes the rest; its `T_Y` is as in finding 1; reference ADR 0028 §2.
+   The note in ADR 0028 §2 should name the pivot exactly (finding 2) and say what a skew and a
+   negative determinant do (non-blocking 1, 2). The doc comment of `tiling_held_matrix` cites
+   "ADR 0028 §4" (Refusal); the note is in §2. PO: amend criterion 29 with the scale rule, and
+   add a dated line to `specs/0069-tiling/adrs.md`.
+
+### Non-blocking
+
+1. **Flip (`det < 0`)** passes the whole linear part, including the rotation of a one-gesture
+   rotate-and-flip. Defensible: a vertical flip equals Rot(180°)·horizontal flip, so splitting a
+   reflection is convention-dependent and could hold a 180° turn. Document it in the ADR note.
+2. **Skew** goes through the polar split: part of a skew is held as a rotation
+   (`θ = atan2(−k, 2)` for a shear `k`), the instance receives the symmetric stretch, not the
+   skew. Say so in the note and add one test, or state that skew is held fully if preferred.
+3. **Per-step split is path-dependent.** Rotate then stretch along screen axes stretches the
+   instance along axes tilted by the held rotation; a flip of a rotated source shows as a flip
+   about a tilted axis (visually an extra turn of 2θ). The next Apply resets it. Note it in the
+   ADR, no code change.
+4. **Tolerance:** `close` compares entries absolutely at 1e-6 and duplicates `close` in
+   `tiling_write.rs:125`. It only drives the notice count, but give `Affine` one
+   `approx_eq(other, tolerance)` with a named constant and use it in both places.
+5. **Concurrency:** the cell key is read locally at transform time. A peer's concurrent Release
+   leaves a plain own-placement clone with a scale-passing matrix; a concurrent Apply contends
+   last-writer-wins on `clone_link` as before. Acceptable; one sentence in ADR 0028 §6.
+6. **Tests missing:** non-uniform scale with rotation in one gesture, a flip, a skew, a clone
+   chain through an instance (blocking 1), two sources (blocking 2), undo restoring the instance
+   matrices, and "re-Apply after a scale writes nothing".

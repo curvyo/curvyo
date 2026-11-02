@@ -84,6 +84,10 @@ TILE-EXTRAS A and TILE-RESULT-GROUP A. Everything under "Feature-local decisions
    plus `uniform_scale`; `seed`, `result`, `keep_source`. Absent channel = 0.
 10. **Format and goldens.** `CURRENT_FORMAT_VERSION` 32 (provisional, next free at merge; main is
    31). Goldens as ADR 0028 Consequences lists, named `tiling_*_v32.curvyo`.
+11. **Instances follow a source scale (2026-11-02).** After the customer finding on PR #247 a
+   tiling instance holds back only the rigid part of a source transform, about one pivot per
+   tiling (the centre of Apply's cell box), decided in the pure `clone_matrices_after` with
+   `Hold::Rigid`; ADR 0028 §2 and ADR 0016 §2 are amended, criterion 29 says it.
 
 ## For the product owner
 

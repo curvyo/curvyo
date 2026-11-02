@@ -1978,3 +1978,15 @@ after the duplicate reads were removed. The 500 ms targets are Proposals, so
 
 **Resolution:** open; candidates are writing own style only for the varied fields and a cheaper
 post-command read for large groups. Decide with the customer whether a hard target is wanted.
+
+## A live source drag of a 100 x 100 tiling costs about 85 ms a frame (`0069` criterion 29, 2026-11-02)
+
+While the source of a tiling is scaled or node-dragged, every clone instance is resolved and
+drawn as itself each frame (customer 2026-11-02, "it should be live"). With 10,000 instances of
+a 50-segment source a frame costs about 85 ms of thread CPU (release, local), against about
+40 ms before, when the instances were held still; a 10 x 10 tiling costs about 1 ms.
+`curvyo-editor-wasm/tests/tiling_budget.rs` reports it against a 16 ms Proposal target without
+asserting.
+
+**Resolution:** open; candidates are drawing the instances from one tessellation of the source
+under their matrices, and moving rather than copying the swapped objects.

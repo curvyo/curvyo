@@ -64,6 +64,12 @@ Constraint that shapes everything: a transform of an original is **baked into it
    `0049` adrs decision 4) decides every write to the clones downstream of a transformed set.
    For an unselected clone Y with original Z: if `own_placement`, then `M_Y' = M_Y·T_Z⁻¹` and
    `T_Y = identity`, else `T_Y = M_Y·T_Z·M_Y⁻¹` as before (a following clone is not written).
+   *Amended 2026-11-02 (`specs/0069-tiling` criterion 29, ADR 0028 §2):* a tiling instance (a
+   clone with own placement and a `tiling_cell` or `tiling_member` key) holds back only the rigid
+   part `R` of `T_Z` about its tiling's pivot and passes the rest: `M_Y' = M_Y·R⁻¹` and
+   `T_Y = M_Y·R⁻¹·T_Z·M_Y⁻¹` (not identity), so clones downstream of an instance keep the chain
+   rule. The same pure function decides it; the held set it takes says per clone whether it holds
+   the whole change or the rigid part about which pivot (`Hold::Whole`, `Hold::Rigid`).
    Selected clones keep the `0049` rule whatever the flag. The write is the whole `clone_link`
    with the origin read. When `|det T_Z| < 1e-9` the held-back clone is unlinked first, in the
    same commit, with the outline it had (it keeps its place, which is what the flag promised);
@@ -154,6 +160,10 @@ Constraint that shapes everything: a transform of an original is **baked into it
 Tests in `curvyo-document-core` (and `ui-core` for the gesture):
 
 - held-back clone: outline unchanged after move, rotate, scale, skew and flip of the original;
+  *amended 2026-11-02:* a tiling instance only after move and rotate; after a scale, stretch,
+  skew or flip it shows the non-rigid part in its cell (ADR 0028 §2,
+  `curvyo-document-core/tests/tiling_source_scale.rs`), and a clone downstream of it follows
+  the chain rule with the instance's real change;
   chain cases (a) to (c) of `0057` criterion 5 with their matrices;
 - singular T unlinks the flagged clone with its outline, style and opacity; ±1e7 refuses all;
 - S(c) over B → A → O; effective opacity for the cases of §3 (own, chain with a layer above A,

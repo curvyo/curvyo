@@ -10,6 +10,8 @@ operating tips or hint labels. Labels that name a control or a state stay; toolt
 the control is an icon, one rule line. Nothing here says "press Enter" or "Esc to cancel" anywhere on screen.
 No dialog, no popover, no dropdown: every choice is a segmented control, a switch or a field.
 
+**Amended 2026-11-02 (customer feedback on PR #247): section 12 wins** over sections 2.1 (items 1, 2, 4), 2.2 (Mirror, Offset: icon names unchanged), 2.3 (circle fields), 2.4 (Variance block, Seed group, Result, count status), 3 (Cancel), 4 (count rows), 5 (circle handles), 6 (tab order), 7 (strings) and 8 (widths). Where this file and section 12 differ, section 12 is right.
+
 ## 1. Tile button in the Select bar
 
 - A **text button with a 16 px glyph**, label **Tile**, 28 px high (`BUTTON_CLASS`, `h-7 px-2`), about 64 px
@@ -199,6 +201,12 @@ never blocks Apply.
   are listed and selectable there and by entering the group on the canvas. Properties shows the group's
   position and size. Hand edits last until the next Apply (criterion 28); to keep them, Release tiling.
 - Pages are ignored: instances land where the layout puts them, off the page too.
+- **Live source edits (amended 2026-11-02, customer on PR #247: "it should be live"):** while the source of a
+  stored tiling is scaled with the Select handles, or a node, handle or side of it is dragged with the Node tool,
+  every clone instance is drawn as itself with the edit in its own cell in the same frame, as the release leaves
+  it; a style preview reaches the instances that take the source's style. **(Proposal)** the instances leave no
+  drag ghost and are drawn as themselves in a Node drag too (not as the blue clone outline of `0049`): 10,000
+  ghosts or blue outlines are noise and cost about 100 ms a frame.
 
 ## 6. Keyboard and accessibility
 
@@ -316,3 +324,220 @@ Open findings:
    Resolved (2026-11-02): the label gap is 8 px (`gap-2`), as the other bar fields.
 4. Not exercised: dark theme, coarse pointer (36 px hits), the box-only preview above 10,000 visible
    instances at low zoom, screen reader output. Tester or the demo should cover them.
+
+## 12. Amendment 2026-11-02: the bar redesigned after the customer's feedback on PR #247
+
+Authority: customer feedback of 2026-11-02 (two screenshots, grid and circle with Variance open, translated in the
+lead's brief). **(Proposal)** marks my choices, vetoable at the demo. Customer rule 2026-10-16 still holds: no
+operating tips or hint labels. Nothing on screen says "double-click" or "Esc"; the handles, the Escape key and the
+entry boxes are learned from the other tools (consistency replaces explanation). Labels and tooltips only name.
+
+### 12.1 What the customer asked for, and what it becomes
+
+| Feedback | Result |
+|---|---|
+| Cancel goes, Apply far right | No Cancel button; Escape cancels. Apply is pinned at the right end of line 1 |
+| Grid / Circle: only symbols | Two 28 px icon segments, names in tooltip and `aria-label` |
+| Centre X/Y out of the bar | Centre handle; double-click opens an entry box (X, Y) |
+| Radius the same | Radius handle; double-click opens an entry box (r) |
+| Start angle and sweep: handles, double-click, out of the bar | Two new handles with entry boxes (Start, Sweep) |
+| Seed goes completely | No seed control or display; the stored seed stays |
+| Instance count goes | No running count; a quiet notice icon only when a limit is hit (12.3) |
+| Keep source vertically centred | One 28 px centre line for every control on line 1 (12.2) |
+| Variance more compact | Three blocks of two channels (amended 2026-11-02), narrow fields, 24 px rows (12.5) |
+
+The Count field of the circle stays: it is an input, not the count display.
+
+### 12.2 The bar, final order (left to right)
+
+Line 1 is a left cluster that wraps by whole group (25 px apart, dividers as in section 8) and **Apply**, a
+separate right column that never wraps away and never moves.
+
+1. **Title**: the word **Tile** ("Edit tiling" when a stored tiling is open), 14 px semibold `--toolbar-icon`.
+2. **Layout**: `radiogroup` "Layout", two **28 x 28 px icon segments** in the Offset chip's pill look (1.5 px
+   `--toolbar-icon` ring, selected = `--toolbar-icon-active-bg` / `-fg`). Glyphs, 16 px, 1.5 px stroke, `currentColor`,
+   custom like `StaggerGlyph`: **Grid** = 3 x 3 squares of 3 px; **Circle** = 6 squares of 3 px on a ring. Tooltip
+   (400 ms) is the name only: "Grid", "Circle". Roving tabindex, one Tab stop, arrows choose. Default Grid; values of
+   both layouts are kept.
+3. **Mode fields.** Grid: Columns, Rows, Spacing (Gap | Pitch, X, Y) as in 2.2. Circle: **Count** (44 px) and the
+   switch **Face centre**. Nothing else: centre, radius, start and sweep are on the canvas (12.4).
+4. **Mirror and Offset toggles** (Grid only): names, glyphs, exclusivity and the Shift field as in 2.2.
+5. **Variance** button (as 2.4: glyph, dot, tooltip "Variance: none" or "Variance: rotation, scale", `aria-expanded`).
+6. **Result**: label outside "Result", segments **Clones** | **Copies** (as 2.4).
+7. **Keep source**: the `ToolbarSwitch`, label **Keep source in place** (tooltip as 2.4). **Vertical centring:**
+   the group is `h-7 inline-flex items-center gap-2`; the switch track and the 20 px label line share the 28 px
+   centre line. Review test: the centre y of Keep source equals that of Title, Layout and the fields within 0.5 px
+   at 1440, 1100 and 800 px (the same row test applies to every other control of the row).
+8. **Notice slot** (12.3): a 16 px icon, only while a notice is active.
+9. **Apply** (far right): 64 x 28 px, selected fill, as now. Same rules as before: `aria-disabled` and 40 % opacity
+   while a field is invalid or the count is refused. In the DOM and the Tab order it comes last.
+
+Layout in CSS terms: `flex`, the cluster `min-w-0 flex-1 flex-wrap`, Apply `shrink-0 self-start`, so on a wrapped
+bar Apply stays at the top right of line 1. The Variance block opens below both, full width, as before.
+
+**Escape cancels** the tiling anywhere in the bar and on the canvas, also inside a bar field and with the Variance
+block open, **except** with a handle entry box open: then Escape closes only the box (12.4) and the next Escape
+cancels. Enter applies as before (in a bar field, on the canvas); with a box open, Enter belongs to the box.
+Focus on entering: Columns or Count, text selected. Focus after Apply or Escape: the canvas.
+
+### 12.3 What remains of the count (decided)
+
+No count text. One **notice slot** (a 16 px `CircleAlert`, focusable, 28 px hit area, `role="status"` with the
+text as its accessible name) after Keep source, shown only when a notice is active; its tooltip lists the active
+lines, one per line:
+
+| When | Look | Text |
+|---|---|---|
+| Over 10,000 and up to 100,000 instances | icon, `--toolbar-icon` | "Over 10,000 instances. The preview is simplified." |
+| Clones chosen and the source holds an image | same icon | "Images become copies." |
+| Over 100,000 instances | icon in `--field-invalid`, **and** the chip under it stays visible (`role="alert"`, refusal look, as section 4); Apply disabled | "Too many instances. 100,000 at most." |
+
+Reason: a refusal that blocks Apply must be readable without a hover; the two soft notices are quiet. The sr-only
+live region keeps "Tiling, 48 instances" on entering and when a limit state changes; it no longer announces every
+count change. The Apply refusal under Apply (section 4) is unchanged.
+
+### 12.4 Circle handles and their entry boxes
+
+Only in Circle; Grid has none. Drawn above the preview and the dashed selection box; the source shows nothing else.
+**Path:** the swept arc dashed 1 px `--preview-new` at 50 % (as now); the unswept rest of the circle dotted 1 px at
+20 %; when |Sweep| is under 360, two 1 px 50 % lines from the centre to the start and sweep knobs. All `aria-hidden`.
+
+| Handle | Where | Look | Cursor | Drag |
+|---|---|---|---|---|
+| Centre | the circle's centre | 12 px ring with cross, 2 px `--accent` over 1 px white casing (as built) | `move` | moves Centre X, Y |
+| Radius | on the circle at the **middle of the arc** (start + sweep / 2; at a full circle opposite the start), **moved from the start angle** so it no longer sits on the source | 10 px square, 2 px `--accent` over white casing (as built) | the stock resize cursor nearest the radial direction | Radius = distance to the pointer, more than 0 |
+| Start | on the circle at the start angle | the **Parameter handle** (10 px round, idle white ground, hover `--accent-hover`, dragging or box open solid `--accent`) | `pointer` | rotates the whole arrangement; Sweep is kept, so the end moves with it |
+| Sweep | on the circle at start + Sweep | the same Parameter handle | `pointer` | changes Sweep, start fixed |
+
+- **Sweep rest position:** at |Sweep| = 360 the sweep knob is drawn 14 px of arc before the start knob (the arc
+  handles' 14 px rule), so the two never lie on each other. Dragging it tracks the pointer angle relative to the
+  start, unwrapped continuously, clamped to -360 to 360; within 5 px of the full turn it snaps to exactly 360.
+- **Hit size:** 12 px pick distance around each handle's centre, at every zoom (as built). Nearest wins; on a tie the
+  order is Sweep, Start, Radius, Centre. Below a 20 px on-screen radius the handles overlap; the maker zooms in or
+  types (the keys below).
+- **Angles:** counterclockwise as seen on screen, 0 pointing right (criterion 11). Start is shown from -180 to 180°
+  and stored as typed (normalised to that range). Free drag: 0.1°; **Ctrl** snaps to the 15° and 22.5° stops (the arc
+  handles' rule; the Select tool's handles use Ctrl to snap angles too). No other key.
+- **Snapping, centre and radius:** as the other Select-tool handles (`0060`, `0090`), Ctrl suspends; no tiling-only
+  key. The radius uses the snapped pointer point.
+- **Readout chip** at the pointer, the "Live transform readout", one decimal, real minus sign:
+  "Centre 120.0, 80.0 mm" / "r 42.0 mm" / "start 30.0° · sweep 120.0°" (start drag) / "end 150.0° · sweep 120.0°"
+  (sweep drag).
+- **Hint chips:** none.
+
+**Entry box** (opened by a **double-click on a handle**): the "Transform entry chip" surface, built with
+`EntryField` and the placement and message card of `MoveEntryChip` (`frontend/src/components/`; patterns of `0052`
+and `0072`: `PenEntryChip`, `PlacementChip`). New component `TilingEntryChip.tsx`; the handle it belongs to stays
+in its dragging look while the box is open.
+
+| Handle | Fields (28 px high, fixed unit suffix, 14 px tabular) | Accessible names |
+|---|---|---|
+| Centre | "X" and "Y", 100 px each, 4 px apart, `mm`, 20 px left padding | "Centre X, millimetres", "Centre Y, millimetres" |
+| Radius | "r", 100 px, `mm` | "Radius, millimetres" |
+| Start | "Start", 126 px, `°`, 44 px left padding | "Start angle, degrees" |
+| Sweep | "Sweep", 126 px, `°`, 44 px left padding | "Sweep, degrees" |
+
+- **Prefill:** the current value (up to two decimals, centre in document coordinates as Properties shows). Focus on
+  the first field, text selected; the double-clicked handle decides the box, so Centre opens on X.
+- **Placement:** Radius, Start, Sweep: outward of the handle (centre-to-handle direction), 10 px clear of its glyph,
+  upright, flipped and clamped with the readout rule, right of `--rail-right` + 12; Centre: left edge 16 px right of
+  the glyph, top 16 px below it (the Move chip rule). Follows pan, zoom and resize.
+- **Typing previews** on every valid keystroke (debounced 120 ms), like the bar fields and the `0052` chip (a
+  deliberate difference from the numeric entry chip of the Select tool, which does not preview).
+- **Keys:** Tab and Shift+Tab loop through the box's fields (Centre: X, Y). **Enter** keeps the typed values, closes
+  the box and returns focus to the canvas; it does not apply the tiling (the next Enter does). Enter on unedited text
+  closes the box and changes nothing. **Escape** closes the box and **restores the values it opened with**; it does
+  not cancel the tiling (the next Escape does). No arrow stepping, no modifiers.
+- **A press elsewhere** (not swallowed; a press on another handle starts its drag) and a tool switch, page switch or
+  window blur close the box as Escape does.
+- **Errors:** a refused value keeps the box open, re-selects the text, marks the field `aria-invalid` with the 2 px
+  `--field-invalid` ring and shows the Move chip's message card (12 px, `CircleAlert`, `role="status"`): "Enter a
+  number" (all), "Must be more than 0." (Radius), "Must be between -360 and 360." (Sweep). The error clears on the
+  next keystroke. While invalid, the last valid preview stays and Enter keeps the box open.
+- **Keyboard route (Proposal):** handles are canvas pixels, so the bar's old Tab path to these values is gone. With
+  focus on the canvas and the circle bar open, **C**, **R**, **A** and **S** open the box of the Centre, Radius,
+  Start angle and Sweep handle, placed as if double-clicked, also when the handle is off screen or lies on another.
+  They are free in this mode (selection and tools are locked). They are named in the keyboard map in
+  `docs/design-system.md` and the shortcut list, never on the canvas. If the customer prefers no keys, the values
+  are then reachable by pointer only; I do not recommend that.
+
+### 12.5 Compact Variance block
+
+**Amended 2026-11-02** (customer on PR #247: "color und opacity können ruhig auch noch daneben, das spart eine
+zeile"): **three blocks of two channels** instead of two blocks of three, so the block has two rows.
+
+Opens under the bar (full width, 25 % divider above, as before). **Three blocks side by side, two channels each**;
+each block has its own header row once, then two rows. Row height **24 px**, row gap 4 px, fields **24 px high**,
+14 px tabular, no suffix inside (units in the row labels), 6 px inner padding; header row 20 px, 12 px
+`--panel-muted-fg`, right-aligned over its column. Block padding 8 px top and bottom, 8 px left and right.
+
+| Block (left) | Random ± | Per column | Per row |
+|---|---|---|---|
+| Rotation ° | field | field | field |
+| Scale % | field | field | field |
+
+| Block (middle) | Random ± | Per column | Per row |
+|---|---|---|---|
+| Offset X mm | field | field | field |
+| Offset Y mm | field | field | field |
+
+| Block (right) | Random ± | Per column | Per row |
+|---|---|---|---|
+| Colour ° | field | field | field |
+| Opacity % | field | field | field |
+
+- **Widths:** label 56 / 68 / 60 px + 56 + 64 + 56 px columns + 3 gaps of 4 = 244 / 256 / 248 px; two gutters of
+  12 px and padding 8 + 8: **788 px**. "Per column" gets a 64 px column so no header is clipped.
+- **Height:** 8 + 20 + 2 x 24 + 4 + 8 = **88 px** (116 px before).
+- **Fewer columns on a narrower bar:** the blocks wrap (flex-wrap, 12 px gutter, 8 px between lines): under about
+  788 px of bar two blocks per line and the third below with its own header row; from 500 px down see below.
+- **Circle:** the middle and right columns collapse to one, **Per step**; each block is label + 2 x 56 + 4, three
+  blocks fit from about 560 px.
+- **Narrow areas (under 500 px, e.g. 800 x 600, area about 356 px):** the blocks stack into one column of six
+  rows under **one** header row (Random ±, Per column, Per row), label width 72, 6 x 24 + 5 x 4 + 20 + 16 = 200 px
+  high, 268 px wide. Container query on the block, not a media query.
+- **Coarse pointer:** fields 36 px, rows 36 px, one column.
+- **Tab order:** left block row by row (across, then down), then the middle block, then the right block. Names:
+  "Rotation random, degrees", "Rotation per column, degrees" ... (`{channel} {column}, {unit}`), as built.
+- Defaults, ranges, messages and the active-channel dot of the button: unchanged (2.4).
+
+### 12.6 Seed
+
+No control, no display, no dice. A new Tile draws a fresh seed (platform random) and stores it; Edit tiling uses the
+stored seed, so the layout never changes by itself. **Reroll: none** (default, the customer said "completely");
+a maker who wants another random look undoes the Tile and tiles again. Open question 2 below if the customer
+misses it.
+
+### 12.7 Strings
+
+**Removed from the bar:** Cancel, Seed, New random seed, Centre X, Centre Y, Radius, Start angle, Sweep (as bar
+labels), "{n} instances", "1 instance". **New:** tooltips and names "Grid", "Circle" (icon segments; group name
+"Layout" stays); entry box labels "X", "Y", "r", "Start", "Sweep" with the names of 12.4; readouts "start {a}° ·
+sweep {b}°", "end {a}° · sweep {b}°". **Kept:** Tile, Edit tiling, Release tiling, Apply, Columns, Rows, Gap,
+Pitch, X, Y, Shift, Count, Face centre, Variance and its row and column names, Result, Clones, Copies, Keep source
+in place, the three notices of 12.3, the field messages. Group name **Tiling** and the history steps are unchanged.
+
+### 12.8 Review checklist (replaces items 3, 4, 6 to 8, 10 and 13 where they differ)
+
+1. No Cancel, Seed, dice, count text or circle fields (except Count, Face centre) in the bar; Escape cancels from
+   a bar field, the canvas and with the Variance block open; Apply is at the right end of line 1 at 1440, 1100,
+   800 x 600 and does not move when the bar wraps.
+2. Keep source and every control of line 1 share one centre line within 0.5 px.
+3. Layout icons: names, tooltips, arrows, one Tab stop, contrast 3:1 for the glyphs, both themes.
+4. Four handles: look, 12 px pick, tie order, cursors, readouts; Radius no longer on the start angle; sweep knob
+   14 px before the start at 360; snap to 360; Ctrl stops; sweep never flips at a full turn.
+5. Each double-click opens the right box at the right place; Enter keeps and closes; Escape restores and does not
+   cancel the tiling; the next Escape does; invalid text keeps the box and the last preview; focus returns to the
+   canvas; keys C, R, A, S open the same boxes.
+6. Variance: 116 px high at 520 px wide, no clipping of headers, Circle with Per step, 1 column under 500 px, Tab order.
+7. Notice slot: 10,001 icon and tooltip; 100,001 refusal text and Apply disabled; image notice; no number on screen.
+8. No operating tips or hint text anywhere.
+
+### 12.9 Questions for the lead (defaults given)
+
+1. Keys **C, R, A, S** open the handle boxes from the keyboard: default **yes** (accessibility; no on-canvas hint).
+2. Reroll control for the hidden seed: default **none**. If wanted later: a 28 px `Dices` button named "New random
+   seed" in the Variance block header, shown only while a Random ± value is not zero.
+3. Enter in a handle box keeps the value and closes the box; the next Enter applies the tiling: default **yes**
+   (the alternative, Enter applies at once, would skip the check of the other handles).
+4. Radius handle moved to the arc's middle: default **yes**, because the start angle now has its own handle.
