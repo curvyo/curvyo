@@ -21,6 +21,7 @@ import { PenEntryChip } from "@/components/PenEntryChip";
 import { PlacementChip } from "@/components/PlacementChip";
 import { SelectionAnnouncer } from "@/components/SelectionAnnouncer";
 import { TextPathEntryChip } from "@/components/TextPathEntryChip";
+import { TilingEntryChip } from "@/components/TilingEntryChip";
 import { TransformEntryChip } from "@/components/TransformEntryChip";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { ColourPickChip } from "@/components/ColourPickChip";
@@ -209,6 +210,15 @@ export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
           onSide={editor.textPathEntrySide}
           onLine={editor.textPathEntryLine}
           onMirror={editor.textPathEntryMirror}
+        />
+      )}
+      {editor.tiling.entry && editor.tiling.recipe && (
+        <TilingEntryChip
+          key={editor.tiling.entry.handle}
+          entry={editor.tiling.entry}
+          recipe={editor.tiling.recipe}
+          tiling={editor.tiling}
+          containerRef={editor.containerRef}
         />
       )}
       {editor.moveEntry && (

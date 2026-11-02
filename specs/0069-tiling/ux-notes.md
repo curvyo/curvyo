@@ -277,3 +277,42 @@ exclamation marks, no "please".)
 - Grid canvas handles (drag the pitch or the corner): default **none**, fields only.
 - Reopen by Enter on the selected tiling (double-click enters the group, section 1): default **yes**.
 - Keyboard shortcut for Tile: default **none**.
+
+## 11. UX review (2026-11-02, ux-engineer)
+
+Verdict: **CHANGES REQUESTED** (two behaviour findings, one canvas finding; all else matches sections 1 to 8).
+Browser-checked at 1440 x 1000, 1100 x 800 and 800 x 600 (Chromium, dev build). Screenshots:
+`/tmp/claude-1000/-home-marc-curvyo/a768e45d-9f28-55af-89f0-ec536eb460a1/scratchpad/ux0069/`.
+
+Passes: Tile button states (nothing: `aria-disabled`, 40 %, silent press; one or several: enabled; tiling:
+Edit tiling + Release tiling); Enter on the Edit tiling button reopens with identical values and seed; dice
+changes the seed; Apply returns focus to the canvas; group "Tiling" in Layers; history steps Tile, Edit
+tiling, Release tiling; Gap/Pitch converts (5 mm gap = 26 mm pitch for a 21 mm box); offset toggles are
+exclusive, mirror toggles independent; Variance dot and tooltip state ("Variance: opacity, colour"); Circle
+shows Per step; centre and radius handles drag, the readout chip shows "Centre x, y mm" and "r x mm";
+Escape in a field cancels; Ctrl+Z and clicks on artwork are ignored while the bar is open; tool switch
+cancels; 10,001+ shows the warning, 100,001+ the alert; no overflow at 1100 or 800 px (X and Y wrap in the
+pill), Apply and Cancel stay on line 1; no hint text.
+
+Fixed in this review (visual only):
+- Field and alert chips were as narrow as their anchor and wrapped to four lines ("Enter a whole number",
+  "Too many instances. 100,000 at most."); chips now size to their text (max 320 px).
+- Apply showed no disabled look above 100,000 instances; it now takes the 40 % opacity of the other
+  disabled buttons.
+
+Open findings:
+1. Apply is not `aria-disabled` while a field is invalid (Columns "abc": Apply reports false, section 2.1
+   requires true; Enter is blocked correctly). Fix: the bar knows the invalid fields (lift the field error
+   into the session, or reuse the `aria-invalid` check of the Enter path), set `aria-disabled` and the 40 %
+   look, and ignore the press.
+   Resolved (2026-11-02): Apply takes `aria-disabled` and the 40 % look while any field is invalid (`frontend/tests/tilingBar.test.ts`); Enter is blocked likewise.
+2. While the bar is open the source keeps its full transform handles (rotate, scale, skew arrows, corner
+   radius dots). They collide with the circle centre and radius handles (screenshot `13-circle2.png`,
+   `15-drag-centre.png`) and suggest edits that do nothing. Fix (editor-wasm overlay): draw only the
+   dashed selection box while the tiling bar is open (section 5 says "source selection box").
+   Resolved (2026-11-02): with the bar open only the dashed selection box is drawn and the Select cursor never shows a transform handle (`no_transform_handle_is_hit_while_the_bar_is_open`); presses already picked circle handles only.
+3. Minor: the Columns/Count focus ring touches its outside label at 44 px width; add 4 px gap between
+   label and field.
+   Resolved (2026-11-02): the label gap is 8 px (`gap-2`), as the other bar fields.
+4. Not exercised: dark theme, coarse pointer (36 px hits), the box-only preview above 10,000 visible
+   instances at low zoom, screen reader output. Tester or the demo should cover them.

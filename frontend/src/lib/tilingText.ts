@@ -1,6 +1,6 @@
-// Tiling in the frontend (`specs/0069-tiling`, UX notes §1 to §7): the bar's strings, the shape of
-// the recipe and status JSON the session hands out, the field rules and the count status text.
-// Every decision about the layout is Rust's; this holds texts and parses.
+// Tiling in the frontend (`specs/0069-tiling`, UX notes §1 to §7 and §12): the bar's strings, the
+// shape of the recipe, status and entry box JSON the session hands out, the field rules and the
+// notices. Every decision about the layout is Rust's; this holds texts and parses.
 
 export const TILE = "Tile";
 export const EDIT_TILING = "Edit tiling";
@@ -8,11 +8,12 @@ export const RELEASE_TILING = "Release tiling";
 export const TILE_RULE = "Repeat the selection in a grid or a circle.";
 export const TILE_EMPTY_RULE = "Select an object to repeat.";
 export const TILE_WITH_OTHERS_RULE = "A tiling cannot be tiled. Release it first.";
-export const EDIT_TILING_RULE = "Change the grid or circle, the variance and the seed.";
+export const EDIT_TILING_RULE = "Change the grid or circle and the variance.";
 export const RELEASE_TILING_RULE = "Makes a plain group of the instances. The tiling can no longer be changed.";
 export const KEEP_SOURCE = "Keep source in place";
 export const KEEP_SOURCE_RULE = "On: the source becomes the first cell, inside the group. Off: the source stays untouched and the group sits above it.";
-export const NEW_SEED = "New random seed";
+export const GRID = "Grid";
+export const CIRCLE = "Circle";
 export const WARN_TEXT = "Over 10,000 instances. The preview is simplified.";
 export const REFUSED_TEXT = "Too many instances. 100,000 at most.";
 export const IMAGES_TEXT = "Images become copies.";
@@ -27,8 +28,8 @@ export const SWEEP_RANGE = "Must be between -360 and 360.";
 
 /** The most instances a field may name (UX notes §2.2). */
 export const MAX_COUNT = 100_000;
-/** The largest seed (the generator's u32). */
-export const MAX_SEED = 4_294_967_295;
+/** The largest number a count field takes (the recipe's u32); above 100,000 it is refused. */
+export const MAX_COUNT_FIELD = 4_294_967_295;
 
 /** One variance channel: random ±, per row, per column (circle: per step). */
 export type Triple = [number, number, number];
@@ -98,7 +99,7 @@ export function parseStatus(json: string): TilingStatus | null {
 export type FieldResult = { value: number } | { error: string };
 
 /** The rule of one field. */
-export type FieldRule = "count" | "length" | "positive" | "angle" | "sweep" | "shift" | "range" | "step" | "seed";
+export type FieldRule = "count" | "length" | "positive" | "angle" | "sweep" | "shift" | "range" | "step";
 
 const NUMBER = /^-?(\d+\.?\d*|\.\d+)$/;
 const WHOLE = /^\d+$/;
@@ -106,16 +107,13 @@ const WHOLE = /^\d+$/;
 /** Reads `text` by `rule` (UX notes §2.2 to §2.4, §7). A minus is the real one or a hyphen. */
 export function readField(text: string, rule: FieldRule): FieldResult {
   const plain = text.trim().replace("−", "-").replace(",", ".");
-  if (rule === "count" || rule === "seed") {
+  if (rule === "count") {
     if (!WHOLE.test(plain)) {
       return { error: ENTER_WHOLE };
     }
     const value = Number(plain);
-    if (rule === "count") {
-      // Above 100,000 the value is taken: the bar shows the refusal (UX notes §4).
-      return value < 1 ? { error: AT_LEAST_ONE } : value > MAX_SEED ? { error: ENTER_WHOLE } : { value };
-    }
-    return value > MAX_SEED ? { error: ENTER_WHOLE } : { value };
+    // Above 100,000 the value is taken: the bar shows the refusal (UX notes §4).
+    return value < 1 ? { error: AT_LEAST_ONE } : value > MAX_COUNT_FIELD ? { error: ENTER_WHOLE } : { value };
   }
   if (!NUMBER.test(plain)) {
     return { error: ENTER_NUMBER };
@@ -135,10 +133,28 @@ export function readField(text: string, rule: FieldRule): FieldResult {
   }
 }
 
-/** The count status, "48 instances" or "1 instance". */
+/** The lines of the notice slot (UX notes §12.3), empty while no notice is active: the
+ * simplified preview, the images that become copies, the refused count. No number. */
+export function noticeLines(status: TilingStatus): string[] {
+  return [
+    ...(status.level === "simplified" ? [WARN_TEXT] : []),
+    ...(status.images_copies ? [IMAGES_TEXT] : []),
+    ...(status.level === "refused" ? [REFUSED_TEXT] : []),
+  ];
+}
+
+/** The count in the live region's sentence, "48 instances" or "1 instance". */
 export function countText(count: number): string {
   return count === 1 ? "1 instance" : `${count.toLocaleString("en-US")} instances`;
 }
+
+/** The three blocks of the compact Variance block (UX notes §12.5, 2026-11-02), two channels
+ * each: Rotation and Scale, Offset X and Offset Y, Colour and Opacity. */
+export const VARIANCE_BLOCKS: { keys: (typeof VARIANCE_ROWS)[number]["key"][]; labelWidth: number }[] = [
+  { keys: ["rotation", "scale"], labelWidth: 56 },
+  { keys: ["offset_x", "offset_y"], labelWidth: 68 },
+  { keys: ["hue", "opacity"], labelWidth: 60 },
+];
 
 /** The channels of the Variance block, in order, with their row labels. */
 export const VARIANCE_ROWS: { key: "rotation" | "scale" | "offset_x" | "offset_y" | "opacity" | "hue"; label: string; name: string; unit: string }[] = [
@@ -187,10 +203,11 @@ export function tileRule(slot: TileSlot): string {
 
 /** Typed values reach the preview this long after the last keystroke (UX notes §2.1). */
 export const FIELD_DEBOUNCE_MS = 120;
-/** The live region speaks a new count this long after the last change (UX notes §6). */
+/** The live region speaks this long after entering or a change of the limit state (UX notes
+ * §12.3). */
 export const ANNOUNCE_DELAY_MS = 500;
 
-/** What the polite live region says on entering and after a count change (UX notes §6). */
+/** What the polite live region says on entering and when a limit state changes (UX notes §12.3). */
 export function tilingAnnouncement(count: number): string {
   return `Tiling, ${countText(count)}`;
 }
@@ -256,4 +273,57 @@ export class ChangeQueue<T extends object> {
     this.#change = {};
     this.#refused = [];
   }
+}
+
+/** A circle handle with an entry box (UX notes §12.4). */
+export type CircleHandle = "centre" | "radius" | "start" | "sweep";
+
+/** The open entry box as `Session::tiling_entry_json` gives it: the handle and, in canvas CSS
+ * pixels, the handle and the circle centre. */
+export interface TilingEntry {
+  handle: CircleHandle;
+  x: number;
+  y: number;
+  cx: number;
+  cy: number;
+}
+
+export function parseEntry(json: string): TilingEntry | null {
+  if (json === "") {
+    return null;
+  }
+  try {
+    return JSON.parse(json) as TilingEntry;
+  } catch {
+    return null;
+  }
+}
+
+/** One field of an entry box. */
+export interface EntryFieldSpec {
+  key: "centre_x" | "centre_y" | "radius" | "start" | "sweep";
+  label: string;
+  name: string;
+  suffix: string;
+  width: number;
+  /** The left padding that holds a long label; the 20 px default otherwise. */
+  labelWidth?: number;
+  rule: FieldRule;
+}
+
+/** The fields of each handle's entry box (UX notes §12.4). */
+export const ENTRY_FIELDS: Record<CircleHandle, EntryFieldSpec[]> = {
+  centre: [
+    { key: "centre_x", label: "X", name: "Centre X, millimetres", suffix: "mm", width: 100, rule: "length" },
+    { key: "centre_y", label: "Y", name: "Centre Y, millimetres", suffix: "mm", width: 100, rule: "length" },
+  ],
+  radius: [{ key: "radius", label: "r", name: "Radius, millimetres", suffix: "mm", width: 100, rule: "positive" }],
+  start: [{ key: "start", label: "Start", name: "Start angle, degrees", suffix: "°", width: 126, labelWidth: 44, rule: "angle" }],
+  sweep: [{ key: "sweep", label: "Sweep", name: "Sweep, degrees", suffix: "°", width: 126, labelWidth: 44, rule: "sweep" }],
+};
+
+/** The prefill of an entry field: up to two decimals, no trailing zeros, the real minus sign. */
+export function entryText(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return String(Object.is(rounded, -0) ? 0 : rounded).replace("-", "−");
 }
