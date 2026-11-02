@@ -1,6 +1,6 @@
 # Constraint sketcher: construct geometry from constraints, dimensions and formulas
 
-Status: Done (PR #228, #237); revision 5 follow-up in progress
+Status: Done (PR #228, #237, #241; revision 5 merged 2026-11-01)
 Priority: Should
 Origin: Customer (2026-10-17; expanded and accepted 2026-10-30).
 

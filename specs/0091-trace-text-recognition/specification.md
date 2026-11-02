@@ -1,6 +1,6 @@
 # Trace text recognition: read the text on the raster first
 
-Status: Ready
+Status: Slice 1 Done (PR #244, merged 2026-11-02); slice 2 (multicolour) not started
 Priority: Should
 Origin: Customer (2026-10-31); numbers marked Proposal are the product owner's
 

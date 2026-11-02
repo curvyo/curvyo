@@ -1,6 +1,6 @@
 # Align and distribute: a row of symbol buttons in the Select bar
 
-Status: In progress (implementation requested 2026-10-30; the defaults below apply)
+Status: Done (PR #239, merged 2026-11-01)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "We definitely need it too, similar to Inkscape but user-friendly. Inkscape's features are good but not easy to operate, and it takes long to understand them."
 

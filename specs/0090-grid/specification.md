@@ -1,6 +1,6 @@
 # Grid: a document grid on the canvas and a grid target for snapping
 
-Status: In review (PR #238, 2026-11-01; amendment of 2026-11-01 in progress)
+Status: Done (PR #238, merged 2026-11-01, with the amendment of 2026-11-01)
 Amendment: Customer feedback on PR #238 (2026-11-01, translated): "Origin X and Y and Reset to page corner are not needed, but you could choose one of the four corners. For a laser cutter the origin is bottom left. Can the ruler follow it, also per page, so that per page 0/0 can be bottom left? Name the entry Grid and Scale/Ruler, whatever is best English." Criteria 16 to 19 below; they replace the origin offset of criteria 1 and 3.
 Priority: Should
 Origin: Customer (request of 2026-10-31, translated): "We need a grid: a new element that is operated like snapping. Shift+click switches it on and off. You can set how the grid behaves: the spacing, whether it zooms and finer cells appear, or whether it is rigid. The grid can be rotated and switched to logarithmic. The default is a 5 mm (at 100 %) linear grid that zooms along, so at 500 % it has 1 mm cells. Whatever makes sense. Snapping gets an extra switch for the grid, where you then state which part snaps to the grid. Default is the centre point."

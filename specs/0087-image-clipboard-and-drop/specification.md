@@ -1,6 +1,6 @@
 # Image clipboard, drag and drop, and a preview in the import dialog
 
-Status: Ready (2026-10-28; customer answered Frage 65, 67, 68, 69 on 2026-10-28; no open question for the customer; the architect's `adrs.md` still decides the desktop clipboard route, the desktop drop route and the preview mechanism, including the browser deviation)
+Status: Done (slices 1 and 2 PR #218, slice 3 PR #217; merged 2026-10-29)
 Priority: Should
 Origin: Customer. Request of 2026-10-28 on PR #213 (`0025` slice 1): "for the feature to be really usable we need some side features: an image in the clipboard must be pastable with Ctrl+V, and Ctrl+C must copy it out to paste elsewhere. Drag and drop would be good too. The import dialog lacks an image preview in the file browser." Everything marked **Proposal** is the product owner's and vetoable at the demo.
 Depends on: `0058-bitmap-import` (done, #207: image object, the import commit, placement, limits, notices, file drop on the canvas), `0020-undo-redo`, `0050-layers-and-objects-panel`.

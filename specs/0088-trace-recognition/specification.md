@@ -1,6 +1,6 @@
 # Trace recognition: text and shapes from traced outlines
 
-Status: Ready (Part A; Part B is later)
+Status: Part A Done (PR #234, merged 2026-10-31); Part B (shape recognition) is later
 Priority: Could
 Origin: Customer idea 2026-10-28 (the split into parts A and B and all tolerances were Proposals, now decided, see below)
 
