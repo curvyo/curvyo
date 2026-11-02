@@ -7,6 +7,7 @@ import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/u
 import { type ClonesApi, useClones } from "@/hooks/useClones";
 import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
 import { type RecogniseApi, useRecognise } from "@/hooks/useRecognise";
+import { type TilingApi, useTiling } from "@/hooks/useTiling";
 import { type TraceApi, useTrace } from "@/hooks/useTrace";
 import { ViewRest } from "@/lib/viewRest";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
@@ -722,6 +723,8 @@ export interface EditorSession {
   trace: TraceApi;
   /** Recognise text: the Select bar button, its bar and the run (`specs/0088-trace-recognition`). */
   recognise: RecogniseApi;
+  /** Tiling: the Select bar's Tile slot, its bar and the preview (`specs/0069-tiling`). */
+  tiling: TilingApi;
   /** The flip buttons and the keys H and V (`specs/0056-mirror-and-negative-scale/`). */
   flip: FlipApi;
   align: AlignApi;
@@ -1199,6 +1202,12 @@ export function useEditorSession(
   useEffect(() => {
     traceNotice.current = recognise.showNotice;
   }, [recognise.showNotice]);
+  const tilingFirstFieldRef = useRef<HTMLInputElement | null>(null);
+  const tiling = useTiling(getSession, syncFromSession, {
+    syncRevision,
+    containerRef,
+    firstFieldRef: tilingFirstFieldRef,
+  });
   // Enter and Escape of the Trace tool, and a double-click that creates, reach it through refs so
   // the canvas handlers keep their dependencies (`specs/0025-raster-trace` criterion 12).
   const traceKeyRef = useRef(trace.keyDown);
@@ -2880,6 +2889,7 @@ export function useEditorSession(
     clones,
     strokeToPath,
     recognise,
+    tiling,
     trace,
     flip,
     flipEnabled,
