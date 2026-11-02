@@ -168,6 +168,21 @@ impl<'t, 'a> Parts<'t, 'a> {
     /// A path, primitive or clone, split into its fill and its stroke outline under Strokes as
     /// paths (criterion 146).
     fn shape(&self, object: &ObjectSnapshot, state: ExportState) -> Option<ExportNode> {
+        if let Some(pieces) = crate::svg_export_pattern::pattern_pieces_node(object, self.t) {
+            let region = self.plain_shape(object, ExportState::default())?;
+            return Some(ExportNode::Group {
+                state,
+                layer: false,
+                // The pieces first, below the outline, as the canvas draws them; on a laser or plotter
+                // document order is job order: the engraving before the outline is cut (ADR 0029 §7).
+                children: vec![pieces, region],
+            });
+        }
+        self.plain_shape(object, state)
+    }
+
+    /// [`Parts::shape`] without its pattern.
+    fn plain_shape(&self, object: &ObjectSnapshot, state: ExportState) -> Option<ExportNode> {
         let (kind, style, shadow) = shape_leaf(object, self.t)?;
         if !(self.options.strokes_as_paths && draws_stroke(object.style())) {
             return Some(leaf_node(state, kind, style, shadow));

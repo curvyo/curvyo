@@ -58,7 +58,7 @@ impl SharedOutlines {
             .entry(std::sync::Arc::as_ptr(root))
             .or_insert_with(|| tessellate(root, view));
         let style = &clone.resolved.style;
-        if style.fill.paints() {
+        if style.fill.paints_solid() {
             let color = paint(style.fill.color, style.fill.opacity);
             if color.a > 0
                 && let Some(fill) = &layers.fill

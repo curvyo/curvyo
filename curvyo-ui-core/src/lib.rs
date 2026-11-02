@@ -93,6 +93,10 @@ mod param_edit;
 mod param_entry;
 mod param_handles;
 mod paste_rank;
+mod pattern_cache;
+mod pattern_draw;
+mod pattern_fields;
+mod pattern_output;
 mod pen_constraint;
 mod pen_entry;
 mod pen_entry_text;
@@ -129,6 +133,7 @@ mod svg_export;
 mod svg_export_leaf;
 mod svg_export_notices;
 mod svg_export_parts;
+mod svg_export_pattern;
 mod svg_export_pens;
 mod svg_export_shapes;
 mod svg_export_sketch;
@@ -220,6 +225,7 @@ pub use combine::{
     plan_combine,
 };
 pub use conversion::{build_primitive_conversions, primitive_as_path};
+pub use curvyo_geometry_core::{PATTERN_MAX_PIECES, PATTERN_NOTE_PIECES, PatternError};
 pub use curvyo_svg_core::SvgDrawing;
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
 pub use curvyo_vectorize_core::{
@@ -377,6 +383,12 @@ pub use param_handles::{
     param_handles, radius_gain, radius_travel,
 };
 pub use paste_rank::{PasteRank, paste_rank};
+pub use pattern_cache::{PatternCache, PatternState};
+pub use pattern_fields::{PatternField, PatternFieldView};
+pub use pattern_output::{
+    PATTERN_TOLERANCE, PatternSubject, object_pattern_pieces, pattern_convert_plan,
+    pattern_subject, piece_style,
+};
 pub use pen_constraint::constrain_segment;
 pub use pen_entry::{LengthNotPositive, PenEntry, PenEntryField, PenEntryNotice, PenEntryPlaced};
 pub use pen_entry_text::{
