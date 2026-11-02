@@ -14,9 +14,10 @@ use curvyo_ui_core::{
 };
 
 use super::select::DoubleClickHint;
-use super::trace_colours::{PaletteView, filled_layers};
+use super::trace_colours::{PaletteView, filled_layers, with_leftovers};
 use super::trace_draw::{TraceViewMode, preview_anchors};
 use super::trace_mesh::MeshCache;
+use super::trace_text::leftovers_of;
 use super::{Session, Tool};
 
 /// The preview of one image (criterion 8): its outlines and what is tessellated from them.
@@ -34,6 +35,9 @@ pub(super) struct TracePreview {
     /// A multicolour result's layers and palette (`specs/0089` slice M); empty for one colour.
     pub(super) layers: Vec<TraceLayerWire>,
     pub(super) palette: Vec<TracePaletteWire>,
+    /// The layers the drawn paths fill in order: a multicolour result's layers, then one per
+    /// text line or text in its fill (`specs/0091` slice 2); empty for one colour.
+    pub(super) fill_layers: Vec<TraceLayerWire>,
     /// Colour regions joined to a neighbour.
     pub(super) joined: usize,
     /// Text lines set and found (`specs/0091` UX notes §4).
@@ -205,24 +209,31 @@ impl Session {
             return false;
         };
         // `specs/0091`: until the lines are fitted, their own outlines stand where their texts
-        // will be.
+        // will be, in the texts' fills.
+        // A line whose fill the maker excluded is left out (slice 2).
+        let shown = || read.texts.lines.iter().filter(|l| !l.excluded);
         let paths: Vec<kurbo::BezPath> = read
             .outlines
             .iter()
-            .chain(read.texts.lines.iter().flat_map(|l| &l.outlines))
+            .chain(shown().flat_map(|l| &l.outlines))
             .cloned()
             .collect();
-        self.show_trace_preview(image, read, &paths, false);
+        let extra: Vec<TraceLayerWire> = shown()
+            .map(|l| super::trace_colours::text_layer(l.fill, l.outlines.len()))
+            .collect();
+        self.show_trace_preview(image, read, &paths, &extra, false);
         true
     }
 
     /// Shows `paths` (document millimetres) as the preview of `image` with the palette, layers
-    /// and counts of `read`, out of date with `stale`.
+    /// and counts of `read`, the paths past its layers filled by the `extra` layers (a
+    /// multicolour result's texts), out of date with `stale`.
     pub(super) fn show_trace_preview(
         &mut self,
         image: NodeId,
         read: TraceWire,
         paths: &[kurbo::BezPath],
+        extra: &[TraceLayerWire],
         stale: bool,
     ) {
         let mut outlines = Vec::with_capacity(paths.len());
@@ -232,7 +243,12 @@ impl Session {
             boxes.push((Point::new(b.x0, b.y0), Point::new(b.x1, b.y1)));
             outlines.push(preview_anchors(path));
         }
-        let fills = filled_layers(image, &outlines, &read.layers, &self.trace.palette_view);
+        let fill_layers: Vec<TraceLayerWire> = if read.layers.is_empty() {
+            Vec::new()
+        } else {
+            read.layers.iter().chain(extra).copied().collect()
+        };
+        let fills = filled_layers(image, &outlines, &fill_layers, &self.trace.palette_view);
         self.trace.preview = Some(TracePreview {
             image,
             outlines,
@@ -241,6 +257,7 @@ impl Session {
             fills,
             layers: read.layers,
             palette: read.palette,
+            fill_layers,
             joined: read.joined,
             text_counts: (read.texts.lines.len(), read.texts.found),
             outline_mesh: MeshCache::default(),
@@ -317,23 +334,19 @@ impl Session {
                     .iter()
                     .find(|node| node.id == image.id)
                     .and_then(|node| node.registers.name.clone());
-                // `specs/0091` decision 6: the lines' outlines no text replaces join the paths;
-                // without a fit, all of them do.
-                let mut outlines = wire.outlines.clone();
-                match fitted.iter().find(|f| f.image == image.id) {
-                    Some(found) => outlines.extend(found.leftovers.iter().cloned()),
-                    None => outlines.extend(
-                        wire.texts
-                            .lines
-                            .iter()
-                            .flat_map(|l| l.outlines.iter().cloned()),
-                    ),
-                }
+                // `specs/0091` decision 6: the lines' outlines no text replaces join the paths
+                // (in Multicolour the layer of their fill).
+                let (outlines, colours) = with_leftovers(
+                    &wire.outlines,
+                    &wire.layers,
+                    &leftovers_of(&fitted, image.id, wire),
+                    &this.trace.palette_view,
+                );
                 targets.push(TraceTarget {
                     image: image.id,
                     name,
                     outlines,
-                    colours: this.trace.palette_view.colours(&wire.layers),
+                    colours,
                 });
             }
             let plan = plan_trace(&targets, &mut this.minter);
@@ -341,6 +354,7 @@ impl Session {
             if plan.items.is_empty() && !has_texts {
                 return TraceCreateOutcome::Ignored;
             }
+            let view = this.trace.palette_view.clone();
             let written =
                 this.document
                     .batch(curvyo_document_core::TRACE_IMAGE_COMMIT_LABEL, |document| {
@@ -364,7 +378,7 @@ impl Session {
                             })
                             .collect();
                         let texts =
-                            super::trace_text_write::write_texts(document, &fitted, &above)?;
+                            super::trace_text_write::write_texts(document, &fitted, &above, &view)?;
                         Some((groups, texts))
                     });
             let Some((groups, texts)) = written else {

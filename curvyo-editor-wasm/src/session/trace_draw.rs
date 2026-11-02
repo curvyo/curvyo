@@ -219,7 +219,7 @@ impl Session {
                 )
             });
             // The colours Isolate leaves out are drawn at 35 % (`specs/0089` UX notes §7).
-            let layer_of = outline_layers(&preview.layers, preview.outlines.len());
+            let layer_of = outline_layers(&preview.fill_layers, preview.outlines.len());
             let palette_view = &self.trace.palette_view;
             let (mut bright, mut dim): (Vec<Vec<PreviewAnchor>>, Vec<Vec<PreviewAnchor>>) =
                 (Vec::new(), Vec::new());
@@ -232,7 +232,8 @@ impl Session {
                 if !seen {
                     continue;
                 }
-                let dimmed = layer.is_some_and(|k| palette_view.dimmed(preview.layers[k].colour));
+                let dimmed =
+                    layer.is_some_and(|k| palette_view.dimmed(preview.fill_layers[k].colour));
                 if dimmed {
                     dim.push(outline.clone());
                 } else {

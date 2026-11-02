@@ -164,8 +164,8 @@ pub fn fit_step(progress: &TraceProgressSink) -> String {
 
 /// As [`trace_job`] with the OCR `lines` (the JSON of [`ocr_job`], scaled to this picture):
 /// the text pass first, the main trace over the filled picture, the text section after
-/// (`specs/0091` decisions 2, 3 and 6). Black and white only; Multicolour traces as
-/// [`trace_job`].
+/// (`specs/0091` decisions 2, 3 and 6); in Multicolour with the picture's palette and each
+/// line's fill (slice 2).
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_text_job(
@@ -177,11 +177,19 @@ pub fn trace_text_job(
     lines: &str,
     progress: &TraceProgressSink,
 ) -> Vec<f64> {
-    if crate::trace_glue::trace_colour_settings(settings).is_some() {
-        return trace_job(rgba, width, height, map, settings, progress);
-    }
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     let mut report = |percent| progress.report(percent);
+    if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
+        return curvyo_ui_core::trace_text_colour_job_with(
+            rgba,
+            width,
+            height,
+            map,
+            &colour,
+            &crate::trace_glue::read_ocr_lines(lines, width),
+            &mut report,
+        );
+    }
     curvyo_ui_core::trace_text_job_with(
         rgba,
         width,
@@ -216,8 +224,8 @@ pub fn trace_text_regions_job(
     )
 }
 
-/// As [`trace_mask_job`] with the OCR `lines`: the pixels left out for text at 128
-/// (`specs/0091` UX notes §2).
+/// As [`trace_mask_job`] with the OCR `lines`: the pixels left out for text at 128, in
+/// Multicolour as opaque grey (`specs/0091` UX notes §2).
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_text_mask_job(
@@ -228,10 +236,22 @@ pub fn trace_text_mask_job(
     settings: &str,
     lines: &str,
 ) -> Option<TraceMaskJs> {
-    if crate::trace_glue::trace_colour_settings(settings).is_some() {
-        return trace_mask_job(rgba, width, height, map, settings);
-    }
     let map6: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
+        return curvyo_ui_core::trace_text_colour_mask_job(
+            rgba,
+            width,
+            height,
+            map6,
+            &colour,
+            &crate::trace_glue::read_ocr_lines(lines, width),
+        )
+        .map(|mask| TraceMaskJs {
+            width: mask.width,
+            height: mask.height,
+            bits: mask.rgba,
+        });
+    }
     curvyo_ui_core::trace_text_mask_job(
         rgba,
         width,

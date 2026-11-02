@@ -33,17 +33,6 @@ impl PaletteView {
     pub(super) fn dimmed(&self, colour: TraceRgb) -> bool {
         self.isolated.is_some_and(|isolated| isolated != colour)
     }
-
-    /// The layers of a result as Create paths writes them: each recoloured fill and its count.
-    pub(super) fn colours(&self, layers: &[TraceLayerWire]) -> Vec<TraceColour> {
-        layers
-            .iter()
-            .map(|layer| TraceColour {
-                fill: color(self.fill(layer.colour)),
-                outlines: layer.outlines,
-            })
-            .collect()
-    }
 }
 
 /// A trace colour as a document colour.
@@ -53,6 +42,67 @@ pub(super) fn color(c: TraceRgb) -> Color {
         g: c.g,
         b: c.b,
     }
+}
+
+/// The fill layer of `outlines` paths of a text or text line of a multicolour result
+/// (`specs/0091` slice 2): its fill, black without one.
+pub(super) fn text_layer(fill: Option<TraceRgb>, outlines: usize) -> TraceLayerWire {
+    TraceLayerWire {
+        colour: fill.unwrap_or(TraceRgb::new(0, 0, 0)),
+        outlines,
+    }
+}
+
+/// The outlines and colours Create paths writes for a result of `outlines` in `layers` with the
+/// `leftovers` of its text lines (`specs/0091` decision 6): one colour, all in the black path;
+/// multicolour, each leftover in the layer of its fill (recoloured as the layer), or in a path of
+/// its fill after the layers when no layer has it.
+pub(super) fn with_leftovers(
+    outlines: &[kurbo::BezPath],
+    layers: &[TraceLayerWire],
+    leftovers: &[(kurbo::BezPath, TraceRgb)],
+    view: &PaletteView,
+) -> (Vec<kurbo::BezPath>, Vec<TraceColour>) {
+    if layers.is_empty() {
+        let mut all = outlines.to_vec();
+        all.extend(leftovers.iter().map(|(p, _)| p.clone()));
+        return (all, Vec::new());
+    }
+    let mut out = Vec::with_capacity(outlines.len() + leftovers.len());
+    let mut colours = Vec::with_capacity(layers.len());
+    let mut at = 0;
+    for layer in layers {
+        let to = (at + layer.outlines).min(outlines.len());
+        out.extend_from_slice(&outlines[at..to]);
+        at = to;
+        let own = leftovers.iter().filter(|(_, f)| *f == layer.colour);
+        let before = out.len();
+        out.extend(own.map(|(p, _)| p.clone()));
+        colours.push(TraceColour {
+            fill: color(view.fill(layer.colour)),
+            outlines: layer.outlines + out.len() - before,
+        });
+    }
+    let mut rest: Vec<TraceRgb> = Vec::new();
+    for (_, fill) in leftovers {
+        if !layers.iter().any(|l| l.colour == *fill) && !rest.contains(fill) {
+            rest.push(*fill);
+        }
+    }
+    for fill in rest {
+        let before = out.len();
+        out.extend(
+            leftovers
+                .iter()
+                .filter(|(_, f)| *f == fill)
+                .map(|(p, _)| p.clone()),
+        );
+        colours.push(TraceColour {
+            fill: color(view.fill(fill)),
+            outlines: out.len() - before,
+        });
+    }
+    (out, colours)
 }
 
 /// The layer of every outline (`None` for a single-colour result).
@@ -95,9 +145,22 @@ pub(super) fn filled_layers(
         .collect()
 }
 
+/// The colours the shown result fills, for its colour count: its layers' colours, then the
+/// palette colours only its texts use (`specs/0091` slice 2), so the count and the strip agree.
+fn used_colours(preview: &super::trace::TracePreview) -> Vec<TraceRgb> {
+    let mut used: Vec<TraceRgb> = preview.layers.iter().map(|l| l.colour).collect();
+    for layer in &preview.fill_layers {
+        let in_palette = preview.palette.iter().any(|e| e.colour == layer.colour);
+        if layer.outlines > 0 && in_palette && !used.contains(&layer.colour) {
+            used.push(layer.colour);
+        }
+    }
+    used
+}
+
 impl Session {
     /// The palette of the shown preview as JSON (`specs/0089` UX notes §7): `{"colours": [{hex,
-    /// fixed, pixels}], "layers": [hex], "joined": n}`; empty for a single-colour preview or none.
+    /// fixed, pixels}], "layers": [hex] (the colours it fills, texts included), "joined": n}`; empty for a single-colour preview or none.
     #[must_use]
     pub fn trace_palette_json(&self) -> String {
         let shown = self.trace_view().shown;
@@ -116,7 +179,7 @@ impl Session {
                 "fixed": e.fixed,
                 "pixels": e.pixels,
             })).collect::<Vec<_>>(),
-            "layers": preview.layers.iter().map(|l| hex(l.colour)).collect::<Vec<_>>(),
+            "layers": used_colours(preview).into_iter().map(hex).collect::<Vec<_>>(),
             "joined": preview.joined,
         })
         .to_string()
@@ -141,7 +204,7 @@ impl Session {
             preview.fills = filled_layers(
                 preview.image,
                 &preview.outlines,
-                &preview.layers,
+                &preview.fill_layers,
                 &self.trace.palette_view,
             );
             preview.fill_mesh = MeshCache::default();
