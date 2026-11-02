@@ -1,6 +1,6 @@
 # Trace quality and colour: intended geometry, colour selection, multicolour, automatic analysis
 
-Status: Ready (slices A and D done, PR #223; slice C done, PR #226; slice E in progress)
+Status: Done (slices A and D #223, C #226, E #227, M #230, F #232; the simple Trace bar #236); slices G and H are Later
 Priority: Must (slices A, D, C, E); Should (slices M, F); Could (Later: G, H)
 Origin: Customer, 2026-10-29: he handed over a German proposal document from another chat ("Tracing weiterentwickeln", dated 2026-10-28; the document calls itself a proposal for review, not an order for all stages) with the words "after that we continue with tracing; we now simply bring it to a very, very cool level." The direction, target material, priorities and work packages below are the document's. Slicing, numbers and everything marked **Proposal** are the product owner's and vetoable.
 Depends on: `0025-raster-trace` (slices 1 to 3; the Trace tool, bar, presets, harness, ADR 0023). Feeds: `0088-trace-recognition` (text first, glyph matching; shapes later).

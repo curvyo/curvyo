@@ -1,6 +1,6 @@
 # Measure and dimension: measure on the canvas and leave green dimensions that are guides
 
-Status: In build (story/0070-measure-and-dimension). UX notes and `adrs.md` exist; ADR 0027 Accepted (customer, 2026-11-01). Builds on the guide flag of the reworked `0046`.
+Status: Done (PR #243, merged 2026-11-01; ADR 0027 Accepted by the customer 2026-11-01). Builds on the guide flag of the reworked `0046`.
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "A measuring tool: I want to measure and dimension easily. Dimensions are drawn thin green by default and not printed or exported. It is however a guide line and can also be converted back to a normal path." Customer, 2026-11-01: "nice, UX/UI consistent and above all working". Items marked (Proposal) are the product owner's or the UX engineer's ideas, vetoable at the demo.
 

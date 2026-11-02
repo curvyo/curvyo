@@ -1,6 +1,6 @@
 # Snapping: document settings, object edges, guides, nodes and page fractions
 
-Status: In review (PR #225; 2026-10-30: Alt inversion in every creation phase implemented and independently verified; customer acceptance pending)
+Status: Done (PR #225, merged 2026-10-30)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated): "A fairly complex feature that you switch on and off in the Select tool and configure in properties. Snap to the bounding box of other objects, to guide lines, to nodes. A small zone close by where it is magnetically pulled, and a somewhat larger one to let go again (hysteresis)." Guide lines are paths marked as guides (the rework of `0046`).
 Amendment: Customer (2026-10-29): "snapping ist eine property vom document. eine page hat snapping punkte bei 25%, 33.3% 50% 66.6% 75% 100% sowohl horizental als auch vertikal". Snapping is therefore stored in the document, not per user, and the page contributes six fractions on each axis.

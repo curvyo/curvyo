@@ -1,6 +1,6 @@
 # SVG import and export: bring an SVG drawing into a project as objects, and write the project out as SVG
 
-Status: Slices 1 to 3 Done (#205, #210, #211); slice 4 (export) in review (PR #242, 2026-11-01)
+Status: Done (slices 1 to 3: #205, #210, #211; slice 4, export: #242, merged 2026-11-01)
 Priority: Must
 Origin: Customer (MVP slice 11, confirmed 2026-10-02: "imports and exports plain SVG well enough that a project can move to and from Inkscape without hand-fixing geometry"; R-SYS-006). Customer decisions of 2026-10-16 (section "Decided (customer, 2026-10-16)") narrowed the first slice to the import: the customer does not save natively in SVG, so "import and then place where we want is enough"; there is no loss report. The page-size rules, the CSS subset, the Inkscape attributes and every item marked **Proposal** are the product owner's, vetoable at the demo.
 Slice 2: customer request of 2026-10-27 ("SVG import with text is sorely missing … please finish SVG import with text objects and bitmaps so we can close the import topic"). Items marked **Proposal** in slice 2 are the product owner's and vetoable at the demo.
