@@ -160,6 +160,8 @@ impl<'t, 'a> Parts<'t, 'a> {
                 state,
                 image: Box::new(export_image(image, self.document, t)?),
             }),
+            // A dimension is never output (ADR 0027).
+            ObjectSnapshot::Dimension(_) => None,
         }
     }
 
