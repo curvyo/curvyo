@@ -23,8 +23,10 @@ mod font_checks_glue;
 mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
+mod ocr_pool_glue;
 mod session;
 mod trace_analysis_glue;
+mod trace_fit_glue;
 mod trace_glue;
 
 #[cfg(target_arch = "wasm32")]
@@ -74,6 +76,8 @@ mod wasm_navigation;
 #[cfg(target_arch = "wasm32")]
 mod wasm_node_tool;
 #[cfg(target_arch = "wasm32")]
+mod wasm_ocr_pool;
+#[cfg(target_arch = "wasm32")]
 mod wasm_offset;
 #[cfg(target_arch = "wasm32")]
 mod wasm_pages;
@@ -122,6 +126,7 @@ pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
+pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
 pub use session::SvgExportResult;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
@@ -141,11 +146,14 @@ pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
 pub use session::{
     TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
+    TracedText,
 };
 pub use session::{align_command_from_code, distribute_from_code};
 pub use trace_analysis_glue::analysis_json as trace_analysis_json;
+pub use trace_fit_glue::{FitTextRead, FitWorker, read_fit_result};
 pub use trace_glue::{
-    hex as trace_hex, trace_colour_settings, trace_params_json, trace_presets_json, trace_settings,
+    hex as trace_hex, ocr_lines_json, read_ocr_lines, trace_colour_settings, trace_params_json,
+    trace_presets_json, trace_settings,
 };
 
 #[cfg(target_arch = "wasm32")]
