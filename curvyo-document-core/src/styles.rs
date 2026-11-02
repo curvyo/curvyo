@@ -12,6 +12,10 @@ use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::leaf_exists;
 use crate::path_model::{Color, NodeId};
 use crate::paths::tree_id_of;
+use crate::pattern_model::{
+    FillPaint, GeneratorKind, PatternFill, PatternMode, PatternParam, PatternParamError,
+    PatternSeed,
+};
 use crate::shape_codec::{ShapeTag, read_shape_tag_checked};
 use crate::style_codec::{read_style, write_changes};
 use crate::style_model::{
@@ -36,6 +40,13 @@ pub enum StyleEditError {
     /// refused.
     #[error("markers can only be set on paths")]
     NotAPath,
+    /// A pattern parameter is not one of the generator's or out of its range
+    /// (`specs/0071-pattern-fill`).
+    #[error("invalid pattern parameter: {0}")]
+    InvalidPattern(PatternParamError),
+    /// A pattern margin must be finite and not negative.
+    #[error("a pattern margin must be zero or greater")]
+    InvalidMargin,
 }
 
 /// One style property change. Applied to each target object on its own, so
@@ -81,6 +92,24 @@ pub enum StyleEdit {
     MarkerPlace(MarkerPlace),
     /// How many Middle markers a Spaced placement draws (a path only).
     MarkerCount(MarkerCount),
+    /// The fill paints a colour or a pattern, and is on (`specs/0071-pattern-fill` criterion 1).
+    /// A first Pattern gives the shape Hatch at its defaults and its fresh seed; a stored pattern
+    /// is kept while the paint is a colour (criterion 3).
+    FillPaint(FillPaint),
+    /// The pattern's generator; Spacing and Angle carry over where the new one has them.
+    PatternGenerator(GeneratorKind),
+    /// One parameter of the current generator, in stored units (mm, degrees, share, count).
+    PatternParam(PatternParam, f64),
+    /// The pattern's margin.
+    PatternMargin(Length),
+    /// Lines or Shapes.
+    PatternMode(PatternMode),
+    /// The pattern's seed.
+    PatternSeed(PatternSeed),
+    /// Re-roll: each shape's seed becomes the next of its own.
+    PatternReroll,
+    /// Whole pieces only (criterion 29).
+    PatternWholePieces(bool),
 }
 
 impl StyleEdit {
@@ -136,8 +165,89 @@ impl StyleEdit {
             Self::MarkerEnd(shape) => stroke.markers.end = *shape,
             Self::MarkerPlace(place) => stroke.markers.mid_place = *place,
             Self::MarkerCount(count) => stroke.markers.mid_count = *count,
+            Self::FillPaint(paint) => {
+                style.fill.enabled = true;
+                style.fill.paint = *paint;
+                if *paint == FillPaint::Pattern && style.fill.pattern.is_none() {
+                    style.fill.pattern = Some(Box::default());
+                }
+            }
+            _ => self.apply_to_pattern(style.fill.pattern.get_or_insert_with(Box::default))?,
         }
         Ok(())
+    }
+
+    /// Applies a pattern edit to `pattern`.
+    fn apply_to_pattern(&self, pattern: &mut PatternFill) -> Result<(), StyleEditError> {
+        match self {
+            Self::PatternGenerator(kind) => {
+                pattern.generator = pattern.generator.switched_to(*kind);
+            }
+            Self::PatternParam(param, value) => {
+                pattern.generator = pattern
+                    .generator
+                    .with(*param, *value)
+                    .map_err(StyleEditError::InvalidPattern)?;
+            }
+            Self::PatternMargin(margin) => {
+                let mm = margin.as_mm();
+                if !mm.is_finite() || mm < 0.0 {
+                    return Err(StyleEditError::InvalidMargin);
+                }
+                pattern.margin = *margin;
+            }
+            Self::PatternMode(mode) => pattern.mode = *mode,
+            Self::PatternSeed(seed) => pattern.seed = *seed,
+            Self::PatternReroll => pattern.seed = pattern.seed.next(),
+            Self::PatternWholePieces(on) => pattern.whole_pieces = *on,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// [`StyleEdit::apply_to`] for the object `id`: a pattern edit on a shape without a stored
+    /// pattern starts from Hatch with the shape's fresh seed (ADR 0029 §5).
+    ///
+    /// # Errors
+    /// As [`StyleEdit::apply_to`].
+    pub fn apply_to_object(&self, style: &mut Style, id: NodeId) -> Result<(), StyleEditError> {
+        if self.is_pattern_edit() && style.fill.pattern.is_none() {
+            style.fill.pattern = Some(Box::new(PatternFill::fresh(id)));
+        }
+        self.apply_to(style)
+    }
+
+    /// The commit label of this edit: its own for the pattern edits, so the History tab names
+    /// them (`specs/0071-pattern-fill` UX notes §6); `edit_style` for every other.
+    #[must_use]
+    pub const fn commit_label(&self) -> &'static str {
+        match self {
+            Self::FillPaint(FillPaint::Pattern) => "fill_pattern",
+            Self::PatternGenerator(kind) => kind.commit_label(),
+            Self::PatternParam(param, _) => param.commit_label(),
+            Self::PatternMargin(_) => "pattern_margin",
+            Self::PatternMode(PatternMode::Lines) => "pattern_mode_lines",
+            Self::PatternMode(PatternMode::Shapes) => "pattern_mode_shapes",
+            Self::PatternSeed(_) | Self::PatternReroll => "pattern_seed",
+            Self::PatternWholePieces(_) => "pattern_whole_pieces",
+            _ => "edit_style",
+        }
+    }
+
+    /// Whether the edit sets the pattern or the pattern paint.
+    #[must_use]
+    pub const fn is_pattern_edit(&self) -> bool {
+        matches!(
+            self,
+            Self::FillPaint(FillPaint::Pattern)
+                | Self::PatternGenerator(_)
+                | Self::PatternParam(..)
+                | Self::PatternMargin(_)
+                | Self::PatternMode(_)
+                | Self::PatternSeed(_)
+                | Self::PatternReroll
+                | Self::PatternWholePieces(_)
+        )
     }
 
     /// Whether this edit changes a marker setting, which only a path has.
@@ -159,8 +269,12 @@ impl StyleEdit {
     pub const fn is_fill_edit(&self) -> bool {
         matches!(
             self,
-            Self::FillEnabled(_) | Self::FillColor(_) | Self::FillRgba(..) | Self::FillOpacity(_)
-        )
+            Self::FillEnabled(_)
+                | Self::FillColor(_)
+                | Self::FillRgba(..)
+                | Self::FillOpacity(_)
+                | Self::FillPaint(_)
+        ) || self.is_pattern_edit()
     }
 }
 
@@ -179,17 +293,17 @@ impl Document {
     pub fn edit_style(&self, ids: &[NodeId], edit: &StyleEdit) -> Result<(), StyleEditError> {
         // A linked clone owns a style only with own style; the others are left alone
         // (`specs/0057-clone-overrides` criterion 18).
-        let metas: Vec<LoroMap> = self
+        let metas: Vec<(NodeId, LoroMap)> = self
             .style_metas(ids)?
             .into_iter()
-            .filter(|meta| {
+            .filter(|(_, meta)| {
                 (!crate::clone_codec::is_clone_meta(meta)
                     || crate::clone_codec::read_overrides(meta).own_style)
                     && crate::text_clone_commands::owns_style_keys(meta)
             })
             .collect();
         if edit.is_marker_edit()
-            && metas.iter().any(|meta| {
+            && metas.iter().any(|(_, meta)| {
                 !matches!(read_shape_tag_checked(meta), ShapeTag::Absent)
                     && !crate::clone_codec::is_clone_meta(meta)
             })
@@ -198,10 +312,10 @@ impl Document {
         }
         let planned: Vec<(LoroMap, Style, Style)> = metas
             .into_iter()
-            .map(|meta| {
+            .map(|(id, meta)| {
                 let old = read_style(&meta);
                 let mut new = old.clone();
-                edit.apply_to(&mut new)?;
+                edit.apply_to_object(&mut new, id)?;
                 Ok((meta, old, new))
             })
             .collect::<Result<_, StyleEditError>>()?;
@@ -210,7 +324,7 @@ impl Document {
             wrote |= write_changes(meta, old, new);
         }
         if wrote {
-            self.commit_with_label("edit_style");
+            self.commit_with_label(edit.commit_label());
         }
         Ok(())
     }
@@ -228,11 +342,11 @@ impl Document {
 
     /// Resolves each distinct id to its meta map, refusing on the first
     /// stale one.
-    fn style_metas(&self, ids: &[NodeId]) -> Result<Vec<LoroMap>, StyleEditError> {
+    fn style_metas(&self, ids: &[NodeId]) -> Result<Vec<(NodeId, LoroMap)>, StyleEditError> {
         let mut seen = HashSet::with_capacity(ids.len());
         ids.iter()
             .filter(|id| seen.insert(**id))
-            .map(|&id| self.style_meta(id))
+            .map(|&id| Ok((id, self.style_meta(id)?)))
             .collect()
     }
 }

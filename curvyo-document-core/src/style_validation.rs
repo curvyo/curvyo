@@ -90,4 +90,5 @@ pub(crate) fn style_is_valid(meta: &LoroMap) -> bool {
         && key_ok(meta, KEY_FILL_KIND, is_valid_kind)
         && key_ok(meta, KEY_FILL, is_color)
         && key_ok(meta, KEY_FILL_OPACITY, is_unit_number)
+        && crate::pattern_codec::keys_are_valid(meta)
 }

@@ -310,7 +310,14 @@ impl DocumentVersion {
 /// a slot count that does not fit the kind, a malformed slot, a value that is not finite. The
 /// number is provisional by the rule above. Goldens: `dimension_v31.curvyo` and
 /// `dimension_*_v31.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 31;
+///
+/// Bumped to 32 in `pattern-fill` (ADR 0029, `specs/0071-pattern-fill`): the style keys
+/// `fill_paint` and `fill_pattern` (`crate::pattern_codec`). A version-31 reader would paint a
+/// patterned shape as a solid colour, so it must refuse every file of this build. Migration from
+/// version 31 is none. Damage: an unknown paint or generator, a parameter of the wrong type,
+/// non-finite or out of its range, a seed that is not an integer in u32. Golden:
+/// `pattern_v32.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 32;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::path_model::Color;
+use crate::pattern_model::{FillPaint, PatternFill};
 use crate::units::Length;
 
 /// The stroke width every object is created with (`path-node-editing`'s and
@@ -295,27 +296,52 @@ impl Default for Stroke {
     }
 }
 
-/// An object's fill: the on/off flag, the solid colour and its opacity. The
-/// colour and opacity stay stored while the fill is off, so switching it back on
-/// restores them. A fill is None or Solid; there is nothing else
-/// (`specs/0017-style-panel-rework/`).
+/// An object's fill: the on/off flag, the solid colour and its opacity, and what it paints (a
+/// colour or a pattern, `specs/0071-pattern-fill`). The colour, opacity and pattern stay stored
+/// while the fill is off or paints the other kind, so switching back restores them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Fill {
     /// Whether the fill is painted (`false` is "None").
     pub enabled: bool,
-    /// The solid colour.
+    /// The solid colour; a Shapes pattern's pieces are filled with it too.
     pub color: Color,
     /// The solid fill's opacity.
     pub opacity: Opacity,
+    /// What the fill paints when it is on.
+    #[serde(default, skip_serializing_if = "is_colour")]
+    pub paint: FillPaint,
+    /// The stored pattern, if one was ever set (ADR 0029 §1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<Box<PatternFill>>,
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's `skip_serializing_if` passes a reference
+fn is_colour(paint: &FillPaint) -> bool {
+    *paint == FillPaint::Colour
 }
 
 impl Fill {
     /// Whether this fill paints anything: it is on. A fill at opacity 0 still
     /// counts, because it is a non-None fill (`0007` acceptance criterion 23).
-    /// The one rule the renderer and the interior hit-test share.
+    /// The one rule the renderer and the interior hit-test share; a pattern fill
+    /// counts too (ADR 0029 §7).
     #[must_use]
     pub const fn paints(&self) -> bool {
         self.enabled
+    }
+
+    /// Whether this fill paints its solid colour over the whole region.
+    #[must_use]
+    pub fn paints_solid(&self) -> bool {
+        self.enabled && self.paint == FillPaint::Colour
+    }
+
+    /// The pattern this fill paints, if it paints one: the stored pattern, or the default for a
+    /// pattern paint without one.
+    #[must_use]
+    pub fn painted_pattern(&self) -> Option<PatternFill> {
+        (self.enabled && self.paint == FillPaint::Pattern)
+            .then(|| self.pattern.as_deref().copied().unwrap_or_default())
     }
 }
 
@@ -325,6 +351,8 @@ impl Default for Fill {
             enabled: false,
             color: Color::BLACK,
             opacity: Opacity::OPAQUE,
+            paint: FillPaint::Colour,
+            pattern: None,
         }
     }
 }
