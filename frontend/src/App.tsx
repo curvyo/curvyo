@@ -16,6 +16,7 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { TraceBar } from "@/components/TraceBar";
+import { TilingBar } from "@/components/TilingBar";
 import { RecogniseBar } from "@/components/RecogniseBar";
 import { useTraceInfo } from "@/hooks/useTraceInfo";
 import { focusCurrentFont } from "@/lib/textText";
@@ -212,7 +213,8 @@ function Editor() {
           {editor.tool === "select" && editor.recognise.open ? (
             <RecogniseBar recognise={editor.recognise} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}
-          {editor.tool === "select" && !editor.recognise.open ? (
+          {editor.tool === "select" && editor.tiling.open ? <TilingBar tiling={editor.tiling} /> : null}
+          {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open ? (
             <SelectToolbar
               scaleStrokeWidth={editor.scaleStrokeWidth}
               onSetScaleStrokeWidth={editor.setScaleStrokeWidth}
@@ -264,6 +266,7 @@ function Editor() {
               guideState={editor.guideState}
               onToggleGuide={editor.toggleGuide}
               arcBar={editor.arcBar}
+              tile={{ slot: editor.tiling.slot, onEnter: editor.tiling.enter, onRelease: editor.tiling.release }}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}

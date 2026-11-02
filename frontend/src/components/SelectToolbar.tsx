@@ -30,6 +30,8 @@ import { AlignBarGroup, DistributeBarGroup } from "@/components/AlignGroup";
 import { GridBarGroup } from "@/components/GridGroup";
 import { FlipGroup } from "@/components/FlipGroup";
 import { GuideButton } from "@/components/GuideButton";
+import { TileGroup } from "@/components/TileGroup";
+import type { TileSlot } from "@/lib/tilingText";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
@@ -125,6 +127,8 @@ export interface SelectToolbarProps {
   align?: AlignApi;
   /** The ellipse group and the Curve field (`specs/0021-ellipse-arcs-and-shaping/`). */
   arcBar: ArcBarApi;
+  /** The Tile slot (`specs/0069-tiling` UX notes §1): Tile, or Edit tiling and Release tiling. */
+  tile?: { slot: TileSlot; onEnter: (byKeyboard: boolean) => void; onRelease: () => void };
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -643,6 +647,7 @@ export function SelectToolbar({
   traceShown = false,
   onTrace,
   recognise,
+  tile,
   flipEnabled,
   flip,
   align,
@@ -665,6 +670,11 @@ export function SelectToolbar({
     if (align.grid.shown) {
       groups.push(<GridBarGroup key="grid" align={align} onReturnFocus={onReturnFocus} />);
     }
+  }
+  // The Tile slot after the arrange groups, before the kind groups, in every selection state of
+  // the Select tool, so the bar does not jump (`specs/0069-tiling` UX notes §1).
+  if (tile) {
+    groups.push(<TileGroup key="tile" slot={tile.slot} onEnter={tile.onEnter} onRelease={tile.onRelease} onReturnFocus={onReturnFocus} />);
   }
   if (bar.radiusShown) {
     groups.push(
