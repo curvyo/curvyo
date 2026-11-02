@@ -4,10 +4,8 @@
  * terminates the worker and the next job starts a fresh one from the cached module.
  */
 
-import { mergeReads, poolPercent, poolSize, shareLines } from "./ocrPool.ts";
+import { mergeReads, poolPercent, poolSize, readingCost, shareLines } from "./ocrPool.ts";
 
-/** The recogniser's input height, px: a crop holds width x this x 3 samples (`curvyo-ocr-core`). */
-const OCR_LINE_HEIGHT = 48;
 
 /** A message to the worker. */
 export type TraceRequest =
@@ -31,6 +29,8 @@ export type TraceRequest =
   | { type: "regions"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
   /** The font fit of the read lines (`specs/0091` decision 4): the session's request. */
   | { type: "fit"; id: number; request: string }
+  /** A share of the fit ends with every share's nearest face, the JSON list (`specs/0091` round 2). */
+  | { type: "fit-finish"; id: number; nearest: string }
   /** The faces a fit asked for, as `[file, index, bytes]`; the fit goes on. */
   | { type: "fit-faces"; id: number; faces: FitFace[] }
   /** The text lines of a picture detected and cropped for the reading pool (`specs/0091` round 2). */
@@ -333,15 +333,15 @@ export class TraceRunner {
     if (response.error !== "") {
       return { lines: "", error: response.error, rgba: response.rgba };
     }
-    const crops = (JSON.parse(response.lines) as { lines: { quad: number[][]; width: number }[] }).lines;
+    const crops = (JSON.parse(response.lines) as { lines: { quad: number[][]; width: number; samples: number }[] }).lines;
     const offsets: number[] = [];
     let at = 0;
     for (const crop of crops) {
       offsets.push(at);
-      at += crop.width * OCR_LINE_HEIGHT * 3;
+      at += crop.samples;
     }
     const shares = shareLines(
-      crops.map((c) => c.width),
+      crops.map((c) => readingCost(c.width)),
       this.poolWorkers,
     );
     while (this.pool.length < shares.length) {
@@ -351,10 +351,10 @@ export class TraceRunner {
     onProgress?.(poolPercent(0, crops.length));
     const reads = await Promise.all(
       shares.map(async (share, k) => {
-        const samples = new Float32Array(share.reduce((n, i) => n + crops[i].width * OCR_LINE_HEIGHT * 3, 0));
+        const samples = new Float32Array(share.reduce((n, i) => n + crops[i].samples, 0));
         let to = 0;
         for (const i of share) {
-          const n = crops[i].width * OCR_LINE_HEIGHT * 3;
+          const n = crops[i].samples;
           samples.set(response.samples.subarray(offsets[i], offsets[i] + n), to);
           to += n;
         }
@@ -409,18 +409,68 @@ export class TraceRunner {
     loadFaces: (faces: [string, number][]) => Promise<FitFace[]>,
     onProgress?: (percent: number) => void,
   ): Promise<string> {
+    const parsed = JSON.parse(request) as { lines: { outlines: unknown[] }[] };
+    // Round 2: the lines are fitted on the pool, the costliest (most outlines) dealt first.
+    const shares = shareLines(
+      parsed.lines.map((l) => l.outlines.length),
+      this.poolWorkers,
+    );
+    while (this.pool.length < shares.length) {
+      this.pool.push(new TraceRunner(this.makeWorker, this.module, this.startMs));
+    }
+    const done = shares.map(() => 0);
+    const report = () => onProgress?.(Math.floor(done.reduce((a, b) => a + b, 0) / Math.max(1, parsed.lines.length)));
+    const stopAll = (error: unknown): never => {
+      for (const runner of this.pool) {
+        runner.cancel();
+      }
+      throw error;
+    };
+    const nearest = await Promise.all(
+      shares.map((share, k) =>
+        this.pool[k].fitShare(JSON.stringify({ ...parsed, lines: share.map((i) => parsed.lines[i]), share }), loadFaces, (p) => {
+          done[k] = p * share.length;
+          report();
+        }),
+      ),
+    ).catch(stopAll);
+    const all = JSON.stringify(nearest.filter((n) => n !== null));
+    const finished = await Promise.all(shares.map((_, k) => this.pool[k].finishShare(all))).catch(stopAll);
+    const lines = mergeReads(shares, finished);
+    onProgress?.(100);
+    return JSON.stringify({ kind: "finished", lines });
+  }
+
+  /** A pool worker's share of a fit, until searched: its nearest face (`null` without one). */
+  private async fitShare(request: string, loadFaces: (faces: [string, number][]) => Promise<FitFace[]>, onProgress: (percent: number) => void): Promise<unknown> {
     let response = await this.send((id) => ({ type: "fit", id, request }), [], onProgress);
     for (;;) {
       if (response.kind !== "fit") {
         throw new Error(response.kind === "error" ? response.message : "unexpected reply");
       }
-      const reply = JSON.parse(response.reply) as { kind: string; faces?: [string, number][] };
+      const reply = JSON.parse(response.reply) as { kind: string; faces?: [string, number][]; nearest?: unknown };
+      if (reply.kind === "searched") {
+        return reply.nearest ?? null;
+      }
       if (reply.kind !== "need") {
-        return response.reply;
+        throw new Error(`a fitting worker answered ${reply.kind}`);
       }
       const faces = await loadFaces(reply.faces ?? []);
       response = await this.send((id) => ({ type: "fit-faces", id, faces }), [], onProgress);
     }
+  }
+
+  /** Ends a pool worker's share of a fit with every share's nearest face: its lines. */
+  private async finishShare(nearest: string): Promise<unknown[]> {
+    const response = await this.send((id) => ({ type: "fit-finish", id, nearest }), []);
+    if (response.kind !== "fit") {
+      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
+    }
+    const reply = JSON.parse(response.reply) as { kind: string; lines?: unknown[] };
+    if (reply.kind !== "finished" || !reply.lines) {
+      throw new Error("a fitting worker could not finish its lines");
+    }
+    return reply.lines;
   }
 
   /** The PNG of `rgba` (`width` x `height`, straight alpha), made in the worker; the pixels are

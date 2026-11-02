@@ -482,7 +482,8 @@ pub use text_path_edit::{
     rotated_position, shift_along, slid_values, snap_stops, stored_vertical_layout,
 };
 pub use text_recognise_job::{
-    AcceptedLine, FaceState, FaceTier, JobStep, RecogniseJob, TIER_CAP, Tiers, recognise_tiers,
+    AcceptedLine, FaceState, FaceTier, JobStep, NearestFound, RecogniseJob, TIER_CAP, Tiers,
+    recognise_tiers,
 };
 pub use text_recognise_plan::{
     RecogniseSubjects, RecogniseWrite, RecognisedText, plan_recognise_write, recognise_available,

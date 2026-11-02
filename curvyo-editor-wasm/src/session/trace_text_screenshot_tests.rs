@@ -1,5 +1,6 @@
 //! The customer's screenshot of the font manager through Trace with text
-//! (`specs/0091-trace-text-recognition` criteria 26 and 27): the per-line table of the PR.
+//! (`specs/0091-trace-text-recognition` criteria 26 and 27): the per-line table of the PR, the
+//! profile of the fit, and the fit in shares as the worker pool runs it (round 2).
 //!
 //! ```text
 //! cargo test --release -p curvyo-editor-wasm --lib trace_text_screenshot -- --ignored --nocapture
@@ -7,7 +8,7 @@
 
 use curvyo_ui_core::{OcrModel, TraceParams, trace_read_text, trace_text_job_with};
 
-use super::trace_text_tests::{fit, model, session_with};
+use super::trace_text_tests::{fit, fonts, model, session_with};
 
 /// One read line after the fit: the OCR's string and mean confidence, whether it passes the
 /// garbage filter, and the text it became (face file, sure letters, letters, nearest), if any.
@@ -122,4 +123,145 @@ fn the_screenshot_lines_become_text() {
     let small = fitted_lines(&model, "small_labels.png");
     print_lines("small labels", &small);
     assert!(small.iter().all(|l| l.3.is_some()));
+}
+
+/// Where the time of the text pass and the font fit goes on the screenshot (thread CPU).
+#[test]
+#[ignore = "harness: prints the profile of the fit"]
+fn the_fit_profile() {
+    use super::trace_text_tests::cpu_seconds;
+    let model = model();
+    for file in ["customer/font-manager-screenshot.png", "tester/poster.png"] {
+        let (mut session, image) = session_with(file);
+        let source = session.trace_source(image, false).unwrap();
+        let lines = trace_read_text(
+            &model,
+            &source.rgba,
+            source.width,
+            source.height,
+            &mut |_| std::ops::ControlFlow::Continue(()),
+        )
+        .unwrap();
+        assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
+        let params = TraceParams::with_threshold(curvyo_ui_core::trace_auto_threshold(
+            &source.rgba,
+            source.width,
+            source.height,
+        ));
+        let t = cpu_seconds();
+        let regions = curvyo_ui_core::trace_text_regions_with(
+            &source.rgba,
+            source.width,
+            source.height,
+            source.map,
+            &params,
+            &lines,
+        );
+        let pass = cpu_seconds() - t;
+        let t = cpu_seconds();
+        let request = session
+            .trace_fit_request_for(image, &regions, 0.3, &[])
+            .unwrap();
+        let req = cpu_seconds() - t;
+        let t = cpu_seconds();
+        let reply = fit(&request);
+        let fitted = cpu_seconds() - t;
+        let _ = trace_text_job_with;
+        println!(
+            "{file}: {} lines; text pass {pass:.2} s, request {req:.2} s, fit {fitted:.2} s ({} bytes)",
+            lines.len(),
+            reply.len()
+        );
+    }
+}
+
+/// The fit of `request` as `shares` pool workers run it (round 2): the lines dealt round-robin,
+/// each share searched apart, every share finished with all shares' nearest faces, the lines
+/// put back in their order.
+fn fit_in_shares(request: &str, shares: usize) -> String {
+    let mut value: serde_json::Value = serde_json::from_str(request).unwrap();
+    let lines = value["lines"].as_array().unwrap().clone();
+    let deal: Vec<Vec<usize>> = (0..shares)
+        .map(|k| (k..lines.len()).step_by(shares).collect())
+        .filter(|d: &Vec<usize>| !d.is_empty())
+        .collect();
+    let mut workers = Vec::new();
+    let mut nearest = Vec::new();
+    for share in &deal {
+        value["lines"] =
+            serde_json::Value::Array(share.iter().map(|&i| lines[i].clone()).collect());
+        value["share"] = serde_json::json!(share);
+        let mut worker = crate::trace_fit_glue::FitWorker::default();
+        let mut reply = worker.start(&value.to_string(), &mut |_| {});
+        loop {
+            let v: serde_json::Value = serde_json::from_str(&reply).unwrap();
+            if v["kind"] == "searched" {
+                nearest.push(v["nearest"].clone());
+                break;
+            }
+            for face in v["faces"].as_array().unwrap() {
+                let file = face[0].as_str().unwrap();
+                let bytes = std::fs::read(fonts().join(file)).unwrap();
+                assert!(worker.add_face(
+                    file,
+                    u32::try_from(face[1].as_u64().unwrap()).unwrap(),
+                    &bytes
+                ));
+            }
+            reply = worker.step(&mut |_| {});
+        }
+        workers.push(worker);
+    }
+    let all = serde_json::Value::Array(nearest.into_iter().filter(|n| !n.is_null()).collect())
+        .to_string();
+    let mut merged = vec![serde_json::Value::Null; lines.len()];
+    for (share, worker) in deal.iter().zip(&mut workers) {
+        let done: serde_json::Value = serde_json::from_str(&worker.finish(&all)).unwrap();
+        for (&i, line) in share.iter().zip(done["lines"].as_array().unwrap()) {
+            merged[i] = line.clone();
+        }
+    }
+    serde_json::json!({ "kind": "finished", "lines": merged }).to_string()
+}
+
+/// The request of the fit of `file` (OCR, text pass alone).
+fn fit_request(model: &OcrModel, file: &str) -> String {
+    let (mut session, image) = session_with(file);
+    let source = session.trace_source(image, false).unwrap();
+    let lines = trace_read_text(
+        model,
+        &source.rgba,
+        source.width,
+        source.height,
+        &mut |_| std::ops::ControlFlow::Continue(()),
+    )
+    .unwrap();
+    assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
+    let regions = curvyo_ui_core::trace_text_regions_with(
+        &source.rgba,
+        source.width,
+        source.height,
+        source.map,
+        &TraceParams::with_threshold(128),
+        &lines,
+    );
+    session
+        .trace_fit_request_for(image, &regions, 0.3, &[])
+        .unwrap()
+}
+
+/// Round 2: the fit of the tester poster in three shares is the fit in one worker, byte for
+/// byte (the same faces, sure and guessed letters, glyphs).
+#[test]
+fn the_fit_in_shares_is_the_fit_in_one_worker() {
+    let request = fit_request(&model(), "tester/poster.png");
+    assert_eq!(fit_in_shares(&request, 3), fit(&request));
+}
+
+/// Round 2 on the screenshot (78 lines): four shares and one worker fit the same.
+#[test]
+#[ignore = "release harness: the screenshot's fit takes seconds"]
+fn the_screenshot_fit_in_shares_is_the_fit_in_one_worker() {
+    let request = fit_request(&model(), "customer/font-manager-screenshot.png");
+    assert_eq!(fit_in_shares(&request, 4), fit(&request));
 }

@@ -201,6 +201,36 @@ struct Near {
     face: usize,
     deviation: f64,
     rank: (bool, bool),
+    /// When it was found: the line of `order` and the tier searched.
+    found_at: (usize, usize),
+}
+
+/// The face that came nearest over a job, with what a job over other lines needs to tell which
+/// of two came nearest (`specs/0091` round 2: lines fitted in several workers): how telling its
+/// line is (over the tolerance, several glyphs), its deviation and when it was found.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NearestFound {
+    /// The face's listing index.
+    pub face: usize,
+    /// Its largest deviation, mm.
+    pub deviation: f64,
+    /// Over the tolerance, several glyphs: the higher, the more telling.
+    pub rank: (bool, bool),
+    /// The outline set and its line it was found on, and the tier searched.
+    pub found_at: (usize, usize, usize),
+}
+
+impl NearestFound {
+    /// Whether this one wins over `other`, as one job over both their lines would decide:
+    /// the more telling, then the lower deviation, then the one found first.
+    #[must_use]
+    pub fn beats(&self, other: &Self) -> bool {
+        self.rank > other.rank
+            || (self.rank == other.rank
+                && (self.deviation < other.deviation
+                    || (self.deviation.total_cmp(&other.deviation).is_eq()
+                        && self.found_at < other.found_at)))
+    }
 }
 
 /// One Recognise text run over a selection: the lines, the tiers and the decisions so far.
@@ -299,6 +329,20 @@ impl RecogniseJob {
         self.nearest.as_ref().map(|n| (n.face, n.deviation))
     }
 
+    /// [`Self::nearest`] with what tells it from the nearest face of a job over other lines;
+    /// `sources` gives each of this job's outline sets its index among all of them (ascending).
+    #[must_use]
+    pub fn nearest_found(&self, sources: &[usize]) -> Option<NearestFound> {
+        let near = self.nearest.as_ref()?;
+        let (r, l) = self.order[near.found_at.0];
+        Some(NearestFound {
+            face: near.face,
+            deviation: near.deviation,
+            rank: near.rank,
+            found_at: (sources.get(r).copied().unwrap_or(r), l, near.found_at.1),
+        })
+    }
+
     /// The last tier searched.
     #[must_use]
     pub const fn last_tier(&self) -> Option<FaceTier> {
@@ -343,6 +387,7 @@ impl RecogniseJob {
                 face: listed[near.face],
                 deviation,
                 rank: (deviation > self.tolerance, found.letters >= 2),
+                found_at: (self.line, self.tier),
             };
             let better = self.nearest.as_ref().is_none_or(|n| {
                 candidate.rank > n.rank || (candidate.rank == n.rank && deviation < n.deviation)

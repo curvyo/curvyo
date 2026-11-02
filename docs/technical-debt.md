@@ -1726,8 +1726,13 @@ first slice's PR:
   Since 2026-11-02 the lines are read by a pool of workers (min(cores - 1, 4), each loads the
   weights once, about 37 MB wasm memory each), strings unchanged: Chromium, 8 cores, "Reading
   text" on the screenshot 6.6 s (one reader 22.2 s), on the tester poster 2.3 s (3.3 s). The
-  screenshot's text pass and font fit before the trace then take 14 s (78 lines): the next
-  lever.
+  screenshot's text pass and font fit before the trace then take 14 s (78 lines). Profile
+  (native, thread CPU, screenshot): text pass 0.16 s, font fit 9.2 s, of it 8.6 s the tier search
+  and 7.9 s the per-face fits of the matcher (`fits_of`), 0.7 s the single-line fits; no cut in
+  the matcher keeps every result, so the lines are fitted on the same pool (2026-11-02, results
+  byte-identical to one worker): the fit before the trace 15.0 s -> 6.1 s, the whole job 38.9 s
+  -> 14.4 s on the screenshot (tester poster 7.5 s -> 5.2 s). A pool worker holds about 76 MB of
+  wasm memory with the weights, the faces of the tiers and its share.
 
 **Resolution:** open. Levers: OCR as its own wasm module loaded on first use (removes the main-thread
 cost, needs a second `-wasm` crate and an ADR), width buckets and batching in recognition (several

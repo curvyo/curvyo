@@ -74,7 +74,7 @@ test("a worker that starts answers its jobs, and the next job after a failed sta
 
 // `specs/0091` round 2: the text lines read by a pool of workers.
 const weights = { detector: new Uint8Array(1), recogniser: new Uint8Array(1), alphabet: "a" };
-const crops = { lines: [{ quad: [[0, 0]], width: 1 }, { quad: [[0, 1]], width: 2 }, { quad: [[0, 2]], width: 1 }] };
+const crops = { lines: [{ quad: [[0, 0]], width: 1, samples: 144 }, { quad: [[0, 1]], width: 2, samples: 288 }, { quad: [[0, 2]], width: 1, samples: 144 }] };
 
 /** A worker that crops three lines and reads each as `L<first sample>`; `failing` reads fail. */
 function ocrWorker(failing = false) {
@@ -124,5 +124,53 @@ test("0091 pool: a reader that fails fails the read with no text", async () => {
   const { fake } = ocrWorker(true);
   const runner = new TraceRunner(fake.make, module, 5_000, 2);
   await assert.rejects(runner.ocr(pixels(), weights), /could not read its lines/);
+  runner.dispose();
+});
+
+/** A worker whose fit takes a share, asks for one face once, and finishes each line as `F<text>`
+ * with the nearest faces it was handed. */
+function fitWorker(failFinish = false) {
+  const finishes: string[] = [];
+  const fake = fakeWorker((r) => {
+    if (r.type === "init") {
+      return [{ id: 0, kind: "ready", error: "" }];
+    }
+    if (r.type === "fit") {
+      return [{ id: r.id, kind: "fit", reply: JSON.stringify({ kind: "need", faces: [["a.ttf", 0]] }), ms: 1 }];
+    }
+    if (r.type === "fit-faces") {
+      return [{ id: r.id, kind: "progress", percent: 100 }, { id: r.id, kind: "fit", reply: JSON.stringify({ kind: "searched", nearest: { face: r.faces.length } }), ms: 1 }];
+    }
+    if (r.type === "fit-finish") {
+      finishes.push(r.nearest);
+      return [{ id: r.id, kind: "fit", reply: failFinish ? JSON.stringify({ kind: "need" }) : JSON.stringify({ kind: "finished", lines: ["x"] }), ms: 1 }];
+    }
+    return [];
+  });
+  return { fake, finishes };
+}
+
+test("0091 pool: the fit's lines are shared, every share finishes with all nearest faces, the lines come back in order", async () => {
+  const { fake, finishes } = fitWorker();
+  const runner = new TraceRunner(fake.make, module, 5_000, 2);
+  const request = JSON.stringify({ lines: [{ text: "a", outlines: [1] }, { text: "b", outlines: [1, 2] }] });
+  const asked: string[][] = [];
+  const out = JSON.parse(await runner.fit(request, async (faces) => {
+    asked.push(faces.map((f) => f[0]));
+    return [];
+  })) as { kind: string; lines: unknown[] };
+  assert.equal(out.kind, "finished");
+  // Two shares of one line each.
+  assert.deepEqual(out.lines, ["x", "x"]);
+  assert.deepEqual(finishes, ['[{"face":0},{"face":0}]', '[{"face":0},{"face":0}]']);
+  assert.equal(asked.length, 2, "each worker asks for its faces");
+  runner.dispose();
+});
+
+test("0091 pool: a fitting worker that cannot finish fails the fit", async () => {
+  const { fake } = fitWorker(true);
+  const runner = new TraceRunner(fake.make, module, 5_000, 2);
+  const request = JSON.stringify({ lines: [{ text: "a", outlines: [1] }, { text: "b", outlines: [1] }] });
+  await assert.rejects(runner.fit(request, async () => []), /could not finish/);
   runner.dispose();
 });

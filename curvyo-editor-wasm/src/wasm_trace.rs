@@ -146,6 +146,14 @@ pub fn fit_add_face(file: &str, index: u32, bytes: &[u8]) -> bool {
     FIT_WORKER.with(|w| w.borrow_mut().add_face(file, index, bytes))
 }
 
+/// Ends this worker's share of a fit (`specs/0091` round 2) with every share's nearest face (the
+/// JSON list of their `searched` answers' `nearest`): `{kind: "finished", lines}`.
+#[wasm_bindgen]
+#[must_use]
+pub fn fit_finish(nearest: &str) -> String {
+    FIT_WORKER.with(|w| w.borrow_mut().finish(nearest))
+}
+
 /// Goes on with the fit after the faces it asked for were handed in.
 #[wasm_bindgen]
 #[must_use]

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use curvyo_text_core::{Face, LayoutOptions, Mm, RecognisedRun, layout};
 use kurbo::{BezPath, Vec2};
 
-use crate::text_recognise_job::{FaceState, JobStep, RecogniseJob, Tiers};
+use crate::text_recognise_job::{FaceState, JobStep, NearestFound, RecogniseJob, Tiers};
 
 /// One read line to fit: its string, its direction and its own outlines (document mm).
 #[derive(Debug, Clone, PartialEq)]
@@ -194,22 +194,24 @@ impl TraceFit {
         })
     }
 
-    /// Line `source` in the face that came nearest on it (else over the whole fit), every letter
-    /// guessed (Frage 114 B).
+    /// Line `source` in the face that came nearest on it (else `overall`), every letter guessed
+    /// (Frage 114 B).
     fn nearest_text(
         &self,
         source: usize,
         face: &dyn Fn(usize) -> Option<Arc<Face>>,
+        overall: Option<usize>,
     ) -> Option<FitText> {
         let job = &self.job;
         let line = &self.lines[source];
-        let (index, _) = job
+        let index = job
             .line_nearest()
             .iter()
             .filter(|(r, _, _)| *r == source)
             .filter_map(|(_, _, near)| *near)
             .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
-            .or_else(|| job.nearest())?;
+            .map(|(index, _)| index)
+            .or(overall)?;
         let found = face(index)?;
         let run = job.recognisers()[source].fit_text(&found, &line.text, line.direction)?;
         Some(FitText {
@@ -228,6 +230,25 @@ impl TraceFit {
     /// `face` gives a listed face that is loaded.
     #[must_use]
     pub fn finish(&self, face: &dyn Fn(usize) -> Option<Arc<Face>>) -> Vec<FitResult> {
+        self.finish_with(face, self.job.nearest().map(|(index, _)| index))
+    }
+
+    /// The face that came nearest over this fit, to weigh against the fits of other lines
+    /// (`specs/0091` round 2: a picture's lines fitted in several workers); `lines` gives each
+    /// of this fit's lines its index among all of them (ascending).
+    #[must_use]
+    pub fn nearest_found(&self, lines: &[usize]) -> Option<NearestFound> {
+        self.job.nearest_found(lines)
+    }
+
+    /// As [`Self::finish`], a line with no nearest face of its own set in `overall` (the face
+    /// that came nearest over every worker's lines).
+    #[must_use]
+    pub fn finish_with(
+        &self,
+        face: &dyn Fn(usize) -> Option<Arc<Face>>,
+        overall: Option<usize>,
+    ) -> Vec<FitResult> {
         let mut out = Vec::with_capacity(self.lines.len());
         for (source, line) in self.lines.iter().enumerate() {
             // Criterion 27: thin strokes near a single-line face are set in it.
@@ -251,7 +272,7 @@ impl TraceFit {
                     .collect();
             }
             if texts.is_empty() {
-                texts.extend(self.nearest_text(source, face));
+                texts.extend(self.nearest_text(source, face, overall));
             }
             // Frage 115 B / 117 B: a wrong font is better than paths, unless the line is garbage.
             texts.retain(|t| line.plausible || t.run.guessed.len() < t.run.letters);

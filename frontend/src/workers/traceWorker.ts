@@ -8,6 +8,7 @@
 import {
   encode_png,
   fit_add_face,
+  fit_finish,
   fit_start,
   fit_step,
   initSync,
@@ -76,6 +77,11 @@ scope.onmessage = (event) => {
       // The text pass alone (`specs/0091` criterion 25); the pixels go back for the trace.
       const wire = trace_text_regions_job(request.rgba, request.width, request.height, new Float64Array(request.map), request.settings, request.lines);
       scope.postMessage({ id: request.id, kind: "regions", wire, rgba: request.rgba, ms: performance.now() - started }, [wire.buffer, request.rgba.buffer]);
+      return;
+    }
+    if (request.type === "fit-finish") {
+      // A share of the fit ends with every share's nearest face (`specs/0091` round 2).
+      scope.postMessage({ id: request.id, kind: "fit", reply: fit_finish(request.nearest), ms: performance.now() - started });
       return;
     }
     if (request.type === "fit" || request.type === "fit-faces") {

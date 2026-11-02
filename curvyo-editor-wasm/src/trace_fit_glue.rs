@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use curvyo_text_core::{Face, FaceKey, FaceStore, Mm, RecognisedRun};
-use curvyo_ui_core::{FaceState, FitLine, FitResult, JobStep, Tiers, TraceFit};
+use curvyo_ui_core::{FaceState, FitLine, FitResult, JobStep, NearestFound, Tiers, TraceFit};
 use kurbo::{Affine, BezPath, Vec2};
 use serde_json::{Value, json};
 
@@ -25,6 +25,9 @@ pub struct FitWorker {
     /// Faces asked for once: still missing at the next step, they are unavailable.
     requested: Vec<usize>,
     fit: Option<TraceFit>,
+    /// A share of a picture's lines (`specs/0091` round 2): each line's index among all of them.
+    /// The fit then stops once searched, for the nearest face over every share.
+    share: Option<Vec<usize>>,
 }
 
 impl std::fmt::Debug for FitWorker {
@@ -76,6 +79,26 @@ fn file_index(value: &Value) -> Option<(String, u32)> {
         pair.first()?.as_str()?.to_owned(),
         u32::try_from(pair.get(1)?.as_u64()?).ok()?,
     ))
+}
+
+fn nearest_json(n: NearestFound) -> Value {
+    json!({
+        "face": n.face,
+        "deviation": n.deviation,
+        "rank": [n.rank.0, n.rank.1],
+        "found_at": [n.found_at.0, n.found_at.1, n.found_at.2],
+    })
+}
+
+fn read_nearest(value: &Value) -> Option<NearestFound> {
+    let rank = value.get("rank")?.as_array()?;
+    let at = indices(value.get("found_at"));
+    Some(NearestFound {
+        face: usize::try_from(value.get("face")?.as_u64()?).ok()?,
+        deviation: value.get("deviation")?.as_f64()?,
+        rank: (rank.first()?.as_bool()?, rank.get(1)?.as_bool()?),
+        found_at: (*at.first()?, *at.get(1)?, *at.get(2)?),
+    })
 }
 
 /// A text of a finished fit as JSON (`face` indexes the request's faces; `hash` its file's).
@@ -214,6 +237,10 @@ impl FitWorker {
             .into_iter()
             .filter(|&i| i < self.faces.len())
             .collect();
+        self.share = value
+            .get("share")
+            .and_then(Value::as_array)
+            .map(|_| indices(value.get("share")));
         self.fit = Some(TraceFit::new(lines, Mm(tolerance), tiers, strokes));
         self.step(progress)
     }
@@ -265,12 +292,47 @@ impl FitWorker {
                 JobStep::Finished => break,
             }
         }
-        let results: Vec<FitResult> = fit.finish(&|index| {
-            self.faces
-                .get(index)
-                .and_then(|file| self.face(file))
-                .map(|(_, face)| face)
-        });
+        if let Some(share) = &self.share {
+            let nearest = fit.nearest_found(share).map(nearest_json);
+            self.fit = Some(fit);
+            return json!({ "kind": "searched", "nearest": nearest }).to_string();
+        }
+        let overall = fit.nearest_found(&[]).map(|n| n.face);
+        self.finished(&fit, overall)
+    }
+
+    /// Ends a share's fit (`specs/0091` round 2) with every share's nearest face (`[{face,
+    /// deviation, rank, found_at}]`, the JSON of their `searched` answers): the one a fit over
+    /// all lines would have found stands for the lines with none of their own.
+    pub fn finish(&mut self, nearest: &str) -> String {
+        let Some(fit) = self.fit.take() else {
+            return json!({ "kind": "finished", "lines": [] }).to_string();
+        };
+        let candidates: Vec<NearestFound> = serde_json::from_str::<Vec<Value>>(nearest)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(read_nearest)
+            .collect();
+        let mut best: Option<NearestFound> = None;
+        for candidate in candidates {
+            if best.is_none_or(|b| candidate.beats(&b)) {
+                best = Some(candidate);
+            }
+        }
+        self.finished(&fit, best.map(|b| b.face))
+    }
+
+    /// The finished JSON of `fit`, a line with no nearest face of its own set in `overall`.
+    fn finished(&self, fit: &TraceFit, overall: Option<usize>) -> String {
+        let results: Vec<FitResult> = fit.finish_with(
+            &|index| {
+                self.faces
+                    .get(index)
+                    .and_then(|file| self.face(file))
+                    .map(|(_, face)| face)
+            },
+            overall,
+        );
         let hash_of = |index: usize| {
             self.faces
                 .get(index)

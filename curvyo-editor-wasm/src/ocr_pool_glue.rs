@@ -2,7 +2,8 @@
 //! that read them (`specs/0091-trace-text-recognition` round 2): numbers and JSON across the wasm
 //! boundary, host-independent so ordinary `cargo test` covers it.
 //!
-//! The crops: `{lines: [{quad, width}]}` and one `f32` array of their samples, line after line.
+//! The crops: `{lines: [{quad, width, samples}]}` (`samples`: how many numbers of the array are
+//! the line's) and one `f32` array of their samples, line after line.
 //! A read: a JSON array with one entry per crop, the line as `ocr_lines_json` writes it or `null`.
 
 use curvyo_ui_core::{LineCrop, OCR_LINE_HEIGHT, OcrModel, trace_read_crop};
@@ -13,7 +14,7 @@ use serde_json::{Value, json};
 pub fn crops_wire(crops: &[LineCrop]) -> (String, Vec<f32>) {
     let lines: Vec<Value> = crops
         .iter()
-        .map(|c| json!({ "quad": c.quad, "width": c.width }))
+        .map(|c| json!({ "quad": c.quad, "width": c.width, "samples": c.rgb.len() }))
         .collect();
     let samples = crops.iter().flat_map(|c| c.rgb.iter().copied()).collect();
     (json!({ "lines": lines }).to_string(), samples)

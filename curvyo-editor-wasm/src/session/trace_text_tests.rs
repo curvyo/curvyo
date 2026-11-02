@@ -16,7 +16,7 @@ use curvyo_ui_core::{OcrModel, TraceParams, trace_read_text, trace_text_job_with
 
 /// The thread's CPU time in seconds (`CLAUDE.md` §5: timings are thread CPU time).
 #[allow(clippy::cast_precision_loss)] // seconds and nanoseconds of a test run
-fn cpu_seconds() -> f64 {
+pub(super) fn cpu_seconds() -> f64 {
     #[cfg(unix)]
     {
         let t = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
@@ -32,7 +32,7 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
-fn fonts() -> PathBuf {
+pub(super) fn fonts() -> PathBuf {
     root().join("frontend/public/fonts")
 }
 

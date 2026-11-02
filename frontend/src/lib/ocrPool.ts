@@ -1,7 +1,8 @@
 /**
  * How one picture's text lines are shared over a small pool of workers and put back together
  * (`specs/0091-trace-text-recognition` round 2, lead 2026-11-02): the lines are independent, the
- * main trace worker detects them in order, the pool reads them, and the result keeps that order.
+ * main trace worker detects them in order, the pool reads and fits them, and the result keeps
+ * that order.
  * No React and no workers, so node tests can check it.
  */
 
@@ -15,14 +16,14 @@ export function poolSize(cores: number | undefined): number {
   return Math.max(1, Math.min(MAX_POOL, Number.isFinite(n) ? n : 1));
 }
 
-/** The line indices each of `workers` reads: every line once, the longest first to the worker
- * with the least work so far (the reading time grows with the padded width; ties go to the lower
- * worker and the lower line), each share in line order. */
-export function shareLines(widths: readonly number[], workers: number): number[][] {
+/** The line indices each of `workers` takes: every line once, the costliest first to the worker
+ * with the least work so far (ties go to the lower worker and the lower line), each share in line
+ * order. */
+export function shareLines(costs: readonly number[], workers: number): number[][] {
   const count = Math.max(1, workers);
   const shares: number[][] = Array.from({ length: count }, () => []);
   const load = new Array<number>(count).fill(0);
-  const order = widths.map((w, i) => [Math.max(w, 1024), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  const order = costs.map((c, i) => [c, i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
   for (const [cost, line] of order) {
     let best = 0;
     for (let k = 1; k < count; k++) {
@@ -50,6 +51,11 @@ export function mergeReads<T>(shares: readonly number[][], reads: readonly (read
     });
   });
   return byLine.filter((r): r is T => r !== null);
+}
+
+/** The reading cost of a line `width` px wide: the recogniser pads it to 1024 px at least. */
+export function readingCost(width: number): number {
+  return Math.max(width, 1024);
 }
 
 /** One percent over the pool's lines: `done` of `total` lines read, after the detection's share
