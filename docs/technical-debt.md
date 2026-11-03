@@ -2084,3 +2084,108 @@ in a Renovate batch.
 ## One wasm trap poisons the main instance for good (2026-11-04)
 
 A single trap in the main wasm instance leaves it unusable ("null pointer passed to rust" on every later call), and the app has no recovery or reload path yet.
+
+## Only a Save from the window writes a thumbnail (`0095` criterion 6, 2026-11-03)
+
+The thumbnail in `thumbnail.png` is drawn by the page's GPU renderer into an offscreen canvas on
+Save (`frontend/src/lib/pageThumbnail.ts`, `WasmThumbnail`) and put into the container by the host
+(`curvyo_storage_io::with_thumbnail`). Every write without a window has none: a new or duplicated
+workspace document, a file written by the background writer or a join (M5, M6), a later CLI or
+headless save. Their rows show the placeholder until the document is saved from the window. A
+document saved where no WebGL context exists (a webview without GPU) gets none either.
+
+**Resolution:** open; a CPU rasteriser of the draw list in a core crate (see "The SVG preview's
+rasterizer lives in `curvyo-app`") would let every writer draw one. Decide when the background
+writer lands or a headless save is built.
+
+## A shared workspace never purges its tombstones (`0095`, ADR 0037 decision 6, 2026-11-03)
+
+A deleted document or folder stays in the list as a tombstone, and its state stays in the
+workspace room and in every workspace snapshot, so that any member can restore it (criterion 40).
+Each device also keeps a copy as `.curvyo-workspace/deleted/<id>.curvyo` (**Proposal** of M7,
+for the architect: a member has no other local copy to restore from or to put into the next
+snapshot). A workspace that deletes much grows without bound.
+
+**Resolution:** a purge rule (age, or an explicit "Delete for good" by an admin) with a later
+slice of the workspace; needs an ADR addendum (who may purge, what a member offline at the purge
+does).
+
+## A workspace folder is watched by polling every 2 s (`0095` criteria 5 and 7, ADR 0037 decision 2)
+
+The File tab rescans the open workspace every 2 s (names, sizes, times; a shared workspace also
+reads each changed file's sharing members). 500 documents cost 0.5 ms per scan, so this is cheap
+for the target, but it is late by up to 2 s and scans when nothing changed.
+
+**Resolution:** an OS file watcher in `curvyo-storage-io` (`notify`, an ADR for the dependency)
+once a workspace of thousands of files or a battery complaint shows the cost.
+
+## Workspace names are compared without Unicode normalisation (`0095` criteria 13, 38, ADR 0037 decision 6)
+
+Names are compared under `to_lowercase` only. "Café" typed as one code point on one computer and
+as "e" plus a combining accent on another are two names: both stay, neither gets " 2", and on
+macOS (which normalises file names) the two files can collide on disk.
+
+**Resolution:** NFC before every comparison and on every name written, with a dependency
+(`unicode-normalization`) and an ADR note; tests with decomposed names from a macOS peer.
+
+## A taken-in document's old room stays on the relay (`0095` criterion 42, ADR 0037 decision 10)
+
+After a take-in, the document's own `0092` room holds its last state and the `Moved` record. No
+client syncs it again and nobody is admitted there, but the relay keeps its data (ADR 0031 has no
+room deletion).
+
+**Resolution:** room deletion in the relay protocol (an admin-signed frame), with server
+retention in a later `0092` slice.
+
+## Changes pushed to an old room after `Moved` stay local (`0095` criterion 42, ADR 0037 decision 10)
+
+A member of a document's own room who edits it while another member takes it into a workspace
+pushes changes to the old room that arrive after `Moved`. They are not carried into the workspace:
+that member's copy becomes a local file holding them, and the member is told so.
+
+**Resolution:** a push across the take-in instant (the taking device merges the old room's tail
+up to `Moved` into the workspace stream), with an ADR 0037 addendum.
+
+## A missing document whose records keep arriving holds the marker cursor back (`0095` criterion 41, 2026-11-03)
+
+When a document of a shared workspace is "Missing on this computer" (another program removed its
+file), its records cannot be written into a file, and the marker cursor never passes a record
+that is not in a file (M5 rule). Until the maker uses Download again, every reconnect asks the
+relay from that cursor again, so the replay grows with every record of the workspace after it. No
+edit is lost; criterion 41 asks only for the row state and Download again, which work.
+
+**Resolution:** keep the records of a missing document beside the marker (like the kept copies of
+deleted documents) so the cursor can pass them, or offer Download again automatically when the
+replay passes a size.
+
+## Notices name the author of a rename or move only when that member was seen online (`0095`, `ux-notes.md` section 7)
+
+A rename or move notice names the member whose list record carried it, by the list replica peer
+that member's presence announced in this session (**Proposal**). A change made offline and merged
+while its author is not online, or before the first presence heartbeat (2 s), says "Someone".
+The criteria (36, 37) ask only for the change to reach the disk; the UX notes name the member.
+
+**Resolution:** keep the list peer to label mapping beside the marker (it only grows by members),
+or record the author in the list's node meta with an ADR 0037 note (a list format addition).
+
+## A workspace snapshot is sealed on the main thread (`0095` criterion 31, ADR 0037 decision 8, 2026-11-03)
+
+The main session seals every part of a workspace snapshot in one go when the snapshot is due
+(about 1 ms per MiB on the measuring machine): a 100 MiB workspace stalls the window for about
+100 ms each time a snapshot is due. The worker holds no keys (decision 8), so the sealing cannot
+move there without an ADR change.
+
+**Resolution:** seal and send one part per tick of the sync pump, so no tick seals more than one
+part (4 MiB).
+
+## The relay holds staged and current snapshot parts in memory, and staging has no size limit (`0095`, ADR 0037 decision 7, 2026-11-03)
+
+A room keeps its current multi-part snapshot and the parts being uploaded in memory as well as
+on disk, so a busy workspace room can hold two snapshots at once. Each message is capped at
+64 MiB (ADR 0031 decision 10), but the number of parts of one upload is not: a member can stage
+any number of parts until its connection closes.
+
+**Resolution:** a per-room ceiling on staged bytes (refuse the upload past it with `Protocol`),
+and serve the current snapshot's parts from disk instead of memory.
+
+- **0095: share.json v2 parsed twice.** `curvyo-storage-io/src/workspace_share_files.rs` (`names_workspace`) reads `share.json` v2 as raw JSON next to `curvyo-document-core`'s `WorkspaceShareRecord::from_share_json`. Fix: `remove_marker_share` takes a predicate that `curvyo-app` fills from document-core (architect review, 2026-11-03).
