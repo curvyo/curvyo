@@ -282,8 +282,9 @@ impl Session {
 
     /// Save as profile (criteria 3, 8): a user profile from the values the block shows, added to
     /// the library (no history), and the copy points at it in one step. A copy whose id is a
-    /// user id this library lacks is saved under that id; otherwise a new id is made from
-    /// `random`. Returns the notice of a work area cut into the profile range.
+    /// user id this library lacks is saved under that id, unless a record of that id was skipped
+    /// at load (it is never written); otherwise a new id is made from `random`. Returns the
+    /// notice of a work area cut into the profile range.
     pub fn save_machine_profile(&mut self, random: [u8; 16], now_ms: i64) -> Option<String> {
         let active = self.active_copy()?;
         let profiles = &self.manufacturing.machine.profiles;
@@ -291,7 +292,9 @@ impl Session {
         let id = copy
             .id
             .clone()
-            .filter(|id| is_profile_id(id) && profiles.find(id).is_none())
+            .filter(|id| {
+                is_profile_id(id) && profiles.find(id).is_none() && !profiles.is_skipped(id)
+            })
             .unwrap_or_else(|| new_profile_id(random));
         let name = save_as_name(&copy.values.name, |name| profiles.name_taken(name));
         let area = clamp_work_area(active.page);

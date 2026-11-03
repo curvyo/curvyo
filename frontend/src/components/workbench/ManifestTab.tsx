@@ -18,9 +18,8 @@ interface ManifestTabProps {
 /**
  * A manufacturing workbench's tab, drawn from its extension's manifest (ADR 0034 §4,
  * `specs/0093-laser-workbench-shell` UX notes §4): the block kinds `Notice`, `MachineProfile`
- * (`specs/0026-machine-profile`) and `FixtureList` in the manifest's order. No extension declares
- * a `Params` block of its own registers yet (they come with `0027`), so it draws nothing. Nothing
- * here names a process.
+ * (`specs/0026-machine-profile`) and `FixtureList` in the manifest's order. Nothing here names a
+ * process.
  */
 export function ManifestTab({ contribution, view, workbenches, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
@@ -50,8 +49,6 @@ function Block({
   switch (block.kind) {
     case "notice":
       return <NoticeBlock text={view.notices[block.id]} />;
-    case "params":
-      return null;
     case "machine_profile":
       return view.machine ? (
         <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} />

@@ -787,7 +787,6 @@ fn ac8_save_as_profile_adds_the_copy_under_the_same_id() {
 }
 
 #[test]
-#[ignore = "FINDING 0026 AC13: Save as profile of a Not-in-your-profiles copy overwrites the skipped newer record with the same id"]
 fn ac8_save_as_of_an_unknown_id_does_not_overwrite_a_skipped_newer_record() {
     // The library holds this id in a record of a newer format (skipped at load, ADR 0036 §3).
     let p = k40(1);

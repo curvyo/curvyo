@@ -8,9 +8,9 @@ migration in that extension.
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn
   by the shell; the extension only places it.
-- Removed (no user left): `HostKey`, `ParamKind::Display`, `ParamValue::Text`, and
-  `WorkbenchContribution::{machine_name, work_width_mm, work_height_mm}`; a new manufacturing's
-  machine and work area come from the machine profile (ADR 0037 §8).
+- Removed (no user left): block kind `Params`, `HostKey`, `ParamKind::Display`,
+  `ParamValue::Text`, and `WorkbenchContribution::{machine_name, work_width_mm, work_height_mm}`;
+  a new manufacturing's machine and work area come from the machine profile (ADR 0037 §8).
 
 ## 0.1.0 (2026-11-02)
 

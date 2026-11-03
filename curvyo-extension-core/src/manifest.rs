@@ -78,17 +78,10 @@ pub struct Tab {
     pub blocks: Vec<Block>,
 }
 
-/// A block of a schema-rendered tab: the shell knows exactly these four kinds.
+/// A block of a schema-rendered tab: the shell knows exactly these three kinds.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Block {
-    /// A group of value fields under a heading.
-    Params {
-        /// The group heading ("Machine").
-        label: &'static str,
-        /// The fields, in order.
-        params: Vec<Param>,
-    },
     /// The machine profile picker and the copy's fields, drawn by the shell from the session's
     /// manufacturing view (`specs/0026-machine-profile` `adrs.md` note 4); the extension only says
     /// where it sits.

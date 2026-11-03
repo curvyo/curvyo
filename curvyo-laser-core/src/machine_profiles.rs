@@ -33,6 +33,8 @@ pub struct MachineProfiles {
     user: Vec<MachineProfile>,
     damaged: usize,
     newer: usize,
+    /// The ids of the records that did not load; they are never written (ADR 0004 §9).
+    skipped: Vec<String>,
 }
 
 impl Default for MachineProfiles {
@@ -42,6 +44,7 @@ impl Default for MachineProfiles {
             user: Vec::new(),
             damaged: 0,
             newer: 0,
+            skipped: Vec::new(),
         }
     }
 }
@@ -49,22 +52,40 @@ impl Default for MachineProfiles {
 impl MachineProfiles {
     /// The library from `(file name, text)` pairs: names that are not `<uuid>.json` are ignored,
     /// a damaged or newer record is skipped and counted (criterion 13), every other one loads.
+    /// The ids of skipped records and of records past [`MAX_RECORDS`] are kept so that no later
+    /// write replaces them.
     #[must_use]
     pub fn load(entries: &[(String, String)]) -> Self {
-        let mut records: Vec<&(String, String)> = entries
+        let mut records: Vec<(&str, &String, &String)> = entries
             .iter()
-            .filter(|(name, _)| record_id(name).is_some())
+            .filter_map(|(name, text)| record_id(name).map(|id| (id, name, text)))
             .collect();
-        records.sort_by(|a, b| a.0.cmp(&b.0));
+        records.sort_by(|a, b| a.1.cmp(b.1));
         let mut library = Self::default();
-        for (name, text) in records.into_iter().take(MAX_RECORDS) {
+        for (index, (id, name, text)) in records.into_iter().enumerate() {
+            if index >= MAX_RECORDS {
+                library.skipped.push(id.to_owned());
+                continue;
+            }
             match read_record(name, text) {
                 Ok(profile) => library.user.push(profile),
-                Err(RecordError::Damaged) => library.damaged += 1,
-                Err(RecordError::Newer) => library.newer += 1,
+                Err(error) => {
+                    match error {
+                        RecordError::Damaged => library.damaged += 1,
+                        RecordError::Newer => library.newer += 1,
+                    }
+                    library.skipped.push(id.to_owned());
+                }
             }
         }
         library
+    }
+
+    /// Whether `id` names a record that was left as it is at load (damaged, newer or past the
+    /// limit): it is never written, so Save as profile takes a new id instead.
+    #[must_use]
+    pub fn is_skipped(&self, id: &str) -> bool {
+        self.skipped.iter().any(|skipped| skipped == id)
     }
 
     /// The notices of the last load (UX notes §2 item 1), one per kind that applies.
@@ -129,9 +150,10 @@ impl MachineProfiles {
     }
 
     /// Adds or replaces the user profile `profile` (Save as profile; a copy's id from another
-    /// computer is kept, criterion 8). `None` for the built-in's id.
+    /// computer is kept, criterion 8). `None` for the built-in's id and for the id of a skipped
+    /// record (ADR 0004 §9).
     pub fn add(&mut self, profile: MachineProfile) -> Option<LibraryWrite> {
-        if profile.is_builtin() {
+        if profile.is_builtin() || self.is_skipped(&profile.id) {
             return None;
         }
         let write = write_of(&profile);

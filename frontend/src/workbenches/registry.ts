@@ -15,7 +15,6 @@ export interface ManifestParam {
 
 /** A block of a schema-rendered tab. */
 export type ManifestBlock =
-  | { kind: "params"; label: string; params: ManifestParam[] }
   | { kind: "machine_profile"; label: string }
   | { kind: "fixture_list"; label: string }
   | { kind: "notice"; id: string };
