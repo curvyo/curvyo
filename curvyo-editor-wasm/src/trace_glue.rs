@@ -99,6 +99,16 @@ pub fn trace_settings(settings: &str) -> TraceParams {
     }
 }
 
+/// Whether `settings` turn Recognise shapes on (`"shapes": true`, `specs/0088` Part B); off when
+/// missing or unreadable.
+#[must_use]
+pub fn recognise_shapes(settings: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(settings)
+        .ok()
+        .and_then(|json| json.get("shapes").and_then(serde_json::Value::as_bool))
+        .unwrap_or(false)
+}
+
 /// The colours of `list` (a JSON list of `#RRGGBB`), unreadable ones dropped.
 fn colours(list: Option<&serde_json::Value>) -> Vec<TraceRgb> {
     list.and_then(serde_json::Value::as_array)
@@ -304,6 +314,15 @@ mod tests {
 
     /// `specs/0089` criterion 14: the method and its fields cross; a missing tolerance is the
     /// method's default; unreadable colours are dropped.
+    /// `specs/0088` Part B: Recognise shapes crosses as `"shapes": true`, off otherwise.
+    #[test]
+    fn recognise_shapes_crosses_as_json() {
+        assert!(recognise_shapes(r#"{"threshold":128,"shapes":true}"#));
+        assert!(!recognise_shapes(r#"{"threshold":128,"shapes":false}"#));
+        assert!(!recognise_shapes(r#"{"threshold":128}"#));
+        assert!(!recognise_shapes("not json"));
+    }
+
     #[test]
     fn the_method_crosses_as_json() {
         let p = trace_settings(r##"{"method":1,"background":"#3366cc","colour_tolerance":30}"##);

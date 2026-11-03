@@ -9,8 +9,8 @@ use curvyo_document_core::{AssetHash, DrawingNode, ImageSnapshot, NodeId, Object
 use curvyo_image_core::WorkingImage;
 use curvyo_render_core::PreviewAnchor;
 use curvyo_ui_core::{
-    TraceLayerWire, TracePaletteWire, TraceStatus, TraceTarget, TraceWire, hit_test_objects,
-    plan_trace, read_trace_wire,
+    TraceLayerWire, TracePaletteWire, TraceShapeRegion, TraceStatus, TraceTarget, TraceWire,
+    hit_test_objects, plan_trace, read_trace_wire,
 };
 
 use super::select::DoubleClickHint;
@@ -42,6 +42,8 @@ pub(super) struct TracePreview {
     pub(super) joined: usize,
     /// Text lines set and found (`specs/0091` UX notes §4).
     pub(super) text_counts: (usize, usize),
+    /// Shapes set (`specs/0088` Part B, UX notes B3): the primitives of the recognised regions.
+    pub(super) shape_count: usize,
     /// The tessellated hollow outline, kept across frames (criterion 56).
     pub(super) outline_mesh: MeshCache,
     /// The tessellated filled result of the Trace view, kept across frames (criterion 56).
@@ -260,6 +262,7 @@ impl Session {
             fill_layers,
             joined: read.joined,
             text_counts: (read.texts.lines.len(), read.texts.found),
+            shape_count: read.shapes.iter().map(TraceShapeRegion::primitives).sum(),
             outline_mesh: MeshCache::default(),
             fill_mesh: MeshCache::default(),
         });
@@ -292,6 +295,12 @@ impl Session {
             .preview
             .as_ref()
             .map_or((0, 0), |p| p.text_counts)
+    }
+
+    /// The shapes the shown preview sets (`specs/0088` Part B, UX notes B3).
+    #[must_use]
+    pub fn trace_shape_count(&self) -> usize {
+        self.trace.preview.as_ref().map_or(0, |p| p.shape_count)
     }
 
     /// Forgets the full-size results (a value changed).
@@ -336,7 +345,7 @@ impl Session {
                     .and_then(|node| node.registers.name.clone());
                 // `specs/0091` decision 6: the lines' outlines no text replaces join the paths
                 // (in Multicolour the layer of their fill).
-                let (outlines, colours) = with_leftovers(
+                let (outlines, colours, places) = with_leftovers(
                     &wire.outlines,
                     &wire.layers,
                     &leftovers_of(&fitted, image.id, wire),
@@ -347,6 +356,7 @@ impl Session {
                     name,
                     outlines,
                     colours,
+                    shapes: shapes_at(&wire.shapes, &places),
                 });
             }
             let plan = plan_trace(&targets, &mut this.minter);
@@ -457,6 +467,17 @@ impl Session {
             .find(|(id, _, _)| *id == group)
             .map(|&(_, paths, nodes)| (paths, nodes))
     }
+}
+
+/// The recognised shapes of a result (`specs/0088` Part B) at their outlines' new `places`.
+fn shapes_at(shapes: &[TraceShapeRegion], places: &[usize]) -> Vec<TraceShapeRegion> {
+    shapes
+        .iter()
+        .map(|region| TraceShapeRegion {
+            outlines: region.outlines.iter().map(|&i| places[i]).collect(),
+            shapes: region.shapes.clone(),
+        })
+        .collect()
 }
 
 /// The outlines and anchors of a planned trace group's compound path.
