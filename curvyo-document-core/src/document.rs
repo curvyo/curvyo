@@ -448,7 +448,7 @@ pub struct Document {
     pub(crate) assets: std::cell::RefCell<crate::assets::AssetStore>,
     /// Where the document syncs and its keyring, when it is shared (ADR 0031 decision 9); kept in
     /// the container, not in the Loro log.
-    pub(crate) share: std::cell::RefCell<Option<crate::container_share::ShareRecord>>,
+    pub(crate) share: std::cell::RefCell<Option<crate::container_share::Sharing>>,
 }
 
 impl Document {
@@ -553,7 +553,11 @@ impl Document {
         #[allow(clippy::unwrap_used)]
         loro.set_peer_id(peer_id).unwrap();
         crate::text_chars::configure(&loro);
-        loro.import(bytes).map_err(|_| OpenError::Damaged)?;
+        let status = loro.import(bytes).map_err(|_| OpenError::Damaged)?;
+        // Changes that continue a history this replica lacks leave no document to open.
+        if status.pending.is_some() {
+            return Err(OpenError::Damaged);
+        }
         if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
             || !crate::document_background::validate(&loro)
             || !crate::snapping::validate(&loro)

@@ -72,6 +72,54 @@ impl ClientSession {
         Ok(())
     }
 
+    /// Seals the plaintexts of a workspace snapshot's parts (`split_snapshot`) as signed
+    /// snapshot envelopes covering every record up to `covers_seq`, and uploads them as
+    /// `SnapshotPart` frames now or on the next connection (ADR 0037 decision 7).
+    ///
+    /// # Errors
+    /// `NoKey` without the current key; `TooLarge` for a part over the message limit; `Ended`.
+    pub fn upload_snapshot_parts(
+        &mut self,
+        parts: &[Vec<u8>],
+        covers_seq: u64,
+    ) -> Result<(), SessionError> {
+        if self.state == State::Ended {
+            return Err(SessionError::Ended);
+        }
+        if parts.iter().any(|part| part.len() + 1024 > MAX_MESSAGE_LEN) {
+            return Err(SessionError::TooLarge);
+        }
+        let mut envelopes = Vec::with_capacity(parts.len());
+        for part in parts {
+            let envelope = self
+                .keys
+                .seal(EnvelopeKind::Snapshot, part)?
+                .ok_or(SessionError::NoKey)?;
+            envelopes.push(envelope);
+        }
+        self.since_snapshot = (0, 0);
+        self.snapshot_asked = false;
+        self.workspace_snapshot = Some(parts.iter().map(|p| p.len() as u64).sum());
+        if self.is_online() {
+            self.send_parts(covers_seq, envelopes);
+        } else {
+            self.pending_parts = Some((covers_seq, envelopes));
+        }
+        Ok(())
+    }
+
+    pub(super) fn send_parts(&mut self, covers_seq: u64, envelopes: Vec<Vec<u8>>) {
+        let count = envelopes.len();
+        for (index, envelope) in (0_u32..).zip(envelopes) {
+            self.send(&ClientFrame::SnapshotPart {
+                covers_seq,
+                index,
+                last: index as usize + 1 == count,
+                envelope,
+            });
+        }
+    }
+
     /// This device's presence (the `ui-core` payload); sent at most every 50 ms while it
     /// changes and every 2 s otherwise.
     pub fn set_presence(&mut self, payload: Vec<u8>, now: Millis) {

@@ -199,6 +199,10 @@ mod units;
 mod value_scale;
 mod viewport;
 mod weld_plan;
+pub mod workspace_rows;
+pub mod workspace_share_text;
+pub mod workspace_text;
+pub mod workspace_tree_text;
 
 pub use align_commit::{
     AlignInput, AlignOutcome, AlignReference, BoxedUnits, align_page, align_reference,
@@ -567,7 +571,7 @@ pub use transform_math::{
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
 pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
-pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, Viewport, Zoom};
+pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, SavedView, Viewport, Zoom};
 pub use weld_plan::{
     WELD_COMMIT_LABEL, WeldAvailability, WeldPlan, WeldRefusal, plan_weld, weld_availability,
 };

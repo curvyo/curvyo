@@ -423,3 +423,35 @@ fn show_area_moves_a_box_out_from_under_the_bars() {
     let (_, y) = viewport.view().document_to_screen(Point::new(50.0, top_mm));
     assert!(y >= 120.0 - 1e-6, "{y}");
 }
+
+/// `specs/0095-workspace` criterion 10: a saved view comes back in a fresh viewport, the document
+/// point at the centre and the zoom kept; a canvas of another size keeps that centre.
+#[test]
+fn a_saved_view_is_restored_around_its_centre() {
+    let mut viewport = Viewport::with_document_inset();
+    viewport.resize(1000.0, 800.0);
+    viewport.zoom_about(300.0, 200.0, 2.5);
+    viewport.pan_by_screen_delta(40.0, -70.0);
+    let saved = viewport.saved_view();
+
+    let mut fresh = Viewport::with_document_inset();
+    fresh.resize(1000.0, 800.0);
+    fresh.restore_view(saved);
+    assert_eq!(fresh.zoom_percent(), viewport.zoom_percent());
+    let (a, b) = (fresh.view(), viewport.view());
+    let here = a.document_to_screen(Point::new(10.0, 20.0));
+    let there = b.document_to_screen(Point::new(10.0, 20.0));
+    assert!((here.0 - there.0).abs() < 1e-6 && (here.1 - there.1).abs() < 1e-6);
+
+    let mut wider = Viewport::with_document_inset();
+    wider.resize(1200.0, 800.0);
+    wider.restore_view(saved);
+    let centre = wider.screen_to_document(600.0, 400.0);
+    assert!((centre.x - saved.centre.x).abs() < 1e-6 && (centre.y - saved.centre.y).abs() < 1e-6);
+    wider.resize(1300.0, 800.0);
+    let centre = wider.screen_to_document(650.0, 400.0);
+    assert!(
+        (centre.x - saved.centre.x).abs() < 1e-6,
+        "no longer the inset view"
+    );
+}

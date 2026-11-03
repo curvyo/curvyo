@@ -51,6 +51,19 @@ impl Document {
     }
 }
 
+impl Document {
+    /// A document built from the updates of a stream that starts at its creation (a document
+    /// another member created in a shared workspace, `specs/0095-workspace` criterion 35), with
+    /// the checks of opening a file.
+    ///
+    /// # Errors
+    /// [`SyncError::Malformed`] for bytes that are no updates or a state that does not open.
+    pub fn from_updates(peer_id: u64, bytes: &[u8]) -> Result<Self, SyncError> {
+        let (_, updates) = unframe(bytes).ok_or(SyncError::Malformed)?;
+        Self::from_loro_snapshot(peer_id, updates).map_err(|_| SyncError::Malformed)
+    }
+}
+
 /// The updates behind the history epoch of the sender: `[epoch length: u32][epoch][updates]`. The
 /// epoch is compared before anything is merged.
 fn frame(epoch: Option<&str>, updates: &[u8]) -> Vec<u8> {

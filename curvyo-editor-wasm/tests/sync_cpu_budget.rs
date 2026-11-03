@@ -93,6 +93,8 @@ fn one_presence_message_encoded_and_sealed_within_0_1_ms() {
         selection: Vec::new(),
         tool: "select".to_owned(),
         drag: Some([3.0, -1.5]),
+        document: String::new(),
+        list_peer: String::new(),
     };
     let mut x = 0.0;
     let took = worst_of(|| {

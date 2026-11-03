@@ -17,6 +17,7 @@ import { useCallback, useEffect, useId, useRef } from "react";
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { ExportSvgSection } from "@/components/panel/ExportSvgSection";
 import { FileTab } from "@/components/panel/FileTab";
+import { WorkspaceSection } from "@/components/panel/WorkspaceSection";
 import { HistoryTab } from "@/components/panel/HistoryTab";
 import { LayersTab } from "@/components/panel/LayersTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
@@ -32,6 +33,8 @@ import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 import type { ProjectApi } from "@/hooks/useProject";
+import type { WorkspaceApi } from "@/hooks/useWorkspace";
+import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
@@ -53,6 +56,10 @@ interface PropertiesPanelProps {
   panelOpen: PanelOpenApi;
   /** The open project: the File tab shows it and the strip carries its dirty dot. */
   project: ProjectApi;
+  /** The open workspace (`specs/0095-workspace`): the File tab's Workspace section, desktop only. */
+  workspace: WorkspaceApi;
+  /** The workspace's sharing in the Share tab (`specs/0095-workspace` criteria 25 to 28). */
+  workspaceSync: WorkspaceSyncApi;
   /** The Trace tool's About Trace tab, last in the strip while the tool is active. */
   traceInfo: TraceInfoApi;
   /** Cooperative editing: the Share tab (`specs/0092-cooperative-editing`). */
@@ -81,6 +88,8 @@ export function PropertiesPanel({
   document: doc,
   panelOpen,
   project,
+  workspace,
+  workspaceSync,
   traceInfo,
   collab,
 }: PropertiesPanelProps) {
@@ -413,12 +422,31 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
                 exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
                 extensions={<ExtensionsGroup workbenches={workbenches} />}
+                workspace={
+                  isTauri ? (
+                    <WorkspaceSection
+                      workspace={workspace}
+                      sharedLine={collab.view.workspace?.headerLine}
+                      onReturnFocus={returnFocus}
+                    />
+                  ) : undefined
+                }
               />
             ) : doc.view.content === "share" ? (
               <ShareTab
                 collab={collab}
                 saved={project.info.path !== null}
                 onReturnFocus={returnFocus}
+                workspace={
+                  isTauri
+                    ? {
+                        open: workspace.open,
+                        name: workspace.name,
+                        documents: workspace.view.documents,
+                        sync: workspaceSync,
+                      }
+                    : undefined
+                }
               />
             ) : doc.view.content === "parameters" ? (
               <SketchParameters key={sketch.view.active ?? sketch.view.page} sketch={sketch} />

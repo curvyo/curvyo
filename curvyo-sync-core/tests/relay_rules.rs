@@ -584,10 +584,258 @@ fn a_restored_relay_continues_the_sequence() {
         room: ROOM,
         keyring: Vec::new(),
         snapshot: None,
+        snapshot_rest: Vec::new(),
         records: Vec::new(),
     };
     assert_eq!(
         Relay::restore(vec![empty]).err(),
         Some(RestoreError::DamagedKeyring)
     );
+}
+
+// ------------------------------------------------- snapshot parts (ADR 0037 decision 7, protocol 2)
+
+fn part(covers_seq: u64, index: u32, last: bool, n: u8) -> ClientFrame {
+    ClientFrame::SnapshotPart {
+        covers_seq,
+        index,
+        last,
+        envelope: envelope(EnvelopeKind::Snapshot, ROOM, Some(&device(1)), n),
+    }
+}
+
+fn snapshot_records(out: &[RelayOutput], to: ConnectionId) -> Vec<(u64, RecordKind, Vec<u8>)> {
+    sends(out, to)
+        .into_iter()
+        .filter_map(|f| match f {
+            RelayFrame::Record {
+                seq,
+                kind,
+                envelope,
+            } => Some((seq, kind, envelope)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn pushed(relay: &mut Relay, conn: ConnectionId, count: u8) {
+    for n in 1..=count {
+        send(
+            relay,
+            conn,
+            &ClientFrame::Push {
+                client_id: u64::from(n),
+                kind: RecordKind::Update,
+                envelope: envelope(EnvelopeKind::Update, ROOM, None, n),
+            },
+        );
+    }
+}
+
+/// Parts are staged until the last; then they replace the snapshot, the covered records are
+/// pruned, and a newcomer receives the parts as consecutive snapshot records.
+#[test]
+fn snapshot_parts_are_staged_and_swapped_in_on_the_last() {
+    let (mut relay, conn, _) = room_with_admin();
+    pushed(&mut relay, conn, 4);
+    let out = send(&mut relay, conn, &part(3, 0, false, 20));
+    assert!(out.iter().any(|o| matches!(
+        o,
+        RelayOutput::Store(StoreOp::SnapshotPart {
+            covers_seq: 3,
+            index: 0,
+            ..
+        })
+    )));
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 0);
+    assert_eq!(relay.room(&ROOM).unwrap().records().len(), 4);
+    let out = send(&mut relay, conn, &part(3, 1, true, 21));
+    assert!(out.iter().any(|o| matches!(
+        o,
+        RelayOutput::Store(StoreOp::SnapshotParts {
+            covers_seq: 3,
+            count: 2,
+            ..
+        })
+    )));
+    let room = relay.room(&ROOM).unwrap();
+    assert_eq!(room.snapshot_seq(), 3);
+    assert_eq!(
+        room.records().iter().map(|r| r.seq).collect::<Vec<_>>(),
+        vec![4]
+    );
+    let (fresh, out) = handshake(&mut relay, &device(1), ROOM, 0);
+    let records = snapshot_records(&out, fresh);
+    let ClientFrame::SnapshotPart {
+        envelope: first, ..
+    } = part(3, 0, false, 20)
+    else {
+        unreachable!()
+    };
+    let ClientFrame::SnapshotPart {
+        envelope: second, ..
+    } = part(3, 1, true, 21)
+    else {
+        unreachable!()
+    };
+    assert_eq!(
+        records,
+        vec![
+            (3, RecordKind::Snapshot, first),
+            (3, RecordKind::Snapshot, second),
+            (
+                4,
+                RecordKind::Update,
+                envelope(EnvelopeKind::Update, ROOM, None, 4)
+            ),
+        ]
+    );
+}
+
+/// A part out of order, unsigned, of another kind or beyond the head is refused.
+#[test]
+fn snapshot_parts_out_of_order_or_unsigned_are_refused() {
+    let (mut relay, conn, _) = room_with_admin();
+    pushed(&mut relay, conn, 2);
+    let out = send(&mut relay, conn, &part(2, 1, true, 20));
+    assert_eq!(refused(&out, conn), Some(RefusalReason::Protocol));
+    let (conn, _) = handshake(&mut relay, &device(1), ROOM, 2);
+    let out = send(&mut relay, conn, &part(9, 0, true, 20));
+    assert_eq!(refused(&out, conn), Some(RefusalReason::Protocol));
+    let (conn, _) = handshake(&mut relay, &device(1), ROOM, 2);
+    let unsigned = ClientFrame::SnapshotPart {
+        covers_seq: 2,
+        index: 0,
+        last: true,
+        // A snapshot envelope cannot be sealed unsigned; an update in its place is refused alike.
+        envelope: envelope(EnvelopeKind::Update, ROOM, None, 20),
+    };
+    assert_eq!(
+        refused(&send(&mut relay, conn, &unsigned), conn),
+        Some(RefusalReason::Protocol)
+    );
+    let (conn, _) = handshake(&mut relay, &device(1), ROOM, 2);
+    send(&mut relay, conn, &part(2, 0, false, 20));
+    let out = send(&mut relay, conn, &part(1, 1, true, 21));
+    assert_eq!(refused(&out, conn), Some(RefusalReason::Protocol));
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 0);
+}
+
+/// A new part 0 starts the staging over; a complete snapshot older than the stored one is
+/// dropped and the stored one stays (only the highest complete `covers_seq` is kept).
+#[test]
+fn only_the_newest_complete_snapshot_is_kept() {
+    let (mut relay, conn, _) = room_with_admin();
+    pushed(&mut relay, conn, 4);
+    send(&mut relay, conn, &part(2, 0, false, 20));
+    send(&mut relay, conn, &part(4, 0, false, 30));
+    send(&mut relay, conn, &part(4, 1, true, 31));
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 4);
+    send(&mut relay, conn, &part(3, 0, false, 40));
+    let out = send(&mut relay, conn, &part(3, 1, true, 41));
+    assert!(
+        out.iter()
+            .any(|o| matches!(o, RelayOutput::Store(StoreOp::DropStagedParts { .. })))
+    );
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 4);
+    let (fresh, out) = handshake(&mut relay, &device(1), ROOM, 0);
+    assert_eq!(snapshot_records(&out, fresh).len(), 2);
+}
+
+/// Two members upload multi-part snapshots at once: the parts of the one that started second are
+/// dropped without a refusal, neither connection is closed, and exactly one complete snapshot
+/// is kept. Once the first upload is done, the other member can upload again.
+#[test]
+fn concurrent_part_uploads_keep_one_snapshot_and_refuse_nobody() {
+    let (mut relay, first, _) = room_with_admin();
+    pushed(&mut relay, first, 4);
+    let (second, _) = handshake(&mut relay, &device(1), ROOM, 4);
+    let outs = vec![
+        send(&mut relay, first, &part(3, 0, false, 20)),
+        send(&mut relay, second, &part(4, 0, false, 30)),
+        send(&mut relay, first, &part(3, 1, false, 21)),
+        send(&mut relay, second, &part(4, 1, false, 31)),
+        send(&mut relay, first, &part(3, 2, true, 22)),
+        send(&mut relay, second, &part(4, 2, true, 32)),
+    ];
+    for out in &outs {
+        assert_eq!(refused(out, first), None);
+        assert_eq!(refused(out, second), None);
+        assert!(!out.iter().any(|o| matches!(o, RelayOutput::Close { .. })));
+    }
+    let swaps = outs
+        .iter()
+        .flatten()
+        .filter(|o| matches!(o, RelayOutput::Store(StoreOp::SnapshotParts { .. })))
+        .count();
+    assert_eq!(swaps, 1);
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 3);
+    let (fresh, out) = handshake(&mut relay, &device(1), ROOM, 0);
+    let parts = snapshot_records(&out, fresh)
+        .into_iter()
+        .filter(|(_, kind, _)| *kind == RecordKind::Snapshot)
+        .count();
+    assert_eq!(parts, 3, "the first upload's parts");
+    // The second member's next upload is staged normally.
+    send(&mut relay, second, &part(4, 0, false, 40));
+    let out = send(&mut relay, second, &part(4, 1, true, 41));
+    assert_eq!(refused(&out, second), None);
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 4);
+}
+
+/// An unfinished upload is dropped when its connection leaves, so another member can stage.
+#[test]
+fn an_upload_ends_with_its_connection() {
+    let (mut relay, first, _) = room_with_admin();
+    pushed(&mut relay, first, 2);
+    let (second, _) = handshake(&mut relay, &device(1), ROOM, 2);
+    send(&mut relay, first, &part(2, 0, false, 20));
+    let out = relay.disconnect(first);
+    assert!(
+        out.iter()
+            .any(|o| matches!(o, RelayOutput::Store(StoreOp::DropStagedParts { .. })))
+    );
+    send(&mut relay, second, &part(2, 0, false, 30));
+    let out = send(&mut relay, second, &part(2, 1, true, 31));
+    assert_eq!(refused(&out, second), None);
+    assert_eq!(relay.room(&ROOM).unwrap().snapshot_seq(), 2);
+}
+
+/// A restored relay serves a stored multi-part snapshot; a client of protocol 1 is still
+/// admitted (protocol 2 only adds `SnapshotPart`).
+#[test]
+fn a_restored_relay_serves_its_parts_and_protocol_1_still_connects() {
+    let (mut relay, conn, _) = room_with_admin();
+    pushed(&mut relay, conn, 2);
+    send(&mut relay, conn, &part(2, 0, false, 20));
+    send(&mut relay, conn, &part(2, 1, true, 21));
+    let stored = relay.room(&ROOM).unwrap().stored();
+    assert_eq!(stored.snapshot.as_ref().map(|(seq, _)| *seq), Some(2));
+    assert_eq!(stored.snapshot_rest.len(), 1);
+    let mut restored = Relay::restore(vec![stored]).unwrap();
+    let conn = restored.connect();
+    let out = send(
+        &mut restored,
+        conn,
+        &ClientFrame::Hello {
+            protocol: 1,
+            room: ROOM,
+            since_seq: 0,
+            identity: device(1).identity().member,
+        },
+    );
+    let Some(RelayFrame::Challenge { nonce }) = sends(&out, conn).first().cloned() else {
+        panic!("a challenge for protocol 1");
+    };
+    let mut message = b"curvyo-relay-v1".to_vec();
+    message.extend_from_slice(&ROOM.0);
+    message.extend_from_slice(&nonce);
+    let out = send(
+        &mut restored,
+        conn,
+        &ClientFrame::Proof {
+            signature: device(1).sign(&message),
+        },
+    );
+    assert_eq!(snapshot_records(&out, conn).len(), 2);
 }

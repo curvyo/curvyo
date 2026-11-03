@@ -39,10 +39,14 @@ mod preview_slot;
 mod project;
 #[cfg(target_os = "linux")]
 mod raster;
+mod raw_ipc;
 mod state;
 mod svg_export;
 #[cfg(target_os = "linux")]
 mod svg_preview;
+mod workspace;
+mod workspace_share;
+mod workspace_shared;
 
 use std::path::PathBuf;
 
@@ -101,6 +105,70 @@ fn relaunch_for_linux_webkit_env() -> ! {
     panic!("failed to relaunch with WEBKIT_DISABLE_DMABUF_RENDERER set: {error}");
 }
 
+/// Every command the page may invoke (ADR 0001 §6).
+fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
+        project::take_pending_open,
+        project::pick_project,
+        project::pick_import_files,
+        project::confirm_project_opened,
+        project::reset_project,
+        project::set_dirty,
+        project::set_shared,
+        project::save_project_bytes,
+        project::quit_app,
+        svg_export::pick_svg_export_path,
+        svg_export::write_svg_export,
+        formats::read_formats_file,
+        formats::write_formats_file,
+        formats::set_formats_file_aside,
+        formats::import_formats_file,
+        formats::export_formats_file,
+        extensions_file::read_extensions_file,
+        extensions_file::write_extensions_file,
+        fonts::font_folder_list,
+        fonts::system_font_list,
+        fonts::font_bytes,
+        fonts::pick_font_files,
+        fonts::add_font_files,
+        dropped_fonts::add_dropped_fonts,
+        local_files::read_local_files,
+        fonts::remove_font_files,
+        font_documents::read_font_document,
+        font_documents::open_font_document,
+        font_library::read_font_library,
+        font_library::write_font_library,
+        font_library::set_font_library_aside,
+        font_library::read_font_checks,
+        font_library::write_font_checks,
+        device_keys::read_device_keys,
+        device_keys::write_document_keys,
+        workspace::pick_workspace,
+        workspace::open_recent_workspace,
+        workspace::recent_workspaces,
+        workspace::remove_recent_workspace,
+        workspace::close_workspace,
+        workspace::scan_open_workspace,
+        workspace::apply_workspace_op,
+        workspace::read_workspace_document,
+        workspace::confirm_workspace_document_opened,
+        workspace::probe_workspace_document,
+        workspace_share::workspace_marker_share,
+        workspace_share::write_workspace_marker_share,
+        workspace_share::write_workspace_id,
+        workspace_share::replace_workspace_document,
+        workspace_share::write_workspace_index,
+        workspace_share::pick_join_folder,
+        workspace_share::start_joined_workspace,
+        workspace_shared::scan_shared_workspace,
+        workspace_shared::keep_workspace_document,
+        workspace_shared::restore_workspace_document,
+        workspace_shared::read_deleted_document,
+        workspace_shared::write_deleted_document,
+        workspace_shared::clear_workspace_marker_share,
+    ]
+}
+
 // invariant: `.build()` only returns an `Err` for a host-level setup
 // failure (e.g. the webview engine missing) that leaves the process with
 // nothing useful to do; there is no caller to propagate a `Result` to
@@ -115,46 +183,11 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(workspace_shared::ShareCache::default())
         .manage(device_keys::OpenStore::default())
         .manage(fonts::FontFiles::default())
         .manage(fonts::GrantedFontPaths::default())
-        .invoke_handler(tauri::generate_handler![
-            project::take_pending_open,
-            project::pick_project,
-            project::pick_import_files,
-            project::confirm_project_opened,
-            project::reset_project,
-            project::set_dirty,
-            project::set_shared,
-            project::save_project_bytes,
-            project::quit_app,
-            svg_export::pick_svg_export_path,
-            svg_export::write_svg_export,
-            formats::read_formats_file,
-            formats::write_formats_file,
-            formats::set_formats_file_aside,
-            formats::import_formats_file,
-            formats::export_formats_file,
-            extensions_file::read_extensions_file,
-            extensions_file::write_extensions_file,
-            fonts::font_folder_list,
-            fonts::system_font_list,
-            fonts::font_bytes,
-            fonts::pick_font_files,
-            fonts::add_font_files,
-            dropped_fonts::add_dropped_fonts,
-            local_files::read_local_files,
-            fonts::remove_font_files,
-            font_documents::read_font_document,
-            font_documents::open_font_document,
-            font_library::read_font_library,
-            font_library::write_font_library,
-            font_library::set_font_library_aside,
-            font_library::read_font_checks,
-            font_library::write_font_checks,
-            device_keys::read_device_keys,
-            device_keys::write_document_keys,
-        ])
+        .invoke_handler(commands())
         // The window's close button and Alt+F4: a project with unsaved changes holds the close and
         // the page asks; a clean one closes at once, with no round trip to the page.
         .on_window_event(|window, event| {

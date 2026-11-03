@@ -115,6 +115,8 @@ impl Client {
 pub struct Net {
     pub relay: Relay,
     pub store: BTreeMap<RoomId, StoredRoom>,
+    /// The snapshot parts the relay staged per room (`snapshot.part/`).
+    staged: BTreeMap<RoomId, Vec<Vec<u8>>>,
     pub now: Millis,
     pub clients: Vec<Client>,
     conns: BTreeMap<ConnectionId, usize>,
@@ -128,6 +130,7 @@ impl Net {
         Self {
             relay: Relay::new(),
             store: BTreeMap::new(),
+            staged: BTreeMap::new(),
             now: Millis(START_MS),
             clients: Vec::new(),
             conns: BTreeMap::new(),
@@ -451,6 +454,7 @@ impl Net {
             room,
             keyring: Vec::new(),
             snapshot: None,
+            snapshot_rest: Vec::new(),
             records: Vec::new(),
         };
         match op {
@@ -474,6 +478,31 @@ impl Net {
                 let stored = self.store.entry(room).or_insert_with(|| room_of(room));
                 stored.records.retain(|r| r.seq > covers_seq);
                 stored.snapshot = Some((covers_seq, envelope));
+                stored.snapshot_rest.clear();
+            }
+            StoreOp::SnapshotPart {
+                room,
+                index,
+                envelope,
+                ..
+            } => {
+                let staged = self.staged.entry(room).or_default();
+                if index == 0 {
+                    staged.clear();
+                }
+                staged.push(envelope);
+            }
+            StoreOp::SnapshotParts {
+                room, covers_seq, ..
+            } => {
+                let mut parts = self.staged.remove(&room).unwrap_or_default().into_iter();
+                let stored = self.store.entry(room).or_insert_with(|| room_of(room));
+                stored.records.retain(|r| r.seq > covers_seq);
+                stored.snapshot = parts.next().map(|first| (covers_seq, first));
+                stored.snapshot_rest = parts.collect();
+            }
+            StoreOp::DropStagedParts { room } => {
+                self.staged.remove(&room);
             }
         }
     }

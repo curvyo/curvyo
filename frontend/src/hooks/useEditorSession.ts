@@ -14,6 +14,7 @@ import { type RecogniseApi, useRecognise } from "@/hooks/useRecognise";
 import { type TilingApi, useTiling } from "@/hooks/useTiling";
 import { type TraceApi, useTrace } from "@/hooks/useTrace";
 import { ViewRest } from "@/lib/viewRest";
+import { renderPageThumbnail } from "@/lib/pageThumbnail";
 import { isStrokeToPathChord } from "@/lib/strokeToPathText";
 import { type GroupingApi, useGrouping } from "@/hooks/useGrouping";
 import { type OffsetApi, readOffsetView, useOffset } from "@/hooks/useOffset";
@@ -35,6 +36,7 @@ import { type AlignApi, type AlignBarState, useAlign } from "@/hooks/useAlign";
 import { NO_ALIGN_BAR, readAlignBar, sameAlignBar } from "@/lib/alignBar";
 import { TOO_FAR_HINT } from "@/lib/nudgeText";
 import { createSession, openFileSession, openSession } from "@/lib/editorSession";
+import { moveWorkspaceLink } from "@/lib/workspaceLink";
 import type { WasmSession } from "@/lib/editorSession";
 import { freeCanvasArea, type GuideState, readGuideState } from "@/lib/guideText";
 import type { EditHint } from "@/components/EditHintChip";
@@ -908,6 +910,9 @@ export interface EditorSession {
    * `JsValue` `curvyo-editor-wasm`'s `pack` throws if the document could
    * not be serialized — the caller shows it, this hook does not. */
   packProject: () => Uint8Array;
+  /** The PNG of the active page for the container's `thumbnail.png` (`specs/0095-workspace`
+   * criterion 6), or `null` when it cannot be drawn. */
+  renderThumbnail: () => Promise<Uint8Array | null>;
   /** The bytes of the last `packProject` are written: the project is clean unless it changed
    * since (`specs/0051-sidebar-and-no-menu/` criterion 22). */
   markSaved: () => void;
@@ -1339,6 +1344,8 @@ export function useEditorSession(
   const attachSession = useCallback(
     (session: WasmSession) =>
       enqueueSessionTask(async () => {
+        // A shared workspace's link goes on with the next document (`specs/0095-workspace`).
+        moveWorkspaceLink(sessionRef.current, session);
         sessionRef.current?.free();
         sessionRef.current = null;
         // A new or opened project keeps the pane over the canvas (`coverCanvasRight`).
@@ -1582,6 +1589,8 @@ export function useEditorSession(
     session.checkpoint_text_edit();
     return session.pack();
   }, []);
+
+  const renderThumbnail = useCallback(() => renderPageThumbnail(() => sessionRef.current), []);
 
   const toggleGuide = useCallback(() => {
     sessionRef.current?.toggle_guide();
@@ -2985,6 +2994,7 @@ export function useEditorSession(
     importAddTooLarge,
     importFinish,
     packProject,
+    renderThumbnail,
     markSaved,
   };
 }

@@ -70,6 +70,8 @@ pub enum SyncEnd {
     Removed,
     /// The relay refused the session.
     Refused,
+    /// The document was taken into a shared workspace (`specs/0095-workspace` criterion 49).
+    Moved,
 }
 
 /// One other participant's connection, as the relay reported it and its presence says.
@@ -130,6 +132,14 @@ pub(super) struct SyncLink {
     pub(super) changed: bool,
     /// Bumped whenever anything the Share tab or the pill shows changes.
     pub(super) revision: u32,
+    /// The workspace part of a shared workspace's link (`specs/0095-workspace`), `None` for a
+    /// document shared on its own.
+    pub(super) workspace: Option<Box<super::workspace_channel::WorkspaceChannel>>,
+    /// The highest sequence applied to the open document when a save packed it.
+    pub(super) packed_through: Option<u64>,
+    /// The push of a take-in's `Moved` record, and whether the relay stored it.
+    pub(super) moved_push: Option<u64>,
+    pub(super) moved_stored: bool,
 }
 
 impl SyncLink {
@@ -164,6 +174,10 @@ impl SyncLink {
             notices: VecDeque::new(),
             changed: false,
             revision: 1,
+            workspace: None,
+            packed_through: None,
+            moved_push: None,
+            moved_stored: false,
         }
     }
 
@@ -218,7 +232,11 @@ impl Session {
 
     /// The transport opened its socket.
     pub fn sync_connected(&mut self, now: Millis) {
-        if let Some(link) = self.sync.as_mut() {
+        if let Some(link) = self
+            .sync
+            .as_mut()
+            .filter(|l| l.ended != Some(SyncEnd::Moved))
+        {
             link.now = now;
             link.client.connected(now);
         }
@@ -227,7 +245,11 @@ impl Session {
 
     /// The transport's socket closed or could not open.
     pub fn sync_disconnected(&mut self, now: Millis) {
-        if let Some(link) = self.sync.as_mut() {
+        if let Some(link) = self
+            .sync
+            .as_mut()
+            .filter(|l| l.ended != Some(SyncEnd::Moved))
+        {
             link.now = now;
             if !link.ever_online && !link.failed_first {
                 link.failed_first = true;
@@ -240,7 +262,11 @@ impl Session {
 
     /// One binary message arrived.
     pub fn sync_received(&mut self, bytes: &[u8], now: Millis) {
-        if let Some(link) = self.sync.as_mut() {
+        if let Some(link) = self
+            .sync
+            .as_mut()
+            .filter(|l| l.ended != Some(SyncEnd::Moved))
+        {
             link.now = now;
             link.last_heard = now;
             link.client.received(bytes, now);
@@ -269,6 +295,7 @@ impl Session {
             link.revision = link.revision.wrapping_add(1);
         }
         self.sync_export();
+        self.export_workspace_list();
         self.send_presence(now);
         if let Some(link) = self.sync.as_mut() {
             link.client.tick(now);
@@ -339,6 +366,11 @@ impl Session {
         let secret = link.client.invite(expires)?;
         let text = InviteLink {
             server: link.server.clone(),
+            kind: if link.workspace.is_some() {
+                curvyo_sync_core::InviteKind::Workspace
+            } else {
+                curvyo_sync_core::InviteKind::Document
+            },
             secret,
         }
         .to_text();
@@ -363,7 +395,7 @@ impl Session {
     /// without a live session or before the document arrived.
     pub(super) fn sync_share_record(&self) -> Option<ShareRecord> {
         let link = self.sync.as_ref()?;
-        if link.awaiting_document || link.ended.is_some() {
+        if link.awaiting_document || link.ended.is_some() || link.workspace.is_some() {
             return None;
         }
         Some(ShareRecord {

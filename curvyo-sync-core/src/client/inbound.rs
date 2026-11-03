@@ -258,6 +258,7 @@ impl ClientSession {
             self.delivered = self.delivered.max(seq);
             if kind == RecordKind::Snapshot {
                 self.since_snapshot = (0, 0);
+                self.note_snapshot_part(seq, envelope.len());
             } else {
                 self.count_record(envelope.len());
             }
@@ -301,6 +302,17 @@ impl ClientSession {
             return;
         }
         self.resynced_through = Some(seq.max(self.head_seq));
+        self.resync();
+    }
+
+    /// Reads the room again from its snapshot: the session reconnects with cursor 0, so the
+    /// snapshot and every record after it arrive again (ADR 0031 decision 3); importing them
+    /// twice changes nothing. A shared workspace downloads a document that is missing on this
+    /// computer this way (`specs/0095-workspace` criterion 41, Download again).
+    pub fn resync(&mut self) {
+        if self.state == State::Ended {
+            return;
+        }
         self.delivered = 0;
         self.pending.clear();
         self.event(SessionEvent::Resyncing);
@@ -323,13 +335,30 @@ impl ClientSession {
         self.since_snapshot.1 += u64::try_from(len).unwrap_or(u64::MAX);
     }
 
-    /// Asks for a snapshot after 500 records or 4 MiB since the last one (decision 10).
+    /// A workspace room's snapshot arrives as consecutive records of one sequence: their sizes
+    /// add up to the snapshot's.
+    fn note_snapshot_part(&mut self, seq: u64, len: usize) {
+        let len = u64::try_from(len).unwrap_or(u64::MAX);
+        let (at, bytes) = self.receiving_snapshot;
+        self.receiving_snapshot = if at == seq {
+            (seq, bytes.saturating_add(len))
+        } else {
+            (seq, len)
+        };
+        if let Some(last) = self.workspace_snapshot.as_mut() {
+            *last = self.receiving_snapshot.1;
+        }
+    }
+
+    /// Asks for a snapshot after 500 records or 4 MiB since the last one (decision 10); in a
+    /// workspace room by [`snapshot_due`](crate::snapshot_due) (ADR 0037 decision 7).
     fn check_snapshot(&mut self) {
         let (records, bytes) = self.since_snapshot;
-        if self.is_online()
-            && !self.snapshot_asked
-            && (records > SNAPSHOT_RECORDS || bytes > SNAPSHOT_BYTES)
-        {
+        let due = match self.workspace_snapshot {
+            Some(last) => crate::snapshot_due(bytes, records, last),
+            None => records > SNAPSHOT_RECORDS || bytes > SNAPSHOT_BYTES,
+        };
+        if self.is_online() && !self.snapshot_asked && due {
             self.snapshot_asked = true;
             let covers_seq = self.cursor();
             self.event(SessionEvent::SnapshotDue { covers_seq });
@@ -339,6 +368,9 @@ impl ClientSession {
     fn send_pending_snapshot(&mut self) {
         if !self.is_online() {
             return;
+        }
+        if let Some((covers_seq, envelopes)) = self.pending_parts.take() {
+            self.send_parts(covers_seq, envelopes);
         }
         if let Some((covers_seq, envelope)) = self.pending_snapshot.take() {
             self.out.push(ClientOutput::Send(

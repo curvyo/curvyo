@@ -53,11 +53,13 @@ type Action =
   | { kind: "close" }
   | { kind: "quit" }
   | { kind: "handover"; path: string; bytes: number[] }
-  | { kind: "join"; then: () => void };
+  | { kind: "join"; then: () => void }
+  /** A workspace action (`specs/0095-workspace`): `then` runs once the check let it. */
+  | { kind: "then"; ends: ReplacingKind; then: () => Promise<void> | void };
 
 /** Who asked: a button of the File tab, or something outside it (a chord, the window close, the
  * operating system handing over a file). */
-type Origin = { button: FileCommandName } | "outside";
+type Origin = { button: FileCommandName } | { refocus: () => void } | "outside";
 
 /** The inline check of unsaved changes while it shows (`specs/0051-sidebar-and-no-menu/`
  * criteria 25 to 28). */
@@ -84,6 +86,11 @@ export interface ProjectInfo {
   /** The SVG the project was opened from ("poster.svg"): the name Export SVG… offers
    * (`specs/0024-svg-import-export` criterion 4). */
   sourceSvg?: string | null;
+  /** Another program removed the open file (`specs/0095-workspace` criterion 7). */
+  missing?: boolean;
+  /** Another member deleted the open shared document while it has unsaved changes: the status
+   * line says so ("Deleted by Ben. Save as to keep it.", criterion 40). */
+  deletedStatus?: string;
 }
 
 export interface ProjectApi {
@@ -120,6 +127,25 @@ export interface ProjectApi {
   replaceForJoin: (then: () => void) => void;
   /** Save, as the File tab's button (a shared document's file keeps its room). */
   save: () => void;
+  /** A workspace action that replaces or ends the open project (`specs/0095-workspace` criteria
+   * 9, 17, 21): the unsaved-changes check when needed, then `then`. Cancel calls `refocus`. */
+  replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void) => void;
+  /** Opens the bytes of the workspace document at `path` (criterion 9); `title` is its place
+   * ("Box job/Sides/Lid.curvyo"). Whether it opened; a refusal raised the error dialog. */
+  openWorkspaceDocument: (
+    path: string[],
+    fileName: string,
+    title: string,
+    bytes: Uint8Array,
+  ) => Promise<boolean>;
+  /** Replaces the project by an empty, never-saved one, as Close does after the check. */
+  resetToEmpty: () => Promise<void>;
+  /** The open file moved inside the workspace or was removed by another program (criteria 7,
+   * 14, 16); the host's path follows the move by itself. */
+  setFileState: (fileName: string, title: string, missing: boolean) => void;
+  /** Another member deleted the open shared document (criterion 40): the status line's words,
+   * empty to clear them. */
+  setDeletedStatus: (text: string) => void;
   /** Export SVG… (`specs/0024-svg-import-export` criterion 4) with the File tab's switches; `mouse`
    * when a click pressed it (the focus then goes to the canvas). */
   exportSvg: (options: SvgExportOptions, mouse: boolean) => void;
@@ -314,6 +340,45 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         /* The window title falls behind, but the document itself opened fine. */
       });
       setInfo({ fileName: name, path });
+    },
+    [setInfo],
+  );
+
+  const openWorkspaceDocument = useCallback(
+    async (path: string[], fileName: string, title: string, bytes: Uint8Array) => {
+      if (!busy.enter()) {
+        return false;
+      }
+      const { editor, onOpenError } = depsRef.current;
+      const inFileTab = depsRef.current.panel.view.activeTab === "file";
+      try {
+        await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName), () =>
+          editor.openFile(bytes, fileName),
+        );
+        // A new session starts on its own tab; switching from the tree keeps the File tab.
+        if (inFileTab) {
+          depsRef.current.panel.pressTab("file");
+        }
+      } catch (error) {
+        onOpenError(String(error), OPEN_FILE_TITLE);
+        return false;
+      } finally {
+        busy.leave();
+      }
+      await invoke("confirm_workspace_document_opened", { path }).catch(() => undefined);
+      setInfo({ fileName, path: title });
+      return true;
+    },
+    [busy, setInfo],
+  );
+
+  const setFileState = useCallback(
+    (fileName: string, title: string, missing: boolean) => {
+      const current = infoRef.current;
+      if (current.fileName === fileName && current.path === title && (current.missing ?? false) === missing) {
+        return;
+      }
+      setInfo({ ...current, fileName, path: title, missing });
     },
     [setInfo],
   );
@@ -556,6 +621,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         case "quit":
           await quit();
           break;
+        case "then":
+          await action.then();
+          break;
       }
     },
     [openBytes, openFlow, quit, resetProject],
@@ -578,8 +646,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
           return "failed";
         }
         const suggestedName = infoRef.current.suggestedName ?? null;
+        const thumbnail = await editor.renderThumbnail();
         const outcome = await invoke<SaveOutcome>("save_project_bytes", {
           bytes: Array.from(bytes),
+          thumbnail: thumbnail ? Array.from(thumbnail) : null,
           saveAs,
           fileName: infoRef.current.fileName ?? suggestedName ?? DEFAULT_FILE_NAME,
           suggestedName,
@@ -630,7 +700,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         checkRef.current?.previous ??
         (inFileTab ? null : { tab: panel.view.activeTab, open: panelOpen.isOpen() });
       checkCounter.current += 1;
-      setCheck({ id: checkCounter.current, kind: action.kind, origin, previous, action });
+      const kind = action.kind === "then" ? action.ends : action.kind;
+      setCheck({ id: checkCounter.current, kind, origin, previous, action });
       if (!inFileTab) {
         // Not the maker's choice: the saved hidden or shown state stays as it was.
         panelOpen.setOpen(true, false);
@@ -685,6 +756,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     // The buttons come back with the focus on the one that was pressed, or on the canvas.
     window.setTimeout(() => {
       const origin = pending.origin;
+      if (origin !== "outside" && "refocus" in origin) {
+        origin.refocus();
+        return;
+      }
       const button =
         origin !== "outside" && depsRef.current.panelOpen.isOpen()
           ? document.querySelector<HTMLElement>(`[data-file-command="${origin.button}"]`)
@@ -850,5 +925,22 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     exportSvg: (options: SvgExportOptions, mouse: boolean) => void exportSvg(options, mouse),
     replaceForJoin: (then: () => void) => request({ kind: "join", then }, "outside"),
     save: () => void save(false),
+    replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void) =>
+      request({ kind: "then", ends, then }, refocus ? { refocus } : "outside"),
+    openWorkspaceDocument,
+    resetToEmpty: async () => {
+      const inFileTab = depsRef.current.panel.view.activeTab === "file";
+      await resetProject();
+      if (inFileTab) {
+        depsRef.current.panel.pressTab("file");
+      }
+    },
+    setFileState,
+    setDeletedStatus: (text: string) => {
+      const current = infoRef.current;
+      if ((current.deletedStatus ?? "") !== text) {
+        setInfo({ ...current, deletedStatus: text });
+      }
+    },
   };
 }
