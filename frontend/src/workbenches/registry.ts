@@ -9,13 +9,14 @@ export interface ManifestParam {
   key: string;
   label: string;
   tooltip: string;
-  kind: { kind: "length"; min: number; max: number } | { kind: "display" };
-  default: { kind: "length" | "text"; value: number | string };
+  kind: { kind: "length"; min: number; max: number };
+  default: { kind: "length"; value: number };
 }
 
 /** A block of a schema-rendered tab. */
 export type ManifestBlock =
   | { kind: "params"; label: string; params: ManifestParam[] }
+  | { kind: "machine_profile"; label: string }
   | { kind: "fixture_list"; label: string }
   | { kind: "notice"; id: string };
 
@@ -25,7 +26,6 @@ export interface ManifestWorkbenchContribution {
   id: string;
   label: string;
   icon: string;
-  machine_name: string;
   tabs: { id: string; label: string; icon: string; blocks: ManifestBlock[] }[];
   toolbox_cards: { label: string; commands: { id: string; label: string; icon: string }[] }[];
   fixture_kinds: { id: string; label: string; icon: string; params: ManifestParam[] }[];

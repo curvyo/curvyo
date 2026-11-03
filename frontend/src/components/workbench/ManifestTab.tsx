@@ -2,6 +2,7 @@ import { Eye, EyeOff, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
+import { MachineBlock } from "@/components/workbench/MachineBlock";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { fixtureRowKey, focusAfterRemove, tabStopRow } from "@/lib/fixtureRowKeys";
 import { WorkbenchIcon } from "@/workbenches/icons";
@@ -16,8 +17,10 @@ interface ManifestTabProps {
 
 /**
  * A manufacturing workbench's tab, drawn from its extension's manifest (ADR 0034 §4,
- * `specs/0093-laser-workbench-shell` UX notes §4): the three block kinds `Notice`, `Params` and
- * `FixtureList` in the manifest's order. Nothing here names a process.
+ * `specs/0093-laser-workbench-shell` UX notes §4): the block kinds `Notice`, `MachineProfile`
+ * (`specs/0026-machine-profile`) and `FixtureList` in the manifest's order. No extension declares
+ * a `Params` block of its own registers yet (they come with `0027`), so it draws nothing. Nothing
+ * here names a process.
  */
 export function ManifestTab({ contribution, view, workbenches, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
@@ -48,12 +51,11 @@ function Block({
     case "notice":
       return <NoticeBlock text={view.notices[block.id]} />;
     case "params":
-      return (
-        <section aria-label={block.label} className="flex flex-col gap-2">
-          <h3 className="text-sm text-[var(--toolbar-icon)]">{block.label}</h3>
-          <HostParams params={block.params} view={view} workbenches={workbenches} />
-        </section>
-      );
+      return null;
+    case "machine_profile":
+      return view.machine ? (
+        <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} />
+      ) : null;
     case "fixture_list":
       return (
         <FixtureList
@@ -84,51 +86,6 @@ function NoticeBlock({ text }: { text: string | undefined }) {
       <TriangleAlert size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
       <span>{text}</span>
     </div>
-  );
-}
-
-/** The fields of a `Params` block whose keys bind host values (machine name, work area). */
-function HostParams({
-  params,
-  view,
-  workbenches,
-}: {
-  params: ManifestParam[];
-  view: ManufacturingView;
-  workbenches: WorkbenchesApi;
-}) {
-  const width = Number(view.values["host.work_width"]);
-  const height = Number(view.values["host.work_height"]);
-  const commit = (key: string, mm: number) => {
-    if (key === "host.work_width") workbenches.setWorkArea(mm, height);
-    if (key === "host.work_height") workbenches.setWorkArea(width, mm);
-  };
-  const lengths = params.filter((param) => param.kind.kind === "length");
-  return (
-    <>
-      {params
-        .filter((param) => param.kind.kind === "display")
-        .map((param) => (
-          <label key={param.key} className="flex h-7 items-center justify-between gap-2 text-sm">
-            <span className="text-[var(--toolbar-icon)]">{param.label}</span>
-            <input
-              readOnly
-              value={String(view.values[param.key] ?? "")}
-              className="h-7 w-[150px] rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm opacity-70 outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-            />
-          </label>
-        ))}
-      <div className="grid grid-cols-2 gap-2">
-        {lengths.map((param) => (
-          <MmField
-            key={`${param.key}:${String(view.values[param.key])}`}
-            param={param}
-            value={Number(view.values[param.key])}
-            onCommit={(mm) => commit(param.key, mm)}
-          />
-        ))}
-      </div>
-    </>
   );
 }
 
