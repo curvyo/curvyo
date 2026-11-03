@@ -28,6 +28,7 @@ mod import_dialog;
 #[cfg(target_os = "linux")]
 mod import_preview;
 mod local_files;
+mod machine_profiles;
 #[cfg(any(target_os = "macos", test))]
 mod menu;
 #[cfg(target_os = "linux")]
@@ -126,6 +127,11 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         formats::export_formats_file,
         extensions_file::read_extensions_file,
         extensions_file::write_extensions_file,
+        machine_profiles::list_machine_profiles,
+        machine_profiles::write_machine_profile,
+        machine_profiles::remove_machine_profile,
+        machine_profiles::read_machine_choice,
+        machine_profiles::write_machine_choice,
         fonts::font_folder_list,
         fonts::system_font_list,
         fonts::font_bytes,

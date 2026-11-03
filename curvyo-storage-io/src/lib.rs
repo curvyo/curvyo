@@ -11,6 +11,7 @@
 mod container_thumbnail;
 mod credentials;
 mod filesystem;
+mod folder_texts;
 mod font_archives;
 mod font_documents;
 mod font_files;
@@ -29,6 +30,7 @@ pub use credentials::{CredentialError, CredentialStore, KEY_FILE, credential_slo
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,
 };
+pub use folder_texts::{read_dir_texts, remove_file};
 pub use font_archives::{AddedArchive, ArchiveRefusal, add_font_archive, is_archive};
 pub use font_documents::{MAX_SHOWN_DOCUMENT_BYTES, font_document_pdf, read_font_document};
 pub use font_files::{AddedFonts, RemovedFonts, add_font_files, remove_font_files};
