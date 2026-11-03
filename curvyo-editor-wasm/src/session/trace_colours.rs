@@ -56,23 +56,26 @@ pub(super) fn text_layer(fill: Option<TraceRgb>, outlines: usize) -> TraceLayerW
 /// The outlines and colours Create paths writes for a result of `outlines` in `layers` with the
 /// `leftovers` of its text lines (`specs/0091` decision 6): one colour, all in the black path;
 /// multicolour, each leftover in the layer of its fill (recoloured as the layer), or in a path of
-/// its fill after the layers when no layer has it.
+/// its fill after the layers when no layer has it. The third value is where each of `outlines`
+/// went (`specs/0088` Part B: the recognised shapes follow their outlines).
 pub(super) fn with_leftovers(
     outlines: &[kurbo::BezPath],
     layers: &[TraceLayerWire],
     leftovers: &[(kurbo::BezPath, TraceRgb)],
     view: &PaletteView,
-) -> (Vec<kurbo::BezPath>, Vec<TraceColour>) {
+) -> (Vec<kurbo::BezPath>, Vec<TraceColour>, Vec<usize>) {
     if layers.is_empty() {
         let mut all = outlines.to_vec();
         all.extend(leftovers.iter().map(|(p, _)| p.clone()));
-        return (all, Vec::new());
+        return (all, Vec::new(), (0..outlines.len()).collect());
     }
     let mut out = Vec::with_capacity(outlines.len() + leftovers.len());
+    let mut places = Vec::with_capacity(outlines.len());
     let mut colours = Vec::with_capacity(layers.len());
     let mut at = 0;
     for layer in layers {
         let to = (at + layer.outlines).min(outlines.len());
+        places.extend(out.len()..out.len() + (to - at));
         out.extend_from_slice(&outlines[at..to]);
         at = to;
         let own = leftovers.iter().filter(|(_, f)| *f == layer.colour);
@@ -102,7 +105,7 @@ pub(super) fn with_leftovers(
             outlines: out.len() - before,
         });
     }
-    (out, colours)
+    (out, colours, places)
 }
 
 /// The layer of every outline (`None` for a single-colour result).

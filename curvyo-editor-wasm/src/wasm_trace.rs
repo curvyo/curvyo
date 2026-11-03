@@ -57,7 +57,7 @@ pub fn trace_job(
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     let mut report = |percent| progress.report(percent);
     // Multicolour (`specs/0089` slice M): the outlines layer by layer, the palette after them.
-    match crate::trace_glue::trace_colour_settings(settings) {
+    let mut wire = match crate::trace_glue::trace_colour_settings(settings) {
         Some(colour) => {
             curvyo_ui_core::trace_colour_job_with(rgba, width, height, map, &colour, &mut report)
         }
@@ -69,6 +69,16 @@ pub fn trace_job(
             &crate::trace_glue::trace_settings(settings),
             &mut report,
         ),
+    };
+    with_shapes(&mut wire, map, settings);
+    wire
+}
+
+/// The shape section of Recognise shapes (`specs/0088` Part B) added to `wire` when `settings`
+/// turn it on, in the same job.
+fn with_shapes(wire: &mut Vec<f64>, map: [f64; 6], settings: &str) {
+    if crate::trace_glue::recognise_shapes(settings) {
+        curvyo_ui_core::trace_add_shapes(wire, map);
     }
 }
 
@@ -179,8 +189,8 @@ pub fn trace_text_job(
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     let mut report = |percent| progress.report(percent);
-    if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
-        return curvyo_ui_core::trace_text_colour_job_with(
+    let mut wire = if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
+        curvyo_ui_core::trace_text_colour_job_with(
             rgba,
             width,
             height,
@@ -188,17 +198,20 @@ pub fn trace_text_job(
             &colour,
             &crate::trace_glue::read_ocr_lines(lines, width),
             &mut report,
-        );
-    }
-    curvyo_ui_core::trace_text_job_with(
-        rgba,
-        width,
-        height,
-        map,
-        &crate::trace_glue::trace_settings(settings),
-        &crate::trace_glue::read_ocr_lines(lines, width),
-        &mut report,
-    )
+        )
+    } else {
+        curvyo_ui_core::trace_text_job_with(
+            rgba,
+            width,
+            height,
+            map,
+            &crate::trace_glue::trace_settings(settings),
+            &crate::trace_glue::read_ocr_lines(lines, width),
+            &mut report,
+        )
+    };
+    with_shapes(&mut wire, map, settings);
+    wire
 }
 
 /// The text pass alone with the OCR `lines` (`specs/0091` criterion 25): a result without
@@ -684,6 +697,12 @@ impl WasmSession {
     pub fn trace_text_counts(&self) -> Vec<u32> {
         let (set, found) = self.session.trace_text_counts();
         vec![count(set), count(found)]
+    }
+
+    /// The shapes the shown preview sets (`specs/0088` Part B, UX notes B3).
+    #[must_use]
+    pub fn trace_shape_count(&self) -> u32 {
+        count(self.session.trace_shape_count())
     }
 
     /// Create paths over every selected image, one step (criteria 12, 13, 46).

@@ -57,7 +57,7 @@ pub(super) fn session_with(file: &str) -> (Session, NodeId) {
 }
 
 /// A session with the included fonts listed and the picture `bytes` imported as `file`.
-fn session_with_bytes(bytes: &[u8], file: &str) -> (Session, NodeId) {
+pub(super) fn session_with_bytes(bytes: &[u8], file: &str) -> (Session, NodeId) {
     let mut session = Session::new(1);
     let index: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(fonts().join("index.json")).unwrap())
