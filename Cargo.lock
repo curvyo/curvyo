@@ -867,6 +867,7 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-image-core",
+ "curvyo-laser-core",
  "curvyo-storage-io",
  "curvyo-svg-core",
  "curvyo-text-core",
@@ -924,6 +925,7 @@ dependencies = [
  "curvyo-document-core",
  "curvyo-extension-core",
  "curvyo-image-core",
+ "curvyo-laser-core",
  "curvyo-render-core",
  "curvyo-sketch-core",
  "curvyo-sync-core",
@@ -981,6 +983,7 @@ version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
  "curvyo-extension-core",
+ "serde",
  "serde_json",
 ]
 
