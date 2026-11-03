@@ -288,7 +288,7 @@ impl Grid {
 }
 
 /// A primitive's outline as a path: a cubic between two nodes with handles, else a line.
-fn outline_path(outline: &PrimitiveOutline) -> BezPath {
+pub(crate) fn outline_path(outline: &PrimitiveOutline) -> BezPath {
     let mut path = BezPath::new();
     let at = |p: curvyo_document_core::Point| Point::new(p.x, p.y);
     let Some(first) = outline.anchors.first() else {
