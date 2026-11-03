@@ -178,3 +178,15 @@ Depends on: `specs/0026` machine profile (reserved; slice 1 uses a stand-in), `s
 Related: `specs/0063-manufacturing-workbenches/`, `specs/0065-extensions-sdk/`, ADR 0007 (the other "connector")
 ADRs: a connector ADR (protocol, pairing, encryption, crates), `needs-customer`; to be written by the architect
 PR: -
+
+## Customer decisions (2026-11-03)
+
+- **CONN-GCODE: C.** Slice 1 waits for the manufacturing workbench (`0063`), which produces the G-code. This story is parked until then; the workbench and the connector side are being built by the Phai session, this spec, ADR 0032 (draft), the UX notes and the spike report are handed over as input.
+- **CONN-LOSS: A, sharpened.** The connector receives the complete G-code before the run and can drive the job to the end on its own. Over the link (LAN or sync) only state and signals travel. The connector decides when a requested pause can take effect (at a safe point, feed hold); **stop goes through at once** (soft reset), accepting that steps may be lost.
+- **CONN-BROWSER: B.** The hosted https app must reach connectors in slice 1.
+- **CONN-UI:** inside Curvyo, no separate connector UI; probably in the Properties panel next to the machine (place to be decided with the workbench).
+- **CONN-SEC:** to be aligned with the Phai session. Customer's direction: both self-signed https with public key pinning plus a password, and real certificates via EST (RFC 7030). ADR 0032 must be revised accordingly (it proposed Noise XX over `ws://` without TLS).
+- **CONN-BIN: A.** Linux x86_64 and aarch64 suffice for testing.
+- **STOP-KEY: C.** Stop is the button only; no keyboard shortcut.
+- **JOG-RELEASE: A.** A short click jogs one step; press and hold jogs while held and stops on release.
+- **CONN-PATH, CONN-SAFETY:** defaults (A, A) unless the Phai session decides otherwise with the customer.
