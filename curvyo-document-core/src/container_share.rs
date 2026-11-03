@@ -1,6 +1,8 @@
-//! The two container members that make a file shared (ADR 0031 decision 9, ADR 0004 §1):
-//! `share.json`, where the document syncs and how far, and `keyring.log`, the membership log kept
-//! as opaque bytes. Both are present or both are absent.
+//! The container members that make a file shared (ADR 0031 decision 9, ADR 0037 decision 3,
+//! ADR 0004 §1): `share.json` version 1 with `keyring.log` for a document shared on its own
+//! (both present or both absent), or `share.json` version 2 alone for a workspace document.
+//! A shared workspace's marker directory keeps a `share.json` of the version 1 shape too
+//! (ADR 0037 decision 1), read and written here as bytes.
 
 use std::io::{Cursor, Read};
 
@@ -13,8 +15,13 @@ use crate::error::{OpenError, SaveError};
 const SHARE_MEMBER: &str = "share.json";
 const KEYRING_MEMBER: &str = "keyring.log";
 
-/// The `format_version` of `share.json` this build writes and the newest it reads.
-pub const CURRENT_SHARE_FORMAT_VERSION: u32 = 1;
+/// The newest `format_version` of `share.json` this build reads. A document shared on its own is
+/// written as version 1, a workspace document as version 2.
+pub const CURRENT_SHARE_FORMAT_VERSION: u32 = 2;
+/// `share.json` of a document shared on its own room.
+const ROOM_SHARE_VERSION: u32 = 1;
+/// `share.json` of a workspace document.
+const WORKSPACE_SHARE_VERSION: u32 = 2;
 
 /// The bytes the keyring log member may hold at most when read (64 MiB, the relay's message
 /// limit); a longer member is damage.
@@ -35,18 +42,138 @@ pub struct ShareRecord {
     pub keyring_log: Vec<u8>,
 }
 
-impl crate::Document {
-    /// The share record this document's file carries, `None` for a document that is not shared.
-    #[must_use]
-    pub fn share(&self) -> Option<ShareRecord> {
-        self.share.borrow().clone()
+/// Which workspace a workspace document belongs to and its identity there, as kept in its file
+/// (`share.json` version 2). The identity is never derived from the file's name or place.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceShareRecord {
+    /// The workspace id: the room of the workspace.
+    pub workspace: [u8; 16],
+    /// The document id: the document's stream in the workspace room.
+    pub document: [u8; 16],
+    /// The version the workspace room acknowledged last; updates after it go out on sync.
+    pub synced_version: DocumentVersion,
+}
+
+/// Where a shared workspace syncs and how far, as its marker's `share.json` keeps it (ADR 0037
+/// decision 1): the shape of version 1 with `room` = the workspace id, `server_seq` = the
+/// workspace cursor and `synced_version` = the list's version the room acknowledged last.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceRoomRecord {
+    /// The relay address.
+    pub server: String,
+    /// The workspace id, the room on that relay.
+    pub workspace: [u8; 16],
+    /// The relay sequence up to which every record is in a file.
+    pub server_seq: u64,
+    /// The list's version the room acknowledged last.
+    pub synced_version: DocumentVersion,
+}
+
+impl WorkspaceRoomRecord {
+    /// The marker's `share.json` bytes.
+    ///
+    /// # Errors
+    /// [`SaveError::Container`] if the JSON cannot be written.
+    pub fn to_bytes(&self) -> Result<Vec<u8>, SaveError> {
+        serde_json::to_vec(&ShareJson {
+            format_version: ROOM_SHARE_VERSION,
+            server: self.server.clone(),
+            room: hex(&self.workspace),
+            server_seq: self.server_seq,
+            synced_version: self.synced_version.to_text(),
+        })
+        .map_err(|_| SaveError::Container)
     }
 
-    /// Sets or clears the share record written with the next save; not a history step. A removed
-    /// device clears it and keeps a plain local file (R-COLLAB-010).
+    /// Reads the marker's `share.json`.
+    ///
+    /// # Errors
+    /// [`OpenError::FormatTooNew`] for a newer version; [`OpenError::Damaged`] otherwise.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, OpenError> {
+        let version: ShareJsonVersion =
+            serde_json::from_slice(bytes).map_err(|_| OpenError::Damaged)?;
+        if version.format_version > ROOM_SHARE_VERSION {
+            return Err(OpenError::FormatTooNew {
+                found: version.format_version,
+                supported: ROOM_SHARE_VERSION,
+            });
+        }
+        let json: ShareJson = serde_json::from_slice(bytes).map_err(|_| OpenError::Damaged)?;
+        if json.format_version != ROOM_SHARE_VERSION {
+            return Err(OpenError::Damaged);
+        }
+        Ok(Self {
+            server: json.server,
+            workspace: unhex(&json.room).ok_or(OpenError::Damaged)?,
+            server_seq: json.server_seq,
+            synced_version: DocumentVersion::from_text(&json.synced_version)
+                .ok_or(OpenError::Damaged)?,
+        })
+    }
+}
+
+impl WorkspaceShareRecord {
+    /// The record in a container's `share.json` member when it is version 2 (a document of a
+    /// shared workspace), read by a host's scan without opening the document
+    /// (`specs/0095-workspace` criterion 41); `None` for any other content.
+    #[must_use]
+    pub fn from_share_json(bytes: &[u8]) -> Option<Self> {
+        let version: ShareJsonVersion = serde_json::from_slice(bytes).ok()?;
+        if version.format_version != WORKSPACE_SHARE_VERSION {
+            return None;
+        }
+        match read_workspace_share(bytes).ok()? {
+            Sharing::Workspace(record) => Some(record),
+            Sharing::Room(_) => None,
+        }
+    }
+}
+
+/// The record a file carries: at most one of the two kinds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Sharing {
+    /// Shared on its own room.
+    Room(ShareRecord),
+    /// A document of a shared workspace.
+    Workspace(WorkspaceShareRecord),
+}
+
+impl crate::Document {
+    /// The share record of a document shared on its own room, `None` otherwise.
+    #[must_use]
+    pub fn share(&self) -> Option<ShareRecord> {
+        match self.share.borrow().as_ref() {
+            Some(Sharing::Room(record)) => Some(record.clone()),
+            _ => None,
+        }
+    }
+
+    /// Sets the room record written with the next save, replacing a workspace record, or clears
+    /// either; not a history step. A removed device clears it and keeps a plain local file
+    /// (R-COLLAB-010).
     pub fn set_share(&self, record: Option<ShareRecord>) {
-        self.commit_state.set_shared(record.is_some());
-        *self.share.borrow_mut() = record;
+        self.set_sharing(record.map(Sharing::Room));
+    }
+
+    /// The record of a workspace document, `None` otherwise (`specs/0095-workspace` criterion
+    /// 15).
+    #[must_use]
+    pub fn workspace_share(&self) -> Option<WorkspaceShareRecord> {
+        match self.share.borrow().as_ref() {
+            Some(Sharing::Workspace(record)) => Some(record.clone()),
+            _ => None,
+        }
+    }
+
+    /// Sets the workspace record written with the next save, replacing a room record, or clears
+    /// either; not a history step.
+    pub fn set_workspace_share(&self, record: Option<WorkspaceShareRecord>) {
+        self.set_sharing(record.map(Sharing::Workspace));
+    }
+
+    pub(crate) fn set_sharing(&self, sharing: Option<Sharing>) {
+        self.commit_state.set_shared(sharing.is_some());
+        *self.share.borrow_mut() = sharing;
     }
 }
 
@@ -59,43 +186,66 @@ struct ShareJson {
     synced_version: String,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WorkspaceShareJson {
+    format_version: u32,
+    workspace: String,
+    document: String,
+    synced_version: String,
+}
+
 #[derive(Deserialize)]
 struct ShareJsonVersion {
     format_version: u32,
 }
 
-/// The members of `record`: `share.json`, then `keyring.log`.
-pub(crate) fn share_members(
-    record: &ShareRecord,
-) -> Result<[(&'static str, Vec<u8>); 2], SaveError> {
-    let json = ShareJson {
-        format_version: CURRENT_SHARE_FORMAT_VERSION,
-        server: record.server.clone(),
-        room: hex(&record.room),
-        server_seq: record.server_seq,
-        synced_version: record.synced_version.to_text(),
-    };
-    let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
-    Ok([
-        (SHARE_MEMBER, json),
-        (KEYRING_MEMBER, record.keyring_log.clone()),
-    ])
+/// The members of `sharing`: `share.json`, then `keyring.log` for a room record.
+pub(crate) fn share_members(sharing: &Sharing) -> Result<Vec<(&'static str, Vec<u8>)>, SaveError> {
+    match sharing {
+        Sharing::Room(record) => {
+            let json = ShareJson {
+                format_version: ROOM_SHARE_VERSION,
+                server: record.server.clone(),
+                room: hex(&record.room),
+                server_seq: record.server_seq,
+                synced_version: record.synced_version.to_text(),
+            };
+            let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
+            Ok(vec![
+                (SHARE_MEMBER, json),
+                (KEYRING_MEMBER, record.keyring_log.clone()),
+            ])
+        }
+        Sharing::Workspace(record) => {
+            let json = WorkspaceShareJson {
+                format_version: WORKSPACE_SHARE_VERSION,
+                workspace: hex(&record.workspace),
+                document: hex(&record.document),
+                synced_version: record.synced_version.to_text(),
+            };
+            let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
+            Ok(vec![(SHARE_MEMBER, json)])
+        }
+    }
 }
 
 /// The share record of `archive`, `None` for a file that was never shared.
 ///
 /// # Errors
-/// [`OpenError::Damaged`] for one member without the other or a malformed `share.json`;
-/// [`OpenError::FormatTooNew`] for a `share.json` newer than this build reads.
+/// [`OpenError::Damaged`] for a version 1 record without its keyring or the other way round, a
+/// version 2 record beside a keyring, or a malformed `share.json`; [`OpenError::FormatTooNew`]
+/// for a `share.json` newer than this build reads.
 pub(crate) fn read_share(
     archive: &mut ZipArchive<Cursor<&[u8]>>,
-) -> Result<Option<ShareRecord>, OpenError> {
+) -> Result<Option<Sharing>, OpenError> {
     let json = read_optional(archive, SHARE_MEMBER, MAX_KEYRING_BYTES)?;
     let keyring = read_optional(archive, KEYRING_MEMBER, MAX_KEYRING_BYTES)?;
-    let (json, keyring_log) = match (json, keyring) {
-        (None, None) => return Ok(None),
-        (Some(json), Some(keyring)) => (json, keyring),
-        _ => return Err(OpenError::Damaged),
+    let Some(json) = json else {
+        return match keyring {
+            None => Ok(None),
+            Some(_) => Err(OpenError::Damaged),
+        };
     };
     let version: ShareJsonVersion =
         serde_json::from_slice(&json).map_err(|_| OpenError::Damaged)?;
@@ -105,14 +255,32 @@ pub(crate) fn read_share(
             supported: CURRENT_SHARE_FORMAT_VERSION,
         });
     }
-    let json: ShareJson = serde_json::from_slice(&json).map_err(|_| OpenError::Damaged)?;
-    Ok(Some(ShareRecord {
+    match (version.format_version, keyring) {
+        (WORKSPACE_SHARE_VERSION, None) => read_workspace_share(&json).map(Some),
+        (ROOM_SHARE_VERSION, Some(keyring_log)) => read_room_share(&json, keyring_log).map(Some),
+        _ => Err(OpenError::Damaged),
+    }
+}
+
+fn read_room_share(json: &[u8], keyring_log: Vec<u8>) -> Result<Sharing, OpenError> {
+    let json: ShareJson = serde_json::from_slice(json).map_err(|_| OpenError::Damaged)?;
+    Ok(Sharing::Room(ShareRecord {
         server: json.server,
         room: unhex(&json.room).ok_or(OpenError::Damaged)?,
         server_seq: json.server_seq,
         synced_version: DocumentVersion::from_text(&json.synced_version)
             .ok_or(OpenError::Damaged)?,
         keyring_log,
+    }))
+}
+
+fn read_workspace_share(json: &[u8]) -> Result<Sharing, OpenError> {
+    let json: WorkspaceShareJson = serde_json::from_slice(json).map_err(|_| OpenError::Damaged)?;
+    Ok(Sharing::Workspace(WorkspaceShareRecord {
+        workspace: unhex(&json.workspace).ok_or(OpenError::Damaged)?,
+        document: unhex(&json.document).ok_or(OpenError::Damaged)?,
+        synced_version: DocumentVersion::from_text(&json.synced_version)
+            .ok_or(OpenError::Damaged)?,
     }))
 }
 

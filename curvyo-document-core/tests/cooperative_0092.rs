@@ -492,13 +492,14 @@ fn a_share_record_without_its_keyring_or_malformed_is_damaged() {
     let newer = with_member(
         &bytes,
         "share.json",
-        Some(br#"{"format_version":2,"server":"ws://x","room":"07070707070707070707070707070707","server_seq":1,"synced_version":""}"#),
+        Some(br#"{"format_version":3,"server":"ws://x","room":"07070707070707070707070707070707","server_seq":1,"synced_version":""}"#),
     );
+    // Version 2 is a workspace document's record (`specs/0095-workspace`, ADR 0037 decision 3).
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 2,
-            supported: 1
+            found: 3,
+            supported: 2
         })
     ));
 }

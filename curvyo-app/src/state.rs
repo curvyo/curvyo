@@ -19,13 +19,19 @@ pub struct ProjectState {
     /// Where it was last saved to or opened from, or `None` for a
     /// never-saved new project.
     pub path: Option<PathBuf>,
+    /// Whether it was opened from the open workspace's tree (`specs/0095-workspace` criteria 3,
+    /// 11): only then is it titled by its place in the workspace.
+    pub in_workspace: bool,
 }
 
 impl ProjectState {
     /// A fresh, never-saved project (File → New, and the app's initial
     /// launch state).
     pub fn new_unsaved() -> Self {
-        Self { path: None }
+        Self {
+            path: None,
+            in_workspace: false,
+        }
     }
 
     /// A project just read back from `path` — recorded only once the
@@ -34,7 +40,10 @@ impl ProjectState {
     /// constructor, so an already-open project is never touched by one
     /// (acceptance criterion 7).
     pub fn opened(path: PathBuf) -> Self {
-        Self { path: Some(path) }
+        Self {
+            path: Some(path),
+            in_workspace: false,
+        }
     }
 
     /// The file name (with extension) the title bar should show, if this
@@ -92,6 +101,12 @@ pub struct AppState {
     quitting: AtomicBool,
     /// The file Export SVG… chose, until the page hands over the text (`specs/0024` criterion 4).
     svg_export_path: Mutex<Option<std::path::PathBuf>>,
+    /// The folder of the open workspace (`specs/0095-workspace`); the page names only paths
+    /// inside it.
+    workspace: Mutex<Option<PathBuf>>,
+    /// The folder chosen for a joined workspace, until the join writes its marker
+    /// (`specs/0095-workspace` criterion 27).
+    join_folder: Mutex<Option<PathBuf>>,
 }
 
 impl AppState {
@@ -108,6 +123,45 @@ impl AppState {
             .lock()
             .ok()
             .and_then(|mut slot| slot.take())
+    }
+
+    /// Sets or clears the folder of the open workspace.
+    pub fn set_workspace(&self, root: Option<PathBuf>) {
+        if let Ok(mut slot) = self.workspace.lock() {
+            *slot = root;
+        }
+    }
+
+    /// Keeps or clears the folder chosen for a joined workspace.
+    pub fn set_join_folder(&self, folder: Option<PathBuf>) {
+        if let Ok(mut slot) = self.join_folder.lock() {
+            *slot = folder;
+        }
+    }
+
+    /// The folder chosen for a joined workspace.
+    pub fn join_folder(&self) -> Option<PathBuf> {
+        self.join_folder.lock().ok().and_then(|slot| slot.clone())
+    }
+
+    /// The folder of the open workspace.
+    pub fn workspace(&self) -> Option<PathBuf> {
+        self.workspace.lock().ok().and_then(|slot| slot.clone())
+    }
+
+    /// An entry moved from `from` to `to`: the project's path follows when it is that entry or
+    /// lies below it, so Save writes to the moved file (`specs/0095-workspace` criteria 14, 16).
+    pub fn follow_move(&self, from: &std::path::Path, to: &std::path::Path) {
+        let mut project = self.lock_project();
+        if let Some(path) = &project.path
+            && let Ok(rest) = path.strip_prefix(from)
+        {
+            project.path = Some(if rest.as_os_str().is_empty() {
+                to.to_path_buf()
+            } else {
+                to.join(rest)
+            });
+        }
     }
 
     /// Records what the page reported: the project has changes that no saved file holds.
@@ -149,6 +203,13 @@ impl AppState {
         *self.lock_project() = ProjectState::opened(path);
         self.set_dirty(false);
         let _ = self.take_pending_open();
+    }
+
+    /// The page opened the file at `path` from the open workspace's tree: as
+    /// [`Self::confirm_opened`], and the title names its place in the workspace.
+    pub fn confirm_workspace_opened(&self, path: PathBuf) {
+        self.confirm_opened(path);
+        self.lock_project().in_workspace = true;
     }
 
     /// Whether a window close or an exit must wait for the page's answer: there are unsaved
@@ -235,6 +296,38 @@ mod tests {
             state.take_pending_open(),
             Some(PendingOpen::IoError(_))
         ));
+    }
+
+    /// `specs/0095-workspace` criteria 14 and 16: renaming or moving the open document, or a
+    /// folder above it, keeps Save on the moved file; other moves leave the path alone.
+    #[test]
+    fn the_project_path_follows_a_move_of_its_file_or_folder() {
+        let state = AppState::default();
+        state.confirm_opened(PathBuf::from("/w/Sides/Lid.curvyo"));
+        state.follow_move(
+            std::path::Path::new("/w/Sides/Lid.curvyo"),
+            std::path::Path::new("/w/Sides/Cover.curvyo"),
+        );
+        assert_eq!(
+            state.lock_project().path,
+            Some(PathBuf::from("/w/Sides/Cover.curvyo"))
+        );
+        state.follow_move(
+            std::path::Path::new("/w/Sides"),
+            std::path::Path::new("/w/Walls"),
+        );
+        assert_eq!(
+            state.lock_project().path,
+            Some(PathBuf::from("/w/Walls/Cover.curvyo"))
+        );
+        state.follow_move(
+            std::path::Path::new("/w/Side"),
+            std::path::Path::new("/w/X"),
+        );
+        assert_eq!(
+            state.lock_project().path,
+            Some(PathBuf::from("/w/Walls/Cover.curvyo"))
+        );
     }
 
     /// An opened file is the project's path, clean, and no longer pending.

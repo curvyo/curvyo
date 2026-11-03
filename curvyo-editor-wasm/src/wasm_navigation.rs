@@ -44,6 +44,17 @@ impl WasmSession {
         self.session.is_panning()
     }
 
+    /// The view to come back to after switching documents (`specs/0095-workspace` criterion 10).
+    #[must_use]
+    pub fn saved_view_text(&self) -> String {
+        self.session.saved_view_text()
+    }
+
+    /// Shows a view [`WasmSession::saved_view_text`] gave; `false` for other text.
+    pub fn restore_view_text(&mut self, text: &str) -> bool {
+        self.session.restore_view_text(text)
+    }
+
     /// The current zoom level's integer percentage read-out (acceptance
     /// criterion 9), for the status bar's center segment.
     #[must_use]

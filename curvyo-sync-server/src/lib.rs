@@ -13,7 +13,9 @@ mod config;
 mod health;
 mod hub;
 mod log;
+mod room_scan;
 mod server;
+mod snapshot_file;
 mod store;
 
 pub use config::{Config, ConfigError, DEFAULT_DATA, DEFAULT_LISTEN, USAGE};

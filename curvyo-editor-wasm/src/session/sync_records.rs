@@ -23,7 +23,14 @@ impl Session {
         if version == link.exported {
             return;
         }
+        if link.workspace.as_ref().is_some_and(|c| c.stream.is_none()) {
+            // A document outside the shared workspace sends nothing on its room.
+            return;
+        }
         let Ok(bytes) = self.document.export_updates(&link.exported) else {
+            return;
+        };
+        let Some(bytes) = self.workspace_payload(&bytes) else {
             return;
         };
         // Pictures are only scanned for when the store grew: reading every object per commit
@@ -49,6 +56,10 @@ impl Session {
         };
         link.asset_total = asset_total;
         for (hash, picture) in pictures {
+            let picture = match link.workspace.as_ref().and_then(|c| c.stream) {
+                Some(stream) => curvyo_sync_core::encode_inner_record(stream, self.peer, &picture),
+                None => picture,
+            };
             if link.client.push(RecordKind::Asset, picture).is_ok() {
                 link.assets.insert(hash);
             }
@@ -79,6 +90,9 @@ impl Session {
         let mut changed = false;
         let mut rejected: Option<u64> = None;
         for (seq, kind, bytes) in records {
+            if kind == RecordKind::Update && self.moved_away(&bytes) {
+                return changed;
+            }
             match self.apply_record(kind, &bytes) {
                 Some(applied) => changed |= applied,
                 None => rejected = rejected.or(Some(seq)),

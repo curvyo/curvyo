@@ -33,7 +33,7 @@ function loadOnce(): Promise<void> {
  * source). The top bit is cleared so every consumer along the way (a
  * Rust `u64`, a JS `bigint`, `wasm-bindgen`'s own marshalling) agrees on
  * the value without relying on unsigned 64-bit wraparound anywhere. */
-function mintPeerId(): bigint {
+export function mintPeerId(): bigint {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
   let value = 0n;

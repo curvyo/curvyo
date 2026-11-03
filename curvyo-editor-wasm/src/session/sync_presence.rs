@@ -76,7 +76,21 @@ impl Session {
             selection: self.selection.ids().to_vec(),
             tool: tool_word(self.tool).to_owned(),
             drag,
+            document: self.presence_document(),
+            list_peer: self
+                .workspace_channel()
+                .map(|c| c.list_peer.to_string())
+                .unwrap_or_default(),
         }
+    }
+
+    /// The open document's id as hex inside a shared workspace, empty otherwise: marks are
+    /// drawn only between sessions of one document (`specs/0095-workspace`).
+    fn presence_document(&self) -> String {
+        self.workspace_channel()
+            .and_then(|c| c.stream)
+            .map(|stream| super::sync::hex(&stream))
+            .unwrap_or_default()
     }
 
     /// Hands the session this device's presence when it changed; the session throttles it.
@@ -118,7 +132,13 @@ impl Session {
             return objects;
         };
         let mut offsets: HashMap<NodeId, Vec2> = HashMap::new();
-        for presence in link.peers.values().filter_map(|p| p.presence.as_ref()) {
+        let document = self.presence_document();
+        for presence in link
+            .peers
+            .values()
+            .filter_map(|p| p.presence.as_ref())
+            .filter(|p| p.document == document)
+        {
             if let Some([dx, dy]) = presence.drag {
                 for id in &presence.selection {
                     offsets.insert(*id, Vec2::new(dx, dy));
@@ -152,8 +172,9 @@ impl Session {
         let mine: HashSet<NodeId> = self.selection.ids().iter().copied().collect();
         let pressed_or_hovered = self.hovered_object;
         let mut marks = Vec::new();
+        let document = self.presence_document();
         for peer in link.peers.values() {
-            let Some(presence) = peer.presence.as_ref() else {
+            let Some(presence) = peer.presence.as_ref().filter(|p| p.document == document) else {
                 continue;
             };
             let fingerprint = peer

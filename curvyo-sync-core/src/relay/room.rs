@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use curvyo_crypto_core::keyring::{Entry, Keyring};
 use curvyo_crypto_core::{EnvelopeHeader, EnvelopeKind, MemberId};
 
+use super::snapshot::{Snapshots, Staged};
 use super::{RelayOutput, RestoreError, Stage, StoreOp};
 use crate::frame::{ClientFrame, ConnectionId, RecordKind, RefusalReason, RelayFrame, RoomId};
 
@@ -28,8 +29,12 @@ pub struct StoredRoom {
     pub room: RoomId,
     /// The accepted keyring entries, in the order they were appended.
     pub keyring: Vec<Vec<u8>>,
-    /// The newest snapshot: the sequence it covers and its envelope.
+    /// The newest snapshot: the sequence it covers and its envelope, the first part of a
+    /// multi-part snapshot.
     pub snapshot: Option<(u64, Vec<u8>)>,
+    /// The parts after the first of a multi-part snapshot (ADR 0037 decision 7), in order; empty
+    /// for a single one.
+    pub snapshot_rest: Vec<Vec<u8>>,
     /// The records after the snapshot, ascending.
     pub records: Vec<StoredRecord>,
 }
@@ -40,7 +45,7 @@ pub struct RoomLog {
     entries: Vec<(Entry, Vec<u8>)>,
     keyring: Keyring,
     head_seq: u64,
-    snapshot: Option<(u64, Vec<u8>)>,
+    snapshots: Snapshots,
     records: Vec<StoredRecord>,
     online: BTreeMap<ConnectionId, MemberId>,
 }
@@ -52,7 +57,7 @@ impl RoomLog {
             entries: vec![(genesis, bytes)],
             keyring,
             head_seq: 0,
-            snapshot: None,
+            snapshots: Snapshots::default(),
             records: Vec::new(),
             online: BTreeMap::new(),
         }
@@ -70,6 +75,11 @@ impl RoomLog {
             return Err(RestoreError::DamagedKeyring);
         }
         let covers = stored.snapshot.as_ref().map_or(0, |(seq, _)| *seq);
+        let current = stored.snapshot.map(|(seq, first)| {
+            let mut parts = vec![first];
+            parts.extend(stored.snapshot_rest);
+            (seq, parts)
+        });
         let mut head_seq = covers;
         for record in &stored.records {
             if record.seq <= head_seq {
@@ -82,7 +92,7 @@ impl RoomLog {
             entries,
             keyring,
             head_seq,
-            snapshot: stored.snapshot,
+            snapshots: Snapshots::restored(current),
             records: stored.records,
             online: BTreeMap::new(),
         })
@@ -109,7 +119,7 @@ impl RoomLog {
     /// The sequence the stored snapshot covers, 0 without one.
     #[must_use]
     pub fn snapshot_seq(&self) -> u64 {
-        self.snapshot.as_ref().map_or(0, |(seq, _)| *seq)
+        self.snapshots.covers()
     }
 
     /// The records after the snapshot.
@@ -130,7 +140,15 @@ impl RoomLog {
         StoredRoom {
             room: self.room,
             keyring: self.entries.iter().map(|(_, b)| b.clone()).collect(),
-            snapshot: self.snapshot.clone(),
+            snapshot: self
+                .snapshots
+                .current()
+                .and_then(|(seq, parts)| Some((*seq, parts.first()?.clone()))),
+            snapshot_rest: self
+                .snapshots
+                .current()
+                .map(|(_, parts)| parts.iter().skip(1).cloned().collect())
+                .unwrap_or_default(),
             records: self.records.clone(),
         }
     }
@@ -152,14 +170,17 @@ impl RoomLog {
         }));
         self.send_keyring(connection, out);
         let mut after = since_seq;
-        if let Some((covers, envelope)) = &self.snapshot
+        // A multi-part snapshot goes out as consecutive snapshot records of one sequence.
+        if let Some((covers, parts)) = self.snapshots.current()
             && (since_seq == 0 || since_seq < *covers)
         {
-            out.push(send(RelayFrame::Record {
-                seq: *covers,
-                kind: RecordKind::Snapshot,
-                envelope: envelope.clone(),
-            }));
+            for envelope in parts {
+                out.push(send(RelayFrame::Record {
+                    seq: *covers,
+                    kind: RecordKind::Snapshot,
+                    envelope: envelope.clone(),
+                }));
+            }
             after = *covers;
         }
         for record in self.records.iter().filter(|r| r.seq > after) {
@@ -199,6 +220,9 @@ impl RoomLog {
 
     /// A connection left: the others are told.
     pub(super) fn leave(&mut self, connection: ConnectionId, out: &mut Vec<RelayOutput>) {
+        let mut ops = Vec::new();
+        self.snapshots.forget(self.room, connection, &mut ops);
+        out.extend(ops.into_iter().map(RelayOutput::Store));
         if self.online.remove(&connection).is_none() {
             return;
         }
@@ -235,6 +259,12 @@ impl RoomLog {
                 covers_seq,
                 envelope,
             } => self.on_snapshot(covers_seq, envelope, out)?,
+            ClientFrame::SnapshotPart {
+                covers_seq,
+                index,
+                last,
+                envelope,
+            } => self.on_snapshot_part(connection, covers_seq, index, last, envelope, out)?,
             ClientFrame::Awareness { envelope } => {
                 self.check_envelope(&envelope, EnvelopeKind::Presence)?;
                 self.broadcast(
@@ -311,16 +341,39 @@ impl RoomLog {
         if !header.signed || covers_seq > self.head_seq {
             return Err(RefusalReason::Protocol);
         }
-        // The newest snapshot wins; one covering the same records replaces the stored
-        // one, since a rotation re-seals the same state under a new key (decision 6a).
-        if covers_seq >= self.snapshot_seq() {
+        if self.snapshots.replace(covers_seq, envelope.clone()) {
             out.push(RelayOutput::Store(StoreOp::Snapshot {
                 room: self.room,
                 covers_seq,
-                envelope: envelope.clone(),
+                envelope,
             }));
             self.records.retain(|r| r.seq > covers_seq);
-            self.snapshot = Some((covers_seq, envelope));
+        }
+        Ok(())
+    }
+
+    /// Stages one part of a multi-part snapshot; the last swaps the parts in and prunes the
+    /// records they cover (ADR 0037 decision 7).
+    fn on_snapshot_part(
+        &mut self,
+        connection: ConnectionId,
+        covers_seq: u64,
+        index: u32,
+        last: bool,
+        envelope: Vec<u8>,
+        out: &mut Vec<RelayOutput>,
+    ) -> Result<(), RefusalReason> {
+        let header = self.check_envelope(&envelope, EnvelopeKind::Snapshot)?;
+        if !header.signed || covers_seq > self.head_seq {
+            return Err(RefusalReason::Protocol);
+        }
+        let mut ops = Vec::new();
+        let staged = self.snapshots.stage(
+            self.room, connection, covers_seq, index, last, envelope, &mut ops,
+        );
+        out.extend(ops.into_iter().map(RelayOutput::Store));
+        if let Staged::Swapped { covers } = staged? {
+            self.records.retain(|r| r.seq > covers);
         }
         Ok(())
     }

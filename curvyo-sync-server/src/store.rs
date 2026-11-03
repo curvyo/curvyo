@@ -6,7 +6,7 @@
 //!   entry as a little-endian `u32` length and its bytes), appended one entry at a time.
 //! - `log`: records after the snapshot, each `seq: u64`, `kind: u8` (0 update, 1 asset),
 //!   `len: u32`, then the envelope; little-endian.
-//! - `snapshot`: `covers_seq: u64` and the signed envelope, replaced by write-temp-then-rename.
+//! - `snapshot` and the staged `snapshot.part/`: see `crate::snapshot_file`.
 //!
 //! Every append is synced before the relay's sends that follow it go out, so an acknowledged
 //! record is on disk. A record or entry cut short by a crash (never acknowledged) is dropped by the
@@ -18,10 +18,11 @@ use std::path::{Path, PathBuf};
 
 use curvyo_sync_core::{RecordKind, RoomId, StoreOp, StoredRecord, StoredRoom};
 
-const KEYRING: &str = "keyring.log";
-const LOG: &str = "log";
-const SNAPSHOT: &str = "snapshot";
-const TEMP_SUFFIX: &str = ".tmp";
+use crate::snapshot_file;
+
+pub(crate) const KEYRING: &str = "keyring.log";
+pub(crate) const LOG: &str = "log";
+pub(crate) const TEMP_SUFFIX: &str = ".tmp";
 /// `seq`, `kind` and `len` of a log record.
 const RECORD_HEAD: usize = 8 + 1 + 4;
 
@@ -43,7 +44,10 @@ pub enum StoreError {
     Damaged(PathBuf),
 }
 
-fn io_err(action: &'static str, path: &Path) -> impl FnOnce(io::Error) -> StoreError + use<> {
+pub(crate) fn io_err(
+    action: &'static str,
+    path: &Path,
+) -> impl FnOnce(io::Error) -> StoreError + use<> {
     let path = path.to_owned();
     move |source| StoreError::Io {
         action,
@@ -76,7 +80,7 @@ impl Store {
             if !path.is_dir() {
                 continue;
             }
-            if let Some(found) = scan_room(&path, id)? {
+            if let Some(found) = crate::room_scan::scan_room(&path, id)? {
                 rooms.push(found);
             }
         }
@@ -116,14 +120,23 @@ impl Store {
                 room,
                 covers_seq,
                 envelope,
-            } => {
-                let dir = self.room_dir(*room)?;
-                let mut bytes = Vec::with_capacity(envelope.len() + 8);
-                bytes.extend_from_slice(&covers_seq.to_le_bytes());
-                bytes.extend_from_slice(envelope);
-                replace(&dir, SNAPSHOT, &bytes)?;
-                prune_log(&dir, *covers_seq)
-            }
+            } => snapshot_file::write(
+                &self.room_dir(*room)?,
+                *covers_seq,
+                std::slice::from_ref(envelope),
+            ),
+            StoreOp::SnapshotPart {
+                room,
+                index,
+                envelope,
+                ..
+            } => snapshot_file::stage(&self.room_dir(*room)?, *index, envelope),
+            StoreOp::SnapshotParts {
+                room,
+                covers_seq,
+                count,
+            } => snapshot_file::commit_staged(&self.room_dir(*room)?, *covers_seq, *count),
+            StoreOp::DropStagedParts { room } => snapshot_file::drop_staged(&self.room_dir(*room)?),
         }
     }
 
@@ -160,7 +173,7 @@ fn room_from_hex(name: &str) -> Option<RoomId> {
 }
 
 /// The magic and version that open every `keyring.log`.
-fn keyring_header() -> Vec<u8> {
+pub(crate) fn keyring_header() -> Vec<u8> {
     // invariant: an empty entry list always encodes (it is the magic and the version byte).
     curvyo_crypto_core::keyring::encode_log(&[]).unwrap_or_default()
 }
@@ -194,7 +207,7 @@ fn file_len(path: &Path) -> Result<u64, StoreError> {
     }
 }
 
-fn read_or_empty(path: &Path) -> Result<Vec<u8>, StoreError> {
+pub(crate) fn read_or_empty(path: &Path) -> Result<Vec<u8>, StoreError> {
     match fs::read(path) {
         Ok(bytes) => Ok(bytes),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
@@ -214,7 +227,7 @@ fn append(path: &Path, bytes: &[u8]) -> Result<(), StoreError> {
 }
 
 /// Replaces `dir/name` with `bytes` by writing a synced temporary file and renaming it.
-fn replace(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), StoreError> {
+pub(crate) fn replace(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), StoreError> {
     let temp = dir.join(format!("{name}{TEMP_SUFFIX}"));
     let target = dir.join(name);
     let mut file = File::create(&temp).map_err(io_err("create", &temp))?;
@@ -226,7 +239,7 @@ fn replace(dir: &Path, name: &str, bytes: &[u8]) -> Result<(), StoreError> {
 }
 
 /// Drops every log record up to `covers_seq` (the snapshot holds them).
-fn prune_log(dir: &Path, covers_seq: u64) -> Result<(), StoreError> {
+pub(crate) fn prune_log(dir: &Path, covers_seq: u64) -> Result<(), StoreError> {
     let path = dir.join(LOG);
     let (records, _) = decode_records(&read_or_empty(&path)?, &path)?;
     let mut bytes = Vec::new();
@@ -237,7 +250,7 @@ fn prune_log(dir: &Path, covers_seq: u64) -> Result<(), StoreError> {
 }
 
 /// Makes a directory's entries (a created file or directory, a rename) durable.
-fn sync_dir(dir: &Path) -> Result<(), StoreError> {
+pub(crate) fn sync_dir(dir: &Path) -> Result<(), StoreError> {
     #[cfg(unix)]
     File::open(dir)
         .and_then(|d| d.sync_all())
@@ -247,87 +260,11 @@ fn sync_dir(dir: &Path) -> Result<(), StoreError> {
     Ok(())
 }
 
-/// Truncates `path` to `len` bytes when a crash left a cut-short end after it.
-fn truncate_to(path: &Path, len: usize, total: usize) -> Result<(), StoreError> {
-    if len == total {
-        return Ok(());
-    }
-    let file = OpenOptions::new()
-        .write(true)
-        .open(path)
-        .map_err(io_err("open", path))?;
-    file.set_len(len as u64).map_err(io_err("truncate", path))?;
-    file.sync_all().map_err(io_err("sync", path))
-}
-
-/// Reads one room back; `None` for a directory a crash left without a complete keyring entry.
-fn scan_room(dir: &Path, room: RoomId) -> Result<Option<StoredRoom>, StoreError> {
-    for name in [SNAPSHOT, LOG] {
-        let temp = dir.join(format!("{name}{TEMP_SUFFIX}"));
-        if temp.exists() {
-            fs::remove_file(&temp).map_err(io_err("remove", &temp))?;
-        }
-    }
-    let keyring_path = dir.join(KEYRING);
-    let bytes = read_or_empty(&keyring_path)?;
-    let (keyring, kept) = decode_keyring(&bytes, &keyring_path)?;
-    truncate_to(&keyring_path, kept, bytes.len())?;
-    if keyring.is_empty() {
-        return Ok(None);
-    }
-
-    let snapshot_path = dir.join(SNAPSHOT);
-    let snapshot = match read_or_empty(&snapshot_path)? {
-        bytes if bytes.is_empty() => None,
-        bytes if bytes.len() < 8 => return Err(StoreError::Damaged(snapshot_path)),
-        bytes => {
-            let mut seq = [0; 8];
-            seq.copy_from_slice(&bytes[..8]);
-            Some((u64::from_le_bytes(seq), bytes[8..].to_vec()))
-        }
-    };
-    let covers = snapshot.as_ref().map_or(0, |(seq, _)| *seq);
-
-    let log_path = dir.join(LOG);
-    let bytes = read_or_empty(&log_path)?;
-    let (records, kept) = decode_records(&bytes, &log_path)?;
-    truncate_to(&log_path, kept, bytes.len())?;
-    // A crash between the snapshot's rename and the log's prune leaves covered records behind.
-    let records = records.into_iter().filter(|r| r.seq > covers).collect();
-    Ok(Some(StoredRoom {
-        room,
-        keyring,
-        snapshot,
-        records,
-    }))
-}
-
-/// The complete keyring entries and the length of the bytes holding them.
-fn decode_keyring(bytes: &[u8], path: &Path) -> Result<(Vec<Vec<u8>>, usize), StoreError> {
-    let header = keyring_header();
-    if bytes.len() < header.len() {
-        return Ok((Vec::new(), 0));
-    }
-    if bytes[..header.len()] != header[..] {
-        return Err(StoreError::Damaged(path.to_owned()));
-    }
-    let mut at = header.len();
-    let mut entries = Vec::new();
-    while let Some(len) = bytes.get(at..at + 4) {
-        let mut word = [0; 4];
-        word.copy_from_slice(len);
-        let len = u32::from_le_bytes(word) as usize;
-        let Some(entry) = bytes.get(at + 4..at + 4 + len) else {
-            break;
-        };
-        entries.push(entry.to_vec());
-        at += 4 + len;
-    }
-    Ok((entries, at))
-}
-
 /// The complete log records and the length of the bytes holding them.
-fn decode_records(bytes: &[u8], path: &Path) -> Result<(Vec<StoredRecord>, usize), StoreError> {
+pub(crate) fn decode_records(
+    bytes: &[u8],
+    path: &Path,
+) -> Result<(Vec<StoredRecord>, usize), StoreError> {
     let mut at = 0;
     let mut records = Vec::new();
     while let Some(head) = bytes.get(at..at + RECORD_HEAD) {
@@ -429,6 +366,55 @@ mod tests {
         assert_eq!(seqs, vec![4]);
     }
 
+    /// `specs/0095-workspace` criterion 48: a multi-part snapshot is staged, swapped in on its
+    /// last part, read back after a restart as its parts; a staging cut short by a restart is
+    /// dropped and the stored snapshot stays.
+    #[test]
+    fn snapshot_parts_survive_a_restart_and_a_cut_staging_is_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut store, _) = Store::open(dir.path()).unwrap();
+        store.apply(&keyring(1)).unwrap();
+        for seq in 1..=3 {
+            store.apply(&record(seq, RecordKind::Update, 9)).unwrap();
+        }
+        for (index, fill) in [(0, 5_u8), (1, 6)] {
+            store
+                .apply(&StoreOp::SnapshotPart {
+                    room: ROOM,
+                    covers_seq: 2,
+                    index,
+                    envelope: vec![fill; 20],
+                })
+                .unwrap();
+        }
+        store
+            .apply(&StoreOp::SnapshotParts {
+                room: ROOM,
+                covers_seq: 2,
+                count: 2,
+            })
+            .unwrap();
+        store
+            .apply(&StoreOp::SnapshotPart {
+                room: ROOM,
+                covers_seq: 3,
+                index: 0,
+                envelope: vec![8; 20],
+            })
+            .unwrap();
+        let rooms = reopen(dir.path());
+        assert_eq!(rooms[0].snapshot, Some((2, vec![5; 20])));
+        assert_eq!(rooms[0].snapshot_rest, vec![vec![6; 20]]);
+        let seqs: Vec<u64> = rooms[0].records.iter().map(|r| r.seq).collect();
+        assert_eq!(seqs, vec![3]);
+        assert!(
+            !dir.path()
+                .join(room_hex(ROOM))
+                .join("snapshot.part")
+                .exists()
+        );
+    }
+
     #[test]
     fn a_cut_short_end_is_dropped_and_truncated() {
         let dir = tempfile::tempdir().unwrap();
@@ -466,7 +452,7 @@ mod tests {
         let room = dir.path().join(room_hex(ROOM));
         let mut snapshot = 2_u64.to_le_bytes().to_vec();
         snapshot.extend_from_slice(&[7; 10]);
-        fs::write(room.join(SNAPSHOT), snapshot).unwrap();
+        fs::write(room.join(snapshot_file::SNAPSHOT), snapshot).unwrap();
         fs::write(room.join("log.tmp"), b"half").unwrap();
         let rooms = reopen(dir.path());
         let seqs: Vec<u64> = rooms[0].records.iter().map(|r| r.seq).collect();

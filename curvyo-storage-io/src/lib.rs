@@ -8,6 +8,7 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod container_thumbnail;
 mod credentials;
 mod filesystem;
 mod font_archives;
@@ -15,9 +16,15 @@ mod font_documents;
 mod font_files;
 mod font_subfolders;
 mod fonts;
+mod recent_workspaces;
 mod room_keys;
 mod svg_fonts;
+mod workspace;
+mod workspace_deleted;
+mod workspace_documents;
+mod workspace_share_files;
 
+pub use container_thumbnail::{ThumbnailError, with_thumbnail};
 pub use credentials::{CredentialError, CredentialStore, KEY_FILE, credential_slot};
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,
@@ -29,4 +36,25 @@ pub use font_subfolders::{FolderDocument, FontFolder, remove_add_leftovers};
 pub use fonts::{
     FolderFonts, FontFace, FontSource, MAX_FONT_FILE_BYTES, list_font_folder, list_system_fonts,
 };
+pub use recent_workspaces::{
+    MAX_RECENT_WORKSPACES, RECENT_WORKSPACES_FILE, RECENT_WORKSPACES_FORMAT, RecentWorkspace,
+    RecentWorkspaces, RecentWorkspacesError,
+};
 pub use room_keys::{decode_room_keys, encode_room_keys};
+pub use workspace::{
+    MARKER_DIR, MARKER_FILE, ScannedEntry, ScannedKind, WORKSPACE_FORMAT_VERSION, WorkspaceError,
+    create_document, create_folder, fresh_workspace_id, marker_text, move_entry, open_workspace,
+    parse_marker, scan_workspace, trash_entry,
+};
+pub use workspace_deleted::{
+    DELETED_DIR, keep_deleted, read_deleted, restore_deleted, write_deleted,
+};
+pub use workspace_documents::{
+    DocumentProbe, MAX_THUMBNAIL_BYTES, ShareMembers, probe_document, read_document, share_members,
+};
+pub use workspace_share_files::{
+    INDEX_FORMAT_VERSION, IndexEntry, JoinFolderError, MARKER_INDEX_FILE, MARKER_KEYRING_FILE,
+    MARKER_LIST_FILE, MARKER_SHARE_FILE, MarkerShare, check_join_folder, create_joined_workspace,
+    index_text, read_index, read_marker_share, remove_marker_share, replace_document,
+    replace_workspace_id, write_index, write_marker_share,
+};

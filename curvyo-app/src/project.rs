@@ -101,10 +101,48 @@ pub(crate) fn window_title(file_name: Option<&str>, dirty: bool, shared: bool) -
     }
 }
 
+/// The name the title gives the open project: "Box job / Sides / Lid" for a document inside the
+/// open workspace (`specs/0095-workspace` criterion 11), otherwise its file name.
+pub(crate) fn title_name(workspace: Option<&Path>, path: Option<&Path>) -> Option<String> {
+    let path = path?;
+    let inside =
+        workspace.and_then(|root| Some((root.file_name()?, path.strip_prefix(root).ok()?)));
+    let Some((root_name, rest)) = inside else {
+        return path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned());
+    };
+    let mut parts = vec![root_name.to_string_lossy().into_owned()];
+    parts.extend(
+        rest.components()
+            .map(|part| part.as_os_str().to_string_lossy().into_owned()),
+    );
+    if let Some(last) = parts.last_mut()
+        && let Some(stem) = Path::new(last.as_str())
+            .file_stem()
+            .filter(|_| last.to_lowercase().ends_with(".curvyo"))
+    {
+        *last = stem.to_string_lossy().into_owned();
+    }
+    Some(parts.join(" / "))
+}
+
+/// The name the title gives the open project: its place in the workspace when it was opened from
+/// the workspace's tree, otherwise its file name, even inside the workspace's folder
+/// (`specs/0095-workspace` criterion 3).
+pub(crate) fn project_title_name(state: &AppState) -> Option<String> {
+    let (path, in_workspace) = {
+        let project = state.lock_project();
+        (project.path.clone(), project.in_workspace)
+    };
+    let workspace = state.workspace().filter(|_| in_workspace);
+    title_name(workspace.as_deref(), path.as_deref())
+}
+
 /// Puts the project's file name and dirty state into the window title.
-fn refresh_window_title(app: &AppHandle) {
+pub(crate) fn refresh_window_title(app: &AppHandle) {
     let state = app.state::<AppState>();
-    let file_name = state.lock_project().file_name();
+    let file_name = project_title_name(&state);
     let title = window_title(file_name.as_deref(), state.is_dirty(), state.is_shared());
     if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
         let _ = window.set_title(&title);
@@ -234,7 +272,8 @@ pub(crate) fn set_shared(app: AppHandle, shared: bool) {
 /// already-packed bytes, write them. `save_as` forces the native save
 /// dialog even when a path is already known (acceptance criterion 3);
 /// otherwise an unknown path falls back to the same dialog (first-ever
-/// save).
+/// save). `thumbnail` is the page's PNG of the current page, written into the container as
+/// `thumbnail.png` (`specs/0095-workspace` criterion 6).
 #[tauri::command]
 #[allow(clippy::unused_async)] // async keeps the blocking dialog off the main thread
 pub(crate) async fn save_project_bytes(
@@ -242,6 +281,7 @@ pub(crate) async fn save_project_bytes(
     bytes: Vec<u8>,
     save_as: bool,
     suggested_name: Option<String>,
+    thumbnail: Option<Vec<u8>>,
 ) -> SaveOutcome {
     let state = app.state::<AppState>();
     let (known_path, known_name) = {
@@ -256,6 +296,7 @@ pub(crate) async fn save_project_bytes(
         return SaveOutcome::Cancelled;
     };
 
+    let bytes = with_page_thumbnail(bytes, thumbnail.as_deref());
     if curvyo_storage_io::write_atomic(&path, &bytes).is_err() {
         // A failed save that looks successful is the worst failure mode
         // this product can have — report it, don't just return.
@@ -275,6 +316,14 @@ pub(crate) async fn save_project_bytes(
         file_name,
         path: path.to_string_lossy().into_owned(),
     }
+}
+
+/// The container bytes with `thumbnail` as their `thumbnail.png`; a thumbnail that cannot be put
+/// in leaves the bytes as they are, since the row then shows the placeholder.
+fn with_page_thumbnail(bytes: Vec<u8>, thumbnail: Option<&[u8]>) -> Vec<u8> {
+    thumbnail
+        .and_then(|png| curvyo_storage_io::with_thumbnail(&bytes, png).ok())
+        .unwrap_or(bytes)
 }
 
 /// Leaves the application: the page asked, after Discard, a successful Save, or with nothing to
@@ -362,7 +411,7 @@ fn project_dialog(app: &AppHandle) -> FileDialogBuilder<Wry> {
 }
 
 /// `dialog` modal to the main window, when it exists.
-fn parented(app: &AppHandle, dialog: FileDialogBuilder<Wry>) -> FileDialogBuilder<Wry> {
+pub(crate) fn parented(app: &AppHandle, dialog: FileDialogBuilder<Wry>) -> FileDialogBuilder<Wry> {
     match app.get_webview_window(MAIN_WINDOW) {
         Some(window) => dialog.set_parent(&window),
         None => dialog,
@@ -379,7 +428,74 @@ fn pick_save_path(app: &AppHandle, current_name: Option<&str>) -> Option<PathBuf
 
 #[cfg(test)]
 mod tests {
-    use super::window_title;
+    use std::path::Path;
+
+    use super::{project_title_name, title_name, window_title, with_page_thumbnail};
+    use crate::state::AppState;
+
+    /// `specs/0095-workspace` criterion 11: a workspace document is titled by the workspace's name
+    /// and its path inside it; any other file by its file name.
+    #[test]
+    fn a_workspace_document_is_titled_by_its_place_in_the_workspace() {
+        let root = Path::new("/home/maker/Box job");
+        assert_eq!(
+            title_name(Some(root), Some(&root.join("Sides/Lid.curvyo"))).as_deref(),
+            Some("Box job / Sides / Lid")
+        );
+        assert_eq!(
+            title_name(Some(root), Some(Path::new("/tmp/Poster.curvyo"))).as_deref(),
+            Some("Poster.curvyo")
+        );
+        assert_eq!(
+            title_name(None, Some(&root.join("Lid.curvyo"))).as_deref(),
+            Some("Lid.curvyo")
+        );
+        assert_eq!(title_name(Some(root), None), None);
+    }
+
+    /// `specs/0095-workspace` criterion 3: a file opened with plain Open keeps today's title even
+    /// when it lies inside the open workspace; one opened from the tree is titled by its place.
+    #[test]
+    fn a_file_opened_with_open_keeps_its_file_name_title_inside_the_workspace() {
+        let root = Path::new("/home/maker/Box job");
+        let state = AppState::default();
+        state.set_workspace(Some(root.to_path_buf()));
+        state.confirm_opened(root.join("Sides/Lid.curvyo"));
+        assert_eq!(project_title_name(&state).as_deref(), Some("Lid.curvyo"));
+        state.confirm_workspace_opened(root.join("Sides/Lid.curvyo"));
+        assert_eq!(
+            project_title_name(&state).as_deref(),
+            Some("Box job / Sides / Lid")
+        );
+        state.follow_move(&root.join("Sides"), &root.join("Walls"));
+        assert_eq!(
+            project_title_name(&state).as_deref(),
+            Some("Box job / Walls / Lid")
+        );
+        state.confirm_opened(root.join("Walls/Lid.curvyo"));
+        assert_eq!(project_title_name(&state).as_deref(), Some("Lid.curvyo"));
+    }
+
+    /// `specs/0095-workspace` criterion 6: Save writes the page's thumbnail into the container;
+    /// a thumbnail that is not a PNG leaves the bytes as the page packed them.
+    #[test]
+    fn save_puts_the_thumbnail_into_the_container() {
+        let packed = curvyo_document_core::pack(&curvyo_document_core::Document::new(1), "0.1.0")
+            .expect("pack");
+        let png = b"\x89PNG\r\n\x1a\npage".as_slice();
+        let saved = with_page_thumbnail(packed.clone(), Some(png));
+        let dir = tempfile::tempdir().expect("dir");
+        std::fs::write(dir.path().join("Lid.curvyo"), &saved).expect("write");
+        assert_eq!(
+            curvyo_storage_io::probe_document(dir.path(), &["Lid.curvyo".to_owned()])
+                .expect("probe"),
+            curvyo_storage_io::DocumentProbe::Readable {
+                thumbnail: Some(png.to_vec())
+            }
+        );
+        assert_eq!(with_page_thumbnail(packed.clone(), Some(b"GIF89a")), packed);
+        assert_eq!(with_page_thumbnail(packed.clone(), None), packed);
+    }
 
     /// Criterion 30: the title for every combination of file name and dirty state.
     #[test]

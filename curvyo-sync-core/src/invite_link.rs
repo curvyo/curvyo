@@ -1,23 +1,37 @@
-//! The invite link's text form (ADR 0031 decision 8):
-//! `curvyo://join?server=<url-encoded relay URL>#1.<base64url(room_id ‖ invite_seed)>`.
+//! The invite link's text form (ADR 0031 decision 8, ADR 0037 decision 9):
+//! `curvyo://join?server=<url-encoded relay URL>#<version>.<base64url(room_id ‖ invite_seed)>`.
 //!
 //! Only the part after `#` carries the secret, so a web server that ever serves the link never
-//! receives it (criterion 2). Version `1.` means one document whose room id is its document id.
+//! receives it (criterion 2). Version `1.` means one document whose room id is its document id,
+//! version `2.` a workspace whose room id is its workspace id.
 
 use crate::client::InviteSecret;
 use crate::frame::RoomId;
 
 /// The link's scheme and path as written.
 const PREFIX: &str = "curvyo://join";
-/// The only link version slice 1 reads and writes.
-const VERSION: &str = "1.";
+/// The version of a link to one document.
+const DOCUMENT_VERSION: &str = "1.";
+/// The version of a link to a workspace.
+const WORKSPACE_VERSION: &str = "2.";
 const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-/// An invite link: the relay to reach and the one-time secret.
+/// What an invite link opens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InviteKind {
+    /// One document (version `1.`).
+    Document,
+    /// A whole workspace (version `2.`).
+    Workspace,
+}
+
+/// An invite link: the relay to reach, what it opens and the one-time secret.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InviteLink {
     /// The relay address, as the inviting device has it (`ws://host:port`).
     pub server: String,
+    /// A document or a workspace.
+    pub kind: InviteKind,
     /// The room and the invite seed.
     pub secret: InviteSecret,
 }
@@ -40,15 +54,20 @@ impl InviteLink {
         let mut secret = Vec::with_capacity(48);
         secret.extend_from_slice(&self.secret.room.0);
         secret.extend_from_slice(&self.secret.seed);
+        let version = match self.kind {
+            InviteKind::Document => DOCUMENT_VERSION,
+            InviteKind::Workspace => WORKSPACE_VERSION,
+        };
         format!(
-            "{PREFIX}?server={}#{VERSION}{}",
+            "{PREFIX}?server={}#{version}{}",
             percent_encode(&self.server),
             base64url(&secret)
         )
     }
 
-    /// Reads a pasted link: `curvyo://join?server=…#1.…`, or any other address with the same
-    /// `server` parameter and fragment (an `https://…#1.…` shape). Spaces around it are ignored.
+    /// Reads a pasted link: `curvyo://join?server=…#1.…` or `#2.…`, or any other address with
+    /// the same `server` parameter and fragment (an `https://…#1.…` shape). Spaces around it are
+    /// ignored.
     ///
     /// # Errors
     /// `Malformed` for anything else, `UnknownVersion` for a fragment of another version.
@@ -64,7 +83,13 @@ impl InviteLink {
         if server.is_empty() {
             return Err(InviteLinkError::Malformed);
         }
-        let Some(encoded) = fragment.strip_prefix(VERSION) else {
+        let found = [
+            (DOCUMENT_VERSION, InviteKind::Document),
+            (WORKSPACE_VERSION, InviteKind::Workspace),
+        ]
+        .into_iter()
+        .find_map(|(version, kind)| Some((kind, fragment.strip_prefix(version)?)));
+        let Some((kind, encoded)) = found else {
             let looks_versioned = fragment
                 .split_once('.')
                 .is_some_and(|(v, _)| !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit()));
@@ -82,6 +107,7 @@ impl InviteLink {
         let seed: [u8; 32] = seed.try_into().map_err(|_| InviteLinkError::Malformed)?;
         Ok(Self {
             server,
+            kind,
             secret: InviteSecret {
                 room: RoomId(room),
                 seed,
@@ -174,6 +200,7 @@ mod tests {
     fn link() -> InviteLink {
         InviteLink {
             server: "ws://192.168.1.20:8787".to_owned(),
+            kind: InviteKind::Document,
             secret: InviteSecret {
                 room: RoomId([0xd0; 16]),
                 seed: [7; 32],
@@ -224,8 +251,25 @@ mod tests {
             );
         }
         assert_eq!(
-            InviteLink::parse(&text.replace("#1.", "#2.")),
+            InviteLink::parse(&text.replace("#1.", "#3.")),
             Err(InviteLinkError::UnknownVersion)
+        );
+    }
+
+    /// `specs/0095-workspace` criterion 26: a workspace link is version `2.`, with the
+    /// workspace id and the seed after `#`; version `1.` keeps its meaning.
+    #[test]
+    fn a_workspace_link_is_version_2() {
+        let workspace = InviteLink {
+            kind: InviteKind::Workspace,
+            ..link()
+        };
+        let text = workspace.to_text();
+        assert!(text.starts_with("curvyo://join?server=ws%3A%2F%2F192.168.1.20%3A8787#2."));
+        assert_eq!(InviteLink::parse(&text).unwrap(), workspace);
+        assert_eq!(
+            InviteLink::parse(&text.replace("#2.", "#1.")).unwrap().kind,
+            InviteKind::Document
         );
     }
 

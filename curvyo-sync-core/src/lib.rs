@@ -16,15 +16,21 @@ mod frame;
 mod invite_link;
 mod relay;
 mod time;
+mod workspace_stream;
 
 pub use client::{
     ClientOutput, ClientSession, InviteSecret, SNAPSHOT_BYTES, SNAPSHOT_RECORDS, SessionConfig,
     SessionError, SessionEvent, SessionStart,
 };
 pub use frame::{
-    ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, PROTOCOL_VERSION, RecordKind,
-    RefusalReason, RelayFrame, RoomId,
+    ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, OLDEST_PROTOCOL_VERSION,
+    PROTOCOL_VERSION, RecordKind, RefusalReason, RelayFrame, RoomId,
 };
-pub use invite_link::{InviteLink, InviteLinkError};
+pub use invite_link::{InviteKind, InviteLink, InviteLinkError};
 pub use relay::{Relay, RelayOutput, RestoreError, RoomLog, StoreOp, StoredRecord, StoredRoom};
 pub use time::Millis;
+pub use workspace_stream::{
+    InnerHeader, Moved, PART_BYTES, PART_PADDING, SNAPSHOT_STREAM_VERSION, SnapshotAssembler,
+    StreamEntry, StreamError, decode_inner_record, decode_moved, encode_inner_record, encode_moved,
+    encode_snapshot_stream, snapshot_due, split_snapshot,
+};

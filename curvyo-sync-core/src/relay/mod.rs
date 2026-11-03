@@ -4,6 +4,7 @@
 
 mod admission;
 mod room;
+mod snapshot;
 
 use std::collections::BTreeMap;
 
@@ -58,6 +59,33 @@ pub enum StoreOp {
         covers_seq: u64,
         /// The signed envelope.
         envelope: Vec<u8>,
+    },
+    /// Stage one part of a multi-part snapshot (`snapshot.part/`); part 0 discards any staged
+    /// parts first (ADR 0037 decision 7).
+    SnapshotPart {
+        /// The room.
+        room: RoomId,
+        /// The last record the snapshot covers.
+        covers_seq: u64,
+        /// The part's place.
+        index: u32,
+        /// The signed envelope.
+        envelope: Vec<u8>,
+    },
+    /// The staged `count` parts replace the room's snapshot; every record up to `covers_seq` is
+    /// dropped.
+    SnapshotParts {
+        /// The room.
+        room: RoomId,
+        /// The last record they cover.
+        covers_seq: u64,
+        /// How many parts are staged.
+        count: u32,
+    },
+    /// Discard the staged parts: a complete snapshot older than the stored one.
+    DropStagedParts {
+        /// The room.
+        room: RoomId,
     },
 }
 

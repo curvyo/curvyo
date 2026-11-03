@@ -194,3 +194,25 @@ fn a_record_the_caller_could_not_import_resyncs_from_the_snapshot() {
     net.run(1_000);
     assert_eq!(net.clients[b].count(|e| *e == SessionEvent::Resyncing), 1);
 }
+
+/// `specs/0095-workspace` criterion 41 (Download again): a resync the caller asks for shows no
+/// rejection, reconnects once and reads the room's snapshot again; it can be asked again.
+#[test]
+fn a_resync_the_caller_asks_for_reads_the_snapshot_again() {
+    let (mut net, a, b) = pair(7);
+    net.edit(a, |d| rect(d, 20.0, 0.0));
+    net.run(500);
+    let connects = net.clients[b].connect_times.len();
+    net.clients[b].session.as_mut().unwrap().resync();
+    net.pump(b);
+    net.run(3_000);
+    let client = &net.clients[b];
+    assert_eq!(client.count(|e| *e == SessionEvent::UpdateRejected), 0);
+    assert_eq!(client.connect_times.len(), connects + 1, "reconnected once");
+    assert!(snapshot_after_resync(client));
+    assert!(net.converged(&[a, b]));
+    net.clients[b].session.as_mut().unwrap().resync();
+    net.pump(b);
+    net.run(3_000);
+    assert_eq!(net.clients[b].count(|e| *e == SessionEvent::Resyncing), 2);
+}

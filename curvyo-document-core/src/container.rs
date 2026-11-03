@@ -94,8 +94,9 @@ fn pack_members(
     write_member(&mut writer, MANIFEST_MEMBER, &manifest_bytes, options)?;
     write_member(&mut writer, LORO_SNAPSHOT_MEMBER, &loro_bytes, options)?;
     write_member(&mut writer, DOCUMENT_JSON_MEMBER, &json_bytes, options)?;
-    if let Some(record) = document.share().filter(|_| with_share) {
-        for (name, bytes) in crate::container_share::share_members(&record)? {
+    let sharing = document.share.borrow().clone().filter(|_| with_share);
+    if let Some(sharing) = sharing {
+        for (name, bytes) in crate::container_share::share_members(&sharing)? {
             write_member(&mut writer, name, &bytes, options)?;
         }
     }
@@ -166,7 +167,7 @@ pub fn unpack(peer_id: u64, bytes: &[u8]) -> Result<Document, OpenError> {
     let loro_bytes = read_member(&mut archive, LORO_SNAPSHOT_MEMBER)?;
     let document = Document::from_loro_snapshot(peer_id, &loro_bytes)?;
     *document.assets.borrow_mut() = crate::container_assets::read_assets(&mut archive);
-    document.set_share(share);
+    document.set_sharing(share);
     Ok(document)
 }
 

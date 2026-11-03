@@ -4,7 +4,21 @@
 // `tests/projectText.test.ts` covers it.
 
 /** What a replacing action does, in the words of the check's sentence. */
-export type ReplacingKind = "new" | "open" | "close" | "quit" | "handover" | "join";
+export type ReplacingKind =
+  | "new"
+  | "open"
+  | "close"
+  | "quit"
+  | "handover"
+  | "join"
+  // `specs/0095-workspace`: a click on another document of the workspace, Open workspace or a
+  // recent one over an open workspace, Close workspace, Delete of the open document.
+  | "switch"
+  | "open-workspace"
+  | "close-workspace"
+  | "delete-open"
+  // Share workspace closes the open document while it prepares every file (criterion 25).
+  | "share-workspace";
 
 /** The file name of a path, either separator, without the folders. */
 export function baseName(path: string): string {
@@ -18,9 +32,16 @@ export function projectName(fileName: string | null): string {
   return fileName === null || fileName === "" ? "Untitled" : fileName;
 }
 
-/** The status line under the name: "Unsaved changes" while dirty, otherwise whether the project
- * has a saved file to compare with. */
-export function projectStatus(fileName: string | null, dirty: boolean): string {
+/** The status line under the name: "File missing" once another program removed the open file
+ * (`specs/0095-workspace` criterion 7), "Unsaved changes" while dirty, otherwise whether the
+ * project has a saved file to compare with. */
+export function projectStatus(fileName: string | null, dirty: boolean, missing = false, deleted = ""): string {
+  if (deleted !== "") {
+    return deleted;
+  }
+  if (missing) {
+    return "File missing";
+  }
   if (dirty) {
     return "Unsaved changes";
   }
@@ -34,6 +55,11 @@ const ENDS: Record<ReplacingKind, string> = {
   join: "open another project",
   close: "close it",
   quit: "quit",
+  switch: "open another document",
+  "open-workspace": "open another workspace",
+  "close-workspace": "close the workspace",
+  "delete-open": "delete it",
+  "share-workspace": "share the workspace",
 };
 
 /** The sentence of the inline check: what is at stake, what each answer does and that discarding
