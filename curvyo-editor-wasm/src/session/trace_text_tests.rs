@@ -99,12 +99,15 @@ fn session_with_bytes(bytes: &[u8], file: &str) -> (Session, NodeId) {
 
 /// What one run produced.
 #[derive(Debug, PartialEq)]
-struct Run {
-    texts: Vec<(String, Vec<usize>, f64, [f64; 6])>,
-    paths: usize,
-    ocr_seconds: f64,
-    pass_seconds: f64,
-    fit_seconds: f64,
+pub(super) struct Run {
+    /// Each text: string, guessed positions, size in mm, placement.
+    pub(super) texts: Vec<(String, Vec<usize>, f64, [f64; 6])>,
+    /// Each text's face, family and style.
+    pub(super) faces: Vec<String>,
+    pub(super) paths: usize,
+    pub(super) ocr_seconds: f64,
+    pub(super) pass_seconds: f64,
+    pub(super) fit_seconds: f64,
 }
 
 fn texts(session: &Session) -> Vec<TextSnapshot> {
@@ -141,7 +144,7 @@ pub(super) fn fit(request: &str) -> String {
 }
 
 /// OCR, text pass and trace, the fit, Create paths, one undo; checks the one step (criterion 11).
-fn run(model: &OcrModel, file: &str) -> Run {
+pub(super) fn run(model: &OcrModel, file: &str) -> Run {
     let (mut session, image) = session_with(file);
     let source = session.trace_source(image, false).unwrap();
     let started = cpu_seconds();
@@ -208,6 +211,10 @@ fn run(model: &OcrModel, file: &str) -> Run {
                     t.placement.to_array(),
                 )
             })
+            .collect(),
+        faces: written
+            .iter()
+            .map(|t| format!("{} {}", t.font.family, t.font.style))
             .collect(),
         paths,
         ocr_seconds,

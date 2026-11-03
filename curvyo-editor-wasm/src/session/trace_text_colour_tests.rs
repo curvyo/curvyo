@@ -20,7 +20,7 @@ use super::trace_text_tests::{
 use super::{Session, TraceCreateOutcome};
 
 /// Multicolour with Remove background on white paper, the rest at its first-use values.
-fn colour_params() -> TraceColourParams {
+pub(super) fn colour_params() -> TraceColourParams {
     TraceColourParams::new(TraceParams {
         selection: TraceMethod::RemoveBackground {
             background: Some(TraceRgb::new(255, 255, 255)),
@@ -31,21 +31,21 @@ fn colour_params() -> TraceColourParams {
 }
 
 /// One written text: string, fill, guessed positions, size in mm, placement.
-type WrittenColourText = (String, Color, Vec<usize>, f64, [f64; 6]);
+pub(super) type WrittenColourText = (String, Color, Vec<usize>, f64, [f64; 6]);
 
 /// What one run wrote: the texts (string, fill, guessed positions, size, placement) and the
 /// colour paths (fill, outline count), in the document's order, and where the texts lie.
 #[derive(Debug, PartialEq)]
-struct ColourRun {
-    texts: Vec<WrittenColourText>,
-    paths: Vec<(Color, usize)>,
+pub(super) struct ColourRun {
+    pub(super) texts: Vec<WrittenColourText>,
+    pub(super) paths: Vec<(Color, usize)>,
     /// Every text lies above every traced path.
-    texts_on_top: bool,
+    pub(super) texts_on_top: bool,
 }
 
 /// Seconds of thread CPU per stage of one run.
 #[derive(Debug, Default)]
-struct Times {
+pub(super) struct Times {
     ocr: f64,
     regions: f64,
     fit: f64,
@@ -56,7 +56,7 @@ struct Times {
 
 /// OCR, the text pass alone, the fit, the one multicolour trace (criterion 25), Create paths,
 /// one undo; checks the one step (criterion 24/11).
-fn run(model: &OcrModel, file: &str, params: &TraceColourParams) -> (ColourRun, Times) {
+pub(super) fn run(model: &OcrModel, file: &str, params: &TraceColourParams) -> (ColourRun, Times) {
     let (mut session, image) = session_with(file);
     let source = session.trace_source(image, false).unwrap();
     let mut times = Times::default();

@@ -2,8 +2,8 @@
 //! that read them (`specs/0091-trace-text-recognition` round 2): numbers and JSON across the wasm
 //! boundary, host-independent so ordinary `cargo test` covers it.
 //!
-//! The crops: `{lines: [{quad, width, samples}]}` (`samples`: how many numbers of the array are
-//! the line's) and one `f32` array of their samples, line after line.
+//! The crops: `{lines: [{quad, width, pad, samples}]}` (`samples`: how many numbers of the array
+//! are the line's, its padding included) and one `f32` array of their samples, line after line.
 //! A read: a JSON array with one entry per crop, the line as `ocr_lines_json` writes it or `null`.
 
 use curvyo_ui_core::{LineCrop, OCR_LINE_HEIGHT, OcrModel, trace_read_crop};
@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 pub fn crops_wire(crops: &[LineCrop]) -> (String, Vec<f32>) {
     let lines: Vec<Value> = crops
         .iter()
-        .map(|c| json!({ "quad": c.quad, "width": c.width, "samples": c.rgb.len() }))
+        .map(|c| json!({ "quad": c.quad, "width": c.width, "pad": c.pad, "samples": c.rgb.len() }))
         .collect();
     let samples = crops.iter().flat_map(|c| c.rgb.iter().copied()).collect();
     (json!({ "lines": lines }).to_string(), samples)
@@ -28,6 +28,11 @@ pub fn read_crops_wire(json: &str, samples: &[f32]) -> Option<Vec<LineCrop>> {
     let mut out = Vec::new();
     for line in value.get("lines")?.as_array()? {
         let width = usize::try_from(line.get("width")?.as_u64()?).ok()?;
+        let pad = line.get("pad")?.as_array()?;
+        let pad = [
+            usize::try_from(pad.first()?.as_u64()?).ok()?,
+            usize::try_from(pad.get(1)?.as_u64()?).ok()?,
+        ];
         let mut quad = [[0.0_f32; 2]; 4];
         let corners = line.get("quad")?.as_array()?;
         if corners.len() != 4 {
@@ -41,10 +46,15 @@ pub fn read_crops_wire(json: &str, samples: &[f32]) -> Option<Vec<LineCrop>> {
                 *out = [xy.first()?.as_f64()? as f32, xy.get(1)?.as_f64()? as f32];
             }
         }
-        let count = width.checked_mul(OCR_LINE_HEIGHT * 3)?;
+        let count = (pad[0] + width + pad[1]).checked_mul(OCR_LINE_HEIGHT * 3)?;
         let rgb = samples.get(at..at.checked_add(count)?)?.to_vec();
         at += count;
-        out.push(LineCrop { quad, width, rgb });
+        out.push(LineCrop {
+            quad,
+            width,
+            pad,
+            rgb,
+        });
     }
     (at == samples.len()).then_some(out)
 }
@@ -135,7 +145,8 @@ mod tests {
         let (json, mut samples) = crops_wire(&[LineCrop {
             quad: [[0.0, 0.0], [8.0, 0.0], [8.0, 48.0], [0.0, 48.0]],
             width: 8,
-            rgb: vec![0.5; 8 * OCR_LINE_HEIGHT * 3],
+            pad: [1, 2],
+            rgb: vec![0.5; 11 * OCR_LINE_HEIGHT * 3],
         }]);
         assert!(read_crops_wire(&json, &samples).is_some());
         samples.pop();
