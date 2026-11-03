@@ -274,3 +274,94 @@ of the multicolour job compared in Chromium against the editor wasm.
   read its result) and `frontend/tests/acceptance_0089_tidyup_tester.test.ts` c57 (Multicolour Tab
   order now has "Recognise text" after Drop border shapes). Left for the tester; with the first
   assertion flipped locally the three 0091 cases pass.
+
+# Slice 3: upside-down and steep text (criteria 30 to 35)
+
+Implementer, 2026-11-02, on `story/trace-ocr-upside-down` (stacked on slice 2, PR #250). Built
+against `specification.md` criteria 30 to 35 and the lead's approach (Proposal): no new model or
+weights; a line whose first read is unsure or whose box is steeper than 45° is also read turned
+by 180°, the surer read wins, the text object follows the winning read's direction. No new crate,
+no new dependency, no public API change, no `format_version` change.
+
+## Approach
+
+- **Where:** the reads in `curvyo-ocr-core/src/read.rs`. A line's crop sampled along its quad turned by
+  180° is the same samples in reverse order (the sampling grid is symmetric), so the second read
+  needs no new sampling: the crop's samples reversed, its quad's corners started at the opposite
+  corner. `read_crop` does both reads, so the trace worker's own read and the pool workers'
+  shares (round 2) take the same path, and the pool, the wire and the frontend stay unchanged.
+- **The turned read wins** when it is sure (mean at least 0.9), its doubt (1 minus the mean) is
+  at most a fifth of the first read's, and it holds at least 2 letters or digits (Proposals,
+  `adrs.md` decision 11: short symbol lines of the screenshot such as "3", "*", "88+" read as
+  well or better turned, and the `0025` dot grid's "0000…" reads "0000…01" turned at 0.95; all
+  must stay as they are, criteria 18 and 32). A line kept turned grows by 0.2 of its height
+  above its text, so the dots of an upside-down "Ä" are inside its quad.
+- **Rotation:** the winning quad's top edge gives the line direction as today, so the region
+  trace, the positions and the text object's direction follow. The font fit turns a line more
+  than 45° from reading left to right into a frame where it does (new module
+  `curvyo-ui-core/src/trace_fit_turn.rs`, "Turns a read line into the fit's reading frame"),
+  because the `0088` recogniser lays a line out along its own axis pointing right; its texts
+  are turned back. Lines within 45° are not turned, so their fit is unchanged.
+- **Angles:** the spec's "+90° (reading bottom to top)" is the turn on screen (counter-clockwise);
+  the tests use pixel space as the existing truth files do (y down), where that line is -90°.
+
+## Affected crates/modules
+
+- `curvyo-ocr-core`: `read.rs` (the turned read and the choice), tests `turned.rs`.
+- `curvyo-ui-core`: `trace_fit.rs`, `trace_fit_guess.rs` (the fit in the line's reading frame),
+  new `trace_fit_turn.rs`.
+- Fixtures: `curvyo-ocr-core/tests/fixtures/turned/` (`poster_180.png`, `steep.png`,
+  `mixed.png`, `truth.toml`) from `make_turned.py`.
+- `curvyo-editor-wasm`: session tests on the new fixtures (`trace_text_turned_tests.rs`: texts,
+  faces, sure letters, rotation, one step, Multicolour, the times).
+
+## Tasks
+
+1. [x] Plan (this section).
+2. [x] Fixtures: the reference poster turned by 180°, a steep picture (+90° and -90°), a mixed
+   picture (upright and upside down) (criteria 30, 31, 33).
+3. [x] Calibrate the sure-read threshold on all fixtures and the screenshot; record it in
+   `adrs.md` (criteria 32, 34).
+4. [x] ocr-core, tests first: the turned read for unsure and steep lines, the surer read wins,
+   no extra read for sure level lines (counter 0 on the clean poster) (criteria 30, 31, 32, 33,
+   34).
+5. [x] ui-core, test first: the fit turns an upside-down or steep line into its reading frame
+   and its texts back (criteria 30, 31, 33).
+6. [x] Session tests: the 180° poster, the steep and the mixed picture give the strings, faces,
+   sure letters and rotations; the existing posters unchanged; Multicolour too (criteria 30, 31,
+   33, 35).
+7. [x] Times (CPU) on the upright poster, the 180° poster, the steep picture and the
+   screenshot (criterion 34); docs; full gate.
+
+## Validation
+
+Unit test in `read.rs` (the turned crop is the same samples reversed; the extra-read counter is
+0 on the clean poster); integration test `curvyo-ocr-core/tests/turned.rs` (strings and angles
+of the three fixtures); session tests in `curvyo-editor-wasm` (texts, faces, sure letters and
+rotations through the fit; unchanged results and goldens of slices 1 and 2).
+
+## Results (2026-11-03)
+
+- Threshold 0.9 (`adrs.md` decision 11). Lines read twice: clean and noisy poster 0, all other
+  committed upright fixtures 0 except the colour crop (1, kept) and the screenshot (17 of 78,
+  all kept as first read); the 180° poster 8 of 8 (all turned), the steep picture 2 (one turned),
+  the mixed picture 1 (turned), the tester's 90° line 1 (turned: "Neunzig 90" instead of
+  "M6 8zunat"), the `0025` dot grid 114 of 116 (none turned). On every committed upright
+  fixture no turned read wins, so the OCR lines are the slice 2 lines; the screenshot's per-line
+  fit table is identical before and after (diff of the harness output).
+- 180° poster (Create paths): 8 texts, 5 paths (shapes whole); 7 strings, faces and guessed
+  letters equal to the upright poster's, "BÄCKERE(" for "BÄCKEREI" (the detector's box ends at
+  the last letter, the reader drops it; the fit sets the "I" as a guessed "("), 0 wrong sure
+  letters; every text turned 180° from its upright one within 0.02°. Steep picture: "Steil nach
+  oben" at -90° (reads bottom to top), "Steil nach unten" at +90° (document space, y down).
+  Mixed: "Oben richtig" unturned, "Kopfstand 180" at 180°, the same in Multicolour.
+- CPU of the OCR, native release, one `rayon` thread (process CPU; slice 2 code → slice 3):
+  upright poster 2.4 s → 2.4 s, 180° poster 2.4 s → 3.9 s, steep picture 1.15 s → 1.48 s, mixed
+  picture 0.83 s → 1.06 s, screenshot 15.6 s → 18.9 s (+21 %, its 17 unsure UI lines). Font fit
+  of the 180° poster 1.52 s against 1.55 s upright.
+- Lead fixes (2026-11-03): the crop is padded 0.3 line height at both ends for the turned read
+  only (the 180° poster now gives "BÄCKEREI", all letters sure; upright reads and goldens
+  unchanged); no space is put in next to `. , / : ; ' "`, nor beside a "-" unless the "-" gets
+  a space on both sides (the tester's criterion 29 case "Nord - Sud" keeps its spaces). The
+  noisy poster gives "Art.-Nr." again and `the_posters_read_right` passes (8 of 8 exact on
+  both posters, 0 wrong sure letters).
