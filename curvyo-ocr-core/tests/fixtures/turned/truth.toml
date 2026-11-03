@@ -1,0 +1,20 @@
+# Truth of the slice 3 fixtures (`make_turned.py`). Lines top to bottom on the picture.
+# `rotation_degrees` is each line's reading direction in pixel space (x right, y down), as the
+# other truth files: a line reading bottom to top ("+90 degrees" on screen) is -90. `upright`
+# names the picture this one turns by 180 degrees: each line's angle is then 180 plus the angle
+# the upright picture's line reads at.
+[[images]]
+file = "poster_180.png"
+upright = "../poster.png"
+lines = ["small print: est. 1998 in Hamburg", "Art.-Nr. 0815/ÄÖÜ äöü ß", "Wedding", "FRESH", "Größe 42 mm, Laser 0.2", "Müller & Söhne", "SALE", "BÄCKEREI"]
+rotation_degrees = [180.0, 180.0, 180.0, 180.0, 180.0, 180.0, 180.0, 180.0]
+
+[[images]]
+file = "steep.png"
+lines = ["Steil nach unten", "Steil nach oben"]
+rotation_degrees = [90.0, -90.0]
+
+[[images]]
+file = "mixed.png"
+lines = ["Oben richtig", "Kopfstand 180"]
+rotation_degrees = [0.0, 180.0]
