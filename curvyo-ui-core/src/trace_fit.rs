@@ -13,6 +13,7 @@ use curvyo_text_core::{Face, LayoutOptions, Mm, RecognisedRun, layout};
 use kurbo::{Affine, BezPath, Vec2};
 
 use crate::text_recognise_job::{FaceState, JobStep, NearestFound, RecogniseJob, Tiers};
+use crate::trace_fit_turn::fit_turn;
 
 /// One read line to fit: its string, its direction and its own outlines (document mm).
 #[derive(Debug, Clone, PartialEq)]
@@ -103,6 +104,8 @@ pub struct TraceFit {
     pub(crate) scales: Vec<f64>,
     /// Per line: its outlines in the fit's space and its tolerance there.
     pub(crate) scaled: Vec<(Vec<BezPath>, Mm)>,
+    /// Per line: the turn that makes it read left to right in the fit's space ([`crate::trace_fit_turn::fit_turn`]).
+    pub(crate) turns: Vec<Affine>,
     /// The faces a line without a sure letter is set in (criterion 29).
     pub(crate) fallback: Vec<FallbackFace>,
 }
@@ -189,14 +192,15 @@ impl TraceFit {
         fallback: Vec<FallbackFace>,
     ) -> Self {
         let scales: Vec<f64> = lines.iter().map(fit_scale).collect();
+        let turns: Vec<Affine> = lines.iter().map(fit_turn).collect();
         let hinted: Vec<(Vec<BezPath>, String, Mm)> = lines
             .iter()
-            .zip(&scales)
-            .map(|(l, &k)| {
+            .zip(scales.iter().zip(&turns))
+            .map(|(l, (&k, &turn))| {
                 (
                     l.outlines
                         .iter()
-                        .map(|p| Affine::scale(k) * p.clone())
+                        .map(|p| Affine::scale(k) * turn * p.clone())
                         .collect(),
                     l.text.clone(),
                     Mm(line_tolerance(l, tolerance).get() * k),
@@ -210,6 +214,7 @@ impl TraceFit {
             strokes,
             strokes_asked: false,
             scales,
+            turns,
             fallback,
         }
     }
@@ -248,7 +253,7 @@ impl TraceFit {
             .iter()
             .filter_map(|&index| {
                 let found = face(index)?;
-                let fit = recogniser.fit_strokes(&found, &line.text, line.direction)?;
+                let fit = recogniser.fit_strokes(&found, &line.text, self.direction(source))?;
                 Some((index, found, fit))
             })
             .min_by(|a, b| a.2.score.total_cmp(&b.2.score).then(a.0.cmp(&b.0)))?;
@@ -260,7 +265,7 @@ impl TraceFit {
             && fit.run.sure >= MIN_STROKE_SURE
             && STROKE_SURE_EVERY * fit.run.sure >= fit.run.letters;
         let k = self.scales[source];
-        let run = unscaled(fit.run, k);
+        let run = self.in_document(source, fit.run);
         taken.then(|| FitText {
             glyphs: glyphs(&found, &run),
             nearest: run.sure == 0,
@@ -307,7 +312,7 @@ impl TraceFit {
                 .filter(|a| a.source == source)
                 .filter_map(|a| {
                     let found = face(a.face)?;
-                    let run = unscaled(a.run.clone(), self.scales[source]);
+                    let run = self.in_document(source, a.run.clone());
                     Some(FitText {
                         glyphs: glyphs(&found, &run),
                         run,
@@ -376,12 +381,22 @@ mod tests {
     /// The fit of one line `text` with `outlines` against Source Sans 3 Regular; `plausible` as
     /// the garbage filter judged the OCR line.
     fn fit_one(text: &str, outlines: Vec<BezPath>, plausible: bool) -> FitResult {
+        fit_along(text, outlines, plausible, Vec2::new(1.0, 0.0))
+    }
+
+    /// As [`fit_one`], the line reading along `direction`.
+    fn fit_along(
+        text: &str,
+        outlines: Vec<BezPath>,
+        plausible: bool,
+        direction: Vec2,
+    ) -> FitResult {
         let face = sans();
         let mut tiers = Tiers::default();
         tiers.faces[0] = vec![0];
         let line = FitLine {
             text: text.to_owned(),
-            direction: Vec2::new(1.0, 0.0),
+            direction,
             outlines,
             plausible,
             pixel: 0.0,
@@ -459,5 +474,31 @@ mod tests {
         assert!((line_tolerance(&line(40.0, 0.1), Mm(0.3)).get() - 2.0).abs() < 1e-9);
         // Unknown pixel size: the fit's own tolerance.
         assert_eq!(line_tolerance(&line(40.0, 0.0), Mm(0.3)), Mm(0.3));
+    }
+
+    /// Slice 3 (criteria 30 and 31): a line turned by 180° or standing at ±90° is fitted in the
+    /// frame it reads in: the same string and sure letters as upright, its text turned with it.
+    #[test]
+    fn a_turned_line_fits_as_the_upright_one() {
+        let face = sans();
+        let laid = layout(&face, "Hamburg", Mm(10.0), &LayoutOptions::default()).unwrap();
+        let upright = subpaths(&laid.glyph_paths(&face));
+        let base = fit_one("Hamburg", upright.clone(), true);
+        assert_eq!(base.texts.len(), 1, "{base:?}");
+        for degrees in [180.0_f64, 90.0, -90.0] {
+            let turn = Affine::rotate(degrees.to_radians());
+            let outlines = upright.iter().map(|p| turn * p.clone()).collect();
+            let direction = (turn * kurbo::Point::new(1.0, 0.0)).to_vec2();
+            let result = fit_along("Hamburg", outlines, true, direction);
+            assert_eq!(result.texts.len(), 1, "{degrees}: {result:?}");
+            let (a, b) = (&base.texts[0].run, &result.texts[0].run);
+            assert_eq!((&b.text, &b.guessed), (&a.text, &a.guessed), "{degrees}");
+            let m = b.placement.as_coeffs();
+            let got = m[1].atan2(m[0]).to_degrees();
+            assert!(
+                ((got - degrees + 540.0) % 360.0 - 180.0).abs() < 0.5,
+                "{degrees}: {got}"
+            );
+        }
     }
 }

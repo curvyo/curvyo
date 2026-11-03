@@ -8,7 +8,7 @@ use std::sync::Arc;
 use curvyo_text_core::{Face, LayoutOptions, Mm, RecognisedRun, Recogniser, layout};
 use kurbo::Vec2;
 
-use crate::trace_fit::{FallbackFace, FitText, TraceFit, glyphs, unscaled};
+use crate::trace_fit::{FallbackFace, FitText, TraceFit, glyphs};
 use crate::trace_words::{ink_spans, plan_words};
 
 /// A line leaning more than this many degrees is set in an italic cut (Proposal, tester round 3:
@@ -51,8 +51,9 @@ impl TraceFit {
         face: &dyn Fn(usize) -> Option<Arc<Face>>,
     ) -> Option<usize> {
         let line = &self.lines[source];
+        let direction = self.direction(source);
         let recogniser = &self.job.recognisers()[source];
-        let italic = recogniser.slant(line.direction) > ITALIC_DEGREES;
+        let italic = recogniser.slant(direction) > ITALIC_DEGREES;
         let cuts: Vec<&FallbackFace> = {
             let wanted: Vec<_> = self
                 .fallback
@@ -70,14 +71,14 @@ impl TraceFit {
             .find(|f| f.regular)
             .or_else(|| cuts.first())
             .map(|f| f.face)?;
-        let Some(measured) = recogniser.stroke_width(line.direction) else {
+        let Some(measured) = recogniser.stroke_width(direction) else {
             return Some(regular);
         };
         Some(
             cuts.iter()
                 .filter_map(|f| {
                     let found = face(f.face)?;
-                    let width = drawn_width(recogniser, &found, &line.text, line.direction)?;
+                    let width = drawn_width(recogniser, &found, &line.text, direction)?;
                     Some((f.face, (width - measured.get()).abs()))
                 })
                 .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
@@ -114,13 +115,14 @@ impl TraceFit {
             return Vec::new();
         };
         let recogniser = &job.recognisers()[source];
-        let Some(whole) = recogniser.fit_text(&found, &line.text, line.direction) else {
+        let direction = self.direction(source);
+        let Some(whole) = recogniser.fit_text(&found, &line.text, direction) else {
             return Vec::new();
         };
         let (outlines, tolerance) = &self.scaled[source];
-        let length = line.direction.hypot();
+        let length = direction.hypot();
         let u = if length > 0.0 {
-            line.direction / length
+            direction / length
         } else {
             Vec2::new(1.0, 0.0)
         };
@@ -139,7 +141,7 @@ impl TraceFit {
             Vec::new()
         };
         let text_of = |run: RecognisedRun| {
-            let run = unscaled(run, k);
+            let run = self.in_document(source, run);
             FitText {
                 glyphs: glyphs(&found, &run),
                 run,
@@ -152,7 +154,7 @@ impl TraceFit {
             let mut run = whole;
             if let Some(part) = parts.first()
                 && part.text != line.text
-                && let Some(spaced) = recogniser.fit_text(&found, &part.text, line.direction)
+                && let Some(spaced) = recogniser.fit_text(&found, &part.text, direction)
             {
                 run = spaced;
             }
@@ -170,11 +172,8 @@ impl TraceFit {
                     })
                     .collect();
                 let paths: Vec<_> = mine.iter().map(|&i| outlines[i].clone()).collect();
-                let mut run = Recogniser::with_hint(&paths, *tolerance, &part.text).fit_text(
-                    &found,
-                    &part.text,
-                    line.direction,
-                )?;
+                let mut run = Recogniser::with_hint(&paths, *tolerance, &part.text)
+                    .fit_text(&found, &part.text, direction)?;
                 run.outlines = run.outlines.iter().map(|&i| mine[i]).collect();
                 Some(text_of(run))
             })

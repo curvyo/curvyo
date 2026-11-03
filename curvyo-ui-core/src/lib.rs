@@ -169,6 +169,7 @@ mod text_recognise_plan;
 pub mod tiling;
 mod trace_fit;
 mod trace_fit_guess;
+mod trace_fit_turn;
 mod trace_inpaint;
 mod trace_ocr;
 mod trace_plan;

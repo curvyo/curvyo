@@ -59,7 +59,9 @@ pub fn ink_spans(outlines: &[BezPath], u: Vec2) -> Vec<(f64, f64)> {
 /// position along the line where character `i` starts as `text` is laid out over the ink
 /// (`boundaries.len()` is the number of characters) and `em` the em of that layout. Each gap goes to the character boundary
 /// nearest its middle. An inserted space never leaves a word of one character, unless that is a
-/// digit, "&", "+" or "-" (Proposal, lead 2026-11-02: a wrong space is worse than a missing one).
+/// digit, "&", "+" or "-" (Proposal, lead 2026-11-02: a wrong space is worse than a missing one),
+/// and none is put in next to punctuation (`. , - / : ; ' "`, lead 2026-11-03), except on both sides
+/// of a "-" that stands alone ("Nord - Sud", criterion 29).
 #[must_use]
 pub fn plan_words(text: &str, boundaries: &[f64], spans: &[(f64, f64)], em: f64) -> Vec<WordPart> {
     let chars: Vec<char> = text.chars().collect();
@@ -109,10 +111,11 @@ pub fn plan_words(text: &str, boundaries: &[f64], spans: &[(f64, f64)], em: f64)
             if cut_at.last().is_none_or(|c| c.0 != b) {
                 cut_at.push((b, middle));
             }
-        } else {
+        } else if !is_punctuation(chars[b - 1]) && !is_punctuation(chars[b]) {
             space_at[b] = true;
         }
     }
+    keep_lone_dashes(&chars, &mut space_at);
     keep_real_words(&chars, &mut space_at);
     let mut parts = Vec::new();
     let mut current = String::new();
@@ -156,6 +159,37 @@ pub fn plan_words(text: &str, boundaries: &[f64], spans: &[(f64, f64)], em: f64)
         });
     }
     parts
+}
+
+/// A mark no space is put in beside, on either side (lead 2026-11-03: "Art.-Nr.", "0815/ÄÖÜ"); a
+/// "-" only when it does not stand alone ([`keep_lone_dashes`]).
+fn is_punctuation(c: char) -> bool {
+    matches!(c, '.' | ',' | '/' | ':' | ';' | '\'' | '"')
+}
+
+/// Drops every space inserted beside a "-" that does not get a space on its other side too: a
+/// dash between two word gaps stands alone ("Nord - Sud"), one with a gap on one side joins
+/// ("Art.-Nr.").
+fn keep_lone_dashes(chars: &[char], space_at: &mut [bool]) {
+    // A space before character `i` (inserted, or a space character before it), and after it.
+    let before =
+        |space_at: &[bool], i: usize| i >= 1 && (space_at[i] || chars[i - 1].is_whitespace());
+    let after = |space_at: &[bool], i: usize| {
+        chars
+            .get(i + 1)
+            .is_some_and(|c| c.is_whitespace() || space_at[i + 1])
+    };
+    let alone = |space_at: &[bool], dash: usize| before(space_at, dash) && after(space_at, dash);
+    for b in 1..chars.len() {
+        if !space_at[b] {
+            continue;
+        }
+        let before_dash = chars[b] == '-' && !alone(space_at, b);
+        let after_dash = chars[b - 1] == '-' && !alone(space_at, b - 1);
+        if before_dash || after_dash {
+            space_at[b] = false;
+        }
+    }
 }
 
 /// A character that may stand alone as a word.
@@ -299,5 +333,46 @@ mod tests {
         assert_eq!(after("Track7", 5), "Track 7");
         assert_eq!(after("A&B", 1), "A&B");
         assert_eq!(after("Salt&", 4), "Salt &");
+    }
+
+    /// Lead 2026-11-03: no space is put in next to punctuation, on either side ("Art.-Nr." of
+    /// the noisy poster became "Art. -Nr.").
+    #[test]
+    fn no_space_next_to_punctuation() {
+        assert_eq!(after("Art.-Nr.", 4), "Art.-Nr.");
+        assert_eq!(after("Art.-Nr.", 5), "Art.-Nr.");
+        for (text, first) in [
+            ("Hamburg,Kiel", 8),
+            ("Hamburg,Kiel", 7),
+            ("Nr.42", 3),
+            ("0815/AB", 4),
+            ("0815/AB", 5),
+            ("Zeit:Jetzt", 5),
+            ("eins;zwei", 4),
+            ("Peter'sHaus", 5),
+            ("Peter'sHaus", 6),
+            ("sagt\"Hallo", 5),
+        ] {
+            assert_eq!(after(text, first), text, "{text} at {first}");
+        }
+    }
+
+    /// A "-" with a word gap on both sides stands alone; with a gap on one side it joins.
+    #[test]
+    fn a_lone_dash_keeps_its_spaces() {
+        let plan = |text: &str, gaps: &[usize]| {
+            let mut boundaries = evenly(text);
+            for &g in gaps {
+                for b in boundaries.iter_mut().skip(g) {
+                    *b += 0.8;
+                }
+            }
+            let spans: Vec<(f64, f64)> = boundaries.iter().map(|&x| (x, x + 0.9)).collect();
+            plan_words(text, &boundaries, &spans, 1.0)[0].text.clone()
+        };
+        assert_eq!(plan("Nord-Sud", &[4, 5]), "Nord - Sud");
+        assert_eq!(plan("Nord-Sud", &[4]), "Nord-Sud");
+        assert_eq!(plan("Nord-Sud", &[5]), "Nord-Sud");
+        assert_eq!(plan("-Sud", &[1]), "-Sud");
     }
 }
