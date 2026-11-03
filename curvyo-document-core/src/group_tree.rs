@@ -56,23 +56,45 @@ pub(crate) fn group_parent(tree: &LoroTree, id: TreeID) -> Option<TreeID> {
     }
 }
 
+/// The children of `parent` in z-order; at the document root the manufacturings are left out,
+/// so every walk of the drawing skips their subtrees (ADR 0032 §4, the one skip predicate of
+/// `specs/0093-laser-workbench-shell/adrs.md` decision 2).
 pub(crate) fn children_of(tree: &LoroTree, parent: Option<TreeID>) -> Vec<TreeID> {
-    let parent = parent.map_or(TreeParentId::Root, TreeParentId::Node);
-    tree.children(parent).unwrap_or_default()
+    let mut children = tree
+        .children(parent.map_or(TreeParentId::Root, TreeParentId::Node))
+        .unwrap_or_default();
+    if parent.is_none() {
+        children.retain(|&id| !crate::manufacturing_codec::is_manufacturing_node(tree, id));
+    }
+    children
 }
 
 /// The leaves under `parent` (`None` is the document root) in paint order: depth first, siblings in
 /// z-order, a group contributing its leaves and never itself. An empty group contributes nothing.
+/// At the root a manufacturing contributes nothing either; its meta map is read once with the
+/// group check, so the skip costs no second read per node.
 pub(crate) fn leaves_under(tree: &LoroTree, parent: Option<TreeID>) -> Vec<TreeID> {
     let mut leaves = Vec::new();
-    let mut stack = vec![children_of(tree, parent).into_iter()];
-    while let Some(level) = stack.last_mut() {
+    let first = tree
+        .children(parent.map_or(TreeParentId::Root, TreeParentId::Node))
+        .unwrap_or_default();
+    let mut stack = vec![(first.into_iter(), parent.is_none())];
+    while let Some((level, at_root)) = stack.last_mut() {
+        let at_root = *at_root;
         let Some(node) = level.next() else {
             stack.pop();
             continue;
         };
-        if is_group_node(tree, node) {
-            stack.push(children_of(tree, Some(node)).into_iter());
+        let meta = tree.get_meta(node).ok();
+        if at_root
+            && meta
+                .as_ref()
+                .is_some_and(crate::manufacturing_codec::meta_is_manufacturing)
+        {
+            continue;
+        }
+        if meta.as_ref().is_some_and(meta_is_group) {
+            stack.push((children_of(tree, Some(node)).into_iter(), false));
         } else {
             leaves.push(node);
         }

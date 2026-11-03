@@ -68,10 +68,13 @@ pub(crate) fn node_exists(tree: &LoroTree, id: loro::TreeID) -> bool {
     tree.contains(id) && matches!(tree.is_node_deleted(&id), Ok(false))
 }
 
-/// Whether `id` is a live leaf object (a path or a primitive): a live node that is not a group.
-/// The kind-specific commands use it, so a group id is "no such object" to them.
+/// Whether `id` is a live leaf object (a path or a primitive): a live node that is not a group
+/// and not part of a manufacturing. The kind-specific commands use it, so a group id or a
+/// placement is "no such object" to them (ADR 0032 skip rule).
 pub(crate) fn leaf_exists(tree: &LoroTree, id: loro::TreeID) -> bool {
-    node_exists(tree, id) && !crate::group_tree::is_group_node(tree, id)
+    node_exists(tree, id)
+        && !crate::group_tree::is_group_node(tree, id)
+        && !crate::manufacturing_codec::in_manufacturing_subtree(tree, id)
 }
 
 /// Writes a brand-new path's `closed` flag and its whole style. Takes the

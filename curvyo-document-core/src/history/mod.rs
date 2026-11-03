@@ -6,7 +6,7 @@ mod checkout;
 mod commit;
 mod cost;
 mod error;
-mod lineage;
+pub(crate) mod lineage;
 mod merge;
 mod node_value;
 mod object_index;

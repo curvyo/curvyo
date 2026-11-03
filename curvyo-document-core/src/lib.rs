@@ -82,6 +82,14 @@ mod images;
 mod junction;
 mod layers;
 mod legacy_fill;
+mod manufacturing;
+mod manufacturing_codec;
+pub use manufacturing::{
+    ADD_FIXTURE_COMMIT_LABEL, ADD_MANUFACTURING_COMMIT_LABEL, DELETE_FIXTURE_COMMIT_LABEL,
+    DELETE_MANUFACTURING_COMMIT_LABEL, FixtureParams, FixtureSnapshot, ManufacturingError,
+    ManufacturingSnapshot, NewManufacturing, PlacementSnapshot, SET_FIXTURE_PARAMS_COMMIT_LABEL,
+    SET_FIXTURE_VISIBLE_COMMIT_LABEL, SET_WORK_AREA_COMMIT_LABEL,
+};
 mod node_edit;
 mod node_move;
 mod node_read;

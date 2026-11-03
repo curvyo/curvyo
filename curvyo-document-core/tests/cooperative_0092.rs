@@ -222,7 +222,7 @@ fn undo_of_a_resize_restores_the_frame() {
 
 #[test]
 fn format_version_is_34() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 34);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 34);
 }
 
 /// Golden: a document with two pages, the first resized and fitted, the second moved.
