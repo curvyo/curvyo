@@ -10,6 +10,20 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## Machine profile records live in the laser extension, not in `curvyo-library-core` (2026-11-03)
+
+ADR 0004 §8 and ADR 0011 §2 reserve `curvyo-library-core` for the record model of the
+machine/material database and its `merge(local, remote)`. Spec `0026` writes the first such
+records, laser machine profiles, and ADR 0036 keeps their model and codec in `curvyo-laser-core`
+because a crate with one laser-only record and no merge would be speculative (`CLAUDE.md` §5).
+Merge of two computers' edits of the same profile is not built: the later file wins when the
+data directory is synced. The file format (`machines/<uuid>.json`) is already the one the
+library crate will read, so the move is code only.
+
+**Resolution:** when `0028` (material records) or a second machine family arrives, a
+`curvyo-library-core` ADR extracts the shared envelope (`id`, `kind`, `format_version`,
+`modified`) and the merge, and `curvyo-laser-core` keeps only the laser fields.
+
 ## One 0020 tester test takes about five minutes in a debug build (2026-11-03)
 
 `acceptance_0020_tester_more::c30_a_step_of_hundreds_of_objects_asks_for_the_busy_state_and_undoes_in_one_press`

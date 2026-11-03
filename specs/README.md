@@ -148,7 +148,7 @@ own entry when the customer schedules it.
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
-| 0026 | `machine-profile` | Define and reuse a machine profile (work area, connection, limits) for a laser cutter; select it for a project. | Not started | Must | R-MFG-001 | 13 |
+| [0026](0026-machine-profile/) | `machine-profile` | A reusable laser machine profile (name, work area, origin corner, max feed, max power, laser mode, stored connection data) in a per-user library; a laser manufacturing picks one and keeps a copy of the used values in the file (the connection stays out of it); update, reset, "Not in your profiles". Built-in Generic laser only. No device I/O. | Draft (2026-11-03, two questions with defaults) | Must | R-MFG-001 | 13 |
 | 0027 | `manufacturing-roles` | Assign a cut or engrave role to geometry (by layer) within one file. | Not started | Must | R-MFG-002 | 14 |
 | 0028 | `material-test-library` | Generate a power/speed test-cut grid for the selected machine, record which cell worked, store it as a reusable material record. | Not started | Must | R-MAT-001, R-MAT-002, R-MAT-003 | 15 |
 | 0029 | `laser-job-preview-and-output` | Toolpath and time preview, an explicit machine and material gate before export, GRBL G-code export for cut and engrave geometry. The MVP's capstone: a maker's own design goes from drawing to a file their laser runs. | Not started | Must | R-MFG-003, R-MFG-LASER-001, R-SYS-008 | 16 |

@@ -1,6 +1,6 @@
 # ADR 0033: Manufacturing data in the project file
 
-**Status:** Accepted (customer, 2026-11-02: Frage 118 MFG-MODEL A). `needs-customer` (persistence: what a `.curvyo` file holds and
+**Status:** Accepted (customer, 2026-11-02: Frage 118 MFG-MODEL A); §1 `mfg_machine_name` and §7 amended by [ADR 0037](0037-machine-profile-copy-in-the-project-file.md) (proposed 2026-11-03). `needs-customer` (persistence: what a `.curvyo` file holds and
 how it survives builds without an extension). Follows [ADR 0032](0032-workbench-model-and-registry.md);
 extends ADR 0004 §1 and §9, ADR 0009 (merge per register), ADR 0014 (history). Specs: `0063`
 criterion 9, `0093` criteria 12 and 13.
