@@ -11,10 +11,10 @@ use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
 use crate::document_size::{DocumentSizeError, validated_document_side};
 use crate::group_tree::node_id;
 use crate::manufacturing_codec::{
-    KEY_FIXTURE_KIND, KEY_MACHINE_NAME, KEY_MANUFACTURING, KEY_PAGE, KEY_PROCESS, PAGE_OWNER_FIELD,
-    PlacementLink, SHAPE_FIXTURE, SHAPE_PLACEMENT, is_manufacturing_node, manufacturing_nodes,
-    owner_text, read_fixture_params, read_placement_link, string, write_fixture_params,
-    write_placement_link,
+    KEY_FIXTURE_KIND, KEY_MACHINE_NAME, KEY_MANUFACTURING, KEY_PAGE, KEY_PROCESS, KEY_PROFILE,
+    PAGE_OWNER_FIELD, PlacementLink, SHAPE_FIXTURE, SHAPE_PLACEMENT, is_manufacturing_node,
+    manufacturing_nodes, owner_text, read_fixture_params, read_placement_link, string,
+    write_fixture_params, write_placement_link, write_plain_map,
 };
 use crate::node_registers::{KEY_NAME, KEY_VISIBLE, read_registers};
 use crate::page_frame::{Frame, write_frame};
@@ -39,6 +39,60 @@ pub const DELETE_FIXTURE_COMMIT_LABEL: &str = "delete_fixture";
 pub const SET_FIXTURE_VISIBLE_COMMIT_LABEL: &str = "set_fixture_visible";
 /// The label of a fixture parameter edit.
 pub const SET_FIXTURE_PARAMS_COMMIT_LABEL: &str = "set_fixture_params";
+/// The label of a machine profile pick (`specs/0026-machine-profile` criterion 5).
+pub const PICK_PROFILE_COMMIT_LABEL: &str = "pick_profile";
+/// The label of Reset from profile (criterion 7).
+pub const RESET_PROFILE_COMMIT_LABEL: &str = "reset_profile";
+/// The label of Save as profile pointing the copy at the new record (criterion 3).
+pub const SAVE_AS_PROFILE_COMMIT_LABEL: &str = "save_as_profile";
+/// The label of an edit of the copy's name.
+pub const EDIT_PROFILE_NAME_COMMIT_LABEL: &str = "edit_profile_name";
+/// The label of an edit of the copy's origin corner.
+pub const EDIT_ORIGIN_CORNER_COMMIT_LABEL: &str = "edit_origin_corner";
+/// The label of an edit of the copy's max feed.
+pub const EDIT_MAX_FEED_COMMIT_LABEL: &str = "edit_max_feed";
+/// The label of an edit of the copy's max power.
+pub const EDIT_MAX_POWER_COMMIT_LABEL: &str = "edit_max_power";
+/// The label of an edit of the copy's laser mode.
+pub const EDIT_LASER_MODE_COMMIT_LABEL: &str = "edit_laser_mode";
+
+/// Which change writes the machine profile copy; each is one history step with its own label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProfileChange {
+    /// A pick from the library.
+    Pick,
+    /// Reset from profile.
+    Reset,
+    /// Save as profile (the copy now points at the new record).
+    SaveAs,
+    /// The Name field.
+    EditName,
+    /// The origin corner.
+    EditOrigin,
+    /// The max feed field.
+    EditMaxFeed,
+    /// The max power field.
+    EditMaxPower,
+    /// The laser mode switch.
+    EditLaserMode,
+}
+
+impl ProfileChange {
+    /// The commit label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Pick => PICK_PROFILE_COMMIT_LABEL,
+            Self::Reset => RESET_PROFILE_COMMIT_LABEL,
+            Self::SaveAs => SAVE_AS_PROFILE_COMMIT_LABEL,
+            Self::EditName => EDIT_PROFILE_NAME_COMMIT_LABEL,
+            Self::EditOrigin => EDIT_ORIGIN_CORNER_COMMIT_LABEL,
+            Self::EditMaxFeed => EDIT_MAX_FEED_COMMIT_LABEL,
+            Self::EditMaxPower => EDIT_MAX_POWER_COMMIT_LABEL,
+            Self::EditLaserMode => EDIT_LASER_MODE_COMMIT_LABEL,
+        }
+    }
+}
 
 /// A fixture's parameter values as stored: opaque plain values (ADR 0033 §3).
 pub type FixtureParams = serde_json::Map<String, serde_json::Value>;
@@ -52,8 +106,12 @@ pub struct ManufacturingSnapshot {
     pub name: String,
     /// The process id, equal to the extension's id (`curvyo.laser`).
     pub process: String,
-    /// The placeholder machine name ("Generic laser").
-    pub machine_name: String,
+    /// The machine profile copy `mfg_profile`, opaque here and typed by the process's extension
+    /// (ADR 0037 §1); `None` for a format-35 manufacturing.
+    pub profile: Option<FixtureParams>,
+    /// The format-35 placeholder machine name, read for the migration (ADR 0037 §6).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub legacy_machine_name: Option<String>,
     /// The owned output page; `None` when its record is missing (damaged by a merge).
     pub page: Option<Page>,
     /// The placements, in tree order.
@@ -108,8 +166,8 @@ pub struct NewManufacturing<'a> {
     pub process: &'a str,
     /// The process name the new manufacturing's name starts with ("Laser").
     pub label: &'a str,
-    /// The placeholder machine name.
-    pub machine_name: &'a str,
+    /// The machine profile copy, written whole; `None` writes no copy.
+    pub profile: Option<&'a FixtureParams>,
     /// The work area, the output page's size.
     pub work_area: DocumentSize,
     /// The drawing page placed at the output page's top-left corner, if any (criterion 5).
@@ -211,7 +269,8 @@ impl Document {
             id: node_id(node),
             name: read_registers(&meta).name.unwrap_or_default(),
             process: string(&meta, KEY_PROCESS)?,
-            machine_name: string(&meta, KEY_MACHINE_NAME).unwrap_or_default(),
+            profile: crate::manufacturing_codec::read_profile_map(&meta),
+            legacy_machine_name: string(&meta, KEY_MACHINE_NAME),
             page: owned_page(&self.loro().get_map(ROOT_MAP), &page_id),
             placements,
             fixtures,
@@ -254,7 +313,9 @@ impl Document {
             meta.insert(KEY_NAME, name.as_str()).unwrap();
             meta.insert(KEY_PROCESS, new.process).unwrap();
             meta.insert(KEY_PAGE, page_id.as_str()).unwrap();
-            meta.insert(KEY_MACHINE_NAME, new.machine_name).unwrap();
+            if let Some(profile) = new.profile {
+                write_plain_map(&meta, KEY_PROFILE, profile);
+            }
         }
         let root = self.loro().get_map(ROOT_MAP);
         write(&root, &page_id, "name", name.as_str());
@@ -347,6 +408,58 @@ impl Document {
             },
         );
         self.commit_with_label(SET_WORK_AREA_COMMIT_LABEL);
+        Ok(true)
+    }
+
+    /// Writes the machine profile copy `profile` whole and sets the work area, the output page's
+    /// size, in one history step labelled by `change` (ADR 0037 §4); the format-35 machine name
+    /// goes in the same step. Placed content keeps its place relative to the top-left corner.
+    /// `Ok(false)` and nothing written when the copy, the size and the old key are unchanged.
+    ///
+    /// # Errors
+    /// [`ManufacturingError::NotFound`] for an unknown manufacturing or one without its page;
+    /// [`ManufacturingError::Size`] for a side outside the page size limits.
+    pub fn set_manufacturing_profile(
+        &self,
+        id: NodeId,
+        profile: &FixtureParams,
+        work_area: DocumentSize,
+        change: ProfileChange,
+    ) -> Result<bool, ManufacturingError> {
+        let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
+        let page = manufacturing.page.ok_or(ManufacturingError::NotFound)?;
+        let width = validated_document_side(work_area.width)?;
+        let height = validated_document_side(work_area.height)?;
+        #[allow(clippy::float_cmp)] // exact register equality avoids an empty step
+        let same_size =
+            page.size.width.as_mm() == width.as_mm() && page.size.height.as_mm() == height.as_mm();
+        let same_profile = manufacturing.profile.as_ref() == Some(profile);
+        if same_size && same_profile && manufacturing.legacy_machine_name.is_none() {
+            return Ok(false);
+        }
+        let meta = self
+            .loro()
+            .get_tree(OBJECTS_TREE)
+            .get_meta(tree_id_of(id))
+            .map_err(|_| ManufacturingError::NotFound)?;
+        if !same_profile {
+            write_plain_map(&meta, KEY_PROFILE, profile);
+        }
+        if manufacturing.legacy_machine_name.is_some() {
+            meta.delete(KEY_MACHINE_NAME)
+                .map_err(|_| ManufacturingError::NotFound)?;
+        }
+        if !same_size {
+            write_frame(
+                &self.loro().get_map(ROOT_MAP),
+                &page.id,
+                Frame {
+                    origin: Point::new(0.0, 0.0),
+                    size: DocumentSize { width, height },
+                },
+            );
+        }
+        self.commit_with_label(change.label());
         Ok(true)
     }
 

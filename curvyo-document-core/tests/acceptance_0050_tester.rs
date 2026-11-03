@@ -720,6 +720,9 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             // hidden fixture and named manufacturings.
             || name.starts_with("laser_workbench_")
             || name.starts_with("manufacturing_")
+            // `0026-machine-profile` (format 36) is a later build: its goldens hold manufacturings.
+            || name.starts_with("machine_profile")
+            || name.starts_with("mfg_profile")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

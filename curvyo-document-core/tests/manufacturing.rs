@@ -1,8 +1,9 @@
 //! Manufacturings in the document model (`specs/0093-laser-workbench-shell` criteria 2, 3, 4, 5,
 //! 9, 10, 12, 13; ADR 0032, ADR 0033): the commands and their undo, the skip predicate per
 //! consumer, the output page out of the drawing's page list, open validation and the goldens
-//! `laser_workbench_v35.curvyo` and `manufacturing_unknown_process_v35.curvyo`.
-//! `CURVYO_WRITE_FIXTURES=1` rewrites the fixtures.
+//! `laser_workbench_v36.curvyo` and the frozen format-35 `laser_workbench_v35.curvyo` and
+//! `manufacturing_unknown_process_v35.curvyo`, which open by the migration of ADR 0037 §6.
+//! `CURVYO_WRITE_FIXTURES=1` rewrites `laser_workbench_v36.curvyo`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
@@ -15,8 +16,8 @@ use curvyo_document_core::{
 };
 use loro::{LoroDoc, LoroValue};
 
-const THIS_SLICE_VERSION: u32 = 35;
-const GOLDEN: &str = "laser_workbench_v35.curvyo";
+const GOLDEN: &str = "laser_workbench_v36.curvyo";
+const GOLDEN_V35: &str = "laser_workbench_v35.curvyo";
 const UNKNOWN: &str = "manufacturing_unknown_process_v35.curvyo";
 const GRID: &str = "curvyo.laser/engraved_grid";
 
@@ -26,11 +27,27 @@ fn fixture_path(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// The copy of the built-in Generic laser as the laser extension writes it.
+fn generic_copy() -> &'static FixtureParams {
+    static COPY: std::sync::OnceLock<FixtureParams> = std::sync::OnceLock::new();
+    COPY.get_or_init(|| {
+        serde_json::from_value(serde_json::json!({
+            "id": "generic-laser",
+            "name": "Generic laser",
+            "origin": "bottom_left",
+            "max_feed_mm_per_min": 6000,
+            "max_power": 1000,
+            "laser_mode": true,
+        }))
+        .unwrap()
+    })
+}
+
 fn laser(place: Option<&str>) -> NewManufacturing<'_> {
     NewManufacturing {
         process: "curvyo.laser",
         label: "Laser",
-        machine_name: "Generic laser",
+        profile: Some(generic_copy()),
         work_area: DocumentSize::from_mm(400.0, 300.0),
         place,
     }
@@ -88,7 +105,7 @@ fn add_manufacturing_makes_laser_1_with_its_output_page_and_a_placement_in_one_s
     let made = document.manufacturing(id).unwrap();
     assert_eq!(made.name, "Laser 1");
     assert_eq!(made.process, "curvyo.laser");
-    assert_eq!(made.machine_name, "Generic laser");
+    assert_eq!(made.profile.as_ref(), Some(generic_copy()));
     let page = made.page.as_ref().unwrap();
     assert_eq!(made.work_area(), DocumentSize::from_mm(400.0, 300.0));
     assert_eq!(page.origin, Point::new(0.0, 0.0));
@@ -292,28 +309,6 @@ fn golden_document() -> Document {
     document
 }
 
-/// The golden's document with the process renamed to one no build knows, and one process value.
-fn unknown_process_bytes() -> Vec<u8> {
-    let document = golden_document();
-    let loro = LoroDoc::new();
-    loro.import(&document.export_loro_snapshot().unwrap())
-        .unwrap();
-    let tree = loro.get_tree("paths");
-    let node = tree
-        .children(loro::TreeParentId::Root)
-        .unwrap()
-        .into_iter()
-        .find(|&n| tree.get_meta(n).unwrap().get("manufacturing").is_some())
-        .unwrap();
-    let meta = tree.get_meta(node).unwrap();
-    meta.insert("mfg_process", "example.cnc").unwrap();
-    meta.insert("x.example.cnc.spindle", LoroValue::Double(12_000.0))
-        .unwrap();
-    loro.commit();
-    let reopened = repack(&loro);
-    pack(&unpack(3, &reopened).unwrap(), "0.1.0").unwrap()
-}
-
 /// `loro` as a container of this build's format.
 fn repack(loro: &LoroDoc) -> Vec<u8> {
     let manifest = serde_json::json!({
@@ -341,7 +336,6 @@ fn write_fixtures_on_request() {
             pack(&golden_document(), "0.1.0").unwrap(),
         )
         .unwrap();
-        std::fs::write(fixture_path(UNKNOWN), unknown_process_bytes()).unwrap();
     }
 }
 
@@ -370,22 +364,20 @@ fn stored_loro(bytes: &[u8]) -> LoroDoc {
     loro
 }
 
-#[test]
-fn the_format_version_is_this_slices() {
-    assert_eq!(CURRENT_FORMAT_VERSION, THIS_SLICE_VERSION);
-}
+// The manufacturing shape of this file arrived with format 35; later formats keep it.
+const _: () = assert!(CURRENT_FORMAT_VERSION >= 35);
 
 #[test]
 fn the_laser_golden_reads_back_identical_and_opening_it_writes_nothing() {
     write_fixtures_on_request();
     let bytes = std::fs::read(fixture_path(GOLDEN)).unwrap();
-    assert_eq!(manifest_version(&bytes), THIS_SLICE_VERSION);
+    assert_eq!(manifest_version(&bytes), CURRENT_FORMAT_VERSION);
     let document = unpack(2, &bytes).unwrap();
     let version = document.version();
     let made = &document.manufacturings()[0];
     assert_eq!(made.name, "Laser 1");
     assert_eq!(made.process, "curvyo.laser");
-    assert_eq!(made.machine_name, "Generic laser");
+    assert_eq!(made.profile.as_ref(), Some(generic_copy()));
     assert_eq!(made.work_area(), DocumentSize::from_mm(600.0, 400.0));
     assert_eq!(made.fixtures.len(), 2);
     assert!(made.fixtures[0].visible);
@@ -398,6 +390,23 @@ fn the_laser_golden_reads_back_identical_and_opening_it_writes_nothing() {
         document.manufacturings(),
         golden_document().manufacturings()
     );
+    assert_eq!(document.version(), version);
+    assert_eq!(
+        stored_loro(&bytes).oplog_vv(),
+        stored_loro(&pack(&document, "0.1.0").unwrap()).oplog_vv()
+    );
+}
+
+#[test]
+fn the_format_35_laser_golden_opens_as_generic_laser_and_writes_nothing() {
+    let bytes = std::fs::read(fixture_path(GOLDEN_V35)).unwrap();
+    assert_eq!(manifest_version(&bytes), 35);
+    let document = unpack(2, &bytes).unwrap();
+    let version = document.version();
+    let made = &document.manufacturings()[0];
+    assert_eq!(made.profile, None);
+    assert_eq!(made.legacy_machine_name.as_deref(), Some("Generic laser"));
+    assert_eq!(made.work_area(), DocumentSize::from_mm(600.0, 400.0));
     assert_eq!(document.version(), version);
     assert_eq!(
         stored_loro(&bytes).oplog_vv(),

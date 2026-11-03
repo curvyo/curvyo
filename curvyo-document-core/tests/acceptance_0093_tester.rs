@@ -26,7 +26,7 @@ fn laser(place: Option<&str>) -> NewManufacturing<'_> {
     NewManufacturing {
         process: "curvyo.laser",
         label: "Laser",
-        machine_name: "Generic laser",
+        profile: None,
         work_area: DocumentSize::from_mm(400.0, 300.0),
         place,
     }
@@ -160,7 +160,10 @@ fn ac2_add_is_one_step_and_its_undo_leaves_the_document_as_before() {
     );
     let m = d.manufacturing(id).unwrap();
     assert_eq!(m.name, "Laser 1");
-    assert_eq!(m.machine_name, "Generic laser");
+    assert_eq!(
+        m.legacy_machine_name, None,
+        "format 36 writes no placeholder name"
+    );
     undo_last(&d);
     assert!(d.manufacturings().is_empty());
     assert_eq!(d.pages(), pages);
@@ -405,7 +408,10 @@ fn ac12_the_laser_golden_holds_what_the_criterion_lists() {
     assert_eq!(all.len(), 1);
     let m = &all[0];
     assert_eq!(m.process, "curvyo.laser");
-    assert_eq!(m.machine_name, "Generic laser");
+    assert_eq!(
+        m.legacy_machine_name, None,
+        "format 36 writes no placeholder name"
+    );
     assert_eq!(m.work_area(), DocumentSize::from_mm(600.0, 400.0));
     let page = m.page.as_ref().unwrap();
     assert_eq!(page.size, DocumentSize::from_mm(600.0, 400.0));
@@ -457,7 +463,7 @@ fn unknown_process_file() -> Vec<u8> {
         .add_manufacturing(NewManufacturing {
             process: "acme.waterjet",
             label: "Waterjet",
-            machine_name: "Acme 3000",
+            profile: None,
             work_area: DocumentSize::from_mm(1500.0, 3000.0),
             place: Some("first"),
         })

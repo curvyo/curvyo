@@ -376,7 +376,21 @@ impl DocumentVersion {
 /// naming a live node that is not a manufacturing. An unknown process is not damage: it opens
 /// disabled and saves back unchanged (ADR 0033 §4). Goldens: `laser_workbench_v35.curvyo` and
 /// `manufacturing_unknown_process_v35.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 35;
+///
+/// Bumped to 36 in `machine-profile` (ADR 0037, `specs/0026-machine-profile`): a manufacturing
+/// carries its machine profile copy as one atomic map register `mfg_profile` (the library id and
+/// the copied values, never a connection; opaque here, typed by the process's extension) instead
+/// of the placeholder `mfg_machine_name`. A build that stops at 35 would show the manufacturing
+/// without its machine and Add manufacturing would write the old shape into the same document,
+/// so it must refuse every file of this build as too new. Migration from 35: a manufacturing
+/// without `mfg_profile` reads as the built-in Generic laser named by `mfg_machine_name`; nothing
+/// is rewritten on open, and the first profile write stores `mfg_profile` and removes the old key
+/// in the same step. Damage: `mfg_profile` present and not a map of plain values (a non-finite
+/// number inside it reads as `null`, which the extension reads as that field's default). The
+/// number is provisional by the rule above. Goldens: `machine_profile_v36.curvyo`,
+/// `machine_profile_damaged_v36.curvyo`, `mfg_profile_not_a_map_v36.curvyo` and
+/// `laser_workbench_v36.curvyo`; the version 35 goldens stay and open by the migration.
+pub const CURRENT_FORMAT_VERSION: u32 = 36;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

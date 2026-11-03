@@ -605,6 +605,7 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "page_frame_missing_field_v34.curvyo",
         "page_frame_nan_v34.curvyo",
         "page_frame_too_large_v34.curvyo",
+        "mfg_profile_not_a_map_v36.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

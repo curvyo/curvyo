@@ -17,8 +17,11 @@ pub(crate) const KEY_MANUFACTURING: &str = "manufacturing";
 pub(crate) const KEY_PROCESS: &str = "mfg_process";
 /// The owned page's id.
 pub(crate) const KEY_PAGE: &str = "mfg_page";
-/// The placeholder machine name.
+/// The format-35 placeholder machine name; read for the migration, removed by the first profile
+/// write (ADR 0037 §6).
 pub(crate) const KEY_MACHINE_NAME: &str = "mfg_machine_name";
+/// The atomic map of the machine profile copy (ADR 0037 §1), opaque here.
+pub(crate) const KEY_PROFILE: &str = "mfg_profile";
 /// The `shape` tag of a placement node.
 pub(crate) const SHAPE_PLACEMENT: &str = "placement";
 /// The `shape` tag of a fixture node.
@@ -127,7 +130,22 @@ pub(crate) fn read_placement_link(meta: &LoroMap) -> Option<PlacementLink> {
 pub(crate) fn read_fixture_params(
     meta: &LoroMap,
 ) -> Option<serde_json::Map<String, serde_json::Value>> {
-    let Some(ValueOrContainer::Value(LoroValue::Map(map))) = meta.get(KEY_FIXTURE_PARAMS) else {
+    read_plain_map(meta, KEY_FIXTURE_PARAMS)
+}
+
+pub(crate) fn write_fixture_params(
+    meta: &LoroMap,
+    params: &serde_json::Map<String, serde_json::Value>,
+) {
+    write_plain_map(meta, KEY_FIXTURE_PARAMS, params);
+}
+
+/// The register `key` as a map of plain JSON values, `None` when absent or not such a map.
+pub(crate) fn read_plain_map(
+    meta: &LoroMap,
+    key: &str,
+) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let Some(ValueOrContainer::Value(LoroValue::Map(map))) = meta.get(key) else {
         return None;
     };
     map.iter()
@@ -135,8 +153,30 @@ pub(crate) fn read_fixture_params(
         .collect()
 }
 
-pub(crate) fn write_fixture_params(
+/// The machine profile copy `mfg_profile` as plain JSON values, `None` when absent or not a map of
+/// plain values. A number that is not finite reads as `null`, so the extension reads that one
+/// field as its default and the file still opens (ADR 0037 §3).
+pub(crate) fn read_profile_map(
     meta: &LoroMap,
+) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let Some(ValueOrContainer::Value(LoroValue::Map(map))) = meta.get(KEY_PROFILE) else {
+        return None;
+    };
+    map.iter()
+        .map(|(key, value)| {
+            let json = match value {
+                LoroValue::Double(number) if !number.is_finite() => serde_json::Value::Null,
+                other => json_of(other)?,
+            };
+            Some((key.clone(), json))
+        })
+        .collect()
+}
+
+/// Writes `params` whole as the plain map register `key`.
+pub(crate) fn write_plain_map(
+    meta: &LoroMap,
+    key: &str,
     params: &serde_json::Map<String, serde_json::Value>,
 ) {
     let value: HashMap<String, LoroValue> = params
@@ -145,8 +185,7 @@ pub(crate) fn write_fixture_params(
         .collect();
     // invariant: inserting a plain map value under a known key on an attached map cannot fail.
     #[allow(clippy::unwrap_used)]
-    meta.insert(KEY_FIXTURE_PARAMS, LoroValue::from(value))
-        .unwrap();
+    meta.insert(key, LoroValue::from(value)).unwrap();
 }
 
 /// A plain Loro value as JSON; `None` for a container, binary or non-finite number.
@@ -171,12 +210,16 @@ pub(crate) fn json_of(value: &LoroValue) -> Option<serde_json::Value> {
     })
 }
 
-/// A JSON value as a plain Loro value; every number is stored as a double.
+/// A JSON value as a plain Loro value; an integer is stored as `I64` (ADR 0037 §1), every other
+/// number as a double.
 fn loro_of(value: &serde_json::Value) -> LoroValue {
     match value {
         serde_json::Value::Null => LoroValue::Null,
         serde_json::Value::Bool(flag) => LoroValue::Bool(*flag),
-        serde_json::Value::Number(number) => LoroValue::Double(number.as_f64().unwrap_or_default()),
+        serde_json::Value::Number(number) => number.as_i64().map_or_else(
+            || LoroValue::Double(number.as_f64().unwrap_or_default()),
+            LoroValue::I64,
+        ),
         serde_json::Value::String(text) => LoroValue::from(text.as_str()),
         serde_json::Value::Array(items) => {
             LoroValue::from(items.iter().map(loro_of).collect::<Vec<_>>())
@@ -248,6 +291,7 @@ fn manufacturing_is_valid(tree: &LoroTree, id: TreeID, meta: &LoroMap) -> bool {
             meta.get(KEY_MACHINE_NAME),
             None | Some(ValueOrContainer::Value(LoroValue::String(_)))
         )
+        && (meta.get(KEY_PROFILE).is_none() || read_profile_map(meta).is_some())
         && crate::node_registers::registers_are_valid(meta, false)
         && meta.get(crate::group_tree::KEY_GROUP).is_none();
     strings_ok
