@@ -269,6 +269,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
+  "Recognise shapes: finds rectangles, circles, ellipses, polygons and stars in the traced outlines and sets them as shapes.",
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
@@ -316,6 +317,9 @@ export interface TraceValues {
   /** Recognise text in Advanced (`specs/0091` criterion 17): an app setting, off by default
    * (Frage 116 B a). */
   recogniseText: boolean;
+  /** Recognise shapes in Advanced (`specs/0088` Part B, UX notes B1): an app setting, off by
+   * default, not in presets. */
+  recogniseShapes: boolean;
   /** The selection method: `BRIGHTNESS`, `REMOVE_BACKGROUND` or `PICK_COLOURS`. */
   method: number;
   /** The Colour tolerance of Remove background and of Pick colours, 0 to 100, each its own. */
@@ -631,6 +635,7 @@ export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALL
     invert: false,
     ignoreBackground: false,
     recogniseText: false,
+    recogniseShapes: false,
     method: BRIGHTNESS,
     backgroundTolerance: DEFAULT_BACKGROUND_TOLERANCE,
     pickTolerance: DEFAULT_PICK_TOLERANCE,
@@ -696,6 +701,8 @@ export function settingsJson(values: TraceValues, threshold: number, suggested?:
     denoise: values.denoise,
     invert: values.invert,
     ignore_background: values.ignoreBackground,
+    // `specs/0088` Part B: only when on, so the settings of a trace with it off are as before.
+    ...(values.recogniseShapes ? { shapes: true } : {}),
   });
 }
 
@@ -728,6 +735,7 @@ export function readChoice(
       output?: unknown;
       colours?: unknown;
       recogniseTextOn?: unknown;
+      recogniseShapesOn?: unknown;
     };
     // The method and its tolerances are app settings too (`specs/0089` criterion 20); a missing
     // method reads as Brightness.
@@ -764,6 +772,8 @@ export function readChoice(
         // `specs/0091` criterion 17: off unless the maker turned it on (Frage 116 B a; a new key,
         // so the old default "on" kept by earlier builds does not count as turned on).
         recogniseText: stored.recogniseTextOn === true,
+        // `specs/0088` Part B: off unless the maker turned it on.
+        recogniseShapes: stored.recogniseShapesOn === true,
         colours:
           typeof stored.colours === "number" && Number.isFinite(stored.colours)
             ? Math.min(MAX_COLOURS, Math.max(MIN_COLOURS, Math.round(stored.colours)))
@@ -796,6 +806,7 @@ export function writeChoice(choice: TraceChoice, storage: ValueStorage | undefin
         output: choice.values.output,
         colours: choice.values.colours,
         recogniseTextOn: choice.values.recogniseText,
+        recogniseShapesOn: choice.values.recogniseShapes,
       }),
     );
   } catch {
@@ -835,6 +846,9 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
   if (values.recogniseText) {
     changed.push(RECOGNISE_TEXT);
   }
+  if (values.recogniseShapes) {
+    changed.push(RECOGNISE_SHAPES);
+  }
   if (values.denoise !== dflt("denoise")) {
     changed.push("Denoise");
   }
@@ -852,6 +866,8 @@ export function changedAdvancedText(values: TraceValues, params: readonly TraceP
 
 /** The Recognise text switch (`specs/0091` UX notes §9). */
 export const RECOGNISE_TEXT = "Recognise text";
+/** The Recognise shapes switch (`specs/0088` Part B, UX notes B7). */
+export const RECOGNISE_SHAPES = "Recognise shapes";
 /** The progress label while the text is read (UX notes §3). */
 export const READING_TEXT = "Reading text";
 
@@ -870,4 +886,13 @@ export function textLinesText(set: number, found: number): string {
     return `${set} text ${set === 1 ? "line" : "lines"} set`;
   }
   return `${set} of ${found} text lines set`;
+}
+
+/** The muted line's shape segment (`specs/0088` Part B, UX notes B3): "12 shapes set", "1 shape
+ * set"; empty when none was set. */
+export function shapesText(set: number): string {
+  if (set === 0) {
+    return "";
+  }
+  return `${set} ${set === 1 ? "shape" : "shapes"} set`;
 }

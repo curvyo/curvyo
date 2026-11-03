@@ -758,14 +758,14 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
   });
 });
 
-test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, Colours, palette pipette, strip, Invert, Drop border shapes, Recognise text (0091 ux-notes §7; drawn in Multicolour too since 0091 slice 2, criterion 17 as amended), Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, Colours, palette pipette, Invert, Drop border shapes, Recognise text, Recognise shapes (0091 ux-notes §7; 0088 Part B ux-notes B2 as changed 2026-11-03: the four toggles share the Output row; drawn in Multicolour too), strip, Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pale.png", PALE, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     const single = await tabStops(s);
     console.log("Brightness, Single, Advanced open:", JSON.stringify(single));
-    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Analyse", "Output", "Invert", "Drop border shapes", "Recognise text", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Analyse", "Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners"]);
     await setOutput(s, "Multicolour");
     await settledCounts(s);
     const multi = await tabStops(s);
@@ -773,8 +773,8 @@ test("0025 tidy-up c57: Tab order with Advanced open continues Analyse, Output, 
     const tail = multi.slice(multi.indexOf("Trace") + 1);
     const strip = tail.filter((n) => n === "swatch" || n.startsWith("action "));
     assert.ok(strip.length >= 1 && strip.filter((n) => n === "swatch").length === 1, `the strip is one Tab stop: ${JSON.stringify(strip)}`);
-    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Analyse", "Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Recognise text", "Denoise", "Upscale", "Corners"]);
-    assert.ok(tail.indexOf("swatch") > tail.indexOf("Pick palette colour from the image") && tail.indexOf("swatch") < tail.indexOf("Invert"), "the strip sits between the palette pipette and Invert");
+    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Analyse", "Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners"]);
+    assert.ok(tail.indexOf("swatch") > tail.indexOf("Recognise shapes") && tail.indexOf("swatch") < tail.indexOf("Denoise"), "the strip sits between Recognise shapes and Denoise (0088 Part B ux-notes B2)");
     // Pick colours has its pipette in the bar and none in Advanced.
     await pickMethod(s, "Pick colours");
     await setOutput(s, "Single colour");
@@ -810,7 +810,7 @@ test("0089 tidy-up 22.1: bar heights at 800 x 600 with Advanced closed, panel op
   }, "", 800, 600);
 });
 
-test("0089 tidy-up 22.3: the Advanced block adds about 222 px (panel open) and 150 px (closed) to the Single colour Brightness bar at 800 x 600", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.3: the Advanced block adds about 237 px (panel open) and 165 px (closed; 0088 Part B ux-notes B2, 40 px margin of 22.3) to the Single colour Brightness bar at 800 x 600", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, false);
     await pickMethod(s, "Brightness");
@@ -827,7 +827,7 @@ test("0089 tidy-up 22.3: the Advanced block adds about 222 px (panel open) and 1
       const height = await barHeight(s);
       const added = height - closed[String(open)];
       console.log(`Advanced open, panel ${open ? "open" : "closed"}: bar ${height} px, block ${added} px`);
-      assert.ok(Math.abs(added - (open ? 222 : 150)) <= 40, `Advanced adds ${added} px, ux-notes 22.3 says about ${open ? 222 : 150}`);
+      assert.ok(Math.abs(added - (open ? 237 : 165)) <= 40, `Advanced adds ${added} px, ux-notes 22.3 and 0088 B2 say about ${open ? 237 : 165}`);
     }
   }, "", 800, 600);
 });

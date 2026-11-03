@@ -12,6 +12,7 @@ import {
   MULTICOLOUR,
   readsText,
   textLinesText,
+  shapesText,
   NO_STATUS,
   pickedCountText,
   TRACE_BAR_DESCRIPTION,
@@ -179,6 +180,7 @@ test("criterion 70: the info page's exact text", () => {
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
+  "Recognise shapes: finds rectangles, circles, ellipses, polygons and stars in the traced outlines and sets them as shapes.",
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
@@ -209,6 +211,7 @@ test("criteria 41, 43 (removed): no Node limit and no Full-size preview in the s
     "method",
     "output",
     "pickTolerance",
+    "recogniseShapes",
     "recogniseText",
     "smooth",
     "specks",
@@ -241,6 +244,7 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
     invert: false,
     ignoreBackground: false,
     recogniseText: false,
+    recogniseShapes: false,
     method: 0,
     backgroundTolerance: 40,
     pickTolerance: 19,
@@ -579,4 +583,20 @@ test("specs/0091 UX notes §4: the text-line count", () => {
   assert.equal(textLinesText(1, 1), "1 text line set");
   assert.equal(textLinesText(3, 5), "3 of 5 text lines set");
   assert.equal(textLinesText(0, 2), "0 of 2 text lines set");
+});
+
+test("0088 Part B: Recognise shapes is an app setting off by default, not in presets, in the settings only when on", () => {
+  const storage = memoryStorage();
+  const first = readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage);
+  assert.equal(first.values.recogniseShapes, false);
+  assert.ok(!("shapes" in JSON.parse(settingsJson(first.values, 128))));
+  const on = { ...first, values: { ...first.values, recogniseShapes: true } };
+  assert.equal(JSON.parse(settingsJson(on.values, 128)).shapes, true);
+  writeChoice(on, storage);
+  assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.recogniseShapes, true);
+  assert.equal(pickPreset(on, TRACE_PRESETS_FALLBACK[1]).values.recogniseShapes, true, "a preset keeps the switch");
+  assert.equal(changedAdvancedText(on.values), "Changed: Recognise shapes");
+  assert.equal(shapesText(0), "");
+  assert.equal(shapesText(1), "1 shape set");
+  assert.equal(shapesText(12), "12 shapes set");
 });

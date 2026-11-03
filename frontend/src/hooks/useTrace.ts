@@ -14,6 +14,7 @@ import {
   READING_TEXT,
   readsText,
   textLinesText,
+  shapesText,
   type TraceChoice,
   type TraceSlot,
   type TraceStatusText,
@@ -136,6 +137,7 @@ export function useTrace(
   const ocrFailed = useRef(new Set<string>());
   /** The text lines of the shown preview: set and found (UX notes §4). */
   const [textCounts, setTextCounts] = useState<[number, number]>([0, 0]);
+  const [shapeCount, setShapeCount] = useState(0);
   const textOptionsRef = useRef(textOptions);
   useEffect(() => {
     textOptionsRef.current = textOptions;
@@ -422,6 +424,7 @@ export function useTrace(
           const [set, found] = session.trace_text_counts();
           textSet = set;
           setTextCounts([set, found]);
+          setShapeCount(session.trace_shape_count());
         };
         // A picture of text only traces to no path and is still something to create
         // (`specs/0091`); a failed read says so in the bar (UX notes §3).
@@ -866,7 +869,10 @@ export function useTrace(
         : busy
           ? { kind: "running", percent: loading ? null : percent, label: reading ? READING_TEXT : undefined }
           : { kind: "none" };
-  const advancedStatus = advancedStatusOf(status, palette.note, reading ? READING_TEXT : textLinesText(...textCounts));
+  const recognised = reading
+    ? READING_TEXT
+    : [textLinesText(...textCounts), shapesText(shapeCount)].filter((t) => t !== "").join(" · ");
+  const advancedStatus = advancedStatusOf(status, palette.note, recognised);
   // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
   // has no paths.
   const traceBlocked =

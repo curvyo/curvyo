@@ -1,4 +1,4 @@
-import { Contrast, ImageMinus, Pipette, ScanText, type LucideIcon } from "lucide-react";
+import { Contrast, ImageMinus, Pipette, ScanText, Shapes, type LucideIcon } from "lucide-react";
 import { useRef } from "react";
 import type { KeyboardEvent } from "react";
 
@@ -16,6 +16,7 @@ import {
   OUTPUT,
   PICK_COLOURS,
   PICK_TOOLTIP,
+  RECOGNISE_SHAPES,
   RECOGNISE_TEXT,
   TRACE_OUTPUTS,
   type TraceParam,
@@ -248,92 +249,104 @@ export function TraceAdvanced({
           {status.muted ? <span className={`${LABEL_CLASS} opacity-70`}>{status.muted}</span> : null}
         </div>
       ) : null}
-      {/* 3. Output, the Colours field and the Brightness palette pipette. */}
-      <ChoicePill param={OUTPUT_PARAM} bare value={values.output} onValue={(v) => setValue("output", v)} onReturnFocus={onReturnFocus} />
-      {values.output === MULTICOLOUR ? (
-        <div className="flex h-9 items-center gap-1">
-          {values.method === PICK_COLOURS ? (
-            // Pick colours: the palette is exactly the picked colours, the count fixed (Frage 90 A).
-            <div aria-disabled="true" data-trace-colours-fixed="" className="pointer-events-none opacity-50">
+      {/* 3. Output, the Colours field, the Brightness palette pipette and the toggles, one row at
+          4 px gaps so the four toggles fit beside Output at 800 x 600 with the panel open
+          (`specs/0088` UX notes B2, lead 2026-11-03). */}
+      <div data-trace-output-row="" className="flex flex-wrap items-center gap-x-1">
+        <ChoicePill param={OUTPUT_PARAM} bare value={values.output} onValue={(v) => setValue("output", v)} onReturnFocus={onReturnFocus} />
+        {values.output === MULTICOLOUR ? (
+          <div className="flex h-9 items-center gap-1">
+            {values.method === PICK_COLOURS ? (
+              // Pick colours: the palette is exactly the picked colours, the count fixed (Frage 90 A).
+              <div aria-disabled="true" data-trace-colours-fixed="" className="pointer-events-none opacity-50">
+                <TraceField
+                  param={COLOURS_PARAM}
+                  value={Math.max(1, values.swatches.length)}
+                  display={String(values.swatches.length)}
+                  width={COLOURS_WIDTH}
+                  onValue={() => undefined}
+                  onEndDrag={onEndDrag}
+                  onCreate={onCreate}
+                  onReturnFocus={onReturnFocus}
+                />
+              </div>
+            ) : (
               <TraceField
                 param={COLOURS_PARAM}
-                value={Math.max(1, values.swatches.length)}
-                display={String(values.swatches.length)}
+                value={values.colours ?? 1}
+                display={coloursText(values.colours, coloursFound)}
                 width={COLOURS_WIDTH}
-                onValue={() => undefined}
+                onValue={(v, dragging) => setValue("colours", v <= 1 ? null : v, dragging)}
                 onEndDrag={onEndDrag}
                 onCreate={onCreate}
                 onReturnFocus={onReturnFocus}
               />
-            </div>
-          ) : (
-            <TraceField
-              param={COLOURS_PARAM}
-              value={values.colours ?? 1}
-              display={coloursText(values.colours, coloursFound)}
-              width={COLOURS_WIDTH}
-              onValue={(v, dragging) => setValue("colours", v <= 1 ? null : v, dragging)}
-              onEndDrag={onEndDrag}
-              onCreate={onCreate}
-              onReturnFocus={onReturnFocus}
-            />
-          )}
-          {values.method === BRIGHTNESS ? (
-            <Tooltip side="bottom" content={PICK_TOOLTIP}>
-              <button
-                type="button"
-                aria-label={PICK_PALETTE_COLOUR}
-                aria-pressed={paletteArmed}
-                data-trace-pipette="palette"
-                onClick={(event) => {
-                  onPalettePipette();
-                  if (event.detail > 0) {
-                    onReturnFocus();
-                  }
-                }}
-                className={`${ICON_BUTTON_CLASS} ${
-                  paletteArmed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-                }`}
-              >
-                <Pipette size={16} strokeWidth={1.5} aria-hidden />
-              </button>
-            </Tooltip>
-          ) : null}
+            )}
+            {values.method === BRIGHTNESS ? (
+              <Tooltip side="bottom" content={PICK_TOOLTIP}>
+                <button
+                  type="button"
+                  aria-label={PICK_PALETTE_COLOUR}
+                  aria-pressed={paletteArmed}
+                  data-trace-pipette="palette"
+                  onClick={(event) => {
+                    onPalettePipette();
+                    if (event.detail > 0) {
+                      onReturnFocus();
+                    }
+                  }}
+                  className={`${ICON_BUTTON_CLASS} ${
+                    paletteArmed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+                  }`}
+                >
+                  <Pipette size={16} strokeWidth={1.5} aria-hidden />
+                </button>
+              </Tooltip>
+            ) : null}
+          </div>
+        ) : null}
+        {/* 3b. The four icon toggles share the Output row (`specs/0088` UX notes B2, lead 2026-11-03),
+            before the strip, Denoise, Upscale and Corners. */}
+        <div className="flex h-9 items-center gap-1">
+          {params
+            .filter((p) => p.advanced && p.kind === "toggle")
+            .map((p) => {
+              const toggle = TOGGLES[p.name];
+              return toggle ? (
+                <TraceToggle
+                  key={p.name}
+                  label={p.label}
+                  icon={toggle.icon}
+                  pressed={values[toggle.key]}
+                  onChange={(v) => setValue(toggle.key, v)}
+                  onReturnFocus={onReturnFocus}
+                />
+              ) : null;
+            })}
+          {/* `specs/0091` UX notes §1: the third icon toggle, with either Output (slice 2). */}
+          <TraceToggle
+            label={RECOGNISE_TEXT}
+            icon={ScanText}
+            pressed={values.recogniseText}
+            onChange={(v) => setValue("recogniseText", v)}
+            onReturnFocus={onReturnFocus}
+          />
+          {/* `specs/0088` Part B, UX notes B1 and B2: the fourth icon toggle, with either Output. */}
+          <TraceToggle
+            label={RECOGNISE_SHAPES}
+            icon={Shapes}
+            pressed={values.recogniseShapes}
+            onChange={(v) => setValue("recogniseShapes", v)}
+            onReturnFocus={onReturnFocus}
+          />
         </div>
-      ) : null}
+      </div>
       {/* 4. The one colour strip with its edit actions (Multicolour palette, or the picked colours). */}
       {palette.swatches.length > 0 ? (
         <div className={`basis-full ${countsStale ? "opacity-50" : ""}`}>
           <TracePalette palette={palette} hsvOf={hsvOf} rgbOf={rgbOf} />
         </div>
       ) : null}
-      {/* 5. Options: the three toggles first, then Denoise, Upscale, Corners. */}
-      <div className="flex h-9 items-center gap-1">
-        {params
-          .filter((p) => p.advanced && p.kind === "toggle")
-          .map((p) => {
-            const toggle = TOGGLES[p.name];
-            return toggle ? (
-              <TraceToggle
-                key={p.name}
-                label={p.label}
-                icon={toggle.icon}
-                pressed={values[toggle.key]}
-                onChange={(v) => setValue(toggle.key, v)}
-                onReturnFocus={onReturnFocus}
-              />
-            ) : null;
-          })}
-        {/* `specs/0091` UX notes §1: the third icon toggle, with either Output (slice 2); no
-            "Recognise shapes" until 0088 Part B. */}
-        <TraceToggle
-          label={RECOGNISE_TEXT}
-          icon={ScanText}
-          pressed={values.recogniseText}
-          onChange={(v) => setValue("recogniseText", v)}
-          onReturnFocus={onReturnFocus}
-        />
-      </div>
       {denoise ? <ChoicePill param={denoise} value={values.denoise} onValue={(v) => setValue("denoise", v)} onReturnFocus={onReturnFocus} /> : null}
       {upscale ? <ChoicePill param={upscale} value={values.upscale} onValue={(v) => setValue("upscale", v)} onReturnFocus={onReturnFocus} /> : null}
       {corners ? (

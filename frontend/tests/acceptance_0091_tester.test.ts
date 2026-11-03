@@ -264,7 +264,8 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
     // Criterion 17: turned on above (off by default), kept with the Trace settings in local storage.
     await openAdvanced(s);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').getAttribute('aria-pressed')`), "true");
-    assert.equal(await s.evaluate(`!!document.querySelector('[aria-label="Recognise shapes"]')`), false);
+    // 0088 Part B: "Recognise shapes" is the fourth toggle, present and off by default.
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise shapes"]')?.getAttribute('aria-pressed') ?? null`), "false");
     // Criterion 17 as amended by slice 2 (ux-notes §1): drawn in Multicolour too, at the same place
     // (right after Drop border shapes), keeping its value; and still on with Single colour.
     const output = (name: string) => s.evaluate(`[...document.querySelectorAll('${BAR} [role=radio], ${BAR} button')].find((b) => b.textContent?.trim() === ${JSON.stringify(name)})?.click()`);
@@ -273,6 +274,7 @@ test("0091 tester c4 c5 c6 c11 c14 c16 c17 c20 c21: the poster end to end, the w
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed') ?? null`), "true", "drawn and on in Multicolour (slice 2)");
     const toggles = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [aria-pressed]')].map((e) => e.getAttribute('aria-label')))`)) as string) as string[];
     assert.equal(toggles.indexOf("Recognise text"), toggles.indexOf("Drop border shapes") + 1, `the toggle after Drop border shapes: ${JSON.stringify(toggles)}`);
+    assert.equal(toggles.indexOf("Recognise shapes"), toggles.indexOf("Recognise text") + 1, `Recognise shapes after Recognise text: ${JSON.stringify(toggles)}`);
     await output("Single colour");
     await sleep(800);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]')?.getAttribute('aria-pressed')`), "true");
