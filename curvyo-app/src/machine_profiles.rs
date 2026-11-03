@@ -41,13 +41,14 @@ fn choice_path(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|error| format!("the config folder is not available ({error})"))
 }
 
-/// Every record file's name and text, in name order; none when the folder does not exist yet.
+/// Every record file's name and text (`<uuid>.json` names only), in name order; none when the
+/// folder does not exist yet.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn list_machine_profiles(app: AppHandle) -> Result<Vec<RecordText>, String> {
     let texts = curvyo_storage_io::read_dir_texts(
         &machines_dir(&app)?,
-        curvyo_laser_core::RECORD_SUFFIX,
+        |name| curvyo_laser_core::record_id(name).is_some(),
         curvyo_laser_core::MAX_RECORDS,
         curvyo_laser_core::MAX_RECORD_BYTES,
     )

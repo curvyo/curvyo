@@ -7,16 +7,17 @@ use std::path::Path;
 
 use crate::filesystem::FsError;
 
-/// The files of `dir` whose name ends with `suffix`, in name order, at most `max_files`, each as
-/// `(file name, text)`. A missing folder lists nothing. Of each file at most `max_bytes + 1` bytes
-/// are read, so the caller can tell an over-long one; a file that is not UTF-8 text or cannot be
-/// read gives an empty text, which the caller reads as damage. Nothing is written.
+/// The files of `dir` whose name `accept` takes, in name order, at most `max_files`, each as
+/// `(file name, text)`. Names are filtered before the limit, so other files cannot hide records.
+/// A missing folder lists nothing. Of each file at most `max_bytes + 1` bytes are read, so the
+/// caller can tell an over-long one; a file that is not UTF-8 text or cannot be read gives an
+/// empty text, which the caller reads as damage. Nothing is written.
 ///
 /// # Errors
 /// [`FsError::Read`] when the folder exists but cannot be listed.
 pub fn read_dir_texts(
     dir: &Path,
-    suffix: &str,
+    accept: impl Fn(&str) -> bool,
     max_files: usize,
     max_bytes: usize,
 ) -> Result<Vec<(String, String)>, FsError> {
@@ -34,7 +35,7 @@ pub fn read_dir_texts(
         .flatten()
         .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
         .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| name.ends_with(suffix))
+        .filter(|name| accept(name))
         .collect();
     names.sort();
     names.truncate(max_files);
@@ -75,6 +76,12 @@ pub fn remove_file(path: &Path) -> Result<(), FsError> {
 mod tests {
     use super::*;
 
+    fn json(name: &str) -> bool {
+        std::path::Path::new(name)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+    }
+
     #[test]
     fn texts_are_listed_in_name_order_and_cut_after_the_limit() {
         let dir = tempfile::tempdir().unwrap();
@@ -83,7 +90,7 @@ mod tests {
         fs::write(dir.path().join("c.json"), [0xff, 0xfe]).unwrap();
         fs::write(dir.path().join("notes.txt"), "x").unwrap();
         fs::create_dir(dir.path().join("d.json")).unwrap();
-        let texts = read_dir_texts(dir.path(), ".json", 10, 8).unwrap();
+        let texts = read_dir_texts(dir.path(), json, 10, 8).unwrap();
         assert_eq!(
             texts,
             vec![
@@ -92,11 +99,22 @@ mod tests {
                 ("c.json".to_owned(), String::new()),
             ]
         );
-        assert_eq!(read_dir_texts(dir.path(), ".json", 1, 8).unwrap().len(), 1);
+        assert_eq!(read_dir_texts(dir.path(), json, 1, 8).unwrap().len(), 1);
         assert_eq!(
-            read_dir_texts(&dir.path().join("none"), ".json", 1, 8).unwrap(),
+            read_dir_texts(&dir.path().join("none"), json, 1, 8).unwrap(),
             vec![]
         );
+    }
+
+    #[test]
+    fn rejected_names_do_not_count_towards_the_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        for junk in ["0.txt", "1.txt", "2.txt"] {
+            fs::write(dir.path().join(junk), "junk").unwrap();
+        }
+        fs::write(dir.path().join("9.json"), "record").unwrap();
+        let texts = read_dir_texts(dir.path(), json, 1, 8).unwrap();
+        assert_eq!(texts, vec![("9.json".to_owned(), "record".to_owned())]);
     }
 
     #[test]

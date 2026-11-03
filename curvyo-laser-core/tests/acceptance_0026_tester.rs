@@ -1077,7 +1077,6 @@ fn ac13_the_rest_of_the_library_stays_editable_after_a_skip() {
 }
 
 #[test]
-#[ignore = "FINDING 0026 AC13: MachineProfiles::add writes over the id of a skipped newer-format record (ADR 0004 §9)"]
 fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
     // ADR 0004 §9 / ADR 0036 §3: a newer record is never written. A project made on the newer
     // computer carries that id, reads "Not in your profiles" here, and Save as profile adds the
@@ -1096,7 +1095,6 @@ fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
 }
 
 #[test]
-#[ignore = "FINDING 0026 AC13: MachineProfiles::add writes over the id of a skipped damaged record"]
 fn ac13_a_skipped_damaged_record_is_never_overwritten_by_save_as_profile() {
     let p = user(1, "Damaged on disk");
     let mut lib = MachineProfiles::load(&[(record_file_name(&p.id), "{ broken".to_owned())]);
