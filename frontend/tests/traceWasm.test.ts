@@ -165,3 +165,24 @@ test("criteria 6, 45, 59, 60: the schema and the presets equal the copies in tra
   assert.deepEqual(JSON.parse(bindings.trace_params()), text.TRACE_PARAMS_FALLBACK);
   assert.deepEqual(JSON.parse(bindings.trace_presets()), text.TRACE_PRESETS_FALLBACK);
 });
+
+test("0088 Part B criterion 13: the wasm shape sections equal the native record", { skip: !existsSync(WASM) }, async () => {
+  const bindings = (await import(path.join(BINDINGS, "curvyo_editor_wasm.js"))) as {
+    initSync: (options: { module: BufferSource }) => unknown;
+    trace_job: (rgba: Uint8Array, w: number, h: number, map: Float64Array, settings: string, progress: { report: (percent: number) => void }) => Float64Array;
+  };
+  bindings.initSync({ module: readFileSync(WASM) });
+  const record = JSON.parse(
+    readFileSync(path.join(ROOT, "curvyo-editor-wasm", "tests", "fixtures", "trace_shapes_native.json"), "utf8"),
+  ) as { map: number[]; settings: string; sections: Record<string, number[]> };
+  const off = JSON.stringify({ ...JSON.parse(record.settings), shapes: false });
+  for (const [file, section] of Object.entries(record.sections)) {
+    const picture = readPicture(file);
+    const run = (settings: string) =>
+      bindings.trace_job(picture.rgba, picture.width, picture.height, new Float64Array(record.map), settings, { report() {} });
+    const plain = run(off);
+    const wire = run(record.settings);
+    assert.deepEqual(Array.from(wire.subarray(0, plain.length)), Array.from(plain), `${file}: the trace is as with the switch off`);
+    assert.deepEqual(Array.from(wire.subarray(plain.length)), section, `${file}: bit for bit`);
+  }
+});

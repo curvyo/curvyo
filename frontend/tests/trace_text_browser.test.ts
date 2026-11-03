@@ -192,16 +192,16 @@ test("0091 slice 1 in Chromium: the switch, reading text offline, the text above
     closeAll = s.close;
     await openTrace(s, ROTATED);
     await openAdvanced(s);
-    // Criterion 17 (Frage 116 B a): off by default, the third toggle, no "Recognise shapes", no
-    // hint text; turned on here.
+    // Criterion 17 (Frage 116 B a): off by default, the third toggle, no hint text; turned on
+    // here. `0088` Part B: "Recognise shapes" is the fourth toggle, off by default.
     assert.equal(await toggle(s, "Recognise text"), "false");
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Recognise text"]').click()`);
     await sleep(500);
     assert.equal(await toggle(s, "Recognise text"), "true");
-    assert.equal(await toggle(s, "Recognise shapes"), "missing");
+    assert.equal(await toggle(s, "Recognise shapes"), "false");
     const order = (await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} button[aria-pressed]')].map((b) => b.getAttribute('aria-label')))`)) as string;
     const labels = JSON.parse(order) as string[];
-    assert.deepEqual(labels.slice(labels.indexOf("Invert"), labels.indexOf("Invert") + 3), ["Invert", "Drop border shapes", "Recognise text"]);
+    assert.deepEqual(labels.slice(labels.indexOf("Invert"), labels.indexOf("Invert") + 4), ["Invert", "Drop border shapes", "Recognise text", "Recognise shapes"]);
     // The preview with the read line counted in the status line.
     const status = await waitFor("the text line count", async () => {
       const text = await s.statusText();
@@ -348,6 +348,9 @@ test("0091 slice 2 in Chromium: Recognise text drawn and honoured in Multicolour
   }
 });
 
+// The page's calls below run on their own instance of the editor wasm (`?own-instance`): on the
+// app's instance, loading the OCR weights and tracing the poster left the app's session trapping
+// ("memory access out of bounds" in its timers), on this branch to the point of a hang.
 test("0091 slice 2 c24/13 across builds: the editor wasm traces the small colour poster with text as natively", { skip: !BROWSER, timeout: 300_000 }, async () => {
   const native = JSON.parse(readFileSync(COLOUR_NATIVE, "utf8")) as { width: number; height: number; rgba_fnv32: number; settings: string; map: number[]; ocr: string; wire: number[] };
   let vite: ChildProcess | null = null;
@@ -364,7 +367,7 @@ test("0091 slice 2 c24/13 across builds: the editor wasm traces the small colour
     const png = readFileSync(COLOUR_SMALL).toString("base64");
     const out = JSON.parse(
       (await s.evaluate(`(async () => {
-        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js?own-instance');
         await m.default();
         const png = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
         const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
@@ -386,7 +389,7 @@ test("0091 slice 2 c24/13 across builds: the editor wasm traces the small colour
     const big = readFileSync(COLOUR_POSTER).toString("base64");
     const times = JSON.parse(
       (await s.evaluate(`(async () => {
-        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js?own-instance');
         await m.default();
         const png = Uint8Array.from(atob(${JSON.stringify(big)}), (c) => c.charCodeAt(0));
         const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
