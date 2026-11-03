@@ -208,3 +208,19 @@ text within 5 s and B's pointer gone in A (17); three edits each side, then both
 change (32); finally no label or document JSON in the relay's files or log (24). It prints the
 observed timings (wall time, not a gate figure). Screenshots and saved files go to
 `target/0092-browser/`.
+
+### Workspace (0095)
+
+`workspace.cjs` is the slice 1 journey of the shared workspace, set up like
+`cooperative-editing.cjs` (relay on a free port with `target/0095-browser/relay-data`, preview on
+port 1421 unless `CURVYO_BROWSER_URL` is set). The browser has no folder access, so each device gets
+a faked desktop host (`window.__TAURI_INTERNALS__`, as `acceptance_0087_browser.test.ts`) whose
+workspace commands run on real folders under `target/0095-browser/<A|B>/`; zip members are read
+with `python3`. A opens an empty folder, creates Lid, Base and Solo, shares Solo on its own, then
+shares the workspace: the confirm names Solo as taken in (criteria 25, 42) and Solo's file turns
+`share.json` v2. B joins by the `2.` link into an empty folder and receives every file (26 to 28);
+A's create, rename, move and delete reach B's disk, the notices name Anna, the deleted file goes to
+B's trash and B restores it for both (35 to 40); a rectangle drawn in the open document reaches
+the other side both ways (30); A removes B, whose workspace says "Not shared" with its files kept
+(43, 44); finally no name or label in the relay's files or log (34). The host commands' Rust side
+is covered by the `curvyo-storage-io` and `curvyo-app` tests, not by this journey.
