@@ -227,9 +227,9 @@ fn ac2_add_laser_makes_laser_1_shows_it_and_is_one_undo_step() {
     assert_eq!(active(&s), id.full_id(), "the Laser workbench is shown");
     let v = view(&s);
     assert_eq!(v["name"], "Laser 1");
-    assert_eq!(v["values"]["host.machine_name"], "Generic laser");
-    assert_eq!(v["values"]["host.work_width"], 400.0);
-    assert_eq!(v["values"]["host.work_height"], 300.0);
+    assert_eq!(v["machine"]["copy"]["name"], "Generic laser");
+    assert_eq!(v["machine"]["copy"]["width"], 400.0);
+    assert_eq!(v["machine"]["copy"]["height"], 300.0);
     let entry = workbenches(&s)["entries"]
         .as_array()
         .unwrap()
@@ -274,8 +274,8 @@ fn ac3_work_area_edit_resizes_the_output_page_keeps_content_and_is_one_step() {
     assert!(s.set_work_area(mm(600.0), mm(400.0)));
     assert_eq!(s.undo_len(), steps + 1);
     let v = view(&s);
-    assert_eq!(v["values"]["host.work_width"], 600.0);
-    assert_eq!(v["values"]["host.work_height"], 400.0);
+    assert_eq!(v["machine"]["copy"]["width"], 600.0);
+    assert_eq!(v["machine"]["copy"]["height"], 400.0);
     let d = opened(&s);
     let m = &d.manufacturings()[0];
     assert_eq!(
@@ -290,7 +290,7 @@ fn ac3_work_area_edit_resizes_the_output_page_keeps_content_and_is_one_step() {
     assert!(!s.set_work_area(mm(600.0), mm(400.0)), "no change, no step");
     assert_eq!(s.undo_len(), steps + 1);
     s.undo();
-    assert_eq!(view(&s)["values"]["host.work_width"], 400.0);
+    assert_eq!(view(&s)["machine"]["copy"]["width"], 400.0);
 }
 
 #[test]
@@ -299,19 +299,14 @@ fn ac3_out_of_range_work_areas_are_clamped_and_nan_writes_nothing() {
     add_laser(&mut s);
     assert!(s.set_work_area(mm(0.0), mm(1e9)));
     let v = view(&s);
-    assert_eq!(v["values"]["host.work_width"], 1.0);
-    assert_eq!(v["values"]["host.work_height"], 10_000.0);
+    assert_eq!(v["machine"]["copy"]["width"], 1.0);
+    assert_eq!(v["machine"]["copy"]["height"], 10_000.0);
     let steps = s.undo_len();
     let _ = s.set_work_area(mm(f64::NAN), mm(300.0));
     let _ = s.set_work_area(mm(f64::INFINITY), mm(f64::NEG_INFINITY));
     let v = view(&s);
-    assert!(v["values"]["host.work_width"].as_f64().unwrap().is_finite());
-    assert!(
-        v["values"]["host.work_height"]
-            .as_f64()
-            .unwrap()
-            .is_finite()
-    );
+    assert!(v["machine"]["copy"]["width"].as_f64().unwrap().is_finite());
+    assert!(v["machine"]["copy"]["height"].as_f64().unwrap().is_finite());
     let d = opened(&s);
     let size = d.manufacturings()[0].work_area();
     assert!(size.width.as_mm().is_finite() && size.height.as_mm().is_finite());
@@ -972,7 +967,7 @@ fn ac12_an_unknown_process_opens_disabled_and_saves_back_unchanged() {
         .add_manufacturing(NewManufacturing {
             process: "acme.cnc",
             label: "CNC",
-            machine_name: "Router",
+            profile: None,
             work_area: DocumentSize::from_mm(800.0, 600.0),
             place: Some("first"),
         })

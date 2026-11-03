@@ -33,10 +33,13 @@ impl WasmSession {
             .is_some_and(|id| self.session.delete_manufacturing(id))
     }
 
-    /// Sets the active work area in mm.
-    pub fn set_work_area(&mut self, width_mm: f64, height_mm: f64) -> bool {
+    /// Sets the active work area in mm; returns the notice of a side set into its range, empty
+    /// when there is none.
+    pub fn set_work_area(&mut self, width_mm: f64, height_mm: f64) -> String {
         self.session
-            .set_work_area(Length::from_mm(width_mm), Length::from_mm(height_mm))
+            .set_work_area_limited(Length::from_mm(width_mm), Length::from_mm(height_mm))
+            .1
+            .unwrap_or_default()
     }
 
     /// Installs a fixture of `kind` in the active setup.

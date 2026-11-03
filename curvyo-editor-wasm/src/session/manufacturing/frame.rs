@@ -66,6 +66,9 @@ impl Session {
             art.map_positions(|p| map.apply_point(p));
             list.extend(art);
         }
+        if let Some(active) = self.active_copy() {
+            list.extend(origin_marker(active.read.copy.values.origin, area, view));
+        }
         list
     }
 
@@ -133,6 +136,23 @@ impl Session {
         });
         members
     }
+}
+
+/// The machine origin marker at the copy's corner of the output page (`0026` criterion 11):
+/// drawn above the placed content, view only.
+fn origin_marker(
+    corner: curvyo_laser_core::OriginCorner,
+    area: curvyo_document_core::DocumentSize,
+    view: ViewTransform,
+) -> DrawList {
+    let (width, height) = (area.width.as_mm(), area.height.as_mm());
+    let x = if corner.is_right() { width } else { 0.0 };
+    let y = if corner.is_bottom() { height } else { 0.0 };
+    let inward = (
+        if corner.is_right() { -1.0 } else { 1.0 },
+        if corner.is_bottom() { -1.0 } else { 1.0 },
+    );
+    curvyo_render_core::build_origin_marker(Point::new(x, y), inward, width.min(height), view)
 }
 
 /// How much a placement map scales lengths (for the tessellation tolerance only): the square

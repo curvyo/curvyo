@@ -36,6 +36,7 @@ mod marquee_overlay;
 mod move_axes;
 mod node_opacity;
 mod offset_preview;
+mod origin_marker;
 mod pen_cue;
 mod pen_preview;
 mod reference_box;
@@ -72,6 +73,7 @@ pub use offset_preview::{
     OffsetCenterState, OffsetHandleState, PreviewAnchor, build_offset_center_handle,
     build_offset_grown_box, build_offset_handles, build_offset_preview, build_preview_outline,
 };
+pub use origin_marker::{ORIGIN_MARKER_MIN_PAGE_PX, build_origin_marker};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;
 pub use reference_box::{ReferenceBoxInput, ReferenceMark};

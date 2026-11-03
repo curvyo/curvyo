@@ -3,7 +3,7 @@
 //! the extension list, the manifests, and the values the schema-rendered tab shows.
 
 use curvyo_document_core::{ManufacturingSnapshot, NodeId};
-use curvyo_extension_core::{Block, HostKey, NoticeContext, Param, ParamValue};
+use curvyo_extension_core::{Block, NoticeContext, Param, ParamValue};
 use serde_json::{Value, json};
 
 use super::super::{Session, Workbench};
@@ -118,7 +118,7 @@ impl Session {
     }
 
     /// The active manufacturing's values for its schema-rendered tab and the status bar
-    /// (UX notes §3 to §6); `null` in a drawing workbench.
+    /// (UX notes §3 to §6; the Machine block of `0026`); `null` in a drawing workbench.
     #[must_use]
     pub fn manufacturing_view_json(&self) -> String {
         let Some(manufacturing) = self.active_manufacturing() else {
@@ -140,11 +140,11 @@ impl Session {
                 notices.insert((*id).to_owned(), Value::String(text));
             }
         }
-        let host = json!({
-            HostKey::MachineName.key(): manufacturing.machine_name,
-            HostKey::WorkWidth.key(): area.width.as_mm(),
-            HostKey::WorkHeight.key(): area.height.as_mm(),
-        });
+        let machine = self.machine_view();
+        let machine_name = machine
+            .as_ref()
+            .and_then(|m| m["copy"]["name"].as_str().map(str::to_owned))
+            .unwrap_or_default();
         let notice = self.manufacturing.notice.map(|n| {
             json!({
                 "seq": n.seq,
@@ -158,12 +158,11 @@ impl Session {
             "name": manufacturing.name,
             "process": manufacturing.process,
             "status": format!(
-                "{} · {:.1} × {:.1} mm",
-                manufacturing.machine_name,
+                "{machine_name} · {:.1} × {:.1} mm",
                 area.width.as_mm(),
                 area.height.as_mm()
             ),
-            "values": host,
+            "machine": machine,
             "notices": notices,
             "fixtures": fixtures_json(&manufacturing, &contribution),
             "read_only_notice": notice,
@@ -205,6 +204,5 @@ fn fixtures_json(
 fn value_json(param: &Param, stored: &curvyo_extension_core::StoredParams) -> Value {
     match param.read(stored) {
         ParamValue::Length(length) => json!(length.as_mm()),
-        ParamValue::Text(text) => json!(text),
     }
 }
