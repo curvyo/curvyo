@@ -1,0 +1,12 @@
+[package]
+name = "spike-0064-connector"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+# No `libudev` (default feature): no C library, so a static musl build needs no sysroot.
+serialport = { version = "=4.10.1", default-features = false }
+# `handshake` only: the HTTP upgrade, no TLS, no rustls/native-tls.
+tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake"] }

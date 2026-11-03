@@ -1,0 +1,11 @@
+[workspace]
+resolver = "3"
+members = ["channel", "connector"]
+exclude = ["webview"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

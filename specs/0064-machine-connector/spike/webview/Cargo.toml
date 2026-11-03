@@ -1,0 +1,30 @@
+[package]
+name = "spike-0064-webview"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+
+# Its own workspace: Tauri stays out of the channel/connector spike. Same tauri version and
+# features as curvyo-app, so the WebView setup (custom protocol, CSP injection) is the real one.
+[workspace]
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", default-features = false, features = ["config-json"] }
+
+[dependencies]
+tauri = { version = "2", default-features = false, features = [
+    "common-controls-v6",
+    "compression",
+    "dbus",
+    "dynamic-acl",
+    "tauri-runtime-wry",
+    "webkit2gtk",
+    "webview2-com",
+    "wry",
+    "x11",
+] }

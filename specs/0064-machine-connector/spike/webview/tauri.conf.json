@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ws-spike",
+  "identifier": "org.curvyo.spike0064",
+  "build": { "frontendDist": "dist" },
+  "app": {
+    "windows": [{ "label": "main", "title": "ws spike", "width": 400, "height": 300 }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data: blob:; worker-src 'self'; connect-src 'self' ipc: http://ipc.localhost ws:; object-src 'none'; base-uri 'none'; form-action 'none'"
+    }
+  },
+  "bundle": { "active": false, "icon": ["icons/32x32.png", "icons/icon.png"] }
+}

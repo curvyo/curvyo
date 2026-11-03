@@ -1,0 +1,4 @@
+listening on 0.0.0.0:7979
+upgrade from Some(10.0.2.2:54280) origin=Some("tauri://localhost") protocols="curvyo-connector.1"
+echo 3 bytes
+text: page-got-echo origin=tauri://localhost secure=true
