@@ -261,11 +261,93 @@ safe defaults (end of this file); none touches the document model or a written f
     criterion 6) is an options-bar value. Where the button sits (Trace tool options bar after
     Create paths, and the Path menu, as default) is the ux-engineer's call in `ux-notes.md`.
 
+## Part B: Recognise shapes in Trace (implementer, 2026-11-03, Proposal)
+
+Lead decisions of 2026-11-03 applied: the primitives sit inside the "Trace of" group in the fill
+of their path; no new crate, no new dependency, no `format_version` change, no document model
+change.
+
+12. **Where it runs.** A pass over the outlines of the one trace, in the same worker job
+    (`trace_job`, `trace_text_job`) after the trace and its text section, when the settings say
+    `"shapes": true`: `curvyo-ui-core::trace_shapes` (pass and wire), `trace_shape_sample`
+    (outline sampled at one picture pixel, area moments), `trace_shape_fit` (circle, ellipse,
+    rectangle, rounded rectangle), `trace_shape_star` (regular polygon, star),
+    `trace_shape_math` (`atan2`, `sin_cos` from `+ − × ÷` and `sqrt`). It adds a section (mark
+    -4) after the text section; the traced numbers before it are untouched, and with the switch
+    off there is no section, so the wire is bit-identical to before (criterion 11). The session
+    reads the section and puts each recognised outline's primitive outline in place of the traced
+    one, so preview and Create paths draw the same thing. No extra progress stage (criterion 6).
+13. **Reuse of `0024` slice 3.** Its checks compare an SVG star or ellipse whose parameters the
+    file states with its `d`; they cannot find unknown parameters, so the fit is new. Reused: the
+    primitive constructors as the import builds them (rect with uniform `CornerRadii`, ellipse
+    with `Curve::ELLIPSE_DEFAULT`, polygon and star by `StarFrame` with the first outer corner's
+    angle and rotation 0) and `svg_import_match::outline_path` for a primitive's drawn outline.
+14. **Fit and simplest fit (criterion 7).** Candidates in order, the first within tolerance wins:
+    circle (centroid, mean radius), ellipse (second area moments: a solid ellipse has a²/4 and
+    b²/4, axis from the moments), rectangle with square corners, rounded rectangle (direction from
+    the length-weighted fourfold direction of the outline; each side the mean of the pieces within
+    10° of it, refitted on the straight parts; radius from the area w·h − (4 − π)·r²), regular
+    polygon, star (count 3 to 24 from the strongest harmonic of the radius over the angle; *changed
+    2026-11-03 after the customer's 8-point star*: every side is folded onto the first corner's
+    wedge and all sides are fitted as one line, a polygon's perpendicular to the wedge's middle;
+    the turn is the one, within 2° of the harmonic's, where the folded sides lie best on one line;
+    a second fit leaves out the tip the tracer cuts (2 x tolerance over the tangent of the half
+    tip angle) and the valley; up to 1 % of a turn of steps back around the centroid is allowed
+    at traced corners). Before, each side had its own line through its middle 60 % and the corners
+    were where neighbouring lines crossed: a sharp tip far from the fitted middles turned a small
+    line error into a radius error of 2 to 5 px, over the 2 px floor (7 of 392 stars of the sweep
+    `curvyo-ui-core/tests/trace_shape_sweep.rs` failed, e.g. 4 points ratio 0.4 at 22.5°, radius
+    2.8 px short; now 0 of 392, polygons 0 of 56 before and after). Accepted when every sampled point is within the tolerance of the primitive
+    and the areas differ by at most the tolerance times the perimeter (no sliver along a curve).
+15. **Tolerance share (lead: implementer's choice).** max(2 picture pixels, **1 % of the square
+    root of the outline's area**). In pixels, so it does not depend on the dpi; the floor is the
+    spec's 0.2 mm at 10 px/mm. Measured on the 10 px/mm fixtures (`curvyo-ui-core/tests/trace_shapes.rs`),
+    largest deviation of the traced outline from the found primitive: circle 50 mm 0.033 mm (tolerance
+    0.44 mm), ellipse 60 x 40 mm 0.039, rounded rectangle 200 x 100 mm 0.039 (1.41), hexagon 0.107
+    (0.48), star 0.057 (0.49), ring 0.044 / 0.023, rectangles 0.000. The wobbly circle (±3 % of
+    25 mm, irregular): best circle 0.78 mm, best ellipse 0.80 mm against 0.44, so it stays a path.
+    Found parameters: rectangle 200.000 x 100.000, corner 9.94 (spec 10 ± 0.2); circle 25.004;
+    ellipse 29.99 x 20.03 at 24.96° (25°); star outer 40.02, inner 20.00, turn off by 0.01°;
+    hexagon 30.001. 0.5 % would leave a large scanned shape little room; 2 % would accept the
+    wobbly circle (0.89 mm).
+16. **Holes (lead: implementer's choice).** A region is an outer outline (winding as the
+    largest outline of its colour) and the holes whose smallest enclosing outer it is. **The outer
+    decides:** an outer that is no primitive leaves its region as traced paths, holes included
+    (a letter's counter never becomes a polygon). A recognised outer without holes becomes a
+    primitive node. A recognised outer with holes becomes its own compound path of the region,
+    each recognised outline as its primitive's clean outline and each other hole as traced
+    (criterion 8: a ring is one compound of two circles, a frame one of two rectangles). The
+    document model has no compound of primitives; making the ring two editable circles with a hole
+    would be a model change (architect and customer), so it is not done here.
+    *Changed 2026-11-03 after the customer's page (an 8-point star drawn as a 2 to 3 px outline came
+    out filled):* a primitive's outline always winds one way, so a hole replaced by its
+    primitive's outline wound like the outer and the nonzero fill closed it (the ring of criterion
+    8 had the same fault; the tests counted outlines, not fill). Each primitive outline now takes
+    the winding of the traced outline it replaces, and a guard keeps a region's traced paths when
+    its fill would change by more than its outlines' own accepted area changes add up to
+    (`trace_shapes::with_primitives`, `keeps_fill`), so a hole is never lost. The customer's page
+    (`curvyo-ui-core/tests/fixtures/trace_shapes/customer-page.png`): ellipse, rounded rectangle and
+    15-point star become primitives, the outline star one compound of two clean star outlines,
+    each region filling what it fills with the switch off within 2 %. The wire is unchanged.
+17. **Place and fill.** Per colour (one for black and white): the colour's leftover compound path
+    first, then its primitives and holed compounds in outline order, all in the "Trace of" group
+    and in the colour's fill (recolours apply). Names are the primitives' own. One step, as before.
+18. **Determinism (criterion 13).** Fixed order, no hash maps, no platform trigonometry; the
+    shape sections of the golden pictures are recorded natively
+    (`curvyo-editor-wasm/tests/fixtures/trace_shapes_native.json`) and the editor wasm gives them
+    bit for bit (`frontend/tests/traceWasm.test.ts`).
+19. **Time (criterion 6).** Thread CPU, debug build: 500 traced paths 0.033 s; the reference
+    poster with Recognise text on (5 outlines left after the text) 0.002 s.
+20. **Layout (lead 2026-11-03).** With the fourth toggle in its own row the Advanced block grew
+    from about 222 px to 273 px at 800 x 600 with the panel open (the row 124 + 8 + Denoise 185 px
+    no longer fit 304 px). The toggles now share the Output row, one flex row at 4 px gaps (173 +
+    4 + 124 = 301 px): 237 px panel open, 165 px closed (`0089` tidy-up 22.3 within its 40 px).
+    Tab order: Output, Colours, pipette, the four toggles, then strip, Denoise, Upscale, Corners.
+
 ## Not decided here
 
-- Part B (shapes): it reuses the shape checks of `0024` slice 3 (`ui-core::svg_import_shapes`) and
-  the `sample.rs`/`distance.rs` idea; whether those move to `geometry-core` is decided in Part B's
-  note. Tablet gestures (Later) need their own story.
+- Part B (shapes): decided in decisions 12 to 19 above; nothing moves to `geometry-core`. Tablet
+  gestures (Later) need their own story.
 - `ocrs`: a later customer decision; it would be a new crate and an ADR (decision 1 trigger).
 
 ## Customer decisions (2026-10-31, replaces the open questions)

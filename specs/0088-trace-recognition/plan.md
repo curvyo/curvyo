@@ -119,3 +119,86 @@ one sequence that reads top to bottom:
   error, max deviation, thread CPU) reported in the PR.
 - Determinism: the synthetic set run twice gives identical results.
 - Chromium e2e for the bar, notices and undo, file by file.
+
+# Plan for Part B (Recognise shapes in Trace)
+
+Implementer, 2026-11-03, on `story/trace-shapes` (from `main` `7d5513ca`). Built against
+`specification.md` Part B criteria 1 to 15, the lead decisions of 2026-11-03 and `ux-notes.md`
+B1 to B9. No new crate, no new dependency, no `format_version` change. **(Proposal)** marks my
+choices, vetoable at the demo.
+
+## Affected crates/modules
+
+- **`curvyo-ui-core`** (new modules, each one sentence, each under 500 lines):
+  - `trace_shape_math.rs`: computes angles and their sines with basic arithmetic only, so every
+    platform gets the same bits (determinism rule of `0089` §8: no `atan2`, `sin`, `cos`).
+  - `trace_shape_sample.rs`: samples a closed traced outline at a step of one picture pixel and
+    sums its area moments.
+  - `trace_shape_fit.rs`: finds the simplest circle, ellipse or rectangle within a tolerance.
+  - `trace_shape_star.rs`: finds the simplest regular polygon or star within a tolerance.
+  - `trace_shapes.rs`: the shape pass over one trace result (regions, holes, tolerance) and its
+    section of the wire.
+  - `trace_transfer.rs`: `TraceWire.shapes`; `read_trace_wire` reads the section and puts each
+    recognised outline's primitive outline in place of the traced one (preview equals result).
+  - `trace_plan.rs`: `TraceTarget.shapes`; a recognised outline without holes becomes a
+    primitive node after its colour's path, a region with holes its own compound path.
+  - `svg_import_match.rs`: `outline_path` becomes `pub(crate)` (reused, no second copy).
+- **`curvyo-editor-wasm`**: `wasm_trace.rs` runs the pass in `trace_job` and `trace_text_job`
+  when the settings say `"shapes": true` (`trace_glue.rs` reads it); the session keeps the shape
+  count of the preview (`trace_shape_count`) and hands the shapes to Create paths, remapped past
+  the text leftovers (`trace_colours::with_leftovers`).
+- **`frontend`**: `recogniseShapes` value (app setting `recogniseShapesOn`, not in presets),
+  `"shapes"` in the settings JSON only when on, the fourth toggle `Shapes` in `TraceAdvanced`,
+  the muted segment "N shapes set", the About Trace entry, "Changed:" line.
+- Docs: `docs/design-system.md` (UX B8), `docs/tracing-images.md`, `adrs.md` Part B note.
+
+## Design choices (Proposal)
+
+- **Reuse of 0024 slice 3.** Its checks match an SVG's declared star/ellipse/rect against its `d`
+  (parameters are given), so they cannot fit unknown parameters; what is reused is the primitive
+  model and constructors (`Shape::Rect`/`Ellipse`/`Polygon`/`Star` as the import builds them, frame
+  angle on the star, rotation 0) and `outline_path` for the primitive's drawn outline. The fit is
+  new: moments for circle and ellipse, edge-line fits for rectangle, polygon and star.
+- **Holes.** A region is an outer outline and the holes it contains. The outer decides: an outer
+  that matches no primitive leaves the whole region as paths. A matched outer without holes
+  becomes a primitive. A matched outer with holes becomes one compound path of its region in
+  which every matched outline is the primitive's clean outline and an unmatched hole stays its
+  traced path (the document model has no compound of primitives; adding one is a model change).
+- **Tolerance.** In picture pixels: max(2 px, 1 % of the square root of the outline's area).
+- **Candidates in order:** circle, ellipse, rectangle, rounded rectangle, regular polygon (3 to 24
+  sides), star (3 to 24 points). The first within tolerance wins (criterion 7).
+- **Wire.** The pass leaves every traced number as it is and adds a section (mark `-3`) after the
+  text section: per recognised region its outline indices and each outline's primitive
+  parameters. With the switch off the section is absent and the wire is bit-identical.
+
+## Tasks
+
+- [x] 1. `trace_shape_math` with tests against `std` (AC 13).
+- [x] 2. Sampling, moments and the five fits, unit tests on exact outlines (AC 1 to 5, 7).
+- [x] 3. Shape pass on traced pictures: rect, rounded rect, circle, rotated ellipse, hexagon,
+      5-star, ring, rectangle frame, wobbly circle, ring and dot grid of `0025`, red circle and
+      blue rectangle in Multicolour, twice for determinism (AC 1 to 5, 7 to 10, 13).
+- [x] 4. Wire section and `read_trace_wire`; off is bit-identical, the goldens unchanged (AC 11).
+- [x] 5. `plan_trace` with primitives and compounds per colour; session Create paths, one undo
+      (AC 1, 8, 10, 14).
+- [x] 6. editor-wasm: settings flag, both jobs, shape count; text poster with both switches on:
+      texts and no shape from a letter (AC 12, 15).
+- [x] 7. CPU timing: 500 traced closed paths under 2 s thread CPU (AC 6).
+- [x] 8. Frontend toggle, value, settings JSON, status segment, info entry, tests (UX B1 to B7).
+- [x] 9. Docs: design-system row (UX B8), tracing guide, adrs.md note with measurements.
+- [x] 10. Full gate; Chromium files of 0091, trace_text_browser, 0025, 0089_tidyup.
+
+## Built differently from the plan (Proposal)
+
+- The shape section mark is `-4` (the text section already uses `-1` to `-3` inside its own).
+- `plan_trace` got a helper `plan_colour`; `trace_shape_star::fit` (62 lines) and `plan_trace`
+  (62 lines) are one sequence each. `trace_transfer.rs` was 695 lines before this part and is
+  723 now (the section read); splitting it is a note for the lead.
+- The status line counts primitives, so a ring adds 2 ("2 shapes set").
+
+## Validation
+
+- Unit and pass tests in `curvyo-ui-core`, session tests in `curvyo-editor-wasm`; the wasm
+  `npm test` runs the pass on the golden pictures and compares the section with the native
+  record bit for bit.
+- Existing goldens and 0091 tests unchanged with the switch off.
