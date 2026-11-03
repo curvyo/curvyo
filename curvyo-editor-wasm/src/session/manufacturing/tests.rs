@@ -74,10 +74,10 @@ fn ac3_the_work_area_edit_resizes_the_output_page_and_is_clamped() {
     let mut session = session_with_drawing();
     session.add_manufacturing("curvyo.laser").unwrap();
     assert!(session.set_work_area(Length::from_mm(600.0), Length::from_mm(400.0)));
-    assert_eq!(view(&session)["values"]["host.work_width"], 600.0);
+    assert_eq!(view(&session)["machine"]["copy"]["width"], 600.0);
     assert!(session.set_work_area(Length::from_mm(20_000.0), Length::from_mm(0.0)));
-    assert_eq!(view(&session)["values"]["host.work_width"], 10_000.0);
-    assert_eq!(view(&session)["values"]["host.work_height"], 1.0);
+    assert_eq!(view(&session)["machine"]["copy"]["width"], 10_000.0);
+    assert_eq!(view(&session)["machine"]["copy"]["height"], 1.0);
 }
 
 #[test]

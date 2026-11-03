@@ -1,16 +1,17 @@
 //! The commands of a manufacturing workbench (criteria 2, 3, 9, 10, 13): each is one history
 //! step recorded like every other command; values are clamped by the extension's schema.
 
-use curvyo_document_core::{DocumentSize, Length, NewManufacturing, NodeId};
-use curvyo_extension_core::{FixtureKind, HostKey, Param, ParamValue, WorkbenchContribution};
+use curvyo_document_core::{Length, NewManufacturing, NodeId};
+use curvyo_extension_core::{FixtureKind, Param, ParamValue, WorkbenchContribution};
+use curvyo_laser_core::{ProfileCopy, write_copy};
 
 use super::super::{Session, Workbench};
 
 impl Session {
-    /// Add manufacturing with the process `process` (criterion 2): "Laser 1" with the manifest's
-    /// placeholder machine and work area, the active drawing page placed at the output page's
-    /// top-left corner, in one step; then its workbench opens. `None` for a process that is not
-    /// compiled in or is switched off.
+    /// Add manufacturing with the process `process` (criterion 2): "Laser 1" with the copy and
+    /// work area of the profile last picked on this computer (`0026` criterion 10), the active
+    /// drawing page placed at the output page's top-left corner, in one step; then its workbench
+    /// opens. `None` for a process that is not compiled in or is switched off.
     pub fn add_manufacturing(&mut self, process: &str) -> Option<NodeId> {
         if !self.process_enabled(process) {
             return None;
@@ -18,16 +19,15 @@ impl Session {
         let manifest = curvyo_ui_core::manifest(process)?;
         let workbench = manifest.workbench()?;
         let place = self.active_page().id;
+        let profile = self.initial_machine_profile();
+        let copy = write_copy(&ProfileCopy::of(&profile));
         let id = self.recording(|this| {
             this.document
                 .add_manufacturing(NewManufacturing {
                     process,
                     label: workbench.label,
-                    machine_name: workbench.machine_name,
-                    work_area: DocumentSize::from_mm(
-                        workbench.work_width_mm,
-                        workbench.work_height_mm,
-                    ),
+                    profile: Some(&copy),
+                    work_area: profile.work_area,
                     place: Some(&place),
                 })
                 .ok()
@@ -49,31 +49,10 @@ impl Session {
         deleted
     }
 
-    /// Sets the active manufacturing's work area, each side clamped into the schema's bounds
+    /// Sets the active manufacturing's work area, each side set into the profile range
     /// (criterion 3); the output page follows at once. `false` when nothing changed.
     pub fn set_work_area(&mut self, width: Length, height: Length) -> bool {
-        let Some(manufacturing) = self.active_manufacturing() else {
-            return false;
-        };
-        let Some(contribution) = workbench_of(&manufacturing.process) else {
-            return false;
-        };
-        let clamp = |key: HostKey, value: Length| {
-            host_param(&contribution, key)
-                .and_then(|param| param.accept(ParamValue::Length(value)))
-                .and_then(|value| value.length())
-        };
-        let (Some(width), Some(height)) = (
-            clamp(HostKey::WorkWidth, width),
-            clamp(HostKey::WorkHeight, height),
-        ) else {
-            return false;
-        };
-        self.recording(|this| {
-            this.document
-                .set_work_area(manufacturing.id, DocumentSize::new(width, height))
-                .unwrap_or(false)
-        })
+        self.set_work_area_limited(width, height).0
     }
 
     /// Installs a fixture of `kind` with its defaults at the end of the active setup (criterion
@@ -153,21 +132,6 @@ impl Session {
 /// The workbench contribution of the process `process`.
 pub(super) fn workbench_of(process: &str) -> Option<WorkbenchContribution> {
     curvyo_ui_core::manifest(process)?.workbench().cloned()
-}
-
-/// The parameter of a `Params` block that binds the host value `key`.
-pub(super) fn host_param(contribution: &WorkbenchContribution, key: HostKey) -> Option<Param> {
-    contribution
-        .tabs
-        .iter()
-        .flat_map(|tab| &tab.blocks)
-        .filter_map(|block| match block {
-            curvyo_extension_core::Block::Params { params, .. } => Some(params),
-            _ => None,
-        })
-        .flatten()
-        .find(|param| HostKey::from_key(param.key) == Some(key))
-        .cloned()
 }
 
 /// The fixture kind a stored `<process>/<kind>` names in this contribution.

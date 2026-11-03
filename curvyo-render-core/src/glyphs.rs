@@ -245,6 +245,14 @@ pub(crate) fn cased(
     list
 }
 
+/// The axis-aligned rectangle between the corners `a` and `b`, filled.
+#[must_use]
+pub(crate) fn filled_rect(a: Point, b: Point, color: RgbaColor) -> DrawList {
+    let mut list = DrawList::default();
+    list.push_quad(a, Point::new(b.x, a.y), b, Point::new(a.x, b.y), color);
+    list
+}
+
 /// An axis-aligned square centered at `center`, `size_mm` wide — a
 /// corner node glyph (`docs/design-system.md`).
 #[must_use]

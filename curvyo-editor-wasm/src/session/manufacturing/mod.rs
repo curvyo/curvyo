@@ -4,6 +4,8 @@
 
 mod commands;
 mod frame;
+mod machine;
+mod machine_view;
 #[cfg(test)]
 mod tests;
 mod view_json;
@@ -52,6 +54,8 @@ pub(super) struct ManufacturingState {
     notice: Option<ReadOnlyNotice>,
     /// The members of each placement for the drawing read they were computed from.
     pub(super) placed: frame::PlacedCache,
+    /// The maker's machine profiles and the last pick (`specs/0026-machine-profile`).
+    pub(super) machine: machine::MachineState,
 }
 
 impl Session {

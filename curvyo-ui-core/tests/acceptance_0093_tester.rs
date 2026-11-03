@@ -65,8 +65,13 @@ fn ac2_the_laser_workbench_brings_generic_laser_at_400_by_300() {
     let m = manifest(LASER).unwrap();
     let w = m.workbench().unwrap();
     assert_eq!(w.label, "Laser");
-    assert_eq!(w.machine_name, "Generic laser");
-    assert_eq!((w.work_width_mm, w.work_height_mm), (400.0, 300.0));
+    // `0026` moved the machine and work area into the machine profile (ADR 0037 §8).
+    let generic = curvyo_laser_core::MachineProfile::generic_laser();
+    assert_eq!(generic.values.name, "Generic laser");
+    assert_eq!(
+        generic.work_area,
+        curvyo_document_core::DocumentSize::from_mm(400.0, 300.0)
+    );
     assert_eq!(w.tabs.len(), 1);
     assert_eq!(w.tabs[0].label, "Laser");
     assert!(

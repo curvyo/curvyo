@@ -194,6 +194,8 @@ pub use workspace_glue::{WorkspaceGlue, workspace_copy_bytes};
 pub use workspace_tree_glue::{deleted_json, disk_answer_json, disk_scan, list_edit, stamps};
 
 #[cfg(target_arch = "wasm32")]
+mod wasm_machine_profiles;
+#[cfg(target_arch = "wasm32")]
 mod wasm_manufacturing;
 #[cfg(target_arch = "wasm32")]
 mod wasm_measure;
