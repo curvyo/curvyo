@@ -1,7 +1,7 @@
 # Feature specs
 
 The list of all features comes first, then the convention for writing them.
-State of this list: 2026-11-02, synced up to #246 (open: #247 `0069`, #248 `0071`). The customer
+State of this list: 2026-11-03, synced up to #255. The customer
 renumbered every folder on 2026-10-09, see "Numbering" below.
 
 Spec-driven development, adapted from
@@ -103,7 +103,9 @@ agree for 0001 to 0007 only; see "Spec number versus slice label" below.
 | [0066](0066-constraint-sketcher/) | `constraint-sketcher` | Parametric Sketch workbench; customer-requested revision: one Sketch object per page, centred origin, mixed Polyline modes, axis autoconstraints, Alt/Tab input, left-rail constraint tools and fx Parameters tab. Previous PR #228 gate passed; customer rejected that UI. | Done (#228, #237, #241) | Should | R-EDIT-042 | - |
 | [0061](0061-align-and-distribute/) | `align-and-distribute` | Symbol buttons in the Select bar: align to an edge or centre, distribute with equal gaps or centres; the reference follows from the selection (selection box, key object, or the page for one object), no dialog. Customer request of 2026-10-17. | Done (#239) | Should | R-EDIT-040 | - |
 | [0070](0070-measure-and-dimension/) | `measure-and-dimension` | A Measure tool and dimensions (linear, aligned, angle, radius, diameter) as thin solid green guide objects (guides stay dashed; decided 2026-10-17) that are not output and convert back to paths; the base of driving dimensions in `0066`. Customer request of 2026-10-17. | Done (#243) | Should | R-EDIT-045 | - |
-| [0069](0069-tiling/) | `tiling` | Grid and circular arrays as linked clones or copies, with variance for rotation, scale and offset and a seeded randomizer; options in the top bar. Linked clones by default, core feature (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Should | R-EDIT-044 | - |
+| [0069](0069-tiling/) | `tiling` | Grid and circular arrays as linked clones or copies, with variance for rotation, scale and offset and a seeded randomizer; options in the top bar. Linked clones by default, core feature (decided 2026-10-17). Customer request of 2026-10-17. | Done (#247) | Should | R-EDIT-044 | - |
+| [0091](0091-trace-text-recognition/) | `trace-text-recognition` | Trace reads the text in the picture first (offline OCR, ADR 0028), sets each line as text in the nearest font and leaves it out of the traced paths; switch "Recognise text" in Trace Advanced. Slice 1 black and white, slice 2 multicolour, slice 3 upside-down and steep text. | Done (#244, #250, #251) | Should | to be added | - |
+| [0093](0093-laser-workbench-shell/) | `laser-workbench-shell` | First slice of `0063` and first extension of `0065`: Laser as a registered workbench, Add manufacturing creates a laser manufacturing with a placeholder machine (work area) and an output page of that size with the drawing placed live, an engraved-grid fixture shown on it, file round-trip. No G-code, connector or material library. Customer request of 2026-11-02. | Done (#255, 2026-11-03) | Must | R-MFG-001, R-EXT-003 to R-EXT-005 | - |
 
 ### In progress, Ready (next, in the order the lead starts them)
 
@@ -117,9 +119,7 @@ Their order, dependencies and conflicts are in "Proposed build order" below.
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
-| [0032](0032-pen-tablet-input/) | `pen-tablet-input` | A minimal Pencil (freehand) tool, and pen pressure from a drawing tablet, read through browser Pointer Events in the webview, that sets the width of Pencil strokes; the result is an ordinary outline; a mouse or a pen without pressure draws a plain path. Promoted by the customer on 2026-10-10 (was a Could draft). Device and OS questions are confirmed at the demo. | Ready, on hold (PR #116 closed unmerged) | Should | R-INP-001 | - |
-| [0091](0091-trace-text-recognition/) | `trace-text-recognition` | Trace reads the text in the picture first (offline OCR, ADR 0028), sets each line as text in the nearest font and leaves it out of the traced paths; switch "Recognise text" in Trace Advanced. Slice 1 black and white, slice 2 multicolour. | Slice 1 Done (#244); slice 2 not started | Should | to be added | - |
-| [0033](0033-stroke-brushes/) | `stroke-brushes` | Brushes for the stroke (width profile, stamp, pattern along path), a picker in the Stroke section, expanded to paths for jobs. **Stage 1 (built-in brushes) is Ready**; stage 2 (the maker's own brush files) and stage 3 (plugin brushes, waits for the plugin host) are not. | Ready (stage 1) | Could | R-EDIT-021 | - |
+| [0032](0032-pen-tablet-input/) | `pen-tablet-input` | A minimal Pencil (freehand) tool, and pen pressure from a drawing tablet, read through browser Pointer Events in the webview, that sets the width of Pencil strokes; the result is an ordinary outline; a mouse or a pen without pressure draws a plain path. Promoted by the customer on 2026-10-10 (was a Could draft). Device and OS questions are confirmed at the demo. | Ready, on hold (PR #116 closed unmerged) | Should | R-INP-001 | - || [0033](0033-stroke-brushes/) | `stroke-brushes` | Brushes for the stroke (width profile, stamp, pattern along path), a picker in the Stroke section, expanded to paths for jobs. **Stage 1 (built-in brushes) is Ready**; stage 2 (the maker's own brush files) and stage 3 (plugin brushes, waits for the plugin host) are not. | Ready (stage 1) | Could | R-EDIT-021 | - |
 
 ### Specified but not built
 
@@ -143,8 +143,6 @@ own entry when the customer schedules it.
 | [0071](0071-pattern-fill/) | `pattern-fill` | Fill a closed shape with generated vector patterns (hatch, grid, dots, honeycomb, motif) as real geometry; Hatch, Grid and Dots are core, further generators extensions (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Could | R-EDIT-046 | - |
 | [0073](0073-parameter-handle-clone/) | `parameter-handle-clone` | Ctrl on a parameter handle (Curve, inner radius, Start, End, corner radius, sides) or an "As copy" check in its entry box makes an ordinary copy at the same place with the new value instead of changing the shape. Customer request of 2026-10-19. | Draft (sketch, 2026-10-19) | Should | R-EDIT-004 | - |
 | [0086](0086-stick-fonts/) | `stick-fonts` | OTF and TTF single-line ("stick") fonts with doubled-back outlines, read as one centre line per stroke; where they appear (Fonts tab or only a workbench) is open. Split from `0062` and `0076` (Frage 19). | Draft (parked 2026-10-26: customer wants to refine it first) | Should | R-FONT-002 | - |
-| [0093](0093-laser-workbench-shell/) | `laser-workbench-shell` | First slice of `0063` and first extension of `0065`: Laser as a registered workbench, Add manufacturing creates a laser manufacturing with a placeholder machine (work area) and an output page of that size with the drawing placed live, an engraved-grid fixture shown on it, file round-trip. No G-code, connector or material library. Customer request of 2026-11-02. | Draft (2026-11-02, waits for ADRs) | Must | R-MFG-001, R-EXT-003 to R-EXT-005 | - |
-
 ### MVP slices not yet specified (no folder, number reserved)
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
@@ -262,7 +260,7 @@ Slice labels, as in the column above.
 
 ### `format_version` plan
 
-The current story writes `format_version` **32** (0069 tiling; built on 0070 dimensions 31, 0090 grid 30,
+The latest merged story writes `format_version` **35** (0093 laser workbench shell; built on 0092 page frames 34, 0069 tiling 33, 0071 pattern fill 32, 0070 dimensions 31, 0090 grid 30,
 0066 constraint-sketcher revision 4 format 29, 0066 format 28, 0060 snapping 27 and 0059 multiple-pages 26). The table records the format decisions.
 Each change that alters the on-disk shape takes the next number at merge, and
 a reader refuses a file with a higher number ("saved by a newer version").
@@ -302,8 +300,9 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | none | 0032 | No bump: a pressure stroke is stored as an ordinary closed path (its Question 2, A); a stored width profile (B) would take the next free number together with 0033 |
 | 31 | 0070 `measure-and-dimension` (a `shape = "dimension"` leaf with references to measured geometry, ADR 0027) | Done. Goldens: `dimension_v31.curvyo`, `dimension_*_v31.curvyo` |
 | 32 | 0071 `pattern-fill` (style keys `fill_paint` and `fill_pattern`, ADR 0029) | Done (PR #248). Golden: `pattern_v32.curvyo` |
-| 33 | 0069 `tiling` (a group with the `tiling` recipe and `tiling_sources`; instances keyed by `tiling_cell`, members by `tiling_member`; ADR 0030) | In review (PR #247). Golden: `tiling_v33.curvyo`; damaged `tiling_on_a_leaf`, `tiling_layout_unknown`, `tiling_result_unknown`, `tiling_count_zero`, `tiling_count_over_limit`, `tiling_number_nan`, `tiling_sources_malformed`, `tiling_cell_malformed`, `tiling_member_malformed` (`_v33.curvyo`); residue `tiling_residue_v33.curvyo` opens |
-| 35 | 0093 `laser-workbench-shell` (a manufacturing node with `mfg_*` registers, placement and fixture leaves, `page.<id>.owner` for its output page; ADR 0032, ADR 0033) | In progress. Goldens: `laser_workbench_v35.curvyo`, `manufacturing_unknown_process_v35.curvyo` |
+| 33 | 0069 `tiling` (a group with the `tiling` recipe and `tiling_sources`; instances keyed by `tiling_cell`, members by `tiling_member`; ADR 0030) | Done (PR #247). Golden: `tiling_v33.curvyo`; damaged `tiling_on_a_leaf`, `tiling_layout_unknown`, `tiling_result_unknown`, `tiling_count_zero`, `tiling_count_over_limit`, `tiling_number_nan`, `tiling_sources_malformed`, `tiling_cell_malformed`, `tiling_member_malformed` (`_v33.curvyo`); residue `tiling_residue_v33.curvyo` opens |
+| 34 | 0092 `cooperative-editing` (page size in one `page.<id>.frame` register so concurrent resizes converge; ADR 0031) | Done (PR #253) |
+| 35 | 0093 `laser-workbench-shell` (a manufacturing node with `mfg_*` registers, placement and fixture leaves, `page.<id>.owner` for its output page; ADR 0032, ADR 0033) | Done (PR #255). Goldens: `laser_workbench_v35.curvyo`, `manufacturing_unknown_process_v35.curvyo` |
 | 27 | 0060 `snapping` (seven document-root registers: enabled, the four target flags, capture and release px) | In progress (2026-10-30). Golden: `snapping_v27.curvyo`; old-file compatibility waived by the customer. |
 
 A spec does not hard-code a version number it does not own; it says "next free

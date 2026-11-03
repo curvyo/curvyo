@@ -1,6 +1,6 @@
 # Laser workbench shell: add a laser manufacturing, get an output page with fixtures and your drawing placed on it
 
-Status: Ready (ADRs 0032 to 0034 accepted and all questions answered by the customer, 2026-11-02)
+Status: Done (PR #255)
 Priority: Must
 Origin: Customer (2026-11-02, translated): "create a laser cutter workbench as the first extension. The laser output is for now also just a page, created by the laser cutter manufacturing workbench. The laser cutter can have different fixtures installed, e.g. an engraved grid or holders for specific materials." Details marked Proposal are the product owner's and vetoable at the demo.
 

@@ -1,6 +1,6 @@
 # Tiling: grid and circular arrays of an object, with variance and a seeded randomizer
 
-Status: In review (PR #247, 2026-11-02)
+Status: Done (PR #247)
 
 **Amendment (customer, 2026-11-02, PR #247 feedback; changes marked "Amended 2026-11-02" below):** the tiling bar loses its Cancel button (Escape cancels), the Seed field and dice, the instance count display, and the circle's Centre X/Y, Radius, Start angle and Sweep fields. Those four circle values are set with canvas handles; a double-click on a handle opens an entry box for typing the value. Apply sits at the far right. The Variance block becomes more compact. **TILE-PERF A:** no hard 500 ms gate on Apply. Layout and look: `ux-notes.md` section 12.
 Priority: Should

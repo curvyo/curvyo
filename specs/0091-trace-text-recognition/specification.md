@@ -1,6 +1,6 @@
 # Trace text recognition: read the text on the raster first
 
-Status: Slice 1 Done (PR #244, merged 2026-11-02); slice 2 (multicolour) in Build; slice 3 (upside-down and steep text) in Build
+Status: Done (slice 1 PR #244, slice 2 PR #250, slice 3 PR #251)
 Priority: Should
 Origin: Customer (2026-10-31); numbers marked Proposal are the product owner's
 
