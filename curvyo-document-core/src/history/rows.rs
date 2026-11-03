@@ -148,6 +148,14 @@ pub fn is_document_level_label(label: &str) -> bool {
             | "delete_fixture"
             | "set_fixture_visible"
             | "set_fixture_params"
+            | "pick_profile"
+            | "reset_profile"
+            | "save_as_profile"
+            | "edit_profile_name"
+            | "edit_origin_corner"
+            | "edit_max_feed"
+            | "edit_max_power"
+            | "edit_laser_mode"
     )
 }
 
