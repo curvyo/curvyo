@@ -121,9 +121,25 @@ function pickProject(kind: string): Promise<OpenPayload | null> {
 const FORMATS_KEY = "curvyo.document-formats";
 /** The browser keeps `extensions.toml` here (ADR 0034 §6). */
 const EXTENSIONS_KEY = "curvyo.extensions";
+/** The machine profile records, one entry per profile (`curvyo.machines/<id>`), and the last
+ * pick of this browser (ADR 0036 §1, §6). */
+const MACHINES_PREFIX = "curvyo.machines/";
+const MACHINE_CHOICE_KEY = "curvyo.machine-choice";
 /** The font library's text and the check cache in the browser build (`0075` decisions 1, 5). */
 const FONT_LIBRARY_KEY = "curvyo.font-library";
 const FONT_CHECKS_KEY = "curvyo.font-checks";
+
+/** Every stored machine profile record as `{ name: "<id>.json", text }`; other keys are ignored. */
+function listBrowserMachineProfiles(): { name: string; text: string }[] {
+  const records: { name: string; text: string }[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key?.startsWith(MACHINES_PREFIX)) {
+      records.push({ name: `${key.slice(MACHINES_PREFIX.length)}.json`, text: readStored(key) ?? "" });
+    }
+  }
+  return records;
+}
 
 function readStored(key: string): string | null {
   try {
@@ -200,6 +216,12 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   import_formats_file: () => pickTextFile(),
   read_extensions_file: () => readStored(EXTENSIONS_KEY),
   write_extensions_file: (args) => window.localStorage.setItem(EXTENSIONS_KEY, String(args?.text)),
+  list_machine_profiles: () => listBrowserMachineProfiles(),
+  write_machine_profile: (args) =>
+    window.localStorage.setItem(`${MACHINES_PREFIX}${String(args?.id)}`, String(args?.text)),
+  remove_machine_profile: (args) => window.localStorage.removeItem(`${MACHINES_PREFIX}${String(args?.id)}`),
+  read_machine_choice: () => readStored(MACHINE_CHOICE_KEY),
+  write_machine_choice: (args) => window.localStorage.setItem(MACHINE_CHOICE_KEY, String(args?.text)),
   export_formats_file: (args) => {
     downloadText("curvyo-formats.toml", String(args?.text));
     return true;

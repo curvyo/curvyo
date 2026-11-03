@@ -29,7 +29,6 @@ const dummyManifest = {
       id: "test.dummy",
       label: "Dummy",
       icon: "Box",
-      machine_name: "Dummy machine",
       tabs: [{ id: "dummy", label: "Dummy", icon: "Box", blocks: [{ kind: "fixture_list" as const, label: "Fixtures" }] }],
       toolbox_cards: [],
       fixture_kinds: [],
