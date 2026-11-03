@@ -10,6 +10,17 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## One 0020 tester test takes about five minutes in a debug build (2026-11-03)
+
+`acceptance_0020_tester_more::c30_a_step_of_hundreds_of_objects_asks_for_the_busy_state_and_undoes_in_one_press`
+takes about 318 s in the debug build the gate runs (seen on the `0092` branch and on `main`), the
+longest single test of `cargo nextest run --workspace`. It builds and undoes a step of hundreds of
+objects through the unoptimised document stack. It passes; it only stretches the gate's wall time.
+
+**Resolution:** profile the step in a debug build (the likely cost is per-object history work that
+the optimised build hides), then either make that path cheaper or shrink the test's object count to
+the smallest number that still asks for the busy state.
+
 ## Tiling places text instances straight (`0069`, 2026-11-02)
 
 `specs/0069-tiling` criterion 23 (Proposal, accepted by the architect review): a text copy or text
@@ -370,24 +381,23 @@ obligation: presence must make it visible that someone else is manipulating the
 object you are about to grab (ADR 0009 §2's awareness channel already carries
 what that needs). A design-system story owns it.
 
-## Resize and fit merge per field across peers
+**Mitigated** by `specs/0092-cooperative-editing` criterion 15 (2026-11-03): hovering or pressing
+an object another participant has selected or is dragging shows "Ben is editing this" on it before
+the change. The entry stays as documented behaviour: one value still wins.
 
-A resize or a fit is one commit that writes the size registers and every
-object's position (`specs/0015-document-size-and-rulers/`). Locally it is
-atomic. Across peers it is not: Loro merges each register on its own
-([ADR 0009](adr/0009-concurrent-editing-semantics.md) §3), and records no
-operation for a register whose value did not change. Two concurrent resizes,
-one changing only the width and one only the height, merge to a size with
-both changes but object positions shifted by one of them; a resize concurrent
-with a move keeps one of the two positions for that object. The result
-converges and nothing is lost from the log, but the document is centred on
-neither peer's intent. A test for the two-resizes case is kept as an ignored
-test in `curvyo-document-core/tests/acceptance_0015_pr1_tester.rs`.
+## A page move concurrent with a resize of the same page (`0092`, 2026-11-03)
 
-**Resolution:** before collaboration ships (post-MVP), either store the
-document origin as one register that objects are read relative to, or make
-resize and fit refuse while a peer is editing. Decide in the collaboration
-slice; nothing in the single-user MVP is affected.
+Replaces "Resize and fit merge per field across peers", resolved by `specs/0092-cooperative-editing`
+criterion 31 (COOP-RESIZE B): a page's origin and size are one frame register
+(`page.<id>.frame`, format 34, [ADR 0031](adr/0031-sync-engine-relay-protocol-and-transport.md)
+decision 9a), a resize or fit writes the whole frame and moves no object, so two concurrent resizes
+converge to one of the two whole frames (the formerly ignored two-resizes test in
+`curvyo-document-core/tests/acceptance_0015_pr1_tester.rs` passes). What remains: a page move
+concurrent with a resize of the same page keeps one whole frame and the move's shift of the
+page's objects, not both intents. It converges and nothing is lost from the log.
+
+**Resolution:** open; a move that writes the frame and shifts its objects as one register would
+remove it, at the cost of storing object positions relative to their page.
 
 ## The document's edge and the origin tick can differ by one device pixel
 
@@ -461,6 +471,10 @@ and edit a document they cannot render faithfully.
 export option, plus a visible substituted-font marker. Both are stories; the
 write-back restriction must be enforced in `curvyo-document-core`, not only in
 the UI, because it is a correctness rule rather than a hint.
+
+The guard exists since before `0092` (checked 2026-11-03): Object to path refuses a text with a
+missing face, and measured layout is never stored, so a peer without the font writes nothing back.
+The entry stays open for the embed action and the marker.
 
 ## Record conflicts are not merged automatically
 
@@ -1990,3 +2004,79 @@ asserting.
 
 **Resolution:** open; candidates are drawing the instances from one tessellation of the source
 under their matrices, and moving rather than copying the swapped objects.
+
+## The relay has no TLS and lets anyone create a room (`0092`, 2026-11-03)
+
+`curvyo-sync-server` speaks plain `ws://` and creates a room for any genesis it receives
+([ADR 0031](adr/0031-sync-engine-relay-protocol-and-transport.md) decision 11, COOP-HOST): fine on
+the LAN demo, where the content is sealed anyway (ADR 0008), but anyone who reaches the port can
+fill its disk. There are no quotas and no rate limits. The browser build cannot join a `ws://`
+relay from an `https://` page, so it waits for `wss://`.
+
+**Resolution:** the Kubernetes step: a TLS-terminating ingress offering `wss://`, then room
+quotas and rate limits in the server (own story).
+
+## The relay's file store allows one replica (`0092`, 2026-11-03)
+
+One server process owns its data directory (criterion 38): the room logs, keyrings and snapshots
+are plain files appended and renamed by one thread, so two replicas on one volume would corrupt
+them, and two volumes would split the rooms. A restart is the only failover; clients reconnect
+within 30 s (criterion 20).
+
+**Resolution:** open; a store with its own replication, or rooms partitioned across replicas by
+id, when one instance is no longer enough.
+
+## Browser key custody is undecided (`0092`, 2026-11-03)
+
+The browser build connects to a relay but keeps its device identity and the document's epoch keys
+in the page's memory only (`frontend/src/platform/host.ts`): a reload is a new device that needs a
+new invite, and a shared document saved from the browser cannot reconnect. The desktop build keeps
+them in the OS credential store or an encrypted key file (ADR 0007 §1, ADR 0031 decision 12).
+
+**Resolution:** an ADR on browser key custody (non-extractable WebCrypto keys in IndexedDB, or a
+passphrase-wrapped file) before the browser build is offered for collaboration.
+
+## Joining needs a member online (`0092`, 2026-11-03)
+
+COOP-JOIN A: the invite link holds only a one-time secret, and the joiner gets the document key
+from an online member's `RewrapEpoch` ([ADR 0010](adr/0010-document-keyring-admins-and-revocation.md)
+§7 as amended). With no member online the joiner waits, and an invite that expires (by the
+admitting member's clock) before a member sees the claim is not completed: the joiner asks for a
+new link.
+
+**Resolution:** accepted for slice 1; the verified flow of slice 2 adds no offline path either. A
+key in the link (ADR 0010 §7's original shape) would remove the wait at the cost of the server
+holding a link that opens the document.
+
+## A reopened shared file resends its pictures after offline edits (`0092` criterion 19, 2026-11-03)
+
+ADR 0031 decision 9 pushes "any asset not yet acknowledged" on connect, but `share.json` keeps
+only the acknowledged document version, not which pictures the room holds, and
+`curvyo-document-core` has no read of the document at a past version. So a shared file reopened
+with edits that were never acknowledged sends every picture it references again before its
+update (`curvyo-editor-wasm/src/session/sync.rs`, `resume_shared`). Receivers insert them
+idempotently; the cost is upload bandwidth and room log size until the next snapshot (the 4 MiB
+trigger prunes it). A file reopened without unsynced edits sends nothing.
+
+**Resolution:** open; either list the acknowledged asset hashes in `share.json` (a container
+format change) or read the referenced pictures of the acknowledged version from the document.
+
+## A record that stays damaged is skipped after one resync (`0092` criterion 25, 2026-11-03)
+
+A received record that does not open or import is shown once and the session resyncs from the
+room's snapshot (`ClientSession::record_rejected`, `curvyo-sync-core/src/client/inbound.rs`). If the
+same record fails again, it is skipped instead of looped on. Updates that depend on it then stay
+pending in Loro and do not show until a newer snapshot (from a member that imported it) covers
+them. Only a misbehaving member or a damaged relay store produces such a record.
+
+**Resolution:** open; a member could upload a fresh snapshot when a peer reports a skipped record,
+or the relay could drop a record no member can open. Decide when it shows up outside tests.
+
+## Two `sha2` lines in the tree (`0092`, 2026-11-03)
+
+`curvyo-crypto-core` uses `sha2` 0.11 (the line `ed25519-dalek` 3 and `hkdf` 0.13 use) while the
+rest of the workspace is on 0.10; `cargo deny` warns about the duplicate. Costs build time and
+wasm size, no behaviour.
+
+**Resolution:** move the workspace to `sha2` 0.11 when its other users (`digest` 0.10 tree) allow,
+in a Renovate batch.
