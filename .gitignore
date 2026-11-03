@@ -21,3 +21,4 @@ curvyo-app/gen/
 .projectatlas/projectatlas.opencode.json
 # ProjectAtlas runtime lock
 .projectatlas/repository-graph-stage.lock
+specs/*/spike/webview/gen/
