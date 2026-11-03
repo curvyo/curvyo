@@ -156,7 +156,7 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
                     type="button"
                     aria-label={update.armed ? ARMED_UPDATE : "Update profile"}
                     {...{ [ARM_TRASH]: "update" }}
-                    className={`${ICON_BUTTON} ${update.armed ? "bg-[var(--destructive)] text-white hover:bg-[var(--destructive)]" : ""}`}
+                    className={update.armed ? ICON_BUTTON.replace("hover:bg-[var(--editor-accent-hover)]", "bg-[var(--destructive)] text-white") : ICON_BUTTON}
                     onClick={() =>
                       update.press("update", ARMED_UPDATE, () => {
                         show(api.update(), "save");
@@ -206,7 +206,6 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
       ) : null}
       <div className="flex flex-col gap-2">
         <TextField
-          key={`name:${copy.name}`}
           label="Name"
           value={copy.name}
           notice={noticeAt("name")}
@@ -214,7 +213,6 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
         />
         <div className="relative grid grid-cols-2 gap-2">
           <NumberField
-            key={`w:${copy.width}`}
             label="Width"
             unit="mm"
             accessibleName="Width (mm)"
@@ -222,7 +220,6 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
             onCommit={(mm) => show(workbenches.setWorkArea(mm, copy.height), "area")}
           />
           <NumberField
-            key={`h:${copy.height}`}
             label="Height"
             unit="mm"
             accessibleName="Height (mm)"
@@ -233,7 +230,6 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
         </div>
         <CornerControl corner={copy.origin} onChange={(corner) => api.setOrigin(corner)} />
         <NumberField
-          key={`f:${copy.max_feed}`}
           label="Max feed"
           unit="mm/min"
           accessibleName="Max feed (mm/min)"
@@ -242,7 +238,6 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
           onCommit={(value) => show(api.setMaxFeed(value), "feed")}
         />
         <NumberField
-          key={`p:${copy.max_power}`}
           label="Max power"
           accessibleName="Max power (S-max)"
           value={copy.max_power}
@@ -288,6 +283,13 @@ function FieldNotice({ notice }: { notice: Notice }) {
 /** Enter or blur commits, Escape reverts; the parent keys the field on its value. */
 function useDraft(initial: string) {
   const [text, setText] = useState(initial);
+  const [seen, setSeen] = useState(initial);
+  if (seen !== initial) {
+    // The shown value changed (a commit, undo or another tab): the draft follows it in place, so the
+    // input keeps its focus.
+    setSeen(initial);
+    setText(initial);
+  }
   return { text, setText, revert: () => setText(initial) };
 }
 
@@ -314,6 +316,7 @@ function TextField({
       return;
     }
     onCommit(draft.text);
+    draft.revert();
   };
   return (
     <div className="relative">
@@ -374,6 +377,7 @@ function NumberField({
       draft.revert();
     } else if (typed !== value) {
       onCommit(typed);
+      draft.revert();
     }
   };
   return (
@@ -491,7 +495,6 @@ function ConnectionGroup({
         </p>
       ) : null}
       <TextField
-        key={`a:${address}:${readOnly}`}
         label="Connector address"
         value={address}
         readOnly={readOnly}
@@ -499,7 +502,6 @@ function ConnectionGroup({
         onCommit={(text) => onCommit(text, port, baud)}
       />
       <TextField
-        key={`p:${port}:${readOnly}`}
         label="Controller port"
         value={port}
         readOnly={readOnly}
@@ -507,7 +509,6 @@ function ConnectionGroup({
         onCommit={(text) => onCommit(address, text, baud)}
       />
       <NumberField
-        key={`b:${baud}:${readOnly}`}
         label="Baud rate"
         accessibleName="Baud rate"
         value={baud}

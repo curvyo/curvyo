@@ -213,7 +213,7 @@ function RowButton({
         tabIndex={-1}
         aria-label={label}
         {...(armTarget === undefined ? {} : { [ARM_TRASH]: armTarget })}
-        className={`${ROW_BUTTON} ${armed ? "bg-[var(--destructive)] text-white hover:bg-[var(--destructive)]" : ""}`}
+        className={armed ? ROW_BUTTON.replace("hover:bg-[var(--editor-accent-hover)]", "bg-[var(--destructive)] text-white") : ROW_BUTTON}
         onClick={(event) => {
           event.stopPropagation();
           onPress();
