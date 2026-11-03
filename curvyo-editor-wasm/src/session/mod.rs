@@ -149,6 +149,19 @@ mod style;
 mod style_view;
 mod svg_export;
 mod svg_import;
+mod sync;
+mod sync_events;
+mod sync_members;
+mod sync_presence;
+mod sync_records;
+#[cfg(test)]
+mod sync_removal_tests;
+mod sync_start;
+#[cfg(test)]
+mod sync_test_support;
+#[cfg(test)]
+mod sync_tests;
+mod sync_view;
 mod text;
 mod text_bar;
 mod text_clones;
@@ -282,6 +295,8 @@ pub use open_error::map_open_error;
 pub use svg_export::SvgExportResult;
 #[cfg(target_arch = "wasm32")]
 pub use svg_import::SvgImportOutcome;
+#[cfg(target_arch = "wasm32")]
+pub use sync::{SyncSeeds, TransportAction, hex, unhex};
 
 // Re-exported only for `wasm_api`'s own `LiveReadout` wrapper (its only
 // consumer, and itself `wasm32`-only) — `#[cfg]`-gated the same way so
@@ -353,6 +368,10 @@ pub enum Tool {
 /// One open document's whole editing session.
 pub struct Session {
     document: Document,
+    /// The document's Loro peer id, the sender of what it shares (ADR 0031 decision 4).
+    peer: u64,
+    /// The link of a shared document to its room (`sync.rs`), `None` when not shared.
+    sync: Option<Box<sync::SyncLink>>,
     sketch: sketch::SketchState,
     /// The version of the document that the last Save, Save as, Open or New left (`project.rs`).
     saved: DocumentVersion,
@@ -556,6 +575,8 @@ impl Session {
             saved: document.version(),
             packed: None,
             document,
+            peer,
+            sync: None,
             minter: AnchorIdMinter::new(peer),
             pen: PenTool::new(),
             node: NodeTool::new(),
@@ -654,6 +675,8 @@ impl Session {
             saved: document.version(),
             packed: None,
             document,
+            peer,
+            sync: None,
             minter: AnchorIdMinter::new(peer),
             pen: PenTool::new(),
             node: NodeTool::new(),

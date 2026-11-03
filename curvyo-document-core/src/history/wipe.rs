@@ -23,8 +23,8 @@ pub(crate) fn encode_frontiers(frontiers: &Frontiers) -> String {
 }
 
 impl Document {
-    /// Whether the document has been shared (it has a keyring, ADR 0004 §1). Nothing builds a
-    /// keyring yet; the sharing slice calls [`Document::mark_shared`].
+    /// Whether the document has been shared (it has a keyring, ADR 0004 §1): it holds a share
+    /// record, or [`Document::mark_shared`] was called.
     #[must_use]
     pub fn is_shared(&self) -> bool {
         self.commit_state.is_shared()
@@ -32,7 +32,7 @@ impl Document {
 
     /// Records that the document has a keyring: its history is not wiped any more.
     pub fn mark_shared(&self) {
-        self.commit_state.set_shared();
+        self.commit_state.set_shared(true);
     }
 
     /// The epoch of the history: the encoded start of what a wipe kept, the same on every replica

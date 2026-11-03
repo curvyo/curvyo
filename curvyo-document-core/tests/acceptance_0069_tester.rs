@@ -874,17 +874,20 @@ fn c25_the_group_stores_recipe_and_sources_and_instances_their_cell() {
 
 #[test]
 fn c25_format_version_is_33_and_a_newer_file_is_refused() {
-    // `0071` took 32 for pattern fills before this slice merged.
-    assert_eq!(CURRENT_FORMAT_VERSION, 33);
+    // `0071` took 32 for pattern fills before this slice merged; `0092` took 34 after it.
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 33);
     let d = Document::new(1);
     tile(&d, vec![tri(&d, 0.0, 1)], recipe(2, 1));
     let bytes = snapshot(&d);
     let manifest = read_member(&bytes, "manifest.json");
     let v: serde_json::Value = serde_json::from_slice(&manifest).unwrap();
-    assert_eq!(v["format_version"].as_u64(), Some(33));
-    // A build one version older is simulated by the newer-version check: a 34 is refused here.
+    assert_eq!(
+        v["format_version"].as_u64(),
+        Some(u64::from(CURRENT_FORMAT_VERSION))
+    );
+    // A build one version older is simulated by the newer-version check: the next one is refused.
     let mut newer = v.clone();
-    newer["format_version"] = 34.into();
+    newer["format_version"] = (CURRENT_FORMAT_VERSION + 1).into();
     let bumped = replace_member(
         &bytes,
         "manifest.json",

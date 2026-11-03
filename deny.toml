@@ -85,6 +85,21 @@ name = "curvyo-render-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-editor-wasm"
 
+# ADR 0031: the sealing and keyring crate.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-crypto-core"
+
+# ADR 0031: the relay protocol crate.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-sync-core"
+
+# ADR 0031: the relay server binary.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-sync-server"
+
 [advisories]
 # "Unmaintained" advisories with no safe upgrade available, from
 # dependencies we don't control (`loro`, Tauri and ACS/nalgebra trees). Not

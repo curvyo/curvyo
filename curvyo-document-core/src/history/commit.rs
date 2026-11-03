@@ -68,8 +68,8 @@ impl CommitState {
         self.shared.get()
     }
 
-    pub(crate) fn set_shared(&self) {
-        self.shared.set(true);
+    pub(crate) fn set_shared(&self, shared: bool) {
+        self.shared.set(shared);
     }
 
     /// A wipe removed the steps this session started: they are no longer in the log.

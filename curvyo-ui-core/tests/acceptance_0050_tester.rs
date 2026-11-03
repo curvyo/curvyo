@@ -58,7 +58,8 @@ fn the_strip_has_layers_fourth_and_never_dimmed() {
                     "snapping",
                     "grid",
                     "sketches",
-                    "parameters"
+                    "parameters",
+                    "share"
                 ]
             );
             let l = &entries[3];

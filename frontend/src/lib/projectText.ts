@@ -4,7 +4,7 @@
 // `tests/projectText.test.ts` covers it.
 
 /** What a replacing action does, in the words of the check's sentence. */
-export type ReplacingKind = "new" | "open" | "close" | "quit" | "handover";
+export type ReplacingKind = "new" | "open" | "close" | "quit" | "handover" | "join";
 
 /** The file name of a path, either separator, without the folders. */
 export function baseName(path: string): string {
@@ -31,6 +31,7 @@ const ENDS: Record<ReplacingKind, string> = {
   new: "start a new project",
   open: "open another project",
   handover: "open another project",
+  join: "open another project",
   close: "close it",
   quit: "quit",
 };

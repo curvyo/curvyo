@@ -9,6 +9,7 @@ export type PanelContent =
   | "grid"
   | "sketches"
   | "parameters"
+  | "share"
   | "file" | "document" | "style" | "layers" | "history" | "fonts" | "empty";
 
 /** One tab of the panel's strip (`curvyo-ui-core::panel_tabs`). */

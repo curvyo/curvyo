@@ -168,10 +168,10 @@ fn ac1_add_page_after_reorder_copies_from_the_last_page_in_list_order() {
     // 0059: the new page takes its size from the last page in list order.
     let d = Document::new(9007);
     let first = d.pages()[0].id.clone();
-    d.resize_page(&first, DocumentSize::from_mm(100.0, 100.0), &[])
+    d.resize_page(&first, DocumentSize::from_mm(100.0, 100.0))
         .unwrap();
     let second = d.add_page();
-    d.resize_page(&second.id, DocumentSize::from_mm(300.0, 50.0), &[])
+    d.resize_page(&second.id, DocumentSize::from_mm(300.0, 50.0))
         .unwrap();
     d.set_page_grid(&first, custom_grid()).unwrap();
     d.reorder_page(&first, 1).unwrap();
@@ -181,20 +181,26 @@ fn ac1_add_page_after_reorder_copies_from_the_last_page_in_list_order() {
 }
 
 #[test]
-fn ac16_page_move_and_resize_keep_the_origin_corner() {
+fn ac16_page_move_and_resize_keep_the_grid_and_the_resize_keeps_the_centre() {
     let d = Document::new(9008);
     let first = d.pages()[0].id.clone();
     d.set_page_grid(&first, custom_grid()).unwrap();
     d.move_page(&first, Vec2::new(-321.5, 44.0), &[]).unwrap();
     assert_grid_eq(d.page_grid(&first), custom_grid());
-    d.resize_page(&first, DocumentSize::from_mm(17.0, 900.0), &[])
+    d.resize_page(&first, DocumentSize::from_mm(17.0, 900.0))
         .unwrap();
     assert_grid_eq(d.page_grid(&first), custom_grid());
     let page = d.pages()[0].clone();
-    assert_eq!(page.origin, Point::new(-321.5, 44.0));
+    // Since format 34 the resize keeps the frame's centre (ADR 0031 decision 9a): the origin
+    // moves by half of (210 - 17, 297 - 900).
+    let origin = Point::new(-321.5 + 96.5, 44.0 - 301.5);
+    assert_eq!(page.origin, origin);
     assert_grid_eq(page.grid, custom_grid());
     // The bottom-right zero follows the moved and resized page's corner.
-    assert_eq!(page.zero_point(), Point::new(-321.5 + 17.0, 44.0 + 900.0));
+    assert_eq!(
+        page.zero_point(),
+        Point::new(origin.x + 17.0, origin.y + 900.0)
+    );
 }
 
 #[test]

@@ -243,7 +243,31 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   },
   read_font_checks: () => readStored(FONT_CHECKS_KEY),
   write_font_checks: (args) => window.localStorage.setItem(FONT_CHECKS_KEY, String(args?.text)),
+  // Browser key custody is undecided (`specs/0092-cooperative-editing/adrs.md`, debt): the
+  // device identity and the epoch keys live in this page's memory only and end with it.
+  read_device_keys: (args) => ({
+    status: "ok",
+    identity: browserIdentity(),
+    keys: browserRoomKeys.get(String(args?.room)) ?? [],
+  }),
+  // The browser's tab title names no share (the desktop build is slice 1).
+  set_shared: () => undefined,
+  write_document_keys: (args) => {
+    browserRoomKeys.set(String(args?.room), args?.keys as [number, string][]);
+  },
 };
+
+/** The browser page's device identity: 64 random bytes as hex, made once per page. */
+let pageIdentity: string | null = null;
+function browserIdentity(): string {
+  if (pageIdentity === null) {
+    const bytes = new Uint8Array(64);
+    crypto.getRandomValues(bytes);
+    pageIdentity = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return pageIdentity;
+}
+const browserRoomKeys = new Map<string, [number, string][]>();
 
 /** Same contract as Tauri's `invoke`. */
 export function invoke<T>(

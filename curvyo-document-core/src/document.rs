@@ -23,6 +23,25 @@ impl DocumentVersion {
     pub fn never() -> Self {
         Self(loro::Frontiers::default())
     }
+
+    /// The version as text, `peer@counter` pairs sorted and joined by commas (ADR 0014 §7); the
+    /// empty text for [`DocumentVersion::never`]. A shared file stores its synced version so
+    /// (ADR 0031 decision 9).
+    #[must_use]
+    pub fn to_text(&self) -> String {
+        crate::history::encode_frontiers(&self.0)
+    }
+
+    /// The inverse of [`DocumentVersion::to_text`]; `None` for a malformed text.
+    #[must_use]
+    pub fn from_text(text: &str) -> Option<Self> {
+        if text.is_empty() {
+            return Some(Self::never());
+        }
+        crate::history::decode_frontiers(text)
+            .filter(|frontiers| frontiers.iter().all(|id| id.counter >= 0))
+            .map(Self)
+    }
 }
 
 /// The container `format_version` this build writes and the newest it
@@ -327,7 +346,20 @@ impl DocumentVersion {
 /// Damage: `tiling` on a node that is not a group, an unknown layout or result, a count of 0 or
 /// over 100,000, a number that is not finite, a malformed source list, cell or member key. The
 /// number is provisional by the rule above. Goldens: `tiling_*_v33.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 33;
+///
+/// Bumped to 34 in `cooperative-editing` (ADR 0031 decisions 9 and 9a, `specs/0092-cooperative-
+/// editing`): a page's origin and size are one register `page.<id>.frame` (the map `{x, y,
+/// width, height}`, written whole), so concurrent resizes converge to one whole frame; resize and
+/// fit move the frame, not the objects (`crate::page_frame`). A shared file adds the container
+/// members `share.json` and `keyring.log` (`crate::container_share`). A build that stops at 33
+/// would read every page at its version 33 registers (or at A4 in the origin) and save a shared
+/// file without its keyring, so it must refuse every file of this build as too new. Migration
+/// from 33: a page without `frame` is read from the four old registers; nothing is rewritten until
+/// the page is next edited. Damage: a frame that is not a map of exactly four finite numbers or
+/// has a side outside the document size range; one shared member without the other, or a
+/// malformed `share.json`. The number is provisional by the rule above. Goldens:
+/// `page_frame_v34.curvyo`, `shared_v34.curvyo`, `page_frame_*_v34.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 34;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -397,6 +429,9 @@ pub struct Document {
     pub(crate) writable_cache: std::cell::RefCell<Option<crate::history::WritableUndo>>,
     /// The picture bytes the image nodes name (ADR 0017 §2); not in the Loro log.
     pub(crate) assets: std::cell::RefCell<crate::assets::AssetStore>,
+    /// Where the document syncs and its keyring, when it is shared (ADR 0031 decision 9); kept in
+    /// the container, not in the Loro log.
+    pub(crate) share: std::cell::RefCell<Option<crate::container_share::ShareRecord>>,
 }
 
 impl Document {
@@ -446,6 +481,9 @@ impl Document {
             root.insert(KEY_WIDTH_MM, size.width.as_mm()).unwrap();
             root.insert(KEY_HEIGHT_MM, size.height.as_mm()).unwrap();
         }
+        // The first page starts on the version 33 registers, which every build reads as its
+        // frame; its first edit writes the frame register (ADR 0031 decision 9a), so a new
+        // document's setup change is the same as before format 34.
         crate::pages::initialize(&root);
         Self {
             loro,
@@ -464,6 +502,7 @@ impl Document {
             writable_cache: std::cell::RefCell::default(),
             sketch_cache: std::cell::RefCell::default(),
             assets: std::cell::RefCell::default(),
+            share: std::cell::RefCell::default(),
         }
     }
 
@@ -502,6 +541,7 @@ impl Document {
             || !crate::document_background::validate(&loro)
             || !crate::snapping::validate(&loro)
             || !crate::page_grid::validate(&loro)
+            || !crate::page_frame::validate(&loro)
         {
             return Err(OpenError::Damaged);
         }
@@ -522,6 +562,7 @@ impl Document {
             writable_cache: std::cell::RefCell::default(),
             sketch_cache: std::cell::RefCell::default(),
             assets: std::cell::RefCell::default(),
+            share: std::cell::RefCell::default(),
         })
     }
 

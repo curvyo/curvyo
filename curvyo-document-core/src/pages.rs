@@ -1,6 +1,7 @@
-//! Ordered spatial page frames stored as independent root registers.
+//! Ordered spatial page frames stored as root registers, each frame one register.
 use crate::document::{KEY_HEIGHT_MM, KEY_WIDTH_MM, ROOT_MAP};
 use crate::document_size::{MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side};
+use crate::page_frame::{Frame, read_frame, write_frame};
 use crate::page_grid::{PageGrid, grid_of_fields, grid_of_root, write_non_default};
 use crate::{Document, DocumentSize, DocumentSizeError, NodeId, ObjectEditError, Point, Vec2};
 use loro::{LoroMap, LoroValue, ValueOrContainer};
@@ -111,24 +112,54 @@ pub(crate) fn write_drawing_pages(
         write(&root, &id, "name", frame.name.clone());
         #[allow(clippy::cast_precision_loss)] // page counts are far below 2^52
         let order = index as f64;
-        for (field, value) in [
-            ("x", frame.origin.x),
-            ("y", frame.origin.y),
-            ("width", frame.size.width.as_mm()),
-            ("height", frame.size.height.as_mm()),
-            ("order", order),
-        ] {
-            write(&root, &id, field, value);
-        }
+        write(&root, &id, "order", order);
+        write_frame(
+            &root,
+            &id,
+            Frame {
+                origin: frame.origin,
+                size: frame.size,
+            },
+        );
     }
 }
 
-pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
+/// The frame of page `id`: its register, else (a version 33 page, or a damaged register the open
+/// check let through) the four old registers with the size falling back to A4 on both axes.
+fn frame_of(root: &LoroMap, id: &str) -> Option<Frame> {
+    if let Some(frame) = read_frame(root, id) {
+        return Some(frame);
+    }
+    // Persisted values are validated strictly: command tolerance must not admit damaged sizes.
+    // Keep the frame and fall back on both axes, without repairing or otherwise writing the
+    // stored registers.
+    let valid = |field| {
+        number(root, id, field).filter(|mm| (MIN_DOCUMENT_MM..=MAX_DOCUMENT_MM).contains(mm))
+    };
+    let size = match (valid("width"), valid("height")) {
+        (Some(width), Some(height)) => DocumentSize::from_mm(width, height),
+        _ => DocumentSize::default(),
+    };
+    Some(Frame {
+        origin: Point::new(number(root, id, "x")?, number(root, id, "y")?),
+        size,
+    })
+}
+
+/// The registered grid fields of one page, by field name.
+type GridFields = Vec<(String, LoroValue)>;
+
+/// Every page id with a name, and the grid registers of each page, in one pass over the root.
+fn page_keys(
+    root: &LoroMap,
+) -> (
+    std::collections::BTreeSet<String>,
+    std::collections::HashMap<String, GridFields>,
+) {
     let mut ids = std::collections::BTreeSet::new();
     // The grid registers are gathered in the same pass, so a page without any (a grid never
     // touched) costs no keyed read per frame (`specs/0090-grid` criterion 9).
-    let mut grids: std::collections::HashMap<String, Vec<(String, LoroValue)>> =
-        std::collections::HashMap::new();
+    let mut grids: std::collections::HashMap<String, GridFields> = std::collections::HashMap::new();
     root.for_each(|name, value| {
         let Some(rest) = name.strip_prefix("page.") else {
             return;
@@ -145,24 +176,19 @@ pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
                 .push((field.to_owned(), value));
         }
     });
+    (ids, grids)
+}
+
+pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
+    let (ids, grids) = page_keys(root);
     let mut pages: Vec<_> = ids
         .into_iter()
         .filter_map(|id| {
-            // Persisted values are validated strictly: command tolerance must not
-            // admit damaged sizes. Keep the frame and fall back on both axes,
-            // without repairing or otherwise writing the stored registers.
-            let valid = |field| {
-                number(root, &id, field)
-                    .filter(|mm| (MIN_DOCUMENT_MM..=MAX_DOCUMENT_MM).contains(mm))
-            };
-            let size = match (valid("width"), valid("height")) {
-                (Some(width), Some(height)) => DocumentSize::from_mm(width, height),
-                _ => DocumentSize::default(),
-            };
+            let frame = frame_of(root, &id)?;
             let page = Page {
                 name: string(root, &id, "name")?,
-                origin: Point::new(number(root, &id, "x")?, number(root, &id, "y")?),
-                size,
+                origin: frame.origin,
+                size: frame.size,
                 grid: grids.get(&id).map_or(PageGrid::DEFAULT, |fields| {
                     grid_of_fields(|field| {
                         fields
@@ -189,15 +215,25 @@ pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
     });
     if pages.is_empty() {
         // Concurrent deletes may tombstone every frame; deterministically expose one.
-        pages.push(fallback.unwrap_or_else(|| Page {
-            id: FIRST_PAGE_ID.to_owned(),
-            name: "Page 1".into(),
-            origin: Point::new(0.0, 0.0),
-            size: Document::size_of_root(root),
-            grid: grid_of_root(root, FIRST_PAGE_ID),
-        }));
+        pages.push(fallback.unwrap_or_else(|| first_page_of_old_file(root)));
     }
     pages
+}
+
+/// The one page of a file older than pages (format 26), which names none; a resize since wrote
+/// a frame.
+fn first_page_of_old_file(root: &LoroMap) -> Page {
+    let frame = read_frame(root, FIRST_PAGE_ID).unwrap_or(Frame {
+        origin: Point::new(0.0, 0.0),
+        size: Document::size_of_root(root),
+    });
+    Page {
+        id: FIRST_PAGE_ID.to_owned(),
+        name: "Page 1".into(),
+        origin: frame.origin,
+        size: frame.size,
+        grid: grid_of_root(root, FIRST_PAGE_ID),
+    }
 }
 
 impl Document {
@@ -251,18 +287,20 @@ impl Document {
         let root = self.loro().get_map(ROOT_MAP);
         write(&root, &last.id, "deleted", false);
         write(&root, &page.id, "name", page.name.clone());
-        for (field, value) in [
-            ("x", origin.x),
-            ("y", origin.y),
-            ("width", page.size.width.as_mm()),
-            ("height", page.size.height.as_mm()),
-            (
-                "order",
-                number(&root, &last.id, "order").unwrap_or(0.0) + 1.0,
-            ),
-        ] {
-            write(&root, &page.id, field, value);
-        }
+        write(
+            &root,
+            &page.id,
+            "order",
+            number(&root, &last.id, "order").unwrap_or(0.0) + 1.0,
+        );
+        write_frame(
+            &root,
+            &page.id,
+            Frame {
+                origin,
+                size: page.size,
+            },
+        );
         write_non_default(&root, &page.id, page.grid);
         self.commit_with_label("add_page");
         page
@@ -383,37 +421,51 @@ impl Document {
             doc.translate_page_objects(objects, delta)?;
             let root = doc.loro().get_map(ROOT_MAP);
             write(&root, id, "deleted", false);
-            write(&root, id, "x", page.origin.x + delta.x);
-            write(&root, id, "y", page.origin.y + delta.y);
+            write_frame(
+                &root,
+                id,
+                Frame {
+                    origin: Point::new(page.origin.x + delta.x, page.origin.y + delta.y),
+                    size: page.size,
+                },
+            );
             Ok(true)
         })
     }
-    /// Resizes a frame, centering the supplied exclusively contained leaves.
+    /// Resizes a frame around its centre in one commit; no object moves (ADR 0031 decision 9a).
     /// # Errors
-    /// Refuses unknown identities, invalid sizes or invalid object transforms.
-    pub fn resize_page(
-        &self,
-        id: &str,
-        size: DocumentSize,
-        objects: &[NodeId],
-    ) -> Result<bool, PageError> {
+    /// Refuses unknown identities or invalid sizes.
+    pub fn resize_page(&self, id: &str, size: DocumentSize) -> Result<bool, PageError> {
         let page = self.find_page(id)?;
         let size = DocumentSize::new(
             validated_document_side(size.width)?,
             validated_document_side(size.height)?,
         );
-        let delta = Self::resize_shift(page.size, size);
-        if delta.x.abs() <= EPS && delta.y.abs() <= EPS {
-            return Ok(false);
+        Ok(self.write_page_frame(&page, size, "resize_page"))
+    }
+
+    /// Writes `page` resized to `size` around its centre and commits it under `label`; `false`
+    /// and nothing written when the size stays within 1e-9 mm.
+    pub(crate) fn write_page_frame(&self, page: &Page, size: DocumentSize, label: &str) -> bool {
+        let same = (size.width.as_mm() - page.size.width.as_mm()).abs() <= EPS
+            && (size.height.as_mm() - page.size.height.as_mm()).abs() <= EPS;
+        if same {
+            return false;
         }
-        self.validate_page_translation(objects, delta)?;
-        self.batch("resize_page", |doc| {
-            doc.translate_page_objects(objects, delta)?;
-            let root = doc.loro().get_map(ROOT_MAP);
-            write(&root, id, "deleted", false);
-            write(&root, id, "width", size.width.as_mm());
-            write(&root, id, "height", size.height.as_mm());
-            Ok(true)
-        })
+        let frame = Frame {
+            origin: page.origin,
+            size: page.size,
+        }
+        .resized(size);
+        self.write_frame_commit(&page.id, frame, label);
+        true
+    }
+
+    /// Writes `frame` as page `id`'s frame and commits it under `label`.
+    pub(crate) fn write_frame_commit(&self, id: &str, frame: Frame, label: &str) {
+        let root = self.loro().get_map(ROOT_MAP);
+        write(&root, id, "deleted", false);
+        write_frame(&root, id, frame);
+        self.commit_with_label(label);
     }
 }

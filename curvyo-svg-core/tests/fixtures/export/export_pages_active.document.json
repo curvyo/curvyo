@@ -1,5 +1,5 @@
 {
-  "format_version": 33,
+  "format_version": 34,
   "size": {
     "width": 100.0,
     "height": 100.0
@@ -56,14 +56,14 @@
       "shape": "layer",
       "id": {
         "peer": "32",
-        "counter": 14
+        "counter": 12
       },
       "objects": [
         {
           "shape": "rect",
           "id": {
             "peer": "32",
-            "counter": 17
+            "counter": 15
           },
           "bounds": {
             "origin": {
@@ -116,7 +116,7 @@
           "shape": "ellipse",
           "id": {
             "peer": "32",
-            "counter": 26
+            "counter": 24
           },
           "frame": {
             "center": {

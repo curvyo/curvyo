@@ -1139,6 +1139,11 @@ export function useEditorSession(
   }, [syncEntry, syncBadges, setSketchView]);
 
   const getSession = useCallback(() => sessionRef.current, []);
+  // The render loop reads the latest refresh without restarting (remote edits, `0092`).
+  const syncFromSessionRef = useRef(syncFromSession);
+  useEffect(() => {
+    syncFromSessionRef.current = syncFromSession;
+  }, [syncFromSession]);
   // A right click in pick mode of text on path ends it (`specs/0080-text-on-path` UX notes §2).
   const cancelTextPathPick = useCallback(() => {
     const session = sessionRef.current;
@@ -1450,6 +1455,11 @@ export function useEditorSession(
         if (moving !== null) {
           session.set_trace_view_moving(moving);
         }
+      }
+      // Remote records of a shared document are imported before the frame is drawn, all of them
+      // in one redraw (`specs/0092-cooperative-editing` adrs.md decision 3); the panels follow.
+      if (session?.sync_frame_start() && session.take_sync_changed()) {
+        syncFromSessionRef.current();
       }
       session?.render();
       // An image of an opened project whose picture cannot be read, once per open

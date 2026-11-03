@@ -114,6 +114,16 @@ fn points(d: &Document) -> Vec<(f64, f64)> {
     out
 }
 
+/// `points` on the page: relative to the first page's frame origin (since format 34 a resize or
+/// fit moves the frame, not the objects, ADR 0031 decision 9a).
+fn page_points(d: &Document) -> Vec<(f64, f64)> {
+    let o = d.pages()[0].origin;
+    points(d)
+        .into_iter()
+        .map(|(x, y)| (x - o.x, y - o.y))
+        .collect()
+}
+
 fn on_screen(view: ViewTransform, pts: &[(f64, f64)]) -> Vec<(f64, f64)> {
     pts.iter()
         .map(|&(x, y)| view.document_to_screen(pt(x, y)))
@@ -351,7 +361,7 @@ fn ac23_24_fit_sizes_the_document_to_the_outline_box_and_moves_it_to_0_0() {
     let (lo, hi) = bbox(&before);
     let mut s = session_of(&d);
     assert_eq!(fit(&mut s), "Fitted");
-    let after = points(&reopened(&s));
+    let after = page_points(&reopened(&s));
     let (alo, ahi) = bbox(&after);
     assert!(alo.0.abs() < 1e-9 && alo.1.abs() < 1e-9, "top-left {alo:?}");
     let (w, h) = size_mm(&s);
@@ -401,7 +411,7 @@ fn ac24_fit_with_everything_far_away_in_both_directions() {
         let mut s = session_of(&d);
         assert_eq!(fit(&mut s), "Fitted");
         assert_eq!(size_mm(&s), (40.0, 20.0));
-        let (lo, _) = bbox(&points(&reopened(&s)));
+        let (lo, _) = bbox(&page_points(&reopened(&s)));
         assert!(lo.0.abs() < 1e-9 && lo.1.abs() < 1e-9, "{lo:?}");
     }
 }
@@ -414,7 +424,7 @@ fn ac25_a_flat_line_fits_to_one_mm_on_that_axis_and_is_centred() {
     assert_eq!(fit(&mut s), "Fitted");
     assert_eq!(size_mm(&s), (100.0, 1.0));
     assert_eq!(s.size_text(), "100.0 \u{d7} 1.0 mm");
-    let pts = points(&reopened(&s));
+    let pts = page_points(&reopened(&s));
     assert!(
         (pts[0].1 - 0.5).abs() < 1e-9 && (pts[1].1 - 0.5).abs() < 1e-9,
         "{pts:?}"
@@ -426,7 +436,7 @@ fn ac25_a_flat_line_fits_to_one_mm_on_that_axis_and_is_centred() {
     let mut s = session_of(&d);
     assert_eq!(fit(&mut s), "Fitted");
     assert_eq!(size_mm(&s), (1.0, 50.0));
-    let pts = points(&reopened(&s));
+    let pts = page_points(&reopened(&s));
     assert!(
         (pts[0].0 - 0.5).abs() < 1e-9 && pts[0].1.abs() < 1e-9,
         "{pts:?}"
@@ -436,7 +446,7 @@ fn ac25_a_flat_line_fits_to_one_mm_on_that_axis_and_is_centred() {
     let mut s = session_of(&d);
     assert_eq!(fit(&mut s), "Fitted");
     assert_eq!(size_mm(&s), (1.0, 1.0));
-    let pts = points(&reopened(&s));
+    let pts = page_points(&reopened(&s));
     assert!(
         (pts[0].0 - 0.5).abs() < 1e-9 && (pts[0].1 - 0.5).abs() < 1e-9,
         "{pts:?}"

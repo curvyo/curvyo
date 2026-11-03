@@ -259,7 +259,7 @@ fn ac1_the_strip_is_file_document_style_layers_history_and_layers_is_never_dimme
         names,
         [
             "file", "document", "style", "layers", "history", "fonts", "snapping", "grid",
-            "sketches"
+            "sketches", "share"
         ]
     );
     let layers = v.tabs.iter().find(|t| t.name == "layers").unwrap();

@@ -254,7 +254,8 @@ fn c45_tabs_found_by_name_order_file_document_style_history() {
                     "snapping",
                     "grid",
                     "sketches",
-                    "parameters"
+                    "parameters",
+                    "share"
                 ]
             );
             // exactly one selected; it is the active tab

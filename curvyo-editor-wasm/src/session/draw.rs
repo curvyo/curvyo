@@ -92,7 +92,9 @@ impl Session {
         // largest cost of a frame with many objects.
         let objects = self.objects();
         // Outside an entered group the artwork recedes; the decorations only see the inside.
-        let render = self.render_objects();
+        // Another participant's move drag in flight is drawn where it has the objects (`0092`
+        // criterion 7).
+        let render = self.with_remote_drags(self.render_objects());
         // A reopened tiling hides its instances under the preview (`0069` criterion 34).
         let render: std::sync::Arc<[ObjectSnapshot]> = if self.tiling_open() {
             render

@@ -52,6 +52,8 @@ interface CanvasProps {
   editor: EditorSession;
   /** Files dropped on the canvas (`specs/0058-bitmap-import` criterion 4). */
   onDropFiles?: (dropped: DroppedFiles) => void;
+  /** Drawn over the canvas, in its coordinates: the other participants' marks (`0092`). */
+  overlay?: React.ReactNode;
 }
 
 /**
@@ -66,7 +68,7 @@ interface CanvasProps {
  * (`specs/0001-project-file-foundation`'s "chrome never frames the canvas"
  * precedent, reaffirmed by `docs/design-system.md`).
  */
-export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
+export function Canvas({ editor, sketch, onDropFiles, overlay }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
     editor.showHistoryNotice(clipboard_notice("link", ""), 5000, "canvas", "alert"),
@@ -307,6 +309,7 @@ export function Canvas({ editor, sketch, onDropFiles }: CanvasProps) {
           containerRef={editor.containerRef}
         />
       )}
+      {overlay}
     </div>
   );
 }

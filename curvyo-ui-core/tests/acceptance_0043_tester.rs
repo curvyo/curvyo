@@ -46,7 +46,8 @@ fn c1_the_tabs_in_order_with_names_and_tooltips() {
                     "snapping",
                     "grid",
                     "sketches",
-                    "parameters"
+                    "parameters",
+                    "share"
                 ]
             );
             let labels: Vec<&str> = entries.iter().map(|e| e.label).collect();
@@ -62,7 +63,8 @@ fn c1_the_tabs_in_order_with_names_and_tooltips() {
                     "Snapping",
                     "Grid & Rulers",
                     "Sketches",
-                    "Parameters"
+                    "Parameters",
+                    "Share"
                 ]
             );
             assert_eq!(entry(&entries, "history").tooltip, "History (Shift+Ctrl+H)");

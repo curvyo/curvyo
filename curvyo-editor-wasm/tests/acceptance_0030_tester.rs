@@ -77,12 +77,15 @@ fn with_rect() -> Session {
 
 fn rect_origin(s: &Session) -> (f64, f64) {
     let d = doc_of(s);
+    // On the page: relative to the first page's frame origin (since format 34 a resize moves
+    // the frame, not the objects, ADR 0031 decision 9a).
+    let o = d.pages()[0].origin;
     for id in d.object_ids() {
         if let ObjectSnapshot::Primitive(p) = d.object(id).unwrap() {
             if let Shape::Rect { bounds, .. } = p.shape {
                 assert!((bounds.width.as_mm() - 50.0).abs() < 1e-9, "still 50 wide");
                 assert!((bounds.height.as_mm() - 50.0).abs() < 1e-9, "still 50 high");
-                return (bounds.origin.x, bounds.origin.y);
+                return (bounds.origin.x - o.x, bounds.origin.y - o.y);
             }
         }
     }
@@ -405,9 +408,15 @@ fn an_unknown_id_and_hostile_ids_write_nothing() {
 #[test]
 fn the_view_follows_the_shift_so_the_artwork_does_not_move_on_screen() {
     let mut s = with_rect();
-    let before = s.screen_to_document(100.0, 100.0);
+    // Read on the page (relative to the frame origin, ADR 0031 decision 9a).
+    let on_page = |s: &Session| {
+        let p = s.screen_to_document(100.0, 100.0);
+        let o = doc_of(s).pages()[0].origin;
+        pt(p.x - o.x, p.y - o.y)
+    };
+    let before = on_page(&s);
     s.apply_document_preset("a3");
-    let after = s.screen_to_document(100.0, 100.0);
+    let after = on_page(&s);
     // The same screen pixel now shows the document point shifted by the same
     // half-difference the objects moved by (43.5, 61.5): the rect stays put.
     assert!(

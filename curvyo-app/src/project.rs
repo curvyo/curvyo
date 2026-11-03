@@ -90,11 +90,14 @@ pub(crate) enum SaveOutcome {
 /// The window title for a project: `Curvyo`, `<file> — Curvyo`, and a leading `*` while it has
 /// unsaved changes (`specs/0051-sidebar-and-no-menu/` criterion 30). The page applies the same rule
 /// to the browser tab's title.
-pub(crate) fn window_title(file_name: Option<&str>, dirty: bool) -> String {
+pub(crate) fn window_title(file_name: Option<&str>, dirty: bool, shared: bool) -> String {
     let marker = if dirty { "*" } else { "" };
-    match file_name {
-        Some(name) => format!("{marker}{name} — Curvyo"),
-        None => format!("{marker}Curvyo"),
+    // A shared document says so (`specs/0092-cooperative-editing` criterion 1d).
+    let shared = if shared { " (shared)" } else { "" };
+    match (file_name, shared.is_empty()) {
+        (Some(name), _) => format!("{marker}{name}{shared} — Curvyo"),
+        (None, true) => format!("{marker}Curvyo"),
+        (None, false) => format!("{marker}Untitled{shared} — Curvyo"),
     }
 }
 
@@ -102,7 +105,7 @@ pub(crate) fn window_title(file_name: Option<&str>, dirty: bool) -> String {
 fn refresh_window_title(app: &AppHandle) {
     let state = app.state::<AppState>();
     let file_name = state.lock_project().file_name();
-    let title = window_title(file_name.as_deref(), state.is_dirty());
+    let title = window_title(file_name.as_deref(), state.is_dirty(), state.is_shared());
     if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
         let _ = window.set_title(&title);
     }
@@ -216,6 +219,14 @@ pub(crate) fn reset_project(app: AppHandle) {
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn set_dirty(app: AppHandle, dirty: bool) {
     app.state::<AppState>().set_dirty(dirty);
+    refresh_window_title(&app);
+}
+
+/// The page reports whether the open document is shared: the title says "(shared)".
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn set_shared(app: AppHandle, shared: bool) {
+    app.state::<AppState>().set_shared(shared);
     refresh_window_title(&app);
 }
 
@@ -373,15 +384,28 @@ mod tests {
     /// Criterion 30: the title for every combination of file name and dirty state.
     #[test]
     fn the_title_names_the_file_and_marks_unsaved_changes() {
-        assert_eq!(window_title(None, false), "Curvyo");
-        assert_eq!(window_title(None, true), "*Curvyo");
+        assert_eq!(window_title(None, false, false), "Curvyo");
+        assert_eq!(window_title(None, true, false), "*Curvyo");
         assert_eq!(
-            window_title(Some("Poster.curvyo"), false),
+            window_title(Some("Poster.curvyo"), false, false),
             "Poster.curvyo — Curvyo"
         );
         assert_eq!(
-            window_title(Some("Poster.curvyo"), true),
+            window_title(Some("Poster.curvyo"), true, false),
             "*Poster.curvyo — Curvyo"
+        );
+    }
+
+    /// `specs/0092-cooperative-editing` criterion 1d: a shared document is marked in the title.
+    #[test]
+    fn a_shared_document_is_marked_in_the_title() {
+        assert_eq!(
+            window_title(Some("Poster.curvyo"), true, true),
+            "*Poster.curvyo (shared) — Curvyo"
+        );
+        assert_eq!(
+            window_title(None, true, true),
+            "*Untitled (shared) — Curvyo"
         );
     }
 }

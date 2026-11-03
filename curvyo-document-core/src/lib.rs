@@ -33,6 +33,7 @@ mod clone_write;
 mod clones;
 mod container;
 mod container_assets;
+mod container_share;
 mod corner_radii;
 mod corner_radii_codec;
 mod display_unit;
@@ -40,6 +41,7 @@ mod document;
 mod document_background;
 mod document_presets;
 mod document_size;
+mod page_frame;
 mod page_grid;
 mod pages;
 pub use page_grid::{GridMode, GridScale, OriginCorner, PageGrid, PageGridError};
@@ -160,7 +162,8 @@ pub use clones::{
     CloneError, LINKED_CLONE_COMMIT_LABEL, REMOVE_ORPHAN_CLONES_COMMIT_LABEL,
     UNLINK_CLONE_COMMIT_LABEL,
 };
-pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, unpack};
+pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, pack_snapshot, unpack};
+pub use container_share::{CURRENT_SHARE_FORMAT_VERSION, ShareRecord};
 pub use corner_radii::{Corner, CornerRadii, SHARP_CORNER_EPSILON_MM, effective_corner_radii};
 pub use display_unit::DisplayUnit;
 pub use document::{CURRENT_FORMAT_VERSION, Document, DocumentVersion};

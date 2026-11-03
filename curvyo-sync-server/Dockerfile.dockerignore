@@ -1,0 +1,7 @@
+# Build context of curvyo-sync-server/Dockerfile (the repository root): the workspace's crates
+# and manifests only.
+.git
+**/target
+target-ux
+frontend
+.projectatlas

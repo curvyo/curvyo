@@ -136,9 +136,12 @@ fn ac5_ac8_true_bezier_guide_matches_curve_not_chord_or_control_polygon() {
 #[test]
 fn ac5_ac15_page_fractions_have_exact_thirds_global_origins_and_no_zero_line() {
     let d = Document::new(601);
-    d.resize_page("first", DocumentSize::from_mm(300.0, 120.0), &[])
+    d.resize_page("first", DocumentSize::from_mm(300.0, 120.0))
         .unwrap();
-    d.move_page("first", Vec2::new(-40.0, 10.0), &[]).unwrap();
+    // The resize keeps the frame's centre (ADR 0031 decision 9a); the move puts it at (-40, 10).
+    let o = d.pages()[0].origin;
+    d.move_page("first", Vec2::new(-40.0 - o.x, 10.0 - o.y), &[])
+        .unwrap();
     let p = d.add_page();
     let targets =
         SnapTargets::gather_pages(&[], &d.pages(), &settings(1.0), SnapExclusions::default());

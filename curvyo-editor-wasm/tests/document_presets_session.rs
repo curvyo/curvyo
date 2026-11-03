@@ -50,6 +50,9 @@ fn reopened(session: &Session) -> Document {
 fn rect(session: &Session) -> (f64, f64, f64, f64) {
     let document = reopened(session);
     let id = document.object_ids()[0];
+    // On the page: relative to the first page's frame origin (since format 34 a resize moves
+    // the frame, not the objects, ADR 0031 decision 9a).
+    let o = document.pages()[0].origin;
     let Some(ObjectSnapshot::Primitive(primitive)) = document.object(id) else {
         panic!("a primitive");
     };
@@ -57,8 +60,8 @@ fn rect(session: &Session) -> (f64, f64, f64, f64) {
         panic!("a rectangle");
     };
     (
-        bounds.origin.x,
-        bounds.origin.y,
+        bounds.origin.x - o.x,
+        bounds.origin.y - o.y,
         bounds.width.as_mm(),
         bounds.height.as_mm(),
     )

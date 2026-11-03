@@ -1,0 +1,21 @@
+[package]
+name = "curvyo-sync-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo relay protocol: wire frames, the client session and the relay's room rules as pure state machines over bytes and passed-in time (wasm-compatible, no I/O)."
+
+[lints]
+workspace = true
+
+# ADR 0031 decision 1: `curvyo-crypto-core` is the only `curvyo-*` dependency (invariant), so a
+# document-model change never forces a relay deploy (ADR 0008 §5).
+[dependencies]
+curvyo-crypto-core = { path = "../curvyo-crypto-core", version = "0.1.0" }
+thiserror.workspace = true
+
+# The network simulator drives real document replicas (ADR 0031 decision 14); a dev-dependency
+# only, never a normal one.
+[dev-dependencies]
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }

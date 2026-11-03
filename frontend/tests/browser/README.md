@@ -193,3 +193,18 @@ the endpoint capture closing a chain. Screenshots go to `target/0066-browser/rev
 selects a rectangle with a click and at once (one CDP burst, within the double-click interval)
 drags it 100 px: it must move. A real double-click must still enter node editing on a path and
 text editing on a text. Screenshots and saved projects go to `target/drag-after-click-browser/`.
+
+### Cooperative editing (0092)
+
+`cooperative-editing.cjs` is the slice 1 journey with two devices: it starts
+`target/debug/curvyo-sync-server` (`cargo build -p curvyo-sync-server`) on a free port of
+127.0.0.1 with a fresh data directory `target/0092-browser/relay-data`, and the production preview
+on port 1421 unless `CURVYO_BROWSER_URL` is set (`npm run build` first). Two browser contexts, A and
+B, each with their own storage and in-page keys: A saves and shares (criterion 1), invites (2), B
+pastes the link and joins (3); rectangles both ways (6); A's pointer and selection in B (14); "Ben is
+editing this" in A (15); A's drag shown live in B and landing as one step (7); B offline with the pill
+text within 5 s and B's pointer gone in A (17); three edits each side, then both hold all of them
+(18); A removes B, the first 400 ms of the confirm ignored, key epoch 1, B told and given no later
+change (32); finally no label or document JSON in the relay's files or log (24). It prints the
+observed timings (wall time, not a gate figure). Screenshots and saved files go to
+`target/0092-browser/`.

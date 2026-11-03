@@ -18,6 +18,8 @@ import { GridSection } from "@/components/panel/GridSection";
 import { SnappingSection } from "@/components/panel/SnappingSection";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
+import { ShareTab } from "@/components/panel/ShareTab";
+import type { CollaborationApi } from "@/hooks/useCollaboration";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
@@ -45,6 +47,8 @@ interface PropertiesPanelProps {
   project: ProjectApi;
   /** The Trace tool's About Trace tab, last in the strip while the tool is active. */
   traceInfo: TraceInfoApi;
+  /** Cooperative editing: the Share tab (`specs/0092-cooperative-editing`). */
+  collab: CollaborationApi;
 }
 
 /**
@@ -69,6 +73,7 @@ export function PropertiesPanel({
   panelOpen,
   project,
   traceInfo,
+  collab,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   const panelId = useId();
@@ -203,7 +208,9 @@ export function PropertiesPanel({
         ? panel.view.subject
         : doc.view.content === "fonts"
           ? fontsSubject(editor.text.fonts)
-          : "";
+          : doc.view.content === "share"
+            ? collab.view.subject
+            : "";
   const activeLabel = doc.view.tabs.find((tab) => tab.name === doc.view.activeTab)?.label ?? "";
   // The About Trace tab is the frontend's, appended last so no other tab moves (UX notes 21.1).
   const tabs = traceInfo.available
@@ -369,6 +376,12 @@ export function PropertiesPanel({
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
                 exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
+              />
+            ) : doc.view.content === "share" ? (
+              <ShareTab
+                collab={collab}
+                saved={project.info.path !== null}
+                onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "parameters" ? (
               <SketchParameters key={sketch.view.active ?? sketch.view.page} sketch={sketch} />

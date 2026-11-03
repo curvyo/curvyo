@@ -1,16 +1,15 @@
 //! `Document`'s size commands: resize with the centre fixed, and fit to
 //! content (`specs/0015-document-size-and-rulers/`, criteria 17-27a).
 //!
-//! Each command is one commit that writes the size registers and moves every
-//! object together, so no state exists in which only one of the two has
-//! happened. Nothing here scales, crops, restyles or rotates an object.
+//! Each command is one commit that writes the page's whole frame register and moves no object
+//! (ADR 0031 decision 9a). Nothing here scales, crops, restyles or rotates an object.
 
-use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
+use crate::document::Document;
 #[cfg(test)]
-use crate::document::{KEY_HEIGHT_MM, KEY_WIDTH_MM};
-use crate::objects::translate_meta;
-use crate::paths::tree_id_of;
-use crate::units::{DocumentSize, Length, Point, Vec2};
+use crate::document::{KEY_HEIGHT_MM, KEY_WIDTH_MM, ROOT_MAP};
+use crate::page_frame::Frame;
+use crate::pages::{Page, PageError};
+use crate::units::{DocumentSize, Length, Point};
 
 /// The smallest document side: 1 mm.
 pub const MIN_DOCUMENT_MM: f64 = 1.0;
@@ -60,17 +59,15 @@ pub fn validated_document_side(side: Length) -> Result<Length, DocumentSizeError
 }
 
 impl Document {
-    /// Sets the document size and moves every object by half the change, so
-    /// the centre of the document and every object's place relative to it
-    /// stay as they were (criterion 17; the shift is
-    /// `((w1 - w0) / 2, (h1 - h0) / 2)`). Nothing is scaled, cropped or
-    /// rotated, also when the new size is smaller than the content
-    /// (criterion 18).
+    /// Sets the size of the first page (the document size) around its centre, so every object
+    /// keeps its place relative to the centre (criterion 17). Since format 34 the frame moves and
+    /// no object does (ADR 0031 decision 9a): read relative to the frame's origin, an object sits
+    /// where the version 33 resize put it. Nothing is scaled, cropped or rotated, also when the
+    /// new size is smaller than the content (criterion 18).
     ///
-    /// One commit, labelled `resize_document`, writes both size registers and
-    /// moves all objects (criterion 19). A size equal to the current one
-    /// within 1e-9 mm writes nothing and returns `Ok(false)`. A side within
-    /// 1e-9 mm of a limit is accepted and clamped onto it.
+    /// One commit, labelled `resize_document`, writes the whole frame (criterion 19). A size
+    /// equal to the current one within 1e-9 mm writes nothing and returns `Ok(false)`. A side
+    /// within 1e-9 mm of a limit is accepted and clamped onto it.
     ///
     /// # Errors
     /// [`DocumentSizeError::NotFinite`] for an infinite or NaN side,
@@ -81,50 +78,18 @@ impl Document {
             validated_document_side(size.width)?,
             validated_document_side(size.height)?,
         );
-        let shift = Self::resize_shift(self.size(), size);
-        Ok(self.apply_size(size, shift, "resize_document"))
+        Ok(self.write_page_frame(&self.size_page(), size, "resize_document"))
     }
 
-    /// The shift [`Document::resize`] moves every object by when the size goes
-    /// from `from` to `to`: half the change on each axis, so the centre stays
-    /// where it was (criterion 17). A host that shows the document moves its
-    /// view by the same shift, so nothing moves on screen (criterion 20).
-    #[must_use]
-    pub fn resize_shift(from: DocumentSize, to: DocumentSize) -> Vec2 {
-        Vec2::new(
-            (to.width.as_mm() - from.width.as_mm()) / 2.0,
-            (to.height.as_mm() - from.height.as_mm()) / 2.0,
-        )
-    }
-
-    /// The shift [`Document::fit_to_content`] moves every object by for a
-    /// content box: the box's top-left corner goes to (0, 0), and a side
-    /// narrower than [`MIN_DOCUMENT_MM`] is centred on the 1 mm it gets
-    /// (criteria 24 and 25).
-    #[must_use]
-    pub fn fit_shift(content: (Point, Point)) -> Vec2 {
-        let (min, max) = content;
-        let side = |extent: f64| extent.clamp(MIN_DOCUMENT_MM, MAX_DOCUMENT_MM);
-        let (extent_x, extent_y) = (max.x - min.x, max.y - min.y);
-        Vec2::new(
-            -min.x + (side(extent_x) - extent_x) / 2.0,
-            -min.y + (side(extent_y) - extent_y) / 2.0,
-        )
-    }
-
-    /// Sets the document to the extent of `content` (the axis-aligned box of
-    /// all objects' outline geometry, computed by the caller because curve
-    /// extremes need `curvyo-geometry-core`) with a margin of 0 mm, and moves
-    /// every object so the box's top-left corner lies at (0, 0)
-    /// (criteria 23 and 24). Unlike [`Document::resize`] the centre of the
-    /// old document does not matter.
+    /// Sets the document's frame to `content` (the axis-aligned box of all objects' outline
+    /// geometry, computed by the caller because curve extremes need `curvyo-geometry-core`) with
+    /// a margin of 0 mm (criteria 23 and 24); no object moves (ADR 0031 decision 9a), so the
+    /// box's top-left corner is the frame's origin.
     ///
-    /// A side of the box narrower than [`MIN_DOCUMENT_MM`] becomes 1 mm and
-    /// the content is centred on it (criterion 25). One commit, labelled
-    /// `fit_document_to_content` (criterion 27). If the size and every
-    /// position would stay the same within 1e-9 mm, nothing is written and
-    /// the result is `Ok(false)` (criterion 26). A document without objects
-    /// is left as it is and also returns `Ok(false)` (criterion 22).
+    /// A side of the box narrower than [`MIN_DOCUMENT_MM`] becomes 1 mm, centred on the content
+    /// (criterion 25). One commit, labelled `fit_document_to_content` (criterion 27). A frame
+    /// that already equals the box within 1e-9 mm writes nothing and returns `Ok(false)`
+    /// (criterion 26), and so does a document without objects (criterion 22).
     ///
     /// # Errors
     /// [`DocumentSizeError::NotFinite`] for a non-finite bound,
@@ -132,95 +97,83 @@ impl Document {
     /// `content.0` on an axis, [`DocumentSizeError::OutOfRange`] if the box is
     /// wider or taller than [`MAX_DOCUMENT_MM`] (criterion 27a).
     pub fn fit_to_content(&self, content: (Point, Point)) -> Result<bool, DocumentSizeError> {
-        let (min, max) = content;
-        if ![min.x, min.y, max.x, max.y].iter().all(|v| v.is_finite()) {
-            return Err(DocumentSizeError::NotFinite);
-        }
-        let (extent_x, extent_y) = (max.x - min.x, max.y - min.y);
-        if extent_x < 0.0 || extent_y < 0.0 {
-            return Err(DocumentSizeError::InvalidBounds);
-        }
-        let size = DocumentSize::new(
-            validated_document_side(Length::from_mm(extent_x.max(MIN_DOCUMENT_MM)))?,
-            validated_document_side(Length::from_mm(extent_y.max(MIN_DOCUMENT_MM)))?,
-        );
+        let frame = fitted_frame(content)?;
         if self.object_ids().is_empty() {
             return Ok(false);
         }
-        Ok(self.apply_size(size, Self::fit_shift(content), "fit_document_to_content"))
+        Ok(self.write_fitted_frame(&self.size_page(), frame))
     }
 
-    /// Writes the size registers and shifts all objects by `shift` in one
-    /// commit named `label`; writes nothing and returns `false` if neither
-    /// the size nor any position would change.
-    fn apply_size(&self, size: DocumentSize, shift: Vec2, label: &str) -> bool {
-        let current = self.size();
-        let size_same = (size.width.as_mm() - current.width.as_mm()).abs() <= EQUAL_EPSILON_MM
-            && (size.height.as_mm() - current.height.as_mm()).abs() <= EQUAL_EPSILON_MM;
-        let shift_zero = shift.x.abs() <= EQUAL_EPSILON_MM && shift.y.abs() <= EQUAL_EPSILON_MM;
-        if size_same && shift_zero {
-            return false;
-        }
-        // Both registers are set. Loro records an operation only for a value
-        // that differs from the stored one, and a damaged stored side always
-        // differs from the valid new one, so a damaged size is repaired by the
-        // next resize or fit. Across peers each register merges on its own
-        // (docs/technical-debt.md, "Resize and fit merge per field").
-        let root = self.loro().get_map(ROOT_MAP);
-        // invariant: the root map is attached and the values are plain f64.
-        #[allow(clippy::unwrap_used)]
-        {
-            let pages = self.pages();
-            let id = pages
-                .iter()
-                .find(|p| p.id == crate::FIRST_PAGE_ID)
-                .unwrap_or(&pages[0])
-                .id
-                .as_str();
-            root.insert(&crate::pages::key(id, "width"), size.width.as_mm())
-                .unwrap();
-            root.insert(&crate::pages::key(id, "height"), size.height.as_mm())
-                .unwrap();
-        }
-        if !shift_zero {
-            self.translate_all_objects(shift);
-        }
-        self.commit_with_label(label);
-        true
-    }
-
-    /// Moves every object by `offset` without committing; the caller commits.
-    /// A linked clone moves with everything else: its matrix becomes `t·M·t⁻¹`
-    /// (`specs/0049-linked-clone` criterion 16, every object selected).
-    fn translate_all_objects(&self, offset: Vec2) {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        let ids = self.object_ids();
-        let links = self.clone_links();
-        let clones: std::collections::HashMap<_, _> = if links.is_empty() {
-            std::collections::HashMap::new()
-        } else {
-            // Every object moves, so no clone is held back (ADR 0016 §2).
-            crate::clone_transform::clone_matrices_after(
-                &links,
-                &crate::clone_transform::HeldClones::new(),
-                &ids,
-                crate::affine::Affine::translation(offset),
-            )
-            .matrices
+    /// Sets page `id`'s frame to `content` as [`Document::fit_to_content`] does for the document
+    /// size; the caller passes the bounds of the objects it fits the page to.
+    ///
+    /// # Errors
+    /// [`PageError::NotFound`] for an unknown page, else the errors of
+    /// [`Document::fit_to_content`] as [`PageError::Size`].
+    pub fn fit_page_to_content(
+        &self,
+        id: &str,
+        content: (Point, Point),
+    ) -> Result<bool, PageError> {
+        let frame = fitted_frame(content)?;
+        let page = self
+            .pages()
             .into_iter()
-            .collect()
-        };
-        for id in ids {
-            if let Ok(meta) = tree.get_meta(tree_id_of(id)) {
-                match (clones.get(&id), links.get(&id)) {
-                    (Some(&matrix), Some(&(origin, _))) => {
-                        crate::clone_write::write_matrix(&meta, origin, matrix);
-                    }
-                    _ => translate_meta(&meta, offset),
-                }
-            }
-        }
+            .find(|p| p.id == id)
+            .ok_or(PageError::NotFound)?;
+        Ok(self.write_fitted_frame(&page, frame))
     }
+
+    /// Writes `frame` as `page`'s frame in one commit `fit_document_to_content`; `false` and
+    /// nothing written when the frame stays within 1e-9 mm.
+    fn write_fitted_frame(&self, page: &Page, frame: Frame) -> bool {
+        let unchanged = [
+            (frame.origin.x, page.origin.x),
+            (frame.origin.y, page.origin.y),
+            (frame.size.width.as_mm(), page.size.width.as_mm()),
+            (frame.size.height.as_mm(), page.size.height.as_mm()),
+        ]
+        .iter()
+        .all(|(a, b)| (a - b).abs() <= EQUAL_EPSILON_MM);
+        if !unchanged {
+            self.write_frame_commit(&page.id, frame, "fit_document_to_content");
+        }
+        !unchanged
+    }
+
+    /// The page whose size is the document size: the first page, or the first visible one
+    /// after it was deleted.
+    fn size_page(&self) -> Page {
+        let mut pages = self.pages();
+        let index = pages
+            .iter()
+            .position(|p| p.id == crate::FIRST_PAGE_ID)
+            .unwrap_or(0);
+        // invariant: pages() always holds at least one frame.
+        pages.swap_remove(index)
+    }
+}
+
+/// The frame a fit writes for `content`: the box, a side under [`MIN_DOCUMENT_MM`] widened to it
+/// around the content (criterion 25).
+fn fitted_frame(content: (Point, Point)) -> Result<Frame, DocumentSizeError> {
+    let (min, max) = content;
+    if ![min.x, min.y, max.x, max.y].iter().all(|v| v.is_finite()) {
+        return Err(DocumentSizeError::NotFinite);
+    }
+    let (extent_x, extent_y) = (max.x - min.x, max.y - min.y);
+    if extent_x < 0.0 || extent_y < 0.0 {
+        return Err(DocumentSizeError::InvalidBounds);
+    }
+    let size = DocumentSize::new(
+        validated_document_side(Length::from_mm(extent_x.max(MIN_DOCUMENT_MM)))?,
+        validated_document_side(Length::from_mm(extent_y.max(MIN_DOCUMENT_MM)))?,
+    );
+    let origin = Point::new(
+        min.x - (size.width.as_mm() - extent_x) / 2.0,
+        min.y - (size.height.as_mm() - extent_y) / 2.0,
+    );
+    Ok(Frame { origin, size })
 }
 
 #[cfg(test)]
@@ -230,7 +183,33 @@ mod tests {
     use crate::primitive_model::{
         EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, RectBounds, StarFrame,
     };
-    use crate::units::Angle;
+    use crate::units::{Angle, Vec2};
+
+    /// The first page's frame origin.
+    fn origin(document: &Document) -> Point {
+        document.pages()[0].origin
+    }
+
+    /// `point` read relative to the first page's frame origin, as rulers and export read it.
+    fn on_page(document: &Document, point: Point) -> Point {
+        let o = origin(document);
+        Point::new(point.x - o.x, point.y - o.y)
+    }
+
+    fn near(a: Point, b: Point) -> bool {
+        (a.x - b.x).abs() < 1e-9 && (a.y - b.y).abs() < 1e-9
+    }
+
+    /// Turns `document` into what a version 33 build wrote: four page registers, no frame.
+    fn as_version_33(document: &Document) {
+        let root = document.loro().get_map(ROOT_MAP);
+        root.delete("page.first.frame").unwrap();
+        root.insert("page.first.x", 0.0).unwrap();
+        root.insert("page.first.y", 0.0).unwrap();
+        root.insert(KEY_WIDTH_MM, 210.0).unwrap();
+        root.insert(KEY_HEIGHT_MM, 297.0).unwrap();
+        document.loro().commit();
+    }
 
     fn mm(value: f64) -> Length {
         Length::from_mm(value)
@@ -294,16 +273,22 @@ mod tests {
         let crate::primitive_model::Shape::Rect { bounds, .. } = primitive.shape else {
             panic!("a rect");
         };
-        assert!((bounds.origin.x - 55.0).abs() < 1e-9);
-        assert!((bounds.origin.y - 61.5).abs() < 1e-9);
+        assert!(
+            near(bounds.origin, Point::new(10.0, 10.0)),
+            "stored: unmoved"
+        );
+        assert!(near(
+            on_page(&document, bounds.origin),
+            Point::new(55.0, 61.5)
+        ));
         assert!((bounds.width.as_mm() - 50.0).abs() < 1e-9);
         assert!((bounds.height.as_mm() - 50.0).abs() < 1e-9);
     }
 
-    /// Criteria 17 and 18 for every kind, rotated or not: each object is its
-    /// old self translated by the half-change and nothing else.
+    /// Criteria 17 and 18 for every kind, rotated or not: no object changes, and the frame's
+    /// origin moves by minus the half-change, so on the page each object moved by it.
     #[test]
-    fn resize_moves_every_kind_rotated_or_not_by_half_the_change() {
+    fn resize_moves_the_frame_and_leaves_every_kind_rotated_or_not_unchanged() {
         let document = Document::new(1);
         let curved = document.create_path(
             &[
@@ -357,13 +342,9 @@ mod tests {
             .expect("valid");
 
         // (100 - 210) / 2 and (50 - 297) / 2
-        let shift = Vec2::new(-55.0, -123.5);
+        assert!(near(origin(&document), Point::new(55.0, 123.5)));
         for (id, old) in ids.iter().zip(&before) {
-            assert_eq!(
-                document.object(*id).as_ref(),
-                Some(&old.translated(shift)),
-                "{id:?}"
-            );
+            assert_eq!(document.object(*id).as_ref(), Some(old), "{id:?}");
         }
         assert_eq!(document.size(), DocumentSize::from_mm(100.0, 50.0));
     }
@@ -458,7 +439,7 @@ mod tests {
         assert_eq!(document.size(), DocumentSize::from_mm(100_000.0, 1.0));
     }
 
-    /// Criterion 18: a size smaller than the content moves, never crops.
+    /// Criterion 18: a size smaller than the content never crops.
     #[test]
     fn resize_below_the_content_leaves_objects_whole_on_the_pasteboard() {
         let document = Document::new(1);
@@ -472,14 +453,14 @@ mod tests {
         let crate::primitive_model::Shape::Rect { bounds, .. } = primitive.shape else {
             panic!("a rect");
         };
-        assert!((bounds.origin.x - -100.0).abs() < 1e-9);
+        assert!((on_page(&document, bounds.origin).x - -100.0).abs() < 1e-9);
         assert!((bounds.width.as_mm() - 200.0).abs() < 1e-9);
     }
 
-    /// Criteria 23, 24: the box's top-left corner lands at (0, 0) and the
-    /// size is the box's extent.
+    /// Criteria 23, 24: the frame's origin is the box's top-left corner and the size is the
+    /// box's extent; no object moves.
     #[test]
-    fn fit_moves_the_box_to_the_origin_and_takes_its_extent() {
+    fn fit_puts_the_frame_on_the_box_and_takes_its_extent() {
         let document = Document::new(1);
         let a = rect(&document, 30.0, 40.0, 20.0, 10.0);
         let b = line(&document, (-10.0, 5.0), (25.0, 80.0));
@@ -492,21 +473,18 @@ mod tests {
         assert_eq!(changes(&document), before + 1);
         assert_eq!(last_label(&document), "fit_document_to_content");
         assert_eq!(document.size(), DocumentSize::from_mm(60.0, 75.0));
-        let shift = Vec2::new(10.0, -5.0);
-        assert_eq!(
-            document.object(a).as_ref(),
-            Some(&rect_before.translated(shift))
-        );
+        assert_eq!(origin(&document), Point::new(-10.0, 5.0));
+        assert_eq!(document.object(a).as_ref(), Some(&rect_before));
         let Some(ObjectSnapshot::Path(path)) = document.object(b) else {
             panic!("a path");
         };
         assert_eq!(
-            path.anchors[0].point,
-            Point::new(-10.0, 5.0).translated(shift)
+            on_page(&document, path.anchors[0].point),
+            Point::new(0.0, 0.0)
         );
         assert_eq!(
-            path.anchors[1].point,
-            Point::new(25.0, 80.0).translated(shift)
+            on_page(&document, path.anchors[1].point),
+            Point::new(35.0, 75.0)
         );
     }
 
@@ -524,8 +502,14 @@ mod tests {
         let Some(ObjectSnapshot::Path(path)) = document.object(id) else {
             panic!("a path");
         };
-        assert_eq!(path.anchors[0].point, Point::new(0.0, 0.5));
-        assert_eq!(path.anchors[1].point, Point::new(100.0, 0.5));
+        assert_eq!(
+            on_page(&document, path.anchors[0].point),
+            Point::new(0.0, 0.5)
+        );
+        assert_eq!(
+            on_page(&document, path.anchors[1].point),
+            Point::new(100.0, 0.5)
+        );
     }
 
     /// Criterion 26: fitting a fitted document changes and commits nothing,
@@ -540,7 +524,7 @@ mod tests {
         let before = changes(&document);
         let size = document.size();
 
-        let again = document.fit_to_content((Point::new(0.0, 0.5), Point::new(100.0, 0.5)));
+        let again = document.fit_to_content((Point::new(3.0, 7.0), Point::new(103.0, 7.0)));
 
         assert_eq!(again, Ok(false));
         assert_eq!(changes(&document), before);
@@ -617,7 +601,17 @@ mod tests {
             panic!("a path");
         };
         assert_eq!(path.anchors[0].handle_out, Vec2::new(3.0, 4.0));
-        assert_eq!(path.anchors[0].point, Point::new(-80.0, -118.5));
+        assert_eq!(
+            on_page(&document, path.anchors[0].point),
+            Point::new(-80.0, -118.5)
+        );
+        document
+            .fit_to_content((Point::new(0.0, 0.0), Point::new(10.0, 10.0)))
+            .unwrap();
+        let Some(ObjectSnapshot::Path(path)) = document.object(id) else {
+            panic!("a path");
+        };
+        assert_eq!(path.anchors[0].handle_out, Vec2::new(3.0, 4.0));
     }
 
     /// Criterion 13: missing, non-finite or out-of-range sides open as A4 on
@@ -634,6 +628,7 @@ mod tests {
             (Some(100.0), None),
         ] {
             let document = Document::new(1);
+            as_version_33(&document);
             let root = document.loro().get_map(ROOT_MAP);
             match width {
                 Some(v) => root.insert(KEY_WIDTH_MM, v).unwrap(),
@@ -658,6 +653,7 @@ mod tests {
     #[test]
     fn a_text_side_reads_as_a4() {
         let document = Document::new(1);
+        as_version_33(&document);
         document
             .loro()
             .get_map(ROOT_MAP)
@@ -670,6 +666,7 @@ mod tests {
     #[test]
     fn resize_after_a_damaged_side_stores_a_valid_size() {
         let document = Document::new(1);
+        as_version_33(&document);
         document
             .loro()
             .get_map(ROOT_MAP)
@@ -687,42 +684,6 @@ mod tests {
             .join(name)
     }
 
-    /// The document `size_damaged_v7.curvyo` is made from: a 50 x 50 mm
-    /// rectangle at (10, 10) and a stored height of 100000.5 mm, just over
-    /// the 100 000 mm limit, so the file is damaged in one axis only.
-    fn damaged_size_document() -> Document {
-        let document = Document::new(1);
-        let _ = rect(&document, 10.0, 10.0, 50.0, 50.0);
-        let root = document.loro().get_map(ROOT_MAP);
-        root.insert(KEY_WIDTH_MM, 120.0).unwrap();
-        root.insert(KEY_HEIGHT_MM, 100_000.5).unwrap();
-        document.loro().commit();
-        document
-    }
-
-    /// Run deliberately to regenerate `tests/fixtures/size_damaged_v7.curvyo`
-    /// and `display_unit_in_v7.curvyo` (`cargo test -p curvyo-document-core
-    /// generate_size_fixtures -- --ignored`). The committed bytes are what
-    /// `tests/document_size.rs` pins.
-    #[test]
-    #[ignore = "run deliberately to regenerate tests/fixtures/*.curvyo, not on every `cargo test`"]
-    fn generate_size_fixtures() {
-        let bytes = crate::container::pack(&damaged_size_document(), "0.1.0").unwrap();
-        std::fs::write(fixture_path("size_damaged_v7.curvyo"), bytes).unwrap();
-
-        // A 50 x 50 mm rectangle at (10, 10), resized from A4 to US Letter
-        // (215.9 x 279.4 mm, 8.5 x 11 in), which moves it by (2.95, -8.8), to
-        // (12.95, 1.2); display unit inches.
-        let document = Document::new(1);
-        let _ = rect(&document, 10.0, 10.0, 50.0, 50.0);
-        document
-            .resize(DocumentSize::from_mm(215.9, 279.4))
-            .unwrap();
-        assert!(document.set_display_unit(crate::display_unit::DisplayUnit::In));
-        let bytes = crate::container::pack(&document, "0.1.0").unwrap();
-        std::fs::write(fixture_path("display_unit_in_v7.curvyo"), bytes).unwrap();
-    }
-
     /// The golden really is damaged: the raw stored height is out of range
     /// (and the width is valid), so `size()` falling back to A4 is the damaged
     /// path and not a coincidence of a valid A4 file.
@@ -738,32 +699,5 @@ mod tests {
         assert!((stored(KEY_WIDTH_MM) - 120.0).abs() < f64::EPSILON);
         assert!(stored(KEY_HEIGHT_MM) > MAX_DOCUMENT_MM);
         assert_eq!(document.size(), DocumentSize::default());
-    }
-
-    /// The shifts a host moves its view by are the ones the commands apply:
-    /// the document moves by exactly them (criterion 20).
-    #[test]
-    fn the_published_shifts_are_the_ones_the_commands_apply() {
-        let document = Document::new(1);
-        let id = rect(&document, 30.0, 40.0, 20.0, 10.0);
-        let before = document.object(id).unwrap();
-        let from = document.size();
-        let to = DocumentSize::from_mm(300.0, 120.0);
-        document.resize(to).unwrap();
-        let shift = Document::resize_shift(from, to);
-        assert_eq!(shift, Vec2::new(45.0, -88.5));
-        assert_eq!(document.object(id).unwrap(), before.translated(shift));
-
-        let content = (Point::new(75.0, -48.5), Point::new(95.0, -38.5));
-        let after_resize = document.object(id).unwrap();
-        let fit_shift = Document::fit_shift(content);
-        document.fit_to_content(content).unwrap();
-        assert_eq!(
-            document.object(id).unwrap(),
-            after_resize.translated(fit_shift)
-        );
-        // A side under 1 mm is centred on the 1 mm it gets.
-        let thin = Document::fit_shift((Point::new(10.0, 5.0), Point::new(110.0, 5.0)));
-        assert_eq!(thin, Vec2::new(-10.0, -4.5));
     }
 }

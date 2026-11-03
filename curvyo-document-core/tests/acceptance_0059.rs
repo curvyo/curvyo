@@ -12,7 +12,7 @@ fn ac1_current_document_starts_with_one_default_frame_and_roundtrips_without_rea
     let p = d.add_page();
     d.rename_page(&p.id, "Frühstück 🐈").unwrap();
     d.move_page(&p.id, Vec2::new(-500.0, -60.0), &[]).unwrap();
-    d.resize_page(&p.id, DocumentSize::from_mm(80.0, 40.0), &[])
+    d.resize_page(&p.id, DocumentSize::from_mm(80.0, 40.0))
         .unwrap();
     d.reorder_page(&p.id, 0).unwrap();
     let reopened = unpack(592, &pack(&d, "acceptance").unwrap()).unwrap();
@@ -24,32 +24,34 @@ fn ac1_current_document_starts_with_one_default_frame_and_roundtrips_without_rea
 
 #[test]
 fn ac3_gap_wrap_and_reordered_last_frame_supply_dimensions() {
+    // Since format 34 a resize keeps the frame's centre (ADR 0031 decision 9a): A4 to 100 x 100
+    // puts the first frame at (55, 98.5).
     let d = Document::new(593);
     let first = d.pages()[0].id.clone();
-    d.resize_page(&first, DocumentSize::from_mm(100.0, 100.0), &[])
+    d.resize_page(&first, DocumentSize::from_mm(100.0, 100.0))
         .unwrap();
     let second = d.add_page();
-    assert_eq!(second.origin, Point::new(120.0, 0.0));
-    d.resize_page(&second.id, DocumentSize::from_mm(400.0, 100.0), &[])
+    assert_eq!(second.origin, Point::new(175.0, 98.5));
+    d.resize_page(&second.id, DocumentSize::from_mm(400.0, 100.0))
         .unwrap();
     let third = d.add_page();
-    assert_eq!(third.origin, Point::new(560.0, 0.0));
+    assert_eq!(third.origin, Point::new(465.0, 98.5));
     assert_eq!(third.size, DocumentSize::from_mm(400.0, 100.0));
     d.reorder_page(&first, 2).unwrap();
     let next = d.add_page();
     assert_eq!(next.size, DocumentSize::from_mm(100.0, 100.0));
-    assert_eq!(next.origin, Point::new(120.0, 0.0));
+    assert_eq!(next.origin, Point::new(175.0, 98.5));
     let row = Document::new(594);
-    row.resize_page("first", DocumentSize::from_mm(100.0, 150.0), &[])
+    row.resize_page("first", DocumentSize::from_mm(100.0, 150.0))
         .unwrap();
     for _ in 1..9 {
         row.add_page();
     }
-    assert_eq!(row.pages()[8].origin, Point::new(0.0, 170.0));
+    assert_eq!(row.pages()[8].origin, Point::new(55.0, 243.5));
     let wide = Document::new(595);
-    wide.resize_page("first", DocumentSize::from_mm(2000.0, 100.0), &[])
+    wide.resize_page("first", DocumentSize::from_mm(2000.0, 100.0))
         .unwrap();
-    assert_eq!(wide.add_page().origin, Point::new(0.0, 300.0));
+    assert_eq!(wide.add_page().origin, Point::new(-895.0, 398.5));
 }
 
 #[test]
@@ -92,7 +94,7 @@ fn ac13_rejections_and_noops_do_not_create_history_or_operations() {
         DocumentSize::from_mm(f64::NAN, 10.0),
         DocumentSize::from_mm(10.0, f64::INFINITY),
     ] {
-        assert!(d.resize_page(&initial.id, size, &[]).is_err());
+        assert!(d.resize_page(&initial.id, size).is_err());
     }
     assert!(
         d.move_page(&initial.id, Vec2::new(f64::NAN, 0.0), &[])
@@ -102,7 +104,7 @@ fn ac13_rejections_and_noops_do_not_create_history_or_operations() {
     assert!(d.reorder_page("absent", 0).is_err());
     assert!(!d.reorder_page(&initial.id, 0).unwrap());
     assert!(!d.rename_page(&initial.id, &initial.name).unwrap());
-    assert!(!d.resize_page(&initial.id, initial.size, &[]).unwrap());
+    assert!(!d.resize_page(&initial.id, initial.size).unwrap());
     assert_eq!(d.version(), version);
     assert_eq!(d.history_len(), history);
     assert_eq!(d.pages(), vec![initial]);

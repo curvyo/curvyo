@@ -52,7 +52,8 @@ type Action =
   | { kind: "open" }
   | { kind: "close" }
   | { kind: "quit" }
-  | { kind: "handover"; path: string; bytes: number[] };
+  | { kind: "handover"; path: string; bytes: number[] }
+  | { kind: "join"; then: () => void };
 
 /** Who asked: a button of the File tab, or something outside it (a chord, the window close, the
  * operating system handing over a file). */
@@ -114,6 +115,11 @@ export interface ProjectApi {
   discard: () => void;
   /** Cancel or Escape in the check. */
   cancel: () => void;
+  /** Open shared document (`specs/0092-cooperative-editing` criterion 3): the unsaved-changes
+   * check when needed, then a blank project, then `then` starts the join on it. */
+  replaceForJoin: (then: () => void) => void;
+  /** Save, as the File tab's button (a shared document's file keeps its room). */
+  save: () => void;
   /** Export SVG… (`specs/0024-svg-import-export` criterion 4) with the File tab's switches; `mouse`
    * when a click pressed it (the focus then goes to the canvas). */
   exportSvg: (options: SvgExportOptions, mouse: boolean) => void;
@@ -494,7 +500,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         const notice = parseTimedNotice(
           svg_export_notice(fileName, !isTauri, answer.objects, answer.kept),
         );
-        editor.showHistoryNotice(notice.text, notice.ms);
+        // A shared document's export names the version it was made from (`0092` criterion 29).
+        const version = session.export_version_note();
+        editor.showHistoryNotice(version ? `${notice.text} ${version}` : notice.text, notice.ms);
         settle();
       } catch (error) {
         onOpenError(String(error), EXPORT_FAILED_TITLE);
@@ -536,6 +544,14 @@ export function useProject(deps: ProjectDeps): ProjectApi {
           break;
         case "handover":
           await openBytes(action.path, action.bytes);
+          break;
+        case "join":
+          // Joining replaces the open project by a blank one the room's document then fills
+          // (`specs/0092-cooperative-editing` UX notes §2.5).
+          await resetProject();
+          // The Share tab stays shown while the join runs ("the tab switches to the shared state").
+          depsRef.current.panel.pressTab("share");
+          action.then();
           break;
         case "quit":
           await quit();
@@ -832,5 +848,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     discard,
     cancel,
     exportSvg: (options: SvgExportOptions, mouse: boolean) => void exportSvg(options, mouse),
+    replaceForJoin: (then: () => void) => request({ kind: "join", then }, "outside"),
+    save: () => void save(false),
   };
 }

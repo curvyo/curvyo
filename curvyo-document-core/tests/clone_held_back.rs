@@ -326,8 +326,10 @@ fn the_document_fit_moves_every_clone_whatever_its_flag() {
     let (o_before, c_before) = (drawn(&d, o), drawn(&d, c));
     d.fit_to_content((Point::new(-10.0, -10.0), Point::new(80.0, 20.0)))
         .unwrap();
-    let o_shift = drawn(&d, o).anchors[0].point.x - o_before.anchors[0].point.x;
-    let c_shift = drawn(&d, c).anchors[0].point.x - c_before.anchors[0].point.x;
+    // Read on the page: since format 34 the fit moves the frame (ADR 0031 decision 9a).
+    let frame_x = d.pages()[0].origin.x;
+    let o_shift = drawn(&d, o).anchors[0].point.x - frame_x - o_before.anchors[0].point.x;
+    let c_shift = drawn(&d, c).anchors[0].point.x - frame_x - c_before.anchors[0].point.x;
     assert!(o_shift.abs() > 1.0, "the fit moved the content");
     assert!(
         (o_shift - c_shift).abs() < 1e-9,

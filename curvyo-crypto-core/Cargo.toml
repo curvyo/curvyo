@@ -1,0 +1,36 @@
+[package]
+name = "curvyo-crypto-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The Curvyo sealing and keyring layer: envelopes, key wraps, identities and the signed keyring replay (pure, wasm-compatible, no randomness or clock)."
+
+[lints]
+workspace = true
+
+# ADR 0031 decision 13: RustCrypto and dalek, all without default features, so neither
+# `rand_core` nor `getrandom` enters the tree (callers pass every byte of entropy in).
+[dependencies]
+# XChaCha20-Poly1305 (ADR 0008 §2). Apache-2.0 OR MIT.
+chacha20poly1305 = { version = "0.11", default-features = false }
+# The ChaCha20 stream of `NonceStream` (ADR 0031 decision 6). Apache-2.0 OR MIT.
+chacha20 = { version = "0.10", default-features = false, features = ["cipher"] }
+# Wrap and invite key derivation. MIT OR Apache-2.0.
+hkdf = { version = "0.13", default-features = false }
+# Hashes of keyring entries, fingerprints and `key_id`. MIT OR Apache-2.0. Not the workspace's
+# 0.10: the 0.11 line is what `ed25519-dalek` 3 and `hkdf` 0.13 use.
+sha2 = { version = "0.11", default-features = false }
+# Identity signatures (ADR 0010 §1). BSD-3-Clause.
+ed25519-dalek = { version = "3", default-features = false, features = ["zeroize"] }
+# X25519 wrap agreement (ADR 0010 §6) through `MontgomeryPoint::mul_clamped`. BSD-3-Clause.
+# Used directly instead of `x25519-dalek` (which ADR 0031 names): `x25519-dalek` 3 depends on
+# `rand_core` unconditionally, which decision 13 rules out; `curve25519-dalek` is already in the
+# tree through `ed25519-dalek` and is the code `x25519-dalek` wraps (RFC 7748 vectors in tests).
+curve25519-dalek = { version = "5", default-features = false, features = ["zeroize"] }
+# Secret key newtypes are wiped on drop. Apache-2.0 OR MIT.
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
+thiserror.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest.workspace = true

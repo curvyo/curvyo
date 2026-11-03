@@ -97,9 +97,11 @@ mod tests {
         let size = document.size();
         assert!((size.width.as_mm() - 155.0).abs() < 1e-9, "{size:?}");
         assert!((size.height.as_mm() - 135.0).abs() < 1e-9, "{size:?}");
+        // The frame is on the box (ADR 0031 decision 9a): its origin is the box's corner.
         let bounds = content_bounds(&document).unwrap();
+        let origin = document.pages()[0].origin;
         assert!(
-            bounds.0.x.abs() < 1e-9 && bounds.0.y.abs() < 1e-9,
+            (bounds.0.x - origin.x).abs() < 1e-9 && (bounds.0.y - origin.y).abs() < 1e-9,
             "{bounds:?}"
         );
     }

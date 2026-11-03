@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Impure capabilities for the desktop client: atomic writes, path reads, the font list (ADR 0011, ADR 0020 §3)."
+description = "Impure capabilities for the desktop client: atomic writes, path reads, the font list, the credential store (ADR 0011, ADR 0020 §3, ADR 0031 decision 12)."
 
 [lints]
 workspace = true
@@ -16,6 +16,17 @@ fontdb.workspace = true
 # (`specs/0076-single-line-fonts` criteria 1, 3, 23); only its SVG-only entry point
 # `svg_listable_faces` is called (`adrs.md` decision 5, architect note 2026-10-23).
 curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
+# The credential store of device and document keys (ADR 0007 §1, ADR 0031 decision 12): the OS
+# keychain (Secret Service over libdbus, already linked by the Tauri shell; macOS Keychain; Windows
+# Credential Manager), MIT OR Apache-2.0. Not `zbus`, which `cargo deny` flags.
+keyring = { version = "3.6", default-features = false, features = ["sync-secret-service", "apple-native", "windows-native"] }
+# Its fallback, the encrypted key file under the maker's passphrase: Argon2id (RustCrypto, MIT OR
+# Apache-2.0) derives the key, XChaCha20-Poly1305 (the cipher of ADR 0008 §2, already locked)
+# seals the file, `getrandom` draws its salt and nonces (already locked).
+argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
+chacha20poly1305 = { version = "0.11", default-features = false }
+zeroize = { version = "1", default-features = false, features = ["alloc"] }
+getrandom = "0.3"
 
 [dev-dependencies]
 # Only the test that opening an older project writes nothing to its file (`0040` criterion 4).

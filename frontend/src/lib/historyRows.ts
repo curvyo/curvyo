@@ -36,6 +36,8 @@ export interface HistoryRowData {
   /** False for a label the table does not know: the name is "Edit". */
   known: boolean;
   author: "you" | "earlier";
+  /** The label of the live participant whose step it is (`specs/0092` adrs.md decision 4). */
+  peerLabel?: string | null;
   /** Seconds since the epoch; 0 for an unknown time. */
   time: number;
   kind: "create" | "delete" | "replace" | "change" | "document";
@@ -101,12 +103,12 @@ export function formatFullTime(seconds: number): string {
 
 /** "You" or "Earlier" in a row. */
 export function authorWord(row: HistoryRowData): string {
-  return row.author === "you" ? "You" : "Earlier";
+  return row.author === "you" ? "You" : (row.peerLabel ?? "Earlier");
 }
 
 /** "You" or "Earlier session" in the tooltip and the accessible name. */
 export function authorLong(row: HistoryRowData): string {
-  return row.author === "you" ? "You" : "Earlier session";
+  return row.author === "you" ? "You" : (row.peerLabel ?? "Earlier session");
 }
 
 /** The status word of a row, empty while it is in effect: "Undone" for a step taken back with

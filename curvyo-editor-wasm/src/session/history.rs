@@ -326,8 +326,13 @@ impl Session {
         let shapes = summary_shapes(&target.label, &touched);
         let summary = objects_summary(&shapes);
         let off_screen = report.wrote && self.selection_is_off_screen();
+        // In a shared document an own step whose objects a participant deleted is skipped with
+        // who did it (`specs/0092-cooperative-editing` criterion 22, at most 70 characters).
+        let notice = self
+            .deleted_by_peer_notice(&report)
+            .unwrap_or_else(|| restore_notice(&name, &report, summary.as_deref(), off_screen));
         HistoryResult {
-            notice: restore_notice(&name, &report, summary.as_deref(), off_screen),
+            notice,
             changed: report.wrote,
         }
     }

@@ -87,6 +87,8 @@ pub struct AppState {
     project: Mutex<ProjectState>,
     pending_open: Mutex<Option<PendingOpen>>,
     dirty: AtomicBool,
+    /// The open document is shared (the title's "(shared)").
+    shared: AtomicBool,
     quitting: AtomicBool,
     /// The file Export SVG… chose, until the page hands over the text (`specs/0024` criterion 4).
     svg_export_path: Mutex<Option<std::path::PathBuf>>,
@@ -116,6 +118,16 @@ impl AppState {
     /// Whether the page last reported unsaved changes.
     pub fn is_dirty(&self) -> bool {
         self.dirty.load(Ordering::SeqCst)
+    }
+
+    /// Records whether the open document is shared.
+    pub fn set_shared(&self, shared: bool) {
+        self.shared.store(shared, Ordering::SeqCst);
+    }
+
+    /// Whether the open document is shared.
+    pub fn is_shared(&self) -> bool {
+        self.shared.load(Ordering::SeqCst)
     }
 
     /// The page asked to leave the application: the exit that follows is not held.
