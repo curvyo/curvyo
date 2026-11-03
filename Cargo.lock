@@ -943,6 +943,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "curvyo-extension-core"
+version = "0.1.0"
+dependencies = [
+ "curvyo-document-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "curvyo-geometry-core"
 version = "0.1.0"
 dependencies = [
@@ -963,6 +972,15 @@ dependencies = [
  "image",
  "proptest",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "curvyo-laser-core"
+version = "0.1.0"
+dependencies = [
+ "curvyo-document-core",
+ "curvyo-extension-core",
+ "serde_json",
 ]
 
 [[package]]

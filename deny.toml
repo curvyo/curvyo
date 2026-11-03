@@ -69,6 +69,16 @@ name = "curvyo-vectorize-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-sketch-core"
 
+# The extension contract and the first compiled-in extension (ADR 0034 §7): part of the
+# AGPL-3.0-or-later work like every other first-party crate.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-extension-core"
+
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-laser-core"
+
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ocr-core"

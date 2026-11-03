@@ -1,0 +1,15 @@
+[package]
+name = "curvyo-laser-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The laser workbench extension (ADR 0034): its manifest, fixture outlines and notices."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+serde_json.workspace = true
