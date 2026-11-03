@@ -314,7 +314,7 @@ fn t31_a_resize_after_a_conflict_wins_everywhere() {
 /// frames through a save and reopen, and each frame is finite and positive.
 #[test]
 fn format_34_opens_every_older_valid_fixture_and_keeps_its_frames() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 34);
+    const _: () = assert!(CURRENT_FORMAT_VERSION >= 34);
     let valid = [
         "pages_v26.curvyo",
         "tiling_v33.curvyo",

@@ -134,10 +134,7 @@ impl<'a> Detached<'a> {
 
     /// The children of `parent` (`None` is the document root) in z-order at this version.
     pub(crate) fn children(&self, parent: Option<TreeID>) -> Vec<TreeID> {
-        self.doc
-            .get_tree(OBJECTS_TREE)
-            .children(parent.map_or(TreeParentId::Root, TreeParentId::Node))
-            .unwrap_or_default()
+        crate::group_tree::children_of(&self.doc.get_tree(OBJECTS_TREE), parent)
     }
 }
 

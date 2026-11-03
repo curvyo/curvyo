@@ -149,7 +149,8 @@ fn frame_of(root: &LoroMap, id: &str) -> Option<Frame> {
 /// The registered grid fields of one page, by field name.
 type GridFields = Vec<(String, LoroValue)>;
 
-/// Every page id with a name, and the grid registers of each page, in one pass over the root.
+/// Every drawing page id with a name (an owned output page is not one), and the grid registers
+/// of each page, in one pass over the root.
 fn page_keys(
     root: &LoroMap,
 ) -> (
@@ -157,6 +158,8 @@ fn page_keys(
     std::collections::HashMap<String, GridFields>,
 ) {
     let mut ids = std::collections::BTreeSet::new();
+    // A page a manufacturing owns is its output page, never a drawing page (ADR 0032 §5).
+    let mut owned = std::collections::HashSet::new();
     // The grid registers are gathered in the same pass, so a page without any (a grid never
     // touched) costs no keyed read per frame (`specs/0090-grid` criterion 9).
     let mut grids: std::collections::HashMap<String, GridFields> = std::collections::HashMap::new();
@@ -166,6 +169,8 @@ fn page_keys(
         };
         if let Some(id) = rest.strip_suffix(".name") {
             ids.insert(id.to_owned());
+        } else if let Some(id) = rest.strip_suffix(".owner") {
+            owned.insert(id.to_owned());
         } else if let Some((id, field)) = rest.rsplit_once('.')
             && field.starts_with("grid_")
             && let ValueOrContainer::Value(value) = value
@@ -176,6 +181,7 @@ fn page_keys(
                 .push((field.to_owned(), value));
         }
     });
+    ids.retain(|id| !owned.contains(id));
     (ids, grids)
 }
 
@@ -234,6 +240,26 @@ fn first_page_of_old_file(root: &LoroMap) -> Page {
         size: frame.size,
         grid: grid_of_root(root, FIRST_PAGE_ID),
     }
+}
+
+/// The output page `id` a manufacturing owns, `None` when it is missing, deleted or not owned. Its
+/// size is the machine's work area; its position in the plane never matters (ADR 0032 §5).
+pub(crate) fn owned_page(root: &LoroMap, id: &str) -> Option<Page> {
+    crate::manufacturing_codec::page_owner(root, id)?;
+    if root
+        .get(&key(id, "deleted"))
+        .is_some_and(|v| v.get_deep_value() == LoroValue::Bool(true))
+    {
+        return None;
+    }
+    let frame = frame_of(root, id)?;
+    Some(Page {
+        id: id.to_owned(),
+        name: string(root, id, "name")?,
+        origin: Point::new(0.0, 0.0),
+        size: frame.size,
+        grid: PageGrid::DEFAULT,
+    })
 }
 
 impl Document {

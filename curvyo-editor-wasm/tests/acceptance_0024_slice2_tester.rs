@@ -2213,8 +2213,8 @@ fn c109_deterministic_and_format_unchanged() {
     assert_eq!(frames(&ia), frames(&ib));
     assert_eq!(
         curvyo_document_core::CURRENT_FORMAT_VERSION,
-        34,
-        "SVG import adds no format change beyond document sketches (28, 29: 0066), page grids (30: 0090), dimensions (31: 0070), pattern fills (32: 0071), tilings (33: 0069) and page frames (34: 0092)"
+        35,
+        "SVG import adds no format change beyond document sketches (28, 29: 0066), page grids (30: 0090), dimensions (31: 0070), pattern fills (32: 0071), tilings (33: 0069), page frames (34: 0092) and manufacturings (35: 0093)"
     );
 }
 

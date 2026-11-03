@@ -716,6 +716,10 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             || name.starts_with("image_")
             // `0069-tiling` (format 33) is a later build: a tiling group is named "Tiling".
             || name.starts_with("tiling_")
+            // `0093-laser-workbench-shell` (format 35) is a later build: its goldens store a
+            // hidden fixture and named manufacturings.
+            || name.starts_with("laser_workbench_")
+            || name.starts_with("manufacturing_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

@@ -22,6 +22,10 @@ const EXEMPT: &[(&str, &str)] = &[
         "clones.rs",
         "the orphan repair removes orphans only, and every clone behind an orphan is one",
     ),
+    (
+        "manufacturing.rs",
+        "a manufacturing holds placements and fixtures only, never an object a clone follows",
+    ),
 ];
 
 fn count(text: &str, call: &str) -> usize {

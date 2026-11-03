@@ -359,7 +359,24 @@ impl DocumentVersion {
 /// has a side outside the document size range; one shared member without the other, or a
 /// malformed `share.json`. The number is provisional by the rule above. Goldens:
 /// `page_frame_v34.curvyo`, `shared_v34.curvyo`, `page_frame_*_v34.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 34;
+///
+/// Bumped to 35 in `laser-workbench-shell` (ADR 0032, ADR 0033 §7,
+/// `specs/0093-laser-workbench-shell`): a top-level node may be a manufacturing (`manufacturing: true`, `mfg_process`, `mfg_page`,
+/// `mfg_machine_name`) whose children are placements (`shape = "placement"`, `placement_link`) and
+/// fixtures (`shape = "fixture"`, `fixture_kind`, `fixture_params`), and a page record may carry
+/// `page.<id>.owner`, which makes it that manufacturing's output page (its size in the version 34
+/// `page.<id>.frame`). A build that stops at
+/// version 34 would read a placement or fixture as an unknown primitive and could draw or output
+/// it, and would list the output page as a drawing page, so it must refuse every file of this
+/// build as too new. Migration from version 34 is none: a file without manufacturings opens
+/// unchanged and is not rewritten. Damage (`crate::manufacturing_codec::validate`): a
+/// `placement_link` that is not `{page string, six finite numbers within ±1e7}`, a fixture
+/// without a kind or with `fixture_params` that is not a map of plain values, another leaf under
+/// a manufacturing, a manufacturing without process or page, a `page.<id>.owner` of a live page
+/// naming a live node that is not a manufacturing. An unknown process is not damage: it opens
+/// disabled and saves back unchanged (ADR 0033 §4). Goldens: `laser_workbench_v35.curvyo` and
+/// `manufacturing_unknown_process_v35.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 35;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -542,6 +559,7 @@ impl Document {
             || !crate::snapping::validate(&loro)
             || !crate::page_grid::validate(&loro)
             || !crate::page_frame::validate(&loro)
+            || !crate::manufacturing_codec::validate(&loro)
         {
             return Err(OpenError::Damaged);
         }
@@ -658,6 +676,7 @@ impl Document {
             background: self.background().into(),
             snapping: self.snapping().into(),
             objects,
+            manufacturings: self.manufacturings(),
         };
         serde_json::to_vec_pretty(&view).map_err(|_| SaveError::Encode)
     }
@@ -725,6 +744,9 @@ struct DocumentJsonView {
     background: crate::document_background::BackgroundJson,
     snapping: crate::snapping::SnappingJson,
     objects: Vec<NodeJson>,
+    /// The manufacturings with their generic fields and raw process values (ADR 0033 §6).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    manufacturings: Vec<crate::ManufacturingSnapshot>,
 }
 
 /// One node of `document.json`: its kind and data, and its registers where they are not at their

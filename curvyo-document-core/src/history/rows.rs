@@ -141,6 +141,13 @@ pub fn is_document_level_label(label: &str) -> bool {
             | "resize_page"
             | "move_page"
             | "reorder_pages"
+            | "add_manufacturing"
+            | "delete_manufacturing"
+            | "set_work_area"
+            | "add_fixture"
+            | "delete_fixture"
+            | "set_fixture_visible"
+            | "set_fixture_params"
     )
 }
 
