@@ -20,4 +20,4 @@ pub use manifest::{
     WorkbenchContribution,
 };
 pub use notice::NoticeContext;
-pub use param::{HostKey, Param, ParamKind, ParamValue, StoredParams};
+pub use param::{Param, ParamKind, ParamValue, StoredParams};

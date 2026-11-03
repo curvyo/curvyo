@@ -49,12 +49,6 @@ pub struct WorkbenchContribution {
     pub label: &'static str,
     /// The Lucide glyph name of the switcher entry ("Zap").
     pub icon: &'static str,
-    /// The placeholder machine of a new manufacturing ("Generic laser"), until `0026`.
-    pub machine_name: &'static str,
-    /// The work area width of a new manufacturing in mm.
-    pub work_width_mm: f64,
-    /// The work area height of a new manufacturing in mm.
-    pub work_height_mm: f64,
     /// The Properties tabs, in order.
     pub tabs: Vec<Tab>,
     /// The toolbox cards, in order.
@@ -84,7 +78,7 @@ pub struct Tab {
     pub blocks: Vec<Block>,
 }
 
-/// A block of a schema-rendered tab: the shell knows exactly these three kinds.
+/// A block of a schema-rendered tab: the shell knows exactly these four kinds.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Block {
@@ -94,6 +88,13 @@ pub enum Block {
         label: &'static str,
         /// The fields, in order.
         params: Vec<Param>,
+    },
+    /// The machine profile picker and the copy's fields, drawn by the shell from the session's
+    /// manufacturing view (`specs/0026-machine-profile` `adrs.md` note 4); the extension only says
+    /// where it sits.
+    MachineProfile {
+        /// The group heading ("Machine").
+        label: &'static str,
     },
     /// The installed fixtures with add, hide and remove.
     FixtureList {
@@ -154,9 +155,6 @@ mod tests {
                 id: "test.dummy",
                 label: "Dummy",
                 icon: "Box",
-                machine_name: "Dummy machine",
-                work_width_mm: 10.0,
-                work_height_mm: 20.0,
                 tabs: vec![Tab {
                     id: "dummy",
                     label: "Dummy",

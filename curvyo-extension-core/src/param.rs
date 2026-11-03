@@ -14,8 +14,7 @@ const MM: &str = "mm";
 /// One field of a schema-rendered block.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Param {
-    /// The key under which the value is stored; a [`HostKey`] spelling binds a value the host
-    /// owns (the machine name, the work area) instead.
+    /// The key under which the value is stored.
     pub key: &'static str,
     /// The field label ("Spacing").
     pub label: &'static str,
@@ -38,8 +37,6 @@ pub enum ParamKind {
         /// The largest value.
         max: Length,
     },
-    /// A text the host shows and the maker does not edit (the placeholder machine name).
-    Display,
 }
 
 /// A typed parameter value.
@@ -48,12 +45,10 @@ pub enum ParamKind {
 pub enum ParamValue {
     /// A length.
     Length(Length),
-    /// A text.
-    Text(String),
 }
 
 impl ParamValue {
-    /// The stored encoding: a length is `{"mm": <number>}`, a text a plain string.
+    /// The stored encoding: a length is `{"mm": <number>}`.
     #[must_use]
     pub fn to_stored(&self) -> Value {
         match self {
@@ -62,7 +57,6 @@ impl ParamValue {
                 map.insert(MM.to_owned(), Value::from(length.as_mm()));
                 Value::Object(map)
             }
-            Self::Text(text) => Value::String(text.clone()),
         }
     }
 
@@ -75,7 +69,6 @@ impl ParamValue {
                 let mm = map.get(MM)?.as_f64().filter(|mm| mm.is_finite())?;
                 Some(Self::Length(Length::from_mm(mm)))
             }
-            Value::String(text) => Some(Self::Text(text.clone())),
             _ => None,
         }
     }
@@ -85,7 +78,6 @@ impl ParamValue {
     pub const fn length(&self) -> Option<Length> {
         match self {
             Self::Length(length) => Some(*length),
-            Self::Text(_) => None,
         }
     }
 }
@@ -114,7 +106,6 @@ impl Param {
                     length.as_mm().clamp(min.as_mm(), max.as_mm()),
                 )))
             }
-            (ParamKind::Display, ParamValue::Text(text)) => Some(ParamValue::Text(text)),
             _ => None,
         }
     }
@@ -124,41 +115,8 @@ impl Param {
     pub fn defaults(params: &[Self]) -> StoredParams {
         params
             .iter()
-            .filter(|param| HostKey::from_key(param.key).is_none())
             .map(|param| (param.key.to_owned(), param.default.to_stored()))
             .collect()
-    }
-}
-
-/// The generic manufacturing values a block may show, owned by the host rather than stored in
-/// the extension's registers (ADR 0033 §1: the work area is the owned page's size).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HostKey {
-    /// The placeholder machine name (`mfg_machine_name`).
-    MachineName,
-    /// The work area width (the output page's width).
-    WorkWidth,
-    /// The work area height (the output page's height).
-    WorkHeight,
-}
-
-impl HostKey {
-    /// The parameter key that binds this host value.
-    #[must_use]
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::MachineName => "host.machine_name",
-            Self::WorkWidth => "host.work_width",
-            Self::WorkHeight => "host.work_height",
-        }
-    }
-
-    /// The host value a parameter key binds, `None` for an extension's own key.
-    #[must_use]
-    pub fn from_key(key: &str) -> Option<Self> {
-        [Self::MachineName, Self::WorkWidth, Self::WorkHeight]
-            .into_iter()
-            .find(|host| host.key() == key)
     }
 }
 
@@ -213,19 +171,5 @@ mod tests {
             param.accept(ParamValue::Length(Length::from_mm(f64::NAN))),
             None
         );
-        assert_eq!(param.accept(ParamValue::Text("x".into())), None);
-    }
-
-    #[test]
-    fn defaults_leave_out_host_values() {
-        let mut host = spacing();
-        host.key = HostKey::WorkWidth.key();
-        let stored = Param::defaults(&[spacing(), host]);
-        assert_eq!(stored.len(), 1);
-        assert_eq!(
-            HostKey::from_key("host.work_height"),
-            Some(HostKey::WorkHeight)
-        );
-        assert_eq!(HostKey::from_key("spacing"), None);
     }
 }
