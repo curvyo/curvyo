@@ -1,6 +1,6 @@
 # Pattern fill: a live fill kind that fills a closed shape with generated vector geometry
 
-Status: Ready, in build (customer decisions of 2026-11-01/02 are in; PAT-NEW and PAT-STORE decided 2026-11-02)
+Status: Done (PR #248)
 Priority: Could
 Origin: Customer (request of 2026-10-17, translated): "Pattern filling I also find cool. I have to see whether it becomes an extension or a core feature." Scope decisions 2026-11-01/02.
 
