@@ -118,6 +118,8 @@ function pickProject(kind: string): Promise<OpenPayload | null> {
  * (`specs/0045-document-formats-library/` criterion 31). Every access is
  * guarded: a failure means the built-in formats only. */
 const FORMATS_KEY = "curvyo.document-formats";
+/** The browser keeps `extensions.toml` here (ADR 0034 §6). */
+const EXTENSIONS_KEY = "curvyo.extensions";
 /** The font library's text and the check cache in the browser build (`0075` decisions 1, 5). */
 const FONT_LIBRARY_KEY = "curvyo.font-library";
 const FONT_CHECKS_KEY = "curvyo.font-checks";
@@ -195,6 +197,8 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
     window.localStorage.removeItem(FORMATS_KEY);
   },
   import_formats_file: () => pickTextFile(),
+  read_extensions_file: () => readStored(EXTENSIONS_KEY),
+  write_extensions_file: (args) => window.localStorage.setItem(EXTENSIONS_KEY, String(args?.text)),
   export_formats_file: (args) => {
     downloadText("curvyo-formats.toml", String(args?.text));
     return true;

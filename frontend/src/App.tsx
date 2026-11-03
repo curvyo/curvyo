@@ -1,7 +1,6 @@
 import { useSketch } from "@/hooks/useSketch";
-import { SketchToolRail } from "@/components/sketch/SketchTools";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { Canvas } from "@/components/Canvas";
 import { CanvasArea } from "@/components/CanvasArea";
@@ -24,7 +23,10 @@ import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
 import { setPreviewOpen } from "@/lib/fontPreviewStore";
 import { CursorStatus } from "@/components/CursorStatus";
 import { createCursorPosition } from "@/lib/cursorPosition";
-import { ToolRail } from "@/components/ToolRail";
+import { useWorkbenches } from "@/hooks/useWorkbenches";
+import type { WorkbenchContext } from "@/workbenches/builtin";
+import "@/workbenches/builtin";
+import { activeKind, workbenchEntry } from "@/workbenches/registry";
 import { HistoryPreviewFrame, HistoryPreviewLine } from "@/components/HistoryPreview";
 import { usePreviewState } from "@/lib/historyPreviewStore";
 import { useRailCommands } from "@/hooks/useRailCommands";
@@ -58,6 +60,7 @@ function Editor() {
   const [cursor] = useState(createCursorPosition);
   const editor = useEditorSession(cursor.update);
   const sketch = useSketch(editor);
+  const workbenches = useWorkbenches(editor);
   const historyPreview = usePreviewState();
   const railCommands = useRailCommands(editor);
   const closePathState = useClosePathState(editor);
@@ -137,79 +140,9 @@ function Editor() {
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
   const collab = useCollaboration(editor, project);
 
-  return (
-    // The one tooltip provider of the app: every `Tooltip` and `SliderTip` below needs it, and a
-    // component that renders one without it throws (`frontend/tests/tooltipProvider.test.ts`).
-    <TooltipProvider>
-    <div className="flex h-screen w-screen flex-col overflow-clip" data-scroll-lock="">
-      <div className="flex min-h-0 flex-1">
-        {/* The canvas area: the drawing, and the font preview beside it or over it
-         * (`specs/0077-font-preview`). */}
-        <CanvasArea
-          keepViewOrigin={keepViewOrigin}
-          coverDrawing={editor.coverCanvasRight}
-          open={preview.store.open}
-          wantFull={preview.wantFull}
-          size={preview.size}
-          toggleFull={preview.toggleFull}
-          split={preview.split}
-          setSplit={preview.setSplit}
-          pane={(layout, switchView, resizing) => (
-            <FontPreview
-              preview={preview}
-              layout={layout}
-              resizing={resizing}
-              onSwitchView={switchView}
-              currentFace={editor.text.fonts.current?.index ?? null}
-              onPick={editor.text.pickFamily}
-              tileFace={editor.text.tileFace}
-              onReturnFocus={returnToText}
-              glyphSubject={editor.text.glyphSubject}
-              onInsertGlyph={editor.text.insertGlyph}
-            />
-          )}
-          drawing={
-            <>
-        {/* The canvas region, a grid of the rulers' corner square, the two
-         * ruler strips and the viewport (`specs/0015-document-size-and-rulers`):
-         * the rulers shrink the viewport and are not drawn over it. */}
-        <div
-          className="grid min-h-0 min-w-0 flex-1"
-          style={{
-            gridTemplateColumns: `${RULER_THICKNESS_PX}px minmax(0, 1fr)`,
-            gridTemplateRows: `${RULER_THICKNESS_PX}px minmax(0, 1fr)`,
-          }}
-        >
-        <Rulers editor={editor} unit={documentPanel.view.unit} />
-        {/* The viewport: the rail and the bars' overlay row are anchored to
-         * it, not to the window, so no bar is ever drawn under the
-         * properties panel on its right (`0007` criterion 39) or over a
-         * ruler. */}
-        <div className="relative flex min-h-0 min-w-0">
-        {sketch.view.workbench === "sketch" ? <SketchToolRail sketch={sketch} paused={historyPreview.kind === "document"} /> : <ToolRail
-          tool={editor.tool}
-          selectionCount={editor.selectionCount}
-          onSelect={editor.setTool}
-          onReturnFocus={() => editor.containerRef.current?.focus()}
-          commands={railCommands}
-          grouping={editor.grouping.commands}
-          paused={historyPreview.kind === "document"}
-          onImport={() => project.importFiles()}
-        />}
-        <Canvas
-          editor={editor}
-          sketch={sketch}
-          onDropFiles={project.importFiles}
-          overlay={<PresenceOverlay getSession={editor.getSession} />}
-        />
-        <CollaborationPill
-          view={collab.view}
-          onOpen={() => {
-            panelOpen.setOpen(true);
-            documentPanel.pressTab("share");
-          }}
-        />
-        <HistoryPreviewFrame />
+  const workbench = workbenchEntry<WorkbenchContext, ReactNode>(activeKind(workbenches.list));
+  const drawingOverlay = (
+    <>
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
          * (`docs/design-system.md`, "no layout shift on tool switch"). */}
@@ -225,7 +158,6 @@ function Editor() {
             editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
           }`}
         >
-          {sketch.view.workbench === "sketch" ? null : <>
           {editor.tool === "select" && editor.recognise.open ? (
             <RecogniseBar recognise={editor.recognise} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}
@@ -353,10 +285,9 @@ function Editor() {
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
-          </>}
         </div>
         {/* After the bars in the tab order: canvas, bars, then the indicator's buttons. */}
-        {sketch.view.workbench === "vector" && <CanvasNotice
+        <CanvasNotice
           notice={editor.canvasNotice}
           groupDepth={editor.grouping.depth}
           onLeaveToLevel={(level) => {
@@ -366,7 +297,85 @@ function Editor() {
           }}
           announcement={editor.grouping.announcement}
           persistent={<HistoryPreviewLine getSession={editor.getSession} />}
-        />}
+        />
+    </>
+  );
+  const workbenchContext: WorkbenchContext = {
+    editor,
+    sketch,
+    workbenches,
+    railCommands,
+    paused: historyPreview.kind === "document",
+    onImport: () => void project.importFiles(),
+    drawingOverlay,
+  };
+
+  return (
+    // The one tooltip provider of the app: every `Tooltip` and `SliderTip` below needs it, and a
+    // component that renders one without it throws (`frontend/tests/tooltipProvider.test.ts`).
+    <TooltipProvider>
+    <div className="flex h-screen w-screen flex-col overflow-clip" data-scroll-lock="">
+      <div className="flex min-h-0 flex-1">
+        {/* The canvas area: the drawing, and the font preview beside it or over it
+         * (`specs/0077-font-preview`). */}
+        <CanvasArea
+          keepViewOrigin={keepViewOrigin}
+          coverDrawing={editor.coverCanvasRight}
+          open={preview.store.open}
+          wantFull={preview.wantFull}
+          size={preview.size}
+          toggleFull={preview.toggleFull}
+          split={preview.split}
+          setSplit={preview.setSplit}
+          pane={(layout, switchView, resizing) => (
+            <FontPreview
+              preview={preview}
+              layout={layout}
+              resizing={resizing}
+              onSwitchView={switchView}
+              currentFace={editor.text.fonts.current?.index ?? null}
+              onPick={editor.text.pickFamily}
+              tileFace={editor.text.tileFace}
+              onReturnFocus={returnToText}
+              glyphSubject={editor.text.glyphSubject}
+              onInsertGlyph={editor.text.insertGlyph}
+            />
+          )}
+          drawing={
+            <>
+        {/* The canvas region, a grid of the rulers' corner square, the two
+         * ruler strips and the viewport (`specs/0015-document-size-and-rulers`):
+         * the rulers shrink the viewport and are not drawn over it. */}
+        <div
+          className="grid min-h-0 min-w-0 flex-1"
+          style={{
+            gridTemplateColumns: `${RULER_THICKNESS_PX}px minmax(0, 1fr)`,
+            gridTemplateRows: `${RULER_THICKNESS_PX}px minmax(0, 1fr)`,
+          }}
+        >
+        <Rulers editor={editor} unit={documentPanel.view.unit} />
+        {/* The viewport: the rail and the bars' overlay row are anchored to
+         * it, not to the window, so no bar is ever drawn under the
+         * properties panel on its right (`0007` criterion 39) or over a
+         * ruler. */}
+        <div className="relative flex min-h-0 min-w-0">
+        {workbench?.rail(workbenchContext)}
+        <Canvas
+          editor={editor}
+          sketch={sketch}
+          onDropFiles={project.importFiles}
+          overlay={<PresenceOverlay getSession={editor.getSession} />}
+          showPageFrames={workbenches.view === null}
+        />
+        <CollaborationPill
+          view={collab.view}
+          onOpen={() => {
+            panelOpen.setOpen(true);
+            documentPanel.pressTab("share");
+          }}
+        />
+        <HistoryPreviewFrame />
+        {workbench?.overlay?.(workbenchContext)}
         </div>
         </div>
             </>
@@ -374,6 +383,7 @@ function Editor() {
         />
         <PropertiesPanel
           sketch={sketch}
+          workbenches={workbenches}
           editor={editor}
           document={documentPanel}
           panelOpen={panelOpen}
@@ -385,7 +395,7 @@ function Editor() {
       <CursorStatus
         cursor={cursor}
         format={documentPanel.cursorText}
-        sizeText={documentPanel.view.sizeText}
+        sizeText={workbenches.view?.status ?? documentPanel.view.sizeText}
         zoomPercent={editor.zoomPercent}
         nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}
       />

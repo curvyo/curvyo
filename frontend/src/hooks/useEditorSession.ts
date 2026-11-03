@@ -1,5 +1,9 @@
 import { createSketchPresentation, type SketchPresentation } from "@/lib/sketchPresentation";
 import { type SketchView } from "@/lib/sketchView";
+import { viewTool } from "@/lib/viewTool";
+
+/** The wheel delta one press of the View card's Zoom stands for (one notch of a mouse wheel). */
+const ZOOM_STEP_DELTA = 100;
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 
@@ -2093,7 +2097,16 @@ export function useEditorSession(
       // criteria 3, 4), never forwarded to the active tool — captured so
       // the gesture continues even if the cursor leaves the canvas.
       const isMiddleButton = event.button === 1;
-      const isSpacePrimary = event.button === 0 && isSpaceHeld;
+      // The View card of a manufacturing workbench (`specs/0093` UX notes §3): Pan drags the
+      // view with the primary button, Zoom zooms in about the press (Alt: out).
+      const pressedViewTool = viewTool();
+      const isSpacePrimary = event.button === 0 && (isSpaceHeld || pressedViewTool === "pan");
+      if (event.button === 0 && pressedViewTool === "zoom") {
+        event.preventDefault();
+        session.wheel(0, event.altKey ? ZOOM_STEP_DELTA : -ZOOM_STEP_DELTA, x, y, false, true);
+        syncFromSession();
+        return;
+      }
       if (isMiddleButton || isSpacePrimary) {
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
