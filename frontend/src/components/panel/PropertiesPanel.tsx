@@ -1,4 +1,10 @@
-import { TracePresetMenu } from "@/components/TracePresetMenu";
+import { Trash2 } from "lucide-react";
+import { WorkbenchSwitcher } from "@/components/workbench/WorkbenchSwitcher";
+import { ManifestTab } from "@/components/workbench/ManifestTab";
+import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
+import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
+import { contributionOf } from "@/workbenches/registry";
+import { glyphOf } from "@/workbenches/iconNames";
 import { SketchParameters } from "@/components/sketch/SketchParameters";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchesPanel } from "@/components/sketch/SketchesPanel";
@@ -39,6 +45,8 @@ import { isTauri, PLATFORM } from "@/platform/host";
 
 interface PropertiesPanelProps {
   sketch: SketchApi;
+  /** The workbench registry: the switcher row, a manufacturing's tab and the Extensions group. */
+  workbenches: WorkbenchesApi;
   editor: EditorSession;
   document: DocumentPanelApi;
   /** Whether the body is shown; owned by the app so a request from outside the panel can show it. */
@@ -68,6 +76,7 @@ interface PropertiesPanelProps {
  */
 export function PropertiesPanel({
   sketch,
+  workbenches,
   editor,
   document: doc,
   panelOpen,
@@ -193,8 +202,12 @@ export function PropertiesPanel({
   );
   const objectSubject = historyScope.scope === "object" ? historyScope.info : null;
   const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
+  const manufacturing = workbenches.view;
+  const contribution = contributionOf(workbenches.list, manufacturing?.process);
   const subject =
-    doc.view.content === "file"
+    doc.view.content === "workbench"
+      ? (manufacturing?.name ?? "")
+      : doc.view.content === "file"
       ? project.dirty
         ? "Unsaved changes"
         : ""
@@ -230,12 +243,7 @@ export function PropertiesPanel({
   };
   return (
     <div className="flex h-full shrink-0 flex-col">
-    <div className={`bg-[var(--toolbar-bg)] ${open ? "px-[7px] py-1" : "w-8"}`}>
-    <TracePresetMenu name="Workbench" align="end" widthClass={open ? "w-full" : "w-full !px-1 !gap-0"} current={sketch.view.workbench} edited={false}
-      label={open ? (sketch.view.workbench === "sketch" ? "Sketch" : "Vector") : (sketch.view.workbench === "sketch" ? "S" : "V")}
-      presets={[{key:"vector",label:"Vector",detail:""},{key:"sketch",label:"Sketch",detail:""}]}
-      onPick={choice => {traceInfo.dismiss();sketch.switchWorkbench(choice.key as "vector" | "sketch");}} />
-    </div>
+    <WorkbenchSwitcher workbenches={workbenches} open={open} />
     <Tabs
       value={activeTab}
       onValueChange={activate}
@@ -268,6 +276,7 @@ export function PropertiesPanel({
         onToggleGrid={grid.toggle}
         onActivate={activate}
         onReturnFocus={returnFocus}
+        workbenchGlyph={contribution ? glyphOf(contribution.tabs[0]?.icon ?? contribution.icon) : undefined}
       />
       <aside
         id={panelId}
@@ -333,6 +342,24 @@ export function PropertiesPanel({
           ) : (
             <PanelSubject text={subject} />
           )}
+          {doc.view.content === "workbench" && manufacturing ? (
+            <Tooltip side="left" content={`Delete ${manufacturing.name}`}>
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={`Delete ${manufacturing.name}`}
+                className="inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+                onClick={() => {
+                  workbenches.deleteManufacturing(manufacturing.id);
+                  requestAnimationFrame(() =>
+                    document.querySelector<HTMLElement>('[data-workbench="vector"]')?.focus(),
+                  );
+                }}
+              >
+                <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+              </button>
+            </Tooltip>
+          ) : null}
           </>
           )}
         </div>
@@ -368,7 +395,16 @@ export function PropertiesPanel({
                 : "outline-none"
             }
           >
-            {doc.view.content === "file" ? (
+            {doc.view.content === "workbench" ? (
+              manufacturing && contribution ? (
+                <ManifestTab
+                  contribution={contribution}
+                  view={manufacturing}
+                  workbenches={workbenches}
+                  onReturnFocus={returnFocus}
+                />
+              ) : null
+            ) : doc.view.content === "file" ? (
               <FileTab
                 project={project}
                 desktop={isTauri}
@@ -376,6 +412,7 @@ export function PropertiesPanel({
                 tooltipFor={(command) => fileCommandTooltip(command, PLATFORM)}
                 onReturnFocus={returnFocus}
                 exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
+                extensions={<ExtensionsGroup workbenches={workbenches} />}
               />
             ) : doc.view.content === "share" ? (
               <ShareTab

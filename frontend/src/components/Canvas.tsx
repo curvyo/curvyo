@@ -54,6 +54,8 @@ interface CanvasProps {
   onDropFiles?: (dropped: DroppedFiles) => void;
   /** Drawn over the canvas, in its coordinates: the other participants' marks (`0092`). */
   overlay?: React.ReactNode;
+  /** False in a manufacturing workbench: the drawing's page borders and names are absent there (`specs/0093` UX notes §3). */
+  showPageFrames?: boolean;
 }
 
 /**
@@ -68,7 +70,7 @@ interface CanvasProps {
  * (`specs/0001-project-file-foundation`'s "chrome never frames the canvas"
  * precedent, reaffirmed by `docs/design-system.md`).
  */
-export function Canvas({ editor, sketch, onDropFiles, overlay }: CanvasProps) {
+export function Canvas({ editor, sketch, onDropFiles, overlay, showPageFrames = true }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
     editor.showHistoryNotice(clipboard_notice("link", ""), 5000, "canvas", "alert"),
@@ -169,7 +171,7 @@ export function Canvas({ editor, sketch, onDropFiles, overlay }: CanvasProps) {
         />
 
       </NodeContextMenu>
-      <PageFrames getSession={editor.getSession} />
+      {showPageFrames && <PageFrames getSession={editor.getSession} />}
       <SketchAnnotations sketch={sketch} />
       {sketch.view.workbench !== "sketch" && (
         <MeasureOverlay getSession={editor.getSession} measuring={editor.tool === "measure"} />

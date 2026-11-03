@@ -29,6 +29,8 @@ interface FileTabProps {
   /** Export SVG… and its switches (`specs/0024-svg-import-export` criterion 147), its own section
    * below the button block; the panel passes `ExportSvgSection`. */
   exportSvg?: ReactNode;
+  /** The Extensions group (`specs/0093` UX notes §7), at the end of the tab. */
+  extensions?: ReactNode;
 }
 
 /** What the buttons need besides the project. */
@@ -47,6 +49,7 @@ export function FileTab({
   tooltipFor,
   onReturnFocus,
   exportSvg,
+  extensions,
 }: FileTabProps) {
   const { info, dirty, check } = project;
   const buttonProps = { project, desktop, tooltipFor, onReturnFocus };
@@ -71,6 +74,7 @@ export function FileTab({
           <CommandButton command="quit" label="Quit" {...buttonProps} />
         </>
       ) : null}
+      {extensions}
       <p className={`${desktop ? "mt-3" : "mt-4"} text-xs text-[var(--panel-muted-fg)]`}>
         {`Curvyo ${version}`}
       </p>

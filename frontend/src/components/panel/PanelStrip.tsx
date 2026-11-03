@@ -23,7 +23,7 @@ import type { PanelTabView } from "@/hooks/useDocumentPanel";
 import { isMac } from "@/lib/historyText";
 import { panelHandlesEscape } from "@/lib/panelEscape";
 
-type Glyph = ComponentType<{
+export type Glyph = ComponentType<{
   size: number;
   strokeWidth: number;
   absoluteStrokeWidth: boolean;
@@ -57,6 +57,8 @@ const tooltipText = (text: string, desktop: boolean) =>
       : text;
 
 interface PanelStripProps {
+  /** The glyph of a manufacturing workbench's tab, the one its manifest names (`specs/0093`). */
+  workbenchGlyph?: Glyph;
   tabs: readonly PanelTabView[];
   /** The active tab's name: the one the body shows, or would show. */
   active: string;
@@ -115,6 +117,7 @@ export function PanelStrip({
   onToggle,
   onActivate,
   onReturnFocus,
+  workbenchGlyph,
 }: PanelStripProps) {
   // The tablist is one Tab stop and it is the active tab. Radix keeps the tab that had focus last
   // as the stop, so when the active tab changes while focus is elsewhere (a shortcut, a selection)
@@ -191,7 +194,7 @@ export function PanelStrip({
         className="flex min-h-0 w-full flex-1 flex-col items-start gap-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
-          const Glyph = GLYPHS[tab.name];
+          const Glyph = tab.name === "workbench" && workbenchGlyph ? workbenchGlyph : GLYPHS[tab.name];
           const dot = tab.name === "file" && fileDirty;
           const toggle = toggles[tab.name];
           const trigger = (
