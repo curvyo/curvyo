@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "curvyo-document-core",
     "curvyo-sketch-core",
+    "curvyo-extension-core",
+    "curvyo-laser-core",
     "curvyo-geometry-core",
     "curvyo-text-core",
     "curvyo-svg-core",
