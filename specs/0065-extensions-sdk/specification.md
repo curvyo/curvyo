@@ -1,6 +1,6 @@
 # Extensions SDK: write an extension in Rust without TSX, and add tools, processes, simulations and panels
 
-Status: Draft (a sketch for the customer; not Ready: route and licence decided by the customer 2026-10-17; the UI question and the first extension are open)
+Status: Draft (a sketch for the customer; not Ready as a whole: route and licence decided 2026-10-17, first extension and UI route decided 2026-11-02, ADR 0034 accepted; built slice by slice, first through `0093`)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated; extends ADR 0005 and R-EXT-001/002): "It should be possible to write an extension in Rust without TSX. I do not yet know how that works with an unstable ABI. Perhaps the extension can simply be given as a dependency and is compiled in firmly. We must see what is possible and how to continue, whether an SDK is needed or whatever. It need not necessarily be Rust, although that would be easiest. You should be able to add new toolboxes, new manufacturing processes and simulations, add something to the property panel, and also extend existing toolboxes. You could also add a new vectorizer, other drawing tools, etc. The manufacturing parts are to be built as extensions and can be quite elaborate, e.g. a laser cutter with all its settings, importing images and other vectors, maybe extra laser fonts, material tests with results saved in a material library... As the first extension I imagine something simple; I had a good idea just now, but it slipped my mind; I will write when it comes back."
 
@@ -35,7 +35,7 @@ An extension never ships TypeScript. It declares **contributions** as data, and 
 - **Contribution points:** a toolbox card or a button added to an existing card; a Properties tab or a block in an existing tab; a workbench (`0063`: toolbox, tabs, simulation); a vectorizer for the Trace tool; a command in the Select bar; a font pack or a material pack (data).
 - **Canvas drawing:** the extension returns a **display list** (the shape of render-core's input: paths, colours, transforms), never pixels or HTML; simulations are drawn by the application from it.
 - **Edits:** only through the command journal (ADR 0005 item 5), one history step per invocation.
-- Where the schema is not enough (a custom widget), the answer is "a new schema element in the application", not "extension TSX" (Question 1).
+- Where the schema is not enough (a custom widget), the answer is "a new schema element in the application", not "extension TSX" (EXT-UI, decided A).
 
 The customer rules bind extensions too: no popups, symbols with tooltips, no panel section that appears for an operation, permit over refuse.
 
@@ -51,7 +51,7 @@ The customer rules bind extensions too: no popups, symbols with tooltips, no pan
 8. Given security, then an extension has no network and no filesystem unless the maker grants it for that extension, with the ask shown before first use (data leaving the machine, `CLAUDE.md` §3); routes that have no sandbox (A) are marked as trusted code in the list.
 9. Given the interface, then it is versioned and marked unstable (`0.x`) with a changelog until the freeze trigger of ADR 0005 item 3.
 10. Given the extension list in the app, then every extension (compiled in, as decided) is listed with its name and version, and can be enabled and disabled there (`R-EXT-002`); there is no browse, search or install from the app. Dynamic loading at run time is not required.
-11. Given the first extension, then it is chosen by the customer (open placeholder below) and proves the SDK end to end.
+11. Given the first extension, then it is the **laser cutter workbench** (customer, 2026-11-02): it is registered through the front-end registry and the extension contract like any later extension, compiled in (route A), and appears in the extension list with name and version and an enable switch. A test registers a dummy workbench through the same entry point and sees it in the workbench switcher, which proves that the Laser entry is not special-cased in the shell.
 
 ## Out of scope
 
@@ -72,23 +72,21 @@ The customer rules bind extensions too: no popups, symbols with tooltips, no pan
 - **EXT-ROUTE:** not the proposed route. Extensions may be compiled in as dependencies; they need not be loaded dynamically (wasm is also "kind of compiled in"). The front end (TSX) must be prepared so that things are easy to add: extension points / a registry for toolboxes, panels and tools. ADR 0005 item 2 is not moved.
 - **EXT-LICENCE:** extensions are AGPL-3.0-or-later too, open and staying open. No extension marketplace; the aim is only that others can extend the software easily without always changing the core. `R-EXT-002` is reworded accordingly.
 
-## Open questions (customer; each has a default)
+## Decided (customer, 2026-11-02)
 
-Frage 1 (EXT-UI): Is a declarative contribution (schema plus display list) enough for the UI?
-- A (default, recommended): yes; new element kinds are added to the application when a real extension needs them.
-- B: extensions may also ship a web component for their panels (rich UI, but this is TSX by another name and weakens the design system).
-- Default if unanswered: A.
+- **EXT-UI / EXT-LASER-UI (Frage 119): A.** A declarative contribution (parameter schema, blocks, display list) is enough; the shell draws it with the design system and extensions ship no TSX. New element kinds are added to the application when a real extension needs them (ADR 0034, Accepted).
 
-## First extension (open placeholder)
+## First extension (answered 2026-11-02)
 
-The customer has a first extension in mind ("something simple"), which he will name when it comes back to him. This sketch reserves the place; the extension is chosen, specified and built as the first user of the SDK. Until then, the built-in tracer and the laser workbench are the contract's first users.
+Customer, 2026-11-02 (translated): "create a laser cutter workbench as the first extension." The placeholder is answered: the first extension is the Laser workbench of `0063`, first slice `0093`. It is bigger than the "something simple" imagined on 2026-10-17, so the contract is grown only as far as that slice needs (a workbench entry: switcher symbol, canvas view, toolbox cards, Properties tabs; parameter schema and display list where used). The route stays as decided on 2026-10-17: compiled-in crates plus a front-end registry; no dynamic loading, no wasm host, no WIT in this step. Per "no trait without a second implementation" (`CLAUDE.md` §5) the registry is shared by the built-in Vector and Sketch workbenches and Laser; the architect decides in an ADR how far the Rust-side contract is extracted.
 
-**Candidate:** the constraint sketcher (`0066`) was a guess, and the customer decided it is a core feature (2026-10-17), so it is not the first extension. A small generator such as Honeycomb or Voronoi of `0071` is a cheap first extension if the forgotten idea does not return.
+The forgotten simple idea may still return; it would then be the second extension and the real test of the contract. Candidate if not: a small generator such as Honeycomb or Voronoi of `0071`. The constraint sketcher (`0066`) is core, not an extension (2026-10-17).
 
 ## Links
 
 Requirements: R-EXT-001, R-EXT-002 (existing); R-EXT-003 to R-EXT-005 (new)
 Depends on: ADR 0005 (extended), ADR 0006 (licence), `specs/0025-raster-trace/research.md` section 10 (the tracing extension seam)
+First extension: Laser workbench, `specs/0063-manufacturing-workbenches/`, first slice `specs/0093-laser-workbench-shell/`
 Related: `specs/0063-manufacturing-workbenches/`, `specs/0064-machine-connector/`, `specs/0062-fonts/` (font packs), `specs/0033-stroke-brushes/` (plugin brushes), `docs/design-system.md`
 ADRs: a note on ADR 0005 (dynamic loading not required; item 2 unchanged) and a short follow-up on ADR 0006 (extensions are AGPL-3.0-or-later); the front-end registry is covered by the UI-framework ADR or a short ADR when scheduled
 PR: -

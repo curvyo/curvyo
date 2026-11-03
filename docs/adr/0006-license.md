@@ -132,3 +132,9 @@ involved the customer should confirm it with a lawyer.
 - shadcn/ui components are copied into our tree rather than depended on. Their
   MIT notices must be preserved in those files; the files themselves become
   part of the AGPL work. Routine, but it has to actually be done.
+
+## Reader's note, 2026-11-02
+
+Extensions are AGPL-3.0-or-later as well (customer, 2026-10-17, spec `0065` EXT-LICENCE); how this
+applies to compiled-in extension crates is [ADR 0034](0034-extension-contract-compiled-in.md) §7.
+The decision above is unchanged.
