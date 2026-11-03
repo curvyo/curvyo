@@ -22,6 +22,9 @@ curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 curvyo-vectorize-core = { path = "../curvyo-vectorize-core", version = "0.1.0" }
 # The text reader of Trace (ADR 0028 §1: ui-core → ocr-core; editor-wasm reaches it only here).
 curvyo-ocr-core = { path = "../curvyo-ocr-core", version = "0.1.0" }
+# The compiled-in extension contract and the laser workbench (ADR 0034 §2, §3).
+curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
+curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
 thiserror.workspace = true

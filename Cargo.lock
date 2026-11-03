@@ -922,6 +922,7 @@ dependencies = [
  "console_error_panic_hook",
  "curvyo-crypto-core",
  "curvyo-document-core",
+ "curvyo-extension-core",
  "curvyo-image-core",
  "curvyo-render-core",
  "curvyo-sketch-core",
@@ -1094,8 +1095,10 @@ name = "curvyo-ui-core"
 version = "0.1.0"
 dependencies = [
  "curvyo-document-core",
+ "curvyo-extension-core",
  "curvyo-geometry-core",
  "curvyo-image-core",
+ "curvyo-laser-core",
  "curvyo-ocr-core",
  "curvyo-sketch-core",
  "curvyo-svg-core",

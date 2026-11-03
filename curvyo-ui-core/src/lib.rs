@@ -38,6 +38,7 @@ mod display_unit_text;
 mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
+mod extensions;
 mod face_style_pick;
 mod family_key;
 mod file_chords;
@@ -102,6 +103,7 @@ mod pen_entry;
 mod pen_entry_text;
 mod pen_target;
 mod pen_tool;
+mod placement_view;
 mod poly_star_tool;
 pub mod presence;
 mod preview_faces;
@@ -260,6 +262,7 @@ pub use document_presets_view::{
     PresetEntry, PresetGroupView, PresetsView, orientation_swap, preset_pick_size, presets_view,
 };
 pub use ellipse_tool::EllipseTool;
+pub use extensions::{ExtensionSettings, fixture_drawing, manifest, manifests, notice};
 pub use face_style_pick::{
     Greyed, Pressed, StyleButton, StyleButtons, StylePress, WEIGHT_STEPS, family_target,
     family_tile, italic_target, press_italic, press_weight, style_buttons, weight_target,
@@ -404,6 +407,7 @@ pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_targ
 pub use pen_tool::{
     ClosingPreview, Continuation, PenTool, PointerUpOutcome as PenPointerUpOutcome, PressAction,
 };
+pub use placement_view::{placed_bounds, placement_map, placement_members};
 pub use poly_star_tool::{PolyStarMode, PolyStarSettings, PolygonStarTool};
 pub use preview_faces::{PREVIEW_FACE_BUDGET, PreviewFaces};
 pub use preview_sample::{MAX_SAMPLE_CHARS, sample_line};

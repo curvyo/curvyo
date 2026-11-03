@@ -15,13 +15,27 @@ impl Session {
         if workbench == self.sketch.workbench {
             return;
         }
+        // A manufacturing that is gone or whose extension is off does not open (`0093`
+        // criterion 11, UX notes §1).
+        if let Workbench::Manufacturing(id) = workbench
+            && !self.manufacturing_available(id)
+        {
+            return;
+        }
         self.cancel_gesture();
         self.cancel_placement();
         self.cancel_pen_entry();
         self.end_snapping_drag();
         self.button_down = false;
         self.sketch.cancel();
+        let from = self.sketch.workbench;
         self.sketch.workbench = workbench;
+        self.swap_workbench_view(from, workbench);
+        // A manufacturing workbench selects nothing and keeps the drawing's selection for the
+        // way back (UX notes §3).
+        if matches!(workbench, Workbench::Manufacturing(_)) {
+            return;
+        }
         if workbench == Workbench::Vector
             && self.panel_tabs.get().active() == curvyo_ui_core::PanelTab::Parameters
         {

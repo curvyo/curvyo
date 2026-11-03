@@ -17,6 +17,7 @@
 
 mod device_keys;
 mod dropped_fonts;
+mod extensions_file;
 mod file_uris;
 mod font_documents;
 mod font_library;
@@ -134,6 +135,8 @@ fn main() {
             formats::set_formats_file_aside,
             formats::import_formats_file,
             formats::export_formats_file,
+            extensions_file::read_extensions_file,
+            extensions_file::write_extensions_file,
             fonts::font_folder_list,
             fonts::system_font_list,
             fonts::font_bytes,
