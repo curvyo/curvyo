@@ -204,6 +204,8 @@ mod trace_text_colour_tests;
 mod trace_text_screenshot_tests;
 #[cfg(test)]
 mod trace_text_tests;
+#[cfg(test)]
+mod trace_text_turned_tests;
 mod trace_text_write;
 mod transform_entry;
 mod weld;

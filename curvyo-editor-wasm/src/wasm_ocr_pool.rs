@@ -9,7 +9,7 @@ use crate::wasm_trace::{OCR_MODEL, TraceProgressSink};
 #[wasm_bindgen]
 #[derive(Debug, Clone, Default)]
 pub struct OcrCropsJs {
-    /// `{lines: [{quad, width}]}`, top to bottom.
+    /// `{lines: [{quad, width, pad, samples}]}`, top to bottom.
     #[wasm_bindgen(getter_with_clone)]
     pub lines: String,
     /// Every line's samples, line after line.
