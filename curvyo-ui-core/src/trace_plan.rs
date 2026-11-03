@@ -1,7 +1,8 @@
 //! What Create paths writes (`specs/0025-raster-trace` criteria 13, 14 and 46; `specs/0089`
 //! criterion 29): per traced image one group "Trace of" and the image name holding one compound
 //! path, filled black, no stroke, or one filled compound path per colour of a multicolour trace,
-//! ready for `Document::insert_drawing_above`.
+//! and after each the primitives of its recognised shapes (`specs/0088` Part B), ready for
+//! `Document::insert_drawing_above`.
 
 use curvyo_document_core::{
     AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, NodeId,
@@ -11,6 +12,7 @@ use kurbo::BezPath;
 
 use crate::AnchorIdMinter;
 use crate::svg_import_shapes::{kind_from_handles, outlines};
+use crate::trace_shapes::TraceShapeRegion;
 
 /// The name of an image that has none (the Layers panel's default).
 const IMAGE_DEFAULT_NAME: &str = "Image";
@@ -27,6 +29,9 @@ pub struct TraceTarget {
     /// A multicolour result's layers, largest area first: each fill and how many of `outlines`
     /// (in order) are its; empty for one black path.
     pub colours: Vec<TraceColour>,
+    /// The recognised shapes (`specs/0088` Part B), their indices into `outlines`; each
+    /// recognised outline in `outlines` is already its primitive's outline.
+    pub shapes: Vec<TraceShapeRegion>,
 }
 
 /// One colour of a multicolour result as Create paths writes it.
@@ -115,6 +120,77 @@ fn trace_outlines(path: &BezPath) -> Vec<DrawingOutline> {
     out
 }
 
+/// Adds a path of `outlines` (none: nothing) with `registers` and `style` to `children`, its
+/// anchor ids minted in order.
+fn push_path(
+    plan: &mut TracePlan,
+    children: &mut Vec<DrawingNode>,
+    minter: &mut AnchorIdMinter,
+    outlines: &[&BezPath],
+    registers: DrawingRegisters,
+    style: &Style,
+) {
+    let drawn: Vec<DrawingOutline> = outlines.iter().flat_map(|o| trace_outlines(o)).collect();
+    if drawn.is_empty() {
+        return;
+    }
+    let nodes: usize = drawn.iter().map(|o| o.anchors.len()).sum();
+    plan.anchor_ids.extend((0..nodes).map(|_| minter.mint()));
+    plan.paths += drawn.len();
+    plan.nodes += nodes;
+    children.push(DrawingNode::Path {
+        registers,
+        outlines: drawn,
+        style: style.clone(),
+    });
+}
+
+/// The children of one colour (`fill`, `None` for black) of `target`, its outlines `range`: the
+/// path of the outlines no recognised shape `taken`, then the colour's recognised regions
+/// (`specs/0088` Part B), a primitive each, or a compound path of a region with holes.
+fn plan_colour(
+    plan: &mut TracePlan,
+    children: &mut Vec<DrawingNode>,
+    minter: &mut AnchorIdMinter,
+    target: &TraceTarget,
+    fill: Option<Color>,
+    range: std::ops::Range<usize>,
+    taken: &[bool],
+) {
+    let style = fill.map_or_else(trace_style, trace_colour_style);
+    let name = || DrawingRegisters {
+        name: fill.map(trace_colour_name),
+        ..DrawingRegisters::default()
+    };
+    let rest: Vec<&BezPath> = range
+        .clone()
+        .filter(|&i| !taken[i])
+        .map(|i| &target.outlines[i])
+        .collect();
+    push_path(plan, children, minter, &rest, name(), &style);
+    let regions = target
+        .shapes
+        .iter()
+        .filter(|r| r.outlines.first().is_some_and(|i| range.contains(i)));
+    for region in regions {
+        if let ([Some((shape, rotation))], [_]) = (&region.shapes[..], &region.outlines[..]) {
+            children.push(DrawingNode::Primitive {
+                registers: DrawingRegisters::default(),
+                shape: *shape,
+                rotation: *rotation,
+                style: style.clone(),
+            });
+        } else {
+            let compound: Vec<&BezPath> = region
+                .outlines
+                .iter()
+                .filter_map(|&i| target.outlines.get(i))
+                .collect();
+            push_path(plan, children, minter, &compound, name(), &style);
+        }
+    }
+}
+
 /// The groups of Create paths for `targets` with fresh anchor ids from `minter`; an image whose
 /// result has no outline gets no group.
 pub fn plan_trace(targets: &[TraceTarget], minter: &mut AnchorIdMinter) -> TracePlan {
@@ -143,24 +219,27 @@ pub fn plan_trace(targets: &[TraceTarget], minter: &mut AnchorIdMinter) -> Trace
                 .collect()
         };
         let mut children = Vec::with_capacity(layers.len());
-        for (fill, outlines) in layers {
-            let drawn: Vec<DrawingOutline> = outlines.iter().flat_map(trace_outlines).collect();
-            if drawn.is_empty() {
-                continue;
+        let mut taken = vec![false; target.outlines.len()];
+        for i in target.shapes.iter().flat_map(|r| &r.outlines) {
+            if let Some(t) = taken.get_mut(*i) {
+                *t = true;
             }
-            let nodes: usize = drawn.iter().map(|o| o.anchors.len()).sum();
-            plan.anchor_ids.extend((0..nodes).map(|_| minter.mint()));
-            plan.paths += drawn.len();
-            plan.nodes += nodes;
-            plan.colours += usize::from(fill.is_some());
-            children.push(DrawingNode::Path {
-                registers: DrawingRegisters {
-                    name: fill.map(trace_colour_name),
-                    ..DrawingRegisters::default()
-                },
-                outlines: drawn,
-                style: fill.map_or_else(trace_style, trace_colour_style),
-            });
+        }
+        let mut first = 0;
+        for (fill, outlines) in layers {
+            let range = first..first + outlines.len();
+            first = range.end;
+            let before = children.len();
+            plan_colour(
+                &mut plan,
+                &mut children,
+                minter,
+                target,
+                fill,
+                range,
+                &taken,
+            );
+            plan.colours += usize::from(fill.is_some() && children.len() > before);
         }
         if children.is_empty() {
             continue;
@@ -217,12 +296,14 @@ mod tests {
                 name: Some("logo.png".into()),
                 outlines: vec![square(0.0), square(10.0)],
                 colours: Vec::new(),
+                shapes: Vec::new(),
             },
             TraceTarget {
                 image: second,
                 name: None,
                 outlines: vec![],
                 colours: Vec::new(),
+                shapes: Vec::new(),
             },
         ];
         let plan = plan_trace(&targets, &mut minter);
@@ -284,6 +365,7 @@ mod tests {
                     outlines: 1,
                 },
             ],
+            shapes: Vec::new(),
         };
         let plan = plan_trace(&[target], &mut minter);
         assert_eq!((plan.paths, plan.nodes, plan.colours), (3, 12, 2));
@@ -313,6 +395,81 @@ mod tests {
                 (Some("#234EB8".into()), blue, 1, false)
             ]
         );
+    }
+
+    /// `specs/0088` Part B criteria 1, 8 and 10: a recognised outline without holes is a
+    /// primitive after its colour's path, in that colour; a recognised region with a hole its own
+    /// compound path; the rest stays in the colour's path.
+    #[test]
+    fn recognised_shapes_are_primitives_and_compounds_in_their_colour() {
+        use curvyo_document_core::{Angle, CornerRadii, Length, Point, RectBounds, Shape};
+        let mut minter = AnchorIdMinter::new(3);
+        let doc = curvyo_document_core::Document::new(1);
+        let image = doc.create_rect(RectBounds {
+            origin: Point::new(0.0, 0.0),
+            width: Length::from_mm(1.0),
+            height: Length::from_mm(1.0),
+        });
+        let rect = |x: f64| Shape::Rect {
+            bounds: RectBounds {
+                origin: Point::new(x, 0.0),
+                width: Length::from_mm(4.0),
+                height: Length::from_mm(4.0),
+            },
+            corner_radii: CornerRadii::uniform(Length::from_mm(0.0)),
+        };
+        let turn = Angle::from_radians(0.0);
+        let red = Color { r: 200, g: 0, b: 0 };
+        let blue = Color { r: 0, g: 0, b: 200 };
+        let target = TraceTarget {
+            image,
+            name: None,
+            // Red: a path left, a square; blue: a framed square (outer, hole).
+            outlines: vec![square(0.0), square(10.0), square(20.0), square(21.0)],
+            colours: vec![
+                TraceColour {
+                    fill: red,
+                    outlines: 2,
+                },
+                TraceColour {
+                    fill: blue,
+                    outlines: 2,
+                },
+            ],
+            shapes: vec![
+                TraceShapeRegion {
+                    outlines: vec![1],
+                    shapes: vec![Some((rect(10.0), turn))],
+                },
+                TraceShapeRegion {
+                    outlines: vec![2, 3],
+                    shapes: vec![Some((rect(20.0), turn)), None],
+                },
+            ],
+        };
+        let plan = plan_trace(&[target], &mut minter);
+        let DrawingNode::Group { children, .. } = &plan.items[0].1 else {
+            panic!("a group");
+        };
+        let kinds: Vec<(&str, Color, usize)> = children
+            .iter()
+            .map(|c| match c {
+                DrawingNode::Path {
+                    outlines, style, ..
+                } => ("path", style.fill.color, outlines.len()),
+                DrawingNode::Primitive { shape, style, .. } => {
+                    assert_eq!(*shape, rect(10.0));
+                    ("primitive", style.fill.color, 1)
+                }
+                _ => panic!("{c:?}"),
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            [("path", red, 1), ("primitive", red, 1), ("path", blue, 2)]
+        );
+        assert_eq!((plan.paths, plan.nodes, plan.colours), (3, 12, 2));
+        assert_eq!(plan.anchor_ids.len(), 12);
     }
 
     #[test]

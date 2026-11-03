@@ -68,6 +68,9 @@ pub struct TraceWire {
     pub joined: usize,
     /// The text pass's lines (`specs/0091`); empty without OCR lines.
     pub texts: crate::trace_text_wire::TraceTexts,
+    /// The recognised shapes (`specs/0088` Part B); empty with Recognise shapes off. Each
+    /// recognised outline in `outlines` is already its primitive's outline.
+    pub shapes: Vec<crate::trace_shapes::TraceShapeRegion>,
 }
 
 /// One palette colour of a multicolour result, as the strip shows it.
@@ -417,6 +420,12 @@ pub(crate) fn count(value: f64) -> Option<usize> {
 /// Reads the numbers of [`trace_job`] back; `None` when they are not a well-formed result.
 #[must_use]
 pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
+    read_trace_body(wire).map(|(read, _)| read)
+}
+
+/// As [`read_trace_wire`], with where the shape section starts (or would start: after the text
+/// section).
+pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
     let header = wire.get(..TRACE_WIRE_HEADER)?;
     let status = match count(header[0])? {
         0 => TraceStatus::Traced,
@@ -435,12 +444,22 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
     } else {
         crate::trace_text_wire::TraceTexts::default()
     };
+    // `specs/0088` Part B: the shape section, when Recognise shapes was on.
+    let shapes_at = at;
+    let shapes = if wire.get(at) == Some(&crate::trace_shapes::SHAPE_MARK) {
+        let (shapes, used) = crate::trace_shapes::read_shapes(&wire[at..], outline_count)?;
+        at += used;
+        shapes
+    } else {
+        Vec::new()
+    };
+    let (outlines, shapes) = crate::trace_shapes::with_primitives(outlines, shapes);
     let (palette, layers, joined) = if at == wire.len() {
         (Vec::new(), Vec::new(), 0)
     } else {
         read_colour_tail(&wire[at..], outline_count)?
     };
-    Some(TraceWire {
+    let read = TraceWire {
         status,
         paths: count(header[1])?,
         nodes: count(header[2])?,
@@ -452,7 +471,9 @@ pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
         layers,
         joined,
         texts,
-    })
+        shapes,
+    };
+    Some((read, shapes_at))
 }
 
 /// `n` outlines of the numbers of [`write_outline`] from `wire[*at..]`; `at` moves past them.

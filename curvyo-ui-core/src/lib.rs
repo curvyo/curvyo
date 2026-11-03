@@ -177,6 +177,11 @@ mod trace_fit_turn;
 mod trace_inpaint;
 mod trace_ocr;
 mod trace_plan;
+mod trace_shape_fit;
+mod trace_shape_math;
+mod trace_shape_sample;
+mod trace_shape_star;
+mod trace_shapes;
 mod trace_text;
 mod trace_text_colour;
 mod trace_text_notice;
@@ -524,6 +529,10 @@ pub use trace_ocr::{
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
     trace_group_name, trace_style,
+};
+pub use trace_shapes::{
+    SHAPE_TOLERANCE_PX, SHAPE_TOLERANCE_SHARE, TraceShapeRegion, primitive_path, recognise_shapes,
+    trace_add_shapes,
 };
 pub use trace_text::{TextPass, TextRegion, text_pass};
 pub use trace_text_colour::{trace_text_colour_job_with, trace_text_colour_mask_job};
