@@ -1,6 +1,6 @@
 # Trace recognition: text and shapes from traced outlines
 
-Status: Part A Done (PR #234, merged 2026-10-31); Part B (shape recognition) is later
+Status: Part A Done (PR #234); Part B Ready
 Priority: Could
 Origin: Customer idea 2026-10-28 (the split into parts A and B and all tolerances were Proposals, now decided, see below)
 
@@ -31,6 +31,12 @@ practical synergy with the glyph table."
 - Frage 104 REC-ENTRY = A: a "Recognise text" button in the Select bar chooses the Recognise tool, whose bar holds the tolerance and the Recognise button.
 - Frage 105 REC-SCOPE = A: a readout of the face sources, no selector; the result names the tier that matched.
 - Frage 106 REC-MARK = B: no dashed outline of leftovers; affected letters are selected and reported in words.
+
+## Decisions of the lead, 2026-11-03 (Proposal, vetoable at the demo)
+Frage 107 A (0091) put shape recognition into Trace. Part B is rewritten accordingly: switch "Recognise shapes" in
+Trace Advanced, off by default, not in presets, black and white and Multicolour, tolerance by the 0091 c26
+rule with no field, text decided before shapes, the hole rule left to the implementer, no select-bar
+variant for now.
 
 ## Builds on
 - 0025 raster trace: its output paths are the input. Recognition runs on traced paths only, never on pixels.
@@ -84,24 +90,61 @@ object (0074) in the library font (0075) whose glyphs match best, keeping positi
 10. The Recognise bar shows a readout of the face sources before a run ("5 face sources", tooltip lists the order);
     it has no selector. After a run the notice names the tier that matched (REC-SCOPE A).
 
-## Part B: shape recognition on traced outlines (later)
-Meaning (confirmed): **Recognise shapes** replaces a selected closed traced path by the primitive
-(rectangle with corner radius, ellipse or circle, regular polygon, star) it matches within a tolerance, keeping position, size and rotation.
+## Part B: shape recognition as part of Trace (Ready)
+Meaning (confirmed): a closed traced outline that matches a primitive (rectangle with corner radius, circle or
+ellipse, regular polygon, star) within tolerance becomes that primitive, keeping position, size and rotation.
+Entry (customer Frage 107 A in 0091, entry changed from "explicit operation on a selection" to "part of Trace"):
+the switch **Recognise shapes** in Trace Advanced, next to Recognise text. Everything below is the lead's detailing
+of that answer and is marked Proposal where it is a choice.
 
-### Acceptance criteria (draft)
-1. Given a traced 200 x 100 mm rectangle with 10 mm corners, when Recognise shapes runs with tolerance 0.2 mm,
-   then one rectangle primitive of 200 x 100 mm with radius 10 mm (each within 0.2 mm) replaces the path.
+### Entry and behaviour
+- The switch is off by default, like Recognise text (Proposal, by analogy with 116 B a). It is an app setting and
+  not part of presets. It works in black and white and in Multicolour; in Multicolour the primitive keeps the
+  fill of its colour.
+- With the switch on, the preview and Create paths show recognised primitives in place of the traced paths. They
+  are ordinary primitives, editable with their handles afterwards. Create paths is one undo step, as today.
+- Holes (Proposal, implementer's choice, recorded in adrs.md): a compound outline becomes a compound of
+  primitives. A hole that matches no primitive either stays a path inside the compound, or the whole compound
+  stays paths.
+- Tolerance: default 0.2 mm (Frage 73), applied relative to the picture as in 0091 criterion 26: in picture
+  pixels, max(2 px, a share of the shape size), so the result does not depend on the dpi. No tolerance field in
+  Advanced and no hint text (Proposal: the fixed rule is enough; add a field only if real traces show the need).
+- Text first: with Recognise text also on, text lines are decided first; outlines that became text, and
+  letters that stayed paths in a text line, never become shapes.
+- The 0088 Part A select-bar tool stays as it is. A select-bar "Recognise shapes" for existing paths is Later.
+
+### Acceptance criteria
+Pictures below are rendered at 10 px/mm, so the 2 px floor equals 0.2 mm.
+1. Given a traced 200 x 100 mm rectangle with 10 mm corners and Recognise shapes on, when Create paths runs,
+   then one rectangle primitive of 200 x 100 mm with corner radius 10 mm (each within 0.2 mm) results instead of the path.
 2. Given a traced circle of 50 mm diameter, then a circle primitive of 50 mm (within 0.2 mm) results; a traced
    ellipse 60 x 40 mm gives an ellipse with those radii and the traced rotation (within 0.5 degrees).
 3. Given a traced five-point star, outer radius 40 mm, inner/outer ratio 0.5, then a star primitive with 5 points
    and those radii (each within 0.2 mm) results, rotation within 0.5 degrees.
 4. Given a traced regular hexagon, then a polygon primitive with 6 sides results.
-5. Given a path whose deviation from every candidate exceeds the tolerance, then it stays unchanged and the
-   result says so in one line.
-6. Given a selection of 500 traced paths, then recognition finishes in under 2 s on the 0025 reference machine
-   (thread CPU time) and is deterministic: same input, same primitives.
-7. The tolerance is a setting in mm (default 0.2 mm), shown in the options bar; the original path is restored by one undo step.
-8. Hole structure is kept: a recognised ring (circle with circle hole) stays a compound with both primitives.
+5. Given a closed outline whose deviation from every candidate exceeds the tolerance, then it stays a traced path,
+   unchanged and without a notice. A hand-drawn wobbly circle (radius varying by +-3 % of 25 mm, about 0.75 mm)
+   is such a case and stays a path.
+6. Given 500 traced closed paths and Recognise shapes on, then the recognition pass finishes in under 2 s
+   thread CPU time on the 0025 reference machine. It runs in the trace worker or pool, inside the one Trace progress.
+7. Simplest fit: a shape becomes a primitive only when every sampled outline point is within tolerance and the
+   primitive is the simplest fit. A circle is a circle, not an ellipse; a square-cornered rectangle is not a
+   rounded one; a regular polygon is a polygon, not a star, when both fit equally.
+8. Holes are kept: a traced ring (circle with a circle hole) becomes one compound of two circles; a rectangle
+   frame becomes a compound of two rectangles. The hole rule for non-matching holes follows the Proposal above.
+9. Given the 0025 ring fixture, then the result is 1 compound of 2 circles. Given the 0025 dot grid fixture,
+   then the result is 10,000 circles (100 x 100) and no path remains.
+10. Multicolour: given a picture of a red circle and a blue rectangle, then the result is a circle primitive with
+    the red fill and a rectangle primitive with the blue fill.
+11. Off equals today: with Recognise shapes off, the Trace result for every existing trace fixture is
+    path-for-path identical to the result before this part (compared node by node).
+12. Interplay with text: given a picture with a line of text and a circle, with Recognise text and Recognise
+    shapes both on, then the result is one text object and one circle primitive, and no letter (not even
+    an "o") became a circle.
+13. Determinism: the same picture and settings give the same primitives, with identical parameters, natively and
+    in wasm, and on repeated runs.
+14. Create paths with recognised primitives is one undo step that restores the state before it.
+15. Nothing is sent over the network; recognition works with the network disabled.
 
 ## Later
 - Gesture-based shape recognition (customer, 2026-10-28): the customer compares Part B with VectorCraft's shape
@@ -116,7 +159,8 @@ Meaning (confirmed): **Recognise shapes** replaces a selected closed traced path
 - Bundling a model in the app (0025 Frage 58 A stands unless a later decision changes it).
 - Non-Latin scripts, math, tables, document layout analysis.
 - Recognising Inkscape-only shapes (arcs, spirals) beyond what 0024 slice 3 covers.
-- Automatic recognition during tracing; these are explicit operations on a selection.
+- Recognise shapes on existing paths from the select bar (Later; Part A's select-bar text tool is unchanged).
+- A tolerance field for shapes in Advanced.
 - Live pen-stroke recognition (see Later).
 - Font identification from the web, installing missing fonts.
 

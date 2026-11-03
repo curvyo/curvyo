@@ -175,13 +175,15 @@ shown only when it has something to say:
 3. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
    the palette's pipette; see "Multicolour" below.
 4. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
-5. The options: three icon buttons (pressed means on, the tooltip names each), then three values.
+5. The options: four icon buttons (pressed means on, the tooltip names each), then three values.
 
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
 - **Drop border shapes**: drops the shapes that touch the border of the picture.
 - **Recognise text** (off by default, remembered): reads the text first; see "Recognise text"
   below.
+- **Recognise shapes** (off by default, remembered): sets rectangles, circles, ellipses, polygons
+  and stars as shapes; see "Recognise shapes" below.
 
 - **Denoise** (Off, Low, High): a median filter on the brightness before the Threshold; Low takes
   3 x 3 pixels, High 5 x 5. It removes scan noise and JPEG ringing.
@@ -230,6 +232,31 @@ a black and white trace before it traces the rest (`specs/0091-trace-text-recogn
   kept, and its text is turned to match, so it reads the right way round on the canvas. Lines
   that read upright and sure are read once, as before.
 - With Recognise text off, Trace works exactly as before and the model is not loaded.
+
+## Recognise shapes
+
+With **Recognise shapes** on (Advanced, off by default, a setting of the app, not part of the
+presets) every closed traced outline that is a rectangle (with or without rounded corners), a
+circle, an ellipse, a regular polygon or a star becomes that shape, in place, at its size and
+turn (`specs/0088-trace-recognition` Part B). It works with Single colour and Multicolour:
+
+- A shape is set only when every point of the traced outline lies within the tolerance of it:
+  2 picture pixels, or 1 % of the square root of the outline's area on large shapes (0.2 mm at
+  10 pixels per mm; a 50 mm circle may stray 0.44 mm). So the result does not depend on the dpi,
+  and an outline that is only nearly a shape (a hand-drawn circle) stays a path, unmarked.
+- The simplest shape wins: a circle before an ellipse, square corners before rounded ones, a
+  rectangle before a polygon, a polygon (3 to 24 sides) before a star (3 to 24 points).
+- The preview shows the shapes where the paths were, in the same fill; the Mask view is
+  unchanged. The Advanced status line adds "12 shapes set"; with none found it adds nothing.
+- Create paths puts the shapes into the "Trace of" group, after the path of their colour, in the
+  same one step. They are ordinary shapes: rectangles, ellipses, polygons and stars with their
+  handles.
+- Holes: a shape with holes (a ring, a frame) becomes one compound path of clean outlines, each
+  hole that is a shape as that shape's outline and any other hole as traced. An outline that is no
+  shape keeps its holes as traced paths, whatever they are.
+- With Recognise text on too, the text is decided first: letters become text or stay paths,
+  never shapes.
+- With Recognise shapes off, Trace works exactly as before.
 
 ## Multicolour
 
@@ -339,6 +366,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Invert: traces what the method leaves out; transparent pixels never become shapes.
 - Drop border shapes: drops shapes that touch the image border.
 - Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.
+- Recognise shapes: finds rectangles, circles, ellipses, polygons and stars in the traced outlines and sets them as shapes.
 - Denoise: smooths out noise in the picture before tracing.
 - Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
 - Corners: higher turns more bends into sharp corners.
