@@ -84,6 +84,7 @@ to it instead of restating it.
 | R-EDIT-046 | Pattern fill (customer, 2026-10-17): fill a closed shape with generated vector patterns (hatch, grid, dots, honeycomb, motif) as real geometry for laser and CNC; core or extension is open. Draft sketch. `specs/0071-pattern-fill/` | Could | Customer (2026-10-17) |
 | R-EDIT-047 | Pen angle snap and typed values (customer, 2026-10-19): in the Pen, Ctrl locks the angle of the next node (and of a dragged handle) to the product's angle stops, so horizontal and vertical lines are reliable; a key (Tab, Proposal) opens an entry chip with Length and Angle, units shown, previewed live, Enter adds the node and the Pen keeps drawing. `specs/0072-pen-angle-snap-and-typed-values/` | Should | Customer (2026-10-19) |
 | R-EDIT-049 | Grid (customer, 2026-10-31): a grid per page, to match a grid engraved into the machine bed, shown/hidden by Shift+click on its rail entry, adaptive (zooms with finer cells) or fixed, linear or logarithmic, rotatable; a per-page origin corner (top left by default) where the grid starts and from which the rulers and typed positions count (amendment 2026-11-01); a Grid target in snapping with a choice of which part snaps (default the centre). Built on `story/0090-grid`. `specs/0090-grid/` | Should | Customer (2026-10-31) |
+| R-EDIT-050 | Variable-width ("dynamic") strokes: a path whose stroke width changes along its length, kept as width stops on the path, editable and exported. Prerequisite for R-VEC-006 and R-MFG-EMB-004. | Should | Customer (2026-11-03) |
 
 ## 3. Vectorization (raster-to-vector)
 
@@ -93,6 +94,8 @@ to it instead of restating it.
 | R-VEC-002 | Combine multiple trace passes (e.g. different thresholds or color layers) into one result, so fine detail and large flat areas can each use their own best setting instead of one compromise setting for the whole image. | Should | Customer |
 | R-VEC-003 | Path simplification that reduces node count while holding a stated maximum deviation from the original trace, and visibly outperforms Inkscape's simplify on a corner-heavy test image (fewer nodes at the same deviation tolerance). | Should | Customer |
 | R-VEC-004 | Live preview of trace settings on the actual source image before committing, so a maker doesn't trace-undo-retrace repeatedly. Accepted with the Trace tool mockup (customer, 2026-10-14); specified in `0025`. | Should | Customer |
+| R-VEC-005 | Partial and composite trace with masks: limit a trace to the inside of ordinary paths (positive mask) or leave their inside out (negative mask), trace different parts of one picture with different settings, and join the parts into one result at the end. Concretises R-VEC-002 as a simple workflow over the existing paths. | Should | Customer (2026-11-03) |
+| R-VEC-006 | Centre line with variable width: derive from a traced region, or from any closed path, one path along its middle with a stroke width that follows the local thickness (medial axis). Needed for satin stitch (R-MFG-EMB-004); likely the same geometry as V-carving (R-MFG-CNC-002, OpenVoronoi) and needs variable-width strokes in the document first (R-EDIT-050). Whether it comes out of the trace or out of the path is open; from the path serves both trace and drawn art. | Should | Customer (2026-11-03) |
 
 ## 4. Manufacturing — general
 
@@ -132,6 +135,8 @@ to it instead of restating it.
 | R-MFG-EMB-001 | Convert vector fills/strokes into embroidery stitch paths (at minimum running stitch and satin/fill) comparable to Ink/Stitch's core conversion. | Should | Customer |
 | R-MFG-EMB-002 | Export at least one common embroidery machine format (e.g. DST). | Should | Customer |
 | R-MFG-EMB-003 | Stitch simulation/preview before export. | Should | Proposal |
+| R-MFG-EMB-004 | Satin stitch from one path with a variable stroke width (from R-VEC-006), not from a filled area. | Should | Customer (2026-11-03) |
+| R-MFG-EMB-005 | Show the direction of paths and reverse a path's direction. Stitch order and start/end depend on it; it is probably needed only for embroidery, so it may live in the embroidery workbench. | Should | Customer (2026-11-03) |
 
 ## 8. Manufacturing — CNC mill
 
