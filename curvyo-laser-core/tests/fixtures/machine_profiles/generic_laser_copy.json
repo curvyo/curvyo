@@ -1,0 +1,20 @@
+{
+  "format_version": 1,
+  "id": "0f0e0d0c-0b0a-4908-8706-050403020100",
+  "kind": "laser",
+  "modified": 1762171200000,
+  "name": "Generic laser copy",
+  "work_area_mm": {
+    "width": 400.0,
+    "height": 300.0
+  },
+  "origin": "bottom_left",
+  "max_feed_mm_per_min": 6000,
+  "max_power": 1000,
+  "laser_mode": true,
+  "connection": {
+    "connector_address": "",
+    "controller_port": "",
+    "baud_rate": 115200
+  }
+}

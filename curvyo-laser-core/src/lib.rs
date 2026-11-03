@@ -1,5 +1,6 @@
-//! The laser workbench extension (ADR 0034 §1): its manifest, the outlines of its fixtures and
-//! the text of its notices. It receives document data as arguments and never writes.
+//! The laser workbench extension (ADR 0034 §1): its manifest, the outlines of its fixtures, the
+//! text of its notices and its machine profiles (ADR 0036, ADR 0037). It receives document data
+//! and record texts as arguments and never writes.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(
@@ -8,10 +9,29 @@
 )]
 
 mod engraved_grid;
+mod machine_profile;
+mod machine_profile_copy;
+mod machine_profile_file;
+mod machine_profiles;
 mod manifest;
 mod overhang;
 
 pub use engraved_grid::{ENGRAVED_GRID, engraved_grid};
+pub use machine_profile::{
+    BaudRate, Connection, FeedRate, GENERIC_LASER_ID, GENERIC_LASER_NAME, Limited,
+    MAX_CONNECTION_CHARS, MAX_NAME_CHARS, MAX_WORK_MM, MIN_WORK_MM, MachineProfile, OriginCorner,
+    PowerValue, ProfileValues, clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port,
+    clamp_power, clamp_work_area, clamp_work_side, grouped, is_profile_id, new_profile_id,
+    save_as_name,
+};
+pub use machine_profile_copy::{
+    CopyRead, DAMAGED_NAME_NOTICE, ProfileCopy, differs, read_copy, write_copy,
+};
+pub use machine_profile_file::{
+    MAX_RECORD_BYTES, RECORD_SUFFIX, RecordError, read_choice, read_record, record_file_name,
+    record_id, write_choice, write_record,
+};
+pub use machine_profiles::{LibraryWrite, MAX_RECORDS, MachineProfiles};
 pub use manifest::{PROCESS_ID, manifest};
 pub use overhang::{OVERHANG_NOTICE, OVERHANG_TOLERANCE, overhang_text};
 
