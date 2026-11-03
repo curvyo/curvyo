@@ -135,3 +135,31 @@ test("a socket that cannot be made counts as a failed attempt", () => {
   transport.drain();
   assert.deepEqual(session.told, ["disconnected@5"]);
 });
+
+test("a workspace link handed to the next session keeps its socket and holds what arrives", () => {
+  const { transport, session, sockets } = rig();
+  session.actions.push(action("connect", "ws://h:1/"));
+  transport.drain();
+  sockets[0].onopen?.({});
+  const next = new FakeSession();
+  transport.handOver(next);
+  transport.attach(null);
+  sockets[0].onmessage?.({ data: new Uint8Array([4]).buffer });
+  assert.equal(sockets[0].closed, false, "the socket stays open");
+  assert.deepEqual(next.told, [], "nothing reaches a session still being attached");
+  transport.attach(next);
+  assert.deepEqual(next.told, ["received 4@1000"]);
+  next.actions.push(action("send", "", [9]));
+  transport.drain();
+  assert.deepEqual(sockets[0].sent, [[9]]);
+  assert.deepEqual(session.told, ["connected@1000"]);
+});
+
+test("attaching another session than the one handed to closes the socket", () => {
+  const { transport, session, sockets } = rig();
+  session.actions.push(action("connect", "ws://h:1/"));
+  transport.drain();
+  transport.handOver(new FakeSession());
+  transport.attach(new FakeSession());
+  assert.equal(sockets[0].closed, true);
+});

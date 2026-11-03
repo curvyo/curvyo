@@ -419,6 +419,42 @@ impl Viewport {
     }
 }
 
+/// What a view shows, to come back to after switching documents (`specs/0094-workspace`
+/// criterion 10): the zoom factor and the document point at the canvas's centre.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SavedView {
+    /// The zoom factor, `1.0` for 100 %.
+    pub zoom: f64,
+    /// The document point at the canvas's centre.
+    pub centre: Point,
+}
+
+impl Viewport {
+    /// The zoom and the document point at the canvas's centre.
+    #[must_use]
+    pub fn saved_view(&self) -> SavedView {
+        let (width, height) = self.canvas_size;
+        SavedView {
+            zoom: self.zoom.factor(),
+            centre: self.screen_to_document(width / 2.0, height / 2.0),
+        }
+    }
+
+    /// Shows `saved` on this canvas: its zoom, its centre point at the canvas's centre. Ends the
+    /// untouched default view, so later resizes keep the centre.
+    pub fn restore_view(&mut self, saved: SavedView) {
+        self.zoom = Zoom::new(saved.zoom);
+        let scale = self.zoom.scale();
+        let (width, height) = self.canvas_size;
+        self.origin = Point::new(
+            saved.centre.x - width / 2.0 / scale,
+            saved.centre.y - height / 2.0 / scale,
+        );
+        self.inset_view = false;
+        self.drag_pan = None;
+    }
+}
+
 impl Default for Viewport {
     fn default() -> Self {
         Self::new()

@@ -72,6 +72,13 @@ pub struct ClientSession {
     outbox: BTreeMap<u64, OutItem>,
     next_client_id: u64,
     pending_snapshot: Option<(u64, Vec<u8>)>,
+    /// A workspace snapshot's sealed parts waiting for the connection, with what it covers.
+    pending_parts: Option<(u64, Vec<Vec<u8>>)>,
+    /// For a workspace room (ADR 0036 decision 7): the bytes of the last snapshot, which set
+    /// when the next one is due; `None` for a document's room.
+    workspace_snapshot: Option<u64>,
+    /// The sequence and the bytes so far of the snapshot being received in parts.
+    receiving_snapshot: (u64, u64),
     since_snapshot: (u64, u64),
     snapshot_asked: bool,
     rejected_shown: bool,
@@ -133,6 +140,9 @@ impl ClientSession {
             outbox: BTreeMap::new(),
             next_client_id: 1,
             pending_snapshot: None,
+            pending_parts: None,
+            workspace_snapshot: None,
+            receiving_snapshot: (0, 0),
             since_snapshot: (0, 0),
             snapshot_asked: false,
             rejected_shown: false,
@@ -145,6 +155,13 @@ impl ClientSession {
     /// Takes everything the caller must carry out, in order.
     pub fn drain(&mut self) -> Vec<ClientOutput> {
         core::mem::take(&mut self.out)
+    }
+
+    /// Makes this the session of a workspace room (ADR 0036 decision 7): a snapshot is due by
+    /// [`snapshot_due`](crate::snapshot_due) against the last snapshot's size, and is uploaded
+    /// with [`upload_snapshot_parts`](Self::upload_snapshot_parts).
+    pub fn use_workspace_snapshots(&mut self) {
+        self.workspace_snapshot.get_or_insert(0);
     }
 
     /// The room.

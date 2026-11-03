@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod background_writer;
 mod clipboard_glue;
 mod font_archive_glue;
 mod font_checks_glue;
@@ -28,6 +29,9 @@ mod session;
 mod trace_analysis_glue;
 mod trace_fit_glue;
 mod trace_glue;
+mod workspace_glue;
+mod workspace_share_builder;
+mod workspace_tree_glue;
 
 #[cfg(target_arch = "wasm32")]
 mod gpu;
@@ -39,6 +43,8 @@ mod gpu_pipeline;
 mod wasm_api;
 #[cfg(target_arch = "wasm32")]
 mod wasm_background;
+#[cfg(target_arch = "wasm32")]
+mod wasm_background_writer;
 #[cfg(target_arch = "wasm32")]
 mod wasm_boolean;
 #[cfg(target_arch = "wasm32")]
@@ -120,12 +126,23 @@ mod wasm_text_layout;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_path;
 #[cfg(target_arch = "wasm32")]
+mod wasm_thumbnail;
+#[cfg(target_arch = "wasm32")]
 mod wasm_tiling;
 #[cfg(target_arch = "wasm32")]
 mod wasm_trace;
 #[cfg(target_arch = "wasm32")]
 mod wasm_weld;
+#[cfg(target_arch = "wasm32")]
+mod wasm_workspace;
+#[cfg(target_arch = "wasm32")]
+mod wasm_workspace_sync;
+#[cfg(target_arch = "wasm32")]
+mod wasm_workspace_take_in;
+#[cfg(target_arch = "wasm32")]
+mod wasm_workspace_tree;
 
+pub use background_writer::{BackgroundWriter, WRITE_INTERVAL_MS, Waiting, WriteError};
 pub use clipboard_glue::{clipboard_notice, encode_rgba_png, paste_rank_code};
 pub use font_archive_glue::FontArchiveGlue;
 pub use font_checks_glue::FontChecksGlue;
@@ -142,6 +159,11 @@ pub use session::{
     ObjectWipeOutcome, PanelReply, PanelTabsRecord, PanelView, PenJoinNotice, RowFlag, RowPress,
     Session, SizeOutcome, SnappingSettingsRecord, SnappingToolbarRecord, SplitOutcome,
     StackOutcome, Tool, WipeOutcome, WipeState,
+};
+pub use session::{
+    BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, ListEdit,
+    MarkerFiles, PreparedShare, SyncSeeds, TakeIn, TransportAction, WorkspaceLink, WorkspaceWrite,
+    take_in_allowed, take_in_check,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{
@@ -162,11 +184,14 @@ pub use trace_glue::{
     hex as trace_hex, ocr_lines_json, read_ocr_lines, recognise_shapes as trace_recognise_shapes,
     trace_colour_settings, trace_params_json, trace_presets_json, trace_settings,
 };
+pub use workspace_share_builder::{NotAdded, ShareFiles, WorkspaceShareBuilder};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};
 
 pub use session::{SketchTool, Workbench};
+pub use workspace_glue::{WorkspaceGlue, workspace_copy_bytes};
+pub use workspace_tree_glue::{deleted_json, disk_answer_json, disk_scan, list_edit, stamps};
 
 #[cfg(target_arch = "wasm32")]
 mod wasm_manufacturing;

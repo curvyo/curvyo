@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import type { ProjectApi } from "@/hooks/useProject";
 import { SyncTransport, type SocketLike } from "@/lib/syncTransport";
+import { onWorkspaceLinkMoved } from "@/lib/workspaceLink";
 import { invoke } from "@/platform/host";
 import {
   invite_expiry_text,
@@ -46,6 +47,20 @@ export interface ShareView {
   participants: ShareParticipant[];
   join?: { phase: string; text: string } | null;
   ended?: string | null;
+  /** A shared workspace's link (`specs/0094-workspace`), absent for a document's own room. */
+  workspace?: WorkspaceShareView | null;
+}
+
+/** The shared workspace as the Share tab and the File tab's header line show it. */
+export interface WorkspaceShareView {
+  id: string;
+  name: string;
+  headerLine: string;
+  receiving: string | null;
+  openInWorkspace: boolean;
+  documentLine: string;
+  people: string;
+  joining: boolean;
 }
 
 /** The invite on screen. */
@@ -88,7 +103,21 @@ export interface CollaborationApi {
   joinError: string;
   passphrase: PassphraseAsk | null;
   submitPassphrase: (text: string) => void;
+  /** This device's identity and the epoch keys of `room` (hex), `null` while the passphrase is
+   * asked (then `retry` runs once it is given) or the store failed (the reason is shown). */
+  deviceKeys: (room: string, retry: () => void) => Promise<DeviceKeys | null>;
+  /** Carries out what `session` just queued on the transport (a shared workspace's start). */
+  drive: (session: SessionLike) => void;
 }
+
+/** This device's identity (hex) and a room's epoch keys. */
+export interface DeviceKeys {
+  identity: string;
+  keys: [number, string][];
+}
+
+/** A session as the transport drives it. */
+export type SessionLike = Parameters<SyncTransport["attach"]>[0];
 
 const SERVER_KEY = "curvyo.share-server";
 const NAME_KEY = "curvyo.share-name";
@@ -295,9 +324,14 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
     // A network that comes back reconnects at once, not after the backoff (criterion 18).
     const onOnline = () => transport?.networkBack();
     window.addEventListener("online", onOnline);
+    // A shared workspace's link moves to the next document's session with its socket.
+    const stopHandOver = onWorkspaceLinkMoved((next) => {
+      transport?.handOver(next as unknown as Parameters<SyncTransport["handOver"]>[0]);
+    });
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("online", onOnline);
+      stopHandOver();
       transport?.attach(null);
     };
   }, [showNotice, getSession, resume]);
@@ -466,6 +500,8 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
     carry(transportRef.current, session);
   }, [getSession]);
 
+  const drive = useCallback((session: SessionLike) => carry(transportRef.current, session), []);
+
   const submitPassphrase = useCallback((text: string) => {
     passphraseRef.current = text;
     const pending = pendingRef.current;
@@ -497,5 +533,7 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
     joinError,
     passphrase,
     submitPassphrase,
+    deviceKeys: keysFor,
+    drive,
   };
 }

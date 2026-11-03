@@ -282,7 +282,7 @@ fn an_undo_of_what_a_peer_deleted_is_skipped_and_names_the_peer() {
 
 #[cfg(unix)]
 #[path = "../../tests/cpu_time/mod.rs"]
-mod cpu_time;
+pub(super) mod cpu_time;
 
 /// adrs.md decision 9 (criterion 13): importing one remote edit into a document of 1,000 objects
 /// at the start of a frame costs at most 2 ms of thread CPU time, asserted at four times (8 ms)

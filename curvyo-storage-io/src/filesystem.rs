@@ -130,7 +130,7 @@ fn temporary_sibling_path(dir: &Path, final_path: &Path) -> PathBuf {
     dir.join(format!("{file_name}.{}.tmp", unique_suffix()))
 }
 
-fn unique_suffix() -> String {
+pub(crate) fn unique_suffix() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let pid = std::process::id();
     let nanos = SystemTime::now()

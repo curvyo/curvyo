@@ -13,8 +13,9 @@ use curvyo_sync_core::{
 
 fn client_frames() -> Vec<ClientFrame> {
     vec![
+        // `frames_v1.bin` pins the protocol 1 bytes; protocol 2 adds `SnapshotPart` only.
         ClientFrame::Hello {
-            protocol: PROTOCOL_VERSION,
+            protocol: 1,
             room: RoomId([0xd0; 16]),
             since_seq: 42,
             identity: MemberId([0x11; 32]),
@@ -132,6 +133,53 @@ fn every_frame_matches_its_golden_bytes() {
         bytes,
         "frames_v1.bin differs"
     );
+}
+
+/// Relay protocol 2 (ADR 0036 decision 7): `Hello` naming 2 and `SnapshotPart`, golden in
+/// `frames_v2.bin`; regenerate with `CURVYO_UPDATE_GOLDEN=1`.
+#[test]
+fn protocol_2_frames_match_their_golden_bytes() {
+    assert_eq!(PROTOCOL_VERSION, 2);
+    let frames = [
+        ClientFrame::Hello {
+            protocol: PROTOCOL_VERSION,
+            room: RoomId([0xd0; 16]),
+            since_seq: 42,
+            identity: MemberId([0x11; 32]),
+        },
+        ClientFrame::SnapshotPart {
+            covers_seq: 500,
+            index: 0,
+            last: false,
+            envelope: vec![0xe7; 4],
+        },
+        ClientFrame::SnapshotPart {
+            covers_seq: 500,
+            index: 1,
+            last: true,
+            envelope: vec![0xe8; 3],
+        },
+    ];
+    let mut bytes = Vec::new();
+    for frame in &frames {
+        let message = frame.encode();
+        assert_eq!(ClientFrame::decode(&message).unwrap(), *frame);
+        bytes.extend_from_slice(&u32::try_from(message.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(&message);
+    }
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/frames_v2.bin");
+    if std::env::var_os("CURVYO_UPDATE_GOLDEN").is_some() {
+        std::fs::write(&path, &bytes).unwrap();
+    }
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        bytes,
+        "frames_v2.bin differs"
+    );
+    // A `last` flag other than 0 or 1 is malformed.
+    let mut odd = frames[1].encode();
+    odd[13] = 2;
+    assert_eq!(ClientFrame::decode(&odd), Err(FrameError::Malformed));
 }
 
 #[test]

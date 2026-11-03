@@ -44,6 +44,11 @@ mod document_size;
 mod page_frame;
 mod page_grid;
 mod pages;
+mod workspace_disk_plan;
+mod workspace_list;
+mod workspace_list_view;
+mod workspace_names;
+mod workspace_plan;
 pub use page_grid::{GridMode, GridScale, OriginCorner, PageGrid, PageGridError};
 pub use pages::{FIRST_PAGE_ID, Page, PageError};
 mod dimension_codec;
@@ -171,7 +176,9 @@ pub use clones::{
     UNLINK_CLONE_COMMIT_LABEL,
 };
 pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, pack_snapshot, unpack};
-pub use container_share::{CURRENT_SHARE_FORMAT_VERSION, ShareRecord};
+pub use container_share::{
+    CURRENT_SHARE_FORMAT_VERSION, ShareRecord, WorkspaceRoomRecord, WorkspaceShareRecord,
+};
 pub use corner_radii::{Corner, CornerRadii, SHARP_CORNER_EPSILON_MM, effective_corner_radii};
 pub use display_unit::DisplayUnit;
 pub use document::{CURRENT_FORMAT_VERSION, Document, DocumentVersion};
@@ -294,6 +301,19 @@ pub use tiling_model::{
     TilingRequest, TilingResult, Variance, hue_shifted,
 };
 pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};
+pub use workspace_disk_plan::{DiskOp, DiskPlan, DiskState, ListPlace, ScannedDocument, plan_disk};
+pub use workspace_list::{
+    Created, ListError, ListImportReport, ListNodeId, WORKSPACE_LIST_FORMAT_VERSION, WorkspaceList,
+};
+pub use workspace_list_view::{DeletedEntry, ListEntry};
+pub use workspace_names::{
+    MAX_ENTRY_NAME_CHARS, NameRefusal, check_entry_name, copy_entry_name, free_entry_name,
+    same_entry_name,
+};
+pub use workspace_plan::{
+    DOCUMENT_EXTENSION, EntryKind, FileOp, PlanRefusal, Planned, WorkspacePath, WorkspaceTree,
+    document_name,
+};
 
 mod sketch_model;
 pub use sketch_model::{SketchCheckpoint, SketchDelta, SketchEntityRecord, SketchSnapshot};

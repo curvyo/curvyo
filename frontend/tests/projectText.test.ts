@@ -40,6 +40,16 @@ test("the status line (criterion 16)", () => {
   assert.equal(projectStatus(null, true), "Unsaved changes");
   assert.equal(projectStatus("a.curvyo", false), "No changes since the last save");
   assert.equal(projectStatus(null, false), "Not saved yet");
+  // `specs/0094-workspace` criterion 7: the open file was removed by another program.
+  assert.equal(projectStatus("a.curvyo", true, true), "File missing");
+  assert.equal(projectStatus("a.curvyo", false, true), "File missing");
+});
+
+test("the check names what the workspace actions do (specs/0094-workspace criteria 9, 17, 21)", () => {
+  assert.match(checkSentence("Poster.curvyo", "switch"), /before you open another document\?/);
+  assert.match(checkSentence("Poster.curvyo", "open-workspace"), /before you open another workspace\?/);
+  assert.match(checkSentence("Poster.curvyo", "close-workspace"), /before you close the workspace\?/);
+  assert.match(checkSentence("Poster.curvyo", "delete-open"), /before you delete it\?/);
 });
 
 test("the sentence of the check names the project and the action (criterion 25)", () => {
@@ -65,4 +75,9 @@ test("a long file name is cut in the middle in the sentence of the check and kee
   const sentence = checkSentence(long, "new");
   assert.match(sentence, /^x+…x*\.curvyo has unsaved changes\./);
   assert.ok(sentence.indexOf(" has unsaved") <= 41);
+});
+
+test("a shared document another member deleted says so (0094 criterion 40)", () => {
+  assert.equal(projectStatus("a.curvyo", true, false, "Deleted by Ben. Save as to keep it."), "Deleted by Ben. Save as to keep it.");
+  assert.equal(projectStatus("a.curvyo", true, false, ""), "Unsaved changes");
 });

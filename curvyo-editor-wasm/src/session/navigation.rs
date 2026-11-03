@@ -63,6 +63,31 @@ impl Session {
         self.viewport.screen_to_document(screen_x, screen_y)
     }
 
+    /// The view to come back to after switching documents, as text: the zoom factor and the
+    /// document point at the canvas's centre (`specs/0094-workspace` criterion 10).
+    #[must_use]
+    pub fn saved_view_text(&self) -> String {
+        let saved = self.viewport.saved_view();
+        format!("{} {} {}", saved.zoom, saved.centre.x, saved.centre.y)
+    }
+
+    /// Shows the view of [`Session::saved_view_text`]; `false` and no change for other text.
+    pub fn restore_view_text(&mut self, text: &str) -> bool {
+        let numbers: Vec<f64> = text
+            .split(' ')
+            .filter_map(|part| part.parse::<f64>().ok())
+            .filter(|value| value.is_finite())
+            .collect();
+        let [zoom, x, y] = numbers.as_slice() else {
+            return false;
+        };
+        self.viewport.restore_view(curvyo_ui_core::SavedView {
+            zoom: *zoom,
+            centre: Point::new(*x, *y),
+        });
+        true
+    }
+
     /// The current zoom level's integer percentage read-out (acceptance
     /// criterion 9).
     #[must_use]
@@ -207,6 +232,34 @@ mod tests {
         let (right, bottom) =
             view.document_to_screen(Point::new(size.width.as_mm(), size.height.as_mm()));
         ((left, right), (top, bottom))
+    }
+
+    /// `specs/0094-workspace` criterion 10: the view of a document comes back in the session that
+    /// reopens it; other text changes nothing.
+    #[test]
+    fn a_saved_view_comes_back_in_a_reopened_session() {
+        let mut first = Session::new(1);
+        first.show_default_view();
+        first.resize_viewport(1200.0, 900.0);
+        first.wheel(0.0, -300.0, 400.0, 300.0, false, true);
+        first.wheel(25.0, 60.0, 400.0, 300.0, false, false);
+        let saved = first.saved_view_text();
+
+        let mut again = Session::new(2);
+        again.show_default_view();
+        again.resize_viewport(1200.0, 900.0);
+        assert!(again.restore_view_text(&saved));
+        assert_eq!(again.zoom_percent(), first.zoom_percent());
+        let close = |a: &Session, b: &Session| {
+            let ((l1, r1), (t1, b1)) = document_edges(a);
+            let ((l2, r2), (t2, b2)) = document_edges(b);
+            [l1 - l2, r1 - r2, t1 - t2, b1 - b2]
+                .iter()
+                .all(|delta| delta.abs() < 1e-6)
+        };
+        assert!(close(&again, &first));
+        assert!(!again.restore_view_text("broken"));
+        assert!(close(&again, &first));
     }
 
     /// The customer's observation: a new project showed the document at the

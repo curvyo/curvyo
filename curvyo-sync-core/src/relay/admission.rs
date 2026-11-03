@@ -9,7 +9,8 @@ use curvyo_crypto_core::{MemberId, verify, verify_claim_proof};
 
 use super::{RelayOutput, RoomLog, Stage};
 use crate::frame::{
-    ClientFrame, ConnectionId, PROTOCOL_VERSION, RefusalReason, RelayFrame, RoomId,
+    ClientFrame, ConnectionId, OLDEST_PROTOCOL_VERSION, PROTOCOL_VERSION, RefusalReason,
+    RelayFrame, RoomId,
 };
 use crate::time::Millis;
 
@@ -49,7 +50,7 @@ pub(super) fn hello(
     else {
         return Err(RefusalReason::Protocol);
     };
-    if protocol != PROTOCOL_VERSION {
+    if !(OLDEST_PROTOCOL_VERSION..=PROTOCOL_VERSION).contains(&protocol) {
         return Err(RefusalReason::Protocol);
     }
     out.push(RelayOutput::Send {

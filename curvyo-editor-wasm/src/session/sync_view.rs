@@ -36,7 +36,9 @@ impl Session {
     /// the join phase and the participants (own row first, then by member id).
     #[must_use]
     pub fn share_view_json(&self) -> String {
-        let Some(link) = self.sync.as_ref() else {
+        // A device removed from its shared workspace shows a local workspace: "Not shared" with
+        // Share workspace available (`specs/0094-workspace` criterion 44, `ux-notes.md` 4).
+        let Some(link) = self.sync.as_ref().filter(|_| !self.workspace_removed()) else {
             let record = self.document.share();
             return json!({
                 "shared": record.is_some(),
@@ -57,6 +59,7 @@ impl Session {
             .filter(|p| p["online"].as_bool() == Some(true))
             .count();
         let join = join_json(link);
+        let workspace = workspace_json(link, participants.len(), state);
         json!({
             "shared": shared,
             "live": link.ended.is_none(),
@@ -75,7 +78,9 @@ impl Session {
             "ended": link.ended.map(|e| match e {
                 SyncEnd::Removed => "removed",
                 SyncEnd::Refused => "refused",
+                SyncEnd::Moved => "moved",
             }),
+            "workspace": workspace,
         })
         .to_string()
     }
@@ -122,9 +127,35 @@ fn participant_rows(link: &SyncLink, is_admin: bool) -> Vec<Value> {
         .collect()
 }
 
+/// The shared workspace as the Share tab's Workspace block and the File tab's header line show
+/// it (`specs/0094-workspace` `ux-notes.md` sections 2.1, 4 and 9); `None` for a document
+/// shared on its own.
+fn workspace_json(
+    link: &SyncLink,
+    people: usize,
+    state: curvyo_ui_core::share_text::ConnectionState,
+) -> Option<Value> {
+    use curvyo_ui_core::workspace_share_text::{shared_header_line, shared_through_text};
+    let channel = link.workspace.as_ref()?;
+    let receiving = channel.receiving();
+    Some(json!({
+        "id": super::sync::hex(&channel.workspace),
+        "name": channel.name,
+        "headerLine": shared_header_line(people, state, receiving),
+        "receiving": receiving.map(|(done, total)| {
+            curvyo_ui_core::workspace_share_text::receiving_text(done, total)
+        }),
+        "openInWorkspace": channel.stream.is_some(),
+        "documentLine": shared_through_text(&channel.name),
+        "people": curvyo_ui_core::workspace_share_text::people_text(people),
+        "joining": channel.joining,
+    }))
+}
+
 /// The join phase as the Share tab shows it (UX notes §2.5), `None` when this is no join.
 fn join_json(link: &SyncLink) -> Option<Value> {
     let phase = link.join?;
+    let workspace = link.workspace.as_ref();
     // A join that never reached the server says so (UX notes §2.5).
     if phase == JoinPhase::Connecting && link.failed_first {
         return Some(json!({
@@ -139,9 +170,23 @@ fn join_json(link: &SyncLink) -> Option<Value> {
         JoinPhase::Connecting => json!({"phase": "connecting", "text": "Connecting..."}),
         JoinPhase::Waiting => json!({
             "phase": "waiting",
-            "text": "Waiting for a member of this document to let you in",
+            "text": if workspace.is_some() {
+                curvyo_ui_core::workspace_share_text::WORKSPACE_WAITING_TEXT
+            } else {
+                "Waiting for a member of this document to let you in"
+            },
         }),
-        JoinPhase::Downloading => json!({"phase": "downloading", "text": "Downloading..."}),
+        JoinPhase::Downloading => json!({
+            "phase": "downloading",
+            "text": workspace
+                .and_then(|c| c.receiving())
+                .map_or_else(
+                    || "Downloading...".to_owned(),
+                    |(done, total)| {
+                        curvyo_ui_core::workspace_share_text::receiving_text(done, total)
+                    },
+                ),
+        }),
         JoinPhase::Done => json!({"phase": "done", "text": ""}),
         JoinPhase::Refused(reason) => json!({
             "phase": "refused",

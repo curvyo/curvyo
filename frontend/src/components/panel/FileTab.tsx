@@ -31,6 +31,9 @@ interface FileTabProps {
   exportSvg?: ReactNode;
   /** The Extensions group (`specs/0093` UX notes §7), at the end of the tab. */
   extensions?: ReactNode;
+  /** The Workspace section (`specs/0094-workspace` `ux-notes.md` section 1), appended below Export
+   * SVG and above Quit; the desktop build only. */
+  workspace?: ReactNode;
 }
 
 /** What the buttons need besides the project. */
@@ -50,12 +53,20 @@ export function FileTab({
   onReturnFocus,
   exportSvg,
   extensions,
+  workspace,
 }: FileTabProps) {
   const { info, dirty, check } = project;
   const buttonProps = { project, desktop, tooltipFor, onReturnFocus };
   return (
     <div className="flex flex-col">
-      <ProjectBlock fileName={info.fileName} path={info.path} dirty={dirty} desktop={desktop} />
+      <ProjectBlock
+        fileName={info.fileName}
+        path={info.path}
+        dirty={dirty}
+        missing={info.missing ?? false}
+        deleted={info.deletedStatus ?? ""}
+        desktop={desktop}
+      />
       <div className="mt-3 h-[100px]">
         {check ? (
           <UnsavedCheck key={check.id} check={check} fileName={info.fileName} project={project} />
@@ -64,6 +75,7 @@ export function FileTab({
         )}
       </div>
       {exportSvg}
+      {workspace}
       {desktop ? (
         <>
           <div
@@ -86,11 +98,15 @@ function ProjectBlock({
   fileName,
   path,
   dirty,
+  missing,
+  deleted,
   desktop,
 }: {
   fileName: string | null;
   path: string | null;
   dirty: boolean;
+  missing: boolean;
+  deleted: string;
   desktop: boolean;
 }) {
   const name = (
@@ -105,7 +121,7 @@ function ProjectBlock({
       ) : (
         name
       )}
-      <p className="text-xs text-[var(--panel-muted-fg)]">{projectStatus(fileName, dirty)}</p>
+      <p className="text-xs text-[var(--panel-muted-fg)]">{projectStatus(fileName, dirty, missing, deleted)}</p>
     </div>
   );
 }

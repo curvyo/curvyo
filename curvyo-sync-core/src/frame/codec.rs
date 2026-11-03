@@ -16,6 +16,7 @@ mod tag {
     pub(super) const SNAPSHOT: u8 = 0x05;
     pub(super) const AWARENESS: u8 = 0x06;
     pub(super) const PING: u8 = 0x07;
+    pub(super) const SNAPSHOT_PART: u8 = 0x08;
     pub(super) const CHALLENGE: u8 = 0x81;
     pub(super) const WELCOME: u8 = 0x82;
     pub(super) const RELAY_KEYRING: u8 = 0x83;
@@ -120,6 +121,18 @@ impl ClientFrame {
                 out.extend_from_slice(envelope);
             }
             Self::Ping => out.push(tag::PING),
+            Self::SnapshotPart {
+                covers_seq,
+                index,
+                last,
+                envelope,
+            } => {
+                out.push(tag::SNAPSHOT_PART);
+                out.extend_from_slice(&covers_seq.to_le_bytes());
+                out.extend_from_slice(&index.to_le_bytes());
+                out.push(u8::from(*last));
+                out.extend_from_slice(envelope);
+            }
         }
         out
     }
@@ -164,6 +177,16 @@ impl ClientFrame {
                 envelope: reader.rest_nonempty()?,
             },
             tag::PING => Self::Ping,
+            tag::SNAPSHOT_PART => Self::SnapshotPart {
+                covers_seq: reader.u64()?,
+                index: reader.u32()?,
+                last: match reader.u8()? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(FrameError::Malformed),
+                },
+                envelope: reader.rest_nonempty()?,
+            },
             _ => return Err(FrameError::Malformed),
         };
         reader.finish()?;
@@ -323,6 +346,10 @@ impl<'a> Reader<'a> {
 
     fn u16(&mut self) -> Result<u16, FrameError> {
         Ok(u16::from_le_bytes(self.array()?))
+    }
+
+    fn u32(&mut self) -> Result<u32, FrameError> {
+        Ok(u32::from_le_bytes(self.array()?))
     }
 
     fn u64(&mut self) -> Result<u64, FrameError> {

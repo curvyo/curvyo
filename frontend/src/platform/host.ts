@@ -17,6 +17,7 @@ import {
   listBrowserFonts,
   removeBrowserFontFiles,
 } from "@/lib/browserFonts";
+import { ARGS_HEADER, asciiJson } from "@/lib/binaryArgs";
 import { detectPlatform, type PlatformKind } from "@/lib/platformKind";
 import type { OpenPayload, SaveOutcome } from "@/lib/projectState";
 
@@ -259,7 +260,37 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   write_document_keys: (args) => {
     browserRoomKeys.set(String(args?.room), args?.keys as [number, string][]);
   },
+  // A workspace is a folder, which the browser cannot open (`specs/0094-workspace`, desktop app
+  // only): no recent workspaces, and the section is not shown, so nothing else is called.
+  recent_workspaces: () => [],
+  remove_recent_workspace: () => [],
+  pick_workspace: () => ({ kind: "cancelled" }),
+  open_recent_workspace: () => ({ kind: "refused", code: "not-found" }),
+  close_workspace: () => undefined,
+  scan_open_workspace: () => noWorkspace(),
+  apply_workspace_op: () => noWorkspace(),
+  read_workspace_document: () => noWorkspace(),
+  confirm_workspace_document_opened: () => undefined,
+  probe_workspace_document: () => noWorkspace(),
+  workspace_marker_share: () => noWorkspace(),
+  write_workspace_marker_share: () => noWorkspace(),
+  write_workspace_id: () => noWorkspace(),
+  replace_workspace_document: () => noWorkspace(),
+  write_workspace_index: () => noWorkspace(),
+  pick_join_folder: () => ({ kind: "cancelled" }),
+  start_joined_workspace: () => ({ kind: "refused", code: "not-found" }),
+  scan_shared_workspace: () => noWorkspace(),
+  keep_workspace_document: () => noWorkspace(),
+  restore_workspace_document: () => noWorkspace(),
+  read_deleted_document: () => noWorkspace(),
+  write_deleted_document: () => noWorkspace(),
+  clear_workspace_marker_share: () => noWorkspace(),
 };
+
+/** What a workspace command answers in the browser: there is no folder. */
+function noWorkspace(): never {
+  throw "not-found";
+}
 
 /** The browser page's device identity: 64 random bytes as hex, made once per page. */
 let pageIdentity: string | null = null;
@@ -273,20 +304,25 @@ function browserIdentity(): string {
 }
 const browserRoomKeys = new Map<string, [number, string][]>();
 
-/** Same contract as Tauri's `invoke`. */
+/** Same contract as Tauri's `invoke`. With `bytes`, they travel as a raw binary body and `args`
+ * in a header (`curvyo-app`'s `raw_ipc`), so a file never crosses as a JSON number array; the
+ * browser stand-in gets `{ ...args, bytes }`. */
 export function invoke<T>(
   command: string,
   args?: Record<string, unknown>,
+  bytes?: Uint8Array,
 ): Promise<T> {
   if (isTauri) {
-    return tauriInvoke<T>(command, args);
+    return bytes
+      ? tauriInvoke<T>(command, bytes, { headers: { [ARGS_HEADER]: asciiJson(args ?? {}) } })
+      : tauriInvoke<T>(command, args);
   }
   const handler = browserCommands[command];
   if (!handler) {
     return Promise.reject(new Error(`${command} is not available in the browser`));
   }
   try {
-    return Promise.resolve(handler(args) as T);
+    return Promise.resolve(handler(bytes ? { ...args, bytes } : args) as T);
   } catch (error) {
     // A guarded storage access that fails is a rejected command, not a throw.
     return Promise.reject(error);

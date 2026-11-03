@@ -36,6 +36,16 @@ pub struct PresencePayload {
     pub tool: String,
     /// The offset of the selection's move drag in flight, in millimetres (criterion 7).
     pub drag: Option<[f64; 2]>,
+    /// In a shared workspace, the open document's id as hex, so that marks are drawn only in
+    /// the same document (`specs/0094-workspace`, ADR 0036 decision 5: it travels inside the
+    /// seal); empty for a document shared on its own.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub document: String,
+    /// In a shared workspace, the Loro peer id of this device's list replica as decimal text,
+    /// so that the notice of a rename or move names its author (`specs/0094-workspace`
+    /// `ux-notes.md` section 7); empty for a document shared on its own.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub list_peer: String,
 }
 
 impl PresencePayload {
@@ -43,6 +53,12 @@ impl PresencePayload {
     #[must_use]
     pub fn peer_id(&self) -> Option<u64> {
         self.peer.parse().ok()
+    }
+
+    /// The list replica's peer id, if the text is one.
+    #[must_use]
+    pub fn list_peer_id(&self) -> Option<u64> {
+        self.list_peer.parse().ok()
     }
 
     /// The payload as it may be drawn: `None` for another version; the label cut to
@@ -79,6 +95,8 @@ mod tests {
             selection: Vec::new(),
             tool: "select".to_owned(),
             drag: Some([f64::NAN, 1.0]),
+            document: String::new(),
+            list_peer: String::new(),
         }
     }
 

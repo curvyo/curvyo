@@ -27,8 +27,20 @@ impl Session {
         if let Some(record) = self.sync_share_record() {
             self.document.set_share(Some(record));
         }
+        // A document of a shared workspace keeps its workspace and id (`specs/0094-workspace`
+        // criterion 15); the records applied so far are in the file once it is written.
+        if let Some(record) = self.workspace_share_record() {
+            self.document.set_workspace_share(Some(record));
+        }
+        let applied = self.sync.as_ref().and_then(|link| {
+            let channel = link.workspace.as_ref()?;
+            channel.unsaved.iter().map(|item| item.seq).max()
+        });
         let bytes = self.pack(APP_VERSION)?;
         self.packed = Some(version);
+        if let Some(link) = self.sync.as_mut() {
+            link.packed_through = applied;
+        }
         Ok(bytes)
     }
 
@@ -37,6 +49,12 @@ impl Session {
     pub fn mark_saved(&mut self) {
         if let Some(version) = self.packed.take() {
             self.saved = version;
+        }
+        if let Some(link) = self.sync.as_mut()
+            && let Some(through) = link.packed_through.take()
+            && let Some(channel) = link.workspace.as_mut()
+        {
+            channel.open_saved(through);
         }
     }
 

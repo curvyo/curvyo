@@ -35,6 +35,8 @@ import { useClosePathState } from "@/hooks/usePenCue";
 import { useDocumentPanel } from "@/hooks/useDocumentPanel";
 import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { useProject } from "@/hooks/useProject";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { useWorkspaceSync } from "@/hooks/useWorkspaceSync";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { CollaborationPill } from "@/components/CollaborationPill";
@@ -139,6 +141,10 @@ function Editor() {
   // Ctrl+V and Ctrl+C for images (`specs/0087-image-clipboard-and-drop`).
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
   const collab = useCollaboration(editor, project);
+  // The workspace outlives the File tab: its scan and open document stay while other tabs show.
+  const workspace = useWorkspace(editor, project);
+  // Its sharing, joining and reconnecting (`specs/0094-workspace` criteria 25 to 33).
+  const workspaceSync = useWorkspaceSync(editor, project, collab, workspace);
 
   const workbench = workbenchEntry<WorkbenchContext, ReactNode>(activeKind(workbenches.list));
   const drawingOverlay = (
@@ -390,6 +396,8 @@ function Editor() {
           project={project}
           traceInfo={traceInfo}
           collab={collab}
+          workspace={workspace}
+          workspaceSync={workspaceSync}
         />
       </div>
       <CursorStatus

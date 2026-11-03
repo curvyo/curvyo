@@ -6,8 +6,11 @@ mod codec;
 
 use curvyo_crypto_core::{DocumentId, MemberId};
 
-/// The protocol version a client names in its `Hello`.
-pub const PROTOCOL_VERSION: u16 = 1;
+/// The protocol version a client names in its `Hello`: 2 adds `SnapshotPart` (ADR 0036 decision
+/// 7). The relay still admits clients of protocol 1, of which 2 is a superset.
+pub const PROTOCOL_VERSION: u16 = 2;
+/// The oldest protocol version the relay admits.
+pub const OLDEST_PROTOCOL_VERSION: u16 = 1;
 
 /// The largest message either side accepts: 64 MiB (ADR 0031 decision 5, Proposal; above the
 /// image import ceiling).
@@ -113,6 +116,18 @@ pub enum ClientFrame {
     },
     /// Liveness.
     Ping,
+    /// One part of a multi-part signed snapshot covering every record up to `covers_seq`
+    /// (protocol 2): parts arrive in order from index 0; the relay swaps them in on `last`.
+    SnapshotPart {
+        /// The last record the snapshot holds.
+        covers_seq: u64,
+        /// The part's place, from 0.
+        index: u32,
+        /// Whether it is the snapshot's last part.
+        last: bool,
+        /// The signed envelope.
+        envelope: Vec<u8>,
+    },
 }
 
 /// A frame the relay sends to a client.
