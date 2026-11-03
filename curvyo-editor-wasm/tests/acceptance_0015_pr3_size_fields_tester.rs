@@ -73,6 +73,16 @@ fn points(d: &Document) -> Vec<(f64, f64)> {
     out
 }
 
+/// `points` on the page: relative to the first page's frame origin (since format 34 a resize or
+/// fit moves the frame, not the objects, ADR 0031 decision 9a).
+fn page_points(d: &Document) -> Vec<(f64, f64)> {
+    let o = d.pages()[0].origin;
+    points(d)
+        .into_iter()
+        .map(|(x, y)| (x - o.x, y - o.y))
+        .collect()
+}
+
 fn screen_points(s: &Session) -> Vec<(f64, f64)> {
     points(&reopened(s))
         .iter()
@@ -136,7 +146,7 @@ fn ac17_the_specs_example_300_by_400() {
     assert_eq!(s.set_document_side(Width, "300"), SizeOutcome::Committed);
     assert_eq!(s.set_document_side(Height, "400"), SizeOutcome::Committed);
     assert_eq!(size_mm(&s), (300.0, 400.0));
-    let p = points(&reopened(&s));
+    let p = page_points(&reopened(&s));
     assert_eq!(p[0], (55.0, 61.5));
     assert_eq!(p[2], (105.0, 111.5));
     assert_eq!(s.size_text(), "300.0 \u{d7} 400.0 mm");
@@ -161,7 +171,7 @@ fn ac17_18_a_smaller_document_scales_nothing_and_moves_content_to_the_pasteboard
     let mut s = one_rect_session();
     assert_eq!(s.set_document_side(Width, "20"), SizeOutcome::Committed);
     assert_eq!(s.set_document_side(Height, "20"), SizeOutcome::Committed);
-    let p = points(&reopened(&s));
+    let p = page_points(&reopened(&s));
     // shift (-95, -138.5)
     assert!(
         (p[0].0 + 85.0).abs() < 1e-9 && (p[0].1 + 128.5).abs() < 1e-9,

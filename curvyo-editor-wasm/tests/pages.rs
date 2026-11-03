@@ -30,7 +30,9 @@ fn origin(d: &Document, id: curvyo_document_core::NodeId) -> Point {
     }
 }
 #[test]
-fn active_resize_moves_only_exclusive_content_and_rulers_follow_origin() {
+/// Since format 34 the resize moves the frame around its centre and no object (ADR 0031 decision
+/// 9a).
+fn active_resize_moves_the_frame_only_and_rulers_follow_origin() {
     let d = Document::new(1);
     let second = d.add_page();
     let inside = rectangle(&d, second.origin.x + 10.0, 10.0, 20.0, 20.0);
@@ -42,9 +44,10 @@ fn active_resize_moves_only_exclusive_content_and_rulers_follow_origin() {
     assert_eq!(s.undo_len(), undo);
     s.set_document_side(DocumentSide::Width, "310");
     let changed = document(&s);
+    assert_eq!(origin(&changed, inside), origin(&d, inside));
     assert_eq!(
-        origin(&changed, inside),
-        Point::new(second.origin.x + 60.0, 10.0)
+        changed.pages()[1].origin,
+        Point::new(second.origin.x - 50.0, second.origin.y)
     );
     assert_eq!(origin(&changed, partial), origin(&d, partial));
     assert_eq!(origin(&changed, first), origin(&d, first));
@@ -148,12 +151,8 @@ fn two_hundred_pages_cpu_budget() {
     let d = Document::new(8);
     for i in 1..200 {
         let p = d.add_page();
-        d.resize_page(
-            &p.id,
-            DocumentSize::from_mm(100.0 + f64::from(i % 7), 80.0),
-            &[],
-        )
-        .unwrap();
+        d.resize_page(&p.id, DocumentSize::from_mm(100.0 + f64::from(i % 7), 80.0))
+            .unwrap();
         rectangle(&d, p.origin.x + 10.0, p.origin.y + 10.0, 20.0, 20.0);
     }
     let bytes = pack(&d, "test").unwrap();

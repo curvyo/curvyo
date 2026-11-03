@@ -34,6 +34,9 @@ import { useDocumentPanel } from "@/hooks/useDocumentPanel";
 import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { useProject } from "@/hooks/useProject";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
+import { useCollaboration } from "@/hooks/useCollaboration";
+import { CollaborationPill } from "@/components/CollaborationPill";
+import { PresenceOverlay } from "@/components/PresenceOverlay";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
 import { nodeCountText } from "@/lib/nodeText";
 import { isTauri, unsupportedReason } from "@/platform/host";
@@ -132,6 +135,7 @@ function Editor() {
   });
   // Ctrl+V and Ctrl+C for images (`specs/0087-image-clipboard-and-drop`).
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
+  const collab = useCollaboration(editor, project);
 
   return (
     // The one tooltip provider of the app: every `Tooltip` and `SliderTip` below needs it, and a
@@ -192,7 +196,19 @@ function Editor() {
           paused={historyPreview.kind === "document"}
           onImport={() => project.importFiles()}
         />}
-        <Canvas editor={editor} sketch={sketch} onDropFiles={project.importFiles} />
+        <Canvas
+          editor={editor}
+          sketch={sketch}
+          onDropFiles={project.importFiles}
+          overlay={<PresenceOverlay getSession={editor.getSession} />}
+        />
+        <CollaborationPill
+          view={collab.view}
+          onOpen={() => {
+            panelOpen.setOpen(true);
+            documentPanel.pressTab("share");
+          }}
+        />
         <HistoryPreviewFrame />
         {/* Contextual tool bar: floats over the canvas, right of the tool
          * rail, so showing/hiding it never resizes the canvas
@@ -363,6 +379,7 @@ function Editor() {
           panelOpen={panelOpen}
           project={project}
           traceInfo={traceInfo}
+          collab={collab}
         />
       </div>
       <CursorStatus

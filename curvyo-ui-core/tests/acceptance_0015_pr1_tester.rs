@@ -13,9 +13,17 @@ use curvyo_document_core::{
     StarFrame, StyleEdit, Vec2,
 };
 use curvyo_ui_core::{
-    content_bounds, content_too_large_message, document_side_message, fit_document_to_content,
-    format_cursor, format_field_length, format_size, format_status_length, parse_document_side,
+    content_too_large_message, document_side_message, fit_document_to_content, format_cursor,
+    format_field_length, format_size, format_status_length, parse_document_side,
 };
+
+/// The content box on the page: relative to the first page's frame origin (since format 34 a
+/// resize or fit moves the frame, not the objects, ADR 0031 decision 9a).
+fn content_bounds(d: &Document) -> Option<(Point, Point)> {
+    let o = d.pages()[0].origin;
+    curvyo_ui_core::content_bounds(d)
+        .map(|(a, b)| (pt(a.x - o.x, a.y - o.y), pt(b.x - o.x, b.y - o.y)))
+}
 
 fn pt(x: f64, y: f64) -> Point {
     Point::new(x, y)
@@ -556,6 +564,7 @@ fn content_bounds_with_a_zero_size_rectangle() {
 // -------------------------------------------------------------------- fit
 
 fn first_path_points(d: &Document) -> Vec<(f64, f64)> {
+    let o = d.pages()[0].origin;
     d.object_ids()
         .into_iter()
         .filter_map(|id| match d.object(id).unwrap() {
@@ -566,7 +575,11 @@ fn first_path_points(d: &Document) -> Vec<(f64, f64)> {
             ObjectSnapshot::Path(p) => Some(p),
             ObjectSnapshot::Primitive(_) | ObjectSnapshot::Clone(_) => None,
         })
-        .flat_map(|p| p.anchors.into_iter().map(|a| (a.point.x, a.point.y)))
+        .flat_map(|p| {
+            p.anchors
+                .into_iter()
+                .map(|a| (a.point.x - o.x, a.point.y - o.y))
+        })
         .collect()
 }
 

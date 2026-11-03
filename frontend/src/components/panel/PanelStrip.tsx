@@ -13,6 +13,7 @@ import {
   Check,
   PanelRightClose,
   PanelRightOpen,
+  Users,
 } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 
@@ -42,6 +43,7 @@ const GLYPHS: Record<string, Glyph> = {
   sketches: Shapes,
   parameters: Variable,
   "trace-info": Info,
+  share: Users,
 };
 
 /** The tooltips come from the session with the Ctrl key; macOS says Cmd (criterion 4). */

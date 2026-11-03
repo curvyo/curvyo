@@ -3,6 +3,8 @@
 //! code — zip in/out over `&[u8]`/`Vec<u8>`, no `std::fs`
 //! (ADR 0011 §2, `curvyo-document-core`'s responsibility).
 //!
+//! A shared document adds `share.json` and `keyring.log` (`crate::container_share`).
+//!
 //! `manifest.json` is read first and alone decides whether the rest of the
 //! container is trusted (`specs/0001-project-file-foundation/adrs.md`,
 //! "container version lives in a `manifest.json` member"): it carries the
@@ -60,6 +62,24 @@ struct Manifest {
 /// Returns [`SaveError`] if the document cannot be exported or the zip
 /// container cannot be assembled.
 pub fn pack(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError> {
+    pack_members(document, app_version, true)
+}
+
+/// Packs a [`Document`] as a relay snapshot: like [`pack`], without the share record
+/// (`share.json`, `keyring.log`), which belongs to one replica's file and never to the room
+/// (ADR 0031 decision 9).
+///
+/// # Errors
+/// As [`pack`].
+pub fn pack_snapshot(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError> {
+    pack_members(document, app_version, false)
+}
+
+fn pack_members(
+    document: &Document,
+    app_version: &str,
+    with_share: bool,
+) -> Result<Vec<u8>, SaveError> {
     let loro_bytes = document.export_loro_snapshot()?;
     let json_bytes = document.export_json()?;
     let manifest = Manifest {
@@ -74,6 +94,11 @@ pub fn pack(document: &Document, app_version: &str) -> Result<Vec<u8>, SaveError
     write_member(&mut writer, MANIFEST_MEMBER, &manifest_bytes, options)?;
     write_member(&mut writer, LORO_SNAPSHOT_MEMBER, &loro_bytes, options)?;
     write_member(&mut writer, DOCUMENT_JSON_MEMBER, &json_bytes, options)?;
+    if let Some(record) = document.share().filter(|_| with_share) {
+        for (name, bytes) in crate::container_share::share_members(&record)? {
+            write_member(&mut writer, name, &bytes, options)?;
+        }
+    }
     crate::container_assets::write_assets(&mut writer, &document.assets.borrow())?;
     let cursor = writer.finish().map_err(|_| SaveError::Container)?;
     Ok(cursor.into_inner())
@@ -137,9 +162,11 @@ pub fn unpack(peer_id: u64, bytes: &[u8]) -> Result<Document, OpenError> {
         });
     }
 
+    let share = crate::container_share::read_share(&mut archive)?;
     let loro_bytes = read_member(&mut archive, LORO_SNAPSHOT_MEMBER)?;
     let document = Document::from_loro_snapshot(peer_id, &loro_bytes)?;
     *document.assets.borrow_mut() = crate::container_assets::read_assets(&mut archive);
+    document.set_share(share);
     Ok(document)
 }
 

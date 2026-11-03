@@ -8,14 +8,17 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod credentials;
 mod filesystem;
 mod font_archives;
 mod font_documents;
 mod font_files;
 mod font_subfolders;
 mod fonts;
+mod room_keys;
 mod svg_fonts;
 
+pub use credentials::{CredentialError, CredentialStore, KEY_FILE, credential_slot};
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,
 };
@@ -26,3 +29,4 @@ pub use font_subfolders::{FolderDocument, FontFolder, remove_add_leftovers};
 pub use fonts::{
     FolderFonts, FontFace, FontSource, MAX_FONT_FILE_BYTES, list_font_folder, list_system_fonts,
 };
+pub use room_keys::{decode_room_keys, encode_room_keys};

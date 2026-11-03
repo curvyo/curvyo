@@ -262,7 +262,6 @@ fn r03_resize_does_not_recenter_and_explicit_content_move_applies_once() {
     d.resize_page(
         &page,
         curvyo_document_core::DocumentSize::from_mm(500.0, 400.0),
-        &[],
     )
     .unwrap();
     assert_eq!(d.sketch(id).unwrap().placement, old.placement);

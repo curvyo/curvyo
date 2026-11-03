@@ -765,8 +765,13 @@ fn resizing_the_document_moves_every_outline_by_the_half_change() {
         .unwrap();
     let after = path_of(&document, node);
     assert_eq!(after.all_anchors().count(), before.all_anchors().count());
+    // Read on the page: since format 34 the resize moves the frame (ADR 0031 decision 9a).
+    let o = document.pages()[0].origin;
     for (new, old) in after.all_anchors().zip(before.all_anchors()) {
-        assert_eq!(new.point, old.point.translated(Vec2::new(45.0, 51.5)));
+        assert_eq!(
+            Point::new(new.point.x - o.x, new.point.y - o.y),
+            old.point.translated(Vec2::new(45.0, 51.5))
+        );
         assert_eq!(new.id, old.id);
     }
     assert_eq!(

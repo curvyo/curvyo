@@ -1,0 +1,32 @@
+[package]
+name = "curvyo-sync-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The self-hostable Curvyo relay: a WebSocket and file-store shell around the sans-I/O relay of curvyo-sync-core (ADR 0031 decision 11)."
+publish = false
+
+[lints]
+workspace = true
+
+# ADR 0031 decisions 1 and 13: the server's only `curvyo-*` dependencies are `curvyo-sync-core`
+# (the relay rules) and `curvyo-crypto-core` (the `keyring.log` header), so it never sees a
+# document type and a document-model change never forces a relay deploy (ADR 0008 §5).
+[dependencies]
+curvyo-crypto-core = { path = "../curvyo-crypto-core", version = "0.1.0" }
+curvyo-sync-core = { path = "../curvyo-sync-core", version = "0.1.0" }
+anyhow = "1"
+thiserror.workspace = true
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
+# The `Challenge` nonces of the handshake (the relay rules take entropy from their caller).
+getrandom = "0.3"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+
+[dev-dependencies]
+# The criterion 24 test seals the updates of a real document holding the marker text and colour;
+# a dev-dependency only, never a normal one.
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tempfile = "3"
+tokio-tungstenite = "0.29"

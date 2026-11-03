@@ -9,13 +9,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 #![allow(clippy::too_many_lines, clippy::cast_precision_loss)]
 
-use curvyo_document_core::{
-    DisplayUnit, Document, DocumentSize, Length, Point, RectBounds, Vec2, ViewTransform,
-};
+use curvyo_document_core::{DisplayUnit, Document, DocumentSize, Length, Point, RectBounds};
 use curvyo_ui_core::{
-    ObjectSelection, PX_PER_MM_AT_100, PanelContent, PanelTabs, Viewport,
-    content_too_large_message, document_side_message, format_cursor, format_field_length,
-    format_size, panel_body, parse_document_side,
+    ObjectSelection, PanelContent, PanelTabs, content_too_large_message, document_side_message,
+    format_cursor, format_field_length, format_size, panel_body, parse_document_side,
 };
 use proptest::prelude::*;
 
@@ -349,110 +346,7 @@ fn ac14a_clearing_the_selection_reveals_the_document_section() {
 }
 
 // ---- criterion 20: the view follows a resize or a fit ----
-
-fn screen(view: ViewTransform, x: f64, y: f64) -> (f64, f64) {
-    view.document_to_screen(Point::new(x, y))
-}
-
-fn viewport_at(percent_steps: i32, with_inset: bool) -> Viewport {
-    let mut v = if with_inset {
-        Viewport::with_document_inset()
-    } else {
-        Viewport::new()
-    };
-    v.resize(1000.0, 700.0);
-    if percent_steps != 0 {
-        v.zoom_about(300.0, 200.0, 1.25_f64.powi(percent_steps));
-        v.pan_by_screen_delta(17.5, -33.25);
-    }
-    v
-}
-
-/// An object at document point `p` before, at `p + offset` after the
-/// command, has the same screen position: for every zoom, with and without
-/// the inset flag, for any offset.
-#[test]
-fn ac20_pan_by_document_offset_keeps_moved_points_in_place() {
-    let offsets = [
-        Vec2::new(0.0, 0.0),
-        Vec2::new(45.0, 0.0),
-        Vec2::new(45.0, 51.5),
-        Vec2::new(-45.0, -51.5),
-        Vec2::new(-0.000_001, 1e-9),
-        Vec2::new(99_999.0, -99_999.0),
-        Vec2::new(12_345.678, 0.5),
-    ];
-    for steps in [-20, -8, -3, 0, 3, 8, 20] {
-        for with_inset in [true, false] {
-            for off in offsets {
-                let mut v = viewport_at(steps, with_inset);
-                let p = Point::new(10.0, 10.0);
-                let (bx, by) = screen(v.view(), p.x, p.y);
-                v.pan_by_document_offset(off);
-                let (ax, ay) = screen(v.view(), p.x + off.x, p.y + off.y);
-                let tol = 1e-6;
-                assert!(
-                    (bx - ax).abs() < tol && (by - ay).abs() < tol,
-                    "zoom steps {steps} inset {with_inset} off {off:?}: ({bx}, {by}) vs ({ax}, {ay})"
-                );
-            }
-        }
-    }
-}
-
-#[test]
-fn ac20_zero_offset_changes_nothing_including_the_inset() {
-    let mut v = Viewport::with_document_inset();
-    v.resize(900.0, 600.0);
-    let before = screen(v.view(), 0.0, 0.0);
-    v.pan_by_document_offset(Vec2::new(0.0, 0.0));
-    assert_eq!(screen(v.view(), 0.0, 0.0), before);
-    // 128 px is not exactly representable through the scale, as 72 px happened to be.
-    let near = |(x, y): (f64, f64)| (x - 128.0).abs() < 1e-9 && (y - 128.0).abs() < 1e-9;
-    assert!(near(before), "{before:?}");
-    // Still the untouched view: a window resize keeps the corner at 128 px.
-    v.resize(500.0, 450.0);
-    assert!(near(screen(v.view(), 0.0, 0.0)));
-}
-
-/// The command is not a navigation gesture: a window resize of a view that
-/// only followed a resize keeps what was on screen where it was (as-built
-/// note, criterion 20).
-#[test]
-fn ac20_a_window_resize_after_the_command_keeps_the_objects_in_place() {
-    let mut v = Viewport::with_document_inset();
-    v.resize(1000.0, 700.0);
-    let off = Vec2::new(45.0, 51.5);
-    let before = screen(v.view(), 10.0, 10.0);
-    v.pan_by_document_offset(off);
-    v.resize(640.0, 480.0);
-    v.resize(1300.0, 900.0);
-    let after = screen(v.view(), 10.0 + off.x, 10.0 + off.y);
-    assert!(
-        (before.0 - after.0).abs() < 1e-6 && (before.1 - after.1).abs() < 1e-6,
-        "{before:?} vs {after:?}"
-    );
-}
-
-#[test]
-fn ac20_zoom_is_unchanged_by_the_command() {
-    let mut v = viewport_at(5, false);
-    let zoom = v.zoom_percent();
-    v.pan_by_document_offset(Vec2::new(500.0, -500.0));
-    assert_eq!(v.zoom_percent(), zoom);
-    let expected_scale = f64::from(i32::try_from(zoom).unwrap()) / 100.0 * PX_PER_MM_AT_100;
-    assert!((v.view().scale() - expected_scale).abs() / expected_scale < 0.01);
-}
-
-/// Two commands in a row equal one with the summed offset.
-#[test]
-fn ac20_offsets_add_up() {
-    let mut a = viewport_at(4, true);
-    let mut b = viewport_at(4, true);
-    a.pan_by_document_offset(Vec2::new(10.0, 20.0));
-    a.pan_by_document_offset(Vec2::new(-3.0, 7.5));
-    b.pan_by_document_offset(Vec2::new(7.0, 27.5));
-    let (ax, ay) = screen(a.view(), 0.0, 0.0);
-    let (bx, by) = screen(b.view(), 0.0, 0.0);
-    assert!((ax - bx).abs() < 1e-9 && (ay - by).abs() < 1e-9);
-}
+// Since format 34 a resize or a fit moves the page frame and no object (ADR 0031 decision 9a), so
+// the view needs no command of its own: what criterion 20 asks, objects staying where they were
+// on screen, is checked on the session in
+// `curvyo-editor-wasm/tests/acceptance_0015_pr3_session_tester.rs` (`ac20_*`).

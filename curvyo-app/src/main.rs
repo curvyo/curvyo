@@ -15,6 +15,7 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod device_keys;
 mod dropped_fonts;
 mod file_uris;
 mod font_documents;
@@ -113,6 +114,7 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
+        .manage(device_keys::OpenStore::default())
         .manage(fonts::FontFiles::default())
         .manage(fonts::GrantedFontPaths::default())
         .invoke_handler(tauri::generate_handler![
@@ -122,6 +124,7 @@ fn main() {
             project::confirm_project_opened,
             project::reset_project,
             project::set_dirty,
+            project::set_shared,
             project::save_project_bytes,
             project::quit_app,
             svg_export::pick_svg_export_path,
@@ -146,6 +149,8 @@ fn main() {
             font_library::set_font_library_aside,
             font_library::read_font_checks,
             font_library::write_font_checks,
+            device_keys::read_device_keys,
+            device_keys::write_document_keys,
         ])
         // The window's close button and Alt+F4: a project with unsaved changes holds the close and
         // the page asks; a clean one closes at once, with no round trip to the page.

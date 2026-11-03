@@ -112,6 +112,8 @@ mod wasm_svg_export;
 #[cfg(target_arch = "wasm32")]
 mod wasm_svg_import;
 #[cfg(target_arch = "wasm32")]
+mod wasm_sync;
+#[cfg(target_arch = "wasm32")]
 mod wasm_text;
 #[cfg(target_arch = "wasm32")]
 mod wasm_text_layout;

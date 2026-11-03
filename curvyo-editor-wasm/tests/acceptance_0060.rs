@@ -235,9 +235,11 @@ fn ac7_node_anchor_drag_snaps_to_another_path_and_is_one_undo_step() {
 fn ac15_inactive_page_targets_follow_its_actual_origin_and_new_size() {
     let d = Document::new(619);
     let p = d.add_page();
-    d.resize_page(&p.id, DocumentSize::from_mm(300.0, 120.0), &[])
+    d.resize_page(&p.id, DocumentSize::from_mm(300.0, 120.0))
         .unwrap();
-    d.move_page(&p.id, Vec2::new(1000.0 - p.origin.x, 400.0), &[])
+    // The resize keeps the frame's centre (ADR 0031 decision 9a); the move puts it at (1000, 400).
+    let o = d.pages()[1].origin;
+    d.move_page(&p.id, Vec2::new(1000.0 - o.x, 400.0 - o.y), &[])
         .unwrap();
     d.set_snapping(config());
     let mut s = Session::open(620, &pack(&d, "acceptance").unwrap()).unwrap();

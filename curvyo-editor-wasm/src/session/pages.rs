@@ -136,8 +136,7 @@ impl Session {
     }
     pub(super) fn resize_active_page(&mut self, size: DocumentSize) -> SizeOutcome {
         let page = self.active_page();
-        let objects = self.contained_page_objects(&page, true);
-        match self.document.resize_page(&page.id, size, &objects) {
+        match self.document.resize_page(&page.id, size) {
             Ok(true) => SizeOutcome::Committed,
             Ok(false) => SizeOutcome::Unchanged,
             Err(_) => SizeOutcome::Invalid,
@@ -164,25 +163,8 @@ impl Session {
             min = Point::new(min.x.min(a.x), min.y.min(a.y));
             max = Point::new(max.x.max(b.x), max.y.max(b.y));
         }
-        let size = DocumentSize::from_mm((max.x - min.x).max(1.0), (max.y - min.y).max(1.0));
-        let shift = curvyo_document_core::Vec2::new(
-            page.origin.x - min.x + (size.width.as_mm() - (max.x - min.x)) / 2.0,
-            page.origin.y - min.y + (size.height.as_mm() - (max.y - min.y)) / 2.0,
-        );
-        let ids: Vec<_> = objects.iter().map(|o| o.id()).collect();
-        let result = self.document.batch(
-            "fit_document_to_content",
-            |doc| -> Result<bool, curvyo_document_core::PageError> {
-                curvyo_document_core::validated_document_side(size.width)?;
-                curvyo_document_core::validated_document_side(size.height)?;
-                let moved = shift.x.abs() > 1e-9 || shift.y.abs() > 1e-9;
-                if moved {
-                    doc.translate_objects(&ids, shift)?;
-                }
-                Ok(doc.resize_page(&page.id, size, &[])? || moved)
-            },
-        );
-        match result {
+        // The frame goes onto the content; no object moves (ADR 0031 decision 9a).
+        match self.document.fit_page_to_content(&page.id, (min, max)) {
             Ok(true) => super::FitOutcome::Fitted,
             Ok(false) => super::FitOutcome::AlreadyFits,
             Err(_) => super::FitOutcome::TooLarge(curvyo_ui_core::content_too_large_message(

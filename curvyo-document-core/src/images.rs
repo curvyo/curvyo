@@ -112,6 +112,26 @@ impl Document {
         self.assets.borrow().get(hash)
     }
 
+    /// Stores asset bytes a collaborator sent under their own hash, without a history step
+    /// (ADR 0031 decision 3): the image node that names them arrives as an update of its own.
+    /// Storing bytes already held changes nothing.
+    ///
+    /// # Errors
+    /// [`AssetError::ProjectFull`] if the project would hold more than
+    /// [`MAX_PROJECT_ASSET_BYTES`] of pictures; nothing is stored.
+    pub fn insert_asset(&self, bytes: &[u8]) -> Result<AssetHash, AssetError> {
+        let hash = AssetHash::of(bytes);
+        let mut store = self.assets.borrow_mut();
+        let adds = store.added_bytes(&[(hash.clone(), bytes)]);
+        if store.total_bytes() + adds > MAX_PROJECT_ASSET_BYTES {
+            return Err(AssetError::ProjectFull { adds });
+        }
+        if adds > 0 {
+            store.insert(hash.clone(), Arc::from(bytes));
+        }
+        Ok(hash)
+    }
+
     /// The bytes of pictures this project holds, in total.
     #[must_use]
     pub fn asset_bytes(&self) -> u64 {

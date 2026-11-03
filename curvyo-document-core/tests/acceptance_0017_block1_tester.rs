@@ -601,6 +601,10 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "tiling_sources_malformed_v33.curvyo",
         "tiling_cell_malformed_v33.curvyo",
         "tiling_member_malformed_v33.curvyo",
+        "page_frame_not_a_map_v34.curvyo",
+        "page_frame_missing_field_v34.curvyo",
+        "page_frame_nan_v34.curvyo",
+        "page_frame_too_large_v34.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

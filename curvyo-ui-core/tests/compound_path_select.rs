@@ -515,7 +515,8 @@ fn a_double_click_on_a_compound_path_hands_off_to_the_node_tool() {
 
 /// Rulers criterion 23 with a compound path: the document fits the box of
 /// every outline, so a piece far from the first outline is not left out, and
-/// the objects move so the box starts at (0, 0).
+/// the frame goes onto the box (ADR 0031 decision 9a), so on the page the box
+/// starts at (0, 0).
 #[test]
 fn fit_to_content_covers_every_outline_of_a_compound_path() {
     let document = Document::new(1);
@@ -532,12 +533,17 @@ fn fit_to_content_covers_every_outline_of_a_compound_path() {
     assert!((size.width.as_mm() - 130.0).abs() < 1e-9, "{size:?}");
     assert!((size.height.as_mm() - 80.0).abs() < 1e-9, "{size:?}");
     let path = path_of(&document, id);
+    let o = document.pages()[0].origin;
+    let on_page = |p: Point| pt(p.x - o.x, p.y - o.y);
     assert_eq!(
-        path.anchors[0].point,
+        on_page(path.anchors[0].point),
         pt(0.0, 0.0),
-        "the first piece moved by (-20, -30)"
+        "the first piece is at the frame's corner"
     );
-    assert_eq!(path.extra_subpaths[0].anchors[2].point, pt(130.0, 80.0));
+    assert_eq!(
+        on_page(path.extra_subpaths[0].anchors[2].point),
+        pt(130.0, 80.0)
+    );
     assert_eq!(
         fit_document_to_content(&document),
         Ok(false),

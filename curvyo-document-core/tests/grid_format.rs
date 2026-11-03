@@ -349,7 +349,7 @@ fn the_grid_moves_with_its_page_and_survives_a_resize() {
         .move_page(&page.id, Vec2::new(30.0, -10.0), &[])
         .unwrap();
     document
-        .resize_page(&page.id, DocumentSize::from_mm(80.0, 60.0), &[])
+        .resize_page(&page.id, DocumentSize::from_mm(80.0, 60.0))
         .unwrap();
     let moved = document
         .pages()
@@ -364,7 +364,7 @@ fn the_origin_corner_measures_positive_into_the_page() {
     let document = Document::new(1);
     let mut page = document.add_page();
     document
-        .resize_page(&page.id, DocumentSize::from_mm(100.0, 50.0), &[])
+        .resize_page(&page.id, DocumentSize::from_mm(100.0, 50.0))
         .unwrap();
     page = document.pages()[1].clone();
     let (x, y) = (page.origin.x, page.origin.y);

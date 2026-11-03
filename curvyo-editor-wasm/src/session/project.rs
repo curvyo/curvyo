@@ -22,6 +22,11 @@ impl Session {
     /// See [`curvyo_document_core::pack`].
     pub fn pack_for_save(&mut self) -> Result<Vec<u8>, SaveError> {
         let version = self.document.version();
+        // A shared document's file keeps its room, cursor and keyring (`share.json`,
+        // `keyring.log`, ADR 0031 decision 9), so it reconnects when reopened (criterion 5).
+        if let Some(record) = self.sync_share_record() {
+            self.document.set_share(Some(record));
+        }
         let bytes = self.pack(APP_VERSION)?;
         self.packed = Some(version);
         Ok(bytes)

@@ -37,11 +37,15 @@
 #                        wasm32-unknown-unknown, lints it, and asserts the
 #                        ADR 0011 §6 dependency ban list. Ubuntu only, per the
 #                        ADR.
+#   dependency-edges  — ADR 0011 §4/§6 (note of 2026-11-03): the `curvyo-*` dependencies of
+#                        `crypto-core` (none), `sync-core` (`crypto-core` only) and
+#                        `sync-server` (`crypto-core` and `sync-core` only), from `cargo
+#                        metadata`, ubuntu only.
 #   performance-budgets — the performance budgets in a release build, ubuntu only: the boolean
 #                        kernel and the commands of 0035, 0036, 0048, the linked clones of
 #                        0049 (read, frame, commands, hostile sizes, the no-cycle property test),
 #                        Fracture, Flatten and Weld (0037, 0068), node editing of compound
-#                        paths (0055), and tiling (0069).
+#                        paths (0055), tiling (0069), and cooperative editing (0092).
 #   boolean-wasm-golden — the kernel's golden results and the tiling layout goldens (0069) in the
 #                        wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
@@ -324,11 +328,15 @@ jobs:
           done
           exit $status
 
+      # ADR 0011 §7: `curvyo-sync-server` is deployed on Linux and runs on ubuntu only; the
+      # nightly windows and macos legs leave it out.
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets --message-format=short -- -D warnings
+        shell: bash
+        run: cargo clippy --workspace ${{ matrix.os != 'ubuntu-latest' && '--exclude curvyo-sync-server' || '' }} --all-targets --message-format=short -- -D warnings
 
       - name: cargo nextest
-        run: cargo nextest run --workspace --status-level fail --no-fail-fast
+        shell: bash
+        run: cargo nextest run --workspace ${{ matrix.os != 'ubuntu-latest' && '--exclude curvyo-sync-server' || '' }} --status-level fail --no-fail-fast
 
   # Discovers the crates core-wasm32 below runs against, instead of a
   # hand-maintained list that silently misses a new crate: every workspace
@@ -350,6 +358,37 @@ jobs:
             | jq -c '[.packages[].name | select(endswith("-core") or . == "curvyo-editor-wasm")]')
           echo "Discovered: $crates"
           echo "crates=$crates" >> "$GITHUB_OUTPUT"
+
+  # ADR 0011 §4 and §6 (note of 2026-11-03, ADR 0031): the server may reach the client's code
+  # only through the two sealing crates, and no document type may reach them. Normal and build
+  # dependencies count; dev-dependencies (the simulator's real documents) do not.
+  dependency-edges:
+    name: dependency edges (sync)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned Rust toolchain
+        run: rustup show
+      - name: Assert the curvyo dependencies of crypto-core, sync-core and sync-server
+        run: |
+          set -euo pipefail
+          meta=$(cargo metadata --no-deps --format-version=1)
+          status=0
+          for spec in "curvyo-crypto-core=" "curvyo-sync-core=curvyo-crypto-core" \
+                      "curvyo-sync-server=curvyo-crypto-core,curvyo-sync-core"; do
+            crate=${spec%%=*}
+            want=${spec#*=}
+            got=$(echo "$meta" | jq -r --arg c "$crate" '.packages[] | select(.name == $c)
+              | [.dependencies[] | select(.kind == null or .kind == "build") | .name
+                 | select(startswith("curvyo-"))] | sort | join(",")')
+            if [ "$got" != "$want" ]; then
+              echo "::error::$crate depends on [$got], allowed is [$want] (ADR 0011 §4)"
+              status=1
+            else
+              echo "$crate: [$got]"
+            fi
+          done
+          exit $status
 
   # ADR 0011 §6: every *-core crate builds for wasm32-unknown-unknown, and CI
   # asserts *which* dependency would silently break that build rather than
@@ -436,6 +475,15 @@ jobs:
               exit 1
             fi
           fi
+          # ADR 0031 decision 13 (ADR 0011 §6 note of 2026-11-03): the sealing crates take every
+          # byte of entropy from their callers, so neither `getrandom` nor `rand_core` may enter
+          # their tree.
+          if [ "$crate" = curvyo-crypto-core ] || [ "$crate" = curvyo-sync-core ]; then
+            if echo "$tree_output" | grep -E '^(getrandom|rand_core) v'; then
+              echo "::error::$crate pulls a randomness source into its wasm32-unknown-unknown tree (see the match above)"
+              exit 1
+            fi
+          fi
           echo "$crate: clean"
 
   # The boolean kernel's performance budgets (specs/0016-boolean-operations criteria 44, 45) are
@@ -484,6 +532,8 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test font_preview_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test grid_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test acceptance_0066_session --test acceptance_0066_chain -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test sync_cpu_budget -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --lib frame_start_budget -- --nocapture
 
   # The tracer's quality harness, its 2000 x 2000 px budget, its 16 Mpx memory test
   # (specs/0025-raster-trace criteria 25 to 28, 36) and the reference set (specs/0089 slice A):

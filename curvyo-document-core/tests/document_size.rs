@@ -16,14 +16,17 @@ fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(&path).unwrap_or_else(|err| panic!("reading fixture {}: {err}", path.display()))
 }
 
+/// The rectangle's corner on the page: relative to the first page's frame origin (since format
+/// 34 a resize or fit moves the frame, not the objects, ADR 0031 decision 9a).
 fn rect_origin(document: &Document, id: NodeId) -> Point {
+    let o = document.pages()[0].origin;
     let Some(ObjectSnapshot::Primitive(primitive)) = document.object(id) else {
         panic!("a primitive");
     };
     let Shape::Rect { bounds, .. } = primitive.shape else {
         panic!("a rect");
     };
-    bounds.origin
+    Point::new(bounds.origin.x - o.x, bounds.origin.y - o.y)
 }
 
 fn first_rect(document: &Document) -> NodeId {
@@ -130,7 +133,7 @@ fn resize_and_fit_survive_save_and_reopen() {
     assert_eq!(rect_origin(&reopened, id), Point::new(55.0, 61.5));
 
     reopened
-        .fit_to_content((Point::new(55.0, 61.5), Point::new(105.0, 111.5)))
+        .fit_to_content((Point::new(10.0, 10.0), Point::new(60.0, 60.0)))
         .unwrap();
     assert!(reopened.set_display_unit(DisplayUnit::Cm));
     let again = unpack(3, &pack(&reopened, "0.1.0").unwrap()).unwrap();

@@ -15,6 +15,15 @@ fn opened(s: &Session) -> Document {
 fn bounds(d: &Document, id: NodeId) -> (Point, Point) {
     curvyo_ui_core::object_bounds(&d.object(id).unwrap())
 }
+/// The object's bounds centre minus the centre of page `page`, in mm.
+fn centre_offset(d: &Document, id: NodeId, page: usize) -> (f64, f64) {
+    let (low, high) = bounds(d, id);
+    let frame = &d.pages()[page];
+    (
+        f64::midpoint(low.x, high.x) - (frame.origin.x + frame.size.width.as_mm() / 2.0),
+        f64::midpoint(low.y, high.y) - (frame.origin.y + frame.size.height.as_mm() / 2.0),
+    )
+}
 fn select_all(s: &mut Session) {
     s.key_down(KeyInput {
         key: "a",
@@ -28,7 +37,10 @@ fn press(s: &mut Session, point: Point) {
 }
 
 #[test]
-fn ac4_overlapping_frame_resize_centers_exclusive_content_but_keeps_shared_and_partial() {
+/// Since format 34 the resize moves the frame around its centre and no object (ADR 0031 decision
+/// 9a): exclusive content keeps its offset from the resized frame's centre (it stays centred as
+/// before), shared and partial content stays put.
+fn ac4_overlapping_frame_resize_keeps_its_centre_and_moves_no_content() {
     let d = Document::new(600);
     let p = d.add_page();
     d.move_page(&p.id, Vec2::new(100.0 - p.origin.x, 0.0), &[])
@@ -42,8 +54,16 @@ fn ac4_overlapping_frame_resize_centers_exclusive_content_but_keeps_shared_and_p
     s.set_document_side(DocumentSide::Width, "230");
     let changed = opened(&s);
     assert_eq!(changed.pages()[0], d.pages()[0]);
-    assert_eq!(changed.pages()[1].origin, Point::new(100.0, 0.0));
-    assert_eq!(bounds(&changed, exclusive).0, Point::new(260.0, 30.0));
+    assert_eq!(changed.pages()[1].origin, Point::new(90.0, 0.0));
+    let (after, before) = (
+        centre_offset(&changed, exclusive, 1),
+        centre_offset(&d, exclusive, 1),
+    );
+    assert!(
+        (after.0 - before.0).abs() < 1e-9 && (after.1 - before.1).abs() < 1e-9,
+        "the exclusive object keeps its offset from the frame's centre: {before:?} to {after:?}"
+    );
+    assert_eq!(bounds(&changed, exclusive), bounds(&d, exclusive));
     assert_eq!(bounds(&changed, shared), bounds(&d, shared));
     assert_eq!(bounds(&changed, partial), bounds(&d, partial));
     assert_eq!(s.undo_len(), steps + 1);

@@ -176,6 +176,7 @@ impl PanelTabsRecord {
             PanelContent::Grid => "grid",
             PanelContent::Sketches => "sketches",
             PanelContent::Parameters => "parameters",
+            PanelContent::Share => "share",
             PanelContent::Empty => "empty",
         };
         Self {
@@ -261,7 +262,7 @@ mod tests {
             record.tab_names,
             [
                 "file", "document", "style", "layers", "history", "fonts", "snapping", "grid",
-                "sketches"
+                "sketches", "share"
             ]
         );
         assert_eq!(record.tab_enabled[at(&record, "style")], 0);

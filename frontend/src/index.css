@@ -153,6 +153,14 @@
     /* The violet of the marks of a selected linked clone and of what it follows
      * (`docs/design-system.md`, "Linked clone marks"; `specs/0049-linked-clone` criterion 60). */
     --clone-link: #7B3FD6;
+    /* The participant colours of cooperative editing (`specs/0092-cooperative-editing` UX notes
+     * §4): picked from the fingerprint, white text on each, none a shell semantic colour. */
+    --peer-1: #C2410C;
+    --peer-2: #0F766E;
+    --peer-3: #BE185D;
+    --peer-4: #4D7C0F;
+    --peer-5: #854D0E;
+    --peer-6: #A21CAF;
 
     /* 0066 constraint sketcher (docs/design-system.md, "Color tokens"): dimension annotations,
        constraint symbols and fully constrained geometry in the Sketch workbench. */

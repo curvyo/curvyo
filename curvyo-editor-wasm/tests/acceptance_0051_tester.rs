@@ -716,7 +716,7 @@ fn c2_tab_order_is_file_document_style_history_and_labels_and_tooltips() {
         names(&s),
         [
             "file", "document", "style", "layers", "history", "fonts", "snapping", "grid",
-            "sketches"
+            "sketches", "share"
         ]
     );
     let labels: Vec<_> = view.tabs.iter().map(|t| t.label).collect();
@@ -731,7 +731,8 @@ fn c2_tab_order_is_file_document_style_history_and_labels_and_tooltips() {
             "Fonts",
             "Snapping",
             "Grid & Rulers",
-            "Sketches"
+            "Sketches",
+            "Share"
         ]
     );
     let tip = |n: &str| view.tabs.iter().find(|t| t.name == n).unwrap().tooltip;

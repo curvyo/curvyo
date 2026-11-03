@@ -2,11 +2,11 @@
 //! and the status bar show and change them (`specs/0015-document-size-and-
 //! rulers/` criteria 12, 14 to 27a, 33 to 36).
 //!
-//! A resize or a fit moves every object; the view moves by the same shift, so
-//! nothing moves on screen and the document's edges move instead
+//! A resize or a fit moves the page frame and no object (ADR 0031 decision
+//! 9a), so nothing moves on screen and the document's edges move instead
 //! (criterion 20).
 
-use curvyo_document_core::{DisplayUnit, Document, DocumentSize, DocumentSizeError, Length};
+use curvyo_document_core::{DisplayUnit, DocumentSize, DocumentSizeError, Length};
 use curvyo_ui_core::{
     content_bounds, content_too_large_message, document_side_message, format_cursor,
     format_field_length, format_size, parse_document_side,
@@ -98,8 +98,8 @@ impl Session {
     }
 
     /// Applies the text typed in a size field (criteria 15 to 19): parsed in
-    /// the display unit, the other side kept, one commit that moves every
-    /// object by half the change. The view follows by the same shift.
+    /// the display unit, the other side kept, one commit that moves the frame
+    /// around its centre; no object and no view moves (ADR 0031 decision 9a).
     pub fn set_document_side(&mut self, side: DocumentSide, text: &str) -> SizeOutcome {
         if self.pen_path_unfinished() {
             return SizeOutcome::Unchanged;
@@ -116,8 +116,8 @@ impl Session {
     }
 
     /// The one resize every size change goes through (a typed side, a preset,
-    /// an orientation swap): the centre stays fixed, every object moves by half
-    /// the change, one commit, and the view follows by the same shift. A size
+    /// an orientation swap): the frame's centre stays fixed and nothing else
+    /// moves, so nothing moves on screen (criterion 20), one commit. A size
     /// within 1e-9 mm of the current one writes nothing. Ignored while the Pen
     /// has an unfinished path.
     pub(super) fn resize_document_to(&mut self, wanted: DocumentSize) -> SizeOutcome {
@@ -125,18 +125,11 @@ impl Session {
             if this.pen_path_unfinished() {
                 return SizeOutcome::Unchanged;
             }
-            let before = this.active_page().size;
             if this.document.pages().len() > 1 {
                 return this.resize_active_page(wanted);
             }
             match this.document.resize(wanted) {
-                Ok(true) => {
-                    this.follow_document_shift(Document::resize_shift(
-                        before,
-                        this.active_page().size,
-                    ));
-                    SizeOutcome::Committed
-                }
+                Ok(true) => SizeOutcome::Committed,
                 Ok(false) => SizeOutcome::Unchanged,
                 Err(_) => SizeOutcome::Invalid,
             }
@@ -149,20 +142,14 @@ impl Session {
             if this.pen_path_unfinished() {
                 return FitOutcome::Blocked;
             }
-            if this.document.pages().len() > 1
-                || this.active_page().origin != curvyo_document_core::Point::new(0.0, 0.0)
-            {
+            if this.document.pages().len() > 1 {
                 return this.fit_active_page();
             }
             let Some(bounds) = content_bounds(&this.document) else {
                 return FitOutcome::Empty;
             };
-            let shift = Document::fit_shift(bounds);
             match this.document.fit_to_content(bounds) {
-                Ok(true) => {
-                    this.follow_document_shift(shift);
-                    FitOutcome::Fitted
-                }
+                Ok(true) => FitOutcome::Fitted,
                 Ok(false) => FitOutcome::AlreadyFits,
                 Err(DocumentSizeError::OutOfRange) => {
                     FitOutcome::TooLarge(content_too_large_message(this.display_unit()))
@@ -171,12 +158,6 @@ impl Session {
                 Err(_) => FitOutcome::Empty,
             }
         })
-    }
-
-    /// Moves the view by the shift every object just moved by, so the objects
-    /// stay where they were on screen (criterion 20).
-    fn follow_document_shift(&mut self, shift: curvyo_document_core::Vec2) {
-        self.viewport.pan_by_document_offset(shift);
     }
 
     /// The status bar's cursor readout for a document point in millimetres,
@@ -285,7 +266,11 @@ mod tests {
         let curvyo_document_core::Shape::Rect { bounds, .. } = p.shape else {
             panic!("a rect");
         };
-        assert!((bounds.origin.x - 55.0).abs() < 1e-9 && (bounds.origin.y - 61.5).abs() < 1e-9);
+        // The frame moved around its centre and the object did not (ADR 0031 decision 9a): on the
+        // page the rectangle is at (55, 61.5).
+        let o = session.active_page().origin;
+        assert!((bounds.origin.x - o.x - 55.0).abs() < 1e-9);
+        assert!((bounds.origin.y - o.y - 61.5).abs() < 1e-9);
         let screen_after = session.view().document_to_screen(bounds.origin);
         assert!(
             (screen_after.0 - screen_before.0).abs() < 0.5
@@ -348,7 +333,10 @@ mod tests {
 
         assert_eq!(session.fit_document(), FitOutcome::Fitted);
         assert_eq!(session.document.size(), DocumentSize::from_mm(20.0, 10.0));
-        let after = session.view().document_to_screen(Point::new(0.0, 0.0));
+        // The frame's corner is on the rectangle's corner; nothing moved on screen.
+        let after = session
+            .view()
+            .document_to_screen(session.active_page().origin);
         assert!((after.0 - before.0).abs() < 0.5 && (after.1 - before.1).abs() < 0.5);
         assert_eq!(session.fit_document(), FitOutcome::AlreadyFits);
 

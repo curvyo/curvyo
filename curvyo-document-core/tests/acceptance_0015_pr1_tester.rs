@@ -54,8 +54,9 @@ fn labels(d: &Document) -> Vec<String> {
     out.into_iter().map(|(_, s)| s).collect()
 }
 
-/// Flat description of one object: absolute outline points, handles and the
-/// rotation register.
+/// Flat description of one object: outline points relative to the first page's
+/// frame origin (since format 34 a resize or fit moves the frame, not the objects,
+/// ADR 0031 decision 9a), handles and the rotation register.
 #[derive(Debug, Clone, PartialEq)]
 struct Sig {
     id: NodeId,
@@ -65,6 +66,7 @@ struct Sig {
 }
 
 fn sig_of(d: &Document, id: NodeId) -> Sig {
+    let o = d.pages()[0].origin;
     match d.object(id).expect("object exists") {
         ObjectSnapshot::Sketch(_) => unreachable!("no sketch in this test"),
         ObjectSnapshot::Image(_) => unreachable!("no image in this test"),
@@ -72,7 +74,11 @@ fn sig_of(d: &Document, id: NodeId) -> Sig {
         ObjectSnapshot::Text(_) => unreachable!("no text in this test"),
         ObjectSnapshot::Path(p) => Sig {
             id,
-            points: p.anchors.iter().map(|a| (a.point.x, a.point.y)).collect(),
+            points: p
+                .anchors
+                .iter()
+                .map(|a| (a.point.x - o.x, a.point.y - o.y))
+                .collect(),
             handles: p
                 .anchors
                 .iter()
@@ -82,11 +88,14 @@ fn sig_of(d: &Document, id: NodeId) -> Sig {
         },
         ObjectSnapshot::Clone(_) => panic!("no clone here"),
         ObjectSnapshot::Primitive(p) => {
-            let o = outline_of_rotated(&p.shape, p.rotation);
+            let outline = outline_of_rotated(&p.shape, p.rotation);
             Sig {
                 id,
-                points: o.iter().map(|a| (a.point.x, a.point.y)).collect(),
-                handles: o
+                points: outline
+                    .iter()
+                    .map(|a| (a.point.x - o.x, a.point.y - o.y))
+                    .collect(),
+                handles: outline
                     .iter()
                     .map(|a| (a.handle_in.x, a.handle_in.y, a.handle_out.x, a.handle_out.y))
                     .collect(),
@@ -353,8 +362,10 @@ fn resize_example_from_the_spec() {
     let curvyo_document_core::Shape::Rect { bounds, .. } = p.shape else {
         panic!()
     };
-    assert!(near(bounds.origin.x, 55.0, 1e-9));
-    assert!(near(bounds.origin.y, 61.5, 1e-9));
+    // Read on the page: relative to the frame origin (ADR 0031 decision 9a).
+    let o = d.pages()[0].origin;
+    assert!(near(bounds.origin.x - o.x, 55.0, 1e-9));
+    assert!(near(bounds.origin.y - o.y, 61.5, 1e-9));
     assert_eq!(bounds.width.as_mm(), 50.0);
     assert_eq!(bounds.height.as_mm(), 50.0);
 }
@@ -627,7 +638,8 @@ fn fit_is_idempotent_and_the_second_call_commits_nothing() {
     assert_eq!(d.fit_to_content(bx), Ok(true));
     let l = labels(&d);
     let s = sigs(&d);
-    let bx2 = (pt(0.0, 0.0), pt(230.0, 535.0));
+    // The objects did not move (the frame did, ADR 0031 decision 9a): same box.
+    let bx2 = bx;
     assert_eq!(d.fit_to_content(bx2), Ok(false));
     assert_eq!(labels(&d), l);
     assert_eq!(sigs(&d), s);
@@ -647,8 +659,9 @@ fn fit_of_a_flat_box_is_idempotent() {
     );
     d.fit_to_content((pt(0.0, 0.0), pt(100.0, 0.0))).unwrap();
     let l = labels(&d);
-    // After the first fit the line is at y = 0.5, the box is (0,0.5)-(100,0.5).
-    assert_eq!(d.fit_to_content((pt(0.0, 0.5), pt(100.0, 0.5))), Ok(false));
+    // After the first fit the line is at y = 0.5 on the page; it did not move (the frame did,
+    // ADR 0031 decision 9a), so its box is the same.
+    assert_eq!(d.fit_to_content((pt(0.0, 0.0), pt(100.0, 0.0))), Ok(false));
     assert_eq!(labels(&d), l);
 }
 
@@ -931,7 +944,6 @@ fn concurrent_resizes_of_both_axes_converge_to_one_consistent_result() {
 /// the objects get only one peer's shift per axis, so the drawing moves
 /// relative to the document centre (criterion 17 broken after a merge).
 #[test]
-#[ignore = "defect: concurrent resize of different axes merges to a size the objects do not match"]
 fn concurrent_resizes_of_different_axes_keep_the_centre() {
     check_concurrent_resizes(&[(size(300.0, 297.0), size(210.0, 400.0))]);
 }

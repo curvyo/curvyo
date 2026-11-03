@@ -140,6 +140,10 @@ impl Session {
             "name": name,
             "known": known,
             "author": author_word(row.author),
+            // A live participant's step names them (`specs/0092` adrs.md decision 4).
+            "peerLabel": (row.author != Author::You)
+                .then(|| self.live_peer_label(row.step.peer()))
+                .flatten(),
             "time": row.time.as_secs(),
             "status": status,
             "undoneBy": undone_by,

@@ -29,6 +29,8 @@ pub enum PanelContent {
     Sketches,
     /// Named sketch parameters and formulas.
     Parameters,
+    /// The Share tab (`specs/0092-cooperative-editing` UX notes §2).
+    Share,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
     /// rework` criterion 1). The Document tab with an unfinished Pen path, so
     /// a resize would not move the path being drawn, or the Style tab with
@@ -62,6 +64,7 @@ pub fn panel_body(
         PanelTab::Grid => PanelContent::Grid,
         PanelTab::Sketches => PanelContent::Sketches,
         PanelTab::Parameters => PanelContent::Parameters,
+        PanelTab::Share => PanelContent::Share,
     }
 }
 

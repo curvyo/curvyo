@@ -70,7 +70,10 @@ fn change_count(d: &Document) -> usize {
     l.len_changes()
 }
 
+/// The first rectangle's corner on the page: relative to the first page's frame origin (since
+/// format 34 a resize or fit moves the frame, not the objects, ADR 0031 decision 9a).
 fn rect_origin(d: &Document) -> Point {
+    let o = d.pages()[0].origin;
     let id = d.object_ids()[0];
     let Some(curvyo_document_core::ObjectSnapshot::Primitive(p)) = d.object(id) else {
         panic!()
@@ -78,7 +81,7 @@ fn rect_origin(d: &Document) -> Point {
     let curvyo_document_core::Shape::Rect { bounds, .. } = p.shape else {
         panic!()
     };
-    bounds.origin
+    Point::new(bounds.origin.x - o.x, bounds.origin.y - o.y)
 }
 
 /// AC 13: every kind of damaged size opens at A4 on both axes, is not
@@ -370,6 +373,7 @@ fn resize_of_five_hundred_objects_is_one_commit() {
     assert_eq!(change_count(&d), n + 1);
     let ids = d.object_ids();
     assert_eq!(ids.len(), 500);
+    let frame = d.pages()[0].origin;
     for (i, id) in ids.iter().enumerate() {
         let Some(curvyo_document_core::ObjectSnapshot::Primitive(p)) = d.object(*id) else {
             panic!()
@@ -379,8 +383,8 @@ fn resize_of_five_hundred_objects_is_one_commit() {
         };
         #[allow(clippy::cast_precision_loss)]
         let i = i as f64;
-        assert!((bounds.origin.x - (i + 500.0)).abs() < 1e-9);
-        assert!((bounds.origin.y - (-i + 500.0)).abs() < 1e-9);
+        assert!((bounds.origin.x - frame.x - (i + 500.0)).abs() < 1e-9);
+        assert!((bounds.origin.y - frame.y - (-i + 500.0)).abs() < 1e-9);
     }
 }
 

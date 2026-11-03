@@ -69,10 +69,13 @@ fn with_rect() -> Session {
 
 fn rect_origin(s: &Session) -> (f64, f64) {
     let d = doc_of(s);
+    // On the page: relative to the first page's frame origin (since format 34 a resize moves
+    // the frame, not the objects, ADR 0031 decision 9a).
+    let o = d.pages()[0].origin;
     for id in d.object_ids() {
         if let ObjectSnapshot::Primitive(p) = d.object(id).unwrap() {
             if let Shape::Rect { bounds, .. } = p.shape {
-                return (bounds.origin.x, bounds.origin.y);
+                return (bounds.origin.x - o.x, bounds.origin.y - o.y);
             }
         }
     }

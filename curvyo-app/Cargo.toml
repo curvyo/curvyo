@@ -72,6 +72,10 @@ kurbo.workspace = true
 # adrs.md decision 6): MIT, already in the tree under Tauri at this version, safe API only.
 gtk = "0.18"
 
+[dev-dependencies]
+# The key-file store of the credential command's test (`device_keys.rs`).
+tempfile = "3"
+
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 # PNG fixtures for the preview tests; already the decoder of `curvyo-image-core`.
 image.workspace = true

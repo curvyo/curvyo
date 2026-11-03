@@ -10,6 +10,9 @@ members = [
     "curvyo-vectorize-core",
     "curvyo-ocr-core",
     "curvyo-ui-core",
+    "curvyo-crypto-core",
+    "curvyo-sync-core",
+    "curvyo-sync-server",
     "curvyo-render-core",
     "curvyo-editor-wasm",
     "curvyo-storage-io",
@@ -96,6 +99,11 @@ debug = false
 # The asset hash runs over up to 512 MiB in the image tests (`specs/0058-bitmap-import`
 # criterion 17); unoptimised SHA-256 takes seconds there.
 [profile.dev.package.sha2]
+opt-level = 3
+
+# The keyring tests of `curvyo-crypto-core` replay every ancestor-closed subset of their graphs,
+# verifying each entry's ed25519 signature; unoptimised curve arithmetic makes that minutes.
+[profile.dev.package.curve25519-dalek]
 opt-level = 3
 
 [profile.release]

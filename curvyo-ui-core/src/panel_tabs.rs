@@ -28,6 +28,9 @@ pub enum PanelTab {
     Sketches,
     /// Named sketch parameters and formulas.
     Parameters,
+    /// Sharing the document and its participants (`specs/0092-cooperative-editing` UX notes
+    /// §1): never active by itself.
+    Share,
 }
 
 impl PanelTab {
@@ -45,6 +48,7 @@ impl PanelTab {
             Self::Grid => "grid",
             Self::Sketches => "sketches",
             Self::Parameters => "parameters",
+            Self::Share => "share",
         }
     }
 
@@ -67,6 +71,7 @@ impl PanelTab {
             Self::Grid => "Grid & Rulers",
             Self::Sketches => "Sketches",
             Self::Parameters => "Parameters",
+            Self::Share => "Share",
         }
     }
 
@@ -85,6 +90,7 @@ impl PanelTab {
             (Self::Grid, _) => "Grid & Rulers",
             (Self::Sketches, _) => "Sketches",
             (Self::Parameters, _) => "Parameters",
+            (Self::Share, _) => "Share",
         }
     }
 }
@@ -114,7 +120,7 @@ impl StyleBlocker {
 
 /// The strip's tabs, in order (`0051` criterion 2). A tab whose feature has not shipped is not
 /// built; the order never changes.
-const TABS: [PanelTab; 10] = [
+const TABS: [PanelTab; 11] = [
     PanelTab::File,
     PanelTab::Document,
     PanelTab::Style,
@@ -125,6 +131,7 @@ const TABS: [PanelTab; 10] = [
     PanelTab::Grid,
     PanelTab::Sketches,
     PanelTab::Parameters,
+    PanelTab::Share,
 ];
 
 /// The active tab and the one fact the automatic switches need: whether the
@@ -378,7 +385,7 @@ mod tests {
 
     /// `0051` criterion 2 and `0043` criterion 4: names, order, tooltips, the dimmed tab.
     #[test]
-    fn the_strip_has_ten_tabs_with_tooltips_and_a_dimmed_style() {
+    fn the_strip_has_eleven_tabs_with_tooltips_and_a_dimmed_style() {
         let empty = tab_entries(Document, false);
         let names: Vec<_> = empty.iter().map(|e| (e.name, e.label)).collect();
         assert_eq!(
@@ -393,7 +400,8 @@ mod tests {
                 ("snapping", "Snapping"),
                 ("grid", "Grid & Rulers"),
                 ("sketches", "Sketches"),
-                ("parameters", "Parameters")
+                ("parameters", "Parameters"),
+                ("share", "Share")
             ]
         );
         assert_eq!(entry(&empty, "file").tooltip, "File");

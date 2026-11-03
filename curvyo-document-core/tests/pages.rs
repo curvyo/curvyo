@@ -11,7 +11,7 @@ fn pages_edit_roundtrip_and_undo() {
     assert_eq!(doc.pages().len(), 2);
     assert_eq!(second.size, first.size);
     doc.rename_page(&second.id, "Coasters 🐈").unwrap();
-    doc.resize_page(&second.id, DocumentSize::from_mm(100.0, 120.0), &[])
+    doc.resize_page(&second.id, DocumentSize::from_mm(100.0, 120.0))
         .unwrap();
     doc.move_page(&second.id, Vec2::new(-30.0, 40.0), &[])
         .unwrap();
@@ -36,7 +36,7 @@ fn invalid_or_unchanged_edits_write_nothing() {
     assert!(!doc.rename_page(&page.id, &page.name).unwrap());
     assert!(!doc.move_page(&page.id, Vec2::new(0.0, 0.0), &[]).unwrap());
     assert!(
-        doc.resize_page(&page.id, DocumentSize::from_mm(-1.0, 20.0), &[])
+        doc.resize_page(&page.id, DocumentSize::from_mm(-1.0, 20.0))
             .is_err()
     );
     assert!(doc.reorder_page(&page.id, 1).is_err());
@@ -68,7 +68,7 @@ fn independent_fields_and_concurrent_deletion_converge() {
     let second = a.add_page();
     let b = unpack(81, &pack(&a, "test").unwrap()).unwrap();
     a.rename_page(&second.id, "Board").unwrap();
-    b.resize_page(&second.id, DocumentSize::from_mm(100.0, 80.0), &[])
+    b.resize_page(&second.id, DocumentSize::from_mm(100.0, 80.0))
         .unwrap();
     merge(&a, &b);
     assert_eq!(a.pages(), b.pages());
@@ -122,16 +122,15 @@ fn page_history_preview_keeps_its_own_frames() {
 fn golden_multiple_pages_v26_roundtrips() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/pages_v26.curvyo");
+    // The file was written by a version 26 build: two pages, the second renamed and resized with
+    // its top-left corner kept, as resizes did before format 34.
     let doc = Document::new(86);
     let second = doc.add_page();
     doc.rename_page(&second.id, "Coasters").unwrap();
-    doc.resize_page(&second.id, DocumentSize::from_mm(100.0, 100.0), &[])
-        .unwrap();
-    if std::env::var_os("UPDATE_PAGE_FIXTURE").is_some() {
-        std::fs::write(&path, pack(&doc, "test").unwrap()).unwrap();
-    }
+    let mut expected = doc.pages();
+    expected[1].size = DocumentSize::from_mm(100.0, 100.0);
     let opened = unpack(87, &std::fs::read(path).unwrap()).unwrap();
-    assert_eq!(opened.pages(), doc.pages());
+    assert_eq!(opened.pages(), expected);
 }
 
 #[test]
