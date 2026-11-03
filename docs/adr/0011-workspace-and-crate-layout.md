@@ -190,6 +190,19 @@ for the cost of one `lib.rs`: doing it now is a speculative crate
    > `curvyo-svg-core → (external only)`, never `document-core`; `text-core → svg-core` (shared
    > hostile-XML guard and path data); `ui-core → svg-core` (mapping to the document).
 
+   > **Note 2026-11-02 ([ADR 0034](0034-extension-contract-compiled-in.md) and
+   > [ADR 0035](0035-machine-connector-protocol.md), architect; in effect when each is accepted):**
+   > new crates `curvyo-extension-core` (the compiled-in extension contract: manifest,
+   > contributions, parameter schema and values; `→ document-core` for units only) and
+   > `curvyo-laser-core` (the first extension, the laser workbench; `→ extension-core,
+   > document-core, geometry-core`); `ui-core → extension-core, laser-core`; `editor-wasm →
+   > extension-core`. An extension crate never depends on `ui-core`, `render-core`,
+   > `editor-wasm`, `-io`, `-app` or the front end. Connector crates, created with their stories:
+   > `curvyo-connector-core` (`→ external only`, wasm32), `curvyo-connector-io` (native;
+   > `→ connector-core`), `curvyo-connector-server` (`→ connector-io`); `curvyo-app →
+   > connector-io`. The first slot of §8 (machine/toolpath core and device `-io` crate) is filled
+   > for the laser family by `curvyo-laser-core` and `curvyo-connector-io`.
+
    **No `*-core` crate depends on `*-io`, on `*-app`, on `vecmanf-editor-wasm`
    or on the frontend, ever.** This is the `CLAUDE.md` §6 rule, and the crate
    graph is what enforces it.

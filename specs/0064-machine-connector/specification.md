@@ -22,14 +22,14 @@ A single self-contained binary, written in Rust, that the maker downloads or bui
 ## Acceptance criteria (as far as clear)
 
 1. Given the connector program, then it runs without the desktop app, without a display and without an account, on Linux first (a Raspberry Pi or a workshop PC), with a command line and a configuration file; it needs no installer.
-2. Given its first start, then it prints a **pairing code** and its address. The app pairs once by typing the code; afterwards both sides hold a shared key and the code is spent. Nothing is sent to a connector that is not paired.
+2. Given its first start, then it prints a **pairing code** and its address. The app pairs once by typing the code; afterwards the app knows the connector's key (pinned) or trusts its CA certificate (EST), holds a pairing token, and the code is spent (CONN-SEC, ADR 0035). Nothing is sent to a connector that is not paired.
 3. Given pairing, then the connection is encrypted on the LAN (no plain HTTP with a token) and the app remembers the connector by its key, so a changed key is shown as a changed key, not silently accepted.
 4. Given the app, then the machine profile (`0026`) names the connector (direct address or relayed id) and the controller port; a connection test is a symbol button in the profile with a visible result (connected, controller answered, version), no popup.
 5. Given the first connector (decided: GRBL over serial), then it speaks **GRBL over serial** to one controller: it reports status and position, accepts a G-code job, streams it with the controller's flow control, pauses, resumes and stops it, and can run the **frame** (outline at low power, `R-MFG-LASER-003`).
 6. Given a job in progress, then the app shows progress and status from the connector, and a lost connection never leaves the job in an unknown state: the connector keeps running the job and the app reconnects and reads the state; stop works even from a fresh connection.
 7. Given the browser build (`R-SYS-005`), then it reaches a connector the same way (network), because it has no serial access of its own; export of the G-code file stays always available.
 8. Given the sync service as the path, then the connector's outbound link is the only open connection; no inbound port needs to be opened on the workshop network.
-9. Given safety, then a machine can be set to **require a local start**: the job is accepted and shown at the connector (a button or a key on the connector's host), and runs only after that (Question 3). The default is off; it is the maker's setting (permit over refuse).
+9. Given safety, then a machine can be set to **require a local start**: the job is accepted and shown at the connector (a button or a key on the connector's host), and runs only after that (CONN-SAFETY, Frage 2 below). The default is off; it is the maker's setting (permit over refuse).
 10. Given logs, then the connector keeps a local log of jobs (time, name, result) and sends nothing else anywhere. No telemetry (`R-SYS-007`).
 11. Given the code, then the message types (job, status, commands) are plain data in a `*-core` crate that builds for wasm32 (so the browser app and the connector share them); the connection code (serial, sockets, TLS) is in an `-io` crate; the connector binary is thin.
 
@@ -43,8 +43,22 @@ A single self-contained binary, written in Rust, that the maker downloads or bui
 ## Architect notes (2026-10-17)
 
 - New crates need an ADR (`CLAUDE.md` §5): a protocol core crate, an `-io` crate for GRBL/serial and the transport, and a `-server`-style binary. Crate naming needs the exception of `CLAUDE.md` §8 extended (the connector is a binary like `curvyo-sync-server`). **`needs-customer`** (data leaves the machine over the relay; security model).
-- Decide: HTTP/WebSocket or a framed binary protocol (WebSocket is reachable from the browser; recommended), how a job travels (G-code text as data, so the connector needs no CAM code), and how the relay reuses the document keyring of ADR 0010 for pairing.
+- Decided in ADR 0035: WebSocket over TLS, the job as G-code text, pairing by code; the document keyring of ADR 0010 is not reused.
 - The connector holds no document and no user data beyond the job in flight.
+
+## Decided (customer, 2026-11-02)
+
+Customer (translated): "0064 also becomes relevant, at least the protocol between connector and workbench." Scope order, still a sketch:
+
+1. **Next:** the protocol between connector and the Laser workbench (`0063`, `0093`): the message types (job, status, commands, frame) as plain data in a `*-core` crate that builds for wasm32 (criterion 11), with golden-file tests of their encoding. No sockets, no serial, no pairing yet.
+2. **After:** device I/O (GRBL over serial, the thin connector binary), pairing and encryption, the relay path. These keep their criteria 1 to 10 and the open questions below.
+
+A story number is assigned when the protocol slice is scheduled (after `0093` and the G-code of `0029`, whose job text is what the protocol carries). The architect's connector ADR (crate names, WebSocket versus framed binary) is wanted before that slice.
+
+## Decided (customer, 2026-11-02, answers to ADR 0035)
+
+- **CONN-SEC (Frage 120): B, TLS.** Customer (translated): "B, with public key pinning and pairing code, or an EST client, i.e. a valid certificate." The connection is TLS 1.3. Two ways to trust the connector: (1) its self-signed certificate's public key is pinned at pairing, and the pairing code authenticates that first contact; (2) the connector obtains a valid certificate from the maker's CA with an EST client (RFC 7030), validated normally. No Noise channel. ADR 0035 §2 to §4.
+- **CONN-BROWSER (Frage 121): A and B.** The browser reaches a connector through the relay once the sync service exists, **and** the connector serves the Curvyo web app itself on the LAN, so the page talks to it same-origin. With a self-signed certificate the browser warns once and cannot pin; with an EST certificate from a CA on the maker's device it does not warn. ADR 0035 §8.
 
 ## Decided (customer, 2026-10-17)
 
@@ -68,5 +82,5 @@ Frage 2 (CONN-SAFETY): Is a local start confirmation (criterion 9) built in the 
 Requirements: R-MFG-LASER-002, R-MFG-LASER-003 (existing); R-MFG-011 (new)
 Depends on: `specs/0026` machine-profile (reserved), `specs/0029` laser job output (reserved, the G-code), ADR 0004 (sync service), ADR 0008 (end-to-end encryption), ADR 0010 (keyring)
 Related: `specs/0063-manufacturing-workbenches/`, `specs/0065-extensions-sdk/`, ADR 0007 (the other "connector")
-ADRs: a connector ADR (protocol, pairing, crates), `needs-customer`
+ADRs: ADR 0035 (protocol, security, pairing, crates), accepted by the customer 2026-11-02
 PR: -

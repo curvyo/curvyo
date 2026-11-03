@@ -150,3 +150,9 @@ to be designed rather than grown.
   the customer's "there will be no paid plugins", that is consistent; it does
   foreclose a proprietary third-party plugin ecosystem, which ADR 0006 flags
   for explicit confirmation.
+
+## Reader's note, 2026-11-02
+
+The customer's route decision of 2026-10-17 (spec `0065`, EXT-ROUTE: compiled-in extensions and a
+front-end registry) is recorded in [ADR 0034](0034-extension-contract-compiled-in.md), which, when
+accepted, amends §9 for compiled-in crates only. §1 to §8 are unchanged.
