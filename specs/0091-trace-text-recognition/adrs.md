@@ -139,6 +139,47 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
     `editor-wasm` gets `ocr_load` and `ocr_job` in `wasm_trace.rs` and the lines input on
     `trace_job`; no logic of its own.
 
+11. **Slice 3: upside-down and steep text (Proposal, lead 2026-11-02; implementer 2026-11-02).**
+    No new model, weights, crate, dependency or public API.
+    - *Where:* `curvyo-ocr-core/src/read.rs` reads a line once more turned by 180° when its first
+      read is unsure or its quad is steeper than 45°. The turned crop is the crop's samples in
+      reverse order with its quad started at the opposite corner (the sampling grid is symmetric,
+      so no new sampling); the pool workers' shares take the same path, so the frontend and the
+      wire do not change.
+    - *Threshold `SURE_READ` = 0.9 (mean character confidence), calibrated* on the first reads
+      of every committed fixture and the customer's screenshot, each also read turned. Upright
+      lines of the posters read at 0.93 and up (clean poster lowest 0.930 "BÄCKEREI", noisy
+      0.943, tester posters 0.940, rotated 7°, 15° and 30° 0.991 and up). The reference poster
+      upside down first reads at 0.79 and below ("Wedding" as "8uippaM", the rest 0.51 and
+      below), and its turned reads at 0.94 and up; turned upright poster lines read at 0.82 and
+      below. 0.9 lies between with room on both sides; the clean and the noisy poster read no
+      line twice (counter test in `read.rs`). Screenshot lines under 0.9 (UI symbols, small
+      labels) are read twice and keep their first read.
+    - *The turned read wins* when it is sure (at least `SURE_READ`), its doubt (1 minus its
+      mean) is at most a fifth of the first read's (`TURNED_DOUBT` = 5), and it holds at least 2
+      letters or digits. Calibrated: the upside-down lines of the fixtures have a doubt ratio of
+      12 and more; the `0025` dot grid's "0000…" (0.82) against its turned "0000…01" (0.95) 3.7,
+      which would otherwise set a text on the dot grid (criterion 18). The letters rule keeps
+      the screenshot as it was: short symbol lines there ("3", "*", "88+", "y") read about as
+      well or better turned ("G" at 0.997, "*", "±88", ";<"); none may change (criterion 32).
+    - *Marks above a turned line:* the detector boxes the marks above upright letters but leaves
+      out those below upside-down ones (the poster's "BÄCKEREI": 107 px high upright, 91 px
+      turned), so a line kept as read turned grows by 0.2 of its height above its text
+      (`MARKS_ROOM`); otherwise the dots of "Ä" stay traced shapes.
+    - *Rotation:* the winning quad's top edge is the line's direction, as before. The font fit
+      (`curvyo-ui-core/src/trace_fit.rs`) turns a line more than 45° from reading left to right
+      into the fit's space with its direction on the x axis and turns the found texts back
+      (`fit_turn`, `in_document`), because the `0088` recogniser lays a line out along its own
+      axis pointing right. Lines within 45° are not turned, so their fit is unchanged.
+    - *Padding (lead 2026-11-03):* a detector box can end at a letter, which the turned read then
+      lost (the 180° poster's "BÄCKEREI" read "BACKERE"). Each crop is sampled 0.3 of the line's
+      height further at both ends along the line, as far as the picture reaches (`END_PAD`). The
+      first read uses only the quad's samples (bit for bit as before); the turned read uses the
+      padded line, and a winning turned line's quad includes the padding. The pool's wire
+      carries the padding (`pad` per crop).
+    - *Known limit:* a word that reads as another word upside down ("Sans"
+      turned reads "sues" at 1.00) is sure either way and is not read again.
+
 ## Not decided here
 
 - Part B (Recognise shapes): its own dated note before it is built (0088 decision list).

@@ -225,6 +225,10 @@ a black and white trace before it traces the rest (`specs/0091-trace-text-recogn
   and each text takes the palette colour nearest its letters, or the background colour (white
   text on a red box is white text above the whole box). Recolouring a palette colour recolours
   its texts too.
+- Text turned upside down, or standing at about 90° either way, is read too: a line the reader
+  is unsure of, or one steeper than 45°, is read once more turned round, the surer reading is
+  kept, and its text is turned to match, so it reads the right way round on the canvas. Lines
+  that read upright and sure are read once, as before.
 - With Recognise text off, Trace works exactly as before and the model is not loaded.
 
 ## Multicolour

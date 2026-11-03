@@ -1,6 +1,6 @@
 # Trace text recognition: read the text on the raster first
 
-Status: Slice 1 Done (PR #244, merged 2026-11-02); slice 2 (multicolour) in Build
+Status: Slice 1 Done (PR #244, merged 2026-11-02); slice 2 (multicolour) in Build; slice 3 (upside-down and steep text) in Build
 Priority: Should
 Origin: Customer (2026-10-31); numbers marked Proposal are the product owner's
 
@@ -83,9 +83,11 @@ threshold per text line, text kept out of the main trace, fonts matched by our o
    out of the main trace, switch in Advanced, offline, licence record, one undo step.
 2. **Slice 2, multicolour.** The same in the multicolour trace: text takes the nearest palette colour
    of its pixels; text on coloured shapes stays on top of whole shapes.
-3. **Later, own story:** Recognise shapes (0088 Part B) with its switch.
-4. **Later (customer 2026-11-02):** text turned upside down (rotated beyond ±90°) is not read correctly;
-   reading each line also at 180° and keeping the surer read is one way. Not scheduled.
+3. **Slice 3, upside-down and steep text (customer 2026-11-02, "Über-Kopf-Texte").** Text turned
+   upside down (180°) or standing at about ±90° is read and set with the right rotation. No new
+   model or weights: an unsure or steep line is also read rotated by 180°, the surer read wins
+   (Proposal, lead 2026-11-02; criteria 30 to 35).
+4. **Later, own story:** Recognise shapes (0088 Part B) with its switch.
 
 Slice 1 is the MVP cut. Each slice is tried by the customer on his own images.
 
@@ -214,8 +216,39 @@ Slice 2
     counts the palette colours only texts use too, so it agrees with the strip.
 24. Slice 1 criteria 3, 6, 11, 12 and 13 hold in the multicolour trace.
 
+Slice 3 (Proposal, lead 2026-11-02: no new model or weights. A line whose first read is unsure, i.e.
+mean letter confidence below a threshold the implementer calibrates on the fixtures and records in
+adrs.md, or whose box is steeper than 45°, is also read rotated by 180°. The surer read wins and the
+text object gets the matching rotation, about 180° plus the line angle. This covers upside-down text
+(180°) and text at ±90°, where the direction is ambiguous.)
+30. Upside-down: given the reference poster rotated by 180° (committed fixture), when Create paths
+    runs with Recognise text on, then the lines give the same strings, the same faces and the same
+    sure letters as the upright poster, each string exact or within 1 letter, and 0 wrong sure
+    letters. Each text object's rotation is within 1° of the true angle (180° plus the line angle).
+31. Steep text: given a fixture with one line reading bottom to top and one reading top to
+    bottom, then both become text objects with the rendered string (exact or within 1 letter) and a
+    rotation within 1° of -90° and +90° (the document's y-down angle, as in criterion 8), so the text object reads the right way
+    round on the canvas.
+32. Upright unchanged: given the existing posters (clean, noisy, rotated 15°, screenshot), then the
+    text objects and traced paths are identical to the slice 2 result, and no second read runs for a
+    line whose first read is sure and whose box is at most 45° steep (checked by a counter of extra
+    reads of 0 on the clean poster). The one intended change: no space is put in next to punctuation
+    (". , / : ;" and quotes), so the noisy poster's "Art. -Nr." is now "Art.-Nr." (lead 2026-11-03).
+33. Mixed: given one picture with an upright line and an upside-down line, then both are read
+    correctly in one run: each with its own string and its own rotation within 1°, the upright one
+    not rotated.
+34. Cost: given the extra read, then it runs only for unsure or steep lines, never for all lines. The
+    PR reports the measured time on the upright poster, the 180° poster and the ±90° fixture
+    (thread CPU time as for 20 and 21); a miss is a `docs/technical-debt.md` entry, not a blocker.
+35. Slices 1 and 2: all criteria still hold, including 0 wrong sure letters (3), the ring and the dot
+    grid unchanged (18), one history step (11), one main trace per run (25) and determinism (13), in
+    black and white and in multicolour. The text object's fill, position, size and baseline are
+    still checked as in criteria 9 and 10 for rotated lines.
+
 ## Out of scope
 - Recognise shapes and its switch (0088 Part B).
+- A second model or a direction classifier, mirrored text, and text at angles the 180° re-read does
+  not cover (a line between 45° and 90° steep is read as ±90° or not at all, reported as is).
 - Non-Latin scripts, vertical text, handwriting; script and decorative faces may read worse and are
   caught by the font fit or marked as guessed.
 - Cloud OCR, accounts, telemetry, any download of weights.
