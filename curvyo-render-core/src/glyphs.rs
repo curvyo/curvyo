@@ -177,6 +177,18 @@ impl DrawList {
         self.triangles.push(vertex);
     }
 
+    /// Moves every vertex and image corner through `map`: a placement draws the artwork of its
+    /// drawing page on an output page through one composed matrix, the outlines reused
+    /// (`specs/0093-laser-workbench-shell`, ADR 0032 §6).
+    pub fn map_positions(&mut self, map: impl Fn(Point) -> Point) {
+        for vertex in &mut self.triangles {
+            vertex.position = map(vertex.position);
+        }
+        for image in &mut self.images {
+            image.corners = image.corners.map(&map);
+        }
+    }
+
     /// Appends another draw list to this one. Its artwork layers stay layers
     /// when this list has no overlay yet (artwork is extended before
     /// decorations); otherwise its triangles join this list's overlay. This

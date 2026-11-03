@@ -31,6 +31,9 @@ pub enum PanelTab {
     /// Sharing the document and its participants (`specs/0092-cooperative-editing` UX notes
     /// §1): never active by itself.
     Share,
+    /// The active manufacturing workbench's tab, drawn from its extension's manifest
+    /// (`specs/0093-laser-workbench-shell`, ADR 0032 §2); its label comes from the manifest.
+    Workbench,
 }
 
 impl PanelTab {
@@ -49,13 +52,31 @@ impl PanelTab {
             Self::Sketches => "sketches",
             Self::Parameters => "parameters",
             Self::Share => "share",
+            Self::Workbench => "workbench",
         }
     }
 
     /// The tab called `name`; `None` for an unknown name.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
-        TABS.iter().copied().find(|tab| tab.name() == name)
+        TABS.iter()
+            .copied()
+            .chain([Self::Workbench])
+            .find(|tab| tab.name() == name)
+    }
+
+    /// The strip entry of this tab with `label`, for the tab a manufacturing workbench takes from
+    /// its manifest ([`PanelTab::Workbench`]), which the drawing strip of [`tab_entries_for`]
+    /// does not list.
+    #[must_use]
+    pub const fn entry_labelled(self, label: &'static str, selected: bool) -> PanelTabEntry {
+        PanelTabEntry {
+            name: self.name(),
+            label,
+            tooltip: label,
+            enabled: true,
+            selected,
+        }
     }
 
     fn label(self) -> &'static str {
@@ -72,6 +93,7 @@ impl PanelTab {
             Self::Sketches => "Sketches",
             Self::Parameters => "Parameters",
             Self::Share => "Share",
+            Self::Workbench => "Workbench",
         }
     }
 
@@ -91,6 +113,7 @@ impl PanelTab {
             (Self::Sketches, _) => "Sketches",
             (Self::Parameters, _) => "Parameters",
             (Self::Share, _) => "Share",
+            (Self::Workbench, _) => "Workbench",
         }
     }
 }

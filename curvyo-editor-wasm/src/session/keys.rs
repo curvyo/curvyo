@@ -319,6 +319,20 @@ impl Session {
         }
     }
 
+    /// A key a mode takes before the key table: a manufacturing workbench's (`specs/0093`
+    /// criterion 7), Enter in text-path pick mode (`0080` criterion 2), the tiling bar's.
+    fn mode_key(&mut self, input: &KeyInput<'_>) -> Option<KeyOutcome> {
+        if matches!(self.workbench(), super::Workbench::Manufacturing(_))
+            && let Some(outcome) = self.manufacturing_key(input)
+        {
+            return Some(outcome);
+        }
+        if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
+            return Some(KeyOutcome::Consumed);
+        }
+        self.tiling_key(input)
+    }
+
     /// One key press: the gate of criterion 55, then the key table of
     /// criterion 54. The frontend forwards the key and what the DOM alone
     /// knows and prevents the page's default for every outcome except
@@ -333,11 +347,7 @@ impl Session {
         if self.workbench() == super::Workbench::Sketch {
             return self.sketch_key(input);
         }
-        // Enter in pick mode puts the text on the pick set (`0080` criterion 2).
-        if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
-            return KeyOutcome::Consumed;
-        }
-        if let Some(outcome) = self.tiling_key(&input) {
+        if let Some(outcome) = self.mode_key(&input) {
             return outcome;
         }
         match decide(&input, self.key_state()) {
@@ -598,8 +608,13 @@ impl Session {
 
     /// Acceptance criteria 19, 21 (Delete/Backspace, or the contextual
     /// toolbar's Delete button): removes every selected object when the
-    /// Select or Node tool is active. A no-op for every other tool.
+    /// Select or Node tool is active. A no-op for every other tool; in a manufacturing
+    /// workbench it only shows the read-only notice (`specs/0093` criterion 7).
     pub fn delete_selected(&mut self) {
+        if matches!(self.workbench(), super::Workbench::Manufacturing(_)) {
+            self.show_read_only_notice(None);
+            return;
+        }
         self.recording(|this| {
             this.flush_select_bar_preview();
             this.flush_style_preview();

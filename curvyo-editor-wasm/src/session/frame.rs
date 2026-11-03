@@ -32,6 +32,10 @@ impl Session {
             ));
             return list;
         }
+        // A manufacturing workbench shows its output page only (`specs/0093` criterion 4).
+        if matches!(self.workbench(), super::Workbench::Manufacturing(_)) {
+            return self.manufacturing_frame();
+        }
         let pages = self.shown_pages();
         let background = self.shown_background();
         let grids = self.grid_lists(&pages, background);

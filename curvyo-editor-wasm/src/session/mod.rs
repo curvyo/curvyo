@@ -90,6 +90,7 @@ mod layers_panel_tests;
 #[cfg(test)]
 mod layers_tests;
 mod layers_toolbar;
+mod manufacturing;
 mod measure;
 mod move_entry;
 mod move_indicators;
@@ -563,6 +564,9 @@ pub struct Session {
     trace_text: trace_text::TraceTextState,
     /// The open tiling bar (`tiling.rs`), `None` while it is closed.
     tiling: Option<tiling::TilingMode>,
+    /// The manufacturing workbenches' views, tabs, notice and extension switches
+    /// (`manufacturing/`).
+    manufacturing: manufacturing::ManufacturingState,
 }
 
 impl Session {
@@ -660,6 +664,7 @@ impl Session {
             recognise: recognise::RecogniseState::default(),
             trace_text: trace_text::TraceTextState::default(),
             tiling: None,
+            manufacturing: manufacturing::ManufacturingState::default(),
         }
     }
 
@@ -753,6 +758,7 @@ impl Session {
             recognise: recognise::RecogniseState::default(),
             trace_text: trace_text::TraceTextState::default(),
             tiling: None,
+            manufacturing: manufacturing::ManufacturingState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -875,6 +881,10 @@ impl Session {
                 this.sketch_pointer_down(point);
                 return;
             }
+            if matches!(this.workbench(), Workbench::Manufacturing(_)) {
+                this.manufacturing_pointer_down(point);
+                return;
+            }
             this.page_view.press(&this.document.pages(), point);
 
             // Same flush as `set_tool`'s own doc comment explains: a canvas
@@ -977,6 +987,9 @@ impl Session {
         self.held.ctrl = constrain;
         if self.workbench() == Workbench::Sketch {
             self.sketch_pointer_hover(point);
+            return;
+        }
+        if matches!(self.workbench(), Workbench::Manufacturing(_)) {
             return;
         }
         if self.colour_pick_move(point) || self.trace_pick_move(point) {
@@ -1090,6 +1103,9 @@ impl Session {
                 this.sketch_pointer_up(point);
                 return;
             }
+            if matches!(this.workbench(), Workbench::Manufacturing(_)) {
+                return;
+            }
             if this.page_drag_end(point) {
                 return;
             }
@@ -1157,6 +1173,9 @@ impl Session {
             if this.workbench() == Workbench::Sketch {
                 // A dimension's text opens the entry box there (AC31, AC33).
                 this.sketch_edit_dimension_at(point);
+                return DoubleClickHint::None;
+            }
+            if matches!(this.workbench(), Workbench::Manufacturing(_)) {
                 return DoubleClickHint::None;
             }
             // On the position handle of a text on path: its entry box (`0080`, customer

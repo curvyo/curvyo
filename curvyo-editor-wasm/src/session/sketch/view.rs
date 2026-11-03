@@ -16,7 +16,7 @@ impl Session {
             json!({"id":node.id.full_id(),"name":node.registers.name.clone().unwrap_or_else(||format!("Sketch {}",node.id.short_id())),"editable":node.visible&&!node.locked})
         }).collect::<Vec<_>>();
         let snapshot = self.sketch.active.and_then(|id| self.document.sketch(id));
-        let mut view = json!({"workbench":if self.workbench()==super::Workbench::Sketch {"sketch"} else {"vector"},"tool":self.sketch_tool().name(),"active":snapshot.as_ref().map(|s| s.id.full_id()),"sketches":sketches,"error":self.sketch.error,"pending_picks":self.sketch.picks.len(),"entities":[],"constraints":[],"parameters":[],"actions":[],"status":null,"stale":false});
+        let mut view = json!({"workbench":match self.workbench() { super::Workbench::Sketch => "sketch", super::Workbench::Vector => "vector", super::Workbench::Manufacturing(_) => "manufacturing" },"tool":self.sketch_tool().name(),"active":snapshot.as_ref().map(|s| s.id.full_id()),"sketches":sketches,"error":self.sketch.error,"pending_picks":self.sketch.picks.len(),"entities":[],"constraints":[],"parameters":[],"actions":[],"status":null,"stale":false});
         view["draft_epoch"] = json!(self.sketch.draft_epoch);
         view["can_resume"] = json!(self.sketch_can_resume());
         view["constraint_tool"] = json!(self.sketch.constraint_tool);

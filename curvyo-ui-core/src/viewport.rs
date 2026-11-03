@@ -299,6 +299,35 @@ impl Viewport {
         );
     }
 
+    /// Shows the box `min`..`max` whole and as large as it fits, zooming in or out, centred in the
+    /// part of the canvas right of `free_left` and below `free_top` with a 24 px margin on the
+    /// other sides: the opening view and Fit page of a manufacturing's output page (`specs/0093`
+    /// UX notes §3). An unknown canvas size, no room or an empty box leaves the view as it is.
+    pub fn fit_area(&mut self, min: Point, max: Point, free_left: f64, free_top: f64) {
+        let (canvas_width, canvas_height) = self.canvas_size;
+        let room_width = canvas_width - DOCUMENT_TOP_MARGIN_PX - free_left.max(0.0);
+        let room_height = canvas_height - DOCUMENT_TOP_MARGIN_PX - free_top.max(0.0);
+        let (width_mm, height_mm) = (max.x - min.x, max.y - min.y);
+        let usable = |value: f64| value.is_finite() && value > 0.0;
+        if ![room_width, room_height, width_mm, height_mm]
+            .into_iter()
+            .all(usable)
+        {
+            return;
+        }
+        let factor = (room_width / (width_mm * PX_PER_MM_AT_100))
+            .min(room_height / (height_mm * PX_PER_MM_AT_100));
+        self.inset_view = false;
+        self.zoom = Zoom::new(factor);
+        let scale = self.zoom.scale();
+        let centre_x = free_left.max(0.0) + room_width / 2.0;
+        let centre_y = free_top.max(0.0) + room_height / 2.0;
+        self.origin = Point::new(
+            f64::midpoint(min.x, max.x) - centre_x / scale,
+            f64::midpoint(min.y, max.y) - centre_y / scale,
+        );
+    }
+
     /// Starts a drag-pan gesture (acceptance criteria 3, 4): records the
     /// document point currently under `(screen_x, screen_y)` as the
     /// anchor [`Viewport::continue_drag_pan`] keeps fixed under the

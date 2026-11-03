@@ -55,6 +55,9 @@ impl Session {
     /// edge since the last read switches the tab, in the same frame as the
     /// selection change), then returns the strip and the body.
     pub fn panel_view(&self) -> PanelView {
+        if let super::Workbench::Manufacturing(id) = self.workbench() {
+            return self.manufacturing_panel_view(id);
+        }
         let non_empty = self.panel_scope_non_empty();
         let active = self.update_panel_tabs(|tabs| {
             tabs.observe(non_empty);
@@ -68,6 +71,27 @@ impl Session {
                     self.workbench() == super::Workbench::Sketch || tab.name != "parameters"
                 })
                 .collect(),
+        }
+    }
+
+    /// The strip of a manufacturing workbench (UX notes §3): its manifest tab first, then File and
+    /// History, which are project-wide. A drawing tab chosen by a shortcut shows the manifest tab.
+    fn manufacturing_panel_view(&self, id: curvyo_document_core::NodeId) -> PanelView {
+        let active = match self.panel_tabs.get().active() {
+            tab @ (PanelTab::File | PanelTab::History) => tab,
+            _ => PanelTab::Workbench,
+        };
+        let label = self.manufacturing_tab_label(id);
+        let mut tabs =
+            vec![PanelTab::Workbench.entry_labelled(label, active == PanelTab::Workbench)];
+        tabs.extend(
+            tab_entries_for(active, None)
+                .into_iter()
+                .filter(|tab| tab.name == "file" || tab.name == "history"),
+        );
+        PanelView {
+            content: panel_body(active, false, false),
+            tabs,
         }
     }
 
@@ -177,6 +201,7 @@ impl PanelTabsRecord {
             PanelContent::Sketches => "sketches",
             PanelContent::Parameters => "parameters",
             PanelContent::Share => "share",
+            PanelContent::Workbench => "workbench",
             PanelContent::Empty => "empty",
         };
         Self {

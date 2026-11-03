@@ -1,5 +1,5 @@
 //! Thin host bridge forwards sketch workbench actions to the Rust session.
-use crate::{SketchTool, Workbench, wasm_api::WasmSession};
+use crate::{SketchTool, wasm_api::WasmSession};
 use curvyo_sketch_core::{Dimension, Length};
 use wasm_bindgen::prelude::*;
 fn error(error: impl std::fmt::Display) -> JsValue {
@@ -20,11 +20,10 @@ impl WasmSession {
     /// # Errors
     /// Refuses unknown workbench names.
     pub fn set_workbench(&mut self, name: &str) -> Result<(), JsValue> {
-        let workbench = match name {
-            "vector" => Workbench::Vector,
-            "sketch" => Workbench::Sketch,
-            _ => return Err(error("Unknown workbench")),
-        };
+        let workbench = self
+            .session
+            .workbench_named(name)
+            .ok_or_else(|| error("Unknown workbench"))?;
         self.session.set_workbench(workbench);
         Ok(())
     }

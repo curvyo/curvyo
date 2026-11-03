@@ -3,7 +3,8 @@ use curvyo_document_core::{DocumentVersion, NodeId};
 use curvyo_sketch_core::{ConstraintId, EntityId, Position};
 use std::collections::BTreeSet;
 
-/// The two built-in editing contexts.
+/// The session's view mode (ADR 0032 §1): the two built-in editing contexts or one
+/// manufacturing's workbench. Never document state.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Workbench {
     /// Existing vector object editing.
@@ -11,6 +12,8 @@ pub enum Workbench {
     Vector,
     /// Analytic parametric sketch editing.
     Sketch,
+    /// The manufacturing node's workbench, drawn from its extension's manifest.
+    Manufacturing(NodeId),
 }
 
 /// Sketch tools name concrete construction variants.
