@@ -10,7 +10,7 @@
 
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use curvyo_document_core::Shape;
+use curvyo_document_core::{LineJoin, Shape};
 use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_with};
 
 /// 10 px/mm.
@@ -393,11 +393,12 @@ fn stroked_star_area(shape: &Shape, width: f64) -> f64 {
 
 /// The customer's page of 2026-11-04 (`tests/fixtures/trace_shapes/customer-outline-stars.png`,
 /// 794 x 1123 px at 96 dpi): ten 8-point outline stars of several sizes, turns and stroke widths,
-/// drawn with bevelled joins (the tips are cut flat). Criterion 16: each star whose outlines are
-/// stars within the tolerance is one stroked star with n = 8 covering what the traced band covers
-/// within 2 %. The two thickest (2.4 mm strokes, bottom) have tips cut by about 2 mm, beyond the
-/// tolerance: their outer outline is no star, so they stay paths (a bevelled stroke is not a
-/// mitred one; lead to decide).
+/// drawn with bevelled joins (the tips are cut flat). Criterion 16: each is one stroked star with
+/// n = 8 covering what the traced band covers within 2 % (a stroke of its centre line with its
+/// join; decision 22). The bottom-right one (2 mm stroke, tips cut flat by about 2 mm) is
+/// bevelled; the thinner ones are within the tolerance of a mitred outline and stay mitred. The
+/// bottom-middle one (2 mm) has clipped miters, 1.3 mm short of the miter point and 0.9 mm past a
+/// bevel, and mitred inner corners: neither join draws it within the tolerance, so it stays paths.
 #[test]
 fn the_customers_ten_outline_stars_are_stroked_stars() {
     let png = image::open(
@@ -431,6 +432,7 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
     );
     assert_eq!(off.outlines.len(), 20, "ten stars of two outlines each");
     let mut failures = Vec::new();
+    let mut bevelled = 0;
     for region in &on.shapes {
         let traced: f64 = region
             .outlines
@@ -445,13 +447,15 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
         let Shape::Star { point_count, .. } = band.shape else {
             panic!("{band:?}");
         };
-        let stroked = stroked_star_area(&band.shape, band.width.as_mm());
+        let stroked = stroke_cover(&band.shape, band.width.as_mm(), band.join);
         let off_by = 100.0 * (stroked - traced) / traced;
         eprintln!(
-            "{:?}: width {:.3} mm, stroked {stroked:.1} mm², traced {traced:.1} mm² ({off_by:+.1} %)",
+            "{:?}: width {:.3} mm, {:?}, stroked {stroked:.1} mm², traced {traced:.1} mm² ({off_by:+.1} %)",
             region.outlines,
-            band.width.as_mm()
+            band.width.as_mm(),
+            band.join
         );
+        bevelled += usize::from(band.join == LineJoin::Bevel);
         if point_count.get() != 8 || off_by.abs() > 2.0 {
             failures.push(format!(
                 "{:?}: n {}, {off_by:+.1} %",
@@ -463,7 +467,67 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
     assert!(failures.is_empty(), "{failures:?}");
     assert_eq!(
         on.shapes.len(),
-        8,
-        "the two bevel-cut thick stars stay paths"
+        9,
+        "one stroked star each but the clipped one"
     );
+    assert_eq!(bevelled, 1, "the bottom-right star is bevelled");
+}
+
+/// The area kurbo's stroke of `width` with `join` along the star `shape` covers (an oracle apart
+/// from the shape pass), by a winding-number grid of 0.1 mm.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+fn stroke_cover(shape: &Shape, width: f64, join: LineJoin) -> f64 {
+    let Shape::Star {
+        frame,
+        point_count,
+        inner_ratio,
+        ..
+    } = shape
+    else {
+        return 0.0;
+    };
+    let m = 2 * point_count.get();
+    let mut path = kurbo::BezPath::new();
+    for j in 0..m {
+        let r = frame.radius.as_mm() * if j % 2 == 1 { inner_ratio.get() } else { 1.0 };
+        let a = frame.angle.as_radians() + TAU * f64::from(j) / f64::from(m);
+        let p = (frame.center.x + r * a.cos(), frame.center.y + r * a.sin());
+        if j == 0 {
+            path.move_to(p);
+        } else {
+            path.line_to(p);
+        }
+    }
+    path.close_path();
+    let style = kurbo::Stroke::new(width)
+        .with_join(match join {
+            LineJoin::Bevel => kurbo::Join::Bevel,
+            LineJoin::Round => kurbo::Join::Round,
+            LineJoin::Miter => kurbo::Join::Miter,
+        })
+        .with_miter_limit(4.0);
+    let outline = kurbo::stroke(path.iter(), &style, &kurbo::StrokeOpts::default(), 0.01);
+    let bb = kurbo::Shape::bounding_box(&outline);
+    let step = 0.1;
+    let (nx, ny) = (
+        ((bb.x1 - bb.x0) / step).ceil() as u32,
+        ((bb.y1 - bb.y0) / step).ceil() as u32,
+    );
+    let mut hits = 0u64;
+    for j in 0..ny {
+        for i in 0..nx {
+            let p = kurbo::Point::new(
+                bb.x0 + (f64::from(i) + 0.5) * step,
+                bb.y0 + (f64::from(j) + 0.5) * step,
+            );
+            if kurbo::Shape::winding(&outline, p) != 0 {
+                hits += 1;
+            }
+        }
+    }
+    hits as f64 * step * step
 }

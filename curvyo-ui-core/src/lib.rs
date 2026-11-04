@@ -179,6 +179,8 @@ mod trace_ocr;
 mod trace_plan;
 mod trace_shape_band;
 mod trace_shape_fit;
+mod trace_shape_hole_band;
+mod trace_shape_join;
 mod trace_shape_math;
 mod trace_shape_sample;
 mod trace_shape_star;

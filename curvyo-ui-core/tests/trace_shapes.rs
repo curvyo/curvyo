@@ -8,7 +8,7 @@
     clippy::similar_names
 )]
 
-use curvyo_document_core::{Angle, Shape};
+use curvyo_document_core::{Angle, LineJoin, Shape};
 use curvyo_ui_core::{
     TraceColourParams, TraceMethod, TraceParams, TraceRgb, TraceShapeRegion, TraceWire,
     read_trace_wire, trace_add_shapes, trace_colour_job_with, trace_job_with,
@@ -480,4 +480,110 @@ fn c11_c13_off_is_today_and_runs_repeat() {
     let (again, _) = traced(&rgba, 800, 800, true);
     assert_eq!(on, again, "bit for bit");
     assert_eq!(on[..plain.len()], plain[..]);
+}
+
+/// The tip and valley radius of a star's mitred offset by `s` (sides moved out by `s`), the star
+/// of `n` points with tip radius `r` and inner ratio `q`.
+fn offset_radii(n: u32, r: f64, q: f64, s: f64) -> (f64, f64) {
+    let h = std::f64::consts::PI / f64::from(n);
+    let (tip, valley) = ((r, 0.0), (r * q * h.cos(), r * q * h.sin()));
+    let (ex, ey) = (valley.0 - tip.0, valley.1 - tip.1);
+    let len = ex.hypot(ey);
+    let normal = (ey / len, -ex / len);
+    let p = normal.0 * tip.0 + s;
+    (p / normal.0, p / (normal.0 * h.cos() + normal.1 * h.sin()))
+}
+
+/// Whether (`x`, `y`) lies in the star of `n` points about `c` with radii `tip` and `valley`.
+fn in_star(x: f64, y: f64, c: (f64, f64), n: u32, tip: f64, valley: f64) -> bool {
+    let (dx, dy) = (x - c.0, y - c.1);
+    if dx.hypot(dy) > tip {
+        return false;
+    }
+    let m = 2 * n;
+    let corner = |j: u32| {
+        let r = if j % 2 == 1 { valley } else { tip };
+        let a = std::f64::consts::TAU * f64::from(j) / f64::from(m);
+        (r * a.cos(), r * a.sin())
+    };
+    let mut inside = false;
+    for j in 0..m {
+        let (a, b) = (corner(j), corner((j + 1) % m));
+        if (a.1 > dy) != (b.1 > dy) && dx < a.0 + (dy - a.1) * (b.0 - a.0) / (b.1 - a.1) {
+            inside = !inside;
+        }
+    }
+    inside
+}
+
+/// Criterion 16 with decision 22: three 8-point outline stars (tip radius 20 mm, inner ratio
+/// 0.55, mitred 1.5 mm strokes) in a row, touching tip to tip, trace to one outer outline with
+/// three holes; the region is split into three stroked stars, each at its own centre line with
+/// its own width, mitred, covering what its star covers within 2 %.
+#[test]
+fn c16_touching_outline_stars_are_one_stroked_star_each() {
+    let (n, r, q, t) = (8, 20.0, 0.55, 0.75);
+    let (outer, outer_valley) = offset_radii(n, r, q, t);
+    let (inner, inner_valley) = offset_radii(n, r, q, -t);
+    // The outer tips overlap by 0.2 mm.
+    let step = 2.0 * outer - 0.2;
+    let centres = [(30.0, 40.0), (30.0 + step, 40.0), (30.0 + 2.0 * step, 40.0)];
+    // 147 mm wide: the right star's tips end about 9 mm before the edge.
+    let w = 1470;
+    assert!(centres[2].0 + outer < 145.0);
+    let rgba = picture(w, 800, |x, y| {
+        centres.iter().any(|&c| {
+            in_star(x, y, c, n, outer, outer_valley) && !in_star(x, y, c, n, inner, inner_valley)
+        })
+    });
+    let (_, read) = traced(&rgba, w, 800, true);
+    assert_eq!(read.outlines.len(), 4, "one outer outline and three holes");
+    assert_eq!(read.shapes.len(), 1, "{:?}", read.shapes);
+    let region = &read.shapes[0];
+    assert_eq!(region.band, None);
+    assert_eq!(region.bands.len(), 3, "{region:?}");
+    assert_eq!(region.primitives(), 3);
+    let drawn = |s: f64| {
+        let (a, b) = offset_radii(n, r, q, s);
+        8.0 * a * b * (std::f64::consts::PI / 8.0).sin()
+    };
+    let truth = drawn(t) - drawn(-t);
+    for (band, c) in region.bands.iter().zip(centres) {
+        let Shape::Star {
+            frame,
+            point_count,
+            inner_ratio,
+            ..
+        } = band.shape
+        else {
+            panic!("{band:?}");
+        };
+        eprintln!("{band:?}");
+        assert_eq!(point_count.get(), 8);
+        assert_eq!(band.join, LineJoin::Miter);
+        assert!(
+            near(frame.center.x, c.0, 0.2) && near(frame.center.y, c.1, 0.2),
+            "{band:?}"
+        );
+        assert!(near(frame.radius.as_mm(), r, 0.3), "{band:?}");
+        assert!(near(inner_ratio.get(), q, 0.02), "{band:?}");
+        let (a, b) = offset_radii(
+            n,
+            frame.radius.as_mm(),
+            inner_ratio.get(),
+            band.width.as_mm() / 2.0,
+        );
+        let (c2, d) = offset_radii(
+            n,
+            frame.radius.as_mm(),
+            inner_ratio.get(),
+            -band.width.as_mm() / 2.0,
+        );
+        let sin = (std::f64::consts::PI / 8.0).sin();
+        let stroked = 8.0 * sin * (a * b - c2 * d);
+        assert!(
+            (stroked - truth).abs() <= 0.02 * truth,
+            "stroked {stroked} vs drawn {truth}"
+        );
+    }
 }

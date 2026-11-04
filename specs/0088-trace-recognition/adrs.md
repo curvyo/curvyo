@@ -371,6 +371,31 @@ change.
     (`customer-outline-stars.png`): eight stars are stroked stars of 8 points within 0.1 % of the
     traced area; the two thickest stay paths, their tips bevelled about 2 mm off the mitred outline. Bands of varying width stay two clean outlines (R-EDIT-050, dynamic strokes).
 
+22. **Traced joins and touching bands (criterion 16; lead Proposal, 2026-11-04).**
+    `curvyo-ui-core/src/trace_shape_join.rs` (the offset outlines of a star or polygon stroke,
+    mitred or bevelled) and `trace_shape_hole_band.rs` (bands found from the holes when the outer
+    is no primitive). A band whose outer fits keeps decision 21 (mitred). When it does not, the
+    hole's star or polygon gives the centre line (its sides moved out by half the width): for a
+    miter, then a bevel, the width whose stroke covers the traced band's area, accepted when every
+    traced outer and hole point lies within the tolerance of that stroke's outlines (a mitred one
+    also within the miter limit of 4). `TraceBand` carries the `join`; Create paths writes it into
+    the stroke. A region whose outer is no primitive and which has two or more star or polygon
+    holes is split into touching bands: each outer point goes to the nearest hole, each hole's
+    half width is where as many of its points lie outside the stroke's outer outline as inside,
+    its join the one they lie closer to; accepted when every outer point lies on one of the
+    strokes' outer outlines and every hole on its inner one within the tolerance, and the strokes'
+    areas add up to the traced region's within the tolerance along its outlines, else today's
+    paths. Mixed regions (some holes no band) stay paths: splitting them would need a boolean
+    difference. Such a region has no outer primitive (its preview fills the traced outer and the
+    clean holes); `TraceShapeRegion::bands` holds its bands. The wire: a band's width is followed
+    by its join (0 miter, 1 bevel, 2 round); a negative width −m announces m touching bands, each
+    width, join and centre line. Re-blessed "on" records: `ring`, `ring25`, `frame`
+    (`acceptance_0088_partb_native.json`) and `ring-with-dot.pgm` (`trace_shapes_native.json`),
+    each by the join number; no "off" record changed. The customer's ten-star page: the bottom-right
+    star is bevelled (2.0 mm, within 0.1 % of the traced area); the bottom-middle one has clipped
+    miters (1.3 mm short of the miter point, 0.9 mm past a bevel, its inner corners mitred) that
+    neither join draws within the tolerance, so it stays paths.
+
 ## Not decided here
 
 - Part B (shapes): decided in decisions 12 to 19 above; nothing moves to `geometry-core`. Tablet

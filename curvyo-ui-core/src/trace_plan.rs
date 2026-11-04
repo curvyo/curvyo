@@ -5,14 +5,14 @@
 //! `Document::insert_drawing_above`.
 
 use curvyo_document_core::{
-    AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, Length,
-    NodeId, Opacity, Stroke, Style, clean_name,
+    AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, NodeId,
+    Opacity, Stroke, Style, clean_name,
 };
 use kurbo::BezPath;
 
 use crate::AnchorIdMinter;
 use crate::svg_import_shapes::{kind_from_handles, outlines};
-use crate::trace_shapes::TraceShapeRegion;
+use crate::trace_shapes::{TraceBand, TraceShapeRegion};
 
 /// The name of an image that has none (the Layers panel's default).
 const IMAGE_DEFAULT_NAME: &str = "Image";
@@ -145,13 +145,14 @@ fn push_path(
     });
 }
 
-/// The style of a band of `width` in a colour whose filled style is `filled`: no fill, a stroke
-/// of that width in the fill's colour (mitred, butt, solid: the stroke's defaults).
-fn band_style(filled: &Style, width: Length) -> Style {
+/// The style of `band` in a colour whose filled style is `filled`: no fill, a stroke of its width
+/// and join in the fill's colour (butt, solid: the stroke's defaults).
+fn band_style(filled: &Style, band: &TraceBand) -> Style {
     Style {
         stroke: Stroke {
             enabled: true,
-            width,
+            width: band.width,
+            join: band.join,
             color: filled.fill.color,
             opacity: Opacity::OPAQUE,
             ..Stroke::default()
@@ -191,14 +192,18 @@ fn plan_colour(
         .iter()
         .filter(|r| r.outlines.first().is_some_and(|i| range.contains(i)));
     for region in regions {
-        if let Some(band) = &region.band {
-            // `specs/0088` Part B criterion 16: a band is its centre line, stroked in the fill.
-            children.push(DrawingNode::Primitive {
-                registers: DrawingRegisters::default(),
-                shape: band.shape,
-                rotation: band.rotation,
-                style: band_style(&style, band.width),
-            });
+        let bands = region.band.iter().chain(&region.bands);
+        if region.band.is_some() || !region.bands.is_empty() {
+            // `specs/0088` Part B criterion 16: a band is its centre line, stroked in the fill
+            // with the join the trace shows (decision 22); touching bands one each.
+            for band in bands {
+                children.push(DrawingNode::Primitive {
+                    registers: DrawingRegisters::default(),
+                    shape: band.shape,
+                    rotation: band.rotation,
+                    style: band_style(&style, band),
+                });
+            }
         } else if let ([Some((shape, rotation))], [_]) = (&region.shapes[..], &region.outlines[..])
         {
             children.push(DrawingNode::Primitive {
@@ -468,11 +473,13 @@ mod tests {
                     outlines: vec![1],
                     shapes: vec![Some((rect(10.0), turn))],
                     band: None,
+                    bands: Vec::new(),
                 },
                 TraceShapeRegion {
                     outlines: vec![2, 3],
                     shapes: vec![Some((rect(20.0), turn)), None],
                     band: None,
+                    bands: Vec::new(),
                 },
             ],
         };
