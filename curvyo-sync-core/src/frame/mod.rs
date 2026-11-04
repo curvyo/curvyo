@@ -4,11 +4,12 @@
 
 mod codec;
 
-use curvyo_crypto_core::{DocumentId, MemberId};
+use curvyo_crypto_core::{BackupId, DocumentId, MemberId};
 
 /// The protocol version a client names in its `Hello`: 2 adds `SnapshotPart` (ADR 0037 decision
-/// 7). The relay still admits clients of protocol 1, of which 2 is a superset.
-pub const PROTOCOL_VERSION: u16 = 2;
+/// 7), 3 the pairing frames (ADR 0040 decision 3). The relay still admits clients of protocols 1
+/// and 2, of which 3 is a superset.
+pub const PROTOCOL_VERSION: u16 = 3;
 /// The oldest protocol version the relay admits.
 pub const OLDEST_PROTOCOL_VERSION: u16 = 1;
 
@@ -66,6 +67,29 @@ pub enum RefusalReason {
     Protocol,
     /// The identity was removed from the room's keyring.
     Removed,
+    /// No pairing slot has that number (protocol 3).
+    Unknown,
+    /// The pairing code was locked after too many tries (protocol 3).
+    Locked,
+    /// The pairing slot already has a joiner, or the relay holds its most slots (protocol 3).
+    Busy,
+    /// A backup write's signature or write key does not check out (protocol 3).
+    Forbidden,
+}
+
+/// Why a pairing ended, sent by either side and forwarded by the relay (ADR 0040 decision 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PairCloseReason {
+    /// The joiner's confirmation did not check out: a wrong code (opener only).
+    Wrong,
+    /// The maker cancelled.
+    Cancelled,
+    /// The opener locked the code after too many wrong tries (opener only).
+    Locked,
+    /// The pairing finished (opener only).
+    Done,
+    /// The other side's connection ended (relay only).
+    Gone,
 }
 
 /// A frame a client sends to the relay.
@@ -127,6 +151,49 @@ pub enum ClientFrame {
         last: bool,
         /// The signed envelope.
         envelope: Vec<u8>,
+    },
+    /// Opens a pairing slot (protocol 3; the first frame of a pairing connection).
+    PairOpen,
+    /// Joins the pairing slot a code names (protocol 3; the first frame of a pairing connection).
+    PairJoin {
+        /// The slot, below 2^15.
+        slot: u16,
+    },
+    /// A pairing message for the other side, forwarded unread.
+    PairMsg {
+        /// The message bytes.
+        bytes: Vec<u8>,
+    },
+    /// Ends this side's part in the pairing.
+    PairClose {
+        /// Why.
+        reason: PairCloseReason,
+    },
+    /// Asks for the backup record stored under `id` (protocol 3; the first and only frame of a
+    /// backup read).
+    BackupGet {
+        /// The record id.
+        id: BackupId,
+    },
+    /// Opens a write of the backup record `id`; the relay answers with a `Challenge` (protocol
+    /// 3; the first frame of a backup write).
+    BackupBegin {
+        /// The record id.
+        id: BackupId,
+    },
+    /// Stores or replaces the record, signed by the write key over the challenge.
+    BackupPut {
+        /// The write key; the first put pins it.
+        write_key: MemberId,
+        /// The signature (`curvyo_crypto_core::verify_backup_write`, op put).
+        signature: [u8; 64],
+        /// The sealed backup record.
+        record: Vec<u8>,
+    },
+    /// Deletes the record, signed by its write key over the challenge.
+    BackupDelete {
+        /// The signature (op delete, empty record).
+        signature: [u8; 64],
     },
 }
 
@@ -190,6 +257,35 @@ pub enum RelayFrame {
     },
     /// The answer to a `Ping`.
     Pong,
+    /// The opener's slot: its number and its lifetime.
+    PairSlot {
+        /// The slot, below 2^15.
+        slot: u16,
+        /// Seconds until the slot expires.
+        expires_in_s: u32,
+    },
+    /// A joiner joined the slot; sent to the joiner and to the opener.
+    PairJoined {
+        /// The `CPace` session id, fresh for every join.
+        sid: [u8; 16],
+    },
+    /// The other side's pairing message.
+    PairMsg {
+        /// The message bytes.
+        bytes: Vec<u8>,
+    },
+    /// The other side ended its part in the pairing.
+    PairClose {
+        /// Why.
+        reason: PairCloseReason,
+    },
+    /// The stored backup record a `BackupGet` asked for.
+    BackupRecord {
+        /// The sealed record.
+        record: Vec<u8>,
+    },
+    /// A backup put or delete is on disk.
+    BackupDone,
 }
 
 /// Why bytes are not a frame.

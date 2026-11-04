@@ -11,6 +11,7 @@
 
 mod aead;
 mod agreement;
+mod backup;
 mod codec;
 mod envelope;
 mod error;
@@ -19,8 +20,15 @@ mod invite;
 pub mod keyring;
 mod keys;
 mod nonce;
+mod pair_channel;
+mod pair_code;
+mod pake;
 mod wrap;
 
+pub use backup::{
+    BACKUP_LABEL_MAX, BACKUP_RECORD_VERSION, BACKUP_SERVER_MAX, BackupContent, BackupId,
+    BackupKeys, BackupOp, backup_prf_input, verify_backup_write,
+};
 pub use envelope::{
     ENVELOPE_VERSION, EnvelopeHeader, EnvelopeKind, HEADER_LEN, NONCE_LEN, Opened, Sealing, open,
     seal,
@@ -30,4 +38,8 @@ pub use identity::{Identity, IdentityKeys, MemberId, verify};
 pub use invite::{InviteId, InviteKey, verify_claim_proof};
 pub use keys::{DocumentId, EpochKey, KeyId};
 pub use nonce::NonceStream;
+pub use pair_channel::{
+    PAIR_MESSAGE_VERSION, PairChannel, PairHello, PairMessage, PairRole, PairStart,
+};
+pub use pair_code::{PAIR_SLOTS, PairCode, PairSecret};
 pub use wrap::{WRAP_LEN, Wrap, unwrap_epoch_key, wrap_epoch_key};

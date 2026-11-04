@@ -1,5 +1,5 @@
-//! The server's lifecycle over its HTTP routes (`/` WebSocket, `/healthz`): bind, startup scan,
-//! relay, graceful shutdown closing every socket with code 1012 (ADR 0031 decision 11, criteria
+//! The server's lifecycle over its HTTP routes (`/` WebSocket for rooms and pairing, `/healthz`):
+//! bind, startup scan, relay, graceful shutdown closing every socket with code 1012 (ADR 0031 decision 11, criteria
 //! 35 to 38).
 
 use std::io;
@@ -13,7 +13,7 @@ use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade, close_
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::routing::get;
-use curvyo_sync_core::{MAX_MESSAGE_LEN, Relay, RestoreError};
+use curvyo_sync_core::{Backups, MAX_MESSAGE_LEN, Relay, RestoreError};
 use tokio::net::TcpListener;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
@@ -84,10 +84,11 @@ impl Server {
             health: Arc::clone(&health),
             stop: stop_rx.clone(),
         };
+        tokio::spawn(tick(state.hub.clone(), stop_rx.clone()));
         let serve = tokio::spawn(serve(listener, state, stop_rx));
         log.line(&format!("listening on {addr}"));
 
-        let (store, relay) = match scan(config.data.clone()).await {
+        let (store, relay, backups) = match scan(config.data.clone()).await {
             Ok(found) => found,
             Err(e) => {
                 let _ = stop.send(true);
@@ -96,10 +97,11 @@ impl Server {
             }
         };
         log.line(&format!(
-            "startup scan done: {} rooms",
-            relay.room_ids().len()
+            "startup scan done: {} rooms, {} backups",
+            relay.room_ids().len(),
+            backups.count()
         ));
-        let hub = Hub::new(relay, store);
+        let hub = Hub::new(relay, backups, store);
         let failed = stop.clone();
         let hub_log = log.clone();
         let hub = tokio::task::spawn_blocking(move || {
@@ -150,11 +152,12 @@ impl Server {
 }
 
 /// The startup scan, off the async threads.
-async fn scan(data: PathBuf) -> Result<(Store, Relay), ServerError> {
+async fn scan(data: PathBuf) -> Result<(Store, Relay, Backups), ServerError> {
     tokio::task::spawn_blocking(move || {
         let (store, rooms) = Store::open(&data)?;
         let relay = Relay::restore(rooms)?;
-        Ok((store, relay))
+        let backups = Backups::restore(crate::backup_file::load(&data)?);
+        Ok((store, relay, backups))
     })
     .await
     .map_err(|_| ServerError::Panicked)?
@@ -174,6 +177,21 @@ async fn serve(
             let _ = stop.wait_for(|stop| *stop).await;
         })
         .await
+}
+
+/// Tells the hub every second, so pairing slots expire without traffic (ADR 0040 decision 3).
+async fn tick(hub: mpsc::UnboundedSender<ToHub>, mut stop: watch::Receiver<bool>) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+    loop {
+        tokio::select! {
+            _ = stop.wait_for(|stop| *stop) => return,
+            _ = interval.tick() => {
+                if hub.send(ToHub::Tick).is_err() {
+                    return;
+                }
+            }
+        }
+    }
 }
 
 async fn healthz(State(state): State<AppState>) -> (StatusCode, &'static str) {

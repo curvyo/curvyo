@@ -3,10 +3,13 @@
 
 use std::collections::BTreeMap;
 
-use curvyo_crypto_core::keyring::{Entry, EntryHash, Keyring, Payload, RecipientWrap, Role};
+use curvyo_crypto_core::keyring::{
+    Entry, EntryHash, EpochWrap, Keyring, Payload, RecipientWrap, Role,
+};
 use curvyo_crypto_core::{
-    CryptoError, DocumentId, EnvelopeHeader, EnvelopeKind, EpochKey, IdentityKeys, InviteKey,
-    KeyId, MemberId, NonceStream, Opened, Sealing, open, seal, unwrap_epoch_key, wrap_epoch_key,
+    CryptoError, DocumentId, EnvelopeHeader, EnvelopeKind, EpochKey, Identity, IdentityKeys,
+    InviteKey, KeyId, MemberId, NonceStream, Opened, Sealing, open, seal, unwrap_epoch_key,
+    wrap_epoch_key,
 };
 
 use super::SessionError;
@@ -154,22 +157,69 @@ impl Keys {
         self.write(payload)
     }
 
-    /// `RemoveMember` then `NewEpoch` (highest + 1) with a fresh key wrapped to every remaining
-    /// member (ADR 0031 decision 6a).
+    /// `AddMember` of `identity` with `role` and a wrap of every epoch key held. Refuses a
+    /// member, and an identity that was removed unless `readmit`: this client re-adds a removed
+    /// identity only for a device of the maker's group that a device of the group removed (ADR
+    /// 0040 decision 5; ADR 0010 §8 itself allows re-adding).
+    pub(super) fn write_addition(
+        &mut self,
+        identity: Identity,
+        role: Role,
+        readmit: bool,
+        entropy: &mut Entropy,
+    ) -> Result<Entry, SessionError> {
+        let keyring = self.keyring.as_ref().ok_or(SessionError::NotAMember)?;
+        if keyring.role(&identity.member).is_some()
+            || (!readmit && keyring.was_removed(&identity.member))
+        {
+            return Err(SessionError::AlreadyMember);
+        }
+        let mut wraps = Vec::with_capacity(self.held.len());
+        for (epoch, key) in self.held.values() {
+            wraps.push(EpochWrap {
+                epoch: *epoch,
+                wrap: wrap_epoch_key(key, *epoch, self.document_id, &identity, entropy.secret())?,
+            });
+        }
+        self.write(Payload::AddMember {
+            identity,
+            role,
+            wraps,
+        })
+    }
+
+    /// A `RemoveMember` per member, then one `NewEpoch` (highest + 1) with a fresh key wrapped
+    /// to every remaining member (ADR 0031 decision 6a, ADR 0040 decision 5).
     pub(super) fn write_removal(
         &mut self,
-        member: MemberId,
+        members: &[MemberId],
         entropy: &mut Entropy,
     ) -> Result<Vec<Entry>, SessionError> {
         let keyring = self.keyring.as_ref().ok_or(SessionError::NotAMember)?;
         if keyring.role(&self.me()) != Some(Role::Admin) {
             return Err(SessionError::NotAdmin);
         }
-        if keyring.role(&member).is_none() || member == self.me() {
+        if members.is_empty()
+            || members
+                .iter()
+                .any(|member| keyring.role(member).is_none() || *member == self.me())
+        {
             return Err(SessionError::NotAMember);
         }
-        let remove = self.write(Payload::RemoveMember { member })?;
+        let mut written = Vec::with_capacity(members.len() + 1);
+        for member in members {
+            written.push(self.write(Payload::RemoveMember { member: *member })?);
+        }
+        written.push(self.write_rotation(entropy)?);
+        Ok(written)
+    }
+
+    /// One `NewEpoch` (highest + 1) with a fresh key wrapped to every current member.
+    pub(super) fn write_rotation(&mut self, entropy: &mut Entropy) -> Result<Entry, SessionError> {
         let keyring = self.keyring.as_ref().ok_or(SessionError::NotAMember)?;
+        if keyring.role(&self.me()) != Some(Role::Admin) {
+            return Err(SessionError::NotAdmin);
+        }
         let epoch = keyring.highest_epoch_number() + 1;
         let remaining = keyring.participants();
         let key = EpochKey::from_bytes(entropy.secret());
@@ -187,8 +237,7 @@ impl Keys {
             });
         }
         self.held.insert(key.key_id(), (epoch, key));
-        let rotate = self.write(Payload::NewEpoch { epoch, wraps })?;
-        Ok(vec![remove, rotate])
+        self.write(Payload::NewEpoch { epoch, wraps })
     }
 
     /// The `RewrapEpoch` entries this device owes other members (ADR 0031 decision 6a), at
