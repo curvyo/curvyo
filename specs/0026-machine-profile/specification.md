@@ -1,6 +1,6 @@
 # Machine profile: describe your laser once, pick it for every laser manufacturing
 
-Status: Accepted by the customer (PR #258, 2026-11-04; Frage 122 A, Frage 123 A; Machine block as a host-drawn block kind, adrs.md note 4)
+Status: Done (PR #258)
 Priority: Must
 Origin: Customer (R-MFG-001, MVP slice 13: "define a machine profile per physical device and reuse it across projects"; customer picked this story on 2026-11-03). Everything marked Proposal is the product owner's and vetoable at the demo.
 
