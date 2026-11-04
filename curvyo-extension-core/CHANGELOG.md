@@ -4,6 +4,12 @@ The contract is `0.x` and unstable (ADR 0034 §5). Parameter keys and fixture ki
 publishes are written into project files (ADR 0033 §3): renaming one is a format change with a
 migration in that extension.
 
+## Unreleased (`specs/0027-manufacturing-roles`)
+
+- Block kind `Layers { label }`: one row per drawing layer with its role in the manufacturing,
+  drawn by the shell; the extension only places it. Keyed register families
+  `x.<process id>.<family>.<node id or reserved word>` next to declared parameters (ADR 0040 §2).
+
 ## Unreleased (`specs/0026-machine-profile`)
 
 - Block kind `MachineProfile { label }`: the machine profile picker and the copy's fields, drawn

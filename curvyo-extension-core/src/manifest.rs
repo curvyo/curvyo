@@ -78,7 +78,7 @@ pub struct Tab {
     pub blocks: Vec<Block>,
 }
 
-/// A block of a schema-rendered tab: the shell knows exactly these three kinds.
+/// A block of a schema-rendered tab: the shell knows exactly these four kinds.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Block {
@@ -87,6 +87,13 @@ pub enum Block {
     /// where it sits.
     MachineProfile {
         /// The group heading ("Machine").
+        label: &'static str,
+    },
+    /// One row per drawing layer with its role in this manufacturing, the role view switch, its
+    /// legend and notice, drawn by the shell from the session's manufacturing view
+    /// (`specs/0027-manufacturing-roles` `adrs.md` note 1); the extension only says where it sits.
+    Layers {
+        /// The group heading ("Layers").
         label: &'static str,
     },
     /// The installed fixtures with add, hide and remove.

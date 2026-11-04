@@ -51,6 +51,23 @@ impl NodeId {
     pub fn short_id(self) -> String {
         self.full_id().chars().take(6).collect()
     }
+
+    /// The `peer:counter` text a register key or value names a node by (the text of
+    /// `page.<id>.owner`; ADR 0040 §1).
+    #[must_use]
+    pub fn to_register_text(self) -> String {
+        format!("{}:{}", self.peer, self.counter)
+    }
+
+    /// The inverse of [`NodeId::to_register_text`]; `None` for any other text.
+    #[must_use]
+    pub fn from_register_text(text: &str) -> Option<Self> {
+        let (peer, counter) = text.split_once(':')?;
+        Some(Self {
+            peer: peer.parse().ok()?,
+            counter: counter.parse().ok()?,
+        })
+    }
 }
 
 /// `document.json`'s on-the-wire shape for a [`NodeId`]: `peer` written as

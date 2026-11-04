@@ -31,6 +31,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("edit_max_feed", "Edit max feed"),
     ("edit_max_power", "Edit max power"),
     ("edit_laser_mode", "Edit laser mode"),
+    // `specs/0027-manufacturing-roles` criterion 4.
+    ("set_role", "Set role"),
     ("add_sketch", "Add sketch"),
     ("edit_sketch", "Edit sketch"),
     ("convert_sketch_to_path", "Sketch to path"),

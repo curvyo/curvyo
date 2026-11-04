@@ -1,5 +1,5 @@
-//! The laser workbench's manifest: one Laser tab, a View card and the Engraved grid fixture
-//! (`specs/0093-laser-workbench-shell` UX notes §3, §4).
+//! The laser workbench's manifest: one Laser tab (Machine, Layers, Fixtures), a View card and the
+//! Engraved grid fixture (`specs/0093-laser-workbench-shell` UX notes §3, §4).
 
 use curvyo_extension_core::{
     Block, Contribution, FixtureKind, Manifest, Tab, ToolboxCard, ToolboxCommand,
@@ -33,6 +33,7 @@ pub fn manifest() -> Manifest {
                         id: OVERHANG_NOTICE,
                     },
                     Block::MachineProfile { label: "Machine" },
+                    Block::Layers { label: "Layers" },
                     Block::FixtureList { label: "Fixtures" },
                 ],
             }],
@@ -83,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn the_laser_tab_starts_with_the_notice_then_machine_then_fixtures() {
+    fn the_laser_tab_starts_with_the_notice_then_machine_layers_and_fixtures() {
         let manifest = manifest();
         let blocks = &manifest.workbench().unwrap().tabs[0].blocks;
         assert!(matches!(blocks[0], Block::Notice { .. }));
@@ -91,6 +92,7 @@ mod tests {
             blocks[1],
             Block::MachineProfile { label: "Machine" }
         ));
-        assert!(matches!(blocks[2], Block::FixtureList { .. }));
+        assert!(matches!(blocks[2], Block::Layers { label: "Layers" }));
+        assert!(matches!(blocks[3], Block::FixtureList { .. }));
     }
 }

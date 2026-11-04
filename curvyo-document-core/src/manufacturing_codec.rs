@@ -212,7 +212,7 @@ pub(crate) fn json_of(value: &LoroValue) -> Option<serde_json::Value> {
 
 /// A JSON value as a plain Loro value; an integer is stored as `I64` (ADR 0039 §1), every other
 /// number as a double.
-fn loro_of(value: &serde_json::Value) -> LoroValue {
+pub(crate) fn loro_of(value: &serde_json::Value) -> LoroValue {
     match value {
         serde_json::Value::Null => LoroValue::Null,
         serde_json::Value::Bool(flag) => LoroValue::Bool(*flag),
@@ -243,6 +243,18 @@ pub(crate) fn process_values(meta: &LoroMap) -> serde_json::Map<String, serde_js
         }
     });
     values
+}
+
+/// Whether no `x.*` register of a manufacturing holds a container: ADR 0033 §3 allows only plain
+/// Loro values there, and ADR 0040 §3 refuses any other shape as damage.
+fn process_values_are_plain(meta: &LoroMap) -> bool {
+    let mut plain = true;
+    meta.for_each(|key, value| {
+        if key.starts_with("x.") && matches!(value, ValueOrContainer::Container(_)) {
+            plain = false;
+        }
+    });
+    plain
 }
 
 /// The text a node id is stored as in `page.<id>.owner`.
@@ -293,7 +305,8 @@ fn manufacturing_is_valid(tree: &LoroTree, id: TreeID, meta: &LoroMap) -> bool {
         )
         && (meta.get(KEY_PROFILE).is_none() || read_profile_map(meta).is_some())
         && crate::node_registers::registers_are_valid(meta, false)
-        && meta.get(crate::group_tree::KEY_GROUP).is_none();
+        && meta.get(crate::group_tree::KEY_GROUP).is_none()
+        && process_values_are_plain(meta);
     strings_ok
         && tree
             .children(loro::TreeParentId::Node(id))

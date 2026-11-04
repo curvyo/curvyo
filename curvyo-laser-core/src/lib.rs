@@ -1,6 +1,6 @@
 //! The laser workbench extension (ADR 0034 §1): its manifest, the outlines of its fixtures, the
-//! text of its notices and its machine profiles (ADR 0038, ADR 0039). It receives document data
-//! and record texts as arguments and never writes.
+//! text of its notices, its machine profiles (ADR 0038, ADR 0039) and its roles (ADR 0040). It
+//! receives document data and record texts as arguments and never writes.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(
@@ -15,6 +15,7 @@ mod machine_profile_file;
 mod machine_profiles;
 mod manifest;
 mod overhang;
+mod roles;
 
 pub use engraved_grid::{ENGRAVED_GRID, engraved_grid};
 pub use machine_profile::{
@@ -34,6 +35,10 @@ pub use machine_profile_file::{
 pub use machine_profiles::{LibraryWrite, MAX_RECORDS, MachineProfiles};
 pub use manifest::{PROCESS_ID, manifest};
 pub use overhang::{OVERHANG_NOTICE, OVERHANG_TOLERANCE, overhang_text};
+pub use roles::{
+    Role, RoleRead, RoleTarget, SET_ROLE_COMMIT_LABEL, is_output, read_role, role_notices,
+    role_value,
+};
 
 use curvyo_document_core::DocumentSize;
 use curvyo_extension_core::{FixtureDrawing, NoticeContext, StoredParams};

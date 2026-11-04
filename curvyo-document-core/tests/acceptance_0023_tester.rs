@@ -603,6 +603,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("image_")
             // `0069-tiling` (format 33) is a later build: a tiling is a group.
             || name.starts_with("tiling_")
+            // `0027-manufacturing-roles` (format 36) is a later build: roles are keyed by layers.
+            || name.starts_with("laser_roles")
         {
             continue;
         }

@@ -183,6 +183,9 @@ pub enum ManufacturingError {
     /// The id names no live fixture.
     #[error("no such fixture")]
     NoSuchFixture,
+    /// The register key is not in the manufacturing's own process namespace.
+    #[error("the key is outside the manufacturing's process")]
+    OutsideProcess,
     /// The work area is not a valid page size.
     #[error(transparent)]
     Size(#[from] DocumentSizeError),
@@ -460,6 +463,47 @@ impl Document {
             );
         }
         self.commit_with_label(change.label());
+        Ok(true)
+    }
+
+    /// Writes the process register `key` of the manufacturing `id` to the plain value `value`, or
+    /// deletes it for `None`, in one history step labelled `label` (ADR 0040 §4). `Ok(false)` and
+    /// nothing written when the register already holds that value (or is already absent). The
+    /// drawing is never written.
+    ///
+    /// # Errors
+    /// [`ManufacturingError::NotFound`] for an unknown manufacturing;
+    /// [`ManufacturingError::OutsideProcess`] for a key outside `x.<its process id>.`.
+    pub fn set_process_register(
+        &self,
+        id: NodeId,
+        key: &str,
+        value: Option<&serde_json::Value>,
+        label: &str,
+    ) -> Result<bool, ManufacturingError> {
+        let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
+        let prefix = format!("x.{}.", manufacturing.process);
+        if key.len() <= prefix.len() || !key.starts_with(&prefix) {
+            return Err(ManufacturingError::OutsideProcess);
+        }
+        let meta = self
+            .loro()
+            .get_tree(OBJECTS_TREE)
+            .get_meta(tree_id_of(id))
+            .map_err(|_| ManufacturingError::NotFound)?;
+        let stored = meta.get(key);
+        match value {
+            None if stored.is_none() => return Ok(false),
+            None => meta.delete(key).map_err(|_| ManufacturingError::NotFound)?,
+            Some(value) => {
+                if manufacturing.process_values.get(key) == Some(value) {
+                    return Ok(false);
+                }
+                meta.insert(key, crate::manufacturing_codec::loro_of(value))
+                    .map_err(|_| ManufacturingError::NotFound)?;
+            }
+        }
+        self.commit_with_label(label);
         Ok(true)
     }
 
