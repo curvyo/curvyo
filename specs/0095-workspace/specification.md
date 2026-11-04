@@ -1,6 +1,6 @@
 # Workspace: several documents together, shared as a whole
 
-Status: Ready (ADR 0037 accepted 2026-11-03; UX notes in `ux-notes.md`)
+Status: Done, slice 1 (PR #264)
 Priority: Should
 Origin: Customer (request of 2026-11-03, translated): a workspace feature, several documents together. Earlier customer words (COOP-SCOPE, 2026-11-03): "even several documents shared, but we do not have several documents yet, that needs a workspace feature." Customer decisions of 2026-11-03 are recorded below and applied. What is marked Proposal is the product owner's until the customer accepts it.
 
