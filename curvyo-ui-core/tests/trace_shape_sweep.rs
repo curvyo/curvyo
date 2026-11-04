@@ -390,3 +390,80 @@ fn stroked_star_area(shape: &Shape, width: f64) -> f64 {
     };
     area(p + width / 2.0) - area(p - width / 2.0)
 }
+
+/// The customer's page of 2026-11-04 (`tests/fixtures/trace_shapes/customer-outline-stars.png`,
+/// 794 x 1123 px at 96 dpi): ten 8-point outline stars of several sizes, turns and stroke widths,
+/// drawn with bevelled joins (the tips are cut flat). Criterion 16: each star whose outlines are
+/// stars within the tolerance is one stroked star with n = 8 covering what the traced band covers
+/// within 2 %. The two thickest (2.4 mm strokes, bottom) have tips cut by about 2 mm, beyond the
+/// tolerance: their outer outline is no star, so they stay paths (a bevelled stroke is not a
+/// mitred one; lead to decide).
+#[test]
+fn the_customers_ten_outline_stars_are_stroked_stars() {
+    let png = image::open(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/trace_shapes/customer-outline-stars.png"),
+    )
+    .unwrap()
+    .to_rgba8();
+    let (w, h) = png.dimensions();
+    let map = [
+        0.264_583_333_333_333_34,
+        0.0,
+        0.0,
+        0.264_583_333_333_333_34,
+        0.0,
+        0.0,
+    ];
+    let off = trace_job_with(
+        png.as_raw(),
+        w,
+        h,
+        map,
+        &TraceParams::with_threshold(128),
+        &mut |_| {},
+    );
+    let mut on = off.clone();
+    trace_add_shapes(&mut on, map);
+    let (off, on) = (
+        read_trace_wire(&off).unwrap(),
+        read_trace_wire(&on).unwrap(),
+    );
+    assert_eq!(off.outlines.len(), 20, "ten stars of two outlines each");
+    let mut failures = Vec::new();
+    for region in &on.shapes {
+        let traced: f64 = region
+            .outlines
+            .iter()
+            .map(|&i| kurbo::Shape::area(&off.outlines[i]))
+            .sum::<f64>()
+            .abs();
+        let Some(band) = region.band else {
+            failures.push(format!("{:?}: no band", region.outlines));
+            continue;
+        };
+        let Shape::Star { point_count, .. } = band.shape else {
+            panic!("{band:?}");
+        };
+        let stroked = stroked_star_area(&band.shape, band.width.as_mm());
+        let off_by = 100.0 * (stroked - traced) / traced;
+        eprintln!(
+            "{:?}: width {:.3} mm, stroked {stroked:.1} mm², traced {traced:.1} mm² ({off_by:+.1} %)",
+            region.outlines,
+            band.width.as_mm()
+        );
+        if point_count.get() != 8 || off_by.abs() > 2.0 {
+            failures.push(format!(
+                "{:?}: n {}, {off_by:+.1} %",
+                region.outlines,
+                point_count.get()
+            ));
+        }
+    }
+    assert!(failures.is_empty(), "{failures:?}");
+    assert_eq!(
+        on.shapes.len(),
+        8,
+        "the two bevel-cut thick stars stay paths"
+    );
+}

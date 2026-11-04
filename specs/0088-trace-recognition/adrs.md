@@ -353,7 +353,10 @@ change.
     square; polygons of one n, centre and turn, the apothems d apart; stars of one n, centre and
     turn whose sides are parallel within the tolerance over a side's length, the centre-line star
     the one whose sides lie halfway between (a mitred stroke keeps the corner angles and changes the
-    ratio), and no tip or valley sharper than the renderer's miter limit of 4. The area guard of
+    ratio), and no tip or valley sharper than the renderer's miter limit of 4. A star's width is the
+    one whose mitred stroke covers the traced band's area (2026-11-04: the two fits' distance is
+    noisy on a band a few pixels wide, up to 7 % in area on the customer's ten-star page; the area
+    sums the whole band), and it must be the fits' distance within the tolerance. The area guard of
     decision 16 for the stroke: the area the mitred stroke covers (offset areas: Steiner for
     ellipses, exact for rectangles, polygons and stars) must be the traced band's within the
     tolerance times both outlines' length. Create paths writes the centre-line primitive with a
@@ -364,8 +367,9 @@ change.
     re-blessed: circle, colour, cut, dots, ellipse, frame, grid500, hexagon, mixed, rect, ring,
     ring25, rounded, rounded_turned, star, wobbly_small; pictures and "off" wires unchanged). A
     band is counted as one shape in the status line. The customer's page: the outline star is a
-    star of 8 points with a 0.998 mm stroke, stroked area 368.9 mm² against the traced 365.3 mm²
-    (+1.0 %). Bands of varying width stay two clean outlines (R-EDIT-050, dynamic strokes).
+    star of 8 points with a 0.988 mm stroke covering the traced 365.3 mm². The ten-star page
+    (`customer-outline-stars.png`): eight stars are stroked stars of 8 points within 0.1 % of the
+    traced area; the two thickest stay paths, their tips bevelled about 2 mm off the mitred outline. Bands of varying width stay two clean outlines (R-EDIT-050, dynamic strokes).
 
 ## Not decided here
 
