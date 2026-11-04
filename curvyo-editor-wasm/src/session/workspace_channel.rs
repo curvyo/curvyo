@@ -291,6 +291,7 @@ impl WorkspaceChannel {
             if let Some((done, _)) = self.received.as_mut() {
                 *done += 1;
             }
+            self.note_safe_name(entry.stream, &path);
             self.writes_pending.insert(entry.stream, seq);
             self.writes.push_back(WorkspaceWrite::Document {
                 path,
@@ -332,6 +333,24 @@ impl WorkspaceChannel {
     }
 
     /// The file path of the document `id` as the list places it.
+    /// A document arriving under a name this file system refuses is written under its safe
+    /// name and the maker is told (`specs/0096-own-devices-sync` criterion 15); its id stays.
+    fn note_safe_name(&mut self, id: [u8; 16], path: &[String]) {
+        let Some(node) = self.list.find_document(id) else {
+            return;
+        };
+        let (Some(stored), Some(file)) = (self.list.stored_name(node), path.last()) else {
+            return;
+        };
+        if curvyo_document_core::check_entry_name(&stored).is_err() {
+            let shown = file.strip_suffix(".curvyo").unwrap_or(file);
+            self.notices
+                .push(curvyo_ui_core::devices_text::renamed_file_notice(
+                    &stored, shown,
+                ));
+        }
+    }
+
     pub(super) fn document_path(&self, id: [u8; 16]) -> Option<Vec<String>> {
         let entry = self
             .list
@@ -463,6 +482,23 @@ impl WorkspaceChannel {
     }
 
     /// "Receiving 7 of 20" while a join's documents arrive.
+    /// Documents whose records wait for their files (queued or with the background writer).
+    pub(super) fn waiting_documents(&self) -> usize {
+        let mut documents: std::collections::BTreeSet<[u8; 16]> =
+            self.handed.keys().copied().collect();
+        documents.extend(self.background.iter().map(|item| item.document));
+        documents.len()
+    }
+
+    /// The documents the list shows.
+    pub(super) fn document_count(&self) -> usize {
+        self.list
+            .entries()
+            .iter()
+            .filter(|e| e.kind == EntryKind::Document)
+            .count()
+    }
+
     pub(super) fn receiving(&self) -> Option<(usize, usize)> {
         let (done, total) = self.received?;
         let written = done.saturating_sub(self.writes_pending.len());

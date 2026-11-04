@@ -42,6 +42,8 @@ pub(super) struct Net {
     pub(super) now: Millis,
     pub(super) devices: Vec<Device>,
     nonce: u8,
+    /// A device whose handling of each received frame is timed, and the slowest time.
+    pub(super) watch: Option<(usize, std::time::Duration)>,
 }
 
 enum Delivery {
@@ -56,6 +58,7 @@ impl Net {
             now: Millis(START_MS),
             devices: Vec::new(),
             nonce: 0,
+            watch: None,
         }
     }
 
@@ -141,7 +144,14 @@ impl Net {
                 match delivery {
                     Delivery::Bytes(i, bytes) => {
                         if self.devices[i].link_up {
-                            self.devices[i].session.sync_received(&bytes, now);
+                            let session = &mut self.devices[i].session;
+                            match self.watch.as_mut() {
+                                Some((watched, slowest)) if *watched == i => {
+                                    let took = thread_cpu(|| session.sync_received(&bytes, now));
+                                    *slowest = (*slowest).max(took);
+                                }
+                                _ => session.sync_received(&bytes, now),
+                            }
                         }
                     }
                     Delivery::Closed(i) => self.devices[i].session.sync_disconnected(now),
@@ -179,6 +189,30 @@ impl Net {
 
     pub(super) fn json(&mut self, i: usize) -> Vec<u8> {
         self.devices[i].session.document.export_json().unwrap()
+    }
+}
+
+/// The CPU time `work` costs this thread (`CLOCK_THREAD_CPUTIME_ID`), so a busy machine does
+/// not count against a budget; wall time off Unix.
+pub(super) fn thread_cpu(work: impl FnOnce()) -> std::time::Duration {
+    #[cfg(unix)]
+    {
+        let read = || {
+            let now = rustix::time::clock_gettime(rustix::time::ClockId::ThreadCPUTime);
+            std::time::Duration::new(
+                u64::try_from(now.tv_sec).unwrap_or(0),
+                u32::try_from(now.tv_nsec).unwrap_or(0),
+            )
+        };
+        let start = read();
+        work();
+        read().saturating_sub(start)
+    }
+    #[cfg(not(unix))]
+    {
+        let start = std::time::Instant::now();
+        work();
+        start.elapsed()
     }
 }
 

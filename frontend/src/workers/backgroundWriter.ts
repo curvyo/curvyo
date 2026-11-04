@@ -55,7 +55,7 @@ scope.onmessage = (event) => {
     const created = request.type === "create";
     const written = created
       ? writer.create(request.document, request.workspace, Date.now())
-      : writer.write(request.document, request.bytes, Date.now());
+      : writer.write(request.document, request.workspace, request.bytes, Date.now());
     if (!written) {
       scope.postMessage({ type: "failed", document: request.document });
       return;
@@ -66,9 +66,10 @@ scope.onmessage = (event) => {
       bytes: written.bytes,
       through: written.through,
       created,
+      outgoing: written.outgoing,
     };
     written.free();
-    scope.postMessage(reply, [reply.bytes.buffer]);
+    scope.postMessage(reply, [reply.bytes.buffer, reply.outgoing.buffer]);
   } catch (error) {
     scope.postMessage({ type: "error", message: String(error) });
   }

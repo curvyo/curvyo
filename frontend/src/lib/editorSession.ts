@@ -18,12 +18,14 @@ import init, {
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 let ready: Promise<void> | null = null;
+let loaded = false;
 
 /** Initializes the wasm module exactly once, however many editor
  * sessions open over the app's lifetime. */
 function loadOnce(): Promise<void> {
   ready ??= init().then(() => {
     init_panic_hook();
+    loaded = true;
   });
   return ready;
 }
@@ -42,6 +44,11 @@ export function mintPeerId(): bigint {
     value = (value << 8n) | BigInt(byte);
   }
   return value & 0x7f_ff_ff_ff_ff_ff_ff_ffn;
+}
+
+/** Whether the wasm module is initialised, for words a hook formats while rendering. */
+export function wasmLoaded(): boolean {
+  return loaded;
 }
 
 /** Resolves once the wasm module is initialised (the font library's objects need it). */

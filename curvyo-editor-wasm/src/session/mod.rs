@@ -140,6 +140,12 @@ mod tiling_live_tests;
 mod tiling_view;
 pub use sketch::{SketchTool, Workbench};
 #[cfg(test)]
+mod device_budget_tests;
+mod device_facts;
+mod device_sync;
+#[cfg(test)]
+mod device_sync_tests;
+#[cfg(test)]
 mod single_line_tests;
 mod snapping;
 mod snapping_node;
@@ -263,6 +269,7 @@ pub use clones::CloneResult;
 pub use close_path::{ClosePathOutcome, ClosePathState};
 pub use combine::CombineOutcome;
 pub use cut::CutOutcome;
+pub use device_facts::{DeviceFacts, OwnState};
 pub use document::{DocumentSide, FitOutcome, SizeOutcome};
 pub use document_presets::DocumentPresetsRecord;
 pub use formats::{FormTexts, FormatEdit};

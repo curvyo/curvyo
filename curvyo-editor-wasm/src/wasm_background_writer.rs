@@ -38,6 +38,10 @@ pub struct WasmWrittenFile {
     pub bytes: Vec<u8>,
     /// The highest sequence they hold.
     pub through: f64,
+    /// The file's own changes the room lacks (empty for none): the page sends them with
+    /// `WasmSession::workspace_send_local`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub outgoing: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -82,15 +86,26 @@ impl WasmBackgroundWriter {
         serde_json::to_string(&due).unwrap_or_default()
     }
 
-    /// Writes the waiting records of `document` (hex) into its file `bytes`; `undefined` when
-    /// the file does not open (the records keep waiting).
-    pub fn write(&mut self, document: &str, bytes: &[u8], now: f64) -> Option<WasmWrittenFile> {
+    /// Writes the waiting records of `document` (hex), a document of `workspace` (hex), into
+    /// its file `bytes`; `undefined` when the file does not open (the records keep waiting).
+    pub fn write(
+        &mut self,
+        document: &str,
+        workspace: &str,
+        bytes: &[u8],
+        now: f64,
+    ) -> Option<WasmWrittenFile> {
         let id = unhex::<16>(document)?;
-        let (bytes, through) = self.writer.write(id, bytes, whole(now)).ok()?;
+        let workspace = unhex::<16>(workspace)?;
+        let written = self
+            .writer
+            .write_for(id, workspace, bytes, whole(now))
+            .ok()?;
         #[allow(clippy::cast_precision_loss)] // Sequences stay far below 2^53.
         Some(WasmWrittenFile {
-            bytes,
-            through: through as f64,
+            bytes: written.bytes,
+            through: written.through as f64,
+            outgoing: written.outgoing.unwrap_or_default(),
         })
     }
 
@@ -104,6 +119,7 @@ impl WasmBackgroundWriter {
         Some(WasmWrittenFile {
             bytes,
             through: through as f64,
+            outgoing: Vec::new(),
         })
     }
 

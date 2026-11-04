@@ -5,7 +5,7 @@
 
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 
-import { BackgroundWriterLink, type WriterItem, type WriterResponse } from "@/lib/backgroundWriterJobs";
+import { BackgroundWriterLink, type WriterItem, type WriterResponse, sendLocal } from "@/lib/backgroundWriterJobs";
 import { mintPeerId } from "@/lib/editorSession";
 import { type DocumentPlace, parsePlace } from "@/lib/sharedTree";
 import { answerBytes } from "@/lib/binaryArgs";
@@ -87,7 +87,7 @@ export function useWorkspaceWriter(
         const workspace = session.workspace_id_hex();
         void readPlace(place, document).then((file) => {
           if (file) {
-            link.send({ type: "file", document, bytes: file }, [file.buffer]);
+            link.send({ type: "file", document, workspace, bytes: file }, [file.buffer]);
           } else {
             link.send({ type: "create", document, workspace });
           }
@@ -99,7 +99,8 @@ export function useWorkspaceWriter(
             return;
           }
           const place = parsePlace(session.workspace_document_place(answer.document));
-          if (await writePlace(place, answer.document, answer.bytes, answer.created)) {
+          const bytes = sendLocal(session, answer.document, answer.bytes, answer.outgoing);
+          if (await writePlace(place, answer.document, bytes, answer.created)) {
             getSession()?.background_written(answer.document, answer.through);
           }
         });

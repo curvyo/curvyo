@@ -37,6 +37,7 @@ import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { useProject } from "@/hooks/useProject";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceSync } from "@/hooks/useWorkspaceSync";
+import { useDevices } from "@/hooks/useDevices";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { CollaborationPill } from "@/components/CollaborationPill";
@@ -145,6 +146,8 @@ function Editor() {
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).
   const workspaceSync = useWorkspaceSync(editor, project, collab, workspace);
+  // My devices: pairing, the device group and synced workspaces (`specs/0096-own-devices-sync`).
+  const devices = useDevices(editor, collab, workspace, workspaceSync);
 
   const workbench = workbenchEntry<WorkbenchContext, ReactNode>(activeKind(workbenches.list));
   const drawingOverlay = (
@@ -398,6 +401,7 @@ function Editor() {
           collab={collab}
           workspace={workspace}
           workspaceSync={workspaceSync}
+          devices={devices}
         />
       </div>
       <CursorStatus

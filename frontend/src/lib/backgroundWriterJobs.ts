@@ -16,7 +16,8 @@ export interface WriterItem {
 export type WriterRequest =
   | { type: "init"; module: WebAssembly.Module; peer: bigint }
   | { type: "records"; items: WriterItem[] }
-  | { type: "file"; document: string; bytes: Uint8Array }
+  /** The document's file, of the workspace `workspace` (hex). */
+  | { type: "file"; document: string; workspace: string; bytes: Uint8Array }
   | { type: "skip"; document: string }
   /** The document has no file here yet: build it from its records (criterion 35). */
   | { type: "create"; document: string; workspace: string }
@@ -27,7 +28,9 @@ export type WriterRequest =
 export type WriterResponse =
   | { type: "ready" }
   | { type: "need"; document: string }
-  | { type: "written"; document: string; bytes: Uint8Array; through: number; created: boolean }
+  /** `outgoing`: the file's own changes the room lacks (empty for none), sent by the page
+   * with `workspace_send_local` (`specs/0096-own-devices-sync` criterion 14). */
+  | { type: "written"; document: string; bytes: Uint8Array; through: number; created: boolean; outgoing: Uint8Array }
   | { type: "skipped"; document: string; through: number }
   | { type: "failed"; document: string }
   | { type: "error"; message: string };
@@ -65,5 +68,25 @@ export class BackgroundWriterLink {
     this.worker?.terminate();
     this.worker = null;
     this.starting = null;
+  }
+}
+
+/** The file to write after the worker merged a document: when the file had changes of its own
+ * the room lacks (`outgoing`, criterion 14 of `0096`), they are sent through `session` and the
+ * file comes back marked synced; if that fails, the worker's file (still marked unsent) is
+ * written and the changes go out the next time. */
+export function sendLocal(
+  session: { workspace_send_local(document: string, file: Uint8Array, outgoing: Uint8Array): Uint8Array },
+  document: string,
+  file: Uint8Array,
+  outgoing: Uint8Array,
+): Uint8Array {
+  if (outgoing.length === 0) {
+    return file;
+  }
+  try {
+    return session.workspace_send_local(document, file, outgoing);
+  } catch {
+    return file;
   }
 }

@@ -1,22 +1,173 @@
 import { Share2 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { ALERT, APPLY, BUTTON, DestructiveConfirm, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { PanelSwitch } from "@/components/ui/switch";
 import type { ShareView } from "@/hooks/useCollaboration";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import {
+  devices_switch_on_line,
+  devices_sync_off_confirm,
+  devices_sync_on_confirm,
+  devices_text,
   normalize_server_address,
   workspace_not_added_text,
   workspace_share_confirm_text,
   workspace_uploading_text,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
-const BUTTON =
-  "inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-[5px] border text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 aria-disabled:opacity-40";
-const OUTLINE =
-  "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
-const APPLY =
-  "border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110";
-const MUTED = "text-xs text-[var(--panel-muted-fg)]";
+/** The switch "Sync to my devices" (`specs/0096-own-devices-sync` ux-notes 6). */
+export interface SyncSwitch {
+  /** Whether the devices list marks the open workspace on. */
+  on: boolean;
+  /** Why it cannot be turned on, or empty. */
+  reason: string;
+  /** "on" or "off" while a switch runs. */
+  switching: "" | "on" | "off";
+  /** The last switch-on failed. */
+  failed: boolean;
+  /** The other devices' names (the off confirm names them). */
+  otherNames: string[];
+  /** The people other than my devices who share the workspace (the off confirm names them). */
+  others: string[];
+  switchOn: () => void;
+  /** "" when started, else why not (the confirm stays and shows it). */
+  switchOff: () => string;
+  onReturnFocus: () => void;
+}
+
+/** The switch row with its inline confirms (ux-notes 6.1 to 6.3). */
+function SyncSwitchRow({
+  name,
+  documents,
+  sync,
+  share,
+  takenIn,
+  outside,
+  check,
+}: {
+  name: string;
+  documents: number;
+  sync: SyncSwitch;
+  /** Share workspace's progress, which the switch-on runs first. */
+  share: WorkspaceSyncApi["share"];
+  takenIn: string[];
+  outside: string[];
+  /** Finds the documents shared on their own that the on confirm names. */
+  check: () => void;
+}) {
+  const [confirm, setConfirm] = useState<"" | "on" | "off">("");
+  const row = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef(false);
+  // Cancel, Escape and the action put the focus back on the switch the confirm replaced.
+  useEffect(() => {
+    if (confirm === "" && returnFocus.current) {
+      returnFocus.current = false;
+      row.current?.querySelector<HTMLElement>('[role="switch"]')?.focus();
+    }
+  }, [confirm]);
+  const close = () => {
+    returnFocus.current = true;
+    setConfirm("");
+  };
+  const busy = sync.switching !== "";
+  if (confirm === "off") {
+    return (
+      <DestructiveConfirm
+        text={devices_sync_off_confirm(name, JSON.stringify(sync.otherNames), JSON.stringify(sync.others))}
+        label={`Stop syncing ${name}`}
+        action="Stop syncing"
+        width={110}
+        onCancel={close}
+        onConfirm={() => {
+          const refusal = sync.switchOff();
+          if (refusal === "") {
+            close();
+          }
+          return refusal;
+        }}
+      />
+    );
+  }
+  if (confirm === "on") {
+    const text = devices_sync_on_confirm(
+      name,
+      documents,
+      sync.otherNames.length === 0,
+      JSON.stringify(takenIn),
+      JSON.stringify(outside),
+    );
+    return (
+      <div
+        role="group"
+        aria-label={`Sync ${name} to your devices`}
+        className="flex flex-col gap-2"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            close();
+          }
+        }}
+      >
+        <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
+        <div className="flex gap-2">
+          <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={`${BUTTON} ${APPLY} w-[110px]`}
+            onClick={() => {
+              close();
+              sync.switchOn();
+            }}
+          >
+            Sync
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const line =
+    sync.switching === "on"
+      ? share.kind === "uploading"
+        ? workspace_uploading_text(share.done, share.total)
+        : "Uploading..."
+      : sync.switching === "off"
+        ? "Stopping..."
+        : sync.on
+          ? devices_switch_on_line(sync.otherNames.length)
+          : sync.reason;
+  return (
+    <div ref={row} className="flex flex-col gap-1" aria-busy={busy}>
+      <PanelSwitch
+        label="Sync to my devices"
+        checked={sync.on || sync.switching === "on"}
+        onReturnFocus={sync.onReturnFocus}
+        onCheckedChange={(checked) => {
+          if (busy || (checked && sync.reason !== "")) {
+            return;
+          }
+          if (checked) {
+            check();
+          }
+          setConfirm(checked ? "on" : "off");
+        }}
+      />
+      {line ? (
+        <p role="status" aria-live="polite" className={MUTED}>
+          {line}
+        </p>
+      ) : null}
+      {sync.failed && !busy && !sync.on ? (
+        <p role="alert" className={ALERT}>
+          {devices_text("sync-failed")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 interface WorkspaceShareBlockProps {
   /** The open workspace's name (its folder's). */
@@ -32,6 +183,10 @@ interface WorkspaceShareBlockProps {
   invite: ReactNode;
   /** The participant list of the shared workspace. */
   participants: ReactNode;
+  /** The switch "Sync to my devices"; absent in the browser. */
+  devices?: SyncSwitch;
+  /** The heading's right text when every member is one of my devices ("Synced, 2 devices"). */
+  syncedHeader?: string;
 }
 
 /**
@@ -48,6 +203,8 @@ export function WorkspaceShareBlock({
   sync,
   invite,
   participants,
+  devices,
+  syncedHeader,
 }: WorkspaceShareBlockProps) {
   const [confirming, setConfirming] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -79,8 +236,19 @@ export function WorkspaceShareBlock({
         <p className="min-w-0 truncate text-sm font-semibold text-[var(--toolbar-icon)]" title={name}>
           {name}
         </p>
-        <span className={MUTED}>{shared ? view.workspace?.people : "Not shared"}</span>
+        <span className={MUTED}>{shared ? syncedHeader || view.workspace?.people : "Not shared"}</span>
       </div>
+      {devices ? (
+        <SyncSwitchRow
+          name={name}
+          documents={documents}
+          sync={devices}
+          share={sync.share}
+          takenIn={sync.shareCheck.takenIn}
+          outside={sync.shareCheck.outside}
+          check={() => void sync.checkShare()}
+        />
+      ) : null}
       {shared ? (
         <>
           <div className="flex flex-col gap-1">
@@ -92,7 +260,7 @@ export function WorkspaceShareBlock({
           {view.admin ? invite : null}
           {participants}
         </>
-      ) : confirming ? (
+      ) : devices && devices.switching === "on" ? null : confirming ? (
         <div
           role="group"
           aria-label={confirmText}

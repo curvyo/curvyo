@@ -123,6 +123,8 @@ export interface WorkspaceApi {
   showAlert: (text: string) => void;
   /** The block on a device removed from the workspace (criterion 44), empty when none. */
   removedText: string;
+  /** Reads the recent workspaces again (a synced workspace arrived, `0096` ux-notes 4.4). */
+  reloadRecents: () => void;
   showRemoved: (text: string) => void;
   dismissRemoved: () => void;
   /** Asks in the action slot: `text`, Cancel and `action`, which runs `run`. */
@@ -780,6 +782,7 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
     showStatus: (text: string) => showSlot({ kind: "status", text }, STATUS_MS),
     showAlert: alert,
     removedText,
+    reloadRecents: loadRecents,
     showRemoved: setRemovedText,
     dismissRemoved: () => setRemovedText(""),
     ask: (text: string, action: string, run: () => void) => showSlot({ kind: "ask", text, action, run }),

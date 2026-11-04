@@ -289,6 +289,53 @@ impl Session {
         Ok(out)
     }
 
+    /// Sends `outgoing`, the own changes of the workspace document `document` that the
+    /// background writer found in its `file` (criterion 14: a connected copy's offline edits,
+    /// also of documents never opened here), as records of its stream, with the pictures it
+    /// shows; returns the file marked synced up to them. A push queued while offline goes out
+    /// on the next connection; one still queued when the app closes is not sent again
+    /// **(Proposal)**.
+    ///
+    /// # Errors
+    /// `Ended` without a shared workspace or for a file that does not open; `TooLarge` and the
+    /// other push errors (the caller then writes the writer's file, which still says unsent).
+    pub fn workspace_send_local(
+        &mut self,
+        document: [u8; 16],
+        file: &[u8],
+        outgoing: &[u8],
+    ) -> Result<Vec<u8>, SessionError> {
+        let workspace = self
+            .workspace_channel()
+            .ok_or(SessionError::Ended)?
+            .workspace;
+        let opened = unpack(self.peer, file).map_err(|_| SessionError::Ended)?;
+        let pictures: Vec<Vec<u8>> = crate::background_writer::image_assets(&opened)
+            .into_iter()
+            .filter_map(|hash| opened.asset(&hash).map(|bytes| bytes.to_vec()))
+            .collect();
+        let peer = self.peer;
+        let link = self.sync.as_mut().ok_or(SessionError::Ended)?;
+        for picture in pictures {
+            link.client.push(
+                RecordKind::Asset,
+                encode_inner_record(document, peer, &picture),
+            )?;
+        }
+        link.client.push(
+            RecordKind::Update,
+            encode_inner_record(document, peer, outgoing),
+        )?;
+        opened.set_workspace_share(Some(WorkspaceShareRecord {
+            workspace,
+            document,
+            synced_version: opened.version(),
+        }));
+        let out = pack(&opened, super::APP_VERSION).map_err(|_| SessionError::Ended)?;
+        self.sync_pump();
+        Ok(out)
+    }
+
     /// Where the workspace document `document` keeps its file, `None` when the list does not
     /// know it (yet).
     #[must_use]

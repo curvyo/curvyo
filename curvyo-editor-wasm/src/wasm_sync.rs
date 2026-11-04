@@ -281,7 +281,7 @@ impl WasmSession {
 #[wasm_bindgen]
 #[must_use]
 pub fn normalize_server_address(text: &str) -> String {
-    share_text::normalize_server_address(text).unwrap_or_default()
+    curvyo_sync_core::normalize_server_address(text).unwrap_or_default()
 }
 
 /// The address as sentences show it.

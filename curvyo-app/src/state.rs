@@ -107,6 +107,10 @@ pub struct AppState {
     /// The folder chosen for a joined workspace, until the join writes its marker
     /// (`specs/0095-workspace` criterion 27).
     join_folder: Mutex<Option<PathBuf>>,
+    /// The folders of synced workspaces that are not open, by workspace id as hex
+    /// (`specs/0096-own-devices-sync`, ADR 0040 decision 7): the page names one by its id, never
+    /// by a path.
+    synced: Mutex<std::collections::BTreeMap<String, PathBuf>>,
 }
 
 impl AppState {
@@ -147,6 +151,18 @@ impl AppState {
     /// The folder of the open workspace.
     pub fn workspace(&self) -> Option<PathBuf> {
         self.workspace.lock().ok().and_then(|slot| slot.clone())
+    }
+
+    /// Keeps `root` as the folder of the synced workspace `id` (hex).
+    pub fn register_synced(&self, id: &str, root: PathBuf) {
+        if let Ok(mut map) = self.synced.lock() {
+            map.insert(id.to_owned(), root);
+        }
+    }
+
+    /// The folder of the synced workspace `id` (hex), when one was registered.
+    pub fn synced_root(&self, id: &str) -> Option<PathBuf> {
+        self.synced.lock().ok().and_then(|map| map.get(id).cloned())
     }
 
     /// An entry moved from `from` to `to`: the project's path follows when it is that entry or

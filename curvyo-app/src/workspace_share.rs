@@ -15,7 +15,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::project::{parented, refresh_window_title};
 use crate::raw_ipc::call_args;
 use crate::state::AppState;
-use crate::workspace::{WorkspaceAnswer, error_code, open_root, recents_file};
+use crate::workspace::{WorkspaceAnswer, error_code, open_root, recents_file, root_of};
 
 /// The marker's share files as the page reads and writes them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,10 +44,6 @@ pub(crate) enum JoinFolderAnswer {
     Refused { code: String },
 }
 
-fn root(state: &AppState) -> Result<std::path::PathBuf, String> {
-    state.workspace().ok_or_else(|| "not-found".to_owned())
-}
-
 pub(crate) fn unhex(text: &str) -> Option<[u8; 16]> {
     if text.len() != 32 {
         return None;
@@ -59,9 +55,13 @@ pub(crate) fn unhex(text: &str) -> Option<[u8; 16]> {
     Some(out)
 }
 
-/// The open workspace's marker share files, `None` when it is not shared.
-pub(crate) fn marker_of(state: &AppState) -> Result<Option<MarkerPayload>, String> {
-    let root = root(state)?;
+/// The marker share files of the open workspace or the synced workspace `workspace`, `None`
+/// when it is not shared.
+pub(crate) fn marker_of(
+    state: &AppState,
+    workspace: Option<&str>,
+) -> Result<Option<MarkerPayload>, String> {
+    let root = root_of(state, workspace)?;
     curvyo_storage_io::read_marker_share(&root)
         .map(|found| {
             found.map(|share| MarkerPayload {
@@ -73,9 +73,13 @@ pub(crate) fn marker_of(state: &AppState) -> Result<Option<MarkerPayload>, Strin
         .map_err(|error| error_code(&error))
 }
 
-/// Writes the open workspace's marker share files.
-pub(crate) fn write_marker(state: &AppState, marker: MarkerPayload) -> Result<(), String> {
-    let root = root(state)?;
+/// Writes the marker share files of the open workspace or the synced workspace `workspace`.
+pub(crate) fn write_marker(
+    state: &AppState,
+    workspace: Option<&str>,
+    marker: MarkerPayload,
+) -> Result<(), String> {
+    let root = root_of(state, workspace)?;
     curvyo_storage_io::write_marker_share(
         &root,
         &MarkerShare {
@@ -88,21 +92,30 @@ pub(crate) fn write_marker(state: &AppState, marker: MarkerPayload) -> Result<()
 }
 
 /// Share's fresh id into `workspace.toml` (ADR 0037 decision 4).
-pub(crate) fn write_id(state: &AppState, id: &str) -> Result<(), String> {
-    let root = root(state)?;
+pub(crate) fn write_id(state: &AppState, workspace: Option<&str>, id: &str) -> Result<(), String> {
+    let root = root_of(state, workspace)?;
     let id = unhex(id).ok_or_else(|| "damaged".to_owned())?;
     curvyo_storage_io::replace_workspace_id(&root, id).map_err(|error| error_code(&error))
 }
 
 /// Replaces the existing document at `path` by `bytes`.
-pub(crate) fn replace(state: &AppState, path: &[String], bytes: &[u8]) -> Result<(), String> {
-    let root = root(state)?;
+pub(crate) fn replace(
+    state: &AppState,
+    workspace: Option<&str>,
+    path: &[String],
+    bytes: &[u8],
+) -> Result<(), String> {
+    let root = root_of(state, workspace)?;
     curvyo_storage_io::replace_document(&root, path, bytes).map_err(|error| error_code(&error))
 }
 
 /// Writes `index.json` for the documents named.
-pub(crate) fn write_index(state: &AppState, documents: &[IndexPayload]) -> Result<(), String> {
-    let root = root(state)?;
+pub(crate) fn write_index(
+    state: &AppState,
+    workspace: Option<&str>,
+    documents: &[IndexPayload],
+) -> Result<(), String> {
+    let root = root_of(state, workspace)?;
     let ids: Vec<([u8; 16], Vec<String>)> = documents
         .iter()
         .filter_map(|d| Some((unhex(&d.document)?, d.path.clone())))
@@ -143,8 +156,11 @@ pub(crate) fn start_joined(state: &AppState, recents: Option<&Path>, id: &str) -
 /// The marker share files of the open workspace (criterion 33), `null` when not shared.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn workspace_marker_share(app: AppHandle) -> Result<Option<MarkerPayload>, String> {
-    marker_of(&app.state::<AppState>())
+pub(crate) fn workspace_marker_share(
+    app: AppHandle,
+    workspace: Option<String>,
+) -> Result<Option<MarkerPayload>, String> {
+    marker_of(&app.state::<AppState>(), workspace.as_deref())
 }
 
 /// Writes the marker share files (criteria 25, 28, 33).
@@ -153,21 +169,29 @@ pub(crate) fn workspace_marker_share(app: AppHandle) -> Result<Option<MarkerPayl
 pub(crate) fn write_workspace_marker_share(
     app: AppHandle,
     marker: MarkerPayload,
+    workspace: Option<String>,
 ) -> Result<(), String> {
-    write_marker(&app.state::<AppState>(), marker)
+    write_marker(&app.state::<AppState>(), workspace.as_deref(), marker)
 }
 
 /// Writes Share's fresh workspace id (hex).
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn write_workspace_id(app: AppHandle, id: String) -> Result<(), String> {
-    write_id(&app.state::<AppState>(), &id)
+pub(crate) fn write_workspace_id(
+    app: AppHandle,
+    id: String,
+    workspace: Option<String>,
+) -> Result<(), String> {
+    write_id(&app.state::<AppState>(), workspace.as_deref(), &id)
 }
 
 /// The arguments of `replace_workspace_document`.
 #[derive(Debug, Deserialize)]
 pub(crate) struct ReplaceArgs {
     path: Vec<String>,
+    /// A synced workspace that is not open, by id (hex); absent: the open workspace.
+    #[serde(default)]
+    workspace: Option<String>,
 }
 
 /// Replaces an existing workspace document (Share, background writer); the bytes come as the
@@ -179,7 +203,12 @@ pub(crate) fn replace_workspace_document(
     request: Request<'_>,
 ) -> Result<(), String> {
     let (args, bytes): (ReplaceArgs, Vec<u8>) = call_args(&request)?;
-    replace(&app.state::<AppState>(), &args.path, &bytes)
+    replace(
+        &app.state::<AppState>(),
+        args.workspace.as_deref(),
+        &args.path,
+        &bytes,
+    )
 }
 
 /// Writes `index.json`.
@@ -188,8 +217,9 @@ pub(crate) fn replace_workspace_document(
 pub(crate) fn write_workspace_index(
     app: AppHandle,
     documents: Vec<IndexPayload>,
+    workspace: Option<String>,
 ) -> Result<(), String> {
-    write_index(&app.state::<AppState>(), &documents)
+    write_index(&app.state::<AppState>(), workspace.as_deref(), &documents)
 }
 
 /// Choose folder… of a join: the OS folder picker, then the folder's check.
@@ -224,17 +254,17 @@ mod tests {
     fn the_marker_share_files_belong_to_the_open_workspace() {
         let work = tempfile::tempdir().unwrap();
         let state = AppState::default();
-        assert_eq!(marker_of(&state), Err("not-found".to_owned()));
+        assert_eq!(marker_of(&state, None), Err("not-found".to_owned()));
         open_root(&state, None, work.path());
-        assert_eq!(marker_of(&state), Ok(None));
+        assert_eq!(marker_of(&state, None), Ok(None));
         let marker = MarkerPayload {
             share_json: b"{}".to_vec(),
             keyring_log: vec![1],
             list: vec![2],
         };
-        write_marker(&state, marker.clone()).unwrap();
-        assert_eq!(marker_of(&state), Ok(Some(marker)));
-        write_id(&state, &"57".repeat(16)).unwrap();
+        write_marker(&state, None, marker.clone()).unwrap();
+        assert_eq!(marker_of(&state, None), Ok(Some(marker)));
+        write_id(&state, None, &"57".repeat(16)).unwrap();
         let text =
             fs::read_to_string(work.path().join(".curvyo-workspace/workspace.toml")).unwrap();
         assert!(text.contains(&"57".repeat(16)));

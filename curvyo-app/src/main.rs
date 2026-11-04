@@ -16,6 +16,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod device_keys;
+mod devices;
 mod dropped_fonts;
 mod extensions_file;
 mod file_uris;
@@ -149,6 +150,16 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         font_library::write_font_checks,
         device_keys::read_device_keys,
         device_keys::write_document_keys,
+        devices::read_device_group,
+        devices::write_device_group,
+        devices::remove_device_group,
+        devices::device_host_name,
+        devices::prepare_synced_folder,
+        devices::pick_synced_folder,
+        devices::register_synced_workspace,
+        devices::create_synced_workspace,
+        devices::find_workspace_copy,
+        devices::workspace_summary,
         workspace::pick_workspace,
         workspace::open_recent_workspace,
         workspace::recent_workspaces,

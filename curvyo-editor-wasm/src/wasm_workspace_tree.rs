@@ -64,6 +64,23 @@ impl WasmSession {
             .map_err(|error| JsError::new(&error.to_string()))
     }
 
+    /// Sends a workspace document's own changes `outgoing` that the background writer found
+    /// in its `file` (criterion 14); returns the file marked synced.
+    ///
+    /// # Errors
+    /// When there is no shared workspace, the file does not open or the push is refused.
+    pub fn workspace_send_local(
+        &mut self,
+        document: &str,
+        file: &[u8],
+        outgoing: &[u8],
+    ) -> Result<Vec<u8>, JsError> {
+        let id = unhex::<16>(document).ok_or_else(|| JsError::new("bad document id"))?;
+        self.session
+            .workspace_send_local(id, file, outgoing)
+            .map_err(|error| JsError::new(&error.to_string()))
+    }
+
     /// The Deleted list's rows (JSON), times local `offset_minutes` east of UTC.
     #[must_use]
     pub fn workspace_deleted_json(&self, now: f64, offset_minutes: i32) -> String {

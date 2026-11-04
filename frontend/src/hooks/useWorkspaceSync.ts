@@ -11,19 +11,19 @@ import type { ProjectApi } from "@/hooks/useProject";
 import type { ScannedEntryData, WorkspaceApi } from "@/hooks/useWorkspace";
 import { useSharedTree } from "@/hooks/useSharedTree";
 import { useWorkspaceWriter } from "@/hooks/useWorkspaceWriter";
-import { mintPeerId } from "@/lib/editorSession";
-import { openOldRoom, pushMoved } from "@/lib/movedPush";
+import { claimOpenRoom, inGroupList, openRoomNow, releaseOpenRoom } from "@/lib/backgroundWorkspace";
+import { commitShare, prepareShare } from "@/lib/workspaceShare";
 import type { SharedScan } from "@/lib/sharedTree";
 import type { WorkspaceAnswer } from "@/lib/workspaceRows";
 import { invoke } from "@/platform/host";
 import { answerBytes } from "@/lib/binaryArgs";
 import {
-  WasmWorkspaceShare,
   invite_link_server,
   invite_link_workspace,
   join_folder_refusal_text,
   normalize_server_address,
   workspace_removed_text,
+  devices_no_longer_synced_notice,
   workspace_share_take_in,
   type WasmSession,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
@@ -82,10 +82,6 @@ function random(length: number): Uint8Array {
   return bytes;
 }
 
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 function fromHex(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i += 1) {
@@ -103,13 +99,6 @@ function folderName(path: string): string {
 /** A document's name as rows show it: its file name without `.curvyo`. */
 function documentName(path: readonly string[]): string {
   return (path[path.length - 1] ?? "").replace(/\.curvyo$/i, "");
-}
-
-/** Whether the own room of the document file `bytes` can be reached for its `Moved` record. */
-async function probeOldRoom(bytes: Uint8Array, collab: CollaborationApi): Promise<boolean> {
-  const room = await openOldRoom(bytes, collab.name, (id) => collab.deviceKeys(id, () => undefined));
-  room?.close();
-  return room !== null;
 }
 
 /** The workspace id (hex) named by a marker's `share.json`. */
@@ -143,7 +132,7 @@ export function useWorkspaceSync(
   collab: CollaborationApi,
   workspace: WorkspaceApi,
 ): WorkspaceSyncApi {
-  const { getSession } = editor;
+  const { getSession, showHistoryNotice } = editor;
   const refs = useRef({ project, collab, workspace });
   useEffect(() => {
     refs.current = { project, collab, workspace };
@@ -187,6 +176,15 @@ export function useWorkspaceSync(
     }
     setSharedName(refs.current.workspace.name);
     const room = markerRoom(marker.share_json);
+    // A synced workspace held in the background hands over first: its marker is written, its
+    // socket closed (`specs/0096-own-devices-sync`, ADR 0040 decision 7).
+    await claimOpenRoom(room);
+    const fresh = await invoke<MarkerPayload | null>("workspace_marker_share").catch(() => null);
+    if (fresh) {
+      marker.share_json = fresh.share_json;
+      marker.keyring_log = fresh.keyring_log;
+      marker.list = fresh.list;
+    }
     const keys = await refs.current.collab.deviceKeys(room, () => void resumeRef.current());
     const current = getSession();
     if (!keys || !current || current.has_workspace_link()) {
@@ -226,6 +224,7 @@ export function useWorkspaceSync(
     }
     // A closed workspace's waiting records stay in its room: the worker ends.
     stopWriter();
+    releaseOpenRoom();
     return undefined;
   }, [opened, resume, stopWriter]);
 
@@ -284,7 +283,13 @@ export function useWorkspaceSync(
         removedRef.current = session;
         setSharedName("");
         void invoke("clear_workspace_marker_share").catch(() => undefined);
-        refs.current.workspace.showRemoved(workspace_removed_text());
+        const id = openRoomNow();
+        if (id !== "" && inGroupList(id)) {
+          // Switched off for my devices (0096 ux-notes 6.4): a notice, the copy stays.
+          showHistoryNotice(devices_no_longer_synced_notice(refs.current.workspace.name), 5000, "canvas", "status");
+        } else {
+          refs.current.workspace.showRemoved(workspace_removed_text());
+        }
       }
       if (!session.has_workspace_link()) {
         // A join that was cancelled or refused leaves nothing to wait for.
@@ -336,7 +341,7 @@ export function useWorkspaceSync(
       });
     }, PUMP_MS);
     return () => window.clearInterval(timer);
-  }, [getSession, pumpWriter, writeIndex, writeJoined]);
+  }, [getSession, pumpWriter, showHistoryNotice, writeIndex, writeJoined]);
 
   /** Waits for the shared workspace's first connection; "" once connected, else the reason. */
   const connected = useCallback(
@@ -369,7 +374,6 @@ export function useWorkspaceSync(
     const server = normalize_server_address(collab.server);
     const reopen = ws.openPath;
     const entries: ScannedEntryData[] = ws.scanned();
-    const documents = entries.filter((e) => e.kind === "document");
     sharingRef.current = true;
     try {
       await refs.current.project.resetToEmpty();
@@ -379,44 +383,15 @@ export function useWorkspaceSync(
         setShare({ kind: "idle" });
         return;
       }
-      const id = random(16);
-      const builder = new WasmWorkspaceShare(id, mintPeerId(), Date.now(), random(16));
-      builder.set_identity(fromHex(keys.identity));
-      const ids = new Map<string, string[]>();
-      const originals = new Map<string, Uint8Array>();
-      /** Documents to take in whose own room cannot be reached: they stay out (Proposal). */
-      const unreachable: string[] = [];
+      const deps = {
+        label: collab.name,
+        keysFor: (room: string) => collab.deviceKeys(room, () => undefined),
+        progress: (done: number, total: number) => setShare({ kind: "uploading", done, total }),
+      };
+      const prepared = await prepareShare(entries, keys.identity, deps);
+      const { builder } = prepared;
       try {
-        for (const entry of entries.filter((e) => e.kind === "folder")) {
-          builder.add_folder(JSON.stringify(entry.path));
-        }
-        let done = 0;
-        for (const entry of documents) {
-          setShare({ kind: "uploading", done, total: documents.length });
-          const bytes = await invoke<ArrayBuffer>("read_workspace_document", { path: entry.path }).then(answerBytes).catch(() => null);
-          if (bytes) {
-            originals.set(JSON.stringify(entry.path), bytes);
-          }
-          const document = random(16);
-          const reachable =
-            !bytes ||
-            workspace_share_take_in(bytes, fromHex(keys.identity)) !== "allowed" ||
-            (await probeOldRoom(bytes, collab));
-          if (!reachable) {
-            unreachable.push(documentName(entry.path));
-          }
-          const refusal = !reachable
-            ? "unreachable"
-            : bytes
-              ? builder.add_document(JSON.stringify(entry.path), bytes, document)
-              : "unreadable";
-          if (refusal === "") {
-            ids.set(toHex(document), entry.path);
-          }
-          done += 1;
-        }
-        setNotAdded([...(JSON.parse(builder.not_added_json()) as string[]), ...unreachable]);
-        builder.prepare(random(16));
+        setNotAdded(prepared.notAdded);
         const session = getSession();
         if (!session) {
           setShare({ kind: "idle" });
@@ -439,24 +414,7 @@ export function useWorkspaceSync(
           setShare({ kind: "failed", text: `Could not share: ${failure}` });
           return;
         }
-        for (let index = 0; index < builder.file_count(); index += 1) {
-          await invoke(
-            "replace_workspace_document",
-            { path: JSON.parse(builder.file_path(index)) as string[] },
-            builder.file_bytes(index),
-          ).catch(() => undefined);
-        }
-        // ADR 0037 decision 10: each document taken in ends its own room with `Moved`.
-        for (const taken of JSON.parse(builder.taken_in_json()) as { path: string[]; document: string }[]) {
-          const original = originals.get(JSON.stringify(taken.path));
-          if (original) {
-            await pushMoved(original, toHex(id), taken.document, collab.name, (room) =>
-              collab.deviceKeys(room, () => undefined),
-            );
-          }
-        }
-        await invoke("write_workspace_id", { id: toHex(id) }).catch(() => undefined);
-        await writeIndex(ids);
+        await commitShare(prepared, deps);
       } finally {
         builder.free();
       }
@@ -470,7 +428,7 @@ export function useWorkspaceSync(
     } finally {
       sharingRef.current = false;
     }
-  }, [connected, getSession, writeIndex]);
+  }, [connected, getSession]);
 
   const checkShare = useCallback(async () => {
     const scan = await invoke<SharedScan>("scan_shared_workspace").catch(() => null);

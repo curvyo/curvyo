@@ -125,9 +125,23 @@ pub(crate) fn open_root(state: &AppState, recents: Option<&Path>, root: &Path) -
     }
 }
 
-/// The scan of the open workspace.
-pub(crate) fn scan_open(state: &AppState) -> Result<Vec<ScannedPayload>, String> {
-    let root = state.workspace().ok_or_else(|| "not-found".to_owned())?;
+/// The folder a command works in: the open workspace, or with `workspace` (an id as hex) the
+/// registered synced workspace of that id, which need not be open
+/// (`specs/0096-own-devices-sync`, ADR 0040 decision 7).
+pub(crate) fn root_of(state: &AppState, workspace: Option<&str>) -> Result<PathBuf, String> {
+    match workspace {
+        None => state.workspace(),
+        Some(id) => state.synced_root(id),
+    }
+    .ok_or_else(|| "not-found".to_owned())
+}
+
+/// The scan of the open workspace, or of the synced workspace `workspace`.
+pub(crate) fn scan_open(
+    state: &AppState,
+    workspace: Option<&str>,
+) -> Result<Vec<ScannedPayload>, String> {
+    let root = root_of(state, workspace)?;
     curvyo_storage_io::scan_workspace(&root)
         .map(|entries| entries.into_iter().map(ScannedPayload::from).collect())
         .map_err(|error| error_code(&error))
@@ -135,8 +149,13 @@ pub(crate) fn scan_open(state: &AppState) -> Result<Vec<ScannedPayload>, String>
 
 /// Runs a planned operation in the open workspace; a new document gets `bytes`. The project's
 /// path follows a move of its file or a folder above it.
-pub(crate) fn apply_op(state: &AppState, op: &OpPayload, bytes: &[u8]) -> Result<(), String> {
-    let root = state.workspace().ok_or_else(|| "not-found".to_owned())?;
+pub(crate) fn apply_op(
+    state: &AppState,
+    workspace: Option<&str>,
+    op: &OpPayload,
+    bytes: &[u8],
+) -> Result<(), String> {
+    let root = root_of(state, workspace)?;
     let result = match op {
         OpPayload::CreateDocument { path } => {
             curvyo_storage_io::create_document(&root, path, bytes)
@@ -153,8 +172,12 @@ pub(crate) fn apply_op(state: &AppState, op: &OpPayload, bytes: &[u8]) -> Result
 }
 
 /// The bytes of the document at `path` in the open workspace.
-pub(crate) fn read_open(state: &AppState, path: &[String]) -> Result<Vec<u8>, String> {
-    let root = state.workspace().ok_or_else(|| "not-found".to_owned())?;
+pub(crate) fn read_open(
+    state: &AppState,
+    workspace: Option<&str>,
+    path: &[String],
+) -> Result<Vec<u8>, String> {
+    let root = root_of(state, workspace)?;
     curvyo_storage_io::read_document(&root, path).map_err(|error| error_code(&error))
 }
 
@@ -185,7 +208,7 @@ pub(crate) fn recent_rows(file: &Path) -> Vec<RecentPayload> {
 
 /// The recents list in `file`: empty when there is none or it is damaged (the next write
 /// replaces it), `None` when a newer build wrote it (never written over).
-fn read_recents(file: &Path) -> Option<RecentWorkspaces> {
+pub(crate) fn read_recents(file: &Path) -> Option<RecentWorkspaces> {
     let Ok(Some(bytes)) = curvyo_storage_io::read_optional(file) else {
         return Some(RecentWorkspaces::default());
     };
@@ -198,7 +221,7 @@ fn read_recents(file: &Path) -> Option<RecentWorkspaces> {
 
 /// Changes the recents list in `file` with `change` and writes it back, unless a newer build
 /// wrote it. A failed write only loses a shortcut.
-fn update_recents(file: &Path, change: impl FnOnce(&mut RecentWorkspaces)) {
+pub(crate) fn update_recents(file: &Path, change: impl FnOnce(&mut RecentWorkspaces)) {
     let Some(mut list) = read_recents(file) else {
         return;
     };
@@ -291,14 +314,20 @@ pub(crate) fn close_workspace(app: AppHandle) {
 /// The scan of the open workspace, polled by the page (criterion 7).
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn scan_open_workspace(app: AppHandle) -> Result<Vec<ScannedPayload>, String> {
-    scan_open(&app.state::<AppState>())
+pub(crate) fn scan_open_workspace(
+    app: AppHandle,
+    workspace: Option<String>,
+) -> Result<Vec<ScannedPayload>, String> {
+    scan_open(&app.state::<AppState>(), workspace.as_deref())
 }
 
 /// The arguments of `apply_workspace_op`.
 #[derive(Debug, Deserialize)]
 pub(crate) struct ApplyArgs {
     op: OpPayload,
+    /// A synced workspace that is not open, by id (hex); absent: the open workspace.
+    #[serde(default)]
+    workspace: Option<String>,
 }
 
 /// Runs a planned operation (criteria 13, 14, 16 to 19); a new document's bytes come as the raw
@@ -307,7 +336,12 @@ pub(crate) struct ApplyArgs {
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn apply_workspace_op(app: AppHandle, request: Request<'_>) -> Result<(), String> {
     let (args, bytes): (ApplyArgs, Vec<u8>) = call_args(&request)?;
-    let result = apply_op(&app.state::<AppState>(), &args.op, &bytes);
+    let result = apply_op(
+        &app.state::<AppState>(),
+        args.workspace.as_deref(),
+        &args.op,
+        &bytes,
+    );
     refresh_window_title(&app);
     result
 }
@@ -318,8 +352,9 @@ pub(crate) fn apply_workspace_op(app: AppHandle, request: Request<'_>) -> Result
 pub(crate) fn read_workspace_document(
     app: AppHandle,
     path: Vec<String>,
+    workspace: Option<String>,
 ) -> Result<Response, String> {
-    read_open(&app.state::<AppState>(), &path).map(Response::new)
+    read_open(&app.state::<AppState>(), workspace.as_deref(), &path).map(Response::new)
 }
 
 /// The page opened the workspace document at `path`: it is the project's file now, clean.
@@ -417,17 +452,25 @@ mod tests {
         open_root(&state, None, work.path());
         apply_op(
             &state,
+            None,
             &OpPayload::CreateDocument {
                 path: p("Lid.curvyo"),
             },
             b"bytes",
         )
         .unwrap();
-        apply_op(&state, &OpPayload::CreateFolder { path: p("Sides") }, &[]).unwrap();
-        assert_eq!(read_open(&state, &p("Lid.curvyo")).unwrap(), b"bytes");
+        apply_op(
+            &state,
+            None,
+            &OpPayload::CreateFolder { path: p("Sides") },
+            &[],
+        )
+        .unwrap();
+        assert_eq!(read_open(&state, None, &p("Lid.curvyo")).unwrap(), b"bytes");
         state.confirm_opened(work.path().join("Lid.curvyo"));
         apply_op(
             &state,
+            None,
             &OpPayload::Move {
                 from: p("Lid.curvyo"),
                 to: p("Sides/Lid.curvyo"),
@@ -442,6 +485,7 @@ mod tests {
         assert_eq!(
             apply_op(
                 &state,
+                None,
                 &OpPayload::CreateDocument {
                     path: p("Sides/Lid.curvyo")
                 },
@@ -452,6 +496,7 @@ mod tests {
         assert_eq!(
             apply_op(
                 &state,
+                None,
                 &OpPayload::CreateFolder {
                     path: p("../outside")
                 },
@@ -459,7 +504,7 @@ mod tests {
             ),
             Err("outside".to_owned())
         );
-        let scanned = scan_open(&state).unwrap();
+        let scanned = scan_open(&state, None).unwrap();
         assert_eq!(scanned.len(), 2);
         assert_eq!(
             probe_open(&state, &p("Sides/Lid.curvyo")).unwrap(),
@@ -471,9 +516,9 @@ mod tests {
     #[test]
     fn without_a_workspace_nothing_is_touched() {
         let state = AppState::default();
-        assert_eq!(scan_open(&state), Err("not-found".to_owned()));
+        assert_eq!(scan_open(&state, None), Err("not-found".to_owned()));
         assert_eq!(
-            apply_op(&state, &OpPayload::CreateFolder { path: p("A") }, &[]),
+            apply_op(&state, None, &OpPayload::CreateFolder { path: p("A") }, &[]),
             Err("not-found".to_owned())
         );
     }

@@ -78,8 +78,8 @@ impl Session {
         if link.kind != InviteKind::Workspace {
             return Err(JoinRefusal::Invalid);
         }
-        let server = curvyo_ui_core::share_text::normalize_server_address(&link.server)
-            .ok_or(JoinRefusal::Invalid)?;
+        let server =
+            curvyo_sync_core::normalize_server_address(&link.server).ok_or(JoinRefusal::Invalid)?;
         let workspace = link.secret.room.0;
         let config = workspace_config(link.secret.room, 0, SessionStart::Join(link.secret), seeds);
         let mut client = ClientSession::new(config, now).map_err(|_| JoinRefusal::Invalid)?;
@@ -143,7 +143,7 @@ impl Session {
         true
     }
 
-    fn start_workspace_link(
+    pub(super) fn start_workspace_link(
         &mut self,
         client: ClientSession,
         channel: WorkspaceChannel,
