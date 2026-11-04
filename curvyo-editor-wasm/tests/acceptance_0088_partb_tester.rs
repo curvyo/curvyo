@@ -1377,3 +1377,115 @@ fn c3_even_n_stars_with_a_point_straight_up() {
         }
     }
 }
+
+/// A picture of the strokes of `lines` (picture pixels, 10 px/mm) drawn with `join`.
+fn stroked_star_picture(
+    w: u32,
+    h: u32,
+    lines: &[(f64, f64, f64, f64, u32)],
+    width: f64,
+    join: kurbo::Join,
+) -> Vec<u8> {
+    let outlines: Vec<BezPath> = lines
+        .iter()
+        .map(|&(cx, cy, r, ratio, n)| {
+            let verts = star_vertices(cx, cy, n, r, Some(r * ratio), 0.1);
+            let mut p = BezPath::new();
+            for (i, v) in verts.iter().enumerate() {
+                if i == 0 {
+                    p.move_to(*v);
+                } else {
+                    p.line_to(*v);
+                }
+            }
+            p.close_path();
+            let style = kurbo::Stroke::new(width)
+                .with_join(join)
+                .with_miter_limit(4.0);
+            kurbo::stroke(p.iter(), &style, &kurbo::StrokeOpts::default(), 0.05)
+        })
+        .collect();
+    picture(w, h, move |x, y| {
+        let p = Point::new(x, y);
+        outlines.iter().any(|o| kurbo::Shape::winding(o, p) != 0)
+    })
+}
+
+/// Criterion 16 (join as traced): a bevelled outline star is one stroked star whose stroke joins are
+/// bevel; a mitred one has miter joins.
+#[test]
+fn c16_the_join_of_a_stroked_star_is_the_traced_one() {
+    for (join, want) in [
+        (kurbo::Join::Bevel, curvyo_document_core::LineJoin::Bevel),
+        (kurbo::Join::Miter, curvyo_document_core::LineJoin::Miter),
+    ] {
+        let mut h = Host::new(&stroked_star_picture(
+            700,
+            700,
+            &[(350.0, 350.0, 250.0, 0.55, 5)],
+            30.0,
+            join,
+        ));
+        h.create(ON);
+        let leaves = h.leaves();
+        assert_eq!(leaves.len(), 1, "{want:?}: {leaves:?}");
+        let p = prims(&leaves);
+        assert_eq!(p.len(), 1, "{want:?}");
+        assert!(matches!(p[0].shape, Shape::Star { .. }), "{want:?}");
+        assert_eq!(p[0].style.stroke.join, want);
+        assert_stroked(&p[0], 3.0 * h.u, Color { r: 0, g: 0, b: 0 }, 0.3 * h.u);
+    }
+}
+
+/// Criterion 16: three touching outline stars are three stroked stars, no path; the same row with a
+/// plain filled disc touching it stays paths.
+#[test]
+fn c16_touching_stars_are_one_stroked_star_each() {
+    let row: Vec<_> = (0..3)
+        .map(|k| (200.0 + 310.0 * f64::from(k), 200.0, 160.0, 0.8, 8))
+        .collect();
+    let mut h = Host::new(&stroked_star_picture(
+        1020,
+        400,
+        &row,
+        25.0,
+        kurbo::Join::Miter,
+    ));
+    h.create(ON);
+    let leaves = h.leaves();
+    assert_eq!(leaves.len(), 3, "{leaves:?}");
+    assert_eq!(paths(&leaves).len(), 0, "no leftover path");
+    for p in prims(&leaves) {
+        assert!(matches!(p.shape, Shape::Star { point_count, .. } if point_count.get() == 8));
+        assert_stroked(&p, 2.5 * h.u, Color { r: 0, g: 0, b: 0 }, 0.3 * h.u);
+    }
+}
+
+/// Criterion 16: a stroked star touching a filled disc with an off-centre hole is not split.
+#[test]
+fn c16_a_touching_hole_that_is_no_band_leaves_paths() {
+    let star = stroked_star_picture(
+        800,
+        400,
+        &[(200.0, 200.0, 160.0, 0.8, 8)],
+        25.0,
+        kurbo::Join::Miter,
+    );
+    // Re-render star plus a disc with an off-centre hole into one picture.
+    let img = image::load_from_memory(&star).unwrap().to_luma8();
+    let png = picture(800, 400, |x, y| {
+        let star_ink = img.get_pixel(x as u32, y as u32).0[0] < 128;
+        let disc = (x - 490.0).hypot(y - 200.0) <= 140.0 && (x - 530.0).hypot(y - 200.0) > 60.0;
+        star_ink || disc
+    });
+    let mut h = Host::new(&png);
+    h.create(ON);
+    let leaves = h.leaves();
+    assert!(
+        prims(&leaves)
+            .iter()
+            .all(|p| !p.style.stroke.enabled || p.style.fill.enabled),
+        "no stroked band primitive from a mixed region: {leaves:?}"
+    );
+    assert!(!paths(&leaves).is_empty(), "paths remain");
+}
