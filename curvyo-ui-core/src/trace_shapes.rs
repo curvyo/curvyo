@@ -154,8 +154,8 @@ fn recognise_layer(
 /// the traced band's within the tolerance along both outlines (the area guard of decision 16 for
 /// the stroke).
 fn band(outer: &Sampled, hole: &Sampled, o: &Fitted, i: &Fitted, tol: f64) -> Option<TraceBand> {
-    let ((shape, rotation), width) = band_of(o, i, tol)?;
     let traced = outer.area() - hole.area();
+    let ((shape, rotation), width) = band_of(o, i, traced, tol)?;
     let stroked = stroked_area(&shape, width);
     ((stroked - traced).abs() <= tol * (outer.perimeter + hole.perimeter)).then_some(TraceBand {
         shape,

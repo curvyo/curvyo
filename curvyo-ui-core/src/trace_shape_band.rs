@@ -20,8 +20,14 @@ use crate::trace_shape_sample::length;
 const MITER_LIMIT: f64 = 4.0;
 
 /// The centre-line primitive and the stroke width of the band between `outer` and `inner`, when
-/// they are parallel offsets of it within `tolerance`; `None` for any other pair.
-pub(crate) fn band_of(outer: &Fitted, inner: &Fitted, tolerance: f64) -> Option<(Fitted, f64)> {
+/// they are parallel offsets of it within `tolerance`; `None` for any other pair. `traced` is the
+/// traced band's area (a star's width is the one that covers it).
+pub(crate) fn band_of(
+    outer: &Fitted,
+    inner: &Fitted,
+    traced: f64,
+    tolerance: f64,
+) -> Option<(Fitted, f64)> {
     let ((o, o_turn), (i, i_turn)) = (outer, inner);
     let (mid, width) = match (o, i) {
         (Shape::Ellipse { frame: f, .. }, Shape::Ellipse { frame: g, .. }) => {
@@ -69,7 +75,7 @@ pub(crate) fn band_of(outer: &Fitted, inner: &Fitted, tolerance: f64) -> Option<
                 inner_ratio: q2,
                 ..
             },
-        ) if n == m => star_band(o, f, q1.get(), g, q2.get(), n.get(), tolerance)?,
+        ) if n == m => star_band(o, (f, q1.get()), (g, q2.get()), n.get(), traced, tolerance)?,
         _ => return None,
     };
     (width > 0.0).then_some((mid, width))
@@ -210,15 +216,17 @@ fn side_line(outer: f64, inner: f64, n: u32) -> Option<([f64; 2], f64)> {
     Some((normal, normal[0] * outer))
 }
 
-/// The band of two stars of `n` points: their sides parallel within the tolerance over a side's
-/// length, the centre line's sides halfway between, no corner sharper than the miter limit.
+/// The band of two stars of `n` points (frame and inner ratio each): their sides parallel within
+/// the tolerance over a side's length, the centre line's sides halfway between, no corner sharper
+/// than the miter limit. The width is the one whose stroke covers the `traced` area: the two
+/// fits' distance is that within the tolerance, but on a band a few pixels wide each fit's error
+/// is a large part of it, while the area sums the whole band.
 fn star_band(
     outer: &Shape,
-    f: &StarFrame,
-    q1: f64,
-    g: &StarFrame,
-    q2: f64,
+    (f, q1): (&StarFrame, f64),
+    (g, q2): (&StarFrame, f64),
     n: u32,
+    traced: f64,
     tolerance: f64,
 ) -> Option<(Fitted, f64)> {
     let (r1, r2) = (f.radius.as_mm(), g.radius.as_mm());
@@ -257,6 +265,12 @@ fn star_band(
     if tip_sine * MITER_LIMIT < 1.0 || valley_sine * MITER_LIMIT < 1.0 {
         return None;
     }
+    // The stroke of width w covers the offsets' areas k(p ± w/2)² apart: 2kp·w.
+    let k = f64::from(n) * us / (normal[0] * (normal[0] * uc + normal[1] * us));
+    let width = traced / (2.0 * k * p);
+    if (width - (p1 - p2)).abs() > tolerance {
+        return None;
+    }
     let mut shape = *outer;
     if let Shape::Star {
         frame, inner_ratio, ..
@@ -265,7 +279,7 @@ fn star_band(
         frame.radius = Length::from_mm(tip);
         *inner_ratio = InnerRatio::new(valley / tip).ok()?;
     }
-    Some(((shape, Angle::from_radians(0.0)), p1 - p2))
+    Some(((shape, Angle::from_radians(0.0)), width))
 }
 
 /// The area a stroke of `width` along the closed outline of `shape` covers (mitred corners):
@@ -354,7 +368,15 @@ mod tests {
             let tip = p / normal[0];
             star(tip, p / (normal[0] * uc + normal[1] * us) / tip)
         };
-        let ((found, _), width) = band_of(&offset(p + 1.0), &offset(p - 1.0), 0.05).unwrap();
+        let area = |s: &Fitted| match s.0 {
+            Shape::Star {
+                frame, inner_ratio, ..
+            } => 8.0 * frame.radius.as_mm().powi(2) * inner_ratio.get() * us,
+            _ => 0.0,
+        };
+        let between = area(&offset(p + 1.0)) - area(&offset(p - 1.0));
+        let ((found, _), width) =
+            band_of(&offset(p + 1.0), &offset(p - 1.0), between, 0.05).unwrap();
         assert!((width - 2.0).abs() < 1e-9);
         let (
             Shape::Star {
@@ -368,19 +390,20 @@ mod tests {
         assert!((frame.radius.as_mm() - 40.0).abs() < 1e-9);
         assert!((inner_ratio.get() - 0.5).abs() < 1e-9);
         assert!((frame.angle.as_radians() - 0.3).abs() < 1e-12);
-        let area = |s: &Fitted| match s.0 {
-            Shape::Star {
-                frame, inner_ratio, ..
-            } => 8.0 * frame.radius.as_mm().powi(2) * inner_ratio.get() * us,
-            _ => 0.0,
-        };
-        let between = area(&offset(p + 1.0)) - area(&offset(p - 1.0));
         assert!((stroked_area(&found, 2.0) - between).abs() < 1e-9);
+        // An area whose width is not the offsets' distance within the tolerance is no band.
+        assert_eq!(
+            band_of(&offset(p + 1.0), &offset(p - 1.0), 1.1 * between, 0.05),
+            None
+        );
     }
 
     /// Two stars of different tip angles are no band.
     #[test]
     fn stars_of_other_angles_are_no_band() {
-        assert_eq!(band_of(&star(40.0, 0.5), &star(30.0, 0.3), 0.05), None);
+        assert_eq!(
+            band_of(&star(40.0, 0.5), &star(30.0, 0.3), 500.0, 0.05),
+            None
+        );
     }
 }
