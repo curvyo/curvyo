@@ -107,6 +107,7 @@ agree for 0001 to 0007 only; see "Spec number versus slice label" below.
 | [0091](0091-trace-text-recognition/) | `trace-text-recognition` | Trace reads the text in the picture first (offline OCR, ADR 0028), sets each line as text in the nearest font and leaves it out of the traced paths; switch "Recognise text" in Trace Advanced. Slice 1 black and white, slice 2 multicolour, slice 3 upside-down and steep text. | Done (#244, #250, #251) | Should | to be added | - |
 | [0093](0093-laser-workbench-shell/) | `laser-workbench-shell` | First slice of `0063` and first extension of `0065`: Laser as a registered workbench, Add manufacturing creates a laser manufacturing with a placeholder machine (work area) and an output page of that size with the drawing placed live, an engraved-grid fixture shown on it, file round-trip. No G-code, connector or material library. Customer request of 2026-11-02. | Done (#255, 2026-11-03) | Must | R-MFG-001, R-EXT-003 to R-EXT-005 | - |
 | [0094](0094-masked-composite-trace/) | `masked-composite-trace` | Trace limited to the inside or outside of selected paths (positive and negative masks, exact stencil edge), parts of one picture traced with their own settings and joined into one result without doubled area. Customer request of 2026-11-03 (R-VEC-005). | Draft (Fragen 130 to 134 open) | Should | R-VEC-005, R-VEC-002 | - |
+| [0026](0026-machine-profile/) | `machine-profile` | A reusable laser machine profile (name, work area, origin corner, max feed, max power, laser mode, stored connection data) in a per-user library; a laser manufacturing picks one and keeps a copy of the used values in the file (the connection stays out of it); update, reset, "Not in your profiles". Built-in Generic laser only. No device I/O. | Done (#258, 2026-11-04) | Must | R-MFG-001 | 13 |
 
 ### In progress, Ready (next, in the order the lead starts them)
 
@@ -148,7 +149,6 @@ own entry when the customer schedules it.
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
-| [0026](0026-machine-profile/) | `machine-profile` | A reusable laser machine profile (name, work area, origin corner, max feed, max power, laser mode, stored connection data) in a per-user library; a laser manufacturing picks one and keeps a copy of the used values in the file (the connection stays out of it); update, reset, "Not in your profiles". Built-in Generic laser only. No device I/O. | Draft (2026-11-03, two questions with defaults) | Must | R-MFG-001 | 13 |
 | 0027 | `manufacturing-roles` | Assign a cut or engrave role to geometry (by layer) within one file. | Not started | Must | R-MFG-002 | 14 |
 | 0028 | `material-test-library` | Generate a power/speed test-cut grid for the selected machine, record which cell worked, store it as a reusable material record. | Not started | Must | R-MAT-001, R-MAT-002, R-MAT-003 | 15 |
 | 0029 | `laser-job-preview-and-output` | Toolpath and time preview, an explicit machine and material gate before export, GRBL G-code export for cut and engrave geometry. The MVP's capstone: a maker's own design goes from drawing to a file their laser runs. | Not started | Must | R-MFG-003, R-MFG-LASER-001, R-SYS-008 | 16 |
@@ -261,7 +261,7 @@ Slice labels, as in the column above.
 
 ### `format_version` plan
 
-The latest merged story writes `format_version` **35** (0093 laser workbench shell; built on 0092 page frames 34, 0069 tiling 33, 0071 pattern fill 32, 0070 dimensions 31, 0090 grid 30,
+The latest merged story writes `format_version` **36** (0026 machine profile; built on 0093 laser workbench shell 35, 0092 page frames 34, 0069 tiling 33, 0071 pattern fill 32, 0070 dimensions 31, 0090 grid 30,
 0066 constraint-sketcher revision 4 format 29, 0066 format 28, 0060 snapping 27 and 0059 multiple-pages 26). The table records the format decisions.
 Each change that alters the on-disk shape takes the next number at merge, and
 a reader refuses a file with a higher number ("saved by a newer version").
@@ -304,6 +304,7 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | 33 | 0069 `tiling` (a group with the `tiling` recipe and `tiling_sources`; instances keyed by `tiling_cell`, members by `tiling_member`; ADR 0030) | Done (PR #247). Golden: `tiling_v33.curvyo`; damaged `tiling_on_a_leaf`, `tiling_layout_unknown`, `tiling_result_unknown`, `tiling_count_zero`, `tiling_count_over_limit`, `tiling_number_nan`, `tiling_sources_malformed`, `tiling_cell_malformed`, `tiling_member_malformed` (`_v33.curvyo`); residue `tiling_residue_v33.curvyo` opens |
 | 34 | 0092 `cooperative-editing` (page size in one `page.<id>.frame` register so concurrent resizes converge; ADR 0031) | Done (PR #253) |
 | 35 | 0093 `laser-workbench-shell` (a manufacturing node with `mfg_*` registers, placement and fixture leaves, `page.<id>.owner` for its output page; ADR 0032, ADR 0033) | Done (PR #255). Goldens: `laser_workbench_v35.curvyo`, `manufacturing_unknown_process_v35.curvyo` |
+| 36 | 0026 `machine-profile` (one atomic `mfg_profile` map with the profile id and copied values, never the connection; `mfg_machine_name` of format 35 read as Generic laser; ADR 0039) | Done (PR #258). Goldens: `machine_profile_v36.curvyo`, `machine_profile_damaged_v36.curvyo`, `mfg_profile_not_a_map_v36.curvyo`, `laser_workbench_v36.curvyo` |
 | 27 | 0060 `snapping` (seven document-root registers: enabled, the four target flags, capture and release px) | In progress (2026-10-30). Golden: `snapping_v27.curvyo`; old-file compatibility waived by the customer. |
 
 A spec does not hard-code a version number it does not own; it says "next free
