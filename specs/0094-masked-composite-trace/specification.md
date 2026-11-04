@@ -1,6 +1,6 @@
 # Masked and composite trace: trace only parts of a picture, each with its own settings, and join them
 
-Status: Draft
+Status: Ready (2026-11-04; Fragen 130 to 134 unanswered, defaults A applied, vetoable at the demo)
 Priority: Should
 Origin: Customer (2026-11-03); everything marked Proposal is the product owner's
 
@@ -208,6 +208,9 @@ Slice 2
 - A Join command for already created trace groups.
 - Clip of the image itself or of other objects (0067).
 - Success notices and hint texts.
+
+## Decisions
+Defaults applied 2026-11-04 (unanswered, vetoable): Frage 130 A (image plus paths selected), 131 A (mask paths stay), 132 A (later part on top, no doubled area), 133 A (parts only while the Trace tool is open), 134 A (exact stencil edge, geometric clip).
 
 ## Open questions for the customer
 
