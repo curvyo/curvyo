@@ -135,3 +135,29 @@ test("a socket that cannot be made counts as a failed attempt", () => {
   transport.drain();
   assert.deepEqual(session.told, ["disconnected@5"]);
 });
+
+test("events of a socket whose session was freed reach nothing and do not throw", () => {
+  const sockets: FakeSocket[] = [];
+  const session = new FakeSession();
+  let live: FakeSession | null = session;
+  const transport = new SyncTransport(
+    (address) => {
+      const socket = new FakeSocket(address);
+      sockets.push(socket);
+      return socket;
+    },
+    () => 1,
+    (s) => s === live,
+  );
+  transport.attach(session);
+  session.actions.push(action("connect", "ws://x"));
+  transport.drain();
+  live = null; // New/Open frees the session before the timer re-attaches
+  const before = [...session.told];
+  assert.doesNotThrow(() => {
+    sockets[0].onmessage?.({ data: new Uint8Array([1]).buffer });
+    sockets[0].onclose?.({});
+    sockets[0].onerror?.({});
+  });
+  assert.deepEqual(session.told, before);
+});

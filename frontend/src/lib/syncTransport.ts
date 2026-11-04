@@ -34,10 +34,17 @@ export class SyncTransport {
 
   private readonly makeSocket: (address: string) => SocketLike;
   private readonly now: () => number;
+  private readonly isLive: (session: SyncSessionPort) => boolean;
 
-  constructor(makeSocket: (address: string) => SocketLike, now: () => number = () => Date.now()) {
+  /** `isLive` says whether a session may still be called; a freed one must never be reached. */
+  constructor(
+    makeSocket: (address: string) => SocketLike,
+    now: () => number = () => Date.now(),
+    isLive: (session: SyncSessionPort) => boolean = () => true,
+  ) {
     this.makeSocket = makeSocket;
     this.now = now;
+    this.isLive = isLive;
   }
 
   /** The session this transport serves; a different one closes the old socket first. */
@@ -87,7 +94,10 @@ export class SyncTransport {
   private open(session: SyncSessionPort, address: string): void {
     this.dropSocket();
     const generation = ++this.generation;
-    const current = () => generation === this.generation && this.session === session;
+    // A socket event of a session that was freed (New or Open while shared) is dropped: the
+    // document it belonged to is gone, and the next timer tick attaches the new session.
+    const current = () =>
+      generation === this.generation && this.session === session && this.isLive(session);
     let socket: SocketLike;
     try {
       socket = this.makeSocket(address);
