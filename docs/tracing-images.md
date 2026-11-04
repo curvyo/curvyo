@@ -251,9 +251,14 @@ turn (`specs/0088-trace-recognition` Part B). It works with Single colour and Mu
 - Create paths puts the shapes into the "Trace of" group, after the path of their colour, in the
   same one step. They are ordinary shapes: rectangles, ellipses, polygons and stars with their
   handles.
-- Holes: a shape with holes (a ring, a frame) becomes one compound path of clean outlines, each
-  hole that is a shape as that shape's outline and any other hole as traced. An outline that is no
-  shape keeps its holes as traced paths, whatever they are.
+- Bands: a ring, a frame or an outline drawn as a line of even width (a shape with one hole of
+  the same kind, its sides the same distance apart all round) becomes that shape along the middle
+  of the line, with a stroke as wide as the line and no fill: a circle, rectangle, polygon or star
+  you can edit and whose line width you can change.
+- Holes: any other shape with holes becomes one compound path of clean outlines, each hole that
+  is a shape as that shape's outline and any other hole as traced (a line that gets wider or
+  narrower stays like this). An outline that is no shape keeps its holes as traced paths, whatever
+  they are.
 - With Recognise text on too, the text is decided first: letters become text or stay paths,
   never shapes.
 - With Recognise shapes off, Trace works exactly as before.
