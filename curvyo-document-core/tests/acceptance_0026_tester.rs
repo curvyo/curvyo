@@ -1,5 +1,5 @@
 //! Independent acceptance tests for `specs/0026-machine-profile` at the document model and file
-//! format (ADR 0037, format 36): the atomic `mfg_profile` register (criteria 5, 6), one undo step
+//! format (ADR 0039, format 36): the atomic `mfg_profile` register (criteria 5, 6), one undo step
 //! per write and none for an unchanged one, the copy never holding a connection (6, 15), the
 //! golden round trip and the damaged goldens (12), the format-35 migration with no write on open,
 //! and refusal of a newer file or of a register that is not a map of plain values.
@@ -576,7 +576,7 @@ fn ac12_the_first_profile_write_on_a_format_35_file_stores_the_copy_and_drops_th
         "name".to_owned(),
         json!(m.legacy_machine_name.clone().unwrap()),
     );
-    // Same values, same size: still a write, because the old key goes away (ADR 0037 §4).
+    // Same values, same size: still a write, because the old key goes away (ADR 0039 §4).
     let changed = d
         .set_manufacturing_profile(m.id, &g, m.work_area(), ProfileChange::EditName)
         .unwrap();

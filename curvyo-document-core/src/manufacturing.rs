@@ -107,9 +107,9 @@ pub struct ManufacturingSnapshot {
     /// The process id, equal to the extension's id (`curvyo.laser`).
     pub process: String,
     /// The machine profile copy `mfg_profile`, opaque here and typed by the process's extension
-    /// (ADR 0037 §1); `None` for a format-35 manufacturing.
+    /// (ADR 0039 §1); `None` for a format-35 manufacturing.
     pub profile: Option<FixtureParams>,
-    /// The format-35 placeholder machine name, read for the migration (ADR 0037 §6).
+    /// The format-35 placeholder machine name, read for the migration (ADR 0039 §6).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub legacy_machine_name: Option<String>,
     /// The owned output page; `None` when its record is missing (damaged by a merge).
@@ -412,7 +412,7 @@ impl Document {
     }
 
     /// Writes the machine profile copy `profile` whole and sets the work area, the output page's
-    /// size, in one history step labelled by `change` (ADR 0037 §4); the format-35 machine name
+    /// size, in one history step labelled by `change` (ADR 0039 §4); the format-35 machine name
     /// goes in the same step. Placed content keeps its place relative to the top-left corner.
     /// `Ok(false)` and nothing written when the copy, the size and the old key are unchanged.
     ///

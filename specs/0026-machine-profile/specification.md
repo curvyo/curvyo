@@ -1,6 +1,6 @@
 # Machine profile: describe your laser once, pick it for every laser manufacturing
 
-Status: Ready (2026-11-03; Frage 122/123 open with defaults A/A; Machine block as a host-drawn block kind, adrs.md note 4)
+Status: Accepted by the customer (PR #258, 2026-11-04; Frage 122 A, Frage 123 A; Machine block as a host-drawn block kind, adrs.md note 4)
 Priority: Must
 Origin: Customer (R-MFG-001, MVP slice 13: "define a machine profile per physical device and reuse it across projects"; customer picked this story on 2026-11-03). Everything marked Proposal is the product owner's and vetoable at the demo.
 
@@ -73,6 +73,6 @@ Requirements: R-MFG-001, R-SYS-002, R-SYS-007, R-EXT-003 (the profile is the las
 Depends on: `specs/0093-laser-workbench-shell/` (Done, PR #255: placeholder profile, Laser tab, owned output page), `specs/0081-inline-delete-confirm/`, `specs/0045-document-formats-library/` and `specs/0075-font-library/` (the per-user file pattern)
 Parent: `specs/0063-manufacturing-workbenches/` (stage 2, setup choice per manufacturing)
 Follow-ups: `0027`, `0028`, `0029` (use the limits and the origin), `0064` (reads the connection fields)
-ADRs: `adrs.md`; ADR 0036 (profile records, one JSON file per profile) and ADR 0037 (copy in the project file; amends ADR 0033 §1 and §7), both `needs-customer` for Frage 122/123
-Format: `format_version` bump, next free at merge (36 today); `mfg_machine_name` is replaced by one atomic `mfg_profile` map (id inside it; ADR 0037)
+ADRs: `adrs.md`; ADR 0038 (profile records, one JSON file per profile) and ADR 0039 (copy in the project file; amends ADR 0033 §1 and §7), both `needs-customer` for Frage 122/123
+Format: `format_version` bump, next free at merge (36 today); `mfg_machine_name` is replaced by one atomic `mfg_profile` map (id inside it; ADR 0039)
 PR: -

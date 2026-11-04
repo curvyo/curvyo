@@ -1,7 +1,6 @@
-# ADR 0036: Machine profile records in the per-user data directory
+# ADR 0038: Machine profile records in the per-user data directory
 
-**Status:** Proposed, `needs-customer` (persistence: Frage 122 PROFILE-HOME, Frage 123
-PROFILE-CONN; written for answer A on both, see "If the customer answers B"). Realises the
+**Status:** Accepted 2026-11-04 (customer accepted PR #258, built with Frage 122 A and Frage 123 A). Realises the
 machine part of [ADR 0004](0004-persistence-and-cross-machine-sync.md) §6 for the laser family;
 places the record model in `curvyo-laser-core` instead of the `curvyo-library-core` slot of
 ADR 0004 §8 and [ADR 0011](0011-workspace-and-crate-layout.md) §2 until a second user of it
@@ -13,7 +12,7 @@ A machine profile describes one physical laser (bed, origin corner, limits, how 
 is reused by every laser manufacturing in every project (R-MFG-001). It is the maker's data, not
 the project's: it lives on this computer per user, follows the data directory when the maker
 syncs that folder (ADR 0004 §7), and never leaves the machine on its own (R-SYS-002, R-SYS-007).
-The project keeps a copy of the used values ([ADR 0037](0037-machine-profile-copy-in-the-project-file.md)).
+The project keeps a copy of the used values ([ADR 0039](0039-machine-profile-copy-in-the-project-file.md)).
 
 ADR 0004 §6 (accepted) already shaped this data: "the machine/material database ... one small
 file per record, `machines/<uuid>.json`, ... a UUID, a `format_version` and a `modified`
@@ -81,7 +80,7 @@ them. The question is which pattern the machine profiles follow.
    exists in code only, with the defaults of criterion 1; it is never written to a file.
 5. **Ids.** A new user profile's id is a UUID v4 made in core from 16 random bytes the caller
    passes in (the page's `crypto.getRandomValues`, as `editorSession.ts` does). Random ids are
-   required: a file from another computer carries its id (ADR 0037), and a counter or a name
+   required: a file from another computer carries its id (ADR 0039), and a counter or a name
    slug would match an unrelated profile of this library and show a false "Differs".
 6. **Last picked** (criterion 10) is this computer's preference, not a record: `machine-choice.json`
    (`{ "format_version": 1, "last_picked": "<id>" }`) in the config directory (`app_config_dir()`,
@@ -123,14 +122,14 @@ them. The question is which pattern the machine profiles follow.
   `format_version`, `modified`) and the merge; the file format does not change. Tracked in
   `docs/technical-debt.md`.
 - The connection fields sync with the data directory if the maker syncs it; that is their own
-  folder. They never enter a project file (ADR 0037 §2).
+  folder. They never enter a project file (ADR 0039 §2).
 - Budgets of criterion 14 (200 records: list in 100 ms, load in 200 ms of thread CPU time) are
   confirmed; a test under `curvyo-editor-wasm/tests/cpu_time/` holds them.
 
 ### If the customer answers B
 
-- **Frage 122 B** (library only, the file stores name and bed): this ADR is unchanged. ADR 0037
+- **Frage 122 B** (library only, the file stores name and bed): this ADR is unchanged. ADR 0039
   shrinks to `{ id, name }` (see there).
 - **Frage 122 C** (no library): this ADR is withdrawn; nothing of decisions 1 to 7 is built.
 - **Frage 123 B** (connection travels with the file): this ADR is unchanged; the record keeps the
-  connection, and ADR 0037 §2 adds it to the copy.
+  connection, and ADR 0039 §2 adds it to the copy.

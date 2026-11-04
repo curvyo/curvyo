@@ -122,7 +122,7 @@ const FORMATS_KEY = "curvyo.document-formats";
 /** The browser keeps `extensions.toml` here (ADR 0034 §6). */
 const EXTENSIONS_KEY = "curvyo.extensions";
 /** The machine profile records, one entry per profile (`curvyo.machines/<id>`), and the last
- * pick of this browser (ADR 0036 §1, §6). */
+ * pick of this browser (ADR 0038 §1, §6). */
 const MACHINES_PREFIX = "curvyo.machines/";
 const MACHINE_CHOICE_KEY = "curvyo.machine-choice";
 /** The font library's text and the check cache in the browser build (`0075` decisions 1, 5). */

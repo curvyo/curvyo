@@ -2,7 +2,7 @@
 //! 9, 10, 12, 13; ADR 0032, ADR 0033): the commands and their undo, the skip predicate per
 //! consumer, the output page out of the drawing's page list, open validation and the goldens
 //! `laser_workbench_v36.curvyo` and the frozen format-35 `laser_workbench_v35.curvyo` and
-//! `manufacturing_unknown_process_v35.curvyo`, which open by the migration of ADR 0037 §6.
+//! `manufacturing_unknown_process_v35.curvyo`, which open by the migration of ADR 0039 §6.
 //! `CURVYO_WRITE_FIXTURES=1` rewrites `laser_workbench_v36.curvyo`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]

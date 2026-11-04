@@ -14,7 +14,7 @@ it is accepted for good.
 
 ADR 0004 §8 and ADR 0011 §2 reserve `curvyo-library-core` for the record model of the
 machine/material database and its `merge(local, remote)`. Spec `0026` writes the first such
-records, laser machine profiles, and ADR 0036 keeps their model and codec in `curvyo-laser-core`
+records, laser machine profiles, and ADR 0038 keeps their model and codec in `curvyo-laser-core`
 because a crate with one laser-only record and no merge would be speculative (`CLAUDE.md` §5).
 Merge of two computers' edits of the same profile is not built: the later file wins when the
 data directory is synced. The file format (`machines/<uuid>.json`) is already the one the

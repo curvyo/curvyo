@@ -67,7 +67,7 @@ curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
-# The machine profile record names and limits (ADR 0036 §1, §3): which file names are records and
+# The machine profile record names and limits (ADR 0038 §1, §3): which file names are records and
 # how much of each is read; the commands parse nothing.
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 kurbo.workspace = true

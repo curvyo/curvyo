@@ -1,5 +1,5 @@
 //! The commands that move the text of the machine profile records, `machines/<id>.json` in the
-//! app data directory, and of `machine-choice.json` in the config directory (ADR 0036 §1, §6, §7).
+//! app data directory, and of `machine-choice.json` in the config directory (ADR 0038 §1, §6, §7).
 //! They parse nothing; `curvyo-laser-core` does, inside the frontend's `WasmSession`. An id that
 //! is not a profile id is refused, so no command can reach outside the folder.
 

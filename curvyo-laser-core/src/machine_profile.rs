@@ -1,4 +1,4 @@
-//! The laser machine profile record with its limits and the built-in (ADR 0036 §2, §4, §5;
+//! The laser machine profile record with its limits and the built-in (ADR 0038 §2, §4, §5;
 //! `specs/0026-machine-profile` criteria 1, 2, 3 and 9).
 
 use std::fmt::Write as _;
@@ -141,7 +141,7 @@ bounded_integer!(
     BaudRate(u32), 1, 4_000_000, 115_200
 );
 
-/// The values a manufacturing copies from a profile (ADR 0037 §1), the work area aside.
+/// The values a manufacturing copies from a profile (ADR 0039 §1), the work area aside.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileValues {
     /// The profile name, 1 to 60 characters; not unique.
@@ -179,7 +179,7 @@ pub struct Connection {
     pub baud_rate: BaudRate,
 }
 
-/// One machine profile of the library (ADR 0036 §2).
+/// One machine profile of the library (ADR 0038 §2).
 #[derive(Debug, Clone, PartialEq)]
 pub struct MachineProfile {
     /// A lowercase UUID v4, or [`GENERIC_LASER_ID`] for the built-in.
@@ -432,7 +432,7 @@ pub fn save_as_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
 }
 
 /// A new profile id: a lowercase UUID v4 from 16 random bytes the caller passes in (core has no
-/// random source; ADR 0036 §5).
+/// random source; ADR 0038 §5).
 #[must_use]
 pub fn new_profile_id(random: [u8; 16]) -> String {
     let mut bytes = random;

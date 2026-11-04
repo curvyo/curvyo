@@ -377,7 +377,7 @@ impl DocumentVersion {
 /// disabled and saves back unchanged (ADR 0033 §4). Goldens: `laser_workbench_v35.curvyo` and
 /// `manufacturing_unknown_process_v35.curvyo`.
 ///
-/// Bumped to 36 in `machine-profile` (ADR 0037, `specs/0026-machine-profile`): a manufacturing
+/// Bumped to 36 in `machine-profile` (ADR 0039, `specs/0026-machine-profile`): a manufacturing
 /// carries its machine profile copy as one atomic map register `mfg_profile` (the library id and
 /// the copied values, never a connection; opaque here, typed by the process's extension) instead
 /// of the placeholder `mfg_machine_name`. A build that stops at 35 would show the manufacturing

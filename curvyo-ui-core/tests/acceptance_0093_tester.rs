@@ -65,7 +65,7 @@ fn ac2_the_laser_workbench_brings_generic_laser_at_400_by_300() {
     let m = manifest(LASER).unwrap();
     let w = m.workbench().unwrap();
     assert_eq!(w.label, "Laser");
-    // `0026` moved the machine and work area into the machine profile (ADR 0037 §8).
+    // `0026` moved the machine and work area into the machine profile (ADR 0039 §8).
     let generic = curvyo_laser_core::MachineProfile::generic_laser();
     assert_eq!(generic.values.name, "Generic laser");
     assert_eq!(
