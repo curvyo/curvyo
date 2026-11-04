@@ -2080,3 +2080,7 @@ wasm size, no behaviour.
 
 **Resolution:** move the workspace to `sha2` 0.11 when its other users (`digest` 0.10 tree) allow,
 in a Renovate batch.
+
+## One wasm trap poisons the main instance for good (2026-11-04)
+
+A single trap in the main wasm instance leaves it unusable ("null pointer passed to rust" on every later call), and the app has no recovery or reload path yet.

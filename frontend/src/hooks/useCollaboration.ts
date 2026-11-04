@@ -181,6 +181,8 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
   const transportRef = useRef<SyncTransport | null>(null);
   transportRef.current ??= new SyncTransport(
     (address) => new WebSocket(address) as unknown as SocketLike,
+    undefined,
+    (session) => (session as unknown) === getSession(),
   );
   const projectRef = useRef(project);
   useEffect(() => {
