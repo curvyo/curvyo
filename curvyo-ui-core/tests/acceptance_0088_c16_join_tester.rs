@@ -433,12 +433,14 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_round() {
         let b = r.band.unwrap();
         assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 8));
         let traced = region_area(&off, r);
+        // A 0.2 mm raster keeps the test fast in debug; against a 0.05 mm raster it was at most
+        // 0.32 % off on these stars, so 0.5 % of the 3 % rule is kept as the margin.
         let stroked = area_of(
             &[stroke_of(&centre_line(&b), b.width.as_mm(), join_of(&b))],
-            0.05,
+            0.2,
         );
         assert!(
-            (stroked - traced).abs() <= 0.03 * traced,
+            (stroked - traced).abs() <= 0.025 * traced,
             "stroked {stroked} vs traced {traced}"
         );
         // Width vs distance between the offsets (mitred stars only: the sides are parallel).
