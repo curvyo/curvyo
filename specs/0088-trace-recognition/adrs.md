@@ -343,6 +343,29 @@ change.
     no longer fit 304 px). The toggles now share the Output row, one flex row at 4 px gaps (173 +
     4 + 124 = 301 px): 237 px panel open, 165 px closed (`0089` tidy-up 22.3 within its 40 px).
     Tab order: Output, Colours, pipette, the four toggles, then strip, Denoise, Upscale, Corners.
+21. **Bands of constant width (criterion 16; lead Proposal, customer Frage 119 A, 2026-11-03).**
+    `curvyo-ui-core/src/trace_shape_band.rs` ("The centre-line primitive of a traced band of
+    constant width"). A region with exactly one hole, both recognised as the same kind, is a band
+    when they are parallel offsets of one primitive within the outer's tolerance: circles and
+    ellipses with one centre (and turn) and both radii smaller by the same d; rectangles with one
+    centre and turn, equal borders d, the centre line's corner radius the outer's less d/2 (a
+    square outer is a mitred square centre line) and the inner's the centre line's less d/2 or
+    square; polygons of one n, centre and turn, the apothems d apart; stars of one n, centre and
+    turn whose sides are parallel within the tolerance over a side's length, the centre-line star
+    the one whose sides lie halfway between (a mitred stroke keeps the corner angles and changes the
+    ratio), and no tip or valley sharper than the renderer's miter limit of 4. The area guard of
+    decision 16 for the stroke: the area the mitred stroke covers (offset areas: Steiner for
+    ellipses, exact for rectangles, polygons and stars) must be the traced band's within the
+    tolerance times both outlines' length. Create paths writes the centre-line primitive with a
+    stroke of width d in the colour's fill, mitred, butt, solid, no fill; the preview still fills
+    the two clean outlines (the same pixels). The wire: each region's shapes are followed by the
+    band width (0: none) and, for a band, the centre-line primitive's numbers; every recorded "on"
+    wire changes by that number (`trace_shapes_native.json`, `acceptance_0088_partb_native.json`
+    re-blessed: circle, colour, cut, dots, ellipse, frame, grid500, hexagon, mixed, rect, ring,
+    ring25, rounded, rounded_turned, star, wobbly_small; pictures and "off" wires unchanged). A
+    band is counted as one shape in the status line. The customer's page: the outline star is a
+    star of 8 points with a 0.998 mm stroke, stroked area 368.9 mm² against the traced 365.3 mm²
+    (+1.0 %). Bands of varying width stay two clean outlines (R-EDIT-050, dynamic strokes).
 
 ## Not decided here
 

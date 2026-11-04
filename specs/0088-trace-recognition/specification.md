@@ -132,7 +132,10 @@ Pictures below are rendered at 10 px/mm, so the 2 px floor equals 0.2 mm.
    rounded one; a regular polygon is a polygon, not a star, when both fit equally.
 8. Holes are kept: a traced ring (circle with a circle hole) becomes one compound of two circles; a rectangle
    frame becomes a compound of two rectangles. The hole rule for non-matching holes follows the Proposal above.
-9. Given the 0025 ring fixture, then the result is 1 compound of 2 circles. Given the 0025 dot grid fixture,
+   **Changed 2026-11-03 by criterion 16 (Frage 119 A):** a ring or frame of constant width is one stroked
+   primitive; a compound of two clean outlines remains for bands of varying width.
+9. Given the 0025 ring fixture, then the result is 1 compound of 2 circles (**changed 2026-11-03 by criterion 16:**
+   one circle with a stroke of the ring's width). Given the 0025 dot grid fixture,
    then the result is 10,000 circles (100 x 100) and no path remains.
 10. Multicolour: given a picture of a red circle and a blue rectangle, then the result is a circle primitive with
     the red fill and a rectangle primitive with the blue fill.
@@ -145,6 +148,16 @@ Pictures below are rendered at 10 px/mm, so the 2 px floor equals 0.2 mm.
     in wasm, and on repeated runs.
 14. Create paths with recognised primitives is one undo step that restores the state before it.
 15. Nothing is sent over the network; recognition works with the network disabled.
+16. Bands of constant width (lead Proposal 2026-11-03, customer Frage 119 A): given a traced region with exactly one
+    hole whose outer and inner outlines are parallel offsets of one primitive (same kind, centre, rotation and n,
+    the sides a constant distance d apart within tolerance), then it becomes that primitive at the centre line
+    with a stroke of width d, no fill, the stroke in the region's fill colour (black, or its palette colour). A
+    ring is a stroked circle, a rectangle frame a stroked rectangle (corner radius at the centre line), an outline
+    star or polygon a stroked star or polygon (mitred corners: the centre-line star is derived from both offsets;
+    a corner sharper than the miter limit of 4 is not a stroke). The stroked area matches the traced band's within
+    the tolerance, else the region stays two clean outlines, as does a band of varying width (dynamic strokes are
+    R-EDIT-050). The customer's page: the 8-point outline star is one stroked star with n = 8, its stroked area
+    within 2 % of the traced band's.
 
 ## Later
 - Gesture-based shape recognition (customer, 2026-10-28): the customer compares Part B with VectorCraft's shape
