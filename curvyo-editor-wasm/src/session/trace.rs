@@ -476,6 +476,7 @@ fn shapes_at(shapes: &[TraceShapeRegion], places: &[usize]) -> Vec<TraceShapeReg
         .map(|region| TraceShapeRegion {
             outlines: region.outlines.iter().map(|&i| places[i]).collect(),
             shapes: region.shapes.clone(),
+            band: region.band,
         })
         .collect()
 }

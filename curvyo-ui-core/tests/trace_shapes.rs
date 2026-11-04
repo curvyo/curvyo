@@ -267,6 +267,16 @@ fn c8_holes_are_kept() {
         near(radii[0], 30.0, 0.2) && near(radii[1], 15.0, 0.2),
         "{radii:?}"
     );
+    // Criterion 16 (Frage 119 A): the ring is a band, a circle at its centre line with a stroke.
+    let band = region.band.unwrap();
+    let Shape::Ellipse { frame, .. } = band.shape else {
+        panic!("{band:?}");
+    };
+    assert!(
+        frame.rx == frame.ry && near(frame.rx.as_mm(), 22.5, 0.2),
+        "{band:?}"
+    );
+    assert!(near(band.width.as_mm(), 15.0, 0.2), "{band:?}");
     let frame = picture(1400, 1000, |x, y| {
         let outer = (10.0..130.0).contains(&x) && (10.0..90.0).contains(&y);
         let hole = (30.0..110.0).contains(&x) && (30.0..70.0).contains(&y);
@@ -287,6 +297,61 @@ fn c8_holes_are_kept() {
         near(sizes[0].0, 120.0, 0.2) && near(sizes[1].1, 40.0, 0.2),
         "{sizes:?}"
     );
+    // Criterion 16: a square-cornered rectangle at the centre line, a 20 mm stroke.
+    let band = region.band.unwrap();
+    let Shape::Rect {
+        bounds,
+        corner_radii,
+    } = band.shape
+    else {
+        panic!("{band:?}");
+    };
+    assert!(near(bounds.width.as_mm(), 100.0, 0.2) && near(bounds.height.as_mm(), 60.0, 0.2));
+    assert_eq!(corner_radii.tl.as_mm(), 0.0);
+    assert!(near(band.width.as_mm(), 20.0, 0.2), "{band:?}");
+}
+
+/// Criterion 16: a hexagon outline (outer radius 30 mm, sides 3 mm apart) is a hexagon at the
+/// centre line with a 3 mm stroke; bands of varying width (a ring whose hole is off centre, a
+/// frame with borders of 20 and 10 mm) stay two clean outlines.
+#[test]
+fn c16_bands_of_constant_width_are_stroked_primitives() {
+    let apothem = 30.0 * (std::f64::consts::PI / 6.0).cos();
+    let inner = (apothem - 3.0) / (std::f64::consts::PI / 6.0).cos();
+    let hexagons = picture(800, 800, |x, y| {
+        regular(x, y, 6, 30.0, None, 0.2) && !regular(x, y, 6, inner, None, 0.2)
+    });
+    let (_, read) = traced(&hexagons, 800, 800, true);
+    let (region, _) = only(&read);
+    let band = region.band.unwrap();
+    let Shape::Polygon {
+        frame, point_count, ..
+    } = band.shape
+    else {
+        panic!("{band:?}");
+    };
+    assert_eq!(point_count.get(), 6);
+    let mid = (apothem - 1.5) / (std::f64::consts::PI / 6.0).cos();
+    assert!(near(frame.radius.as_mm(), mid, 0.2), "{band:?}");
+    assert!(near(band.width.as_mm(), 3.0, 0.2), "{band:?}");
+    assert_eq!(region.primitives(), 1);
+    let off_centre = picture(700, 700, |x, y| {
+        (x - 35.0).hypot(y - 35.0) <= 30.0 && (x - 39.0).hypot(y - 35.0) > 15.0
+    });
+    let uneven = picture(1400, 1000, |x, y| {
+        let outer = (10.0..130.0).contains(&x) && (10.0..90.0).contains(&y);
+        let hole = (30.0..110.0).contains(&x) && (20.0..80.0).contains(&y);
+        outer && !hole
+    });
+    for (name, rgba, w, h) in [
+        ("off centre", off_centre, 700, 700),
+        ("uneven", uneven, 1400, 1000),
+    ] {
+        let (_, read) = traced(&rgba, w, h, true);
+        let (region, _) = only(&read);
+        assert_eq!(region.band, None, "{name}");
+        assert_eq!(region.primitives(), 2, "{name}: two clean outlines");
+    }
 }
 
 /// Criterion 9: the `0025` ring (radii 20 and 60 px in 200 x 200 px) and dot grid (3 px dots
@@ -325,7 +390,9 @@ fn c9_the_0025_ring_and_dot_grid() {
         };
         let read = shape_wire(&ring, 200);
         let (region, _) = only(&read);
-        assert_eq!(region.primitives(), 2, "{:?}", region.shapes);
+        // Criterion 16: the ring is one stroked circle.
+        assert_eq!(region.primitives(), 1, "{:?}", region.shapes);
+        assert!(region.band.is_some());
         let read = shape_wire(&dots, 800);
         assert_eq!(read.outlines.len(), 10_000);
         assert_eq!(read.shapes.len(), 10_000);

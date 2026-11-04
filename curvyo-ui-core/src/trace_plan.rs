@@ -5,8 +5,8 @@
 //! `Document::insert_drawing_above`.
 
 use curvyo_document_core::{
-    AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, NodeId,
-    Opacity, Stroke, Style, clean_name,
+    AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, Length,
+    NodeId, Opacity, Stroke, Style, clean_name,
 };
 use kurbo::BezPath;
 
@@ -145,6 +145,24 @@ fn push_path(
     });
 }
 
+/// The style of a band of `width` in a colour whose filled style is `filled`: no fill, a stroke
+/// of that width in the fill's colour (mitred, butt, solid: the stroke's defaults).
+fn band_style(filled: &Style, width: Length) -> Style {
+    Style {
+        stroke: Stroke {
+            enabled: true,
+            width,
+            color: filled.fill.color,
+            opacity: Opacity::OPAQUE,
+            ..Stroke::default()
+        },
+        fill: Fill {
+            enabled: false,
+            ..filled.fill.clone()
+        },
+    }
+}
+
 /// The children of one colour (`fill`, `None` for black) of `target`, its outlines `range`: the
 /// path of the outlines no recognised shape `taken`, then the colour's recognised regions
 /// (`specs/0088` Part B), a primitive each, or a compound path of a region with holes.
@@ -173,7 +191,16 @@ fn plan_colour(
         .iter()
         .filter(|r| r.outlines.first().is_some_and(|i| range.contains(i)));
     for region in regions {
-        if let ([Some((shape, rotation))], [_]) = (&region.shapes[..], &region.outlines[..]) {
+        if let Some(band) = &region.band {
+            // `specs/0088` Part B criterion 16: a band is its centre line, stroked in the fill.
+            children.push(DrawingNode::Primitive {
+                registers: DrawingRegisters::default(),
+                shape: band.shape,
+                rotation: band.rotation,
+                style: band_style(&style, band.width),
+            });
+        } else if let ([Some((shape, rotation))], [_]) = (&region.shapes[..], &region.outlines[..])
+        {
             children.push(DrawingNode::Primitive {
                 registers: DrawingRegisters::default(),
                 shape: *shape,
@@ -440,10 +467,12 @@ mod tests {
                 TraceShapeRegion {
                     outlines: vec![1],
                     shapes: vec![Some((rect(10.0), turn))],
+                    band: None,
                 },
                 TraceShapeRegion {
                     outlines: vec![2, 3],
                     shapes: vec![Some((rect(20.0), turn)), None],
+                    band: None,
                 },
             ],
         };
