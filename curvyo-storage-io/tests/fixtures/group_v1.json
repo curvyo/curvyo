@@ -1,0 +1,11 @@
+{
+  "format_version": 1,
+  "server": "ws://192.168.1.20:8787",
+  "room": "6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e",
+  "server_seq": 42,
+  "synced_version": "v1:abc",
+  "synced_folder": "/home/maker/Curvyo",
+  "folders": {
+    "77777777777777777777777777777777": "/home/maker/Curvyo/Box job"
+  }
+}

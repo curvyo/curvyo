@@ -10,6 +10,7 @@
 
 mod container_thumbnail;
 mod credentials;
+mod devices;
 mod filesystem;
 mod folder_texts;
 mod font_archives;
@@ -27,6 +28,12 @@ mod workspace_share_files;
 
 pub use container_thumbnail::{ThumbnailError, with_thumbnail};
 pub use credentials::{CredentialError, CredentialStore, KEY_FILE, credential_slot};
+pub use devices::{
+    DEFAULT_SYNCED_FOLDER, DEVICES_DIR, DEVICES_LIST_FILE, DeviceGroupFiles, DevicesError,
+    GROUP_FILE, GROUP_FORMAT_VERSION, GROUP_KEYRING_FILE, GroupRecord, SyncedFolderError,
+    arrival_folder, prepare_synced_folder, read_device_group, remove_device_group,
+    safe_folder_name, write_device_group,
+};
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,
 };

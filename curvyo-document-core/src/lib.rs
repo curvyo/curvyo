@@ -36,6 +36,7 @@ mod container_assets;
 mod container_share;
 mod corner_radii;
 mod corner_radii_codec;
+mod devices_list;
 mod display_unit;
 mod document;
 mod document_background;
@@ -180,9 +181,13 @@ pub use clones::{
 };
 pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, pack_snapshot, unpack};
 pub use container_share::{
-    CURRENT_SHARE_FORMAT_VERSION, ShareRecord, WorkspaceRoomRecord, WorkspaceShareRecord,
+    CURRENT_SHARE_FORMAT_VERSION, ContainerShareMembers, ShareRecord, WorkspaceRoomRecord,
+    WorkspaceShareRecord, container_share_members,
 };
 pub use corner_radii::{Corner, CornerRadii, SHARP_CORNER_EPSILON_MM, effective_corner_radii};
+pub use devices_list::{
+    DEVICES_LIST_FORMAT_VERSION, DeviceEntry, DevicesList, DevicesListError, SyncedWorkspace,
+};
 pub use display_unit::DisplayUnit;
 pub use document::{CURRENT_FORMAT_VERSION, Document, DocumentVersion};
 pub use document_background::{BackgroundPaint, DocumentBackground};

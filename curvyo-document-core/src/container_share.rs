@@ -284,6 +284,34 @@ fn read_workspace_share(json: &[u8]) -> Result<Sharing, OpenError> {
     }))
 }
 
+/// What a container says about its sharing, read without opening the document.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ContainerShareMembers {
+    /// The bytes of `share.json`, when present and not too large.
+    pub share_json: Option<Vec<u8>>,
+    /// Whether a `keyring.log` is present: the document is shared on its own room.
+    pub keyring: bool,
+}
+
+/// The raw `share.json` of the container `bytes` and whether it holds a keyring, read without
+/// opening the document: what a shared workspace's scan needs per file where no file system
+/// does it (`specs/0096-own-devices-sync` criterion 35, the browser). A file that is no
+/// container, or whose `share.json` is too large, has neither.
+#[must_use]
+pub fn container_share_members(bytes: &[u8]) -> ContainerShareMembers {
+    let Ok(mut archive) = ZipArchive::new(Cursor::new(bytes)) else {
+        return ContainerShareMembers::default();
+    };
+    let share_json = read_optional(&mut archive, SHARE_MEMBER, MAX_KEYRING_BYTES)
+        .ok()
+        .flatten();
+    let keyring = archive.index_for_name(KEYRING_MEMBER).is_some();
+    ContainerShareMembers {
+        share_json,
+        keyring,
+    }
+}
+
 fn read_optional(
     archive: &mut ZipArchive<Cursor<&[u8]>>,
     name: &str,
@@ -333,5 +361,28 @@ mod tests {
         assert_eq!(unhex("0707"), None);
         assert_eq!(unhex(&"AB".repeat(16)), None, "lowercase only");
         assert_eq!(unhex(&"zz".repeat(16)), None);
+    }
+
+    /// A workspace document names its `share.json` and no keyring; plain bytes have neither.
+    #[test]
+    fn share_members_read_without_opening_the_document() {
+        let document = crate::Document::new(3);
+        document.set_workspace_share(Some(WorkspaceShareRecord {
+            workspace: [0x57; 16],
+            document: [0x11; 16],
+            synced_version: document.version(),
+        }));
+        let bytes = crate::pack(&document, "t").unwrap();
+        let members = container_share_members(&bytes);
+        assert!(
+            String::from_utf8(members.share_json.unwrap())
+                .unwrap()
+                .contains("\"format_version\":2")
+        );
+        assert!(!members.keyring);
+        let none = ContainerShareMembers::default();
+        assert_eq!(container_share_members(b"plain"), none);
+        let plain = crate::pack(&crate::Document::new(4), "t").unwrap();
+        assert_eq!(container_share_members(&plain), none);
     }
 }
