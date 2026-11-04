@@ -79,7 +79,7 @@ function scrollParent(element: HTMLElement | null): HTMLElement | null {
 }
 
 const ROLE_BUTTON =
-  "flex h-7 flex-1 items-center justify-center gap-1 rounded-md text-sm outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 [@media(pointer:coarse)]:h-9";
+  "flex h-7 min-w-0 flex-1 basis-0 items-center justify-center gap-1 rounded-md text-sm outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 [@media(pointer:coarse)]:h-9";
 
 /**
  * The Layers block of the Laser tab (`specs/0027-manufacturing-roles` criteria 1, 2, 6, 11, 14,
@@ -293,7 +293,7 @@ export function LayersBlock({
                     ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]"
                     : "text-[var(--toolbar-icon)]"
                 }`}
-                style={pressed ? undefined : { border: "1px solid color-mix(in srgb, var(--toolbar-icon) 60%, transparent)" }}
+                style={{ border: `1px solid ${pressed ? "transparent" : "color-mix(in srgb, var(--toolbar-icon) 60%, transparent)"}` }}
               >
                 <RoleGlyph role={role} />
                 {ROLE_LABELS[role]}
