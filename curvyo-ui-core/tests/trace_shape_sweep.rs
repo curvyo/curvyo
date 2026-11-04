@@ -338,4 +338,55 @@ fn the_customers_page_keeps_every_hole() {
         .find(|k| k.0 == "star8")
         .expect("the 8-point star is a star");
     assert_eq!(outline_star.1, 2, "the outline star keeps its hole");
+    // Criterion 16 (Frage 119 A): the outline star is one star with a stroke, n = 8, covering
+    // what the traced band covers within 2 %.
+    let region = on.shapes.iter().find(|r| r.outlines.len() == 2).unwrap();
+    let band = region.band.expect("a stroked star");
+    let Shape::Star { point_count, .. } = band.shape else {
+        panic!("{band:?}");
+    };
+    assert_eq!(point_count.get(), 8);
+    let traced: f64 = region
+        .outlines
+        .iter()
+        .map(|&i| kurbo::Shape::area(&off.outlines[i]))
+        .sum::<f64>()
+        .abs();
+    let stroked = stroked_star_area(&band.shape, band.width.as_mm());
+    eprintln!(
+        "outline star: width {:.3} mm, stroked {stroked:.1} mm², traced {traced:.1} mm²",
+        band.width.as_mm()
+    );
+    assert!(
+        (stroked - traced).abs() <= 0.02 * traced,
+        "{stroked} vs {traced}"
+    );
+}
+
+/// The area a mitred stroke of `width` along a star covers, from its two offset stars (each side
+/// moved by half the width along its normal), by the area of a star from its radii.
+fn stroked_star_area(shape: &Shape, width: f64) -> f64 {
+    let Shape::Star {
+        frame,
+        point_count,
+        inner_ratio,
+        ..
+    } = shape
+    else {
+        return 0.0;
+    };
+    let n = f64::from(point_count.get());
+    let (r, q) = (frame.radius.as_mm(), inner_ratio.get());
+    let h = PI / n;
+    let (tip, valley) = ((r, 0.0), (r * q * h.cos(), r * q * h.sin()));
+    let (ex, ey) = (valley.0 - tip.0, valley.1 - tip.1);
+    let len = ex.hypot(ey);
+    let normal = (ey / len, -ex / len);
+    let p = normal.0 * tip.0;
+    let area = |p: f64| {
+        let t = p / normal.0;
+        let v = p / (normal.0 * h.cos() + normal.1 * h.sin());
+        n * t * v * h.sin()
+    };
+    area(p + width / 2.0) - area(p - width / 2.0)
 }

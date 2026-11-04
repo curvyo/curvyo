@@ -1,0 +1,386 @@
+//! The centre-line primitive of a traced band of constant width (`specs/0088-trace-recognition`
+//! Part B criterion 16, `adrs.md` decision 21): an outer and an inner primitive of one kind that
+//! are parallel offsets of one primitive become that primitive with a stroke of the band's width.
+
+// The formulas' own names (a, b, d, h, p, r, ...) read better than long ones here.
+#![allow(clippy::many_single_char_names, clippy::similar_names)]
+
+use std::f64::consts::PI;
+
+use curvyo_document_core::{
+    Angle, CornerRadii, EllipseFrame, InnerRatio, Length, Point, RectBounds, Shape, StarFrame,
+};
+
+use crate::trace_shape_fit::Fitted;
+use crate::trace_shape_math::sin_cos;
+use crate::trace_shape_sample::length;
+
+/// The longest miter the renderer draws, in stroke widths (SVG's 4, `curvyo-render-core`): a
+/// corner sharper than this would be bevelled, so its band is not a stroke.
+const MITER_LIMIT: f64 = 4.0;
+
+/// The centre-line primitive and the stroke width of the band between `outer` and `inner`, when
+/// they are parallel offsets of it within `tolerance`; `None` for any other pair.
+pub(crate) fn band_of(outer: &Fitted, inner: &Fitted, tolerance: f64) -> Option<(Fitted, f64)> {
+    let ((o, o_turn), (i, i_turn)) = (outer, inner);
+    let (mid, width) = match (o, i) {
+        (Shape::Ellipse { frame: f, .. }, Shape::Ellipse { frame: g, .. }) => {
+            ellipse_band(o, f, g, (*o_turn, *i_turn), tolerance)?
+        }
+        (
+            Shape::Rect {
+                bounds: f,
+                corner_radii: fr,
+            },
+            Shape::Rect {
+                bounds: g,
+                corner_radii: gr,
+            },
+        ) => rect_band(
+            f,
+            fr.tl.as_mm(),
+            g,
+            gr.tl.as_mm(),
+            (*o_turn, *i_turn),
+            tolerance,
+        )?,
+        (
+            Shape::Polygon {
+                frame: f,
+                point_count: n,
+                ..
+            },
+            Shape::Polygon {
+                frame: g,
+                point_count: m,
+                ..
+            },
+        ) if n == m => polygon_band(o, f, g, n.get(), tolerance)?,
+        (
+            Shape::Star {
+                frame: f,
+                point_count: n,
+                inner_ratio: q1,
+                ..
+            },
+            Shape::Star {
+                frame: g,
+                point_count: m,
+                inner_ratio: q2,
+                ..
+            },
+        ) if n == m => star_band(o, f, q1.get(), g, q2.get(), n.get(), tolerance)?,
+        _ => return None,
+    };
+    (width > 0.0).then_some((mid, width))
+}
+
+/// Whether the turns `a` and `b` (radians, of a figure repeating every `period`) agree within
+/// `tolerance` at `reach` from the centre.
+fn same_turn(a: f64, b: f64, period: f64, reach: f64, tolerance: f64) -> bool {
+    let d = (a - b).rem_euclid(period);
+    d.min(period - d) * reach <= tolerance
+}
+
+/// Whether two centres agree within `tolerance`.
+fn near(p: Point, q: Point, tolerance: f64) -> bool {
+    length(p.x - q.x, p.y - q.y) <= tolerance
+}
+
+/// The band of two ellipses: one centre and turn (none for circles), both radii shrunk alike.
+fn ellipse_band(
+    outer: &Shape,
+    f: &EllipseFrame,
+    g: &EllipseFrame,
+    turns: (Angle, Angle),
+    tolerance: f64,
+) -> Option<(Fitted, f64)> {
+    let (a1, b1, a2, b2) = (f.rx.as_mm(), f.ry.as_mm(), g.rx.as_mm(), g.ry.as_mm());
+    let round = (a1 - b1).abs() <= tolerance && (a2 - b2).abs() <= tolerance;
+    let turned = round
+        || same_turn(
+            turns.0.as_radians(),
+            turns.1.as_radians(),
+            PI,
+            a1,
+            tolerance,
+        );
+    let (da, db) = (a1 - a2, b1 - b2);
+    if !near(f.center, g.center, tolerance) || !turned || (da - db).abs() > 2.0 * tolerance {
+        return None;
+    }
+    let mut shape = *outer;
+    if let Shape::Ellipse { frame, .. } = &mut shape {
+        frame.rx = Length::from_mm(f64::midpoint(a1, a2));
+        frame.ry = Length::from_mm(f64::midpoint(b1, b2));
+    }
+    Some(((shape, turns.0), f64::midpoint(da, db)))
+}
+
+/// The band of two regular polygons of `n` sides: one centre and turn; the centre line's apothem
+/// halfway between theirs (a mitred stroke keeps the corners' angle).
+fn polygon_band(
+    outer: &Shape,
+    f: &StarFrame,
+    g: &StarFrame,
+    n: u32,
+    tolerance: f64,
+) -> Option<(Fitted, f64)> {
+    let h = PI / f64::from(n);
+    let (_, c) = sin_cos(h);
+    let (p1, p2) = (f.radius.as_mm() * c, g.radius.as_mm() * c);
+    let turned = same_turn(
+        f.angle.as_radians(),
+        g.angle.as_radians(),
+        2.0 * h,
+        f.radius.as_mm(),
+        tolerance,
+    );
+    if !near(f.center, g.center, tolerance) || !turned {
+        return None;
+    }
+    let mut shape = *outer;
+    if let Shape::Polygon { frame, .. } = &mut shape {
+        frame.radius = Length::from_mm(f64::midpoint(p1, p2) / c);
+    }
+    Some(((shape, Angle::from_radians(0.0)), p1 - p2))
+}
+
+/// The band of two rectangles: equal borders, the same turn; the centre line's corner radius is
+/// the outer's less half the width (a square outer corner is a mitred square centre line), and
+/// the inner's must be the centre line's less half the width, or square.
+fn rect_band(
+    f: &RectBounds,
+    r1: f64,
+    g: &RectBounds,
+    r2: f64,
+    turns: (Angle, Angle),
+    tolerance: f64,
+) -> Option<(Fitted, f64)> {
+    let (w1, h1, w2, h2) = (
+        f.width.as_mm(),
+        f.height.as_mm(),
+        g.width.as_mm(),
+        g.height.as_mm(),
+    );
+    let centre = |b: &RectBounds| {
+        Point::new(
+            b.origin.x + b.width.as_mm() / 2.0,
+            b.origin.y + b.height.as_mm() / 2.0,
+        )
+    };
+    let (c1, c2) = (centre(f), centre(g));
+    let d = f64::midpoint(w1 - w2, h1 - h2) / 2.0;
+    let quarter = PI / 2.0;
+    let off = (turns.0.as_radians() - turns.1.as_radians()).rem_euclid(quarter);
+    let turned = off.min(quarter - off) * w1.max(h1) <= tolerance;
+    if length(c1.x - c2.x, c1.y - c2.y) > tolerance
+        || !turned
+        || ((w1 - w2) - (h1 - h2)).abs() > 2.0 * tolerance
+        || d <= 0.0
+    {
+        return None;
+    }
+    let r = if r1 <= tolerance { 0.0 } else { r1 - d / 2.0 };
+    if r < -tolerance || (r2 - (r - d / 2.0).max(0.0)).abs() > tolerance {
+        return None;
+    }
+    let (w, h) = (f64::midpoint(w1, w2), f64::midpoint(h1, h2));
+    let shape = Shape::Rect {
+        bounds: RectBounds {
+            origin: Point::new(c1.x - w / 2.0, c1.y - h / 2.0),
+            width: Length::from_mm(w),
+            height: Length::from_mm(h),
+        },
+        corner_radii: CornerRadii::uniform(Length::from_mm(r.max(0.0))),
+    };
+    Some(((shape, turns.0), d))
+}
+
+/// One side of a star in its own frame: the unit normal of the side from the tip (angle 0) to
+/// the valley (angle π/n) and its distance from the centre.
+fn side_line(outer: f64, inner: f64, n: u32) -> Option<([f64; 2], f64)> {
+    let (us, uc) = sin_cos(PI / f64::from(n));
+    let (ex, ey) = (inner * uc - outer, inner * us);
+    let len = length(ex, ey);
+    if len == 0.0 {
+        return None;
+    }
+    let normal = [ey / len, -ex / len];
+    Some((normal, normal[0] * outer))
+}
+
+/// The band of two stars of `n` points: their sides parallel within the tolerance over a side's
+/// length, the centre line's sides halfway between, no corner sharper than the miter limit.
+fn star_band(
+    outer: &Shape,
+    f: &StarFrame,
+    q1: f64,
+    g: &StarFrame,
+    q2: f64,
+    n: u32,
+    tolerance: f64,
+) -> Option<(Fitted, f64)> {
+    let (r1, r2) = (f.radius.as_mm(), g.radius.as_mm());
+    let period = 2.0 * PI / f64::from(n);
+    let turned = same_turn(
+        f.angle.as_radians(),
+        g.angle.as_radians(),
+        period,
+        r1,
+        tolerance,
+    );
+    if !near(f.center, g.center, tolerance) || !turned {
+        return None;
+    }
+    let (n1, p1) = side_line(r1, r1 * q1, n)?;
+    let (n2, p2) = side_line(r2, r2 * q2, n)?;
+    let side = r1 * (1.0 - q1).max(q1);
+    if (n1[0] * n2[1] - n1[1] * n2[0]).abs() * side > tolerance || p1 <= p2 {
+        return None;
+    }
+    let (nx, ny) = (n1[0] + n2[0], n1[1] + n2[1]);
+    let len = length(nx, ny);
+    let normal = [nx / len, ny / len];
+    let p = f64::midpoint(p1, p2);
+    let (us, uc) = sin_cos(PI / f64::from(n));
+    let tip = p / normal[0];
+    let valley = p / (normal[0] * uc + normal[1] * us);
+    // The side's direction from the tip; the tip's half angle against the x axis, the valley's
+    // against the middle line.
+    let (ex, ey) = (valley * uc - tip, valley * us);
+    let e = length(ex, ey);
+    let tip_sine = ey.abs() / e;
+    let (vx, vy) = (tip - valley * uc, -valley * us);
+    let valley_cosine = (vx * uc + vy * us) / e;
+    let valley_sine = (1.0 - valley_cosine * valley_cosine).max(0.0).sqrt();
+    if tip_sine * MITER_LIMIT < 1.0 || valley_sine * MITER_LIMIT < 1.0 {
+        return None;
+    }
+    let mut shape = *outer;
+    if let Shape::Star {
+        frame, inner_ratio, ..
+    } = &mut shape
+    {
+        frame.radius = Length::from_mm(tip);
+        *inner_ratio = InnerRatio::new(valley / tip).ok()?;
+    }
+    Some(((shape, Angle::from_radians(0.0)), p1 - p2))
+}
+
+/// The area a stroke of `width` along the closed outline of `shape` covers (mitred corners):
+/// the outer offset's area less the inner offset's.
+pub(crate) fn stroked_area(shape: &Shape, width: f64) -> f64 {
+    let t = width / 2.0;
+    match shape {
+        Shape::Ellipse { frame, .. } => {
+            // Steiner: a convex curve's offsets differ in area by its length times the width.
+            let (a, b) = (frame.rx.as_mm(), frame.ry.as_mm());
+            let perimeter = PI * (3.0 * (a + b) - ((3.0 * a + b) * (a + 3.0 * b)).sqrt());
+            perimeter * width
+        }
+        Shape::Rect {
+            bounds,
+            corner_radii,
+        } => {
+            let (w, h, r) = (
+                bounds.width.as_mm(),
+                bounds.height.as_mm(),
+                corner_radii.tl.as_mm(),
+            );
+            let area = |w: f64, h: f64, r: f64| w * h - (4.0 - PI) * r * r;
+            let outer_r = if r > 0.0 { r + t } else { 0.0 };
+            area(w + width, h + width, outer_r) - area(w - width, h - width, (r - t).max(0.0))
+        }
+        Shape::Polygon {
+            frame, point_count, ..
+        } => {
+            let n = f64::from(point_count.get());
+            let (s, c) = sin_cos(PI / n);
+            let apothem = frame.radius.as_mm() * c;
+            let area = |a: f64| n * a * a * s / c;
+            area(apothem + t) - area(apothem - t)
+        }
+        Shape::Star {
+            frame,
+            point_count,
+            inner_ratio,
+            ..
+        } => {
+            let n = point_count.get();
+            let r = frame.radius.as_mm();
+            let Some((normal, p)) = side_line(r, r * inner_ratio.get(), n) else {
+                return 0.0;
+            };
+            let (us, uc) = sin_cos(PI / f64::from(n));
+            let area = |p: f64| {
+                let tip = p / normal[0];
+                let valley = p / (normal[0] * uc + normal[1] * us);
+                f64::from(n) * tip * valley * us
+            };
+            area(p + t) - area(p - t)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use curvyo_document_core::{Curve, PointCount};
+
+    fn star(r: f64, q: f64) -> Fitted {
+        (
+            Shape::Star {
+                frame: StarFrame {
+                    center: Point::new(0.0, 0.0),
+                    radius: Length::from_mm(r),
+                    angle: Angle::from_radians(0.3),
+                },
+                point_count: PointCount::new(8).unwrap(),
+                inner_ratio: InnerRatio::new(q).unwrap(),
+                curve: Curve::POLYGON_DEFAULT,
+            },
+            Angle::from_radians(0.0),
+        )
+    }
+
+    /// The stroke's two offsets of a star are stars; the band of the two is the star again.
+    #[test]
+    fn a_stroked_star_is_found_from_its_two_offsets() {
+        let (mid, _) = star(40.0, 0.5);
+        let (normal, p) = side_line(40.0, 20.0, 8).unwrap();
+        let (us, uc) = sin_cos(PI / 8.0);
+        let offset = |p: f64| {
+            let tip = p / normal[0];
+            star(tip, p / (normal[0] * uc + normal[1] * us) / tip)
+        };
+        let ((found, _), width) = band_of(&offset(p + 1.0), &offset(p - 1.0), 0.05).unwrap();
+        assert!((width - 2.0).abs() < 1e-9);
+        let (
+            Shape::Star {
+                frame, inner_ratio, ..
+            },
+            Shape::Star { .. },
+        ) = (found, mid)
+        else {
+            panic!("{found:?}");
+        };
+        assert!((frame.radius.as_mm() - 40.0).abs() < 1e-9);
+        assert!((inner_ratio.get() - 0.5).abs() < 1e-9);
+        assert!((frame.angle.as_radians() - 0.3).abs() < 1e-12);
+        let area = |s: &Fitted| match s.0 {
+            Shape::Star {
+                frame, inner_ratio, ..
+            } => 8.0 * frame.radius.as_mm().powi(2) * inner_ratio.get() * us,
+            _ => 0.0,
+        };
+        let between = area(&offset(p + 1.0)) - area(&offset(p - 1.0));
+        assert!((stroked_area(&found, 2.0) - between).abs() < 1e-9);
+    }
+
+    /// Two stars of different tip angles are no band.
+    #[test]
+    fn stars_of_other_angles_are_no_band() {
+        assert_eq!(band_of(&star(40.0, 0.5), &star(30.0, 0.3), 0.05), None);
+    }
+}

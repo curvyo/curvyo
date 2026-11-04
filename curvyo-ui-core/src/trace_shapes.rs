@@ -9,6 +9,7 @@ use curvyo_document_core::{
 use kurbo::BezPath;
 
 use crate::svg_import_match::outline_path;
+use crate::trace_shape_band::{band_of, stroked_area};
 use crate::trace_shape_fit::{Fitted, fit_outline};
 use crate::trace_shape_sample::{Sampled, sample_closed};
 use crate::trace_transfer::count;
@@ -36,13 +37,32 @@ pub struct TraceShapeRegion {
     pub outlines: Vec<usize>,
     /// The primitive of each, with its rotation; the outer's is always there.
     pub shapes: Vec<Option<(Shape, Angle)>>,
+    /// A band of constant width (one hole, outer and hole parallel offsets of one primitive,
+    /// `specs/0088` Part B criterion 16): the centre-line primitive and the stroke width it is
+    /// written as; `None` for a filled region.
+    pub band: Option<TraceBand>,
+}
+
+/// The centre-line primitive of a band and its stroke width.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TraceBand {
+    /// The primitive at the band's centre line.
+    pub shape: Shape,
+    /// Its rotation about its frame's centre.
+    pub rotation: Angle,
+    /// The band's width: the stroke width.
+    pub width: Length,
 }
 
 impl TraceShapeRegion {
-    /// How many primitives it holds.
+    /// How many primitives it is written as: one for a band, else one per recognised outline.
     #[must_use]
     pub fn primitives(&self) -> usize {
-        self.shapes.iter().filter(|s| s.is_some()).count()
+        if self.band.is_some() {
+            1
+        } else {
+            self.shapes.iter().filter(|s| s.is_some()).count()
+        }
     }
 }
 
@@ -112,15 +132,36 @@ fn recognise_layer(
         let mut region = TraceShapeRegion {
             outlines: vec![first + k],
             shapes: vec![Some(shape)],
+            band: None,
         };
+        let mut holes = Vec::new();
         for (h, hole) in sampled.iter().enumerate() {
             if parents[h] == Some(k) {
                 region.outlines.push(first + h);
                 region.shapes.push(hole.as_ref().and_then(fit));
+                holes.extend(hole.as_ref());
             }
+        }
+        if let ([Some(o), Some(i)], [hole]) = (&region.shapes[..], &holes[..]) {
+            region.band = band(outer, hole, o, i, tolerance(outer.area(), pixel_mm));
         }
         regions.push(region);
     }
+}
+
+/// The band between the traced `outer` and its one `hole`, recognised as `o` and `i`: their
+/// centre-line primitive when they are parallel offsets of one, and the stroked area it covers is
+/// the traced band's within the tolerance along both outlines (the area guard of decision 16 for
+/// the stroke).
+fn band(outer: &Sampled, hole: &Sampled, o: &Fitted, i: &Fitted, tol: f64) -> Option<TraceBand> {
+    let ((shape, rotation), width) = band_of(o, i, tol)?;
+    let traced = outer.area() - hole.area();
+    let stroked = stroked_area(&shape, width);
+    ((stroked - traced).abs() <= tol * (outer.perimeter + hole.perimeter)).then_some(TraceBand {
+        shape,
+        rotation,
+        width: Length::from_mm(width),
+    })
 }
 
 /// The smallest outer outline that holds `hole`.
@@ -225,6 +266,14 @@ pub(crate) fn write_shapes(wire: &mut Vec<f64>, regions: &[TraceShapeRegion]) {
             wire.extend(region.outlines.iter().map(|&i| i as f64));
             for shape in &region.shapes {
                 wire.extend(shape_numbers(shape.as_ref()));
+            }
+            // The band: its width (0 for none), then its centre-line primitive.
+            match &region.band {
+                Some(band) => {
+                    wire.push(band.width.as_mm());
+                    wire.extend(shape_numbers(Some(&(band.shape, band.rotation))));
+                }
+                None => wire.push(0.0),
             }
         }
     }
@@ -376,6 +425,21 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
             shapes.push(shape_of(&numbers).ok()?);
         }
         shapes.first()?.as_ref()?;
+        let width = next()?;
+        let band = if width == 0.0 {
+            None
+        } else {
+            let numbers: Vec<f64> = (0..SHAPE_NUMBERS).map(|_| next()).collect::<Option<_>>()?;
+            let (shape, rotation) = shape_of(&numbers).ok()??;
+            if !(width > 0.0 && width.is_finite() && k == 2) {
+                return None;
+            }
+            Some(TraceBand {
+                shape,
+                rotation,
+                width: Length::from_mm(width),
+            })
+        };
         if indices
             .iter()
             .enumerate()
@@ -386,6 +450,7 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
         out.push(TraceShapeRegion {
             outlines: indices,
             shapes,
+            band,
         });
     }
     Some((out, at))
