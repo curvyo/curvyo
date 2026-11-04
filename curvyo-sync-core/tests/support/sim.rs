@@ -5,8 +5,8 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use curvyo_crypto_core::EpochKey;
-use curvyo_crypto_core::keyring::{decode_log, encode_log};
+use curvyo_crypto_core::keyring::{Role, decode_log, encode_log};
+use curvyo_crypto_core::{EpochKey, Identity};
 use curvyo_document_core::{Document, DocumentVersion, ShareRecord, pack, unpack};
 use curvyo_sync_core::{
     ClientOutput, ClientSession, ConnectionId, InviteSecret, Millis, RecordKind, Relay,
@@ -185,6 +185,33 @@ impl Net {
     pub fn join(&mut self, i: usize, secret: InviteSecret) {
         let config = self.config(i, secret.room, 0, SessionStart::Join(secret));
         self.clients[i].session = Some(ClientSession::new(config, self.now).unwrap());
+        self.pump(i);
+    }
+
+    /// Client `i` connects to `room` as a member without a local copy or keys: a device the room
+    /// admitted by `AddMember` (a paired device, ADR 0040 decision 4).
+    pub fn connect_member(&mut self, i: usize, room: RoomId) {
+        let config = self.config(
+            i,
+            room,
+            0,
+            SessionStart::Member {
+                keyring: Vec::new(),
+                epoch_keys: Vec::new(),
+            },
+        );
+        self.clients[i].session = Some(ClientSession::new(config, self.now).unwrap());
+        self.pump(i);
+    }
+
+    /// Client `i` (admin, online) adds `identity` with `role` and every epoch key it holds.
+    pub fn add_member(&mut self, i: usize, identity: Identity, role: Role) {
+        self.clients[i]
+            .session
+            .as_mut()
+            .unwrap()
+            .add_member(identity, role)
+            .unwrap();
         self.pump(i);
     }
 
@@ -504,6 +531,8 @@ impl Net {
             StoreOp::DropStagedParts { room } => {
                 self.staged.remove(&room);
             }
+            // The room relay never writes a backup (ADR 0040 decision 13).
+            StoreOp::Backup(_) | StoreOp::DropBackup { .. } => {}
         }
     }
 

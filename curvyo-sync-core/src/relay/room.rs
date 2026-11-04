@@ -280,7 +280,16 @@ impl RoomLog {
                 connection,
                 frame: RelayFrame::Pong,
             }),
-            ClientFrame::Hello { .. } | ClientFrame::Proof { .. } => {
+            ClientFrame::Hello { .. }
+            | ClientFrame::Proof { .. }
+            | ClientFrame::PairOpen
+            | ClientFrame::PairJoin { .. }
+            | ClientFrame::PairMsg { .. }
+            | ClientFrame::PairClose { .. }
+            | ClientFrame::BackupGet { .. }
+            | ClientFrame::BackupBegin { .. }
+            | ClientFrame::BackupPut { .. }
+            | ClientFrame::BackupDelete { .. } => {
                 return Err(RefusalReason::Protocol);
             }
         }

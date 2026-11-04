@@ -8,6 +8,8 @@
 //!   `len: u32`, then the envelope; little-endian.
 //! - `snapshot` and the staged `snapshot.part/`: see `crate::snapshot_file`.
 //!
+//! Passkey backups live in `backups/` beside the rooms: see `crate::backup_file`.
+//!
 //! Every append is synced before the relay's sends that follow it go out, so an acknowledged
 //! record is on disk. A record or entry cut short by a crash (never acknowledged) is dropped by the
 //! startup scan. The store holds only sealed bytes; it parses nothing it does not have to.
@@ -18,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use curvyo_sync_core::{RecordKind, RoomId, StoreOp, StoredRecord, StoredRoom};
 
-use crate::snapshot_file;
+use crate::{backup_file, snapshot_file};
 
 pub(crate) const KEYRING: &str = "keyring.log";
 pub(crate) const LOG: &str = "log";
@@ -137,6 +139,8 @@ impl Store {
                 count,
             } => snapshot_file::commit_staged(&self.room_dir(*room)?, *covers_seq, *count),
             StoreOp::DropStagedParts { room } => snapshot_file::drop_staged(&self.room_dir(*room)?),
+            StoreOp::Backup(backup) => backup_file::write(&self.root, backup),
+            StoreOp::DropBackup { id } => backup_file::delete(&self.root, *id),
         }
     }
 
@@ -161,7 +165,7 @@ pub fn room_hex(room: RoomId) -> String {
     })
 }
 
-fn room_from_hex(name: &str) -> Option<RoomId> {
+pub(crate) fn room_from_hex(name: &str) -> Option<RoomId> {
     if name.len() != 32 || !name.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
         return None;
     }

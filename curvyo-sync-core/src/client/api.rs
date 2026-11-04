@@ -149,6 +149,9 @@ pub enum SessionError {
     /// The device named, or this device, is not a current member.
     #[error("not a current member")]
     NotAMember,
+    /// The device to add is a member already, or was removed.
+    #[error("already a member or removed")]
+    AlreadyMember,
     /// The payload is over the message size limit.
     #[error("the message is too large")]
     TooLarge,

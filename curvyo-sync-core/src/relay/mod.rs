@@ -3,6 +3,8 @@
 //! message in and carries the [`RelayOutput`]s out (sends, closes and store writes).
 
 mod admission;
+mod backups;
+mod pair_slots;
 mod room;
 mod snapshot;
 
@@ -10,6 +12,10 @@ use std::collections::BTreeMap;
 
 use curvyo_crypto_core::MemberId;
 
+pub use backups::{BACKUP_RECORD_MAX, Backups, StoredBackup};
+pub use pair_slots::{
+    PAIR_JOINS_PER_SLOT, PAIR_MESSAGE_MAX, PAIR_SLOT_LIFETIME_MS, PAIR_SLOTS_PER_SERVER, PairSlots,
+};
 pub use room::{RoomLog, StoredRecord, StoredRoom};
 
 use crate::frame::{ClientFrame, ConnectionId, FrameError, RefusalReason, RelayFrame, RoomId};
@@ -34,7 +40,8 @@ pub enum RelayOutput {
     Store(StoreOp),
 }
 
-/// A write to the relay's store (ADR 0031 decision 11: `keyring.log`, `log`, `snapshot`).
+/// A write to the relay's store (ADR 0031 decision 11: `keyring.log`, `log`, `snapshot`; ADR 0040
+/// decision 13: `backups/`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoreOp {
     /// Append an accepted keyring entry; the first one creates the room.
@@ -86,6 +93,13 @@ pub enum StoreOp {
     DropStagedParts {
         /// The room.
         room: RoomId,
+    },
+    /// Store or replace a passkey backup (ADR 0040 decision 13).
+    Backup(StoredBackup),
+    /// Delete a passkey backup.
+    DropBackup {
+        /// Its id.
+        id: curvyo_crypto_core::BackupId,
     },
 }
 

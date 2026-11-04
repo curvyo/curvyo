@@ -1,12 +1,15 @@
 //! The hand-written byte codec of the frames: tag byte, little-endian fixed fields, trailing
 //! bytes field.
 
-use curvyo_crypto_core::MemberId;
+use curvyo_crypto_core::{BackupId, MemberId};
 
 use super::{
-    ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, RecordKind, RefusalReason, RelayFrame,
-    RoomId,
+    ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, PairCloseReason, RecordKind,
+    RefusalReason, RelayFrame, RoomId,
 };
+
+/// The number of pairing slots, `2^15`: a slot is below it.
+const SLOT_COUNT: u16 = 1 << 15;
 
 mod tag {
     pub(super) const HELLO: u8 = 0x01;
@@ -17,6 +20,14 @@ mod tag {
     pub(super) const AWARENESS: u8 = 0x06;
     pub(super) const PING: u8 = 0x07;
     pub(super) const SNAPSHOT_PART: u8 = 0x08;
+    pub(super) const PAIR_OPEN: u8 = 0x09;
+    pub(super) const PAIR_JOIN: u8 = 0x0a;
+    pub(super) const PAIR_MSG: u8 = 0x0b;
+    pub(super) const PAIR_CLOSE: u8 = 0x0c;
+    pub(super) const BACKUP_GET: u8 = 0x0d;
+    pub(super) const BACKUP_BEGIN: u8 = 0x0e;
+    pub(super) const BACKUP_PUT: u8 = 0x0f;
+    pub(super) const BACKUP_DELETE: u8 = 0x10;
     pub(super) const CHALLENGE: u8 = 0x81;
     pub(super) const WELCOME: u8 = 0x82;
     pub(super) const RELAY_KEYRING: u8 = 0x83;
@@ -26,6 +37,12 @@ mod tag {
     pub(super) const RELAY_AWARENESS: u8 = 0x87;
     pub(super) const REFUSED: u8 = 0x88;
     pub(super) const PONG: u8 = 0x89;
+    pub(super) const PAIR_SLOT: u8 = 0x8a;
+    pub(super) const PAIR_JOINED: u8 = 0x8b;
+    pub(super) const RELAY_PAIR_MSG: u8 = 0x8c;
+    pub(super) const RELAY_PAIR_CLOSE: u8 = 0x8d;
+    pub(super) const BACKUP_RECORD: u8 = 0x8e;
+    pub(super) const BACKUP_DONE: u8 = 0x8f;
 }
 
 impl RecordKind {
@@ -56,6 +73,10 @@ impl RefusalReason {
             Self::TooLarge => 4,
             Self::Protocol => 5,
             Self::Removed => 6,
+            Self::Unknown => 7,
+            Self::Locked => 8,
+            Self::Busy => 9,
+            Self::Forbidden => 10,
         }
     }
 
@@ -67,8 +88,44 @@ impl RefusalReason {
             4 => Ok(Self::TooLarge),
             5 => Ok(Self::Protocol),
             6 => Ok(Self::Removed),
+            7 => Ok(Self::Unknown),
+            8 => Ok(Self::Locked),
+            9 => Ok(Self::Busy),
+            10 => Ok(Self::Forbidden),
             _ => Err(FrameError::Malformed),
         }
+    }
+}
+
+impl PairCloseReason {
+    fn tag(self) -> u8 {
+        match self {
+            Self::Wrong => 1,
+            Self::Cancelled => 2,
+            Self::Locked => 3,
+            Self::Done => 4,
+            Self::Gone => 5,
+        }
+    }
+
+    fn from_tag(tag: u8) -> Result<Self, FrameError> {
+        match tag {
+            1 => Ok(Self::Wrong),
+            2 => Ok(Self::Cancelled),
+            3 => Ok(Self::Locked),
+            4 => Ok(Self::Done),
+            5 => Ok(Self::Gone),
+            _ => Err(FrameError::Malformed),
+        }
+    }
+}
+
+/// A slot number read from the wire: below 2^15.
+fn slot(value: u16) -> Result<u16, FrameError> {
+    if value < SLOT_COUNT {
+        Ok(value)
+    } else {
+        Err(FrameError::Malformed)
     }
 }
 
@@ -133,6 +190,41 @@ impl ClientFrame {
                 out.push(u8::from(*last));
                 out.extend_from_slice(envelope);
             }
+            Self::PairOpen => out.push(tag::PAIR_OPEN),
+            Self::PairJoin { slot } => {
+                out.push(tag::PAIR_JOIN);
+                out.extend_from_slice(&slot.to_le_bytes());
+            }
+            Self::PairMsg { bytes } => {
+                out.push(tag::PAIR_MSG);
+                out.extend_from_slice(bytes);
+            }
+            Self::PairClose { reason } => {
+                out.push(tag::PAIR_CLOSE);
+                out.push(reason.tag());
+            }
+            Self::BackupGet { id } => {
+                out.push(tag::BACKUP_GET);
+                out.extend_from_slice(&id.0);
+            }
+            Self::BackupBegin { id } => {
+                out.push(tag::BACKUP_BEGIN);
+                out.extend_from_slice(&id.0);
+            }
+            Self::BackupPut {
+                write_key,
+                signature,
+                record,
+            } => {
+                out.push(tag::BACKUP_PUT);
+                out.extend_from_slice(&write_key.0);
+                out.extend_from_slice(signature);
+                out.extend_from_slice(record);
+            }
+            Self::BackupDelete { signature } => {
+                out.push(tag::BACKUP_DELETE);
+                out.extend_from_slice(signature);
+            }
         }
         out
     }
@@ -186,6 +278,30 @@ impl ClientFrame {
                     _ => return Err(FrameError::Malformed),
                 },
                 envelope: reader.rest_nonempty()?,
+            },
+            tag::PAIR_OPEN => Self::PairOpen,
+            tag::PAIR_JOIN => Self::PairJoin {
+                slot: slot(reader.u16()?)?,
+            },
+            tag::PAIR_MSG => Self::PairMsg {
+                bytes: reader.rest_nonempty()?,
+            },
+            tag::PAIR_CLOSE => Self::PairClose {
+                reason: PairCloseReason::from_tag(reader.u8()?)?,
+            },
+            tag::BACKUP_GET => Self::BackupGet {
+                id: BackupId(reader.array()?),
+            },
+            tag::BACKUP_BEGIN => Self::BackupBegin {
+                id: BackupId(reader.array()?),
+            },
+            tag::BACKUP_PUT => Self::BackupPut {
+                write_key: MemberId(reader.array()?),
+                signature: reader.array()?,
+                record: reader.rest_nonempty()?,
+            },
+            tag::BACKUP_DELETE => Self::BackupDelete {
+                signature: reader.array()?,
             },
             _ => return Err(FrameError::Malformed),
         };
@@ -260,6 +376,28 @@ impl RelayFrame {
                 out.push(reason.tag());
             }
             Self::Pong => out.push(tag::PONG),
+            Self::PairSlot { slot, expires_in_s } => {
+                out.push(tag::PAIR_SLOT);
+                out.extend_from_slice(&slot.to_le_bytes());
+                out.extend_from_slice(&expires_in_s.to_le_bytes());
+            }
+            Self::PairJoined { sid } => {
+                out.push(tag::PAIR_JOINED);
+                out.extend_from_slice(sid);
+            }
+            Self::PairMsg { bytes } => {
+                out.push(tag::RELAY_PAIR_MSG);
+                out.extend_from_slice(bytes);
+            }
+            Self::PairClose { reason } => {
+                out.push(tag::RELAY_PAIR_CLOSE);
+                out.push(reason.tag());
+            }
+            Self::BackupRecord { record } => {
+                out.push(tag::BACKUP_RECORD);
+                out.extend_from_slice(record);
+            }
+            Self::BackupDone => out.push(tag::BACKUP_DONE),
         }
         out
     }
@@ -311,6 +449,23 @@ impl RelayFrame {
                 reason: RefusalReason::from_tag(reader.u8()?)?,
             },
             tag::PONG => Self::Pong,
+            tag::PAIR_SLOT => Self::PairSlot {
+                slot: slot(reader.u16()?)?,
+                expires_in_s: reader.u32()?,
+            },
+            tag::PAIR_JOINED => Self::PairJoined {
+                sid: reader.array()?,
+            },
+            tag::RELAY_PAIR_MSG => Self::PairMsg {
+                bytes: reader.rest_nonempty()?,
+            },
+            tag::RELAY_PAIR_CLOSE => Self::PairClose {
+                reason: PairCloseReason::from_tag(reader.u8()?)?,
+            },
+            tag::BACKUP_RECORD => Self::BackupRecord {
+                record: reader.rest_nonempty()?,
+            },
+            tag::BACKUP_DONE => Self::BackupDone,
             _ => return Err(FrameError::Malformed),
         };
         reader.finish()?;

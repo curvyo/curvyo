@@ -5,10 +5,10 @@
 
 use std::path::PathBuf;
 
-use curvyo_crypto_core::MemberId;
+use curvyo_crypto_core::{BackupId, MemberId};
 use curvyo_sync_core::{
-    ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, PROTOCOL_VERSION, RecordKind,
-    RefusalReason, RelayFrame, RoomId,
+    ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, OLDEST_PROTOCOL_VERSION,
+    PROTOCOL_VERSION, PairCloseReason, RecordKind, RefusalReason, RelayFrame, RoomId,
 };
 
 fn client_frames() -> Vec<ClientFrame> {
@@ -139,10 +139,9 @@ fn every_frame_matches_its_golden_bytes() {
 /// `frames_v2.bin`; regenerate with `CURVYO_UPDATE_GOLDEN=1`.
 #[test]
 fn protocol_2_frames_match_their_golden_bytes() {
-    assert_eq!(PROTOCOL_VERSION, 2);
     let frames = [
         ClientFrame::Hello {
-            protocol: PROTOCOL_VERSION,
+            protocol: 2,
             room: RoomId([0xd0; 16]),
             since_seq: 42,
             identity: MemberId([0x11; 32]),
@@ -245,7 +244,7 @@ fn truncated_extended_and_unknown_messages_are_malformed() {
         ClientFrame::decode(&[push, vec![3, 1]].concat()),
         Err(FrameError::Malformed)
     );
-    assert_eq!(RelayFrame::decode(&[0x88, 7]), Err(FrameError::Malformed));
+    assert_eq!(RelayFrame::decode(&[0x88, 11]), Err(FrameError::Malformed));
     assert_eq!(
         RelayFrame::decode(&[0x86, 0, 0, 0, 0, 0, 0, 0, 0, 2]),
         Err(FrameError::Malformed)
@@ -268,4 +267,145 @@ fn messages_over_64_mib_are_too_large() {
     let mut relay = vec![0xe7; MAX_MESSAGE_LEN + 1];
     relay[0] = 0x89;
     assert_eq!(RelayFrame::decode(&relay), Err(FrameError::TooLarge));
+}
+
+/// Relay protocol 3 (ADR 0040 decisions 3 and 13, `specs/0096-own-devices-sync` criteria 1, 4,
+/// 5, Frage 145 A): the pairing frames, the refusals of a pairing code and the backup frames,
+/// golden in `frames_v3.bin`; regenerate with
+/// `CURVYO_UPDATE_GOLDEN=1`. Protocols 1 and 2 are still admitted.
+#[test]
+fn protocol_3_pairing_frames_match_their_golden_bytes() {
+    assert_eq!(PROTOCOL_VERSION, 3);
+    assert_eq!(OLDEST_PROTOCOL_VERSION, 1);
+    let client = [
+        ClientFrame::PairOpen,
+        ClientFrame::PairJoin { slot: 0x7fff },
+        ClientFrame::PairMsg {
+            bytes: vec![1, 1, 0xa5],
+        },
+        ClientFrame::PairClose {
+            reason: PairCloseReason::Wrong,
+        },
+        ClientFrame::PairClose {
+            reason: PairCloseReason::Cancelled,
+        },
+        ClientFrame::PairClose {
+            reason: PairCloseReason::Locked,
+        },
+        ClientFrame::PairClose {
+            reason: PairCloseReason::Done,
+        },
+        ClientFrame::BackupGet {
+            id: BackupId([0x1d; 16]),
+        },
+        ClientFrame::BackupBegin {
+            id: BackupId([0x1e; 16]),
+        },
+        ClientFrame::BackupPut {
+            write_key: MemberId([0x2f; 32]),
+            signature: [0x3f; 64],
+            record: vec![1, 0x4f],
+        },
+        ClientFrame::BackupDelete {
+            signature: [0x30; 64],
+        },
+    ];
+    let relay = [
+        RelayFrame::PairSlot {
+            slot: 0x1234,
+            expires_in_s: 300,
+        },
+        RelayFrame::PairJoined { sid: [0x51; 16] },
+        RelayFrame::PairMsg {
+            bytes: vec![1, 2, 0xb6],
+        },
+        RelayFrame::PairClose {
+            reason: PairCloseReason::Gone,
+        },
+        RelayFrame::Refused {
+            reason: RefusalReason::Unknown,
+        },
+        RelayFrame::Refused {
+            reason: RefusalReason::Locked,
+        },
+        RelayFrame::Refused {
+            reason: RefusalReason::Busy,
+        },
+        RelayFrame::BackupRecord {
+            record: vec![1, 0x8e],
+        },
+        RelayFrame::BackupDone,
+        RelayFrame::Refused {
+            reason: RefusalReason::Forbidden,
+        },
+    ];
+    let mut bytes = Vec::new();
+    let mut push = |message: Vec<u8>| {
+        bytes.extend_from_slice(&u32::try_from(message.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(&message);
+    };
+    for frame in &client {
+        let message = frame.encode();
+        assert_eq!(ClientFrame::decode(&message).unwrap(), *frame);
+        push(message);
+    }
+    for frame in &relay {
+        let message = frame.encode();
+        assert_eq!(RelayFrame::decode(&message).unwrap(), *frame);
+        push(message);
+    }
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/frames_v3.bin");
+    if std::env::var_os("CURVYO_UPDATE_GOLDEN").is_some() {
+        std::fs::write(&path, &bytes).unwrap();
+    }
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        bytes,
+        "frames_v3.bin differs"
+    );
+}
+
+/// A slot at or above 2^15, an unknown close reason, an empty pairing message and trailing bytes
+/// are malformed.
+#[test]
+fn malformed_pairing_frames_are_refused() {
+    let mut high = ClientFrame::PairJoin { slot: 0 }.encode();
+    high[2] = 0x80;
+    assert_eq!(ClientFrame::decode(&high), Err(FrameError::Malformed));
+    let mut reason = ClientFrame::PairClose {
+        reason: PairCloseReason::Wrong,
+    }
+    .encode();
+    reason[1] = 9;
+    assert_eq!(ClientFrame::decode(&reason), Err(FrameError::Malformed));
+    let empty = ClientFrame::PairMsg { bytes: vec![1] }.encode();
+    assert_eq!(ClientFrame::decode(&empty[..1]), Err(FrameError::Malformed));
+    let mut long = ClientFrame::PairOpen.encode();
+    long.push(0);
+    assert_eq!(ClientFrame::decode(&long), Err(FrameError::Malformed));
+    let empty_put = ClientFrame::BackupPut {
+        write_key: MemberId([1; 32]),
+        signature: [2; 64],
+        record: vec![3],
+    }
+    .encode();
+    assert_eq!(
+        ClientFrame::decode(&empty_put[..empty_put.len() - 1]),
+        Err(FrameError::Malformed)
+    );
+    let short_get = ClientFrame::BackupGet {
+        id: BackupId([1; 16]),
+    }
+    .encode();
+    assert_eq!(
+        ClientFrame::decode(&short_get[..16]),
+        Err(FrameError::Malformed)
+    );
+    let mut slot = RelayFrame::PairSlot {
+        slot: 1,
+        expires_in_s: 300,
+    }
+    .encode();
+    slot[2] = 0x80;
+    assert_eq!(RelayFrame::decode(&slot), Err(FrameError::Malformed));
 }

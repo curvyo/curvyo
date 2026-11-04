@@ -64,6 +64,14 @@ impl ClientSession {
                     self.on_caught_up(now);
                 }
             }
+            // Pairing and backup frames belong to their own connections, never to a room
+            // session.
+            RelayFrame::PairSlot { .. }
+            | RelayFrame::PairJoined { .. }
+            | RelayFrame::PairMsg { .. }
+            | RelayFrame::PairClose { .. }
+            | RelayFrame::BackupRecord { .. }
+            | RelayFrame::BackupDone => {}
         }
     }
 
@@ -137,10 +145,10 @@ impl ClientSession {
             return;
         }
         self.event(SessionEvent::KeyringChanged);
-        let me = self.keys.me();
-        if self.keys.keyring().is_some_and(|k| k.was_removed(&me)) {
-            self.event(SessionEvent::Removed);
-            self.end();
+        // While catching up the keyring arrives entry by entry: a device removed and admitted
+        // again (a workspace switched off and on, ADR 0040 decision 6) passes its removal first,
+        // so the removal counts once the catch-up ends.
+        if self.state != (State::Joined { caught_up: false }) && self.removed_here() {
             return;
         }
         if self.claim_once_invite_is_known() {
@@ -200,7 +208,21 @@ impl ClientSession {
         self.send_pending_snapshot();
     }
 
+    /// Ends the session as removed when the keyring no longer lists this device.
+    fn removed_here(&mut self) -> bool {
+        let me = self.keys.me();
+        if !self.keys.keyring().is_some_and(|k| k.was_removed(&me)) {
+            return false;
+        }
+        self.event(SessionEvent::Removed);
+        self.end();
+        true
+    }
+
     fn on_caught_up(&mut self, now: Millis) {
+        if self.removed_here() {
+            return;
+        }
         if self.keys.holds_any_key() {
             self.note_admitted();
             self.event(SessionEvent::Online);

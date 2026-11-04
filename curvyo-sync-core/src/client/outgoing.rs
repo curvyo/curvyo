@@ -1,8 +1,8 @@
 //! What a client sends on its own account: pushes through the outbox, snapshots, presence,
 //! invites and removals.
 
-use curvyo_crypto_core::keyring::{Entry, Payload, Role};
-use curvyo_crypto_core::{EnvelopeKind, InviteKey, MemberId};
+use curvyo_crypto_core::keyring::{Entry, Keyring, Payload, Role};
+use curvyo_crypto_core::{EnvelopeKind, Identity, InviteKey, MemberId};
 
 use super::{ClientSession, InviteSecret, OutItem, SessionError, SessionEvent, State};
 use crate::frame::{ClientFrame, MAX_MESSAGE_LEN, RecordKind};
@@ -151,20 +151,108 @@ impl ClientSession {
         })
     }
 
+    /// Adds `identity` as a member with `role` and every epoch key this device holds (ADR 0040
+    /// decisions 1 and 5: a paired device, full history). Admin only.
+    ///
+    /// # Errors
+    /// `NotAdmin`, `NotAMember` (this device), `AlreadyMember`, `Offline`, `Ended`, `Crypto`.
+    pub fn add_member(&mut self, identity: Identity, role: Role) -> Result<(), SessionError> {
+        self.add(identity, role, false)
+    }
+
+    /// Adds a device of the maker's `group` like [`add_member`](Self::add_member), also one a
+    /// device that ever was in the group removed before (a switch-off, ADR 0040 decision 6),
+    /// never one an admin who never was in the group removed ([`may_readmit`](crate::may_readmit), decision 5). The
+    /// caller makes sure it is a current group member ([`reconcile`](crate::reconcile)). Admin
+    /// only.
+    ///
+    /// # Errors
+    /// `NotAdmin`, `NotAMember` (this device), `AlreadyMember` (also for a device withheld by
+    /// that rule), `Offline`, `Ended`, `Crypto`.
+    pub fn admit_device(
+        &mut self,
+        group: &Keyring,
+        identity: Identity,
+        role: Role,
+    ) -> Result<(), SessionError> {
+        let readmit = self
+            .keys
+            .keyring()
+            .is_some_and(|keyring| crate::may_readmit(group, keyring, &identity.member));
+        self.add(identity, role, readmit)
+    }
+
+    fn add(&mut self, identity: Identity, role: Role, readmit: bool) -> Result<(), SessionError> {
+        self.require_admin()?;
+        let entry = self
+            .keys
+            .write_addition(identity, role, readmit, &mut self.entropy)?;
+        self.send_entries(&[entry])?;
+        self.event(SessionEvent::KeyringChanged);
+        Ok(())
+    }
+
     /// Removes `member` with a key rotation, then asks for a snapshot under the new epoch
     /// (criterion 32, ADR 0031 decision 6a). Admin only.
     ///
     /// # Errors
     /// `NotAdmin`, `NotAMember`, `Offline`, `Ended`, `Crypto`.
     pub fn remove(&mut self, member: MemberId) -> Result<(), SessionError> {
+        self.remove_members(&[member])
+    }
+
+    /// Removes every one of `members`, then rotates once and asks for a snapshot under the new
+    /// epoch (ADR 0040 decision 5). Admin only.
+    ///
+    /// # Errors
+    /// `NotAdmin`, `NotAMember` (also for an empty list), `Offline`, `Ended`, `Crypto`.
+    pub fn remove_members(&mut self, members: &[MemberId]) -> Result<(), SessionError> {
         self.require_admin()?;
-        let entries = self.keys.write_removal(member, &mut self.entropy)?;
+        let entries = self.keys.write_removal(members, &mut self.entropy)?;
         self.send_entries(&entries)?;
+        self.rotated();
+        Ok(())
+    }
+
+    /// Writes a `NewEpoch` for the current members (a former member still holds the current
+    /// key, ADR 0040 decision 5) and asks for a snapshot under it. Admin only.
+    ///
+    /// # Errors
+    /// `NotAdmin`, `NotAMember`, `Offline`, `Ended`, `Crypto`.
+    pub fn rotate(&mut self) -> Result<(), SessionError> {
+        self.require_admin()?;
+        let entry = self.keys.write_rotation(&mut self.entropy)?;
+        self.send_entries(&[entry])?;
+        self.rotated();
+        Ok(())
+    }
+
+    /// This device leaves the room by its own `RemoveMember` (criterion 27); an admin rotates
+    /// later. The caller then closes the session and forgets the room's keys.
+    ///
+    /// # Errors
+    /// `NotAMember`, `Offline`, `Ended`, `Crypto`.
+    pub fn leave(&mut self) -> Result<(), SessionError> {
+        if self.state == State::Ended {
+            return Err(SessionError::Ended);
+        }
+        if !self.is_online() {
+            return Err(SessionError::Offline);
+        }
+        let me = self.keys.me();
+        if self.keys.keyring().and_then(|k| k.role(&me)).is_none() {
+            return Err(SessionError::NotAMember);
+        }
+        let entry = self.keys.write(Payload::RemoveMember { member: me })?;
+        self.send_entries(&[entry])?;
+        Ok(())
+    }
+
+    fn rotated(&mut self) {
         self.event(SessionEvent::KeyringChanged);
         self.snapshot_asked = true;
         let covers_seq = self.cursor();
         self.event(SessionEvent::SnapshotDue { covers_seq });
-        Ok(())
     }
 
     fn require_admin(&self) -> Result<(), SessionError> {
