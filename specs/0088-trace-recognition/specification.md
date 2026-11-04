@@ -153,15 +153,18 @@ Pictures below are rendered at 10 px/mm, so the 2 px floor equals 0.2 mm.
     the sides a constant distance d apart within tolerance), then it becomes that primitive at the centre line
     with a stroke of width d, no fill, the stroke in the region's fill colour (black, or its palette colour). A
     ring is a stroked circle, a rectangle frame a stroked rectangle (corner radius at the centre line), an outline
-    star or polygon a stroked star or polygon with the join as traced, miter or bevel (**changed 2026-11-04, lead
-    Proposal**: a star or polygon whose traced outer corners are cut flat is a bevelled stroke; the centre line
-    is derived from the offsets; a mitred corner sharper than the miter limit of 4 is not a stroke). The stroked
-    area matches the traced band's within the tolerance, else the region stays two clean outlines, as does a band
+    star or polygon a stroked star or polygon with the join as traced, miter, bevel or round (**changed
+    2026-11-04, lead Proposal; customer 2026-11-04**: the sides decide within the tolerance, a zone of about 1.5
+    band widths around each tip and valley is left to the join: sharp tips are a miter, flat ones a bevel, rounded
+    or clipped ones the nearest join; the centre line is derived from the offsets; a mitred corner sharper than the
+    miter limit of 4 is not a stroke). The stroked area matches the traced band's within 3 % (Proposal) and no
+    hole is lost, else the region stays two clean outlines, as does a band
     of varying width (dynamic strokes are R-EDIT-050). Touching outline stars or polygons (lead Proposal
     2026-11-04): a region whose outer outline is no primitive, with several holes that are each the inner outline
     of a stroked star or polygon whose outer outlines together make the region's outer, is one stroked primitive
-    per hole; when the region cannot be split so within the tolerance it stays paths. The customer's page: the
-    8-point outline star is one stroked star with n = 8, its stroked area within 2 % of the traced band's.
+    per hole; when the region cannot be split so within the tolerance it stays paths. Tips are never a reason to
+    accept an uneven band. The customer's pages: the 8-point outline star is one stroked star with n = 8, its
+    stroked area within 2 % of the traced band's; on the ten-star page every star is one stroked star.
 
 ## Later
 - Gesture-based shape recognition (customer, 2026-10-28): the customer compares Part B with VectorCraft's shape

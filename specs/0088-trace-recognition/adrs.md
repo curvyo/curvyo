@@ -396,6 +396,20 @@ change.
     miters (1.3 mm short of the miter point, 0.9 mm past a bevel, its inner corners mitred) that
     neither join draws within the tolerance, so it stays paths.
 
+23. **The tip zone (criterion 16; customer 2026-11-04, lead Proposal).** The tracer rounds,
+    flattens or clips a thick stroke's tips, so when a band is found from its hole (decision 22)
+    the traced points within 1.5 band widths of a centre-line corner (at most a quarter of the
+    shortest side, so half of every side decides) are left out of the deviation check: the sides
+    must lie on the stroke's outlines within the tolerance, the centre, turn and n are the hole's.
+    For each join (miter, bevel, round; `LineJoin::Round` exists) the width covers the traced
+    area; of the joins whose sides fit, the one whose outlines the tip points lie closest to (root
+    mean square) wins; a mitred one must be within the miter limit. The area guard is a share:
+    the stroked area within 3 % of the traced band's (`BAND_AREA_SHARE`, also for mitred bands and
+    touching ones); the fill guard keeps every hole. Bands of other kinds, uneven or off-centre
+    bands and holes without a partner are unchanged (they never reach the zone). The ten-star
+    page: eight mitred, the bottom-right bevelled, the bottom-middle (clipped miters) round; no
+    record re-blessed. Decision 22's note that the clipped star stays paths no longer holds.
+
 ## Not decided here
 
 - Part B (shapes): decided in decisions 12 to 19 above; nothing moves to `geometry-core`. Tablet

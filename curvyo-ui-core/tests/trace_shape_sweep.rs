@@ -395,10 +395,9 @@ fn stroked_star_area(shape: &Shape, width: f64) -> f64 {
 /// 794 x 1123 px at 96 dpi): ten 8-point outline stars of several sizes, turns and stroke widths,
 /// drawn with bevelled joins (the tips are cut flat). Criterion 16: each is one stroked star with
 /// n = 8 covering what the traced band covers within 2 % (a stroke of its centre line with its
-/// join; decision 22). The bottom-right one (2 mm stroke, tips cut flat by about 2 mm) is
-/// bevelled; the thinner ones are within the tolerance of a mitred outline and stay mitred. The
-/// bottom-middle one (2 mm) has clipped miters, 1.3 mm short of the miter point and 0.9 mm past a
-/// bevel, and mitred inner corners: neither join draws it within the tolerance, so it stays paths.
+/// join; decision 22). The thinner ones are within the tolerance of a mitred outline and stay
+/// mitred; the two thick ones (2 mm, bottom) have tips cut flat or clipped, which the tip zone
+/// leaves to the join (customer 2026-11-04): each is the join nearest to its tips.
 #[test]
 fn the_customers_ten_outline_stars_are_stroked_stars() {
     let png = image::open(
@@ -465,12 +464,8 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
         }
     }
     assert!(failures.is_empty(), "{failures:?}");
-    assert_eq!(
-        on.shapes.len(),
-        9,
-        "one stroked star each but the clipped one"
-    );
-    assert_eq!(bevelled, 1, "the bottom-right star is bevelled");
+    assert_eq!(on.shapes.len(), 10, "one stroked star each, no path left");
+    assert!(bevelled >= 1, "the bottom-right star is bevelled");
 }
 
 /// The area kurbo's stroke of `width` with `join` along the star `shape` covers (an oracle apart

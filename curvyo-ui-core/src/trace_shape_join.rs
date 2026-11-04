@@ -9,8 +9,11 @@ use std::f64::consts::{PI, TAU};
 use curvyo_document_core::{InnerRatio, Length, LineJoin, Shape};
 
 use crate::trace_shape_band::side_line;
-use crate::trace_shape_math::sin_cos;
+use crate::trace_shape_math::{atan2, sin_cos};
 use crate::trace_shape_sample::length;
+
+/// The pieces of a round join's arc.
+const ARC_STEPS: u32 = 8;
 
 /// The longest miter the renderer draws, in stroke widths (SVG's 4, `curvyo-render-core`).
 pub(crate) const MITER_LIMIT: f64 = 4.0;
@@ -97,7 +100,8 @@ fn normal(corners: &[[f64; 2]], i: usize) -> [f64; 2] {
 }
 
 /// `corners` with every side moved out by `s` (in for a negative `s`); a corner the stroke turns
-/// round on this side gets `join` (a bevel is two points), the others the sides' meeting point.
+/// round on this side gets `join` (a bevel is two points, a round join an arc), the others the
+/// sides' meeting point.
 pub(crate) fn offset(corners: &[[f64; 2]], s: f64, join: LineJoin) -> Vec<[f64; 2]> {
     let m = corners.len();
     let mut out = Vec::with_capacity(2 * m);
@@ -108,6 +112,14 @@ pub(crate) fn offset(corners: &[[f64; 2]], s: f64, join: LineJoin) -> Vec<[f64; 
         if join == LineJoin::Bevel && convex == (s > 0.0) {
             out.push([v[0] + s * na[0], v[1] + s * na[1]]);
             out.push([v[0] + s * nb[0], v[1] + s * nb[1]]);
+        } else if join == LineJoin::Round && convex == (s > 0.0) {
+            // The arc about the corner from one side's end to the next one's.
+            let turn = atan2(na[0] * nb[1] - na[1] * nb[0], na[0] * nb[0] + na[1] * nb[1]);
+            for k in 0..=ARC_STEPS {
+                let (sn, cs) = sin_cos(turn * f64::from(k) / f64::from(ARC_STEPS));
+                let n = [na[0] * cs - na[1] * sn, na[0] * sn + na[1] * cs];
+                out.push([v[0] + s * n[0], v[1] + s * n[1]]);
+            }
         } else {
             let k = s / (1.0 + na[0] * nb[0] + na[1] * nb[1]).max(f64::MIN_POSITIVE);
             out.push([v[0] + k * (na[0] + nb[0]), v[1] + k * (na[1] + nb[1])]);
@@ -192,6 +204,13 @@ mod tests {
         assert!((mitred - (144.0 - 64.0)).abs() < 1e-9);
         let bevelled = stroke_area(&square(), 2.0, LineJoin::Bevel);
         assert!((bevelled - (80.0 - 2.0)).abs() < 1e-9);
+        // A round corner of radius 1 instead of the square one: π − 4 less each, to the arc's
+        // pieces.
+        let round = stroke_area(&square(), 2.0, LineJoin::Round);
+        assert!(
+            (round - (80.0 - (4.0 - std::f64::consts::PI))).abs() < 0.03,
+            "{round}"
+        );
         assert!((distance([5.0, -3.0], &square()) - 3.0).abs() < 1e-12);
         assert!(inside([5.0, 5.0], &square()) && !inside([5.0, -1.0], &square()));
     }
