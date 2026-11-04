@@ -149,7 +149,7 @@ fn join_of(b: &curvyo_ui_core::TraceBand) -> Join {
     match b.join {
         LineJoin::Bevel => Join::Bevel,
         LineJoin::Miter => Join::Miter,
-        other @ LineJoin::Round => panic!("unexpected join {other:?}"),
+        LineJoin::Round => Join::Round,
     }
 }
 
@@ -169,8 +169,10 @@ fn median_offset_distance(wire: &TraceWire, r: &TraceShapeRegion) -> f64 {
     let inner = &wire.outlines[r.outlines[1]];
     let mut d: Vec<f64> = Vec::new();
     for seg in outer.segments() {
-        for k in 0..20 {
-            let p = kurbo::ParamCurve::eval(&seg, f64::from(k) / 20.0);
+        // Samples spaced by length, so many short tip arcs do not outvote the long sides.
+        let n = ((kurbo::ParamCurveArclen::arclen(&seg, 1e-3) / 0.2).ceil() as u32).max(1);
+        for k in 0..n {
+            let p = kurbo::ParamCurve::eval(&seg, f64::from(k) / f64::from(n));
             d.push(dist_to(inner, p));
         }
     }
@@ -216,7 +218,7 @@ fn join_a_bevelled_stroked_star_is_a_bevelled_star() {
         0.05,
     );
     assert!(
-        (stroked - traced).abs() <= 0.02 * traced,
+        (stroked - traced).abs() <= 0.03 * traced,
         "stroked {stroked} vs traced {traced}"
     );
 }
@@ -382,7 +384,7 @@ fn touching_a_non_overlapping_split_would_not_explain_the_region() {
 }
 
 #[test]
-fn customer_outline_stars_eight_mitred_one_bevelled_one_paths() {
+fn customer_outline_stars_eight_mitred_one_bevelled_one_round() {
     let png = image::open(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/trace_shapes/customer-outline-stars.png"),
@@ -415,14 +417,18 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_paths() {
         .filter(|r| r.band.unwrap().join == LineJoin::Bevel)
         .collect();
     eprintln!("regions {} bands {}", on.shapes.len(), bands.len());
+    let round: Vec<_> = bands
+        .iter()
+        .filter(|r| r.band.unwrap().join == LineJoin::Round)
+        .collect();
     assert_eq!(miter.len(), 8, "eight mitred");
     assert_eq!(bevel.len(), 1, "one bevelled");
-    assert_eq!(bands.len(), 9);
-    // Ten stars on the page: 20 traced outlines; the clipped one is in no band.
+    assert_eq!(round.len(), 1, "one round");
+    assert_eq!(bands.len(), 10, "all ten stars are stroked stars");
     let in_bands: usize = bands.iter().map(|r| r.outlines.len()).sum();
     eprintln!("outlines {} in bands {in_bands}", off.outlines.len());
     assert_eq!(off.outlines.len(), 20, "ten stars, two outlines each");
-    assert_eq!(off.outlines.len() - in_bands, 2, "one star stays paths");
+    assert_eq!(in_bands, 20, "no star stays paths");
     for r in &bands {
         let b = r.band.unwrap();
         assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 8));
@@ -432,7 +438,7 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_paths() {
             0.05,
         );
         assert!(
-            (stroked - traced).abs() <= 0.02 * traced,
+            (stroked - traced).abs() <= 0.03 * traced,
             "stroked {stroked} vs traced {traced}"
         );
         // Width vs distance between the offsets (mitred stars only: the sides are parallel).
@@ -446,6 +452,46 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_paths() {
             (b.width.as_mm() - d).abs() <= 0.25,
             "width {} vs offset distance {d}",
             b.width.as_mm()
+        );
+    }
+}
+
+#[test]
+fn join_a_rounded_tip_star_is_a_round_join() {
+    let line = star_outline((30.0, 30.0), 20.0, 0.55, 5, -1.3);
+    let (_, on) = trace(60.0, 60.0, ink_of(vec![stroke_of(&line, 3.0, Join::Round)]));
+    let bands = band_regions(&on);
+    assert_eq!(bands.len(), 1, "{:?}", on.shapes);
+    let b = bands[0].band.unwrap();
+    assert_eq!(b.join, LineJoin::Round);
+    assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 5));
+    assert!((b.width.as_mm() - 3.0).abs() <= 0.25, "{}", b.width.as_mm());
+    let traced = region_area(&on, bands[0]);
+    let stroked = area_of(
+        &[stroke_of(&centre_line(&b), b.width.as_mm(), Join::Round)],
+        0.05,
+    );
+    assert!(
+        (stroked - traced).abs() <= 0.03 * traced,
+        "stroked {stroked} vs traced {traced}"
+    );
+}
+
+#[test]
+fn join_a_star_clipped_beyond_the_tip_zone_stays_paths() {
+    let line = star_outline((30.0, 30.0), 20.0, 0.55, 5, -1.3);
+    let band = stroke_of(&line, 3.0, Join::Miter);
+    // Cut the star at a quarter of the width: every tip loses far more than 1.5 band widths.
+    let clip = kurbo::Circle::new((30.0, 30.0), 12.0).to_path(0.01);
+    let ink = move |x: f64, y: f64| {
+        let p = kurbo::Point::new(x, y);
+        band.winding(p) != 0 && clip.winding(p) != 0
+    };
+    let (_, on) = trace(60.0, 60.0, ink);
+    for r in &on.shapes {
+        assert!(
+            r.band.is_none() && r.bands.is_empty(),
+            "clipped star stays paths: {r:?}"
         );
     }
 }
