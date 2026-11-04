@@ -68,20 +68,26 @@ fn drawing(document: &Document) -> String {
 /// Layers A (Cut), B (Engrave), C (Ignore), D (no role), E (the unknown role "score") and the
 /// role of a deleted layer (criterion 19).
 fn golden_document() -> Document {
+    // Each role is set right after its layer is drawn, so no two adjacent history rows share a
+    // label (`0020` criterion 36 reads every fixture).
     let document = Document::new(1);
-    let layer_a = layer_with_rect(&document, "A", 10.0);
-    let layer_b = layer_with_rect(&document, "B", 30.0);
-    let layer_c = layer_with_rect(&document, "C", 50.0);
-    let _layer_d = layer_with_rect(&document, "D", 70.0);
-    let layer_e = layer_with_rect(&document, "E", 90.0);
-    let gone = layer_with_rect(&document, "Gone", 110.0);
-    let laser = add_laser(&document);
-    set(&document, laser, layer_a, Some("cut"));
-    set(&document, laser, layer_b, Some("engrave"));
-    set(&document, laser, layer_c, Some("ignore"));
-    set(&document, laser, layer_e, Some("score"));
-    set(&document, laser, gone, Some("cut"));
-    document.delete_layer(gone).unwrap();
+    let made = add_laser(&document);
+    for (name, x, role) in [
+        ("A", 10.0, Some("cut")),
+        ("B", 30.0, Some("engrave")),
+        ("C", 50.0, Some("ignore")),
+        ("D", 70.0, None),
+        ("E", 90.0, Some("score")),
+        ("Gone", 110.0, Some("cut")),
+    ] {
+        let layer = layer_with_rect(&document, name, x);
+        if let Some(role) = role {
+            set(&document, made, layer, Some(role));
+        }
+        if name == "Gone" {
+            document.delete_layer(layer).unwrap();
+        }
+    }
     document
 }
 

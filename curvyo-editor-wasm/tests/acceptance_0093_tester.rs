@@ -164,6 +164,9 @@ fn mm(v: f64) -> Length {
 }
 
 fn add_laser(s: &mut Session) -> NodeId {
+    // `specs/0027-manufacturing-roles` "Changes to accepted text": the criteria of `0093` are
+    // checked with the Role view switch off, the look `0093` shipped.
+    s.set_role_view(false);
     s.add_manufacturing(LASER).expect("Laser can be added")
 }
 
@@ -919,6 +922,7 @@ fn ac12_save_and_reopen_keep_everything_and_the_placement_still_follows() {
     let laser_frame = s.frame_draw_list();
 
     let mut r = Session::open(9205, &s.pack("0.1.0").unwrap()).unwrap();
+    r.set_role_view(false);
     let after = opened(&r).manufacturings();
     assert_eq!(after, before);
     assert_eq!(after[0].placements[0].page, second);

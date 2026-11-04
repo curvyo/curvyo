@@ -94,6 +94,9 @@ fn drawing() -> Vec<u8> {
 /// A session over a one-rectangle drawing with `disk` as the library.
 fn session(disk: &Disk) -> Session {
     let mut s = Session::open(9300, &drawing()).unwrap();
+    // `specs/0027-manufacturing-roles` "Changes to accepted text": the output page of `0093`
+    // and `0026` is checked with the Role view switch off.
+    s.set_role_view(false);
     s.load_machine_profiles_json(&library_json(disk));
     s
 }
