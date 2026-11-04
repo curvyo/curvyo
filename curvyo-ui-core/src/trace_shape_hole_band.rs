@@ -14,8 +14,16 @@ use crate::trace_shape_join::{
 use crate::trace_shape_sample::Sampled;
 use crate::trace_shapes::TraceBand;
 
-/// The joins looked for, in the order they are tried: a mitred stroke before a bevelled one.
-const JOINS: [LineJoin; 2] = [LineJoin::Miter, LineJoin::Bevel];
+/// The joins looked for; on a tie the earlier one wins.
+const JOINS: [LineJoin; 3] = [LineJoin::Miter, LineJoin::Bevel, LineJoin::Round];
+
+/// The radius about each corner of the centre line, in band widths, whose traced points only
+/// choose the join and are left out of the deviation check (customer 2026-11-04: the tracer
+/// rounds, flattens or clips the tips; Proposal, calibrated on his ten-star page).
+const TIP_ZONE: f64 = 1.5;
+
+/// The most a band's stroked area may differ from the traced band's, as a share of it (Proposal).
+pub(crate) const BAND_AREA_SHARE: f64 = 0.03;
 
 /// Halvings of a half width's search.
 const STEPS: u32 = 60;
@@ -75,6 +83,59 @@ fn all_within(points: &[[f64; 2]], outline: &[[f64; 2]], tolerance: f64) -> bool
     !outline.is_empty() && points.iter().all(|&p| distance(p, outline) <= tolerance)
 }
 
+/// `points` split into those within the tip zone of a corner of `stroke`'s centre line (at most a
+/// quarter of its shortest side) and those on its sides.
+fn by_zone(points: &[[f64; 2]], stroke: &Stroke) -> (Vec<[f64; 2]>, Vec<[f64; 2]>) {
+    let corners = corners(&stroke.centre).unwrap_or_default();
+    // At most a quarter of the shortest side, so half of every side decides.
+    let shortest = (0..corners.len())
+        .map(|i| {
+            let (a, b) = (corners[i], corners[(i + 1) % corners.len()]);
+            crate::trace_shape_sample::length(b[0] - a[0], b[1] - a[1])
+        })
+        .fold(f64::INFINITY, f64::min);
+    let zone = (TIP_ZONE * 2.0 * stroke.half).min(shortest / 4.0);
+    points.iter().partition(|p| {
+        corners
+            .iter()
+            .any(|c| crate::trace_shape_sample::length(p[0] - c[0], p[1] - c[1]) <= zone)
+    })
+}
+
+/// How far, as a root mean square, `points` lie from `outline` (0 for none).
+fn spread(points: &[[f64; 2]], outline: &[[f64; 2]]) -> f64 {
+    if points.is_empty() {
+        return 0.0;
+    }
+    #[allow(clippy::cast_precision_loss)] // point counts far below 2^52
+    let n = points.len() as f64;
+    (points
+        .iter()
+        .map(|&p| distance(p, outline).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt()
+}
+
+/// Whether the side points of `outer` and `hole` lie on `stroke`'s outlines within `tolerance`
+/// (enough of them), and how far its tip-zone points lie from them.
+fn sides_fit(
+    stroke: &Stroke,
+    outer: &[[f64; 2]],
+    hole: &[[f64; 2]],
+    tolerance: f64,
+) -> Option<f64> {
+    let (out_line, in_line) = (stroke.outline(1.0), stroke.outline(-1.0));
+    let (outer_tips, outer_sides) = by_zone(outer, stroke);
+    let (hole_tips, hole_sides) = by_zone(hole, stroke);
+    (stroke.drawable()
+        && outer_sides.len() >= FEWEST_POINTS
+        && hole_sides.len() >= FEWEST_POINTS
+        && all_within(&outer_sides, &out_line, tolerance)
+        && all_within(&hole_sides, &in_line, tolerance))
+    .then(|| spread(&outer_tips, &out_line).max(spread(&hole_tips, &in_line)))
+}
+
 /// The half width in (0, `hi`] where `rises` turns true, by halving (`rises` false at 0).
 fn search(hi: f64, rises: impl Fn(f64) -> bool) -> f64 {
     let (mut lo, mut hi) = (0.0, hi);
@@ -90,9 +151,9 @@ fn search(hi: f64, rises: impl Fn(f64) -> bool) -> f64 {
 }
 
 /// The band of the traced `outer` and its one `hole`, recognised as `inner` (a star or polygon),
-/// when the outer is no primitive: the first join whose stroke covers the traced band's area
-/// with every traced point within `tolerance` of its outlines (a bevelled stroke's outer outline
-/// is cut at the tips, so it is no star).
+/// when the outer is no primitive: for each join the width whose stroke covers the traced band's
+/// area, kept when the sides lie on its outlines within `tolerance` (the tips are left to the
+/// join), the join whose outlines the tips lie closest to.
 pub(crate) fn band_from_hole(
     outer: &Sampled,
     hole: &Sampled,
@@ -104,18 +165,25 @@ pub(crate) fn band_from_hole(
     let (o, h) = (absolute(outer), absolute(hole));
     // The widest stroke looked for has the band's area along the hole's length alone.
     let hi = traced / hole.perimeter;
-    JOINS.iter().find_map(|&join| {
+    let mut best: Option<(f64, Stroke)> = None;
+    for join in JOINS {
         let covers =
             |half: f64| Stroke::of(&inner.0, half, join).is_some_and(|s| s.area() >= traced);
         if !covers(hi) {
-            return None;
+            continue;
         }
-        let stroke = Stroke::of(&inner.0, search(hi, covers), join)?;
-        (stroke.drawable()
-            && all_within(&o, &stroke.outline(1.0), tolerance)
-            && all_within(&h, &stroke.outline(-1.0), tolerance))
-        .then(|| stroke.band())
-    })
+        let Some(stroke) = Stroke::of(&inner.0, search(hi, covers), join) else {
+            continue;
+        };
+        let Some(tips) = sides_fit(&stroke, &o, &h, tolerance) else {
+            continue;
+        };
+        if best.as_ref().is_none_or(|(b, _)| tips < *b) {
+            best = Some((tips, stroke));
+        }
+    }
+    let (_, stroke) = best?;
+    ((stroke.area() - traced).abs() <= BAND_AREA_SHARE * traced).then(|| stroke.band())
 }
 
 /// The median of `values` (empty: 0).
@@ -159,7 +227,7 @@ fn stroke_through(points: &[[f64; 2]], inner: &Shape) -> Option<Stroke> {
 /// The bands of touching strokes whose outer outlines the trace merged into `outer`, one per
 /// hole (each recognised in `inners` as a star or polygon), when every outer point lies on one of
 /// their outer outlines within `tolerance`, every hole on its stroke's inner outline, and their
-/// areas add up to the traced region's within the tolerance along its outlines; `None` when the
+/// areas add up to the traced region's within [`BAND_AREA_SHARE`]; `None` when the
 /// region cannot be split into them exactly.
 pub(crate) fn touching_bands(
     outer: &Sampled,
@@ -188,16 +256,17 @@ pub(crate) fn touching_bands(
         })
         .collect::<Option<_>>()?;
     let outers: Vec<Vec<[f64; 2]>> = strokes.iter().map(|s| s.outline(1.0)).collect();
+    // A point in a tip zone is left to the join (decision 23).
+    let in_tip = |p: [f64; 2]| strokes.iter().any(|s| by_zone(&[p], s).0.len() == 1);
     let explained = o
         .iter()
+        .filter(|&&p| !in_tip(p))
         .all(|&p| outers.iter().any(|ring| distance(p, ring) <= tolerance));
-    let on_holes = strokes
-        .iter()
-        .zip(holes)
-        .all(|(s, h)| s.drawable() && all_within(&absolute(h), &s.outline(-1.0), tolerance));
+    let on_holes = strokes.iter().zip(holes).all(|(s, h)| {
+        s.drawable() && all_within(&by_zone(&absolute(h), s).1, &s.outline(-1.0), tolerance)
+    });
     let traced = outer.area() - holes.iter().map(|h| h.area()).sum::<f64>();
     let covered: f64 = strokes.iter().map(Stroke::area).sum();
-    let length = outer.perimeter + holes.iter().map(|h| h.perimeter).sum::<f64>();
-    (explained && on_holes && (covered - traced).abs() <= tolerance * length)
+    (explained && on_holes && (covered - traced).abs() <= BAND_AREA_SHARE * traced)
         .then(|| strokes.iter().map(Stroke::band).collect())
 }

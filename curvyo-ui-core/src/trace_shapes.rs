@@ -11,7 +11,7 @@ use kurbo::BezPath;
 use crate::svg_import_match::outline_path;
 use crate::trace_shape_band::{band_of, stroked_area};
 use crate::trace_shape_fit::{Fitted, fit_outline};
-use crate::trace_shape_hole_band::{band_from_hole, touching_bands};
+use crate::trace_shape_hole_band::{BAND_AREA_SHARE, band_from_hole, touching_bands};
 use crate::trace_shape_sample::{Sampled, sample_closed};
 use crate::trace_transfer::count;
 
@@ -184,13 +184,12 @@ fn recognise_layer(
 
 /// The band between the traced `outer` and its one `hole`, recognised as `o` and `i`: their
 /// centre-line primitive when they are parallel offsets of one, and the stroked area it covers is
-/// the traced band's within the tolerance along both outlines (the area guard of decision 16 for
-/// the stroke).
+/// the traced band's within [`BAND_AREA_SHARE`] (the area guard of decision 16 for the stroke).
 fn band(outer: &Sampled, hole: &Sampled, o: &Fitted, i: &Fitted, tol: f64) -> Option<TraceBand> {
     let traced = outer.area() - hole.area();
     let ((shape, rotation), width) = band_of(o, i, traced, tol)?;
     let stroked = stroked_area(&shape, width);
-    ((stroked - traced).abs() <= tol * (outer.perimeter + hole.perimeter)).then_some(TraceBand {
+    ((stroked - traced).abs() <= BAND_AREA_SHARE * traced).then_some(TraceBand {
         shape,
         rotation,
         width: Length::from_mm(width),
