@@ -12,7 +12,7 @@
     "multicolour": false,
     "off_fnv": "ecd9ac445e038835",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "44fafba9226610dd",
+    "on_fnv": "e9dcd176505b0e7d",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 700
@@ -30,7 +30,7 @@
     "multicolour": true,
     "off_fnv": "e430e9e21933dae5",
     "off_settings": "{\"output\":1,\"colours\":null,\"fixed\":[],\"excluded\":[],\"merged\":[],\"method\":0,\"background\":null,\"swatches\":[],\"threshold\":128}",
-    "on_fnv": "46496527501b4f74",
+    "on_fnv": "2d89311a55c18354",
     "on_settings": "{\"output\":1,\"colours\":null,\"fixed\":[],\"excluded\":[],\"merged\":[],\"method\":0,\"background\":null,\"swatches\":[],\"threshold\":128,\"shapes\":true}",
     "shapes": 2,
     "width": 1000
@@ -48,7 +48,7 @@
     "multicolour": false,
     "off_fnv": "53b4f21fa10f1764",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "d1e2be73e2e5fd74",
+    "on_fnv": "ac2d608ed93acfd4",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 2,
     "width": 600
@@ -66,7 +66,7 @@
     "multicolour": false,
     "off_fnv": "accc9a9e2a4ad3c6",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "fd63e28fda9e6b8d",
+    "on_fnv": "adab96fd83e5e22d",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 10000,
     "width": 800
@@ -84,7 +84,7 @@
     "multicolour": false,
     "off_fnv": "b6927ca57c8845e0",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "b67b701c658c63af",
+    "on_fnv": "891e7d20924a6f8f",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 800
@@ -102,7 +102,7 @@
     "multicolour": false,
     "off_fnv": "e1c935aeb2dd1389",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "73c303bd2553b9fa",
+    "on_fnv": "303232c471df3400",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 2200
@@ -120,7 +120,7 @@
     "multicolour": false,
     "off_fnv": "df53ead417892296",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "18b94a8fda9b7885",
+    "on_fnv": "43a9f41eb8e50c25",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 500,
     "width": 1500
@@ -138,7 +138,7 @@
     "multicolour": false,
     "off_fnv": "06ae570d54561bf7",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "0030feaf34941829",
+    "on_fnv": "2b96116dbe59f749",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 800
@@ -156,7 +156,7 @@
     "multicolour": false,
     "off_fnv": "b9a3707d260ab9d3",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "a42311be78937318",
+    "on_fnv": "465704c43767d098",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 4,
     "width": 1800
@@ -174,7 +174,7 @@
     "multicolour": false,
     "off_fnv": "5e896f7531f5bd59",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "8c6830773a2f9e3f",
+    "on_fnv": "1a3b6e0a76b29c1f",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 2200
@@ -192,7 +192,7 @@
     "multicolour": false,
     "off_fnv": "fa4302b489704208",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "daaf632488597e93",
+    "on_fnv": "e3876e53844271e6",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 700
@@ -210,7 +210,7 @@
     "multicolour": false,
     "off_fnv": "d23e830720992674",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "9a9afbc02a391264",
+    "on_fnv": "16bc65d2c5533287",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 200
@@ -228,7 +228,7 @@
     "multicolour": false,
     "off_fnv": "0470a518894b76f1",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "c2f077068d6b8b58",
+    "on_fnv": "fa14c5a9d84c6658",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 2200
@@ -246,7 +246,7 @@
     "multicolour": false,
     "off_fnv": "0b7437ae8d45e295",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "40294b58661acd53",
+    "on_fnv": "aa395fded74b75b3",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 1800
@@ -264,7 +264,7 @@
     "multicolour": false,
     "off_fnv": "a3df7663cfbaf3c0",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "214cc52659766f09",
+    "on_fnv": "bc728c06c7c3ea29",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 1000
@@ -300,7 +300,7 @@
     "multicolour": false,
     "off_fnv": "c0673abda8762cab",
     "off_settings": "{\"threshold\":128}",
-    "on_fnv": "3ab461c205a9315a",
+    "on_fnv": "041246b23a19609a",
     "on_settings": "{\"threshold\":128,\"shapes\":true}",
     "shapes": 1,
     "width": 700

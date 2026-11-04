@@ -109,7 +109,11 @@ fn c1_c8_c14_create_paths_sets_primitives_in_one_step() {
         dark.then_some([0, 0, 0])
     });
     let mut session = traced(&bytes, false);
-    assert_eq!(session.trace_shape_count(), 4);
+    let image = session.trace_view().images[0];
+    let map = session.trace_source(image, false).unwrap().map;
+    let px = (map[0] * map[3] - map[1] * map[2]).abs().sqrt();
+    // Criterion 16: the ring is one stroked circle, so 3 shapes.
+    assert_eq!(session.trace_shape_count(), 3);
     let steps = session.document.own_steps().len();
     let TraceCreateOutcome::Created { .. } = session.create_traced_paths() else {
         panic!("nothing created");
@@ -118,13 +122,29 @@ fn c1_c8_c14_create_paths_sets_primitives_in_one_step() {
     let out = made(&session);
     let mut kinds: Vec<&str> = out.primitives.iter().map(|p| p.0).collect();
     kinds.sort_unstable();
-    assert_eq!(kinds, ["circle", "rect"], "{out:?}");
-    assert!(out.primitives.iter().all(|p| p.1 == Color::BLACK));
-    assert_eq!(
-        out.paths,
-        [(2, Color::BLACK)],
-        "the ring: one compound of two circles"
+    assert_eq!(kinds, ["circle", "circle", "rect"], "{out:?}");
+    assert_eq!(out.paths, [], "{out:?}");
+    let strokes: Vec<(bool, f64, Color, bool)> = session
+        .objects()
+        .iter()
+        .filter_map(|o| match o {
+            ObjectSnapshot::Primitive(p) => Some((
+                p.style.stroke.enabled,
+                p.style.stroke.width.as_mm(),
+                p.style.stroke.color,
+                p.style.fill.enabled,
+            )),
+            _ => None,
+        })
+        .filter(|s| s.0)
+        .collect();
+    assert_eq!(strokes.len(), 1, "one stroked primitive: {strokes:?}");
+    let (_, width, colour, filled) = strokes[0];
+    assert!(
+        (width - 60.0 * px).abs() <= 2.0 * px,
+        "the ring's 60 px width: {width} mm"
     );
+    assert_eq!((colour, filled), (Color::BLACK, false));
     // The selection is the result (the group's leaves), as before.
     assert_eq!(session.selection.ids().len(), 3);
     session.undo();

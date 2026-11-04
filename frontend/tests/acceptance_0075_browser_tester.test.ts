@@ -114,7 +114,7 @@ async function inBrowser(profile: string, expression: string): Promise<unknown> 
 }
 
 const PRELUDE = `
-  const w = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+  const w = await import('/src/wasm-bindings/curvyo_editor_wasm.js?own-instance');
   await w.default();
   const fonts = await import('/src/lib/browserFonts.ts');
   const host = await import('/src/platform/host.ts');
