@@ -8,7 +8,9 @@ use std::sync::Arc;
 use curvyo_document_core::{
     Affine, ManufacturingSnapshot, ObjectSnapshot, Page, PageGrid, Point, ViewTransform,
 };
-use curvyo_render_core::{DrawList, GridStroke, RgbaColor, build_artwork, build_page_areas};
+use curvyo_render_core::{
+    DrawList, GridStroke, RgbaColor, build_artwork, build_artwork_with_looks, build_page_areas,
+};
 
 use super::super::Session;
 
@@ -62,7 +64,11 @@ impl Session {
                 .collect();
             let tessellation =
                 ViewTransform::new(view.scale() * linear_scale(map), Point::new(0.0, 0.0));
-            let mut art = build_artwork(&objects, tessellation);
+            // Role view draws each leaf by its layer's role (`0027` criterion 6), else as drawn.
+            let mut art = match self.role_looks(&manufacturing, &objects) {
+                Some(looks) => build_artwork_with_looks(&objects, &looks, tessellation),
+                None => build_artwork(&objects, tessellation),
+            };
             art.map_positions(|p| map.apply_point(p));
             list.extend(art);
         }

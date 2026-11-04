@@ -118,7 +118,7 @@ impl Session {
     }
 
     /// The active manufacturing's values for its schema-rendered tab and the status bar
-    /// (UX notes §3 to §6; the Machine block of `0026`); `null` in a drawing workbench.
+    /// (UX notes §3 to §6; the Machine block of `0026`, the Layers block of `0027`); `null` in a drawing workbench.
     #[must_use]
     pub fn manufacturing_view_json(&self) -> String {
         let Some(manufacturing) = self.active_manufacturing() else {
@@ -165,6 +165,7 @@ impl Session {
             "machine": machine,
             "notices": notices,
             "fixtures": fixtures_json(&manufacturing, &contribution),
+            "layers": self.layers_view(&manufacturing),
             "read_only_notice": notice,
         })
         .to_string()

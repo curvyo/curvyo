@@ -41,12 +41,14 @@ struct VertexInput {
     @location(1) uv: vec2<f32>,
     @location(2) opacity: f32,
     @location(3) depth: f32,
+    @location(4) grey: f32,
 };
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) opacity: f32,
+    @location(2) grey: f32,
 };
 
 @vertex
@@ -60,13 +62,18 @@ fn vs_image(input: VertexInput) -> VertexOutput {
     );
     out.uv = input.uv;
     out.opacity = input.opacity;
+    out.grey = input.grey;
     return out;
 }
 
-// The texture holds premultiplied alpha, so the opacity scales all four channels.
+// The texture holds premultiplied alpha, so the opacity scales all four channels. A grey quad
+// (an image in an Engrave layer) shows its luminance (Rec. 709), still premultiplied.
 @fragment
 fn fs_image(input: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(picture, picture_sampler, input.uv) * input.opacity;
+    let sampled = textureSample(picture, picture_sampler, input.uv);
+    let luma = dot(sampled.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let colour = mix(sampled.rgb, vec3<f32>(luma), input.grey);
+    return vec4<f32>(colour, sampled.a) * input.opacity;
 }
 ";
 
@@ -78,6 +85,8 @@ struct ImageVertex {
     uv: [f32; 2],
     opacity: f32,
     depth: f32,
+    /// 1 for a grey-scale preview, 0 for the picture's own colours.
+    grey: f32,
 }
 
 /// One uploaded picture.
@@ -292,6 +301,7 @@ impl GpuImages {
             let depth = list.layer_depth(quad.layer);
             #[allow(clippy::cast_possible_truncation)]
             let opacity = quad.opacity.get() as f32;
+            let grey = if quad.grey { 1.0 } else { 0.0 };
             let corner = |i: usize, uv: [f32; 2]| {
                 let p = quad.corners[i];
                 #[allow(clippy::cast_possible_truncation)]
@@ -301,6 +311,7 @@ impl GpuImages {
                     uv,
                     opacity,
                     depth,
+                    grey,
                 }
             };
             let (tl, tr, br, bl) = (
@@ -394,7 +405,7 @@ fn create_image_pipeline(
                 array_stride: std::mem::size_of::<ImageVertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &wgpu::vertex_attr_array![
-                    0 => Float32x2, 1 => Float32x2, 2 => Float32, 3 => Float32
+                    0 => Float32x2, 1 => Float32x2, 2 => Float32, 3 => Float32, 4 => Float32
                 ],
             })],
             compilation_options: wgpu::PipelineCompilationOptions::default(),

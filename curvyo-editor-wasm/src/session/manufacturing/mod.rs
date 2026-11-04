@@ -6,6 +6,9 @@ mod commands;
 mod frame;
 mod machine;
 mod machine_view;
+mod roles;
+#[cfg(test)]
+mod roles_tests;
 #[cfg(test)]
 mod tests;
 mod view_json;
@@ -56,6 +59,8 @@ pub(super) struct ManufacturingState {
     pub(super) placed: frame::PlacedCache,
     /// The maker's machine profiles and the last pick (`specs/0026-machine-profile`).
     pub(super) machine: machine::MachineState,
+    /// The leaf-to-layer map and the Role view switch (`specs/0027-manufacturing-roles`).
+    pub(super) roles: roles::RoleState,
 }
 
 impl Session {

@@ -86,14 +86,15 @@ Written for Frage 140 A, 141 A and 142 A; note 8 says what changes on B or C.
      drops the visibility condition. Frage 142 C: hidden leaves are drawn with a faded `Marking`
      look and not output. Neither touches the file.
 
-## Spec issues (for the product owner before Ready)
+## Spec issues (for the product owner before Ready; all eight folded into `specification.md` on 2026-11-04)
 
 1. **Criterion 8 (a) and (b) disagree for open outlines under Engrave.** Proposal: a leaf with at
    least one closed outline is filled (open outlines closed by a straight line); a leaf whose
    outlines are all open is a line. Say it in one sentence in criterion 8.
-2. **Criterion 8 (f) points at "criterion 16" for the image notice;** it is criterion 15.
-3. **Criterion 19:** the golden is `laser_roles_v36.curvyo` (no bump); drop "next free at merge"
-   and the Format line's conditional.
+2. **Criterion 8 (f) names the image notice's criterion:** it is criterion 15 (the notice
+   lines), not 16 (the live follow).
+3. **Criterion 19 and the Format line:** the golden is `laser_roles_v36.curvyo` in
+   `curvyo-document-core/tests/fixtures/` (no bump, format 36).
 4. **Criterion 18:** "refused as damaged only as ADR 0033 §7 says" should read ADR 0040 §3 (a
    container value under `x.*`); §7 lists no such case.
 5. **Criterion 5:** name the key form (`x.curvyo.laser.role.<layer id>`, `...role.outside`) so the

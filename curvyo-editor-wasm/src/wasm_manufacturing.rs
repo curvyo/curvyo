@@ -67,6 +67,18 @@ impl WasmSession {
         })
     }
 
+    /// Sets the role (`cut`, `engrave`, `ignore`; anything else clears it) of the Layers block row
+    /// `key` (a layer's `peer:counter` or `outside`) in the active manufacturing.
+    pub fn set_layer_role(&mut self, key: &str, role: &str) -> bool {
+        self.session
+            .set_layer_role(key, curvyo_laser_core::Role::parse(role))
+    }
+
+    /// Switches Role view of the output page on or off (view state).
+    pub fn set_role_view(&mut self, on: bool) {
+        self.session.set_role_view(on);
+    }
+
     /// Fit page of the View card.
     pub fn fit_output_page(&mut self) {
         self.session.fit_output_page();

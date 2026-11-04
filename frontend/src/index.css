@@ -122,6 +122,11 @@
     /* docs/design-system.md, "Guide (`0046`)": the marking colour of guide paths (drawn by
        curvyo-render-core's theme::GUIDE; kept here so the two stay one value). */
     --guide: #166534;
+    /* docs/design-system.md, `0027` roles: the looks of the Laser output page (drawn by
+       curvyo-render-core's theme::ROLE_*; kept here so the two stay one value). */
+    --role-cut: #C4122F;
+    --role-engrave: #8A4B08;
+    --role-ignore: #737379;
     /* The ground of a list row under the pointer: lighter than the control hover so the muted
        text on it keeps 4.5:1 (4.58:1 at 8 %). */
     --row-hover: color-mix(in srgb, #2F6FEE 8%, transparent);
