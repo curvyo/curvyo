@@ -35,6 +35,8 @@ import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 import type { ProjectApi } from "@/hooks/useProject";
 import type { WorkspaceApi } from "@/hooks/useWorkspace";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
+import type { DevicesApi } from "@/hooks/useDevices";
+import { syncedHeader } from "@/lib/devicesApi";
 import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
@@ -60,6 +62,8 @@ interface PropertiesPanelProps {
   workspace: WorkspaceApi;
   /** The workspace's sharing in the Share tab (`specs/0095-workspace` criteria 25 to 28). */
   workspaceSync: WorkspaceSyncApi;
+  /** My devices (`specs/0096-own-devices-sync`). */
+  devices: DevicesApi;
   /** The Trace tool's About Trace tab, last in the strip while the tool is active. */
   traceInfo: TraceInfoApi;
   /** Cooperative editing: the Share tab (`specs/0092-cooperative-editing`). */
@@ -90,10 +94,20 @@ export function PropertiesPanel({
   project,
   workspace,
   workspaceSync,
+  devices,
   traceInfo,
   collab,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
+  // The removed-device alert shows in My devices and in the File tab's Workspace section; one OK
+  // dismisses both, and the workspace's own removed block with them (0096 ux-notes 7.2).
+  const devicesForTabs: DevicesApi = {
+    ...devices,
+    dismissRemoved: () => {
+      devices.dismissRemoved();
+      workspace.dismissRemoved();
+    },
+  };
   const panelId = useId();
   const asideRef = useRef<HTMLElement>(null);
   /** A shortcut asked for the first control: it is focused once the chosen
@@ -423,10 +437,13 @@ export function PropertiesPanel({
                 exportSvg={<ExportSvgSection project={project} onReturnFocus={returnFocus} />}
                 extensions={<ExtensionsGroup workbenches={workbenches} />}
                 workspace={
-                  isTauri ? (
+                  // The browser holds synced workspaces only (`specs/0096-own-devices-sync`
+                  // criterion 35): the section is shown once it holds one.
+                  isTauri || workspace.open || workspace.recents.length > 0 ? (
                     <WorkspaceSection
                       workspace={workspace}
-                      sharedLine={collab.view.workspace?.headerLine}
+                      sharedLine={syncedHeader(devicesForTabs, collab.view) ?? collab.view.workspace?.headerLine}
+                      devicesRemoved={devicesForTabs.view?.removed ? devicesForTabs.dismissRemoved : undefined}
                       onReturnFocus={returnFocus}
                     />
                   ) : undefined
@@ -437,8 +454,9 @@ export function PropertiesPanel({
                 collab={collab}
                 saved={project.info.path !== null}
                 onReturnFocus={returnFocus}
+                devices={devicesForTabs}
                 workspace={
-                  isTauri
+                  isTauri || workspace.open
                     ? {
                         open: workspace.open,
                         name: workspace.name,

@@ -4,6 +4,7 @@
 //! open workspace and checked by `curvyo-storage-io`.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use curvyo_storage_io::ShareMembers;
@@ -13,13 +14,16 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::raw_ipc::call_args;
 use crate::state::AppState;
-use crate::workspace::{ScannedPayload, error_code};
+use crate::workspace::{ScannedPayload, error_code, root_of};
 use crate::workspace_share::unhex;
 
 /// The sharing members read per file, kept while the file's size and time stay the same, so a
 /// scan every 2 s opens only the files that changed.
 #[derive(Default)]
-pub(crate) struct ShareCache(Mutex<HashMap<Vec<String>, (u64, u64, ShareMembers)>>);
+pub(crate) struct ShareCache(Mutex<HashMap<PathBuf, ShareMap>>);
+
+/// The sharing members of one workspace's files, by path.
+type ShareMap = HashMap<Vec<String>, (u64, u64, ShareMembers)>;
 
 /// One document file of a shared scan: its `share.json` text, whether it has a keyring.
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -46,17 +50,19 @@ pub(crate) struct SharedScanPayload {
     known: Vec<KnownPayload>,
 }
 
-/// The scan of the open shared workspace.
+/// The scan of the open shared workspace, or of the synced workspace `workspace`.
 pub(crate) fn shared_scan(
     state: &AppState,
+    workspace: Option<&str>,
     cache: &ShareCache,
 ) -> Result<SharedScanPayload, String> {
-    let root = state.workspace().ok_or_else(|| "not-found".to_owned())?;
+    let root = root_of(state, workspace)?;
     let entries = curvyo_storage_io::scan_workspace(&root).map_err(|error| error_code(&error))?;
-    let mut kept = cache
+    let mut all = cache
         .0
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let kept = all.entry(root.clone()).or_default();
     let mut fresh = HashMap::new();
     let mut folders = Vec::new();
     let mut documents = Vec::new();
@@ -108,10 +114,6 @@ fn hex(id: &[u8; 16]) -> String {
     })
 }
 
-fn root(state: &AppState) -> Result<std::path::PathBuf, String> {
-    state.workspace().ok_or_else(|| "not-found".to_owned())
-}
-
 fn id(document: &str) -> Result<[u8; 16], String> {
     unhex(document).ok_or_else(|| "damaged".to_owned())
 }
@@ -122,8 +124,9 @@ fn id(document: &str) -> Result<[u8; 16], String> {
 pub(crate) fn scan_shared_workspace(
     app: AppHandle,
     cache: State<'_, ShareCache>,
+    workspace: Option<String>,
 ) -> Result<SharedScanPayload, String> {
-    shared_scan(&app.state::<AppState>(), &cache)
+    shared_scan(&app.state::<AppState>(), workspace.as_deref(), &cache)
 }
 
 /// Keeps a copy of the deleted document `document` at `path`; with `trash`, its file then goes
@@ -135,8 +138,9 @@ pub(crate) fn keep_workspace_document(
     path: Vec<String>,
     document: String,
     trash: bool,
+    workspace: Option<String>,
 ) -> Result<(), String> {
-    let root = root(&app.state::<AppState>())?;
+    let root = root_of(&app.state::<AppState>(), workspace.as_deref())?;
     let id = id(&document)?;
     let result = if trash {
         curvyo_storage_io::keep_deleted(&root, &path, id)
@@ -155,8 +159,9 @@ pub(crate) fn restore_workspace_document(
     app: AppHandle,
     document: String,
     path: Vec<String>,
+    workspace: Option<String>,
 ) -> Result<(), String> {
-    let root = root(&app.state::<AppState>())?;
+    let root = root_of(&app.state::<AppState>(), workspace.as_deref())?;
     curvyo_storage_io::restore_deleted(&root, id(&document)?, &path)
         .map_err(|error| error_code(&error))
 }
@@ -164,8 +169,12 @@ pub(crate) fn restore_workspace_document(
 /// The kept copy of the deleted document `document`, raw.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn read_deleted_document(app: AppHandle, document: String) -> Result<Response, String> {
-    let root = root(&app.state::<AppState>())?;
+pub(crate) fn read_deleted_document(
+    app: AppHandle,
+    document: String,
+    workspace: Option<String>,
+) -> Result<Response, String> {
+    let root = root_of(&app.state::<AppState>(), workspace.as_deref())?;
     curvyo_storage_io::read_deleted(&root, id(&document)?)
         .map(Response::new)
         .map_err(|error| error_code(&error))
@@ -175,8 +184,11 @@ pub(crate) fn read_deleted_document(app: AppHandle, document: String) -> Result<
 /// go and the workspace is a local one; every document stays.
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn clear_workspace_marker_share(app: AppHandle) -> Result<(), String> {
-    let root = root(&app.state::<AppState>())?;
+pub(crate) fn clear_workspace_marker_share(
+    app: AppHandle,
+    workspace: Option<String>,
+) -> Result<(), String> {
+    let root = root_of(&app.state::<AppState>(), workspace.as_deref())?;
     curvyo_storage_io::remove_marker_share(&root).map_err(|error| error_code(&error))
 }
 
@@ -184,6 +196,9 @@ pub(crate) fn clear_workspace_marker_share(app: AppHandle) -> Result<(), String>
 #[derive(Debug, Deserialize)]
 pub(crate) struct DeletedArgs {
     document: String,
+    /// A synced workspace that is not open, by id (hex); absent: the open workspace.
+    #[serde(default)]
+    workspace: Option<String>,
 }
 
 /// Writes the kept copy of a deleted document (a background write, a join); the bytes come as
@@ -192,7 +207,7 @@ pub(crate) struct DeletedArgs {
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn write_deleted_document(app: AppHandle, request: Request<'_>) -> Result<(), String> {
     let (args, bytes): (DeletedArgs, Vec<u8>) = call_args(&request)?;
-    let root = root(&app.state::<AppState>())?;
+    let root = root_of(&app.state::<AppState>(), args.workspace.as_deref())?;
     curvyo_storage_io::write_deleted(&root, id(&args.document)?, &bytes)
         .map_err(|error| error_code(&error))
 }
@@ -226,7 +241,7 @@ mod tests {
         let state = AppState::default();
         state.set_workspace(Some(root));
         let cache = ShareCache::default();
-        let scan = shared_scan(&state, &cache).unwrap();
+        let scan = shared_scan(&state, None, &cache).unwrap();
         assert_eq!(scan.folders, vec![vec!["Sides".to_owned()]]);
         let lid = &scan.documents[0];
         assert!(
@@ -244,8 +259,8 @@ mod tests {
                 path: vec!["Lid.curvyo".to_owned()]
             }]
         );
-        assert_eq!(cache.0.lock().unwrap().len(), 2);
-        let again = shared_scan(&state, &cache).unwrap();
+        assert_eq!(cache.0.lock().unwrap().values().next().unwrap().len(), 2);
+        let again = shared_scan(&state, None, &cache).unwrap();
         assert_eq!(again.documents, scan.documents);
     }
 }

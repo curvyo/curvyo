@@ -96,33 +96,6 @@ pub enum RemoteDeleteCase {
     Selected,
 }
 
-/// A server address as the maker typed it, normalised to `ws://host:port` or `wss://host:port`
-/// (UX notes §2.1): `host:port`, `ws://host:port` and `wss://host:port`, a trailing `/` allowed.
-/// `None` for anything else ("Not a server address.").
-#[must_use]
-pub fn normalize_server_address(text: &str) -> Option<String> {
-    let text = text.trim();
-    let (scheme, rest) = if let Some(rest) = text.strip_prefix("ws://") {
-        ("ws", rest)
-    } else if let Some(rest) = text.strip_prefix("wss://") {
-        ("wss", rest)
-    } else if text.contains("://") {
-        return None;
-    } else {
-        ("ws", text)
-    };
-    let rest = rest.strip_suffix('/').unwrap_or(rest);
-    let (host, port) = rest.rsplit_once(':')?;
-    let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
-    let host_ok = !host.is_empty()
-        && host.len() <= 253
-        && (host
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
-            || (host.starts_with('[') && host.ends_with(']') && host.len() > 2));
-    host_ok.then(|| format!("{scheme}://{}:{port}", host.to_ascii_lowercase()))
-}
-
 /// A normalised address as sentences show it: `192.168.1.20:8787` for `ws://`, the whole
 /// address for `wss://`.
 #[must_use]
@@ -349,23 +322,12 @@ mod tests {
     }
 
     #[test]
-    fn server_addresses_are_normalised() {
-        assert_eq!(
-            normalize_server_address("192.168.1.20:8787").as_deref(),
-            Some("ws://192.168.1.20:8787")
-        );
-        assert_eq!(
-            normalize_server_address(" wss://Sync.Example.org:443/ ").as_deref(),
-            Some("wss://sync.example.org:443")
-        );
-        assert_eq!(
-            normalize_server_address("ws://[::1]:8787").as_deref(),
-            Some("ws://[::1]:8787")
-        );
-        for bad in ["", "host", "http://h:1", "h:0", "h:99999", "a b:1", ":80"] {
-            assert_eq!(normalize_server_address(bad), None, "{bad}");
-        }
+    fn server_addresses_are_shown_without_ws() {
         assert_eq!(server_shown("ws://192.168.1.20:8787"), "192.168.1.20:8787");
+        assert_eq!(
+            server_shown("wss://sync.example.org:443"),
+            "wss://sync.example.org:443"
+        );
     }
 
     #[test]

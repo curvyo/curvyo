@@ -1,10 +1,13 @@
 import { Copy, FolderOpen, LogIn, Share2, UserMinus, UserPlus } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { MyDevicesBlock } from "@/components/panel/MyDevicesBlock";
 import { PanelRadioGroup } from "@/components/panel/PanelRadioGroup";
 import { WorkspaceShareBlock } from "@/components/panel/WorkspaceShareBlock";
 import type { CollaborationApi, ShareParticipant } from "@/hooks/useCollaboration";
+import type { DevicesApi } from "@/hooks/useDevices";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
+import { myDeviceIds, syncedHeader } from "@/lib/devicesApi";
 import {
   invite_link_kind,
   invite_sentence,
@@ -53,6 +56,8 @@ interface ShareTabProps {
   onReturnFocus: () => void;
   /** The workspace's sharing; absent in the browser (desktop only). */
   workspace?: ShareTabWorkspace;
+  /** My devices (`specs/0096-own-devices-sync`); absent in the browser until its slice. */
+  devices?: DevicesApi;
 }
 
 /** A labelled text field that commits on Enter or when it loses focus, Escape restores. */
@@ -143,7 +148,16 @@ export function AvatarDisc({ participant, size = 24 }: { participant: Pick<Share
  * One participant (UX notes §2.4). An admin gets Remove in the row's action slot on the other
  * rows; it asks with the sentence of criterion 32 in place before anything is written.
  */
-function ParticipantRow({ participant, onRemove }: { participant: ShareParticipant; onRemove: (member: string) => string }) {
+function ParticipantRow({
+  participant,
+  onRemove,
+  myDevice,
+}: {
+  participant: ShareParticipant;
+  onRemove: (member: string) => string;
+  /** One of my own devices: marked, and removed from My devices only (0096 ux-notes 6.1). */
+  myDevice: boolean;
+}) {
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
   const removeButton = useRef<HTMLButtonElement>(null);
@@ -172,12 +186,16 @@ function ParticipantRow({ participant, onRemove }: { participant: ShareParticipa
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-[var(--toolbar-icon)]">
             {participant.label}
-            {participant.self ? <span className="text-[var(--panel-muted-fg)]"> this device</span> : null}
+            {participant.self ? (
+              <span className="text-[var(--panel-muted-fg)]"> this device</span>
+            ) : myDevice ? (
+              <span className="text-[var(--panel-muted-fg)]"> my device</span>
+            ) : null}
           </p>
           <p className="truncate font-mono text-xs text-[var(--panel-muted-fg)]">{participant.fingerprint}</p>
         </div>
         {participant.online ? null : <span className={MUTED}>offline</span>}
-        {participant.removable ? (
+        {participant.removable && !myDevice ? (
           <button
             ref={removeButton}
             type="button"
@@ -471,7 +489,7 @@ function JoinBlock({ collab, workspace }: { collab: CollaborationApi; workspace?
  * The Share tab (`specs/0092-cooperative-editing` UX notes §2): the server and name settings,
  * Share with its inline confirm, Invite, the participant list and Open shared document.
  */
-export function ShareTab({ collab, saved, onReturnFocus, workspace }: ShareTabProps) {
+export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: ShareTabProps) {
   const { view } = collab;
   // A session that carries a shared workspace's link shows the workspace in the Workspace block
   // and only a line in the Document block (`specs/0095-workspace` ux-notes section 9).
@@ -499,6 +517,9 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace }: ShareTabPr
           ? "Enter a name."
           : "";
   const reason = !saved ? "Save the document first." : serverReason;
+  // My own devices among the participants of a synced workspace (0096 ux-notes 6.1).
+  const myDevices = myDeviceIds(devices);
+  const others = view.participants.filter((p) => !p.self && !myDevices.has(p.member)).map((p) => p.label);
   const participantList =
     view.participants.length > 0 ? (
       <div className="flex flex-col gap-1">
@@ -510,7 +531,12 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace }: ShareTabPr
         </div>
         <ul aria-label="Participants" className="flex flex-col">
           {view.participants.map((participant) => (
-            <ParticipantRow key={participant.fingerprint} participant={participant} onRemove={collab.remove} />
+            <ParticipantRow
+              key={participant.fingerprint}
+              participant={participant}
+              onRemove={collab.remove}
+              myDevice={myDevices.has(participant.member)}
+            />
           ))}
         </ul>
       </div>
@@ -574,6 +600,10 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace }: ShareTabPr
         ) : null}
       </div>
 
+      {devices ? (
+        <MyDevicesBlock devices={devices} server={server} reason={serverReason} onReturnFocus={onReturnFocus} />
+      ) : null}
+
       {workspace?.open ? (
         <WorkspaceShareBlock
           name={workspace.name}
@@ -588,6 +618,22 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace }: ShareTabPr
             ) : null
           }
           participants={workspaceView ? participantList : null}
+          syncedHeader={syncedHeader(devices, view)}
+          devices={
+            devices && devices.view && !devices.view.removed
+              ? {
+                  on: devices.openSynced,
+                  reason: serverReason,
+                  switching: devices.switching,
+                  failed: devices.switchFailed,
+                  otherNames: devices.otherNames,
+                  others,
+                  switchOn: devices.switchOn,
+                  switchOff: devices.switchOff,
+                  onReturnFocus,
+                }
+              : undefined
+          }
         />
       ) : null}
 

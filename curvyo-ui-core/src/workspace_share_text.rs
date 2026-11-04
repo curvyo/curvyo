@@ -30,6 +30,13 @@ pub fn workspace_share_confirm_text(
          computer encrypted; the server cannot read them.",
         server_shown(server)
     );
+    format!("{text}{}", takeover_text(taken_in, not_added))
+}
+
+/// The sentences about documents shared on their own that a share takes in, and those it leaves
+/// out, each with a leading space; empty for none.
+#[must_use]
+pub fn takeover_text(taken_in: &[String], not_added: &[String]) -> String {
     let taken_in = match taken_in {
         [] => String::new(),
         [one] => format!(
@@ -55,7 +62,7 @@ pub fn workspace_share_confirm_text(
             not_added.join(", ")
         )
     };
-    format!("{text}{taken_in}{outside}")
+    format!("{taken_in}{outside}")
 }
 
 /// The Workspace block's state at the right of its heading: "1 person", "2 people".

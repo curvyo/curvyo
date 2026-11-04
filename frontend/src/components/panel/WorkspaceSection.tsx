@@ -7,7 +7,7 @@ import { WorkspaceTree } from "@/components/panel/WorkspaceTree";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { WorkspaceApi, WorkspaceSlot } from "@/hooks/useWorkspace";
 import { type RecentWorkspaceData, type WorkspaceRowData, targetFolder } from "@/lib/workspaceRows";
-import { workspace_tree_words_json } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { devices_removed_alert, workspace_tree_words_json } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The fixed words of a shared workspace's tree, formatted in Rust; read on first use, since the
  * wasm module is not ready while this module loads. */
@@ -30,6 +30,9 @@ interface WorkspaceSectionProps {
   /** The header line of a shared workspace ("Shared, 2 people", "Receiving 7 of 20"), from the
    * Share view; absent while the workspace is local. */
   sharedLine?: string;
+  /** This device was removed from my devices: the alert shows here too, and this dismisses
+   * both (`specs/0096-own-devices-sync` ux-notes 7.2). */
+  devicesRemoved?: () => void;
   /** After a mouse press the keyboard goes back to the canvas. */
   onReturnFocus: () => void;
 }
@@ -40,7 +43,7 @@ interface WorkspaceSectionProps {
  * empty state with Open workspace… and the recent workspaces, the tree, the inline name field of a
  * new entry and the action slot. Desktop only.
  */
-export function WorkspaceSection({ workspace, sharedLine, onReturnFocus }: WorkspaceSectionProps) {
+export function WorkspaceSection({ workspace, sharedLine, devicesRemoved, onReturnFocus }: WorkspaceSectionProps) {
   const [focusedRow, setFocusedRow] = useState<WorkspaceRowData | null>(null);
   const rootDrop = useRef<HTMLParagraphElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -65,10 +68,13 @@ export function WorkspaceSection({ workspace, sharedLine, onReturnFocus }: Works
 
   return (
     <section ref={sectionRef} aria-label="Workspace" className="mt-3 flex flex-col">
-      {workspace.removedText !== "" ? (
-        <div role="alert" className="mb-2 flex items-start gap-2">
-          <p className="min-w-0 flex-1 text-xs text-[var(--toolbar-icon)]">{workspace.removedText}</p>
-          <button type="button" onClick={workspace.dismissRemoved} className={`${OUTLINE} w-[52px] text-xs`}>
+      {devicesRemoved || workspace.removedText !== "" ? (
+        // One block: this device's removal from my devices replaces the workspace's own text.
+        <div className="mb-2 flex items-start gap-2">
+          <p role="alert" className="min-w-0 flex-1 text-xs text-[var(--toolbar-icon)]">
+            {devicesRemoved ? devices_removed_alert() : workspace.removedText}
+          </p>
+          <button type="button" onClick={devicesRemoved ?? workspace.dismissRemoved} className={`${OUTLINE} w-[52px] text-xs`}>
             OK
           </button>
         </div>

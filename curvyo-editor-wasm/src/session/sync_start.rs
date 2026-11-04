@@ -53,8 +53,8 @@ impl Session {
         now: Millis,
     ) -> Result<(), JoinRefusal> {
         let link = InviteLink::parse(link).map_err(|_| JoinRefusal::Invalid)?;
-        let server = curvyo_ui_core::share_text::normalize_server_address(&link.server)
-            .ok_or(JoinRefusal::Invalid)?;
+        let server =
+            curvyo_sync_core::normalize_server_address(&link.server).ok_or(JoinRefusal::Invalid)?;
         let config = self.sync_config(link.secret.room, 0, SessionStart::Join(link.secret), seeds);
         let client = ClientSession::new(config, now).map_err(|_| JoinRefusal::Invalid)?;
         let mut sync = SyncLink::new(client, server, label.to_owned(), now);

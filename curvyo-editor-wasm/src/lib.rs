@@ -19,12 +19,14 @@
 
 mod background_writer;
 mod clipboard_glue;
+mod device_group_glue;
 mod font_archive_glue;
 mod font_checks_glue;
 mod font_file_glue;
 mod font_library_glue;
 mod font_preview_glue;
 mod ocr_pool_glue;
+mod pairing_glue;
 mod session;
 mod trace_analysis_glue;
 mod trace_fit_glue;
@@ -46,6 +48,8 @@ mod wasm_background;
 #[cfg(target_arch = "wasm32")]
 mod wasm_background_writer;
 #[cfg(target_arch = "wasm32")]
+mod wasm_backup;
+#[cfg(target_arch = "wasm32")]
 mod wasm_boolean;
 #[cfg(target_arch = "wasm32")]
 mod wasm_clone;
@@ -53,6 +57,10 @@ mod wasm_clone;
 mod wasm_combine;
 #[cfg(target_arch = "wasm32")]
 mod wasm_cut;
+#[cfg(target_arch = "wasm32")]
+mod wasm_devices;
+#[cfg(target_arch = "wasm32")]
+mod wasm_devices_text;
 #[cfg(target_arch = "wasm32")]
 mod wasm_document;
 #[cfg(target_arch = "wasm32")]
@@ -142,14 +150,16 @@ mod wasm_workspace_take_in;
 #[cfg(target_arch = "wasm32")]
 mod wasm_workspace_tree;
 
-pub use background_writer::{BackgroundWriter, WRITE_INTERVAL_MS, Waiting, WriteError};
+pub use background_writer::{BackgroundWriter, WRITE_INTERVAL_MS, Waiting, WriteError, Written};
 pub use clipboard_glue::{clipboard_notice, encode_rgba_png, paste_rank_code};
+pub use device_group_glue::{DeviceGroupGlue, GroupFiles};
 pub use font_archive_glue::FontArchiveGlue;
 pub use font_checks_glue::FontChecksGlue;
 pub use font_file_glue::{face_preview_path, font_file_faces};
 pub use font_library_glue::FontLibraryGlue;
 pub use font_preview_glue::PreviewFacesGlue;
 pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
+pub use pairing_glue::{PairPhase, PairingGlue};
 pub use session::SvgExportResult;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,

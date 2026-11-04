@@ -33,6 +33,20 @@ impl core::fmt::Display for WriteError {
 
 impl std::error::Error for WriteError {}
 
+/// A document's file with its waiting records written in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Written {
+    /// The new file bytes.
+    pub bytes: Vec<u8>,
+    /// The highest sequence they hold.
+    pub through: u64,
+    /// The file's own changes the room has not had (edits made here while the document was not
+    /// open on a link, or a copy connected by Connect this folder): the page pushes them as
+    /// the document's records ([`Session::workspace_send_local`](crate::Session::workspace_send_local)).
+    /// While they are not sent, the file's `share.json` says they are not.
+    pub outgoing: Option<Vec<u8>>,
+}
+
 /// One record waiting for its file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Waiting {
@@ -103,7 +117,8 @@ impl BackgroundWriter {
     }
 
     /// Writes every waiting record of `document` into its file's `bytes` at `now`: the new
-    /// bytes and the highest sequence they hold. The records stay waiting when it fails.
+    /// bytes and the highest sequence they hold ([`write_for`](Self::write_for) with the
+    /// workspace the file's own record names, if any). The records stay waiting when it fails.
     ///
     /// # Errors
     /// [`WriteError::Unreadable`] for bytes that do not open, [`WriteError::Pack`].
@@ -113,16 +128,57 @@ impl BackgroundWriter {
         bytes: &[u8],
         now: u64,
     ) -> Result<(Vec<u8>, u64), WriteError> {
+        let workspace = unpack(self.peer, bytes)
+            .ok()
+            .and_then(|file| file.workspace_share())
+            .filter(|record| record.document == document)
+            .map(|record| record.workspace);
+        self.write_into(document, workspace, bytes, now)
+            .map(|written| (written.bytes, written.through))
+    }
+
+    /// Writes every waiting record of `document`, a document of `workspace`, into its file's
+    /// `bytes` at `now`. The file keeps (or, for a copy from before the workspace was shared,
+    /// gets) its `share.json` v2; changes of the file the room lacks come back as
+    /// [`Written::outgoing`]. The records stay waiting when it fails.
+    ///
+    /// # Errors
+    /// [`WriteError::Unreadable`] for bytes that do not open, [`WriteError::Pack`].
+    pub fn write_for(
+        &mut self,
+        document: [u8; 16],
+        workspace: [u8; 16],
+        bytes: &[u8],
+        now: u64,
+    ) -> Result<Written, WriteError> {
+        self.write_into(document, Some(workspace), bytes, now)
+    }
+
+    fn write_into(
+        &mut self,
+        document: [u8; 16],
+        workspace: Option<[u8; 16]>,
+        bytes: &[u8],
+        now: u64,
+    ) -> Result<Written, WriteError> {
         let queue = self.queues.entry(document).or_default();
         queue.asked = false;
         let records = std::mem::take(&mut queue.records);
         let Some(through) = records.iter().map(|r| r.seq).max() else {
-            return Ok((bytes.to_vec(), 0));
+            return Ok(Written {
+                bytes: bytes.to_vec(),
+                through: 0,
+                outgoing: None,
+            });
         };
-        match apply(self.peer, bytes, &records) {
-            Ok(written) => {
+        match apply(self.peer, (workspace, document), bytes, &records) {
+            Ok((written, outgoing)) => {
                 queue.written_at = Some(now);
-                Ok((written, through))
+                Ok(Written {
+                    bytes: written,
+                    through,
+                    outgoing,
+                })
             }
             Err(error) => {
                 // Tried again after the interval, not at once.
@@ -182,12 +238,73 @@ impl BackgroundWriter {
     }
 }
 
-/// The file `bytes` with `records` imported. A record that does not import is skipped (the
-/// room's next snapshot carries the document whole).
-fn apply(peer: u64, bytes: &[u8], records: &[Waiting]) -> Result<Vec<u8>, WriteError> {
-    let document = unpack(peer, bytes).map_err(|_| WriteError::Unreadable)?;
-    import_records(peer, &document, records);
-    pack(&document, APP_VERSION).map_err(|_| WriteError::Pack)
+/// The file `bytes` of the document `(workspace, document)` with `records` imported, and the
+/// file's own changes the room lacks. A record that does not import is skipped (the room's
+/// next snapshot carries the document whole). Without a `workspace` (a file of no workspace
+/// record) the file is only merged.
+///
+/// The file's record says what the room has: its `synced_version`, or, for a file without a
+/// record of this workspace (a copy from before it was shared, criterion 14), the state the
+/// records alone build. A file with nothing of its own is marked synced up to the merge; one
+/// with changes of its own keeps that mark until the page has sent them.
+fn apply(
+    peer: u64,
+    (workspace, document): (Option<[u8; 16]>, [u8; 16]),
+    bytes: &[u8],
+    records: &[Waiting],
+) -> Result<(Vec<u8>, Option<Vec<u8>>), WriteError> {
+    let file = unpack(peer, bytes).map_err(|_| WriteError::Unreadable)?;
+    let Some(workspace) = workspace else {
+        import_records(peer, &file, records);
+        return Ok((
+            pack(&file, APP_VERSION).map_err(|_| WriteError::Pack)?,
+            None,
+        ));
+    };
+    let record = file
+        .workspace_share()
+        .filter(|r| r.workspace == workspace && r.document == document);
+    let own = match &record {
+        Some(record) if file.version() != record.synced_version => {
+            let updates = file
+                .export_updates(&record.synced_version)
+                .map_err(|_| WriteError::Pack)?;
+            Some((record.synced_version.clone(), updates))
+        }
+        _ => None,
+    };
+    import_records(peer, &file, records);
+    let (synced, outgoing) = match (record, own) {
+        (Some(_), Some((synced, updates))) => (synced, Some(updates)),
+        (Some(_), None) => (file.version(), None),
+        (None, _) => {
+            let room = room_version(peer, records);
+            if file.version() == room {
+                (room, None)
+            } else {
+                let updates = file.export_updates(&room).map_err(|_| WriteError::Pack)?;
+                (room, Some(updates))
+            }
+        }
+    };
+    file.set_workspace_share(Some(WorkspaceShareRecord {
+        workspace,
+        document,
+        synced_version: synced,
+    }));
+    let bytes = pack(&file, APP_VERSION).map_err(|_| WriteError::Pack)?;
+    Ok((bytes, outgoing))
+}
+
+/// The version the records alone build: what the room holds of the document, as far as these
+/// records show it ([`DocumentVersion::never`] when they start none).
+fn room_version(peer: u64, records: &[Waiting]) -> DocumentVersion {
+    let mut sorted = records.to_vec();
+    sorted.sort_by_key(|r| r.seq);
+    start_document(peer.wrapping_add(2), &sorted).map_or_else(DocumentVersion::never, |room| {
+        import_records(peer.wrapping_add(2), &room, &sorted);
+        room.version()
+    })
 }
 
 /// The document the first container among `records`, else the first update, starts.
@@ -284,7 +401,12 @@ mod tests {
         );
         assert_eq!(writer.due(1_000), vec![[2; 16]]);
         assert!(writer.due(1_000).is_empty(), "asked once");
-        let (written, through) = writer.write([2; 16], &file, 1_000).unwrap();
+        let Written {
+            bytes: written,
+            through,
+            outgoing,
+        } = writer.write_for([2; 16], [1; 16], &file, 1_000).unwrap();
+        assert_eq!(outgoing, None, "nothing of its own");
         assert_eq!(through, 7);
         let opened = unpack(5, &written).unwrap();
         assert_eq!(opened.read_objects().objects.len(), 2);

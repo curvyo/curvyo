@@ -18,6 +18,9 @@ import {
   removeBrowserFontFiles,
 } from "@/lib/browserFonts";
 import { ARGS_HEADER, asciiJson } from "@/lib/binaryArgs";
+import { browserDeviceName } from "@/lib/browserDevice";
+import { browserKeyStore, readDeviceKeys, writeRoomKeys } from "@/lib/deviceKeyStore";
+import { browserWorkspaceCommands, forgetOpenDocument, saveOpenDocument } from "@/platform/browserWorkspaces";
 import { detectPlatform, type PlatformKind } from "@/lib/platformKind";
 import type { OpenPayload, SaveOutcome } from "@/lib/projectState";
 
@@ -191,10 +194,13 @@ function downloadText(name: string, text: string) {
 
 const browserCommands: Record<string, (args?: Record<string, unknown>) => unknown> = {
   take_pending_open: () => null,
-  pick_project: (args) => pickProject(String(args?.kind ?? "project")),
+  pick_project: (args) => {
+    forgetOpenDocument();
+    return pickProject(String(args?.kind ?? "project"));
+  },
   pick_import_files: () => pickImportFiles(),
   confirm_project_opened: () => undefined,
-  reset_project: () => undefined,
+  reset_project: () => forgetOpenDocument(),
   set_dirty: () => undefined,
   // The browser downloads an export without a dialog (`specs/0024-svg-import-export` criterion 4);
   // the page calls these two only on the desktop.
@@ -202,8 +208,16 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   write_svg_export: () => {
     throw new Error("the browser downloads an SVG export");
   },
-  save_project_bytes: (args) =>
-    download(args?.bytes as number[], String(args?.fileName ?? DEFAULT_FILE_NAME)),
+  // A workspace document open from this browser's storage is saved there; anything else downloads.
+  save_project_bytes: async (args) => {
+    const bytes = args?.bytes as number[];
+    const stored = args?.saveAs ? null : await saveOpenDocument(Uint8Array.from(bytes));
+    if (stored) {
+      return stored;
+    }
+    forgetOpenDocument();
+    return download(bytes, String(args?.fileName ?? DEFAULT_FILE_NAME));
+  },
   read_formats_file: () => readStored(FORMATS_KEY),
   write_formats_file: (args) => window.localStorage.setItem(FORMATS_KEY, String(args?.text)),
   set_formats_file_aside: () => {
@@ -270,61 +284,64 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   },
   read_font_checks: () => readStored(FONT_CHECKS_KEY),
   write_font_checks: (args) => window.localStorage.setItem(FONT_CHECKS_KEY, String(args?.text)),
-  // Browser key custody is undecided (`specs/0092-cooperative-editing/adrs.md`, debt): the
-  // device identity and the epoch keys live in this page's memory only and end with it.
-  read_device_keys: (args) => ({
-    status: "ok",
-    identity: browserIdentity(),
-    keys: browserRoomKeys.get(String(args?.room)) ?? [],
-  }),
+  // The browser's key custody (ADR 0040 decision 9, custody A of Frage 145): the identity and
+  // every room's keys in IndexedDB, sealed by a non-extractable key (`deviceKeyStore`).
+  read_device_keys: (args) => readDeviceKeys(browserKeys, String(args?.room ?? "")),
   // The browser's tab title names no share (the desktop build is slice 1).
   set_shared: () => undefined,
-  write_document_keys: (args) => {
-    browserRoomKeys.set(String(args?.room), args?.keys as [number, string][]);
-  },
-  // A workspace is a folder, which the browser cannot open (`specs/0095-workspace`, desktop app
-  // only): no recent workspaces, and the section is not shown, so nothing else is called.
-  recent_workspaces: () => [],
-  remove_recent_workspace: () => [],
-  pick_workspace: () => ({ kind: "cancelled" }),
-  open_recent_workspace: () => ({ kind: "refused", code: "not-found" }),
-  close_workspace: () => undefined,
-  scan_open_workspace: () => noWorkspace(),
-  apply_workspace_op: () => noWorkspace(),
-  read_workspace_document: () => noWorkspace(),
-  confirm_workspace_document_opened: () => undefined,
-  probe_workspace_document: () => noWorkspace(),
-  workspace_marker_share: () => noWorkspace(),
-  write_workspace_marker_share: () => noWorkspace(),
-  write_workspace_id: () => noWorkspace(),
-  replace_workspace_document: () => noWorkspace(),
-  write_workspace_index: () => noWorkspace(),
+  write_document_keys: (args) => writeRoomKeys(browserKeys, String(args?.room), args?.keys as [number, string][]),
+  // The browser is a device (`specs/0096-own-devices-sync` criteria 33 to 40): its name defaults
+  // to the browser and the system; its synced workspaces live in IndexedDB (`browserWorkspaces`).
+  device_host_name: () => browserDeviceName(navigator.userAgent),
+  // Joining a workspace by a `2.` link needs a folder (`0095`); the browser receives synced
+  // workspaces only.
   pick_join_folder: () => ({ kind: "cancelled" }),
   start_joined_workspace: () => ({ kind: "refused", code: "not-found" }),
-  scan_shared_workspace: () => noWorkspace(),
-  keep_workspace_document: () => noWorkspace(),
-  restore_workspace_document: () => noWorkspace(),
-  read_deleted_document: () => noWorkspace(),
-  write_deleted_document: () => noWorkspace(),
-  clear_workspace_marker_share: () => noWorkspace(),
+  recent_workspaces: ws("recent_workspaces"),
+  remove_recent_workspace: ws("remove_recent_workspace"),
+  pick_workspace: ws("pick_workspace"),
+  open_recent_workspace: ws("open_recent_workspace"),
+  close_workspace: ws("close_workspace"),
+  scan_open_workspace: ws("scan_open_workspace"),
+  apply_workspace_op: ws("apply_workspace_op"),
+  read_workspace_document: ws("read_workspace_document"),
+  confirm_workspace_document_opened: ws("confirm_workspace_document_opened"),
+  probe_workspace_document: ws("probe_workspace_document"),
+  workspace_marker_share: ws("workspace_marker_share"),
+  write_workspace_marker_share: ws("write_workspace_marker_share"),
+  clear_workspace_marker_share: ws("clear_workspace_marker_share"),
+  write_workspace_id: ws("write_workspace_id"),
+  replace_workspace_document: ws("replace_workspace_document"),
+  write_workspace_index: ws("write_workspace_index"),
+  scan_shared_workspace: ws("scan_shared_workspace"),
+  keep_workspace_document: ws("keep_workspace_document"),
+  restore_workspace_document: ws("restore_workspace_document"),
+  read_deleted_document: ws("read_deleted_document"),
+  write_deleted_document: ws("write_deleted_document"),
+  register_synced_workspace: ws("register_synced_workspace"),
+  create_synced_workspace: ws("create_synced_workspace"),
+  find_workspace_copy: ws("find_workspace_copy"),
+  workspace_summary: ws("workspace_summary"),
+  read_device_group: ws("read_device_group"),
+  write_device_group: ws("write_device_group"),
+  remove_device_group: ws("remove_device_group"),
+  prepare_synced_folder: ws("prepare_synced_folder"),
+  pick_synced_folder: ws("pick_synced_folder"),
 };
 
-/** What a workspace command answers in the browser: there is no folder. */
-function noWorkspace(): never {
-  throw "not-found";
+/** A workspace or device-group command of the browser's store (`browserWorkspaces`). */
+function ws(name: string): (args?: Record<string, unknown>) => unknown {
+  return (args) => {
+    const command = browserWorkspaceCommands[name];
+    if (!command) {
+      throw "not-found";
+    }
+    return command(args);
+  };
 }
 
-/** The browser page's device identity: 64 random bytes as hex, made once per page. */
-let pageIdentity: string | null = null;
-function browserIdentity(): string {
-  if (pageIdentity === null) {
-    const bytes = new Uint8Array(64);
-    crypto.getRandomValues(bytes);
-    pageIdentity = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-  }
-  return pageIdentity;
-}
-const browserRoomKeys = new Map<string, [number, string][]>();
+/** The browser's key custody. */
+const browserKeys = browserKeyStore;
 
 /** Same contract as Tauri's `invoke`. With `bytes`, they travel as a raw binary body and `args`
  * in a header (`curvyo-app`'s `raw_ipc`), so a file never crosses as a JSON number array; the
