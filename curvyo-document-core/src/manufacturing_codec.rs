@@ -18,9 +18,9 @@ pub(crate) const KEY_PROCESS: &str = "mfg_process";
 /// The owned page's id.
 pub(crate) const KEY_PAGE: &str = "mfg_page";
 /// The format-35 placeholder machine name; read for the migration, removed by the first profile
-/// write (ADR 0037 §6).
+/// write (ADR 0039 §6).
 pub(crate) const KEY_MACHINE_NAME: &str = "mfg_machine_name";
-/// The atomic map of the machine profile copy (ADR 0037 §1), opaque here.
+/// The atomic map of the machine profile copy (ADR 0039 §1), opaque here.
 pub(crate) const KEY_PROFILE: &str = "mfg_profile";
 /// The `shape` tag of a placement node.
 pub(crate) const SHAPE_PLACEMENT: &str = "placement";
@@ -155,7 +155,7 @@ pub(crate) fn read_plain_map(
 
 /// The machine profile copy `mfg_profile` as plain JSON values, `None` when absent or not a map of
 /// plain values. A number that is not finite reads as `null`, so the extension reads that one
-/// field as its default and the file still opens (ADR 0037 §3).
+/// field as its default and the file still opens (ADR 0039 §3).
 pub(crate) fn read_profile_map(
     meta: &LoroMap,
 ) -> Option<serde_json::Map<String, serde_json::Value>> {
@@ -210,7 +210,7 @@ pub(crate) fn json_of(value: &LoroValue) -> Option<serde_json::Value> {
     })
 }
 
-/// A JSON value as a plain Loro value; an integer is stored as `I64` (ADR 0037 §1), every other
+/// A JSON value as a plain Loro value; an integer is stored as `I64` (ADR 0039 §1), every other
 /// number as a double.
 fn loro_of(value: &serde_json::Value) -> LoroValue {
     match value {

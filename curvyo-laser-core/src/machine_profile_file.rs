@@ -1,4 +1,4 @@
-//! Reads and writes one machine profile record and the last-pick file (ADR 0036 §2, §3, §6).
+//! Reads and writes one machine profile record and the last-pick file (ADR 0038 §2, §3, §6).
 
 use curvyo_document_core::DocumentSize;
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-//! The maker's machine profiles as one list (ADR 0036 §3, §4, §7): loaded from the record texts
+//! The maker's machine profiles as one list (ADR 0038 §3, §4, §7): loaded from the record texts
 //! the host read, edited in memory, and every edit names the write the host must do.
 
 use crate::machine_profile::{

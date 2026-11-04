@@ -788,7 +788,7 @@ fn ac8_save_as_profile_adds_the_copy_under_the_same_id() {
 
 #[test]
 fn ac8_save_as_of_an_unknown_id_does_not_overwrite_a_skipped_newer_record() {
-    // The library holds this id in a record of a newer format (skipped at load, ADR 0036 §3).
+    // The library holds this id in a record of a newer format (skipped at load, ADR 0038 §3).
     let p = k40(1);
     let bytes = foreign_file(&p);
     let mut newer: Value = serde_json::from_str(&write_record(&p)).unwrap();

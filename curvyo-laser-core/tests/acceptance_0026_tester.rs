@@ -2,7 +2,7 @@
 //! profile model and its ranges (criteria 1, 9), the built-in (2), naming of saved and duplicated
 //! profiles (3), one record per profile (4), the copy written to the project (6, 15), "Differs"
 //! (7), a copy whose id the library lacks (8), the last pick (10), damaged copies and the
-//! format-35 reading (12), and the per-record load with its skips (13, ADR 0036 §3).
+//! format-35 reading (12), and the per-record load with its skips (13, ADR 0038 §3).
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -397,7 +397,7 @@ fn ac3_list_order_is_generic_first_then_by_name_ignoring_case() {
     );
 }
 
-// ---- criterion 4 and ADR 0036 §2: one record per profile -------------------------------------
+// ---- criterion 4 and ADR 0038 §2: one record per profile -------------------------------------
 
 #[test]
 fn ac4_each_edit_writes_only_its_own_record() {
@@ -1078,7 +1078,7 @@ fn ac13_the_rest_of_the_library_stays_editable_after_a_skip() {
 
 #[test]
 fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
-    // ADR 0004 §9 / ADR 0036 §3: a newer record is never written. A project made on the newer
+    // ADR 0004 §9 / ADR 0038 §3: a newer record is never written. A project made on the newer
     // computer carries that id, reads "Not in your profiles" here, and Save as profile adds the
     // copy "under the same id" (criterion 8) -- which must not overwrite the newer file.
     let p = user(1, "From the future");

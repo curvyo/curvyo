@@ -1,11 +1,11 @@
 # Plan for the machine profile
 
-Implementer, 2026-11-03. Branch `story/0026-machine-profile`. ADRs 0036, 0037 (written for
+Implementer, 2026-11-03. Branch `story/0026-machine-profile`. ADRs 0038, 0039 (written for
 Frage 122 A and Frage 123 A, built as A/A), `adrs.md` note 4 (host-drawn `Block::MachineProfile`).
 
 ## Affected crates/modules
 
-- **`curvyo-laser-core`** (ADR 0036 §7, ADR 0037 §3): new modules `machine_profile` (record,
+- **`curvyo-laser-core`** (ADR 0038 §7, ADR 0039 §3): new modules `machine_profile` (record,
   `OriginCorner`, newtypes `FeedRate`, `PowerValue`, `BaudRate`, clamps with notice text, the
   built-in, `new_profile_id`), `machine_profile_file` (record and `machine-choice.json` codec),
   `machine_profiles` (the library list: load with skip counts, add, duplicate, rename, update,
@@ -41,7 +41,7 @@ Frage 122 A and Frage 123 A, built as A/A), `adrs.md` note 4 (host-drawn `Block:
 - [x] 1. laser-core `machine_profile`: record type, defaults, ranges, clamps and notice texts,
   name cut, unique "copy" naming, UUID v4 from 16 bytes; unit tests (AC 1, 2, 3, 9).
 - [x] 2. laser-core `machine_profile_file`: canonical writer, reader with every damage case of
-  ADR 0036 §3, choice file; golden fixtures (AC 4, 10, 13).
+  ADR 0038 §3, choice file; golden fixtures (AC 4, 10, 13).
 - [x] 3. laser-core `machine_profiles`: load (skip counts, 1,000 cap, non-uuid names ignored),
   list order, add/save-as, duplicate, rename, update, delete, connection edit, writes returned;
   built-in protected (AC 2, 3, 4, 9, 13).

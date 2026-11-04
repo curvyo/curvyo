@@ -1,4 +1,4 @@
-// The per-user machine profile records and the last pick (ADR 0036 §1, §6, §7). The host only
+// The per-user machine profile records and the last pick (ADR 0038 §1, §6, §7). The host only
 // moves text (Tauri commands on the desktop, `localStorage` in the browser); `curvyo-laser-core`
 // parses and writes inside each session. Read once before the first session; every new session
 // gets them; each library change the session makes comes back as writes the host performs here.

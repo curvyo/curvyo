@@ -61,7 +61,7 @@ export interface MachineView {
   profiles: MachineProfileRow[];
 }
 
-/** 16 random bytes for a new profile id (core has no random source, ADR 0036 §5). */
+/** 16 random bytes for a new profile id (core has no random source, ADR 0038 §5). */
 function randomBytes(): Uint8Array {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);

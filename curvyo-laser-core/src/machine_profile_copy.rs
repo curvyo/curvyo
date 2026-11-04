@@ -1,4 +1,4 @@
-//! Reads and writes the machine profile copy of a manufacturing (ADR 0037 §1 to §3, §5, §6): the
+//! Reads and writes the machine profile copy of a manufacturing (ADR 0039 §1 to §3, §5, §6): the
 //! `mfg_profile` map, every field read on its own with its default on damage.
 
 use curvyo_document_core::{DocumentSize, PRESET_MATCH_TOLERANCE};
@@ -100,7 +100,7 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
     }
 }
 
-/// A stored whole number: an integer, or an integral finite double (ADR 0037 §1).
+/// A stored whole number: an integer, or an integral finite double (ADR 0039 §1).
 fn whole(value: Option<&Value>) -> Option<u64> {
     let value = value?;
     value.as_u64().or_else(|| {
@@ -113,7 +113,7 @@ fn whole(value: Option<&Value>) -> Option<u64> {
 }
 
 /// The stored map of `copy`: the id (when known) and the copied values, never a connection field
-/// (ADR 0037 §2: the copy type has none).
+/// (ADR 0039 §2: the copy type has none).
 #[must_use]
 pub fn write_copy(copy: &ProfileCopy) -> StoredParams {
     let mut map = StoredParams::new();
@@ -131,7 +131,7 @@ pub fn write_copy(copy: &ProfileCopy) -> StoredParams {
     map
 }
 
-/// "Differs from profile" (ADR 0037 §5): any copied value differs from the record's, or the
+/// "Differs from profile" (ADR 0039 §5): any copied value differs from the record's, or the
 /// page size differs from its work area by more than 0.01 mm. Derived, never stored.
 #[must_use]
 pub fn differs(copy: &ProfileCopy, page: DocumentSize, record: &MachineProfile) -> bool {

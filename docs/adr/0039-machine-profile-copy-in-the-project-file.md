@@ -1,9 +1,8 @@
-# ADR 0037: Machine profile copy in the project file
+# ADR 0039: Machine profile copy in the project file
 
-**Status:** Proposed, `needs-customer` (persistence and file format; Frage 122 PROFILE-HOME and
-Frage 123 PROFILE-CONN, written for answer A on both). Amends [ADR 0033](0033-manufacturing-data-in-the-project-file.md)
+**Status:** Accepted 2026-11-04 (customer accepted PR #258, built with Frage 122 A and Frage 123 A). Amends [ADR 0033](0033-manufacturing-data-in-the-project-file.md)
 §1 (`mfg_machine_name` is replaced) and §7 (a new `format_version`). Uses the records of
-[ADR 0036](0036-machine-profile-records.md). Spec: `specs/0026-machine-profile` criteria 5 to 8,
+[ADR 0038](0038-machine-profile-records.md). Spec: `specs/0026-machine-profile` criteria 5 to 8,
 12, 15.
 
 ## Context
@@ -11,7 +10,7 @@ Frage 123 PROFILE-CONN, written for answer A on both). Amends [ADR 0033](0033-ma
 ADR 0033 §1 gave the manufacturing a placeholder register `mfg_machine_name` and said it would be
 replaced by "a profile reference and snapshot in `0026`". The file must show the bed and the
 limits it was made for on a computer that has none of the maker's profiles, so it carries a copy
-of the used values plus the id of the library record they came from (ADR 0036 §5). The work area
+of the used values plus the id of the library record they came from (ADR 0038 §5). The work area
 is already the owned page's `page.<id>.frame` (ADR 0031, format 34) and stays the only number for
 it.
 
@@ -58,7 +57,7 @@ it.
    the page's top-left corner); a pick whose result equals the stored map and frame writes
    nothing. A field edit and Reset from profile are one commit each that write the whole map.
    Every one of these commits also deletes `mfg_machine_name` if present. Update profile and
-   Save as profile write the library (ADR 0036), not history; Save as profile additionally sets
+   Save as profile write the library (ADR 0038), not history; Save as profile additionally sets
    the map's `id` in one commit (criterion 3: the manufacturing now points at it).
 5. **"Differs from profile"** is derived on every read, never stored: the copy differs when the
    library record with its id exists and any copied field differs or the page size differs from

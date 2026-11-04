@@ -1,4 +1,4 @@
-//! The session's machine profiles (`specs/0026-machine-profile`, ADR 0036 §7): the library and
+//! The session's machine profiles (`specs/0026-machine-profile`, ADR 0038 §7): the library and
 //! the last pick, the commands of the Machine block, and the outbox of writes the host performs.
 //! Library edits are no history step; edits of the manufacturing's copy are one step each.
 
@@ -13,7 +13,7 @@ use curvyo_laser_core::{
 use super::super::Session;
 use super::commands::workbench_of;
 
-/// One write the host must perform for the library or the last pick (ADR 0036 §1, §6).
+/// One write the host must perform for the library or the last pick (ADR 0038 §1, §6).
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HostWrite {
     /// A record write or removal.

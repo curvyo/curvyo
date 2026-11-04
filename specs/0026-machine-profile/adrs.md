@@ -8,11 +8,11 @@ write (the machine profile record) and one project `format_version` bump. Both A
 
 ## Depends on or extends
 
-- [ADR 0036](../../docs/adr/0036-machine-profile-records.md) (new): the per-user library is one
+- [ADR 0038](../../docs/adr/0038-machine-profile-records.md) (new): the per-user library is one
   JSON file per profile, `machines/<uuid>.json` in the data directory (ADR 0004 §6), one
   `localStorage` entry per profile in the browser; model and codec in `curvyo-laser-core`
   (`machine_profile`, `machine_profile_file`, `machine_profiles`); the host only moves text.
-- [ADR 0037](../../docs/adr/0037-machine-profile-copy-in-the-project-file.md) (new, amends
+- [ADR 0039](../../docs/adr/0039-machine-profile-copy-in-the-project-file.md) (new, amends
   ADR 0033 §1 and §7): one atomic `mfg_profile` map (id plus copied values, never the
   connection); per-field defaults on damage; "Differs" derived; format-35 files read as Generic
   laser; next `format_version` (36 today).
@@ -29,11 +29,11 @@ write (the machine profile record) and one project `format_version` bump. Both A
 - [`0045` adrs.md](../0045-document-formats-library/adrs.md) and
   [`0075` adrs.md](../0075-font-library/adrs.md): the host-moves-text pattern (`curvyo-app`
   commands over `curvyo-storage-io`, `localStorage` in `frontend/src/platform/host.ts`, parsing
-  in wasm). Their single-TOML-file shape is deliberately not copied (ADR 0036 option B).
+  in wasm). Their single-TOML-file shape is deliberately not copied (ADR 0038 option B).
 
 ## Spec issues (for the product owner before Ready)
 
-1. **Criteria 4, 10, 13 say "one file" / "the library file".** ADR 0036 uses one file per
+1. **Criteria 4, 10, 13 say "one file" / "the library file".** ADR 0038 uses one file per
    profile (ADR 0004 §6) and keeps the last pick in the config directory. Reword: "the
    profiles are kept per user ... in the data directory"; criterion 10 "remembered on this
    computer"; criterion 13 becomes per record: a damaged record is skipped and untouched, a
@@ -44,14 +44,14 @@ write (the machine profile record) and one project `format_version` bump. Both A
    record's file.
 3. **Criterion 9 has no range for Baud rate and no length for Controller port.** Proposal:
    baud rate an integer 1 to 4,000,000; port up to 200 characters, like the address.
-4. **Criterion 1: feed and power are integers** (ADR 0036 §2); a typed fraction is rounded with
+4. **Criterion 1: feed and power are integers** (ADR 0038 §2); a typed fraction is rounded with
    the range notice. Proposal.
-5. **Criterion 12: "Differs" is derived, not stored** (ADR 0037 §5). The golden file test in
+5. **Criterion 12: "Differs" is derived, not stored** (ADR 0039 §5). The golden file test in
    `curvyo-document-core` checks id, copy and work area; the "Differs" part is a session test
    in `curvyo-editor-wasm` with a fixture record in the library.
 6. **Format line: `mfg_profile_id` + `mfg_profile`** becomes one register, the id inside the map
-   (ADR 0037 option B lost). Behaviour is unchanged.
-7. **Criterion 12, damaged name:** the default is "Generic laser" (ADR 0037 §3). A long name
+   (ADR 0039 option B lost). Behaviour is unchanged.
+7. **Criterion 12, damaged name:** the default is "Generic laser" (ADR 0039 §3). A long name
    reading as "Generic laser" may surprise; truncation would be the alternative. Proposal kept
    because it matches ADR 0033 §3 (default, never repaired).
 8. **Criterion 3, Save as profile then Undo:** undo restores the old `id` in the copy; the new
@@ -81,8 +81,8 @@ write (the machine profile record) and one project `format_version` bump. Both A
      compare and of Save as profile); their range comes from the profile model, not a `Param`.
    - **Rejected: `ParamKind::Text`, `Count`, `Switch`, `Choice` plus a picker block.** Four
      kinds and a block for one user; the fields are not `x.<process>.*` registers but the
-     `mfg_profile` map (ADR 0037) and, for Connection, the library record with no undo
-     (ADR 0036), so a `Params` block's "store in registers, one undo step" meaning would break
+     `mfg_profile` map (ADR 0039) and, for Connection, the library record with no undo
+     (ADR 0038), so a `Params` block's "store in registers, one undo step" meaning would break
      or need a host-key per field. Layout needs (side-by-side work area, 2 x 2 corner, unit
      suffix, sub-group) would have become schema options with one user (`CLAUDE.md` §5).
      Generic kinds are added when an extension's own registers need them (`0027`, `0028`).

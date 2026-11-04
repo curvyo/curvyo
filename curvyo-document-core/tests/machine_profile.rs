@@ -1,5 +1,5 @@
 //! The machine profile copy in the project file (`specs/0026-machine-profile` criteria 5, 6, 8 and
-//! 12; ADR 0037): the `mfg_profile` register, its one-step writes, the migration of format 35, the
+//! 12; ADR 0039): the `mfg_profile` register, its one-step writes, the migration of format 35, the
 //! open check and the goldens `machine_profile_v36.curvyo`, `machine_profile_damaged_v36.curvyo`
 //! and `mfg_profile_not_a_map_v36.curvyo`. `CURVYO_WRITE_FIXTURES=1` rewrites them.
 

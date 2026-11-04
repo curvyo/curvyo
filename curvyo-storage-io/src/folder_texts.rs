@@ -1,4 +1,4 @@
-//! The small text files of one folder, one record each (ADR 0004 §6, ADR 0036 §1): list and read
+//! The small text files of one folder, one record each (ADR 0004 §6, ADR 0038 §1): list and read
 //! them in name order, or remove one. What a text means is decided by the caller.
 
 use std::fs;
