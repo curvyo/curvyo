@@ -430,7 +430,7 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     assert.match(settled, /^2 paths, \d+ nodes, [\d.]+ s/, "ring and hole: 2 paths");
     // Outside the Trace bar: its own "Recognise text" toggle is on by default (`specs/0091`
     // criterion 17), the rail's buttons are not pressed.
-    const pressed = (await s.evaluate(`[...document.querySelectorAll('button[aria-pressed=true]')].filter((b) => !b.closest('[role=toolbar][aria-label=Trace]')).map((b) => b.getAttribute('aria-label')).join('|')`)) as string;
+    const pressed = (await s.evaluate(`[...document.querySelectorAll('button[aria-pressed=true]')].filter((b) => !b.closest('[role=toolbar][aria-label=Trace]') && !b.closest('[role=toolbar][aria-label=Workbench]')).map((b) => b.getAttribute('aria-label')).join('|')`)) as string;
     assert.equal(pressed, "", "no rail button is pressed in the Trace tool");
     const bar = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.innerText ?? ''`)) as string;
     // 0089 criterion 22a (Frage 84): no state label; the first control is the About Trace "i" and

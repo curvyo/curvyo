@@ -431,7 +431,7 @@ test("0091 tester c13 across builds: the editor wasm reads, traces and fits the 
     const png = readFileSync(POSTER).toString("base64");
     const out = JSON.parse(
       (await s.evaluate(`(async () => {
-        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js?own-instance');
         await m.default();
         const png = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
         const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
@@ -719,7 +719,7 @@ test("0091 tester slice 2 c24 with c13 across builds: the editor wasm reads, fit
     const png = readFileSync(COLOUR_POSTER).toString("base64");
     const out = JSON.parse(
       (await s.evaluate(`(async () => {
-        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js');
+        const m = await import('/src/wasm-bindings/curvyo_editor_wasm.js?own-instance');
         await m.default();
         const png = Uint8Array.from(atob(${JSON.stringify(png)}), (c) => c.charCodeAt(0));
         const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });

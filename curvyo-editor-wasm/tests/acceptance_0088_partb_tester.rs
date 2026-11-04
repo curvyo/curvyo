@@ -36,7 +36,7 @@ use curvyo_editor_wasm::{
     trace_settings,
 };
 use curvyo_ui_core::{read_trace_wire, trace_add_shapes, trace_colour_job_with, trace_job_with};
-use kurbo::{Affine, BezPath, PathEl, Point, Shape as _};
+use kurbo::{Affine, BezPath, PathEl, Point};
 use proptest::prelude::*;
 
 const OFF: &str = r#"{"threshold":128}"#;
@@ -512,23 +512,6 @@ fn bez(p: &PathSnapshot) -> Vec<BezPath> {
         .collect()
 }
 
-fn flat(path: &BezPath) -> Vec<Point> {
-    let mut pts = Vec::new();
-    kurbo::flatten(path.iter(), 0.005, |el| match el {
-        PathEl::MoveTo(p) | PathEl::LineTo(p) => pts.push(p),
-        _ => {}
-    });
-    pts
-}
-
-/// Largest distance of the outline's points from a circle (`c`, `r`).
-fn circle_dev(path: &BezPath, c: (f64, f64), r: f64) -> f64 {
-    flat(path)
-        .iter()
-        .map(|p| ((p.x - c.0).hypot(p.y - c.1) - r).abs())
-        .fold(0.0, f64::max)
-}
-
 fn angle_diff(a: f64, b: f64, period: f64) -> f64 {
     let d = (a - b).rem_euclid(period);
     d.min(period - d)
@@ -809,85 +792,131 @@ fn c5_a_nearly_round_outline_inside_the_tolerance_becomes_a_circle() {
     assert_eq!(rx, ry);
 }
 
-/// Criterion 8: a traced ring is one compound path whose two outlines are clean circles
-/// (decision 16: the document model has no compound of primitives), no leftover traced polygon.
+/// Criterion 16 (changed from 8): a stroked band is one primitive at the centre line, the stroke
+/// of the band's width in the region's colour, no fill.
+fn assert_stroked(p: &PrimitiveSnapshot, width_mm: f64, colour: Color, tol: f64) {
+    assert!(!p.style.fill.enabled, "no fill: {:?}", p.style);
+    assert!(p.style.stroke.enabled, "a stroke: {:?}", p.style);
+    near(p.style.stroke.width.as_mm(), width_mm, tol, "stroke width");
+    assert_eq!(p.style.stroke.color, colour, "stroke in the fill colour");
+}
+
+/// Criterion 16: a ring of 25 mm outer and 10 mm inner radius is one circle of radius 17.5 mm
+/// with a 15 mm stroke, no leftover path.
 #[test]
-fn c8_a_ring_is_one_compound_of_two_clean_circles() {
+fn c16_a_ring_is_one_stroked_circle() {
     let mut h = Host::new(&make("ring"));
     h.create(ON);
     let leaves = h.leaves();
     assert_eq!(leaves.len(), 1, "one object: {leaves:?}");
-    let ps = paths(&leaves);
-    assert_eq!(ps.len(), 1);
-    let subs = bez(&ps[0]);
-    assert_eq!(subs.len(), 2, "two outlines");
+    assert_eq!(paths(&leaves).len(), 0, "no path");
+    let p = prims(&leaves);
+    assert_eq!(p.len(), 1);
+    let (rx, ry, centre, _) = ellipse_of(&p[0]);
     let c = h.mm(350.0, 350.0);
-    let mut radii = [(25.0, f64::MAX), (10.0, f64::MAX)];
-    for sub in &subs {
-        for r in &mut radii {
-            r.1 = r.1.min(circle_dev(sub, c, r.0 * h.u));
-        }
-    }
-    for (r, dev) in radii {
-        assert!(
-            dev < 0.05 * h.u,
-            "an outline is a clean circle of {r} mm: deviation {dev}"
-        );
-    }
-    for sub in ps[0].subpaths() {
-        assert!(
-            sub.anchors.len() <= 8,
-            "a clean circle outline has few anchors, not {}",
-            sub.anchors.len()
-        );
-    }
+    near(rx, 17.5 * h.u, TOL * h.u, "centre-line radius");
+    assert_eq!(rx, ry, "a circle");
+    near(centre.0, c.0, TOL * h.u, "centre x");
+    near(centre.1, c.1, TOL * h.u, "centre y");
+    assert_stroked(&p[0], 15.0 * h.u, Color { r: 0, g: 0, b: 0 }, TOL * h.u);
 }
 
-/// Criterion 8: a rectangle frame is one compound of two rectangle outlines (four corners each).
+/// Criterion 16: a 200 x 100 mm frame with a 160 x 60 mm hole is one 180 x 80 mm rectangle with a
+/// 20 mm stroke.
 #[test]
-fn c8_a_frame_is_one_compound_of_two_rectangles() {
+fn c16_a_frame_is_one_stroked_rectangle() {
     let mut h = Host::new(&make("frame"));
     h.create(ON);
     let leaves = h.leaves();
     assert_eq!(leaves.len(), 1, "{leaves:?}");
-    let ps = paths(&leaves);
-    assert_eq!(ps.len(), 1);
-    let mut sizes: Vec<(f64, f64)> = bez(&ps[0])
-        .iter()
-        .map(|b| {
-            let r = b.bounding_box();
-            (r.width(), r.height())
-        })
-        .collect();
-    sizes.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-    assert_eq!(sizes.len(), 2);
-    near(sizes[0].0, 200.0 * h.u, TOL * h.u, "outer width");
-    near(sizes[0].1, 100.0 * h.u, TOL * h.u, "outer height");
-    near(sizes[1].0, 160.0 * h.u, TOL * h.u, "hole width");
-    near(sizes[1].1, 60.0 * h.u, TOL * h.u, "hole height");
-    for sub in ps[0].subpaths() {
-        assert_eq!(sub.anchors.len(), 4, "a clean rectangle outline");
-    }
+    assert_eq!(paths(&leaves).len(), 0, "no path");
+    let p = prims(&leaves);
+    assert_eq!(p.len(), 1);
+    let Shape::Rect { bounds, .. } = p[0].shape else {
+        panic!("{:?}", p[0].shape)
+    };
+    near(bounds.width.as_mm(), 180.0 * h.u, TOL * h.u, "width");
+    near(bounds.height.as_mm(), 80.0 * h.u, TOL * h.u, "height");
+    let c = h.mm(1100.0, 600.0);
+    near(
+        bounds.origin.x + bounds.width.as_mm() / 2.0,
+        c.0,
+        TOL * h.u,
+        "centre x",
+    );
+    near(
+        bounds.origin.y + bounds.height.as_mm() / 2.0,
+        c.1,
+        TOL * h.u,
+        "centre y",
+    );
+    assert_stroked(&p[0], 20.0 * h.u, Color { r: 0, g: 0, b: 0 }, TOL * h.u);
 }
 
-/// Criterion 9: the 0025 ring fixture is one compound of two circles.
+/// Criterion 9 (changed by 16): the 0025 ring (radii 6 and 2 mm) is one circle of radius 4 mm with
+/// a 4 mm stroke.
 #[test]
-fn c9_the_0025_ring_is_one_compound_of_two_circles() {
+fn c9_the_0025_ring_is_one_stroked_circle() {
     let mut h = Host::new(&make("ring25"));
     h.create(ON);
     let leaves = h.leaves();
     assert_eq!(leaves.len(), 1);
-    let ps = paths(&leaves);
-    assert_eq!(ps.len(), 1);
-    let subs = bez(&ps[0]);
-    assert_eq!(subs.len(), 2);
+    assert_eq!(paths(&leaves).len(), 0);
+    let p = prims(&leaves);
+    assert_eq!(p.len(), 1);
+    let (rx, ry, centre, _) = ellipse_of(&p[0]);
     let c = h.mm(100.0, 100.0);
-    let mut devs: Vec<f64> = Vec::new();
-    for (r, sub) in [(6.0, &subs[0]), (2.0, &subs[1])] {
-        let other = if r > 3.0 { 2.0 } else { 6.0 };
-        devs.push(circle_dev(sub, c, r * h.u).min(circle_dev(sub, c, other * h.u)));
+    near(rx, 4.0 * h.u, 0.1 * h.u, "radius");
+    assert_eq!(rx, ry);
+    near(centre.0, c.0, 0.1 * h.u, "centre x");
+    near(centre.1, c.1, 0.1 * h.u, "centre y");
+    assert_stroked(&p[0], 4.0 * h.u, Color { r: 0, g: 0, b: 0 }, 0.1 * h.u);
+}
+
+/// Criterion 16: a ring whose hole is off centre and a frame with borders of 20 and 10 mm are of
+/// varying width, so they stay one compound of two outlines (no primitive).
+#[test]
+fn c16_uneven_bands_stay_two_outlines() {
+    let off_centre = picture(700, 700, |x, y| {
+        (x - 350.0).hypot(y - 350.0) <= 300.0 && (x - 390.0).hypot(y - 350.0) > 150.0
+    });
+    let uneven = picture(1400, 1000, |x, y| {
+        let outer = (100.0..1300.0).contains(&x) && (100.0..900.0).contains(&y);
+        let hole = (300.0..1100.0).contains(&x) && (200.0..800.0).contains(&y);
+        outer && !hole
+    });
+    for (name, png) in [("off centre", off_centre), ("uneven frame", uneven)] {
+        let mut h = Host::new(&png);
+        h.create(ON);
+        let leaves = h.leaves();
+        assert_eq!(leaves.len(), 1, "{name}: {leaves:?}");
+        assert_eq!(prims(&leaves).len(), 0, "{name}: no primitive");
+        let ps = paths(&leaves);
+        assert_eq!(ps.len(), 1, "{name}");
+        assert_eq!(bez(&ps[0]).len(), 2, "{name}: two outlines");
     }
-    assert!(devs.iter().all(|d| *d < 0.1 * h.u), "{devs:?}");
+}
+
+/// Criterion 16 and 10: a red ring in Multicolour is a stroked circle with a red stroke.
+#[test]
+fn c16_a_multicolour_ring_keeps_its_colour_on_the_stroke() {
+    let png = colour_picture(700, 700, |x, y| {
+        let r = (x - 350.0).hypot(y - 350.0);
+        if r <= 250.0 && r > 100.0 {
+            [255, 0, 0]
+        } else {
+            [255, 255, 255]
+        }
+    });
+    let mut h = Host::new(&png);
+    h.create(MULTI_ON);
+    let leaves = h.leaves();
+    assert_eq!(leaves.len(), 1, "{leaves:?}");
+    let p = prims(&leaves);
+    assert_eq!(p.len(), 1, "{leaves:?}");
+    let (rx, _, _, _) = ellipse_of(&p[0]);
+    near(rx, 17.5 * h.u, TOL * h.u, "radius");
+    assert_stroked(&p[0], 15.0 * h.u, Color { r: 255, g: 0, b: 0 }, TOL * h.u);
 }
 
 /// Criterion 9: the 0025 dot grid is 10,000 circles (100 x 100) and no path remains.
