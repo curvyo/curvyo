@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
+import type { RoleName } from "@/lib/roleRowKeys";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
 
 /** The active manufacturing's values (`manufacturing_view_json`). */
@@ -25,6 +26,28 @@ export interface ManufacturingView {
     values: Record<string, number | string>;
   }[];
   read_only_notice: { seq: number; text: string; x: number | null; y: number | null } | null;
+  /** The Layers block's values (`specs/0027-manufacturing-roles`); absent for a workbench without one. */
+  layers?: LayersView;
+}
+
+/** One row of the Layers block: a drawing layer, or the objects in no layer. */
+export interface LayerRoleRow {
+  /** The row's register key text: the layer's `peer:counter`, or `outside`. */
+  key: string;
+  name: string;
+  outside: boolean;
+  role: RoleName | null;
+  /** The stored value is not a role this build knows (criterion 18). */
+  unknown: boolean;
+  hidden: boolean;
+  locked: boolean;
+}
+
+/** The Layers block's values: the Role view switch, the rows, the notice lines. */
+export interface LayersView {
+  role_view: boolean;
+  rows: LayerRoleRow[];
+  notices: string[];
 }
 
 /** A corner of the output page, as stored. */
@@ -131,6 +154,9 @@ export function useWorkbenches(editor: EditorSession) {
       run((session) => session.set_fixture_visible(id, visible)),
     setFixtureLength: (id: string, key: string, mm: number) =>
       run((session) => session.set_fixture_length(id, key, mm)),
+    setLayerRole: (key: string, role: RoleName | null) =>
+      run((session) => session.set_layer_role(key, role ?? "")),
+    setRoleView: (on: boolean) => run((session) => session.set_role_view(on)),
     fitPage: () => run((session) => session.fit_output_page()),
     setExtensionEnabled: (id: string, enabled: boolean) => {
       const text = run((session) => session.set_extension_enabled(id, enabled));

@@ -44,19 +44,19 @@ it. Noted for the UX review; nothing changed here.
 - [x] 2. laser-core `roles`: parse to Known/Unknown/Unassigned, key text, output rule, notice
   texts within 70 characters (AC 3, 5, 11, 13, 14, 15, 18).
 - [x] 3. extension-core `Block::Layers`, laser manifest, changelog; history name (AC 1, 4).
-- [ ] 4. render-core looks: Cut 1 px cased outline, Engrave area by fill rule or 2 px line for
+- [x] 4. render-core looks: Cut 1 px cased outline, Engrave area by fill rule or 2 px line for
   all-open leaves, Muted dashed 4/3, images grey under Area and frame otherwise, Area then Muted
   then Outline order, style and opacity ignored (AC 6, 7, 8).
-- [ ] 5. editor-wasm session: leaf-to-layer map, looks in the Laser frame (hidden absent, guides
+- [x] 5. editor-wasm session: leaf-to-layer map, looks in the Laser frame (hidden absent, guides
   and dimensions absent, clones by their own layer), Role view switch, Layers block view JSON,
   `set_layer_role` one step, drawing never written (AC 1 to 4, 6 to 17, 20, 22, 23).
-- [ ] 6. golden `laser_roles_v36.curvyo` and the round trip with stale and unknown entries; old
+- [x] 6. golden `laser_roles_v36.curvyo` and the round trip with stale and unknown entries; old
   goldens open with no role (AC 19).
-- [ ] 7. budget tests `manufacturing_budget.rs` (AC 21).
-- [ ] 8. GPU grey flag for engraved images (AC 8 f).
-- [ ] 9. frontend Layers block, role control, roving focus keys (tested helper), Role view
+- [x] 7. budget tests `manufacturing_budget.rs` (AC 21).
+- [x] 8. GPU grey flag for engraved images (AC 8 f).
+- [x] 9. frontend Layers block, role control, roving focus keys (tested helper), Role view
   switch, legend, notice, windowing (AC 1, 2, 6, 14, 15, 16, 18).
-- [ ] 10. browser check end to end, screenshots; docs; full gate (all).
+- [x] 10. browser check end to end, screenshots; docs; full gate (all).
 
 ## Validation
 

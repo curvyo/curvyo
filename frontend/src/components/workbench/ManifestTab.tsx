@@ -2,6 +2,7 @@ import { Eye, EyeOff, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
+import { LayersBlock } from "@/components/workbench/LayersBlock";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { fixtureRowKey, focusAfterRemove, tabStopRow } from "@/lib/fixtureRowKeys";
@@ -18,7 +19,8 @@ interface ManifestTabProps {
 /**
  * A manufacturing workbench's tab, drawn from its extension's manifest (ADR 0034 §4,
  * `specs/0093-laser-workbench-shell` UX notes §4): the block kinds `Notice`, `MachineProfile`
- * (`specs/0026-machine-profile`) and `FixtureList` in the manifest's order. Nothing here names a
+ * (`specs/0026-machine-profile`), `Layers` (`specs/0027-manufacturing-roles`) and `FixtureList` in
+ * the manifest's order. Nothing here names a
  * process.
  */
 export function ManifestTab({ contribution, view, workbenches, onReturnFocus }: ManifestTabProps) {
@@ -52,6 +54,10 @@ function Block({
     case "machine_profile":
       return view.machine ? (
         <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} />
+      ) : null;
+    case "layers":
+      return view.layers ? (
+        <LayersBlock label={block.label} layers={view.layers} workbenches={workbenches} onReturnFocus={onReturnFocus} />
       ) : null;
     case "fixture_list":
       return (
