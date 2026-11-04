@@ -71,6 +71,13 @@ impl WorkspaceList {
         out
     }
 
+    /// The name a member gave `node`, before it was made safe for this file system; `None` for
+    /// an unknown node (`specs/0096-own-devices-sync` criterion 15).
+    #[must_use]
+    pub fn stored_name(&self, node: ListNodeId) -> Option<String> {
+        read_node(self, node.tree_id()).map(|read| read.name)
+    }
+
     /// The node of the visible document with the id `document`.
     #[must_use]
     pub fn find_document(&self, document: [u8; 16]) -> Option<ListNodeId> {
@@ -286,6 +293,19 @@ pub(crate) fn shown_name(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::shown_name;
+
+    #[test]
+    fn a_stored_name_keeps_what_the_member_typed() {
+        let list = crate::WorkspaceList::new(1);
+        let created = crate::workspace_list::Created { at: 5, id: [1; 16] };
+        let node = list.create_document(None, "ab", [7; 16], created).unwrap();
+        // A member with other naming rules wrote a name this system refuses.
+        let meta = list.tree().get_meta(node.tree_id()).unwrap();
+        meta.insert(crate::workspace_list::KEY_NAME, "a:b").unwrap();
+        assert_eq!(list.stored_name(node).as_deref(), Some("a:b"));
+        let entry = list.entries().into_iter().next().unwrap();
+        assert_eq!(entry.path, vec!["a_b".to_owned()]);
+    }
 
     #[test]
     fn refused_names_from_a_peer_are_shown_with_underscores() {
