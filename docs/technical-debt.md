@@ -10,6 +10,16 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## Role entries of deleted layers are never removed (`0027`, ADR 0040, 2026-11-04)
+
+Deleting a layer leaves its `x.curvyo.laser.role.<layer id>` register on every manufacturing, so
+undo of the deletion brings the role back and the drawing command never writes a manufacturing.
+Each stale entry is one short register; they are never shown, and a file only grows by one per
+deleted layer that had a role.
+
+**Resolution:** a clean-up story (explicit "remove roles of deleted layers", or dropping entries
+when a layer is wiped from history by ADR 0014's shallow snapshot), when makers ask.
+
 ## Machine profile records live in the laser extension, not in `curvyo-library-core` (2026-11-03)
 
 ADR 0004 §8 and ADR 0011 §2 reserve `curvyo-library-core` for the record model of the
