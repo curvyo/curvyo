@@ -10,6 +10,67 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## The pairing code's secret is `Copy` and never wiped (`0096`, 2026-11-04)
+
+`PairSecret` in `curvyo-crypto-core::pair_code` (ADR 0040 decision 4) is a `Copy` 25-bit value, so
+copies of it stay in memory after the pairing until overwritten; the code is also shown on screen
+and typed. It protects a pairing for at most 5 minutes and 5 tries, so a later memory read gains an
+attacker nothing once the slot is used or expired; the crypto review of M1 rated it non-blocking.
+
+**Resolution:** make `PairSecret` a non-`Copy` type that zeroizes on drop and pass it by reference
+through `PairStart` and the pairing state machine, the next time `pair_code` is touched.
+
+## Mutual removal freezes a device group (`0096`, 2026-11-04, Frage 146 default A)
+
+With DEV-ROLE A every paired device is an admin. When the only two admins of a room remove each
+other at the same time (a stolen device that races its own removal), ADR 0010 §5 drops both
+removals and every later removal of either while they are the only admins: the stolen device
+keeps every current and later key, and `reconcile` plans no removal there (ADR 0040 decision 8).
+Pairing a third device makes both old removals take effect at once, so the maker's own device
+leaves the group too, and both old devices stay members of the workspaces with their keys,
+which no device left in the group can reach. Shown by `a_mutual_removal_of_the_only_two_devices_freezes_the_group` in
+`curvyo-sync-core/tests/devices_reconcile.rs`.
+
+**Resolution:** for now the maker dissolves the group (every device leaves), stops syncing the
+workspaces, pairs again and switches them on (Frage 146 default A). A keyring rule that settles
+a mutual removal (for example the earlier removal by causal order wins) is a change to ADR 0010
+§5 and its exhaustive tests; it waits for the customer.
+
+## Any identity ever paired counts as the maker's for good (`0096`, 2026-11-05)
+
+`may_readmit` (ADR 0040 decision 5) re-adds a group device to a switched-on workspace when every
+removal of it was written by an identity that ever was in the group, current or removed. That
+undoes a stolen device's removals once it is removed from the group, but it also means an
+identity paired once, even by mistake or on a device later handed to someone who now administers
+a shared workspace, can never remove the maker's devices for good: its removals are undone by the
+next reconcile. Only a removal by an identity never in the group stands.
+
+**Resolution:** accepted for slice 1 (tester finding 1, lead's Proposal). A later rule could
+count a former device's removals only up to its own removal from the group, in keyring causal
+order across the two rooms.
+
+## Passkey backups and pairing slots have no server-wide quota (`0096`, 2026-11-04)
+
+The relay keeps one passkey backup per id in `backups/` (ADR 0040 decision 13). A record is capped
+at 4 KiB, but anyone who can reach the relay can store records under fresh ids, as anyone can
+create rooms today: the relay has no quotas at all (debt of `0092`). Pairing slots are capped at
+4,096 per server (`PAIR_SLOTS_PER_SERVER`), and the cap counts slots the relay still remembers as
+used or expired, up to 10 minutes after they were opened: someone who opens slots in a loop can
+make pairing answer `busy` for everyone for that long.
+
+**Resolution:** with the server quotas: a count of backups per server, slots per address, and a
+rate limit per address, when a hosted or shared instance is offered.
+
+## A passkey backup is tied to one web origin and one server address (`0096`, 2026-11-04)
+
+A passkey belongs to the web app's origin (WebAuthn), and the record lies on the relay the browser
+was paired with. A self-hosted web app served from a second domain has other passkeys, and Restore
+reads from the server address typed in the Share tab, so the maker must type the same one. A
+browser that cannot evaluate PRF keeps custody A and is a lost device after clearing its data.
+
+**Resolution:** accepted for slice 1; a later accounts ADR (the hybrid of ADR 0040) can add more
+passkeys as further wraps and remember the server.
+
 ## Machine profile records live in the laser extension, not in `curvyo-library-core` (2026-11-03)
 
 ADR 0004 §8 and ADR 0011 §2 reserve `curvyo-library-core` for the record model of the
@@ -2039,16 +2100,6 @@ within 30 s (criterion 20).
 
 **Resolution:** open; a store with its own replication, or rooms partitioned across replicas by
 id, when one instance is no longer enough.
-
-## Browser key custody is undecided (`0092`, 2026-11-03)
-
-The browser build connects to a relay but keeps its device identity and the document's epoch keys
-in the page's memory only (`frontend/src/platform/host.ts`): a reload is a new device that needs a
-new invite, and a shared document saved from the browser cannot reconnect. The desktop build keeps
-them in the OS credential store or an encrypted key file (ADR 0007 §1, ADR 0031 decision 12).
-
-**Resolution:** an ADR on browser key custody (non-extractable WebCrypto keys in IndexedDB, or a
-passphrase-wrapped file) before the browser build is offered for collaboration.
 
 ## Joining needs a member online (`0092`, 2026-11-03)
 

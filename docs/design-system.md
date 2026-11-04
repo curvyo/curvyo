@@ -1357,6 +1357,20 @@ Decisions: `specs/0095-workspace/ux-notes.md` sections 2.1, 3 to 9 (WS-SHARE-PLA
 | Notices | Canvas notice slot, `role="status"`, 5s, at most 70 characters, labels cut at 16: "Ben renamed Lid to Cover.", "Ben moved Lid to Sides.", "Ben deleted Lid." ("Someone" when the member was not seen online); the loop notice; concurrent edits of one item show nothing |
 | Removed device | File tab alert block at the top with **OK** (`role="alert"`) and the same words in the canvas notice: "You were removed from this workspace. Your copies stay on this computer." |
 
+## Properties panel: My devices and the sync switch (`0096`, 2026-11-04)
+
+Decisions: `specs/0096-own-devices-sync/ux-notes.md` (DEV-UI A: Share tab only). No new token; every text is formatted in Rust (`curvyo-ui-core::devices_text`, `key_backup_text`).
+
+| Item | Value |
+|---|---|
+| My devices block | Above the Workspace block, always shown: "My devices" (14px semibold) with "Only this device" / "2 devices" at the right (12px muted); the removed alert (text `role="alert"`, **OK**), the device list, "Key renewal pending", removal alerts, decision rows, the one-device warning (`TriangleAlert`, `role="status"`), the passkey row (browser), then **Add a device** (Apply, `MonitorSmartphone`, 148 x 28) and **Join my devices** (outline, `LogIn`) or the open pairing block |
+| Device row | 56px (60 coarse) when it has a fingerprint, else 40px: chevron slot 16px, `Monitor` / `Globe` 16px, name 14px (own: muted "this device"; F2 or double-click renames in place with `EntryField`), fingerprint 12px mono muted, the state line 12px muted (`role="status"`) outside the details button; the details button (`aria-expanded`) opens one 24px line per synced workspace; a 28px action slot: **Remove** (`Unlink`) or **Leave my devices** (`LogOut`), each with a destructive inline confirm (Cancel focused, 400ms guard, short accessible name "Remove Laptop") |
+| Pairing block | The code in a bordered surface, 24px mono semibold 0.08em, inside a group named with the spelled characters; "Server ..." and the visible countdown (`aria-hidden`) with one polite "1 minute left"; the check-words grid (2 x 2, 16px semibold on the bordered surface) under "Check words"; **Pair** and **Words differ**; the group takes the focus, never Pair |
+| Join block | Pairing code field (mono 16px, upper-cased, two groups of four), "Server ...", Device name, Synced workspaces folder (desktop) or the browser loss sentence; **Cancel** and **Connect** (`aria-disabled` with one reason line); refusals under the code field (`role="alert"`, the field `aria-invalid` and described by it), **Try again** after a lost connection |
+| Workspace pick list | After Pair: "Workspaces for Laptop", check box rows (32px, whole row the label, "14 documents" at the right), a member-only workspace unchecked with `aria-disabled` and "Not an admin here", the privacy sentence, **Not now** and **Sync these** |
+| Decision row | `role="group"` named after the workspace, 12px sentence, **Connect this folder** (Apply) and **Make a second copy** (outline), 148 x 28 |
+| Sync switch row | First row of the Workspace block: `PanelSwitch` "Sync to my devices"; the line under it ("Uploading 3 of 14", "In sync with 2 devices", the reason); on: Apply inline confirm, off: destructive inline confirm with the offline refusal; focus returns to the switch; the alert "Could not sync: cannot reach the server." after a failure; the block header reads "Synced, 2 devices" while every member is one of my devices, and own devices in the participant list carry "my device" without Remove |
+
 ## Properties panel: History tab (`0020`, `0041`, `0042`, 2026-10-10)
 
 Decisions: the UX notes of `specs/0020-undo-redo/`, `0041-object-history/`, `0042-history-branches/`. The list is the **one inner scroll area** of the panel: with a long history a panel-wide scroll would put the Undo and Wipe controls thousands of pixels from each other.
