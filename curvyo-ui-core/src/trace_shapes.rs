@@ -3,14 +3,15 @@
 //! after the text section and read back.
 
 use curvyo_document_core::{
-    Angle, CornerRadii, Curve, EllipseFrame, InnerRatio, Length, Point, PointCount, RectBounds,
-    Shape, StarFrame, drawing_outline_of_rotated,
+    Angle, CornerRadii, Curve, EllipseFrame, InnerRatio, Length, LineJoin, Point, PointCount,
+    RectBounds, Shape, StarFrame, drawing_outline_of_rotated,
 };
 use kurbo::BezPath;
 
 use crate::svg_import_match::outline_path;
 use crate::trace_shape_band::{band_of, stroked_area};
 use crate::trace_shape_fit::{Fitted, fit_outline};
+use crate::trace_shape_hole_band::{band_from_hole, touching_bands};
 use crate::trace_shape_sample::{Sampled, sample_closed};
 use crate::trace_transfer::count;
 
@@ -35,12 +36,16 @@ const SHAPE_NUMBERS: usize = 7;
 pub struct TraceShapeRegion {
     /// The outer outline, then its holes, as indices into the outlines.
     pub outlines: Vec<usize>,
-    /// The primitive of each, with its rotation; the outer's is always there.
+    /// The primitive of each, with its rotation; the outer's is there unless the region is
+    /// bands (a bevelled stroke's or touching strokes' outer outline is no primitive).
     pub shapes: Vec<Option<(Shape, Angle)>>,
     /// A band of constant width (one hole, outer and hole parallel offsets of one primitive,
     /// `specs/0088` Part B criterion 16): the centre-line primitive and the stroke width it is
     /// written as; `None` for a filled region.
     pub band: Option<TraceBand>,
+    /// Touching bands whose outer outlines the trace merged into the region's one (`adrs.md`
+    /// decision 22): one stroked primitive per hole; empty otherwise.
+    pub bands: Vec<TraceBand>,
 }
 
 /// The centre-line primitive of a band and its stroke width.
@@ -52,14 +57,18 @@ pub struct TraceBand {
     pub rotation: Angle,
     /// The band's width: the stroke width.
     pub width: Length,
+    /// The join the traced corners show (`adrs.md` decision 22): mitred or bevelled.
+    pub join: LineJoin,
 }
 
 impl TraceShapeRegion {
-    /// How many primitives it is written as: one for a band, else one per recognised outline.
+    /// How many primitives it is written as: one per band, else one per recognised outline.
     #[must_use]
     pub fn primitives(&self) -> usize {
         if self.band.is_some() {
             1
+        } else if !self.bands.is_empty() {
+            self.bands.len()
         } else {
             self.shapes.iter().filter(|s| s.is_some()).count()
         }
@@ -126,26 +135,50 @@ fn recognise_layer(
         let Some(outer) = outer.as_ref().filter(|s| is_outer(s)) else {
             continue;
         };
-        let Some(shape) = fit(outer) else {
+        let holes: Vec<(usize, &Sampled)> = sampled
+            .iter()
+            .enumerate()
+            .filter(|&(h, _)| parents[h] == Some(k))
+            .filter_map(|(h, s)| Some((h, s.as_ref()?)))
+            .collect();
+        let shape = fit(outer);
+        if shape.is_none() && holes.is_empty() {
             continue;
-        };
+        }
         let mut region = TraceShapeRegion {
             outlines: vec![first + k],
-            shapes: vec![Some(shape)],
+            shapes: vec![shape],
             band: None,
+            bands: Vec::new(),
         };
-        let mut holes = Vec::new();
-        for (h, hole) in sampled.iter().enumerate() {
-            if parents[h] == Some(k) {
-                region.outlines.push(first + h);
-                region.shapes.push(hole.as_ref().and_then(fit));
-                holes.extend(hole.as_ref());
+        for &(h, hole) in &holes {
+            region.outlines.push(first + h);
+            region.shapes.push(fit(hole));
+        }
+        let tol = tolerance(outer.area(), pixel_mm);
+        let traced_holes: Vec<&Sampled> = holes.iter().map(|&(_, s)| s).collect();
+        match (&region.shapes[..], &traced_holes[..]) {
+            ([o, Some(i)], [hole]) => {
+                region.band = o
+                    .as_ref()
+                    .and_then(|o| band(outer, hole, o, i, tol))
+                    .or_else(|| band_from_hole(outer, hole, i, tol));
             }
+            ([None, inners @ ..], _) if traced_holes.len() >= 2 => {
+                if let Some(inners) = inners
+                    .iter()
+                    .map(Option::as_ref)
+                    .collect::<Option<Vec<_>>>()
+                {
+                    region.bands =
+                        touching_bands(outer, &traced_holes, &inners, tol).unwrap_or_default();
+                }
+            }
+            _ => {}
         }
-        if let ([Some(o), Some(i)], [hole]) = (&region.shapes[..], &holes[..]) {
-            region.band = band(outer, hole, o, i, tolerance(outer.area(), pixel_mm));
+        if region.shapes[0].is_some() || region.band.is_some() || !region.bands.is_empty() {
+            regions.push(region);
         }
-        regions.push(region);
     }
 }
 
@@ -161,6 +194,7 @@ fn band(outer: &Sampled, hole: &Sampled, o: &Fitted, i: &Fitted, tol: f64) -> Op
         shape,
         rotation,
         width: Length::from_mm(width),
+        join: LineJoin::Miter,
     })
 }
 
@@ -267,16 +301,36 @@ pub(crate) fn write_shapes(wire: &mut Vec<f64>, regions: &[TraceShapeRegion]) {
             for shape in &region.shapes {
                 wire.extend(shape_numbers(shape.as_ref()));
             }
-            // The band: its width (0 for none), then its centre-line primitive.
-            match &region.band {
-                Some(band) => {
-                    wire.push(band.width.as_mm());
-                    wire.extend(shape_numbers(Some(&(band.shape, band.rotation))));
+            // The band: its width (0 for none), its join and its centre-line primitive; touching
+            // bands: minus their count, then each band so.
+            match (&region.band, &region.bands[..]) {
+                (Some(band), _) => write_band(wire, band),
+                (None, []) => wire.push(0.0),
+                (None, bands) => {
+                    wire.push(-(bands.len() as f64));
+                    for band in bands {
+                        write_band(wire, band);
+                    }
                 }
-                None => wire.push(0.0),
             }
         }
     }
+}
+
+/// The join's number on the wire.
+fn join_number(join: LineJoin) -> f64 {
+    match join {
+        LineJoin::Miter => 0.0,
+        LineJoin::Bevel => 1.0,
+        LineJoin::Round => 2.0,
+    }
+}
+
+/// One band's width, join and centre-line primitive.
+fn write_band(wire: &mut Vec<f64>, band: &TraceBand) {
+    wire.push(band.width.as_mm());
+    wire.push(join_number(band.join));
+    wire.extend(shape_numbers(Some(&(band.shape, band.rotation))));
 }
 
 /// The kind and six parameters of one outline's primitive (kind 0: none).
@@ -424,22 +478,28 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
             let numbers: Vec<f64> = (0..SHAPE_NUMBERS).map(|_| next()).collect::<Option<_>>()?;
             shapes.push(shape_of(&numbers).ok()?);
         }
-        shapes.first()?.as_ref()?;
         let width = next()?;
-        let band = if width == 0.0 {
-            None
-        } else {
-            let numbers: Vec<f64> = (0..SHAPE_NUMBERS).map(|_| next()).collect::<Option<_>>()?;
-            let (shape, rotation) = shape_of(&numbers).ok()??;
-            if !(width > 0.0 && width.is_finite() && k == 2) {
+        let (band, bands) = if width == 0.0 {
+            (None, Vec::new())
+        } else if width > 0.0 {
+            if k != 2 {
                 return None;
             }
-            Some(TraceBand {
-                shape,
-                rotation,
-                width: Length::from_mm(width),
-            })
+            (Some(read_band(&mut next, width)?), Vec::new())
+        } else {
+            // Touching bands: one per hole.
+            let m = count(-width).filter(|&m| m + 1 == k && m >= 2)?;
+            let bands = (0..m)
+                .map(|_| {
+                    let width = next()?;
+                    read_band(&mut next, width)
+                })
+                .collect::<Option<Vec<_>>>()?;
+            (None, bands)
         };
+        if shapes.first()?.is_none() && band.is_none() && bands.is_empty() {
+            return None;
+        }
         if indices
             .iter()
             .enumerate()
@@ -451,9 +511,28 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
             outlines: indices,
             shapes,
             band,
+            bands,
         });
     }
     Some((out, at))
+}
+
+/// One band after its width: its join and centre-line primitive.
+fn read_band(next: &mut impl FnMut() -> Option<f64>, width: f64) -> Option<TraceBand> {
+    let join = match count(next()?)? {
+        0 => LineJoin::Miter,
+        1 => LineJoin::Bevel,
+        2 => LineJoin::Round,
+        _ => return None,
+    };
+    let numbers: Vec<f64> = (0..SHAPE_NUMBERS).map(|_| next()).collect::<Option<_>>()?;
+    let (shape, rotation) = shape_of(&numbers).ok()??;
+    (width > 0.0 && width.is_finite()).then_some(TraceBand {
+        shape,
+        rotation,
+        width: Length::from_mm(width),
+        join,
+    })
 }
 
 /// Adds the shape section to a trace result `wire` of a picture mapped by `pixel_map` (the

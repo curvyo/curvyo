@@ -12,12 +12,9 @@ use curvyo_document_core::{
 };
 
 use crate::trace_shape_fit::Fitted;
+use crate::trace_shape_join::MITER_LIMIT;
 use crate::trace_shape_math::sin_cos;
 use crate::trace_shape_sample::length;
-
-/// The longest miter the renderer draws, in stroke widths (SVG's 4, `curvyo-render-core`): a
-/// corner sharper than this would be bevelled, so its band is not a stroke.
-const MITER_LIMIT: f64 = 4.0;
 
 /// The centre-line primitive and the stroke width of the band between `outer` and `inner`, when
 /// they are parallel offsets of it within `tolerance`; `None` for any other pair. `traced` is the
@@ -205,7 +202,7 @@ fn rect_band(
 
 /// One side of a star in its own frame: the unit normal of the side from the tip (angle 0) to
 /// the valley (angle π/n) and its distance from the centre.
-fn side_line(outer: f64, inner: f64, n: u32) -> Option<([f64; 2], f64)> {
+pub(crate) fn side_line(outer: f64, inner: f64, n: u32) -> Option<([f64; 2], f64)> {
     let (us, uc) = sin_cos(PI / f64::from(n));
     let (ex, ey) = (inner * uc - outer, inner * us);
     let len = length(ex, ey);
