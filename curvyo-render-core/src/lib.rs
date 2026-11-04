@@ -41,6 +41,7 @@ mod pen_cue;
 mod pen_preview;
 mod reference_box;
 mod refusal_outline;
+mod role_look;
 mod select_box;
 mod select_decoration;
 mod shape_preview;
@@ -50,7 +51,7 @@ mod text_edit_overlay;
 mod theme;
 mod tiling_overlay;
 
-pub use artwork::{build_artwork, build_artwork_with_guides};
+pub use artwork::{build_artwork, build_artwork_with_guides, build_artwork_with_looks};
 pub use carrier_line::{build_carrier_hover, build_carrier_lines, build_carrier_picked};
 pub use clone_marks::{CloneTrace, build_clone_marks};
 pub use color::RgbaColor;
@@ -78,11 +79,14 @@ pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;
 pub use reference_box::{ReferenceBoxInput, ReferenceMark};
 pub use refusal_outline::build_refusal_outlines;
+pub use role_look::Look;
 pub use select_box::{SelectDecorationInput, SelectionBox};
 pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph};
 pub use shape_preview::build_shape_live_preview;
 pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};
-pub use theme::{CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, PASTEBOARD_BG};
+pub use theme::{
+    CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, PASTEBOARD_BG, ROLE_CUT, ROLE_ENGRAVE, ROLE_IGNORE,
+};
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};

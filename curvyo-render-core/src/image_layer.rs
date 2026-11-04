@@ -22,17 +22,26 @@ pub struct ImageQuad {
     pub opacity: Opacity,
     /// The index of its artwork layer in [`DrawList::layers`].
     pub layer: usize,
+    /// Whether it is drawn as a grey-scale preview (an image in an Engrave layer,
+    /// `specs/0027-manufacturing-roles` criterion 8 f); the host applies the filter.
+    pub grey: bool,
 }
 
 impl DrawList {
     /// Appends `image` as an artwork layer of its own.
     pub(crate) fn push_image(&mut self, image: &ImageSnapshot) {
+        self.push_image_as(image, image.shown_opacity, false);
+    }
+
+    /// Appends `image` as an artwork layer of its own at `opacity`, in grey with `grey`.
+    pub(crate) fn push_image_as(&mut self, image: &ImageSnapshot, opacity: Opacity, grey: bool) {
         let layer = self.push_empty_layer();
         self.images.push(ImageQuad {
             asset: image.asset.clone(),
             corners: image.corners(),
-            opacity: image.shown_opacity,
+            opacity,
             layer,
+            grey,
         });
     }
 

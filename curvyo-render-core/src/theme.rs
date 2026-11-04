@@ -250,6 +250,30 @@ pub const GUIDE_GAP_PX: f64 = 3.0;
 /// one has 2.5:1 on `--pasteboard-bg`; this one 3.6:1 there and 5.8:1 on `--canvas-bg`.
 pub const GUIDE: RgbaColor = RgbaColor::opaque(0x16, 0x65, 0x34);
 
+/// `--role-cut` (`docs/design-system.md`, `specs/0027-manufacturing-roles` UX notes §5): the Cut
+/// hairline on the Laser output page, 4.9:1 on `--canvas-bg`.
+pub const ROLE_CUT: RgbaColor = RgbaColor::opaque(0xC4, 0x12, 0x2F);
+
+/// `--role-engrave`: the Engrave area and line on the output page, 5.6:1 on `--canvas-bg`.
+pub const ROLE_ENGRAVE: RgbaColor = RgbaColor::opaque(0x8A, 0x4B, 0x08);
+
+/// `--role-ignore`: the dashed outline of Ignore and No role on the output page, 3.9:1 on
+/// `--canvas-bg`.
+pub const ROLE_IGNORE: RgbaColor = RgbaColor::opaque(0x73, 0x73, 0x79);
+
+/// The width of a Cut and of an Ignore line, screen-space pixels.
+pub const ROLE_LINE_PX: f64 = 1.0;
+
+/// The width of the line an all-open leaf draws in an Engrave layer, screen-space pixels (UX
+/// notes §5: twice a Cut line, so the two differ by weight as well as colour).
+pub const ROLE_ENGRAVE_LINE_PX: f64 = 2.0;
+
+/// One dash of the Ignore outline, screen-space pixels (the `--dim-reference` pattern).
+pub const ROLE_IGNORE_DASH_PX: f64 = 4.0;
+
+/// The gap between two dashes of the Ignore outline, screen-space pixels.
+pub const ROLE_IGNORE_GAP_PX: f64 = 3.0;
+
 /// The width of a guide path's line, screen-space pixels.
 pub const GUIDE_LINE_PX: f64 = 1.0;
 

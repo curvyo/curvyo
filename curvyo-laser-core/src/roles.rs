@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn the_notices_count_singular_and_plural_within_70_characters() {
-        assert!(role_notices(0, 0).is_empty());
+        assert_eq!(role_notices(0, 0), Vec::<String>::new());
         assert_eq!(
             role_notices(1, 1),
             vec![

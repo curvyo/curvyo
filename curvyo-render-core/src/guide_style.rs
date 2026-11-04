@@ -11,23 +11,36 @@ use crate::theme;
 /// dash restarts at the first node of every outline as any dash does. No fill, no markers.
 #[must_use]
 pub(crate) fn marking_style(view: ViewTransform) -> Style {
+    dashed_outline_style(
+        view,
+        theme::GUIDE,
+        theme::GUIDE_LINE_PX,
+        (theme::GUIDE_MARK_DASH_PX, theme::GUIDE_MARK_GAP_PX),
+    )
+}
+
+/// An outline-only style in `color`, `line_px` wide and dashed `dash_px` on, `gap_px` off, all
+/// in screen pixels at `view`: the guide marking and the Ignore look of `crate::role_look`.
+pub(crate) fn dashed_outline_style(
+    view: ViewTransform,
+    color: crate::color::RgbaColor,
+    line_px: f64,
+    (dash_px, gap_px): (f64, f64),
+) -> Style {
     let mut style = Style::default();
     style.fill.enabled = false;
     style.stroke.enabled = true;
     style.stroke.color = curvyo_document_core::Color {
-        r: theme::GUIDE.r,
-        g: theme::GUIDE.g,
-        b: theme::GUIDE.b,
+        r: color.r,
+        g: color.g,
+        b: color.b,
     };
     style.stroke.opacity = curvyo_document_core::Opacity::OPAQUE;
-    style.stroke.width = Length::from_mm(theme::GUIDE_LINE_PX / view.scale());
+    style.stroke.width = Length::from_mm(line_px / view.scale());
     style.stroke.cap = LineCap::Butt;
-    // The pattern is in multiples of the width: 2 px on, 2 px off at a 1 px line.
-    style.stroke.dash = DashPattern::new(vec![
-        theme::GUIDE_MARK_DASH_PX / theme::GUIDE_LINE_PX,
-        theme::GUIDE_MARK_GAP_PX / theme::GUIDE_LINE_PX,
-    ])
-    .unwrap_or_else(|_| DashPattern::solid());
+    // The pattern is in multiples of the width.
+    style.stroke.dash = DashPattern::new(vec![dash_px / line_px, gap_px / line_px])
+        .unwrap_or_else(|_| DashPattern::solid());
     style
 }
 

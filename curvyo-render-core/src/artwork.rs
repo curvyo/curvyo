@@ -3,7 +3,7 @@
 //! (`specs/0007-stroke-and-fill-styling/specification.md`, criterion 26).
 //! Editor decorations are not artwork; they are drawn after it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{
     NodeId, ObjectSnapshot, Opacity, PathSnapshot, PrimitiveSnapshot, Stroke, Style, ViewTransform,
@@ -18,6 +18,7 @@ use crate::fill;
 use crate::glyphs::DrawList;
 use crate::marker_place::marker_placements;
 use crate::markers::{MarkerBudget, marker_triangles};
+use crate::role_look::{Look, RoleLayers};
 use crate::shape_preview::outline_to_anchors;
 use crate::shared_outline::SharedOutlines;
 use crate::stroke::{self, OutlineRef, StrokeParams};
@@ -67,16 +68,56 @@ pub fn build_artwork_with_guides(
     guides: &HashSet<NodeId>,
     view: ViewTransform,
 ) -> DrawList {
-    let marking = (!guides.is_empty()).then(|| crate::guide_style::marking_style(view));
+    build_with(
+        objects,
+        |id| guides.contains(&id).then_some(Look::Guide),
+        !guides.is_empty(),
+        view,
+    )
+}
+
+/// [`build_artwork`] where each object whose id has a look in `looks` is drawn in that look
+/// instead of its own style (`specs/0027-manufacturing-roles` `adrs.md` note 3): guides at their
+/// place in the order, the role looks after every other object, Engrave areas first, then the
+/// Ignore dashes, then the Cut lines on top (UX notes §5).
+#[must_use]
+// One hasher is used (`CLAUDE.md` §5: no generic parameter for a single type).
+#[allow(clippy::implicit_hasher)]
+pub fn build_artwork_with_looks(
+    objects: &[ObjectSnapshot],
+    looks: &HashMap<NodeId, Look>,
+    view: ViewTransform,
+) -> DrawList {
+    build_with(
+        objects,
+        |id| looks.get(&id).copied(),
+        !looks.is_empty(),
+        view,
+    )
+}
+
+fn build_with(
+    objects: &[ObjectSnapshot],
+    look_of: impl Fn(NodeId) -> Option<Look>,
+    any_look: bool,
+    view: ViewTransform,
+) -> DrawList {
+    let marking = any_look.then(|| crate::guide_style::marking_style(view));
     let mut budgets = FrameBudgets {
         dashes: DashBudget::per_frame(),
         markers: MarkerBudget::per_frame(),
     };
     let mut list = DrawList::default();
+    let mut roles = RoleLayers::default();
     let mut shared = SharedOutlines::default();
     for object in objects {
-        if let Some(style) = marking.as_ref().filter(|_| guides.contains(&object.id())) {
-            draw_guide(&mut list, object, style, view, &mut budgets);
+        if let Some(look) = marking.as_ref().and_then(|_| look_of(object.id())) {
+            match (look, marking.as_ref()) {
+                (Look::Guide, Some(style)) => {
+                    draw_guide(&mut list, object, style, view, &mut budgets);
+                }
+                _ => roles.draw(object, look, view, &mut budgets),
+            }
             continue;
         }
         match object {
@@ -110,6 +151,7 @@ pub fn build_artwork_with_guides(
             ObjectSnapshot::Dimension(_) => {}
         }
     }
+    roles.append_to(&mut list);
     list
 }
 
@@ -194,7 +236,7 @@ fn draw_primitive(
 }
 
 /// The limits shared by every object of one frame.
-struct FrameBudgets {
+pub(crate) struct FrameBudgets {
     dashes: DashBudget,
     markers: MarkerBudget,
 }
@@ -202,7 +244,7 @@ struct FrameBudgets {
 /// An object's outlines as the fill and the stroke read them: one for an
 /// ordinary path or a primitive, several for a compound path. `markers` says
 /// whether the object may draw its stroke markers (paths only).
-fn draw_object(
+pub(crate) fn draw_object(
     list: &mut DrawList,
     outlines: &[OutlineRef<'_>],
     style: &Style,

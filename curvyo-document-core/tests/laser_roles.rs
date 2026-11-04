@@ -69,18 +69,18 @@ fn drawing(document: &Document) -> String {
 /// role of a deleted layer (criterion 19).
 fn golden_document() -> Document {
     let document = Document::new(1);
-    let a = layer_with_rect(&document, "A", 10.0);
-    let b = layer_with_rect(&document, "B", 30.0);
-    let c = layer_with_rect(&document, "C", 50.0);
-    let _d = layer_with_rect(&document, "D", 70.0);
-    let e = layer_with_rect(&document, "E", 90.0);
+    let layer_a = layer_with_rect(&document, "A", 10.0);
+    let layer_b = layer_with_rect(&document, "B", 30.0);
+    let layer_c = layer_with_rect(&document, "C", 50.0);
+    let _layer_d = layer_with_rect(&document, "D", 70.0);
+    let layer_e = layer_with_rect(&document, "E", 90.0);
     let gone = layer_with_rect(&document, "Gone", 110.0);
-    let m = add_laser(&document);
-    set(&document, m, a, Some("cut"));
-    set(&document, m, b, Some("engrave"));
-    set(&document, m, c, Some("ignore"));
-    set(&document, m, e, Some("score"));
-    set(&document, m, gone, Some("cut"));
+    let laser = add_laser(&document);
+    set(&document, laser, layer_a, Some("cut"));
+    set(&document, laser, layer_b, Some("engrave"));
+    set(&document, laser, layer_c, Some("ignore"));
+    set(&document, laser, layer_e, Some("score"));
+    set(&document, laser, gone, Some("cut"));
     document.delete_layer(gone).unwrap();
     document
 }
@@ -209,7 +209,7 @@ fn ac17_deleting_a_layer_keeps_its_role_and_ac20_deleting_the_manufacturing_take
     document.delete_layer(a).unwrap();
     assert_eq!(roles(&document)[&key(a)], "cut");
     document.delete_manufacturing(m).unwrap();
-    assert!(document.manufacturings().is_empty());
+    assert_eq!(document.manufacturings(), Vec::new());
     assert_eq!(document.read_nodes().len(), 0, "the drawing is untouched");
 }
 
