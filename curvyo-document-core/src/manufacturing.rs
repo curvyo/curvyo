@@ -467,7 +467,7 @@ impl Document {
     }
 
     /// Writes the process register `key` of the manufacturing `id` to the plain value `value`, or
-    /// deletes it for `None`, in one history step labelled `label` (ADR 0040 §4). `Ok(false)` and
+    /// deletes it for `None`, in one history step labelled `label` (ADR 0041 §4). `Ok(false)` and
     /// nothing written when the register already holds that value (or is already absent). The
     /// drawing is never written.
     ///

@@ -53,7 +53,7 @@ impl NodeId {
     }
 
     /// The `peer:counter` text a register key or value names a node by (the text of
-    /// `page.<id>.owner`; ADR 0040 §1).
+    /// `page.<id>.owner`; ADR 0041 §1).
     #[must_use]
     pub fn to_register_text(self) -> String {
         format!("{}:{}", self.peer, self.counter)

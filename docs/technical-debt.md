@@ -10,7 +10,7 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
-## Role entries of deleted layers are never removed (`0027`, ADR 0040, 2026-11-04)
+## Role entries of deleted layers are never removed (`0027`, ADR 0041, 2026-11-04)
 
 Deleting a layer leaves its `x.curvyo.laser.role.<layer id>` register on every manufacturing, so
 undo of the deletion brings the role back and the drawing command never writes a manufacturing.

@@ -1,5 +1,5 @@
 //! The laser roles in the project file (`specs/0027-manufacturing-roles` criteria 4, 5, 17 to 20;
-//! ADR 0040): one `x.curvyo.laser.role.<layer id>` register per layer on the manufacturing, written
+//! ADR 0041): one `x.curvyo.laser.role.<layer id>` register per layer on the manufacturing, written
 //! by the generic process register command, merged per layer, kept when stale or unknown, a
 //! container value refused on open, and the golden `laser_roles_v36.curvyo`.
 //! `CURVYO_WRITE_FIXTURES=1` rewrites it.

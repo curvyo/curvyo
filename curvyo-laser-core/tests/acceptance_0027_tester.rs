@@ -1,7 +1,7 @@
 //! Independent acceptance tests for `specs/0027-manufacturing-roles` at the laser extension
-//! (ADR 0040): the three stored values and their spelling (criteria 2, 5), the key form with the
+//! (ADR 0041): the three stored values and their spelling (criteria 2, 5), the key form with the
 //! reserved `outside` word (5, 11), the read of absent, known, unknown and non-string values
-//! (3, 17, 18), the output rule that fails closed (ADR 0040 §6, criteria 8 f, 13, 14), the notice
+//! (3, 17, 18), the output rule that fails closed (ADR 0041 §6, criteria 8 f, 13, 14), the notice
 //! lines (15) and the Layers block below the Machine block in the manifest (1).
 #![allow(
     clippy::unwrap_used,
@@ -215,7 +215,7 @@ fn ac18_a_role_register_of_another_process_is_not_read() {
     );
 }
 
-// ---- ADR 0040 §6: what is output -------------------------------------------------------------
+// ---- ADR 0041 §6: what is output -------------------------------------------------------------
 
 #[test]
 fn adr6_output_rule_fails_closed() {

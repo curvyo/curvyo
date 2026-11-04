@@ -1,6 +1,6 @@
 # Plan for manufacturing roles
 
-Implementer, 2026-11-04. Branch `story/0027-manufacturing-roles`. ADR 0040 and `adrs.md` notes 1
+Implementer, 2026-11-04. Branch `story/0027-manufacturing-roles`. ADR 0041 and `adrs.md` notes 1
 to 8, built for Frage 140 A, 141 A and 142 A. UX notes items 2 to 5 as the lead accepted them
 (notice above the rows, white casing under Cut lines drawn above Engrave, 2 px Engrave lines for
 all-open leaves, read-only lock glyph). No new crate, no new dependency, no `format_version`
@@ -23,7 +23,7 @@ it. Noted for the UX review; nothing changed here.
   `x.<process>.`); the open check refuses a container value under an `x.*` key of a
   manufacturing; golden `laser_roles_v36.curvyo`.
 - **`curvyo-laser-core`**: new module `roles` (`Role`, `RoleTarget`, `RoleRead`, key text,
-  read from `process_values`, the output rule of ADR 0040 §6, the notice texts, commit label
+  read from `process_values`, the output rule of ADR 0041 §6, the notice texts, commit label
   `set_role`); manifest gets `Block::Layers { label: "Layers" }` after Machine.
 - **`curvyo-extension-core`**: `Block::Layers { label }`, `CHANGELOG.md`.
 - **`curvyo-ui-core`**: history name `set_role` → "Set role"; document-level label.

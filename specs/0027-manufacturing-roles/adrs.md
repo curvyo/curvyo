@@ -6,7 +6,7 @@ Written for Frage 140 A, 141 A and 142 A; note 8 says what changes on B or C.
 
 ## Depends on or extends
 
-- [ADR 0040](../../docs/adr/0040-laser-roles-keyed-by-layer.md) (new, extends ADR 0033 §3): one
+- [ADR 0041](../../docs/adr/0041-laser-roles-keyed-by-layer.md) (new, extends ADR 0033 §3): one
   register per layer `x.curvyo.laser.role.<peer:counter>`, reserved `...role.outside`, values
   `cut`/`engrave`/`ignore`, absent = Unassigned; Unknown and Unassigned never output; what is
   output for `0029`; no format bump, golden `laser_roles_v36.curvyo`.
@@ -35,8 +35,8 @@ Written for Frage 140 A, 141 A and 142 A; note 8 says what changes on B or C.
    view state. Rejected: one `Param` of kind `Choice` per layer (a dynamic schema, and the same
    objections as `0026` note 4).
 2. **Code places.** `curvyo-laser-core/src/roles.rs`: `Role`, key text, parse to `Known | Unknown`,
-   the output rule of ADR 0040 §6, notice texts from counts the caller passes. Document-core: the
-   one `x.*` write command (ADR 0040 §4), `NodeId::to_register_text`/parse, the container check.
+   the output rule of ADR 0041 §6, notice texts from counts the caller passes. Document-core: the
+   one `x.*` write command (ADR 0041 §4), `NodeId::to_register_text`/parse, the container check.
    `curvyo-editor-wasm/src/session/manufacturing/roles.rs`: Layers block view, `set_layer_role`,
    the leaf-to-layer map. `curvyo-render-core`: the looks (note 3).
 3. **The role look is a per-leaf override at artwork build, not in the resolution.** Placement
@@ -70,19 +70,19 @@ Written for Frage 140 A, 141 A and 142 A; note 8 says what changes on B or C.
    Layers block at most 100 ms (200 rows and one O(n) count, the size of `0026`'s 200-record
    list within 100 ms). If (a) fails, the fix is a read cache keyed on the drawing only, a
    separate decision.
-7. **No format bump** (ADR 0040 §7). Criterion 19's golden is `laser_roles_v36.curvyo`; the
+7. **No format bump** (ADR 0041 §7). Criterion 19's golden is `laser_roles_v36.curvyo`; the
    tests that `laser_workbench_v36.curvyo` and `machine_profile_v36.curvyo` open with no role and
    write nothing stay as written.
 8. **Other answers.**
-   - Frage 140 B: an all-open leaf under Engrave draws in the Ignore look, is not output (ADR 0040
+   - Frage 140 B: an all-open leaf under Engrave draws in the Ignore look, is not output (ADR 0041
      §6 gains "closed outlines only") and is counted in criterion 15. Storage unchanged.
    - Frage 140 C: values `line`, `fill`, `fill_line`, and a fourth look (`Area` plus `Outline`).
      The strings are written into files, so C must be chosen before merge; afterwards it is a
-     format change (ADR 0040 §2).
+     format change (ADR 0041 §2).
    - Frage 141 B: absent reads as Cut; there is no Unassigned and pressing the pressed button
      does nothing. Changing the meaning of absent after merge is a bump, so this too is final at
      merge.
-   - Frage 142 B: placements draw from `DocumentRead.leaves` (hidden included) and ADR 0040 §6
+   - Frage 142 B: placements draw from `DocumentRead.leaves` (hidden included) and ADR 0041 §6
      drops the visibility condition. Frage 142 C: hidden leaves are drawn with a faded `Marking`
      look and not output. Neither touches the file.
 
@@ -95,7 +95,7 @@ Written for Frage 140 A, 141 A and 142 A; note 8 says what changes on B or C.
    lines), not 16 (the live follow).
 3. **Criterion 19 and the Format line:** the golden is `laser_roles_v36.curvyo` in
    `curvyo-document-core/tests/fixtures/` (no bump, format 36).
-4. **Criterion 18:** "refused as damaged only as ADR 0033 §7 says" should read ADR 0040 §3 (a
+4. **Criterion 18:** "refused as damaged only as ADR 0033 §7 says" should read ADR 0041 §3 (a
    container value under `x.*`); §7 lists no such case.
 5. **Criterion 5:** name the key form (`x.curvyo.laser.role.<layer id>`, `...role.outside`) so the
    tester can assert it; criterion 11's "reserved key" is `outside`.

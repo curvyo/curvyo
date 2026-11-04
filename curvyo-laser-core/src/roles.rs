@@ -1,4 +1,4 @@
-//! The laser roles of ADR 0040 (`specs/0027-manufacturing-roles`): what the laser does with the
+//! The laser roles of ADR 0041 (`specs/0027-manufacturing-roles`): what the laser does with the
 //! content of one drawing layer, as stored on the manufacturing under one register per layer.
 
 use curvyo_document_core::NodeId;
@@ -9,7 +9,7 @@ use crate::manifest::PROCESS_ID;
 /// The commit label of a role press ("Set role", criterion 4).
 pub const SET_ROLE_COMMIT_LABEL: &str = "set_role";
 
-/// The family of the role registers inside the laser's namespace (ADR 0040 §2).
+/// The family of the role registers inside the laser's namespace (ADR 0041 §2).
 const ROLE_FAMILY: &str = "role";
 
 /// The reserved key word of the objects in no layer (criterion 11); no node id has this form.
@@ -27,7 +27,7 @@ pub enum Role {
 }
 
 impl Role {
-    /// The stored value (published contract, ADR 0040 §2).
+    /// The stored value (published contract, ADR 0041 §2).
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -84,7 +84,7 @@ impl RoleTarget {
     }
 }
 
-/// A stored role as read (ADR 0040 §3).
+/// A stored role as read (ADR 0041 §3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoleRead {
     /// Nothing stored (criterion 3).
@@ -125,7 +125,7 @@ pub fn role_value(role: Option<Role>) -> Option<serde_json::Value> {
 }
 
 /// Whether an output-capable leaf (visible, not a guide, dimension or fixture) is output under
-/// `role` (ADR 0040 §6): Cut or Engrave, an image only under Engrave. Unassigned and Unknown are
+/// `role` (ADR 0041 §6): Cut or Engrave, an image only under Engrave. Unassigned and Unknown are
 /// never output (fail closed).
 #[must_use]
 pub const fn is_output(role: RoleRead, is_image: bool) -> bool {

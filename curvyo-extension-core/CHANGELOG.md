@@ -8,7 +8,7 @@ migration in that extension.
 
 - Block kind `Layers { label }`: one row per drawing layer with its role in the manufacturing,
   drawn by the shell; the extension only places it. Keyed register families
-  `x.<process id>.<family>.<node id or reserved word>` next to declared parameters (ADR 0040 §2).
+  `x.<process id>.<family>.<node id or reserved word>` next to declared parameters (ADR 0041 §2).
 
 ## Unreleased (`specs/0026-machine-profile`)
 

@@ -1,6 +1,6 @@
 //! Independent acceptance tests for `specs/0027-manufacturing-roles` at the document model and
-//! file format (ADR 0040, format 36): the generic `x.<process>.*` register command (one step, no
-//! step for an unchanged value, refusals; criteria 4, 5, ADR 0040 §4), the drawing never written
+//! file format (ADR 0041, format 36): the generic `x.<process>.*` register command (one step, no
+//! step for an unchanged value, refusals; criteria 4, 5, ADR 0041 §4), the drawing never written
 //! (4), per-layer merge of concurrent peers (5), no role written by Add manufacturing or a new
 //! layer (3), stale and unknown entries kept and never rewritten (17, 18), the container check on
 //! open (18), the golden round trip and the files from before the slice (19), and delete of a
@@ -339,7 +339,7 @@ fn ac5_two_peers_on_different_layers_both_survive_the_merge() {
 
 #[test]
 fn ac5_two_peers_set_first_roles_concurrently_in_a_fresh_manufacturing() {
-    // The case option B of ADR 0040 loses: both peers write the very first roles at once.
+    // The case option B of ADR 0041 loses: both peers write the very first roles at once.
     let d = Document::new(1);
     let a = layer(&d, "A", 10.0);
     let b = layer(&d, "B", 30.0);
@@ -393,7 +393,7 @@ fn ac5_one_peer_clears_while_the_other_sets_another_layer() {
     assert_eq!(r, roles(&two, m));
 }
 
-// ---- ADR 0040 §4: refusals of the generic command ---------------------------------------------
+// ---- ADR 0041 §4: refusals of the generic command ---------------------------------------------
 
 #[test]
 fn adr4_keys_outside_the_own_namespace_and_unknown_ids_are_refused_without_a_step() {
@@ -444,7 +444,7 @@ fn adr4_keys_outside_the_own_namespace_and_unknown_ids_are_refused_without_a_ste
 
 #[test]
 fn adr4_whatever_value_the_command_accepts_reopens() {
-    // No build may write a value the open check refuses (ADR 0040 §3 "No build writes one").
+    // No build may write a value the open check refuses (ADR 0041 §3 "No build writes one").
     let d = Document::new(1);
     let a = layer(&d, "A", 10.0);
     let m = laser(&d);

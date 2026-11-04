@@ -246,7 +246,7 @@ pub(crate) fn process_values(meta: &LoroMap) -> serde_json::Map<String, serde_js
 }
 
 /// Whether no `x.*` register of a manufacturing holds a container: ADR 0033 §3 allows only plain
-/// Loro values there, and ADR 0040 §3 refuses any other shape as damage.
+/// Loro values there, and ADR 0041 §3 refuses any other shape as damage.
 fn process_values_are_plain(meta: &LoroMap) -> bool {
     let mut plain = true;
     meta.for_each(|key, value| {

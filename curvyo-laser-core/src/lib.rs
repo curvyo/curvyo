@@ -1,5 +1,5 @@
 //! The laser workbench extension (ADR 0034 §1): its manifest, the outlines of its fixtures, the
-//! text of its notices, its machine profiles (ADR 0038, ADR 0039) and its roles (ADR 0040). It
+//! text of its notices, its machine profiles (ADR 0038, ADR 0039) and its roles (ADR 0041). It
 //! receives document data and record texts as arguments and never writes.
 
 #![forbid(unsafe_code)]

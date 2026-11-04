@@ -1,4 +1,4 @@
-# ADR 0040: Laser roles keyed by layer in the manufacturing
+# ADR 0041: Laser roles keyed by layer in the manufacturing
 
 **Status:** Proposed 2026-11-04, `needs-customer` (persistence: what a `.curvyo` file holds; and
 what is output, R-MFG-005). Written for Frage 140 A, 141 A and 142 A of
