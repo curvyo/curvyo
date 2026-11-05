@@ -259,7 +259,7 @@ impl Document {
     }
 
     /// Creates a clone of `source` with the identity matrix directly above it. Uncommitted.
-    fn create_clone_above(&self, source: NodeId) -> NodeId {
+    pub(crate) fn create_clone_above(&self, source: NodeId) -> NodeId {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         // `mov_after` needs the fractional index on for this tree, as `duplicate_objects` does.
         tree.enable_fractional_index(0);

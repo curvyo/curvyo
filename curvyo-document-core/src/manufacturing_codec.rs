@@ -250,14 +250,6 @@ pub(crate) fn owner_text(id: TreeID) -> String {
     encode_node(id)
 }
 
-/// The owner a page record names, `None` for an unowned page or an unreadable value.
-pub(crate) fn page_owner(root: &LoroMap, page: &str) -> Option<TreeID> {
-    match root.get(&crate::pages::key(page, PAGE_OWNER_FIELD))? {
-        ValueOrContainer::Value(LoroValue::String(text)) => decode_node(&text),
-        _ => None,
-    }
-}
-
 /// The open-file check of ADR 0033 §7: every manufacturing names a process and a page, holds only
 /// placement and fixture leaves with readable registers, and every page owner of a live page
 /// names a live manufacturing (or a removed node, whose page is not shown).

@@ -4,6 +4,9 @@ use crate::units::Timestamp;
 
 /// The reserved label of the commit that holds a new document's root setup (ADR 0014 context).
 pub const LABEL_NEW_DOCUMENT: &str = "new_document";
+/// The reserved label of the commit that converts a file of an older format when it is opened
+/// (ADR 0042 §9): not an undo step, not a row of the history list.
+pub const LABEL_MIGRATE_FORMAT: &str = "migrate_format";
 /// The reserved label of an undo (`u` names the step it takes back).
 pub const LABEL_UNDO: &str = "undo";
 /// The reserved label of a redo (`d` names the step it applies again).

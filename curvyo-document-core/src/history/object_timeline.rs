@@ -16,8 +16,8 @@ use super::object_index::ObjectIndex;
 use super::rows::is_document_level_label;
 use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
-    KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO,
-    LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT,
+    KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT,
+    LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT,
 };
 use super::step_id::StepRef;
 use super::step_index::{Position, StepIndex};
@@ -178,7 +178,9 @@ impl Reader<'_> {
         };
         let target = |key: &str| header.extra_value(key).and_then(StepRef::decode);
         match header.label.as_str() {
-            LABEL_NEW_DOCUMENT | LABEL_UNDO | LABEL_REDO | LABEL_WIPE => None,
+            LABEL_NEW_DOCUMENT | LABEL_MIGRATE_FORMAT | LABEL_UNDO | LABEL_REDO | LABEL_WIPE => {
+                None
+            }
             label if is_document_level_label(label) => None,
             LABEL_OBJECT_UNDO => Some(EntryClass::Reverts {
                 target: target(KEY_OBJECT_UNDONE)?,

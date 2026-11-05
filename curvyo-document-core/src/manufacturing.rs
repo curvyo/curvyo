@@ -5,7 +5,6 @@
 use loro::{LoroMap, TreeID, TreeParentId};
 use serde::Serialize;
 
-use crate::Point;
 use crate::affine::Affine;
 use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
 use crate::document_size::{DocumentSizeError, validated_document_side};
@@ -24,13 +23,12 @@ use crate::path_model::NodeId;
 use crate::paths::tree_id_of;
 use crate::shape_codec::KEY_SHAPE;
 use crate::units::DocumentSize;
+use crate::{Point, Vec2};
 
-/// The label of Add manufacturing's commit.
-pub const ADD_MANUFACTURING_COMMIT_LABEL: &str = "add_manufacturing";
-/// The label of Delete manufacturing's commit.
-pub const DELETE_MANUFACTURING_COMMIT_LABEL: &str = "delete_manufacturing";
-/// The label of a work area edit's commit.
-pub const SET_WORK_AREA_COMMIT_LABEL: &str = "set_work_area";
+/// The label of Add page with an output kind (`specs/0098-page-kinds` criterion 4).
+pub const ADD_OUTPUT_PAGE_COMMIT_LABEL: &str = "add_output_page";
+/// The label of the delete of a placement (criterion 12).
+pub const DELETE_PLACEMENT_COMMIT_LABEL: &str = "delete_placement";
 /// The label of Add fixture's commit.
 pub const ADD_FIXTURE_COMMIT_LABEL: &str = "add_fixture";
 /// The label of Delete fixture's commit.
@@ -102,7 +100,8 @@ pub type FixtureParams = serde_json::Map<String, serde_json::Value>;
 pub struct ManufacturingSnapshot {
     /// Its node.
     pub id: NodeId,
-    /// Its name ("Laser 1").
+    /// The node's old name ("Laser 1"), left as is in old files and no longer written: the page
+    /// name is the one shown (ADR 0042 §5).
     pub name: String,
     /// The process id, equal to the extension's id (`curvyo.laser`).
     pub process: String,
@@ -159,19 +158,27 @@ pub struct FixtureSnapshot {
     pub visible: bool,
 }
 
-/// What Add manufacturing creates.
+/// What Add page with an output kind creates.
 #[derive(Debug, Clone, Copy)]
-pub struct NewManufacturing<'a> {
+pub struct NewOutputPage<'a> {
     /// The process id.
     pub process: &'a str,
-    /// The process name the new manufacturing's name starts with ("Laser").
+    /// The word the page's name starts with ("Laser").
     pub label: &'a str,
     /// The machine profile copy, written whole; `None` writes no copy.
     pub profile: Option<&'a FixtureParams>,
-    /// The work area, the output page's size.
+    /// The work area, the page's size.
     pub work_area: DocumentSize,
-    /// The drawing page placed at the output page's top-left corner, if any (criterion 5).
-    pub place: Option<&'a str>,
+}
+
+/// The corner of an output page that keeps its place in the plane when the work area changes
+/// (the machine origin, ADR 0042 §6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PageCorner {
+    /// The corner is on the right edge.
+    pub right: bool,
+    /// The corner is on the bottom edge.
+    pub bottom: bool,
 }
 
 /// A refused manufacturing command; it writes nothing.
@@ -271,149 +278,103 @@ impl Document {
             process: string(&meta, KEY_PROCESS)?,
             profile: crate::manufacturing_codec::read_profile_map(&meta),
             legacy_machine_name: string(&meta, KEY_MACHINE_NAME),
-            page: owned_page(&self.loro().get_map(ROOT_MAP), &page_id),
+            page: owned_page(&self.loro().get_map(ROOT_MAP), &tree, &page_id),
             placements,
             fixtures,
             process_values: crate::manufacturing_codec::process_values(&meta),
         })
     }
 
-    /// Adds a manufacturing named "`label` n" with its owned output page of the work area's size
-    /// and, with `place`, a placement of that drawing page at the top-left corner, scale 1,
-    /// rotation 0, in one history step (criteria 2, 3, 5). The node goes to the end of the
-    /// root, after every drawing node.
+    /// Adds an output page of `new.process` named "`label` N" with exactly the work area, its
+    /// manufacturing node holding the machine copy, no fixture and no placement, placed by the
+    /// Add page rule, in one history step (ADR 0042 §5, `specs/0098-page-kinds` criterion 4).
+    /// The node goes to the end of the root, after every drawing node.
     ///
     /// # Errors
     /// [`ManufacturingError::Size`] for a work area outside the page size limits.
     ///
     /// # Panics
-    /// Does not panic in practice: the tree operations act on the root and nodes just created.
-    pub fn add_manufacturing(
-        &self,
-        new: NewManufacturing<'_>,
-    ) -> Result<NodeId, ManufacturingError> {
-        let width = validated_document_side(new.work_area.width)?;
-        let height = validated_document_side(new.work_area.height)?;
-        let taken: Vec<String> = self.manufacturings().into_iter().map(|m| m.name).collect();
-        let name = next_numbered(new.label, &taken, false);
-        let place = new
-            .place
-            .filter(|page| self.pages().iter().any(|p| p.id == *page));
+    /// Does not panic in practice: the tree operations act on the root and a node just created.
+    pub fn add_output_page(&self, new: NewOutputPage<'_>) -> Result<Page, ManufacturingError> {
+        let size = DocumentSize {
+            width: validated_document_side(new.work_area.width)?,
+            height: validated_document_side(new.work_area.height)?,
+        };
+        let pages = self.pages();
         let tree = self.loro().get_tree(OBJECTS_TREE);
         tree.enable_fractional_index(0);
         // invariant: the root always accepts a new child.
         #[allow(clippy::unwrap_used)]
         let node = tree.create(TreeParentId::Root).unwrap();
-        let page_id = format!("mfg-{}-{}", node.peer, node.counter);
+        let page = Page {
+            id: format!("mfg-{}-{}", node.peer, node.counter),
+            name: crate::pages::next_free_name(&pages, new.label),
+            origin: crate::pages::next_page_origin(&pages, size),
+            size,
+            grid: crate::PageGrid::DEFAULT,
+            kind: crate::PageKind::Output {
+                manufacturing: node_id(node),
+                process: new.process.to_owned(),
+            },
+        };
         // invariant: the node was just created, so its meta map exists; plain values only.
         #[allow(clippy::unwrap_used)]
         {
             let meta = tree.get_meta(node).unwrap();
             meta.insert(KEY_MANUFACTURING, true).unwrap();
-            meta.insert(KEY_NAME, name.as_str()).unwrap();
             meta.insert(KEY_PROCESS, new.process).unwrap();
-            meta.insert(KEY_PAGE, page_id.as_str()).unwrap();
+            meta.insert(KEY_PAGE, page.id.as_str()).unwrap();
             if let Some(profile) = new.profile {
                 write_plain_map(&meta, KEY_PROFILE, profile);
             }
         }
         let root = self.loro().get_map(ROOT_MAP);
-        write(&root, &page_id, "name", name.as_str());
-        write(&root, &page_id, "order", 0.0);
-        write_frame(
-            &root,
-            &page_id,
-            Frame {
-                origin: Point::new(0.0, 0.0),
-                size: DocumentSize { width, height },
-            },
-        );
-        write(&root, &page_id, "deleted", false);
-        write(&root, &page_id, PAGE_OWNER_FIELD, owner_text(node));
-        if let Some(page) = place {
-            // invariant: the manufacturing node was just created and is live.
-            #[allow(clippy::unwrap_used)]
-            let placement = tree.create(TreeParentId::Node(node)).unwrap();
-            #[allow(clippy::unwrap_used)]
-            let meta = tree.get_meta(placement).unwrap();
-            // invariant: a fresh meta map takes a plain value.
-            #[allow(clippy::unwrap_used)]
-            meta.insert(KEY_SHAPE, SHAPE_PLACEMENT).unwrap();
-            write_placement_link(
-                &meta,
-                &PlacementLink {
-                    page: page.to_owned(),
-                    matrix: Affine::IDENTITY,
-                },
-            );
-        }
-        self.commit_with_label(ADD_MANUFACTURING_COMMIT_LABEL);
-        Ok(node_id(node))
+        Self::write_new_page(&root, &pages, &page);
+        write(&root, &page.id, "deleted", false);
+        write(&root, &page.id, PAGE_OWNER_FIELD, owner_text(node));
+        self.commit_with_label(ADD_OUTPUT_PAGE_COMMIT_LABEL);
+        Ok(page)
     }
 
-    /// Deletes the manufacturing `id` with its output page, placements and fixtures in one
-    /// history step; the node goes in one tree delete, so an undo revives everything (criterion
-    /// 13). The drawing is untouched. Allowed for an unknown process too (ADR 0033 §4).
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NotFound`] when `id` is not a live manufacturing.
-    pub fn delete_manufacturing(&self, id: NodeId) -> Result<(), ManufacturingError> {
-        let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
+    /// Removes the manufacturing node `id` with its placements and fixtures in one tree delete,
+    /// uncommitted: the page that owns it is being deleted in the same step (ADR 0042 §5).
+    pub(crate) fn remove_manufacturing_node(&self, id: NodeId) -> Result<(), ManufacturingError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let page = string(
-            &tree
-                .get_meta(tree_id_of(id))
-                .map_err(|_| ManufacturingError::NotFound)?,
-            KEY_PAGE,
-        );
-        tree.delete(tree_id_of(manufacturing.id))
+        tree.delete(tree_id_of(id))
             .map_err(|_| ManufacturingError::NotFound)?;
         // The rule of `specs/0023-groups` that every delete sweeps emptied groups; a
         // manufacturing sits at the root and holds no group, so this finds nothing of its own.
         crate::groups::remove_emptied_groups(&tree, &[None]);
-        if let Some(page) = page {
-            write(&self.loro().get_map(ROOT_MAP), &page, "deleted", true);
-        }
-        self.commit_with_label(DELETE_MANUFACTURING_COMMIT_LABEL);
         Ok(())
     }
 
-    /// Sets the work area, the output page's size, in one history step; placed content keeps its
-    /// place relative to the top-left corner, since it is page-local (criterion 3). `Ok(false)`
-    /// and nothing written when the size is unchanged.
+    /// Removes the placement `id` (only the reference; the drawing page stays) in one history
+    /// step (criterion 12).
     ///
     /// # Errors
-    /// [`ManufacturingError::NotFound`] for an unknown manufacturing or one without its page;
-    /// [`ManufacturingError::Size`] for a side outside the page size limits.
-    pub fn set_work_area(
-        &self,
-        id: NodeId,
-        size: DocumentSize,
-    ) -> Result<bool, ManufacturingError> {
-        let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
-        let page = manufacturing.page.ok_or(ManufacturingError::NotFound)?;
-        let width = validated_document_side(size.width)?;
-        let height = validated_document_side(size.height)?;
-        #[allow(clippy::float_cmp)] // exact register equality avoids an empty step
-        if page.size.width.as_mm() == width.as_mm() && page.size.height.as_mm() == height.as_mm() {
-            return Ok(false);
+    /// [`ManufacturingError::NotFound`] when `id` is not a live placement.
+    pub fn delete_placement(&self, id: NodeId) -> Result<(), ManufacturingError> {
+        let placed = self
+            .manufacturings()
+            .iter()
+            .any(|m| m.placements.iter().any(|p| p.id == id));
+        if !placed {
+            return Err(ManufacturingError::NotFound);
         }
-        let root = self.loro().get_map(ROOT_MAP);
-        write_frame(
-            &root,
-            &page.id,
-            Frame {
-                origin: Point::new(0.0, 0.0),
-                size: DocumentSize { width, height },
-            },
-        );
-        self.commit_with_label(SET_WORK_AREA_COMMIT_LABEL);
-        Ok(true)
+        self.loro()
+            .get_tree(OBJECTS_TREE)
+            .delete(tree_id_of(id))
+            .map_err(|_| ManufacturingError::NotFound)?;
+        crate::groups::remove_emptied_groups(&self.loro().get_tree(OBJECTS_TREE), &[None]);
+        self.commit_with_label(DELETE_PLACEMENT_COMMIT_LABEL);
+        Ok(())
     }
 
     /// Writes the machine profile copy `profile` whole and sets the work area, the output page's
     /// size, in one history step labelled by `change` (ADR 0039 §4); the format-35 machine name
-    /// goes in the same step. Placed content keeps its place relative to the top-left corner.
+    /// goes in the same step. The `anchor` corner (the copy's origin) keeps its place in the
+    /// plane and the frame grows away from it; each placement keeps its place in the plane and
+    /// own items are not written (ADR 0042 §6, `specs/0098-page-kinds` criterion 14).
     /// `Ok(false)` and nothing written when the copy, the size and the old key are unchanged.
     ///
     /// # Errors
@@ -424,6 +385,7 @@ impl Document {
         id: NodeId,
         profile: &FixtureParams,
         work_area: DocumentSize,
+        anchor: PageCorner,
         change: ProfileChange,
     ) -> Result<bool, ManufacturingError> {
         let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
@@ -450,14 +412,39 @@ impl Document {
                 .map_err(|_| ManufacturingError::NotFound)?;
         }
         if !same_size {
+            let shift = Vec2::new(
+                if anchor.right {
+                    page.size.width.as_mm() - width.as_mm()
+                } else {
+                    0.0
+                },
+                if anchor.bottom {
+                    page.size.height.as_mm() - height.as_mm()
+                } else {
+                    0.0
+                },
+            );
             write_frame(
                 &self.loro().get_map(ROOT_MAP),
                 &page.id,
                 Frame {
-                    origin: Point::new(0.0, 0.0),
+                    origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
                     size: DocumentSize { width, height },
                 },
             );
+            let back = Affine::translation(Vec2::new(-shift.x, -shift.y));
+            let tree = self.loro().get_tree(OBJECTS_TREE);
+            for placement in &manufacturing.placements {
+                if let Ok(meta) = tree.get_meta(tree_id_of(placement.id)) {
+                    write_placement_link(
+                        &meta,
+                        &PlacementLink {
+                            page: placement.page.clone(),
+                            matrix: back.compose(placement.matrix),
+                        },
+                    );
+                }
+            }
         }
         self.commit_with_label(change.label());
         Ok(true)

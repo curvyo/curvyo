@@ -269,62 +269,55 @@ fn slot_and_converted_goldens() {
     fixture("sketch_converted_v29.curvyo", &doc, true);
 }
 
+/// The page-sketch goldens of format 29 were written when a drawing page owned its sketch; they
+/// open through the format-36 migration (ADR 0042 §9): the sketch moves to the sketch page
+/// `first-sketch` and a linked clone stays on page 1.
+fn migrated_page_sketch(name: &str) -> Document {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name);
+    let loaded = unpack(919, &std::fs::read(path).unwrap()).unwrap();
+    let pages = loaded.pages();
+    assert_eq!(pages.len(), 2, "{name}");
+    assert_eq!(pages[1].id, "first-sketch", "{name}");
+    assert_eq!(pages[1].kind, crate::PageKind::Sketch, "{name}");
+    assert!(loaded.page_sketch(crate::FIRST_PAGE_ID).is_none(), "{name}");
+    loaded
+}
+
 #[test]
 fn page_sketch_claim_goldens() {
-    let doc = Document::new(903);
-    let page = doc.pages()[0].id.clone();
-    let id = doc
-        .create_page_sketch(&page, &Sketch::new("origin".into()), &Style::default())
-        .unwrap();
-    fixture("sketch_page_owner_v29.curvyo", &doc, true);
-    let root = doc.loro().get_map(crate::document::ROOT_MAP);
-    let key = crate::pages::key(&page, "sketch_owner");
-    root.insert(&key, "invalid identity").unwrap();
-    doc.commit_with_label("damaged_claim");
-    fixture("sketch_page_claim_invalid_v29.curvyo", &doc, false);
-    root.delete(&key).unwrap();
-    let meta = doc.sketch_meta(id).unwrap();
-    meta.insert(crate::sketch_page::PAGE_KEY, 123).unwrap();
-    doc.commit_with_label("damaged_assignment");
-    fixture("sketch_page_assignment_invalid_v29.curvyo", &doc, false);
+    let loaded = migrated_page_sketch("sketch_page_owner_v29.curvyo");
+    assert!(loaded.page_sketch("first-sketch").is_some());
+    for name in [
+        "sketch_page_claim_invalid_v29.curvyo",
+        "sketch_page_assignment_invalid_v29.curvyo",
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join(name);
+        assert!(
+            unpack(919, &std::fs::read(path).unwrap()).is_err(),
+            "{name}"
+        );
+    }
 }
 
 #[test]
 fn dimension_label_goldens() {
-    let doc = Document::new(904);
-    let mut graph = Sketch::new("origin".into());
-    graph = curvyo_sketch_core::create_circle(
-        &graph,
-        "circle",
-        Position::mm(10.0, 10.0),
-        curvyo_sketch_core::Length(5.0),
-    )
-    .unwrap();
-    let circle = graph
-        .entities
-        .iter()
-        .find_map(|(id, e)| {
-            matches!(e, curvyo_sketch_core::Entity::Circle { .. }).then(|| id.clone())
-        })
-        .unwrap();
-    graph.constraints.insert(
-        "radius".into(),
-        Constraint::driving(Relation::Radius {
-            curve: circle,
-            value: Expression::Literal(Quantity::length(5.0).unwrap()),
-        }),
+    let loaded = migrated_page_sketch("sketch_dimension_label_v29.curvyo");
+    let id = loaded.page_sketch("first-sketch").unwrap();
+    assert!(
+        loaded
+            .sketch(id)
+            .unwrap()
+            .graph
+            .constraints
+            .contains_key(&"radius".into())
     );
-    let id = doc
-        .create_page_sketch(&doc.pages()[0].id, &graph, &Style::default())
-        .unwrap();
-    doc.set_sketch_label(id, &"radius".into(), Position::mm(17.0, -3.0))
-        .unwrap();
-    fixture("sketch_dimension_label_v29.curvyo", &doc, true);
-    let meta = doc.sketch_meta(id).unwrap();
-    let labels = crate::sketch_codec::collection(&meta, crate::sketch_labels::KEY).unwrap();
-    labels.insert("radius", "invalid position").unwrap();
-    doc.commit_with_label("damaged_label");
-    fixture("sketch_label_invalid_v29.curvyo", &doc, false);
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/sketch_label_invalid_v29.curvyo");
+    assert!(unpack(919, &std::fs::read(path).unwrap()).is_err());
 }
 
 /// A damaged v29 golden: a horizontal distance record with a negative value (0066 AC46). The
