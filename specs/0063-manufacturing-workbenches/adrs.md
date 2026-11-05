@@ -43,3 +43,8 @@ machine setup, the connector protocol follows.
   with the second extension crate, for the `Extension` trait (ADR 0034 §3).
 - 2026-11-02: WB-PAGE-VIS A and WB-FIXTURE-HOME A (customer, 2026-11-02) are what ADR 0032 §5
   and §8 assume; no change to the ADRs. WB-NAME A, WB-MULTI A, WB-PLACE-DEFAULT A need none either.
+- 2026-11-05: Concept A (customer). Slice `0098` is covered by [ADR 0042](../../docs/adr/0042-page-kinds.md)
+  (page kinds, output page listed and in the plane, workbench of the active page; amends 0024,
+  0026, 0032, 0033, 0039). WB-PAGE-VIS A and WB-PLACE-DEFAULT A no longer hold. The withdrawn laser-roles ADR of the
+  closed PR #269 never reached `main`; its replacement is the operations ADR of
+  `0101`.

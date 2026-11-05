@@ -5,6 +5,7 @@ output page and placements). Extends ADR 0024 (pages), ADR 0015/0016 (clone reso
 ADR 0026 (Sketch workbench state). Specs: `0063` (epic), `0093` (first slice), `0065`.
 Persistence details: [ADR 0033](0033-manufacturing-data-in-the-project-file.md). Extension
 contract: [ADR 0034](0034-extension-contract-compiled-in.md).
+Note 2026-11-05: §1 to §5 and §9 amended by [ADR 0042](0042-page-kinds.md) (proposed; customer feedback of 2026-11-05 reversed WB-PAGE-VIS A and WB-PLACE-DEFAULT A): the output page is listed and in the plane, the workbench follows the active page, no switcher, no Add manufacturing.
 
 ## Context
 

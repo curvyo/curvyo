@@ -7,6 +7,7 @@ not a new unanswered question. Written 2026-10-29. Replaces the deferred scope
 of rejected ADR 0012; extends ADRs 0002, 0009 and 0014. Customer clarification
 2026-10-29: old files do not matter in this unreleased development build;
 backward compatibility is not required.
+Note 2026-11-05: §1 and §3 amended by [ADR 0042](0042-page-kinds.md) (proposed): every page has a fixed kind; an owned output page is listed and in the plane.
 
 ## Context
 
