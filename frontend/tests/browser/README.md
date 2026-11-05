@@ -243,3 +243,15 @@ preview on port 1422) pairs a browser with a desktop device run on the wasm bind
 backs the browser's keys up with Playwright's virtual authenticator (PRF), clears the site data,
 restores the same device without pairing, checks the desktop shows it as a browser under its
 name, removes the backup, and checks that a passkey without PRF stores nothing.
+
+### Membership lifecycle (0097)
+
+`membership.cjs` runs a local `curvyo-sync-server` and three browser contexts (Anna, Ben, Cleo)
+on a shared document: the second-admin line and Make admin / Make member, the only admin's
+refused Leave, a removal with "Check whether I was added back" answering "Not added back yet.",
+an add back with Full history and Sync again, a second removal and add back answered with Keep
+as it is (Ben left, Anna changes the keys), and a workspace on the faked desktop host
+(`support/fake-workspace-host.cjs`, shared with `workspace.cjs`) whose add back has no history
+choice. It ends by checking that the relay's data holds no label, name or content. Run it with
+the Playwright environment above and `CURVYO_BROWSER_URL` of a production preview; screenshots go
+to `target/0097-browser/`.

@@ -273,8 +273,10 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     // Criterion 32: A removes B; Remove ignores the first 400 ms; epoch 1; B is told.
     await tab(A, 'Share');
     await panel(A).getByRole('button', { name: 'Remove Ben', exact: true }).click();
-    const ask = panel(A).getByRole('group', { name: /^Remove Ben\? Removing does not reach back/ });
+    // Since 0097 the confirm group carries the short name of its act; the sentence is its text.
+    const ask = panel(A).getByRole('group', { name: 'Remove Ben', exact: true });
     await ask.waitFor();
+    assert.match(await ask.innerText(), /^Remove Ben\? Removing does not reach back/);
     await ask.getByRole('button', { name: 'Remove', exact: true }).click();
     await settle(A.page, 100);
     assert.equal(await participants(A).count(), 2, 'a press in the first 400 ms does not remove');
@@ -282,7 +284,7 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     await ask.getByRole('button', { name: 'Remove', exact: true }).click();
     await until('A lists only itself', async () => (await participants(A).count()) === 1);
     await panel(A).getByText('Key epoch 1', { exact: true }).waitFor();
-    await until('B told', async () => (await B.page.getByText('You were removed from this document. Your copy stays on this computer.').count()) >= 1, 8000);
+    await until('B told', async () => (await B.page.getByText('You were removed from this document. Your copy stays on this device.').count()) >= 1, 8000);
     await shot(A, '09-a-removed-b');
     await shot(B, '10-b-removed');
     const kept = await saved(B);

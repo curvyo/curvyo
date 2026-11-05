@@ -11,7 +11,10 @@
 // it; A switches on again and B's Connect this folder sends B's edit to A without B opening the
 // document (14). A removes B: B is told and keeps its files (23, 24), and A, now the only device
 // of a synced workspace, shows the one-device warning (28). The server's data holds none of the
-// names (30). Browser pairing and the passkey backup are `key-backup.cjs`.
+// names (30). PR #281 feedback: the removed B pairs again with the same identity and is listed
+// again on both; the server stops before Sync these of two closed workspaces, one alert names
+// both, and it goes once the restarted server lets them in; the Share tab fits its panel in every
+// state shown (`support/panel-overflow.cjs`); the run prints how long each change took. Browser pairing and the passkey backup are `key-backup.cjs`.
 //
 // The fake host mirrors `curvyo-app`'s commands closely enough for the page; their Rust side is
 // covered by `curvyo-app` and `curvyo-storage-io` tests, not here.
@@ -26,6 +29,8 @@ const { spawn, execFileSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+
+const { assertPanelFits } = require('./support/panel-overflow.cjs');
 
 const root = path.resolve(__dirname, '../../..');
 const out = path.join(root, 'target/0096-browser');
@@ -50,11 +55,12 @@ async function waitFor(url) {
   throw new Error(`no server at ${url}`);
 }
 
-/** The relay on a free port with a fresh data directory. */
-async function startRelay() {
-  const data = path.join(out, 'relay-data');
-  fs.mkdirSync(data);
-  const relay = spawn(path.join(root, 'target/debug/curvyo-sync-server'), ['--listen', '127.0.0.1:0', '--data', data], {
+/** The relay on a free port with a fresh data directory, or again on `again`'s address and data. */
+async function startRelay(again) {
+  const data = again ? again.data : path.join(out, 'relay-data');
+  if (!again) fs.mkdirSync(data);
+  const listen = again ? again.address : '127.0.0.1:0';
+  const relay = spawn(path.join(root, 'target/debug/curvyo-sync-server'), ['--listen', listen, '--data', data], {
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -71,7 +77,7 @@ async function startRelay() {
     relay.stderr.on('data', read);
   });
   await waitFor(`http://${address}/healthz`);
-  return { address, data, log: () => log };
+  return { address, data, log: () => log, stop: () => process.kill(-relay.pid, 'SIGKILL') };
 }
 
 const ZIP_PY = `
@@ -283,6 +289,7 @@ function makeHost(label) {
       fs.writeFileSync(marker(a, 'share.json'), Buffer.from(a.marker.share_json));
       fs.writeFileSync(marker(a, 'keyring.log'), Buffer.from(a.marker.keyring_log));
       fs.writeFileSync(marker(a, 'list.loro'), Buffer.from(a.marker.list));
+      fs.rmSync(marker(a, 'share.ended.json'), { force: true });
       return null;
     },
     write_workspace_id: (a) => { writeMarker(rootOf(a), a.id); return null; },
@@ -331,7 +338,20 @@ function makeHost(label) {
       return null;
     },
     clear_workspace_marker_share: (a) => {
-      for (const name of ['share.json', 'keyring.log', 'list.loro', 'index.json']) fs.rmSync(marker(a, name), { force: true });
+      for (const name of ['share.json', 'keyring.log', 'list.loro', 'index.json', 'share.ended.json']) fs.rmSync(marker(a, name), { force: true });
+      return null;
+    },
+    // `specs/0097` (ADR 0041 decision 6): a removal keeps share.ended.json in place of share.json
+    // and keyring.log; complete share files win over it.
+    workspace_marker_ended: (a) => {
+      if (!fs.existsSync(marker(a, 'share.ended.json'))) return null;
+      if (['share.json', 'keyring.log', 'list.loro'].every((n) => fs.existsSync(marker(a, n)))) return null;
+      const list = fs.existsSync(marker(a, 'list.loro')) ? Array.from(fs.readFileSync(marker(a, 'list.loro'))) : [];
+      return { ended_json: Array.from(fs.readFileSync(marker(a, 'share.ended.json'))), list };
+    },
+    end_workspace_marker_share: (a) => {
+      fs.writeFileSync(marker(a, 'share.ended.json'), Buffer.from(a.ended_json));
+      for (const name of ['share.json', 'keyring.log']) fs.rmSync(marker(a, name), { force: true });
       return null;
     },
   };
@@ -497,6 +517,7 @@ async function checkWords(d) {
     await setServer(A, address, 'Anna');
     await setServer(B, address, 'Anna');
     assert.equal(await devicesList(A).count(), 1, 'only this device before pairing');
+    await assertPanelFits(A.page, 'A before pairing');
     await panel(A).getByRole('button', { name: 'Add a device', exact: true }).click();
     const codeGroup = panel(A).getByRole('group', { name: /^[0-9A-Z](, [0-9A-Z]){7}$/ });
     await codeGroup.waitFor({ timeout: 15000 });
@@ -504,6 +525,7 @@ async function checkWords(d) {
     assert.match(code, /^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     assert.ok(await shown(A, 'The device that enters this code can sync the workspaces you choose, and you can remove it again. The server can tell which devices belong together, not their names.'));
     await shot(A, '01-a-code');
+    await assertPanelFits(A.page, 'A shows its code');
     await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).click();
     await panel(B).getByLabel('Pairing code', { exact: true }).fill(code.toLowerCase().replace('-', ' '));
     await panel(B).getByRole('button', { name: 'Connect', exact: true }).click();
@@ -515,6 +537,8 @@ async function checkWords(d) {
     assert.equal(fs.existsSync(B.host.syncedFolder) ? fs.readdirSync(B.host.syncedFolder).length : 0, 0, 'B holds nothing yet');
     await shot(A, '02-a-compare');
     await shot(B, '02-b-compare');
+    await assertPanelFits(A.page, 'A compares the words');
+    await assertPanelFits(B.page, 'B compares the words');
 
     step('Criteria 3 and 8: A pairs; both list both devices; A offers its workspace, checked');
     await panel(A).getByRole('button', { name: 'Pair', exact: true }).click();
@@ -524,12 +548,13 @@ async function checkWords(d) {
     await pick.waitFor({ timeout: 15000 });
     assert.ok(await pick.getByRole('checkbox').first().isChecked(), 'the open workspace is checked');
     await shot(A, '03-a-pick');
+    await assertPanelFits(A.page, 'A picks workspaces');
 
     step('Criteria 9 and 10: Sync these; the workspace arrives on B without input there');
     await panel(A).getByRole('button', { name: 'Sync these', exact: true }).click();
     const bFolder = path.join(B.host.syncedFolder, 'ZQX-WS-7731');
     const bFile = path.join(bFolder, 'ZQX-DOC-7731.curvyo');
-    await until('the document is on B\'s disk', async () => fs.existsSync(bFile) && objects(bFile).length === 1, 60000);
+    const arrivalMs = await until('the document is on B\'s disk', async () => fs.existsSync(bFile) && objects(bFile).length === 1, 60000);
     await shot(B, '04-b-arrived');
 
     step('Criterion 18: B opens it; edits reach the other side both ways');
@@ -563,7 +588,7 @@ async function checkWords(d) {
     assert.match(await off.innerText(), /ZQX-PC-B keeps its copy as local files and gets no later changes\./);
     await sleep(450);
     await off.getByRole('button', { name: 'Stop syncing', exact: true }).click();
-    await until('A\'s switch is off', async () => (await syncSwitch.getAttribute('aria-checked')) === 'false', 30000);
+    const switchOffMs = await until('A\'s switch is off', async () => (await syncSwitch.getAttribute('aria-checked')) === 'false', 30000);
     await until('B is told', () => shown(B, 'ZQX-WS-7731 is no longer synced. Your copy stays here.'), 30000);
 
     step('Criterion 14: B edits offline from the room and closes the workspace; A switches on again; Connect this folder sends B\'s edit without B opening the document');
@@ -578,11 +603,12 @@ async function checkWords(d) {
     const on = panel(A).getByRole('group', { name: 'Sync ZQX-WS-7731 to your devices' });
     await on.waitFor();
     await on.getByRole('button', { name: 'Sync', exact: true }).click();
-    await until('A\'s switch is on', async () => (await syncSwitch.getAttribute('aria-checked')) === 'true', 30000);
+    const switchOnMs = await until('A\'s switch is on', async () => (await syncSwitch.getAttribute('aria-checked')) === 'true', 30000);
     await tab(B, 'Share');
     const connect = panel(B).getByRole('button', { name: 'Connect this folder', exact: true });
     await connect.waitFor({ timeout: 40000 });
     await shot(B, '06-b-decision');
+    await assertPanelFits(B.page, 'B decides about its copy');
     await connect.click();
     await until('A holds B\'s offline rectangle', async () => {
       await save(A);
@@ -597,11 +623,12 @@ async function checkWords(d) {
     assert.match(await ask.innerText(), /Removing does not reach back: the copies already on ZQX-PC-B stay there as local files\./);
     await sleep(450);
     await ask.getByRole('button', { name: 'Remove', exact: true }).click();
-    await until('A lists only itself', async () => (await devicesList(A).count()) === 1, 30000);
+    const removeMs = await until('A lists only itself', async () => (await devicesList(A).count()) === 1, 30000);
     await tab(B, 'Share');
     await until('B is told', () => shown(B, 'This device was removed from your devices. Your copies stay here as local files.'), 30000);
     assert.ok(objects(bFile).length >= 4, 'B keeps its copy');
     await shot(B, '07-b-removed');
+    await assertPanelFits(B.page, 'B was removed');
 
     step('Criterion 28: A is the only device of a synced workspace: the warning stays');
     await until('the one-device warning', () => shown(A, 'Only this device is paired. If you lose it, the copy on the server cannot be opened by anyone. Pair a second device as a backup.'), 15000);
@@ -624,8 +651,75 @@ async function checkWords(d) {
     }
     for (const needle of needles) assert.equal(relay.log().indexOf(needle), -1, `the log holds ${needle}`);
 
+    step('PR #281 review: the removed B pairs again with the same identity and is listed again');
+    const closed = ['ZQX-WS-OUT1', 'ZQX-WS-OUT2'].map((name) => {
+      const folder = path.join(out, 'A', name);
+      fs.mkdirSync(path.join(folder, MARKER), { recursive: true });
+      fs.writeFileSync(path.join(folder, MARKER, 'workspace.toml'), `format_version = 1\nid = "${crypto.randomBytes(16).toString('hex')}"\n`);
+      A.host.state.recents.push(folder);
+      return name;
+    });
+    const identityB = B.host.state.identity;
+    await panel(B).getByRole('region', { name: 'My devices' }).getByRole('button', { name: 'OK', exact: true }).click();
+    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).waitFor({ timeout: 15000 });
+    await assertPanelFits(B.page, 'B removed, Add a device and Join my devices');
+    await shot(B, '09-b-unpaired');
+    await tab(A, 'Share');
+    let pairedAt = Date.now();
+    await panel(A).getByRole('button', { name: 'Add a device', exact: true }).click();
+    const again = panel(A).getByRole('group', { name: /^[0-9A-Z](, [0-9A-Z]){7}$/ });
+    await again.waitFor({ timeout: 15000 });
+    const codeShownMs = Date.now() - pairedAt;
+    const secondCode = (await again.innerText()).trim();
+    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).click();
+    await assertPanelFits(B.page, 'B joining again');
+    await panel(B).getByLabel('Pairing code', { exact: true }).fill(secondCode);
+    pairedAt = Date.now();
+    await panel(B).getByRole('button', { name: 'Connect', exact: true }).click();
+    await checkWords(A);
+    const wordsMs = Date.now() - pairedAt;
+    pairedAt = Date.now();
+    await panel(A).getByRole('button', { name: 'Pair', exact: true }).click();
+    await until('A lists B again', async () => (await devicesList(A).count()) === 2, 20000);
+    const pairMs = Date.now() - pairedAt;
+    await until('B lists both again', async () => (await devicesList(B).count()) === 2, 20000);
+    assert.ok(!(await shown(A, 'Pairing ZQX-PC-B...')), 'A is not left at "Pairing"');
+    assert.equal(B.host.state.identity, identityB, 'B paired again with the same identity');
+    await shot(A, '09-a-b-again');
+
+    step('PR #281 feedback: the server goes down before Sync these of two closed workspaces: one alert for both, gone once the server answers again, and both arrive on B');
+    const pickAgain = panel(A).getByRole('list', { name: 'Workspaces to sync' });
+    await pickAgain.waitFor({ timeout: 15000 });
+    for (const name of closed) {
+      const box = pickAgain.getByRole('checkbox', { name: new RegExp(`^${name}`) });
+      if (!(await box.isChecked())) await box.check();
+    }
+    await assertPanelFits(A.page, 'A picks two closed workspaces');
+    relay.stop();
+    // The group's socket sees the close at once; a second covers the page's next look.
+    await sleep(1000);
+    await panel(A).getByRole('button', { name: 'Sync these', exact: true }).click();
+    const outage = 'Could not sync 2 workspaces: cannot reach the server.';
+    const alertMs = await until('one alert for both workspaces', () => shown(A, outage), 40000);
+    const alerts = await panel(A).getByRole('alert').allInnerTexts();
+    assert.deepEqual(alerts.filter((t) => t.includes('cannot reach the server')), [outage], 'one line per outage, not one per workspace');
+    await assertPanelFits(A.page, 'A shows the outage alert');
+    await shot(A, '10-a-outage');
+    const restarted = await startRelay(relay);
+    const backAt = Date.now();
+    await until('the alert goes once the server answers', async () => !(await shown(A, outage)), 60000);
+    const clearMs = Date.now() - backAt;
+    for (const name of closed) {
+      await until(`${name} arrives on B`, async () => fs.existsSync(path.join(B.host.syncedFolder, name)), 60000);
+    }
+    const arriveMs = Date.now() - backAt;
+    await shot(A, '11-a-back');
+    console.log(`timings: Sync these to the file on B ${arrivalMs} ms, switch off ${switchOffMs} ms, switch on ${switchOnMs} ms, remove ${removeMs} ms`);
+    console.log(`timings: code shown ${codeShownMs} ms, words ${wordsMs} ms, paired ${pairMs} ms, outage alert ${alertMs} ms, alert gone ${clearMs} ms after the restart, both arrived ${arriveMs} ms after it`);
+    restarted.stop();
+
     assert.deepEqual([...A.errors, ...B.errors], []);
-    console.log('PASS browser 0096: pair with code and words, sync these, arrival, edits both ways, switch off and on, connect this folder, remove, one-device warning, server data blind');
+    console.log('PASS browser 0096: pair with code and words, sync these, arrival, edits both ways, switch off and on, connect this folder, remove, one-device warning, server data blind, a removed device pairs again');
   } finally {
     await browser.close();
   }
