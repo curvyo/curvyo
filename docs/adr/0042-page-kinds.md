@@ -1,6 +1,6 @@
 # ADR 0042: Page kinds, output pages in the plane, and the workbench of the active page
 
-**Status:** Proposed, `needs-customer` (document model and file format). The design is the
+**Status:** Accepted 2026-11-05 (customer accepted PR #279; document model and file format). The design is the
 customer's (concept A of `specs/0063-manufacturing-workbenches/concept-output-pages.md`,
 accepted 2026-11-05, Frage 151 A, 155 A); the storage choices below are the architect's
 **Proposal**. Amends, by notes on their Status lines: [ADR 0024](0024-spatial-pages.md) §1, §3

@@ -1,6 +1,6 @@
 # Page kinds: Add page asks Drawing, Sketch or Laser, and the tools follow the active page
 
-Status: Ready (2026-11-05; ADR 0042 is Proposed and is accepted by the customer with the PR)
+Status: Done (PR #279)
 Priority: Must
 Origin: Customer (2026-11-05, translated): "No workbench switching. The laser output is a completely normal page; the workbench follows the active page; Add page has a machine switch." "The Sketch workbench moves to the same model: a Sketch is a page kind. The workbench switcher goes. Pages show their type." "A laser page's size is not editable: the laser is as big as it is." Concept A accepted the same day (`specs/0063-manufacturing-workbenches/concept-output-pages.md`, slice 1 of §9). Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
