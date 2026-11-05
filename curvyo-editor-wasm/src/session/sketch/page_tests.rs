@@ -243,3 +243,73 @@ fn newly_active_source_page_reveals_its_origin_even_when_frame_partly_overlaps()
     s.set_workbench(Workbench::Sketch);
     assert_eq!(s.view().document_to_screen(Point::new(0.0, 0.0)), before);
 }
+
+const PNG: &[u8] =
+    include_bytes!("../../../../curvyo-image-core/tests/fixtures/images/png_rgba_8.png");
+
+/// A session with one imported image in view on the first page.
+fn session_with_image() -> Session {
+    let mut s = Session::new(66400);
+    s.resize_viewport(1100.0, 950.0);
+    s.import_begin(None);
+    s.import_add(PNG, "m.png");
+    s.import_finish(false);
+    s
+}
+
+/// Whether the first image's centre lies on the canvas.
+fn image_on_canvas(s: &Session) -> bool {
+    let quad = &s.frame_draw_list().images[0];
+    let centre = Point::new(
+        f64::midpoint(quad.corners[0].x, quad.corners[2].x),
+        f64::midpoint(quad.corners[0].y, quad.corners[2].y),
+    );
+    let (x, y) = s.view().document_to_screen(centre);
+    (0.0..=1100.0).contains(&x) && (0.0..=950.0).contains(&y)
+}
+
+#[test]
+fn returning_to_vector_from_an_unused_source_page_shows_the_drawing_again() {
+    let mut s = session_with_image();
+    let page = s.active_page().id;
+    let view = s.view();
+    assert!(image_on_canvas(&s));
+    s.set_workbench(Workbench::Sketch);
+    assert_ne!(
+        s.active_page().id,
+        page,
+        "Proposal A: a populated page gets a source page"
+    );
+    s.set_workbench(Workbench::Vector);
+    assert_eq!(s.active_page().id, page);
+    assert_eq!(s.view(), view);
+    assert!(image_on_canvas(&s));
+}
+
+#[test]
+fn returning_through_a_manufacturing_workbench_shows_the_drawing_again() {
+    let mut s = session_with_image();
+    let laser = s.add_manufacturing("curvyo.laser").unwrap();
+    s.set_workbench(Workbench::Vector);
+    let page = s.active_page().id;
+    let view = s.view();
+    s.set_workbench(Workbench::Sketch);
+    s.set_workbench(Workbench::Manufacturing(laser));
+    s.set_workbench(Workbench::Vector);
+    assert_eq!(s.active_page().id, page);
+    assert_eq!(s.view(), view);
+    assert!(image_on_canvas(&s));
+}
+
+#[test]
+fn returning_to_vector_after_drawing_stays_on_the_source_page() {
+    let mut s = session_with_image();
+    let page = s.active_page().id;
+    s.set_workbench(Workbench::Sketch);
+    let source = s.active_page().id;
+    s.sketch_construct(&Construction::Point(Position::mm(10.0, 20.0)))
+        .unwrap();
+    s.set_workbench(Workbench::Vector);
+    assert_ne!(source, page);
+    assert_eq!(s.active_page().id, source);
+}

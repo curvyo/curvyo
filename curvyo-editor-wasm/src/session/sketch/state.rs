@@ -117,6 +117,17 @@ pub(in crate::session) struct SketchState {
     /// Everything the open Polyline chain created so far; selected when the chain ends (AC42).
     /// Not cleared by [`SketchState::cancel`], which runs after every committed segment.
     pub chain_created: BTreeSet<EntityId>,
+    /// The Vector page and view left when entering Sketch created a source page, and that page:
+    /// leaving Sketch with the source page still active and unused goes back to them.
+    pub vector_return: Option<VectorReturn>,
+}
+
+/// Where Vector was before entering Sketch created the source page `source`.
+#[derive(Debug, Clone)]
+pub(in crate::session) struct VectorReturn {
+    pub page: String,
+    pub view: curvyo_ui_core::Viewport,
+    pub source: String,
 }
 
 /// The selection a constraint tool was armed with (AC40).
