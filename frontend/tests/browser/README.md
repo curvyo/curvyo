@@ -224,3 +224,22 @@ B's trash and B restores it for both (35 to 40); a rectangle drawn in the open d
 the other side both ways (30); A removes B, whose workspace says "Not shared" with its files kept
 (43, 44); finally no name or label in the relay's files or log (34). The host commands' Rust side
 is covered by the `curvyo-storage-io` and `curvyo-app` tests, not by this journey.
+
+### Own devices (0096)
+
+`own-devices.cjs` is the journey of `specs/0096-own-devices-sync` slice 1, set up like
+`workspace.cjs` (a relay on a free port with `target/0096-browser/relay-data`, the preview on
+`localhost:1421` unless `CURVYO_BROWSER_URL` is set, a faked desktop host per device whose
+workspace and device-group commands run on real folders under `target/0096-browser/<A|B>/`). A
+shows a pairing code, B joins with it and both show the same four check words (criteria 1 to 3);
+Sync these brings A's workspace to B's Synced workspaces folder (8 to 10); edits reach the other
+side both ways (18); switching off names B and B is told, B edits its closed copy, switching on
+again offers Connect this folder, which sends B's edit to A without B opening the document (13,
+14); Remove, the one-device warning and a scan of the relay's data and log for the names and the
+code (23, 24, 28, 30). Run it under `systemd-run --user --scope -p MemoryMax=8G`.
+
+`key-backup.cjs` (needs `wss://`: it puts a TLS proxy in front of the relay and starts its own
+preview on port 1422) pairs a browser with a desktop device run on the wasm bindings in node,
+backs the browser's keys up with Playwright's virtual authenticator (PRF), clears the site data,
+restores the same device without pairing, checks the desktop shows it as a browser under its
+name, removes the backup, and checks that a passkey without PRF stores nothing.
