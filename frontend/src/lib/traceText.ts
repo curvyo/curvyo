@@ -27,6 +27,15 @@ export const MASK_OUTSIDE_IMAGE = "0 paths: the mask is outside the image.";
 /** The mask paths could not be combined into one region (a kernel refusal). */
 export const MASK_FAILED = "0 paths: the mask paths could not be combined.";
 
+/** The pick button and Clear mask of the Mask group (`specs/0094` slice 1b, UX notes §11). */
+export const PICK_MASK_PATHS = "Pick mask paths";
+export const CLEAR_MASK = "Clear mask";
+
+/** The polite status of the pick mode (UX notes §11, not visible). */
+export function maskPickStatus(armed: boolean): string {
+  return `${PICK_MASK_PATHS} ${armed ? "on" : "off"}`;
+}
+
 /** The status line's mask segment (`specs/0094` UX notes §7): "Inside 2 paths", "Outside 1 path". */
 export function maskText(outside: boolean, paths: number): string {
   return paths > 0 ? `${outside ? "Outside" : "Inside"} ${paths} ${paths === 1 ? "path" : "paths"}` : "";

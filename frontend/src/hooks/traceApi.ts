@@ -28,6 +28,14 @@ export interface TraceApi {
   mask: { paths: number; outside: boolean } | null;
   /** Inside (`false`) or Outside, not remembered (criterion 17). */
   setMaskOutside: (outside: boolean) => void;
+  /** Pick mask paths is armed (`specs/0094` slice 1b, UX notes §11). */
+  maskPick: boolean;
+  /** Arms or disarms Pick mask paths. */
+  setMaskPick: (armed: boolean) => void;
+  /** The last pick hit a text, a sketch or a second image: the notice row says so (criterion 38). */
+  maskRefused: boolean;
+  /** Clear mask: only the image stays selected (criterion 40). */
+  clearMask: () => void;
   /** "Tracing 1 of 3 images", or empty for one image. */
   imagesLabel: string;
   params: readonly TraceParam[];

@@ -445,7 +445,7 @@ const lineText = async (s: S) => (await s.evaluate(`document.querySelector('${RO
 const waitState = (s: S, want: string, ms = 30_000) =>
   waitFor(`the analysis row to be ${want}`, async () => (((await s.evaluate(`document.querySelector('${ROW}')?.getAttribute('data-trace-analysis') ?? 'none'`)) as string) === want ? true : null), ms);
 
-const BRIGHTNESS_BAR = ["About Trace", "Preset", "View", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
+const BRIGHTNESS_BAR = ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
 
 // ------------------------------------------------------------------ 0089 22 / 0025 71: the bar contents per method
 
@@ -479,8 +479,8 @@ test("0089 tidy-up c22, c17: Remove background keeps the chip, hex, Auto and pip
       await setAdvanced(s, false);
       const bar = await barControls(s);
       console.log(`Remove background, ${output}:`, JSON.stringify(bar));
-      assert.deepEqual(bar.slice(0, 5), ["About Trace", "Preset", "View", "Method", "Colour tolerance"]);
-      const group = bar.slice(5, bar.indexOf("Smooth"));
+      assert.deepEqual(bar.slice(0, 6), ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance"]);
+      const group = bar.slice(6, bar.indexOf("Smooth"));
       assert.ok(group.includes("Auto") && group.some((g) => /^Pick background colour/.test(g)), `the group has Auto and the pipette: ${JSON.stringify(group)}`);
       assert.deepEqual(bar.slice(bar.indexOf("Smooth")), ["Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
       await setAdvanced(s, true);
@@ -490,7 +490,7 @@ test("0089 tidy-up c22, c17: Remove background keeps the chip, hex, Auto and pip
       await setOutput(s, output);
       await setAdvanced(s, false);
       const bar = await barControls(s);
-      assert.deepEqual(bar, ["About Trace", "Preset", "View", "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"], `Pick colours, ${output}`);
+      assert.deepEqual(bar, ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"], `Pick colours, ${output}`);
       assert.equal(await pickedLabel(s), "None picked");
       assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-palette-swatch], ${BAR} [data-trace-swatch]').length`), 0, "no swatches with Advanced closed");
       await setAdvanced(s, true);
@@ -747,14 +747,14 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
     await pickMethod(s, "Remove background");
     const removal = await tabStops(s);
     console.log("Remove background:", JSON.stringify(removal));
-    assert.deepEqual(removal.slice(0, 5), ["About Trace", "Preset", "View", "Method", "Colour tolerance"]);
-    const group = removal.slice(5, removal.indexOf("Smooth"));
+    assert.deepEqual(removal.slice(0, 6), ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance"]);
+    const group = removal.slice(6, removal.indexOf("Smooth"));
     assert.ok(group.indexOf("Auto") >= 0 && group.findIndex((g) => /^Pick background colour/.test(g)) > group.indexOf("Auto"), `Auto, then the pipette: ${JSON.stringify(group)}`);
     assert.deepEqual(removal.slice(removal.indexOf("Smooth")), ["Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
     await pickMethod(s, "Pick colours");
     const pick = await tabStops(s);
     console.log("Pick colours:", JSON.stringify(pick));
-    assert.deepEqual(pick, ["About Trace", "Preset", "View", "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
+    assert.deepEqual(pick, ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
   });
 });
 
