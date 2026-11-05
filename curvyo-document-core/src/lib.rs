@@ -33,6 +33,7 @@ mod clone_write;
 mod clones;
 mod container;
 mod container_assets;
+mod container_ended;
 mod container_share;
 mod corner_radii;
 mod corner_radii_codec;
@@ -183,6 +184,7 @@ pub use clones::{
     UNLINK_CLONE_COMMIT_LABEL,
 };
 pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, pack_snapshot, unpack};
+pub use container_ended::{ENDED_FORMAT_VERSION, EndReason, EndedRecord};
 pub use container_share::{
     CURRENT_SHARE_FORMAT_VERSION, ContainerShareMembers, ShareRecord, WorkspaceRoomRecord,
     WorkspaceShareRecord, container_share_members,

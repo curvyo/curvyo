@@ -20,6 +20,7 @@ use crate::workspace::{
     marker_text, open_workspace, parse_marker, probe_writable, resolve, scan_workspace,
 };
 use crate::workspace_documents::SHARE_MEMBER;
+use crate::workspace_ended::{has_ended_record, remove_ended_record};
 use crate::{DocumentProbe, probe_document, share_members, with_thumbnail};
 
 /// The marker's `share.json`.
@@ -70,10 +71,13 @@ impl JoinFolderError {
     }
 }
 
-/// The marker's share files, `None` for a workspace that is not shared (all three absent).
+/// The marker's share files, `None` for a workspace that is not shared (all three absent, or
+/// an ended record kept, `specs/0097` criterion 33). Complete share files win over an ended
+/// record beside them, as `share.json` does in a document (ADR 0041 decision 6).
 ///
 /// # Errors
-/// [`WorkspaceError::Damaged`] when only some of them exist; [`WorkspaceError::Io`].
+/// [`WorkspaceError::Damaged`] when only some of them exist and no ended record explains it;
+/// [`WorkspaceError::Io`].
 pub fn read_marker_share(root: &Path) -> Result<Option<MarkerShare>, WorkspaceError> {
     let dir = root.join(MARKER_DIR);
     let read = |name: &str| match fs::read(dir.join(name)) {
@@ -86,17 +90,20 @@ pub fn read_marker_share(root: &Path) -> Result<Option<MarkerShare>, WorkspaceEr
         read(MARKER_KEYRING_FILE)?,
         read(MARKER_LIST_FILE)?,
     ) {
-        (None, None, None) => Ok(None),
         (Some(share_json), Some(keyring_log), Some(list)) => Ok(Some(MarkerShare {
             share_json,
             keyring_log,
             list,
         })),
+        (None, None, None) => Ok(None),
+        // An ended share keeps the list (and a crash may leave a share file): not shared.
+        _ if has_ended_record(root) => Ok(None),
         _ => Err(WorkspaceError::Damaged),
     }
 }
 
-/// Writes the marker's share files, each by an atomic rename (ADR 0037 decision 1).
+/// Writes the marker's share files, each by an atomic rename (ADR 0037 decision 1); an ended
+/// record goes once they are written (Sync again, a new Share).
 ///
 /// # Errors
 /// [`WorkspaceError::Io`].
@@ -111,7 +118,7 @@ pub fn write_marker_share(root: &Path, share: &MarkerShare) -> Result<(), Worksp
         write_atomic(&path, bytes)
             .map_err(|error| io_error(&path, std::io::Error::other(error.to_string())))?;
     }
-    Ok(())
+    remove_ended_record(root)
 }
 
 /// Writes `id` into `workspace.toml`: Share gives the workspace a fresh id (ADR 0037 decision
@@ -224,8 +231,9 @@ pub fn write_index(root: &Path, ids: &[([u8; 16], Vec<String>)]) -> Result<(), W
 
 /// A removed member's workspace becomes local (`specs/0095-workspace` criterion 44, ADR 0037
 /// decision 9): every document whose `share.json` names this workspace loses it (a local file),
-/// then the marker's share files go; `workspace.toml`, the documents' content and the kept
-/// copies of deleted documents stay.
+/// then the marker's share files and its ended record go; `workspace.toml`, the documents'
+/// content and the kept copies of deleted documents stay. Since `specs/0097` a removal or leave
+/// keeps the way back ([`crate::end_marker_share`]); this is the end without one.
 ///
 /// # Errors
 /// [`WorkspaceError::Io`].
@@ -244,7 +252,7 @@ pub fn remove_marker_share(root: &Path) -> Result<(), WorkspaceError> {
             Err(error) => return Err(io_error(&path, error)),
         }
     }
-    Ok(())
+    remove_ended_record(root)
 }
 
 /// The documents `index.json` names, id to path: where this computer last saw each document of

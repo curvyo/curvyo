@@ -3,11 +3,13 @@
 //!
 //! The root map `group` holds `format_version`; the map `devices` maps a member id (64 lower-case
 //! hex characters) to `{label, browser?}`; the map `workspaces` maps a workspace id (32 hex
-//! characters) to `{name, on}`. Each value is one register: the last writer wins. Entries whose
-//! key or value has another shape are skipped on read, so a damaged or newer entry hides only
-//! itself; fields a reader does not know are ignored, so `browser` (added in `format_version` 1,
-//! optional, `false` when absent) needs no new version. A build that does not know it drops it
-//! when it renames the device, which shows that device as a computer again.
+//! characters) to `{name, on, left?}`. Each value is one register: the last writer wins. Entries
+//! whose key or value has another shape are skipped on read, so a damaged or newer entry hides
+//! only itself; fields a reader does not know are ignored, so `browser` (added in
+//! `format_version` 1, optional, `false` when absent) needs no new version. A build that does not
+//! know it drops it when it renames the device, which shows that device as a computer again. The
+//! same holds for `left` (ADR 0041 decision 3, optional, `false` when absent): the maker left the
+//! workspace; written with `on: false`, so a build that does not know it reads a switch-off.
 
 use std::collections::HashMap;
 
@@ -29,6 +31,7 @@ const KEY_LABEL: &str = "label";
 const KEY_BROWSER: &str = "browser";
 const KEY_NAME: &str = "name";
 const KEY_ON: &str = "on";
+const KEY_LEFT: &str = "left";
 
 /// Why a devices list operation or import did nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -67,6 +70,8 @@ pub struct SyncedWorkspace {
     pub name: String,
     /// Whether "Sync to my devices" is on.
     pub on: bool,
+    /// The maker left it (person leave, ADR 0041 decision 3): every device of the group leaves.
+    pub left: bool,
 }
 
 /// One replica of the devices list.
@@ -228,7 +233,7 @@ impl DevicesList {
         Ok(())
     }
 
-    /// Records the workspace `id` under `name` as switched on or off.
+    /// Records the workspace `id` under `name` as switched on or off; clears a `left` mark.
     ///
     /// # Errors
     /// [`DevicesListError::Encode`].
@@ -241,6 +246,18 @@ impl DevicesList {
         let mut value = HashMap::new();
         value.insert(KEY_NAME.to_owned(), LoroValue::from(name));
         value.insert(KEY_ON.to_owned(), LoroValue::from(on));
+        self.write(WORKSPACES, &hex(&id), value)
+    }
+
+    /// Marks the workspace `id` under `name` as left by the maker: switched off with `left`.
+    ///
+    /// # Errors
+    /// [`DevicesListError::Encode`].
+    pub fn leave_workspace(&self, id: [u8; 16], name: &str) -> Result<(), DevicesListError> {
+        let mut value = HashMap::new();
+        value.insert(KEY_NAME.to_owned(), LoroValue::from(name));
+        value.insert(KEY_ON.to_owned(), LoroValue::from(false));
+        value.insert(KEY_LEFT.to_owned(), LoroValue::from(true));
         self.write(WORKSPACES, &hex(&id), value)
     }
 
@@ -289,7 +306,7 @@ impl DevicesList {
         self.device(member).map(|device| device.label)
     }
 
-    /// Every workspace the list knows, on or off, sorted by id.
+    /// Every workspace the list knows, on, off or left, sorted by id.
     #[must_use]
     pub fn workspaces(&self) -> Vec<SyncedWorkspace> {
         let mut out: Vec<SyncedWorkspace> = entries(&self.doc.get_map(WORKSPACES))
@@ -303,6 +320,7 @@ impl DevicesList {
                     id: unhex(&key)?,
                     name: string_field(&fields, KEY_NAME)?,
                     on,
+                    left: matches!(fields.get(KEY_LEFT), Some(LoroValue::Bool(true))),
                 })
             })
             .collect();
