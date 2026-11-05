@@ -7,10 +7,11 @@ use curvyo_vectorize_core::{Mask as TraceMask, Rgb8, TraceParams};
 use kurbo::{BezPath, Vec2};
 
 use crate::trace_ocr::OcrLine;
+use crate::trace_region::TraceRegion;
 use crate::trace_text::TextPass;
 use crate::trace_text::text_pass;
 use crate::trace_transfer::{
-    TraceStatus, count, read_outlines, status_only, trace_job_with, trace_mask_job, write_outline,
+    TraceStatus, count, read_outlines, status_only, trace_job_in, trace_mask_job, write_outline,
 };
 
 /// The number that opens the text section (no count is negative).
@@ -81,8 +82,8 @@ pub struct TraceTexts {
 }
 
 /// One trace with the OCR `lines` (in this picture's pixels): the text pass, then
-/// [`trace_job_with`] over the filled picture, then the text section. Without lines the numbers
-/// are exactly those of [`trace_job_with`] (criteria 12 and 18).
+/// [`crate::trace_job_with`] over the filled picture, then the text section. Without lines the
+/// numbers are exactly those of [`crate::trace_job_with`] (criteria 12 and 18).
 #[must_use]
 pub fn trace_text_job_with(
     rgba: &[u8],
@@ -93,10 +94,30 @@ pub fn trace_text_job_with(
     lines: &[OcrLine],
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
+    trace_text_job_in(
+        rgba, width, height, pixel_map, params, lines, None, on_percent,
+    )
+}
+
+/// As [`trace_text_job_with`] with a mask `region` (`specs/0094` criterion 11): every line is
+/// left out of the main trace, only those whose box centre the region keeps stay as text, and the
+/// outlines are clipped; with no region exactly [`trace_text_job_with`].
+#[must_use]
+#[allow(clippy::too_many_arguments)] // the job's inputs, as the worker passes them
+pub fn trace_text_job_in(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceParams,
+    lines: &[OcrLine],
+    region: Option<&TraceRegion>,
+    on_percent: &mut dyn FnMut(u8),
+) -> Vec<f64> {
     if lines.is_empty() {
-        return trace_job_with(rgba, width, height, pixel_map, params, on_percent);
+        return trace_job_in(rgba, width, height, pixel_map, params, region, on_percent);
     }
-    let pass = text_pass(
+    let mut pass = text_pass(
         rgba,
         width,
         height,
@@ -104,12 +125,23 @@ pub fn trace_text_job_with(
         params,
         lines,
     );
-    let mut wire = trace_job_with(&pass.rgba, width, height, pixel_map, params, on_percent);
+    keep_lines_in(&mut pass, region);
+    let mut wire = trace_job_in(
+        &pass.rgba, width, height, pixel_map, params, region, on_percent,
+    );
     if wire.first() != Some(&0.0) {
         return wire;
     }
     write_texts(&mut wire, &pass, &[]);
     wire
+}
+
+/// Drops the lines of `pass` whose box centre `region` does not keep (`specs/0094` criterion 11);
+/// their pixels stay left out of the main trace, so they are neither text nor traced.
+pub(crate) fn keep_lines_in(pass: &mut TextPass, region: Option<&TraceRegion>) {
+    if let Some(region) = region {
+        pass.regions.retain(|line| region.keeps(line.centre));
+    }
 }
 
 /// The text section of `pass` after a result's numbers; with `fills` (one per line, multicolour:
@@ -166,7 +198,22 @@ pub fn trace_text_regions_with(
     params: &TraceParams,
     lines: &[OcrLine],
 ) -> Vec<f64> {
-    let pass = text_pass(
+    trace_text_regions_in(rgba, width, height, pixel_map, params, lines, None)
+}
+
+/// As [`trace_text_regions_with`], only the lines whose box centre `region` keeps
+/// (`specs/0094` criterion 11).
+#[must_use]
+pub fn trace_text_regions_in(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceParams,
+    lines: &[OcrLine],
+    region: Option<&TraceRegion>,
+) -> Vec<f64> {
+    let mut pass = text_pass(
         rgba,
         width,
         height,
@@ -174,6 +221,7 @@ pub fn trace_text_regions_with(
         params,
         lines,
     );
+    keep_lines_in(&mut pass, region);
     let mut wire = status_only(TraceStatus::Traced);
     write_texts(&mut wire, &pass, &[]);
     wire
@@ -283,7 +331,7 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::read_trace_wire;
+    use crate::trace_transfer::{read_trace_wire, trace_job_with};
 
     /// A 40 x 20 picture with a black bar (the "text") on white.
     fn picture() -> Vec<u8> {
