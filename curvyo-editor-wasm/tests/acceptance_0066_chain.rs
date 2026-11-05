@@ -1,9 +1,11 @@
 //! Independent connected 100-entity production Session workload and runtime parity corpus.
 #![allow(clippy::unwrap_used)]
 mod cpu_time;
-use curvyo_document_core::{Document, Point, Style, pack, unpack};
-use curvyo_editor_wasm::{Session, SketchTool, Workbench};
+mod page_kind_support;
+use curvyo_document_core::{Point, Style, pack, unpack};
+use curvyo_editor_wasm::{Session, SketchTool};
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 fn chain() -> sk::Sketch {
     let mut g = sk::Sketch::new("origin".into());
     for n in 0..50 {
@@ -46,7 +48,7 @@ fn valid(g: &sk::Sketch) {
 }
 #[test]
 fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
-    let d = Document::new(720);
+    let d = page_kind_support::sketch_document(720);
     let id = d
         .create_page_sketch(&d.pages()[0].id, &chain(), &Style::default())
         .unwrap();
@@ -56,7 +58,7 @@ fn s15_connected_chain_pointer_view_draw_and_parity_fixture() {
     std::fs::write("../target/0066-runtime-revision/chain.curvyo", &bytes).unwrap();
     std::fs::write("../target/0066-runtime-revision/chain-context.json", serde_json::to_vec(&serde_json::json!({"owner": id.full_id(), "page": d.pages()[0].id, "pageOrigin": [d.pages()[0].origin.x, d.pages()[0].origin.y], "pageSize": [d.pages()[0].size.width.as_mm(),d.pages()[0].size.height.as_mm()], "placement": d.sketch(id).unwrap().placement.to_array()})).unwrap()).unwrap();
     let mut s = Session::open(721, &bytes).unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert!(s.enter_sketch(id));
     s.set_sketch_tool(SketchTool::Select);
     let mut snapping = s.snapping();

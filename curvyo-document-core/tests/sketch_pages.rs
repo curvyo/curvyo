@@ -2,6 +2,21 @@
 #![allow(clippy::unwrap_used)]
 use curvyo_document_core::{Document, Point, Style, pack, unpack};
 use curvyo_sketch_core::{Entity, Position, Sketch};
+
+/// A document whose only page is a sketch page at (0, 0) (`0098` criterion 3: only a sketch page
+/// owns a sketch).
+fn sketch_document(peer: u64) -> Document {
+    let d = Document::new(peer);
+    let page = d
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
+    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
+    // At the old first page's place, so the expected coordinates stay as written.
+    let back = curvyo_document_core::Vec2::new(-page.origin.x, -page.origin.y);
+    d.move_page(&page.id, back, &[]).unwrap();
+    d
+}
+
 fn graph() -> Sketch {
     let mut graph = Sketch::new("origin".into());
     graph.entities.insert(
@@ -15,8 +30,10 @@ fn graph() -> Sketch {
 }
 #[test]
 fn first_page_geometry_claim_is_centered_atomic_and_round_trips() {
-    let doc = Document::new(9100);
-    let page = doc.add_page();
+    let doc = sketch_document(9100);
+    let page = doc
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
     let before = doc.version();
     assert_eq!(doc.page_sketch(&page.id), None);
     assert_eq!(doc.version(), before);
@@ -45,7 +62,7 @@ fn first_page_geometry_claim_is_centered_atomic_and_round_trips() {
 }
 #[test]
 fn occupied_page_refuses_creation_without_writes_and_deletion_releases_claim() {
-    let doc = Document::new(9110);
+    let doc = sketch_document(9110);
     let page = doc.pages()[0].clone();
     let first = doc
         .create_page_sketch(&page.id, &graph(), &Style::default())
@@ -65,7 +82,7 @@ fn occupied_page_refuses_creation_without_writes_and_deletion_releases_claim() {
 
 #[test]
 fn concurrent_first_claim_elects_one_owner_without_losing_the_other_graph() {
-    let a = Document::new(9120);
+    let a = sketch_document(9120);
     let b = unpack(9121, &pack(&a, "base").unwrap()).unwrap();
     let page = a.pages()[0].id.clone();
     let left = a
@@ -103,7 +120,7 @@ fn concurrent_first_claim_elects_one_owner_without_losing_the_other_graph() {
 #[test]
 fn original_copy_requires_empty_destination_and_clones_never_claim_it() {
     use curvyo_document_core::{CopySource, Vec2};
-    let doc = Document::new(9130);
+    let doc = sketch_document(9130);
     let first = doc.pages()[0].id.clone();
     let original = doc
         .create_page_sketch(&first, &graph(), &Style::default())
@@ -118,7 +135,9 @@ fn original_copy_requires_empty_destination_and_clones_never_claim_it() {
             .is_err()
     );
     assert_eq!(doc.version(), before);
-    let second = doc.add_page();
+    let second = doc
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
     let copied = doc
         .duplicate_objects_to_page(
             &[source],
@@ -143,8 +162,10 @@ fn original_copy_requires_empty_destination_and_clones_never_claim_it() {
 #[test]
 fn conversion_and_page_removal_preserve_claim_history_without_recentering() {
     use curvyo_document_core::AnchorId;
-    let doc = Document::new(9140);
-    let page = doc.add_page();
+    let doc = sketch_document(9140);
+    let page = doc
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
     let graph = curvyo_sketch_core::create_rectangle(
         &graph(),
         "plate",
@@ -176,7 +197,7 @@ fn conversion_and_page_removal_preserve_claim_history_without_recentering() {
 #[test]
 fn object_undo_of_conversion_restores_its_page_claim() {
     use curvyo_document_core::AnchorId;
-    let doc = Document::new(9150);
+    let doc = sketch_document(9150);
     let page = doc.pages()[0].id.clone();
     let graph = curvyo_sketch_core::create_rectangle(
         &graph(),

@@ -21,6 +21,7 @@
 
 mod cpu_time;
 
+mod page_kind_support;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -709,7 +710,7 @@ fn sketch_doc() -> Document {
         },
     );
     g.construction.insert("construction".into());
-    let d = Document::new(801);
+    let d = page_kind_support::sketch_document(801);
     d.create_page_sketch(&d.pages()[0].id, &g, &Style::default())
         .unwrap();
     d

@@ -258,8 +258,8 @@ fn ac1_the_strip_is_file_document_style_layers_history_and_layers_is_never_dimme
     assert_eq!(
         names,
         [
-            "file", "document", "style", "layers", "history", "fonts", "snapping", "grid",
-            "sketches", "share"
+            // A drawing page has no Sketches tab (`0098` criterion 8).
+            "file", "document", "style", "layers", "history", "fonts", "snapping", "grid", "share"
         ]
     );
     let layers = v.tabs.iter().find(|t| t.name == "layers").unwrap();

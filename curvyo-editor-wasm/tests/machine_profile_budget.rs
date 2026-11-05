@@ -39,7 +39,7 @@ fn reading_200_records_and_listing_them_stay_within_their_budgets() {
     let json = library_json();
     let mut session = Session::open(3, &pack(&Document::new(2), "budget").unwrap()).unwrap();
     let ((), load) = cpu_time::cpu_time_of(|| session.load_machine_profiles_json(&json));
-    session.add_manufacturing("curvyo.laser").unwrap();
+    session.add_page_of_kind("curvyo.laser", None).unwrap();
     let (view, list) = cpu_time::cpu_time_of(|| session.manufacturing_view_json());
     let view: Value = serde_json::from_str(&view).unwrap();
     assert_eq!(view["machine"]["profiles"].as_array().unwrap().len(), 201);

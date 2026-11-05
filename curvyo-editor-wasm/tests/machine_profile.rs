@@ -5,14 +5,15 @@
 
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
+mod page_kind_support;
 use curvyo_document_core::{
-    Document, DocumentSize, Length, NewManufacturing, Point, ProfileChange, RectBounds, pack,
-    unpack,
+    Document, DocumentSize, NewOutputPage, Point, ProfileChange, RectBounds, pack, unpack,
 };
 use curvyo_editor_wasm::Session;
 use curvyo_laser_core::{
     MachineProfile, OriginCorner, new_profile_id, record_file_name, write_record,
 };
+use page_kind_support::PageKinds as _;
 use serde_json::Value;
 
 const LASER: &str = "curvyo.laser";
@@ -62,14 +63,14 @@ fn writes(session: &mut Session) -> Vec<Value> {
 fn with_k40() -> Session {
     let mut s = session();
     s.load_machine_profiles_json(&library(&[k40()]));
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     s
 }
 
 #[test]
 fn ac1_a_new_laser_shows_generic_laser_with_its_defaults() {
     let mut s = session();
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     let m = machine(&s);
     assert_eq!(m["copy"]["name"], "Generic laser");
     assert_eq!(m["copy"]["width"], 400.0);
@@ -91,7 +92,7 @@ fn ac1_a_new_laser_shows_generic_laser_with_its_defaults() {
 #[test]
 fn ac1_edits_are_limited_with_a_notice_and_one_step_each() {
     let mut s = session();
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     let steps = s.history_len();
     assert_eq!(
         s.set_machine_max_feed(250_000.0).as_deref(),
@@ -112,12 +113,6 @@ fn ac1_edits_are_limited_with_a_notice_and_one_step_each() {
     assert_eq!(m["copy"]["name"], "K40");
     assert_eq!(m["state"], "differs", "an edited Generic laser differs");
     assert_eq!(m["can_update"], false, "the built-in cannot be updated");
-    assert_eq!(
-        s.set_work_area_limited(Length::from_mm(20_000.0), Length::from_mm(300.0))
-            .1
-            .as_deref(),
-        Some("Width limited to 10,000 mm.")
-    );
     s.undo();
     s.undo();
     assert_eq!(machine(&s)["copy"]["laser_mode"], true);
@@ -215,7 +210,7 @@ fn ac7_a_renamed_library_profile_makes_its_copies_differ() {
 #[test]
 fn ac3_save_as_profile_adds_a_record_points_at_it_and_undo_keeps_the_record() {
     let mut s = session();
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     let steps = s.history_len();
     assert_eq!(s.save_machine_profile([1; 16], 10), None);
     assert_eq!(s.history_len(), steps + 1);
@@ -290,18 +285,20 @@ fn ac8_a_foreign_profile_opens_unchanged_and_save_as_keeps_its_id() {
     let foreign = k40();
     let copy = curvyo_laser_core::write_copy(&curvyo_laser_core::ProfileCopy::of(&foreign));
     let id = document
-        .add_manufacturing(NewManufacturing {
+        .add_output_page(NewOutputPage {
             process: LASER,
             label: "Laser",
             profile: Some(&copy),
             work_area: DocumentSize::from_mm(600.0, 400.0),
-            place: None,
         })
+        .unwrap()
+        .kind
+        .manufacturing()
         .unwrap();
     let bytes = pack(&document, "test").unwrap();
     let mut s = Session::open(5, &bytes).unwrap();
     let steps = s.undo_len();
-    s.set_workbench(curvyo_editor_wasm::Workbench::Manufacturing(id));
+    s.to_output_page(id);
     let m = machine(&s);
     assert_eq!(m["state"], "missing");
     assert_eq!(m["copy"]["name"], "K40 in the garage");
@@ -322,13 +319,13 @@ fn ac10_add_manufacturing_starts_with_the_last_pick_else_generic() {
     next.load_machine_profiles_json(&library(&[k40()]));
     next.load_machine_choice(&text);
     let steps = next.history_len();
-    next.add_manufacturing(LASER).unwrap();
+    next.add_page_of_kind(LASER, None).unwrap();
     assert_eq!(next.history_len(), steps + 1);
     assert_eq!(machine(&next)["copy"]["name"], "K40 in the garage");
     assert_eq!(machine(&next)["copy"]["width"], 600.0);
     let mut gone = session();
     gone.load_machine_choice(&text);
-    gone.add_manufacturing(LASER).unwrap();
+    gone.add_page_of_kind(LASER, None).unwrap();
     assert_eq!(machine(&gone)["copy"]["name"], "Generic laser");
 }
 
@@ -362,30 +359,33 @@ fn ac12_differs_is_derived_from_a_fixture_record() {
     let mut edited = curvyo_laser_core::ProfileCopy::of(&record);
     edited.values.max_power = curvyo_laser_core::PowerValue::new(500).unwrap();
     let id = document
-        .add_manufacturing(NewManufacturing {
+        .add_output_page(NewOutputPage {
             process: LASER,
             label: "Laser",
             profile: Some(&curvyo_laser_core::write_copy(&edited)),
             work_area: DocumentSize::from_mm(600.0, 400.0),
-            place: None,
         })
+        .unwrap()
+        .kind
+        .manufacturing()
         .unwrap();
     let bytes = pack(&document, "test").unwrap();
     let mut s = Session::open(5, &bytes).unwrap();
     s.load_machine_profiles_json(&library(std::slice::from_ref(&record)));
-    s.set_workbench(curvyo_editor_wasm::Workbench::Manufacturing(id));
+    s.to_output_page(id);
     assert_eq!(machine(&s)["state"], "differs");
     document
         .set_manufacturing_profile(
             id,
             &curvyo_laser_core::write_copy(&curvyo_laser_core::ProfileCopy::of(&record)),
             DocumentSize::from_mm(600.0, 400.0),
+            curvyo_document_core::PageCorner::default(),
             ProfileChange::Reset,
         )
         .unwrap();
     let mut same = Session::open(6, &pack(&document, "test").unwrap()).unwrap();
     same.load_machine_profiles_json(&library(&[record]));
-    same.set_workbench(curvyo_editor_wasm::Workbench::Manufacturing(id));
+    same.to_output_page(id);
     assert_eq!(machine(&same)["state"], Value::Null);
 }
 
@@ -395,16 +395,18 @@ fn ac12_a_damaged_name_reads_generic_laser_with_its_notice() {
     let damaged: curvyo_document_core::FixtureParams =
         serde_json::from_value(serde_json::json!({"id": "generic-laser", "name": ""})).unwrap();
     let id = document
-        .add_manufacturing(NewManufacturing {
+        .add_output_page(NewOutputPage {
             process: LASER,
             label: "Laser",
             profile: Some(&damaged),
             work_area: DocumentSize::from_mm(400.0, 300.0),
-            place: None,
         })
+        .unwrap()
+        .kind
+        .manufacturing()
         .unwrap();
     let mut s = Session::open(5, &pack(&document, "test").unwrap()).unwrap();
-    s.set_workbench(curvyo_editor_wasm::Workbench::Manufacturing(id));
+    s.to_output_page(id);
     let m = machine(&s);
     assert_eq!(m["copy"]["name"], "Generic laser");
     assert_eq!(m["name_notice"], "Name was damaged, showing Generic laser");
@@ -418,7 +420,7 @@ fn ac13_damaged_records_are_counted_in_one_notice() {
         {"name": "readme.txt", "text": "{"},
     ]);
     s.load_machine_profiles_json(&entries.to_string());
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     assert_eq!(
         machine(&s)["library_notices"][0],
         "1 profile could not be read. It was left as it is."
@@ -428,12 +430,16 @@ fn ac13_damaged_records_are_counted_in_one_notice() {
 #[test]
 fn ac11_the_origin_marker_moves_with_the_corner_and_changes_no_content() {
     let mut s = session();
-    s.add_manufacturing(LASER).unwrap();
-    s.fit_output_page();
+    s.add_page_of_kind(LASER, None).unwrap();
+    let origin = s.active_page().origin.x;
     let marker_x = |s: &Session| {
-        let list = s.frame_draw_list();
-        // The marker is the last thing drawn: its ink is the frame's final vertices.
-        list.triangles.last().unwrap().position.x
+        // The marker is in the marker ink, page-local x.
+        s.frame_draw_list()
+            .triangles
+            .iter()
+            .filter(|v| v.color.r == 0x3A && v.color.g == 0x3A && v.color.b == 0x3F)
+            .map(|v| v.position.x - origin)
+            .fold(f64::NAN, f64::max)
     };
     let left = marker_x(&s);
     let objects = opened(&s).read_objects().objects;

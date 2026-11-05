@@ -1,6 +1,7 @@
-// The workbench registry (`specs/0093-laser-workbench-shell` criteria 1 and 11a, ADR 0032 §3):
-// the switcher lists whatever the registry draws, a dummy second manifest workbench registered
-// through the same entry point appears in it, and no shell source names the laser.
+// The page kind registry (`specs/0098-page-kinds` criteria 7, 8 and 18 a, ADR 0042 §7, amending
+// `specs/0093` criterion 11a): the Kind switch offers the kinds a registered entry draws, a dummy
+// second output kind registered through the same entry point appears in it, the tools follow the
+// active page's workbench, and no shell source names the laser.
 
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
@@ -10,13 +11,15 @@ import {
   type WorkbenchList,
   activeKind,
   contributionOf,
+  kindOptions,
   registerWorkbench,
-  switcherButtons,
+  workbenchEntry,
 } from "../src/workbenches/registry.ts";
 
-registerWorkbench({ kind: "vector", icon: () => "PenTool", rail: () => null });
-registerWorkbench({ kind: "sketch", icon: () => "DraftingCompass", rail: () => null });
-registerWorkbench({ kind: "manufacturing", icon: (entry) => entry.icon ?? "Factory", rail: () => null });
+registerWorkbench({ kind: "vector", rail: () => "vector rail" });
+registerWorkbench({ kind: "sketch", rail: () => "sketch rail" });
+registerWorkbench({ kind: "manufacturing", rail: () => "vector rail" });
+registerWorkbench({ kind: "test-dummy", rail: () => "dummy rail" });
 
 const dummyManifest = {
   id: "test.dummy",
@@ -38,41 +41,39 @@ const dummyManifest = {
 
 function list(): WorkbenchList {
   return {
-    active: "1:7",
-    entries: [
-      { id: "vector", kind: "vector", label: "Vector", enabled: true },
-      { id: "sketch", kind: "sketch", label: "Sketch", enabled: true },
-      { id: "1:3", kind: "manufacturing", process: "curvyo.laser", label: "Laser 1", icon: "Zap", enabled: false },
-      { id: "1:7", kind: "manufacturing", process: "test.dummy", label: "Dummy 1", icon: "Box", enabled: true },
-      { id: "1:9", kind: "unknown-kind", label: "Nobody draws me", enabled: true },
+    active: "test-dummy",
+    page: { id: "p", name: "Dummy 1", kind: "test.dummy", word: "Dummy", icon: "Box", off: false },
+    kinds: [
+      { id: "drawing", label: "Drawing", icon: "PenTool", workbench: "vector" },
+      { id: "sketch", label: "Sketch", icon: "DraftingCompass", workbench: "sketch" },
+      { id: "test.dummy", label: "Dummy", icon: "Box", workbench: "test-dummy" },
+      { id: "nobody.draws", label: "Nobody", icon: "Box", workbench: "unregistered" },
     ],
-    add: [{ process: "test.dummy", label: "Dummy", icon: "Box" }],
     extensions: [],
     manifests: [dummyManifest],
-    disabled: [{ id: "1:3", label: "Laser 1" }],
   };
 }
 
-test("a dummy second manifest workbench appears in the switcher through the registry", () => {
-  const buttons = switcherButtons(list());
+test("a dummy second output kind appears in the Kind switch through the registry", () => {
   assert.deepEqual(
-    buttons.map((b) => [b.id, b.label, b.icon, b.enabled, b.pressed]),
+    kindOptions(list()).map((k) => [k.id, k.label, k.icon]),
     [
-      ["vector", "Vector", "PenTool", true, false],
-      ["sketch", "Sketch", "DraftingCompass", true, false],
-      ["1:3", "Laser 1 (disabled)", "Zap", false, false],
-      ["1:7", "Dummy 1", "Box", true, true],
+      ["drawing", "Drawing", "PenTool"],
+      ["sketch", "Sketch", "DraftingCompass"],
+      ["test.dummy", "Dummy", "Box"],
     ],
   );
-  assert.equal(activeKind(list()), "manufacturing");
   assert.equal(contributionOf(list(), "test.dummy")?.label, "Dummy");
   assert.equal(contributionOf(list(), "curvyo.laser"), undefined, "a switched-off extension has no manifest");
 });
 
-test("without a manufacturing the switcher shows Vector and Sketch only", () => {
-  const plain: WorkbenchList = { ...list(), active: "vector", entries: list().entries.slice(0, 2) };
-  assert.deepEqual(switcherButtons(plain).map((b) => b.id), ["vector", "sketch"]);
-  assert.equal(activeKind(plain), "vector");
+test("the tools follow the active page's workbench", () => {
+  assert.equal(activeKind(list()), "test-dummy");
+  assert.equal(workbenchEntry<unknown, string>(activeKind(list()))?.rail(null), "dummy rail");
+  const drawing: WorkbenchList = { ...list(), active: "vector" };
+  assert.equal(workbenchEntry<unknown, string>(activeKind(drawing))?.rail(null), "vector rail");
+  const sketch: WorkbenchList = { ...list(), active: "sketch" };
+  assert.equal(workbenchEntry<unknown, string>(activeKind(sketch))?.rail(null), "sketch rail");
 });
 
 test("no shell source names the laser process or branches on it: it is data from the manifest", () => {

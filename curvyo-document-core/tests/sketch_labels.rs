@@ -4,9 +4,24 @@ use curvyo_document_core::{Document, SketchDelta, Style, pack, unpack};
 use curvyo_sketch_core::{
     Constraint, Construction, Expression, Position, Quantity, Relation, Sketch, construct,
 };
+
+/// A document whose only page is a sketch page at (0, 0) (`0098` criterion 3: only a sketch page
+/// owns a sketch).
+fn sketch_document(peer: u64) -> Document {
+    let d = Document::new(peer);
+    let page = d
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
+    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
+    // At the old first page's place, so the expected coordinates stay as written.
+    let back = curvyo_document_core::Vec2::new(-page.origin.x, -page.origin.y);
+    d.move_page(&page.id, back, &[]).unwrap();
+    d
+}
+
 #[test]
 fn label_position_roundtrip_noop_and_constraint_removal_preserve_geometry() {
-    let doc = Document::new(66221);
+    let doc = sketch_document(66221);
     let graph = construct(
         &Sketch::new("o".into()),
         "line",

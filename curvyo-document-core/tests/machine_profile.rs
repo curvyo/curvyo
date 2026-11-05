@@ -1,19 +1,21 @@
 //! The machine profile copy in the project file (`specs/0026-machine-profile` criteria 5, 6, 8 and
 //! 12; ADR 0039): the `mfg_profile` register, its one-step writes, the migration of format 35, the
-//! open check and the goldens `machine_profile_v36.curvyo`, `machine_profile_damaged_v36.curvyo`
-//! and `mfg_profile_not_a_map_v36.curvyo`. `CURVYO_WRITE_FIXTURES=1` rewrites them.
+//! open check and the frozen goldens `machine_profile_v36.curvyo`,
+//! `machine_profile_damaged_v36.curvyo` and `mfg_profile_not_a_map_v36.curvyo`, which open
+//! through the page-kinds migration (`specs/0098-page-kinds` criterion 19).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewManufacturing, NodeId,
-    OpenError, Point, ProfileChange, RectBounds, pack, unpack,
+    CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewOutputPage, NodeId,
+    OpenError, PageCorner, Point, ProfileChange, RectBounds, pack, unpack,
 };
 use loro::{LoroDoc, LoroValue};
 
+/// The format of the machine profile copy; later formats keep it.
 const THIS_SLICE_VERSION: u32 = 36;
 const GOLDEN: &str = "machine_profile_v36.curvyo";
 const DAMAGED: &str = "machine_profile_damaged_v36.curvyo";
@@ -45,57 +47,17 @@ fn with_laser(profile: &FixtureParams) -> (Document, NodeId) {
         Point::new(30.0, 30.0),
     ));
     let id = document
-        .add_manufacturing(NewManufacturing {
+        .add_output_page(NewOutputPage {
             process: "curvyo.laser",
             label: "Laser",
             profile: Some(profile),
             work_area: DocumentSize::from_mm(400.0, 300.0),
-            place: Some("first"),
         })
+        .unwrap()
+        .kind
+        .manufacturing()
         .unwrap();
     (document, id)
-}
-
-/// A user profile id, an edited copy and a 600 x 400 mm output page (criterion 12).
-fn golden_document() -> Document {
-    let (document, id) = with_laser(&copy(USER_ID, "K40 in the garage", 6000));
-    document
-        .set_manufacturing_profile(
-            id,
-            &copy(USER_ID, "K40 in the garage", 12_000),
-            DocumentSize::from_mm(600.0, 400.0),
-            ProfileChange::EditMaxFeed,
-        )
-        .unwrap();
-    document
-}
-
-/// The golden with `mfg_profile` replaced by `value`, saved as this build's container.
-fn with_profile_value(value: LoroValue) -> Vec<u8> {
-    let loro = LoroDoc::new();
-    loro.import(&golden_document().export_loro_snapshot().unwrap())
-        .unwrap();
-    manufacturing_meta(&loro)
-        .insert("mfg_profile", value)
-        .unwrap();
-    loro.commit();
-    repack(&loro)
-}
-
-fn damaged_profile() -> LoroValue {
-    let map: std::collections::HashMap<String, LoroValue> = [
-        ("id".to_owned(), LoroValue::from(USER_ID)),
-        ("name".to_owned(), LoroValue::from("n".repeat(61).as_str())),
-        ("origin".to_owned(), LoroValue::from("top_right")),
-        (
-            "max_feed_mm_per_min".to_owned(),
-            LoroValue::Double(f64::NAN),
-        ),
-        ("max_power".to_owned(), LoroValue::from("high")),
-        ("laser_mode".to_owned(), LoroValue::Bool(false)),
-    ]
-    .into();
-    LoroValue::from(map)
 }
 
 fn manufacturing_meta(loro: &LoroDoc) -> loro::LoroMap {
@@ -107,41 +69,6 @@ fn manufacturing_meta(loro: &LoroDoc) -> loro::LoroMap {
         .find(|&n| tree.get_meta(n).unwrap().get("manufacturing").is_some())
         .unwrap();
     tree.get_meta(node).unwrap()
-}
-
-fn repack(loro: &LoroDoc) -> Vec<u8> {
-    let manifest = serde_json::json!({
-        "format_version": CURRENT_FORMAT_VERSION,
-        "loro_snapshot_version": curvyo_document_core::CURRENT_LORO_SNAPSHOT_VERSION,
-        "app_version": "0.1.0",
-    });
-    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-    let options = zip::write::SimpleFileOptions::default();
-    writer.start_file("manifest.json", options).unwrap();
-    writer.write_all(manifest.to_string().as_bytes()).unwrap();
-    writer.start_file("document.loro", options).unwrap();
-    writer
-        .write_all(&loro.export(loro::ExportMode::Snapshot).unwrap())
-        .unwrap();
-    writer.start_file("document.json", options).unwrap();
-    writer.write_all(b"{}").unwrap();
-    writer.finish().unwrap().into_inner()
-}
-
-fn write_fixtures_on_request() {
-    if std::env::var_os("CURVYO_WRITE_FIXTURES").is_some() {
-        std::fs::write(
-            fixture_path(GOLDEN),
-            pack(&golden_document(), "0.1.0").unwrap(),
-        )
-        .unwrap();
-        std::fs::write(fixture_path(DAMAGED), with_profile_value(damaged_profile())).unwrap();
-        std::fs::write(
-            fixture_path(NOT_A_MAP),
-            with_profile_value(LoroValue::from("K40")),
-        )
-        .unwrap();
-    }
 }
 
 fn stored_loro(bytes: &[u8]) -> LoroDoc {
@@ -164,17 +91,13 @@ fn stored_profile(bytes: &[u8]) -> LoroValue {
         .get_deep_value()
 }
 
-#[test]
-fn the_format_version_is_this_slices() {
-    assert_eq!(CURRENT_FORMAT_VERSION, THIS_SLICE_VERSION);
-}
+// The copy arrived with format 36; later formats keep it.
+const _: () = assert!(CURRENT_FORMAT_VERSION >= THIS_SLICE_VERSION);
 
 #[test]
 fn the_golden_reads_back_id_copy_and_work_area_identical() {
-    write_fixtures_on_request();
     let bytes = std::fs::read(fixture_path(GOLDEN)).unwrap();
     let document = unpack(2, &bytes).unwrap();
-    let version = document.version();
     let made = &document.manufacturings()[0];
     assert_eq!(
         made.profile,
@@ -182,7 +105,7 @@ fn the_golden_reads_back_id_copy_and_work_area_identical() {
     );
     assert_eq!(made.work_area(), DocumentSize::from_mm(600.0, 400.0));
     assert_eq!(made.legacy_machine_name, None);
-    assert_eq!(document.version(), version, "opening writes nothing");
+    assert_eq!(document.own_step_count(), 0, "opening adds no step");
     let LoroValue::Map(stored) = stored_profile(&bytes) else {
         panic!("one atomic map");
     };
@@ -196,7 +119,6 @@ fn the_golden_reads_back_id_copy_and_work_area_identical() {
 
 #[test]
 fn a_damaged_copy_opens_and_saves_its_register_back_unchanged() {
-    write_fixtures_on_request();
     let bytes = std::fs::read(fixture_path(DAMAGED)).unwrap();
     let document = unpack(2, &bytes).unwrap();
     let profile = document.manufacturings()[0].profile.clone().unwrap();
@@ -212,7 +134,6 @@ fn a_damaged_copy_opens_and_saves_its_register_back_unchanged() {
 
 #[test]
 fn a_profile_register_that_is_not_a_map_is_damage() {
-    write_fixtures_on_request();
     let bytes = std::fs::read(fixture_path(NOT_A_MAP)).unwrap();
     assert!(matches!(unpack(2, &bytes), Err(OpenError::Damaged)));
 }
@@ -229,7 +150,8 @@ fn a_profile_write_is_one_step_with_its_page_and_an_unchanged_one_writes_nothing
                 id,
                 &other,
                 DocumentSize::from_mm(500.0, 500.0),
-                ProfileChange::Pick
+                PageCorner::default(),
+                ProfileChange::Pick,
             )
             .unwrap()
     );
@@ -244,7 +166,8 @@ fn a_profile_write_is_one_step_with_its_page_and_an_unchanged_one_writes_nothing
                 id,
                 &other,
                 DocumentSize::from_mm(500.0, 500.0),
-                ProfileChange::Pick
+                PageCorner::default(),
+                ProfileChange::Pick,
             )
             .unwrap()
     );
@@ -263,6 +186,7 @@ fn the_first_profile_write_of_a_format_35_file_drops_the_placeholder_name() {
             made.id,
             &profile,
             made.work_area(),
+            PageCorner::default(),
             ProfileChange::EditMaxFeed,
         )
         .unwrap();

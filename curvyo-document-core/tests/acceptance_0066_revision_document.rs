@@ -3,6 +3,20 @@
 use curvyo_document_core::{AnchorId, Document, NodeId, SketchDelta, Style, Vec2, pack, unpack};
 use curvyo_sketch_core::{Entity, Position, Sketch};
 
+/// A document whose only page is a sketch page at (0, 0) (`0098` criterion 3: only a sketch page
+/// owns a sketch).
+fn sketch_document(peer: u64) -> Document {
+    let d = Document::new(peer);
+    let page = d
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
+    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
+    // At the old first page's place, so the expected coordinates stay as written.
+    let back = curvyo_document_core::Vec2::new(-page.origin.x, -page.origin.y);
+    d.move_page(&page.id, back, &[]).unwrap();
+    d
+}
+
 fn graph(x: f64) -> Sketch {
     let mut graph = Sketch::new("origin".into());
     graph.entities.insert(
@@ -36,7 +50,7 @@ fn exchange(a: &Document, b: &Document) {
 }
 #[test]
 fn r01_r02_first_owner_is_atomic_centered_and_roundtrips_with_stable_ids() {
-    let d = Document::new(71);
+    let d = sketch_document(71);
     let page = d.pages()[0].clone();
     d.move_page(&page.id, Vec2::new(300.0, -40.0), &[]).unwrap();
     let frame = d.pages()[0].clone();
@@ -77,7 +91,7 @@ fn r01_r02_first_owner_is_atomic_centered_and_roundtrips_with_stable_ids() {
 }
 #[test]
 fn r01_occupied_and_missing_page_refusal_is_inert() {
-    let d = Document::new(73);
+    let d = sketch_document(73);
     let page = d.pages()[0].id.clone();
     let id = create(&d, &page, 10.0);
     let before = d.version();
@@ -95,10 +109,12 @@ fn r01_occupied_and_missing_page_refusal_is_inert() {
 }
 #[test]
 fn r04_clones_are_nonowners_and_source_edits_keep_their_links() {
-    let d = Document::new(74);
+    let d = sketch_document(74);
     let page = d.pages()[0].id.clone();
     let source = create(&d, &page, 10.0);
-    let target = d.add_page();
+    let target = d
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
     let clone = d.linked_clone(&[source], &[]).unwrap()[0];
     assert_eq!(d.sketch_page(clone), None);
     assert_eq!(d.page_sketch(&target.id), None);
@@ -133,7 +149,7 @@ fn r04_clones_are_nonowners_and_source_edits_keep_their_links() {
 }
 #[test]
 fn r04_concurrent_claims_converge_without_discarding_or_editing_loser() {
-    let a = Document::new(76);
+    let a = sketch_document(76);
     let page = a.pages()[0].id.clone();
     let b = reopen(&a, 77);
     let left = create(&a, &page, 10.0);
@@ -174,7 +190,7 @@ fn r04_concurrent_claims_converge_without_discarding_or_editing_loser() {
 }
 #[test]
 fn r03_delete_recreate_and_object_history_restore_claims() {
-    let d = Document::new(78);
+    let d = sketch_document(78);
     let page = d.pages()[0].id.clone();
     let id = create(&d, &page, 10.0);
     d.delete_objects(&[id]).unwrap();
@@ -193,7 +209,7 @@ fn r03_delete_recreate_and_object_history_restore_claims() {
 }
 #[test]
 fn r03_conversion_releases_claim_and_object_undo_restores_same_owner() {
-    let d = Document::new(79);
+    let d = sketch_document(79);
     let page = d.pages()[0].id.clone();
     let id = create(&d, &page, 10.0);
     let ids: Vec<_> = (0..d.sketch(id).unwrap().resolved.all_anchors().count())
@@ -212,8 +228,10 @@ fn r03_conversion_releases_claim_and_object_undo_restores_same_owner() {
 }
 #[test]
 fn r03_page_delete_keeps_artwork_and_undo_restores_association() {
-    let d = Document::new(80);
-    let page = d.add_page();
+    let d = sketch_document(80);
+    let page = d
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
     let id = create(&d, &page.id, 10.0);
     d.delete_page(&page.id).unwrap();
     let step = d.own_steps().last().unwrap().step;
@@ -255,7 +273,7 @@ fn r10_current_format_owner_goldens_distinguish_structural_damage() {
 
 #[test]
 fn r03_resize_does_not_recenter_and_explicit_content_move_applies_once() {
-    let d = Document::new(83);
+    let d = sketch_document(83);
     let page = d.pages()[0].id.clone();
     let id = create(&d, &page, 10.0);
     let old = d.sketch(id).unwrap();
@@ -277,7 +295,7 @@ fn r03_resize_does_not_recenter_and_explicit_content_move_applies_once() {
 #[test]
 fn r23_dimension_label_metadata_is_finite_atomic_and_independent_of_solver_cache() {
     use curvyo_sketch_core::{Constraint, Expression, Quantity, Relation};
-    let d = Document::new(920);
+    let d = sketch_document(920);
     let page = d.pages()[0].id.clone();
     let mut shape = graph(10.0);
     shape.constraints.insert(
@@ -320,7 +338,9 @@ fn r23_dimension_label_metadata_is_finite_atomic_and_independent_of_solver_cache
     assert_eq!(d.version(), version);
     let restored = reopen(&d, 921);
     assert_eq!(restored.sketch(id).unwrap().labels, after.labels);
-    let target = d.add_page();
+    let target = d
+        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+        .unwrap();
     let copied = d
         .duplicate_objects_to_page(
             &[curvyo_document_core::CopySource {
