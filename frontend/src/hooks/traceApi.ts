@@ -22,7 +22,12 @@ export interface TraceApi {
   /** The Select bar shows the Trace button (only images selected). */
   available: boolean;
   /** What is selected, to the tool. */
-  selection: "empty" | "other" | "images";
+  selection: "empty" | "other" | "images" | "mixed";
+  /** The Mask item (`specs/0094` UX notes §1): drawn while mask paths are selected with the
+   * image; `outside` is the chosen mode. */
+  mask: { paths: number; outside: boolean } | null;
+  /** Inside (`false`) or Outside, not remembered (criterion 17). */
+  setMaskOutside: (outside: boolean) => void;
   /** "Tracing 1 of 3 images", or empty for one image. */
   imagesLabel: string;
   params: readonly TraceParam[];

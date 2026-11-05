@@ -10,7 +10,16 @@ import { mergeReads, poolPercent, poolSize, readingCost, shareLines } from "./oc
 /** A message to the worker. */
 export type TraceRequest =
   | { type: "init"; module: WebAssembly.Module }
-  | { type: "threshold"; id: number; rgba: Uint8Array; width: number; height: number }
+  | {
+      type: "threshold";
+      id: number;
+      rgba: Uint8Array;
+      width: number;
+      height: number;
+      /** With a mask (`specs/0094` criterion 9): the map and `{"mask": ...}`; the region's pixels only. */
+      map?: number[];
+      mask?: string;
+    }
   | {
       type: "trace";
       id: number;
@@ -252,10 +261,11 @@ export class TraceRunner {
 
   /** What a new image starts with: the automatic Threshold (criterion 9), the background colour
    * Remove background's Auto suggests (`specs/0089` criterion 16; empty: transparent) and the
-   * analysis JSON (`specs/0089` slice F; empty when it failed). */
-  async defaults(pixels: TracePixels): Promise<{ threshold: number; background: string; analysis: string }> {
+   * analysis JSON (`specs/0089` slice F; empty when it failed); with a `mask` (the region JSON of
+   * the session) of the region's pixels only (`specs/0094` criterion 9). */
+  async defaults(pixels: TracePixels, mask = ""): Promise<{ threshold: number; background: string; analysis: string }> {
     const response = await this.send(
-      (id) => ({ type: "threshold", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height }),
+      (id) => ({ type: "threshold", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, ...(mask === "" ? {} : { map: pixels.map, mask }) }),
       [],
     );
     if (response.kind !== "threshold") {

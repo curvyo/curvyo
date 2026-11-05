@@ -54,19 +54,35 @@ export function pixelsOf(session: WasmSession, id: string, reduced: boolean): Tr
 }
 
 export interface ViewState {
-  selection: "empty" | "other" | "images";
+  selection: "empty" | "other" | "images" | "mixed";
   images: string[];
   shown: string;
+  /** Mask paths selected with the image (`specs/0094`). */
+  maskPaths: number;
+  /** The mask paths cover none of the image (criterion 7). */
+  maskOutsideImage: boolean;
+  /** The mask paths could not be combined (the kernel refused). */
+  maskFailed: boolean;
+  /** The region for the worker's settings (`{"outside", "region"}`), empty without one. */
+  mask: string;
 }
 
-export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "" };
+export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskPaths: 0, maskOutsideImage: false, maskFailed: false, mask: "" };
 
 export function readView(session: WasmSession | null): ViewState {
   const raw = session?.trace_view();
   if (!raw) {
     return NO_VIEW;
   }
-  const view = { selection: raw.selection as ViewState["selection"], images: raw.images, shown: raw.shown };
+  const view = {
+    selection: raw.selection as ViewState["selection"],
+    images: raw.images,
+    shown: raw.shown,
+    maskPaths: raw.mask_paths,
+    maskOutsideImage: raw.mask_outside_image,
+    maskFailed: raw.mask_failed,
+    mask: raw.mask_paths > 0 && session ? session.trace_mask_json() : "",
+  };
   raw.free();
   return view;
 }

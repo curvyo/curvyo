@@ -21,6 +21,7 @@ import {
   trace_auto_threshold,
   trace_job,
   trace_mask_job,
+  trace_region_defaults,
   trace_suggest_background,
   trace_text_job,
   trace_text_mask_job,
@@ -50,6 +51,14 @@ scope.onmessage = (event) => {
       return;
     }
     const started = performance.now();
+    if (request.type === "threshold" && request.mask && request.map) {
+      // `specs/0094` criterion 9: the automatic values of the mask region's pixels only.
+      const read = trace_region_defaults(request.rgba, request.width, request.height, new Float64Array(request.map), `{"mask":${request.mask}}`);
+      const reply = { threshold: read.threshold, background: read.background, analysis: read.analysis };
+      read.free();
+      scope.postMessage({ id: request.id, kind: "threshold", ...reply, ms: performance.now() - started });
+      return;
+    }
     if (request.type === "threshold") {
       const threshold = trace_auto_threshold(request.rgba, request.width, request.height);
       // Remove background's Auto (`specs/0089` criterion 16): read once per image with the Threshold.

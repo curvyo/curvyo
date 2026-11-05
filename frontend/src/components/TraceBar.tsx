@@ -1,4 +1,4 @@
-import { Binary, CircleAlert, Image, Info, Layers, Spline, X } from "lucide-react";
+import { Binary, CircleAlert, Image, Info, Layers, Spline, SquareDashed, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { useId, useRef } from "react";
 import type { KeyboardEvent } from "react";
@@ -14,6 +14,7 @@ import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import { analysisLine } from "@/lib/traceAnalysis";
 import {
+  TRACE_MIXED,
   TRACE_FINISH,
   TRACE_METHODS,
   PICK_COLOURS,
@@ -152,6 +153,51 @@ function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceV
         })}
       </div>
     </Tooltip.Provider>
+  );
+}
+
+/** The Mask item (`specs/0094` UX notes §1): a `SquareDashed` glyph and the text segments Inside
+ * and Outside in the View pill's segmented look; arrows move and select, no wrap. */
+function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outside: boolean) => void }) {
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+    const next = Math.min(1, Math.max(0, (outside ? 1 : 0) + step));
+    if (step !== 0) {
+      event.preventDefault();
+      onOutside(next === 1);
+      buttons.current[next]?.focus();
+    }
+  };
+  return (
+    <div className="flex h-9 items-center gap-1">
+      <span className="flex h-7 w-7 items-center justify-center text-[var(--toolbar-icon)]">
+        <SquareDashed size={16} aria-hidden />
+      </span>
+      <div role="radiogroup" aria-label="Mask" className="my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
+        {(["Inside", "Outside"] as const).map((label, index) => {
+          const on = (index === 1) === outside;
+          return (
+            <button
+              key={label}
+              ref={(element) => {
+                buttons.current[index] = element;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => onOutside(index === 1)}
+              className={`flex h-full w-16 items-center justify-center text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+                on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -328,7 +374,9 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       <div data-context-bar="" className={pill} style={pillStyle} role="toolbar" aria-label="Trace">
         <div className="flex h-9 items-center gap-3">
           {label}
-          <span className="text-[var(--toolbar-icon)]">{trace.selection === "empty" ? TRACE_EMPTY : TRACE_NOT_IMAGE}</span>
+          <span className="text-[var(--toolbar-icon)]">
+            {trace.selection === "empty" ? TRACE_EMPTY : trace.selection === "mixed" ? TRACE_MIXED : TRACE_NOT_IMAGE}
+          </span>
           {trace.selection === "empty" ? (
             <button type="button" className={BUTTON_CLASS} onClick={onImport}>
               {TRACE_IMPORT}
@@ -424,6 +472,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
           />
         </div>
         <ViewPill mode={trace.viewMode} onMode={trace.setViewMode} />
+        {trace.mask ? <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} /> : null}
         <div className="flex h-9 items-center">
           <TracePresetMenu
             name="Method"
