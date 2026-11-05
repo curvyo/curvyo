@@ -65,6 +65,10 @@ turns several such traces into one result in which no area is covered twice."
    a Mask row with Inside / Outside, the trace limited to the region with an exact stencil edge,
    Create paths as today, everything else of the Trace tool unchanged. Works end to end for one
    image and one region; no part list, no join.
+   **Slice 1b, pick mask paths (customer, Frage 130 C, 2026-11-05).** A "Pick mask paths" button in
+   the Trace bar, present before any mask exists: armed, a click on a path or group on the canvas
+   adds it to or removes it from the mask, the mode stays armed; a Clear mask button empties the
+   mask. The selection route and Shift+click of slice 1 stay.
 2. **Slice 2, parts and Join.** A Parts row with one chip per part, Add part, each part with its
    own region, mode and settings, one Create paths that joins the parts (Frage 132), a preview of
    the joined result. Parts live while the Trace tool is open (Frage 133).
@@ -74,7 +78,7 @@ turns several such traces into one result in which no area is covered twice."
 Slice 1 is the MVP cut. Each slice is tried by the customer on his own images.
 
 ## Proposals (not customer requirements; vetoable at the demo)
-- How a mask is chosen: Select image plus paths (Frage 130 A). In the Trace tool a Shift+click on a
+- How a mask is chosen: Select image plus paths (Frage 130, answered C: both). In the Trace tool a Shift+click on a
   path adds it to or removes it from the mask paths, so the maker does not have to leave the tool.
 - The Mask row (Inside / Outside) sits in the Advanced block and is drawn only while mask paths are
   selected. The default is Inside, so the Trace bar stays as simple as today with Advanced closed.
@@ -197,6 +201,41 @@ Slice 2
     row's segments are named "Inside" and "Outside" (UX notes may refine).
 33. Slice 1 criteria 1 to 17 hold with a single part.
 
+Slice 1b
+34. Given the Trace tool with an image selected and no mask path, then the bar shows a button named
+    "Pick mask paths" (`aria-pressed="false"`) directly after the View pill, and no Inside / Outside
+    segments and no "Clear mask" button.
+35. Given a press on it, then `aria-pressed="true"` and the canvas cursor hint is "pick-mask"; given a
+    second press, then `aria-pressed="false"`, the cursor hint is the tool's own, and the mask
+    paths are unchanged.
+36. Given the mode armed, when a click hits a path, then it is in the mask paths of the active part,
+    the selection is the image plus that path, the Mask segments appear with Inside selected, the
+    preview is traced inside it, and the mode is still armed. Given a second click on the same
+    path, then it is removed; given the last one removed, then the segments and "Clear mask"
+    disappear and the mode is still armed.
+37. Given the mode armed, then a click on each of an open path, a compound path, a rectangle, an
+    ellipse, a polygon, a star and a group of paths adds it (a group through its path-like members),
+    with the same result as selecting it for the Select route (same region, same preview).
+38. Given the mode armed, when a click hits a text, a second image or a sketch, then it is not
+    added and not selected, the notice row shows "Use Object to path for text; one image at a
+    time." and the mode stays armed; the next accepted pick clears the row. A click on the traced
+    image or on empty canvas changes nothing, and a double-click on the image creates no paths.
+39. Given the mode armed, when Escape is pressed, then only the mode ends (selection, mask and
+    preview kept); the next Escape stops a running trace if there is one, the one after leaves the
+    tool (the order of 0025). Given the tool left by S, another tool or Create paths and entered
+    again, then the mode is not armed.
+40. Given three mask paths, when "Clear mask" is pressed, then the mask is empty, only the image is
+    selected, the three paths still exist unchanged in the document (same ids), the segments and
+    the button disappear, there is no history step and no notice, and the armed state is unchanged.
+41. Given the pick button, then it is a Tab stop after the View pill and before the Mask segments,
+    Space and Enter toggle it, no letter shortcut exists, and Shift+click (criterion 13) and the
+    Select route give the same mask as the picks.
+42. Given slice 2 with several parts, then a pick adds to or removes from the active part only, a
+    chip pick or Add part leaves the mode armed, and Clear mask empties the active part only.
+43. Given a pick, a removal, arming, disarming or a clear, then no success notice and no hint text
+    appears, and at 800 x 600 with the panel open the group wraps as a whole item with every target
+    at least 28 px and no horizontal scroll.
+
 ## Out of scope
 - Soft, feathered or grey-level masks; a mask taken from the picture's own colours (that is Pick
   colours of 0089).
@@ -213,11 +252,13 @@ Slice 2
 - Success notices and hint texts.
 
 ## Decisions
-Defaults applied 2026-11-04 (unanswered, vetoable): Frage 130 A (image plus paths selected), 131 A (mask paths stay), 132 A (later part on top, no doubled area), 133 A (parts only while the Trace tool is open), 134 A (exact stencil edge, geometric clip).
+Frage 130 answered C by the customer on 2026-11-05 (selection route and Shift+click stay; a pick mode with a button in the Trace bar is added: slice 1b).
+
+Defaults applied 2026-11-04 (unanswered, vetoable): 131 A (mask paths stay), 132 A (later part on top, no doubled area), 133 A (parts only while the Trace tool is open), 134 A (exact stencil edge, geometric clip).
 
 ## Open questions for the customer
 
-Frage 130 (MASK-PICK): How is a mask chosen?
+Frage 130 (MASK-PICK): How is a mask chosen? **Answered C (customer, 2026-11-05):** "select the paths/objects for the mask after activating the Trace tool, with a button in the Trace toolbar." Kept below as history.
 - A: Select the image and the paths together (Select tool, or Shift+click in the Trace tool), then
   Trace. No new tool, works with marquee and lasso.
 - B: A pick mode in the Trace bar: a pipette-like "Mask" button, then click each path on the canvas.

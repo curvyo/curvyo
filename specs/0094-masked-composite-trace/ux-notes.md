@@ -1,8 +1,8 @@
 # UX notes: masked and composite trace (0094)
 
 Written 2026-11-04 by the ux-engineer against the Draft `specification.md`. Every item marked
-**(Proposal)** is mine and vetoable at the demo. It assumes the spec's defaults for Fragen 130 to
-134 (all A); sections that depend on an answer say so. Widths are arithmetic from the merged Trace
+**(Proposal)** is mine and vetoable at the demo. It assumes the spec's defaults for Fragen 131 to
+134 (all A); Frage 130 was answered C by the customer on 2026-11-05 (§11); sections that depend on an answer say so. Widths are arithmetic from the merged Trace
 bar (inner 308 px at 800 x 600 with the panel open, 588 px closed; 36 px rows; `0089` UX notes
 §22.1); the PR re-measures. No hint texts and no success notices: every string below names a
 control or states a state. Icons are Lucide, `lucide-react` ^1.50.0 (installed 1.50.0), 16 px,
@@ -43,9 +43,9 @@ the document, not in presets (spec criterion 17). One Tab stop; Left/Right/Up/Do
   criterion 13): the Mask item appears with the first path and disappears with the last. Hover
   while Shift is held uses the existing `--hover-box`; no new cursor.
 
-*Depends on Frage 130.* A (assumed) needs no pick control. B or C would add a 28 px
-toggle "Pick mask paths" (`MousePointerClick`, `aria-pressed`) as the first item of this group and
-the Shift+click row of the Parts tab order below would gain it.
+*Frage 130 is answered C (2026-11-05):* the selection route and Shift+click stay, and the pick
+button of §11 is added. It replaces the non-interactive `SquareDashed` lead glyph of this group and
+is present before any mask exists; everything else in this section holds.
 
 ## 2. How the mask reads on the canvas
 
@@ -122,9 +122,9 @@ row, not decided here.
 
 ## 4. Tab order and keyboard
 
-Tab order in the bar: About Trace, Preset, View, **Mask** (when drawn), Method, main field, method
+Tab order in the bar: About Trace, Preset, View, **Pick mask paths**, **Mask** and **Clear mask** (when drawn), Method, main field, method
 group, Smooth, Tolerance, Ignore below, Advanced, the Advanced controls, Stop or Trace again,
-Create paths, Retry (existing; Mask is the only new bar stop).
+Create paths, Retry (existing; the pick button, Mask and Clear mask are the new bar stops).
 Inside the Advanced block, top to bottom: **Parts** (one stop; Add part; Remove part is no stop),
 Analyse, the Output row, then as today.
 
@@ -135,6 +135,8 @@ Analyse, the Output row, then as today.
 | Delete | Focused chip | Arms the Remove part trash for that part; Delete or Enter on the armed chip removes it (§5) |
 | Enter / Space | Add part | Adds a part |
 | Escape | Armed trash | Disarms only; the next Escape follows the existing rules (control in the block returns focus to the canvas, then leave the tool) |
+| Space / Enter | Pick mask paths | Arms or disarms the pick mode (§11) |
+| Escape | Canvas or bar, pick mode armed | Disarms the pick mode only (§11); then the existing cascade |
 | Shift+click | Canvas, Trace tool | Adds or removes a closed path as mask path of the active part |
 | Enter | Tool | Create paths (joins the parts) |
 
@@ -232,7 +234,87 @@ paths: the mask is outside the image.", "Use Object to path for text; one image 
 item order gains Mask after View, and the Tab order sentence gains Mask and Parts. The
 Interaction-conventions rows are unchanged.
 
+## 11. Pick mask paths (slice 1b, Frage 130 C, customer 2026-11-05)
+
+Customer: select the mask paths after entering the Trace tool, with a button in the Trace bar. The
+selection route (Select image plus paths) and Shift+click (criterion 13) stay; the button is a
+third way to build the same mask set. Items marked **(Proposal)** are vetoable at the demo.
+
+**Where.** The first element of the Mask group, a 28 px toggle that **replaces the lead glyph** of
+§1: the group is now always in the bar, one flow item directly after the View pill. Before a mask
+exists it is the button alone (28 px); with mask paths it is button, the Inside / Outside radiogroup
+and Clear mask (§11.5), 28 + 4 + 128 + 4 + 28 = 192 px. Item order: About Trace, Preset, View,
+**Pick mask paths, Mask, Clear mask**, Method, ... Icon: Lucide `SquareDashedMousePointer` (a dashed
+region with a pointer; present in the installed lucide-react 1.50.0, as are `MousePointerClick`,
+`Crosshair` and `SquareMousePointer`), 16 px, 1.5 px stroke. Name and tooltip "Pick mask paths"
+(no shortcut text, no second line). One Tab stop, first of the group.
+
+**The mode.**
+1. **Armed:** `aria-pressed="true"`, `--toolbar-icon-active-bg` / `--toolbar-icon-active-fg`;
+   disarmed is the transparent bar-button look. State by fill and the attribute, not colour alone.
+   The canvas cursor becomes the "Pick carrier cursor" look of `0080` with this glyph: the Select
+   arrow with the `SquareDashedMousePointer` glyph at 10 px at its lower right (`cursor_hint`
+   "pick-mask"), `crosshair` where custom images are ignored; the same over every point of the canvas
+   while armed (the cursor tells the mode, not the target).
+2. **Pick:** a click on a path-like object or a group adds it to the mask paths of the active part;
+   a click on a picked one removes it. The accepted set is exactly the Select route's (open and
+   closed paths, compound paths, rectangles, ellipses, polygons and stars; a group counts through
+   its path-like members). The hit rule is the Select tool's (topmost, a group as the group). The
+   mode **stays armed** after every pick.
+3. **Refused:** text, a second image and a sketch are not added. The bar's notice row shows the
+   existing muted string "Use Object to path for text; one image at a time." for those clicks and
+   clears with the next accepted pick or when the mode ends **(Proposal)**. The existing row
+   *replaces the controls* when such an object is selected; here it would take the button away
+   under the pointer and end the mode, so the object is simply not selected. A click on the traced
+   image or on empty canvas does nothing (no selection change, mode stays); double-click on the
+   image does not create paths while armed (Enter still does).
+4. **How a picked path reads.** Nothing new: it is added to the selection, so it carries the
+   ordinary selection box (§2: mask paths are ordinary artwork). While armed, the candidate under
+   the pointer gets the existing `--hover-box` outline; no badge, no fill, no new colour. The Mask
+   segments appear with the first pick (Inside selected, or the choice already made in this entry)
+   and the preview re-traces.
+5. **Clear mask (Proposal).** A 28 px `X` icon button, name and tooltip "Clear mask", last in the
+   group, drawn only with mask paths, one Tab stop after the radiogroup. It removes all mask paths
+   of the active part from the set in one press and leaves the image selected; the paths stay in
+   the document untouched. It is not a delete, so no inline confirm; not a history step; no
+   notice. The group shrinks back to the button alone. The mode state is unchanged.
+6. **Ending.** Pressing the button again; **Escape** (before this story Escape stopped a running
+   trace, then left the tool; now, while armed, the first Escape only disarms, with the selection,
+   mask and preview kept; the next Escape follows the existing cascade); leaving the tool by `S`,
+   another rail tool or Create paths. Never remembered: every entry starts disarmed.
+
+**Keyboard.** Space or Enter on the focused button arms it; no letter or chord (`M` and the
+others are not assigned here: the Trace tool has no letter shortcuts for its bar, §4). Picking is
+pointer-only, like every canvas pick in the app (`0080` pick mode); the keyboard route to the same
+result is the selection route, which stays. A mouse press returns focus to the canvas as for the
+other bar buttons; the key press keeps it on the button. Escape from the button disarms and
+returns focus to the canvas.
+
+**Status and notices.** `aria-pressed` carries the mode for screen readers; the polite status
+region says "Pick mask paths on" / "Pick mask paths off" (not visible). The status line segment
+"Inside 2 paths" updates with each pick (§7). No text appears in the bar while armed, no
+instruction, no success notice after a pick, a removal, a clear or leaving. A mask outside the
+image gives the existing "0 paths: the mask is outside the image.".
+
+**Narrow window (800 x 600, panel open, inner 308 px).** The group is a whole flow item: 28 px
+unmasked, 192 px masked; it wraps with its neighbours exactly as §8 says, dividers hidden at row
+starts, nothing shrinks. With the "Part 2 of 3" label (about 72 px) after it, the line still breaks
+only between items. The PR re-measures.
+
+**Parts (slice 2).** A pick adds to or removes from the **active** part's mask paths; the chip
+becomes unmuted with its first path. The mode stays armed when a chip is picked or a part added
+(Add part, then picks, is the intended flow); Remove part disarms nothing. Clear mask empties the
+active part only. A path may belong to several parts (Frage 132 A resolves the overlap).
+
+**Changes to §1:** the `SquareDashed` lead glyph is gone (its role, naming the group, passes to the
+pick button); the Mask item is "not in the DOM" only for its radiogroup, the group is always there.
+
+### Design-system row (the implementer applies it, after "Trace Mask and Parts")
+
+| Trace pick mask paths (`0094` slice 1b, 2026-11-05) | First element of the Trace bar's Mask group, one flow item after the View pill, present before any mask exists: a 28 px toggle, Lucide `SquareDashedMousePointer` 16 px, name and tooltip "Pick mask paths", no shortcut, `aria-pressed`, `--toolbar-icon-active-bg` / `-fg` when armed; replaces the `SquareDashed` lead glyph. Armed: cursor "pick-mask" (Select arrow with the glyph at 10 px, `crosshair` fallback), a click adds or removes the path-like object or group under the pointer to the active part's mask paths (the Select route's set and hit rule), the mode stays armed, the candidate gets `--hover-box`, a picked path is an ordinary selected object. Text, a second image and a sketch are refused with the muted notice row "Use Object to path for text; one image at a time."; empty canvas and the image do nothing. Ends by the button, by Escape (first, before stopping a run or leaving), by leaving the tool or Create paths; never remembered. The Mask radiogroup and a 28 px `X` "Clear mask" (removes all mask paths of the active part from the set; not a delete, no confirm, no history step) appear with the first pick. Pointer-only picking; the Select route and Shift+click remain. No hint text, no notice on success | `0094` criteria 34 to 43, UX notes §11. Frage 130 C |
+
 ## Changes to the spec (for the product owner)
+- Slice 1b and criteria 34 to 43 (§11); Frage 130 answered C.
 - "The Mask row sits in the Advanced block" becomes "the Mask control sits in the bar after the
   View pill and is drawn only with mask paths" (§1; Proposal, fallback: Advanced).
 - Criterion 18 "Parts row with chip 1 and Add part" holds with the row always present; criterion
