@@ -103,12 +103,14 @@ area of the exclusive-or of two outline sets.
 
 Slice 1
 1. Given an image and one closed path selected, when the Trace tool opens, then the Trace bar shows
-   the preview limited to the region, and Advanced shows a Mask row with Inside selected. Given
+   the preview limited to the region, and the bar shows the Mask control after the View pill with
+   Inside selected (UX notes §1; lead, 2026-11-04). Given
    only images selected, then there is no Mask row and the result is path-for-path identical to the
    result before this story (regression).
 2. Given M1 with R1 Inside and Brightness Threshold 50, when Create paths runs, then no node of the
    result lies more than 0.01 mm outside R1, and the result has the disc and the left half of the
-   bar and not the square.
+   bar and not the square. Text objects are exempt (lead, 2026-11-04): a recognised line is kept
+   whole when its box centre lies in the region (criterion 11).
 3. Given M1 with R1 Outside, then no node lies more than 0.01 mm inside R1, and the result has the
    square and the right half of the bar and not the disc.
 4. Given criteria 2 and 3 at the same settings, then the union of the two results differs from the
@@ -121,8 +123,8 @@ Slice 1
 7. Given a mask that reaches beyond the image, then the region is clipped to the image. Given a
    mask that does not touch the image, then the muted row says "0 paths: the mask is outside the
    image.", the Trace button is dimmed and creates nothing.
-8. Given the image rotated by 30 degrees and scaled to 60 mm width, and R1 transformed the same
-   way, then criteria 2 and 4 hold with the same numbers.
+8. Given the image rotated by 30 degrees and scaled to 60 mm width, or in addition skewed, and R1
+   transformed the same way, then criteria 2 and 4 hold with the same numbers.
 9. Given M2 with Remove background on the right half (a mask over the right half, Inside), then the
    background colour used is #D8D8D8, no shape comes from the paper, and the grey square is traced
    (region-only analysis). The same method with no mask uses the dominant colour of the whole
@@ -140,8 +142,9 @@ Slice 1
 13. Given the Trace tool in use, when Shift+click hits a closed path, then it is added to or removed
     from the mask paths and the preview updates; Shift+click on empty canvas changes nothing.
 14. Given a selection of a text, a second image or a sketch with the image, then the muted row says
-    "Use Object to path for text; one image at a time." and the Trace button is dimmed; the image
-    alone still traces.
+    "Use Object to path for text; one image at a time." in place of the bar's controls, with no
+    Trace button (as the "not an image" row), and Enter creates nothing; the image alone still
+    traces.
 15. Given M1 and the same settings run twice, then the results are identical (determinism).
 16. Given a 2000 x 2000 px image and a mask of 500 nodes, then the stencil clipping adds at most
     0.1 s of thread CPU time to the trace (Proposal; reported, not blocking, a miss goes to

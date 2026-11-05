@@ -82,6 +82,15 @@ Manufacturing output is unaffected — everything is flattened before it reaches
 a machine — but the *editable* result of a union has far more nodes than
 Inkscape's and is not cleanly re-editable.
 
+A masked trace (`specs/0094-masked-composite-trace`, 2026-11-04) inherits this:
+a traced shape that crosses the stencil edge comes back as a polyline over its
+whole outline, flattened at 0.005 mm, not only along the edge; shapes wholly
+inside or outside keep their curves. On the reference fixture M1 at Threshold 50 the
+Inside result grows from 28 to 168 nodes (the disc and the bar, joined, cut at the edge).
+The architect's curve-preserving clip
+(`specs/0094-masked-composite-trace/adrs.md` decision 1, option a') replaces
+it without a change to the job or the wire.
+
 **Resolution:** a curve-refitting pass after boolean operations, as its own
 story using `kurbo`'s curve fitting. Needs a quality bar defined first
 (maximum deviation, node-count target).

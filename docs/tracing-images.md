@@ -2,7 +2,8 @@
 
 The **Trace** tool turns an image object into smooth, closed paths you can cut, engrave, plot or
 edit. Select one or several images and press **Trace**, the last button of the Select bar (it is
-there only while nothing but images is selected), or press **I**. Ctrl+I stays Import. The bar
+there only while nothing but images is selected, or one image with mask paths, see "Mask"), or
+press **I**. Ctrl+I stays Import. The bar
 above the canvas becomes the Trace bar; the right panel gets one more tab, **About Trace**, which
 opens only when you ask for it (see "About Trace" below).
 (`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, the
@@ -194,6 +195,40 @@ shown only when it has something to say:
   where the two straight sides meet.
 
 Invert and Drop border shapes start off with each start of the app.
+
+## Mask
+
+To trace only a part of a picture, draw one or more ordinary paths over it (rectangles, ellipses,
+polygons, stars, pen paths, compound paths or linked clones; a group counts as the paths in it),
+select the image together with them and press **Trace**. In the Trace tool, Shift+click on a path
+adds it to the mask paths or takes it out again; Shift+click on empty canvas changes nothing.
+(`specs/0094-masked-composite-trace` slice 1.)
+
+The paths together are the mask: where they overlap they count once, the hole of a compound path is
+a hole in the mask, and an open path is closed by a straight line. Their fill and stroke do not
+matter. With mask paths selected the bar shows **Mask** after View: **Inside** (the default on every
+entry into the tool) traces only what lies inside the mask, **Outside** only what lies outside it.
+The mode is not remembered and is not part of a preset.
+
+The trace ends exactly on the mask path: a shape that crosses it is cut there, so Inside and Outside
+of the same mask fit together without a gap or an overlap. A cut shape comes back as straight
+segments over its whole outline (fine, 0.005 mm), not as curves; shapes wholly inside keep their
+curves. The automatic Threshold, the background of Remove background's Auto and the analysis read
+only the pixels inside the mask. With Recognise text, a line becomes text when the centre of its box
+lies inside the mask (the text is kept whole); a line outside it is neither text nor traced.
+Recognise shapes looks only at the cut result.
+
+In **Overlay** the image outside the mask is washed further (to 12 %), and the outline is drawn only
+inside it; the **Mask** view is white outside the mask; the **Trace** view shows nothing outside it.
+The status line in Advanced starts with "Inside 2 paths" or "Outside 1 path". Mask paths that cover
+none of the image give "0 paths: the mask is outside the image." and nothing to create; mask paths
+that cannot be combined into one area give "0 paths: the mask paths could not be combined." An image
+selected together with a text, a sketch or a second image and mask paths gives "Use Object to path
+for text; one image at a time."
+
+Create paths makes the same group "Trace of ..." as without a mask, in one History step; the mask
+paths stay exactly as they are (same objects, nodes and style), so a path drawn as a cut outline
+stays in the job.
 
 ## Recognise text
 
