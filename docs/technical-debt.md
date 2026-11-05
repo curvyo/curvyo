@@ -36,6 +36,63 @@ workspaces, pairs again and switches them on (Frage 146 default A). A keyring ru
 a mutual removal (for example the earlier removal by causal order wins) is a change to ADR 0010
 §5 and its exhaustive tests; it waits for the customer.
 
+Since [ADR 0041](adr/0041-membership-lifecycle.md) decision 4 (`0097`): the held-back removals
+are exposed by `Keyring::held_back()`, the maker sees a notice, Make admin and pairing warn
+first, and `reconcile` adds group devices only as members in such a room, so no automatic write
+releases them. The room stays frozen until a person adds an admin.
+
+## From now on is a client rule (`0097`, 2026-11-05, ADR 0041 decision 7)
+
+"From now on" withholds the epochs created while a returning member was away only because
+current clients do not write `RewrapEpoch` for them (`missing_wraps`). The keyring would accept
+such a rewrap, so a build without the rule, or a member who wants to, can still hand the keys
+over; any member can pass on the content outside the app anyway. The dialog says "the app does
+not give B the keys", never "B cannot read".
+
+**Resolution:** accepted (Frage 160 A, default). A keyring validity rule (Frage 160 B) would bind
+it for honest replays at the cost of an ADR 0010 rule change and a period in which old and new
+replays disagree.
+
+## Return check heads (`0097`, 2026-11-05, ADR 0041 decision 6)
+
+The return check counts "added back" only for an admission of this device that builds on every
+keyring head its `share.ended.json` kept. This closes the limitation the first build had (a relay
+serving the room's real keyring cut off before the device's `RemoveMember` made the device look
+added back, plan open point 3): such a keyring holds no admission after the heads, so the check
+says "could not be checked". The cost: a head this device wrote that the relay never stored (a
+leave or rewrap sent just before the connection broke) can never be an ancestor of an add back,
+so that device never sees "added back"; its way back is an invite link. The same holds for a
+device whose credential store lost the room's keys (no wrap of a key it held).
+
+**Resolution:** resolved by ADR 0041 decision 11 (2026-11-05): `heads` are the heads of the
+entries the relay confirmed, so an own entry it never stored is never a head. The lost-keys case
+stays.
+
+## A mutual removal does not freeze a room through one relay (`0097`, 2026-11-05, criterion 27)
+
+The relay closes a removed admin's connection as soon as it stores the removal, before that
+admin's concurrent removal of the other is read, so through one relay a mutual removal removes
+one admin (ADR 0041 decision 4). A frozen room still arises from crossed demotions, or from a
+removal that reaches the relay after the remover's own demotion (a demotion closes no
+connection), and from keyrings merged outside one relay; the browser journey
+(`frontend/tests/browser/membership.cjs`) can show the notice that way. A linear held-back act
+(the only admin removing itself) still occurs.
+
+**Resolution:** none needed while one relay serves a room; revisit if rooms ever federate.
+
+## Sync files over 500 lines (`0096`, `0097`, 2026-11-05)
+
+Grown past the module limit of CLAUDE.md §5 by the membership lifecycle, each by the person
+leave, the `left` reconcile or the ended record of the group it already drives:
+`frontend/src/hooks/useDevices.ts` (878), `useSyncedWorkspaces.ts` (600),
+`frontend/src/lib/backgroundWorkspace.ts` (588), `PropertiesPanel.tsx` (586),
+`useCollaboration.ts` (571), `useWorkspaceSync.ts` (563) and
+`curvyo-editor-wasm/src/device_group_glue.rs` (566). Splitting them is a refactoring outside the
+story.
+
+**Resolution:** split `useDevices.ts` into pairing, group list and person leave, and
+`backgroundWorkspace.ts` into its room and its marker writes, the next time either is touched.
+
 ## Any identity ever paired counts as the maker's for good (`0096`, 2026-11-05)
 
 `may_readmit` (ADR 0040 decision 5) re-adds a group device to a switched-on workspace when every
