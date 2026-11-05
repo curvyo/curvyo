@@ -374,7 +374,7 @@ function Editor() {
           sketch={sketch}
           onDropFiles={project.importFiles}
           overlay={<PresenceOverlay getSession={editor.getSession} />}
-          showPageFrames={workbenches.view === null}
+          showPageFrames
         />
         <CollaborationPill
           view={collab.view}
@@ -408,6 +408,7 @@ function Editor() {
         cursor={cursor}
         format={documentPanel.cursorText}
         sizeText={workbenches.view?.status ?? documentPanel.view.sizeText}
+        kind={workbenches.list.page.id ? workbenches.list.page : null}
         zoomPercent={editor.zoomPercent}
         nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}
       />

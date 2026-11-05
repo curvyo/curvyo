@@ -3,6 +3,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
+import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { fixtureRowKey, focusAfterRemove, tabStopRow } from "@/lib/fixtureRowKeys";
 import { WorkbenchIcon } from "@/workbenches/icons";
@@ -12,6 +13,8 @@ interface ManifestTabProps {
   contribution: ManifestWorkbenchContribution;
   view: ManufacturingView;
   workbenches: WorkbenchesApi;
+  /** The document's display unit (the Machine block's work area line). */
+  unit: UnitSymbol;
   onReturnFocus: () => void;
 }
 
@@ -21,7 +24,7 @@ interface ManifestTabProps {
  * (`specs/0026-machine-profile`) and `FixtureList` in the manifest's order. Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, view, workbenches, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, view, workbenches, unit, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
   return (
     <div className="flex flex-col gap-4">
@@ -32,6 +35,7 @@ export function ManifestTab({ contribution, view, workbenches, onReturnFocus }: 
           contribution={contribution}
           view={view}
           workbenches={workbenches}
+          unit={unit}
           onReturnFocus={onReturnFocus}
         />
       ))}
@@ -44,6 +48,7 @@ function Block({
   contribution,
   view,
   workbenches,
+  unit,
   onReturnFocus,
 }: ManifestTabProps & { block: ManifestBlock }) {
   switch (block.kind) {
@@ -51,7 +56,7 @@ function Block({
       return <NoticeBlock text={view.notices[block.id]} />;
     case "machine_profile":
       return view.machine ? (
-        <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} />
+        <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} />
       ) : null;
     case "fixture_list":
       return (

@@ -1,10 +1,9 @@
-import { Trash2 } from "lucide-react";
-import { WorkbenchSwitcher } from "@/components/workbench/WorkbenchSwitcher";
+import { TriangleAlert } from "lucide-react";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { contributionOf } from "@/workbenches/registry";
-import { glyphOf } from "@/workbenches/iconNames";
+import { KindChip } from "@/components/KindChip";
 import { SketchParameters } from "@/components/sketch/SketchParameters";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchesPanel } from "@/components/sketch/SketchesPanel";
@@ -227,10 +226,13 @@ export function PropertiesPanel({
   const historyTotal = doc.view.content === "history" ? historyCount(editor) : 0;
   const manufacturing = workbenches.view;
   const contribution = contributionOf(workbenches.list, manufacturing?.process);
+  const page = workbenches.list.page;
+  // The kind chip sits in the header of the page-scoped tabs only (`specs/0098` criterion 6).
+  const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters"].includes(
+    doc.view.content,
+  );
   const subject =
-    doc.view.content === "workbench"
-      ? (manufacturing?.name ?? "")
-      : doc.view.content === "file"
+    doc.view.content === "file"
       ? project.dirty
         ? "Unsaved changes"
         : ""
@@ -239,7 +241,7 @@ export function PropertiesPanel({
       : doc.view.content === "layers"
       ? (getSession()?.layers_subject() ?? "")
       : doc.view.content === "document"
-      ? doc.view.presets.subject
+      ? page.name
       : doc.view.content === "style"
         ? panel.view.subject
         : doc.view.content === "fonts"
@@ -266,7 +268,6 @@ export function PropertiesPanel({
   };
   return (
     <div className="flex h-full shrink-0 flex-col">
-    <WorkbenchSwitcher workbenches={workbenches} open={open} />
     <Tabs
       value={activeTab}
       onValueChange={activate}
@@ -299,7 +300,6 @@ export function PropertiesPanel({
         onToggleGrid={grid.toggle}
         onActivate={activate}
         onReturnFocus={returnFocus}
-        workbenchGlyph={contribution ? glyphOf(contribution.tabs[0]?.icon ?? contribution.icon) : undefined}
       />
       <aside
         id={panelId}
@@ -365,23 +365,15 @@ export function PropertiesPanel({
           ) : (
             <PanelSubject text={subject} />
           )}
-          {doc.view.content === "workbench" && manufacturing ? (
-            <Tooltip side="left" content={`Delete ${manufacturing.name}`}>
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={`Delete ${manufacturing.name}`}
-                className="inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-                onClick={() => {
-                  workbenches.deleteManufacturing(manufacturing.id);
-                  requestAnimationFrame(() =>
-                    document.querySelector<HTMLElement>('[data-workbench="vector"]')?.focus(),
-                  );
-                }}
-              >
-                <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-              </button>
-            </Tooltip>
+          {pageScoped && page.id ? (
+            <span
+              role="img"
+              aria-label={`${page.word} page`}
+              className="shrink-0 rounded-md px-1.5 py-0.5 text-[var(--toolbar-icon)]"
+              style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
+            >
+              <KindChip hidden size={12} kind={{ icon: page.icon, word: page.word, off: page.off }} />
+            </span>
           ) : null}
           </>
           )}
@@ -418,16 +410,7 @@ export function PropertiesPanel({
                 : "outline-none"
             }
           >
-            {doc.view.content === "workbench" ? (
-              manufacturing && contribution ? (
-                <ManifestTab
-                  contribution={contribution}
-                  view={manufacturing}
-                  workbenches={workbenches}
-                  onReturnFocus={returnFocus}
-                />
-              ) : null
-            ) : doc.view.content === "file" ? (
+            {doc.view.content === "file" ? (
               <FileTab
                 project={project}
                 desktop={isTauri}
@@ -479,6 +462,20 @@ export function PropertiesPanel({
                 document={doc}
                 formats={formats}
                 background={background}
+                workbenches={workbenches}
+                machine={
+                  manufacturing && contribution ? (
+                    <ManifestTab
+                      contribution={contribution}
+                      view={manufacturing}
+                      workbenches={workbenches}
+                      unit={doc.view.unit}
+                      onReturnFocus={returnFocus}
+                    />
+                  ) : page.off ? (
+                    <SwitchedOffNotice word={page.word.replace(/ \(off\)$/, "")} />
+                  ) : null
+                }
                 onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "style" ? (
@@ -522,6 +519,24 @@ export function PropertiesPanel({
         )}
       </aside>
     </Tabs>
+    </div>
+  );
+}
+
+/** The notice on a laser page whose extension is switched off (`specs/0098` criterion 18 b), in
+ * place of the Machine and Fixtures blocks. */
+function SwitchedOffNotice({ word }: { word: string }) {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2 rounded-md p-2 text-xs text-[var(--toolbar-icon)]"
+      style={{
+        background: "var(--toolbar-bg)",
+        border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
+      }}
+    >
+      <TriangleAlert size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
+      {`${word} workbench is switched off`}
     </div>
   );
 }

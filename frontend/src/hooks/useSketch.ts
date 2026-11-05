@@ -24,12 +24,6 @@ export function useSketch(editor: EditorSession) {
     finally { editor.sync(); }
   };
   const focusCanvas = () => editor.containerRef.current?.focus({ preventScroll: true });
-  const switchWorkbench = (name: "vector" | "sketch") => {
-    if (view.workbench === name) return;
-    // Stop the old Vector text/Trace context before the shared canvas changes owner.
-    editor.setTool("select");
-    run(session => session.set_workbench(name));
-  };
   const inspectConstraint = (id: string, edit: boolean) => {
     if (!run(session => session.sketch_inspect_constraint(id, edit))) return;
     if (edit) requestAnimationFrame(() => {
@@ -37,6 +31,6 @@ export function useSketch(editor: EditorSession) {
       field?.focus(); field?.select();
     });
   };
-  return { presentation: editor.sketchPresentation, inspectConstraint, view, error: error ?? view.error, run, runInBox, switchWorkbench, focusCanvas, clearError: () => setError(null) };
+  return { presentation: editor.sketchPresentation, inspectConstraint, view, error: error ?? view.error, run, runInBox, focusCanvas, clearError: () => setError(null) };
 }
 export type SketchApi = ReturnType<typeof useSketch>;

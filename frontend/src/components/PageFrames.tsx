@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
 import { readPages } from "@/lib/pages";
+import { KindChip } from "@/components/KindChip";
 /** Screen-sized page chrome above the un-clipped drawing. Geometry comes from Rust. */
 export function PageFrames({
   getSession,
@@ -44,12 +45,24 @@ export function PageFrames({
               : "color-mix(in srgb, var(--toolbar-icon) 65%, transparent)",
           }}
         >
-          <span
-            className="absolute bottom-full left-0 mb-1 whitespace-nowrap text-xs"
-            style={{ color: "var(--toolbar-icon)" }}
-          >
-            {page.name}
-          </span>
+          {/* The label is never wider than its frame: the name truncates first, the word goes
+              below 96 px, the whole label below 24 px (`specs/0098` UX notes §5). */}
+          {page.screenWidth >= 24 && (
+            <span
+              className="absolute bottom-full left-0 mb-1 flex max-w-full items-center gap-1.5 whitespace-nowrap text-xs"
+              style={{ color: "var(--toolbar-icon)" }}
+            >
+              <span className={`min-w-0 truncate ${page.active ? "font-semibold" : ""}`}>{page.name}</span>
+              <KindChip
+                size={12}
+                kind={{
+                  icon: page.kindIcon,
+                  word: page.screenWidth >= 96 ? page.kindWord : "",
+                  off: page.kindOff,
+                }}
+              />
+            </span>
+          )}
         </div>
       ))}
     </div>

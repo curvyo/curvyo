@@ -1,6 +1,6 @@
 import { PagesBlock } from "@/components/panel/PagesBlock";
 import { CircleAlert } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { BackgroundBlock } from "@/components/panel/BackgroundBlock";
 import { DocumentPresets } from "@/components/panel/DocumentPresets";
@@ -13,6 +13,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { BackgroundPanelApi } from "@/hooks/useBackgroundPanel";
 import type { DocumentPanelApi, UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { FormatsApi } from "@/hooks/useFormats";
+import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
 
 const UNIT_TOOLTIP =
   "How lengths are shown on the rulers, here and in the status bar. Other fields stay in mm. Stored sizes are always mm.";
@@ -45,6 +46,11 @@ interface DocumentSectionProps {
   document: DocumentPanelApi;
   formats: FormatsApi;
   background: BackgroundPanelApi;
+  /** The page kinds and the machine list of Add page (`specs/0098` criterion 1). */
+  workbenches: WorkbenchesApi;
+  /** A laser page's Machine and Fixtures blocks, or the notice of its switched-off extension
+   * (`specs/0098` criteria 13, 18 b); nothing on another page. */
+  machine?: ReactNode;
   onReturnFocus: () => void;
 }
 
@@ -60,9 +66,14 @@ export function DocumentSection({
   document: doc,
   formats,
   background,
+  workbenches,
+  machine,
   onReturnFocus,
 }: DocumentSectionProps) {
   const { view } = doc;
+  // A laser page is as big as its machine, an unknown page keeps its size: no size controls
+  // (`specs/0098` criteria 13, 18 d).
+  const fixedSize = view.pages.find((page) => page.active)?.fixedSize ?? false;
   const messages = { number: view.sideMessage } as const;
   const [notice, setNotice] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -101,6 +112,8 @@ export function DocumentSection({
 
   return (
     <div className="flex flex-col gap-2">
+      {fixedSize ? null : (
+        <>
       <FormatsBrokenBlock formats={formats} />
       <DocumentPresets document={doc} onReturnFocus={onReturnFocus} />
       <FormatList formats={formats} onReturnFocus={onReturnFocus} />
@@ -146,7 +159,9 @@ export function DocumentSection({
           </div>
         </Tooltip>
       </StyleRow>
-      <PagesBlock document={doc} onReturnFocus={onReturnFocus} />
+        </>
+      )}
+      <PagesBlock document={doc} workbenches={workbenches} onReturnFocus={onReturnFocus} />
       <StyleRow label="Unit">
         <ToggleGroup
           label="Display unit"
@@ -157,7 +172,8 @@ export function DocumentSection({
           onReturnFocus={onReturnFocus}
         />
       </StyleRow>
-      {view.hasObjects && (
+      {machine}
+      {view.hasObjects && !fixedSize && (
         <div className="relative">
           <Tooltip side="left" content={FIT_TOOLTIP}>
             <button
