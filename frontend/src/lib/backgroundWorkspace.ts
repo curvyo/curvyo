@@ -236,10 +236,17 @@ export class BackgroundWorkspace {
   /** Whether the room admitted the session (`connected`), it gave up (`not-connected`), or
    * neither yet. */
   get state(): string {
+    return this.connection.state;
+  }
+
+  /** The connection state as [`state`], and why the link ended (`refused`, `removed`), "" while
+   * it lives. */
+  get connection(): { state: string; ended: string } {
     try {
-      return (JSON.parse(this.session.share_view_json()) as { state?: string }).state ?? "";
+      const view = JSON.parse(this.session.share_view_json()) as { state?: string; ended?: string | null };
+      return { state: view.state ?? "", ended: view.ended ?? "" };
     } catch {
-      return "";
+      return { state: "", ended: "" };
     }
   }
 

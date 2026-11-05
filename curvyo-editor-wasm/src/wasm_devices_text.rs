@@ -129,12 +129,25 @@ pub fn devices_syncing_workspaces(workspaces: usize, done: usize, total: usize) 
 }
 
 /// The one alert of the workspaces Sync these could not switch on (3.1); `names_json` is a JSON
-/// array of their names.
+/// array of their names, `problem` one of `unreachable`, `refused`, `local`, `needs-tls`;
+/// `server` is the devices' server, `tab` the Share tab's (an unreachable server that differs from
+/// it is named).
 #[wasm_bindgen]
 #[must_use]
-pub fn devices_could_not_sync(names_json: &str) -> String {
+pub fn devices_could_not_sync(names_json: &str, problem: &str, server: &str, tab: &str) -> String {
     let names: Vec<String> = serde_json::from_str(names_json).unwrap_or_default();
-    texts::could_not_sync_text(&names)
+    let tab = curvyo_sync_core::normalize_server_address(tab).unwrap_or_default();
+    let tab = tab.as_str();
+    let problem = match problem {
+        "refused" => texts::SyncProblem::Refused,
+        "local" => texts::SyncProblem::Local,
+        "needs-tls" => texts::SyncProblem::NeedsTls,
+        _ if !tab.is_empty() && tab != server => {
+            texts::SyncProblem::OtherServer { group: server, tab }
+        }
+        _ => texts::SyncProblem::Unreachable,
+    };
+    texts::could_not_sync_text(&names, problem)
 }
 
 /// The pick list's line of a workspace in which this device is only a member (3.1).

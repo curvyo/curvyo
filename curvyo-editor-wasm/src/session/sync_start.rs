@@ -35,7 +35,7 @@ impl Session {
         let mut link = SyncLink::new(client, server.to_owned(), label.to_owned(), now);
         link.exported = self.document.version();
         link.assets = self.referenced_assets();
-        self.sync = Some(Box::new(link));
+        self.install_link(Box::new(link));
         self.sync_pump();
         Ok(())
     }
@@ -60,7 +60,7 @@ impl Session {
         let mut sync = SyncLink::new(client, server, label.to_owned(), now);
         sync.awaiting_document = true;
         sync.join = Some(JoinPhase::Connecting);
-        self.sync = Some(Box::new(sync));
+        self.install_link(Box::new(sync));
         self.sync_pump();
         Ok(())
     }
@@ -105,7 +105,7 @@ impl Session {
         link.synced = record.synced_version;
         // Keys came from the store: nothing new to write until the keyring changes.
         link.keys_changed = false;
-        self.sync = Some(Box::new(link));
+        self.install_link(Box::new(link));
         self.sync_export();
         self.sync_pump();
         true

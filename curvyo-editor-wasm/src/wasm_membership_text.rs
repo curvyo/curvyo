@@ -51,6 +51,7 @@ pub fn membership_word(key: &str) -> String {
         "removing" => texts::RowBusy::Removing.text(),
         "leaving" => texts::RowBusy::Leaving.text(),
         "adding-back" => texts::RowBusy::AddingBack.text(),
+        "pending-offline" => texts::PENDING_OFFLINE,
         "check" => back::CHECK_BUTTON,
         "checking" => back::CHECKING,
         "not-added-back" => back::NOT_ADDED_BACK_YET,
@@ -182,6 +183,20 @@ pub fn membership_rotation_pending(former_json: &str, admin: bool) -> String {
 #[must_use]
 pub fn membership_mutual_removal(others_json: &str, me: bool) -> String {
     texts::mutual_removal_text(&strings(others_json), me)
+}
+
+/// The crossed-demotions notice: the other admins' labels, `me` when this device is one.
+#[wasm_bindgen]
+#[must_use]
+pub fn membership_mutual_demotion(others_json: &str, me: bool) -> String {
+    texts::mutual_demotion_text(&strings(others_json), me)
+}
+
+/// The frozen-room warning after crossed demotions: the labels of the admins involved.
+#[wasm_bindgen]
+#[must_use]
+pub fn membership_frozen_demotion(mutual_json: &str) -> String {
+    texts::frozen_demotion_warning(&strings(mutual_json))
 }
 
 /// The held-back line.

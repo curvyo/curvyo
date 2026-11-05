@@ -237,6 +237,17 @@ impl PairingGlue {
         }
     }
 
+    /// The opener's device group refused to add the other device: the attempt ends on both
+    /// sides instead of staying at "Pairing ...".
+    pub fn refuse_add(&mut self) {
+        if !matches!(self.phase, PairPhase::Pairing { .. }) {
+            return;
+        }
+        let out = self.cancel_machine();
+        self.carry_out(out);
+        self.set_phase(PairPhase::Failed(PairProblem::NotAdded));
+    }
+
     /// Cancel, Escape or Words differ: the attempt ends and the code dies.
     pub fn cancel(&mut self, words_differ: bool) {
         let out = self.cancel_machine();
@@ -396,6 +407,7 @@ fn problem_code(problem: PairProblem) -> &'static str {
         PairProblem::Lost => "lost",
         PairProblem::Unreachable => "unreachable",
         PairProblem::WordsDiffer => "words-differ",
+        PairProblem::NotAdded => "not-added",
     }
 }
 
@@ -484,6 +496,43 @@ mod tests {
             PairPhase::Paired { group_room, .. } if *group_room == DocumentId([0x6e; 16])
         ));
         assert_eq!(json(&a)["phase"], "paired");
+    }
+
+    /// PR #281 review: a refused add ends the opener's "Pairing ..." with a reason, and the
+    /// joiner hears the end instead of waiting for the welcome.
+    #[test]
+    fn a_refused_add_ends_both_sides() {
+        let now = Millis(1_000);
+        let mut slots = PairSlots::new();
+        let mut a = PairingGlue::opener(SERVER, &identity(1), "Desktop", [1; 32], now).unwrap();
+        settle(&mut slots, &mut [(&mut a, ConnectionId(1))], now);
+        let code = json(&a)["code"].as_str().unwrap().to_owned();
+        let mut b =
+            PairingGlue::joiner(SERVER, &code, &identity(2), "Laptop", [2; 32], now).unwrap();
+        settle(
+            &mut slots,
+            &mut [(&mut a, ConnectionId(1)), (&mut b, ConnectionId(2))],
+            now,
+        );
+        a.refuse_add();
+        assert_eq!(
+            json(&a)["phase"],
+            "compare",
+            "only a pairing in progress ends"
+        );
+        a.mark_pairing();
+        a.refuse_add();
+        settle(
+            &mut slots,
+            &mut [(&mut a, ConnectionId(1)), (&mut b, ConnectionId(2))],
+            now,
+        );
+        assert_eq!(json(&a)["problem"], "not-added");
+        assert_eq!(
+            json(&a)["text"],
+            "Could not add Laptop to your devices. Pairing stopped."
+        );
+        assert_eq!(json(&b)["phase"], "failed");
     }
 
     #[test]

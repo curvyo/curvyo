@@ -110,6 +110,10 @@ impl RowBusy {
     }
 }
 
+/// A row's busy line once its keyring entry has waited 10 s for the server (ADR 0041 decision
+/// 11, Proposal): the act stays and goes out by itself.
+pub const PENDING_OFFLINE: &str = "Goes out when the connection is back";
+
 /// What changed in the admin set, for the admin-change line (section 2.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdminChange {
@@ -231,6 +235,17 @@ pub fn frozen_room_warning(mutual: &[String], refused: Option<&str>) -> Option<S
     })
 }
 
+/// The frozen-room warning after crossed demotions (criterion 28): `mutual` names the admins
+/// who demoted each other.
+#[must_use]
+pub fn frozen_demotion_warning(mutual: &[String]) -> String {
+    format!(
+        "{} demoted each other earlier. If you add another admin, both demotions apply and both \
+         lose the role.",
+        and_list(mutual)
+    )
+}
+
 /// The button labels and tooltips of the flow (ux-notes 3, 4, 7 and 8).
 pub const MAKE_ADMIN: &str = "Make admin";
 /// Make member's label.
@@ -330,6 +345,21 @@ pub fn mutual_removal_text(others: &[String], me: bool) -> String {
     names.extend(others.iter().map(|l| named(l)));
     format!(
         "{} removed each other at the same time. Nobody was removed.",
+        join_names(&names)
+    )
+}
+
+/// The crossed-demotions notice (criteria 27 and 29): the admins by label, `me` when this
+/// device is one of them.
+#[must_use]
+pub fn mutual_demotion_text(others: &[String], me: bool) -> String {
+    let mut names: Vec<String> = Vec::new();
+    if me {
+        names.push("You".to_owned());
+    }
+    names.extend(others.iter().map(|l| named(l)));
+    format!(
+        "{} demoted each other at the same time. Nobody was demoted.",
         join_names(&names)
     )
 }
@@ -467,6 +497,7 @@ pub(crate) fn every_text() -> Vec<String> {
         DISMISS,
         OK,
         SYNCING,
+        PENDING_OFFLINE,
     ]
     .iter()
     .map(|t| (*t).to_owned())
@@ -505,6 +536,9 @@ pub(crate) fn every_text() -> Vec<String> {
         rotation_pending_text(&[(ben.to_owned(), false), ("Cy".to_owned(), true)], false),
         mutual_removal_text(&pair, false),
         mutual_removal_text(&["Chris".to_owned()], true),
+        mutual_demotion_text(&pair, false),
+        mutual_demotion_text(&["Chris".to_owned()], true),
+        frozen_demotion_warning(&pair),
         not_applied_text("Chris", true),
         not_applied_text("Chris", false),
         admin_removal_confirm_text(ben),
@@ -591,6 +625,20 @@ mod tests {
             mutual_removal_text(&["Chris".to_owned()], true),
             "You and Chris removed each other at the same time. Nobody was removed."
         );
+        assert_eq!(
+            mutual_demotion_text(&["Chris".to_owned()], true),
+            "You and Chris demoted each other at the same time. Nobody was demoted."
+        );
+        assert_eq!(
+            mutual_demotion_text(&["Ana".to_owned(), "Chris".to_owned()], false),
+            "Ana and Chris demoted each other at the same time. Nobody was demoted."
+        );
+        assert_eq!(
+            frozen_demotion_warning(&["Ana".to_owned(), "Chris".to_owned()]),
+            "Ana and Chris demoted each other earlier. If you add another admin, both demotions \
+             apply and both lose the role."
+        );
+        assert_eq!(PENDING_OFFLINE, "Goes out when the connection is back");
         assert_eq!(
             not_applied_text("Chris", true),
             "Removal of Chris was not applied: you are the only admins."

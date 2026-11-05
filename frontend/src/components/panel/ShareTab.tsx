@@ -15,9 +15,9 @@ import type { DevicesApi } from "@/hooks/useDevices";
 import type { MembershipApi } from "@/hooks/useMembership";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { myDeviceIds, syncedHeader } from "@/lib/devicesApi";
+import { frozenWarning } from "@/lib/frozenWarning";
 import {
   membership_leave_confirm,
-  membership_frozen_warning,
   membership_you_left_line,
   normalize_server_address,
   server_shown,
@@ -178,11 +178,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
           server={server}
           reason={serverReason}
           onReturnFocus={onReturnFocus}
-          frozenWarning={
-            devices.openSynced && membership.frozen
-              ? membership_frozen_warning(JSON.stringify(membership.frozen.mutual), membership.frozen.refused)
-              : ""
-          }
+          frozenWarning={devices.openSynced ? frozenWarning(membership.frozen) : ""}
         />
       ) : null}
 

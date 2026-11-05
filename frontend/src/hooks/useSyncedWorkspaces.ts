@@ -20,7 +20,7 @@ import { mintPeerId, wasmReady } from "@/lib/editorSession";
 import { RETRY_MS, type SwitchOnResult, UnreachableWorkspaces } from "@/lib/unreachableWorkspaces";
 import { commitShare, prepareShare, toHex, type ShareEntry } from "@/lib/workspaceShare";
 import type { RecentWorkspaceData } from "@/lib/workspaceRows";
-import { invoke } from "@/platform/host";
+import { invoke, isTauri } from "@/platform/host";
 import {
   WasmSession,
   type WasmDeviceGroup,
@@ -98,6 +98,8 @@ export interface SyncedWorkspacesDeps {
   ownMember: () => string;
   /** A synced workspace's folder was created here: Recent workspaces lists it (ux-notes 4.4). */
   recentsChanged: () => void;
+  /** The Share tab's server address as typed, for an alert about another server. */
+  tabServer: () => string;
 }
 
 export interface SyncedWorkspacesApi {
@@ -147,17 +149,24 @@ function fromHex(hex: string): Uint8Array {
 }
 
 /** Resolves once `runner`'s room answered: whether it was admitted. */
-function admitted(runner: BackgroundWorkspace): Promise<boolean> {
+function admitted(runner: BackgroundWorkspace): Promise<"connected" | "refused" | "not-connected"> {
   return new Promise((resolve) => {
     const started = Date.now();
     const timer = window.setInterval(() => {
-      const state = runner.state;
-      if (state === "connected" || state === "not-connected" || Date.now() - started > CONNECT_MS) {
+      const { state, ended } = runner.connection;
+      // A relay that refused the device answered: no 15 s wait, and the alert says so.
+      const refused = ended === "refused" || ended === "removed";
+      if (state === "connected" || state === "not-connected" || refused || Date.now() - started > CONNECT_MS) {
         window.clearInterval(timer);
-        resolve(state === "connected");
+        resolve(state === "connected" ? "connected" : refused ? "refused" : "not-connected");
       }
     }, 100);
   });
+}
+
+/** What a room that did not admit a switch-on tells the alert. */
+function notAdmitted(answer: "refused" | "not-connected"): SwitchOnResult {
+  return answer === "refused" ? "server-refused" : "unreachable";
 }
 
 export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspacesApi {
@@ -335,14 +344,16 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
             Date.now(),
           );
           if (error) {
+            // Failed here before anything was sent: not the server's doing.
             session.free();
-            return "unreachable";
+            return "share-failed";
           }
           runner = adoptBackground(id, chosen.name, session, host());
-          if (!(await admitted(runner))) {
+          const first = await admitted(runner);
+          if (first !== "connected") {
             await runner.stop();
             switchingRef.current.delete(id);
-            return "unreachable";
+            return notAdmitted(first);
           }
           await commitShare(prepared, shareDeps, chosen.id);
           await invoke<string>("register_synced_workspace", { id, path: chosen.path }).catch(() => "");
@@ -355,11 +366,12 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
         switchingRef.current.delete(id);
         return "refused";
       }
-      if (!(await admitted(runner))) {
+      const admission = await admitted(runner);
+      if (admission !== "connected") {
         // Not running in the background without a list entry: a retry starts it afresh.
         await runner.stop();
         switchingRef.current.delete(id);
-        return "unreachable";
+        return notAdmitted(admission);
       }
       const answer = runner.session.reconcile_workspace(group, true);
       runner.drive();
@@ -631,8 +643,19 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
     unreachableRef.current.wake();
   }, []);
 
-  const unreachableNames = unreachableRef.current.names(deps.record.current.server);
-  const alerts = unreachableNames.length > 0 ? [devices_could_not_sync(JSON.stringify(unreachableNames))] : [];
+  const server = deps.record.current.server;
+  // A browser on an https page cannot open a ws:// address: that is why, not the server.
+  const blocked = !isTauri && window.location.protocol === "https:" && server.startsWith("ws://");
+  const alerts = unreachableRef.current
+    .alerts(server)
+    .map(({ problem, names }) =>
+      devices_could_not_sync(
+        JSON.stringify(names),
+        problem === "unreachable" && blocked ? "needs-tls" : problem,
+        server,
+        deps.tabServer(),
+      ),
+    );
 
   return {
     tick,

@@ -3,11 +3,12 @@
 // (a document's History choice, Full history preselected; a workspace's one sentence).
 
 import { ChevronDown, ChevronRight, UserPlus } from "lucide-react";
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { type KeyboardEvent, useId, useRef, useState } from "react";
 
-import { ALERT, APPLY, BUSY_MS, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { ALERT, APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
 import type { FormerParticipant } from "@/hooks/useCollaboration";
 import type { MembershipApi } from "@/hooks/useMembership";
+import { usePendingLine } from "@/hooks/usePendingLine";
 import { focusParticipants } from "@/lib/shareFocus";
 import {
   membership_add_back_name,
@@ -96,19 +97,12 @@ function FormerRow({
   const [asking, setAsking] = useState(false);
   const [full, setFull] = useState(true);
   const [refusal, setRefusal] = useState("");
-  const [busy, setBusy] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
   const label = former.label;
   const texts = addBackTexts(membership_add_back_texts(label, workspace, membership.name, documents));
-  // "Adding back..." ends when the row leaves; if no change arrives in time, the row is usable
-  // again (as a participant row's busy line, ux-notes 3.1).
-  useEffect(() => {
-    if (!busy) {
-      return undefined;
-    }
-    const timer = window.setTimeout(() => setBusy(false), BUSY_MS);
-    return () => window.clearTimeout(timer);
-  }, [busy]);
+  // "Adding back..." until the server holds the add, then the row leaves (ADR 0041 decision 11).
+  const busyLine = usePendingLine(former.adding ? "adding-back" : null);
+  const busy = busyLine !== null;
   const close = () => {
     setAsking(false);
     setRefusal("");
@@ -123,9 +117,10 @@ function FormerRow({
             {shown}
           </p>
           <p className="truncate font-mono text-xs text-[var(--panel-muted-fg)]">{former.fingerprint}</p>
-          <p className={MUTED}>{busy ? membership_word("adding-back") : membership_word(former.left ? "left" : "removed")}</p>
+          <p className={MUTED}>{busyLine ?? membership_word(former.left ? "left" : "removed")}</p>
         </div>
         <button
+          disabled={busy}
           ref={opener}
           type="button"
           data-add-back
@@ -170,7 +165,6 @@ function FormerRow({
                 setRefusal(answer);
                 if (answer === "") {
                   setAsking(false);
-                  setBusy(true);
                   onDone(former.member);
                 }
               }}

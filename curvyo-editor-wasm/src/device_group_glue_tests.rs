@@ -214,6 +214,42 @@ fn remove_and_leave_end_the_device_and_renew_the_key() {
     );
 }
 
+/// PR #281 review: a removed device paired again with the same identity is added back as an
+/// admin (it hung at "Pairing ..." while `AddMember` refused the removed identity) and joins;
+/// both list both again and B can remove A's other devices like any group device.
+#[test]
+fn a_removed_device_paired_again_is_added_back() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+    );
+    net.run(500);
+    net.devices[a].0.add_device(identity(2), "Laptop");
+    net.run(200);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+    );
+    net.run(1_000);
+    net.devices[a].0.remove_device(identity(2).member).unwrap();
+    net.run(500);
+    assert!(net.devices[b].0.removed());
+
+    net.devices[a].0.add_device(identity(2), "Laptop");
+    net.run(200);
+    assert!(!net.devices[a].0.add_refused(&identity(2).member));
+    assert!(net.devices[a].0.has_member(&identity(2).member));
+    let keyring = net.devices[a].0.keyring().unwrap();
+    assert_eq!(keyring.role(&identity(2).member), Some(Role::Admin));
+    let again = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 14, Millis(net.now)).unwrap(),
+    );
+    net.run(1_500);
+    assert!(net.devices[again].0.is_online());
+    assert!(!net.devices[again].0.removed());
+    assert_eq!(view(&net.devices[a].0)["count"], "2 devices");
+    assert_eq!(view(&net.devices[again].0)["count"], "2 devices");
+}
+
 /// A joiner that connects before the opener's `AddMember` reached the relay retries.
 #[test]
 fn a_join_before_the_admission_retries() {

@@ -61,6 +61,14 @@ impl Keys {
         &self.entries
     }
 
+    /// The local entry with `hash`.
+    pub(super) fn entry(&self, hash: &EntryHash) -> Option<&Entry> {
+        self.hashes
+            .iter()
+            .position(|h| h == hash)
+            .map(|i| &self.entries[i])
+    }
+
     pub(super) fn held_keys(&self) -> Vec<(u32, EpochKey)> {
         self.held.values().cloned().collect()
     }
@@ -114,6 +122,51 @@ impl Keys {
         self.keyring = Keyring::replay(&self.entries).ok();
         self.unwrap_mine();
         self.keyring.as_ref().map(|k| k.accepted_entries().len()) != before
+    }
+
+    /// Removes `dropped` from the local entries and replays; returns whether the accepted
+    /// entries changed.
+    pub(super) fn drop_entries(&mut self, dropped: &[EntryHash]) -> bool {
+        self.retain(|hash| !dropped.contains(hash))
+    }
+
+    /// Keeps only the entries in `kept` and replays; returns whether the accepted entries
+    /// changed.
+    pub(super) fn keep_only(&mut self, kept: &std::collections::BTreeSet<EntryHash>) -> bool {
+        self.retain(|hash| kept.contains(hash))
+    }
+
+    fn retain(&mut self, keep: impl Fn(&EntryHash) -> bool) -> bool {
+        let before: Vec<EntryHash> = self
+            .keyring
+            .as_ref()
+            .map(|k| {
+                k.accepted_entries()
+                    .iter()
+                    .filter_map(|e| e.try_hash().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let (hashes, entries): (Vec<EntryHash>, Vec<Entry>) = self
+            .hashes
+            .drain(..)
+            .zip(self.entries.drain(..))
+            .filter(|(hash, _)| keep(hash))
+            .unzip();
+        self.hashes = hashes;
+        self.entries = entries;
+        self.keyring = Keyring::replay(&self.entries).ok();
+        let after: Vec<EntryHash> = self
+            .keyring
+            .as_ref()
+            .map(|k| {
+                k.accepted_entries()
+                    .iter()
+                    .filter_map(|e| e.try_hash().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        before != after
     }
 
     fn unwrap_mine(&mut self) {

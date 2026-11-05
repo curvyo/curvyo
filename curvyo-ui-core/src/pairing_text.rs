@@ -83,6 +83,8 @@ pub enum PairProblem {
     Unreachable,
     /// This side pressed Words differ.
     WordsDiffer,
+    /// The opener's device group refused to add the other device (opener side).
+    NotAdded,
 }
 
 /// The joiner's message for `problem` (4.5); `tries_left` for a wrong code, `other` names the
@@ -115,7 +117,9 @@ pub fn joiner_problem_text(
         PairProblem::Unreachable => {
             format!("Cannot reach the server at {}.", server_shown(server))
         }
-        PairProblem::WordsDiffer => "Pairing stopped. Nothing was shared.".to_owned(),
+        PairProblem::WordsDiffer | PairProblem::NotAdded => {
+            "Pairing stopped. Nothing was shared.".to_owned()
+        }
     }
 }
 
@@ -134,6 +138,14 @@ pub fn opener_problem_text(problem: PairProblem, label: &str) -> String {
         | PairProblem::WrongCode
         | PairProblem::Used => "Pairing stopped. The code no longer works.".to_owned(),
         PairProblem::Unreachable => "Could not pair: cannot reach the server.".to_owned(),
+        PairProblem::NotAdded => format!(
+            "Could not add {} to your devices. Pairing stopped.",
+            if label.is_empty() {
+                "the other device".to_owned()
+            } else {
+                cut_label(label, 24)
+            }
+        ),
         PairProblem::Unknown | PairProblem::Busy | PairProblem::Lost => {
             "Lost the connection. Pairing stopped. Nothing was shared.".to_owned()
         }
@@ -186,6 +198,10 @@ mod tests {
         assert_eq!(
             opener_problem_text(PairProblem::Stopped, "Laptop"),
             "The words did not match on Laptop. Pairing stopped."
+        );
+        assert_eq!(
+            opener_problem_text(PairProblem::NotAdded, "Laptop"),
+            "Could not add Laptop to your devices. Pairing stopped."
         );
     }
 

@@ -152,13 +152,27 @@ pub(super) struct SyncLink {
     /// A person leave waits for the workspace snapshot its rotation asked for (ADR 0041
     /// decision 3).
     pub(super) leave_after_snapshot: bool,
-    /// The maker leaves this workspace (its devices list entry is marked `left`): however the
-    /// removal arrives, the ended record says "left" (ADR 0041 decision 3).
+    /// The maker leaves this workspace (its devices list entry is marked `left`), or this
+    /// device's own leave waits for the relay (ADR 0041 decisions 2, 3 and 11): however the
+    /// removal arrives, the ended record says "left".
     pub(super) leaving: bool,
+    /// The document's name for the leaver's notice ("" for "this document").
+    pub(super) leave_name: String,
+    /// The own keyring acts the relay had not confirmed at the last pump (ADR 0041 decision 11).
+    pub(super) pending: Vec<curvyo_sync_core::PendingAct>,
+    /// The participants this device added back whose add the relay has not confirmed yet: their
+    /// "was added back" notice waits for it.
+    pub(super) adding_back: BTreeSet<MemberId>,
 }
 
 impl SyncLink {
     pub(super) fn new(client: ClientSession, server: String, label: String, now: Millis) -> Self {
+        // A leave written before the app closed is still pending: it goes out first and the
+        // share ends as "left" (ADR 0041 decision 11).
+        let leaving = client
+            .pending_acts()
+            .iter()
+            .any(|a| a.kind == curvyo_sync_core::PendingKind::Leave);
         Self {
             client,
             server,
@@ -197,7 +211,10 @@ impl SyncLink {
             returning: None,
             workspace_ended: None,
             leave_after_snapshot: false,
-            leaving: false,
+            leaving,
+            leave_name: String::new(),
+            pending: Vec::new(),
+            adding_back: BTreeSet::new(),
         }
     }
 
@@ -232,6 +249,17 @@ impl SyncLink {
 }
 
 impl Session {
+    /// Makes `link` this session's link. Its revision continues the one it replaces, so the
+    /// host, which reads the Share tab again only when the revision changes, never misses the
+    /// new link's state (a second return check ending on the first one's number showed the
+    /// first one's answer).
+    pub(super) fn install_link(&mut self, mut link: Box<SyncLink>) {
+        if let Some(old) = self.sync.as_ref() {
+            link.revision = old.revision.wrapping_add(link.revision).max(1);
+        }
+        self.sync = Some(link);
+    }
+
     /// Whether the open document is shared (a live session or a share record in its file).
     #[must_use]
     pub fn is_shared(&self) -> bool {

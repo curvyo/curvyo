@@ -174,6 +174,11 @@ impl WasmPairing {
     pub fn cancel(&mut self, words_differ: bool) {
         self.glue.cancel(words_differ);
     }
+
+    /// The opener's device group refused to add the other device: the pairing ends.
+    pub fn refuse_add(&mut self) {
+        self.glue.refuse_add();
+    }
 }
 
 /// The maker's device group.
@@ -345,6 +350,13 @@ impl WasmDeviceGroup {
     pub fn has_device(&self, identity: &[u8]) -> bool {
         <[u8; 64]>::try_from(identity)
             .is_ok_and(|bytes| self.glue.has_member(&Identity::from_bytes(&bytes).member))
+    }
+
+    /// Whether the group refused to add the paired device `identity` (64 bytes).
+    #[must_use]
+    pub fn add_refused(&self, identity: &[u8]) -> bool {
+        <[u8; 64]>::try_from(identity)
+            .is_ok_and(|bytes| self.glue.add_refused(&Identity::from_bytes(&bytes).member))
     }
 
     /// Marks this device as the app in a browser in the devices list.

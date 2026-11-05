@@ -33,6 +33,8 @@ export interface ShareParticipant {
   canMakeMember?: boolean;
   canStepDown?: boolean;
   canLeave?: boolean;
+  /** An own act on this row waits for the server (`membership_word` name), else null. */
+  pending?: string | null;
 }
 
 /** A Removed or left row an admin sees (`specs/0097` criterion 17). */
@@ -41,6 +43,8 @@ export interface FormerParticipant {
   /** The last known label, empty when none was kept. */
   label: string;
   fingerprint: string;
+  /** This device added it back and the server has not confirmed it yet. */
+  adding?: boolean;
   /** It left by its own hand (else it was removed). */
   left: boolean;
 }

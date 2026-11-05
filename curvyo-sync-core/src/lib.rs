@@ -25,8 +25,8 @@ mod workspace_stream;
 
 pub use backup::{BackupExchange, BackupOutcome};
 pub use client::{
-    CheckOutcome, ClientOutput, ClientSession, History, InviteSecret, SNAPSHOT_BYTES,
-    SNAPSHOT_RECORDS, SessionConfig, SessionError, SessionEvent, SessionStart,
+    CheckOutcome, ClientOutput, ClientSession, History, InviteSecret, PendingAct, PendingKind,
+    SNAPSHOT_BYTES, SNAPSHOT_RECORDS, SessionConfig, SessionError, SessionEvent, SessionStart,
 };
 pub use devices::{
     DeviceAction, Plan, Target, WorkspaceInput, may_readmit, reconcile, reconcile_with_left,

@@ -11,7 +11,7 @@ use curvyo_crypto_core::keyring::{Keyring, Role, decode_log, encode_log};
 use curvyo_crypto_core::{EpochKey, Identity, IdentityKeys, MemberId};
 use curvyo_document_core::{DevicesList, DocumentVersion};
 use curvyo_sync_core::{
-    ClientSession, ConnectionId, DeviceAction, Millis, RecordKind, RoomId, SessionConfig,
+    ClientSession, ConnectionId, DeviceAction, History, Millis, RecordKind, RoomId, SessionConfig,
     SessionError, SessionStart, Target, reconcile,
 };
 
@@ -68,6 +68,8 @@ pub struct DeviceGroupGlue {
     devices_seen: Vec<MemberId>,
     /// Devices to add once the session is online: identity and name.
     pending_adds: Vec<(Identity, String)>,
+    /// Paired devices the group refused to add: the opener's pairing ends instead of waiting.
+    refused_adds: Vec<MemberId>,
     /// This device's name, written to the list once it can be.
     own_label: Option<String>,
     /// This device is the app in a browser: its list entry is marked so once it can be.
@@ -193,6 +195,7 @@ impl DeviceGroupGlue {
             last_seen: BTreeMap::new(),
             devices_seen: Vec::new(),
             pending_adds: Vec::new(),
+            refused_adds: Vec::new(),
             own_label: None,
             own_browser: false,
             files_changed: true,
@@ -312,6 +315,13 @@ impl DeviceGroupGlue {
                 .client
                 .keyring()
                 .is_some_and(|k| k.role(member).is_some())
+    }
+
+    /// Whether the group refused to add the paired device `member` (the opener's pairing ends
+    /// with "Could not add").
+    #[must_use]
+    pub fn add_refused(&self, member: &MemberId) -> bool {
+        self.refused_adds.contains(member)
     }
 
     /// This device is a browser: its row shows as one on every device (ADR 0040 decision 1).
@@ -447,15 +457,33 @@ impl DeviceGroupGlue {
         }
         let adds = std::mem::take(&mut self.pending_adds);
         for (identity, label) in adds {
-            match self.client.add_member(identity, Role::Admin) {
-                Ok(()) | Err(SessionError::AlreadyMember) => {
+            match self.admit(identity) {
+                Ok(()) => {
+                    self.refused_adds.retain(|m| *m != identity.member);
                     let _ = self.list.set_label(identity.member.0, &label);
                     self.files_changed = true;
                 }
-                Err(_) => self.pending_adds.push((identity, label)),
+                Err(SessionError::Offline) => self.pending_adds.push((identity, label)),
+                Err(_) => self.refused_adds.push(identity.member),
             }
         }
         self.export_list();
+    }
+
+    /// Makes the paired device `identity` an admin of the group: a new one by `AddMember`; one
+    /// that was removed or left and is paired again (ADR 0040: "removed from another device,
+    /// paired again") by the add back of ADR 0041 decision 5 with every key, then `SetRole`
+    /// admin as every group device (DEV-ROLE A). `AddMember` alone refuses a removed identity.
+    fn admit(&mut self, identity: Identity) -> Result<(), SessionError> {
+        let keyring = self.client.keyring().ok_or(SessionError::NotAMember)?;
+        if keyring.role(&identity.member).is_some() {
+            return Ok(());
+        }
+        if keyring.was_removed(&identity.member) {
+            self.client.add_back(identity.member, History::Full)?;
+            return self.client.set_role(identity.member, Role::Admin);
+        }
+        self.client.add_member(identity, Role::Admin)
     }
 
     /// Writes this device's name and browser mark once it can. A device another one added

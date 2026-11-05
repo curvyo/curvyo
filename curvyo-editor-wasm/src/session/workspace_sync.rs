@@ -155,7 +155,7 @@ impl Session {
         let mut channel = channel;
         label.clone_into(&mut channel.me);
         link.workspace = Some(Box::new(channel));
-        self.sync = Some(Box::new(link));
+        self.install_link(Box::new(link));
         self.bind_workspace_stream();
         self.sync_pump();
     }
@@ -189,7 +189,7 @@ impl Session {
     /// Gives this session the workspace's link: when its document belongs to the workspace it
     /// becomes the open stream, and its records not yet in its file are applied.
     pub fn attach_workspace_link(&mut self, link: WorkspaceLink) {
-        self.sync = Some(link.0);
+        self.install_link(link.0);
         self.bind_workspace_stream();
         self.sync_pump();
     }

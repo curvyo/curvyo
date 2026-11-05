@@ -58,16 +58,12 @@ impl ClientSession {
             RelayFrame::Refused { reason } => {
                 self.event(SessionEvent::Refused(reason));
                 if reason == crate::frame::RefusalReason::Removed {
-                    self.event(SessionEvent::Removed);
-                }
-                self.end();
-            }
-            RelayFrame::Pong => {
-                if self.state == (State::Joined { caught_up: false }) {
-                    self.state = State::Joined { caught_up: true };
-                    self.on_caught_up(now);
+                    self.end_removed();
+                } else {
+                    self.end();
                 }
             }
+            RelayFrame::Pong => self.on_pong(now),
             // Pairing and backup frames belong to their own connections, never to a room
             // session.
             RelayFrame::PairSlot { .. }
@@ -96,8 +92,33 @@ impl ClientSession {
         }
     }
 
+    /// A `Pong` confirms the own entries before its `Ping`. The first one of a connection ends
+    /// the relay's catch-up: what the relay lacks goes out again, and the session is caught up
+    /// once that resend is confirmed too, so a push sealed under a resent `NewEpoch` reaches a
+    /// relay that knows the epoch (ADR 0041 decision 11).
+    fn on_pong(&mut self, now: Millis) {
+        if self.state == (State::Joined { caught_up: false }) {
+            self.adopt_relay_keyring();
+        }
+        let resent = self.ponged();
+        if self.state != (State::Joined { caught_up: false }) {
+            return;
+        }
+        if !resent {
+            if self.is_resending() {
+                return;
+            }
+            if self.removed_here() || self.resend_unconfirmed() {
+                return;
+            }
+        }
+        self.state = State::Joined { caught_up: true };
+        self.on_caught_up(now);
+    }
+
     fn on_welcome(&mut self, head_seq: u64, snapshot_seq: u64, now: Millis) {
         self.state = State::Joined { caught_up: false };
+        self.welcomed();
         self.head_seq = self.head_seq.max(head_seq);
         if let Start::Join { .. } = self.start {
             self.start = Start::Member;
@@ -106,7 +127,7 @@ impl ClientSession {
         self.since_snapshot = (head_seq.saturating_sub(snapshot_seq), 0);
         // The relay answers in order: its pong follows the keyring and every record of the
         // admission, so it marks the end of the catch-up (Proposal).
-        self.send(&ClientFrame::Ping);
+        self.send_ping();
         self.link.pinged(now);
     }
 
@@ -153,7 +174,7 @@ impl ClientSession {
             // A member is admitted on its proof and the relay answers this with a pong after the
             // admission; a device the room's keyring does not list is refused "not a member"
             // instead of waiting for a genesis or a claim that never comes (criterion 27).
-            self.send(&ClientFrame::Ping);
+            self.send_ping();
         }
     }
 
@@ -161,6 +182,10 @@ impl ClientSession {
         let Ok(entry) = Entry::decode(bytes) else {
             return;
         };
+        // The relay holds it, whether or not this device knew it already.
+        if let Ok(hash) = entry.try_hash() {
+            self.relay_holds(hash);
+        }
         let had_key = self.keys.holds_any_key();
         if !self.keys.add_entries(vec![entry]) {
             return;
@@ -205,10 +230,8 @@ impl ClientSession {
         };
         *claimed = true;
         self.invite_expires = Some(expires);
-        if let Ok(claim) = self.keys.claim(key, false)
-            && let Ok(entry) = claim.encode()
-        {
-            self.send(&ClientFrame::Keyring { entry });
+        if let Ok(claim) = self.keys.claim(key, false) {
+            self.send_own(&[claim]);
         }
         true
     }
@@ -219,24 +242,20 @@ impl ClientSession {
             .keys
             .write_rewraps(now.unix_seconds(), &mut self.entropy)
         {
-            for entry in entries {
-                if let Ok(bytes) = entry.encode() {
-                    self.send(&ClientFrame::Keyring { entry: bytes });
-                }
-            }
+            self.send_own(&entries);
         }
         let _ = self.flush();
         self.send_pending_snapshot();
     }
 
-    /// Ends the session as removed when the keyring no longer lists this device.
+    /// Ends the session as removed when the confirmed keyring no longer lists this device; an
+    /// own leave the relay has not confirmed goes out first (ADR 0041 decision 11).
     fn removed_here(&mut self) -> bool {
         let me = self.keys.me();
-        if !self.keys.keyring().is_some_and(|k| k.was_removed(&me)) {
+        if !self.confirmed_keyring().is_some_and(|k| k.was_removed(&me)) {
             return false;
         }
-        self.event(SessionEvent::Removed);
-        self.end();
+        self.end_removed();
         true
     }
 
