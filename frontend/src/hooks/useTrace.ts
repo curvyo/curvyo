@@ -896,10 +896,31 @@ export function useTrace(
     [getSession, onChange],
   );
 
+  /** Pick mask paths (`specs/0094` slice 1b): the session's mode; a pick changes the selection,
+   * so the sync above traces again. */
+  const setMaskPick = useCallback(
+    (armed: boolean) => {
+      getSession()?.set_trace_mask_pick(armed);
+      onChange();
+    },
+    [getSession, onChange],
+  );
+  const clearMask = useCallback(() => {
+    getSession()?.clear_trace_mask();
+    onChange();
+  }, [getSession, onChange]);
+
   const keyDown = useCallback(
     (event: KeyboardEvent): boolean => {
       if (!active) {
         return false;
+      }
+      // Armed Pick mask paths ends first, before a running trace stops (`specs/0094` criterion 39).
+      const session = getSession();
+      if (event.key === "Escape" && session?.trace_mask_pick()) {
+        session.set_trace_mask_pick(false);
+        onChange();
+        return true;
       }
       const plain = !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey;
       if (event.key === "Enter" && plain && !event.repeat) {
@@ -912,7 +933,6 @@ export function useTrace(
       }
       // Esc order (UX notes §6): a running trace stops first, then the armed pipette disarms,
       // then the tool is left; a Merge into waiting for its target is cancelled before the tool.
-      const session = getSession();
       if (event.key === "Escape" && palette.merging) {
         palette.cancelMerge();
         return true;
@@ -957,6 +977,8 @@ export function useTrace(
           ? ""
           : status.line || status.message;
   const pickMode = session?.trace_pick_mode() ?? "";
+  const maskPick = session?.trace_mask_pick() ?? false;
+  const maskRefused = session?.trace_mask_pick_refused() ?? false;
   const shownId = view.shown;
   const suggestedBackground = shownId ? (backgrounds.current.get(shownId) ?? null) : null;
   return {
@@ -967,6 +989,10 @@ export function useTrace(
     status: unclipped === "" ? status : { ...status, muted: [status.muted, unclipped].filter((t) => t !== "").join(" ") },
     mask,
     setMaskOutside,
+    maskPick,
+    setMaskPick,
+    maskRefused,
+    clearMask,
     imagesLabel: imagesLabel(progress, view.images.length),
     params,
     presets,

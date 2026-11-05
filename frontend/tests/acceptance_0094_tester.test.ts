@@ -346,7 +346,7 @@ const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector
 const traceButton = (s: S) => s.evaluate(`(() => { const b = document.querySelector('${BAR} [data-trace-slot] , ${BAR} button[data-trace-slot]'); return b ? JSON.stringify({ disabled: b.getAttribute('aria-disabled'), describedby: b.getAttribute('aria-describedby'), reason: b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby'))?.textContent ?? '' : '' }) : 'null'; })()`).then((v) => JSON.parse(v as string) as { disabled: string | null; describedby: string | null; reason: string } | null);
 const settledCounts = (s: S) => waitFor("a trace result", async () => (/^(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 
-const BRIGHTNESS_BAR = ["About Trace", "Preset", "View", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
+const BRIGHTNESS_BAR = ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
 
 // ------------------------------------------------------------------ 0094 fixtures and helpers
 /** M1 of the spec at `n` px (the tester's `support_0094` arithmetic, pixel centres in M1's own 1000 px frame). */
@@ -361,7 +361,7 @@ const M1_PNG = rgbPng(400, 400, (x, y) => {
   const ink = m1Ink((x + 0.5) * 2.5, (y + 0.5) * 2.5);
   return ink === "paper" ? [255, 255, 255] : ink === "grey" ? [128, 128, 128] : [0, 0, 0];
 });
-const MASKED_BAR = ["About Trace", "Preset", "View", "Mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "Fewer trace options", "Trace"];
+const MASKED_BAR = ["About Trace", "Preset", "View", "Pick mask paths", "Mask", "Clear mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "Fewer trace options", "Trace"];
 const NATIVE = path.resolve(FRONTEND, "..", "curvyo-editor-wasm", "tests", "fixtures", "acceptance_0094_tester_native.json");
 
 /** The screen box of the picture: the bar of M1 is the longest dark horizontal run on screen and

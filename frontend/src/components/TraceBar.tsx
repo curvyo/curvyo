@@ -1,6 +1,6 @@
-import { Binary, CircleAlert, Image, Info, Layers, Spline, SquareDashed, X } from "lucide-react";
+import { Binary, CircleAlert, Image, Info, Layers, Spline, SquareDashedMousePointer, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { useRowStarts } from "@/components/SelectToolbar";
@@ -14,6 +14,9 @@ import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import { analysisLine } from "@/lib/traceAnalysis";
 import {
+  CLEAR_MASK,
+  maskPickStatus,
+  PICK_MASK_PATHS,
   TRACE_MIXED,
   TRACE_FINISH,
   TRACE_METHODS,
@@ -156,8 +159,8 @@ function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceV
   );
 }
 
-/** The Mask item (`specs/0094` UX notes §1): a `SquareDashed` glyph and the text segments Inside
- * and Outside in the View pill's segmented look; arrows move and select, no wrap. */
+/** The Inside / Outside segments of the Mask group (`specs/0094` UX notes §1) in the View pill's
+ * segmented look; arrows move and select, no wrap. */
 function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outside: boolean) => void }) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -170,33 +173,102 @@ function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outsid
     }
   };
   return (
-    <div className="flex h-9 items-center gap-1">
-      <span className="flex h-7 w-7 items-center justify-center text-[var(--toolbar-icon)]">
-        <SquareDashed size={16} aria-hidden />
+    <div role="radiogroup" aria-label="Mask" className="my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
+      {(["Inside", "Outside"] as const).map((label, index) => {
+        const on = (index === 1) === outside;
+        return (
+          <button
+            key={label}
+            ref={(element) => {
+              buttons.current[index] = element;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onOutside(index === 1)}
+            className={`flex h-full w-16 items-center justify-center text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+              on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The Mask group (`specs/0094` UX notes §1, §11): one flow item after the View pill, the Pick mask
+ * paths toggle always, and with mask paths the Inside / Outside segments and Clear mask. A mouse
+ * press hands the keyboard back to the canvas, a key keeps it; Escape on the armed toggle disarms
+ * and returns to the canvas. The mode is announced politely, never shown as text. */
+function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: () => void }) {
+  const pickRef = useRef<HTMLButtonElement>(null);
+  const [said, setSaid] = useState("");
+  const armed = trace.maskPick;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    setSaid(maskPickStatus(armed));
+  }, [armed]);
+  const pressed = armed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
+  return (
+    <div data-trace-mask="" className="flex h-9 items-center gap-1">
+      <AppTooltip side="bottom" content={PICK_MASK_PATHS}>
+        <button
+          ref={pickRef}
+          type="button"
+          aria-label={PICK_MASK_PATHS}
+          aria-pressed={armed}
+          data-trace-mask-pick=""
+          onClick={(event) => {
+            trace.setMaskPick(!armed);
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && armed) {
+              event.preventDefault();
+              event.stopPropagation();
+              trace.setMaskPick(false);
+              onReturnFocus();
+            }
+          }}
+          className={`${ICON_BUTTON_CLASS} ${pressed}`}
+        >
+          <SquareDashedMousePointer size={16} strokeWidth={1.5} aria-hidden />
+        </button>
+      </AppTooltip>
+      {trace.mask ? <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} /> : null}
+      {trace.mask ? (
+        <AppTooltip side="bottom" content={CLEAR_MASK}>
+          <button
+            type="button"
+            aria-label={CLEAR_MASK}
+            data-trace-clear-mask=""
+            onClick={(event) => {
+              trace.clearMask();
+              // The button goes with the mask: a key press keeps the keyboard in the group.
+              if (event.detail > 0) {
+                onReturnFocus();
+              } else {
+                pickRef.current?.focus();
+              }
+            }}
+            className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
+          >
+            <X size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </AppTooltip>
+      ) : null}
+      <span role="status" aria-live="polite" className="sr-only">
+        {said}
       </span>
-      <div role="radiogroup" aria-label="Mask" className="my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
-        {(["Inside", "Outside"] as const).map((label, index) => {
-          const on = (index === 1) === outside;
-          return (
-            <button
-              key={label}
-              ref={(element) => {
-                buttons.current[index] = element;
-              }}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              tabIndex={on ? 0 : -1}
-              onClick={() => onOutside(index === 1)}
-              className={`flex h-full w-16 items-center justify-center text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
-                on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -443,7 +515,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       />
     ) : null;
   const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
-  const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "";
+  const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "" || trace.maskRefused;
   return (
     <div className="pointer-events-none flex min-w-0 flex-col gap-2">
     <div
@@ -472,7 +544,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
           />
         </div>
         <ViewPill mode={trace.viewMode} onMode={trace.setViewMode} />
-        {trace.mask ? <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} /> : null}
+        <MaskGroup trace={trace} onReturnFocus={onReturnFocus} />
         <div className="flex h-9 items-center">
           <TracePresetMenu
             name="Method"
@@ -547,6 +619,12 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               </span>
             ) : null}
             {trace.palette.sameNote ? <span className={`block ${LABEL_CLASS}`}>{trace.palette.sameNote}</span> : null}
+            {/* A pick refused (`specs/0094` criterion 38): the criterion 14 string, only while it holds. */}
+            {trace.maskRefused ? (
+              <span data-trace-mask-refused="" className={`block ${LABEL_CLASS} opacity-70`}>
+                {TRACE_MIXED}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

@@ -583,7 +583,7 @@ const barSurvey = async (s: S) =>
         if (w > 1 && h > 1) overlaps.push(name(items[i]) + ' x ' + name(items[j]));
       }
       const outside = items.filter((e) => { const r = e.getBoundingClientRect(); return r.left < box.left - 0.5 || r.right > box.right + 0.5 || r.top < box.top - 0.5 || r.bottom > box.bottom + 0.5 || r.left < 0 || r.right > innerWidth + 0.5 || r.top < 0 || r.bottom > innerHeight + 0.5; }).map(name);
-      const clipped = [...bar.querySelectorAll('button, [role=spinbutton], span, label')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible' && e.clientWidth > 0).map(name);
+      const clipped = [...bar.querySelectorAll('button, [role=spinbutton], span, label')].filter(vis).filter((e) => !e.closest('.sr-only')).filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible' && e.clientWidth > 0).map(name);
       const leaves = [...bar.querySelectorAll('*')].filter((e) => e.children.length === 0 && vis(e));
       const texts = leaves.map((e) => e.textContent.trim()).filter(Boolean);
       const labels = [...bar.querySelectorAll('[aria-label]')].filter(vis).map((e) => e.getAttribute('aria-label'));
