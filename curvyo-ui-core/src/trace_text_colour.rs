@@ -15,11 +15,12 @@ use curvyo_vectorize_core::{
 };
 
 use crate::trace_ocr::OcrLine;
+use crate::trace_region::TraceRegion;
 use crate::trace_text::{TextPass, text_pass};
-use crate::trace_text_wire::{LEFT_OUT_LEVEL, write_texts};
+use crate::trace_text_wire::{LEFT_OUT_LEVEL, keep_lines_in, write_texts};
 use crate::trace_transfer::{
-    TraceStatus, colour_head, job_percent, status_only, trace_colour_job_with,
-    trace_colour_mask_job, write_colour_tail,
+    TraceStatus, colour_head, job_percent, status_only, trace_colour_job_in, trace_colour_mask_job,
+    write_colour_tail,
 };
 
 /// The share of a job's percent the palette of the unfilled picture takes (Proposal: it is the
@@ -28,9 +29,9 @@ const PALETTE_PERCENT: u32 = 25;
 
 /// One multicolour trace with the OCR `lines` (in this picture's pixels): the text pass, the
 /// palette of the picture as it is, the trace of the filled picture with that palette, then the
-/// numbers of [`trace_colour_job_with`] with the text section (each line's fill) between the
+/// numbers of [`crate::trace_colour_job_with`] with the text section (each line's fill) between the
 /// outlines and the palette. Without lines the numbers are exactly those of
-/// [`trace_colour_job_with`] (criteria 12 and 24).
+/// [`crate::trace_colour_job_with`] (criteria 12 and 24).
 #[must_use]
 pub fn trace_text_colour_job_with(
     rgba: &[u8],
@@ -41,11 +42,32 @@ pub fn trace_text_colour_job_with(
     lines: &[OcrLine],
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
+    trace_text_colour_job_in(
+        rgba, width, height, pixel_map, params, lines, None, on_percent,
+    )
+}
+
+/// As [`trace_text_colour_job_with`] with a mask `region` (`specs/0094` criterion 11): only the
+/// lines whose box centre the region keeps stay as text, and each layer is clipped; with no
+/// region exactly [`trace_text_colour_job_with`].
+#[must_use]
+#[allow(clippy::too_many_arguments)] // the job's inputs, as the worker passes them
+pub fn trace_text_colour_job_in(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &ColourParams,
+    lines: &[OcrLine],
+    region: Option<&TraceRegion>,
+    on_percent: &mut dyn FnMut(u8),
+) -> Vec<f64> {
     if lines.is_empty() {
-        return trace_colour_job_with(rgba, width, height, pixel_map, params, on_percent);
+        return trace_colour_job_in(rgba, width, height, pixel_map, params, region, on_percent);
     }
     let map = Affine::from_array(pixel_map);
-    let pass = text_pass(rgba, width, height, map, &params.trace, lines);
+    let mut pass = text_pass(rgba, width, height, map, &params.trace, lines);
+    keep_lines_in(&mut pass, region);
     let raster = Raster {
         width,
         height,
@@ -73,10 +95,12 @@ pub fn trace_text_colour_job_with(
         })
     });
     match traced {
-        Ok(result) => {
+        Ok(mut result) => {
+            let unclipped = region.map_or(0, |region| region.clip_colours(&mut result));
             report(100);
             let fills = line_fills(&pass, &result.palette, raster, params);
             let mut wire = colour_head(&result);
+            crate::trace_region::write_unclipped(&mut wire, unclipped);
             write_texts(&mut wire, &pass, &fills);
             write_colour_tail(&mut wire, &result);
             wire
@@ -268,7 +292,7 @@ fn nearest(colour: Rgb8, candidates: &[Rgb8]) -> Option<Rgb8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::read_trace_wire;
+    use crate::trace_transfer::{read_trace_wire, trace_colour_job_with};
     use curvyo_document_core::Length;
     use curvyo_vectorize_core::TraceParams;
 

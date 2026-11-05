@@ -177,6 +177,8 @@ mod trace_fit_turn;
 mod trace_inpaint;
 mod trace_ocr;
 mod trace_plan;
+mod trace_region;
+mod trace_region_raster;
 mod trace_shape_band;
 mod trace_shape_fit;
 mod trace_shape_hole_band;
@@ -537,21 +539,31 @@ pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
     trace_group_name, trace_style,
 };
+pub use trace_region::{
+    RegionOperand, TRACE_REGION_TOLERANCE, TraceRegion, TraceRegionError, mask_operand,
+    unclipped_notice,
+};
+pub use trace_region_raster::{
+    TraceRegionDefaults, trace_region_defaults, trace_whiten_outside_region,
+};
 pub use trace_shapes::{
     SHAPE_TOLERANCE_PX, SHAPE_TOLERANCE_SHARE, TraceBand, TraceShapeRegion, primitive_path,
     recognise_shapes, trace_add_shapes,
 };
 pub use trace_text::{TextPass, TextRegion, text_pass};
-pub use trace_text_colour::{trace_text_colour_job_with, trace_text_colour_mask_job};
+pub use trace_text_colour::{
+    trace_text_colour_job_in, trace_text_colour_job_with, trace_text_colour_mask_job,
+};
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
 pub use trace_text_wire::{
-    LEFT_OUT_LEVEL, TraceTextWire, TraceTexts, trace_text_job_with, trace_text_mask_job,
-    trace_text_regions_with,
+    LEFT_OUT_LEVEL, TraceTextWire, TraceTexts, trace_text_job_in, trace_text_job_with,
+    trace_text_mask_job, trace_text_regions_in, trace_text_regions_with,
 };
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,
-    trace_analyse, trace_auto_threshold, trace_colour_job_with, trace_colour_mask_job, trace_job,
-    trace_job_with, trace_mask_job, trace_sample_colour, trace_suggest_background,
+    trace_analyse, trace_auto_threshold, trace_colour_job_in, trace_colour_job_with,
+    trace_colour_mask_job, trace_job, trace_job_in, trace_job_with, trace_mask_job,
+    trace_sample_colour, trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

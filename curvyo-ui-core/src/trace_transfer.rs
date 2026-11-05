@@ -12,6 +12,8 @@ use curvyo_vectorize_core::{
 };
 use kurbo::{BezPath, PathEl, Point};
 
+use crate::trace_region::TraceRegion;
+
 /// How a trace job ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TraceStatus {
@@ -71,6 +73,8 @@ pub struct TraceWire {
     /// The recognised shapes (`specs/0088` Part B); empty with Recognise shapes off. Each
     /// recognised outline in `outlines` is already its primitive's outline.
     pub shapes: Vec<crate::trace_shapes::TraceShapeRegion>,
+    /// Outlines kept whole across the mask edge after a kernel refusal (`specs/0094`).
+    pub unclipped: usize,
 }
 
 /// One palette colour of a multicolour result, as the strip shows it.
@@ -161,6 +165,21 @@ pub fn trace_job_with(
     params: &TraceParams,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
+    trace_job_in(rgba, width, height, pixel_map, params, None, on_percent)
+}
+
+/// As [`trace_job_with`], the outlines clipped to `region` before they are written
+/// (`specs/0094` slice 1); with no region exactly [`trace_job_with`].
+#[must_use]
+pub fn trace_job_in(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceParams,
+    region: Option<&TraceRegion>,
+    on_percent: &mut dyn FnMut(u8),
+) -> Vec<f64> {
     let raster = Raster {
         width,
         height,
@@ -176,7 +195,8 @@ pub fn trace_job_with(
         ControlFlow::Continue(())
     };
     match trace(raster, Affine::from_array(pixel_map), params, &mut go) {
-        Ok(result) => {
+        Ok(mut result) => {
+            let unclipped = region.map_or(0, |region| region.clip_trace(&mut result));
             #[allow(clippy::cast_precision_loss)] // counts far below 2^52
             let mut wire = vec![
                 TraceStatus::Traced.code(),
@@ -190,6 +210,7 @@ pub fn trace_job_with(
             for outline in &result.outlines {
                 write_outline(&mut wire, outline);
             }
+            crate::trace_region::write_unclipped(&mut wire, unclipped);
             wire
         }
         Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
@@ -209,6 +230,21 @@ pub fn trace_colour_job_with(
     params: &TraceColourParams,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
+    trace_colour_job_in(rgba, width, height, pixel_map, params, None, on_percent)
+}
+
+/// As [`trace_colour_job_with`], each layer clipped to `region` before it is written
+/// (`specs/0094` slice 1); with no region exactly [`trace_colour_job_with`].
+#[must_use]
+pub fn trace_colour_job_in(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    pixel_map: [f64; 6],
+    params: &TraceColourParams,
+    region: Option<&TraceRegion>,
+    on_percent: &mut dyn FnMut(u8),
+) -> Vec<f64> {
     let raster = Raster {
         width,
         height,
@@ -224,17 +260,16 @@ pub fn trace_colour_job_with(
         ControlFlow::Continue(())
     };
     match trace_colours(raster, Affine::from_array(pixel_map), params, &mut go) {
-        Ok(result) => colour_wire(&result),
+        Ok(mut result) => {
+            let unclipped = region.map_or(0, |region| region.clip_colours(&mut result));
+            let mut wire = colour_head(&result);
+            crate::trace_region::write_unclipped(&mut wire, unclipped);
+            write_colour_tail(&mut wire, &result);
+            wire
+        }
         Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
         Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(TraceStatus::Invalid),
     }
-}
-
-/// The numbers of a multicolour result.
-fn colour_wire(result: &ColourTrace) -> Vec<f64> {
-    let mut wire = colour_head(result);
-    write_colour_tail(&mut wire, result);
-    wire
 }
 
 /// The numbers of a multicolour result before its palette: the header and the outlines layer by
@@ -436,6 +471,13 @@ pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
     let mut at = TRACE_WIRE_HEADER;
     let outline_count = count(header[6])?;
     let outlines = read_outlines(wire, &mut at, outline_count)?;
+    // `specs/0094`: the unclipped count, when a kernel refusal kept outlines whole.
+    let unclipped = if wire.get(at) == Some(&crate::trace_region::UNCLIPPED_MARK) {
+        at += 2;
+        count(*wire.get(at - 1)?)?
+    } else {
+        0
+    };
     // `specs/0091`: the text section, when the job had OCR lines.
     let texts = if wire.get(at) == Some(&crate::trace_text_wire::TEXT_MARK) {
         let (texts, used) = crate::trace_text_wire::read_texts(&wire[at..])?;
@@ -472,6 +514,7 @@ pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
         joined,
         texts,
         shapes,
+        unclipped,
     };
     Some((read, shapes_at))
 }

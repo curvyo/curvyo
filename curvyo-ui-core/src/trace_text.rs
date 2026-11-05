@@ -57,6 +57,9 @@ pub struct TextRegion {
     pub outlines: Vec<BezPath>,
     /// The line's direction in document millimetres (the quad's top edge).
     pub direction: Vec2,
+    /// The centre of the line's box (its quad) in document millimetres: the point a mask's
+    /// region tests (`specs/0094` criterion 11).
+    pub centre: curvyo_document_core::Point,
     /// Pixels left out of the main trace for it.
     pub masked: usize,
     /// The OCR line passes the garbage filter ([`OcrLine::plausible`]).
@@ -278,6 +281,7 @@ pub fn text_pass(
             text: line.text.clone(),
             outlines: result.outlines,
             direction,
+            centre: quad_centre(&q, pixel_map),
             masked,
             plausible: line.plausible(),
             positions,
@@ -293,6 +297,14 @@ pub fn text_pass(
     inpaint(&mut pass.rgba, w, h, &pass.left_out);
     set_under(&mut pass.regions, &pass.rgba, &mut inks);
     pass
+}
+
+/// The centre of `quad` (picture pixels) in document millimetres.
+fn quad_centre(quad: &[[f64; 2]; 4], pixel_map: Affine) -> curvyo_document_core::Point {
+    let mid = quad
+        .iter()
+        .fold([0.0, 0.0], |c, p| [c[0] + p[0] / 4.0, c[1] + p[1] / 4.0]);
+    pixel_map.apply_point(curvyo_document_core::Point::new(mid[0], mid[1]))
 }
 
 /// Sets what lies under each of `regions`: the median of its text pixels `inks` in the filled
