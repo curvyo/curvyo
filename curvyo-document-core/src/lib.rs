@@ -44,6 +44,8 @@ mod document_presets;
 mod document_size;
 mod page_frame;
 mod page_grid;
+mod page_kind;
+mod page_kind_migration;
 mod pages;
 mod workspace_disk_plan;
 mod workspace_list;
@@ -51,7 +53,8 @@ mod workspace_list_view;
 mod workspace_names;
 mod workspace_plan;
 pub use page_grid::{GridMode, GridScale, OriginCorner, PageGrid, PageGridError};
-pub use pages::{FIRST_PAGE_ID, Page, PageError};
+pub use page_kind::PageKind;
+pub use pages::{ADD_SKETCH_PAGE_COMMIT_LABEL, FIRST_PAGE_ID, Page, PageError};
 mod dimension_codec;
 mod dimension_commands;
 mod dimension_keep;
@@ -91,13 +94,13 @@ mod legacy_fill;
 mod manufacturing;
 mod manufacturing_codec;
 pub use manufacturing::{
-    ADD_FIXTURE_COMMIT_LABEL, ADD_MANUFACTURING_COMMIT_LABEL, DELETE_FIXTURE_COMMIT_LABEL,
-    DELETE_MANUFACTURING_COMMIT_LABEL, EDIT_LASER_MODE_COMMIT_LABEL, EDIT_MAX_FEED_COMMIT_LABEL,
+    ADD_FIXTURE_COMMIT_LABEL, ADD_OUTPUT_PAGE_COMMIT_LABEL, DELETE_FIXTURE_COMMIT_LABEL,
+    DELETE_PLACEMENT_COMMIT_LABEL, EDIT_LASER_MODE_COMMIT_LABEL, EDIT_MAX_FEED_COMMIT_LABEL,
     EDIT_MAX_POWER_COMMIT_LABEL, EDIT_ORIGIN_CORNER_COMMIT_LABEL, EDIT_PROFILE_NAME_COMMIT_LABEL,
-    FixtureParams, FixtureSnapshot, ManufacturingError, ManufacturingSnapshot, NewManufacturing,
-    PICK_PROFILE_COMMIT_LABEL, PlacementSnapshot, ProfileChange, RESET_PROFILE_COMMIT_LABEL,
-    SAVE_AS_PROFILE_COMMIT_LABEL, SET_FIXTURE_PARAMS_COMMIT_LABEL,
-    SET_FIXTURE_VISIBLE_COMMIT_LABEL, SET_WORK_AREA_COMMIT_LABEL,
+    FixtureParams, FixtureSnapshot, ManufacturingError, ManufacturingSnapshot, NewOutputPage,
+    PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot, ProfileChange,
+    RESET_PROFILE_COMMIT_LABEL, SAVE_AS_PROFILE_COMMIT_LABEL, SET_FIXTURE_PARAMS_COMMIT_LABEL,
+    SET_FIXTURE_VISIBLE_COMMIT_LABEL,
 };
 mod node_edit;
 mod node_move;
@@ -221,11 +224,12 @@ pub use guides::{GuideMarking, SET_GUIDE_COMMIT_LABEL};
 pub use history::{
     Author, BranchMark, Direction, Event, FAR_STEP_OPS, GoToReport, HistoricalDocument,
     HistoryBranch, HistoryError, HistoryRow, LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION,
-    LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO,
-    LABEL_WIPE_OBJECT, MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult, ObjectRow,
-    ObjectRowClass, ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep, RestoreReport,
-    Role, RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status,
-    StepKind, StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
+    LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO,
+    LABEL_UNDO, LABEL_WIPE_OBJECT, MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult,
+    ObjectRow, ObjectRowClass, ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep,
+    RestoreReport, Role, RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason,
+    StackMachine, Status, StepKind, StepRef, SyncError, TouchedObject, WIPE_LABEL,
+    is_document_level_label, shown_ids,
 };
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,

@@ -6,7 +6,7 @@ use std::cell::{Cell, RefCell};
 
 use loro::{CommitOptions, Frontiers};
 
-use super::step_header::{LABEL_NEW_DOCUMENT, StepHeader};
+use super::step_header::{LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, StepHeader};
 use super::step_id::StepRef;
 use crate::document::Document;
 use crate::units::Timestamp;
@@ -288,6 +288,24 @@ impl Document {
             vv: self.loro().oplog_vv(),
         });
         step
+    }
+
+    /// Runs `write` as one commit with the reserved label `migrate_format` (ADR 0042 §9): no step
+    /// of this session's stacks and no row of the history list; nothing is committed when
+    /// `write` wrote nothing.
+    pub(crate) fn commit_migration(&self, write: impl FnOnce(&Self)) {
+        self.commit_state
+            .batch_depth
+            .set(self.commit_state.batch_depth.get() + 1);
+        {
+            let _guard = BatchGuard(&self.commit_state);
+            write(self);
+        }
+        if self.loro().get_pending_txn_len() > 0 {
+            let header = StepHeader::new(LABEL_MIGRATE_FORMAT, 0, self.commit_state.time.get());
+            self.loro()
+                .commit_with(CommitOptions::new().commit_msg(&header.format()));
+        }
     }
 
     /// Commits the root setup of a new document as its own change, so that the first user step

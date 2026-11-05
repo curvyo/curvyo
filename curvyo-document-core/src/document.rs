@@ -390,7 +390,21 @@ impl DocumentVersion {
 /// number is provisional by the rule above. Goldens: `machine_profile_v36.curvyo`,
 /// `machine_profile_damaged_v36.curvyo`, `mfg_profile_not_a_map_v36.curvyo` and
 /// `laser_workbench_v36.curvyo`; the version 35 goldens stay and open by the migration.
-pub const CURRENT_FORMAT_VERSION: u32 = 36;
+///
+/// Bumped to 37 in `page-kinds` (ADR 0042, `specs/0098-page-kinds`): a page record carries
+/// `page.<id>.kind` (`"drawing"` or `"sketch"`, written once at creation); a page with
+/// `page.<id>.owner` naming a live manufacturing is an output page, listed and placed in the plane
+/// like any other, and only a sketch page owns a sketch. A build that stops at 36 would hide output
+/// pages again and let a drawing page own a sketch, recreating what the migration removed, so it
+/// must refuse every file of this build as too new. Migration from 36
+/// (`crate::page_kind_migration`, one commit `migrate_format` at open, no undo step): output pages
+/// get a list place and a frame by the Add page rule; the sketch of a drawing page moves to a new
+/// sketch page `<page id>-sketch` and leaves a linked clone with own placement. Damage: a `kind`
+/// that is not a text reads as a drawing page and is not refused; an unknown text is kept. The
+/// number is provisional by the rule above. Goldens: `page_kinds_v37.curvyo`,
+/// `page_kind_damaged_v37.curvyo`, `page_kind_unknown_v37.curvyo`,
+/// `page_kinds_migration_v36.curvyo`.
+pub const CURRENT_FORMAT_VERSION: u32 = 37;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

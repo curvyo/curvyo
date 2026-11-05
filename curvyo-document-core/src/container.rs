@@ -168,6 +168,7 @@ pub fn unpack(peer_id: u64, bytes: &[u8]) -> Result<Document, OpenError> {
     let document = Document::from_loro_snapshot(peer_id, &loro_bytes)?;
     *document.assets.borrow_mut() = crate::container_assets::read_assets(&mut archive);
     document.set_sharing(share);
+    document.migrate_page_kinds(manifest.format_version);
     Ok(document)
 }
 

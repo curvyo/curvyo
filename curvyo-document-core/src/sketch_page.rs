@@ -5,15 +5,27 @@ use curvyo_sketch_core::Sketch;
 
 pub(crate) const PAGE_KEY: &str = "sketch_page";
 pub(crate) const OWNERSHIP_CONFLICT: &str = "This object is not the page’s owning sketch; convert or remove it to resolve the competing creation";
-const OWNER_FIELD: &str = "sketch_owner";
+pub(crate) const OWNER_FIELD: &str = "sketch_owner";
 
 impl Document {
     /// The live owning original of a page; reading never repairs dangling claims.
     #[must_use]
+    /// Only a sketch page owns a sketch: a claim on a page of another kind reads as no owner
+    /// and is never repaired on read (ADR 0042 §8).
     pub fn page_sketch(&self, page: &str) -> Option<NodeId> {
-        if !self.pages().iter().any(|p| p.id == page) {
+        if !self
+            .pages()
+            .iter()
+            .any(|p| p.id == page && p.kind == crate::PageKind::Sketch)
+        {
             return None;
         }
+        self.claimed_sketch(page)
+    }
+
+    /// The live sketch that page `page` claims, whatever the page's kind (the format-36
+    /// migration reads the claims of drawing pages).
+    pub(crate) fn claimed_sketch(&self, page: &str) -> Option<NodeId> {
         let root = self.loro().get_map(ROOT_MAP);
         let id = crate::sketch_codec::atomic(&root, &crate::pages::key(page, OWNER_FIELD)).ok()?;
         let meta = self.sketch_meta(id).ok()?;
@@ -30,7 +42,8 @@ impl Document {
     /// Creates the page's original with geometry and claim in one history step.
     /// The local zero starts at the global page centre; subsequent resize does not recenter it.
     /// # Errors
-    /// Refuses missing/occupied pages or invalid graph geometry without writing.
+    /// Refuses missing/occupied pages, a page that is not a sketch page (ADR 0042 §8) or invalid
+    /// graph geometry without writing.
     pub fn create_page_sketch(
         &self,
         page: &str,
@@ -42,6 +55,9 @@ impl Document {
             .into_iter()
             .find(|p| p.id == page)
             .ok_or_else(|| SketchEditError("Page not found".into()))?;
+        if frame.kind != crate::PageKind::Sketch {
+            return Err(SketchEditError("Only a sketch page holds a sketch".into()));
+        }
         if self.page_sketch(page).is_some() {
             return Err(SketchEditError("This page already has a sketch".into()));
         }

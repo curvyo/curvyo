@@ -115,7 +115,10 @@ impl<'a> Detached<'a> {
 
     /// The spatial frames at this version.
     pub(crate) fn pages(&self) -> Vec<crate::Page> {
-        crate::pages::pages_of_root(&self.doc.get_map(ROOT_MAP))
+        crate::pages::pages_of_root(
+            &self.doc.get_map(ROOT_MAP),
+            &self.doc.get_tree(OBJECTS_TREE),
+        )
     }
 
     /// The page at this version: its size and background.

@@ -3,8 +3,9 @@ use crate::document::{KEY_HEIGHT_MM, KEY_WIDTH_MM, ROOT_MAP};
 use crate::document_size::{MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_side};
 use crate::page_frame::{Frame, read_frame, write_frame};
 use crate::page_grid::{PageGrid, grid_of_fields, grid_of_root, write_non_default};
+use crate::page_kind::PageKind;
 use crate::{Document, DocumentSize, DocumentSizeError, NodeId, ObjectEditError, Point, Vec2};
-use loro::{LoroMap, LoroValue, ValueOrContainer};
+use loro::{LoroMap, LoroTree, LoroValue, ValueOrContainer};
 use serde::Serialize;
 
 /// Stable identity of the initial page.
@@ -26,6 +27,10 @@ pub struct Page {
     /// `document.json` at its default, like a node's registers.
     #[serde(skip_serializing_if = "PageGrid::is_default")]
     pub grid: PageGrid,
+    /// What the page is (ADR 0042); fixed from its creation. Left out of `document.json` for a
+    /// drawing page, so a file without page kinds exports as before.
+    #[serde(skip_serializing_if = "PageKind::is_drawing")]
+    pub kind: PageKind,
 }
 impl Page {
     /// Whether a global point lies within the frame, including its edge.
@@ -63,6 +68,9 @@ pub enum PageError {
     /// Invalid content movement.
     #[error(transparent)]
     Object(#[from] ObjectEditError),
+    /// The page's size comes from its machine or its kind is unknown (ADR 0042 §3).
+    #[error("this page's size cannot be changed here")]
+    FixedSize,
 }
 pub(crate) fn key(id: &str, field: &str) -> String {
     match (id, field) {
@@ -149,60 +157,74 @@ fn frame_of(root: &LoroMap, id: &str) -> Option<Frame> {
 /// The registered grid fields of one page, by field name.
 type GridFields = Vec<(String, LoroValue)>;
 
-/// Every drawing page id with a name (an owned output page is not one), and the grid registers
-/// of each page, in one pass over the root.
-fn page_keys(
-    root: &LoroMap,
-) -> (
-    std::collections::BTreeSet<String>,
-    std::collections::HashMap<String, GridFields>,
-) {
-    let mut ids = std::collections::BTreeSet::new();
-    // A page a manufacturing owns is its output page, never a drawing page (ADR 0032 §5).
-    let mut owned = std::collections::HashSet::new();
-    // The grid registers are gathered in the same pass, so a page without any (a grid never
-    // touched) costs no keyed read per frame (`specs/0090-grid` criterion 9).
-    let mut grids: std::collections::HashMap<String, GridFields> = std::collections::HashMap::new();
+/// The registers of one page record that `pages()` reads in its one pass over the root.
+#[derive(Default)]
+struct PageRecord {
+    named: bool,
+    grid: GridFields,
+    kind: Option<LoroValue>,
+    owner: Option<LoroValue>,
+}
+
+/// Every page record, in one pass over the root: the grid registers are gathered in the same
+/// pass, so a page without any (a grid never touched) costs no keyed read per frame
+/// (`specs/0090-grid` criterion 9), and so are the kind and owner of ADR 0042 §2.
+fn page_records(root: &LoroMap) -> std::collections::BTreeMap<String, PageRecord> {
+    let mut records: std::collections::BTreeMap<String, PageRecord> =
+        std::collections::BTreeMap::new();
     root.for_each(|name, value| {
         let Some(rest) = name.strip_prefix("page.") else {
             return;
         };
-        if let Some(id) = rest.strip_suffix(".name") {
-            ids.insert(id.to_owned());
-        } else if let Some(id) = rest.strip_suffix(".owner") {
-            owned.insert(id.to_owned());
-        } else if let Some((id, field)) = rest.rsplit_once('.')
-            && field.starts_with("grid_")
-            && let ValueOrContainer::Value(value) = value
-        {
-            grids
-                .entry(id.to_owned())
-                .or_default()
-                .push((field.to_owned(), value));
+        let Some((id, field)) = rest.rsplit_once('.') else {
+            return;
+        };
+        let ValueOrContainer::Value(value) = value else {
+            if field == "name" {
+                records.entry(id.to_owned()).or_default().named = true;
+            }
+            return;
+        };
+        let record = records.entry(id.to_owned()).or_default();
+        match field {
+            "name" => record.named = true,
+            crate::page_kind::KIND_FIELD => record.kind = Some(value),
+            crate::manufacturing_codec::PAGE_OWNER_FIELD => record.owner = Some(value),
+            grid if grid.starts_with("grid_") => record.grid.push((grid.to_owned(), value)),
+            _ => {}
         }
     });
-    ids.retain(|id| !owned.contains(id));
-    (ids, grids)
+    records.retain(|_, record| record.named);
+    records
 }
 
-pub(crate) fn pages_of_root(root: &LoroMap) -> Vec<Page> {
-    let (ids, grids) = page_keys(root);
-    let mut pages: Vec<_> = ids
+/// Every live page of every kind in list order (ADR 0042 §4); reading never writes.
+pub(crate) fn pages_of_root(root: &LoroMap, tree: &LoroTree) -> Vec<Page> {
+    let records = page_records(root);
+    let mut pages: Vec<_> = records
         .into_iter()
-        .filter_map(|id| {
+        .filter_map(|(id, record)| {
             let frame = frame_of(root, &id)?;
             let page = Page {
                 name: string(root, &id, "name")?,
                 origin: frame.origin,
                 size: frame.size,
-                grid: grids.get(&id).map_or(PageGrid::DEFAULT, |fields| {
+                grid: if record.grid.is_empty() {
+                    PageGrid::DEFAULT
+                } else {
                     grid_of_fields(|field| {
-                        fields
+                        record
+                            .grid
                             .iter()
                             .find(|(name, _)| name == field)
                             .map(|(_, value)| value.clone())
                     })
-                }),
+                },
+                kind: crate::page_kind::read_kind(
+                    record.kind.as_ref(),
+                    record.owner.as_ref(),
+                    tree,
+                ),
                 id,
             };
             Some(page)
@@ -239,13 +261,13 @@ fn first_page_of_old_file(root: &LoroMap) -> Page {
         origin: frame.origin,
         size: frame.size,
         grid: grid_of_root(root, FIRST_PAGE_ID),
+        kind: PageKind::Drawing,
     }
 }
 
-/// The output page `id` a manufacturing owns, `None` when it is missing, deleted or not owned. Its
-/// size is the machine's work area; its position in the plane never matters (ADR 0032 §5).
-pub(crate) fn owned_page(root: &LoroMap, id: &str) -> Option<Page> {
-    crate::manufacturing_codec::page_owner(root, id)?;
+/// The output page `id` that `manufacturing` owns, `None` when it is missing, deleted or owned by
+/// another node.
+pub(crate) fn owned_page(root: &LoroMap, tree: &LoroTree, id: &str) -> Option<Page> {
     if root
         .get(&key(id, "deleted"))
         .is_some_and(|v| v.get_deep_value() == LoroValue::Bool(true))
@@ -253,83 +275,172 @@ pub(crate) fn owned_page(root: &LoroMap, id: &str) -> Option<Page> {
         return None;
     }
     let frame = frame_of(root, id)?;
+    let owner = root.get(&key(id, crate::manufacturing_codec::PAGE_OWNER_FIELD));
+    let owner = match owner? {
+        ValueOrContainer::Value(value) => value,
+        ValueOrContainer::Container(_) => return None,
+    };
     Some(Page {
         id: id.to_owned(),
         name: string(root, id, "name")?,
-        origin: Point::new(0.0, 0.0),
+        origin: frame.origin,
         size: frame.size,
-        grid: PageGrid::DEFAULT,
+        grid: grid_of_root(root, id),
+        kind: crate::page_kind::read_kind(None, Some(&owner), tree),
     })
 }
 
+/// The label of Add page with Kind Sketch (`specs/0098-page-kinds` criterion 3).
+pub const ADD_SKETCH_PAGE_COMMIT_LABEL: &str = "add_sketch_page";
+
+/// "`prefix` n" with the smallest n from 1 that no page of `pages` is named.
+pub(crate) fn next_free_name(pages: &[Page], prefix: &str) -> String {
+    let mut n = 1;
+    while pages.iter().any(|p| p.name == format!("{prefix} {n}")) {
+        n += 1;
+    }
+    format!("{prefix} {n}")
+}
+
+/// Where Add page puts a new page of `size` (`specs/0059-multiple-pages` criterion 3): right of
+/// the last page with the gap, or the start of a new row below once the row holds 8 pages or
+/// passes 4 m.
+pub(crate) fn next_page_origin(pages: &[Page], size: DocumentSize) -> Point {
+    let Some(last) = pages.last() else {
+        return Point::new(0.0, 0.0);
+    };
+    let gap = 20.0_f64.max(0.1 * last.size.width.as_mm().max(last.size.height.as_mm()));
+    let row: Vec<_> = pages
+        .iter()
+        .rev()
+        .take_while(|p| (p.origin.y - last.origin.y).abs() <= EPS)
+        .collect();
+    let left = row.iter().map(|p| p.origin.x).fold(f64::INFINITY, f64::min);
+    let origin = Point::new(last.origin.x + last.size.width.as_mm() + gap, last.origin.y);
+    if row.len() >= 8 || origin.x + size.width.as_mm() - left > 4000.0 {
+        return Point::new(
+            left,
+            row.iter()
+                .map(|p| p.origin.y + p.size.height.as_mm())
+                .fold(f64::NEG_INFINITY, f64::max)
+                + gap,
+        );
+    }
+    origin
+}
+
 impl Document {
+    /// The kind of the live page `id` from its own registers only (no walk of the page list),
+    /// `None` when it is missing or deleted: the cheap read of an activation (`specs/0098`
+    /// criterion 21).
+    #[must_use]
+    pub fn page_kind(&self, id: &str) -> Option<PageKind> {
+        let root = self.loro().get_map(ROOT_MAP);
+        string(&root, id, "name")?;
+        let deleted = root
+            .get(&key(id, "deleted"))
+            .is_some_and(|v| v.get_deep_value() == LoroValue::Bool(true));
+        if deleted {
+            return None;
+        }
+        let value = |field: &str| match root.get(&key(id, field)) {
+            Some(ValueOrContainer::Value(value)) => Some(value),
+            _ => None,
+        };
+        Some(crate::page_kind::read_kind(
+            value(crate::page_kind::KIND_FIELD).as_ref(),
+            value(crate::manufacturing_codec::PAGE_OWNER_FIELD).as_ref(),
+            &self.loro().get_tree(crate::document::OBJECTS_TREE),
+        ))
+    }
+
     /// Frames in list order; reading never writes document state.
     #[must_use]
     pub fn pages(&self) -> Vec<Page> {
-        pages_of_root(&self.loro().get_map(ROOT_MAP))
+        pages_of_root(
+            &self.loro().get_map(ROOT_MAP),
+            &self.loro().get_tree(crate::document::OBJECTS_TREE),
+        )
     }
-    /// Adds a frame after the last listed frame in one history step.
-    #[allow(clippy::missing_panics_doc)] // pages() guarantees a frame.
+    /// Adds a drawing page after the last listed page in one history step "Add page"
+    /// (`specs/0098-page-kinds` criterion 2).
+    #[allow(clippy::missing_panics_doc)] // a drawing page is always addable.
     pub fn add_page(&self) -> Page {
-        let pages = self.pages();
-        // invariant: pages always contains at least one frame.
+        // invariant: Drawing is a kind a command creates.
         #[allow(clippy::unwrap_used)]
-        let last = pages.last().unwrap();
-        let gap = 20.0_f64.max(0.1 * last.size.width.as_mm().max(last.size.height.as_mm()));
-        let row: Vec<_> = pages
-            .iter()
-            .rev()
-            .take_while(|p| (p.origin.y - last.origin.y).abs() <= EPS)
-            .collect();
-        let left = row.iter().map(|p| p.origin.x).fold(f64::INFINITY, f64::min);
-        let mut origin = Point::new(last.origin.x + last.size.width.as_mm() + gap, last.origin.y);
-        if row.len() >= 8 || origin.x + last.size.width.as_mm() - left > 4000.0 {
-            origin = Point::new(
-                left,
-                row.iter()
-                    .map(|p| p.origin.y + p.size.height.as_mm())
-                    .fold(f64::NEG_INFINITY, f64::max)
-                    + gap,
-            );
-        }
-        let peer = self.loro().peer_id();
-        let counter = self.loro().oplog_vv().get(&peer).copied().unwrap_or(0);
-        let mut n = 1;
-        while pages.iter().any(|p| p.name == format!("Page {n}")) {
-            n += 1;
-        }
-        let pending = self.loro().get_pending_txn_len();
+        self.add_page_of(&PageKind::Drawing).unwrap()
+    }
+
+    /// Adds a page of `kind` (Drawing or Sketch) in one history step (criteria 2, 3): named
+    /// "Page N" or "Sketch N", the size and grid of the last page of the same kind (a sketch page
+    /// falls back to the last drawing page), else the default size, placed by the Add page rule.
+    ///
+    /// # Errors
+    /// [`PageError::FixedSize`] for a kind no command creates this way (output pages come from
+    /// [`Document::add_output_page`]).
+    pub fn add_page_of(&self, kind: &PageKind) -> Result<Page, PageError> {
+        let stored = kind.stored().ok_or(PageError::FixedSize)?;
+        let pages = self.pages();
+        let last_of = |wanted: &PageKind| pages.iter().rev().find(|p| p.kind == *wanted);
+        let source = last_of(kind).or_else(|| last_of(&PageKind::Drawing));
+        let (size, grid) = source.map_or((DocumentSize::default(), PageGrid::DEFAULT), |p| {
+            (p.size, p.grid)
+        });
+        let prefix = if *kind == PageKind::Sketch {
+            "Sketch"
+        } else {
+            "Page"
+        };
         let page = Page {
-            id: if pending == 0 {
-                format!("{peer}-{counter}")
-            } else {
-                format!("{peer}-{counter}-{pending}")
-            },
-            name: format!("Page {n}"),
-            origin,
-            size: last.size,
-            grid: last.grid,
+            id: self.new_page_id(),
+            name: next_free_name(&pages, prefix),
+            origin: next_page_origin(&pages, size),
+            size,
+            grid,
+            kind: kind.clone(),
         };
         let root = self.loro().get_map(ROOT_MAP);
-        write(&root, &last.id, "deleted", false);
-        write(&root, &page.id, "name", page.name.clone());
-        write(
-            &root,
-            &page.id,
-            "order",
-            number(&root, &last.id, "order").unwrap_or(0.0) + 1.0,
-        );
+        Self::write_new_page(&root, &pages, &page);
+        write(&root, &page.id, crate::page_kind::KIND_FIELD, stored);
+        write_non_default(&root, &page.id, page.grid);
+        self.commit_with_label(if *kind == PageKind::Sketch {
+            ADD_SKETCH_PAGE_COMMIT_LABEL
+        } else {
+            "add_page"
+        });
+        Ok(page)
+    }
+
+    /// A fresh page id from this peer's next operation counter.
+    pub(crate) fn new_page_id(&self) -> String {
+        let peer = self.loro().peer_id();
+        let counter = self.loro().oplog_vv().get(&peer).copied().unwrap_or(0);
+        let pending = self.loro().get_pending_txn_len();
+        if pending == 0 {
+            format!("{peer}-{counter}")
+        } else {
+            format!("{peer}-{counter}-{pending}")
+        }
+    }
+
+    /// Writes the name, the order after the last of `pages` and the frame of `page`, uncommitted.
+    pub(crate) fn write_new_page(root: &LoroMap, pages: &[Page], page: &Page) {
+        if let Some(last) = pages.last() {
+            write(root, &last.id, "deleted", false);
+        }
+        let order = pages.last().map_or(0.0, |last| {
+            number(root, &last.id, "order").unwrap_or(0.0) + 1.0
+        });
+        write(root, &page.id, "name", page.name.clone());
+        write(root, &page.id, "order", order);
         write_frame(
-            &root,
+            root,
             &page.id,
             Frame {
-                origin,
+                origin: page.origin,
                 size: page.size,
             },
         );
-        write_non_default(&root, &page.id, page.grid);
-        self.commit_with_label("add_page");
-        page
     }
     fn find_page(&self, id: &str) -> Result<Page, PageError> {
         self.pages()
@@ -358,11 +469,18 @@ impl Document {
     /// # Errors
     /// Refuses an unknown page or the last frame.
     pub fn delete_page(&self, id: &str) -> Result<(), PageError> {
-        self.find_page(id)?;
+        let page = self.find_page(id)?;
         if self.pages().len() == 1 {
             return Err(PageError::LastPage);
         }
         write(&self.loro().get_map(ROOT_MAP), id, "deleted", true);
+        // The page owns its machine data: the manufacturing goes in the same step, in one tree
+        // delete, so one undo restores the page with its copy, fixtures and placements
+        // (ADR 0042 §5, `specs/0098-page-kinds` criterion 16).
+        if let Some(manufacturing) = page.kind.manufacturing() {
+            self.remove_manufacturing_node(manufacturing)
+                .map_err(|_| PageError::NotFound)?;
+        }
         self.commit_with_label("delete_page");
         Ok(())
     }
@@ -460,9 +578,13 @@ impl Document {
     }
     /// Resizes a frame around its centre in one commit; no object moves (ADR 0031 decision 9a).
     /// # Errors
-    /// Refuses unknown identities or invalid sizes.
+    /// Refuses unknown identities or invalid sizes;
+    /// [`PageError::FixedSize`] for an output page or a page of an unknown kind (ADR 0042 §3).
     pub fn resize_page(&self, id: &str, size: DocumentSize) -> Result<bool, PageError> {
         let page = self.find_page(id)?;
+        if page.kind.fixed_size() {
+            return Err(PageError::FixedSize);
+        }
         let size = DocumentSize::new(
             validated_document_side(size.width)?,
             validated_document_side(size.height)?,

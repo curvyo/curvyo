@@ -121,6 +121,9 @@ impl Document {
             .into_iter()
             .find(|p| p.id == id)
             .ok_or(PageError::NotFound)?;
+        if page.kind.fixed_size() {
+            return Err(PageError::FixedSize);
+        }
         Ok(self.write_fitted_frame(&page, frame))
     }
 
