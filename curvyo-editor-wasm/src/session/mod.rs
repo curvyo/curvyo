@@ -152,6 +152,8 @@ mod device_sync;
 #[cfg(test)]
 mod device_sync_tests;
 #[cfg(test)]
+mod membership_tests;
+#[cfg(test)]
 mod single_line_tests;
 mod snapping;
 mod snapping_node;
@@ -166,10 +168,12 @@ mod svg_import;
 mod sync;
 mod sync_events;
 mod sync_members;
+mod sync_notices;
 mod sync_presence;
 mod sync_records;
 #[cfg(test)]
 mod sync_removal_tests;
+mod sync_return;
 mod sync_start;
 #[cfg(test)]
 mod sync_test_support;

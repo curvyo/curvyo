@@ -128,11 +128,13 @@ pub fn devices_syncing_workspaces(workspaces: usize, done: usize, total: usize) 
     texts::syncing_workspaces_text(workspaces, done, total)
 }
 
-/// The alert of a workspace Sync these could not switch on (3.1).
+/// The one alert of the workspaces Sync these could not switch on (3.1); `names_json` is a JSON
+/// array of their names.
 #[wasm_bindgen]
 #[must_use]
-pub fn devices_could_not_sync(name: &str) -> String {
-    texts::could_not_sync_text(name)
+pub fn devices_could_not_sync(names_json: &str) -> String {
+    let names: Vec<String> = serde_json::from_str(names_json).unwrap_or_default();
+    texts::could_not_sync_text(&names)
 }
 
 /// The pick list's line of a workspace in which this device is only a member (3.1).

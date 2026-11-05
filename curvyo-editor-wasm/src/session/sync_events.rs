@@ -2,9 +2,10 @@
 //! host and session events applied to the link and the document.
 
 use curvyo_crypto_core::MemberId;
+use curvyo_document_core::EndReason;
 use curvyo_sync_core::{ClientOutput, ConnectionId, RefusalReason, SessionEvent};
 use curvyo_ui_core::presence::PresencePayload;
-use curvyo_ui_core::share_text::{JoinRefusal, NOT_ADMITTED_NOTICE, REMOVED_NOTICE};
+use curvyo_ui_core::share_text::{JoinRefusal, NOT_ADMITTED_NOTICE};
 
 use super::Session;
 use super::sync::{BACK_ONLINE_AFTER_MS, JoinPhase, SyncEnd, SyncLink, TransportAction};
@@ -115,6 +116,7 @@ impl Session {
                 link.resyncing = true;
                 link.peers.clear();
             }
+            SessionEvent::CheckResult(outcome) => self.check_answered(outcome),
         }
     }
 
@@ -144,25 +146,23 @@ impl Session {
         }
     }
 
-    /// This device was removed from the room: a document becomes a local file again, so does
-    /// the open document of a workspace (`specs/0095-workspace` criterion 44).
+    /// This device was removed from the room: a document becomes a local file again that keeps
+    /// its ended record (ADR 0041 decision 6), so does the open document of a workspace
+    /// (`specs/0095-workspace` criterion 44). After its own leave the record says "left".
     fn sync_removed(&mut self) {
-        let Some(link) = self.sync.as_mut() else {
+        let Some(link) = self.sync.as_ref() else {
             return;
         };
-        link.online = false;
-        link.ended = Some(SyncEnd::Removed);
-        link.peers.clear();
-        if link.workspace.is_none() {
-            link.notice(REMOVED_NOTICE.to_owned(), true);
-            self.document.set_share(None);
-        } else {
-            link.notice(
-                curvyo_ui_core::workspace_tree_text::WORKSPACE_REMOVED_TEXT.to_owned(),
-                true,
-            );
-            self.document.set_workspace_share(None);
+        if link.ended == Some(SyncEnd::Left) {
+            // Its own leave already ended the share.
+            return;
         }
+        let reason = if link.leaving {
+            EndReason::Left
+        } else {
+            EndReason::Removed
+        };
+        self.end_share(reason, "");
     }
 
     pub(super) fn upload_snapshot(&mut self, covers_seq: u64) {
@@ -199,8 +199,12 @@ impl Session {
     }
 }
 
-/// The relay refused the link: a join shows why, a member's link ends.
+/// The relay refused the link: a join shows why, a member's link ends; a device that left is
+/// refused as removed and stays "left".
 fn refused(link: &mut SyncLink, reason: RefusalReason) {
+    if link.ended == Some(SyncEnd::Left) {
+        return;
+    }
     if link.awaiting_document {
         let refusal = match reason {
             RefusalReason::Used => JoinRefusal::Used,

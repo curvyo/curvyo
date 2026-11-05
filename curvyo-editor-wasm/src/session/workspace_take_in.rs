@@ -95,13 +95,15 @@ impl Session {
         }
     }
 
-    /// Whether this device was removed from the shared workspace it carries (criteria 44, 45):
-    /// the host drops the marker's share files and the workspace is a local one.
+    /// Whether this device was removed from the shared workspace it carries, or left it
+    /// (criteria 44, 45; `specs/0097` criterion 15): the host drops the marker's share files,
+    /// keeps its ended record ([`Session::workspace_ended_record`]) and the workspace is a local
+    /// one.
     #[must_use]
     pub fn workspace_removed(&self) -> bool {
-        self.sync
-            .as_ref()
-            .is_some_and(|l| l.workspace.is_some() && l.ended == Some(SyncEnd::Removed))
+        self.sync.as_ref().is_some_and(|l| {
+            l.workspace.is_some() && matches!(l.ended, Some(SyncEnd::Removed | SyncEnd::Left))
+        })
     }
 
     /// Whether the session is connected and caught up.

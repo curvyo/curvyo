@@ -100,7 +100,9 @@ impl DeviceGroupGlue {
             | SessionEvent::Presence { .. }
             | SessionEvent::UpdateRejected
             | SessionEvent::SnapshotDue { .. }
-            | SessionEvent::Resyncing => {}
+            | SessionEvent::Resyncing
+            // The group room never runs a return check.
+            | SessionEvent::CheckResult(_) => {}
         }
     }
 

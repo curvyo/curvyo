@@ -11,7 +11,8 @@ import type { ProjectApi } from "@/hooks/useProject";
 import type { ScannedEntryData, WorkspaceApi } from "@/hooks/useWorkspace";
 import { useSharedTree } from "@/hooks/useSharedTree";
 import { useWorkspaceWriter } from "@/hooks/useWorkspaceWriter";
-import { claimOpenRoom, inGroupList, openRoomNow, releaseOpenRoom } from "@/lib/backgroundWorkspace";
+import { claimOpenRoom, endedBySwitchOff, openRoomNow, releaseOpenRoom } from "@/lib/backgroundWorkspace";
+import { parseEnded } from "@/lib/endedRecord";
 import { commitShare, prepareShare } from "@/lib/workspaceShare";
 import type { SharedScan } from "@/lib/sharedTree";
 import type { WorkspaceAnswer } from "@/lib/workspaceRows";
@@ -282,14 +283,28 @@ export function useWorkspaceSync(
         // Criterion 44: the workspace is a local one now; every document stays.
         removedRef.current = session;
         setSharedName("");
-        void invoke("clear_workspace_marker_share").catch(() => undefined);
         const id = openRoomNow();
-        if (id !== "" && inGroupList(id)) {
+        // A switch-off drops the share; a removal or leave keeps the marker's ended record and
+        // every document's record for the way back (`specs/0097` criteria 15 and 20).
+        const ended = Array.from(session.workspace_ended_json());
+        const switchedOff =
+          id !== "" && endedBySwitchOff(id, session.share_removed_by_hex(), parseEnded(ended)?.left ?? false);
+        void (switchedOff || ended.length === 0
+          ? invoke("clear_workspace_marker_share")
+          : invoke("end_workspace_marker_share", { ended_json: ended })
+        ).catch(() => undefined);
+        const left = parseEnded(ended)?.left ?? false;
+        if (switchedOff) {
           // Switched off for my devices (0096 ux-notes 6.4): a notice, the copy stays.
           showHistoryNotice(devices_no_longer_synced_notice(refs.current.workspace.name), 5000, "canvas", "status");
-        } else {
+        } else if (!left) {
+          // A leave is told by the session in its own words (`specs/0097` ux-notes 5.2).
           refs.current.workspace.showRemoved(workspace_removed_text());
         }
+      }
+      if (!session.workspace_removed() && removedRef.current === session && session.has_workspace_link()) {
+        // Sync again resumed it (`specs/0097` criterion 21): a later end is handled again.
+        removedRef.current = null;
       }
       if (!session.has_workspace_link()) {
         // A join that was cancelled or refused leaves nothing to wait for.

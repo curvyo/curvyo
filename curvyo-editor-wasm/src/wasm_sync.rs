@@ -26,13 +26,13 @@ pub struct SyncAction {
     pub bytes: Vec<u8>,
 }
 
-fn millis(now: f64) -> Millis {
+pub(crate) fn millis(now: f64) -> Millis {
     // Date.now() is a whole number of milliseconds well inside u64.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     Millis(now.max(0.0) as u64)
 }
 
-fn seeds(identity: &[u8], nonce: &[u8], entropy: &[u8]) -> Option<SyncSeeds> {
+pub(crate) fn seeds(identity: &[u8], nonce: &[u8], entropy: &[u8]) -> Option<SyncSeeds> {
     Some(SyncSeeds {
         identity: identity.try_into().ok()?,
         nonce: nonce.try_into().ok()?,
@@ -102,12 +102,8 @@ impl WasmSession {
         let Some(seeds) = seeds(identity, nonce, entropy) else {
             return false;
         };
-        let keys: Vec<(u32, String)> = serde_json::from_str(keys_json).unwrap_or_default();
-        let keys = keys
-            .into_iter()
-            .filter_map(|(n, hex)| Some((n, unhex::<32>(&hex)?)))
-            .collect();
-        self.session.resume_shared(label, keys, &seeds, millis(now))
+        self.session
+            .resume_shared(label, epoch_keys(keys_json), &seeds, millis(now))
     }
 
     /// Whether the open document is shared.
@@ -275,6 +271,15 @@ impl WasmSession {
     pub fn leave_sync(&mut self) {
         self.session.leave_sync();
     }
+}
+
+/// The epoch keys of `keys_json` (`[[epoch, "hex"], ...]`, the credential store's); malformed
+/// entries are left out.
+pub(crate) fn epoch_keys(keys_json: &str) -> Vec<(u32, [u8; 32])> {
+    let keys: Vec<(u32, String)> = serde_json::from_str(keys_json).unwrap_or_default();
+    keys.into_iter()
+        .filter_map(|(n, hex)| Some((n, unhex::<32>(&hex)?)))
+        .collect()
 }
 
 /// A typed server address normalised (`ws://host:port`), empty when it is not one.

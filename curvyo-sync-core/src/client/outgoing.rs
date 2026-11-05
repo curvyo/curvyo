@@ -4,7 +4,7 @@
 use curvyo_crypto_core::keyring::{Entry, Keyring, Payload, Role};
 use curvyo_crypto_core::{EnvelopeKind, Identity, InviteKey, MemberId};
 
-use super::{ClientSession, InviteSecret, OutItem, SessionError, SessionEvent, State};
+use super::{ClientSession, History, InviteSecret, OutItem, SessionError, SessionEvent, State};
 use crate::frame::{ClientFrame, MAX_MESSAGE_LEN, RecordKind};
 use crate::time::Millis;
 
@@ -227,11 +227,12 @@ impl ClientSession {
         Ok(())
     }
 
-    /// This device leaves the room by its own `RemoveMember` (criterion 27); an admin rotates
-    /// later. The caller then closes the session and forgets the room's keys.
+    /// This device leaves the room by its own `RemoveMember` (criterion 27, ADR 0041 decision
+    /// 2); an admin rotates later. Refused while no other admin would remain (decision 1). The
+    /// caller then closes the session; the room's keys stay in the credential store.
     ///
     /// # Errors
-    /// `NotAMember`, `Offline`, `Ended`, `Crypto`.
+    /// `NotAMember`, `LastAdmin`, `Offline`, `Ended`, `Crypto`.
     pub fn leave(&mut self) -> Result<(), SessionError> {
         if self.state == State::Ended {
             return Err(SessionError::Ended);
@@ -240,11 +241,78 @@ impl ClientSession {
             return Err(SessionError::Offline);
         }
         let me = self.keys.me();
-        if self.keys.keyring().and_then(|k| k.role(&me)).is_none() {
+        let keyring = self.keys.keyring().ok_or(SessionError::NotAMember)?;
+        if keyring.role(&me).is_none() {
             return Err(SessionError::NotAMember);
+        }
+        if !crate::admin_remains(keyring, &[me]) {
+            return Err(SessionError::LastAdmin);
         }
         let entry = self.keys.write(Payload::RemoveMember { member: me })?;
         self.send_entries(&[entry])?;
+        Ok(())
+    }
+
+    /// Gives `member` the role `role` by `SetRole` (ADR 0041 decision 1): Make admin, Make
+    /// member, and Step down as `set_role(me, Member)`. Any admin may change any role; a
+    /// demotion is refused while no other admin would remain. Nothing is written when the role
+    /// is already `role`. Admin only.
+    ///
+    /// # Errors
+    /// `NotAdmin`, `NotAMember` (this device or `member`), `LastAdmin`, `Offline`, `Ended`,
+    /// `Crypto`.
+    pub fn set_role(&mut self, member: MemberId, role: Role) -> Result<(), SessionError> {
+        self.require_admin()?;
+        let keyring = self.keys.keyring().ok_or(SessionError::NotAMember)?;
+        let current = keyring.role(&member).ok_or(SessionError::NotAMember)?;
+        if current == role {
+            return Ok(());
+        }
+        if role == Role::Member && !crate::admin_remains(keyring, &[member]) {
+            return Err(SessionError::LastAdmin);
+        }
+        let entry = self.keys.write(Payload::SetRole { member, role })?;
+        self.send_entries(&[entry])?;
+        self.event(SessionEvent::KeyringChanged);
+        Ok(())
+    }
+
+    /// Adds a former participant back as a member (ADR 0041 decision 5): no invite, the
+    /// identity from [`Keyring::former_participants`]. [`History::Full`] wraps every epoch key
+    /// this device holds; [`History::FromNow`] the current one only and asks for a snapshot
+    /// under it for the device to start from (ADR 0010 §9). No rotation, no role but member.
+    /// Admin only.
+    ///
+    /// # Errors
+    /// `NotAdmin`, `NotAMember` (this device, or `member` never was a participant),
+    /// `AlreadyMember`, `NoKey` (from now on without the current key), `Offline`, `Ended`,
+    /// `Crypto`.
+    pub fn add_back(&mut self, member: MemberId, history: History) -> Result<(), SessionError> {
+        self.require_admin()?;
+        let keyring = self.keys.keyring().ok_or(SessionError::NotAMember)?;
+        if keyring.role(&member).is_some() {
+            return Err(SessionError::AlreadyMember);
+        }
+        let identity = keyring
+            .former_participants()
+            .into_iter()
+            .find(|identity| identity.member == member)
+            .ok_or(SessionError::NotAMember)?;
+        let entry = match history {
+            History::Full => {
+                self.keys
+                    .write_addition(identity, Role::Member, true, &mut self.entropy)?
+            }
+            History::FromNow => self
+                .keys
+                .write_current_addition(identity, &mut self.entropy)?,
+        };
+        self.send_entries(&[entry])?;
+        if history == History::FromNow {
+            self.rotated();
+        } else {
+            self.event(SessionEvent::KeyringChanged);
+        }
         Ok(())
     }
 

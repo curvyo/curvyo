@@ -37,6 +37,7 @@ import { usePanelOpen } from "@/hooks/usePanelOpen";
 import { useProject } from "@/hooks/useProject";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useWorkspaceSync } from "@/hooks/useWorkspaceSync";
+import { useMembership } from "@/hooks/useMembership";
 import { useDevices } from "@/hooks/useDevices";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
@@ -148,6 +149,8 @@ function Editor() {
   const workspaceSync = useWorkspaceSync(editor, project, collab, workspace);
   // My devices: pairing, the device group and synced workspaces (`specs/0096-own-devices-sync`).
   const devices = useDevices(editor, collab, workspace, workspaceSync);
+  // Roles, leave, add back and the notices (`specs/0097-membership-lifecycle`).
+  const membership = useMembership(editor, project, collab, workspace, workspaceSync, devices);
 
   const workbench = workbenchEntry<WorkbenchContext, ReactNode>(activeKind(workbenches.list));
   const drawingOverlay = (
@@ -402,6 +405,7 @@ function Editor() {
           workspace={workspace}
           workspaceSync={workspaceSync}
           devices={devices}
+          membership={membership}
         />
       </div>
       <CursorStatus

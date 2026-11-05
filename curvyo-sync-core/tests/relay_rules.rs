@@ -496,6 +496,50 @@ fn snapshots_replace_and_prune() {
     assert_eq!(refused(&out, conn), Some(RefusalReason::Protocol));
 }
 
+/// `specs/0097` criteria 20, 26 and 33, ADR 0041 decision 6: the return check's cursor
+/// `u64::MAX` gets `Welcome`, the keyring and the peers, no snapshot and no record, with no
+/// relay change.
+#[test]
+fn a_return_check_cursor_gets_the_keyring_and_no_content() {
+    let (mut relay, conn, g) = room_with_admin();
+    let admin = device(1);
+    for n in 1..=4u8 {
+        send(
+            &mut relay,
+            conn,
+            &ClientFrame::Push {
+                client_id: u64::from(n),
+                kind: RecordKind::Update,
+                envelope: envelope(EnvelopeKind::Update, ROOM, None, n),
+            },
+        );
+    }
+    send(
+        &mut relay,
+        conn,
+        &ClientFrame::Snapshot {
+            covers_seq: 3,
+            envelope: envelope(EnvelopeKind::Snapshot, ROOM, Some(&admin), 9),
+        },
+    );
+    let (check, out) = handshake(&mut relay, &admin, ROOM, u64::MAX);
+    let frames = sends(&out, check);
+    assert!(matches!(frames[0], RelayFrame::Welcome { head_seq: 4, .. }));
+    assert_eq!(
+        frames[1..],
+        [
+            RelayFrame::Keyring {
+                entry: g.encode().unwrap()
+            },
+            RelayFrame::Peer {
+                connection: conn,
+                identity: Some(admin.identity().member)
+            }
+        ]
+    );
+    assert_eq!(stores(&out), 0);
+}
+
 /// Presence is relayed to the others and never stored.
 #[test]
 fn awareness_is_relayed_and_never_stored() {

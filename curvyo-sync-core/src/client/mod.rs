@@ -6,6 +6,7 @@
 //! out, and applies the [`SessionEvent`]s to its document. No document type appears here.
 
 mod api;
+mod check;
 mod inbound;
 mod keys;
 mod link;
@@ -14,14 +15,15 @@ mod presence;
 
 use std::collections::{BTreeMap, VecDeque};
 
-use curvyo_crypto_core::keyring::{Entry, Keyring};
+use curvyo_crypto_core::keyring::{Entry, EntryHash, Keyring};
 use curvyo_crypto_core::{EpochKey, InviteKey, MemberId};
 
 use crate::entropy::Entropy;
 use crate::frame::{ClientFrame, ConnectionId, PROTOCOL_VERSION, RecordKind, RoomId};
 use crate::time::Millis;
 pub use api::{
-    ClientOutput, InviteSecret, SessionConfig, SessionError, SessionEvent, SessionStart,
+    CheckOutcome, ClientOutput, History, InviteSecret, SessionConfig, SessionError, SessionEvent,
+    SessionStart,
 };
 use keys::Keys;
 use link::Link;
@@ -36,8 +38,20 @@ pub const SNAPSHOT_BYTES: u64 = 4 * 1024 * 1024;
 /// How the session started, as far as it still matters.
 enum Start {
     Member,
-    Share { genesis: Entry, uploaded: bool },
-    Join { key: InviteKey, claimed: bool },
+    Share {
+        genesis: Entry,
+        uploaded: bool,
+    },
+    Join {
+        key: InviteKey,
+        claimed: bool,
+    },
+    /// The return check (ADR 0041 decision 6); `left` once its own leave went out.
+    Check {
+        then_leave: bool,
+        left: bool,
+        heads: Vec<EntryHash>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,6 +118,7 @@ impl ClientSession {
             config.nonce_seed,
         );
         let awaiting_admission = matches!(config.start, SessionStart::Join(_));
+        let mut since_seq = config.since_seq;
         let start = match config.start {
             SessionStart::Member {
                 keyring,
@@ -121,6 +136,20 @@ impl ClientSession {
                 key: InviteKey::from_seed(&secret.seed)?,
                 claimed: false,
             },
+            SessionStart::ReturnCheck {
+                epoch_keys,
+                then_leave,
+                heads,
+            } => {
+                keys.add_keys(epoch_keys);
+                // From the end of the room: the relay sends the keyring and no record (decision 6).
+                since_seq = u64::MAX;
+                Start::Check {
+                    then_leave,
+                    left: false,
+                    heads,
+                }
+            }
         };
         let mut link = Link::new();
         link.heard(now);
@@ -135,7 +164,7 @@ impl ClientSession {
             link,
             presence: Presence::default(),
             peers: BTreeMap::new(),
-            delivered: config.since_seq,
+            delivered: since_seq,
             pending: VecDeque::new(),
             outbox: BTreeMap::new(),
             next_client_id: 1,
@@ -147,7 +176,7 @@ impl ClientSession {
             snapshot_asked: false,
             rejected_shown: false,
             resynced_through: None,
-            head_seq: config.since_seq,
+            head_seq: since_seq,
             out: vec![ClientOutput::Connect],
         })
     }
@@ -296,8 +325,17 @@ impl ClientSession {
         }
     }
 
-    /// The link is gone: offline, peers gone, a reconnect scheduled.
+    /// Whether this is a return check (ADR 0041 decision 6).
+    fn is_check(&self) -> bool {
+        matches!(self.start, Start::Check { .. })
+    }
+
+    /// The link is gone: offline, peers gone, a reconnect scheduled; a return check ends.
     fn lose(&mut self, now: Millis, close: bool) {
+        if self.is_check() {
+            self.finish_check(CheckOutcome::Failed);
+            return;
+        }
         let was_online = self.is_online();
         if close {
             self.out.push(ClientOutput::Close);

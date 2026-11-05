@@ -10,6 +10,7 @@ import {
   devices_sync_off_confirm,
   devices_sync_on_confirm,
   devices_text,
+  membership_word,
   normalize_server_address,
   workspace_not_added_text,
   workspace_share_confirm_text,
@@ -23,7 +24,7 @@ export interface SyncSwitch {
   /** Why it cannot be turned on, or empty. */
   reason: string;
   /** "on" or "off" while a switch runs. */
-  switching: "" | "on" | "off";
+  switching: "" | "on" | "off" | "leave";
   /** The last switch-on failed. */
   failed: boolean;
   /** The other devices' names (the off confirm names them). */
@@ -33,6 +34,8 @@ export interface SyncSwitch {
   switchOn: () => void;
   /** "" when started, else why not (the confirm stays and shows it). */
   switchOff: () => string;
+  /** "You left Box job." when the maker left it from every device (`specs/0097` 5.4). */
+  leftLine?: string;
   onReturnFocus: () => void;
 }
 
@@ -111,7 +114,7 @@ function SyncSwitchRow({
         }}
       >
         <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
             Cancel
           </button>
@@ -136,14 +139,16 @@ function SyncSwitchRow({
         : "Uploading..."
       : sync.switching === "off"
         ? "Stopping..."
-        : sync.on
-          ? devices_switch_on_line(sync.otherNames.length)
-          : sync.reason;
+        : sync.switching === "leave"
+          ? membership_word("leaving")
+          : sync.on
+            ? devices_switch_on_line(sync.otherNames.length)
+            : sync.leftLine || sync.reason;
   return (
     <div ref={row} className="flex flex-col gap-1" aria-busy={busy}>
       <PanelSwitch
         label="Sync to my devices"
-        checked={sync.on || sync.switching === "on"}
+        checked={(sync.on && sync.switching !== "leave") || sync.switching === "on"}
         onReturnFocus={sync.onReturnFocus}
         onCheckedChange={(checked) => {
           if (busy || (checked && sync.reason !== "")) {
@@ -183,6 +188,12 @@ interface WorkspaceShareBlockProps {
   invite: ReactNode;
   /** The participant list of the shared workspace. */
   participants: ReactNode;
+  /** The Notices block (`specs/0097` ux-notes 4), above Invite. */
+  notices?: ReactNode;
+  /** The Removed block of a workspace this device was removed from or left (ux-notes 7). */
+  ended?: ReactNode;
+  /** The Removed block's add-back prompt is up: Share workspace waits. */
+  endedAsks?: boolean;
   /** The switch "Sync to my devices"; absent in the browser. */
   devices?: SyncSwitch;
   /** The heading's right text when every member is one of my devices ("Synced, 2 devices"). */
@@ -203,6 +214,9 @@ export function WorkspaceShareBlock({
   sync,
   invite,
   participants,
+  notices,
+  ended,
+  endedAsks = false,
   devices,
   syncedHeader,
 }: WorkspaceShareBlockProps) {
@@ -257,10 +271,16 @@ export function WorkspaceShareBlock({
               {view.workspace?.receiving ?? view.stateLine}
             </p>
           </div>
+          {notices}
           {view.admin ? invite : null}
           {participants}
         </>
-      ) : devices && devices.switching === "on" ? null : confirming ? (
+      ) : null}
+      {/* A removed or left workspace keeps its Removed block above Share workspace, which stays
+          available: it starts something new (ux-notes 7.1.3); hidden while the add-back prompt
+          asks. */}
+      {!shared && ended ? ended : null}
+      {shared || endedAsks ? null : devices && devices.switching === "on" ? null : confirming ? (
         <div
           role="group"
           aria-label={confirmText}
@@ -274,7 +294,7 @@ export function WorkspaceShareBlock({
           }}
         >
           <p className="text-xs text-[var(--toolbar-icon)]">{confirmText}</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={cancel}>
               Cancel
             </button>

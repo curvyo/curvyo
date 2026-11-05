@@ -242,7 +242,11 @@ pub fn removal_confirm_text(label: &str) -> String {
 
 /// What a removed device shows (criterion 33).
 pub const REMOVED_NOTICE: &str =
-    "You were removed from this document. Your copy stays on this computer.";
+    "You were removed from this document. Your copy stays on this device.";
+
+/// What a device that left shows when the leave was not given the file's name (`specs/0097`
+/// criterion 10; the named form is `membership_text::left_notice`).
+pub const LEFT_NOTICE: &str = "You left this document. Your copy stays on this device.";
 
 /// What a shared document shows when the relay refuses this device as no participant
 /// (criterion 27; Proposal, the UX notes name no text for it).

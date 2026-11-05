@@ -18,7 +18,7 @@ pub(super) fn group() -> Keyring {
 }
 
 /// The group's entries; with `left`, B's own `RemoveMember` follows (Leave my devices).
-fn group_entries(left: bool) -> Vec<Entry> {
+pub(super) fn group_entries(left: bool) -> Vec<Entry> {
     let a = IdentityKeys::from_entropy(&seeds(1, 0).identity);
     let b = IdentityKeys::from_entropy(&seeds(2, 0).identity);
     let room = DocumentId([0x6e; 16]);

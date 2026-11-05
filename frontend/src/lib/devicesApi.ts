@@ -29,6 +29,8 @@ export interface GroupWorkspace {
   id: string;
   name: string;
   on: boolean;
+  /** The maker left it from every device (`specs/0097` criterion 16). */
+  left: boolean;
 }
 
 /** The My devices block as the group session describes it. */
@@ -106,8 +108,17 @@ export interface DevicesApi {
   switchOn: () => void;
   /** Switches the open workspace off for every device; "" when started, else why not. */
   switchOff: () => string;
+  /** The person leave of the open synced workspace (`specs/0097` criterion 16); "" when the
+   * `left` mark went out, else why not. */
+  leavePerson: () => string;
+  /** Clears the `left` mark of a workspace and waits for the relay; `false` when it could not. */
+  clearLeft: (id: string, name: string) => Promise<boolean>;
+  /** The workspaces the devices list marks as left by the maker. */
+  leftIds: string[];
+  /** The member ids of my devices (the own group for the second-admin line), empty without one. */
+  ownMembers: string[];
   /** "Uploading..." or "Stopping..." while a switch runs. */
-  switching: "" | "on" | "off";
+  switching: "" | "on" | "off" | "leave";
   /** The last switch-on failed: the switch row shows the alert. */
   switchFailed: boolean;
   /** The other devices' names, for the switch-off confirm. */

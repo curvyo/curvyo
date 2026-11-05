@@ -82,7 +82,7 @@ impl DeviceGroupGlue {
             .list
             .workspaces()
             .into_iter()
-            .map(|w| serde_json::json!({"id": hex(&w.id), "name": w.name, "on": w.on}))
+            .map(|w| serde_json::json!({"id": hex(&w.id), "name": w.name, "on": w.on, "left": w.left}))
             .collect();
         let devices = participants.len().max(1);
         let synced_any = self.list.workspaces().iter().any(|w| w.on);

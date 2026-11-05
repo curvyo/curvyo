@@ -24,6 +24,9 @@ interface MyDevicesBlockProps {
   devices: DevicesApi;
   /** The tab's server address (the Server field). */
   server: string;
+  /** The frozen-room warning of the open synced workspace, appended to the pairing's
+   * workspace choice (`specs/0097` ux-notes 3.2), or empty. */
+  frozenWarning?: string;
   /** Why pairing is unavailable ("Set a server address.", ...), or empty. */
   reason: string;
   /** After Enter or Escape in the rename field: the keyboard goes back to the canvas. */
@@ -208,7 +211,7 @@ function DeviceRowView({
  * removed alert, the device list, the one-device warning, and Add a device / Join my devices
  * with their pairing blocks.
  */
-export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus }: MyDevicesBlockProps) {
+export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, frozenWarning = "" }: MyDevicesBlockProps) {
   const backup = useKeyBackup(given);
   // A passkey backup keeps this device when site data is cleared (ADR 0040 decision 13).
   const lossLine = devices_browser_text("own-row");
@@ -342,11 +345,13 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus }
           {devices.syncProgress}
         </p>
       ) : null}
-      {devices.syncAlerts.map((alert) => (
-        <p key={alert} role="alert" className={ALERT}>
-          {alert}
-        </p>
-      ))}
+      {paired
+        ? devices.syncAlerts.map((alert) => (
+            <p key={alert} role="alert" className={ALERT}>
+              {alert}
+            </p>
+          ))
+        : null}
       {paired && view.one_device_warning ? (
         <p role="status" className="flex items-start gap-1 text-xs text-[var(--toolbar-icon)]">
           <TriangleAlert {...GLYPH} className="shrink-0" />
@@ -359,6 +364,7 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus }
       ) : picking !== "" ? (
         <PickWorkspaces
           label={picking}
+          frozenWarning={frozenWarning}
           offered={devices.offered}
           synced={view ? view.workspaces.filter((w) => w.on).map((w) => w.id) : []}
           onDone={(chosen) => {
@@ -372,7 +378,7 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus }
         <JoinerBlock devices={devices} view={joinerView} server={server} onClose={() => setJoining(false)} />
       ) : (
         <div className="flex flex-col gap-1">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               ref={addButton}
               type="button"

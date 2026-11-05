@@ -114,7 +114,12 @@ impl Session {
         let parts = split_snapshot(&encode_snapshot_stream(&entries), snapshot_id);
         link.client.upload_snapshot_parts(&parts, covers_seq)?;
         channel.snapshot_due = None;
+        let leave = link.leave_after_snapshot;
         self.sync_pump();
+        if leave {
+            // A person leave waited for this snapshot (ADR 0041 decision 3).
+            self.leave_after_snapshot();
+        }
         Ok(())
     }
 

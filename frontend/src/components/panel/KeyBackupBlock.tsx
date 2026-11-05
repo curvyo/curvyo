@@ -76,7 +76,7 @@ export function KeyBackupRow({ backup, server }: { backup: KeyBackupApi; server:
           }}
         >
           <p className="text-xs text-[var(--toolbar-icon)]">{key_backup_sentence(normalize_server_address(server))}</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
               Cancel
             </button>

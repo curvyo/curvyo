@@ -339,6 +339,24 @@ impl DeviceGroupGlue {
         self.pump();
     }
 
+    /// Marks workspace `id` named `name` as left by the maker (`specs/0097` criterion 16, ADR
+    /// 0041 decision 3): switched off with `left`. The leaving device runs the leave once
+    /// [`list_acked`](Self::list_acked) says the relay stored the mark.
+    pub fn leave_workspace(&mut self, id: [u8; 16], name: &str) {
+        if self.list.leave_workspace(id, name).is_ok() {
+            self.files_changed = true;
+            self.bump();
+        }
+        self.export_list();
+        self.pump();
+    }
+
+    /// Whether every change of the devices list went out and the relay acknowledged it.
+    #[must_use]
+    pub fn list_acked(&self) -> bool {
+        self.pushed.is_empty() && self.exported == self.list.version()
+    }
+
     /// Removes another device from the group with a key rotation (criterion 23). Its name
     /// stays in the list, so every device can still say who was removed; rows come from the
     /// keyring.

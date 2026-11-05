@@ -227,10 +227,12 @@ function bytesArg(args?: Record<string, unknown>): Uint8Array {
 /** The marker's three share files of `id`, `null` when it is not shared. */
 async function marker(id: string): Promise<{ share_json: number[]; keyring_log: number[]; list: number[] } | null> {
   const share = await get<Uint8Array>(`${id}|m|share.json`);
-  if (!share) {
+  const keyring = await get<Uint8Array>(`${id}|m|keyring.log`);
+  // Complete share files win over an ended record beside them; without them the workspace is
+  // not shared (`specs/0097` criterion 33, ADR 0041 decision 6).
+  if (!share || !keyring) {
     return null;
   }
-  const keyring = (await get<Uint8Array>(`${id}|m|keyring.log`)) ?? new Uint8Array();
   const list = (await get<Uint8Array>(`${id}|m|list.loro`)) ?? new Uint8Array();
   return { share_json: Array.from(share), keyring_log: Array.from(keyring), list: Array.from(list) };
 }
@@ -286,10 +288,28 @@ export const browserWorkspaceCommands: Record<string, (args?: Record<string, unk
     await put(`${id}|m|share.json`, Uint8Array.from(given.share_json));
     await put(`${id}|m|keyring.log`, Uint8Array.from(given.keyring_log));
     await put(`${id}|m|list.loro`, Uint8Array.from(given.list));
+    await remove(`${id}|m|share.ended.json`);
   },
   clear_workspace_marker_share: async (args) => {
     const id = workspaceOf(args);
-    for (const name of ["share.json", "keyring.log", "list.loro"]) {
+    for (const name of ["share.json", "keyring.log", "list.loro", "share.ended.json"]) {
+      await remove(`${id}|m|${name}`);
+    }
+  },
+  // `specs/0097` criteria 15 and 20: the record replaces the share files, the list stays.
+  workspace_marker_ended: async (args) => {
+    const id = workspaceOf(args);
+    const ended = await get<Uint8Array>(`${id}|m|share.ended.json`);
+    if (!ended || (await marker(id))) {
+      return null;
+    }
+    const list = (await get<Uint8Array>(`${id}|m|list.loro`)) ?? new Uint8Array();
+    return { ended_json: Array.from(ended), list: Array.from(list) };
+  },
+  end_workspace_marker_share: async (args) => {
+    const id = workspaceOf(args);
+    await put(`${id}|m|share.ended.json`, Uint8Array.from(args?.ended_json as number[]));
+    for (const name of ["share.json", "keyring.log"]) {
       await remove(`${id}|m|${name}`);
     }
   },
