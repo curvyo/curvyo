@@ -1,7 +1,8 @@
 // Chromium cases for `specs/0094-masked-composite-trace` slice 1b, Pick mask paths (criteria 34
 // to 41 and 43; UX notes §11): arm, pick two paths, Inside / Outside appears, pick again removes,
 // Clear mask, Escape disarms, leaving the tool disarms, a text and a second image are refused with
-// the row, the Tab order and the group at 800 x 600. Set CURVYO_E2E_BROWSER=/path/to/chromium; the
+// the row, the Tab order and the group at 800 x 600, and an outline-only circle over the picture
+// picked by a click inside it. Set CURVYO_E2E_BROWSER=/path/to/chromium; the
 // wasm bindings must be built. The harness is the one of `acceptance_0094_tester.test.ts`.
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -637,4 +638,48 @@ test("0094 c43: at 800 x 600 with the panel open the Mask group wraps as a whole
       assert.equal(g.scroll, false, "no horizontal scroll");
     },
   );
+});
+
+test("0094 c35, c36, c38: an outline-only circle over the picture is picked by a click inside it, not the picture", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    const file = path.join(SCRATCH, "m1.png");
+    writeFileSync(file, M1_PNG);
+    await s.tab("Layers");
+    await s.choose("[data-import-button]", file);
+    await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("m1.png")) ? true : null));
+    await sleep(800);
+    const box = await pictureBox(s);
+    const w = box.x1 - box.x0;
+    const h = box.y1 - box.y0;
+    // A circle over the picture's lower right, wholly inside it (the bar covers its top); the
+    // ellipse tool draws it unfilled.
+    await focusCanvas(s);
+    await press(s, "Escape", 27);
+    await s.key("e", 69);
+    await drag(s, [box.cx + 0.15 * w, box.cy + 0.27 * h], [box.cx + 0.35 * w, box.cy + 0.47 * h]);
+    await waitFor("the circle", async () => ((await s.layerRows()).some((r) => r?.endsWith("ellipse")) ? true : null), 10_000);
+    await s.key("s", 83);
+    await focusCanvas(s);
+    await press(s, "Escape", 27);
+    const picture: [number, number] = [box.cx - 0.3 * w, box.cy + 0.4 * h];
+    await s.click(picture[0], picture[1]);
+    await waitFor("the picture alone selected", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
+    await openTrace(s);
+    await s.clickSel(PICK);
+    const inside: [number, number] = [box.cx + 0.25 * w, box.cy + 0.37 * h];
+    const onCanvas = async () => (await s.evaluate(`document.elementFromPoint(${inside[0]}, ${inside[1]})?.tagName`)) === "CANVAS";
+    assert.ok(await onCanvas(), "the canvas is under the click");
+    await s.click(inside[0], inside[1]);
+    await waitFor("the circle picked", async () => ((await maskState(s)) === "Inside=true,Outside=false" ? true : null), 10_000);
+    await waitFor("one mask path", async () => (/Inside 1 path(?!s)/.test(await advText(s)) ? true : null), 10_000);
+    assert.equal(await refusedShown(s), false);
+    // The picture outside the circle changes nothing; a second click inside removes the circle.
+    await s.click(picture[0], picture[1]);
+    assert.equal(await maskState(s), "Inside=true,Outside=false");
+    assert.ok(await onCanvas(), "the canvas is still under the click");
+    await s.click(inside[0], inside[1]);
+    await waitFor("the mask is empty again", async () => ((await maskState(s)) === "absent" ? true : null), 10_000);
+    assert.ok(await s.evaluate(`!!document.querySelector('${BAR}')`), "the picture stays selected in the tool");
+    assert.equal(await pressedState(s), "true", "still armed");
+  });
 });
