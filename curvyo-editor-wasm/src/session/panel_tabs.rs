@@ -8,7 +8,31 @@ use curvyo_ui_core::{
     PanelContent, PanelTab, PanelTabEntry, PanelTabs, StyleBlocker, panel_body, tab_entries_for,
 };
 
+use curvyo_document_core::PageKind;
+
 use super::{Session, Tool};
+
+/// Whether the tab `name` is in the strip of a page of this kind (`specs/0098` criterion 8): a
+/// sketch page shows the Sketch workbench's tabs as built; every other page the drawing tabs,
+/// without Sketches and Parameters. No page shows the old workbench tab.
+fn tab_of_kind(name: &str, sketch: bool) -> bool {
+    match name {
+        "sketches" | "parameters" => sketch,
+        "workbench" => false,
+        _ => true,
+    }
+}
+
+/// The key a page kind's last tab is kept under (criterion 9): an output page by its process,
+/// every unknown kind as one.
+fn kind_key(kind: &PageKind) -> String {
+    match kind {
+        PageKind::Drawing => "drawing".to_owned(),
+        PageKind::Sketch => "sketch".to_owned(),
+        PageKind::Output { process, .. } => process.clone(),
+        PageKind::Unknown(_) => "unknown".to_owned(),
+    }
+}
 
 /// What the Properties panel shows: the strip and the body of the active tab.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,43 +79,46 @@ impl Session {
     /// edge since the last read switches the tab, in the same frame as the
     /// selection change), then returns the strip and the body.
     pub fn panel_view(&self) -> PanelView {
-        if let super::Workbench::Manufacturing(id) = self.workbench() {
-            return self.manufacturing_panel_view(id);
-        }
         let non_empty = self.panel_scope_non_empty();
         let active = self.update_panel_tabs(|tabs| {
             tabs.observe(non_empty);
             tabs.active()
         });
+        let sketch = self.workbench() == super::Workbench::Sketch;
         PanelView {
             content: panel_body(active, self.pen_path_unfinished(), non_empty),
             tabs: tab_entries_for(active, self.style_blocker(non_empty))
                 .into_iter()
-                .filter(|tab| {
-                    self.workbench() == super::Workbench::Sketch || tab.name != "parameters"
-                })
+                .filter(|tab| tab_of_kind(tab.name, sketch))
                 .collect(),
         }
     }
 
-    /// The strip of a manufacturing workbench (UX notes §3): its manifest tab first, then File and
-    /// History, which are project-wide. A drawing tab chosen by a shortcut shows the manifest tab.
-    fn manufacturing_panel_view(&self, id: curvyo_document_core::NodeId) -> PanelView {
-        let active = match self.panel_tabs.get().active() {
-            tab @ (PanelTab::File | PanelTab::History) => tab,
-            _ => PanelTab::Workbench,
+    /// Hands the tab over when the active page's kind changes (`specs/0098` criterion 9): the
+    /// open tab stays when the new kind has it, else the tab last used on a page of that kind,
+    /// else Document.
+    pub(super) fn follow_tab(&mut self, to: super::Workbench) {
+        let kind = kind_key(&self.active_kind());
+        let Some(from) = self.tab_kind.replace(kind.clone()) else {
+            return;
         };
-        let label = self.manufacturing_tab_label(id);
-        let mut tabs =
-            vec![PanelTab::Workbench.entry_labelled(label, active == PanelTab::Workbench)];
-        tabs.extend(
-            tab_entries_for(active, None)
-                .into_iter()
-                .filter(|tab| tab.name == "file" || tab.name == "history"),
-        );
-        PanelView {
-            content: panel_body(active, false, false),
-            tabs,
+        if from == kind {
+            return;
+        }
+        let current = self.panel_tabs.get().active();
+        self.kind_tabs.insert(from, current);
+        let sketch = to == super::Workbench::Sketch;
+        if tab_of_kind(current.name(), sketch) {
+            return;
+        }
+        let tab = self
+            .kind_tabs
+            .get(&kind)
+            .copied()
+            .filter(|tab| tab_of_kind(tab.name(), sketch))
+            .unwrap_or(PanelTab::Document);
+        if !self.press_panel_tab(tab.name()) {
+            self.press_panel_tab(PanelTab::Document.name());
         }
     }
 
@@ -287,7 +314,7 @@ mod tests {
             record.tab_names,
             [
                 "file", "document", "style", "layers", "history", "fonts", "snapping", "grid",
-                "sketches", "share"
+                "share"
             ]
         );
         assert_eq!(record.tab_enabled[at(&record, "style")], 0);

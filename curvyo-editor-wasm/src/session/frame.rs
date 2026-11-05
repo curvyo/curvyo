@@ -32,13 +32,10 @@ impl Session {
             ));
             return list;
         }
-        // A manufacturing workbench shows its output page only (`specs/0093` criterion 4).
-        if matches!(self.workbench(), super::Workbench::Manufacturing(_)) {
-            return self.manufacturing_frame();
-        }
         let pages = self.shown_pages();
         let background = self.shown_background();
-        let grids = self.grid_lists(&pages, background);
+        let mut grids = self.grid_lists(&pages, background);
+        self.add_output_fixtures(&pages, &mut grids);
         let mut list = build_page_areas_with_grids(
             &pages,
             background,
@@ -46,6 +43,9 @@ impl Session {
             self.device_pixel_ratio,
             &grids,
         );
+        // Output pages draw their placements under the drawing (ADR 0042 §4); their fixtures
+        // are painted with the page grids above.
+        list.extend(self.output_pages_frame());
         // An object preview draws the object only as it was at the version, in its place: its
         // current drawing, selection box and handles are left out (criterion 17).
         if let Some((subject, version)) = self.object_preview() {
@@ -64,9 +64,11 @@ impl Session {
                 &version.objects,
                 self.view(),
             ));
+            list.extend(self.output_pages_overlay());
             return list;
         }
         list.extend(self.draw_list());
+        list.extend(self.output_pages_overlay());
         list
     }
 

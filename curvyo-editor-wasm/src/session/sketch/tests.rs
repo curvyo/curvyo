@@ -1,20 +1,23 @@
 //! Workbench navigation never changes the sketch's persistent intent.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::ObjectSnapshot;
 use curvyo_sketch_core::{Construction, Position};
 
 #[test]
 fn navigation_new_reentry_and_undo_have_distinct_commit_boundaries() {
     let mut session = Session::new(66);
+    session.to_sketch_page();
+    session.to_drawing_page();
     let before = session.document.version();
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     assert_eq!(session.document.version(), before);
     assert_eq!(session.active_sketch(), None);
     let id = session.new_sketch().unwrap();
     assert_eq!(session.undo_len(), 1);
     assert_eq!(session.active_sketch(), Some(id));
-    session.set_workbench(Workbench::Vector);
-    session.set_workbench(Workbench::Sketch);
+    session.to_drawing_page();
+    session.to_sketch_page();
     assert_eq!(session.active_sketch(), Some(id));
     assert_eq!(session.undo_len(), 1);
     session.undo();
@@ -27,7 +30,7 @@ fn navigation_new_reentry_and_undo_have_distinct_commit_boundaries() {
 #[test]
 fn construction_commits_only_explicit_records_and_clone_reentry_routes_original() {
     let mut session = Session::new(67);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session
         .sketch_construct(&Construction::Rectangle(
@@ -54,7 +57,7 @@ fn construction_commits_only_explicit_records_and_clone_reentry_routes_original(
 fn creation_modifier_changes_never_reposition_the_pressed_anchor() {
     use curvyo_document_core::Point;
     let mut session = Session::new(70);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_sketch_tool(SketchTool::Rectangle);
     session.pointer_down(Point::new(1.0, 1.0), false);
@@ -79,7 +82,7 @@ fn every_multipick_variant_commits_once_and_polyline_closes_shared_ids() {
         SketchTool::Slot,
     ] {
         let mut session = Session::new(72);
-        session.set_workbench(Workbench::Sketch);
+        session.to_sketch_page();
         let id = session.new_sketch().unwrap();
         session.set_snapping(curvyo_document_core::DocumentSnapping {
             enabled: false,
@@ -109,7 +112,7 @@ fn every_multipick_variant_commits_once_and_polyline_closes_shared_ids() {
         assert!(session.document.sketch(id).unwrap().graph.entities.len() > 1);
     }
     let mut session = Session::new(73);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,
@@ -137,7 +140,7 @@ fn every_multipick_variant_commits_once_and_polyline_closes_shared_ids() {
 fn numeric_creation_and_inspection_view_use_real_domain_values() {
     use curvyo_document_core::Point;
     let mut session = Session::new(79);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,
@@ -160,7 +163,7 @@ fn numeric_creation_and_inspection_view_use_real_domain_values() {
 fn revision_sync_retains_only_current_analytic_selection() {
     use curvyo_sketch_core::{Constraint, Relation};
     let mut session = Session::new(84);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     for name in ["a", "b"] {
         session
@@ -205,7 +208,7 @@ fn revision_sync_retains_only_current_analytic_selection() {
 #[test]
 fn conversion_switches_only_on_success_and_keeps_one_undo_step() {
     let mut session = Session::new(85);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let history = session.undo_len();
     assert!(session.sketch_convert_to_path().is_err());
     assert_eq!(session.workbench(), Workbench::Sketch);
@@ -220,20 +223,20 @@ fn conversion_switches_only_on_success_and_keeps_one_undo_step() {
     let before = session.document.sketch(id).unwrap().graph;
     let history = session.undo_len();
     session.sketch_convert_to_path().unwrap();
-    assert_eq!(session.workbench(), Workbench::Vector);
-    assert_eq!(session.tool(), crate::Tool::Select);
+    // The page stays a sketch page (`specs/0098` criterion 5); what a path on it is, is `0099`.
+    assert_eq!(session.workbench(), Workbench::Sketch);
     assert_eq!(session.selection.ids(), &[id]);
     assert_eq!(session.undo_len(), history + 1);
     session.undo();
     assert_eq!(session.document.sketch(id).unwrap().graph, before);
-    session.set_workbench(Workbench::Sketch);
+    assert!(session.enter_sketch(id));
     assert_eq!(session.active_sketch(), Some(id));
 }
 
 #[test]
 fn typed_fillet_preview_rejects_invalid_units_without_history() {
     let mut session = Session::new(88);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     session.new_sketch().unwrap();
     let before = session.undo_len();
     assert!(session.sketch_preview_fillet_text("2 rad").is_err());
@@ -243,7 +246,7 @@ fn typed_fillet_preview_rejects_invalid_units_without_history() {
 #[test]
 fn free_geometry_inspection_selects_current_entities_without_history() {
     let mut session = Session::new(89);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     session.new_sketch().unwrap();
     session
         .sketch_construct(&Construction::Point(Position::mm(30.0, 40.0)))
@@ -258,7 +261,7 @@ fn free_geometry_inspection_selects_current_entities_without_history() {
 fn parameter_inspection_follows_transitive_dimension_dependencies() {
     use curvyo_sketch_core::{Dimension, Entity};
     let mut session = Session::new(90);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session
         .sketch_construct(&Construction::Rectangle(
@@ -324,7 +327,7 @@ fn no_drawing_tool_creates_a_redundant_or_conflicting_constraint_on_a_fresh_draw
         SketchTool::Slot,
     ] {
         let mut session = Session::new(74);
-        session.set_workbench(Workbench::Sketch);
+        session.to_sketch_page();
         let id = session.new_sketch().unwrap();
         session.set_snapping(curvyo_document_core::DocumentSnapping {
             enabled: false,

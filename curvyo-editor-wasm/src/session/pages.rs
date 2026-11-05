@@ -1,6 +1,6 @@
 //! Session commands targeting spatial page frames.
 use super::{Session, SizeOutcome};
-use curvyo_document_core::{DocumentSize, NodeId, ObjectSnapshot, Page, Point};
+use curvyo_document_core::{DocumentSize, NodeId, ObjectSnapshot, Page, PageKind, Point};
 use curvyo_ui_core::object_bounds;
 impl Session {
     /// The current active frame, resolved after undo, merge or deletion.
@@ -25,6 +25,12 @@ impl Session {
             self.tiling = None;
         }
         self.page_view.active = Some(id.to_owned());
+        if changed {
+            self.manufacturing.selected_placement = None;
+        }
+        let left = self.sketch.workbench;
+        // The tools and tabs follow the page's kind in the same frame (`specs/0098` criterion 8).
+        self.sync_workbench();
         self.sync_sketch_page();
         let (w, h) = self.viewport.canvas_size();
         let min = self.view().screen_to_document(0.0, 0.0);
@@ -34,19 +40,100 @@ impl Session {
             page.origin.y + page.size.height.as_mm() / 2.0,
         );
         let (x, y) = self.view().document_to_screen(centre);
-        let reveal_sketch = changed
-            && self.workbench() == super::Workbench::Sketch
+        // A newly active sketch page, and any page whose kind differs from the one left (the
+        // way back from a sketch page beside the drawing, main's b1b9d359), shows its centre.
+        let workbench = self.workbench();
+        let reveal = changed
+            && (workbench == super::Workbench::Sketch || workbench != left)
             && (!(0.0..=w).contains(&x) || !(0.0..=h).contains(&y));
-        if !page.overlaps(min, max) || reveal_sketch {
+        if !page.overlaps(min, max) || reveal {
             self.viewport.pan_by_screen_delta(x - w / 2.0, y - h / 2.0);
         }
         true
     }
-    /// Adds and activates the next frame as one history step.
+    /// Adds and activates the next drawing page as one history step.
     pub fn add_page(&mut self) -> String {
         let page = self.recording(|this| this.document.add_page());
         self.activate_page(&page.id);
         page.id
+    }
+
+    /// Add page with the Kind switch (`specs/0098` criteria 1 to 4): `drawing`, `sketch` or an
+    /// enabled output process (`curvyo.laser`, with the machine `profile` or the last pick).
+    /// The new page is active; `None` for a kind that cannot be added.
+    pub fn add_page_of_kind(&mut self, kind: &str, profile: Option<&str>) -> Option<String> {
+        let kind = match kind {
+            "drawing" => PageKind::Drawing,
+            "sketch" => PageKind::Sketch,
+            process => return self.add_output_page_with(process, profile),
+        };
+        let page = self.recording(|this| this.document.add_page_of(&kind).ok())?;
+        self.activate_page(&page.id);
+        Some(page.id)
+    }
+
+    /// Ctrl+Page Down and Ctrl+Page Up (Cmd on macOS; criterion 8): the next or previous page in
+    /// list order, stopping at the ends. `false` at an end.
+    pub fn activate_adjacent_page(&mut self, forward: bool) -> bool {
+        let pages = self.document.pages();
+        let active = self.active_page().id;
+        let Some(index) = pages.iter().position(|p| p.id == active) else {
+            return false;
+        };
+        let next = if forward {
+            index + 1
+        } else {
+            match index.checked_sub(1) {
+                Some(previous) => previous,
+                None => return false,
+            }
+        };
+        match pages.get(next) {
+            Some(page) => {
+                let id = page.id.clone();
+                self.activate_page(&id)
+            }
+            None => false,
+        }
+    }
+
+    /// The page switch chord, before every other key (criterion 8): Ctrl or Cmd with Page Down
+    /// or Page Up, not in a text field.
+    pub(super) fn page_switch_key(
+        &mut self,
+        input: &super::KeyInput<'_>,
+    ) -> Option<super::KeyOutcome> {
+        let forward = match input.key {
+            "PageDown" => true,
+            "PageUp" => false,
+            _ => return None,
+        };
+        if !input.ctrl || input.shift || input.alt || input.dom_blocked {
+            return None;
+        }
+        self.activate_adjacent_page(forward);
+        Some(super::KeyOutcome::Consumed)
+    }
+
+    /// A press inside the frame of another page whose workbench differs (or another sketch
+    /// page): activates that page only and starts nothing (criterion 8).
+    pub(super) fn activate_page_of_other_kind_at(&mut self, point: Point) -> bool {
+        let active = self.active_page();
+        if active.contains(point) {
+            return false;
+        }
+        let current = self.workbench();
+        let pages = self.document.pages();
+        let Some(page) = pages.iter().rev().find(|p| p.contains(point)) else {
+            return false;
+        };
+        let other = self.workbench_of_kind(&page.kind);
+        if other == current && current != super::Workbench::Sketch {
+            return false;
+        }
+        let id = page.id.clone();
+        self.button_down = false;
+        self.activate_page(&id)
     }
     /// Renames a frame, returning false for invalid or unchanged names.
     pub fn rename_page(&mut self, id: &str, name: &str) -> bool {
@@ -64,6 +151,7 @@ impl Session {
             let pages = self.document.pages();
             self.page_view.active = Some(pages[index.min(pages.len() - 1)].id.clone());
         }
+        self.sync_workbench();
         changed
     }
     /// Reorders a frame without changing its position.
@@ -136,6 +224,10 @@ impl Session {
     }
     pub(super) fn resize_active_page(&mut self, size: DocumentSize) -> SizeOutcome {
         let page = self.active_page();
+        // A laser page is as big as its machine; an unknown page keeps its size (ADR 0042 §3).
+        if page.kind.fixed_size() {
+            return SizeOutcome::Unchanged;
+        }
         match self.document.resize_page(&page.id, size) {
             Ok(true) => SizeOutcome::Committed,
             Ok(false) => SizeOutcome::Unchanged,
@@ -189,7 +281,8 @@ impl Session {
             .map_or_else(|| self.shown_pages(), |p| p.pages.clone());
         let rows:Vec<_>=pages.iter().map(|p| {
             let (x,y)=self.view().document_to_screen(p.origin);
-            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.page_view.frame_only.contains(&p.id),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale()})
+            let chip = self.kind_chip(&p.kind);
+            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.page_view.frame_only.contains(&p.id),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale()})
         }).collect();
         serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_owned())
     }

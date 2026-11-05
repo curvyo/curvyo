@@ -71,4 +71,16 @@ impl Session {
             "profiles": profile_rows(profiles, copy.id.as_deref()),
         }))
     }
+
+    /// The machine list of the Add page group (`specs/0098` criterion 1): every profile, the one
+    /// a new laser page starts with marked chosen (the last pick, else Generic laser).
+    #[must_use]
+    pub fn machine_profiles_json(&self) -> String {
+        let start = self.initial_machine_profile();
+        Value::Array(profile_rows(
+            &self.manufacturing.machine.profiles,
+            Some(start.id.as_str()),
+        ))
+        .to_string()
+    }
 }

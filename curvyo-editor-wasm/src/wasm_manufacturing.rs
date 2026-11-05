@@ -1,5 +1,5 @@
-//! Thin host bridge of the manufacturing workbenches (`specs/0093-laser-workbench-shell`): the
-//! registry and the active manufacturing as JSON, and the commands of the Laser tab.
+//! Thin host bridge of laser pages (`specs/0093`, `specs/0098`): the kind list and the active
+//! laser page as JSON, and the commands of its Machine and Fixtures blocks.
 
 use curvyo_document_core::Length;
 use wasm_bindgen::prelude::*;
@@ -8,7 +8,7 @@ use crate::wasm_api::WasmSession;
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// The switcher's entries, Add manufacturing choices, extension list and manifests.
+    /// The active page's workbench and chip, the page kind list, the extensions and manifests.
     pub fn workbenches_json(&self) -> String {
         self.session.workbenches_json()
     }
@@ -18,27 +18,38 @@ impl WasmSession {
         self.session.manufacturing_view_json()
     }
 
-    /// Add manufacturing: the new manufacturing's id, or an empty text when refused.
-    pub fn add_manufacturing(&mut self, process: &str) -> String {
-        self.session
-            .add_manufacturing(process)
-            .map(curvyo_document_core::NodeId::full_id)
-            .unwrap_or_default()
+    /// The machine list of the Add page group: every profile, the starting one chosen.
+    pub fn machine_profiles_json(&self) -> String {
+        self.session.machine_profiles_json()
     }
 
-    /// Deletes the manufacturing named by its full id.
-    pub fn delete_manufacturing(&mut self, id: &str) -> bool {
+    /// Deletes the selected placement of a laser page (`specs/0098` criterion 12).
+    pub fn delete_selected_placement(&mut self) -> bool {
         self.session
-            .manufacturing_named(id)
-            .is_some_and(|id| self.session.delete_manufacturing(id))
+            .selected_placement()
+            .is_some_and(|id| self.session.delete_placement(id))
     }
 
-    /// Sets the active work area in mm; returns the notice of a side set into its range, empty
-    /// when there is none.
-    pub fn set_work_area(&mut self, width_mm: f64, height_mm: f64) -> String {
+    /// Edit work area of the user profile `id` in mm (`specs/0098` criterion 15): a library
+    /// write, no history step. The notice of a side set into its range, empty when there is
+    /// none or the profile cannot be edited.
+    pub fn set_profile_work_area(
+        &mut self,
+        id: &str,
+        width_mm: f64,
+        height_mm: f64,
+        now_ms: f64,
+    ) -> String {
+        #[allow(clippy::cast_possible_truncation)] // a Unix time in milliseconds
+        let now = now_ms as i64;
         self.session
-            .set_work_area_limited(Length::from_mm(width_mm), Length::from_mm(height_mm))
-            .1
+            .set_profile_work_area(
+                id,
+                Length::from_mm(width_mm),
+                Length::from_mm(height_mm),
+                now,
+            )
+            .flatten()
             .unwrap_or_default()
     }
 
@@ -65,11 +76,6 @@ impl WasmSession {
             self.session
                 .set_fixture_length(id, key, Length::from_mm(mm))
         })
-    }
-
-    /// Fit page of the View card.
-    pub fn fit_output_page(&mut self) {
-        self.session.fit_output_page();
     }
 
     /// Switches an extension on or off; returns the text of `extensions.toml` to keep.

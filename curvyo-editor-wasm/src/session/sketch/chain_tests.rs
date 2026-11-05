@@ -1,6 +1,7 @@
 //! Polyline mode cycling and arc previews hold for every segment of a long chain.
 #![allow(clippy::many_single_char_names)] // Geometric frame letters b, e, n, u, v.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use crate::session::{KeyInput, KeyOutcome};
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{ContinuationMode, Entity, Position};
@@ -32,7 +33,7 @@ fn alt(s: &mut Session, repeat: bool) -> KeyOutcome {
 
 fn polyline() -> Session {
     let mut s = Session::new(66_400);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     s
 }

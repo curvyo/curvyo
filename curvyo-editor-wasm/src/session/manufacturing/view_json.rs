@@ -1,37 +1,86 @@
-//! The workbench registry and the active manufacturing as JSON for the front end (ADR 0001 §5:
-//! one text across the wasm boundary): the switcher's entries, the Add manufacturing choices,
-//! the extension list, the manifests, and the values the schema-rendered tab shows.
+//! The page kinds and the active laser page as JSON for the front end (ADR 0001 §5: one text
+//! across the wasm boundary): the kind list, each page's chip, the extension list, the
+//! manifests, and the values the Machine and Fixtures blocks show.
 
-use curvyo_document_core::{ManufacturingSnapshot, NodeId};
+use curvyo_document_core::{ManufacturingSnapshot, NodeId, PageKind};
 use curvyo_extension_core::{Block, NoticeContext, Param, ParamValue};
 use serde_json::{Value, json};
 
 use super::super::{Session, Workbench};
 use super::commands::{fixture_kind_of, workbench_of};
 
-/// The id the front end names a built-in workbench by, or a manufacturing's full node id.
-fn workbench_name(workbench: Workbench) -> String {
+/// The id the front end names a workbench by.
+const fn workbench_name(workbench: Workbench) -> &'static str {
     match workbench {
-        Workbench::Vector => "vector".to_owned(),
-        Workbench::Sketch => "sketch".to_owned(),
-        Workbench::Manufacturing(id) => id.full_id(),
+        Workbench::Vector => "vector",
+        Workbench::Sketch => "sketch",
+        Workbench::Manufacturing(_) => "manufacturing",
     }
 }
 
+/// How a page's kind is shown (`specs/0098` criterion 6): the class the front end keys its
+/// registry by, the word and the Lucide glyph, and whether its extension is off.
+pub struct KindChip {
+    /// `drawing`, `sketch`, the process id of an output page, or `unknown`.
+    pub kind: String,
+    /// "Drawing", "Sketch", "Laser", "Laser (off)", "Unknown kind".
+    pub word: String,
+    /// The glyph's Lucide name.
+    pub icon: &'static str,
+    /// Whether the page is an output page of a process switched off.
+    pub off: bool,
+}
+
 impl Session {
-    /// The workbench named `name` (`vector`, `sketch` or a manufacturing's full id).
+    /// The chip of a page of `kind`: Drawing and Sketch from the shell, an output kind's word and
+    /// glyph from its manifest (`adrs.md` decision 3); no branch names a process.
     #[must_use]
-    pub fn workbench_named(&self, name: &str) -> Option<Workbench> {
-        match name {
-            "vector" => Some(Workbench::Vector),
-            "sketch" => Some(Workbench::Sketch),
-            _ => self
-                .document
-                .manufacturings()
-                .into_iter()
-                .find(|m| m.id.full_id() == name)
-                .map(|m| Workbench::Manufacturing(m.id)),
+    pub fn kind_chip(&self, kind: &PageKind) -> KindChip {
+        let unknown = || KindChip {
+            kind: "unknown".to_owned(),
+            word: "Unknown kind".to_owned(),
+            icon: "CircleHelp",
+            off: false,
+        };
+        match kind {
+            PageKind::Drawing => KindChip {
+                kind: "drawing".to_owned(),
+                word: "Drawing".to_owned(),
+                icon: "PenTool",
+                off: false,
+            },
+            PageKind::Sketch => KindChip {
+                kind: "sketch".to_owned(),
+                word: "Sketch".to_owned(),
+                icon: "DraftingCompass",
+                off: false,
+            },
+            PageKind::Output { process, .. } => workbench_of(process).map_or_else(unknown, |w| {
+                let off = !self.process_enabled(process);
+                KindChip {
+                    kind: process.clone(),
+                    word: if off {
+                        format!("{} (off)", w.label)
+                    } else {
+                        w.label.to_owned()
+                    },
+                    icon: w.icon,
+                    off,
+                }
+            }),
+            PageKind::Unknown(_) => unknown(),
         }
+    }
+
+    /// The machine name of an output page's copy, for the second line of its row.
+    #[must_use]
+    pub fn machine_name_of(&self, kind: &PageKind) -> Option<String> {
+        let manufacturing = self.document.manufacturing(kind.manufacturing()?)?;
+        let read = curvyo_laser_core::read_copy(
+            manufacturing.profile.as_ref(),
+            manufacturing.legacy_machine_name.as_deref(),
+        );
+        Some(read.copy.values.name)
     }
 
     /// The manufacturing named by its full id.
@@ -54,35 +103,23 @@ impl Session {
             .map(|f| f.id)
     }
 
-    /// The registry as the switcher reads it (criteria 1, 11): the active workbench, the built-in
-    /// entries, one entry per manufacturing in creation order (disabled when its process is not
-    /// available), the Add manufacturing choices of the enabled extensions, the extension list
-    /// and the enabled manifests.
+    /// The page kind list and the extensions (ADR 0042 §7): the active page's workbench, the
+    /// kinds of the Kind switch (Drawing, Sketch, then one per enabled extension manifest), the
+    /// extension list and the enabled manifests.
     #[must_use]
     pub fn workbenches_json(&self) -> String {
-        let mut entries = vec![
-            json!({"id": "vector", "kind": "vector", "label": "Vector", "enabled": true}),
-            json!({"id": "sketch", "kind": "sketch", "label": "Sketch", "enabled": true}),
-        ];
-        for manufacturing in self.document.manufacturings() {
-            let enabled = self.process_enabled(&manufacturing.process);
-            let icon = workbench_of(&manufacturing.process).map_or("Factory", |w| w.icon);
-            entries.push(json!({
-                "id": manufacturing.id.full_id(),
-                "kind": "manufacturing",
-                "process": manufacturing.process,
-                "label": manufacturing.name,
-                "icon": icon,
-                "enabled": enabled,
-            }));
-        }
         let manifests = curvyo_ui_core::manifests();
-        let add: Vec<Value> = manifests
-            .iter()
-            .filter(|m| self.manufacturing.extensions.is_enabled(m.id))
-            .filter_map(|m| m.workbench())
-            .map(|w| json!({"process": w.id, "label": w.label, "icon": w.icon}))
-            .collect();
+        let mut kinds = vec![
+            json!({"id": "drawing", "label": "Drawing", "icon": "PenTool", "workbench": "vector"}),
+            json!({"id": "sketch", "label": "Sketch", "icon": "DraftingCompass", "workbench": "sketch"}),
+        ];
+        kinds.extend(
+            manifests
+                .iter()
+                .filter(|m| self.manufacturing.extensions.is_enabled(m.id))
+                .filter_map(|m| m.workbench())
+                .map(|w| json!({"id": w.id, "label": w.label, "icon": w.icon, "workbench": "manufacturing"})),
+        );
         let extensions: Vec<Value> = manifests
             .iter()
             .map(|m| {
@@ -99,20 +136,14 @@ impl Session {
             .iter()
             .filter(|m| self.manufacturing.extensions.is_enabled(m.id))
             .collect();
-        let disabled_manufacturings: Vec<Value> = self
-            .document
-            .manufacturings()
-            .into_iter()
-            .filter(|m| !self.process_enabled(&m.process))
-            .map(|m| json!({"id": m.id.full_id(), "label": m.name}))
-            .collect();
+        let page = self.active_page();
+        let chip = self.kind_chip(&page.kind);
         json!({
             "active": workbench_name(self.workbench()),
-            "entries": entries,
-            "add": add,
+            "page": {"id": page.id, "name": page.name, "kind": chip.kind, "word": chip.word, "icon": chip.icon, "off": chip.off},
+            "kinds": kinds,
             "extensions": extensions,
             "manifests": enabled,
-            "disabled": disabled_manufacturings,
         })
         .to_string()
     }
@@ -145,17 +176,14 @@ impl Session {
             .as_ref()
             .and_then(|m| m["copy"]["name"].as_str().map(str::to_owned))
             .unwrap_or_default();
-        let notice = self.manufacturing.notice.map(|n| {
-            json!({
-                "seq": n.seq,
-                "text": super::READ_ONLY_NOTICE,
-                "x": n.at.map(|a| a.0),
-                "y": n.at.map(|a| a.1),
-            })
-        });
+        let name = manufacturing
+            .page
+            .as_ref()
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
         json!({
             "id": manufacturing.id.full_id(),
-            "name": manufacturing.name,
+            "name": name,
             "process": manufacturing.process,
             "status": format!(
                 "{machine_name} · {:.1} × {:.1} mm",
@@ -165,7 +193,6 @@ impl Session {
             "machine": machine,
             "notices": notices,
             "fixtures": fixtures_json(&manufacturing, &contribution),
-            "read_only_notice": notice,
         })
         .to_string()
     }

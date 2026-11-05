@@ -1,6 +1,7 @@
 //! Tab entry in the follow state and during a press-drag; typed sizes become driving dimensions
 //! (0066 AC39, AC41).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Expression, Relation, SolveStatus};
 
@@ -17,7 +18,7 @@ fn click(s: &mut Session, x: f64, y: f64) {
 
 fn session(tool: SketchTool) -> Session {
     let mut s = Session::new(66_930);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(tool);
     s
 }

@@ -321,8 +321,8 @@ impl Session {
             };
             self.restore_selection(snapshot);
             self.command_refusal = None;
-            // A manufacturing the step removed or brought back (`specs/0093` criteria 2, 13).
-            self.after_history_manufacturing();
+            // A page the step removed or brought back hands the tools over (`specs/0098`).
+            self.sync_workbench();
         }
         let touched: Vec<_> = report.objects.iter().map(|o| (o.shape, o.role)).collect();
         let shapes = summary_shapes(&target.label, &touched);

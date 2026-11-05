@@ -1,6 +1,7 @@
 //! Completed shapes return to Select with exactly the new geometry selected; Polyline only when
 //! its chain ends (0066 AC42), through pointer and key events (AC41).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use crate::session::{KeyInput, KeyOutcome};
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Entity, EntityId, Position};
@@ -33,7 +34,7 @@ fn key(s: &mut Session, key: &str) -> KeyOutcome {
 /// A sketch with one far-away point, so that the first shape does not create the sketch.
 fn session() -> Session {
     let mut s = Session::new(66_940);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Point(Position::mm(200.0, 200.0)))
         .unwrap();
     s.set_sketch_tool(SketchTool::Select);

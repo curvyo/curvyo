@@ -16,17 +16,6 @@ impl WasmSession {
     pub fn sketch_view_json(&self) -> String {
         self.session.sketch_view_json()
     }
-    /// Switches the existing shell's workbench without a document write.
-    /// # Errors
-    /// Refuses unknown workbench names.
-    pub fn set_workbench(&mut self, name: &str) -> Result<(), JsValue> {
-        let workbench = self
-            .session
-            .workbench_named(name)
-            .ok_or_else(|| error("Unknown workbench"))?;
-        self.session.set_workbench(workbench);
-        Ok(())
-    }
     /// Creates one empty analytic sketch with its origin.
     /// # Errors
     /// Reports invalid context or document errors.

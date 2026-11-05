@@ -1,15 +1,22 @@
 //! Page-owned workbench entry defers persistence until actual geometry.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Position};
 
 #[test]
 fn first_geometry_is_one_centered_page_owned_step_without_new_action() {
     let mut s = Session::new(66190);
-    let page = s.active_page();
+    s.to_sketch_page();
+    s.to_drawing_page();
     let before = s.document.version();
-    s.set_workbench(Workbench::Sketch);
-    assert_eq!(s.document.version(), before);
+    s.to_sketch_page();
+    let page = s.active_page();
+    assert_eq!(
+        s.document.version(),
+        before,
+        "activating a sketch page writes nothing"
+    );
     assert!(s.active_sketch().is_none());
     s.sketch_construct(&Construction::Point(Position::mm(10.0, 20.0)))
         .unwrap();
@@ -27,8 +34,8 @@ fn first_geometry_is_one_centered_page_owned_step_without_new_action() {
             page.origin.y + page.size.height.as_mm() / 2.0
         )
     );
-    s.set_workbench(Workbench::Vector);
-    s.set_workbench(Workbench::Sketch);
+    s.to_drawing_page();
+    s.to_sketch_page();
     assert_eq!(s.active_sketch(), Some(id));
     assert_eq!(s.undo_len(), 1);
 }
@@ -36,16 +43,18 @@ fn first_geometry_is_one_centered_page_owned_step_without_new_action() {
 #[test]
 fn changing_page_cancels_picks_and_never_keeps_the_previous_owner() {
     let mut s = Session::new(66191);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Point(Position::mm(10.0, 20.0)))
         .unwrap();
     let first = s.active_page().id;
     let owner = s.active_sketch().unwrap();
-    let second = s.add_page();
+    let second = s.add_page_of_kind("sketch", None).unwrap();
     assert!(s.active_sketch().is_none());
     s.set_sketch_tool(SketchTool::CircleThreePoints);
-    s.pointer_down(Point::new(20.0, 20.0), false);
-    s.pointer_up(Point::new(20.0, 20.0), false, false);
+    let origin = s.active_page().origin;
+    let inside = Point::new(origin.x + 20.0, origin.y + 20.0);
+    s.pointer_down(inside, false);
+    s.pointer_up(inside, false, false);
     assert_eq!(s.sketch.picks.len(), 1);
     s.activate_page(&first);
     assert_eq!(s.sketch.picks, [] as [Position; 0]);
@@ -56,7 +65,7 @@ fn changing_page_cancels_picks_and_never_keeps_the_previous_owner() {
 #[test]
 fn actual_click_creates_geometry_without_vector_attraction() {
     let mut s = Session::new(66192);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Point);
     let page = s.active_page();
     let point = Point::new(
@@ -78,7 +87,7 @@ fn pointer_axis_inference_persists_local_relation_without_vector_settings() {
         let mut settings = s.document.snapping();
         settings.enabled = enabled;
         s.set_snapping(settings);
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         s.set_sketch_tool(SketchTool::Point);
         let page = s.active_page();
         let point = Point::new(
@@ -110,7 +119,7 @@ fn pointer_axis_inference_persists_local_relation_without_vector_settings() {
 fn secondary_press_cancels_each_pick_phase_without_materializing_empty_sketch() {
     for count in [0, 1, 2] {
         let mut s = Session::new(66194);
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         s.set_sketch_tool(SketchTool::Arc);
         let before = s.document.version();
         for point in [Point::new(125.0, 170.0), Point::new(135.0, 180.0)]
@@ -133,7 +142,7 @@ fn secondary_press_cancels_each_pick_phase_without_materializing_empty_sketch() 
 #[test]
 fn empty_source_page_renders_transient_geometry_without_history() {
     let mut s = Session::new(66195);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Rectangle);
     let before = s.document.version();
     s.pointer_down(Point::new(125.0, 170.0), false);
@@ -158,7 +167,7 @@ fn quarter_page_targets_and_alt_do_not_attract_sketch_creation() {
         let mut settings = s.document.snapping();
         settings.enabled = enabled;
         s.set_snapping(settings);
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         s.set_sketch_tool(SketchTool::Point);
         s.modifiers_changed(false, false, alt);
         let raw = Point::new(52.6, 74.3);
@@ -176,7 +185,7 @@ fn quarter_page_targets_and_alt_do_not_attract_sketch_creation() {
 fn parameter_first_materializes_only_a_valid_edit_and_drives_later_geometry() {
     use curvyo_sketch_core::Dimension;
     let mut s = Session::new(66197);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let before = s.document.version();
     assert!(
         s.sketch_add_parameter("width", "missing + 1 mm", Dimension::Length)
@@ -208,7 +217,7 @@ fn parameter_first_materializes_only_a_valid_edit_and_drives_later_geometry() {
 #[test]
 fn first_origin_edit_is_durable_but_unchanged_fixed_origin_is_not() {
     let mut s = Session::new(66198);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let before = s.document.version();
     assert!(!s.sketch_fix_origin(true).unwrap());
     assert_eq!(s.document.version(), before);
@@ -226,9 +235,9 @@ fn first_origin_edit_is_durable_but_unchanged_fixed_origin_is_not() {
 fn newly_active_source_page_reveals_its_origin_even_when_frame_partly_overlaps() {
     let mut s = Session::new(66301);
     s.resize_viewport(1100.0, 950.0);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     for _ in 0..3 {
-        s.add_page();
+        s.add_page_of_kind("sketch", None).unwrap();
         let origin = s
             .sketch_placement()
             .unwrap()
@@ -239,8 +248,8 @@ fn newly_active_source_page_reveals_its_origin_even_when_frame_partly_overlaps()
     }
     s.viewport.pan_by_screen_delta(400.0, 200.0);
     let before = s.view().document_to_screen(Point::new(0.0, 0.0));
-    s.set_workbench(Workbench::Vector);
-    s.set_workbench(Workbench::Sketch);
+    let active = s.active_page().id;
+    s.activate_page(&active);
     assert_eq!(s.view().document_to_screen(Point::new(0.0, 0.0)), before);
 }
 
@@ -268,48 +277,46 @@ fn image_on_canvas(s: &Session) -> bool {
     (0.0..=1100.0).contains(&x) && (0.0..=950.0).contains(&y)
 }
 
+// Main's b1b9d359 in the page-kind model: Sketch never creates a page on its own any more, and
+// leaving a sketch page is activating another page, which shows that page by its kind.
+
 #[test]
-fn returning_to_vector_from_an_unused_source_page_shows_the_drawing_again() {
+fn leaving_an_unused_sketch_page_by_its_row_shows_the_drawing_again() {
     let mut s = session_with_image();
     let page = s.active_page().id;
-    let view = s.view();
     assert!(image_on_canvas(&s));
-    s.set_workbench(Workbench::Sketch);
-    assert_ne!(
-        s.active_page().id,
-        page,
-        "Proposal A: a populated page gets a source page"
-    );
-    s.set_workbench(Workbench::Vector);
-    assert_eq!(s.active_page().id, page);
-    assert_eq!(s.view(), view);
+    let sketch = s.add_page_of_kind("sketch", None).unwrap();
+    assert_eq!(s.workbench(), Workbench::Sketch);
+    assert!(s.activate_page(&page));
+    assert_eq!(s.workbench(), Workbench::Vector);
+    assert!(image_on_canvas(&s));
+    assert!(s.document.page_sketch(&sketch).is_none(), "nothing written");
+}
+
+#[test]
+fn leaving_a_sketch_page_through_a_laser_page_shows_the_drawing_again() {
+    let mut s = session_with_image();
+    let page = s.active_page().id;
+    s.add_page_of_kind("sketch", None).unwrap();
+    s.add_page_of_kind("curvyo.laser", None).unwrap();
+    assert!(matches!(s.workbench(), Workbench::Manufacturing(_)));
+    assert!(s.activate_page(&page));
+    assert_eq!(s.workbench(), Workbench::Vector);
     assert!(image_on_canvas(&s));
 }
 
 #[test]
-fn returning_through_a_manufacturing_workbench_shows_the_drawing_again() {
-    let mut s = session_with_image();
-    let laser = s.add_manufacturing("curvyo.laser").unwrap();
-    s.set_workbench(Workbench::Vector);
-    let page = s.active_page().id;
-    let view = s.view();
-    s.set_workbench(Workbench::Sketch);
-    s.set_workbench(Workbench::Manufacturing(laser));
-    s.set_workbench(Workbench::Vector);
-    assert_eq!(s.active_page().id, page);
-    assert_eq!(s.view(), view);
-    assert!(image_on_canvas(&s));
-}
-
-#[test]
-fn returning_to_vector_after_drawing_stays_on_the_source_page() {
+fn leaving_a_sketch_page_by_the_previous_page_key_shows_the_drawing_again() {
     let mut s = session_with_image();
     let page = s.active_page().id;
-    s.set_workbench(Workbench::Sketch);
-    let source = s.active_page().id;
+    let sketch = s.add_page_of_kind("sketch", None).unwrap();
     s.sketch_construct(&Construction::Point(Position::mm(10.0, 20.0)))
         .unwrap();
-    s.set_workbench(Workbench::Vector);
-    assert_ne!(source, page);
-    assert_eq!(s.active_page().id, source);
+    assert!(s.activate_adjacent_page(false));
+    assert_eq!(s.active_page().id, page);
+    assert!(image_on_canvas(&s));
+    assert!(
+        s.document.page_sketch(&sketch).is_some(),
+        "the sketch stays on its page"
+    );
 }

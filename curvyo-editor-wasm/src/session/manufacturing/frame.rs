@@ -1,14 +1,12 @@
-//! The frame of a manufacturing workbench (criteria 4, 6, 8, 9, 10): the output page, its visible
-//! fixtures below, then each placement's drawing page through one composed matrix, the drawing's
-//! resolved outlines reused and never copied.
+//! What output pages draw in the plane (`0093` criteria 6, 8, 9, 10; `0098` criteria 10, 12).
 
 use std::cell::RefCell;
 use std::sync::Arc;
 
 use curvyo_document_core::{
-    Affine, ManufacturingSnapshot, ObjectSnapshot, Page, PageGrid, Point, ViewTransform,
+    Affine, ManufacturingSnapshot, NodeId, ObjectSnapshot, Page, Point, Vec2, ViewTransform,
 };
-use curvyo_render_core::{DrawList, GridStroke, RgbaColor, build_artwork, build_page_areas};
+use curvyo_render_core::{DrawList, GridStroke, RgbaColor, build_artwork};
 
 use super::super::Session;
 
@@ -28,51 +26,133 @@ struct PlacedEntry {
 }
 
 impl Session {
-    /// The frame of the active manufacturing workbench; an empty list when it is gone.
-    pub(in crate::session) fn manufacturing_frame(&self) -> DrawList {
-        let Some(manufacturing) = self.active_manufacturing() else {
-            return DrawList::default();
-        };
+    /// The visible fixtures of every output page, added to that page's entry of `grids` (one
+    /// entry per page of `pages`): they are painted with the page's grid, under everything
+    /// placed or drawn on it. Lines one device pixel wide in the grid ink.
+    pub(in crate::session) fn add_output_fixtures(
+        &self,
+        pages: &[Page],
+        grids: &mut Vec<DrawList>,
+    ) {
         let view = self.view();
-        let area = manufacturing.work_area();
-        let output = Page {
-            id: String::new(),
-            name: manufacturing.name.clone(),
-            origin: Point::new(0.0, 0.0),
-            size: area,
-            grid: PageGrid::DEFAULT,
-        };
-        let background = self.shown_background();
-        let mut list = build_page_areas(
-            std::slice::from_ref(&output),
-            background,
-            view,
-            self.device_pixel_ratio,
-        );
-        let ink = curvyo_render_core::grid_ink(background);
-        for fixture in manufacturing.fixtures.iter().filter(|f| f.visible) {
-            let drawing = curvyo_ui_core::fixture_drawing(&fixture.kind, &fixture.params, area);
-            list.extend(fixture_lines(&drawing, ink, view, self.device_pixel_ratio));
+        let ink = curvyo_render_core::grid_ink(self.shown_background());
+        for manufacturing in &self.document.manufacturings() {
+            let Some(page) = manufacturing.page.as_ref() else {
+                continue;
+            };
+            let Some(index) = pages.iter().position(|shown| shown.id == page.id) else {
+                continue;
+            };
+            let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
+            for fixture in manufacturing.fixtures.iter().filter(|f| f.visible) {
+                let mut drawing =
+                    curvyo_ui_core::fixture_drawing(&fixture.kind, &fixture.params, page.size);
+                for line in &mut drawing.lines {
+                    line.start = to_plane.apply_point(line.start);
+                    line.end = to_plane.apply_point(line.end);
+                }
+                if grids.len() < pages.len() {
+                    grids.resize_with(pages.len(), DrawList::default);
+                }
+                grids[index].extend(fixture_lines(&drawing, ink, view, self.device_pixel_ratio));
+            }
         }
+    }
+
+    /// Each placement's drawing page on its output page, under the drawing (ADR 0042 §4,
+    /// `adrs.md` decision 2), through one composed matrix: the drawing's resolved outlines
+    /// reused, never copied. Artwork layers only, so the drawing after it keeps its layers and
+    /// images. Drawn in every workbench, in global coordinates.
+    pub(in crate::session) fn output_pages_frame(&self) -> DrawList {
+        let mut list = DrawList::default();
+        let manufacturings = self.document.manufacturings();
+        if manufacturings.is_empty() {
+            return list;
+        }
+        let view = self.view();
         let read = self.document_read();
-        for (_, map, members) in self.placements_of(&manufacturing) {
-            let objects: Vec<ObjectSnapshot> = members
-                .iter()
-                .map(|&index| read.drawn[index].clone())
-                .collect();
-            let tessellation =
-                ViewTransform::new(view.scale() * linear_scale(map), Point::new(0.0, 0.0));
-            let mut art = build_artwork(&objects, tessellation);
-            art.map_positions(|p| map.apply_point(p));
-            list.extend(art);
-        }
-        if let Some(active) = self.active_copy() {
-            list.extend(origin_marker(active.read.copy.values.origin, area, view));
+        for manufacturing in &manufacturings {
+            let Some(page) = manufacturing.page.as_ref() else {
+                continue;
+            };
+            let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
+            for (_, map, members) in self.placements_of(manufacturing) {
+                let map = to_plane.compose(map);
+                let objects: Vec<ObjectSnapshot> = members
+                    .iter()
+                    .map(|&index| read.drawn[index].clone())
+                    .collect();
+                let tessellation =
+                    ViewTransform::new(view.scale() * linear_scale(map), Point::new(0.0, 0.0));
+                let mut art = build_artwork(&objects, tessellation);
+                art.map_positions(|p| map.apply_point(p));
+                list.extend(art);
+            }
         }
         list
     }
 
-    /// The union of the placed content's bounds on the output page (criterion 8).
+    /// The marks over every output page: a selected placement's box and the machine origin
+    /// marker (view only, never artwork).
+    pub(in crate::session) fn output_pages_overlay(&self) -> DrawList {
+        let mut list = DrawList::default();
+        let manufacturings = self.document.manufacturings();
+        if manufacturings.is_empty() {
+            return list;
+        }
+        let view = self.view();
+        let read = self.document_read();
+        let selected = self.selected_placement();
+        for manufacturing in &manufacturings {
+            let Some(page) = manufacturing.page.as_ref() else {
+                continue;
+            };
+            let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
+            for (id, map, members) in self.placements_of(manufacturing) {
+                if selected == Some(id)
+                    && let Some((min, max)) =
+                        curvyo_ui_core::placed_bounds(&read.drawn, &members, to_plane.compose(map))
+                {
+                    let corners = [min, Point::new(max.x, min.y), max, Point::new(min.x, max.y)];
+                    list.extend(curvyo_render_core::build_offset_grown_box(corners, view));
+                }
+            }
+            if self.process_enabled(&manufacturing.process)
+                && let Some(copy) = manufacturing.profile.as_ref()
+            {
+                let read = curvyo_laser_core::read_copy(Some(copy), None);
+                list.extend(origin_marker(read.copy.values.origin, page, view));
+            }
+        }
+        list
+    }
+
+    /// The placement whose placed content lies under `point`, the topmost first.
+    pub(in crate::session) fn placement_at(&self, point: Point) -> Option<NodeId> {
+        let read = self.document_read();
+        self.document
+            .manufacturings()
+            .iter()
+            .rev()
+            .find_map(|manufacturing| {
+                let page = manufacturing.page.as_ref()?;
+                let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
+                self.placements_of(manufacturing)
+                    .into_iter()
+                    .rev()
+                    .find(|(_, map, members)| {
+                        curvyo_ui_core::placed_bounds(&read.drawn, members, to_plane.compose(*map))
+                            .is_some_and(|(min, max)| {
+                                (min.x..=max.x).contains(&point.x)
+                                    && (min.y..=max.y).contains(&point.y)
+                            })
+                    })
+                    .map(|(id, _, _)| id)
+            })
+    }
+
+    /// The union of the placed content's bounds on the output page, page-local (the overhang
+    /// notice of the Engraved grid).
     pub(in crate::session) fn placed_bounds_of(
         &self,
         manufacturing: &ManufacturingSnapshot,
@@ -91,13 +171,13 @@ impl Session {
             })
     }
 
-    /// Each placement whose drawing page exists: the page, the map to the output page and the
-    /// indexes of its members in the drawn leaves. A placement of a deleted page draws nothing
-    /// (ADR 0032 §7).
+    /// Each placement whose drawing page exists: its id, the map to the output page's local mm
+    /// and the indexes of its members in the drawn leaves. A placement of a deleted page draws
+    /// nothing (ADR 0032 §7).
     fn placements_of(
         &self,
         manufacturing: &ManufacturingSnapshot,
-    ) -> Vec<(Page, Affine, Arc<[usize]>)> {
+    ) -> Vec<(NodeId, Affine, Arc<[usize]>)> {
         let pages = self.document.pages();
         let read = self.document_read();
         manufacturing
@@ -107,7 +187,7 @@ impl Session {
                 let source = pages.iter().find(|page| page.id == placement.page)?.clone();
                 let members = self.placed_members(&read.drawn, &read.guides, &source);
                 let map = curvyo_ui_core::placement_map(&source, placement.matrix);
-                Some((source, map, members))
+                Some((placement.id, map, members))
             })
             .collect()
     }
@@ -139,15 +219,15 @@ impl Session {
 }
 
 /// The machine origin marker at the copy's corner of the output page (`0026` criterion 11):
-/// drawn above the placed content, view only.
+/// drawn above the placed content and the drawing, view only.
 fn origin_marker(
     corner: curvyo_laser_core::OriginCorner,
-    area: curvyo_document_core::DocumentSize,
+    page: &Page,
     view: ViewTransform,
 ) -> DrawList {
-    let (width, height) = (area.width.as_mm(), area.height.as_mm());
-    let x = if corner.is_right() { width } else { 0.0 };
-    let y = if corner.is_bottom() { height } else { 0.0 };
+    let (width, height) = (page.size.width.as_mm(), page.size.height.as_mm());
+    let x = page.origin.x + if corner.is_right() { width } else { 0.0 };
+    let y = page.origin.y + if corner.is_bottom() { height } else { 0.0 };
     let inward = (
         if corner.is_right() { -1.0 } else { 1.0 },
         if corner.is_bottom() { -1.0 } else { 1.0 },

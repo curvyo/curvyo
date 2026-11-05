@@ -1,10 +1,11 @@
 //! Revised selection gestures never modify analytic geometry.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Position};
 fn overlapping_lines() -> Session {
     let mut s = Session::new(66240);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     for _ in 0..2 {
         s.sketch_construct(&Construction::Polyline(vec![
             Position::mm(10.0, 10.0),
@@ -54,7 +55,7 @@ fn alt_stroke_selects_touched_edges_and_ctrl_alt_removes_without_copy_or_move() 
 #[test]
 fn numeric_focus_values_are_on_demand_and_leave_history_unchanged() {
     let mut s = Session::new(66241);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     let map = s.sketch_placement().unwrap();
     let start = map.apply_point(Point::new(10.0, 10.0));

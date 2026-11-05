@@ -23,6 +23,19 @@ impl WasmSession {
     pub fn add_page(&mut self) -> String {
         self.session.add_page()
     }
+    /// Add page with the Kind switch (`specs/0098` criteria 1 to 4): `drawing`, `sketch` or an
+    /// output process with the machine profile `profile` (empty for the last pick). The new
+    /// page's id, empty when refused.
+    pub fn add_page_of_kind(&mut self, kind: &str, profile: &str) -> String {
+        let profile = (!profile.is_empty()).then_some(profile);
+        self.session
+            .add_page_of_kind(kind, profile)
+            .unwrap_or_default()
+    }
+    /// Ctrl+Page Down (`forward`) and Ctrl+Page Up: the next or previous page.
+    pub fn activate_adjacent_page(&mut self, forward: bool) -> bool {
+        self.session.activate_adjacent_page(forward)
+    }
     /// Renames a page.
     pub fn rename_page(&mut self, id: &str, name: &str) -> bool {
         self.session.rename_page(id, name)

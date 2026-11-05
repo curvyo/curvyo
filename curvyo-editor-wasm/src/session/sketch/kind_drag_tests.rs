@@ -1,5 +1,6 @@
 //! Select drags every analytic entity kind by its edge or a defining point (AC29).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::{Point, SketchDelta};
 use curvyo_sketch_core::{
     Constraint, Construction, Entity, EntityId, Expression, Length, Position, Quantity, Relation,
@@ -88,7 +89,7 @@ fn placed(s: &Session, x: f64, y: f64) -> Point {
 
 fn setup(case: &Case) -> (Session, curvyo_document_core::NodeId) {
     let mut s = Session::new(66_500);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let id = s.new_sketch().unwrap();
     s.sketch_construct(&case.command).unwrap();
     s.set_sketch_tool(SketchTool::Select);
@@ -314,7 +315,7 @@ fn constrained_kinds_follow_their_constraints_and_fixed_ones_stay() {
 #[test]
 fn arcs_inside_a_drawn_chain_drag_with_their_tangent_joins() {
     let mut s = Session::new(66_501);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let id = s.new_sketch().unwrap();
     s.set_sketch_tool(SketchTool::Polyline);
     let click = |s: &mut Session, x: f64, y: f64| {

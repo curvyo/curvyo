@@ -3,6 +3,7 @@
 //! full value.
 use super::rev3_constraint_tests::{P1, P2, X_AXIS, Y_AXIS, click, global, session};
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_render_core::SketchAxisState::{Hovered, Idle, Selected};
 use curvyo_sketch_core::{ConstraintId, Expression};
 
@@ -89,7 +90,7 @@ fn the_dimension_edit_shows_three_decimals_and_an_untyped_enter_keeps_the_value(
 #[test]
 fn a_placed_dimension_shows_three_decimals_and_an_untyped_enter_keeps_the_value() {
     let mut s = Session::new(66_930);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Circle);
     for at in [(10.0, 10.0), (20.0, 13.0)] {
         click(&mut s, at, false);

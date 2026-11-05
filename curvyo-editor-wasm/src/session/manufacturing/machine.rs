@@ -2,12 +2,11 @@
 //! the last pick, the commands of the Machine block, and the outbox of writes the host performs.
 //! Library edits are no history step; edits of the manufacturing's copy are one step each.
 
-use curvyo_document_core::{DocumentSize, Length, ProfileChange};
+use curvyo_document_core::{DocumentSize, Length, PageCorner, ProfileChange};
 use curvyo_laser_core::{
     Connection, CopyRead, LibraryWrite, MachineProfile, MachineProfiles, OriginCorner, ProfileCopy,
     clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port, clamp_power, clamp_work_area,
-    clamp_work_side, is_profile_id, new_profile_id, read_choice, read_copy, save_as_name,
-    write_choice, write_copy,
+    is_profile_id, new_profile_id, read_choice, read_copy, save_as_name, write_choice, write_copy,
 };
 
 use super::super::Session;
@@ -136,9 +135,14 @@ impl Session {
         change: ProfileChange,
     ) -> bool {
         let map = write_copy(copy);
+        let origin = copy.values.origin;
+        let anchor = PageCorner {
+            right: origin.is_right(),
+            bottom: origin.is_bottom(),
+        };
         self.recording(|this| {
             this.document
-                .set_manufacturing_profile(id, &map, page, change)
+                .set_manufacturing_profile(id, &map, page, anchor, change)
                 .unwrap_or(false)
         })
     }
@@ -158,12 +162,15 @@ impl Session {
             profile.work_area,
             ProfileChange::Pick,
         );
-        let machine = &mut self.manufacturing.machine;
-        machine.last_picked = Some(profile.id.clone());
-        machine
-            .outbox
-            .push(HostWrite::Choice(write_choice(&profile.id)));
+        self.remember_machine_pick(&profile.id);
         changed
+    }
+
+    /// Keeps `id` as this computer's last pick (criterion 10).
+    pub(in crate::session) fn remember_machine_pick(&mut self, id: &str) {
+        let machine = &mut self.manufacturing.machine;
+        machine.last_picked = Some(id.to_owned());
+        machine.outbox.push(HostWrite::Choice(write_choice(id)));
     }
 
     /// Edits one value of the copy (criterion 7): `edit` changes the values and returns the
@@ -228,32 +235,28 @@ impl Session {
         });
     }
 
-    /// The Width and Height fields, each set into the profile range (`0093` criterion 3): the
-    /// output page follows in one step. Whether anything changed, and the first notice.
-    pub fn set_work_area_limited(
+    /// Edit work area of a user profile (`0098` criterion 15): each side set into the profile
+    /// range; a library write, no history step and no change to any page until Reset from
+    /// profile. `None` for the built-in or an unknown profile; else the first notice.
+    pub fn set_profile_work_area(
         &mut self,
+        id: &str,
         width: Length,
         height: Length,
-    ) -> (bool, Option<String>) {
-        let Some(manufacturing) = self.active_manufacturing() else {
-            return (false, None);
-        };
-        let (Some(width), Some(height)) = (
-            clamp_work_side("Width", width),
-            clamp_work_side("Height", height),
-        ) else {
-            return (false, None);
-        };
-        let notice = width.notice.or(height.notice);
-        let changed = self.recording(|this| {
-            this.document
-                .set_work_area(
-                    manufacturing.id,
-                    DocumentSize::new(width.value, height.value),
-                )
-                .unwrap_or(false)
-        });
-        (changed, notice)
+        now_ms: i64,
+    ) -> Option<Option<String>> {
+        let profile = self.manufacturing.machine.profiles.find(id)?.clone();
+        let area = clamp_work_area(DocumentSize::new(width, height));
+        let write =
+            self.manufacturing
+                .machine
+                .profiles
+                .update(id, profile.values, area.value, now_ms)?;
+        self.manufacturing
+            .machine
+            .outbox
+            .push(HostWrite::Library(write));
+        Some(area.notice)
     }
 
     /// Reset from profile (criterion 7): the copy and the page take the library record's values

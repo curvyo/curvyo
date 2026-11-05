@@ -1,5 +1,6 @@
 //! Rail constraint card, dimension annotations and constraint symbols through the session (AC24, AC31, AC32).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{
     Constraint, Construction, Expression, Length, Position, Quantity, Relation,
@@ -8,7 +9,7 @@ use serde_json::Value;
 
 fn sketch_with(commands: &[Construction]) -> (Session, curvyo_document_core::NodeId) {
     let mut s = Session::new(66_700);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let id = s.new_sketch().unwrap();
     for command in commands {
         s.sketch_construct(command).unwrap();
