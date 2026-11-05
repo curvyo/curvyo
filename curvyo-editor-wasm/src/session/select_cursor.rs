@@ -54,6 +54,10 @@ impl Session {
         if self.colour_pick_target().is_some() || self.trace_pick_mode().is_some() {
             return "eyedropper".to_string();
         }
+        // Pick mask paths, over every point of the canvas (`specs/0094` UX notes §11).
+        if self.tool == Tool::Trace && self.trace_mask_pick() {
+            return "pick-mask".to_string();
+        }
         // Pick mode and the position handle of a text on path (`0080` UX notes §2, §3.1).
         if let Some(hint) = self.text_path_cursor() {
             return hint.to_string();
