@@ -1,7 +1,5 @@
-import { Trash2 } from "lucide-react";
 
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
-import { Tooltip } from "@/components/ui/tooltip";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
 
 /**
@@ -30,21 +28,6 @@ export function ExtensionsGroup({ workbenches }: { workbenches: WorkbenchesApi }
             checked={extension.enabled}
             onCheckedChange={(enabled) => workbenches.setExtensionEnabled(extension.id, enabled)}
           />
-        </div>
-      ))}
-      {list.disabled.map((manufacturing) => (
-        <div key={manufacturing.id} className="flex h-9 items-center justify-between gap-2 opacity-60">
-          <span className="truncate text-sm">{manufacturing.label} (disabled)</span>
-          <Tooltip side="left" content={`Delete ${manufacturing.label}`}>
-            <button
-              type="button"
-              aria-label={`Delete ${manufacturing.label}`}
-              className="inline-flex h-7 w-6 items-center justify-center rounded-md text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-              onClick={() => workbenches.deleteManufacturing(manufacturing.id)}
-            >
-              <Trash2 size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-            </button>
-          </Tooltip>
         </div>
       ))}
     </section>

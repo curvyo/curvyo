@@ -5,7 +5,7 @@ import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
 
-/** The active manufacturing's values (`manufacturing_view_json`). */
+/** The active laser page's values (`manufacturing_view_json`), `null` on another page. */
 export interface ManufacturingView {
   id: string;
   name: string;
@@ -24,7 +24,6 @@ export interface ManufacturingView {
     visible: boolean;
     values: Record<string, number | string>;
   }[];
-  read_only_notice: { seq: number; text: string; x: number | null; y: number | null } | null;
 }
 
 /** A corner of the output page, as stored. */
@@ -68,7 +67,7 @@ function randomBytes(): Uint8Array {
   return bytes;
 }
 
-/** The workbench registry read and the manufacturing commands; each command syncs the editor. */
+/** The page kinds read and the laser page commands; each command syncs the editor. */
 export function useWorkbenches(editor: EditorSession) {
   const { getSession, sync, syncRevision } = editor;
   const list = useMemo<WorkbenchList>(() => {
@@ -94,22 +93,27 @@ export function useWorkbenches(editor: EditorSession) {
     },
     [getSession, sync],
   );
+  const profiles = useMemo<MachineProfileRow[]>(() => {
+    void syncRevision;
+    const session = getSession();
+    return session ? (JSON.parse(session.machine_profiles_json()) as MachineProfileRow[]) : [];
+  }, [getSession, syncRevision]);
   return {
     list,
     view,
-    switchTo: (id: string) => {
-      if (id === list.active) return;
+    /** The machine list of the Add page group, the starting profile chosen. */
+    profiles,
+    /** Add page with the Kind switch (`specs/0098` criteria 1 to 4); the new page's id. */
+    addPage: (kind: string, profile: string) => {
       // The drawing tools' context ends before the canvas changes owner.
       editor.setTool("select");
-      run((session) => session.set_workbench(id));
+      return run((session) => session.add_page_of_kind(kind, profile)) ?? "";
     },
-    addManufacturing: (process: string) => run((session) => session.add_manufacturing(process)) ?? "",
-    deleteManufacturing: (id: string) => run((session) => session.delete_manufacturing(id)),
-    setWorkArea: (width: number, height: number) =>
-      run((session) => session.set_work_area(width, height)) ?? "",
+    /** Edit work area of a user profile (criterion 15): a library write; the notice. */
+    setProfileWorkArea: (id: string, width: number, height: number) =>
+      run((session) => session.set_profile_work_area(id, width, height, Date.now())) ?? "",
     machine: {
       pick: (id: string) => run((session) => session.pick_machine_profile(id)),
-      setName: (text: string) => run((session) => session.set_machine_name(text)) ?? "",
       setOrigin: (corner: OriginCorner) => run((session) => session.set_machine_origin(corner)),
       setMaxFeed: (value: number) => run((session) => session.set_machine_max_feed(value)) ?? "",
       setMaxPower: (value: number) => run((session) => session.set_machine_max_power(value)) ?? "",
@@ -131,7 +135,6 @@ export function useWorkbenches(editor: EditorSession) {
       run((session) => session.set_fixture_visible(id, visible)),
     setFixtureLength: (id: string, key: string, mm: number) =>
       run((session) => session.set_fixture_length(id, key, mm)),
-    fitPage: () => run((session) => session.fit_output_page()),
     setExtensionEnabled: (id: string, enabled: boolean) => {
       const text = run((session) => session.set_extension_enabled(id, enabled));
       if (text !== undefined) {

@@ -1,5 +1,5 @@
-import { Check, Copy, Pencil, Trash2 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Check, Copy, Pencil, Ruler, Trash2 } from "lucide-react";
+import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
@@ -18,6 +18,8 @@ interface MachineProfileListProps {
   onDuplicate: (id: string) => string;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  /** Edit work area of a user profile (`specs/0098` criterion 15): a library write; the notice. */
+  onWorkArea: (id: string, width: number, height: number) => string;
   onClose: () => void;
 }
 
@@ -33,8 +35,10 @@ export function MachineProfileList({
   onDuplicate,
   onRename,
   onDelete,
+  onWorkArea,
   onClose,
 }: MachineProfileListProps) {
+  const [sizing, setSizing] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const chosen = Math.max(
     0,
@@ -127,8 +131,8 @@ export function MachineProfileList({
       {rows.map((row, index) => {
         const armed = arm.armed === row.id;
         return (
+          <Fragment key={row.id}>
           <div
-            key={row.id}
             role="option"
             aria-selected={row.chosen}
             data-profile-row={row.id}
@@ -174,6 +178,12 @@ export function MachineProfileList({
                   <Pencil size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
                 </RowButton>
                 <RowButton
+                  label={`Edit work area of ${row.name}`}
+                  onPress={() => setSizing(sizing === row.id ? null : row.id)}
+                >
+                  <Ruler size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+                </RowButton>
+                <RowButton
                   label={armed ? ARMED_DELETE : `Delete ${row.name}`}
                   armTarget={row.id}
                   armed={armed}
@@ -184,6 +194,17 @@ export function MachineProfileList({
               </>
             )}
           </div>
+          {sizing === row.id ? (
+            <WorkAreaRow
+              row={row}
+              onCommit={(width, height) => onWorkArea(row.id, width, height)}
+              onClose={() => {
+                setSizing(null);
+                pendingFocus.current = row.id;
+              }}
+            />
+          ) : null}
+          </Fragment>
         );
       })}
       <span role="status" className="sr-only">
@@ -257,5 +278,65 @@ function RenameField({ name, onDone }: { name: string; onDone: (name: string | n
       }}
       className="h-7 rounded-[5px] border border-[var(--field-border)] bg-white px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
     />
+  );
+}
+
+/** The in-place sub-row of Edit work area (UX notes §9): Width and Height of a user profile, the
+ * profile range and clamp of `0026` criterion 1; Enter or blur commits, Escape closes. */
+function WorkAreaRow({
+  row,
+  onCommit,
+  onClose,
+}: {
+  row: MachineProfileRow;
+  onCommit: (width: number, height: number) => string;
+  onClose: () => void;
+}) {
+  const [notice, setNotice] = useState("");
+  const field = (label: "Width" | "Height", value: number) => (
+    <label className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] px-1 text-xs">
+      <span className="text-[var(--panel-muted-fg)]">{label}</span>
+      <input
+        aria-label={`${label} of ${row.name} (mm)`}
+        type="number"
+        step="any"
+        defaultValue={value}
+        className="min-w-0 flex-1 bg-transparent text-right tabular-nums outline-none"
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            onClose();
+          }
+        }}
+        onBlur={(event) => {
+          const typed = Number(event.target.value);
+          if (!event.target.value.trim() || !Number.isFinite(typed)) {
+            event.target.value = String(value);
+            return;
+          }
+          const width = label === "Width" ? typed : row.width;
+          const height = label === "Height" ? typed : row.height;
+          setNotice(onCommit(width, height));
+        }}
+      />
+      <span className="text-[var(--panel-muted-fg)]">mm</span>
+    </label>
+  );
+  return (
+    <div role="group" aria-label={`Work area of ${row.name}`} className="flex flex-col gap-1 px-2 pb-2">
+      <div className="flex gap-1">
+        {field("Width", row.width)}
+        {field("Height", row.height)}
+      </div>
+      {notice ? (
+        <span role="status" className="text-xs text-[var(--toolbar-icon)]">
+          {notice}
+        </span>
+      ) : null}
+    </div>
   );
 }

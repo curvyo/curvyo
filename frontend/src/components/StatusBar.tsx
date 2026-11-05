@@ -1,3 +1,5 @@
+import { KindChip, type KindInfo } from "@/components/KindChip";
+
 interface StatusBarProps {
   /** The cursor readout, e.g. "x: 12.3  y: 45.6 mm". */
   cursorText: string;
@@ -9,6 +11,8 @@ interface StatusBarProps {
   /** The Node tool's node count, "5 of 120 nodes" (`specs/0053-node-marquee-selection/`
    * criterion 23), or `null` outside the Node tool or with no node to count. */
   nodeCountText?: string | null;
+  /** The active page's kind chip, first in the right block (`specs/0098` criterion 6). */
+  kind?: KindInfo | null;
 }
 
 /**
@@ -20,7 +24,7 @@ interface StatusBarProps {
  * (`specs/0015-document-size-and-rulers/` criteria 12 and 21): fixed decimals
  * and the display unit written once, formatted in Rust.
  */
-export function StatusBar({ cursorText, sizeText, zoomPercent, nodeCountText }: StatusBarProps) {
+export function StatusBar({ cursorText, sizeText, zoomPercent, nodeCountText, kind }: StatusBarProps) {
   return (
     // Three columns, not `justify-between`, so the zoom stays centred however wide the right
     // segment grows with the node count (`0053` UX notes).
@@ -45,7 +49,15 @@ export function StatusBar({ cursorText, sizeText, zoomPercent, nodeCountText }: 
             />
           </>
         )}
-        <span>{sizeText}</span>
+        <span className="flex items-center">
+          {kind && kind.word ? (
+            <>
+              <KindChip size={12} kind={kind} />
+              <span aria-hidden>{" · "}</span>
+            </>
+          ) : null}
+          <span>{sizeText}</span>
+        </span>
       </span>
     </div>
   );

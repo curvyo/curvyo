@@ -1,5 +1,6 @@
 import {
   Box,
+  CircleHelp,
   DraftingCompass,
   Factory,
   Grid3x3,
@@ -15,6 +16,7 @@ import {
 /** The glyphs a manifest or the registry may name (Lucide names). An unknown name draws a box. */
 export const ICONS: Record<string, LucideIcon> = {
   Box,
+  CircleHelp,
   DraftingCompass,
   Factory,
   Grid3x3,

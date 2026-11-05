@@ -1,19 +1,28 @@
 import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
-import type { PageRow } from "@/lib/pages";
+import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
+import { type PageRow, pageReading } from "@/lib/pages";
 import { Tooltip } from "@/components/ui/tooltip";
+import { AddPageGroup } from "@/components/panel/AddPageGroup";
+import { KindChip } from "@/components/KindChip";
+import { kindOptions } from "@/workbenches/registry";
 
 const buttonClass =
   "flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-[var(--editor-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)] focus-visible:outline-offset-1 aria-disabled:opacity-40";
 export function PagesBlock({
   document: doc,
+  workbenches,
   onReturnFocus,
 }: {
   document: DocumentPanelApi;
+  /** The page kinds and machine list of the Add page group (`specs/0098` criterion 1). */
+  workbenches: WorkbenchesApi;
   onReturnFocus: () => void;
 }) {
   const pages = doc.view.pages;
+  const [adding, setAdding] = useState(false);
+  const addButton = useRef<HTMLButtonElement>(null);
   const active = pages.findIndex((p) => p.active);
   const [editing, setEditing] = useState<string | null>(null);
   const cancelledName = useRef(false);
@@ -52,10 +61,12 @@ export function PagesBlock({
         <span className="mr-auto text-xs font-semibold">Pages</span>
         <Tooltip side="left" content="Add page">
           <button
+            ref={addButton}
             type="button"
             className={buttonClass}
             aria-label="Add page"
-            onClick={() => doc.pageAction("add")}
+            aria-expanded={adding}
+            onClick={() => setAdding(!adding)}
           >
             <Plus size={16} />
           </button>
@@ -252,7 +263,8 @@ export function PagesBlock({
                   type="button"
                   data-page-name={index}
                   title={page.name}
-                  className={`block w-full truncate text-left text-xs focus-visible:outline-2 ${page.active ? "font-semibold" : ""}`}
+                  aria-label={pageReading(page.name, page.kindWord)}
+                  className={`flex w-full min-w-0 items-center gap-1.5 text-left text-xs focus-visible:outline-2 ${page.active ? "font-semibold" : ""}`}
                   tabIndex={page.active ? 0 : -1}
                   onClick={() => doc.pageAction("activate", page.id)}
                   onDoubleClick={() => {
@@ -261,11 +273,19 @@ export function PagesBlock({
                     setName(page.name);
                   }}
                 >
-                  {page.name}
+                  <span className="min-w-0 truncate">{page.name}</span>
+                  <KindChip
+                    hidden
+                    className="font-normal"
+                    kind={{ icon: page.kindIcon, word: page.kindWord, off: page.kindOff }}
+                  />
                 </button>
               )}
-              <div className="text-[11px] tabular-nums opacity-65">
-                {page.size}
+              <div
+                className="truncate text-[11px] tabular-nums opacity-65"
+                title={page.machine ? `${page.machine} · ${page.size}` : page.size}
+              >
+                {page.machine ? `${page.machine} · ${page.size}` : page.size}
               </div>
             </div>
             <div role="gridcell">
@@ -325,6 +345,23 @@ export function PagesBlock({
           </div>
         ))}
       </div>
+      {adding && (
+        <AddPageGroup
+          kinds={kindOptions(workbenches.list)}
+          profiles={workbenches.profiles}
+          onCancel={() => {
+            setAdding(false);
+            requestAnimationFrame(() => addButton.current?.focus());
+          }}
+          onAdd={(kind, profile) => {
+            setAdding(false);
+            if (workbenches.addPage(kind, profile)) {
+              // Focus moves to the new page's row, the last one.
+              requestAnimationFrame(() => focusRow(pages.length));
+            }
+          }}
+        />
+      )}
       {pages[active] && (
         <PagePosition key={pages[active].id} page={pages[active]} doc={doc} />
       )}

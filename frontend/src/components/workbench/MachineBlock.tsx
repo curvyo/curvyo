@@ -12,9 +12,11 @@ import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MachineProfileList } from "@/components/workbench/MachineProfileList";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
+import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { MachineView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { CORNER_NAMES, CORNERS, type Corner, cornerKey, typedNumber } from "@/lib/machineBlockKeys";
 import { setMachineWriteFailureHandler } from "@/lib/machineProfilesFile";
+import { formatWorkArea } from "@/lib/workAreaText";
 
 const ICON_BUTTON =
   "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
@@ -41,6 +43,8 @@ interface MachineBlockProps {
   label: string;
   machine: MachineView;
   workbenches: WorkbenchesApi;
+  /** The document's display unit, for the read-only work area line. */
+  unit?: UnitSymbol;
 }
 
 /**
@@ -49,7 +53,7 @@ interface MachineBlockProps {
  * (each edit one undo step) and the connection of the chosen saved profile (library, no undo).
  * Host-drawn from the session's view; the extension only places it (`adrs.md` note 4).
  */
-export function MachineBlock({ label, machine, workbenches }: MachineBlockProps) {
+export function MachineBlock({ label, machine, workbenches, unit = "mm" }: MachineBlockProps) {
   const api = workbenches.machine;
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -201,32 +205,18 @@ export function MachineBlock({ label, machine, workbenches }: MachineBlockProps)
           onDuplicate={(id) => api.duplicate(id)}
           onRename={(id, name) => show(api.rename(id, name), "save")}
           onDelete={(id) => api.remove(id)}
+          onWorkArea={(id, width, height) => workbenches.setProfileWorkArea(id, width, height)}
           onClose={backToButton}
         />
       ) : null}
       <div className="flex flex-col gap-2">
-        <TextField
-          label="Name"
-          value={copy.name}
-          notice={noticeAt("name")}
-          onCommit={(text) => show(api.setName(text), "name")}
-        />
-        <div className="relative grid grid-cols-2 gap-2">
-          <NumberField
-            label="Width"
-            unit="mm"
-            accessibleName="Width (mm)"
-            value={copy.width}
-            onCommit={(mm) => show(workbenches.setWorkArea(mm, copy.height), "area")}
-          />
-          <NumberField
-            label="Height"
-            unit="mm"
-            accessibleName="Height (mm)"
-            value={copy.height}
-            onCommit={(mm) => show(workbenches.setWorkArea(copy.width, mm), "area")}
-          />
-          {noticeAt("area")}
+        {/* The work area is the machine's: read-only text on the page (`specs/0098` criterion
+            13); it is typed only in a user profile of the list. */}
+        <div className="flex h-7 items-center justify-between">
+          <span className="text-xs text-[var(--panel-muted-fg)]">Work area</span>
+          <span className="text-[13px] tabular-nums text-[var(--toolbar-icon)]">
+            {formatWorkArea(copy.width, copy.height, unit)}
+          </span>
         </div>
         <CornerControl corner={copy.origin} onChange={(corner) => api.setOrigin(corner)} />
         <NumberField
@@ -311,10 +301,6 @@ function TextField({
   const draft = useDraft(value);
   const commit = () => {
     if (draft.text === value) return;
-    if (draft.text.trim() === "" && label === "Name") {
-      draft.revert();
-      return;
-    }
     onCommit(draft.text);
     draft.revert();
   };

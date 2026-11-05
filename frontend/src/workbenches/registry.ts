@@ -1,8 +1,8 @@
-// The workbench registry (ADR 0032 §3, `specs/0093-laser-workbench-shell` criterion 11): the
-// one place that maps a workbench kind to what the shell draws for it. Vector and Sketch are two
-// implementations, every manufacturing of any process is drawn by the one generic manifest
-// workbench; the shell never branches on a process. Pure data and functions, so the tests load it
-// without a bundler.
+// The workbench registry (ADR 0032 §3 as amended by ADR 0042 §7, `specs/0098-page-kinds`
+// criterion 18): the one place that maps the workbench of a page kind to what the shell draws for
+// it. Vector and Sketch are two implementations, every output page of any process is drawn by the
+// one generic manufacturing entry; the shell never branches on a process. Pure data and
+// functions, so the tests load it without a bundler.
 
 /** A parameter of a schema-rendered block (`curvyo-extension-core` `Param`). */
 export interface ManifestParam {
@@ -39,46 +39,50 @@ export interface Manifest {
   contributions: ManifestWorkbenchContribution[];
 }
 
-/** One entry of the session's workbench list. */
-export interface WorkbenchListEntry {
-  /** `vector`, `sketch` or a manufacturing's full node id. */
+/** One kind of the Add page Kind switch (ADR 0042 §7): Drawing, Sketch, then one per enabled
+ * extension manifest, with its word and glyph. */
+export interface PageKindEntry {
+  /** `drawing`, `sketch` or the process id of an output kind. */
   id: string;
-  /** The registry kind that draws it. */
-  kind: string;
   label: string;
-  /** The process of a manufacturing. */
-  process?: string;
-  /** The glyph a manufacturing's process declares. */
-  icon?: string;
-  /** `false` for a manufacturing whose extension is off or unknown. */
-  enabled: boolean;
+  /** The Lucide name of the glyph. */
+  icon: string;
+  /** The registry kind whose tools a page of this kind shows. */
+  workbench: string;
 }
 
-/** The session's registry read (`workbenches_json`). */
+/** The active page as the header and status bar show it. */
+export interface ActivePage {
+  id: string;
+  name: string;
+  kind: string;
+  word: string;
+  icon: string;
+  off: boolean;
+}
+
+/** The session's read of the page kinds (`workbenches_json`). */
 export interface WorkbenchList {
+  /** The registry kind of the active page's workbench: `vector`, `sketch` or `manufacturing`. */
   active: string;
-  entries: WorkbenchListEntry[];
-  add: { process: string; label: string; icon: string }[];
+  page: ActivePage;
+  kinds: PageKindEntry[];
   extensions: { id: string; name: string; version: string; licence: string; enabled: boolean }[];
   manifests: Manifest[];
-  disabled: { id: string; label: string }[];
 }
 
 /** An empty list, before the session exists. */
 export const NO_WORKBENCHES: WorkbenchList = {
   active: "vector",
-  entries: [],
-  add: [],
+  page: { id: "", name: "", kind: "drawing", word: "Drawing", icon: "PenTool", off: false },
+  kinds: [],
   extensions: [],
   manifests: [],
-  disabled: [],
 };
 
 /** What the shell draws for one workbench kind. `Ctx` is the app's context of the moment. */
 export interface WorkbenchEntry<Ctx = unknown, Node = unknown> {
   kind: string;
-  /** The switcher glyph's Lucide name for this entry. */
-  icon: (entry: WorkbenchListEntry) => string;
   /** The tool rail. */
   rail: (ctx: Ctx) => Node;
   /** What floats over the canvas (bars, notices); nothing when absent. */
@@ -97,38 +101,15 @@ export function workbenchEntry<Ctx, Node>(kind: string): WorkbenchEntry<Ctx, Nod
   return entries.get(kind) as WorkbenchEntry<Ctx, Node> | undefined;
 }
 
-/** One button of the switcher row. */
-export interface SwitcherButton {
-  id: string;
-  label: string;
-  icon: string;
-  enabled: boolean;
-  pressed: boolean;
+/** The kinds the Kind switch offers, in the session's order: only those whose workbench a
+ * registered entry draws (`specs/0098` criterion 18 a), so the shell never names a process. */
+export function kindOptions(list: WorkbenchList): PageKindEntry[] {
+  return list.kinds.filter((kind) => entries.has(kind.workbench));
 }
 
-/** The switcher's buttons in order (UX notes §1): every listed workbench a registered kind can
- * draw, in the session's order (Vector, Sketch, then the manufacturings in creation order). */
-export function switcherButtons(list: WorkbenchList): SwitcherButton[] {
-  return list.entries.flatMap((entry) => {
-    const registered = entries.get(entry.kind);
-    if (!registered) {
-      return [];
-    }
-    return [
-      {
-        id: entry.id,
-        label: entry.enabled ? entry.label : `${entry.label} (disabled)`,
-        icon: registered.icon(entry),
-        enabled: entry.enabled,
-        pressed: entry.id === list.active,
-      },
-    ];
-  });
-}
-
-/** The kind of the active workbench (`vector` when the list does not name it). */
+/** The registry kind of the active page's workbench. */
 export function activeKind(list: WorkbenchList): string {
-  return list.entries.find((entry) => entry.id === list.active)?.kind ?? "vector";
+  return list.active;
 }
 
 /** The workbench contribution of `process` among the enabled manifests. */
