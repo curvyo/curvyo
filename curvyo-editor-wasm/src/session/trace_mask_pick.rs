@@ -20,9 +20,9 @@ pub(super) struct MaskPick {
 }
 
 /// What an armed press on an object does.
-pub(super) enum PickTarget {
+enum PickTarget {
     /// A path-like object or a group of them: added or removed.
-    Mask,
+    Mask(NodeId),
     /// A text, a sketch, a second image or a group holding one: not added, the row shows.
     Refused,
 }
@@ -66,22 +66,14 @@ impl Session {
         }
     }
 
-    /// The object a press at `point` picks and what the pick does with it, the traced `images`
-    /// never hit: the topmost mask-eligible object under the pointer, above or below the image
-    /// (a closed outline by its interior, filled or not; an open one by its stroke); without one,
-    /// the topmost other object under it is refused when it cannot be a mask path; `None` when
-    /// nothing but the image or empty canvas is there (criteria 36 to 38).
-    pub(super) fn trace_mask_pick_target(
+    /// The topmost mask-eligible object under `point`, the traced `images` never hit, above or
+    /// below the image: a closed outline by its interior, filled or not, an open one by its stroke
+    /// (criteria 35 and 36). Checked cheapest first, as the hover asks on every move.
+    pub(super) fn trace_mask_pick_eligible(
         &self,
         point: Point,
         images: &[NodeId],
-    ) -> Option<(NodeId, PickTarget)> {
-        let others: Vec<ObjectSnapshot> = self
-            .pickable_objects()
-            .iter()
-            .filter(|object| !images.contains(&object.id()))
-            .cloned()
-            .collect();
+    ) -> Option<NodeId> {
         let tolerance = self.object_tolerance();
         let units = self.units();
         let objects = self.objects();
@@ -93,26 +85,34 @@ impl Session {
                     .is_some_and(is_mask_path)
             })
         };
-        let under = |object: &ObjectSnapshot| {
-            !hit_test_objects(std::slice::from_ref(object), point, tolerance).is_empty()
-                || encloses(object, point)
-        };
-        if let Some(object) = others
+        self.pickable_objects()
             .iter()
             .rev()
-            .find(|object| is_mask_path(object) && eligible(object.id()) && under(object))
-        {
-            return Some((object.id(), PickTarget::Mask));
+            .filter(|object| !images.contains(&object.id()) && is_mask_path(object))
+            .find(|object| {
+                (!hit_test_objects(std::slice::from_ref(*object), point, tolerance).is_empty()
+                    || encloses(object, point))
+                    && eligible(object.id())
+            })
+            .map(ObjectSnapshot::id)
+    }
+
+    /// What a press at `point` picks: the eligible object under it; without one, a refusal when
+    /// the topmost other object hit there, the traced `images` left out, is a text, a sketch, a
+    /// second image or a group holding one; `None` over the image alone or empty canvas
+    /// (criterion 38).
+    fn trace_mask_pick_target(&self, point: Point, images: &[NodeId]) -> Option<PickTarget> {
+        if let Some(hit) = self.trace_mask_pick_eligible(point, images) {
+            return Some(PickTarget::Mask(hit));
         }
-        let hit = *hit_test_objects(&others, point, tolerance).first()?;
-        Some((
-            hit,
-            if eligible(hit) {
-                PickTarget::Mask
-            } else {
-                PickTarget::Refused
-            },
-        ))
+        let others: Vec<ObjectSnapshot> = self
+            .pickable_objects()
+            .iter()
+            .filter(|object| !images.contains(&object.id()))
+            .cloned()
+            .collect();
+        (!hit_test_objects(&others, point, self.object_tolerance()).is_empty())
+            .then_some(PickTarget::Refused)
     }
 
     /// A press while armed: adds or removes the mask path under it (the Shift+click route),
@@ -127,11 +127,11 @@ impl Session {
             return false;
         }
         match self.trace_mask_pick_target(point, &images) {
-            Some((hit, PickTarget::Mask)) => {
+            Some(PickTarget::Mask(hit)) => {
                 self.trace_select_hit(hit, true);
                 self.trace.mask_pick.refused = false;
             }
-            Some((_, PickTarget::Refused)) => self.trace.mask_pick.refused = true,
+            Some(PickTarget::Refused) => self.trace.mask_pick.refused = true,
             None => {}
         }
         true
@@ -144,10 +144,7 @@ impl Session {
             return;
         }
         let images = self.trace_view().images;
-        self.hovered_object = match self.trace_mask_pick_target(point, &images) {
-            Some((hit, PickTarget::Mask)) => Some(hit),
-            _ => None,
-        };
+        self.hovered_object = self.trace_mask_pick_eligible(point, &images);
     }
 }
 
