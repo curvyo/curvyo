@@ -20,6 +20,17 @@ export const TRACE_IMPORT = "Import image...";
 
 /** The bar with something else selected (criterion 3). */
 export const TRACE_NOT_IMAGE = "The selection is not an image. Click an image to trace it.";
+/** An image with a text, a sketch or a second image next to mask paths (`specs/0094` criterion 14). */
+export const TRACE_MIXED = "Use Object to path for text; one image at a time.";
+/** The mask paths cover none of the image (`specs/0094` criterion 7). */
+export const MASK_OUTSIDE_IMAGE = "0 paths: the mask is outside the image.";
+/** The mask paths could not be combined into one region (a kernel refusal). */
+export const MASK_FAILED = "0 paths: the mask paths could not be combined.";
+
+/** The status line's mask segment (`specs/0094` UX notes §7): "Inside 2 paths", "Outside 1 path". */
+export function maskText(outside: boolean, paths: number): string {
+  return paths > 0 ? `${outside ? "Outside" : "Inside"} ${paths} ${paths === 1 ? "path" : "paths"}` : "";
+}
 
 /** The name of the progress pill (criterion 10). */
 export const TRACING = "Tracing";
@@ -679,7 +690,14 @@ export function colourTolerance(values: TraceValues): number {
 /** The settings JSON `trace_job` of the wasm module reads, with `threshold`. Pick colours takes
  * the image's `suggested` background (resolved once on the full image, so the reduced preview and
  * the full-size trace agree; empty: transparent). */
-export function settingsJson(values: TraceValues, threshold: number, suggested?: string): string {
+export function settingsJson(values: TraceValues, threshold: number, suggested?: string, mask = ""): string {
+  const json = settingsOnly(values, threshold, suggested);
+  // `specs/0094`: the mask region rides in the settings, so a new mask or mode is a new result;
+  // without one the settings are as before.
+  return mask === "" ? json : `${json.slice(0, -1)},"mask":${mask}}`;
+}
+
+function settingsOnly(values: TraceValues, threshold: number, suggested?: string): string {
   const background = values.method === PICK_COLOURS && suggested !== undefined ? suggested : values.background;
   const multi = values.output === MULTICOLOUR;
   return JSON.stringify({

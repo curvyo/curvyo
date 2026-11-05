@@ -4,8 +4,11 @@ import type { WasmSession } from "@/lib/editorSession";
 import {
   BRIGHTNESS,
   MULTICOLOUR,
+  MASK_FAILED,
+  MASK_OUTSIDE_IMAGE,
   NO_COLOUR_PICKED_LINE,
   NO_STATUS,
+  maskText,
   PICK_COLOURS,
   zeroPathsLine,
   failureReason,
@@ -49,6 +52,7 @@ import { favouritesAmong } from "@/hooks/fontLibraryPage";
 import { listedFileBytes } from "@/hooks/useText";
 import type { FontFace } from "@/lib/textText";
 import { trace_auto_threshold, trace_suggest_background, trace_text_failed_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { applyRegionAnalysis, forgetRegionValues } from "@/lib/traceMaskCaches";
 import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import type { TraceApi } from "./traceApi";
 import { useTraceMask } from "./useTraceMask";
@@ -113,6 +117,13 @@ export function useTrace(
   const backgrounds = useRef(new Map<string, string>());
   /** Each image's analysis (`specs/0089` slice F; `null`: it failed), read once per image. */
   const analyses = useRef(new Map<string, TraceAnalysis | null>());
+  /** The images whose Threshold the maker set: a new mask keeps it (`specs/0094`). */
+  const makerThreshold = useRef(new Set<string>());
+  /** Per image the analysed values the maker set since its analysis (`specs/0094`): a new mask's
+   * analysis keeps them. */
+  const makerFields = useRef(new Map<string, Set<keyof TraceValues>>());
+  /** The images whose analysis is read again for a new mask region. */
+  const regionReread = useRef(new Set<string>());
   /** The images whose analysed values the maker changed since the analysis was applied. */
   const customised = useRef(new Set<string>());
   const [analysisState, setAnalysisState] = useState<TraceAnalysisState>({ kind: "none" });
@@ -138,6 +149,8 @@ export function useTrace(
   /** The text lines of the shown preview: set and found (UX notes §4). */
   const [textCounts, setTextCounts] = useState<[number, number]>([0, 0]);
   const [shapeCount, setShapeCount] = useState(0);
+  /** "1 shape crosses the mask edge unclipped." for the shown preview (`specs/0094`), or empty. */
+  const [unclipped, setUnclipped] = useState("");
   const textOptionsRef = useRef(textOptions);
   useEffect(() => {
     textOptionsRef.current = textOptions;
@@ -167,7 +180,7 @@ export function useTrace(
   // The settings, and whether the text is read (`specs/0091`): a kept result is reused only for
   // both.
   const key = (threshold: number, v: TraceValues, id: string) =>
-    settingsJson(v, threshold, backgrounds.current.get(id) ?? "");
+    settingsJson(v, threshold, backgrounds.current.get(id) ?? "", viewRef.current.mask);
   const resultKey = (settings: string, v: TraceValues) => `${settings}|${readsText(v) ? "text" : ""}`;
 
   /** The OCR lines JSON of image `id` (`specs/0091` decision 1): kept by the session, or read
@@ -259,7 +272,7 @@ export function useTrace(
       }
       let defaults: Awaited<ReturnType<TraceRunner["defaults"]>>;
       try {
-        defaults = await runner().defaults(pixels);
+        defaults = await runner().defaults(pixels, viewRef.current.mask);
       } catch (error) {
         if (error instanceof TraceCancelled) {
           // A newer job takes over (it shows "Analysing..." again after its 400 ms); Stop has
@@ -287,6 +300,23 @@ export function useTrace(
         // image is then dropped and the line reads Custom).
         const analysis = readAnalysis(defaults.analysis);
         analyses.current.set(id, analysis);
+        if (regionReread.current.delete(id) && analysis) {
+          // `specs/0094`: a new mask region; what the analysis filled in follows the region, what
+          // the maker set stays.
+          const maker = makerFields.current.get(id) ?? new Set<keyof TraceValues>();
+          if (!makerThreshold.current.has(id)) {
+            thresholds.current.set(id, analysis.threshold);
+          }
+          const values = applyRegionAnalysis(choiceRef.current.values, analysis, maker);
+          choiceRef.current = { ...choiceRef.current, values };
+          setChoice(choiceRef.current);
+          writeChoice(choiceRef.current);
+          if (viewRef.current.shown === id) {
+            setAnalysisState({ kind: maker.size > 0 ? "custom" : "auto", analysis });
+          }
+          const kept = thresholds.current.get(id);
+          return kept ?? analysis.threshold;
+        }
         const edited = known !== undefined || editedEarly.current.has(id);
         if (analysis && edited) {
           customised.current.add(id);
@@ -363,6 +393,14 @@ export function useTrace(
       setStopped(false);
       setFailure(null);
       setLoading(false);
+      if (viewRef.current.maskOutsideImage || viewRef.current.maskFailed) {
+        // `specs/0094` criterion 7: nothing to trace, no job; the preview is empty.
+        session.set_trace_preview(id, new Float64Array(7));
+        setUnclipped("");
+        setStatus({ ...NO_STATUS, line: viewRef.current.maskFailed ? MASK_FAILED : MASK_OUTSIDE_IMAGE });
+        onChange();
+        return;
+      }
       startTimers();
       const onProgress = (p: number) => {
         if (!stale()) {
@@ -425,6 +463,7 @@ export function useTrace(
           textSet = set;
           setTextCounts([set, found]);
           setShapeCount(session.trace_shape_count());
+          setUnclipped(session.trace_unclipped_notice());
         };
         // A picture of text only traces to no path and is still something to create
         // (`specs/0091`); a failed read says so in the bar (UX notes §3).
@@ -516,9 +555,19 @@ export function useTrace(
     if (
       next.selection === previous.selection &&
       next.shown === previous.shown &&
-      next.images.join() === previous.images.join()
+      next.images.join() === previous.images.join() &&
+      next.mask === previous.mask &&
+      next.maskPaths === previous.maskPaths &&
+      next.maskOutsideImage === previous.maskOutsideImage &&
+      next.maskFailed === previous.maskFailed
     ) {
       return;
+    }
+    if (next.mask !== previous.mask && next.shown) {
+      // `specs/0094` criterion 9: the automatic values and the analysis of the new region; a
+      // Threshold the maker set stays.
+      regionReread.current.add(next.shown);
+      forgetRegionValues(next.shown, { thresholds: thresholds.current, backgrounds: backgrounds.current, analyses: analyses.current }, makerThreshold.current);
     }
     viewRef.current = next;
     setView(next);
@@ -560,6 +609,14 @@ export function useTrace(
       const analysis = id ? analyses.current.get(id) : undefined;
       if (id && !analyses.current.has(id)) {
         editedEarly.current.add(id);
+      }
+      if (id) {
+        const changed = ANALYSED_FIELDS.filter((f) => next.values[f] !== choiceRef.current.values[f]);
+        if (changed.length > 0) {
+          const fields = makerFields.current.get(id) ?? new Set<keyof TraceValues>();
+          changed.forEach((f) => fields.add(f));
+          makerFields.current.set(id, fields);
+        }
       }
       if (id && analysis && ANALYSED_FIELDS.some((f) => next.values[f] !== choiceRef.current.values[f])) {
         customised.current.add(id);
@@ -603,6 +660,7 @@ export function useTrace(
       }
       if (name === "threshold" && viewRef.current.shown && typeof value === "number") {
         thresholds.current.set(viewRef.current.shown, value);
+        makerThreshold.current.add(viewRef.current.shown);
       }
       apply(editChoice(choiceRef.current, name, value));
     },
@@ -654,6 +712,8 @@ export function useTrace(
     const analysis = analyses.current.get(id);
     customised.current.delete(id);
     editedEarly.current.delete(id);
+    makerThreshold.current.delete(id);
+    makerFields.current.delete(id);
     if (!analysis) {
       analyses.current.delete(id);
       thresholds.current.delete(id);
@@ -693,7 +753,7 @@ export function useTrace(
     }
     const session = getSession();
     const current = viewRef.current;
-    if (!session || creating || current.images.length === 0) {
+    if (!session || creating || current.images.length === 0 || current.maskOutsideImage || current.maskFailed) {
       return;
     }
     const threshold = choiceRef.current.values.threshold;
@@ -826,6 +886,16 @@ export function useTrace(
     palettePick: palette.pick,
   });
 
+  /** The Mask item (`specs/0094` UX notes §1): the session's mode; the view's region changes, so
+   * the sync above traces again. */
+  const setMaskOutside = useCallback(
+    (outside: boolean) => {
+      getSession()?.set_trace_mask_outside(outside);
+      onChange();
+    },
+    [getSession, onChange],
+  );
+
   const keyDown = useCallback(
     (event: KeyboardEvent): boolean => {
       if (!active) {
@@ -872,7 +942,10 @@ export function useTrace(
   const recognised = reading
     ? READING_TEXT
     : [textLinesText(...textCounts), shapesText(shapeCount)].filter((t) => t !== "").join(" · ");
-  const advancedStatus = advancedStatusOf(status, palette.note, recognised);
+  const session = active ? getSession() : null;
+  const maskOutside = session?.trace_mask_outside() ?? false;
+  const mask = view.maskPaths > 0 && view.selection === "images" ? { paths: view.maskPaths, outside: maskOutside } : null;
+  const advancedStatus = advancedStatusOf(status, palette.note, recognised, mask ? maskText(mask.outside, mask.paths) : "");
   // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
   // has no paths.
   const traceBlocked =
@@ -883,7 +956,6 @@ export function useTrace(
         : status.canCreate
           ? ""
           : status.line || status.message;
-  const session = active ? getSession() : null;
   const pickMode = session?.trace_pick_mode() ?? "";
   const shownId = view.shown;
   const suggestedBackground = shownId ? (backgrounds.current.get(shownId) ?? null) : null;
@@ -891,6 +963,10 @@ export function useTrace(
     active,
     available,
     selection: view.selection,
+    // The notice row's muted line gains the unclipped shapes (`specs/0094`).
+    status: unclipped === "" ? status : { ...status, muted: [status.muted, unclipped].filter((t) => t !== "").join(" ") },
+    mask,
+    setMaskOutside,
     imagesLabel: imagesLabel(progress, view.images.length),
     params,
     presets,
@@ -898,7 +974,6 @@ export function useTrace(
     choice,
     presetLabel: presetLabel(choice, presets),
     advancedOpen,
-    status,
     countsStale: busy || stopped || creating,
     slot,
     viewMode,
@@ -937,8 +1012,9 @@ function colourCounts(session: WasmSession): { colours: number; joined: number }
 
 /** The Advanced status line (`ux-notes.md` §22.2): the result counts or the message that replaces
  * them, and in the muted line the specks, the joined regions and what a palette action did. */
-function advancedStatusOf(status: TraceStatusText, note: string, text: string): { text: string; muted: string } {
-  const muted = [status.countsMuted, note].filter((t) => t !== "").join(", ");
+function advancedStatusOf(status: TraceStatusText, note: string, text: string, mask = ""): { text: string; muted: string } {
+  // `specs/0094` UX notes §7: the mask segment ("Inside 2 paths") first.
+  const muted = [mask, [status.countsMuted, note].filter((t) => t !== "").join(", ")].filter((t) => t !== "").join(" · ");
   // `specs/0091` UX notes §4: the text lines after the existing segments, joined by " · ".
   return { text: status.message || status.counts, muted: [muted, text].filter((t) => t !== "").join(" · ") };
 }
