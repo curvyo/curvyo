@@ -241,11 +241,11 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
 
     // Criteria 2, 4, 11, 71: the Trace bar with its groups; the counts from the worker are the
-    // last row of the Advanced block, never in the state row.
+    // last row of the Advanced block, never in a visible state row (the sr-only statuses may say them).
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]')`)) ? true : null));
     await sleep(1500);
     assert.equal(
-      await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]') === null && !/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [role=status]')?.textContent ?? '')`),
+      await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]') === null && ![...document.querySelectorAll('[role=toolbar][aria-label=Trace] [role=status]:not(.sr-only)')].some((e) => /\\d+ paths?\\b/.test(e.textContent ?? ''))`),
       true,
       "no counts with Advanced closed",
     );
