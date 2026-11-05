@@ -132,6 +132,8 @@ mod wasm_tiling;
 #[cfg(target_arch = "wasm32")]
 mod wasm_trace;
 #[cfg(target_arch = "wasm32")]
+mod wasm_trace_region;
+#[cfg(target_arch = "wasm32")]
 mod wasm_weld;
 #[cfg(target_arch = "wasm32")]
 mod wasm_workspace;
@@ -182,7 +184,8 @@ pub use trace_analysis_glue::analysis_json as trace_analysis_json;
 pub use trace_fit_glue::{FitTextRead, FitWorker, read_fit_result};
 pub use trace_glue::{
     hex as trace_hex, ocr_lines_json, read_ocr_lines, recognise_shapes as trace_recognise_shapes,
-    trace_colour_settings, trace_params_json, trace_presets_json, trace_settings,
+    trace_colour_settings, trace_mask_region, trace_params_json, trace_presets_json,
+    trace_settings,
 };
 pub use workspace_share_builder::{NotAdded, ShareFiles, WorkspaceShareBuilder};
 

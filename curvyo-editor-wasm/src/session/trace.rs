@@ -44,6 +44,8 @@ pub(super) struct TracePreview {
     pub(super) text_counts: (usize, usize),
     /// Shapes set (`specs/0088` Part B, UX notes B3): the primitives of the recognised regions.
     pub(super) shape_count: usize,
+    /// Shapes kept whole across the mask edge after a kernel refusal (`specs/0094`).
+    pub(super) unclipped: usize,
     /// The tessellated hollow outline, kept across frames (criterion 56).
     pub(super) outline_mesh: MeshCache,
     /// The tessellated filled result of the Trace view, kept across frames (criterion 56).
@@ -75,6 +77,10 @@ pub(super) struct TraceState {
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).
     reduced: Option<(AssetHash, Arc<WorkingImage>)>,
+    /// Outside is chosen in the Mask item (`specs/0094` criterion 17: Inside on every entry).
+    pub(super) mask_outside: bool,
+    /// The region of the mask paths, made once per change of them (`trace_region.rs`).
+    pub(super) region: std::cell::RefCell<Option<super::trace_region::RegionCache>>,
 }
 
 /// The counts of each group Create paths wrote in this session, for its Layers row's tooltip
@@ -89,8 +95,11 @@ pub enum TraceSelection {
     Empty,
     /// Something that is not an image is selected.
     Other,
-    /// Only images are selected.
+    /// Only images are selected, or one image and mask paths (`specs/0094`).
     Images,
+    /// An image with a text, a sketch or a second image next to mask paths: "Use Object to path
+    /// for text; one image at a time." (`specs/0094` criterion 14).
+    Mixed,
 }
 
 /// What the Trace bar and the Select bar's Trace button read.
@@ -102,6 +111,13 @@ pub struct TraceView {
     pub images: Vec<NodeId>,
     /// The image the preview shows: the one clicked last, else the last selected.
     pub shown: Option<NodeId>,
+    /// The mask paths selected with the image, in document order (`specs/0094`).
+    pub mask: Vec<NodeId>,
+    /// The mask paths enclose no area of the image: "0 paths: the mask is outside the image."
+    /// (criterion 7).
+    pub mask_outside_image: bool,
+    /// The kernel refused to combine the mask paths: "0 paths: the mask could not be combined."
+    pub mask_failed: bool,
 }
 
 /// One image's pixels and pixel map for the worker.
@@ -136,7 +152,9 @@ pub enum TraceCreateOutcome {
 }
 
 impl Session {
-    /// The selected images when only images are selected.
+    /// The selected images when only images are selected, or the one image of an image with
+    /// mask paths (`specs/0094` criterion 14: an image with text, a sketch or a second image
+    /// next to mask paths is [`TraceSelection::Mixed`]).
     pub(super) fn trace_images(&self) -> (TraceSelection, Vec<ImageSnapshot>) {
         let ids = self.selection.ids();
         if ids.is_empty() {
@@ -144,13 +162,39 @@ impl Session {
         }
         let objects = self.objects();
         let mut images = Vec::with_capacity(ids.len());
+        let (mut masks, mut refused) = (0, 0);
         for id in ids {
             match objects.iter().find(|object| object.id() == *id) {
                 Some(ObjectSnapshot::Image(image)) => images.push(image.clone()),
-                _ => return (TraceSelection::Other, Vec::new()),
+                Some(object) if super::trace_region::is_mask_path(object) => masks += 1,
+                Some(_) => refused += 1,
+                // A selected group (`specs/0094` Terms: a group counts as the paths in it): its
+                // leaves, at any depth, are mask paths when every one is path-like.
+                None => {
+                    let leaves = self.document.leaves_of(*id);
+                    let paths = leaves
+                        .iter()
+                        .filter(|leaf| {
+                            objects.iter().any(|object| {
+                                object.id() == **leaf && super::trace_region::is_mask_path(object)
+                            })
+                        })
+                        .count();
+                    if paths > 0 && paths == leaves.len() {
+                        masks += paths;
+                    } else {
+                        refused += 1;
+                    }
+                }
             }
         }
-        (TraceSelection::Images, images)
+        if images.is_empty() {
+            return (TraceSelection::Other, Vec::new());
+        }
+        match (masks, refused, images.len()) {
+            (0, 0, _) | (1.., 0, 1) => (TraceSelection::Images, images),
+            _ => (TraceSelection::Mixed, Vec::new()),
+        }
     }
 
     /// What the Trace bar shows (criteria 1 to 4, 46).
@@ -163,10 +207,20 @@ impl Session {
             .last_clicked
             .filter(|id| images.contains(id))
             .or_else(|| images.last().copied());
+        let mask: Vec<NodeId> = self
+            .trace_mask_objects()
+            .iter()
+            .map(ObjectSnapshot::id)
+            .collect();
+        let mask_failed = !mask.is_empty() && self.trace_mask_failure().is_some();
+        let mask_outside_image = !mask.is_empty() && !mask_failed && !self.trace_mask_meets_image();
         TraceView {
             selection,
             images,
             shown,
+            mask,
+            mask_outside_image,
+            mask_failed,
         }
     }
 
@@ -263,6 +317,7 @@ impl Session {
             joined: read.joined,
             text_counts: (read.texts.lines.len(), read.texts.found),
             shape_count: read.shapes.iter().map(TraceShapeRegion::primitives).sum(),
+            unclipped: read.unclipped,
             outline_mesh: MeshCache::default(),
             fill_mesh: MeshCache::default(),
         });
@@ -295,6 +350,13 @@ impl Session {
             .preview
             .as_ref()
             .map_or((0, 0), |p| p.text_counts)
+    }
+
+    /// The muted notice of the shown preview's shapes kept whole across the mask edge
+    /// (`specs/0094`): "1 shape crosses the mask edge unclipped.", or empty.
+    #[must_use]
+    pub fn trace_unclipped_notice(&self) -> String {
+        curvyo_ui_core::unclipped_notice(self.trace.preview.as_ref().map_or(0, |p| p.unclipped))
     }
 
     /// The shapes the shown preview sets (`specs/0088` Part B, UX notes B3).

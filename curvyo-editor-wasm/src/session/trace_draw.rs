@@ -96,6 +96,7 @@ impl Session {
         match self.shown_trace_view_mode() {
             TraceViewMode::Overlay => {
                 self.trace_wash(objects);
+                self.trace_region_wash(objects);
                 None
             }
             TraceViewMode::Image => None,
