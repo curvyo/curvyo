@@ -1,10 +1,11 @@
 //! Pick mask paths, the Trace tool's pick mode (`specs/0094-masked-composite-trace` slice 1b,
-//! criteria 34 to 43, `ux-notes.md` §11): while it is armed, a press on a path-like object or a
-//! group of them adds it to or removes it from the mask paths by the Shift+click route of the
-//! tool, a press on a text, a sketch or a second image is refused, and the mode stays armed.
+//! criteria 34 to 43, `ux-notes.md` §11): while it is armed, a press adds or removes the topmost
+//! mask-eligible object under it by the Shift+click route of the tool, the traced image never hit;
+//! a text, a sketch or a second image with nothing eligible under it is refused; the mode stays.
 
-use curvyo_document_core::{NodeId, Point};
-use curvyo_ui_core::hit_test_objects;
+use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
+use curvyo_ui_core::{hit_test_objects, mask_operand, object_outline_bounds};
+use kurbo::{BezPath, Shape};
 
 use super::trace_region::is_mask_path;
 use super::{Session, Tool};
@@ -19,13 +20,11 @@ pub(super) struct MaskPick {
 }
 
 /// What an armed press on an object does.
-enum PickTarget {
+pub(super) enum PickTarget {
     /// A path-like object or a group of them: added or removed.
     Mask,
     /// A text, a sketch, a second image or a group holding one: not added, the row shows.
     Refused,
-    /// The traced image: nothing.
-    Image,
 }
 
 impl Session {
@@ -67,29 +66,48 @@ impl Session {
         }
     }
 
-    /// The object a press at `point` hits and what the pick does with it; `None` on empty canvas.
-    fn trace_mask_pick_target(
+    /// The object a press at `point` picks and what the pick does with it, the traced `images`
+    /// never hit: the topmost mask-eligible object under the pointer, above or below the image
+    /// (a closed outline by its interior, filled or not; an open one by its stroke); without one,
+    /// the topmost other object under it is refused when it cannot be a mask path; `None` when
+    /// nothing but the image or empty canvas is there (criteria 36 to 38).
+    pub(super) fn trace_mask_pick_target(
         &self,
         point: Point,
         images: &[NodeId],
     ) -> Option<(NodeId, PickTarget)> {
-        let pickable = self.pickable_objects();
-        let hit = *hit_test_objects(&pickable, point, self.object_tolerance()).first()?;
+        let others: Vec<ObjectSnapshot> = self
+            .pickable_objects()
+            .iter()
+            .filter(|object| !images.contains(&object.id()))
+            .cloned()
+            .collect();
+        let tolerance = self.object_tolerance();
         let units = self.units();
-        let members = units.leaves_with(&hit);
-        if members.iter().all(|member| images.contains(member)) {
-            return Some((hit, PickTarget::Image));
-        }
         let objects = self.objects();
-        let path_like = members.iter().all(|member| {
-            objects
-                .iter()
-                .find(|object| object.id() == *member)
-                .is_some_and(is_mask_path)
-        });
+        let eligible = |hit: NodeId| {
+            units.leaves_with(&hit).iter().all(|member| {
+                objects
+                    .iter()
+                    .find(|object| object.id() == *member)
+                    .is_some_and(is_mask_path)
+            })
+        };
+        let under = |object: &ObjectSnapshot| {
+            !hit_test_objects(std::slice::from_ref(object), point, tolerance).is_empty()
+                || encloses(object, point)
+        };
+        if let Some(object) = others
+            .iter()
+            .rev()
+            .find(|object| is_mask_path(object) && eligible(object.id()) && under(object))
+        {
+            return Some((object.id(), PickTarget::Mask));
+        }
+        let hit = *hit_test_objects(&others, point, tolerance).first()?;
         Some((
             hit,
-            if path_like {
+            if eligible(hit) {
                 PickTarget::Mask
             } else {
                 PickTarget::Refused
@@ -114,7 +132,7 @@ impl Session {
                 self.trace.mask_pick.refused = false;
             }
             Some((_, PickTarget::Refused)) => self.trace.mask_pick.refused = true,
-            Some((_, PickTarget::Image)) | None => {}
+            None => {}
         }
         true
     }
@@ -131,4 +149,27 @@ impl Session {
             _ => None,
         };
     }
+}
+
+/// Whether a closed outline of `object` holds `point` by the nonzero rule, filled or not: a mask
+/// path is a region, so an outline-only circle is picked inside (a hole of a compound path is not).
+fn encloses(object: &ObjectSnapshot, point: Point) -> bool {
+    let (low, high) = object_outline_bounds(object);
+    if point.x < low.x || point.x > high.x || point.y < low.y || point.y > high.y {
+        return false;
+    }
+    let at = |p: Point| kurbo::Point::new(p.x, p.y);
+    let mut path = BezPath::new();
+    for (anchors, _) in mask_operand(object)
+        .iter()
+        .filter(|(anchors, closed)| *closed && anchors.len() >= 2)
+    {
+        path.move_to(at(anchors[0].0));
+        for (i, &(from, _, out)) in anchors.iter().enumerate() {
+            let (to, into, _) = anchors[(i + 1) % anchors.len()];
+            path.curve_to(at(from.translated(out)), at(to.translated(into)), at(to));
+        }
+        path.close_path();
+    }
+    path.winding(at(point)) != 0
 }

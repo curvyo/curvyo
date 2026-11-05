@@ -242,17 +242,18 @@ fn c38_a_text_and_a_second_image_are_refused_and_the_image_does_nothing() {
         assert!(session.trace_mask_pick(), "{name}: still armed");
         assert_eq!(session.trace_view().selection, TraceSelection::Images);
     }
-    // The next accepted pick clears the row.
-    let (path, edge) = rect_over(&session, first);
-    click(&mut session, edge);
-    assert_eq!(session.trace_view().mask, [path]);
-    assert!(!session.trace_mask_pick_refused());
-    // The traced image and empty canvas change nothing.
+    // The traced image and empty canvas change nothing (here with no mask path over the image:
+    // a click inside a closed one picks it).
     let before = session.selection.ids().to_vec();
     click(&mut session, first);
     assert_eq!(session.selection.ids(), before, "the image");
     click(&mut session, Point::new(first.x - 300.0, first.y - 300.0));
     assert_eq!(session.selection.ids(), before, "empty canvas");
+    // The next accepted pick clears the row.
+    let (path, edge) = rect_over(&session, first);
+    click(&mut session, edge);
+    assert_eq!(session.trace_view().mask, [path]);
+    assert!(!session.trace_mask_pick_refused());
     // A double-click on the image creates no paths while armed.
     assert_eq!(
         session.double_click_hint(first, false, false),
