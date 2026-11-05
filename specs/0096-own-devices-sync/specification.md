@@ -1,6 +1,6 @@
 # Sync across the maker's own computers
 
-Status: Ready, built on `story/0096-own-devices-sync` (customer decisions of 2026-11-04 applied; ADR 0040 accepted; the open dependency on browser key custody was answered by Frage 145 A, passkey backup; criteria 29, 34, 36 and 38 amended to the built behaviour, (Proposal), 2026-11-04)
+Status: Done, slice 1 desktop and browser (PR #270)
 Priority: Must
 Origin: Customer (request of 2026-11-04, translated): sync the workspace across my own computers, slice 2 of `0095`. The maker pairs a second computer once with the first; afterwards the workspaces sync automatically through the server without an invite link, still end to end encrypted, and the server sees nothing but ciphertext (WS-META of `0095`). Standing requirements: R-SYS-004, R-COLLAB-003 (always available, not conditional on a sync folder), R-COLLAB-006. What is marked Proposal is the product owner's until the customer accepts it.
 
