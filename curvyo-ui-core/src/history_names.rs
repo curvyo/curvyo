@@ -18,6 +18,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("add_manufacturing", "Add manufacturing"),
     ("delete_manufacturing", "Delete manufacturing"),
     ("set_work_area", "Change work area"),
+    // `specs/0098-page-kinds` criteria 3, 4 and 12.
+    ("add_sketch_page", "Add sketch page"),
+    ("add_output_page", "Add laser page"),
+    ("delete_placement", "Delete placement"),
     ("add_fixture", "Add fixture"),
     ("delete_fixture", "Delete fixture"),
     ("set_fixture_visible", "Show or hide fixture"),
@@ -239,6 +243,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
 /// rows named after the step they name (`specs/0041-object-history`).
 pub const RESERVED_LABELS: &[&str] = &[
     curvyo_document_core::LABEL_NEW_DOCUMENT,
+    curvyo_document_core::LABEL_MIGRATE_FORMAT,
     curvyo_document_core::LABEL_UNDO,
     curvyo_document_core::LABEL_REDO,
     curvyo_document_core::WIPE_LABEL,

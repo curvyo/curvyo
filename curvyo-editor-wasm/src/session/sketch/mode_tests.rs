@@ -1,5 +1,6 @@
 //! Revised drawing modes retain connected intent across actual input events.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Position};
 
@@ -19,7 +20,7 @@ fn alt(s: &mut Session) {
 #[test]
 fn pointer_chain_changes_to_tangent_arc_without_committing_mode_change() {
     let mut s = Session::new(66199);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     let placement = s.sketch_placement().unwrap();
     for p in [Point::new(20.0, 20.0), Point::new(30.0, 20.0)] {
@@ -52,7 +53,7 @@ fn pointer_chain_changes_to_tangent_arc_without_committing_mode_change() {
 #[test]
 fn typed_tangent_line_preserves_length_in_the_requested_direction() {
     let mut s = Session::new(66209);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     s.sketch_construct(&Construction::Polyline(vec![
         Position::mm(10.0, 10.0),
@@ -100,7 +101,7 @@ fn typed_tangent_line_preserves_length_in_the_requested_direction() {
 #[test]
 fn dimension_placement_is_ephemeral_until_one_atomic_typed_commit() {
     let mut s = Session::new(66230);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Polyline(vec![
         Position::mm(10.0, 10.0),
         Position::mm(20.0, 10.0),
@@ -147,7 +148,7 @@ fn dimension_placement_is_ephemeral_until_one_atomic_typed_commit() {
 #[test]
 fn invalid_dimension_position_cannot_write_a_constraint_before_failing() {
     let mut s = Session::new(66231);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Polyline(vec![
         Position::mm(10.0, 10.0),
         Position::mm(20.0, 10.0),
@@ -176,7 +177,7 @@ fn invalid_dimension_position_cannot_write_a_constraint_before_failing() {
 #[test]
 fn centre_arc_numeric_radius_is_ephemeral_and_does_not_move_pinned_start() {
     let mut s = Session::new(66232);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::ArcCenter);
     let frame = s.sketch_placement().unwrap();
     let global = |x, y| frame.apply_point(Point::new(x, y));
@@ -233,7 +234,7 @@ fn centre_arc_numeric_radius_is_ephemeral_and_does_not_move_pinned_start() {
 #[test]
 fn clicking_existing_open_endpoint_reuses_its_identity_for_continuation() {
     let mut s = Session::new(66233);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Polyline(vec![
         Position::mm(10.0, 10.0),
         Position::mm(20.0, 10.0),
@@ -272,7 +273,7 @@ fn clicking_existing_open_endpoint_reuses_its_identity_for_continuation() {
 #[test]
 fn axis_inference_does_not_duplicate_an_implied_perpendicular_coordinate() {
     let mut s = Session::new(66234);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     let map = s.sketch_placement().unwrap();
     for p in [Point::new(-20.0, 0.0), Point::new(0.0, 0.0)] {
@@ -306,7 +307,7 @@ fn standalone_arc_resumes_line_and_arc_endpoints_as_one_undoable_step() {
         ]),
     ] {
         let mut s = Session::new(66235);
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         s.sketch_construct(&base).unwrap();
         let id = s.active_sketch().unwrap();
         let before = s.document.sketch(id).unwrap();
@@ -365,7 +366,7 @@ fn standalone_arc_resumes_line_and_arc_endpoints_as_one_undoable_step() {
 #[test]
 fn radius_preference_updates_pending_dimension_without_document_writes() {
     let mut s = Session::new(66236);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Circle {
         center: Position::mm(20.0, 20.0),
         radius: curvyo_sketch_core::Length(6.0),

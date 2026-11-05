@@ -1,6 +1,7 @@
 //! Click-to-follow creation below 4 screen pixels and press-drag-release above (0066 AC38, AC41).
 use super::*;
 use crate::session::KeyInput;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Entity, Position, Relation, Sketch};
 
@@ -38,7 +39,7 @@ fn escape(s: &mut Session) {
 
 fn session(tool: SketchTool) -> Session {
     let mut s = Session::new(66_910);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(tool);
     s
 }

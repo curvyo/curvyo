@@ -352,4 +352,13 @@ mod tests {
         s.document.resize_path(p, &flat, None).unwrap();
         assert_eq!(s.take_clone_hold_notice(), "2 clones became paths.");
     }
+
+    #[test]
+    fn opening_the_format_36_migration_golden_posts_no_clone_notice() {
+        let bytes = include_bytes!(
+            "../../../curvyo-document-core/tests/fixtures/page_kinds_migration_v36.curvyo"
+        );
+        let mut s = Session::open(7, bytes).unwrap();
+        assert_eq!(s.take_clone_hold_notice(), "");
+    }
 }

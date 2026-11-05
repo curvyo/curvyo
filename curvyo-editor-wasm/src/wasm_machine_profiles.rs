@@ -43,11 +43,6 @@ impl WasmSession {
         self.session.pick_machine_profile(id)
     }
 
-    /// The Name field.
-    pub fn set_machine_name(&mut self, text: &str) -> String {
-        self.session.set_machine_name(text).unwrap_or_default()
-    }
-
     /// The origin corner by its stored name.
     pub fn set_machine_origin(&mut self, name: &str) -> bool {
         self.session.set_machine_origin(name)

@@ -1,58 +1,59 @@
-//! The commands of a manufacturing workbench (criteria 2, 3, 9, 10, 13): each is one history
-//! step recorded like every other command; values are clamped by the extension's schema.
+//! The commands of a laser page (`0093` criteria 9, 10; `0098` criteria 4, 12): each is one
+//! history step recorded like every other command; values are clamped by the extension's schema.
 
-use curvyo_document_core::{Length, NewManufacturing, NodeId};
+use curvyo_document_core::{Length, NewOutputPage, NodeId};
 use curvyo_extension_core::{FixtureKind, Param, ParamValue, WorkbenchContribution};
 use curvyo_laser_core::{ProfileCopy, write_copy};
 
-use super::super::{Session, Workbench};
+use super::super::Session;
 
 impl Session {
-    /// Add manufacturing with the process `process` (criterion 2): "Laser 1" with the copy and
-    /// work area of the profile last picked on this computer (`0026` criterion 10), the active
-    /// drawing page placed at the output page's top-left corner, in one step; then its workbench
-    /// opens. `None` for a process that is not compiled in or is switched off.
-    pub fn add_manufacturing(&mut self, process: &str) -> Option<NodeId> {
+    /// Add page with an output kind (`specs/0098-page-kinds` criterion 4): "Laser N" with the
+    /// copy and work area of the profile last picked on this computer (`0026` criterion 10),
+    /// nothing placed, in one step; the new page becomes active. `None` for a process that is
+    /// not compiled in or is switched off.
+    pub fn add_output_page(&mut self, process: &str) -> Option<String> {
+        self.add_output_page_with(process, None)
+    }
+
+    /// As [`Session::add_output_page`] with the library profile `profile` (the machine list of
+    /// the Add page group), else the last pick.
+    pub fn add_output_page_with(&mut self, process: &str, profile: Option<&str>) -> Option<String> {
         if !self.process_enabled(process) {
             return None;
         }
         let manifest = curvyo_ui_core::manifest(process)?;
         let workbench = manifest.workbench()?;
-        let place = self.active_page().id;
-        let profile = self.initial_machine_profile();
+        let picked = profile.and_then(|id| self.manufacturing.machine.profiles.find(id).cloned());
+        let chosen = picked.is_some();
+        let profile = picked.unwrap_or_else(|| self.initial_machine_profile());
         let copy = write_copy(&ProfileCopy::of(&profile));
-        let id = self.recording(|this| {
+        let page = self.recording(|this| {
             this.document
-                .add_manufacturing(NewManufacturing {
+                .add_output_page(NewOutputPage {
                     process,
                     label: workbench.label,
                     profile: Some(&copy),
                     work_area: profile.work_area,
-                    place: Some(&place),
                 })
                 .ok()
         })?;
-        self.manufacturing.return_to = self.workbench();
-        self.set_workbench(Workbench::Manufacturing(id));
-        Some(id)
+        // A machine chosen in the Add page group is this computer's last pick (criterion 1).
+        if chosen {
+            self.remember_machine_pick(&profile.id);
+        }
+        self.activate_page(&page.id);
+        Some(page.id)
     }
 
-    /// Deletes the manufacturing `id` with its output page and fixtures in one step, no confirm
-    /// (criterion 13, lead decision); its workbench hands over to Vector, and the undo that
-    /// restores it opens it again. Allowed for a disabled one too.
-    pub fn delete_manufacturing(&mut self, id: NodeId) -> bool {
-        let deleted = self.recording(|this| this.document.delete_manufacturing(id).is_ok());
-        if deleted && self.workbench() == Workbench::Manufacturing(id) {
-            self.set_workbench(Workbench::Vector);
-            self.manufacturing.deleted_from = Some(id);
+    /// Deletes the placement `id` of the active laser page (`0098` criterion 12): only the
+    /// reference goes, in one step.
+    pub fn delete_placement(&mut self, id: NodeId) -> bool {
+        let deleted = self.recording(|this| this.document.delete_placement(id).is_ok());
+        if deleted {
+            self.manufacturing.selected_placement = None;
         }
         deleted
-    }
-
-    /// Sets the active manufacturing's work area, each side set into the profile range
-    /// (criterion 3); the output page follows at once. `false` when nothing changed.
-    pub fn set_work_area(&mut self, width: Length, height: Length) -> bool {
-        self.set_work_area_limited(width, height).0
     }
 
     /// Installs a fixture of `kind` with its defaults at the end of the active setup (criterion

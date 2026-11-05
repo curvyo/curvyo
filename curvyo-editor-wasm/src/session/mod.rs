@@ -131,6 +131,8 @@ mod select_readout;
 mod select_view;
 mod shapes;
 mod sketch;
+#[cfg(test)]
+pub(crate) mod test_pages;
 mod thumbnail;
 mod tiling;
 mod tiling_handles;
@@ -445,6 +447,12 @@ pub struct Session {
     formats_broken: Option<String>,
     /// The Properties panel's active tab (`panel_tabs.rs`).
     panel_tabs: std::cell::Cell<curvyo_ui_core::PanelTabs>,
+    /// The tab last used on a page of each kind, by kind key (`specs/0098` criterion 9);
+    /// session view state.
+    kind_tabs: std::collections::BTreeMap<String, curvyo_ui_core::PanelTab>,
+    /// The kind key of the page the open tab belongs to; `None` before an opened file's first
+    /// page is read.
+    tab_kind: Option<String>,
     /// Pan/zoom view state (ADR 0009 §2: ephemeral — never written to
     /// the document, resets on `New`/`Open`).
     viewport: Viewport,
@@ -640,6 +648,9 @@ impl Session {
             // A new or opened project starts with an empty selection
             // (`specs/0043-properties-tabs/` criterion 5, 11).
             panel_tabs: std::cell::Cell::new(curvyo_ui_core::PanelTabs::new(false)),
+            kind_tabs: std::collections::BTreeMap::new(),
+            // A new document's only page is a drawing page.
+            tab_kind: Some("drawing".to_owned()),
             colour_pick: colour_pick::ColourPick::default(),
             background_preview: None,
             page_view: curvyo_ui_core::PageViewState::default(),
@@ -734,6 +745,8 @@ impl Session {
             // A new or opened project starts with an empty selection
             // (`specs/0043-properties-tabs/` criterion 5, 11).
             panel_tabs: std::cell::Cell::new(curvyo_ui_core::PanelTabs::new(false)),
+            kind_tabs: std::collections::BTreeMap::new(),
+            tab_kind: None,
             colour_pick: colour_pick::ColourPick::default(),
             background_preview: None,
             page_view: curvyo_ui_core::PageViewState::default(),
@@ -798,6 +811,8 @@ impl Session {
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
+        // The first page's kind decides the tools (`specs/0098` criterion 8).
+        session.sync_workbench();
         Ok(session)
     }
 
@@ -913,15 +928,17 @@ impl Session {
                 return;
             }
             this.held.shift = shift;
+            // A press in the frame of a page of another kind only activates it: the tools follow
+            // (`specs/0098` criterion 8), and nothing is drawn or started.
+            if this.activate_page_of_other_kind_at(point) {
+                return;
+            }
             if this.workbench() == Workbench::Sketch {
                 this.sketch_pointer_down(point);
                 return;
             }
-            if matches!(this.workbench(), Workbench::Manufacturing(_)) {
-                this.manufacturing_pointer_down(point);
-                return;
-            }
             this.page_view.press(&this.document.pages(), point);
+            this.sync_workbench();
 
             // Same flush as `set_tool`'s own doc comment explains: a canvas
             // click can change the selection (e.g. selecting a different
@@ -956,6 +973,18 @@ impl Session {
             this.button_down = true;
             match this.tool {
                 Tool::Select => {
+                    // A press on placed content and on no drawing object selects the placement
+                    // (`specs/0098` criterion 12).
+                    let on_object = !curvyo_ui_core::hit_test_objects(
+                        &this.objects(),
+                        point,
+                        this.object_tolerance(),
+                    )
+                    .is_empty();
+                    if !on_object && this.output_placement_press(point) {
+                        this.button_down = false;
+                        return;
+                    }
                     if !this.dimension_pointer_down(point, shift) {
                         this.select_pointer_down(point, shift);
                     }
@@ -1023,9 +1052,6 @@ impl Session {
         self.held.ctrl = constrain;
         if self.workbench() == Workbench::Sketch {
             self.sketch_pointer_hover(point);
-            return;
-        }
-        if matches!(self.workbench(), Workbench::Manufacturing(_)) {
             return;
         }
         if self.colour_pick_move(point) || self.trace_pick_move(point) {
@@ -1139,9 +1165,6 @@ impl Session {
                 this.sketch_pointer_up(point);
                 return;
             }
-            if matches!(this.workbench(), Workbench::Manufacturing(_)) {
-                return;
-            }
             if this.page_drag_end(point) {
                 return;
             }
@@ -1209,9 +1232,6 @@ impl Session {
             if this.workbench() == Workbench::Sketch {
                 // A dimension's text opens the entry box there (AC31, AC33).
                 this.sketch_edit_dimension_at(point);
-                return DoubleClickHint::None;
-            }
-            if matches!(this.workbench(), Workbench::Manufacturing(_)) {
                 return DoubleClickHint::None;
             }
             // On the position handle of a text on path: its entry box (`0080`, customer

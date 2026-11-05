@@ -1,13 +1,14 @@
 //! The revision 2 UI review changes through the session: small geometry, badge clearance,
 //! dimension kinds, entry refusals and canvas refusals (0066 UX notes, "Revision 2 UI review").
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Constraint, Construction, Entity, EntityId, Length, Position, Relation};
 use serde_json::Value;
 
 fn sketch_with(commands: &[Construction]) -> (Session, curvyo_document_core::NodeId) {
     let mut s = Session::new(66_900);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let id = s.new_sketch().unwrap();
     for command in commands {
         s.sketch_construct(command).unwrap();

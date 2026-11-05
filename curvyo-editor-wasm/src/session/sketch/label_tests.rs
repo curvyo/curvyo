@@ -1,5 +1,6 @@
 //! Alt cycles every mode and variant; the mode label and entry box come from Rust (AC33-AC35).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use crate::session::{KeyInput, KeyOutcome};
 use curvyo_document_core::Point;
 use serde_json::Value;
@@ -35,7 +36,7 @@ fn alt(s: &mut Session) -> KeyOutcome {
 
 fn sketch(tool: SketchTool) -> Session {
     let mut s = Session::new(66_600);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(tool);
     s
 }

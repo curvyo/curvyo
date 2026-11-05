@@ -2,6 +2,7 @@
 //! (0066 AC36, AC41).
 use super::*;
 use crate::session::KeyInput;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Entity, EntityId, Position, Sketch};
 
@@ -127,7 +128,7 @@ fn captured_click(s: &mut Session, at: Position, id: &EntityId, what: &str) {
 #[test]
 fn a_centre_first_arc_refills_a_deleted_chain_segment_on_both_free_endpoints() {
     let mut s = Session::new(66_900);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     // The customer's chain: polyline arc, tangent line, tangent arc, tangent arc to the start.
     click(&mut s, 20.0, 20.0);
@@ -267,7 +268,7 @@ const CASES: &[Case] = &[
 /// Lines (10, 10)-(20, 10) and (40, 40)-(50, 40) and the case's tool.
 fn setup(case: &Case) -> (Session, EntityId) {
     let mut s = Session::new(66_901);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     for (from, to) in [((10.0, 10.0), (20.0, 10.0)), ((40.0, 40.0), (50.0, 40.0))] {
         s.sketch_construct(&Construction::Polyline(vec![
             Position::mm(from.0, from.1),

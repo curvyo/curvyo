@@ -1,93 +1,73 @@
 //! Sketch workbench navigation resolves originals without writing document records.
 use super::{Session, SketchTool, Workbench};
-use curvyo_document_core::{NodeId, ObjectSnapshot, SketchEditError, Style};
+use curvyo_document_core::{NodeId, ObjectSnapshot, PageKind, SketchEditError, Style};
 use curvyo_sketch_core::Sketch;
 
 impl Session {
-    /// Current editing context; changing it does not create artwork.
+    /// The workbench of the active page (ADR 0042 §7): derived from its kind, never set.
     #[must_use]
-    pub const fn workbench(&self) -> Workbench {
-        self.sketch.workbench
+    pub fn workbench(&self) -> Workbench {
+        self.workbench_of_kind(&self.active_kind())
     }
 
-    /// Switches context while cancelling only unfinished interaction.
-    pub fn set_workbench(&mut self, workbench: Workbench) {
-        if workbench == self.sketch.workbench {
-            return;
+    /// The kind of the active page.
+    pub(in crate::session) fn active_kind(&self) -> PageKind {
+        // The stored active page is read by its own registers; only a page that is gone needs
+        // the page list's fallback.
+        self.page_view
+            .active
+            .as_deref()
+            .and_then(|id| self.document.page_kind(id))
+            .unwrap_or_else(|| self.active_page().kind)
+    }
+
+    /// The workbench a page of `kind` shows: a sketch page the Sketch workbench, an output page
+    /// of an enabled process its manufacturing, every other page (drawing, unknown, an output
+    /// page whose extension is off) the vector tools.
+    #[must_use]
+    pub fn workbench_of_kind(&self, kind: &PageKind) -> Workbench {
+        match kind {
+            PageKind::Sketch => Workbench::Sketch,
+            PageKind::Output {
+                manufacturing,
+                process,
+            } if self.process_enabled(process) => Workbench::Manufacturing(*manufacturing),
+            _ => Workbench::Vector,
         }
-        // A manufacturing that is gone or whose extension is off does not open (`0093`
-        // criterion 11, UX notes §1).
-        if let Workbench::Manufacturing(id) = workbench
-            && !self.manufacturing_available(id)
-        {
-            return;
-        }
-        self.cancel_gesture();
-        self.cancel_placement();
-        self.cancel_pen_entry();
-        self.end_snapping_drag();
-        self.button_down = false;
-        self.sketch.cancel();
+    }
+
+    /// Applies a change of the active page's workbench (criteria 8, 9): unfinished interaction
+    /// ends, the tab follows (the tab last used on a page of that kind when the open one is not
+    /// there, else Document) and the Sketch workbench enters the page's sketch. Not a history
+    /// step; nothing is written.
+    pub(in crate::session) fn sync_workbench(&mut self) {
+        let to = self.workbench();
         let from = self.sketch.workbench;
-        self.sketch.workbench = workbench;
-        if from == Workbench::Sketch {
-            self.return_from_source_page();
+        if to != from {
+            self.cancel_gesture();
+            self.cancel_placement();
+            self.cancel_pen_entry();
+            self.end_snapping_drag();
+            self.button_down = false;
+            self.sketch.cancel();
+            self.sketch.workbench = to;
         }
-        self.swap_workbench_view(from, workbench);
-        // A manufacturing workbench selects nothing and keeps the drawing's selection for the
-        // way back (UX notes §3).
-        if matches!(workbench, Workbench::Manufacturing(_)) {
+        // Two pages of one workbench can differ in kind (a drawing and a laser page with its
+        // extension off): the tab follows the kind.
+        self.follow_tab(to);
+        if to == from {
             return;
         }
-        if workbench == Workbench::Vector
-            && self.panel_tabs.get().active() == curvyo_ui_core::PanelTab::Parameters
-        {
-            self.press_panel_tab("document");
+        if to == Workbench::Sketch {
+            self.sketch.page = None;
+            self.sync_sketch_page();
+            self.sync_sketch();
+        } else if from == Workbench::Sketch {
+            self.sketch.active = None;
+            self.sketch.page = None;
+            self.sketch.entities.clear();
+            self.sketch.constraints.clear();
         }
-        if workbench == Workbench::Sketch {
-            self.press_panel_tab("sketches");
-            let selected = self.selection.ids().to_vec();
-            for id in selected {
-                if self.enter_sketch(id) {
-                    break;
-                }
-            }
-        }
-        if workbench == Workbench::Sketch
-            && self.document.page_sketch(&self.active_page().id).is_none()
-        {
-            let page = self.active_page();
-            let populated = self.document_read().leaves.iter().any(|object| {
-                let (min, max) = curvyo_ui_core::object_bounds(object);
-                page.overlaps(min, max)
-            });
-            // Proposal A: preserve populated Vector pages; create a dedicated source page.
-            if populated {
-                let page = self.active_page().id;
-                let view = self.viewport;
-                let source = self.add_page();
-                self.sketch.vector_return = Some(super::state::VectorReturn { page, view, source });
-            }
-        }
-        self.sync_sketch_page();
-        self.sync_sketch();
-    }
-
-    /// Leaving Sketch on the source page its entry created, with nothing drawn there, shows the
-    /// Vector page and view as they were (Proposal): the drawing is not left off-screen.
-    fn return_from_source_page(&mut self) {
-        let Some(back) = self.sketch.vector_return.take() else {
-            return;
-        };
-        if self.active_page().id != back.source
-            || self.document.page_sketch(&back.source).is_some()
-            || !self.activate_page(&back.page)
-        {
-            return;
-        }
-        let canvas = self.viewport.canvas_size();
-        self.viewport = back.view;
-        self.viewport.resize(canvas.0, canvas.1);
     }
 
     /// Active original sketch, excluding deleted or converted objects.

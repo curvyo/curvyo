@@ -319,14 +319,9 @@ impl Session {
         }
     }
 
-    /// A key a mode takes before the key table: a manufacturing workbench's (`specs/0093`
-    /// criterion 7), Enter in text-path pick mode (`0080` criterion 2), the tiling bar's.
+    /// A key a mode takes before the key table: Enter in text-path pick mode (`0080` criterion
+    /// 2), the tiling bar's.
     fn mode_key(&mut self, input: &KeyInput<'_>) -> Option<KeyOutcome> {
-        if matches!(self.workbench(), super::Workbench::Manufacturing(_))
-            && let Some(outcome) = self.manufacturing_key(input)
-        {
-            return Some(outcome);
-        }
         if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
             return Some(KeyOutcome::Consumed);
         }
@@ -343,6 +338,9 @@ impl Session {
         // (`specs/0042-history-branches` criterion 19).
         if self.document_preview_active() {
             return KeyOutcome::Paused;
+        }
+        if let Some(outcome) = self.page_switch_key(&input) {
+            return outcome;
         }
         if self.workbench() == super::Workbench::Sketch {
             return self.sketch_key(input);
@@ -608,11 +606,10 @@ impl Session {
 
     /// Acceptance criteria 19, 21 (Delete/Backspace, or the contextual
     /// toolbar's Delete button): removes every selected object when the
-    /// Select or Node tool is active. A no-op for every other tool; in a manufacturing
-    /// workbench it only shows the read-only notice (`specs/0093` criterion 7).
+    /// Select or Node tool is active. A no-op for every other tool.
     pub fn delete_selected(&mut self) {
-        if matches!(self.workbench(), super::Workbench::Manufacturing(_)) {
-            self.show_read_only_notice(None);
+        // A selected placement goes alone (`specs/0098` criterion 12).
+        if self.delete_selected_placement() {
             return;
         }
         self.recording(|this| {

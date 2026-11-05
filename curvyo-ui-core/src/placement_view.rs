@@ -74,6 +74,7 @@ mod tests {
             origin: Point::new(x, 0.0),
             size: DocumentSize::from_mm(100.0, 100.0),
             grid: PageGrid::DEFAULT,
+            kind: curvyo_document_core::PageKind::Drawing,
         }
     }
 

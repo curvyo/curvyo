@@ -169,8 +169,6 @@ impl Session {
             this.document.convert_sketch_to_path(snapshot.id, &ids)?;
             Ok::<_, SketchEditError>(snapshot.id)
         })?;
-        self.set_workbench(super::Workbench::Vector);
-        self.set_tool(crate::Tool::Select);
         self.selection.select_single(id);
         Ok(())
     }

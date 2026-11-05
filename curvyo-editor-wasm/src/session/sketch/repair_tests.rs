@@ -1,5 +1,6 @@
 //! Workbench navigation never changes the sketch's persistent intent.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_sketch_core::{Construction, Position};
 
 #[test]
@@ -8,7 +9,7 @@ fn constraints_conflict_inspection_parameter_errors_and_origin_changes_are_undoa
         Constraint, Entity, Expression, Length, Parameter, Quantity, Relation, SolveStatus,
     };
     let mut session = Session::new(69);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session
         .sketch_construct(&Construction::Circle {
@@ -88,7 +89,7 @@ fn constraints_conflict_inspection_parameter_errors_and_origin_changes_are_undoa
 fn fillet_preview_is_cancelable_revision_checked_and_commits_once() {
     use curvyo_sketch_core::Length;
     let mut session = Session::new(75);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session
         .sketch_construct_named(
@@ -143,7 +144,7 @@ fn literal_parameter_edit_repairs_a_cycle_created_by_peer_merge() {
     use curvyo_document_core::{SketchDelta, pack, unpack};
     use curvyo_sketch_core::{Dimension, Expression, Parameter, Quantity};
     let mut session = Session::new(76);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     for name in ["a", "b", "c", "d"] {
         session
@@ -234,7 +235,7 @@ fn dangling_relationships_created_by_merge_can_be_removed_individually() {
     use curvyo_document_core::{SketchDelta, pack, unpack};
     use curvyo_sketch_core::{Constraint, Relation};
     let mut session = Session::new(81);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     for name in ["a", "b"] {
         session
@@ -317,7 +318,7 @@ fn parameters_invalid(session: &Session, id: curvyo_document_core::NodeId) -> bo
 #[test]
 fn rejected_numeric_fillet_apply_invalidates_preview_without_history() {
     let mut session = Session::new(92);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session
         .sketch_construct_named(

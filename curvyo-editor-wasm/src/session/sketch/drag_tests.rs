@@ -1,11 +1,12 @@
 //! Workbench navigation never changes the sketch's persistent intent.
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_sketch_core::{Construction, Position};
 
 #[test]
 fn rectangle_clicks_and_circle_drag_use_actual_pointer_routes() {
     let mut session = Session::new(68);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,
@@ -42,7 +43,7 @@ fn rectangle_clicks_and_circle_drag_use_actual_pointer_routes() {
 fn ellipse_body_drag_is_live_shape_preserving_cancelable_and_one_commit() {
     use curvyo_sketch_core::{Entity, Length};
     let mut session = Session::new(71);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,
@@ -106,7 +107,7 @@ fn ellipse_body_drag_is_live_shape_preserving_cancelable_and_one_commit() {
 fn constrained_release_persists_feasible_point_even_after_dimension_removal() {
     use curvyo_sketch_core::{Constraint, Entity, Expression, Quantity, Relation};
     let mut session = Session::new(74);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,
@@ -205,7 +206,7 @@ fn constrained_release_persists_feasible_point_even_after_dimension_removal() {
 fn selected_ellipse_actual_axis_handle_edits_axis_without_moving_center() {
     use curvyo_sketch_core::{Entity, Length, SketchHandle, handle_positions};
     let mut session = Session::new(78);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,
@@ -252,7 +253,7 @@ fn selected_ellipse_actual_axis_handle_edits_axis_without_moving_center() {
 #[test]
 fn offset_press_preserves_raw_geometry_without_node_or_alt_attraction() {
     let mut session = Session::new(80);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     for (name, x) in [("moving", 10.0), ("target", 30.0)] {
         session
@@ -331,7 +332,7 @@ fn offset_press_preserves_raw_geometry_without_node_or_alt_attraction() {
 fn fixed_origin_constrained_drag_ignores_stationary_node_attraction() {
     use curvyo_sketch_core::{Constraint, Expression, Quantity, Relation};
     let mut session = Session::new(83);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let id = session.new_sketch().unwrap();
     for (name, p) in [
         ("moving", Position::mm(10.0, 20.0)),
@@ -393,7 +394,7 @@ fn fixed_origin_constrained_drag_ignores_stationary_node_attraction() {
 #[test]
 fn repeated_modifier_snapshot_does_not_advance_an_existing_drag_preview() {
     let mut session = Session::new(94);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     session.new_sketch().unwrap();
     session.set_snapping(curvyo_document_core::DocumentSnapping {
         enabled: false,

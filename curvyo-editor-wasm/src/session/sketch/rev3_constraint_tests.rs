@@ -1,6 +1,7 @@
 //! Selection-first constraints: each valid selection applies in one step, invalid ones wait for
 //! picks; Coincident and Symmetric targets (0066 AC37, AC40, AC41).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Entity, EntityId, Length, Position};
 
@@ -35,7 +36,7 @@ pub(super) fn click(s: &mut Session, at: (f64, f64), shift: bool) {
 
 pub(super) fn session() -> Session {
     let mut s = Session::new(66_920);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let p = |x: f64, y: f64| Position::mm(x, y);
     let mut commands = vec![
         Construction::Point(p(P1.0, P1.1)),

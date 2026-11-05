@@ -1,5 +1,6 @@
 //! Endpoint capture and the Ctrl angle lock act on real pointer events (AC27, AC28).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::Point;
 use curvyo_sketch_core::{Construction, Entity, EntityId, Position, Relation, Sketch};
 
@@ -27,7 +28,7 @@ fn px(s: &Session) -> f64 {
 /// A sketch holding one line from (10, 10) to (20, 10) and the Polyline tool.
 fn with_line() -> (Session, EntityId) {
     let mut s = Session::new(66_500);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.sketch_construct(&Construction::Polyline(vec![
         Position::mm(10.0, 10.0),
         Position::mm(20.0, 10.0),
@@ -160,7 +161,7 @@ fn ending_on_a_captured_endpoint_reuses_its_identity() {
 #[test]
 fn closing_a_chain_by_capture_yields_one_shared_point() {
     let mut s = Session::new(66_501);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     let u = px(&s);
     click(&mut s, 10.0, 10.0, false);
@@ -203,7 +204,7 @@ fn capture_applies_to_every_drawing_tool_but_not_to_select_or_fillet() {
 
 fn locked_session(degrees: f64) -> Session {
     let mut s = Session::new(66_510);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     click(&mut s, 30.0, 30.0, false);
     // 3 degrees off the stop and 25 mm away; Ctrl locks it.
@@ -260,7 +261,7 @@ fn ctrl_lock_commits_horizontal_or_vertical_only_at_the_axis_stops() {
 #[test]
 fn ctrl_lock_shows_the_pending_relation_and_angle_before_commit_and_releases() {
     let mut s = Session::new(66_511);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Polyline);
     click(&mut s, 30.0, 30.0, false);
     hover(&mut s, 55.0, 31.0, true);
@@ -302,7 +303,7 @@ fn ctrl_has_no_effect_in_fixed_direction_modes_and_capture_wins() {
 #[test]
 fn ctrl_lock_on_the_slot_centreline_constrains_its_side() {
     let mut s = Session::new(66_512);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Slot);
     click(&mut s, 30.0, 30.0, false);
     click(&mut s, 31.0, 60.0, true);

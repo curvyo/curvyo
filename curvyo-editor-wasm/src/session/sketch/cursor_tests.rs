@@ -1,5 +1,6 @@
 //! The Sketch cursor follows hover, press, drag, release and Escape in the event path (AC30).
 use super::*;
+use crate::session::test_pages::PageKinds as _;
 use curvyo_document_core::{Point, SketchDelta};
 use curvyo_sketch_core::{Constraint, Construction, Length, Position, Relation};
 
@@ -14,7 +15,7 @@ fn cursor(s: &Session) -> String {
 
 fn circle_session() -> Session {
     let mut s = Session::new(66_700);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.new_sketch().unwrap();
     s.sketch_construct(&Construction::Circle {
         center: Position::mm(30.0, 30.0),
