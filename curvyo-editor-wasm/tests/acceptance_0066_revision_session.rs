@@ -1,8 +1,10 @@
 //! Independent revised Session lifecycle and local-axis acceptance, without host routing claims.
 #![allow(clippy::unwrap_used)]
+mod page_kind_support;
 use curvyo_document_core::{Document, Point, Vec2, pack, unpack};
-use curvyo_editor_wasm::{Session, SketchTool, Workbench};
+use curvyo_editor_wasm::{Session, SketchTool};
 use curvyo_sketch_core::{Axis, Entity, Relation, Sketch};
+use page_kind_support::PageKinds as _;
 fn setup() -> (Session, Point) {
     let saved_document = Document::new(901);
     let page = saved_document.pages()[0].clone();
@@ -14,7 +16,7 @@ fn setup() -> (Session, Point) {
         -40.0 + page.size.height.as_mm() / 2.0,
     );
     let mut s = Session::open(902, &pack(&saved_document, "revision").unwrap()).unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     (s, center)
 }
 fn document(s: &Session) -> Document {
@@ -49,8 +51,8 @@ fn r01_empty_entry_hover_render_and_cancel_write_nothing() {
     std::hint::black_box(s.sketch_view_json());
     assert!(s.sketch_secondary_press());
     assert!(!s.sketch_secondary_press());
-    s.set_workbench(Workbench::Vector);
-    s.set_workbench(Workbench::Sketch);
+    s.to_drawing_page();
+    s.to_sketch_page();
     assert_eq!(document(&s).version(), before);
     assert_eq!(s.undo_len(), count);
     assert_eq!(s.active_sketch(), None);
@@ -239,7 +241,7 @@ fn r19_page_switch_cancels_pending_input_without_cross_page_commit() {
 }
 #[test]
 fn r09_clone_entry_returns_to_original_source_page_without_history() {
-    let document = Document::new(911);
+    let document = page_kind_support::sketch_document(911);
     let source_page = document.pages()[0].id.clone();
     let mut shape = Sketch::new("origin".into());
     shape.entities.insert(
@@ -260,7 +262,7 @@ fn r09_clone_entry_returns_to_original_source_page_without_history() {
     let clone = document.linked_clone(&[original], &[]).unwrap()[0];
     let mut session = Session::open(912, &pack(&document, "revision").unwrap()).unwrap();
     session.activate_page(&composition.id);
-    session.set_workbench(Workbench::Sketch);
+    session.to_sketch_page();
     let count = session.undo_len();
     assert!(session.enter_sketch(clone));
     assert_eq!(session.active_page().id, source_page);

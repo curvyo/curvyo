@@ -1,8 +1,10 @@
 //! Independent sketch lifecycle, origin, shape dragging and state diagnosis.
 #![allow(clippy::unwrap_used)]
+mod page_kind_support;
 use curvyo_document_core::{Document, Length, Point, RectBounds, pack, unpack};
 use curvyo_editor_wasm::{RowFlag, Session, SketchTool, Workbench};
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 fn doc(s: &Session) -> Document {
     unpack(941, &s.pack("acceptance").unwrap()).unwrap()
 }
@@ -10,7 +12,7 @@ fn state(s: &Session) -> curvyo_document_core::SketchSnapshot {
     doc(s).sketch(s.active_sketch().unwrap()).unwrap()
 }
 fn fresh() -> Session {
-    let d = Document::new(940);
+    let d = page_kind_support::sketch_document(940);
     d.create_page_sketch(
         &d.pages()[0].id,
         &sk::Sketch::new("origin".into()),
@@ -18,7 +20,7 @@ fn fresh() -> Session {
     )
     .unwrap();
     let mut s = Session::open(942, &pack(&d, "owned lifecycle fixture").unwrap()).unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let mut snap = s.snapping();
     snap.enabled = false;
     s.set_snapping(snap);
@@ -55,34 +57,28 @@ fn s01_source_page_creation_preserves_group_and_inert_layer_refusal() {
     s.double_click(Point::new(20.0, 25.0), false, false);
     assert_eq!(s.context_depth(), 1);
     let original_page = s.active_page().id;
-    let steps = s.undo_len();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert_ne!(s.active_page().id, original_page);
-    assert_eq!(
-        s.undo_len(),
-        steps + 1,
-        "dedicated source page is a separate reversible operation"
-    );
+    // `0098`: the sketch page is its own page; the steps that add it belong to the test setup.
+    let steps = s.undo_len();
     assert!(s.active_sketch().is_none());
     s.set_sketch_tool(SketchTool::Point);
     s.sketch_complete_numeric("30 mm", "30 mm").unwrap();
     let id = s.active_sketch().unwrap();
-    assert_eq!(s.undo_len(), steps + 2);
+    assert_eq!(s.undo_len(), steps + 1);
     assert_eq!(doc(&s).page_sketch(&s.active_page().id), Some(id));
     assert_eq!(doc(&s).parent_node(rect), Some(group));
     assert_eq!(doc(&s).parent_node(other), Some(group));
     s.undo();
     assert!(s.active_sketch().is_none());
     assert_eq!(doc(&s).parent_node(rect), Some(group));
-    s.undo();
-    assert_eq!(doc(&s).pages().len(), 1);
     for flag in [RowFlag::Locked, RowFlag::Visible] {
         let mut s = Session::new(952);
         s.new_layer_row();
         let layer = s.active_layer().unwrap();
         s.toggle_layer_row_flag(&serde_json::to_string(&layer).unwrap(), flag);
         let before = doc(&s).children(Some(layer));
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         let steps = s.undo_len();
         s.set_sketch_tool(SketchTool::Point);
         assert!(s.sketch_complete_numeric("30 mm", "30 mm").is_err());
@@ -260,7 +256,8 @@ fn s12_dimensions_redundancy_conflict_repair_and_conversion_undo() {
     assert!(!state(&s).stale);
     let id = s.active_sketch().unwrap();
     s.sketch_convert_to_path().unwrap();
-    assert_eq!(s.workbench(), Workbench::Vector, "conversion exits Sketch");
+    // `0098` criterion 5: the page stays a sketch page; what a path on it is, is `0099`.
+    assert_eq!(s.workbench(), Workbench::Sketch, "the page keeps its kind");
     assert_eq!(
         s.selected_object_count(),
         1,

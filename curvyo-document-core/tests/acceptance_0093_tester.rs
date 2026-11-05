@@ -3,6 +3,11 @@
 //! fixtures, delete and undo (criteria 2, 3, 5, 9, 10, 12, 13), the laser golden read against the
 //! criterion's own list, and the unknown-process round trip with data a build cannot know
 //! (process values, an unknown fixture kind, an unknown child) kept unchanged.
+//!
+//! Updated for `specs/0098-page-kinds` (its "Changes to accepted specs" table): criteria 2 and 3
+//! of `0093` are now Add page with Kind Laser and a read-only work area (`0098` 4, 13), a new laser
+//! page holds no placement (`0098` 4), and delete is Delete page (`0098` 16). Placements come from
+//! older files, so the placement tests build one in the raw file.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -14,22 +19,59 @@ use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    Affine, CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewManufacturing,
-    NodeId, OpenError, Point, RectBounds, pack, unpack,
+    Affine, CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewOutputPage, NodeId,
+    OpenError, Point, RectBounds, pack, unpack,
 };
 use loro::{LoroDoc, LoroValue, TreeParentId};
 
 const GRID: &str = "curvyo.laser/engraved_grid";
 const TOL: f64 = 1e-9;
 
-fn laser(place: Option<&str>) -> NewManufacturing<'_> {
-    NewManufacturing {
+fn laser() -> NewOutputPage<'static> {
+    NewOutputPage {
         process: "curvyo.laser",
         label: "Laser",
         profile: None,
         work_area: DocumentSize::from_mm(400.0, 300.0),
-        place,
     }
+}
+
+/// Add page with Kind Laser; the manufacturing that holds its machine data.
+fn add(d: &Document) -> NodeId {
+    d.add_output_page(laser())
+        .unwrap()
+        .kind
+        .manufacturing()
+        .unwrap()
+}
+
+/// `d` with a placement of `page` at identity under its first manufacturing, as an older file
+/// holds it, reopened.
+fn with_placement(d: &Document, page: &str) -> Document {
+    let loro = LoroDoc::new();
+    loro.import(&d.export_loro_snapshot().unwrap()).unwrap();
+    add_raw_placement(&loro, page);
+    loro.commit();
+    unpack(9, &container(&loro)).unwrap()
+}
+
+fn add_raw_placement(loro: &LoroDoc, page: &str) {
+    let tree = loro.get_tree("paths");
+    let node = manufacturing_node(loro);
+    let child = tree.create(TreeParentId::Node(node)).unwrap();
+    let meta = tree.get_meta(child).unwrap();
+    meta.insert("shape", "placement").unwrap();
+    let identity: Vec<LoroValue> = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+        .into_iter()
+        .map(LoroValue::Double)
+        .collect();
+    let link: std::collections::HashMap<String, LoroValue> = [
+        ("page".to_owned(), LoroValue::from(page)),
+        ("matrix".to_owned(), LoroValue::from(identity)),
+    ]
+    .into();
+    meta.insert("placement_link", LoroValue::from(link))
+        .unwrap();
 }
 
 fn grid(spacing: f64) -> FixtureParams {
@@ -113,6 +155,12 @@ fn manufacturing_node(loro: &LoroDoc) -> loro::TreeID {
         .unwrap()
 }
 
+/// The manufacturing node's registers and children, without the page record.
+fn manufacturing_meta_and_children(loro: &LoroDoc) -> (serde_json::Value, serde_json::Value) {
+    let value = manufacturing_value(loro);
+    (value["meta"].clone(), value["children"].clone())
+}
+
 /// The whole value of `loro`'s manufacturing subtree and its owned page record, for comparing a
 /// file before and after a round trip by meaning.
 fn manufacturing_value(loro: &LoroDoc) -> serde_json::Value {
@@ -152,14 +200,10 @@ fn ac2_add_is_one_step_and_its_undo_leaves_the_document_as_before() {
     let before = json(&d);
     let pages = d.pages();
     let steps = d.own_step_count();
-    let id = d.add_manufacturing(laser(Some(&pages[0].id))).unwrap();
-    assert_eq!(
-        d.own_step_count(),
-        steps + 1,
-        "Add manufacturing is one step"
-    );
+    let id = add(&d);
+    assert_eq!(d.own_step_count(), steps + 1, "Add laser page is one step");
     let m = d.manufacturing(id).unwrap();
-    assert_eq!(m.name, "Laser 1");
+    assert_eq!(m.page.as_ref().unwrap().name, "Laser 1");
     assert_eq!(
         m.legacy_machine_name, None,
         "format 36 writes no placeholder name"
@@ -167,65 +211,45 @@ fn ac2_add_is_one_step_and_its_undo_leaves_the_document_as_before() {
     undo_last(&d);
     assert!(d.manufacturings().is_empty());
     assert_eq!(d.pages(), pages);
-    assert_eq!(
-        json(&d),
-        before,
-        "undo removes manufacturing and output page"
-    );
+    assert_eq!(json(&d), before, "undo removes the laser page and its data");
 }
 
 #[test]
-fn ac2_the_next_manufacturing_takes_the_next_free_number() {
+fn ac2_the_next_laser_page_takes_the_next_free_number() {
     let d = Document::new(1);
-    let a = d.add_manufacturing(laser(None)).unwrap();
-    let b = d.add_manufacturing(laser(None)).unwrap();
-    assert_eq!(d.manufacturing(b).unwrap().name, "Laser 2");
-    d.delete_manufacturing(a).unwrap();
-    let c = d.add_manufacturing(laser(None)).unwrap();
-    assert_eq!(
-        d.manufacturing(c).unwrap().name,
-        "Laser 1",
-        "the smallest free number"
-    );
+    let a = d.add_output_page(laser()).unwrap();
+    let b = d.add_output_page(laser()).unwrap();
+    assert_eq!(b.name, "Laser 2");
+    d.delete_page(&a.id).unwrap();
+    let c = d.add_output_page(laser()).unwrap();
+    assert_eq!(c.name, "Laser 1", "the smallest free number");
 }
 
 #[test]
-fn ac3_the_output_page_is_the_work_area_and_follows_it_in_one_step() {
+fn ac3_the_output_page_is_the_work_area_and_no_size_command_writes_it() {
     let d = Document::new(1);
-    let first = d.pages()[0].id.clone();
-    let id = d.add_manufacturing(laser(Some(&first))).unwrap();
-    let m = d.manufacturing(id).unwrap();
-    let page = m.page.clone().unwrap();
+    let id = add(&d);
+    let page = d.manufacturing(id).unwrap().page.unwrap();
     assert_eq!(page.size, DocumentSize::from_mm(400.0, 300.0));
     assert!(
-        d.pages().iter().all(|p| p.id != page.id),
-        "owned page out of the drawing page list"
+        d.pages().iter().any(|p| p.id == page.id),
+        "the laser page is listed (`0098` criterion 10)"
     );
-    let matrix = m.placements[0].matrix;
     let steps = d.own_step_count();
     assert!(
-        d.set_work_area(id, DocumentSize::from_mm(600.0, 400.0))
-            .unwrap()
+        d.resize_page(&page.id, DocumentSize::from_mm(600.0, 400.0))
+            .is_err()
     );
-    assert_eq!(d.own_step_count(), steps + 1);
-    let m = d.manufacturing(id).unwrap();
-    assert_eq!(m.work_area(), DocumentSize::from_mm(600.0, 400.0));
-    assert_eq!(m.page.unwrap().size, DocumentSize::from_mm(600.0, 400.0));
-    assert_eq!(
-        m.placements[0].matrix, matrix,
-        "placed content keeps its place relative to the top-left corner"
+    assert!(
+        d.fit_page_to_content(&page.id, (Point::new(0.0, 0.0), Point::new(5.0, 5.0)))
+            .is_err()
     );
-    undo_last(&d);
-    assert_eq!(
-        d.manufacturing(id).unwrap().work_area(),
-        DocumentSize::from_mm(400.0, 300.0)
-    );
+    assert_eq!(d.own_step_count(), steps);
 }
 
 #[test]
 fn ac3_an_invalid_work_area_is_refused_and_writes_nothing() {
     let d = Document::new(1);
-    let id = d.add_manufacturing(laser(None)).unwrap();
     let steps = d.own_step_count();
     for (w, h) in [
         (0.0, 300.0),
@@ -233,30 +257,25 @@ fn ac3_an_invalid_work_area_is_refused_and_writes_nothing() {
         (f64::NAN, 300.0),
         (400.0, f64::INFINITY),
     ] {
-        assert!(
-            d.set_work_area(id, DocumentSize::from_mm(w, h)).is_err(),
-            "{w} x {h}"
-        );
+        let new = NewOutputPage {
+            work_area: DocumentSize::from_mm(w, h),
+            ..laser()
+        };
+        assert!(d.add_output_page(new).is_err(), "{w} x {h}");
     }
     assert_eq!(d.own_step_count(), steps);
-    assert_eq!(
-        d.manufacturing(id).unwrap().work_area(),
-        DocumentSize::from_mm(400.0, 300.0)
-    );
+    assert!(d.manufacturings().is_empty());
 }
 
 #[test]
-fn ac5_the_placement_is_a_reference_with_identity_matrix_and_no_copied_objects() {
+fn ac5_a_new_laser_page_places_nothing_and_copies_no_object() {
     let d = Document::new(1);
     let a = rect(&d, 10.0, 10.0);
     let b = rect(&d, 60.0, 40.0);
-    let first = d.pages()[0].id.clone();
     let objects_before = d.object_ids();
-    let id = d.add_manufacturing(laser(Some(&first))).unwrap();
+    let id = add(&d);
     let m = d.manufacturing(id).unwrap();
-    assert_eq!(m.placements.len(), 1);
-    assert_eq!(m.placements[0].page, first);
-    assert_eq!(m.placements[0].matrix, Affine::IDENTITY);
+    assert!(m.placements.is_empty(), "`0098` criterion 4");
     assert_eq!(
         d.object_ids(),
         objects_before,
@@ -267,8 +286,12 @@ fn ac5_the_placement_is_a_reference_with_identity_matrix_and_no_copied_objects()
         vec![a, b],
         "the drawing tree is unchanged"
     );
-    assert!(!d.is_in_manufacturing(a));
-    assert!(d.is_in_manufacturing(m.placements[0].id));
+    let placed = with_placement(&d, "first");
+    let m = placed.manufacturing(id).unwrap();
+    assert_eq!(m.placements[0].page, "first");
+    assert_eq!(m.placements[0].matrix, Affine::IDENTITY);
+    assert!(!placed.is_in_manufacturing(a));
+    assert!(placed.is_in_manufacturing(m.placements[0].id));
 }
 
 // ---- criteria 9, 10 ----------------------------------------------------------------------------
@@ -277,7 +300,7 @@ fn ac5_the_placement_is_a_reference_with_identity_matrix_and_no_copied_objects()
 fn ac9_ac10_fixtures_are_not_drawing_objects_and_hide_is_one_saved_step() {
     let d = Document::new(1);
     let o = rect(&d, 10.0, 10.0);
-    let id = d.add_manufacturing(laser(Some("first"))).unwrap();
+    let id = add(&d);
     assert!(d.manufacturing(id).unwrap().fixtures.is_empty());
     let f = d
         .add_fixture(id, GRID, "Engraved grid", &grid(10.0))
@@ -312,9 +335,8 @@ fn ac13_delete_takes_page_and_fixtures_leaves_drawing_and_undo_restores_everythi
     let _ = rect(&d, 10.0, 10.0);
     let second = d.add_page();
     let _ = rect(&d, second.origin.x + 5.0, second.origin.y + 5.0);
-    let id = d.add_manufacturing(laser(Some(&second.id))).unwrap();
-    d.set_work_area(id, DocumentSize::from_mm(600.0, 400.0))
-        .unwrap();
+    let id = add(&d);
+    let d = with_placement(&d, &second.id);
     let shown = d
         .add_fixture(id, GRID, "Engraved grid", &grid(10.0))
         .unwrap();
@@ -323,21 +345,26 @@ fn ac13_delete_takes_page_and_fixtures_leaves_drawing_and_undo_restores_everythi
         .unwrap();
     d.set_fixture_visible(hidden, false).unwrap();
     let full = d.manufacturing(id).unwrap();
+    let output = full.page.clone().unwrap();
     let pages = d.pages();
+    let drawing_pages: Vec<_> = pages
+        .iter()
+        .filter(|p| p.id != output.id)
+        .cloned()
+        .collect();
     let objects = d.read_objects().objects.clone();
     let before = json(&d);
 
     let steps = d.own_step_count();
-    d.delete_manufacturing(id).unwrap();
+    d.delete_page(&output.id).unwrap();
     assert_eq!(d.own_step_count(), steps + 1, "delete is one step");
     assert!(d.manufacturings().is_empty());
     assert!(d.manufacturing(id).is_none());
-    assert_eq!(d.pages(), pages, "drawing pages untouched");
+    assert_eq!(d.pages(), drawing_pages, "drawing pages untouched");
     assert_eq!(d.read_objects().objects, objects, "drawing untouched");
     let after = json(&d);
-    let text = after.to_string();
     assert!(
-        !text.contains(&full.page.as_ref().unwrap().id),
+        !after.to_string().contains(&output.id),
         "the output page record is gone from document.json"
     );
 
@@ -348,6 +375,7 @@ fn ac13_delete_takes_page_and_fixtures_leaves_drawing_and_undo_restores_everythi
         "manufacturing, output page, fixtures restored"
     );
     assert_eq!(restored.fixtures.len(), 2);
+    assert_eq!(restored.placements.len(), 1);
     assert!(restored.fixtures.iter().any(|f| f.id == shown && f.visible));
     assert!(
         restored
@@ -361,17 +389,14 @@ fn ac13_delete_takes_page_and_fixtures_leaves_drawing_and_undo_restores_everythi
 }
 
 #[test]
-fn ac13_deleting_twice_or_a_drawing_node_is_refused() {
+fn ac13_deleting_twice_or_the_last_page_is_refused() {
     let d = Document::new(1);
     let o = rect(&d, 10.0, 10.0);
-    let id = d.add_manufacturing(laser(None)).unwrap();
-    d.delete_manufacturing(id).unwrap();
+    let page = d.add_output_page(laser()).unwrap();
+    d.delete_page(&page.id).unwrap();
     let steps = d.own_step_count();
-    assert!(d.delete_manufacturing(id).is_err());
-    assert!(
-        d.delete_manufacturing(o).is_err(),
-        "a drawing object is no manufacturing"
-    );
+    assert!(d.delete_page(&page.id).is_err());
+    assert!(d.delete_page("first").is_err(), "the last page stays");
     assert_eq!(d.own_step_count(), steps);
     assert_eq!(d.object_ids(), vec![o]);
 }
@@ -380,7 +405,8 @@ fn ac13_deleting_twice_or_a_drawing_node_is_refused() {
 fn ac5_a_placement_of_a_deleted_page_is_kept_and_undo_brings_the_page_back() {
     let d = Document::new(1);
     let second = d.add_page();
-    let id = d.add_manufacturing(laser(Some(&second.id))).unwrap();
+    let id = add(&d);
+    let d = with_placement(&d, &second.id);
     d.delete_page(&second.id).unwrap();
     let m = d.manufacturing(id).unwrap();
     assert_eq!(m.placements.len(), 1, "no orphan repair (ADR 0032 §7)");
@@ -396,13 +422,13 @@ fn ac5_a_placement_of_a_deleted_page_is_kept_and_undo_brings_the_page_back() {
 fn golden_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures")
-        .join(format!("laser_workbench_v{CURRENT_FORMAT_VERSION}.curvyo"))
+        .join("laser_workbench_v36.curvyo")
 }
 
 #[test]
 fn ac12_the_laser_golden_holds_what_the_criterion_lists() {
-    let bytes = std::fs::read(golden_path()).expect("golden named after this build's format");
-    assert_eq!(manifest_version(&bytes), u64::from(CURRENT_FORMAT_VERSION));
+    let bytes = std::fs::read(golden_path()).expect("the frozen format-36 golden");
+    assert_eq!(manifest_version(&bytes), 36);
     let d = unpack(7, &bytes).unwrap();
     let all = d.manufacturings();
     assert_eq!(all.len(), 1);
@@ -415,7 +441,10 @@ fn ac12_the_laser_golden_holds_what_the_criterion_lists() {
     assert_eq!(m.work_area(), DocumentSize::from_mm(600.0, 400.0));
     let page = m.page.as_ref().unwrap();
     assert_eq!(page.size, DocumentSize::from_mm(600.0, 400.0));
-    assert!(d.pages().iter().all(|p| p.id != page.id));
+    assert!(
+        d.pages().iter().any(|p| p.id == page.id),
+        "listed since `0098` criterion 10"
+    );
     assert_eq!(m.fixtures.len(), 2);
     assert_eq!(m.fixtures.iter().filter(|f| !f.visible).count(), 1);
     assert!(m.fixtures.iter().all(|f| f.kind == GRID));
@@ -430,8 +459,9 @@ fn ac12_the_laser_golden_holds_what_the_criterion_lists() {
     assert_eq!(e.manufacturings(), d.manufacturings());
     assert_eq!(e.pages(), d.pages());
     assert_eq!(
-        manufacturing_value(&stored_loro(&again)),
-        manufacturing_value(&stored_loro(&bytes))
+        manufacturing_meta_and_children(&stored_loro(&again)),
+        manufacturing_meta_and_children(&stored_loro(&bytes)),
+        "the open-time conversion only places the page"
     );
 }
 
@@ -439,9 +469,8 @@ fn ac12_the_laser_golden_holds_what_the_criterion_lists() {
 fn ac12_save_and_reopen_of_a_fresh_project_is_identical() {
     let d = Document::new(1);
     let _ = rect(&d, 10.0, 10.0);
-    let id = d.add_manufacturing(laser(Some("first"))).unwrap();
-    d.set_work_area(id, DocumentSize::from_mm(600.0, 400.0))
-        .unwrap();
+    let id = add(&d);
+    let d = with_placement(&d, "first");
     d.add_fixture(id, GRID, "Engraved grid", &grid(10.0))
         .unwrap();
     let hidden = d
@@ -460,13 +489,15 @@ fn unknown_process_file() -> Vec<u8> {
     let d = Document::new(1);
     let _ = rect(&d, 10.0, 10.0);
     let id = d
-        .add_manufacturing(NewManufacturing {
+        .add_output_page(NewOutputPage {
             process: "acme.waterjet",
             label: "Waterjet",
             profile: None,
             work_area: DocumentSize::from_mm(1500.0, 3000.0),
-            place: Some("first"),
         })
+        .unwrap()
+        .kind
+        .manufacturing()
         .unwrap();
     let params: FixtureParams = serde_json::from_value(serde_json::json!({
         "jaw": {"mm": 42.5},
@@ -484,6 +515,7 @@ fn unknown_process_file() -> Vec<u8> {
         .unwrap();
     meta.insert("x.acme.waterjet.abrasive", LoroValue::from("garnet"))
         .unwrap();
+    add_raw_placement(&loro, "first");
     loro.commit();
     container(&loro)
 }
@@ -494,7 +526,7 @@ fn ac12_an_unknown_process_opens_and_saves_back_unchanged() {
     let d = unpack(4, &bytes).expect("a file with an unknown process opens");
     let m = &d.manufacturings()[0];
     assert_eq!(m.process, "acme.waterjet");
-    assert_eq!(m.name, "Waterjet 1");
+    assert_eq!(m.page.as_ref().unwrap().name, "Waterjet 1");
     assert_eq!(m.fixtures.len(), 1);
     assert_eq!(m.fixtures[0].kind, "acme.waterjet/vise");
     assert_eq!(m.fixtures[0].params["jaw"], serde_json::json!({"mm": 42.5}));
@@ -527,7 +559,7 @@ fn ac12_an_unknown_process_can_still_be_deleted_and_undone() {
     let d = unpack(4, &unknown_process_file()).unwrap();
     let id = d.manufacturings()[0].id;
     let full = d.manufacturing(id).unwrap();
-    d.delete_manufacturing(id).unwrap();
+    d.delete_page(&full.page.clone().unwrap().id).unwrap();
     assert!(d.manufacturings().is_empty());
     undo_last(&d);
     assert_eq!(d.manufacturing(id).unwrap(), full);

@@ -1,9 +1,11 @@
 //! Independent Session acceptance from the pre-implementation matrix.
 #![allow(clippy::unwrap_used)]
 mod cpu_time;
-use curvyo_document_core::{Document, Point, Style, pack, unpack};
+mod page_kind_support;
+use curvyo_document_core::{Point, Style, pack, unpack};
 use curvyo_editor_wasm::{Session, SketchTool};
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 fn workload() -> sk::Sketch {
     let mut graph = sk::Sketch::new("origin".into());
     for n in 0..33 {
@@ -45,14 +47,14 @@ fn workload() -> sk::Sketch {
     graph
 }
 fn setup() -> (Session, curvyo_document_core::NodeId, Vec<u8>) {
-    let d = Document::new(701);
+    let d = page_kind_support::sketch_document(701);
     let id = d
         .create_page_sketch(&d.pages()[0].id, &workload(), &Style::default())
         .unwrap();
     let bytes = pack(&d, "acceptance").unwrap();
     let mut s = Session::open(702, &bytes).unwrap();
     assert!(s.enter_sketch(id));
-    s.set_workbench(curvyo_editor_wasm::Workbench::Sketch);
+    s.to_sketch_page();
     s.set_sketch_tool(SketchTool::Select);
     let mut snap = s.snapping();
     snap.enabled = false;

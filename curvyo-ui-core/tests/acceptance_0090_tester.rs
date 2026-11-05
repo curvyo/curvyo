@@ -32,6 +32,7 @@ fn page(origin: Point, w: f64, h: f64, grid: PageGrid) -> Page {
         origin,
         size: DocumentSize::from_mm(w, h),
         grid,
+        kind: curvyo_document_core::PageKind::Drawing,
     }
 }
 

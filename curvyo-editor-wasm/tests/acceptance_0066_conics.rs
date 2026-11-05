@@ -1,8 +1,10 @@
 //! Independent nonlinear native/WASM runtime corpus with analytic witnesses.
 #![allow(clippy::unwrap_used)]
-use curvyo_document_core::{Document, Style, pack, unpack};
-use curvyo_editor_wasm::{Session, Workbench};
+mod page_kind_support;
+use curvyo_document_core::{Style, pack, unpack};
+use curvyo_editor_wasm::Session;
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 fn seed() -> sk::Sketch {
     let mut g = sk::Sketch::new("origin".into());
     let q = 2.0_f64.sqrt();
@@ -77,7 +79,7 @@ fn known(g: &sk::Sketch) {
 }
 #[test]
 fn s16_native_nonlinear_edit_produces_known_conics_and_runtime_fixture() {
-    let d = Document::new(920);
+    let d = page_kind_support::sketch_document(920);
     let id = d
         .create_page_sketch(&d.pages()[0].id, &seed(), &Style::default())
         .unwrap();
@@ -86,7 +88,7 @@ fn s16_native_nonlinear_edit_produces_known_conics_and_runtime_fixture() {
     std::fs::write("../target/0066-runtime-revision/conics.curvyo", &bytes).unwrap();
     std::fs::write("../target/0066-runtime-revision/conics-context.json", serde_json::to_vec(&serde_json::json!({"owner": id.full_id(), "page": d.pages()[0].id, "pageOrigin": [d.pages()[0].origin.x, d.pages()[0].origin.y], "pageSize": [d.pages()[0].size.width.as_mm(),d.pages()[0].size.height.as_mm()], "placement": d.sketch(id).unwrap().placement.to_array()})).unwrap()).unwrap();
     let mut s = Session::open(922, &bytes).unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert!(s.enter_sketch(id));
     assert!(s.sketch_select_entity(&"ellipse".into(), false));
     assert!(s.sketch_select_entity(&"tangent".into(), true));

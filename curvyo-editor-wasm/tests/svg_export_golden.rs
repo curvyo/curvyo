@@ -14,6 +14,7 @@
     missing_docs
 )]
 
+mod page_kind_support;
 use std::path::{Path, PathBuf};
 
 use curvyo_editor_wasm::{Session, SvgExportResult};
@@ -239,7 +240,7 @@ fn sketch_project() -> Vec<u8> {
         },
     );
     g.construction.insert("construction".into());
-    let d = curvyo_document_core::Document::new(801);
+    let d = page_kind_support::sketch_document(801);
     d.create_page_sketch(
         &d.pages()[0].id,
         &g,

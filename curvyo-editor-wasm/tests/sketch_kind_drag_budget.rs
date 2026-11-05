@@ -1,9 +1,11 @@
 //! AC29: dragging each entity kind in a 100-entity sketch stays inside AC6's 16 ms of thread CPU.
 #![allow(clippy::unwrap_used)]
 mod cpu_time;
-use curvyo_document_core::{Document, Point, Style, pack};
-use curvyo_editor_wasm::{Session, SketchTool, Workbench};
+mod page_kind_support;
+use curvyo_document_core::{Point, Style, pack};
+use curvyo_editor_wasm::{Session, SketchTool};
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 
 /// 30 constrained point/line groups (90 entities) far from the dragged object.
 fn background() -> sk::Sketch {
@@ -109,14 +111,14 @@ fn each_kind_drags_inside_the_frame_budget() {
             .unwrap()
             .candidate;
         assert!(graph.entities.len() >= 92, "{name}");
-        let d = Document::new(66_600);
+        let d = page_kind_support::sketch_document(66_600);
         let id = d
             .create_page_sketch(&d.pages()[0].id, &graph, &Style::default())
             .unwrap();
         let placement = d.sketch(id).unwrap().placement;
         let mut s = Session::open(66_601, &pack(&d, "budget").unwrap()).unwrap();
         assert!(s.enter_sketch(id));
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         s.set_sketch_tool(SketchTool::Select);
         s.pointer_down(placement.apply_point(Point::new(edge.0, edge.1)), false);
         let mut times = Vec::new();

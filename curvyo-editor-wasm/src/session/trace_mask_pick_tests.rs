@@ -8,6 +8,7 @@ use curvyo_document_core::{
 use curvyo_ui_core::oriented_bounds;
 
 use super::{Session, Tool, TraceSelection};
+use crate::session::test_pages::PageKinds as _;
 
 const PNG: &[u8] =
     include_bytes!("../../../curvyo-image-core/tests/fixtures/images/png_rgba_8.png");
@@ -400,7 +401,7 @@ fn c38_a_sketch_is_refused() {
     let mut session = Session::new(1);
     let image = import_images(&mut session, 1)[0];
     let at = centre(&session, image);
-    session.set_workbench(super::Workbench::Sketch);
+    session.to_sketch_page();
     let sketch = session.new_sketch().unwrap();
     session
         .sketch_construct(&Construction::Circle {
@@ -408,7 +409,7 @@ fn c38_a_sketch_is_refused() {
             radius: SketchLength(5.0),
         })
         .unwrap();
-    session.set_workbench(super::Workbench::Vector);
+    session.to_drawing_page();
     let edge = session
         .objects()
         .iter()

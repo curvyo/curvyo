@@ -17,10 +17,12 @@
     clippy::cast_precision_loss,
     clippy::cloned_ref_to_slice_refs
 )]
+mod page_kind_support;
+use page_kind_support::PageKinds as _;
 use std::collections::BTreeMap;
 
 use curvyo_document_core::{Document, Point, unpack};
-use curvyo_editor_wasm::{KeyInput, Session, SketchTool, Workbench};
+use curvyo_editor_wasm::{KeyInput, Session, SketchTool};
 use curvyo_sketch_core as sk;
 use serde_json::Value;
 
@@ -30,7 +32,7 @@ type Pt = (f64, f64);
 
 fn session() -> Session {
     let mut s = Session::new(6640);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.resize_viewport(1000.0, 700.0);
     s
 }
@@ -938,7 +940,7 @@ fn ac45_save_reopen_keeps_the_axis_dimensions_and_convert_omits_annotations() {
     let bytes = s.pack("rev4 reopen").unwrap();
     let g0 = graph(&s);
     let mut r = Session::open(6642, &bytes).unwrap();
-    r.set_workbench(Workbench::Sketch);
+    r.to_sketch_page();
     let d: BTreeMap<String, (String, f64)> =
         dims(&r).into_iter().map(|x| (x.0, (x.1, x.2))).collect();
     assert_eq!(d[&h].0, "horizontal-distance");

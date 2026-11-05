@@ -1,3 +1,8 @@
+//! Updated for `specs/0098-page-kinds` by its "Changes to accepted specs" table: a laser page is
+//! added with Add page (Kind Laser, `0026` 10 → `0098` 1, 4) and reached by activating it, and the
+//! work area is no field on the page (`0026` 1, 7 → `0098` 13, 15), so the work-area edits and the
+//! oversize-page case are gone.
+//!
 //! Independent acceptance tests for `specs/0026-machine-profile` through the public session: the
 //! Machine block view (criterion 1), the built-in and Duplicate (2), Save as profile with its undo
 //! boundary and the list edits (3), library edits outside history and the host writes that keep
@@ -22,8 +27,7 @@ use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    CURRENT_FORMAT_VERSION, Color, Document, DocumentSize, Length, Point, RectBounds, StyleEdit,
-    pack, unpack,
+    Color, Document, DocumentSize, Point, RectBounds, StyleEdit, pack, unpack,
 };
 use curvyo_editor_wasm::Session;
 use curvyo_laser_core::{
@@ -100,7 +104,7 @@ fn session(disk: &Disk) -> Session {
 
 fn with_laser(disk: &Disk) -> Session {
     let mut s = session(disk);
-    s.add_manufacturing(LASER).expect("Laser can be added");
+    s.add_page_of_kind(LASER, None).expect("Laser can be added");
     let _ = s.take_machine_writes_json();
     s
 }
@@ -246,11 +250,6 @@ fn ac1_typed_values_out_of_range_are_limited_with_a_notice_and_one_step_each() {
     assert_eq!(s.undo_len(), steps + 2);
     assert_eq!(s.set_machine_max_feed(5_000.0), None, "in range: no notice");
     assert_eq!(copy(&s)["max_feed"], 5_000);
-    let (changed, notice) =
-        s.set_work_area_limited(Length::from_mm(20_000.0), Length::from_mm(300.0));
-    assert!(changed);
-    assert_eq!(notice.as_deref(), Some("Width limited to 10,000 mm."));
-    assert_eq!(work_area(&s), (10_000.0, 300.0));
     let long = "n".repeat(80);
     assert_eq!(
         s.set_machine_name(&long).as_deref(),
@@ -354,7 +353,6 @@ fn ac2_the_built_in_cannot_be_renamed_deleted_or_updated_through_the_session() {
 fn ac3_save_as_profile_adds_a_record_and_points_the_copy_at_it_in_one_step() {
     let mut s = with_laser(&Disk::new());
     let _ = s.set_machine_max_feed(7_777.0);
-    let _ = s.set_work_area_limited(Length::from_mm(500.0), Length::from_mm(250.0));
     let steps = s.undo_len();
     let _ = s.save_machine_profile([3; 16], 50);
     assert_eq!(s.undo_len(), steps + 1, "Save as profile is one step");
@@ -370,7 +368,7 @@ fn ac3_save_as_profile_adds_a_record_and_points_the_copy_at_it_in_one_step() {
     assert_eq!(lib.len(), 1);
     let rec = read_record(&record_file_name(&new), lib[0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(rec.values.max_feed.get(), 7_777);
-    assert_eq!(rec.work_area, DocumentSize::from_mm(500.0, 250.0));
+    assert_eq!(rec.work_area, DocumentSize::from_mm(400.0, 300.0));
     assert_eq!(rec.values.name, "Generic laser copy");
     assert_eq!(
         rec.connection.baud_rate.get(),
@@ -421,41 +419,6 @@ fn ac3_save_as_with_a_taken_name_saves_name_copy_numbered() {
     let _ = s.set_machine_name("K40");
     let _ = s.save_machine_profile([5; 16], 1);
     assert_eq!(copy(&s)["name"], "K40 copy 2");
-}
-
-#[test]
-fn ac3_save_as_with_an_oversize_page_cuts_the_record_with_a_notice_and_keeps_the_page() {
-    // An old file may hold a page outside the profile range (UX notes §5).
-    let d = unpack(1, &drawing()).unwrap();
-    let m = d
-        .add_manufacturing(curvyo_document_core::NewManufacturing {
-            process: LASER,
-            label: "Laser",
-            profile: None,
-            work_area: DocumentSize::from_mm(400.0, 300.0),
-            place: None,
-        })
-        .unwrap();
-    if d.set_work_area(m, DocumentSize::from_mm(12_000.0, 300.0))
-        .is_err()
-    {
-        eprintln!("the document refuses a 12,000 mm page; the case cannot arise");
-        return;
-    }
-    let mut s = open_laser(&pack(&d, "0.1.0").unwrap(), &Disk::new());
-    assert_eq!(work_area(&s), (12_000.0, 300.0));
-    let notice = s.save_machine_profile([6; 16], 1);
-    assert_eq!(notice.as_deref(), Some("Width limited to 10,000 mm."));
-    assert_eq!(
-        work_area(&s),
-        (12_000.0, 300.0),
-        "the page itself is not changed"
-    );
-    let ws = writes(&mut s);
-    let lib = library_writes(&ws);
-    let new = copy(&s)["id"].as_str().unwrap().to_owned();
-    let rec = read_record(&record_file_name(&new), lib[0]["text"].as_str().unwrap()).unwrap();
-    assert_eq!(rec.work_area.width.as_mm(), 10_000.0);
 }
 
 #[test]
@@ -649,10 +612,6 @@ fn ac7_an_edit_shows_differs_and_typing_the_value_back_clears_it() {
     );
     let _ = s.set_machine_max_feed(12_000.0);
     assert!(machine(&s)["state"].is_null());
-    let _ = s.set_work_area_limited(Length::from_mm(600.5), Length::from_mm(400.0));
-    assert_eq!(machine(&s)["state"], "differs", "the page size counts");
-    let _ = s.set_work_area_limited(Length::from_mm(600.0), Length::from_mm(400.0));
-    assert!(machine(&s)["state"].is_null());
     assert!(s.set_machine_origin("bottom_right"));
     assert_eq!(machine(&s)["state"], "differs");
 }
@@ -662,7 +621,6 @@ fn ac7_reset_takes_the_library_values_in_one_step_and_asks_nothing() {
     let mut s = with_laser(&disk_of(&[k40(1)]));
     assert!(s.pick_machine_profile(&id(1)));
     let _ = s.set_machine_max_power(77.0);
-    let _ = s.set_work_area_limited(Length::from_mm(300.0), Length::from_mm(200.0));
     let _ = s.rename_machine_profile(&id(1), "K40 renamed", 3);
     let _ = writes(&mut s);
     let steps = s.undo_len();
@@ -683,7 +641,6 @@ fn ac7_update_overwrites_the_record_keeps_its_connection_and_adds_no_step() {
     let mut s = with_laser(&disk_of(&[k40(1)]));
     assert!(s.pick_machine_profile(&id(1)));
     let _ = s.set_machine_max_feed(9_999.0);
-    let _ = s.set_work_area_limited(Length::from_mm(700.0), Length::from_mm(500.0));
     let _ = writes(&mut s);
     let steps = s.undo_len();
     let _ = s.update_machine_profile(77);
@@ -694,7 +651,7 @@ fn ac7_update_overwrites_the_record_keeps_its_connection_and_adds_no_step() {
     assert_eq!(lib[0]["id"], json!(id(1)));
     let rec = read_record(&record_file_name(&id(1)), lib[0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(rec.values.max_feed.get(), 9_999);
-    assert_eq!(rec.work_area, DocumentSize::from_mm(700.0, 500.0));
+    assert_eq!(rec.work_area, DocumentSize::from_mm(600.0, 400.0));
     assert_eq!(
         rec.connection.connector_address, ADDRESS,
         "connection stays"
@@ -870,7 +827,7 @@ fn ac10_add_manufacturing_starts_with_the_last_pick_in_one_step() {
     let mut s = session(&disk);
     s.load_machine_choice(&choice);
     let steps = s.undo_len();
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     assert_eq!(s.undo_len(), steps + 1, "still one step");
     assert_eq!(copy(&s)["id"], json!(id(1)));
     assert_eq!(copy(&s)["name"], "K40");
@@ -886,12 +843,12 @@ fn ac10_a_last_pick_that_no_longer_exists_falls_back_to_generic_laser() {
         "{{\"format_version\": 1, \"last_picked\": \"{}\"}}",
         id(77)
     ));
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     assert_eq!(copy(&s)["id"], "generic-laser");
     assert_eq!(work_area(&s), (400.0, 300.0));
     let mut s = session(&Disk::new());
     s.load_machine_choice("garbage");
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     assert_eq!(copy(&s)["id"], "generic-laser");
 }
 
@@ -914,13 +871,16 @@ fn ac11_the_origin_marker_sits_at_the_chosen_corner_and_moves_no_content() {
     let mut s = with_laser(&Disk::new());
     let (w, h) = work_area(&s);
     let red = red_box(&s);
-    let bl = marker_box(&s).expect("a marker is drawn at bottom-left");
+    // The laser page lies in the plane (`0098` criterion 10): boxes relative to its corner.
+    let o = s.active_page().origin;
+    let local = |b: (f64, f64, f64, f64)| (b.0 - o.x, b.1 - o.y, b.2 - o.x, b.3 - o.y);
+    let bl = local(marker_box(&s).expect("a marker is drawn at bottom-left"));
     assert!(bl.0 >= -1.0 && bl.2 < w / 2.0, "left half: {bl:?}");
     assert!(bl.1 > h / 2.0 && bl.3 <= h + 1.0, "bottom half: {bl:?}");
     let steps = s.undo_len();
     assert!(s.set_machine_origin("top_right"));
     assert_eq!(s.undo_len(), steps + 1, "a corner change is one step");
-    let tr = marker_box(&s).expect("a marker at top-right");
+    let tr = local(marker_box(&s).expect("a marker at top-right"));
     assert!(tr.0 > w / 2.0 && tr.2 <= w + 1.0, "right half: {tr:?}");
     assert!(tr.1 >= -1.0 && tr.3 < h / 2.0, "top half: {tr:?}");
     assert_eq!(red_box(&s), red, "no content moves");
@@ -943,7 +903,7 @@ fn ac11_the_marker_is_not_in_the_saved_file_or_the_drawing() {
 
 /// The golden of document-core and a library record equal to its copy.
 fn golden_with_record() -> (Vec<u8>, MachineProfile) {
-    let bytes = fixture(&format!("machine_profile_v{CURRENT_FORMAT_VERSION}.curvyo"));
+    let bytes = fixture("machine_profile_v36.curvyo");
     let d = unpack(1, &bytes).unwrap();
     let m = &d.manufacturings()[0];
     let read = read_copy(m.profile.as_ref(), None);
@@ -957,17 +917,17 @@ fn golden_with_record() -> (Vec<u8>, MachineProfile) {
 fn open_laser(bytes: &[u8], disk: &Disk) -> Session {
     let mut s = Session::open(9330, bytes).unwrap();
     s.load_machine_profiles_json(&library_json(disk));
-    let name = serde_json::from_str::<Value>(&s.workbenches_json()).unwrap()["entries"]
+    let page = serde_json::from_str::<Value>(&s.pages_json())
+        .unwrap()
         .as_array()
         .unwrap()
         .iter()
-        .find(|e| e["id"] != "vector" && e["id"] != "sketch")
+        .find(|row| row["manufacturing"].is_string())
         .unwrap()["id"]
         .as_str()
         .unwrap()
         .to_owned();
-    let w = s.workbench_named(&name).unwrap();
-    s.set_workbench(w);
+    assert!(s.activate_page(&page));
     s
 }
 
@@ -1000,9 +960,7 @@ fn ac12_save_and_reopen_keeps_id_copy_and_work_area_and_the_state() {
 
 #[test]
 fn ac12_the_damaged_golden_shows_defaults_and_the_name_notice_and_writes_nothing() {
-    let bytes = fixture(&format!(
-        "machine_profile_damaged_v{CURRENT_FORMAT_VERSION}.curvyo"
-    ));
+    let bytes = fixture("machine_profile_damaged_v36.curvyo");
     let mut s = open_laser(&bytes, &Disk::new());
     let m = machine(&s);
     assert_eq!(m["copy"]["name"], "Generic laser");
@@ -1117,7 +1075,7 @@ fn ac14_200_records_load_within_200_ms_and_the_list_within_100_ms_of_thread_cpu(
     let json = library_json(&disk_of(&profiles));
     let mut s = Session::open(9340, &drawing()).unwrap();
     let ((), load) = cpu_time::cpu_time_of(|| s.load_machine_profiles_json(&json));
-    s.add_manufacturing(LASER).unwrap();
+    s.add_page_of_kind(LASER, None).unwrap();
     let (view, list) = cpu_time::cpu_time_of(|| s.manufacturing_view_json());
     let view: Value = serde_json::from_str(&view).unwrap();
     assert_eq!(view["machine"]["profiles"].as_array().unwrap().len(), 201);

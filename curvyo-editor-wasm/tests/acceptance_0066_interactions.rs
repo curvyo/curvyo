@@ -1,18 +1,20 @@
 //! Independent sketch interactions: public pointer/command routes and analytical oracles.
 #![allow(clippy::unwrap_used)]
+mod page_kind_support;
 use curvyo_document_core::{Document, Point, unpack};
-use curvyo_editor_wasm::{KeyInput, Session, SketchTool, Workbench};
+use curvyo_editor_wasm::{KeyInput, Session, SketchTool};
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 fn session() -> Session {
     let mut s = Session::new(800);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     let mut snap = s.snapping();
     snap.enabled = false;
     s.set_snapping(snap);
     s
 }
 fn owned_session() -> Session {
-    let d = Document::new(802);
+    let d = page_kind_support::sketch_document(802);
     d.create_page_sketch(
         &d.pages()[0].id,
         &sk::Sketch::new("origin".into()),
@@ -24,7 +26,7 @@ fn owned_session() -> Session {
         &curvyo_document_core::pack(&d, "owned interaction fixture").unwrap(),
     )
     .unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s
 }
 fn document(s: &Session) -> Document {
@@ -195,13 +197,13 @@ fn s07_formula_rename_and_invalid_cycle_keep_valid_values_and_history() {
 fn s01_navigation_is_inert_and_first_page_owner_edit_has_exactly_one_step() {
     let mut s = Session::new(810);
     let initial = s.undo_len();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert_eq!(s.undo_len(), initial);
-    s.set_workbench(Workbench::Vector);
+    s.to_drawing_page();
     s.new_layer_row();
     let layer = s.active_layer().unwrap();
     let count = s.undo_len();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert_eq!(s.undo_len(), count);
     assert!(s.active_sketch().is_none());
     s.set_sketch_tool(SketchTool::Point);
@@ -211,8 +213,8 @@ fn s01_navigation_is_inert_and_first_page_owner_edit_has_exactly_one_step() {
     assert_eq!(document(&s).page_sketch(&s.active_page().id), Some(id));
     assert!(document(&s).contains_node(layer));
     let before = document(&s).version();
-    s.set_workbench(Workbench::Vector);
-    s.set_workbench(Workbench::Sketch);
+    s.to_drawing_page();
+    s.to_sketch_page();
     assert_eq!(s.undo_len(), count + 1);
     assert_eq!(document(&s).version(), before);
 }

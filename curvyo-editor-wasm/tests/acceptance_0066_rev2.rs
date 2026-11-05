@@ -19,17 +19,19 @@
     clippy::float_cmp
 )]
 mod cpu_time;
+mod page_kind_support;
 use curvyo_document_core::{Angle, Document, Point, unpack};
-use curvyo_editor_wasm::{KeyInput, Session, SketchTool, Workbench};
+use curvyo_editor_wasm::{KeyInput, Session, SketchTool};
 use curvyo_sketch_core as sk;
 use curvyo_ui_core::snap_angle;
+use page_kind_support::PageKinds as _;
 use serde_json::Value;
 
 // ---------------------------------------------------------------- helpers
 
 fn session() -> Session {
     let mut s = Session::new(6600);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s
 }
 fn at(s: &Session, x: f64, y: f64) -> Point {

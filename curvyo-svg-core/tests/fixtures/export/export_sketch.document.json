@@ -1,12 +1,12 @@
 {
-  "format_version": 36,
+  "format_version": 37,
   "size": {
     "width": 210.0,
     "height": 297.0
   },
   "pages": [
     {
-      "id": "first",
+      "id": "801-7",
       "name": "Page 1",
       "origin": {
         "x": 0.0,
@@ -15,7 +15,8 @@
       "size": {
         "width": 210.0,
         "height": 297.0
-      }
+      },
+      "kind": "sketch"
     }
   ],
   "display_unit": "mm",
@@ -44,7 +45,7 @@
       "shape": "sketch",
       "id": {
         "peer": "801",
-        "counter": 7
+        "counter": 16
       },
       "graph": {
         "origin": "origin",

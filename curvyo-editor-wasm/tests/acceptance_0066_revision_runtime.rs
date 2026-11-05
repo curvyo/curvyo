@@ -1,8 +1,10 @@
 //! Independent actual-runtime axis and endpoint-normal equations with dimension edits.
 #![allow(clippy::unwrap_used)]
-use curvyo_document_core::{Document, Style, pack, unpack};
-use curvyo_editor_wasm::{Session, Workbench};
+mod page_kind_support;
+use curvyo_document_core::{Style, pack, unpack};
+use curvyo_editor_wasm::Session;
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 const ROOT: &str = "../target/0066-runtime-revision";
 fn point(g: &mut sk::Sketch, id: &str, x: f64, y: f64, fixed: bool) {
     g.entities.insert(
@@ -168,7 +170,7 @@ fn revised_relations_native_known_answers_and_fixtures() {
     std::fs::create_dir_all(ROOT).unwrap();
     for case in ["axis", "left", "right", "arc-arc"] {
         let input = fixture(case);
-        let d = Document::new(990);
+        let d = page_kind_support::sketch_document(990);
         let id = d
             .create_page_sketch(&d.pages()[0].id, &input, &Style::default())
             .unwrap();
@@ -176,7 +178,7 @@ fn revised_relations_native_known_answers_and_fixtures() {
         std::fs::write(format!("{ROOT}/{case}.curvyo"), &bytes).unwrap();
         std::fs::write(format!("{ROOT}/{case}-context.json"),serde_json::to_vec(&serde_json::json!({"owner":id.full_id(),"value":if case=="axis" {"20 mm"} else {"10 mm"}})).unwrap()).unwrap();
         let mut s = Session::open(992, &bytes).unwrap();
-        s.set_workbench(Workbench::Sketch);
+        s.to_sketch_page();
         assert!(s.enter_sketch(id));
         s.sketch_dimension_text(
             &"size".into(),
@@ -286,7 +288,7 @@ fn suffix_witness(g: &sk::Sketch) {
 #[test]
 fn suffix_native_body_drag_full_target_vector_and_fixture() {
     use curvyo_document_core::Point;
-    let d = Document::new(995);
+    let d = page_kind_support::sketch_document(995);
     let input = suffix_seed();
     let id = d
         .create_page_sketch(&d.pages()[0].id, &input, &Style::default())
@@ -297,7 +299,7 @@ fn suffix_native_body_drag_full_target_vector_and_fixture() {
     std::fs::write(format!("{ROOT}/suffix.curvyo"), &bytes).unwrap();
     std::fs::write(format!("{ROOT}/suffix-context.json"),serde_json::to_vec(&serde_json::json!({"owner":id.full_id(),"placement":placement.to_array(),"start":[9.5,2.0],"target":[7.5,2.0]})).unwrap()).unwrap();
     let mut s = Session::open(996, &bytes).unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert!(s.enter_sketch(id));
     s.set_sketch_tool(curvyo_editor_wasm::SketchTool::Select);
     // 0066 AC50 (revision 5): a point within 10 screen px wins over the body, and the point
@@ -360,7 +362,7 @@ fn tangent_native_conditioned_endpoint_fixture() {
     g.constraints.remove(&"d3".into());
     point(&mut g, "p1", 3.0, 4.0, false);
     point(&mut g, "p2", 6.0, 0.0, false);
-    let d = Document::new(997);
+    let d = page_kind_support::sketch_document(997);
     let id = d
         .create_page_sketch(&d.pages()[0].id, &g, &Style::default())
         .unwrap();
@@ -370,7 +372,7 @@ fn tangent_native_conditioned_endpoint_fixture() {
     std::fs::write(format!("{ROOT}/tangent.curvyo"), &bytes).unwrap();
     std::fs::write(format!("{ROOT}/tangent-context.json"),serde_json::to_vec(&serde_json::json!({"owner":id.full_id(),"placement":placement.to_array(),"start":[6.0,0.0],"target":[10.0,0.0]})).unwrap()).unwrap();
     let mut s = Session::open(998, &bytes).unwrap();
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     assert!(s.enter_sketch(id));
     s.set_sketch_tool(curvyo_editor_wasm::SketchTool::Select);
     s.pointer_down(placement.apply_point(Point::new(6.0, 0.0)), false);

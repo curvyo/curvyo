@@ -3,6 +3,11 @@
 //! per write and none for an unchanged one, the copy never holding a connection (6, 15), the
 //! golden round trip and the damaged goldens (12), the format-35 migration with no write on open,
 //! and refusal of a newer file or of a register that is not a map of plain values.
+//!
+//! Updated for `specs/0098-page-kinds` (its "Changes to accepted specs" table): Add manufacturing
+//! is Add page with Kind Laser (`0026` 10 → `0098` 1, 4), a pick keeps the content's distance to
+//! the copy's origin corner (`0026` 5 b → `0098` 14), the format-36 goldens are frozen and open
+//! through the page-kinds migration, and placements come from older files only.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -16,8 +21,8 @@ use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 
 use curvyo_document_core::{
-    CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewManufacturing, NodeId,
-    OpenError, Point, ProfileChange, RectBounds, pack, unpack,
+    CURRENT_FORMAT_VERSION, Document, DocumentSize, FixtureParams, NewOutputPage, NodeId,
+    OpenError, PageCorner, Point, ProfileChange, RectBounds, pack, unpack,
 };
 use loro::{LoroDoc, LoroValue, TreeParentId};
 use serde_json::{Value, json};
@@ -52,15 +57,29 @@ fn generic() -> FixtureParams {
     .clone()
 }
 
-fn laser<'a>(profile: Option<&'a FixtureParams>, place: Option<&'a str>) -> NewManufacturing<'a> {
-    NewManufacturing {
+fn laser(profile: Option<&FixtureParams>) -> NewOutputPage<'_> {
+    NewOutputPage {
         process: "curvyo.laser",
         label: "Laser",
         profile,
         work_area: DocumentSize::from_mm(400.0, 300.0),
-        place,
     }
 }
+
+/// Add page with Kind Laser; the manufacturing of the new page.
+fn add(d: &Document, new: NewOutputPage<'_>) -> NodeId {
+    d.add_output_page(new)
+        .unwrap()
+        .kind
+        .manufacturing()
+        .unwrap()
+}
+
+/// The bottom-left origin corner of the Generic laser copy.
+const BOTTOM_LEFT: PageCorner = PageCorner {
+    right: false,
+    bottom: true,
+};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -69,8 +88,9 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn current(stem: &str) -> Vec<u8> {
-    std::fs::read(fixture(&format!("{stem}_v{CURRENT_FORMAT_VERSION}.curvyo")))
-        .unwrap_or_else(|e| panic!("golden {stem}_v{CURRENT_FORMAT_VERSION}.curvyo: {e}"))
+    // The goldens of this slice's format 36, frozen since format 37 (`0098`).
+    std::fs::read(fixture(&format!("{stem}_v36.curvyo")))
+        .unwrap_or_else(|e| panic!("golden {stem}_v36.curvyo: {e}"))
 }
 
 fn member(bytes: &[u8], name: &str) -> Vec<u8> {
@@ -148,7 +168,33 @@ fn with_placed_rect() -> (Document, NodeId) {
     ));
     let first = d.pages()[0].id.clone();
     let g = generic();
-    let id = d.add_manufacturing(laser(Some(&g), Some(&first))).unwrap();
+    let id = add(&d, laser(Some(&g)));
+    // A placement as an older file holds it (`0098` criterion 12).
+    let loro = LoroDoc::new();
+    loro.import(&d.export_loro_snapshot().unwrap()).unwrap();
+    let tree = loro.get_tree("paths");
+    let node = tree
+        .children(TreeParentId::Root)
+        .unwrap()
+        .into_iter()
+        .find(|&n| tree.get_meta(n).unwrap().get("manufacturing").is_some())
+        .unwrap();
+    let child = tree.create(TreeParentId::Node(node)).unwrap();
+    let meta = tree.get_meta(child).unwrap();
+    meta.insert("shape", "placement").unwrap();
+    let identity: Vec<LoroValue> = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+        .into_iter()
+        .map(LoroValue::Double)
+        .collect();
+    let link: std::collections::HashMap<String, LoroValue> = [
+        ("page".to_owned(), LoroValue::from(first.as_str())),
+        ("matrix".to_owned(), LoroValue::from(identity)),
+    ]
+    .into();
+    meta.insert("placement_link", LoroValue::from(link))
+        .unwrap();
+    loro.commit();
+    let d = unpack(1, &container(&loro, u64::from(CURRENT_FORMAT_VERSION))).unwrap();
     (d, id)
 }
 
@@ -158,7 +204,13 @@ fn with_placed_rect() -> (Document, NodeId) {
 fn ac5_a_pick_writes_copy_and_work_area_in_one_step_and_keeps_placed_content() {
     let (d, id) = with_placed_rect();
     let before = d.manufacturing(id).unwrap();
-    let matrix = before.placements[0].matrix;
+    let old_page = before.page.clone().unwrap();
+    let placed_at = |m: &curvyo_document_core::ManufacturingSnapshot| {
+        let page = m.page.as_ref().unwrap();
+        let local = m.placements[0].matrix.apply_point(Point::new(0.0, 0.0));
+        Point::new(page.origin.x + local.x, page.origin.y + local.y)
+    };
+    let global = placed_at(&before);
     let steps = d.own_step_count();
     let k40 = copy(USER_ID, "K40", 12_000);
     assert!(
@@ -166,7 +218,8 @@ fn ac5_a_pick_writes_copy_and_work_area_in_one_step_and_keeps_placed_content() {
             id,
             &k40,
             DocumentSize::from_mm(600.0, 400.0),
-            ProfileChange::Pick
+            BOTTOM_LEFT,
+            ProfileChange::Pick,
         )
         .unwrap()
     );
@@ -175,12 +228,17 @@ fn ac5_a_pick_writes_copy_and_work_area_in_one_step_and_keeps_placed_content() {
     let m = d.manufacturing(id).unwrap();
     assert_eq!(m.profile.as_ref(), Some(&k40));
     assert_eq!(m.work_area(), DocumentSize::from_mm(600.0, 400.0));
-    assert_eq!(m.placements[0].matrix, matrix, "content keeps its place");
-    let page = m.page.unwrap();
     assert_eq!(
-        page.origin,
-        before.page.as_ref().unwrap().origin,
-        "the page's top-left stays"
+        placed_at(&m),
+        global,
+        "content keeps its place in the plane"
+    );
+    let page = m.page.unwrap();
+    assert_eq!(page.origin.x, old_page.origin.x);
+    assert_eq!(
+        page.origin.y + 400.0,
+        old_page.origin.y + 300.0,
+        "the bottom-left origin corner stays (`0098` criterion 14)"
     );
     undo_last(&d);
     let back = d.manufacturing(id).unwrap();
@@ -199,6 +257,7 @@ fn ac5_picking_the_same_profile_writes_nothing_and_adds_no_step() {
         id,
         &k40,
         DocumentSize::from_mm(600.0, 400.0),
+        PageCorner::default(),
         ProfileChange::Pick,
     )
     .unwrap();
@@ -209,7 +268,8 @@ fn ac5_picking_the_same_profile_writes_nothing_and_adds_no_step() {
             id,
             &k40,
             DocumentSize::from_mm(600.0, 400.0),
-            ProfileChange::Pick
+            PageCorner::default(),
+            ProfileChange::Pick,
         )
         .unwrap()
     );
@@ -233,7 +293,10 @@ fn ac5_each_profile_change_has_its_own_label() {
     for (n, (change, label)) in cases.into_iter().enumerate() {
         let c = copy(USER_ID, "K40", 1_000 + i64::try_from(n).unwrap());
         let steps = d.own_step_count();
-        assert!(d.set_manufacturing_profile(id, &c, area, change).unwrap());
+        assert!(
+            d.set_manufacturing_profile(id, &c, area, PageCorner::default(), change)
+                .unwrap()
+        );
         assert_eq!(d.own_step_count(), steps + 1);
         assert_eq!(last_label(&d), label);
     }
@@ -252,8 +315,14 @@ fn ac5_an_invalid_work_area_or_unknown_id_writes_nothing() {
         (-1.0, -1.0),
     ] {
         assert!(
-            d.set_manufacturing_profile(id, &c, DocumentSize::from_mm(w, h), ProfileChange::Pick)
-                .is_err(),
+            d.set_manufacturing_profile(
+                id,
+                &c,
+                DocumentSize::from_mm(w, h),
+                PageCorner::default(),
+                ProfileChange::Pick
+            )
+            .is_err(),
             "{w} x {h}"
         );
     }
@@ -267,7 +336,8 @@ fn ac5_an_invalid_work_area_or_unknown_id_writes_nothing() {
             stray,
             &c,
             DocumentSize::from_mm(400.0, 300.0),
-            ProfileChange::Pick
+            PageCorner::default(),
+            ProfileChange::Pick,
         )
         .is_err()
     );
@@ -286,6 +356,7 @@ fn ac6_the_copy_is_one_register_with_whole_numbers_as_integers() {
         id,
         &k40,
         DocumentSize::from_mm(600.0, 400.0),
+        PageCorner::default(),
         ProfileChange::Pick,
     )
     .unwrap();
@@ -329,6 +400,7 @@ fn ac6_an_existing_manufacturing_does_not_change_when_nothing_writes_it() {
         id,
         &k40,
         DocumentSize::from_mm(600.0, 400.0),
+        PageCorner::default(),
         ProfileChange::Pick,
     )
     .unwrap();
@@ -343,6 +415,7 @@ fn ac15_no_connection_data_and_no_library_entry_in_the_saved_file() {
         id,
         &copy(USER_ID, "K40", 12_000),
         DocumentSize::from_mm(600.0, 400.0),
+        PageCorner::default(),
         ProfileChange::Pick,
     )
     .unwrap();
@@ -376,8 +449,7 @@ fn ac15_no_connection_data_and_no_library_entry_in_the_saved_file() {
 #[test]
 fn ac12_the_machine_profile_golden_holds_id_edited_copy_and_600_by_400() {
     let bytes = current("machine_profile");
-    assert_eq!(manifest_version(&bytes), u64::from(CURRENT_FORMAT_VERSION));
-    assert_eq!(CURRENT_FORMAT_VERSION, 36);
+    assert_eq!(manifest_version(&bytes), 36);
     let d = unpack(7, &bytes).unwrap();
     let all = d.manufacturings();
     assert_eq!(all.len(), 1);
@@ -435,6 +507,7 @@ fn ac12_an_edited_600_by_400_copy_round_trips_exactly() {
         id,
         &c,
         DocumentSize::from_mm(600.0, 400.0),
+        PageCorner::default(),
         ProfileChange::EditMaxFeed,
     )
     .unwrap();
@@ -578,7 +651,13 @@ fn ac12_the_first_profile_write_on_a_format_35_file_stores_the_copy_and_drops_th
     );
     // Same values, same size: still a write, because the old key goes away (ADR 0039 §4).
     let changed = d
-        .set_manufacturing_profile(m.id, &g, m.work_area(), ProfileChange::EditName)
+        .set_manufacturing_profile(
+            m.id,
+            &g,
+            m.work_area(),
+            PageCorner::default(),
+            ProfileChange::EditName,
+        )
         .unwrap();
     assert!(changed);
     assert_eq!(d.own_step_count(), steps + 1, "one step");
@@ -613,16 +692,17 @@ fn ac12_the_unknown_process_v35_golden_still_opens_and_keeps_its_registers() {
 }
 
 #[test]
-fn ac10_add_manufacturing_writes_the_given_copy_in_the_same_single_step() {
+fn ac10_add_laser_page_writes_the_given_copy_in_the_same_single_step() {
     let d = Document::new(1);
     let k40 = copy(USER_ID, "K40", 12_000);
     let steps = d.own_step_count();
-    let id = d
-        .add_manufacturing(NewManufacturing {
+    let id = add(
+        &d,
+        NewOutputPage {
             work_area: DocumentSize::from_mm(600.0, 400.0),
-            ..laser(Some(&k40), None)
-        })
-        .unwrap();
+            ..laser(Some(&k40))
+        },
+    );
     assert_eq!(d.own_step_count(), steps + 1);
     let m = d.manufacturing(id).unwrap();
     assert_eq!(m.profile.as_ref(), Some(&k40));
@@ -633,13 +713,15 @@ fn ac10_add_manufacturing_writes_the_given_copy_in_the_same_single_step() {
 #[test]
 fn adr0037_two_manufacturings_keep_independent_copies() {
     let d = Document::new(1);
-    let a = d.add_manufacturing(laser(Some(&generic()), None)).unwrap();
-    let b = d.add_manufacturing(laser(Some(&generic()), None)).unwrap();
+    let g = generic();
+    let a = add(&d, laser(Some(&g)));
+    let b = add(&d, laser(Some(&g)));
     let k40 = copy(USER_ID, "K40", 12_000);
     d.set_manufacturing_profile(
         a,
         &k40,
         DocumentSize::from_mm(600.0, 400.0),
+        PageCorner::default(),
         ProfileChange::Pick,
     )
     .unwrap();

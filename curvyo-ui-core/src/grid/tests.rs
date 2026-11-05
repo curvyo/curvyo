@@ -20,6 +20,7 @@ pub(super) fn page_with(grid: PageGrid) -> Page {
         origin: Point::new(0.0, 0.0),
         size: DocumentSize::from_mm(210.0, 297.0),
         grid,
+        kind: curvyo_document_core::PageKind::Drawing,
     }
 }
 

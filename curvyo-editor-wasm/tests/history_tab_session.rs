@@ -76,7 +76,8 @@ fn the_history_tab_exists_and_the_shortcut_selects_it() {
     assert_eq!(active.name, "history");
     let history = view.tabs.iter().find(|t| t.name == "history").unwrap();
     assert_eq!(history.tooltip, "History (Shift+Ctrl+H)");
-    // Fonts follows History; Snapping, Grid and Sketches are appended after Fonts.
+    // Fonts follows History; Snapping and Grid are appended after Fonts (a drawing page has no
+    // Sketches tab, `0098` criterion 8).
     assert_eq!(
         view.tabs
             .iter()
@@ -84,7 +85,7 @@ fn the_history_tab_exists_and_the_shortcut_selects_it() {
             .take(6)
             .map(|t| t.name)
             .collect::<Vec<_>>(),
-        vec!["share", "sketches", "grid", "snapping", "fonts", "history"]
+        vec!["share", "grid", "snapping", "fonts", "history", "layers"]
     );
 }
 

@@ -618,6 +618,14 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
         let stored = read_member(&bytes, "document.loro");
         let reopened = LoroDoc::new();
         reopened.import(&stored).unwrap();
+        // `0098` criterion 19: a file with an output page or a page sketch is converted on open.
+        let converted = reopened
+            .get_map("root")
+            .keys()
+            .any(|key| key.ends_with(".owner") || key.ends_with(".sketch_owner"));
+        if converted {
+            continue;
+        }
         let again = LoroDoc::new();
         again.import(&snap(&doc)).unwrap();
         assert_eq!(

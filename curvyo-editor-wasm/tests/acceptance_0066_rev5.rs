@@ -25,16 +25,18 @@
     clippy::assert_is_empty,
     missing_docs
 )]
+mod page_kind_support;
 use curvyo_document_core::Point;
-use curvyo_editor_wasm::{Session, SketchTool, Workbench};
+use curvyo_editor_wasm::{Session, SketchTool};
 use curvyo_sketch_core as sk;
+use page_kind_support::PageKinds as _;
 use serde_json::Value;
 
 type Pt = (f64, f64);
 
 fn session() -> Session {
     let mut s = Session::new(6650);
-    s.set_workbench(Workbench::Sketch);
+    s.to_sketch_page();
     s.resize_viewport(1000.0, 700.0);
     s
 }
