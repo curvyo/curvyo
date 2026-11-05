@@ -146,6 +146,11 @@ impl Device {
         Self::new(n, url, room, SessionStart::Share, Some(doc))
     }
 
+    /// Device `n` starts a session in `room` with `start` (a return check, `specs/0097`).
+    pub fn start(n: u8, url: &str, room: RoomId, start: SessionStart) -> Self {
+        Self::new(n, url, room, start, None)
+    }
+
     /// Device `n` opens an invite link (criterion 3).
     pub fn join(n: u8, url: &str, secret: InviteSecret) -> Self {
         let room = secret.room;
