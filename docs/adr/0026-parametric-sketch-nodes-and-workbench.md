@@ -8,6 +8,7 @@ placement and parameters/formulas. This record makes the implementation choices
 reviewable; it does not reopen that authorization. External original scaling
 semantics remain the specific pending customer decision; this does not block
 the authorized graph, persistence and rigid-placement integration.
+Note 2026-11-05: the page ownership revision is amended by [ADR 0042](0042-page-kinds.md) (proposed): only sketch pages own a sketch; the Vector/Sketch choice is derived from the active page.
 
 ## Context
 

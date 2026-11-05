@@ -4,6 +4,7 @@
 §1 (`mfg_machine_name` is replaced) and §7 (a new `format_version`). Uses the records of
 [ADR 0038](0038-machine-profile-records.md). Spec: `specs/0026-machine-profile` criteria 5 to 8,
 12, 15.
+Note 2026-11-05: §4 amended by [ADR 0042](0042-page-kinds.md) (proposed): a pick resizes the output page about the copy's origin corner; the work area is never typed on the page.
 
 ## Context
 

@@ -2263,3 +2263,14 @@ any number of parts until its connection closes.
 and serve the current snapshot's parts from disk instead of memory.
 
 - **0095: share.json v2 parsed twice.** `curvyo-storage-io/src/workspace_share_files.rs` (`names_workspace`) reads `share.json` v2 as raw JSON next to `curvyo-document-core`'s `WorkspaceShareRecord::from_share_json`. Fix: `remove_marker_share` takes a predicate that `curvyo-app` fills from document-core (architect review, 2026-11-03).
+
+## The format-36 page-kind migration can duplicate a clone in a shared room (`0098` criterion 19, ADR 0042 §9, 2026-11-05)
+
+The migration is one commit at open. In a shared workspace, two devices that open the same
+format-36 document before they have synced each move the page sketch and each create the linked
+clone left in its old place: the sketch page converges by its deterministic id, the clone does
+not, so two identical clones lie on top of each other. Development build, no compatibility
+promise; the result is visible and either clone can be deleted.
+
+**Resolution:** none planned. If old shared files ever matter, run the migration only on the
+device that holds the room's newest snapshot, or derive the clone's identity from the sketch's.

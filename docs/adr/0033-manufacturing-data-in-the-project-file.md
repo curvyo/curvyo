@@ -4,6 +4,7 @@
 how it survives builds without an extension). Follows [ADR 0032](0032-workbench-model-and-registry.md);
 extends ADR 0004 §1 and §9, ADR 0009 (merge per register), ADR 0014 (history). Specs: `0063`
 criterion 9, `0093` criteria 12 and 13.
+Note 2026-11-05: §1 and §5 amended by [ADR 0042](0042-page-kinds.md) (proposed): the manufacturing is created and deleted with its output page; its `name` is no longer written.
 
 ## Context
 
