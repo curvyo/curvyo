@@ -24,6 +24,7 @@ mod svg_fonts;
 mod workspace;
 mod workspace_deleted;
 mod workspace_documents;
+mod workspace_ended;
 mod workspace_share_files;
 
 pub use container_thumbnail::{ThumbnailError, with_thumbnail};
@@ -61,6 +62,7 @@ pub use workspace_deleted::{
 pub use workspace_documents::{
     DocumentProbe, MAX_THUMBNAIL_BYTES, ShareMembers, probe_document, read_document, share_members,
 };
+pub use workspace_ended::{EndedMarker, MARKER_ENDED_FILE, end_marker_share, read_marker_ended};
 pub use workspace_share_files::{
     INDEX_FORMAT_VERSION, IndexEntry, JoinFolderError, MARKER_INDEX_FILE, MARKER_KEYRING_FILE,
     MARKER_LIST_FILE, MARKER_SHARE_FILE, MarkerShare, check_join_folder, create_joined_workspace,

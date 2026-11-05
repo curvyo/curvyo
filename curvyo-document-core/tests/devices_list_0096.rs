@@ -35,6 +35,7 @@ fn workspace(id: [u8; 16], name: &str, on: bool) -> SyncedWorkspace {
         id,
         name: name.to_owned(),
         on,
+        left: false,
     }
 }
 

@@ -2,13 +2,15 @@
 //! ADR 0004 §1): `share.json` version 1 with `keyring.log` for a document shared on its own
 //! (both present or both absent), or `share.json` version 2 alone for a workspace document.
 //! A shared workspace's marker directory keeps a `share.json` of the version 1 shape too
-//! (ADR 0037 decision 1), read and written here as bytes.
+//! (ADR 0037 decision 1), read and written here as bytes. A removed or left document keeps
+//! `share.ended.json` instead (`crate::container_ended`).
 
 use std::io::{Cursor, Read};
 
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
+use crate::container_ended::{ENDED_MEMBER, EndedRecord};
 use crate::document::DocumentVersion;
 use crate::error::{OpenError, SaveError};
 
@@ -124,18 +126,20 @@ impl WorkspaceShareRecord {
         }
         match read_workspace_share(bytes).ok()? {
             Sharing::Workspace(record) => Some(record),
-            Sharing::Room(_) => None,
+            Sharing::Room(_) | Sharing::Ended(_) => None,
         }
     }
 }
 
-/// The record a file carries: at most one of the two kinds.
+/// The record a file carries: at most one of the three kinds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Sharing {
     /// Shared on its own room.
     Room(ShareRecord),
     /// A document of a shared workspace.
     Workspace(WorkspaceShareRecord),
+    /// A removed or left document shared on its own room: a local file (ADR 0041 decision 6).
+    Ended(EndedRecord),
 }
 
 impl crate::Document {
@@ -172,7 +176,8 @@ impl crate::Document {
     }
 
     pub(crate) fn set_sharing(&self, sharing: Option<Sharing>) {
-        self.commit_state.set_shared(sharing.is_some());
+        let shared = matches!(sharing, Some(Sharing::Room(_) | Sharing::Workspace(_)));
+        self.commit_state.set_shared(shared);
         *self.share.borrow_mut() = sharing;
     }
 }
@@ -227,15 +232,20 @@ pub(crate) fn share_members(sharing: &Sharing) -> Result<Vec<(&'static str, Vec<
             let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
             Ok(vec![(SHARE_MEMBER, json)])
         }
+        Sharing::Ended(record) => Ok(vec![(ENDED_MEMBER, record.to_bytes()?)]),
     }
 }
 
-/// The share record of `archive`, `None` for a file that was never shared.
+/// The share record of `archive`, `None` for a file that was never shared. Without
+/// `share.json` and `keyring.log` an ended record `share.ended.json` is read; beside a complete
+/// share set it is ignored (Proposal); beside a partial one (a version 1 record without its
+/// keyring or the other way round) the file is not shared and keeps the ended record (ADR 0041
+/// decision 6).
 ///
 /// # Errors
-/// [`OpenError::Damaged`] for a version 1 record without its keyring or the other way round, a
-/// version 2 record beside a keyring, or a malformed `share.json`; [`OpenError::FormatTooNew`]
-/// for a `share.json` newer than this build reads.
+/// [`OpenError::Damaged`] for a partial share set without an ended record, a version 2 record
+/// beside a keyring, or a malformed `share.json`; [`OpenError::FormatTooNew`] for a
+/// `share.json` newer than this build reads.
 pub(crate) fn read_share(
     archive: &mut ZipArchive<Cursor<&[u8]>>,
 ) -> Result<Option<Sharing>, OpenError> {
@@ -243,10 +253,20 @@ pub(crate) fn read_share(
     let keyring = read_optional(archive, KEYRING_MEMBER, MAX_KEYRING_BYTES)?;
     let Some(json) = json else {
         return match keyring {
-            None => Ok(None),
+            // A removed or left file; an ended record this build cannot read is no way back.
+            None => Ok(read_ended(archive)),
+            Some(_) if has_member(archive, ENDED_MEMBER) => Ok(read_ended(archive)),
             Some(_) => Err(OpenError::Damaged),
         };
     };
+    if keyring.is_none() && has_member(archive, ENDED_MEMBER) {
+        // A version 1 record without its keyring beside an ended record: the share ended.
+        let room_record = serde_json::from_slice::<ShareJsonVersion>(&json)
+            .is_ok_and(|v| v.format_version == ROOM_SHARE_VERSION);
+        if room_record {
+            return Ok(read_ended(archive));
+        }
+    }
     let version: ShareJsonVersion =
         serde_json::from_slice(&json).map_err(|_| OpenError::Damaged)?;
     if version.format_version > CURRENT_SHARE_FORMAT_VERSION {
@@ -260,6 +280,19 @@ pub(crate) fn read_share(
         (ROOM_SHARE_VERSION, Some(keyring_log)) => read_room_share(&json, keyring_log).map(Some),
         _ => Err(OpenError::Damaged),
     }
+}
+
+/// The ended record of `archive`; `None` when there is none or this build cannot read it.
+fn read_ended(archive: &mut ZipArchive<Cursor<&[u8]>>) -> Option<Sharing> {
+    read_optional(archive, ENDED_MEMBER, MAX_KEYRING_BYTES)
+        .ok()
+        .flatten()
+        .and_then(|bytes| EndedRecord::from_bytes(&bytes))
+        .map(Sharing::Ended)
+}
+
+fn has_member(archive: &mut ZipArchive<Cursor<&[u8]>>, name: &str) -> bool {
+    archive.index_for_name(name).is_some()
 }
 
 fn read_room_share(json: &[u8], keyring_log: Vec<u8>) -> Result<Sharing, OpenError> {
@@ -330,7 +363,7 @@ fn read_optional(
     Ok(Some(bytes))
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub(crate) fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
     bytes.iter().fold(String::new(), |mut text, byte| {
         // invariant: writing into a String cannot fail.
@@ -339,7 +372,7 @@ fn hex(bytes: &[u8]) -> String {
     })
 }
 
-fn unhex(text: &str) -> Option<[u8; 16]> {
+pub(crate) fn unhex(text: &str) -> Option<[u8; 16]> {
     if text.len() != 32 || !text.bytes().all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'f')) {
         return None;
     }
