@@ -65,9 +65,10 @@ test("criteria 7, 8 and 27: tiers are dismissed one by one, mutual removals unti
 });
 
 test("criterion 28: the frozen room comes from the notices, acknowledged or not", () => {
-  assert.deepEqual(frozenRoom([mutual]), { mutual: ["Ana", "Chris"], refused: "" });
+  assert.deepEqual(frozenRoom([mutual]), { mutual: ["Ana", "Chris"], refused: "", demoted: false });
+  assert.deepEqual(frozenRoom([{ ...mutual, demoted: true }]), { mutual: ["Ana", "Chris"], refused: "", demoted: true });
   const own: MembershipNotice = { kind: "notApplied", author: "aa", subject: "aa", label: "Ana", removal: true };
-  assert.deepEqual(frozenRoom([own]), { mutual: [], refused: "Ana" });
+  assert.deepEqual(frozenRoom([own]), { mutual: [], refused: "Ana", demoted: false });
   assert.equal(frozenRoom([promoted]), null);
 });
 

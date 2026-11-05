@@ -339,11 +339,12 @@ impl ClientSession {
         }
     }
 
+    /// Sends own entries, each confirmed by the `Pong` after them (ADR 0041 decision 11).
     fn send_entries(&mut self, entries: &[Entry]) -> Result<(), SessionError> {
         for entry in entries {
-            let bytes = entry.encode()?;
-            self.send(&ClientFrame::Keyring { entry: bytes });
+            entry.encode()?;
         }
+        self.send_own(entries);
         Ok(())
     }
 

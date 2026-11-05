@@ -20,6 +20,8 @@ export interface MembershipNotice {
   left?: boolean;
   admins?: { member: string; label: string }[];
   entries?: string[];
+  /** A mutual notice that holds a demotion: "demoted each other" (criterion 27). */
+  demoted?: boolean;
   author?: string;
   subject?: string;
   removal?: boolean;
@@ -132,16 +134,24 @@ export function acknowledge(room: RoomMembership, notice: MembershipNotice): Roo
   return first === "" || room.acked.includes(first) ? room : { ...room, acked: [...room.acked, first] };
 }
 
+/** A frozen room (criterion 28): the admins of a mutual notice, or the one refused. */
+export interface FrozenRoom {
+  mutual: string[];
+  refused: string;
+  /** The mutual notice holds a demotion. */
+  demoted: boolean;
+}
+
 /** The labels behind the frozen-room warning (criterion 28, from the keyring whether or not
  * the notice was acknowledged): the mutual removal's admins, else the admin whose own act was
  * held back. */
-export function frozenRoom(notices: MembershipNotice[]): { mutual: string[]; refused: string } | null {
+export function frozenRoom(notices: MembershipNotice[]): FrozenRoom | null {
   const mutual = notices.find((n) => n.kind === "mutualRemoval");
   if (mutual) {
-    return { mutual: (mutual.admins ?? []).map((a) => a.label), refused: "" };
+    return { mutual: (mutual.admins ?? []).map((a) => a.label), refused: "", demoted: mutual.demoted === true };
   }
   const refused = notices.find((n) => n.kind === "notApplied" && n.author === n.subject);
-  return refused ? { mutual: [], refused: refused.label ?? "" } : null;
+  return refused ? { mutual: [], refused: refused.label ?? "", demoted: false } : null;
 }
 
 /** Storage as the page has it (`window.localStorage`), or a stand-in in tests. */

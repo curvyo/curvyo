@@ -2,7 +2,7 @@
 //! 13, 22 to 28, `ux-notes.md` sections 2 and 5 to 9): rows, confirms, sync states and notices,
 //! formatted with their names and numbers. The pairing steps are `pairing_text`.
 
-use crate::share_text::cut_label;
+use crate::share_text::{cut_label, server_shown};
 
 /// The privacy sentence of choosing workspaces and of the first switch-on (criteria 9 and 30).
 pub const PRIVACY_SENTENCE: &str = "Names, folders and files leave this device encrypted, to your \
@@ -382,21 +382,50 @@ pub fn syncing_workspaces_text(workspaces: usize, done: usize, total: usize) -> 
     )
 }
 
-/// The one alert of the workspaces that Sync these could not switch on because the server did not
-/// answer (3.1): one names its workspace, more are counted, so an outage shows one line.
+/// Why Sync these could not switch workspaces on (3.1, PR #281 review): named where the app can
+/// tell, so a reachable server is not reported as unreachable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncProblem<'a> {
+    /// The server did not answer.
+    Unreachable,
+    /// The server did not answer, and the devices use another server than the Share tab names:
+    /// `group` (the devices' since pairing), `tab` (the Share tab's).
+    OtherServer {
+        /// The devices' server.
+        group: &'a str,
+        /// The Share tab's server.
+        tab: &'a str,
+    },
+    /// A browser on an https page cannot open a `ws://` address.
+    NeedsTls,
+    /// The server answered and refused the connection (not a member, an older relay).
+    Refused,
+    /// Sharing the workspace failed on this device before anything was sent.
+    Local,
+}
+
+/// The one alert of the workspaces that Sync these could not switch on for `problem` (3.1): one
+/// names its workspace, more are counted, so an outage shows one line.
 #[must_use]
-pub fn could_not_sync_text(names: &[String]) -> String {
-    match names {
-        [name] => format!(
-            "Could not sync {}: cannot reach the server.",
-            cut_label(name, 24)
+pub fn could_not_sync_text(names: &[String], problem: SyncProblem<'_>) -> String {
+    let what = match names {
+        [name] => cut_label(name, 24),
+        _ => format!("{} {}", names.len(), workspaces_word(names.len())),
+    };
+    let why = match problem {
+        SyncProblem::Unreachable => "cannot reach the server.".to_owned(),
+        SyncProblem::OtherServer { group, tab } => format!(
+            "cannot reach {}, the server your devices use. The Share tab names {}.",
+            server_shown(group),
+            server_shown(tab)
         ),
-        _ => format!(
-            "Could not sync {} {}: cannot reach the server.",
-            names.len(),
-            workspaces_word(names.len())
-        ),
-    }
+        SyncProblem::NeedsTls => {
+            "a browser needs a server address that starts with wss://.".to_owned()
+        }
+        SyncProblem::Refused => "the server refused the connection.".to_owned(),
+        SyncProblem::Local => "it could not be shared from this device.".to_owned(),
+    };
+    format!("Could not sync {what}: {why}")
 }
 
 /// The line under the pick list's row of a workspace in which this device is only a member.
@@ -483,12 +512,36 @@ mod tests {
             "Syncing 2 workspaces: uploading 3 of 14"
         );
         assert_eq!(
-            could_not_sync_text(&["Box job".to_owned()]),
+            could_not_sync_text(&["Box job".to_owned()], SyncProblem::Unreachable),
             "Could not sync Box job: cannot reach the server."
         );
+        let two = ["Box job".to_owned(), "Poster".to_owned()];
         assert_eq!(
-            could_not_sync_text(&["Box job".to_owned(), "Poster".to_owned()]),
+            could_not_sync_text(&two, SyncProblem::Unreachable),
             "Could not sync 2 workspaces: cannot reach the server."
+        );
+        assert_eq!(
+            could_not_sync_text(
+                &two,
+                SyncProblem::OtherServer {
+                    group: "ws://localhost:8787",
+                    tab: "ws://192.168.1.20:8787"
+                }
+            ),
+            "Could not sync 2 workspaces: cannot reach localhost:8787, the server your devices \
+             use. The Share tab names 192.168.1.20:8787."
+        );
+        assert_eq!(
+            could_not_sync_text(&two[..1], SyncProblem::NeedsTls),
+            "Could not sync Box job: a browser needs a server address that starts with wss://."
+        );
+        assert_eq!(
+            could_not_sync_text(&two[..1], SyncProblem::Refused),
+            "Could not sync Box job: the server refused the connection."
+        );
+        assert_eq!(
+            could_not_sync_text(&two[..1], SyncProblem::Local),
+            "Could not sync Box job: it could not be shared from this device."
         );
         assert_eq!(
             browser_storage_text(120_000_000, 300_000_001, &["Box job".to_owned()]),

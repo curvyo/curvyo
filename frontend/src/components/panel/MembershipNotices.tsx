@@ -12,6 +12,7 @@ import { focusParticipants } from "@/lib/shareFocus";
 import {
   membership_admin_change,
   membership_more_changes,
+  membership_mutual_demotion,
   membership_mutual_removal,
   membership_not_applied,
   membership_rotation_pending,
@@ -95,11 +96,7 @@ function MutualNotice({
   me: string;
   membership: MembershipApi;
 }) {
-  const admins = notice.admins ?? [];
-  const text = membership_mutual_removal(
-    JSON.stringify(admins.filter((a) => a.member !== me).map((a) => a.label)),
-    admins.some((a) => a.member === me),
-  );
+  const text = mutualText(notice, me);
   return (
     <div role="group" aria-label={text} className="flex flex-col gap-1">
       <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
@@ -123,6 +120,14 @@ function MutualNotice({
   );
 }
 
+/** The mutual notice's words: "demoted each other" when a demotion is among them (criterion 27). */
+function mutualText(notice: MembershipNotice, me: string): string {
+  const admins = notice.admins ?? [];
+  const others = JSON.stringify(admins.filter((a) => a.member !== me).map((a) => a.label));
+  const mine = admins.some((a) => a.member === me);
+  return notice.demoted === true ? membership_mutual_demotion(others, mine) : membership_mutual_removal(others, mine);
+}
+
 /** The words of the shown notices, for the one live region that stays mounted. */
 function spoken(pending: MembershipNotice[], mutual: MembershipNotice | undefined, held: MembershipNotice[], admin: boolean, me: string): string {
   const parts: string[] = [];
@@ -130,13 +135,7 @@ function spoken(pending: MembershipNotice[], mutual: MembershipNotice | undefine
     parts.push(membership_rotation_pending(JSON.stringify(pending.map((n) => [n.label ?? "", n.left === true])), admin));
   }
   if (mutual) {
-    const admins = mutual.admins ?? [];
-    parts.push(
-      membership_mutual_removal(
-        JSON.stringify(admins.filter((a) => a.member !== me).map((a) => a.label)),
-        admins.some((a) => a.member === me),
-      ),
-    );
+    parts.push(mutualText(mutual, me));
   }
   parts.push(...held.map((h) => membership_not_applied(h.label ?? "", h.removal === true)));
   return parts.join(" ");

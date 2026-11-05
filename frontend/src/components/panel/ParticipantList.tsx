@@ -5,13 +5,14 @@
 import { LogOut, ShieldMinus, ShieldPlus, TriangleAlert, UserMinus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { ALERT, BUSY_MS, BUTTON, DestructiveConfirm, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { ALERT, BUTTON, DestructiveConfirm, MUTED, OUTLINE } from "@/components/panel/devicesUi";
 import { AvatarDisc } from "@/components/panel/ParticipantDisc";
 import type { ShareParticipant, ShareView } from "@/hooks/useCollaboration";
 import type { MembershipApi } from "@/hooks/useMembership";
+import { usePendingLine } from "@/hooks/usePendingLine";
+import { frozenWarning } from "@/lib/frozenWarning";
 import { focusEndedHeading, focusParticipants, takeParticipantsFocus } from "@/lib/shareFocus";
 import {
-  membership_frozen_warning,
   membership_key_epoch,
   membership_leave_name,
   membership_make_admin_confirm,
@@ -63,25 +64,14 @@ function ParticipantRow({
   const [asking, setAsking] = useState<Asking>("");
   // A refusal holds for the room as it was: a role change or another admin hides it.
   const [refused, setAlert] = useState({ text: "", room: "" });
-  const [busy, setBusy] = useState<{ text: string; admin: boolean } | null>(null);
   const roleButton = useRef<HTMLButtonElement>(null);
   const actionButton = useRef<HTMLButtonElement>(null);
   const room = roomState;
   const alert = refused.room === room ? refused.text : "";
   const own = participant.self;
   const label = participant.label;
-  // A role change arrived, or nothing arrived in time: the busy line ends (ux-notes 3.1).
-  useEffect(() => {
-    if (!busy) {
-      return undefined;
-    }
-    if (busy.admin === participant.admin) {
-      setBusy(null);
-      return undefined;
-    }
-    const timer = window.setTimeout(() => setBusy(null), BUSY_MS);
-    return () => window.clearTimeout(timer);
-  }, [busy, participant.admin]);
+  // The busy line holds until the server confirms the act (ADR 0041 decision 11).
+  const busy = usePendingLine(participant.pending);
 
   const close = (opener: "role" | "action") => {
     setAsking("");
@@ -94,10 +84,8 @@ function ParticipantRow({
   };
   const makeAdmin = participant.canMakeAdmin === true;
   const roleAction = makeAdmin || participant.canMakeMember === true || participant.canStepDown === true;
-  const frozenText = membership.frozen
-    ? membership_frozen_warning(JSON.stringify(membership.frozen.mutual), membership.frozen.refused)
-    : "";
-  const roleLine = busy?.text ?? membership_role_line(participant.admin, participant.online);
+  const frozenText = frozenWarning(membership.frozen);
+  const roleLine = busy ?? membership_role_line(participant.admin, participant.online);
 
   let confirm = null;
   if (asking === "admin") {
@@ -112,7 +100,6 @@ function ParticipantRow({
         onConfirm={() => {
           const refusal = membership.setRole(participant.member, true);
           if (refusal === "") {
-            setBusy({ text: membership_word("making-admin"), admin: true });
             close("role");
           }
           return refusal;
@@ -131,7 +118,6 @@ function ParticipantRow({
         onConfirm={() => {
           const refusal = membership.setRole(participant.member, false);
           if (refusal === "") {
-            setBusy({ text: membership_word("making-member"), admin: false });
             setAsking("");
             // Step down empties the role slot: the focus goes to the row's Leave (ux-notes 9).
             window.setTimeout(() => (stepDown ? actionButton : roleButton).current?.focus(), 0);
@@ -150,7 +136,6 @@ function ParticipantRow({
         onConfirm={() => {
           const refusal = membership.remove(participant.member);
           if (refusal === "") {
-            setBusy({ text: membership_word("removing"), admin: !participant.admin });
             setAsking("");
             const rows = [...(list.current?.querySelectorAll<HTMLElement>("[data-member]") ?? [])];
             const index = rows.findIndex((r) => r.dataset.member === participant.member);
@@ -172,7 +157,6 @@ function ParticipantRow({
           const refusal = membership.leave();
           if (refusal === "") {
             focusEndedHeading();
-            setBusy({ text: membership_word("leaving"), admin: !participant.admin });
             setAsking("");
           }
           return refusal;

@@ -166,6 +166,7 @@ export function useDevices(
     openSession: getSession,
     ownMember: () => viewRef.current?.rows.find((row) => row.own)?.member ?? "",
     recentsChanged: () => refs.current.workspace.reloadRecents(),
+    tabServer: () => refs.current.collab.server,
   });
   const syncedRef = useRef(synced);
   useEffect(() => {
@@ -440,6 +441,11 @@ export function useDevices(
         // The joiner is a member now: the welcome names the group room (criterion 3).
         addingRef.current = null;
         attempt.pair(groupRef.current.room());
+      } else if (attempt && addingRef.current && groupRef.current?.add_refused(addingRef.current)) {
+        // The group refused the device: the pairing ends with the reason, not "Pairing ..." for good.
+        addingRef.current = null;
+        attempt.refuse_add();
+        pairTransport.current?.drain();
       }
       syncedRef.current.tick(Date.now());
       if (group) {

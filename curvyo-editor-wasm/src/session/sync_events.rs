@@ -13,6 +13,11 @@ use super::sync::{BACK_ONLINE_AFTER_MS, JoinPhase, SyncEnd, SyncLink, TransportA
 impl Session {
     /// Carries out everything the client session asked for, until it asks for nothing.
     pub(super) fn sync_pump(&mut self) {
+        self.sync_drain();
+        self.sync_pending();
+    }
+
+    fn sync_drain(&mut self) {
         loop {
             let Some(link) = self.sync.as_mut() else {
                 return;
@@ -48,6 +53,38 @@ impl Session {
                 }
             }
         }
+    }
+
+    /// The relay confirmed own keyring acts (a `Pong`, no event): the Share tab reads again, and
+    /// an add back confirmed now says "was added back" (ADR 0041 decision 11).
+    fn sync_pending(&mut self) {
+        let Some(link) = self.sync.as_mut() else {
+            return;
+        };
+        let pending = link.client.pending_acts();
+        if pending == link.pending {
+            return;
+        }
+        link.revision = link.revision.wrapping_add(1);
+        let confirmed = link.client.confirmed_keyring();
+        let added: Vec<MemberId> = link
+            .adding_back
+            .iter()
+            .filter(|m| {
+                !pending.iter().any(|a| a.member == **m)
+                    && confirmed.as_ref().is_some_and(|k| k.role(m).is_some())
+            })
+            .copied()
+            .collect();
+        for member in added {
+            link.adding_back.remove(&member);
+            let label = link.labels.get(&member).cloned().unwrap_or_default();
+            link.notice(
+                curvyo_ui_core::membership_return_text::added_back_notice(&label),
+                false,
+            );
+        }
+        link.pending = pending;
     }
 
     #[allow(clippy::too_many_lines)] // One arm per session event; split, the table scatters.
@@ -162,7 +199,8 @@ impl Session {
         } else {
             EndReason::Removed
         };
-        self.end_share(reason, "");
+        let name = link.leave_name.clone();
+        self.end_share(reason, &name);
     }
 
     pub(super) fn upload_snapshot(&mut self, covers_seq: u64) {

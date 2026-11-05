@@ -41,6 +41,19 @@ fn an_idle_connection_pings_every_2_s() {
     assert!(net.clients[a].session().is_online());
 }
 
+/// PR #281 review: the host's thread stalls 4.5 s (a long synchronous job): the link is kept,
+/// no reconnect, because what arrived during the stall is still queued behind that tick.
+#[test]
+fn a_host_stall_longer_than_the_offline_time_keeps_the_link() {
+    let (mut net, a, _) = pair(11);
+    net.run(500);
+    let attempts = net.clients[a].connect_times.len();
+    net.now = net.now.plus(4_500);
+    net.run(1_000);
+    assert!(net.clients[a].session().is_online());
+    assert_eq!(net.clients[a].connect_times.len(), attempts, "no reconnect");
+}
+
 #[test]
 fn reconnects_back_off_from_half_a_second_to_ten_with_jitter() {
     let (mut net, _, b) = pair(2);

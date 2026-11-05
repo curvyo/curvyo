@@ -7,6 +7,7 @@
 
 mod api;
 mod check;
+mod confirm;
 mod inbound;
 mod keys;
 mod link;
@@ -25,6 +26,8 @@ pub use api::{
     CheckOutcome, ClientOutput, History, InviteSecret, SessionConfig, SessionError, SessionEvent,
     SessionStart,
 };
+use confirm::Confirmation;
+pub use confirm::{PendingAct, PendingKind};
 use keys::Keys;
 use link::Link;
 use presence::Presence;
@@ -101,6 +104,8 @@ pub struct ClientSession {
     resynced_through: Option<u64>,
     /// The highest sequence the relay reported or delivered.
     head_seq: u64,
+    /// Which own keyring entries the relay holds (ADR 0041 decision 11).
+    confirmation: Confirmation,
     out: Vec<ClientOutput>,
 }
 
@@ -119,11 +124,13 @@ impl ClientSession {
         );
         let awaiting_admission = matches!(config.start, SessionStart::Join(_));
         let mut since_seq = config.since_seq;
+        let mut confirmation = Confirmation::default();
         let start = match config.start {
             SessionStart::Member {
                 keyring,
                 epoch_keys,
             } => {
+                confirmation = Confirmation::from_log(&keyring, keys.me());
                 keys.add_keys(epoch_keys);
                 keys.add_entries(keyring);
                 Start::Member
@@ -177,6 +184,7 @@ impl ClientSession {
             rejected_shown: false,
             resynced_through: None,
             head_seq: since_seq,
+            confirmation,
             out: vec![ClientOutput::Connect],
         })
     }
@@ -253,6 +261,7 @@ impl ClientSession {
         }
         self.link.heard(now);
         self.state = State::Handshake;
+        self.reset_pings();
         self.send(&ClientFrame::Hello {
             protocol: PROTOCOL_VERSION,
             room: self.room,
@@ -282,6 +291,7 @@ impl ClientSession {
 
     /// Time passed: pings, loss detection, reconnects, presence and invite expiry.
     pub fn tick(&mut self, now: Millis) {
+        self.link.ticked(now);
         match self.state {
             State::Ended => return,
             State::Idle { retry_at } => {
@@ -301,7 +311,7 @@ impl ClientSession {
         }
         if let State::Joined { caught_up } = self.state {
             if self.link.ping_due(now) {
-                self.send(&ClientFrame::Ping);
+                self.send_ping();
             }
             if caught_up {
                 self.tick_joined(now);

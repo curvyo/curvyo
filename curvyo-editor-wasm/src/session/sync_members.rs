@@ -11,7 +11,7 @@ use curvyo_sync_core::{History, SessionError};
 use curvyo_ui_core::share_text::{LEFT_NOTICE, REMOVED_NOTICE};
 
 use super::Session;
-use super::sync::{SyncEnd, SyncLink, TransportAction, hex, unhex};
+use super::sync::{SyncEnd, SyncLink, hex, unhex};
 
 fn member_of(member_hex: &str) -> Result<MemberId, SessionError> {
     unhex::<32>(member_hex)
@@ -90,16 +90,19 @@ impl Session {
             History::FromNow
         };
         link.client.add_back(member, history)?;
+        link.adding_back.insert(member);
         link.revision = link.revision.wrapping_add(1);
         self.sync_pump();
         Ok(())
     }
 
-    /// Leave (criteria 10, 13 and 15): this device writes its own `RemoveMember` and stops
-    /// syncing; a document keeps its ended record "left" in place of its share record, a
-    /// workspace hands the host the marker's ([`Session::workspace_ended_record`]). The room's
-    /// keys stay in the credential store. Refused while this device is the only admin. `name`
-    /// is the document's as the leaver's notice says it ("" for "this document").
+    /// Leave (criteria 10, 13 and 15): this device writes its own `RemoveMember` and keeps
+    /// syncing, shown as "Leaving...", until the relay confirms it or refuses this device as
+    /// removed (ADR 0041 decisions 2 and 11); then a document keeps its ended record "left" in
+    /// place of its share record, a workspace hands the host the marker's
+    /// ([`Session::workspace_ended_record`]). The room's keys stay in the credential store.
+    /// Refused while this device is the only admin. `name` is the document's as the leaver's
+    /// notice says it ("" for "this document").
     ///
     /// # Errors
     /// `LastAdmin`, `NotAMember`, `Offline`, `Ended`, `Crypto` as
@@ -111,12 +114,10 @@ impl Session {
             .filter(|l| l.ended.is_none())
             .ok_or(SessionError::Ended)?;
         link.client.leave()?;
+        link.leaving = true;
+        name.trim().clone_into(&mut link.leave_name);
+        link.revision = link.revision.wrapping_add(1);
         self.sync_pump();
-        self.end_share(EndReason::Left, name);
-        if let Some(link) = self.sync.as_mut() {
-            // The leave went out first; the relay then refuses this device as removed.
-            link.actions.push_back(TransportAction::Close);
-        }
         Ok(())
     }
 
@@ -223,11 +224,14 @@ impl Session {
 /// Where this link synced and how far, as its ended record: a document's room and cursor, or a
 /// workspace's id and the marker's cursor and list version.
 fn ended_record(link: &SyncLink, ended: EndReason) -> EndedRecord {
+    // Only entries the relay confirmed: an own entry it never stored is no head (ADR 0041
+    // decision 11).
     let heads = link
         .client
-        .keyring()
-        .map(|k| k.heads().into_iter().map(|h| h.0).collect())
-        .unwrap_or_default();
+        .confirmed_heads()
+        .into_iter()
+        .map(|h| h.0)
+        .collect();
     match link.workspace.as_ref() {
         None => EndedRecord {
             server: link.server.clone(),

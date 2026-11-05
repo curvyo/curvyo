@@ -172,6 +172,7 @@ fn a_removed_participant_checks_and_syncs_again() {
     net.pump();
     net.run(1_000);
     assert_eq!(view(&net.devices[b].session)["check"], "notYet");
+    let first_check = net.devices[b].session.share_revision();
 
     net.s(a).add_back_participant(&ben, false).unwrap();
     net.run(1_000);
@@ -189,9 +190,13 @@ fn a_removed_participant_checks_and_syncs_again() {
         net.s(b)
             .check_added_back(keys[1].clone(), &seeds(2, 2), now)
     );
+    // The host reads the tab again only on a new revision: the second check's link continues
+    // the first one's, so its answer is never hidden behind an equal number.
+    assert!(net.devices[b].session.share_revision() > first_check);
     net.pump();
     net.run(1_000);
     assert_eq!(view(&net.devices[b].session)["check"], "addedBack");
+    assert!(net.devices[b].session.share_revision() > first_check);
     assert!(
         !net.devices[b].session.is_shared(),
         "nothing syncs before B chooses"

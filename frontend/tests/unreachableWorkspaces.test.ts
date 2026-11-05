@@ -5,21 +5,23 @@ import { test } from "node:test";
 
 import { RETRY_MS, UnreachableWorkspaces } from "../src/lib/unreachableWorkspaces.ts";
 
+const names = (failed: UnreachableWorkspaces<string>, server: string) => failed.alerts(server).flatMap((a) => a.names);
+
 test("only an unreachable server keeps a workspace, and the names come together", () => {
   const failed = new UnreachableWorkspaces<string>();
   failed.record("a", "Box job", "A", "offline", false);
   failed.record("b", "Poster", "B", "offline", false);
   failed.record("c", "Lid", "C", "member-only", true);
   failed.record("d", "Tray", "D", "refused", true);
-  assert.deepEqual(failed.names("wss://relay.example"), ["Box job", "Poster"]);
+  assert.deepEqual(names(failed, "wss://relay.example"), ["Box job", "Poster"]);
   failed.record("a", "Box job", "A", "ok", true);
-  assert.deepEqual(failed.names("wss://relay.example"), ["Poster"]);
+  assert.deepEqual(names(failed, "wss://relay.example"), ["Poster"]);
 });
 
 test("no alert while the server address is unset", () => {
   const failed = new UnreachableWorkspaces<string>();
   failed.record("a", "Box job", "A", "offline", false);
-  assert.deepEqual(failed.names(""), []);
+  assert.deepEqual(names(failed, ""), []);
 });
 
 test("a retry starts when the group comes online again, not while it is offline", () => {
@@ -40,7 +42,7 @@ test("a room that did not answer is retried only when that is cheap", () => {
   failed.record("a", "Box job", "A", "unreachable", false);
   failed.record("b", "Poster", "B", "unreachable", true);
   failed.settled(0);
-  assert.deepEqual(failed.names("wss://relay.example"), ["Box job", "Poster"]);
+  assert.deepEqual(names(failed, "wss://relay.example"), ["Box job", "Poster"]);
   assert.deepEqual(failed.due(true, RETRY_MS), ["B"]);
 });
 
@@ -59,8 +61,23 @@ test("a workspace the group's list names, or a group that ended, clears the aler
   failed.record("b", "Poster", "B", "offline", false);
   assert.equal(failed.forget(["a", "x"]), true);
   assert.equal(failed.forget(["x"]), false);
-  assert.deepEqual(failed.names("wss://relay.example"), ["Poster"]);
+  assert.deepEqual(names(failed, "wss://relay.example"), ["Poster"]);
   failed.clear();
-  assert.deepEqual(failed.names("wss://relay.example"), []);
+  assert.deepEqual(names(failed, "wss://relay.example"), []);
   assert.deepEqual(failed.due(true, 0), []);
+});
+
+test("the alert names why: unreachable, refused by the server or failed here, one line each", () => {
+  const failed = new UnreachableWorkspaces<string>();
+  failed.record("a", "Box job", "A", "offline", false);
+  failed.record("b", "Poster", "B", "unreachable", true);
+  failed.record("c", "Lid", "C", "server-refused", true);
+  failed.record("d", "Tray", "D", "share-failed", true);
+  assert.deepEqual(failed.alerts("wss://relay.example"), [
+    { problem: "unreachable", names: ["Box job", "Poster"] },
+    { problem: "refused", names: ["Lid"] },
+    { problem: "local", names: ["Tray"] },
+  ]);
+  failed.settled(0);
+  assert.deepEqual(failed.due(true, RETRY_MS), ["A", "B"], "a refusal and a local failure wait for the maker");
 });

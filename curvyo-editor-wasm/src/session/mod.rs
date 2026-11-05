@@ -146,6 +146,8 @@ mod tiling_live_tests;
 mod tiling_view;
 pub use sketch::{SketchTool, Workbench};
 #[cfg(test)]
+mod confirmation_tests;
+#[cfg(test)]
 mod device_budget_tests;
 mod device_facts;
 mod device_sync;

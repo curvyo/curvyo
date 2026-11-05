@@ -4,9 +4,9 @@
 use std::collections::BTreeSet;
 
 use curvyo_crypto_core::MemberId;
-use curvyo_crypto_core::keyring::{Payload, Role};
+use curvyo_crypto_core::keyring::{Participant, Payload, Role};
 use curvyo_document_core::EndReason;
-use curvyo_sync_core::CheckOutcome;
+use curvyo_sync_core::{CheckOutcome, PendingKind};
 use curvyo_ui_core::share_text::{
     ConnectionState, cut_label, initials, join_refusal_text, participant_colour, pill_name,
     server_shown, share_subject,
@@ -165,13 +165,27 @@ fn ended_name(reason: EndReason) -> &'static str {
 }
 
 /// The Removed or left rows an admin sees (`specs/0097` criterion 17): every former
-/// participant with its last known label (empty when none was kept) and fingerprint.
+/// participant with its last known label (empty when none was kept) and fingerprint. One this
+/// device added back stays here, `adding`, until the relay confirms the add (ADR 0041 decision
+/// 11).
 fn former_rows(link: &SyncLink) -> Vec<Value> {
     let Some(keyring) = link.client.keyring() else {
         return Vec::new();
     };
-    keyring
-        .former_participants()
+    let adding: Vec<MemberId> = pending_of(link, PendingKind::Add);
+    let confirmed = link.client.confirmed_keyring();
+    let mut former = keyring.former_participants();
+    if let Some(confirmed) = confirmed.as_ref() {
+        former.extend(
+            confirmed
+                .former_participants()
+                .into_iter()
+                .filter(|i| adding.contains(&i.member)),
+        );
+    }
+    former.sort_by_key(|i| i.member.0);
+    former.dedup_by_key(|i| i.member);
+    former
         .into_iter()
         .map(|identity| {
             let label = link
@@ -179,25 +193,74 @@ fn former_rows(link: &SyncLink) -> Vec<Value> {
                 .get(&identity.member)
                 .map(|l| cut_label(l, 24))
                 .unwrap_or_default();
+            let left = confirmed
+                .as_ref()
+                .filter(|_| adding.contains(&identity.member))
+                .map_or_else(
+                    || curvyo_sync_core::left_by_own_hand(keyring, &identity.member),
+                    |k| curvyo_sync_core::left_by_own_hand(k, &identity.member),
+                );
             json!({
                 "member": super::sync::hex(&identity.member.0),
                 "label": label,
                 "fingerprint": identity.fingerprint(),
-                "left": curvyo_sync_core::left_by_own_hand(keyring, &identity.member),
+                "left": left,
+                "adding": adding.contains(&identity.member),
             })
         })
         .collect()
 }
 
-/// The participant rows of the Share tab: own row first, then by member id.
+/// The participants an own act of `kind` waits on the relay for.
+fn pending_of(link: &SyncLink, kind: PendingKind) -> Vec<MemberId> {
+    link.pending
+        .iter()
+        .filter(|a| a.kind == kind)
+        .map(|a| a.member)
+        .collect()
+}
+
+/// The busy word of a row whose own act waits on the relay (ADR 0041 decision 11), as
+/// `membership_word` names it; `None` when nothing waits.
+fn pending_word(link: &SyncLink, member: &MemberId) -> Option<&'static str> {
+    link.pending
+        .iter()
+        .rev()
+        .find(|a| a.member == *member)
+        .and_then(|a| match a.kind {
+            PendingKind::MakeAdmin => Some("making-admin"),
+            PendingKind::MakeMember => Some("making-member"),
+            PendingKind::Remove => Some("removing"),
+            PendingKind::Leave => Some("leaving"),
+            PendingKind::Add => None,
+        })
+}
+
+/// The participant rows of the Share tab: own row first, then by member id. A participant this
+/// device removed, or this device after its own leave, stays until the relay confirms it, and
+/// one it added back appears only then (ADR 0041 decision 11).
 fn participant_rows(link: &SyncLink, is_admin: bool) -> Vec<Value> {
     let me = link.client.me();
     let online: BTreeSet<MemberId> = link.peers.values().filter_map(|p| p.member).collect();
-    let mut rows = link
+    let adding = pending_of(link, PendingKind::Add);
+    let mut rows: Vec<Participant> = link
         .client
         .keyring()
         .map(curvyo_crypto_core::keyring::Keyring::participants)
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|p| !adding.contains(&p.identity.member))
+        .collect();
+    let mut leaving = pending_of(link, PendingKind::Remove);
+    leaving.extend(pending_of(link, PendingKind::Leave));
+    if let Some(confirmed) = link.client.confirmed_keyring() {
+        for participant in confirmed.participants() {
+            let member = participant.identity.member;
+            if leaving.contains(&member) && !rows.iter().any(|p| p.identity.member == member) {
+                rows.push(participant);
+            }
+        }
+    }
     rows.sort_by_key(|p| (p.identity.member != me, p.identity.member.0));
     let alone = rows.len() < 2;
     rows.iter()
@@ -215,6 +278,9 @@ fn participant_rows(link: &SyncLink, is_admin: bool) -> Vec<Value> {
             } else {
                 cut_label(&label, 24)
             };
+            let pending = pending_word(link, &member);
+            // A row whose own act waits offers no further act on it.
+            let free = pending.is_none();
             json!({
                 "member": super::sync::hex(&member.0),
                 "label": shown,
@@ -224,14 +290,15 @@ fn participant_rows(link: &SyncLink, is_admin: bool) -> Vec<Value> {
                 "self": own,
                 "online": own && link.online || online.contains(&member),
                 "admin": participant.role == Role::Admin,
+                "pending": pending,
                 // Criterion 32: only an admin sees Remove, never on its own row.
-                "removable": is_admin && !own,
+                "removable": free && is_admin && !own,
                 // `specs/0097` criteria 2 and 14: roles for admins on other rows; Step down for
                 // an admin and Leave for everyone on the own row, no Leave when alone.
-                "canMakeAdmin": is_admin && !own && participant.role == Role::Member,
-                "canMakeMember": is_admin && !own && participant.role == Role::Admin,
-                "canStepDown": own && participant.role == Role::Admin,
-                "canLeave": own && !alone,
+                "canMakeAdmin": free && is_admin && !own && participant.role == Role::Member,
+                "canMakeMember": free && is_admin && !own && participant.role == Role::Admin,
+                "canStepDown": free && own && participant.role == Role::Admin,
+                "canLeave": free && own && !alone,
             })
         })
         .collect()

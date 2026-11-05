@@ -21,6 +21,7 @@ import {
   acknowledge as acknowledgeIn,
   applyNotices,
   dismissTier as dismissIn,
+  type FrozenRoom,
   frozenRoom,
   loadMembership,
   parseNotices,
@@ -28,7 +29,7 @@ import {
   shownNotices,
 } from "@/lib/membershipState";
 import { invoke } from "@/platform/host";
-import { membership_added_back_notice, membership_clock_time, membership_word } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { membership_clock_time, membership_word } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** A removed or left file or workspace as the Removed block shows it (ux-notes 7). */
 export interface EndedShown {
@@ -46,7 +47,7 @@ export interface MembershipApi {
   /** The notices block and the second-admin line, as shown (dismissed and acknowledged gone). */
   notices: MembershipNotice[];
   /** The frozen room behind Make admin's warning (criterion 28), `null` when not frozen. */
-  frozen: { mutual: string[]; refused: string } | null;
+  frozen: FrozenRoom | null;
   /** The admin-change line with its time, `null` when none. */
   line: (AdminChangeLine & { at: string }) | null;
   /** The Share tab mark (criterion 30). */
@@ -108,6 +109,23 @@ function storage(): Storage | null {
 
 const CHANGE_TO_ME: Record<string, string> = { nowAdmin: "you-are-admin", noLongerAdmin: "you-are-no-longer-admin" };
 
+/** How long a document that synced again waits for its room before it is saved anyway (ms). */
+const SAVE_AFTER_SYNC_MS = 10_000;
+
+/** Saves once `session` is online again (or after [`SAVE_AFTER_SYNC_MS`]), unless another
+ * document replaced it meanwhile. */
+function saveWhenOnline(session: { sync_online(): boolean }, current: () => unknown, save: () => void): void {
+  const started = Date.now();
+  const timer = window.setInterval(() => {
+    if (current() !== session) {
+      window.clearInterval(timer);
+    } else if (session.sync_online() || Date.now() - started > SAVE_AFTER_SYNC_MS) {
+      window.clearInterval(timer);
+      save();
+    }
+  }, 100);
+}
+
 export function useMembership(
   editor: EditorSession,
   project: ProjectApi,
@@ -131,6 +149,15 @@ export function useMembership(
   const ownActRef = useRef(false);
   /** Change keys now was pressed here: its end is a canvas notice. */
   const rotatingRef = useRef(false);
+  // This device's own leave of a document waits for the server; once it is confirmed the file
+  // holds the ended record "left" and is saved again.
+  const leavingRef = useRef(false);
+  useEffect(() => {
+    if (leavingRef.current && view.ended === "left") {
+      leavingRef.current = false;
+      refs.current.project.save();
+    }
+  }, [view.ended]);
   const roomRef = useRef("");
 
   const live = view.live && (view.shared || view.workspace != null);
@@ -251,15 +278,11 @@ export function useMembership(
     rotatingRef.current = refusal === "";
     return refusal;
   }, [act]);
+  // "Ben was added back." comes from the session once the server holds the add (ADR 0041
+  // decision 11), as a sync notice.
   const addBack = useCallback(
-    (member: string, full: boolean, label: string) => {
-      const refusal = act((s) => s.add_back_participant(member, full));
-      if (refusal === "") {
-        showNotice(membership_added_back_notice(label), 5000, "canvas", "status");
-      }
-      return refusal;
-    },
-    [act, showNotice],
+    (member: string, full: boolean, _label: string) => act((s) => s.add_back_participant(member, full)),
+    [act],
   );
   const remove = useCallback((member: string) => act((s) => s.remove_participant(member)), [act]);
 
@@ -274,7 +297,9 @@ export function useMembership(
     }
     const refusal = act((s) => s.leave_share(refs.current.workspace.open ? "" : documentName(refs.current.project)));
     if (refusal === "" && view.workspace == null) {
-      // The ended record "left" is in the document: it is saved (the session tells the leaver).
+      // The keyring log with the pending leave is saved now: a leave not yet confirmed goes out
+      // on the next open (ADR 0041 decision 11); the ended record is saved once it is.
+      leavingRef.current = true;
       refs.current.project.save();
     }
     return refusal;
@@ -351,7 +376,9 @@ export function useMembership(
     const started = session.sync_again(c.name, fromHex(keys.identity), random(32), random(32), Date.now());
     drive(session);
     if (started) {
-      p.save();
+      // The file gets its share record once the room admitted the document: the first save
+      // builds the thumbnail renderer, seconds of work that would hold back the connection.
+      saveWhenOnline(session, getSession, p.save);
     }
     return started ? "" : membership_word("sync-again-failed");
   }, [getSession, ended, endedMarker, drive]);

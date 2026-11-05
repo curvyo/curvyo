@@ -200,7 +200,7 @@ impl Session {
         });
         link.returning = Some((record, workspace));
         link.keys_changed = false;
-        self.sync = Some(Box::new(link));
+        self.install_link(Box::new(link));
         self.sync_pump();
     }
 }

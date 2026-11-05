@@ -5,7 +5,7 @@
 //! in the file or on the wire. The words come from `curvyo-ui-core`.
 
 use curvyo_crypto_core::MemberId;
-use curvyo_crypto_core::keyring::HeldBackKind;
+use curvyo_crypto_core::keyring::{HeldBack, HeldBackKind};
 use curvyo_sync_core::{MembershipNotice, admin_set, membership_notices};
 use serde_json::{Value, json};
 
@@ -20,15 +20,15 @@ impl Session {
         self.sync
             .as_ref()
             .filter(|l| l.ended.is_none())
-            .and_then(|l| l.client.keyring())
-            .map(|k| admin_set(k).iter().map(|m| hex(&m.0)).collect())
+            .and_then(|l| l.client.confirmed_keyring())
+            .map(|k| admin_set(&k).iter().map(|m| hex(&m.0)).collect())
             .unwrap_or_default()
     }
 
     /// The notices of the open share as a JSON array, measured against `previous` (the admin set
     /// last shown, as [`Session::share_admin_set`] gave it; `None` the first time) and
     /// `own_group` (the member ids of the maker's device group; this device when empty). Each is
-    /// `{kind, member?, label?, left?, admins?, entries?, author?, subject?, removal?}`.
+    /// `{kind, member?, label?, left?, admins?, entries?, demoted?, author?, subject?, removal?}`.
     #[must_use]
     pub fn membership_notices_json(
         &self,
@@ -38,7 +38,8 @@ impl Session {
         let Some(link) = self.sync.as_ref().filter(|l| l.ended.is_none()) else {
             return "[]".to_owned();
         };
-        let Some(keyring) = link.client.keyring() else {
+        // The notices read what the relay confirmed (ADR 0041 decision 11).
+        let Some(keyring) = link.client.confirmed_keyring() else {
             return "[]".to_owned();
         };
         let ids = |hexes: &[String]| -> Vec<MemberId> {
@@ -52,12 +53,19 @@ impl Session {
         if group.is_empty() {
             group.push(link.client.me());
         }
-        let notices = membership_notices(previous.as_deref(), keyring, &group);
-        Value::Array(notices.iter().map(|n| notice_json(link, n)).collect()).to_string()
+        let notices = membership_notices(previous.as_deref(), &keyring, &group);
+        let held = keyring.held_back();
+        Value::Array(
+            notices
+                .iter()
+                .map(|n| notice_json(link, &held, n))
+                .collect(),
+        )
+        .to_string()
     }
 }
 
-fn notice_json(link: &SyncLink, notice: &MembershipNotice) -> Value {
+fn notice_json(link: &SyncLink, held: &[HeldBack], notice: &MembershipNotice) -> Value {
     let person = |kind: &str, member: &MemberId| json!({"kind": kind, "member": hex(&member.0), "label": label(link, member)});
     match notice {
         MembershipNotice::NowAdmin(m) => person("nowAdmin", m),
@@ -77,6 +85,12 @@ fn notice_json(link: &SyncLink, notice: &MembershipNotice) -> Value {
                 .map(|m| json!({"member": hex(&m.0), "label": label(link, m)}))
                 .collect::<Vec<_>>(),
             "entries": entries.iter().map(|e| hex(&e.0)).collect::<Vec<_>>(),
+            // Criterion 27: a demotion among them (crossed demotions, or a removal that arrived
+            // after its author's demotion) reads "demoted each other"; removals alone (keyrings
+            // merged outside one relay) "removed each other".
+            "demoted": held
+                .iter()
+                .any(|h| entries.contains(&h.entry) && h.kind == HeldBackKind::Demotion),
         }),
         MembershipNotice::NotApplied(held) => json!({
             "kind": "notApplied",
