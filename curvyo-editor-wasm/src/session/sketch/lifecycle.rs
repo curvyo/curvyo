@@ -30,6 +30,9 @@ impl Session {
         self.sketch.cancel();
         let from = self.sketch.workbench;
         self.sketch.workbench = workbench;
+        if from == Workbench::Sketch {
+            self.return_from_source_page();
+        }
         self.swap_workbench_view(from, workbench);
         // A manufacturing workbench selects nothing and keeps the drawing's selection for the
         // way back (UX notes §3).
@@ -60,11 +63,31 @@ impl Session {
             });
             // Proposal A: preserve populated Vector pages; create a dedicated source page.
             if populated {
-                self.add_page();
+                let page = self.active_page().id;
+                let view = self.viewport;
+                let source = self.add_page();
+                self.sketch.vector_return = Some(super::state::VectorReturn { page, view, source });
             }
         }
         self.sync_sketch_page();
         self.sync_sketch();
+    }
+
+    /// Leaving Sketch on the source page its entry created, with nothing drawn there, shows the
+    /// Vector page and view as they were (Proposal): the drawing is not left off-screen.
+    fn return_from_source_page(&mut self) {
+        let Some(back) = self.sketch.vector_return.take() else {
+            return;
+        };
+        if self.active_page().id != back.source
+            || self.document.page_sketch(&back.source).is_some()
+            || !self.activate_page(&back.page)
+        {
+            return;
+        }
+        let canvas = self.viewport.canvas_size();
+        self.viewport = back.view;
+        self.viewport.resize(canvas.0, canvas.1);
     }
 
     /// Active original sketch, excluding deleted or converted objects.
