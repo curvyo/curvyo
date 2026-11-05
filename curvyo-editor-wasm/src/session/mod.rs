@@ -210,6 +210,9 @@ mod trace_mask;
 mod trace_mask_tests;
 mod trace_mesh;
 mod trace_pick;
+mod trace_region;
+#[cfg(test)]
+mod trace_region_tests;
 #[cfg(test)]
 mod trace_shapes_tests;
 #[cfg(test)]

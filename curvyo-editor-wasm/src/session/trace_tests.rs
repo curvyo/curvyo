@@ -102,7 +102,8 @@ fn the_selection_states_and_the_select_bar_button() {
             width: curvyo_document_core::Length::from_mm(5.0),
             height: curvyo_document_core::Length::from_mm(5.0),
         });
-    session.selection.set(&[images[0], rect]);
+    // `specs/0094`: one image and a path are a masked trace; a path alone is not an image.
+    session.selection.set(&[rect]);
     assert_eq!(session.trace_view().selection, TraceSelection::Other);
     session.set_tool(Tool::Select);
     assert!(!session.trace_available());

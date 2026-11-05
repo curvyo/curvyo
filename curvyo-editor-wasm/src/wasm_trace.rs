@@ -56,17 +56,26 @@ pub fn trace_job(
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     let mut report = |percent| progress.report(percent);
+    // `specs/0094`: the outlines clipped to the mask region of the settings, if any.
+    let region = crate::trace_glue::trace_mask_region(settings);
     // Multicolour (`specs/0089` slice M): the outlines layer by layer, the palette after them.
     let mut wire = match crate::trace_glue::trace_colour_settings(settings) {
-        Some(colour) => {
-            curvyo_ui_core::trace_colour_job_with(rgba, width, height, map, &colour, &mut report)
-        }
-        None => curvyo_ui_core::trace_job_with(
+        Some(colour) => curvyo_ui_core::trace_colour_job_in(
+            rgba,
+            width,
+            height,
+            map,
+            &colour,
+            region.as_ref(),
+            &mut report,
+        ),
+        None => curvyo_ui_core::trace_job_in(
             rgba,
             width,
             height,
             map,
             &crate::trace_glue::trace_settings(settings),
+            region.as_ref(),
             &mut report,
         ),
     };
@@ -189,24 +198,27 @@ pub fn trace_text_job(
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     let mut report = |percent| progress.report(percent);
+    let region = crate::trace_glue::trace_mask_region(settings);
     let mut wire = if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
-        curvyo_ui_core::trace_text_colour_job_with(
+        curvyo_ui_core::trace_text_colour_job_in(
             rgba,
             width,
             height,
             map,
             &colour,
             &crate::trace_glue::read_ocr_lines(lines, width),
+            region.as_ref(),
             &mut report,
         )
     } else {
-        curvyo_ui_core::trace_text_job_with(
+        curvyo_ui_core::trace_text_job_in(
             rgba,
             width,
             height,
             map,
             &crate::trace_glue::trace_settings(settings),
             &crate::trace_glue::read_ocr_lines(lines, width),
+            region.as_ref(),
             &mut report,
         )
     };
@@ -227,13 +239,14 @@ pub fn trace_text_regions_job(
     lines: &str,
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    curvyo_ui_core::trace_text_regions_with(
+    curvyo_ui_core::trace_text_regions_in(
         rgba,
         width,
         height,
         map,
         &crate::trace_glue::trace_settings(settings),
         &crate::trace_glue::read_ocr_lines(lines, width),
+        crate::trace_glue::trace_mask_region(settings).as_ref(),
     )
 }
 
@@ -250,6 +263,19 @@ pub fn trace_text_mask_job(
     lines: &str,
 ) -> Option<TraceMaskJs> {
     let map6: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    text_mask(rgba, width, height, map6, settings, lines)
+        .map(|mask| crate::wasm_trace_region::in_region(mask, width, map6, settings))
+}
+
+/// The mask of [`trace_text_mask_job`] before the region.
+fn text_mask(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map6: [f64; 6],
+    settings: &str,
+    lines: &str,
+) -> Option<TraceMaskJs> {
     if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
         return curvyo_ui_core::trace_text_colour_mask_job(
             rgba,
@@ -295,6 +321,18 @@ pub fn trace_mask_job(
     settings: &str,
 ) -> Option<TraceMaskJs> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    plain_mask(rgba, width, height, map, settings)
+        .map(|mask| crate::wasm_trace_region::in_region(mask, width, map, settings))
+}
+
+/// The mask of [`trace_mask_job`] before the region.
+fn plain_mask(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    settings: &str,
+) -> Option<TraceMaskJs> {
     if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
         return curvyo_ui_core::trace_colour_mask_job(rgba, width, height, map, &colour).map(
             |mask| TraceMaskJs {
@@ -379,9 +417,15 @@ pub fn trace_params() -> String {
 #[wasm_bindgen]
 #[derive(Debug, Clone, Default)]
 pub struct TraceViewJs {
-    /// `"empty"`, `"other"` or `"images"`.
+    /// `"empty"`, `"other"`, `"images"` or `"mixed"` (`specs/0094` criterion 14).
     #[wasm_bindgen(getter_with_clone)]
     pub selection: String,
+    /// Mask paths selected with the image (`specs/0094`).
+    pub mask_paths: u32,
+    /// The mask paths cover none of the image (criterion 7).
+    pub mask_outside_image: bool,
+    /// The mask paths could not be combined (the kernel refused).
+    pub mask_failed: bool,
     /// The selected images' ids, in selection order.
     #[wasm_bindgen(getter_with_clone)]
     pub images: Vec<String>,
@@ -435,11 +479,39 @@ impl WasmSession {
                 TraceSelection::Empty => "empty",
                 TraceSelection::Other => "other",
                 TraceSelection::Images => "images",
+                TraceSelection::Mixed => "mixed",
             }
             .to_string(),
+            mask_paths: count(view.mask.len()),
+            mask_outside_image: view.mask_outside_image,
+            mask_failed: view.mask_failed,
             images: view.images.into_iter().map(id_text).collect(),
             shown: view.shown.map(id_text).unwrap_or_default(),
         }
+    }
+
+    /// The mask region for the worker's settings (`specs/0094`): `{"outside", "region"}` as
+    /// JSON, or empty without one.
+    #[must_use]
+    pub fn trace_mask_json(&self) -> String {
+        self.session.trace_mask_json()
+    }
+
+    /// Chooses Inside (`false`) or Outside in the Mask item (`specs/0094`).
+    pub fn set_trace_mask_outside(&mut self, outside: bool) {
+        self.session.set_trace_mask_outside(outside);
+    }
+
+    /// The muted notice of shapes kept whole across the mask edge (`specs/0094`), or empty.
+    #[must_use]
+    pub fn trace_unclipped_notice(&self) -> String {
+        self.session.trace_unclipped_notice()
+    }
+
+    /// Whether Outside is chosen.
+    #[must_use]
+    pub fn trace_mask_outside(&self) -> bool {
+        self.session.trace_mask_outside()
     }
 
     /// Whether the Select bar shows the Trace button (criterion 1).

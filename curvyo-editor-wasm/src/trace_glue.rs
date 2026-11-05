@@ -99,6 +99,25 @@ pub fn trace_settings(settings: &str) -> TraceParams {
     }
 }
 
+/// The mask region of `settings` (`specs/0094`: `"mask"` holds `outside` and `region`, the
+/// numbers of `TraceRegion::to_numbers`), `None` without one or when it is unreadable.
+#[must_use]
+pub fn trace_mask_region(settings: &str) -> Option<curvyo_ui_core::TraceRegion> {
+    let json: serde_json::Value = serde_json::from_str(settings).ok()?;
+    let mask = json.get("mask")?;
+    let numbers: Vec<f64> = mask
+        .get("region")?
+        .as_array()?
+        .iter()
+        .map(serde_json::Value::as_f64)
+        .collect::<Option<_>>()?;
+    let outside = mask
+        .get("outside")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    curvyo_ui_core::TraceRegion::from_numbers(&numbers, outside)
+}
+
 /// Whether `settings` turn Recognise shapes on (`"shapes": true`, `specs/0088` Part B); off when
 /// missing or unreadable.
 #[must_use]
@@ -389,6 +408,29 @@ mod tests {
                 .colours,
             Some(2)
         );
+    }
+
+    /// `specs/0094`: the region crosses inside the settings; none without a readable one.
+    #[test]
+    fn the_mask_region_crosses_in_the_settings() {
+        let region = curvyo_ui_core::TraceRegion::from_polygons(
+            vec![vec![
+                curvyo_document_core::Point::new(0.0, 0.0),
+                curvyo_document_core::Point::new(5.0, 0.0),
+                curvyo_document_core::Point::new(5.0, 5.0),
+            ]],
+            true,
+        )
+        .unwrap();
+        let settings = serde_json::json!({
+            "threshold": 90,
+            "mask": {"outside": true, "region": region.to_numbers()},
+        })
+        .to_string();
+        assert_eq!(trace_mask_region(&settings), Some(region));
+        assert_eq!(trace_settings(&settings).threshold, 90);
+        assert_eq!(trace_mask_region(r#"{"threshold":90}"#), None);
+        assert_eq!(trace_mask_region(r#"{"mask":{"region":[1,2,0]}}"#), None);
     }
 
     /// `specs/0091` decision 1: the lines cross as JSON and scale to a reduced copy.
