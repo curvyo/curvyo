@@ -204,9 +204,18 @@ select the image together with them and press **Trace**. In the Trace tool, Shif
 adds it to the mask paths or takes it out again; Shift+click on empty canvas changes nothing.
 (`specs/0094-masked-composite-trace` slice 1.)
 
+**Pick mask paths**, the button after View, does the same without Shift: press it, then click each
+path or group on the canvas to add it to the mask or take it out again; the button stays pressed
+until you press it again, press Escape (the first Escape only ends picking and keeps the mask), or
+leave the tool. A click on a text, a sketch or a second image adds nothing and the bar says "Use
+Object to path for text; one image at a time."; a click on the traced image or on empty canvas does
+nothing, and a double-click on the image does not create paths while picking. **Clear mask** (the
+x after Inside and Outside) takes all mask paths out of the mask at once and leaves the image
+selected; the paths stay in the document. (Slice 1b.)
+
 The paths together are the mask: where they overlap they count once, the hole of a compound path is
 a hole in the mask, and an open path is closed by a straight line. Their fill and stroke do not
-matter. With mask paths selected the bar shows **Mask** after View: **Inside** (the default on every
+matter. With mask paths selected the bar shows **Inside** and **Outside** after Pick mask paths: **Inside** (the default on every
 entry into the tool) traces only what lies inside the mask, **Outside** only what lies outside it.
 The mode is not remembered and is not part of a preset.
 

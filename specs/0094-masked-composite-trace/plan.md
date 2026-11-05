@@ -78,3 +78,69 @@ Implementer, 2026-11-04, on `story/masked-trace` (from `main` `d1275c72`). Built
   rectangle to be "not an image"; with 0094 that is a masked trace, so the case now selects the
   rectangle alone.
 - Determinism: the same job twice gives the same numbers (criterion 15).
+
+## Slice 1b, pick mask paths (criteria 34 to 43)
+
+Implementer, 2026-11-05, on `story/mask-pick-button` (from `main` after PR #271). Built against
+`specification.md` slice 1b (criteria 34 to 43, Frage 130 C) and `ux-notes.md` §11.
+
+### Affected crates/modules
+
+- **`curvyo-editor-wasm`**
+  - `session/trace_mask_pick.rs` (new): the pick mode as Trace tool state (armed, the refused
+    flag), the armed press (accept, refuse or ignore), Clear mask, the hover candidate. `trace.rs`
+    is already above 500 lines, so the mode gets its own module.
+  - `session/trace.rs`: the Shift+click toggle (`selection.toggle_all(units.leaves_with(hit))`)
+    becomes `trace_select_hit` and is the one add/remove route for Shift+click and the pick; the
+    pick accepts a hit whose unit (the object, or its group's leaves) is all path-like by
+    `trace_region::is_mask_path`, the rule `trace_images` applies to the Select route.
+  - `session/mod.rs` (press, hover), `select_cursor.rs` (`"pick-mask"`), `select_view.rs` (the
+    candidate's `--hover-box` while armed), `trace_pick.rs` (the pipette and the pick exclude
+    each other).
+  - `wasm_trace.rs`: `set_trace_mask_pick`, `trace_mask_pick`, `trace_mask_pick_refused`,
+    `clear_trace_mask`.
+  - Tests: `session/trace_mask_pick_tests.rs`.
+- **`frontend`**: `TraceBar.tsx` (the Mask group: pick button, Inside / Outside, Clear mask),
+  `useTrace.ts` (the mode, Escape order, refused row), `traceApi.ts`, `traceText.ts` (strings),
+  `cursors.ts` (`"pick-mask"`); unit tests `tests/traceMaskPick.test.ts`; Chromium
+  `tests/acceptance_0094_pick_browser.test.ts`.
+- Docs: `docs/design-system.md` (the §11 row; the Mask row loses the `SquareDashed` glyph),
+  `docs/tracing-images.md` (Mask: Pick mask paths, Clear mask).
+
+### Decisions (Proposal)
+
+- The pipette (Remove background, Pick colours) and the pick mode exclude each other: arming one
+  disarms the other, so a press never has two meanings and the cursor tells which one is armed.
+- A group is accepted only when every leaf is path-like (the Select route's rule); a group with a
+  text in it is refused with the row like a text.
+- The hover box while armed is drawn only over a candidate the pick would accept.
+- An armed press while the selection holds no traceable image does what the tool does unarmed.
+
+### Tasks
+
+1. [x] Session tests first: arm/disarm and cursor (35), pick adds/removes and stays armed (36),
+   each kind gives the Select route's region (37), refusals and no-ops, double-click (38),
+   Escape-independent disarm, leaving the tool and Create paths disarm (39), Clear mask keeps the
+   paths, no history step (40), Shift+click and the pick give the same mask (41).
+2. [x] Session: `trace_mask_pick.rs`, the shared `trace_select_hit` and `is_mask_path`, cursor,
+   hover, double-click, pipette exclusion (35 to 41).
+3. [x] wasm surface (34 to 40).
+4. [x] Frontend unit tests first: strings, cursor (35, 43).
+5. [x] Frontend: the Mask group in the bar, Escape order (pick first, then the running trace, then
+   the tool), refused row, polite on/off status, Clear mask (34 to 41, 43).
+6. [x] Chromium file: arm, pick two paths, Inside / Outside appears, pick again removes, Clear
+   mask, Escape disarms, leaving the tool disarms, images and texts refused with the row, Tab
+   order, 800 x 600 wrap (34 to 41, 43).
+7. [x] Docs: design-system row, tracing-images (34 to 43).
+8. [ ] Full gate; Chromium files of 0094 tester, trace_text_browser, 0091 tester, 0088 Part B,
+   0025 x3, 0089 tidy-up.
+
+Criterion 42 needs slice 2 (parts); with one part "the active part" is the only one, so it holds
+trivially and is checked with slice 2.
+
+### Validation
+
+- `cargo nextest run -p curvyo-editor-wasm` during work; goldens unchanged.
+- Expected tester-test updates (reported, not edited): `acceptance_0094_tester` c1 (`MASKED_BAR`,
+  `BRIGHTNESS_BAR` gain "Pick mask paths", masked also "Clear mask"), `0089_tidyup` c57 Tab order
+  and the bar arrays.
