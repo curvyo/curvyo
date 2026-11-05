@@ -310,6 +310,8 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   workspace_marker_share: ws("workspace_marker_share"),
   write_workspace_marker_share: ws("write_workspace_marker_share"),
   clear_workspace_marker_share: ws("clear_workspace_marker_share"),
+  workspace_marker_ended: ws("workspace_marker_ended"),
+  end_workspace_marker_share: ws("end_workspace_marker_share"),
   write_workspace_id: ws("write_workspace_id"),
   replace_workspace_document: ws("replace_workspace_document"),
   write_workspace_index: ws("write_workspace_index"),

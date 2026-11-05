@@ -9,6 +9,7 @@ import { mintPeerId, wasmReady } from "@/lib/editorSession";
 import { type DiskStep, type DocumentPlace, type SharedScan, parseDiskPlan, parsePlace } from "@/lib/sharedTree";
 import { SyncTransport, type SocketLike } from "@/lib/syncTransport";
 import { invoke } from "@/platform/host";
+import { type GroupFacts, isSwitchOff, parseEnded } from "@/lib/endedRecord";
 import { WasmSession, devices_no_longer_synced_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** How often the files, the marker and the disk plan are looked at (ms). */
@@ -80,18 +81,22 @@ export function openRoomNow(): string {
   return openRoom;
 }
 
-/** The workspaces the device group's list names, on or off (set by My devices). */
-let groupWorkspaces: ReadonlySet<string> = new Set();
+/** What My devices last told about its group's list. */
+let group: GroupFacts = { listed: new Set(), switchedOn: new Set(), members: new Set() };
 
-/** My devices tells which workspaces its group's list names. */
-export function setGroupWorkspaces(ids: Iterable<string>): void {
-  groupWorkspaces = new Set(ids);
+/** My devices tells which workspaces its group's list names (`on` among them) and its devices. */
+export function setGroupWorkspaces(workspaces: Iterable<{ id: string; on: boolean }>, members: Iterable<string>): void {
+  const all = [...workspaces];
+  group = {
+    listed: new Set(all.map((w) => w.id)),
+    switchedOn: new Set(all.filter((w) => w.on).map((w) => w.id)),
+    members: new Set(members),
+  };
 }
 
-/** Whether the workspace `id` is (or was) synced to my devices: its end is a switch-off, not a
- * removal by another maker (`specs/0096-own-devices-sync` ux-notes 6.4). */
-export function inGroupList(id: string): boolean {
-  return groupWorkspaces.has(id);
+/** Whether the end of workspace `id` is a switch-off by my own devices ([`isSwitchOff`]). */
+export function endedBySwitchOff(id: string, removedBy: string, left: boolean): boolean {
+  return isSwitchOff(group, id, removedBy, left);
 }
 
 /** The running background workspaces. */
@@ -332,14 +337,24 @@ export class BackgroundWorkspace {
   }
 
   private removed(): void {
-    // Criteria 13 and 24: the folder stays as a local workspace with every document.
+    // Criteria 13 and 24: the folder stays as a local workspace with every document. A
+    // switch-off drops the share; any other end keeps the way back (`specs/0097` criterion 20).
+    const ended = Array.from(this.session.workspace_ended_json());
+    const switchedOff = endedBySwitchOff(this.id, this.session.share_removed_by_hex(), parseEnded(ended)?.left ?? false);
+    const end =
+      switchedOff || ended.length === 0
+        ? invoke("clear_workspace_marker_share", { workspace: this.id })
+        : invoke("end_workspace_marker_share", { workspace: this.id, ended_json: ended });
     this.chain = this.chain.then(() =>
-      invoke("clear_workspace_marker_share", { workspace: this.id }).then(
+      end.then(
         () => undefined,
         () => undefined,
       ),
     );
-    this.host.notice(devices_no_longer_synced_notice(this.name), false);
+    if (switchedOff) {
+      // Another maker's removal or a leave was told by the session in its own words.
+      this.host.notice(devices_no_longer_synced_notice(this.name), false);
+    }
     this.host.ended(this.id, true);
     void this.stop();
   }

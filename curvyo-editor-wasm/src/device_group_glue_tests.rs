@@ -336,3 +336,25 @@ fn a_newer_list_update_is_refused_and_reported_once() {
     });
     assert_eq!(glue.list().switched_on(), vec![[0x77; 16]]);
 }
+
+/// `specs/0097` criterion 14 (ADR 0041 decision 1, a change of `0096` criterion 27): the group's
+/// only admin device cannot leave; with a second device it can.
+#[test]
+fn the_groups_only_device_cannot_leave_it() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+    );
+    net.run(500);
+    assert_eq!(net.devices[a].0.leave(), Err(SessionError::LastAdmin));
+    assert!(!net.devices[a].0.removed());
+    net.devices[a].0.add_device(identity(2), "Laptop");
+    net.run(200);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+    );
+    net.run(1_000);
+    net.devices[b].0.leave().unwrap();
+    net.run(500);
+    assert!(net.devices[b].0.removed());
+}

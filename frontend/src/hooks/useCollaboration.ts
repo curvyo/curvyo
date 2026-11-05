@@ -28,6 +28,21 @@ export interface ShareParticipant {
   admin: boolean;
   /** Whether this device may remove the participant (an admin, not the own row). */
   removable: boolean;
+  /** `specs/0097` criteria 2 and 14: the role slot's and the own row's actions. */
+  canMakeAdmin?: boolean;
+  canMakeMember?: boolean;
+  canStepDown?: boolean;
+  canLeave?: boolean;
+}
+
+/** A Removed or left row an admin sees (`specs/0097` criterion 17). */
+export interface FormerParticipant {
+  member: string;
+  /** The last known label, empty when none was kept. */
+  label: string;
+  fingerprint: string;
+  /** It left by its own hand (else it was removed). */
+  left: boolean;
 }
 
 /** The Share tab and the pill, as the session describes them. */
@@ -47,6 +62,16 @@ export interface ShareView {
   participants: ShareParticipant[];
   join?: { phase: string; text: string } | null;
   ended?: string | null;
+  /** The room of a removed or left file (hex): where Check goes, the slot of its keys. */
+  endedRoom?: string | null;
+  /** The return check: `checking`, `addedBack`, `notYet`, `leftAgain`, `failed`. */
+  check?: string;
+  /** The return check is a workspace's. */
+  checkWorkspace?: boolean;
+  /** Who added this device back, empty when unknown. */
+  addedBy?: string;
+  /** The Removed or left rows (admins only). */
+  former?: FormerParticipant[];
   /** A shared workspace's link (`specs/0095-workspace`), absent for a document's own room. */
   workspace?: WorkspaceShareView | null;
 }
@@ -139,6 +164,11 @@ function store(key: string, value: string) {
   } catch {
     // A refused write keeps the value for this run only.
   }
+}
+
+/** The kept labels as the session reads them, as JSON (a return check names who added back). */
+export function keptLabelsJson(): string {
+  return JSON.stringify(keptLabels());
 }
 
 /** The kept labels as the session reads them, `{}` when none or unreadable. */

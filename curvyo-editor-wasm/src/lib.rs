@@ -82,6 +82,10 @@ mod wasm_keys;
 #[cfg(target_arch = "wasm32")]
 mod wasm_layers;
 #[cfg(target_arch = "wasm32")]
+mod wasm_membership;
+#[cfg(target_arch = "wasm32")]
+mod wasm_membership_text;
+#[cfg(target_arch = "wasm32")]
 mod wasm_move;
 #[cfg(target_arch = "wasm32")]
 mod wasm_move_entry;

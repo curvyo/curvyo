@@ -22,6 +22,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { PanelTabView } from "@/hooks/useDocumentPanel";
 import { isMac } from "@/lib/historyText";
 import { panelHandlesEscape } from "@/lib/panelEscape";
+import { membership_word } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 export type Glyph = ComponentType<{
   size: number;
@@ -70,6 +71,8 @@ interface PanelStripProps {
   desktop?: boolean;
   /** The project has unsaved changes: the File tab carries a dot, also while the body is hidden. */
   fileDirty: boolean;
+  /** An unread membership notice: the Share tab carries a dot (`specs/0097` ux-notes 2.1). */
+  shareMark?: boolean;
   snappingEnabled: boolean;
   onToggleSnapping: () => boolean;
   /** Whether the active page's grid is shown (`specs/0090-grid` criterion 2). */
@@ -109,6 +112,7 @@ export function PanelStrip({
   open,
   bodyId,
   fileDirty,
+  shareMark = false,
   snappingEnabled,
   onToggleSnapping,
   gridShown = false,
@@ -196,11 +200,12 @@ export function PanelStrip({
         {tabs.map((tab) => {
           const Glyph = tab.name === "workbench" && workbenchGlyph ? workbenchGlyph : GLYPHS[tab.name];
           const dot = tab.name === "file" && fileDirty;
+          const mark = tab.name === "share" && shareMark;
           const toggle = toggles[tab.name];
           const trigger = (
             <TabsTrigger
               value={tab.name}
-              aria-label={dot ? `${tab.label}, unsaved changes` : (toggle?.name ?? tab.label)}
+              aria-label={dot ? `${tab.label}, unsaved changes` : mark ? membership_word("tab-new-notice") : (toggle?.name ?? tab.label)}
               aria-selected={open && tab.name === active}
               disabled={!tab.enabled}
               aria-disabled={tab.enabled ? undefined : true}
@@ -240,6 +245,14 @@ export function PanelStrip({
                   aria-hidden
                   data-dirty-dot
                   className="absolute top-[2px] right-[2px] size-1.5 rounded-full bg-current shadow-[0_0_0_1.5px_var(--panel-bg)] group-aria-selected:shadow-[0_0_0_1.5px_var(--toolbar-icon-active-bg)]"
+                />
+              ) : null}
+              {mark ? (
+                // The 8 px accent dot with a 2 px ring in the strip's ground (ux-notes 2.1).
+                <span
+                  aria-hidden
+                  data-share-mark
+                  className="absolute top-[1px] right-[1px] size-2 rounded-full bg-[var(--editor-accent)] shadow-[0_0_0_2px_var(--panel-bg)] group-aria-selected:shadow-[0_0_0_2px_var(--toolbar-icon-active-bg)]"
                 />
               ) : null}
             </TabsTrigger>

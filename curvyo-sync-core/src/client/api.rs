@@ -1,7 +1,7 @@
 //! The session's inputs and outputs: how it starts, what it asks the caller to do, the events
 //! it reports and why a call is refused.
 
-use curvyo_crypto_core::keyring::Entry;
+use curvyo_crypto_core::keyring::{Entry, EntryHash};
 use curvyo_crypto_core::{CryptoError, EpochKey, IdentityKeys, MemberId};
 
 use crate::frame::{ConnectionId, RecordKind, RefusalReason, RoomId};
@@ -35,6 +35,51 @@ pub enum SessionStart {
     Share,
     /// Joining by invite link (criterion 3).
     Join(InviteSecret),
+    /// The return check of a removed or left device (ADR 0041 decision 6): `Hello` from the end
+    /// of the room, `Proof`, `Ping`, the keyring until `Pong`, its own replay, then
+    /// [`SessionEvent::CheckResult`] and the end. It sends nothing else, unless `then_leave`
+    /// ("Keep as it is", Frage 162 A): a device found added back then writes its own
+    /// `RemoveMember` once and ends when the relay confirms.
+    ReturnCheck {
+        /// The epoch keys this device still holds (credential store): an answer counts only
+        /// when the fetched keyring wraps one of them to this device again.
+        epoch_keys: Vec<(u32, EpochKey)>,
+        /// Leave again at once when added back.
+        then_leave: bool,
+        /// The keyring heads of the ended record: only an admission of this device that builds
+        /// on all of them is an add back, so an older keyring served again is none.
+        heads: Vec<EntryHash>,
+    },
+}
+
+/// What a return check found (ADR 0041 decision 6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckOutcome {
+    /// This device is a participant again: "Sync again?".
+    AddedBack,
+    /// The room refused it as removed, or its keyring does not list it.
+    NotYet,
+    /// It was added back and has left again by its own `RemoveMember` ("Keep as it is").
+    LeftAgain,
+    /// The keyring lists this device but does not prove an add back: it wraps to it no key it
+    /// held (a relay's keyring of its own making, or a credential store that lost the room's
+    /// keys), or no admission of it builds on the heads the ended record kept (a keyring cut
+    /// off before the removal); nothing changes.
+    Unverified,
+    /// The relay knows no such room, or never listed this device in it: nothing to find there.
+    /// The relay answers both alike, "not a member" (Proposal).
+    NotFound,
+    /// The server could not be reached or the connection broke before the answer.
+    Failed,
+}
+
+/// Which epoch keys an added-back device receives (ADR 0010 §9, ADR 0041 decision 5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum History {
+    /// Every epoch key the adding admin holds.
+    Full,
+    /// The current epoch key only, and a fresh signed snapshot under it.
+    FromNow,
 }
 
 /// Everything a session needs from its caller at the start.
@@ -138,6 +183,8 @@ pub enum SessionEvent {
     /// After a rejected record the session reconnects from the room's snapshot: every record
     /// from the snapshot on arrives again (ADR 0031 decision 3, UX notes §6 "Resyncing").
     Resyncing,
+    /// A return check ended with this answer (ADR 0041 decision 6); the session has ended.
+    CheckResult(CheckOutcome),
 }
 
 /// Why a session call was refused.
@@ -146,6 +193,10 @@ pub enum SessionError {
     /// Only an admin may do this.
     #[error("only an admin can do this")]
     NotAdmin,
+    /// No admin would remain outside the devices this act removes or demotes (ADR 0041
+    /// decision 1): "You are the only admin. Make someone else an admin first".
+    #[error("no other admin would remain")]
+    LastAdmin,
     /// The device named, or this device, is not a current member.
     #[error("not a current member")]
     NotAMember,

@@ -179,7 +179,7 @@ impl WasmPairing {
 /// The maker's device group.
 #[wasm_bindgen]
 pub struct WasmDeviceGroup {
-    glue: DeviceGroupGlue,
+    pub(crate) glue: DeviceGroupGlue,
 }
 
 #[wasm_bindgen]
@@ -388,6 +388,11 @@ impl WasmDeviceGroup {
     pub fn leave(&mut self) -> String {
         match self.glue.leave() {
             Ok(()) => String::new(),
+            // ADR 0041 decision 1: the group's only admin device stays (`specs/0097`; a change
+            // of `0096` behaviour, where the last device could leave).
+            Err(curvyo_sync_core::SessionError::LastAdmin) => {
+                curvyo_ui_core::membership_text::GROUP_ONLY_ADMIN.to_owned()
+            }
             Err(_) => texts::NOT_CONNECTED.to_owned(),
         }
     }

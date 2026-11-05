@@ -75,6 +75,8 @@ mod layer_rows;
 mod layer_text;
 mod linked_clone;
 mod marquee;
+pub mod membership_return_text;
+pub mod membership_text;
 mod mirror;
 mod mirror_text;
 mod modifiers;

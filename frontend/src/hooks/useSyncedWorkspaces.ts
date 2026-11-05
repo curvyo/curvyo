@@ -17,6 +17,7 @@ import {
   resumeBackground,
 } from "@/lib/backgroundWorkspace";
 import { mintPeerId, wasmReady } from "@/lib/editorSession";
+import { RETRY_MS, type SwitchOnResult, UnreachableWorkspaces } from "@/lib/unreachableWorkspaces";
 import { commitShare, prepareShare, toHex, type ShareEntry } from "@/lib/workspaceShare";
 import type { RecentWorkspaceData } from "@/lib/workspaceRows";
 import { invoke } from "@/platform/host";
@@ -30,8 +31,6 @@ import {
   keyring_is_admin,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
-/** When a workspace that did not get in is tried again (ms). */
-const RETRY_MS = 30_000;
 /** How long Sync these waits for a room's first answer (ms). */
 const CONNECT_MS = 15_000;
 
@@ -77,6 +76,8 @@ interface GroupWorkspace {
   id: string;
   name: string;
   on: boolean;
+  /** Left by the maker from every device (`specs/0097` criterion 16). */
+  left?: boolean;
 }
 
 export interface SyncedWorkspacesDeps {
@@ -167,7 +168,10 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
   const [decisions, setDecisions] = useState<CopyDecision[]>([]);
   const decisionsRef = useRef<CopyDecision[]>([]);
   const [progress, setProgress] = useState("");
-  const [alerts, setAlerts] = useState<string[]>([]);
+  /** Workspaces Sync these could not switch on for want of the server; a change re-renders. */
+  const unreachableRef = useRef(new UnreachableWorkspaces<OfferedWorkspace>());
+  const [, setUnreachableSeen] = useState(0);
+  const unreachableChanged = useCallback(() => setUnreachableSeen((n) => n + 1), []);
   /** Workspaces whose start is on its way or that wait for a retry, by id. */
   const busyRef = useRef(new Set<string>());
   const retryAtRef = useRef(new Map<string, number>());
@@ -279,16 +283,138 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
     void work().finally(() => busyRef.current.delete(id));
   }, []);
 
+  /** Switches on one workspace that is not open (Sync these): Share it in the background if it is
+   * not shared, admit every group device, then the list entry (ADR 0040 decision 6). */
+  const switchOnClosed = useCallback(
+    async (chosen: OfferedWorkspace, report: (done: number, total: number) => void): Promise<SwitchOnResult> => {
+      const { group: getGroup, record, recordChanged, label, keys } = depsRef.current;
+      const group = getGroup();
+      if (record.current.server === "") {
+        return "no-server";
+      }
+      const identity = await keys("");
+      if (!group || !identity) {
+        return "refused";
+      }
+      if (!group.is_online()) {
+        // The group's own connection is down: no room would answer either, so no 15 s wait.
+        return "offline";
+      }
+      const registered = await invoke<string>("register_synced_workspace", { id: chosen.id, path: chosen.path }).catch(() => "");
+      if (registered === "") {
+        return "refused";
+      }
+      let id = chosen.id;
+      let runner: BackgroundWorkspace | null;
+      if (chosen.shared) {
+        runner = await resumeBackground(id, chosen.name, label(), host());
+      } else {
+        const entries = await invoke<ShareEntry[]>("scan_open_workspace", { workspace: chosen.id }).catch(() => null);
+        if (!entries) {
+          return "refused";
+        }
+        const shareDeps = {
+          label: label(),
+          keysFor: (room: string) => keys(room),
+          progress: report,
+        };
+        const prepared = await prepareShare(entries, identity.identity, shareDeps, chosen.id);
+        try {
+          id = toHex(prepared.id);
+          switchingRef.current.add(id);
+          await wasmReady();
+          const session = new WasmSession(mintPeerId());
+          const error = session.share_workspace(
+            record.current.server,
+            label(),
+            chosen.name,
+            prepared.builder,
+            fromHex(identity.identity),
+            random(32),
+            random(32),
+            Date.now(),
+          );
+          if (error) {
+            session.free();
+            return "unreachable";
+          }
+          runner = adoptBackground(id, chosen.name, session, host());
+          if (!(await admitted(runner))) {
+            await runner.stop();
+            switchingRef.current.delete(id);
+            return "unreachable";
+          }
+          await commitShare(prepared, shareDeps, chosen.id);
+          await invoke<string>("register_synced_workspace", { id, path: chosen.path }).catch(() => "");
+          runner.held = false;
+        } finally {
+          prepared.builder.free();
+        }
+      }
+      if (!runner) {
+        switchingRef.current.delete(id);
+        return "refused";
+      }
+      if (!(await admitted(runner))) {
+        // Not running in the background without a list entry: a retry starts it afresh.
+        await runner.stop();
+        switchingRef.current.delete(id);
+        return "unreachable";
+      }
+      const answer = runner.session.reconcile_workspace(group, true);
+      runner.drive();
+      switchingRef.current.delete(id);
+      if (answer === "" || (JSON.parse(answer) as { needs_admin?: boolean }).needs_admin) {
+        // Only a member here: nothing is switched on (criterion 17).
+        return "member-only";
+      }
+      // The devices are members now, then the list entry (criterion 11).
+      group.switch_workspace(id, chosen.name, true);
+      record.current.folders = { ...record.current.folders, [id]: chosen.path };
+      recordChanged();
+      return "ok";
+    },
+    [host],
+  );
+
+  /** Tries the workspaces that waited for the server again, without progress lines. */
+  const retryUnreachable = useCallback(
+    (due: OfferedWorkspace[]) => {
+      void (async () => {
+        for (const workspace of due) {
+          const result = await switchOnClosed(workspace, () => undefined);
+          // A shared one resumes from its marker; an unshared one would be read and uploaded again.
+          unreachableRef.current.record(workspace.id, workspace.name, workspace, result, workspace.shared);
+        }
+        unreachableRef.current.settled(Date.now());
+        unreachableChanged();
+      })();
+    },
+    [switchOnClosed, unreachableChanged],
+  );
+
   const slow = useCallback(() => {
     const { group: getGroup, record, openId } = depsRef.current;
     const group = getGroup();
+    const unreachable = unreachableRef.current;
     if (!group || group.removed()) {
+      if (unreachable.clear()) {
+        unreachableChanged();
+      }
       return;
     }
     const open = openId() || openRoomNow();
     const now = Date.now();
     const runners = backgroundWorkspaces();
-    for (const workspace of listed(group)) {
+    const list = listed(group);
+    if (unreachable.forget(list.map((w) => w.id))) {
+      unreachableChanged();
+    }
+    const due = unreachable.due(group.is_online(), now);
+    if (due.length > 0) {
+      retryUnreachable(due);
+    }
+    for (const workspace of list) {
       const runner = runners.get(workspace.id);
       if (workspace.id === open || switchingRef.current.has(workspace.id)) {
         continue;
@@ -303,6 +429,13 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
         if (arrivingRef.current.has(workspace.id) && runner.session.workspace_id_hex() !== "" && runner.state === "connected") {
           arrivingRef.current.delete(workspace.id);
           depsRef.current.notice(devices_arrived_notice(workspace.name), false);
+        }
+        if (group.is_online() && runner.state === "connected" && workspace.left) {
+          // The maker left it from every device (`specs/0097` criterion 16): this device runs the
+          // left plan; the runner stops once its own removal ended the share.
+          runner.session.reconcile_left_workspace(group);
+          runner.drive();
+          continue;
         }
         if (group.is_online() && runner.state === "connected") {
           runner.session.reconcile_workspace(group, workspace.on);
@@ -330,7 +463,7 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
         run(workspace.id, () => start(workspace, path));
       }
     }
-  }, [arrive, run, start]);
+  }, [arrive, retryUnreachable, run, start, unreachableChanged]);
 
   const tick = useCallback((now: number) => {
     for (const runner of backgroundWorkspaces().values()) {
@@ -440,86 +573,6 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
     return out;
   }, []);
 
-  /** Switches on one workspace that is not open (Sync these): Share it in the background if it is
-   * not shared, admit every group device, then the list entry (ADR 0040 decision 6). */
-  const switchOnClosed = useCallback(
-    async (chosen: OfferedWorkspace, report: (done: number, total: number) => void): Promise<boolean> => {
-      const { group: getGroup, record, recordChanged, label, keys } = depsRef.current;
-      const group = getGroup();
-      const identity = await keys("");
-      if (!group || !identity) {
-        return false;
-      }
-      const registered = await invoke<string>("register_synced_workspace", { id: chosen.id, path: chosen.path }).catch(() => "");
-      if (registered === "") {
-        return false;
-      }
-      let id = chosen.id;
-      let runner: BackgroundWorkspace | null;
-      if (chosen.shared) {
-        runner = await resumeBackground(id, chosen.name, label(), host());
-      } else {
-        const entries = await invoke<ShareEntry[]>("scan_open_workspace", { workspace: chosen.id }).catch(() => null);
-        if (!entries) {
-          return false;
-        }
-        const shareDeps = {
-          label: label(),
-          keysFor: (room: string) => keys(room),
-          progress: report,
-        };
-        const prepared = await prepareShare(entries, identity.identity, shareDeps, chosen.id);
-        try {
-          id = toHex(prepared.id);
-          switchingRef.current.add(id);
-          await wasmReady();
-          const session = new WasmSession(mintPeerId());
-          const error = session.share_workspace(
-            record.current.server,
-            label(),
-            chosen.name,
-            prepared.builder,
-            fromHex(identity.identity),
-            random(32),
-            random(32),
-            Date.now(),
-          );
-          if (error) {
-            session.free();
-            return false;
-          }
-          runner = adoptBackground(id, chosen.name, session, host());
-          if (!(await admitted(runner))) {
-            await runner.stop();
-            return false;
-          }
-          await commitShare(prepared, shareDeps, chosen.id);
-          await invoke<string>("register_synced_workspace", { id, path: chosen.path }).catch(() => "");
-          runner.held = false;
-        } finally {
-          prepared.builder.free();
-        }
-      }
-      if (!runner || !(await admitted(runner))) {
-        switchingRef.current.delete(id);
-        return false;
-      }
-      const answer = runner.session.reconcile_workspace(group, true);
-      runner.drive();
-      switchingRef.current.delete(id);
-      if (answer === "" || (JSON.parse(answer) as { needs_admin?: boolean }).needs_admin) {
-        // Only a member here: nothing is switched on (criterion 17).
-        return false;
-      }
-      // The devices are members now, then the list entry (criterion 11).
-      group.switch_workspace(id, chosen.name, true);
-      record.current.folders = { ...record.current.folders, [id]: chosen.path };
-      recordChanged();
-      return true;
-    },
-    [host],
-  );
-
   const syncChosen = useCallback(
     (chosen: OfferedWorkspace[]) => {
       const closed = chosen.filter((c) => !c.open);
@@ -527,22 +580,22 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
         return;
       }
       void (async () => {
-        const failed: string[] = [];
         const total = closed.reduce((sum, c) => sum + c.documents, 0);
         let before = 0;
         for (const workspace of closed) {
           const report = (done: number) => setProgress(devices_syncing_workspaces(closed.length, before + done, total));
           report(0);
-          if (!(await switchOnClosed(workspace, report))) {
-            failed.push(devices_could_not_sync(workspace.name));
-          }
+          const result = await switchOnClosed(workspace, report);
+          // A shared one resumes from its marker; an unshared one would be read and uploaded again.
+          unreachableRef.current.record(workspace.id, workspace.name, workspace, result, workspace.shared);
           before += workspace.documents;
         }
+        unreachableRef.current.settled(Date.now());
         setProgress("");
-        setAlerts(failed);
+        unreachableChanged();
       })();
     },
-    [switchOnClosed],
+    [switchOnClosed, unreachableChanged],
   );
 
   const leaveAll = useCallback(async () => {
@@ -565,13 +618,21 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
       await runner.stop();
     }
     setDecisionList([]);
-  }, [setDecisionList]);
+    unreachableRef.current.clear();
+    unreachableChanged();
+  }, [setDecisionList, unreachableChanged]);
 
   const networkBack = useCallback(() => {
     for (const runner of backgroundWorkspaces().values()) {
       runner.networkBack();
     }
+    // Workspaces that waited for a retry try again on the next look, not 30 s later.
+    retryAtRef.current.clear();
+    unreachableRef.current.wake();
   }, []);
+
+  const unreachableNames = unreachableRef.current.names(deps.record.current.server);
+  const alerts = unreachableNames.length > 0 ? [devices_could_not_sync(JSON.stringify(unreachableNames))] : [];
 
   return {
     tick,

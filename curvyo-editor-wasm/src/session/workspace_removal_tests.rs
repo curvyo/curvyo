@@ -19,13 +19,16 @@ fn member_of(session: &super::Session, label: &str) -> String {
 }
 
 /// Criteria 43 and 44: A removes B; the keyring rotates once, a workspace snapshot under the new
-/// epoch is due and is built from the files; B is out, its open document a local file.
+/// epoch is due and is built from the files; B is out; its open document keeps
+/// its record while the workspace is local (`specs/0097` criterion 15).
 #[test]
 fn removal_rotates_the_workspace_key_and_writes_one_fresh_snapshot() {
     let (mut net, a, b, written) = joined();
     open_document(&mut net, b, 0xb3, &written[0].1);
     assert!(net.s(b).document.workspace_share().is_some());
     let ben = member_of(net.s(a), "Ben");
+    let anna = member_of(net.s(a), "Anna");
+    assert_eq!(net.s(b).share_removed_by(), None);
     assert!(
         view(net.s(b))["participants"]
             .as_array()
@@ -55,10 +58,16 @@ fn removal_rotates_the_workspace_key_and_writes_one_fresh_snapshot() {
     let shown = view(net.s(b));
     assert_eq!(shown["shared"], false);
     assert!(shown["workspace"].is_null(), "{shown}");
+    // `specs/0097` criterion 15, ADR 0041 decision 6 (amends ADR 0037 decision 9): the open
+    // document keeps its `share.json` v2 for the way back; the marker's ended record makes the
+    // workspace local, and the Share tab above already shows it as not shared.
     assert!(
-        net.s(b).document.workspace_share().is_none(),
-        "B's open document is a local file"
+        net.s(b).document.workspace_share().is_some(),
+        "B's open document keeps its workspace record"
     );
+    assert!(net.s(b).workspace_ended_record().is_some());
+    // `specs/0097` criterion 20: the host learns that another maker's admin signed the removal.
+    assert_eq!(net.s(b).share_removed_by(), Some(anna));
     assert!(
         net.s(b).take_workspace_marker().is_none(),
         "B writes no marker"
@@ -104,6 +113,9 @@ fn a_removal_found_on_reconnect_ends_the_workspace_and_keeps_offline_edits_local
     net.set_link(b, true);
     net.run(30_000);
     assert!(net.s(b).workspace_removed());
+    // The relay refuses B before any entry: the signer is unknown, so the host falls back to
+    // the devices list (`specs/0097` criterion 20).
+    assert_eq!(net.s(b).share_removed_by(), None);
     assert_eq!(
         super::workspace_sync_tests::objects(net.s(a)),
         before,

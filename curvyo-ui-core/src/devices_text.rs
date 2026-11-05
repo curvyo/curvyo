@@ -382,13 +382,21 @@ pub fn syncing_workspaces_text(workspaces: usize, done: usize, total: usize) -> 
     )
 }
 
-/// The alert of one workspace that Sync these could not switch on (3.1).
+/// The one alert of the workspaces that Sync these could not switch on because the server did not
+/// answer (3.1): one names its workspace, more are counted, so an outage shows one line.
 #[must_use]
-pub fn could_not_sync_text(name: &str) -> String {
-    format!(
-        "Could not sync {}: cannot reach the server.",
-        cut_label(name, 24)
-    )
+pub fn could_not_sync_text(names: &[String]) -> String {
+    match names {
+        [name] => format!(
+            "Could not sync {}: cannot reach the server.",
+            cut_label(name, 24)
+        ),
+        _ => format!(
+            "Could not sync {} {}: cannot reach the server.",
+            names.len(),
+            workspaces_word(names.len())
+        ),
+    }
 }
 
 /// The line under the pick list's row of a workspace in which this device is only a member.
@@ -475,8 +483,12 @@ mod tests {
             "Syncing 2 workspaces: uploading 3 of 14"
         );
         assert_eq!(
-            could_not_sync_text("Box job"),
+            could_not_sync_text(&["Box job".to_owned()]),
             "Could not sync Box job: cannot reach the server."
+        );
+        assert_eq!(
+            could_not_sync_text(&["Box job".to_owned(), "Poster".to_owned()]),
+            "Could not sync 2 workspaces: cannot reach the server."
         );
         assert_eq!(
             browser_storage_text(120_000_000, 300_000_001, &["Box job".to_owned()]),

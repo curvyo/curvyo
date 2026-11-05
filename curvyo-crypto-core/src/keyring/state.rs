@@ -22,8 +22,35 @@ pub struct EpochRef {
 /// How a member came in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Admission {
-    Direct,
+    /// Named in the genesis.
+    Genesis,
+    /// By the `AddMember` entry at this graph index.
+    Added(usize),
+    /// By claiming this invite.
     Claimed(InviteId),
+}
+
+/// What kind of denial replay held back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum HeldBackKind {
+    /// A `RemoveMember`.
+    Removal,
+    /// A `SetRole` to member.
+    Demotion,
+}
+
+/// A removal or demotion that "the admin set never becomes empty" ignored (ADR 0010 §5, ADR
+/// 0041 decision 4): it takes effect once another admin exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeldBack {
+    /// The entry.
+    pub entry: EntryHash,
+    /// Who wrote it.
+    pub author: MemberId,
+    /// Whom it removes or demotes.
+    pub subject: MemberId,
+    /// Removal or demotion.
+    pub kind: HeldBackKind,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -37,6 +64,8 @@ pub(crate) struct MemberState {
 pub(crate) struct EpochState {
     pub(crate) epoch: EpochRef,
     pub(crate) entry: EntryHash,
+    /// The graph index of the entry that created it.
+    pub(crate) index: usize,
     /// Every wrap of this key, in replay order (`NewEpoch` or `Genesis`, `AddMember`, `RewrapEpoch`).
     pub(crate) wraps: Vec<(MemberId, Wrap)>,
 }
@@ -62,11 +91,13 @@ pub struct InviteState {
 pub(crate) struct State {
     pub(crate) document_id: Option<DocumentId>,
     pub(crate) members: BTreeMap<MemberId, MemberState>,
-    pub(crate) ever_added: BTreeSet<MemberId>,
+    /// Everyone an accepted entry ever added, with the identity of their latest add.
+    pub(crate) ever_added: BTreeMap<MemberId, Identity>,
     pub(crate) epochs: Vec<EpochState>,
     pub(crate) current: Option<usize>,
     pub(crate) invites: BTreeMap<InviteId, InviteState>,
-    pub(crate) admin_set_restored: bool,
+    /// The denials the admin-set rule ignored, in causal order.
+    pub(crate) held_back: Vec<HeldBack>,
 }
 
 impl State {
@@ -134,39 +165,69 @@ pub(crate) fn compute(graph: &Graph, set: &BTreeSet<usize>) -> State {
         });
     }
     facts.adds.sort_by_key(|a| graph.position[a.index]);
-    state.ever_added = facts.adds.iter().map(|a| a.identity.member).collect();
+    state.ever_added = facts
+        .adds
+        .iter()
+        .map(|a| (a.identity.member, a.identity))
+        .collect();
     state.members = membership(graph, &facts, &BTreeSet::new());
     if !state.members.values().any(|m| m.role == Role::Admin) && !facts.adds.is_empty() {
-        // ADR 0010 §5: the admin set never becomes empty; the denials that emptied it drop.
-        let denials: BTreeSet<usize> = facts
-            .removes
-            .iter()
-            .map(|(i, _)| *i)
-            .chain(
-                facts
-                    .role_sets
-                    .iter()
-                    .filter(|(_, _, role)| *role == Role::Member)
-                    .map(|(i, _, _)| *i),
-            )
-            .collect();
-        let relaxed = membership(graph, &facts, &denials);
-        let ignored: BTreeSet<usize> = facts
-            .removes
-            .iter()
-            .map(|(i, m)| (*i, *m))
-            .chain(facts.role_sets.iter().map(|(i, m, _)| (*i, *m)))
-            .filter(|(i, m)| {
-                denials.contains(i) && relaxed.get(m).is_some_and(|s| s.role == Role::Admin)
-            })
-            .map(|(i, _)| i)
-            .collect();
-        state.members = membership(graph, &facts, &ignored);
-        state.admin_set_restored = true;
+        (state.members, state.held_back) = restore_admin_set(graph, &facts);
     }
     attach_wraps(&mut state, &facts);
     state.current = current_epoch(&state);
     state
+}
+
+/// ADR 0010 §5: the admin set never becomes empty; the denials that emptied it drop. Returns
+/// the membership without them and the dropped denials.
+fn restore_admin_set(
+    graph: &Graph,
+    facts: &Facts,
+) -> (BTreeMap<MemberId, MemberState>, Vec<HeldBack>) {
+    let denials: BTreeSet<usize> = facts
+        .removes
+        .iter()
+        .map(|(i, _)| *i)
+        .chain(
+            facts
+                .role_sets
+                .iter()
+                .filter(|(_, _, role)| *role == Role::Member)
+                .map(|(i, _, _)| *i),
+        )
+        .collect();
+    let relaxed = membership(graph, facts, &denials);
+    let ignored: BTreeSet<usize> = facts
+        .removes
+        .iter()
+        .map(|(i, m)| (*i, *m))
+        .chain(facts.role_sets.iter().map(|(i, m, _)| (*i, *m)))
+        .filter(|(i, m)| {
+            denials.contains(i) && relaxed.get(m).is_some_and(|s| s.role == Role::Admin)
+        })
+        .map(|(i, _)| i)
+        .collect();
+    let mut ordered: Vec<usize> = ignored.iter().copied().collect();
+    ordered.sort_by_key(|&i| graph.position[i]);
+    let held_back = ordered
+        .into_iter()
+        .filter_map(|i| {
+            let entry = &graph.entries[i];
+            let (subject, kind) = match &entry.payload {
+                Payload::RemoveMember { member } => (*member, HeldBackKind::Removal),
+                Payload::SetRole { member, .. } => (*member, HeldBackKind::Demotion),
+                _ => return None,
+            };
+            Some(HeldBack {
+                entry: graph.hashes[i],
+                author: entry.author,
+                subject,
+                kind,
+            })
+        })
+        .collect();
+    (membership(graph, facts, &ignored), held_back)
 }
 
 fn collect(graph: &Graph, i: usize, state: &mut State, facts: &mut Facts) {
@@ -183,10 +244,10 @@ fn collect(graph: &Graph, i: usize, state: &mut State, facts: &mut Facts) {
                     index: i,
                     identity: *admin,
                     role: Role::Admin,
-                    admission: Admission::Direct,
+                    admission: Admission::Genesis,
                 });
             }
-            push_epoch(state, graph.hashes[i], 0, epoch0_wraps);
+            push_epoch(state, graph, i, 0, epoch0_wraps);
         }
         Payload::AddMember {
             identity,
@@ -197,7 +258,7 @@ fn collect(graph: &Graph, i: usize, state: &mut State, facts: &mut Facts) {
                 index: i,
                 identity: *identity,
                 role: *role,
-                admission: Admission::Direct,
+                admission: Admission::Added(i),
             });
             for wrap in wraps {
                 facts
@@ -207,7 +268,7 @@ fn collect(graph: &Graph, i: usize, state: &mut State, facts: &mut Facts) {
         }
         Payload::RemoveMember { member } => facts.removes.push((i, *member)),
         Payload::SetRole { member, role } => facts.role_sets.push((i, *member, *role)),
-        Payload::NewEpoch { epoch, wraps } => push_epoch(state, graph.hashes[i], *epoch, wraps),
+        Payload::NewEpoch { epoch, wraps } => push_epoch(state, graph, i, *epoch, wraps),
         Payload::AddPendingInvite {
             invite_id,
             role,
@@ -241,7 +302,8 @@ fn collect(graph: &Graph, i: usize, state: &mut State, facts: &mut Facts) {
 
 fn push_epoch(
     state: &mut State,
-    entry: EntryHash,
+    graph: &Graph,
+    index: usize,
     number: u32,
     wraps: &[crate::keyring::RecipientWrap],
 ) {
@@ -251,7 +313,8 @@ fn push_epoch(
             number,
             key_id: first.wrap.key_id(),
         },
-        entry,
+        entry: graph.hashes[index],
+        index,
         wraps: wraps.iter().map(|w| (w.member, w.wrap)).collect(),
     });
 }

@@ -25,6 +25,7 @@ import { SnappingSection } from "@/components/panel/SnappingSection";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { ShareTab } from "@/components/panel/ShareTab";
+import type { MembershipApi } from "@/hooks/useMembership";
 import type { CollaborationApi } from "@/hooks/useCollaboration";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -67,6 +68,8 @@ interface PropertiesPanelProps {
   traceInfo: TraceInfoApi;
   /** Cooperative editing: the Share tab (`specs/0092-cooperative-editing`). */
   collab: CollaborationApi;
+  /** Roles, leave, add back and the notices (`specs/0097-membership-lifecycle`). */
+  membership: MembershipApi;
 }
 
 /**
@@ -96,8 +99,19 @@ export function PropertiesPanel({
   devices,
   traceInfo,
   collab,
+  membership,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
+  // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
+  const shareShown = open && doc.view.content === "share";
+  const { unread, markRead } = membership;
+  useEffect(() => {
+    if (!shareShown || !unread) {
+      return undefined;
+    }
+    const timer = window.setTimeout(markRead, 1000);
+    return () => window.clearTimeout(timer);
+  }, [shareShown, unread, markRead]);
   // The removed-device alert shows in My devices and in the File tab's Workspace section; one OK
   // dismisses both, and the workspace's own removed block with them (0096 ux-notes 7.2).
   const devicesForTabs: DevicesApi = {
@@ -282,6 +296,7 @@ export function PropertiesPanel({
         open={open}
         bodyId={panelId}
         fileDirty={project.dirty}
+        shareMark={membership.unread}
         desktop={isTauri}
         onToggle={(event) => {
           // A press on the collapse control ends picking too (`0040` UX notes).
@@ -438,6 +453,7 @@ export function PropertiesPanel({
                 saved={project.info.path !== null}
                 onReturnFocus={returnFocus}
                 devices={devicesForTabs}
+                membership={membership}
                 workspace={
                   isTauri || workspace.open
                     ? {

@@ -3,12 +3,15 @@
 //! with the device group, and arriving in a synced workspace as a member the group admitted.
 
 use curvyo_crypto_core::IdentityKeys;
+use curvyo_crypto_core::MemberId;
 use curvyo_crypto_core::keyring::Keyring;
+use curvyo_document_core::EndReason;
 use curvyo_document_core::WorkspaceList;
 use curvyo_sync_core::{
-    ClientSession, DeviceAction, Millis, RoomId, SessionConfig, SessionStart, WorkspaceInput,
-    reconcile,
+    ClientSession, DeviceAction, Millis, Plan, RoomId, SessionConfig, SessionStart, WorkspaceInput,
+    admin_remains, reconcile, reconcile_with_left,
 };
+use curvyo_ui_core::membership_text::PERSON_LEAVE_REFUSED;
 
 use super::Session;
 use super::sync::{JoinPhase, SyncSeeds};
@@ -23,6 +26,9 @@ pub struct ReconcileReport {
     pub needs_admin: bool,
     /// Devices still to add or remove there by an admin: (member hex, add).
     pub pending: Vec<(String, bool)>,
+    /// The maker leaves this workspace: this device's own leave went out, or waits for the
+    /// snapshot its rotation asked for (`specs/0097` criterion 16).
+    pub leaving: bool,
 }
 
 impl Session {
@@ -32,6 +38,48 @@ impl Session {
     /// left still holds is renewed. Where this device is not an admin nothing is written.
     /// `None` while no shared workspace's room is online here (nothing could be written).
     pub fn reconcile_workspace(&mut self, group: &Keyring, on: bool) -> Option<ReconcileReport> {
+        self.reconcile_open_workspace(group, on, false)
+    }
+
+    /// Whether the maker may leave the open synced workspace from all their devices: an admin
+    /// must remain outside the device group, counting the devices the group removed (a stolen
+    /// one) as the maker's too (`specs/0097` criterion 16, ADR 0041 decision 1).
+    #[must_use]
+    pub fn person_leave_allowed(&self, group: &Keyring) -> bool {
+        let Some(keyring) = self
+            .sync
+            .as_ref()
+            .filter(|l| l.workspace.is_some() && l.ended.is_none())
+            .and_then(|l| l.client.keyring())
+        else {
+            return false;
+        };
+        let devices: Vec<MemberId> = group
+            .participants()
+            .iter()
+            .map(|p| p.identity)
+            .chain(group.former_participants())
+            .map(|identity| identity.member)
+            .collect();
+        admin_remains(keyring, &devices)
+    }
+
+    /// Reconciles the open shared workspace whose devices list entry is marked `left` (ADR 0041
+    /// decision 3): an admin device removes the other group devices still in it with one
+    /// rotation, waits for the snapshot that asks for, then leaves; a member device leaves at
+    /// once. The leaving device writes the mark and waits for its acknowledgement first; every
+    /// other device calls this when it reads the mark. The ended record says "left" however
+    /// the removal arrives. `None` while no shared workspace's room is online here.
+    pub fn reconcile_left_workspace(&mut self, group: &Keyring) -> Option<ReconcileReport> {
+        self.reconcile_open_workspace(group, false, true)
+    }
+
+    fn reconcile_open_workspace(
+        &mut self,
+        group: &Keyring,
+        on: bool,
+        left: bool,
+    ) -> Option<ReconcileReport> {
         let mut report = ReconcileReport::default();
         let link = self.sync.as_mut().filter(|l| l.workspace.is_some())?;
         if link.ended.is_some() || !link.client.is_online() {
@@ -39,21 +87,21 @@ impl Session {
         }
         let me = link.client.me();
         let keyring = link.client.keyring()?;
-        let plans = reconcile(group, &[WorkspaceInput { on, keyring }], me);
+        let inputs = [WorkspaceInput { on, keyring }];
+        let plans: Vec<Plan> = if left {
+            link.leaving = true;
+            reconcile_with_left(group, &inputs, &[keyring.document_id()], me)
+        } else {
+            reconcile(group, &inputs, me)
+        };
+        let mut leave = false;
         for plan in plans {
+            leave |= plan.leave;
             if plan.needs_admin {
                 report.needs_admin |= !plan.actions.is_empty();
-                for action in &plan.actions {
-                    match action {
-                        DeviceAction::Add { identity, .. } => report
-                            .pending
-                            .push((super::sync::hex(&identity.member.0), true)),
-                        DeviceAction::Remove { members } => report
-                            .pending
-                            .extend(members.iter().map(|m| (super::sync::hex(&m.0), false))),
-                        DeviceAction::Rotate => {}
-                    }
-                }
+                report
+                    .pending
+                    .extend(plan.actions.iter().flat_map(pending_of));
                 continue;
             }
             for action in plan.actions {
@@ -75,7 +123,42 @@ impl Session {
             link.revision = link.revision.wrapping_add(1);
         }
         self.sync_pump();
+        if leave {
+            report.leaving = true;
+            self.leave_after_snapshot();
+        }
         Some(report)
+    }
+
+    /// The person leave's own `RemoveMember`, once no snapshot this device was asked for is
+    /// still to go out (the rotation's, ADR 0031 decision 6a).
+    pub(super) fn leave_after_snapshot(&mut self) {
+        let Some(link) = self.sync.as_mut() else {
+            return;
+        };
+        let due = link
+            .workspace
+            .as_ref()
+            .is_some_and(|c| c.snapshot_due.is_some() || c.prepared.is_some());
+        if due {
+            link.leave_after_snapshot = true;
+            return;
+        }
+        link.leave_after_snapshot = false;
+        if let Err(error) = link.client.leave() {
+            // Refused now (an admin it counted on is gone): the workspace stays synced here and
+            // the maker is told, never left believing they left.
+            link.leaving = false;
+            if error == curvyo_sync_core::SessionError::LastAdmin {
+                link.notice(PERSON_LEAVE_REFUSED.to_owned(), true);
+            }
+            return;
+        }
+        self.sync_pump();
+        self.end_share(EndReason::Left, "");
+        if let Some(link) = self.sync.as_mut() {
+            link.actions.push_back(super::sync::TransportAction::Close);
+        }
     }
 
     /// Leave my devices in this synced workspace (criterion 27, ADR 0040 decision 8): this
@@ -138,5 +221,18 @@ impl Session {
             link.join = Some(JoinPhase::Connecting);
         }
         true
+    }
+}
+
+/// The devices an action this device may not write waits for an admin to add (`true`) or
+/// remove, as member hex.
+fn pending_of(action: &DeviceAction) -> Vec<(String, bool)> {
+    match action {
+        DeviceAction::Add { identity, .. } => vec![(super::sync::hex(&identity.member.0), true)],
+        DeviceAction::Remove { members } => members
+            .iter()
+            .map(|m| (super::sync::hex(&m.0), false))
+            .collect(),
+        DeviceAction::Rotate => Vec::new(),
     }
 }

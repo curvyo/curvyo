@@ -7,7 +7,8 @@
 //! [`ClientSession`](crate::ClientSession): [`DeviceAction::Add`] by
 //! [`admit_device`](crate::ClientSession::admit_device), [`DeviceAction::Remove`] by
 //! [`remove_members`](crate::ClientSession::remove_members) (removals, then one rotation and a
-//! snapshot) and [`DeviceAction::Rotate`] by [`rotate`](crate::ClientSession::rotate). Two
+//! snapshot), [`DeviceAction::Rotate`] by [`rotate`](crate::ClientSession::rotate) and
+//! [`Plan::leave`] by [`leave`](crate::ClientSession::leave). Two
 //! devices reconciling at once write duplicate adds or concurrent rotations; replay merges them
 //! (ADR 0010 §5).
 
@@ -63,6 +64,10 @@ pub struct Plan {
     /// Group devices an admin outside the maker's devices removed from this room: they are not
     /// added again (ADR 0040 decision 5); the room is reported, nothing is written for them.
     pub withheld: Vec<MemberId>,
+    /// The maker left this workspace (its devices list entry is marked `left`, ADR 0041
+    /// decision 3): after `actions` this device writes its own `RemoveMember` by
+    /// [`leave`](crate::ClientSession::leave), also where it is not an admin.
+    pub leave: bool,
 }
 
 /// The plans of every room that needs a change or has a withheld device; rooms that need none
@@ -70,25 +75,77 @@ pub struct Plan {
 /// never paired). In a room whose admin set the replay restored (ADR 0010 §5: the removals that
 /// emptied it are ignored, so a removal there may never take effect) adds and rotations are
 /// planned, removals are not (ADR 0040 decision 8).
+///
+/// In a room with held-back denials (ADR 0041 decision 4) group devices are added as members
+/// only, so no automatic write makes the admin that would release them.
 #[must_use]
 pub fn reconcile(group: &Keyring, workspaces: &[WorkspaceInput<'_>], me: MemberId) -> Vec<Plan> {
+    reconcile_with_left(group, workspaces, &[], me)
+}
+
+/// [`reconcile`] with the workspaces whose devices list entry is marked `left`, the person
+/// leave of ADR 0041 decision 3: such a workspace plans no add; an admin device there removes
+/// every other group device still a member (one rotation and a snapshot), then leaves itself
+/// ([`Plan::leave`]); a member device only leaves itself.
+#[must_use]
+pub fn reconcile_with_left(
+    group: &Keyring,
+    workspaces: &[WorkspaceInput<'_>],
+    left: &[DocumentId],
+    me: MemberId,
+) -> Vec<Plan> {
     if group.role(&me).is_none() {
         return Vec::new();
     }
     let mut plans = Vec::new();
-    if stale_epoch(group) {
+    if !group.rotation_pending().is_empty() {
         plans.push(plan(Target::Group, group, me, vec![DeviceAction::Rotate]));
     }
     for workspace in workspaces {
+        let id = workspace.keyring.document_id();
+        let target = Target::Workspace(id);
+        if left.contains(&id) {
+            if let Some(plan) = leave_plan(group, workspace.keyring, target, me) {
+                plans.push(plan);
+            }
+            continue;
+        }
         let (actions, withheld) = workspace_actions(group, workspace, me);
         if !actions.is_empty() || !withheld.is_empty() {
-            let target = Target::Workspace(workspace.keyring.document_id());
             let mut plan = plan(target, workspace.keyring, me, actions);
             plan.withheld = withheld;
             plans.push(plan);
         }
     }
     plans
+}
+
+/// The person leave of one workspace for this device, `None` once it is no member there.
+fn leave_plan(group: &Keyring, keyring: &Keyring, target: Target, me: MemberId) -> Option<Plan> {
+    let my_role = keyring.role(&me)?;
+    let mut actions = Vec::new();
+    // As a switch-off's removals; none in a restored room, where they may never take effect
+    // (ADR 0040 decision 8): each sibling leaves by itself there.
+    if my_role == Role::Admin && !keyring.admin_set_restored() {
+        let members: Vec<MemberId> = keyring
+            .participants()
+            .into_iter()
+            .map(|participant| participant.identity.member)
+            .filter(|member| {
+                *member != me && (group.role(member).is_some() || group.was_removed(member))
+            })
+            .collect();
+        if !members.is_empty() {
+            actions.push(DeviceAction::Remove { members });
+        }
+    }
+    Some(Plan {
+        target,
+        actions,
+        needs_admin: false,
+        withheld: Vec::new(),
+        leave: true,
+    })
 }
 
 /// Whether a device of the maker's group that is not a member of `keyring` may be added there:
@@ -121,6 +178,7 @@ fn plan(target: Target, keyring: &Keyring, me: MemberId, actions: Vec<DeviceActi
         actions,
         needs_admin: keyring.role(&me) != Some(Role::Admin),
         withheld: Vec::new(),
+        leave: false,
     }
 }
 
@@ -145,10 +203,16 @@ fn workspace_actions(
             }
             if may_readmit(group, keyring, &member) {
                 // The lower of the writer's role there and the device's group role (DEV-ROLE A
-                // makes every group device an admin, so this is the writer's role).
+                // makes every group device an admin, so this is the writer's role); a member
+                // while denials are held back (ADR 0041 decision 4).
+                let role = if keyring.admin_set_restored() {
+                    Role::Member
+                } else {
+                    my_role.min(device.role)
+                };
                 actions.push(DeviceAction::Add {
                     identity: device.identity,
-                    role: my_role.min(device.role),
+                    role,
                 });
             } else {
                 withheld.push(member);
@@ -173,35 +237,8 @@ fn workspace_actions(
     };
     if !members.is_empty() {
         actions.push(DeviceAction::Remove { members });
-    } else if stale_epoch(keyring) {
+    } else if !keyring.rotation_pending().is_empty() {
         actions.push(DeviceAction::Rotate);
     }
     (actions, withheld)
-}
-
-/// Whether the current epoch is wrapped to someone who is no longer a member (a member who left
-/// by itself still holds it, criterion 27).
-fn stale_epoch(keyring: &Keyring) -> bool {
-    let current = keyring.current_epoch();
-    ever_added(keyring)
-        .iter()
-        .any(|member| keyring.was_removed(member) && keyring.holds(member, current))
-}
-
-/// Everyone an accepted entry ever added.
-fn ever_added(keyring: &Keyring) -> Vec<MemberId> {
-    let mut members: Vec<MemberId> = keyring
-        .accepted_entries()
-        .into_iter()
-        .flat_map(|entry| match &entry.payload {
-            Payload::Genesis { admins, .. } => admins.iter().map(|a| a.member).collect(),
-            Payload::AddMember { identity, .. } | Payload::ClaimInvite { identity, .. } => {
-                vec![identity.member]
-            }
-            _ => Vec::new(),
-        })
-        .collect();
-    members.sort_unstable();
-    members.dedup();
-    members
 }

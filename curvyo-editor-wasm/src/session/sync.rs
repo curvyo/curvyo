@@ -72,6 +72,8 @@ pub enum SyncEnd {
     Refused,
     /// The document was taken into a shared workspace (`specs/0095-workspace` criterion 49).
     Moved,
+    /// This device left by its own `RemoveMember` (`specs/0097` criteria 10 and 15).
+    Left,
 }
 
 /// One other participant's connection, as the relay reported it and its presence says.
@@ -140,6 +142,19 @@ pub(super) struct SyncLink {
     /// The push of a take-in's `Moved` record, and whether the relay stored it.
     pub(super) moved_push: Option<u64>,
     pub(super) moved_stored: bool,
+    /// The answer of a return check this link ran (ADR 0041 decision 6).
+    pub(super) check: Option<curvyo_sync_core::CheckOutcome>,
+    /// A return check's link: the ended record it checks and whether it is a workspace's.
+    pub(super) returning: Option<(curvyo_document_core::EndedRecord, bool)>,
+    /// A shared workspace's link that ended by removal or leave: the marker's ended record for
+    /// the host to write (ADR 0041 decision 6).
+    pub(super) workspace_ended: Option<curvyo_document_core::EndedRecord>,
+    /// A person leave waits for the workspace snapshot its rotation asked for (ADR 0041
+    /// decision 3).
+    pub(super) leave_after_snapshot: bool,
+    /// The maker leaves this workspace (its devices list entry is marked `left`): however the
+    /// removal arrives, the ended record says "left" (ADR 0041 decision 3).
+    pub(super) leaving: bool,
 }
 
 impl SyncLink {
@@ -178,6 +193,11 @@ impl SyncLink {
             packed_through: None,
             moved_push: None,
             moved_stored: false,
+            check: None,
+            returning: None,
+            workspace_ended: None,
+            leave_after_snapshot: false,
+            leaving: false,
         }
     }
 

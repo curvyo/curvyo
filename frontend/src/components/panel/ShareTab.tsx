@@ -1,43 +1,29 @@
-import { Copy, FolderOpen, LogIn, Share2, UserMinus, UserPlus } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { Share2 } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 
+import { APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { EndedBlock } from "@/components/panel/EndedBlock";
+import { FormerList } from "@/components/panel/FormerList";
+import { AdminChangeLine, MembershipNotices } from "@/components/panel/MembershipNotices";
 import { MyDevicesBlock } from "@/components/panel/MyDevicesBlock";
-import { PanelRadioGroup } from "@/components/panel/PanelRadioGroup";
+import { ParticipantList } from "@/components/panel/ParticipantList";
+import { InviteBlock, JoinBlock } from "@/components/panel/ShareInviteJoin";
+import { SettingField } from "@/components/panel/ShareSettingField";
 import { WorkspaceShareBlock } from "@/components/panel/WorkspaceShareBlock";
-import type { CollaborationApi, ShareParticipant } from "@/hooks/useCollaboration";
+import type { CollaborationApi } from "@/hooks/useCollaboration";
 import type { DevicesApi } from "@/hooks/useDevices";
+import type { MembershipApi } from "@/hooks/useMembership";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { myDeviceIds, syncedHeader } from "@/lib/devicesApi";
 import {
-  invite_link_kind,
-  invite_sentence,
+  membership_leave_confirm,
+  membership_frozen_warning,
+  membership_you_left_line,
   normalize_server_address,
-  removal_confirm_text,
   server_shown,
   share_confirm_text,
   workspace_invite_sentence,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
-
-const BUTTON =
-  "inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-[5px] border text-sm outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] pointer-coarse:h-9 aria-disabled:opacity-40";
-const OUTLINE =
-  "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
-const APPLY =
-  "border-[var(--toolbar-icon-active-bg)] bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:brightness-110";
-const FIELD =
-  "h-7 w-full rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-[var(--background)] px-2 text-sm text-[var(--toolbar-icon)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] aria-invalid:border-[var(--field-invalid)]";
-const MUTED = "text-xs text-[var(--panel-muted-fg)]";
-const DESTRUCTIVE =
-  "border-[var(--destructive)] bg-[var(--background)] text-[var(--destructive)] hover:bg-[var(--destructive)] hover:text-white focus-visible:bg-[var(--destructive)] focus-visible:text-white";
-
-/** How long a just-shown destructive confirm ignores presses (design system "Inline confirm"). */
-const CONFIRM_GUARD_MS = 400;
-
-const VALIDITY: readonly (readonly ["3600" | "86400" | "604800", string])[] = [
-  ["3600", "1 hour"],
-  ["86400", "24 hours"],
-  ["604800", "7 days"],
-];
 
 /** The open workspace as the Share tab's Workspace block needs it (`specs/0095-workspace`). */
 export interface ShareTabWorkspace {
@@ -58,438 +44,15 @@ interface ShareTabProps {
   workspace?: ShareTabWorkspace;
   /** My devices (`specs/0096-own-devices-sync`); absent in the browser until its slice. */
   devices?: DevicesApi;
-}
-
-/** A labelled text field that commits on Enter or when it loses focus, Escape restores. */
-function SettingField({
-  label,
-  value,
-  placeholder,
-  onCommit,
-  readOnly = false,
-  mono = false,
-  autoFocus = false,
-}: {
-  label: string;
-  value: string;
-  placeholder?: string;
-  onCommit: (text: string) => string;
-  readOnly?: boolean;
-  mono?: boolean;
-  autoFocus?: boolean;
-}) {
-  const [text, setText] = useState(value);
-  const [message, setMessage] = useState("");
-  const id = useId();
-  const commit = () => {
-    if (text === value) {
-      setMessage("");
-      return;
-    }
-    const refusal = onCommit(text);
-    setMessage(refusal);
-  };
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-xs text-[var(--toolbar-icon)]">
-        {label}
-      </label>
-      <input
-        id={id}
-        className={`${FIELD} ${mono ? "font-mono text-xs" : ""}`}
-        value={text}
-        placeholder={placeholder}
-        readOnly={readOnly}
-        autoFocus={autoFocus}
-        aria-invalid={message !== ""}
-        aria-describedby={message ? `${id}-message` : undefined}
-        onChange={(event) => setText(event.target.value)}
-        onBlur={() => !readOnly && commit()}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commit();
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            event.stopPropagation();
-            setText(value);
-            setMessage("");
-          }
-        }}
-      />
-      {message ? (
-        <p id={`${id}-message`} className="text-xs text-[var(--field-invalid)]">
-          {message}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/** A participant's disc: initials on the participant's colour (UX notes §4). */
-export function AvatarDisc({ participant, size = 24 }: { participant: Pick<ShareParticipant, "initials" | "colour" | "online">; size?: number }) {
-  return (
-    <span
-      aria-hidden
-      className="inline-flex shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-      style={{
-        width: size,
-        height: size,
-        background: `var(--peer-${participant.colour})`,
-        opacity: participant.online ? 1 : 0.55,
-      }}
-    >
-      {participant.initials}
-    </span>
-  );
-}
-
-/**
- * One participant (UX notes §2.4). An admin gets Remove in the row's action slot on the other
- * rows; it asks with the sentence of criterion 32 in place before anything is written.
- */
-function ParticipantRow({
-  participant,
-  onRemove,
-  myDevice,
-}: {
-  participant: ShareParticipant;
-  onRemove: (member: string) => string;
-  /** One of my own devices: marked, and removed from My devices only (0096 ux-notes 6.1). */
-  myDevice: boolean;
-}) {
-  const [asking, setAsking] = useState(false);
-  const [error, setError] = useState("");
-  const removeButton = useRef<HTMLButtonElement>(null);
-  // Design system "Inline confirm": the action ignores presses for its first 400 ms, so a
-  // double click on the row's Remove cannot confirm.
-  const armed = useRef(false);
-  useEffect(() => {
-    armed.current = false;
-    if (!asking) {
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      armed.current = true;
-    }, CONFIRM_GUARD_MS);
-    return () => window.clearTimeout(handle);
-  }, [asking]);
-  const close = () => {
-    setAsking(false);
-    window.setTimeout(() => removeButton.current?.focus(), 0);
-  };
-  const sentence = removal_confirm_text(participant.label);
-  return (
-    <li className="flex flex-col">
-      <div className="flex h-10 items-center gap-2 pointer-coarse:h-11">
-        <AvatarDisc participant={participant} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm text-[var(--toolbar-icon)]">
-            {participant.label}
-            {participant.self ? (
-              <span className="text-[var(--panel-muted-fg)]"> this device</span>
-            ) : myDevice ? (
-              <span className="text-[var(--panel-muted-fg)]"> my device</span>
-            ) : null}
-          </p>
-          <p className="truncate font-mono text-xs text-[var(--panel-muted-fg)]">{participant.fingerprint}</p>
-        </div>
-        {participant.online ? null : <span className={MUTED}>offline</span>}
-        {participant.removable && !myDevice ? (
-          <button
-            ref={removeButton}
-            type="button"
-            aria-label={`Remove ${participant.label}`}
-            title="Remove"
-            className={`${BUTTON} ${OUTLINE} w-7 border-transparent`}
-            onClick={() => {
-              setError("");
-              setAsking(true);
-            }}
-          >
-            <UserMinus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-          </button>
-        ) : (
-          <span aria-hidden className="w-7 shrink-0" />
-        )}
-      </div>
-      {asking ? (
-        <div
-          role="group"
-          aria-label={sentence}
-          className="flex flex-col gap-2 pb-2"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              close();
-            }
-          }}
-        >
-          <p className="text-xs text-[var(--toolbar-icon)]">{sentence}</p>
-          <div className="flex gap-2">
-            <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={`${BUTTON} ${DESTRUCTIVE} w-[76px]`}
-              onClick={() => {
-                if (!armed.current) {
-                  return;
-                }
-                const refusal = onRemove(participant.member);
-                setError(refusal);
-                if (refusal === "") {
-                  setAsking(false);
-                }
-              }}
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {error ? (
-        <p role="alert" className="pb-2 text-xs text-[var(--field-invalid)]">
-          {error}
-        </p>
-      ) : null}
-    </li>
-  );
-}
-
-/** The Invite block (UX notes §2.3): validity, Create link, the sentence, the link and Copy. */
-function InviteBlock({
-  collab,
-  onReturnFocus,
-  sentence = invite_sentence(),
-}: {
-  collab: CollaborationApi;
-  onReturnFocus: () => void;
-  sentence?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [validity, setValidity] = useState<"3600" | "86400" | "604800">("86400");
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState("Copy");
-  const inviteButton = useRef<HTMLButtonElement>(null);
-  const linkField = useRef<HTMLInputElement>(null);
-  const close = () => {
-    setOpen(false);
-    collab.clearInvite();
-    window.setTimeout(() => inviteButton.current?.focus(), 0);
-  };
-  if (!open) {
-    return (
-      <button ref={inviteButton} type="button" className={`${BUTTON} ${OUTLINE} w-[118px]`} onClick={() => setOpen(true)}>
-        <UserPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-        Invite
-      </button>
-    );
-  }
-  const invite = collab.invite;
-  return (
-    <div
-      className="flex flex-col gap-2"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          close();
-        }
-      }}
-    >
-      {invite ? (
-        <>
-          <p className="text-xs text-[var(--toolbar-icon)]">
-            {sentence} {invite.expiry}
-          </p>
-          <input
-            ref={linkField}
-            readOnly
-            aria-label="Invite link"
-            className={`${FIELD} font-mono text-xs`}
-            value={invite.link}
-            onFocus={(event) => event.currentTarget.select()}
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`${BUTTON} ${APPLY} w-[76px]`}
-              onClick={() => {
-                navigator.clipboard?.writeText(invite.link).then(
-                  () => {
-                    setCopied("Copied");
-                    window.setTimeout(() => setCopied("Copy"), 2000);
-                  },
-                  () => {
-                    linkField.current?.select();
-                    setCopied("Select and copy");
-                  },
-                );
-              }}
-            >
-              <Copy size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-              <span role="status" aria-live="polite">{copied}</span>
-            </button>
-            <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
-              Done
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-              <PanelRadioGroup
-                legend="Valid for"
-                options={VALIDITY}
-                value={validity}
-                onChange={setValidity}
-                onReturnFocus={onReturnFocus}
-                stacked
-              />
-              <button
-                type="button"
-                className={`${BUTTON} ${APPLY} w-[118px]`}
-                onClick={() => setError(collab.createInvite(Number(validity)))}
-              >
-                Create link
-              </button>
-              {error ? (
-                <p role="alert" className="text-xs text-[var(--field-invalid)]">
-                  {error}
-                </p>
-              ) : null}
-        </>
-      )}
-    </div>
-  );
-}
-
-/** The Join block (UX notes §2.5, `specs/0095-workspace` ux-notes section 8): link, name if
- * none, for a workspace link the folder, Cancel and Join, then the phases. The link decides the
- * route: `1.` opens a document, `2.` joins a workspace. */
-function JoinBlock({ collab, workspace }: { collab: CollaborationApi; workspace?: WorkspaceSyncApi }) {
-  const [open, setOpen] = useState(false);
-  const [link, setLink] = useState("");
-  const join = collab.view.join;
-  const phase = join?.phase ?? "";
-  const busy = phase === "connecting" || phase === "waiting" || phase === "downloading";
-  const refusal = phase === "refused" ? join?.text ?? "" : collab.joinError || (workspace?.joinFolder.refusal ?? "");
-  const isWorkspace = invite_link_kind(link.trim()) === "workspace";
-  const folder = workspace?.joinFolder.path ?? "";
-  if (!open && !busy && !refusal) {
-    return (
-      <div className="flex flex-col gap-2">
-        <button type="button" className={`${BUTTON} ${OUTLINE} w-full`} onClick={() => setOpen(true)}>
-          <LogIn size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-          Open shared document...
-        </button>
-        {workspace ? (
-          <button type="button" className={`${BUTTON} ${OUTLINE} w-full`} onClick={() => setOpen(true)}>
-            <LogIn size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-            Join shared workspace...
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-  const joinReason = collab.name === "" ? "Enter a name." : isWorkspace && folder === "" ? "Choose a folder." : "";
-  const submit = () => {
-    if (link.trim() === "" || joinReason !== "") {
-      return;
-    }
-    if (isWorkspace) {
-      if (workspace && folder !== "") {
-        workspace.joinWorkspace(link.trim());
-      }
-      return;
-    }
-    collab.join(link.trim());
-  };
-  return (
-    <div
-      className="flex flex-col gap-2"
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) {
-          event.preventDefault();
-          event.stopPropagation();
-          setOpen(false);
-        }
-      }}
-    >
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-[var(--toolbar-icon)]">Invite link</span>
-        <input
-          autoFocus
-          className={`${FIELD} font-mono text-xs`}
-          value={link}
-          aria-invalid={refusal !== ""}
-          onChange={(event) => setLink(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              submit();
-            }
-          }}
-        />
-      </label>
-      {refusal ? (
-        <p role="alert" className="text-xs text-[var(--field-invalid)]">
-          {refusal}
-        </p>
-      ) : null}
-      {collab.name === "" ? (
-        <SettingField label="Name shown to others" value="" onCommit={collab.setName} />
-      ) : null}
-      {isWorkspace && workspace && !busy ? (
-        <div className="flex flex-col gap-1">
-          <button type="button" className={`${BUTTON} ${OUTLINE} w-[148px]`} onClick={workspace.chooseJoinFolder}>
-            <FolderOpen size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-            Choose folder...
-          </button>
-          {folder ? <p className={`${MUTED} truncate`} title={folder}>{folder}</p> : null}
-        </div>
-      ) : null}
-      {busy ? (
-        <p role="status" aria-live="polite" className={MUTED}>
-          {join?.text}
-        </p>
-      ) : null}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className={`${BUTTON} ${OUTLINE} w-[76px]`}
-          onClick={() => {
-            if (busy) {
-              collab.leave();
-            }
-            setOpen(false);
-          }}
-        >
-          Cancel
-        </button>
-        {busy ? null : (
-          <button
-            type="button"
-            aria-disabled={joinReason !== ""}
-            className={`${BUTTON} ${APPLY} w-[76px]`}
-            onClick={submit}
-          >
-            Join
-          </button>
-        )}
-      </div>
-      {joinReason && !busy ? <p className={MUTED}>{joinReason}</p> : null}
-    </div>
-  );
+  /** Roles, leave, add back and the notices (`specs/0097-membership-lifecycle`). */
+  membership: MembershipApi;
 }
 
 /**
  * The Share tab (`specs/0092-cooperative-editing` UX notes §2): the server and name settings,
  * Share with its inline confirm, Invite, the participant list and Open shared document.
  */
-export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: ShareTabProps) {
+export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, membership }: ShareTabProps) {
   const { view } = collab;
   // A session that carries a shared workspace's link shows the workspace in the Workspace block
   // and only a line in the Document block (`specs/0095-workspace` ux-notes section 9).
@@ -501,12 +64,14 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
   const shared = view.shared && view.live;
   const server = normalize_server_address(collab.server);
   const { checkServer } = collab;
-  // A check runs when the tab is shown with a server set, never in the background otherwise.
+  // A check runs when the tab is shown with a server set, never in the background otherwise. A
+  // removed or left file contacts nothing until Check is pressed (`specs/0097` criterion 33).
+  const ended = membership.ended;
   useEffect(() => {
-    if (server !== "" && !shared) {
+    if (server !== "" && !shared && !ended) {
       checkServer();
     }
-  }, [server, shared, checkServer]);
+  }, [server, shared, ended, checkServer]);
 
   const serverReason =
     server === ""
@@ -520,27 +85,33 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
   // My own devices among the participants of a synced workspace (0096 ux-notes 6.1).
   const myDevices = myDeviceIds(devices);
   const others = view.participants.filter((p) => !p.self && !myDevices.has(p.member)).map((p) => p.label);
+  const leaveText = membership_leave_confirm(
+    membership.name,
+    workspaceView != null,
+    workspace?.documents ?? 0,
+    JSON.stringify(membership.personLeave ? (devices?.otherNames ?? []) : []),
+  );
   const participantList =
     view.participants.length > 0 ? (
-      <div className="flex flex-col gap-1">
-        <div className="flex items-baseline justify-between">
-          <span className="text-xs text-[var(--toolbar-icon)]">Participants</span>
-          {view.epoch !== null && view.epoch !== undefined ? (
-            <span className={MUTED}>Key epoch {view.epoch}</span>
-          ) : null}
-        </div>
-        <ul aria-label="Participants" className="flex flex-col">
-          {view.participants.map((participant) => (
-            <ParticipantRow
-              key={participant.fingerprint}
-              participant={participant}
-              onRemove={collab.remove}
-              myDevice={myDevices.has(participant.member)}
-            />
-          ))}
-        </ul>
-      </div>
+      <>
+        <ParticipantList view={view} myDevices={myDevices} leaveText={leaveText} membership={membership} />
+        {view.admin ? (
+          <FormerList
+            former={view.former ?? []}
+            workspace={workspaceView != null}
+            documents={workspace?.documents ?? 0}
+            membership={membership}
+          />
+        ) : null}
+      </>
     ) : null;
+  const notices = <MembershipNotices view={view} membership={membership} />;
+  // A workspace the maker left from every device: the switch says so (ux-notes 5.4).
+  const workspaceId = workspaceView?.id ?? "";
+  const leftLine =
+    workspace?.open && devices && (devices.leftIds.includes(workspaceId) || (ended?.workspace === true && ended.left))
+      ? membership_you_left_line(workspace.name)
+      : "";
   const reachLine =
     collab.reach === "reaching"
       ? "Reaching..."
@@ -551,6 +122,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
           : "";
   return (
     <div className="flex flex-col gap-3">
+      <AdminChangeLine membership={membership} />
       <div className="flex flex-col gap-2">
         {view.live && (view.shared || workspaceView != null) ? (
           <div className="flex flex-col gap-1">
@@ -601,7 +173,17 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
       </div>
 
       {devices ? (
-        <MyDevicesBlock devices={devices} server={server} reason={serverReason} onReturnFocus={onReturnFocus} />
+        <MyDevicesBlock
+          devices={devices}
+          server={server}
+          reason={serverReason}
+          onReturnFocus={onReturnFocus}
+          frozenWarning={
+            devices.openSynced && membership.frozen
+              ? membership_frozen_warning(JSON.stringify(membership.frozen.mutual), membership.frozen.refused)
+              : ""
+          }
+        />
       ) : null}
 
       {workspace?.open ? (
@@ -618,6 +200,9 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
             ) : null
           }
           participants={workspaceView ? participantList : null}
+          notices={workspaceView ? notices : null}
+          ended={ended?.workspace ? <EndedBlock membership={membership} /> : null}
+          endedAsks={ended?.workspace === true && ended.check === "addedBack"}
           syncedHeader={syncedHeader(devices, view)}
           devices={
             devices && devices.view && !devices.view.removed
@@ -628,8 +213,10 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
                   failed: devices.switchFailed,
                   otherNames: devices.otherNames,
                   others,
-                  switchOn: devices.switchOn,
+                  // An ended workspace is never shared anew by the switch (`specs/0097` 5.4).
+                  switchOn: ended?.workspace ? membership.clearLeftMark : devices.switchOn,
                   switchOff: devices.switchOff,
+                  leftLine: leftLine,
                   onReturnFocus,
                 }
               : undefined
@@ -648,6 +235,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
         ) : null
       ) : workspace?.sync.sharedOpen ? null : (
         <>
+          {ended && !ended.workspace ? <EndedBlock membership={membership} /> : null}
           {shared ? (
             <div className="flex flex-col gap-1">
               <p className="text-sm text-[var(--toolbar-icon)]">Shared on {view.serverShown}</p>
@@ -655,7 +243,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
                 {view.stateLine}
               </p>
             </div>
-          ) : view.ended === "removed" ? null : confirming ? (
+          ) : ended?.check === "addedBack" ? null : confirming ? (
             <div
               role="group"
               aria-label={share_confirm_text(server)}
@@ -669,7 +257,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
               }}
             >
               <p className="text-xs text-[var(--toolbar-icon)]">{share_confirm_text(server)}</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={() => setConfirming(false)}>
                   Cancel
                 </button>
@@ -722,6 +310,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices }: S
             </div>
           )}
 
+          {shared ? notices : null}
           {shared && view.admin ? <InviteBlock collab={collab} onReturnFocus={onReturnFocus} /> : null}
 
           {participantList}

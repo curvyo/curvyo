@@ -25,6 +25,14 @@ pub(crate) struct MarkerPayload {
     list: Vec<u8>,
 }
 
+/// The ended record of a removed or left workspace and its list, as the page reads them
+/// (`specs/0097` criteria 20 and 21).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct EndedPayload {
+    ended_json: Vec<u8>,
+    list: Vec<u8>,
+}
+
 /// One document of `index.json`: its id as hex and its path.
 #[derive(Debug, Deserialize)]
 pub(crate) struct IndexPayload {
@@ -89,6 +97,34 @@ pub(crate) fn write_marker(
         },
     )
     .map_err(|error| error_code(&error))
+}
+
+/// The ended record of the open workspace or the synced workspace `workspace`, `None` when it
+/// keeps none.
+pub(crate) fn ended_of(
+    state: &AppState,
+    workspace: Option<&str>,
+) -> Result<Option<EndedPayload>, String> {
+    let root = root_of(state, workspace)?;
+    curvyo_storage_io::read_marker_ended(&root)
+        .map(|found| {
+            found.map(|ended| EndedPayload {
+                ended_json: ended.ended_json,
+                list: ended.list,
+            })
+        })
+        .map_err(|error| error_code(&error))
+}
+
+/// Ends the share of the open workspace or the synced workspace `workspace` with the page's
+/// `share.ended.json` (criteria 15 and 20): the documents stay, each with its record.
+pub(crate) fn end_share(
+    state: &AppState,
+    workspace: Option<&str>,
+    ended_json: &[u8],
+) -> Result<(), String> {
+    let root = root_of(state, workspace)?;
+    curvyo_storage_io::end_marker_share(&root, ended_json).map_err(|error| error_code(&error))
 }
 
 /// Share's fresh id into `workspace.toml` (ADR 0037 decision 4).
@@ -172,6 +208,29 @@ pub(crate) fn write_workspace_marker_share(
     workspace: Option<String>,
 ) -> Result<(), String> {
     write_marker(&app.state::<AppState>(), workspace.as_deref(), marker)
+}
+
+/// The ended record of a removed or left workspace (`specs/0097` criteria 20 and 21), `null`
+/// when it keeps none.
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn workspace_marker_ended(
+    app: AppHandle,
+    workspace: Option<String>,
+) -> Result<Option<EndedPayload>, String> {
+    ended_of(&app.state::<AppState>(), workspace.as_deref())
+}
+
+/// This device was removed from the workspace or left it (`specs/0097` criteria 15 and 20):
+/// the marker keeps `ended_json` in place of its share files; every document stays.
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn end_workspace_marker_share(
+    app: AppHandle,
+    ended_json: Vec<u8>,
+    workspace: Option<String>,
+) -> Result<(), String> {
+    end_share(&app.state::<AppState>(), workspace.as_deref(), &ended_json)
 }
 
 /// Writes Share's fresh workspace id (hex).
@@ -268,6 +327,34 @@ mod tests {
         let text =
             fs::read_to_string(work.path().join(".curvyo-workspace/workspace.toml")).unwrap();
         assert!(text.contains(&"57".repeat(16)));
+    }
+
+    /// `specs/0097` criteria 15 and 20: ending keeps the record and the list, the workspace
+    /// then reads as not shared; writing the share files again (Sync again) drops the record.
+    #[test]
+    fn an_ended_workspace_keeps_its_record_until_sync_again() {
+        let work = tempfile::tempdir().unwrap();
+        let state = AppState::default();
+        open_root(&state, None, work.path());
+        assert_eq!(ended_of(&state, None), Ok(None));
+        let marker = MarkerPayload {
+            share_json: b"{}".to_vec(),
+            keyring_log: vec![1],
+            list: vec![2],
+        };
+        write_marker(&state, None, marker.clone()).unwrap();
+        end_share(&state, None, b"{\"ended\":\"removed\"}").unwrap();
+        assert_eq!(marker_of(&state, None), Ok(None));
+        assert_eq!(
+            ended_of(&state, None),
+            Ok(Some(EndedPayload {
+                ended_json: b"{\"ended\":\"removed\"}".to_vec(),
+                list: vec![2],
+            }))
+        );
+        write_marker(&state, None, marker.clone()).unwrap();
+        assert_eq!(ended_of(&state, None), Ok(None));
+        assert_eq!(marker_of(&state, None), Ok(Some(marker)));
     }
 
     /// Criterion 27: a refused folder is not kept; an accepted one becomes the open workspace

@@ -172,6 +172,8 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         workspace::probe_workspace_document,
         workspace_share::workspace_marker_share,
         workspace_share::write_workspace_marker_share,
+        workspace_share::workspace_marker_ended,
+        workspace_share::end_workspace_marker_share,
         workspace_share::write_workspace_id,
         workspace_share::replace_workspace_document,
         workspace_share::write_workspace_index,

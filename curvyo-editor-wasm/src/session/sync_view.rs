@@ -4,7 +4,9 @@
 use std::collections::BTreeSet;
 
 use curvyo_crypto_core::MemberId;
-use curvyo_crypto_core::keyring::Role;
+use curvyo_crypto_core::keyring::{Payload, Role};
+use curvyo_document_core::EndReason;
+use curvyo_sync_core::CheckOutcome;
 use curvyo_ui_core::share_text::{
     ConnectionState, cut_label, initials, join_refusal_text, participant_colour, pill_name,
     server_shown, share_subject,
@@ -38,14 +40,26 @@ impl Session {
     pub fn share_view_json(&self) -> String {
         // A device removed from its shared workspace shows a local workspace: "Not shared" with
         // Share workspace available (`specs/0095-workspace` criterion 44, `ux-notes.md` 4).
+        if let Some(view) = self.return_view() {
+            return view.to_string();
+        }
         let Some(link) = self.sync.as_ref().filter(|_| !self.workspace_removed()) else {
             let record = self.document.share();
+            let ended = self.document.ended_share();
+            // A removed or left file names where Check would connect (`specs/0097` 7.1).
+            let server = record
+                .as_ref()
+                .map(|r| r.server.clone())
+                .or_else(|| ended.as_ref().map(|r| r.server.clone()));
             return json!({
                 "shared": record.is_some(),
                 "live": false,
-                "server": record.as_ref().map(|r| r.server.clone()),
+                "serverShown": server.as_deref().map(server_shown),
+                "server": server,
                 "subject": share_subject(record.is_some(), 0, ConnectionState::NotConnected),
                 "participants": [],
+                "ended": ended.as_ref().map(|r| ended_name(r.ended)),
+                "endedRoom": ended.map(|r| super::sync::hex(&r.room)),
             })
             .to_string();
         };
@@ -74,16 +88,105 @@ impl Session {
             "admin": is_admin,
             "online": link.online,
             "participants": participants,
+            "former": if is_admin { former_rows(link) } else { Vec::new() },
             "join": join,
             "ended": link.ended.map(|e| match e {
                 SyncEnd::Removed => "removed",
                 SyncEnd::Refused => "refused",
                 SyncEnd::Moved => "moved",
+                SyncEnd::Left => "left",
             }),
+            "endedRoom": link.ended.map(|_| super::sync::hex(&ended_room(link))),
             "workspace": workspace,
         })
         .to_string()
     }
+
+    /// The Share tab of a removed or left file while its return check runs or after it
+    /// answered (`specs/0097` criteria 20 and 21); `None` for any other link.
+    fn return_view(&self) -> Option<Value> {
+        let link = self.sync.as_ref()?;
+        let (record, workspace) = link.returning.as_ref()?;
+        let check = match link.check {
+            None => "checking",
+            Some(CheckOutcome::AddedBack) => "addedBack",
+            Some(CheckOutcome::NotYet) => "notYet",
+            Some(CheckOutcome::LeftAgain) => "leftAgain",
+            Some(CheckOutcome::Unverified) => "unverified",
+            Some(CheckOutcome::NotFound) => "notFound",
+            Some(CheckOutcome::Failed) => "failed",
+        };
+        Some(json!({
+            "shared": false,
+            "live": false,
+            "server": record.server,
+            "serverShown": server_shown(&record.server),
+            "subject": share_subject(false, 0, ConnectionState::NotConnected),
+            "participants": [],
+            "ended": ended_name(record.ended),
+            "endedRoom": super::sync::hex(&record.room),
+            "check": check,
+            "checkWorkspace": workspace,
+            "addedBy": added_by(link),
+        }))
+    }
+}
+
+/// The room an ended link synced: a workspace's id, else the document's room.
+fn ended_room(link: &SyncLink) -> [u8; 16] {
+    link.workspace
+        .as_ref()
+        .map_or(link.client.room().0, |channel| channel.workspace)
+}
+
+/// The label of the admin who added this device back last, empty when unknown (ux-notes 7.3).
+fn added_by(link: &SyncLink) -> String {
+    let me = link.client.me();
+    let Some(keyring) = link.client.keyring() else {
+        return String::new();
+    };
+    keyring
+        .accepted_entries()
+        .iter()
+        .rev()
+        .find_map(|entry| match &entry.payload {
+            Payload::AddMember { identity, .. } if identity.member == me => Some(entry.author),
+            _ => None,
+        })
+        .and_then(|author| link.labels.get(&author).cloned())
+        .unwrap_or_default()
+}
+
+fn ended_name(reason: EndReason) -> &'static str {
+    match reason {
+        EndReason::Removed => "removed",
+        EndReason::Left => "left",
+    }
+}
+
+/// The Removed or left rows an admin sees (`specs/0097` criterion 17): every former
+/// participant with its last known label (empty when none was kept) and fingerprint.
+fn former_rows(link: &SyncLink) -> Vec<Value> {
+    let Some(keyring) = link.client.keyring() else {
+        return Vec::new();
+    };
+    keyring
+        .former_participants()
+        .into_iter()
+        .map(|identity| {
+            let label = link
+                .labels
+                .get(&identity.member)
+                .map(|l| cut_label(l, 24))
+                .unwrap_or_default();
+            json!({
+                "member": super::sync::hex(&identity.member.0),
+                "label": label,
+                "fingerprint": identity.fingerprint(),
+                "left": curvyo_sync_core::left_by_own_hand(keyring, &identity.member),
+            })
+        })
+        .collect()
 }
 
 /// The participant rows of the Share tab: own row first, then by member id.
@@ -96,6 +199,7 @@ fn participant_rows(link: &SyncLink, is_admin: bool) -> Vec<Value> {
         .map(curvyo_crypto_core::keyring::Keyring::participants)
         .unwrap_or_default();
     rows.sort_by_key(|p| (p.identity.member != me, p.identity.member.0));
+    let alone = rows.len() < 2;
     rows.iter()
         .map(|participant| {
             let member = participant.identity.member;
@@ -122,6 +226,12 @@ fn participant_rows(link: &SyncLink, is_admin: bool) -> Vec<Value> {
                 "admin": participant.role == Role::Admin,
                 // Criterion 32: only an admin sees Remove, never on its own row.
                 "removable": is_admin && !own,
+                // `specs/0097` criteria 2 and 14: roles for admins on other rows; Step down for
+                // an admin and Leave for everyone on the own row, no Leave when alone.
+                "canMakeAdmin": is_admin && !own && participant.role == Role::Member,
+                "canMakeMember": is_admin && !own && participant.role == Role::Admin,
+                "canStepDown": own && participant.role == Role::Admin,
+                "canLeave": own && !alone,
             })
         })
         .collect()

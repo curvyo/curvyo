@@ -19,7 +19,7 @@ export function DecisionRow({ devices, id, name, text }: { devices: DevicesApi; 
   return (
     <div role="group" aria-label={name} className="flex flex-col gap-2 py-1">
       <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button type="button" className={`${BUTTON} ${APPLY} w-[148px]`} onClick={() => devices.connectCopy(id)}>
           Connect this folder
         </button>
@@ -35,11 +35,14 @@ export function DecisionRow({ devices, id, name, text }: { devices: DevicesApi; 
  * workspaces that are not synced yet, all checked; the synced ones are named above the list. */
 export function PickWorkspaces({
   label,
+  frozenWarning,
   offered,
   synced,
   onDone,
 }: {
   label: string;
+  /** The open synced workspace's frozen-room warning (`specs/0097` ux-notes 3.2), or empty. */
+  frozenWarning: string;
   offered: OfferedWorkspace[];
   /** Ids of workspaces synced already. */
   synced: string[];
@@ -100,8 +103,10 @@ export function PickWorkspaces({
           ))}
         </ul>
       ) : null}
-      <p className="text-xs text-[var(--toolbar-icon)]">{devices_privacy_sentence()}</p>
-      <div className="flex gap-2">
+      <p className="text-xs text-[var(--toolbar-icon)]">
+        {frozenWarning ? `${devices_privacy_sentence()} ${frozenWarning}` : devices_privacy_sentence()}
+      </p>
+      <div className="flex flex-wrap gap-2">
         <button ref={notNow} type="button" className={`${BUTTON} ${OUTLINE} w-[90px]`} onClick={() => onDone([])}>
           Not now
         </button>

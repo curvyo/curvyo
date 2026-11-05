@@ -204,6 +204,14 @@ impl Net {
         self.pump(i);
     }
 
+    /// Client `i` starts a session in `room` from `since_seq` with `start`, keeping its replica
+    /// and its credential store (a return check, Sync again).
+    pub fn start(&mut self, i: usize, room: RoomId, since_seq: u64, start: SessionStart) {
+        let config = self.config(i, room, since_seq, start);
+        self.clients[i].session = Some(ClientSession::new(config, self.now).unwrap());
+        self.pump(i);
+    }
+
     /// Client `i` (admin, online) adds `identity` with `role` and every epoch key it holds.
     pub fn add_member(&mut self, i: usize, identity: Identity, role: Role) {
         self.clients[i]

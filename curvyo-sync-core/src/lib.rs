@@ -16,6 +16,7 @@ mod devices;
 mod entropy;
 mod frame;
 mod invite_link;
+mod membership;
 mod pairing;
 mod relay;
 mod server_address;
@@ -24,15 +25,20 @@ mod workspace_stream;
 
 pub use backup::{BackupExchange, BackupOutcome};
 pub use client::{
-    ClientOutput, ClientSession, InviteSecret, SNAPSHOT_BYTES, SNAPSHOT_RECORDS, SessionConfig,
-    SessionError, SessionEvent, SessionStart,
+    CheckOutcome, ClientOutput, ClientSession, History, InviteSecret, SNAPSHOT_BYTES,
+    SNAPSHOT_RECORDS, SessionConfig, SessionError, SessionEvent, SessionStart,
 };
-pub use devices::{DeviceAction, Plan, Target, WorkspaceInput, may_readmit, reconcile};
+pub use devices::{
+    DeviceAction, Plan, Target, WorkspaceInput, may_readmit, reconcile, reconcile_with_left,
+};
 pub use frame::{
     ClientFrame, ConnectionId, FrameError, MAX_MESSAGE_LEN, OLDEST_PROTOCOL_VERSION,
     PROTOCOL_VERSION, PairCloseReason, RecordKind, RefusalReason, RelayFrame, RoomId,
 };
 pub use invite_link::{InviteKind, InviteLink, InviteLinkError};
+pub use membership::{
+    MembershipNotice, admin_remains, admin_set, left_by_own_hand, membership_notices,
+};
 pub use pairing::{
     CHECK_WORD_COUNT, PAIR_WRONG_TRIES, PairEvent, PairFailure, PairJoiner, PairOpener, PairOutput,
     PairingError, check_word,

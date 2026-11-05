@@ -17,7 +17,9 @@ use curvyo_crypto_core::keyring::{
 };
 use curvyo_crypto_core::wrap_epoch_key;
 use curvyo_crypto_core::{DocumentId, EpochKey, Identity, IdentityKeys, KeyId, MemberId};
-use curvyo_sync_core::{DeviceAction, Plan, Target, WorkspaceInput, reconcile};
+use curvyo_sync_core::{
+    DeviceAction, Plan, Target, WorkspaceInput, admin_remains, reconcile_with_left,
+};
 use support::device;
 
 const GROUP_ID: DocumentId = DocumentId([0x6e; 16]);
@@ -154,12 +156,18 @@ impl Writer<'_> {
         self.write(Payload::NewEpoch { epoch, wraps });
     }
 
-    fn apply(&mut self, actions: &[DeviceAction]) {
-        for action in actions {
+    fn apply(&mut self, plan: &Plan) {
+        for action in &plan.actions {
             match action {
                 DeviceAction::Add { identity, role } => self.add(*identity, *role),
                 DeviceAction::Remove { members } => self.remove(members),
                 DeviceAction::Rotate => self.rotate(),
+            }
+        }
+        if plan.leave {
+            let me = self.author.identity().member;
+            if self.keyring().role(&me).is_some() {
+                self.write(Payload::RemoveMember { member: me });
             }
         }
     }
@@ -197,12 +205,14 @@ enum Status {
     Left,
 }
 
-/// The devices list's switch of the workspace: a last-writer-wins register.
+/// The devices list's switch of the workspace: a last-writer-wins register; `left` is the
+/// person leave's mark (ADR 0041 decision 3).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 struct Switch {
     clock: u32,
     writer: u8,
     on: bool,
+    left: bool,
 }
 
 #[derive(Clone)]
@@ -229,6 +239,7 @@ impl Dev {
                 clock: 0,
                 writer: 0,
                 on: false,
+                left: false,
             },
         }
     }
@@ -245,7 +256,12 @@ impl Dev {
                 keyring,
             })
             .collect();
-        reconcile(&group, &inputs, member(self.n))
+        let left = if self.switch.left {
+            vec![WS_ID]
+        } else {
+            Vec::new()
+        };
+        reconcile_with_left(&group, &inputs, &left, member(self.n))
     }
 }
 
@@ -266,6 +282,11 @@ enum Op {
     Leave {
         who: u8,
     },
+    /// The maker leaves W from device `who` (ADR 0041 decision 3): the `left` mark, its
+    /// acknowledgement, then the plan.
+    PersonLeave {
+        who: u8,
+    },
     /// Sync, then reconcile; what reconcile writes waits for the next sync.
     Step {
         who: u8,
@@ -280,6 +301,10 @@ impl Op {
 
 #[derive(Clone)]
 struct World {
+    /// The other maker's device D's role in W.
+    d_role: Role,
+    /// Whether the exploration offers the person leave.
+    person_leave: bool,
     devs: Vec<Dev>,
     relay_group: Room,
     relay_ws: Room,
@@ -312,6 +337,7 @@ impl World {
             clock: 1,
             writer: A,
             on: true,
+            left: false,
         };
         let mut devs: Vec<Dev> = DEVICES.iter().map(|&n| Dev::new(n)).collect();
         devs[0].status = Status::Active;
@@ -319,6 +345,8 @@ impl World {
         devs[0].ws = ws.clone();
         devs[0].switch = switch;
         Self {
+            d_role: role,
+            person_leave: false,
             devs,
             relay_group: group,
             relay_ws: ws,
@@ -413,8 +441,8 @@ impl World {
         let author = device(n);
         let World { devs, keys, .. } = self;
         let dev = &mut devs[usize::from(n - 1)];
-        for plan in plans.iter().filter(|plan| !plan.needs_admin) {
-            Self::writer(dev, &author, keys, plan.target).apply(&plan.actions);
+        for plan in plans.iter().filter(|plan| !plan.needs_admin || plan.leave) {
+            Self::writer(dev, &author, keys, plan.target).apply(plan);
         }
     }
 
@@ -446,6 +474,42 @@ impl World {
             .copied()
             .filter(|&d| group.role(&member(d)).is_some())
             .collect()
+    }
+
+    /// The maker leaves W from device `who` (ADR 0041 decision 3); false when it does not
+    /// apply: the person-level last-admin rule refuses it without an admin outside the group.
+    fn person_leave(&mut self, who: u8) -> bool {
+        self.sync(who);
+        let me = member(who);
+        let in_ws = self
+            .dev(who)
+            .ws
+            .keyring()
+            .is_some_and(|k| k.role(&me).is_some());
+        if self.dev(who).status != Status::Active || self.dev(who).switch.left || !in_ws {
+            return false;
+        }
+        let group = self.dev(who).group.keyring().unwrap();
+        let devices: Vec<MemberId> = group
+            .participants()
+            .iter()
+            .map(|p| p.identity.member)
+            .collect();
+        if !admin_remains(&self.dev(who).ws.keyring().unwrap(), &devices) {
+            return false;
+        }
+        let dev = self.dev_mut(who);
+        dev.switch = Switch {
+            clock: dev.switch.clock + 1,
+            writer: who,
+            on: false,
+            left: true,
+        };
+        // The mark is acknowledged before the plan runs.
+        self.sync(who);
+        self.reconcile(who);
+        self.sync(who);
+        true
     }
 
     /// Carries out `op`; false when it does not apply in this state.
@@ -490,6 +554,7 @@ impl World {
                     clock: dev.switch.clock + 1,
                     writer: by,
                     on,
+                    left: false,
                 };
                 self.reconcile(by);
                 self.sync(by);
@@ -511,6 +576,7 @@ impl World {
                 self.sync(by);
                 true
             }
+            Op::PersonLeave { who } => self.person_leave(who),
             Op::Leave { who } => {
                 self.sync(who);
                 if self.dev(who).status != Status::Active || self.group_members(who).len() < 2 {
@@ -588,7 +654,7 @@ impl World {
             "{path:?}"
         );
         // The other maker's device is never removed by reconcile and always holds the key.
-        assert_eq!(ws.role(&member(D)), Some(Role::Member), "{path:?}");
+        assert_eq!(ws.role(&member(D)), Some(self.d_role), "{path:?}");
         assert!(
             ws.holds(&member(D), ws.current_epoch()),
             "D lost the current key: {path:?}"
@@ -624,6 +690,12 @@ impl World {
             .map(|p| p.identity.member)
             .collect();
         let in_both = in_group.iter().filter(|m| ws.role(m).is_some()).count();
+        if self.relay_switch.left && !ws.admin_set_restored() {
+            assert_eq!(
+                in_both, 0,
+                "a device of the maker stays after the leave: {path:?}"
+            );
+        }
         if !reached {
         } else if self.relay_switch.on {
             assert_eq!(
@@ -676,6 +748,9 @@ impl World {
                 }
             }
             ops.push(Op::Leave { who: n });
+            if self.person_leave && !self.dev(n).switch.left {
+                ops.push(Op::PersonLeave { who: n });
+            }
         }
         ops
     }
@@ -788,6 +863,7 @@ fn a_paired_device_is_added_with_the_writers_role() {
             }],
             needs_admin: false,
             withheld: Vec::new(),
+            leave: false,
         }]
     );
     let world = paired(true);
@@ -885,6 +961,7 @@ fn a_member_that_is_not_admin_only_reports() {
             }],
             needs_admin: true,
             withheld: Vec::new(),
+            leave: false,
         }]
     );
 }
@@ -998,6 +1075,7 @@ fn a_device_another_maker_removed_is_not_added_back() {
             actions: Vec::new(),
             needs_admin: false,
             withheld: vec![member(B)],
+            leave: false,
         }]
     );
     let ws = world.relay_ws.keyring().unwrap();
@@ -1049,4 +1127,168 @@ fn a_mutual_removal_of_the_only_two_devices_freezes_the_group() {
     let group = world.relay_group.keyring().unwrap();
     assert!(group.role(&member(A)).is_none() && group.role(&member(B)).is_none());
     assert!(group.role(&member(C)).is_some());
+}
+
+// The person leave and frozen rooms (ADR 0041 decisions 3 and 4, `specs/0097` criteria 16 and
+// 28).
+
+/// Criterion 16, plan.md task 9: every interleaving of pairing, switching, removing, leaving and
+/// the person leave, in a workspace where another maker's D is an admin, settles with no device
+/// of the maker left in a workspace marked `left` (outside rooms whose admin set the replay
+/// restored), D an admin with the current key, and nothing left to reconcile.
+#[test]
+fn every_interleaving_with_a_person_leave_settles_safely() {
+    let mut seen = HashSet::new();
+    let mut world = World::with_other_maker(Role::Admin);
+    world.person_leave = true;
+    seen.insert(world.fingerprint());
+    explore(&world, &mut Vec::new(), DEPTH, USER_OPS, &mut seen);
+    assert!(seen.len() > 100, "explored only {} states", seen.len());
+}
+
+/// Criterion 16: the leave from one admin device removes the other group devices with one
+/// rotation, then the device itself; D, another maker's admin, keeps the current key.
+#[test]
+fn a_person_leave_removes_every_device_of_the_maker() {
+    let mut world = World::with_other_maker(Role::Admin);
+    assert!(world.apply(Op::Pair { by: A, new: B }));
+    assert!(world.apply(Op::Pair { by: B, new: C }));
+    world.quiesce();
+    assert_eq!(ws_members(&world).len(), 3);
+    assert!(world.apply(Op::PersonLeave { who: A }));
+    assert!(ws_members(&world).is_empty(), "{:?}", ws_members(&world));
+    world.quiesce();
+    assert!(ws_members(&world).is_empty());
+    let ws = world.relay_ws.keyring().unwrap();
+    assert_eq!(ws.role(&member(D)), Some(Role::Admin));
+    assert!(ws.holds(&member(D), ws.current_epoch()));
+}
+
+/// Criterion 16: a sibling that re-added the leaver in the moment before it read the mark
+/// removes it again, and itself, once it does.
+#[test]
+fn a_sibling_that_re_adds_the_leaver_removes_it_once_it_reads_the_mark() {
+    let mut world = World::with_other_maker(Role::Admin);
+    assert!(world.apply(Op::Pair { by: A, new: B }));
+    assert!(world.apply(Op::Pair { by: B, new: C }));
+    world.quiesce();
+    // A is only a member of W: its leave is its own removal.
+    let author = device(D);
+    let mut relay_ws = world.relay_ws.clone();
+    Writer {
+        author: &author,
+        document: WS_ID,
+        room: &mut relay_ws,
+        keys: &mut world.keys,
+        written: &mut Vec::new(),
+    }
+    .write(Payload::SetRole {
+        member: member(A),
+        role: Role::Member,
+    });
+    world.relay_ws = relay_ws;
+    world.quiesce();
+    assert!(world.apply(Op::PersonLeave { who: A }));
+    assert!(!ws_members(&world).contains(&member(A)));
+    // C reads the room's keyring but not yet the mark, and re-adds A.
+    let relay_ws = world.relay_ws.clone();
+    world.dev_mut(C).ws = relay_ws;
+    let stale = world.dev(C).plans();
+    assert!(
+        stale.iter().flat_map(|p| &p.actions).any(
+            |a| matches!(a, DeviceAction::Add { identity, .. } if identity.member == member(A))
+        ),
+        "{stale:?}"
+    );
+    world.reconcile(C);
+    world.sync(C);
+    world.quiesce();
+    assert!(ws_members(&world).is_empty(), "{:?}", ws_members(&world));
+    let ws = world.relay_ws.keyring().unwrap();
+    assert!(ws.holds(&member(D), ws.current_epoch()));
+}
+
+/// Criterion 16: a member device of a left workspace only leaves itself, and the plan needs no
+/// admin.
+#[test]
+fn a_member_device_only_leaves_itself() {
+    let mut world = World::with_other_maker(Role::Admin);
+    assert!(world.apply(Op::Pair { by: A, new: B }));
+    world.quiesce();
+    let author = device(D);
+    let mut relay_ws = world.relay_ws.clone();
+    let mut writer = Writer {
+        author: &author,
+        document: WS_ID,
+        room: &mut relay_ws,
+        keys: &mut world.keys,
+        written: &mut Vec::new(),
+    };
+    for n in [A, B] {
+        writer.write(Payload::SetRole {
+            member: member(n),
+            role: Role::Member,
+        });
+    }
+    world.relay_ws = relay_ws;
+    world.sync(A);
+    let dev = world.dev_mut(A);
+    dev.switch = Switch {
+        clock: dev.switch.clock + 1,
+        writer: A,
+        on: false,
+        left: true,
+    };
+    let plans = world.dev(A).plans();
+    assert_eq!(
+        plans,
+        vec![Plan {
+            target: Target::Workspace(WS_ID),
+            actions: Vec::new(),
+            needs_admin: false,
+            withheld: Vec::new(),
+            leave: true,
+        }]
+    );
+}
+
+/// Criterion 28 (ADR 0041 decision 4): a device paired into the group while the workspace's
+/// only admins A and B removed each other is added there as a member, so no automatic write
+/// releases the held-back removals.
+#[test]
+fn pairing_into_a_frozen_room_adds_a_member() {
+    let mut world = paired(false);
+    for (by, who) in [(A, B), (B, A)] {
+        let author = device(by);
+        let World { devs, keys, .. } = &mut world;
+        let dev = &mut devs[usize::from(by - 1)];
+        let mut writer = World::writer(dev, &author, keys, Target::Workspace(WS_ID));
+        writer.write(Payload::RemoveMember {
+            member: member(who),
+        });
+    }
+    let pending: Vec<Entry> = [A, B]
+        .iter()
+        .flat_map(|&n| std::mem::take(&mut world.dev_mut(n).pending_ws))
+        .collect();
+    World::publish(&mut world.relay_ws, pending);
+    world.quiesce();
+    let ws = world.relay_ws.keyring().unwrap();
+    assert!(!ws.held_back().is_empty(), "the room is frozen");
+    assert!(world.apply(Op::Pair { by: A, new: C }));
+    let plans = world.dev(A).plans();
+    let adds: Vec<_> = plans
+        .iter()
+        .flat_map(|p| &p.actions)
+        .filter_map(|a| match a {
+            DeviceAction::Add { identity, role } => Some((identity.member, *role)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(adds, vec![(member(C), Role::Member)]);
+    world.quiesce();
+    let ws = world.relay_ws.keyring().unwrap();
+    assert_eq!(ws.role(&member(C)), Some(Role::Member));
+    assert!(ws.role(&member(A)).is_some() && ws.role(&member(B)).is_some());
+    assert!(!ws.held_back().is_empty(), "nothing released the removals");
 }

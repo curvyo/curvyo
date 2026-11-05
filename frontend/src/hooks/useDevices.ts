@@ -24,6 +24,7 @@ import {
   devices_browser_storage_full,
   devices_browser_text,
   devices_text,
+  membership_word,
   devices_synced_folder_refusal,
   normalize_server_address,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
@@ -32,6 +33,8 @@ const TICK_MS = 50;
 /** How often the files, keys, reconciliation and arrivals are looked at (ms). */
 const SLOW_MS = 1000;
 const DEVICE_NAME_KEY = "curvyo.device-name";
+/** How long the switch says "Leaving..." at most before it is usable again (ux-notes 5.4). */
+const LEAVING_MS = 30_000;
 
 export type {
   DeviceDetail,
@@ -119,7 +122,12 @@ export function useDevices(
   const viewRef = useRef<DevicesView | null>(null);
   useEffect(() => {
     viewRef.current = view;
-    setGroupWorkspaces(view && !view.removed ? view.workspaces.map((w) => w.id) : []);
+    // A workspace the maker left ends as a leave with its record, not as a switch-off.
+    const shown = view && !view.removed ? view : null;
+    setGroupWorkspaces(
+      shown ? shown.workspaces.filter((w) => !w.left) : [],
+      shown ? shown.rows.map((row) => row.member).filter((m) => m !== "") : [],
+    );
   });
   const [pairing, setPairing] = useState<{ view: PairingView; opener: boolean } | null>(null);
   const [deviceName, setDeviceNameState] = useState(() => stored(DEVICE_NAME_KEY));
@@ -129,7 +137,9 @@ export function useDevices(
     deviceNameRef.current = deviceName;
   }, [deviceName]);
   const [syncedFolder, setSyncedFolder] = useState<SyncedFolder>({ path: "", refusal: "" });
-  const [switching, setSwitching] = useState<"" | "on" | "off">("");
+  const [switching, setSwitching] = useState<"" | "on" | "off" | "leave">("");
+  /** When the person leave's mark went out (0 when none runs): "Leaving..." until it ends. */
+  const leavingRef = useRef(0);
   /** The last switch-on failed (ux-notes 6.2: the alert under the switch). */
   const [switchFailed, setSwitchFailed] = useState(false);
   const [removedShown, setRemovedShown] = useState(false);
@@ -337,6 +347,14 @@ export function useDevices(
     const group = groupRef.current;
     const session = getSession();
     const id = openWorkspaceId();
+    if (
+      leavingRef.current !== 0 &&
+      (!session || id === "" || session.workspace_removed() || Date.now() - leavingRef.current > LEAVING_MS)
+    ) {
+      // The person leave ended here (or gave up waiting): the switch is no longer busy.
+      leavingRef.current = 0;
+      setSwitching((now) => (now === "leave" ? "" : now));
+    }
     if (pendingSwitchRef.current === "on" && refs.current.workspaceSync.share.kind === "failed") {
       // A failed Share ends the switch-on; the switch row says why.
       pendingSwitchRef.current = "";
@@ -345,6 +363,20 @@ export function useDevices(
       return;
     }
     if (!group || !session || id === "" || !group.is_online()) {
+      return;
+    }
+    if (group.workspace_left(id)) {
+      // `specs/0097` criterion 16: the maker left it from every device. The leaving device waits
+      // for the relay to store the mark first; then every device runs the left plan.
+      if (pendingSwitchRef.current !== "") {
+        // A switch pressed meanwhile ends: the leave goes on (no busy switch is left behind).
+        pendingSwitchRef.current = "";
+        setSwitching("");
+      }
+      if (group.list_acked()) {
+        session.reconcile_left_workspace(group);
+        refs.current.collab.drive(session);
+      }
       return;
     }
     const pending = pendingSwitchRef.current;
@@ -682,6 +714,55 @@ export function useDevices(
     return refusal;
   }, [attachGroup, getSession, openWorkspaceId]);
 
+  /** Leave of the open synced workspace for the person (`specs/0097` criterion 16): the `left`
+   * mark first; every device then runs the left plan once the relay stored it. */
+  const leavePerson = useCallback((): string => {
+    const group = groupRef.current;
+    const session = getSession();
+    const id = openWorkspaceId();
+    if (!group || !session || id === "") {
+      return "";
+    }
+    if (!group.is_online() || !session.sync_online()) {
+      return membership_word("not-connected");
+    }
+    if (!session.person_leave_allowed(group)) {
+      return membership_word("person-only-admin");
+    }
+    group.leave_workspace(id, refs.current.workspace.name);
+    groupTransport.current?.drain();
+    leavingRef.current = Date.now();
+    setSwitching("leave");
+    return "";
+  }, [getSession, openWorkspaceId]);
+
+  /** Clears the `left` mark of workspace `id` (Sync again, ux-notes 5.4): the entry is written
+   * switched off without the mark, and this resolves once the relay stored it (`false` after
+   * 10 s or offline: nothing connects then). */
+  const clearLeft = useCallback((id: string, name: string): Promise<boolean> => {
+    const group = groupRef.current;
+    if (!group || !group.workspace_left(id)) {
+      return Promise.resolve(true);
+    }
+    if (!group.is_online()) {
+      return Promise.resolve(false);
+    }
+    group.switch_workspace(id, name, false);
+    groupTransport.current?.drain();
+    const started = Date.now();
+    return new Promise((resolve) => {
+      const timer = window.setInterval(() => {
+        if (groupRef.current?.list_acked()) {
+          window.clearInterval(timer);
+          resolve(true);
+        } else if (Date.now() - started > 10_000) {
+          window.clearInterval(timer);
+          resolve(false);
+        }
+      }, TICK_MS);
+    });
+  }, []);
+
   const switchOn = useCallback(() => {
     pendingSwitchRef.current = "on";
     setSwitching("on");
@@ -775,6 +856,10 @@ export function useDevices(
     openSynced,
     switchOn,
     switchOff,
+    leavePerson,
+    clearLeft,
+    leftIds: view ? view.workspaces.filter((w) => w.left).map((w) => w.id) : [],
+    ownMembers: view && !view.removed ? view.rows.map((row) => row.member).filter((m) => m !== "") : [],
     switching,
     switchFailed,
     otherNames,

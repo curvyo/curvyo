@@ -25,6 +25,10 @@ impl ClientSession {
         let Ok(frame) = RelayFrame::decode(bytes) else {
             return;
         };
+        if self.is_check() {
+            self.received_in_check(frame);
+            return;
+        }
         match frame {
             RelayFrame::Challenge { nonce } => self.on_challenge(&nonce),
             RelayFrame::Welcome {
@@ -72,6 +76,23 @@ impl ClientSession {
             | RelayFrame::PairClose { .. }
             | RelayFrame::BackupRecord { .. }
             | RelayFrame::BackupDone => {}
+        }
+    }
+
+    /// A return check reads only the handshake, the keyring and the pong (ADR 0041 decision 6).
+    fn received_in_check(&mut self, frame: RelayFrame) {
+        match frame {
+            RelayFrame::Challenge { nonce } => self.on_challenge(&nonce),
+            // The ping after the proof (`on_challenge`) brings the pong that ends the keyring.
+            RelayFrame::Welcome { .. } => self.state = State::Joined { caught_up: false },
+            RelayFrame::Keyring { entry } => {
+                if let Ok(entry) = Entry::decode(&entry) {
+                    self.keys.add_entries(vec![entry]);
+                }
+            }
+            RelayFrame::Pong => self.check_caught_up(),
+            RelayFrame::Refused { reason } => self.check_refused(reason),
+            _ => {}
         }
     }
 
@@ -128,7 +149,7 @@ impl ClientSession {
         };
         if let Some(entry) = first {
             self.send(&ClientFrame::Keyring { entry });
-        } else if matches!(self.start, Start::Member) {
+        } else if matches!(self.start, Start::Member | Start::Check { .. }) {
             // A member is admitted on its proof and the relay answers this with a pong after the
             // admission; a device the room's keyring does not list is refused "not a member"
             // instead of waiting for a genesis or a claim that never comes (criterion 27).

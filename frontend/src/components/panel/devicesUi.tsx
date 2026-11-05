@@ -18,15 +18,20 @@ export const ALERT = "text-xs text-[var(--field-invalid)]";
 export const SURFACE = "rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)]";
 /** How long a just-shown destructive confirm ignores presses (design system "Inline confirm"). */
 export const CONFIRM_GUARD_MS = 400;
+/** How long a membership row shows its busy line at most when no change arrives (ms). */
+export const BUSY_MS = 5000;
 
 
 /** A destructive inline confirm under a row (Remove, Leave, Stop syncing): Cancel focused, the
- * action ignores presses for its first 400 ms, a refusal shows under it and the confirm stays. */
+ * action ignores presses for its first 400 ms, a refusal shows under it and the confirm stays.
+ * `apply` gives the action the Apply look for a confirm that loses nothing (Make admin), which
+ * needs no guard. */
 export function DestructiveConfirm({
   text,
   label,
   action,
   width = 76,
+  apply = false,
   onCancel,
   onConfirm,
 }: {
@@ -36,10 +41,11 @@ export function DestructiveConfirm({
   action: string;
   /** The action button's width (px). */
   width?: number;
+  apply?: boolean;
   onCancel: () => void;
   onConfirm: () => string;
 }) {
-  const [armed, setArmed] = useState(false);
+  const [armed, setArmed] = useState(apply);
   const [refusal, setRefusal] = useState("");
   useEffect(() => {
     const timer = window.setTimeout(() => setArmed(true), CONFIRM_GUARD_MS);
@@ -59,13 +65,13 @@ export function DestructiveConfirm({
       }}
     >
       <p className="text-xs text-[var(--toolbar-icon)]">{text}</p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={onCancel}>
           Cancel
         </button>
         <button
           type="button"
-          className={`${BUTTON} ${DESTRUCTIVE}`}
+          className={`${BUTTON} ${apply ? APPLY : DESTRUCTIVE}`}
           style={{ width }}
           onClick={() => {
             if (armed) {

@@ -51,7 +51,7 @@ export function OpenerBlock({ devices, view, server }: { devices: DevicesApi; vi
         <p role="alert" className={ALERT}>
           {view.text}
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={devices.closePairing}>
             Close
           </button>
@@ -76,7 +76,7 @@ export function OpenerBlock({ devices, view, server }: { devices: DevicesApi; vi
         <p className="truncate text-sm text-[var(--toolbar-icon)]">{view.heading}</p>
         <p className="font-mono text-xs text-[var(--panel-muted-fg)]">{view.fingerprint}</p>
         <CheckWords view={view} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className={`${BUTTON} ${APPLY} w-[76px]`} onClick={devices.pair}>
             Pair
           </button>
@@ -215,7 +215,7 @@ export function JoinerBlock({
           {view.phase === "compare" ? view.heading : "Connecting..."}
         </p>
         {view.phase === "compare" ? <CheckWords view={view} /> : null}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
             Cancel
           </button>
@@ -319,7 +319,7 @@ export function JoinerBlock({
           ) : null}
         </div>
       )}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
           Cancel
         </button>

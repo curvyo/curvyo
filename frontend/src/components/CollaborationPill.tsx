@@ -1,6 +1,6 @@
 import { CloudOff, Radio, RefreshCw } from "lucide-react";
 
-import { AvatarDisc } from "@/components/panel/ShareTab";
+import { AvatarDisc } from "@/components/panel/ParticipantDisc";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { ShareView } from "@/hooks/useCollaboration";
 
