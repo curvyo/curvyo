@@ -16,6 +16,7 @@ use curvyo_ui_core::{
 use super::select::DoubleClickHint;
 use super::trace_colours::{PaletteView, filled_layers, with_leftovers};
 use super::trace_draw::{TraceViewMode, preview_anchors};
+use super::trace_mask_pick::PickTarget;
 use super::trace_mesh::MeshCache;
 use super::trace_text::leftovers_of;
 use super::{Session, Tool};
@@ -491,6 +492,17 @@ impl Session {
     pub(super) fn trace_pointer_down(&mut self, point: Point, shift: bool) {
         if self.trace_mask_pick_press(point) {
             return;
+        }
+        // Shift+click builds the mask by the pick's hit rule, the traced image skipped, so a path
+        // inside the image's frame is toggled and not the image (criteria 13 and 41).
+        if shift {
+            let images = self.trace_view().images;
+            if !images.is_empty()
+                && let Some((hit, PickTarget::Mask)) = self.trace_mask_pick_target(point, &images)
+            {
+                self.trace_select_hit(hit, true);
+                return;
+            }
         }
         let pickable = self.pickable_objects();
         let tolerance = self.object_tolerance();

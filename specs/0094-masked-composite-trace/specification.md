@@ -207,7 +207,13 @@ Slice 1b
     segments and no "Clear mask" button.
 35. Given a press on it, then `aria-pressed="true"` and the canvas cursor hint is "pick-mask"; given a
     second press, then `aria-pressed="false"`, the cursor hint is the tool's own, and the mask
-    paths are unchanged.
+    paths are unchanged. While armed, a click hits by this rule: the traced image is never hit;
+    the click picks the topmost mask-eligible object under the pointer (an open or closed path, a
+    compound path, a rectangle, an ellipse, a polygon, a star, or a group of those), whether it
+    lies above or below the image; a closed outline counts by its interior, filled or not (a hole
+    of a compound path does not), an open path by its stroke within the hit tolerance. Shift+click
+    in the tool (criterion 13) uses the same rule when it finds a mask-eligible object, and the
+    Select tool's rule otherwise.
 36. Given the mode armed, when a click hits a path, then it is in the mask paths of the active part,
     the selection is the image plus that path, the Mask segments appear with Inside selected, the
     preview is traced inside it, and the mode is still armed. Given a second click on the same
@@ -216,10 +222,12 @@ Slice 1b
 37. Given the mode armed, then a click on each of an open path, a compound path, a rectangle, an
     ellipse, a polygon, a star and a group of paths adds it (a group through its path-like members),
     with the same result as selecting it for the Select route (same region, same preview).
-38. Given the mode armed, when a click hits a text, a second image or a sketch, then it is not
-    added and not selected, the notice row shows "Use Object to path for text; one image at a
-    time." and the mode stays armed; the next accepted pick clears the row. A click on the traced
-    image or on empty canvas changes nothing, and a double-click on the image creates no paths.
+38. Given the mode armed, when no mask-eligible object lies under the pointer (criterion 35's
+    rule) and the topmost object hit there, the traced image left out, is a text, a second image
+    or a sketch, then it is not added and not selected, the notice row shows "Use Object to path for text; one image at a
+    time." and the mode stays armed; the next accepted pick clears the row. A text, a second
+    image or a sketch over a mask-eligible object does not stop its pick. A click where nothing
+    but the traced image or empty canvas lies changes nothing, and a double-click on the image creates no paths.
 39. Given the mode armed, when Escape is pressed, then only the mode ends (selection, mask and
     preview kept); the next Escape stops a running trace if there is one, the one after leaves the
     tool (the order of 0025). Given the tool left by S, another tool or Create paths and entered

@@ -214,6 +214,8 @@ mod trace_draw;
 mod trace_mask;
 mod trace_mask_pick;
 #[cfg(test)]
+mod trace_mask_pick_hit_tests;
+#[cfg(test)]
 mod trace_mask_pick_tests;
 #[cfg(test)]
 mod trace_mask_tests;
