@@ -34,6 +34,10 @@ impl Session {
     /// Arms the pipette for `mode`, or disarms it with `None`.
     pub fn set_trace_pick(&mut self, mode: Option<TracePickMode>) {
         self.trace.pick.mode = if self.tool == Tool::Trace { mode } else { None };
+        if self.trace.pick.mode.is_some() {
+            // The pipette and Pick mask paths exclude each other (`specs/0094` plan).
+            self.set_trace_mask_pick(false);
+        }
         self.trace.pick.hover = None;
         if let Some(point) = self.pointer_position {
             self.trace_pick_move(point);

@@ -514,6 +514,28 @@ impl WasmSession {
         self.session.trace_mask_outside()
     }
 
+    /// Arms (`true`) or disarms Pick mask paths (`specs/0094` slice 1b).
+    pub fn set_trace_mask_pick(&mut self, armed: bool) {
+        self.session.set_trace_mask_pick(armed);
+    }
+
+    /// Whether Pick mask paths is armed.
+    #[must_use]
+    pub fn trace_mask_pick(&self) -> bool {
+        self.session.trace_mask_pick()
+    }
+
+    /// Whether the last pick hit a text, a sketch or a second image (`specs/0094` criterion 38).
+    #[must_use]
+    pub fn trace_mask_pick_refused(&self) -> bool {
+        self.session.trace_mask_pick_refused()
+    }
+
+    /// Clear mask: only the traced image stays selected (`specs/0094` criterion 40).
+    pub fn clear_trace_mask(&mut self) {
+        self.session.clear_trace_mask();
+    }
+
     /// Whether the Select bar shows the Trace button (criterion 1).
     #[must_use]
     pub fn trace_available(&self) -> bool {

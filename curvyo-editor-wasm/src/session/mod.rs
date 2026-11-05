@@ -212,6 +212,9 @@ mod trace_colours;
 mod trace_colours_tests;
 mod trace_draw;
 mod trace_mask;
+mod trace_mask_pick;
+#[cfg(test)]
+mod trace_mask_pick_tests;
 #[cfg(test)]
 mod trace_mask_tests;
 mod trace_mesh;
@@ -1066,7 +1069,7 @@ impl Session {
             }
             Tool::Text => self.text_pointer_move(point),
             Tool::Pen => self.pen_snap_hover(point),
-            Tool::Trace => {}
+            Tool::Trace => self.trace_mask_pick_hover(point),
         }
     }
 

@@ -69,6 +69,8 @@ pub(super) struct TraceState {
     pub(super) moving: bool,
     /// The pipette (`trace_pick.rs`).
     pub(super) pick: super::trace_pick::TracePick,
+    /// Pick mask paths (`trace_mask_pick.rs`, `specs/0094` slice 1b).
+    pub(super) mask_pick: super::trace_mask_pick::MaskPick,
     /// The mask of the Mask view (`trace_mask.rs`).
     pub(super) mask: super::trace_mask::TraceMaskState,
     /// Recolours and Isolate of a multicolour preview (`trace_colours.rs`).
@@ -484,8 +486,12 @@ impl Session {
     }
 
     /// A press in the Trace tool selects what it hits, as a click of the Select tool does, and
-    /// nothing else; on empty canvas it clears the selection (criterion 3).
+    /// nothing else; on empty canvas it clears the selection (criterion 3). Armed, Pick mask
+    /// paths takes it (`specs/0094` slice 1b).
     pub(super) fn trace_pointer_down(&mut self, point: Point, shift: bool) {
+        if self.trace_mask_pick_press(point) {
+            return;
+        }
         let pickable = self.pickable_objects();
         let tolerance = self.object_tolerance();
         let Some(&hit) = hit_test_objects(&pickable, point, tolerance).first() else {
@@ -494,9 +500,15 @@ impl Session {
             }
             return;
         };
+        self.trace_select_hit(hit, shift);
+    }
+
+    /// Selects `hit` with its group, or with `toggle` adds or removes them (Shift+click, and
+    /// every pick of Pick mask paths: `specs/0094` criteria 13 and 41).
+    pub(super) fn trace_select_hit(&mut self, hit: NodeId, toggle: bool) {
         let units = self.units();
         let members = units.leaves_with(&hit);
-        if shift {
+        if toggle {
             self.selection.toggle_all(members);
         } else {
             self.selection.set(members);
@@ -506,8 +518,12 @@ impl Session {
         }
     }
 
-    /// A double-click on a traced image asks the host to create the paths (criterion 12).
+    /// A double-click on a traced image asks the host to create the paths (criterion 12); not
+    /// while Pick mask paths is armed (`specs/0094` criterion 38).
     pub(super) fn trace_double_click(&mut self, point: Point) -> DoubleClickHint {
+        if self.trace_mask_pick() {
+            return DoubleClickHint::None;
+        }
         let pickable = self.pickable_objects();
         let tolerance = self.object_tolerance();
         let hit = hit_test_objects(&pickable, point, tolerance)
