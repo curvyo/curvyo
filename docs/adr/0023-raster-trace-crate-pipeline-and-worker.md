@@ -9,6 +9,7 @@ Frage 50 A black and white only, Frage 55 A no extension seam, Frage 60 B Vector
 only). Becomes Accepted when the Inkscape baseline is in, step 0 (§7) does not trigger the fallback (§8) and the customer decides. Fills
 the `curvyo-vectorize-core` slot of [ADR 0011](0011-workspace-and-crate-layout.md) §2/§3 (ADR 0003 §6).
 §5 note of 2026-11-01 (text pass before the trace in the same worker job, [ADR 0028](0028-ocr-text-in-trace.md), Proposed).
+§5 note of 2026-11-04 (a job may carry a mask region, `specs/0094-masked-composite-trace`).
 
 ## Context
 
@@ -122,7 +123,18 @@ needs COOP/COEP we do not serve).
 > line's text pixels are in-painted from the ring around them before the main trace. `trace()`,
 > `TraceParams` and the cancel-by-terminate rule are unchanged; the worker also loads the OCR
 > weights once per worker. Debounce 150 ms, "Tracing..." after 400 ms and Stop after 1.5 s are
-TypeScript timers. The reduced copy (longest side 1000 px, area-averaged) is a function of
+TypeScript timers.
+
+> **Note 2026-11-04 (`specs/0094-masked-composite-trace/adrs.md` decisions 1 to 3, implementer
+> slice 1):** a job may carry a mask region in document mm. It rides inside the settings JSON as
+> `"mask": {"outside", "region"}` (the region's polygons as flat numbers), so no worker function
+> changes its arguments and a new mask or mode is a new settings string for every cache. The worker
+> clips the traced outlines to it with the boolean kernel before it writes the result
+> (`curvyo-ui-core::trace_region`), whitens the Mask view outside it and reads the automatic values
+> of its pixels only (`trace_region_defaults`). `trace()` and `TraceParams` are unchanged; without
+> a mask no clip runs and the numbers are those of before.
+
+The reduced copy (longest side 1000 px, area-averaged) is a function of
 `curvyo-image-core`. Create paths inserts the worker's full-size results (one per selected image,
 Frage 61) through `editor-wasm` into one `ui-core` command, one history step; the source images stay
 (Frage 54 A). Rejected as before: a native Tauri thread (second code path, different numbers in the
