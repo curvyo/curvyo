@@ -335,7 +335,7 @@ pub(crate) fn masked(
             alpha = Some(upscale_2x(a, width, height, poller)?);
         }
         (width, height) = (width * 2, height * 2);
-        map = Affine::scale(0.5, 0.5).compose(pixel_map);
+        map = pixel_map.compose(Affine::scale(0.5, 0.5));
         unit = 2;
     }
     let mut mask = content(&score, &alpha);

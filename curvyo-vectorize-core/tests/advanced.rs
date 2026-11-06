@@ -228,3 +228,52 @@ fn a_noisy_photograph_traces_with_every_preset() {
         assert!(result.counts.paths > 0, "{}", preset.key);
     }
 }
+
+/// Outlines of the logo under `map`, with Upscale Off and Auto (Auto applies below 1 Mpx):
+/// both must land at the same millimetre positions, whatever offset or rotation the frame has.
+fn upscale_matches_off_under(map: Affine) {
+    let trace_with = |upscale| {
+        let p = TraceParams {
+            upscale,
+            ..params(128, 80, 0.0)
+        };
+        run(&logo(), map, &p)
+    };
+    let (off, auto) = (trace_with(Upscale::Off), trace_with(Upscale::Auto));
+    assert_eq!((off.counts.paths, auto.counts.paths), (1, 1));
+    let (a, b) = (
+        off.outlines[0].bounding_box(),
+        auto.outlines[0].bounding_box(),
+    );
+    // Upscale moves edges by at most a pixel (0.27 mm at 96 dpi).
+    let tolerance = 0.3;
+    assert!(
+        (a.x0 - b.x0).abs() < tolerance
+            && (a.x1 - b.x1).abs() < tolerance
+            && (a.y0 - b.y0).abs() < tolerance
+            && (a.y1 - b.y1).abs() < tolerance,
+        "off {a:?} against upscaled {b:?}"
+    );
+}
+
+/// Upscale keeps the picture where its frame puts it: a frame with an offset.
+#[test]
+fn upscale_keeps_the_frame_offset() {
+    let s = common::MM_PER_PX_96;
+    upscale_matches_off_under(Affine::new(s, 0.0, 0.0, s, 120.0, -45.0));
+}
+
+/// Upscale keeps the picture where its frame puts it: a frame with offset and rotation.
+#[test]
+fn upscale_keeps_a_rotated_frame_offset() {
+    let s = common::MM_PER_PX_96;
+    let (sin, cos) = 30f64.to_radians().sin_cos();
+    upscale_matches_off_under(Affine::new(
+        s * cos,
+        s * sin,
+        -s * sin,
+        s * cos,
+        80.0,
+        150.0,
+    ));
+}
