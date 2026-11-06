@@ -159,6 +159,8 @@ was found; it never says what to do.
 
 ## 4. View pill with Mask (item 3)
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.1):** there is no View pill and no Mask, Trace or Image view, no peek and no view cycle; the canvas always shows Overlay. Where this section says otherwise, §24 wins.
+
 - Four 26 x 28 px segments (the merged pill is 3 x 26 = 78; 104 with Mask; width consequence in §2), `role="radiogroup"` "View", arrows move and select, one Tab stop (0025 §13):
   **Overlay, Mask, Trace, Image**. Mask glyph: Lucide `Binary` (16 px, 1.5 px; two states, black and white). Not `Contrast`:
   the Invert toggle in Advanced already uses it (0025 §19) and the two are never told apart by glyph alone. Tooltip names the segment ("Mask"); the Image tooltip keeps its key ("Image (\)").
@@ -538,3 +540,268 @@ General rule (customer, 2026-10-31: "such status messages we don't need"; record
 "Interaction conventions"): no confirmation notice after a successful operation (traced, created, copied,
 recognised, ...). The visible result (selection, History step, the object itself) is the feedback. Notices are
 only for things the user has to act on or that went wrong: refusals, failures, limits.
+
+## 24. Trace bar cleanup of 2026-11-06 (customer, after trying the merged bar; overrides §22 and §23 and the `0094` UX notes where they differ)
+
+Customer, five requests: (1) the Parts move to the last row of Advanced, labelled; (2) the analysis line, the
+status line and "12 shapes set" are gone; (3) the View pill is gone, the view is always Overlay; (4) all value
+fields 10 % narrower; (5) the path-mask controls are always shown. Principle unchanged: **what the maker must act
+on is visible, everything else is a state carried by a control, or it is not shown.** Items marked **(Proposal)**
+are mine and vetoable at the demo. Widths are arithmetic (inner 308 at 800 x 600 with the panel open, 588 closed;
+36 px rows; Advanced block 304 / 584 because of its 4 px right padding); the PR re-measures.
+
+### 24.1 No View pill, no views (request 3)
+
+There is one view, Overlay (§22 / `0025` §4 "Preview look"), and no View state in the hook, the URL, the app
+settings or the document. Gone: the pill, the Mask, Trace and Image views, the peek (`\` held) and the cycle
+(Shift+`\`). `\` and Shift+`\` are free in the Trace tool (no other binding is given to them). Overlay keeps its
+rules: image washed to 35 %, outline 1.5 px `--preview-new` over its casing, a stale outline at 50 %, the 12 %
+extra wash outside a mask region (`0094` §2, Overlay column). Isolate (palette detail row) dims the others to 35 %
+in Overlay as before. The pipette samples the image, as it did in every view.
+The question "did the tracer get my content?" is answered by the outline over the image; the pixel mask stays an
+internal input of the tracer (the wasm export may stay if the tracer reads it; its test is retired, 24.9).
+
+**Every place that names the View pill, a view or its keys** (each is edited or deleted by the implementer; the
+tester greps for `View pill`, `Mask view`, `Trace view`, `Image view`, `peek`, `Shift+\`):
+
+| Document | Places |
+|---|---|
+| `docs/design-system.md` | "Trace bar" row (View in the item order); "Trace View pill" row (deleted); "Trace Mask and Parts" and "Trace pick mask paths" rows ("after the View pill", the Overlay/Mask/Trace/Image canvas sentence); "Trace preview" row (view sentences); "Trace Output and palette" row (Isolate "in Overlay, Trace and Mask"); the keyboard map row "Trace tool" (hold `\`, Shift+`\`) |
+| `docs/tracing-images.md` (the guide) | header lines 10-11 ("View pill", "the Mask view"); the View paragraph at lines 41-50 (deleted, with the peek and cycle sentences); 231 ("In Overlay ..." keeps only the Overlay half); 295 and 334 and 387 (Mask view sentences, deleted or reworded to "the preview"); 433 (the View entry of the old controls list, deleted). `traceText.ts` About entries are compared with this file by a test |
+| `0089` UX notes | header line 7; §1 line 52; §2 item 3 (line 66); **§4 (View pill with Mask), deleted in effect**; §7 line 259 (Isolate in Trace); §9 line 318; §11 Tab order line 335; §12 labels line 350; §22.1 row 3; §22.4 Tab order |
+| `0025` UX notes | the "Trace" preview words in §4 (line 95), **§13 (View pill and peek)**, §15 row 15 of the review table, the About Trace entry for View (line 426) |
+| `0091` UX notes | §2 "what each view shows" (lines 26-37: keep the Overlay row only), line 141 (Mask third tone), §12 line 154 |
+| `0088` UX notes | B4 "What each view shows" (lines 249-258: Overlay row only), line 297, §B9 line 307 |
+| `0094` UX notes | §1 (position "after the View pill"), §2 (View table: Overlay column only), §4 Tab order, §10 and §11 row texts, "Changes to the spec" |
+| Specifications and plans | `0025` criterion 51 (retired), `0025` plan slice 3; `0089` criterion 21 (retired), 22 (order), 24 (About Trace names "the Mask view"); `0094` lines 110, 206, 238 ("after the View pill"); `0091`/`0088` view statements. The product owner amends these; the plans of `0025`, `0089`, `0094` keep history |
+
+### 24.2 The bar, top to bottom (requests 3, 4, 5)
+
+One flow of whole items, 8 px apart, wrapping as before. New order and widths:
+
+| # | Item | Width | Shown |
+|---|---|---|---|
+| 1 | **i** About Trace | 28 | always |
+| 2 | **Preset** | 132 | always |
+| 3 | **Mask group**: Pick mask paths 28, Inside / Outside 128, Clear mask 28, 4 px apart | 192 | **always** (24.4) |
+| 3a | muted label "Part 2 of 3" (unchanged, not a Tab stop) | about 72 | two or more parts |
+| 4 | **Method** | 176 | always |
+| 5 | main field: Threshold or Colour tolerance | **150** (was 168) | always |
+| 6 | method group (Remove background 172; Pick colours pipette plus "3 picked" label about 96), unchanged | 172 / 96 | those methods |
+| 7 | **Smooth** | **150** (was 168) | always |
+| 8 | **Tolerance** | **150** (was 168) | always |
+| 9 | **Ignore below** with its "< 1 px" readout | **215** (was 212) = 171 + 8 + 36 (24.7) | always |
+| 10 | expander, then the blue **Trace** button, far right | 28 + 8 + 75 | always |
+
+Tab order: Select-bar Trace button (when it is how the tool was entered), **i**, Preset, **Pick mask paths,
+Inside / Outside (one stop), Clear mask**, Method, main field, method group, Smooth, Tolerance, Ignore below,
+expander, Trace (Stop / Retry in the same slot). The "Part N of M" label is no stop.
+
+**Rows at 800 x 600, Advanced closed, Brightness** (rows are 36 px; the old figures are today's bar with a one-item
+View pill and a 28 px Pick button):
+
+| | Panel open (308) | Panel closed (588) |
+|---|---|---|
+| Rows | **7 rows, 252 px** (measured in the PR): [i, Preset] [Mask group 192, with "Part 2 of 3" 272] [Method] [Threshold, Smooth 308] [Tolerance] [Ignore below 215] [expander, Trace] | **3 rows, 108 px** (measured): [i, Preset, Mask group, Method 552] [Threshold, Smooth, Tolerance 466] [Ignore below, expander, Trace 334]; the label wraps onto row 2 (466 + 8 + 72 = 546) |
+| Was | 8 rows (View line, Pick button alone on a line, then the same) | 3 rows |
+
+The fields no longer pair at 308 because 150 + 8 + 150 = 310 is two pixels over. **150 px (a 10.7 % reduction) would
+pair Threshold with Smooth, 308 exactly, and save a row (7 rows, 252 px).** The customer said 10 %, so the default
+is 150; see Frage in 24.10. Remove background and Pick colours: unchanged wraps (Colour tolerance 150 + 8 + 172 =
+331 does not fit and the group keeps its own line; 150 + 8 + 96 = 255 fits for Pick colours).
+
+### 24.3 The Advanced block, top to bottom (requests 1, 2)
+
+Divider as built, then rows (36 px unless noted), each present only when it has content. **The Parts row and the
+analysis row are gone from the top; the status line is gone.**
+
+1. **Output row** (Output, Colours and palette pipette, the four icon toggles): as §22.3 item 3 and `0088` B2.
+2. **Colours strip and its detail row**: as §22.3 item 4.
+3. **Options**: Denoise, Upscale, Corners, as §22.3 item 5. The three option cells have a minimum width of 150 px
+   (were `min-w-168`). As built and measured: Upscale and Corners are 150 px; the Denoise cell is 185 px, because its
+   64 px label slot plus the Off | Low | High pill (121 px) need more than the minimum.
+4. **Last row, one flow of two whole groups**: **Parts** `…` then the blue **Analyse** button, which is
+   `margin-left: auto`, always at the far right of its line. Reads: `... Corners | Parts | Analyse`.
+
+**Parts group (one whole item, 4 px gaps inside):** a muted 12 px label "Parts" (`--toolbar-icon` at 70 %, 32 px
+slot, not a Tab stop, `aria-hidden`; the radiogroup keeps its name "Parts" by `aria-label`), then the chips (28 x 28,
+unchanged look, marks and accessible names of `0094` §3), `Plus` Add part, `Trash2` Remove part (Inline delete
+confirm, `0094` §5). Width: 32 + 4 + chips + 4 + 28 + 4 + 28, so **1 part 128, 2 parts 160, 3 parts 192, 6 parts 288,
+7 parts 320, 8 parts 352**. From 7 parts the group exceeds 304 and wraps inside itself: label and chips stay on
+the first line (8 chips: 32 + 4 + 252 = 288), Add and Remove wrap to a second 36 px line; the group stays one Tab stop.
+
+**Wrap by whole groups, never inside a group (except the 7 to 8 part case above):** Parts moves to its own line
+when Corners + Parts does not fit; Analyse moves to its own line, right-aligned, when Parts + Analyse does not fit.
+
+| 800 x 600, Single colour, Brightness | Panel open (block 304) | Panel closed (block 584) |
+|---|---|---|
+| 1 part | [Output row ...] [Denoise] [Upscale] [Corners 150, Parts 128: 287 fits] [Analyse, right] = Output rows + 4 rows | [Output row ...] [Denoise, Upscale, Corners 469] [Parts 128, Analyse 75, right] = Output rows + 2 rows |
+| 3 parts | [Corners] [Parts 192] [Analyse] (150 + 8 + 192 = 351 does not fit; 192 + 8 + 75 = 275 fits: Parts and Analyse share a line) = Output rows + 4 rows | as above |
+| 8 parts | [Corners] [Parts, 2 lines] [Analyse, right] | [Parts, 1 line 352, Analyse 75: 435 fits] |
+
+Net against §22.3 + `0094` §3 (panel open, one part): 7 rows become about 5 rows (about 180 px) because three
+rows (Parts, analysis, status) go and one (Analyse) is added by wrapping; the PR measures. The block keeps
+`min(60vh, 360px)` with its own scroll.
+
+**Tab order inside Advanced:** Output (one stop), Colours, palette pipette (Brightness), the strip (one stop), its
+detail buttons, Invert, Drop border shapes, Recognise text, Recognise shapes, Denoise, Upscale, Corners, **Parts
+(one stop), Add part, Analyse**. Remove part is no stop (Delete on a chip arms it, `0094` §5). Enter on Analyse
+belongs to Analyse; Ctrl+Enter in any field creates; Escape in a block control returns focus to the canvas. Chip
+picks load the part into the bar and the block while focus stays on the chip.
+Parts has no About Trace entry yet; adding one (and its line in `docs/tracing-images.md`) is a follow-up.
+Cost, said openly: the part is chosen **below** the settings it owns. The bar's muted "Part 2 of 3" and the
+expander dot stay for that reason.
+
+### 24.4 The path-mask controls are always shown (request 5)
+
+The Mask group (24.2 item 3) is drawn in every state of the Trace tool, 192 px, so the bar never changes width or
+wrap when the first path is picked. No dimming, no hiding, no `aria-disabled` on any of the three controls.
+
+| Control | With an empty mask (no mask path in the active part) |
+|---|---|
+| **Pick mask paths** | Arms and disarms exactly as `0094` §11. Unchanged |
+| **Inside / Outside** | `role="radiogroup"` "Mask", selectable, **Inside on every entry** (not remembered, not in presets, not a history step). The choice is kept and applies when the first path is added. With no path the trace is the whole image, **Inside or Outside alike**: nothing is traced differently, the preview does not change **(Proposal)** |
+| **Clear mask** | Always a Tab stop and a hit target. With nothing to clear a press **does nothing**: no state change, no notice, no history step, focus stays where it is. It is not greyed out. With paths it behaves as `0094` §11.5 (removes all mask paths of the active part from the set, image stays selected); a key press then keeps focus on the button (it no longer disappears, so the focus move to Pick mask paths in the build is dropped) |
+
+With Parts, Inside / Outside and Clear mask act on the **active** part; a new part starts Inside. The chip mark
+(solid / outlined square) shows the mode only for a part that has mask paths; the first part without paths is
+"whole image", no mark, whatever the segment says. `0094` §1 "No mask path: the item is not in the DOM" is void.
+**Decided (lead 2026-11-06, Proposal; `0094` criterion 14 wins):** a selection of the image with a text, a second
+image or a sketch is an error state, not "no mask": the bar is the one-row state with its label and "Use Object to
+path for text; one image at a time.", with no Mask group and no Trace button. A pick refused while Pick mask paths is
+armed keeps the full bar and shows the same string in the notice row (`0094` criterion 38).
+
+### 24.5 Nothing says what happened; one hidden status region (request 2)
+
+**Removed from view:** the analysis line (every state), the whole Advanced status line (counts, muted specks, joined
+regions, "Inside 2 paths" / "3 parts", "Part 3 has no paths", "3 text lines set", "12 shapes set", "1 shape set",
+and the palette states "Isolating #FFF2A8", "Merging #FFF2A8 into...", "2 colours excluded"). The state of palette
+actions stays in the controls (`aria-pressed` of Isolate and Merge into, the Ban glyph and dashed rings on the
+swatches). The counts remain the Layers tooltip of the trace group ("Traced: 7 paths, 412 nodes.") as in §23.
+
+**Stays visible in the bar's notice row** (only things the maker must act on or that change how the preview
+reads): "Tracing 1 of 3 images", "Preview from a reduced copy", "Over 100,000 nodes. Slow to edit.", "0 paths at
+this Threshold / Colour tolerance: too low / too high.", "1 path covering the whole image.", "Too much detail:
+raise Ignore below.", "Same as #3366CC" (3 s), "Use Object to path for text; one image at a time." And, moved
+here from the Advanced status line because nothing else would show why Trace is dimmed with Advanced closed or
+open **(Proposal)**: "0 paths: no colour picked.", "0 paths: the mask is outside the image.", "0 paths: no part
+has anything to trace.", "No colours found." The Trace button keeps `aria-disabled` and the same text as tooltip
+and `aria-describedby`. The failed analysis is shown as the notice-row line "Analysis failed · automatic Threshold
+used" until the next Analyse or image **(Proposal; a failure, so a visible message is allowed, and the pressed
+button would otherwise do nothing visible)**. Analysing, Auto, Custom and Type unclear have no visible text.
+
+**The hidden region.** One `role="status" aria-live="polite"` element, visually hidden (`sr-only`), **always
+mounted in the bar** (Advanced open or closed; the two other status elements, in the analysis row and the counts
+row, are removed). It announces once per change, after the result has settled (not while a value is dragged),
+the segments below joined by ". ", an empty segment absent, in this order:
+1. the analysis line as it was worded ("Analysing...", "Line drawing · scan · automatic Threshold",
+   "Custom · Line drawing", "Type unclear · ...", "Analysis failed · ...");
+2. the mask segment ("Inside 2 paths" / "Outside 1 path"; with two or more parts "3 parts");
+3. the counts ("7 paths, 412 nodes, 0.4 s"; Multicolour "3 colours, 7 paths, ..."), "38 specks ignored",
+   "2 regions joined";
+4. "3 text lines set" / "12 shapes set";
+5. the palette state ("Isolating #FFF2A8", "Merging #FFF2A8 into...", "2 colours excluded");
+6. "Part 3 has no paths" for an active, empty later part.
+
+No new strings: the region says exactly what the removed lines said. The mask pick mode keeps its own region
+("Pick mask paths on" / "off", `0094` §11). The reasons that moved to the notice row are announced by that row.
+
+### 24.6 Strings and code to remove (visible output only; the data stays)
+
+- `traceText.ts` and callers: `TRACE_VIEWS`, `TraceViewMode`, `isPeekKey`, `isCycleKey`, the View About entry
+  ("View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image;
+  Shift+\\ steps through the views."), the "Status: the result in numbers ..." About entry, the "Analysis" About entry
+  (reworded to say only what Analyse does **(Proposal)**), the tooltip "Image (\\)". `useTraceViewMode.ts`,
+  `ViewPill` in `TraceBar.tsx`, `viewMode` / `setViewMode` in `useTrace.ts` and `traceApi.ts`, the Mask view's
+  fetch path if nothing else reads it.
+- Rendered text (move into the hidden region or the notice row, 24.5): the analysis row's line, the
+  `data-trace-counts` block, the muted `status.muted` spans, `analysisLine` as visible text, `partsStatusSegment`
+  ("3 parts") and `partsEmptyNote` ("Part 3 has no paths") as visible text, the visible use of `textLinesSet`
+  and `shapesSet` ("N text lines set", "N shapes set"), `isolatingText`, `mergingText`, the excluded-colours text.
+- The two `role="status"` elements in `TraceAdvanced.tsx` (analysis span, counts div) and the Advanced-closed-only
+  condition of the hidden region in `TraceBar.tsx`.
+- `docs/tracing-images.md` and the About text in the same change (a test compares them); the sentence "Hold \\
+  to see the image" and every mention of the four views.
+
+### 24.7 Value fields (request 4)
+
+Old widths, from `design-system.md` row "Trace value field" and the code (`TRACE_FIELD_WIDTH = 168` in
+`TraceField.tsx`, `CELL_CLASS` `min-w-[168px]` in `TraceAdvanced.tsx`, Ignore below 168 + 8 + 36 = 212):
+
+| Field | Old (px) | New (px) |
+|---|---|---|
+| Threshold, Colour tolerance (main field) | 168 | **150** |
+| Smooth | 168 | **150** |
+| Tolerance | 168 | **150** |
+| Ignore below (field + readout item) | 168 (212) | **171 (215)**, see the note below |
+| Corners (field and its cell) | 168 | **150** |
+| Colours (Multicolour), not in the customer's list | 120 | 120 **(Proposal, unchanged: already narrow)** |
+| Denoise, Upscale cells (choice pills, not fields) | 168 | 150 **(Proposal, so the options row is even)**; the Denoise pill needs 121 |
+| Hit height, label, behaviour | 28 | unchanged |
+
+Rounded: 168 x 0.9 = 150.2 to 150. The value text ("Threshold 62 %", "Ignore below 0.30 mm") and the slider bar
+must stay readable at 150; the widest label is "Colour tolerance" (14 px, about 100 px) plus its value; the PR
+checks that no label or value clips and that the number entry fits.
+
+**Measured in the PR (lead decision 2026-11-06, Proposal):** at 150 px "Ignore below" and its value touch at "0.50 mm"
+and overlap by 11 px at "10.00 mm". Ignore below alone is therefore **171 px**, as wide as "99.99 mm" needs to keep a
+10 px gap to the label (a Chromium case checks it at the largest value); every other value field stays 150. The rows do
+not break differently: Ignore below has its own line with the panel open, and shares row 3 (334 px) with the panel
+closed. "Colour tolerance 40" keeps 14 px at 150.
+
+### 24.8 Design-system rows that change (`docs/design-system.md`, section Trace tool)
+
+| Row | New text |
+|---|---|
+| Trace bar | Item order: Info toggle, **Preset**, **Mask group** (always), **Method** with its main field and group, **Smooth**, **Tolerance**, **Ignore below**, expander, Trace. "View" is removed from the order and from the sentence about the hidden region ("announces the analysis and status lines" becomes "announces the result, always"). The notice row keeps what is listed in 0089 §24.5, adds the three "0 paths: ..." reasons and "No colours found." |
+| Trace View pill | **Deleted.** One sentence replaces it in "Trace preview": "There is one view, Overlay; no Mask, Trace or Image view, no peek, no view state (0089 §24.1)" |
+| Trace Mask and Parts | "one flow item after the View pill, drawn only while the active part has a mask path" becomes "one flow item after Preset, always drawn with the Pick mask paths toggle and Clear mask". The canvas table keeps only the Overlay sentence. Parts: "first row of the Advanced block" becomes "the last row of the Advanced block, after Corners, before Analyse, with the muted 12 px label Parts; wraps as one whole group; 128 px with one part" |
+| Trace pick mask paths | "one flow item after the View pill, present before any mask exists" becomes "after Preset, 192 px, always with Inside / Outside and Clear mask (Inside default, selectable with no mask, Clear mask a no-op without paths, never dimmed or hidden)"; "The Mask radiogroup and a 28 px X appear with the first pick" is deleted |
+| Trace Advanced button and block | Order: Output row, colour strip and detail row, options (Denoise, Upscale, Corners, 150 px cells), last row Parts then Analyse (far right). No analysis row, no status line. Rows of 36 px unchanged |
+| Trace analysis row | Retitled "Trace Analyse button". Text: the blue Analyse button 75 x 28 px is the last item of the block's last row (far right), always enabled, no visible line; the analysis result is announced by the hidden status region; a failed analysis shows in the notice row |
+| Trace notices | The "Advanced status line" is deleted; the counts are the Layers tooltip and the hidden region; the notice-row list is that of 0089 §24.5 |
+| Trace value field | "168 x 28px" becomes "150 x 28px" |
+| Trace Output and palette | "Isolate: the others at 35 % in Overlay, Trace and Mask" becomes "in Overlay"; Colours stays 120 |
+| Trace preview | View-related sentences replaced by the one sentence above |
+| Trace info tab and page | Entry order loses View, Status and Analysis; Analyse keeps one entry; strings in `traceText.ts` and `docs/tracing-images.md` |
+| Keyboard map, "Trace tool" | Remove "hold `\\` (show the image), Shift+`\\` (next view)"; the rest (`I`, Enter, Escape) unchanged |
+
+### 24.9 Tests that need updating (the tester rewrites them; names as in `frontend/tests`)
+
+- `acceptance_0089_tidyup_tester`: **c22** (bar order has no View, the Mask group follows Preset); **0025 tidy-up
+  c57 Tab order, Advanced closed** and **Advanced open** (Parts and Add part now come after Corners, then Analyse;
+  Pick mask paths, Inside / Outside, Clear mask are stops without a mask); **22.3** (the block adds about 237 / 165 px: new
+  height, and no analysis or status row); **c11, c71** (counts "drawn once in the Advanced status line"; now
+  only the hidden region, always); **22.2 "Same as"**; **"specks ignored ... stay in Advanced"**; **c17** and the
+  hidden-region test (announces always, not only with Advanced closed).
+- `acceptance_0025_slice3_tester`: **c51** (View pill, views, peek, Shift+backslash: retired), "several images:
+  label, views, the peek and one step" (views part), **c57 Tab order** and **c57 hit targets**, "re c4/c71/c41/c11 row 1,
+  counts only in Advanced", "re photo ... every view".
+- `acceptance_0089_sliceE_tester`: **c21** (Mask view pixel by pixel: retired or moved to a wasm-level test of
+  the tracer's mask), c23 "in the Mask view a stale mask", **c24** (About Trace names the Mask view);
+  `acceptance_0089_m_browser` ("the segmented Mask" is the Output/palette test; review for view use).
+- `acceptance_0089_sliceF_tester` / `_f_browser`: the analysis row tests (36 px full-width row, at most two lines,
+  "the row says so" on failure, Analyse 75 x 28 px: only the button and the notice-row failure line remain).
+- `acceptance_0089_bar_width_browser`, `acceptance_0089_c_browser` (800 x 600 bar edges), `acceptance_0089_m_browser`
+  (Multicolour at 800 x 600): new widths 150 / 194 and the Mask group.
+- `acceptance_0094_tester` (**c1, c17**: "the Mask item follows View with Inside on entry", "an image alone has
+  today's bar" is void; c7 mask outside: notice row), `acceptance_0094_pick_tester` and `_pick_browser` (**c34, c41
+  "Tab order View, Pick mask paths, Mask, Clear mask"**, c40/c43: Clear mask without paths, group width 192),
+  `acceptance_0094_parts_browser` (**c18, c28, c29, c43**: Parts row position, label, wrap) and
+  `acceptance_0094_parts_tester`.
+- `traceText.test.ts`, `traceMulticolour.test.ts`, `traceAnalysis.test.ts` (analysis text stays as announced
+  text), `traceParts.test.ts` (segment strings), `trace_text_browser`, `acceptance_0025_slice2_tester` and the `0088`
+  B tests where they open the View pill or read "N shapes set".
+
+### 24.10 Decisions I made (Proposal), and one question
+
+(Proposal) 1. Colours (120 px) is not narrowed; Denoise and Upscale cells follow to a 150 px minimum (Denoise is 185
+px, see 24.3). 2. Inside or Outside with
+an empty mask changes nothing; Clear mask without paths does nothing. 3. Withdrawn (lead 2026-11-06): with a
+text or a second image selected the bar is the one-row error state of `0094` criterion 14 (24.4). 4. The "0 paths:
+..." reasons and "No colours found." move to the notice row; the failed analysis line is a notice-row line.
+5. One always-mounted hidden region announces the old lines unchanged. 6. The "Part 2 of 3" label and the expander
+dot stay in the bar. 7. About Trace loses View and Status, keeps one Analyse entry. Parts has no About Trace entry yet (follow-up). 8. `\` and Shift+`\` are not
+reassigned. 9. The pixel mask stays in the tracer; only its view goes.
+
+Decided (lead, 2026-11-06, Proposal): 150 px (10.7 %), so Threshold and Smooth pair at 308 px and the bar needs one row less. (Was Frage BAR-W, A 151 or B 150.)

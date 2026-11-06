@@ -826,3 +826,59 @@ committed next to it and the harness compares against that:
 - An improvement never fails. Accepting a new state is a deliberate act in a PR:
   `CURVYO_UPDATE_ACCEPTED=1 cargo test --release -p curvyo-vectorize-core --test quality -- --ignored --test-threads=1 quality_table preset_relations`
   rewrites both files from the current misses; the diff is the review.
+
+## Trace bar cleanup (2026-11-06, `ux-notes.md` §24)
+
+UI only: the frontend (`TraceBar.tsx`, `TraceAdvanced.tsx`, `TraceParts.tsx`, `TraceField.tsx`,
+`useTrace.ts`, `traceApi.ts`, `traceText.ts`, the trace worker and job runner), the docs. No
+Rust change: the session's view state (`TraceViewMode`, `set_trace_view_mode`, the peek,
+`set_trace_mask`, the Mask and Trace drawing) and the wasm exports `trace_mask_job` /
+`trace_text_mask_job` stay, because tester Rust tests use them; the frontend no longer calls them,
+so the session always draws Overlay. Traced results are unchanged.
+
+Tasks:
+
+- [x] T1 (§24.5): a pure `traceAnnouncement` in `src/lib/traceText.ts` building the hidden region's
+  text in the six-segment order, joined by ". ", empty segments absent; unit test first.
+- [x] T2 (§24.5): one always-mounted hidden `role="status"` region in the bar with that text, held
+  while a value is dragged; the analysis row's line, the Advanced status line (`data-trace-counts`)
+  and their two `role="status"` elements removed; `advancedStatus` replaced by `announcement` in
+  `TraceApi`.
+- [x] T3 (§24.5): the notice row gains `status.message` ("No colours found.", "0 paths: no colour
+  picked.") and the failed analysis line; the mask and part reasons are already its lines.
+- [x] T4 (§24.4): the Mask group always drawn (Pick mask paths, Inside / Outside, Clear mask); the
+  segment reads the session's mode with no mask paths; Clear mask without paths does nothing and a
+  key press keeps focus on it; SSR unit test of the group and the bar's Tab order.
+- [x] T5 (§24.1): the View pill, `TRACE_VIEWS`, `TraceViewMode`, `isPeekKey`, `isCycleKey`,
+  `useTraceViewMode`, `viewMode` / `setViewMode`, and the Mask view's fetch path (`useTraceMask`,
+  `TraceRunner.mask`, the worker's `"mask"` request) removed; `\` and Shift+`\` are free.
+- [x] T6 (§24.7): value fields 150 px (`TRACE_FIELD_WIDTH`), Ignore below 171 px, Advanced cells
+  `min-w-[150px]`; Colours stays 120.
+- [x] T7 (§24.3): the Parts group (muted `aria-hidden` label "Parts", chips, Add, Remove) after
+  Corners as one whole flow item, then Analyse with `margin-left: auto`; Tab order Corners, Parts,
+  Add part, Analyse.
+- [x] T8 (§24.6, §24.8, §24.1 table): About Trace loses View and Status, "Analysis" becomes one
+  "Analyse" entry; `docs/tracing-images.md`, `docs/design-system.md` rows, the 0025 / 0089 / 0094
+  UX-note places that name the view keys.
+- [x] T9: own tests updated (`traceText.test.ts`, `trace_text_browser`, `acceptance_0025_browser`,
+  the 0094 pick and parts browser files, unit tests); Chromium at 800 x 600, panel open: whole-group
+  wraps, no horizontal scroll, targets at least 28 px.
+
+Validation: `npx tsc -b --noEmit`, `npx oxlint`, `npm test` (with `tests/traceBar.test.ts`, the bar
+rendered on the server: the Mask group, the Tab order, the last row and the hidden region),
+Chromium file by file for the own browser files, the Rust trace crates' tests unchanged, the full
+§7 gate once at the end.
+
+Measured at 800 x 600, panel open, Advanced closed, Brightness: 7 rows (Threshold and Smooth pair at
+150 px); panel closed 3 rows. Mask group 192 px with and without a path, the bar does not jump.
+Advanced last row: one part 128 px beside Corners, Analyse on its own line at the right; three parts
+192 px on their own line with Analyse; eight parts wrap Add and Remove to a second line; no
+horizontal scroll, every target at least 28 px.
+
+Follow-up (lead 2026-11-06): at 150 px "Ignore below" overlapped its value, so that field alone is
+171 px (`SPECKS_FIELD_WIDTH` in `TraceBar.tsx`), checked in Chromium at the largest value; the hidden
+region waits for the full-size result after a reduced preview, so it announces once per edit. The Rust view state
+(`TraceViewMode`, `set_trace_view_mode`, `cycle_trace_view_mode`, `set_trace_peek`,
+`set_trace_mask`, the Mask and Trace drawing) and the wasm exports `trace_mask_job` /
+`trace_text_mask_job` are no longer called by the app; tester Rust tests use them, so they go once
+those tests are retired.

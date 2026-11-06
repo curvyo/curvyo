@@ -248,6 +248,8 @@ line ("7 paths, 412 nodes, 0.4 s") is unchanged. **(Proposal)** wording follows 
 
 ## B4. What each view shows
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.1):** there is no View pill and no Mask, Trace or Image view, no peek and no view cycle; the canvas always shows Overlay. Only the Overlay row of this section holds; where it says otherwise, §24 wins.
+
 | View | With Recognise shapes on (shapes found) |
 |---|---|
 | **Trace** | Each recognised shape drawn as the primitive Create paths makes: rectangle (with corner radius if rounded), circle or ellipse, polygon, star. Same renderer as the document, same fill as its traced path would have (black, or its palette colour in Multicolour). Edge of the shape is the clean primitive, not the traced curve; there is no marker, outline or second tone. |

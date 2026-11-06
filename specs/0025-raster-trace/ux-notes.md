@@ -217,6 +217,8 @@ applies to all (label "Tracing 1 of 3 images" unchanged).
 
 ## 13. Slice 3: View pill and peek (criterion 51)
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.1):** there is no View pill and no Mask, Trace or Image view, no peek and no view cycle; the canvas always shows Overlay. Where this section says otherwise, §24 wins.
+
 - **Pill** right of Preset in row 1, `role="radiogroup"` "View", three 25 x 28 px icon segments (16 px
   glyphs, the Select bar's pill look, selected = `--active-bg`): **Overlay**, **Trace**, **Image**. Tooltips
   name the segment (Overlay, Trace, Image); the Image tooltip adds the key as a key name ("Image (\)"), the
