@@ -1,6 +1,6 @@
 # Sketch pages: a sketch page holds only its sketch, and the sketch is used elsewhere as a linked clone
 
-Status: Ready (2026-11-06; Fragen 157 and 158 open with defaults A; ADR 0043 Proposed, accepted by the customer with the PR)
+Status: Done (PR #287; Frage 157 A and 158 A accepted with the PR)
 Priority: Should
 Origin: Customer (2026-11-05, translated): "The Sketch workbench moves to the same model: a Sketch is a page kind. [...] Sketches are positioned only via linked clone, they are fixed on their page." "Objects can be moved anywhere: pasteboard, over a laser page, over a sketch page. Moving always works; editing only in the context of an active vector page or a matching manufacturing page." Slice 2 of `specs/0063-manufacturing-workbenches/` (concept A, `concept-output-pages.md` §2.1, §2.7, §5 flow 9, §9; sketches f and i). Builds on the merged `0098` `page-kinds` (PR #279), which made Sketch a page kind, put the sketch tools on sketch pages and converts old files. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
