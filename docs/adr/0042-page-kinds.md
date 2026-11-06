@@ -10,6 +10,7 @@ and in the plane, workbench derived, no switcher, no Add manufacturing);
 [ADR 0039](0039-machine-profile-copy-in-the-project-file.md) §4 (resize about the origin corner);
 [ADR 0026](0026-parametric-sketch-nodes-and-workbench.md) "Page ownership revision" (only sketch
 pages own a sketch). Spec: `specs/0098-page-kinds`.
+Note 2026-11-06: §1, §3 and §4 amended by [ADR 0043](0043-sketch-pages-content-by-ownership.md) (proposed): Convert to paths on a sketch page writes `kind` from `"sketch"` to `"drawing"` (the only second write); a sketch page's content is its sketch by ownership.
 
 ## Context
 

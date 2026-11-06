@@ -1624,6 +1624,21 @@ Decisions and reasoning: `specs/0098-page-kinds/ux-notes.md`; sketches a, b, f o
 | Converted sketch page (old file) | Row "<page name> sketch" with the Sketch chip beside the drawing page; the drawing keeps a linked clone at the old place with the `0049` marks. No notice, no banner; the conversion does not mark the file changed |
 
 
+## Sketch pages (`0099`, 2026-11-06)
+
+Decisions and reasoning: `specs/0099-sketch-pages/ux-notes.md`; sketches f and i of `specs/0063-manufacturing-workbenches/concept-sketches.html`. No new colour token.
+
+| Item | Value |
+|---|---|
+| Sketch page row | The `0098` row. Line 2 (11px tabular): state glyph 12px, state word, " · ", size; Empty `CircleDashed`, Fully constrained `CircleCheck`, "N DOF" `Move`, Conflict `TriangleAlert`, Solver failed `CircleX`; Conflict and Solver failed at full opacity, the rest 65 %. The "Move frame only" switch is absent, its 28px column stays empty. Name: "<name>, Sketch page, <state>" (DOF spelled out). Used-by count only in the line-2 tooltip |
+| Row drag out of the list | Grip only. Inside the list: reorder. Outside: place mode (per frame, both ways), only for sketch rows with geometry. Ghost = row "Drag ghost" at the sketch's solved outline, true size, centred on the pointer, snapping as a Select move; 40 % over a sketch page; under 6px an 8px ring. Target page frame: 2px `--editor-accent` outline 2px outside. Escape or a release off the canvas cancels, no step; no animation |
+| Drop badge | DOM, `aria-hidden`, `pointer-events: none`; pill 20px, `--toolbar-bg`, 1px `--toolbar-icon` at 25 %, 8px radius, 6px side padding, 12px glyph, 4px, 12px `--toolbar-icon` word. Top-left 16px right of and 16px below the hotspot, mirrored at viewport edges. Words: `Link2` "Linked clone"; refusals `Ban` "Not on a sketch page", "<name> has no sketch yet", with `cursor: not-allowed` |
+| Place clone on | Sketches tab, Use group. Full-width outline button (244 x 28px), `ChevronDown` / `ChevronUp` 14px, `aria-expanded`. Inline listbox named "Place clone on" under it: rows 36px (44px coarse), name and kind chip, drawing and laser pages only, at most 6 then scrolls. Up, Down, Home, End move; Enter, Space or a press choose; Escape closes and returns focus to the button. Hidden for an empty sketch or with no target page |
+| Use group | `role="group"` "Use": usage line (12px `--panel-muted-fg`: "Not used on other pages", "Used by 3 linked clones on 2 pages"), **Select clones** (full width, only with a clone), Place clone on. Between Status and Fixed origin; Convert to paths stays last |
+| Commands that change the page | Place clone on, Select clones, Select original onto a sketch, Convert to paths: focus goes to the canvas (the focused control's tab is gone). Overrides the "Focus and notices" key rule of the linked clone block for this case |
+| Objects over a sketch page | Drawn as drawn, no notice. Drawing page active: a press on the object selects it as a pasteboard object, the page stays; in the frame on no object: activates the sketch page. Sketch page active: drawing objects are transparent to presses, hover and marquee. The sketch never has a box or handles. Status bar left: "<object> · pasteboard" |
+| Convert to paths and Delete (sketch page) | Convert: full-width outline button, no confirm; the page becomes a drawing page in the frame of the press (chips, rail, tabs, row), focus to the canvas, one undo step. Trash: tooltip and name "Delete Bracket and its sketch; 3 clones become paths" ("1 clone becomes a path", none: "Delete Bracket and its sketch"), no confirm, one undo step; other kinds keep "Delete page: <name>" |
+
 ## Keyboard shortcuts established so far
 
 | Action | Shortcut | Notes |

@@ -9,6 +9,7 @@ reviewable; it does not reopen that authorization. External original scaling
 semantics remain the specific pending customer decision; this does not block
 the authorized graph, persistence and rigid-placement integration.
 Note 2026-11-05: the page ownership revision is amended by [ADR 0042](0042-page-kinds.md) (proposed): only sketch pages own a sketch; the Vector/Sketch choice is derived from the active page.
+Note 2026-11-06: amended by [ADR 0043](0043-sketch-pages-content-by-ownership.md) (proposed): deleting a sketch page deletes its sketch (clones repaired by `0049` criterion 31), replacing "page deletion retains global artwork" for sketch pages; the original is never transformed as a whole, only carried by its frame move, so original scaling is unreachable.
 
 ## Context
 

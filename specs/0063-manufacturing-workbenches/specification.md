@@ -1,6 +1,6 @@
 # Manufacturing workbenches (epic): output pages with operations and fixtures, the tools following the page
 
-Status: Draft (epic; reworked 2026-11-05 for concept A, accepted by the customer. Slices `0098` to `0103`, then `0028` and `0029`; the first slice is `0098`)
+Status: Draft (epic; reworked 2026-11-05 for concept A, accepted by the customer. Slices `0098` to `0103`, then `0028` and `0029`; `0098` is Done (#279), `0099` is specified; follow-up `0104` reserved)
 Priority: Should (the laser part is the Must MVP; 0098, 0100, 0101, 0028 and 0029 are on the road to "engrave with Curvyo")
 Origin: Customer (request of 2026-10-17, translated): "Start with light refinement; not an easy feature. Workflow: you decide to add a manufacturing (or whatever we call it) for a laser cutter. The machine is specific: defined work area, controls and possibilities. In the work area there can be fixtures to lay out or clamp the parts, plus maybe a measuring tape. There is a fixture-preparing step to engrave or cut out tapes, layout outlines, insertion pockets, etc. Then you position the pages of the documents on the work area; they snap in by fitting size, can be dragged there, etc. You can still scale and rotate there, without changing the original drawing. Changes in the original drawing carry over live into the manufacturing. CNC milling is very similar, but e.g. an embroidery machine is entirely different [...] A Curvyo project can be used for several manufacturing processes." Redirected by the customer's feedback of 2026-11-05 (concept rounds 1 and 2, `concept-output-pages.md` §0): "No workbench switching. The laser output is a completely normal page; the workbench follows the active page; Add page has a machine switch."
 
@@ -12,7 +12,7 @@ As a maker with a laser (later a mill, a plotter, an embroidery machine) I want 
 
 ## Words (shown in the UI)
 
-- **Page kind:** every page is a Drawing, a Sketch or an output kind for a machine (Laser first). Chosen once in Add page, never changed, shown as glyph and word next to every page name.
+- **Page kind:** every page is a Drawing, a Sketch or an output kind for a machine (Laser first). Chosen once in Add page, shown as glyph and word next to every page name. Not changed today, except Sketch to Drawing by Convert to paths (`0099`); a general kind change is the follow-up `0104` (customer request, 2026-11-05).
 - **Output page:** a page of a machine kind. Its size is the machine's work area. Its content: placed items (linked clones, placed pages; live), own items (made there with the normal tools) and fixtures.
 - **Operation:** one step of the machine job on an output page: a kind (Cut, Score, Engrave, Engrave + Outline, Cut-out), a name, a colour, settings, Show and Output. The list order is the run order.
 - **Assignment:** which items an operation applies to, at any depth; a leaf runs with the operations of the nearest node above it (itself included) that has any.
@@ -28,14 +28,27 @@ Every slice is one story and one PR that the customer can try end to end.
 | # | Spec | Slice | Meaning in one line | Priority |
 |---|---|---|---|---|
 | 1 | [`0098`](../0098-page-kinds/) `page-kinds` | Page kinds, no switcher | Add page asks Drawing, Sketch or Laser; the tools and tabs follow the active page; the workbench switcher is gone; the laser page is a normal listed page. | Must |
-| 2 | `0099` `sketch-pages` | Sketch pages | A sketch page holds its sketch and nothing else; the sketch is fixed to its page and is used elsewhere only as a linked clone. | Should |
+| 2 | [`0099`](../0099-sketch-pages/) `sketch-pages` | Sketch pages | A sketch page holds its sketch and nothing else; the sketch is fixed to its page and is used elsewhere only as a linked clone (page-row drag or Place clone on); Convert to paths makes it a drawing page; deleting it turns its clones into paths. | Should |
 | 3 | `0100` `bring-content-in` | Bring content in, move versus edit | Dragging a design onto the laser page makes a live linked clone (Alt moves, Ctrl copies), a dragged page row a placed page; objects move anywhere but are edited only in their page's context. | Must |
 | 4 | `0101` `laser-operations` | Operations | An ordered list of operations per laser page, assigned to any object, group, clone or placed page, with Show, Output and the Cuts last switch. Replaces `0027`. | Must |
 | 5a | `0102` `laser-fixtures` | Fixtures as objects | Grid with tapes and major lines, holders with slots, clamps and stops as selectable objects of the bed, each Active or not; parts and pages snap into slots by fitting size. | Should |
 | 5b | `0103` `fixture-jobs` | Fixture jobs | A fixture carries its own operations (engrave the board outlines once), listed below the work with Output off by default. | Should |
 | 6 | `0028`, `0029` | Settings and output | Power and speed per operation from the material library; preview, gate and G-code that read the operation list in order, holes before outlines inside a cut. | Must |
 
-Slice 5 of the concept (`concept-output-pages.md` §9) is split in two (Proposal): fixtures are useful without fixture jobs, and fixture jobs need the operations of slice 4. Slices 2 and 3 can run in parallel. Later machine families (CNC, plotter, embroidery) add their kinds to the same list, assignment, Show/Output and fixtures; only the kinds and their settings are per machine (concept §3). Device I/O and the connector stay with `0064`.
+Slice 5 of the concept (`concept-output-pages.md` §9) is split in two (Proposal): fixtures are useful without fixture jobs, and fixture jobs need the operations of slice 4. Slices 2 and 3 can run in parallel; `0099` names which drag goes where (its split table): sketch page rows are 0099, drawing page rows and canvas drags are 0100, and the page-row drag is built by whichever merges first.
+
+### Follow-up: changing a page's kind (`0104`, not scheduled)
+
+Customer request of 2026-11-05 (translated): "Later there needs to be a way to change the page type." `0098` criterion 5 and ADR 0042 §3 fix the kind today; `0099` only adds the one-way Sketch to Drawing change that Convert to paths makes (its Frage 157).
+
+**Meaning (one line):** turn an existing page into another kind (Drawing, Sketch, Laser, later other machines) in place, keeping its name, place in the plane and place in the list, in one undo step.
+
+**What must be decided before it is specified** (questions for the customer when it is scheduled):
+- **Content per direction.** Drawing to Sketch: a sketch page holds only its sketch (`0099` criterion 1), so the drawing objects either stay where they are as pasteboard objects, move to a new drawing page, or the change is refused until the page is empty; turning paths into sketch geometry is a separate feature. Drawing or Sketch to Laser: the objects become own items, Not assigned (155 A); a sketch becomes a linked clone on the laser page and the sketch moves to a sketch page of its own, or the change is refused.
+- **Size.** To Laser: the page takes the profile's work area, anchored at which corner, and content outside the work area stays outside. From Laser: the work area becomes an editable size.
+- **Machine data.** From Laser: the machine copy, fixtures, placed pages and (after `0101`) operations and assignments are deleted, kept hidden for a change back, or the change is refused while any exist. Laser to another machine kind later: operations do not map between kinds.
+- **The sketch.** Sketch to Drawing is Convert to paths (`0099`) or keeps the sketch as a linked clone with the sketch moved to a new sketch page.
+- **Model and file.** ADR 0042 §3 (the kind written once, `owner` never added or removed) changes; two peers changing one page's kind at once need a merge rule; likely a `format_version` bump. ADR, `needs-customer`. Later machine families (CNC, plotter, embroidery) add their kinds to the same list, assignment, Show/Output and fixtures; only the kinds and their settings are per machine (concept §3). Device I/O and the connector stay with `0064`.
 
 ## Acceptance criteria (epic level; the slices carry the detail)
 
@@ -53,7 +66,9 @@ Slice 5 of the concept (`concept-output-pages.md` §9) is split in two (Proposal
 | `0093` laser-workbench-shell (Done) | The workbench switcher entry and **Add manufacturing** (criteria 1, 2) are replaced by Add page with Kind Laser; the read-only output page (criteria 4, 7) becomes a full editing context, only the inside of a placed item stays read-only; the output page **is listed** and drawn in the plane (WB-PAGE-VIS A reversed); the Laser tab goes, its Machine and Fixtures blocks move to the Document tab; deleting the manufacturing is Delete page. The manufacturing node, owned page, placement link, unknown-process round-trip and extension registry survive (concept §8). | 0098; placement by drag 0100 |
 | `0026` machine-profile (Done) | The Machine block moves to the laser page's Document tab; the work area is read-only text there (criterion 1 fields, criterion 7 work-area edit); a changed profile keeps content relative to the origin corner instead of the top-left corner (criterion 5 b); the profile later gains a fixture set. | 0098; fixture set 0102 |
 | `0027` manufacturing-roles (reserved, PR #269 closed unmerged, 152 A) | **Superseded by `0101` laser-operations.** Roles keyed by drawing layer (the withdrawn laser-roles ADR of the closed PR #269) are dropped; the geometry rules (style ignored, 140 A open/closed rule, images only engrave), the look tokens, the notice counts, the CPU budgets and the tests move into 0101; "hidden is not output" is replaced by 142 B. | 0101 |
-| `0066` constraint-sketcher (Done) | The Vector / Sketch selector (criterion 18, criterion 1's "workbench selector") goes; the Sketch workbench is the tool set of **Sketch pages**; a drawing page has no sketch (criterion 19's page sketch lives on a Sketch page). | 0098; the rest of the sketch-page rules 0099 |
+| `0066` constraint-sketcher (Done) | The Vector / Sketch selector (criterion 18, criterion 1's "workbench selector") goes; the Sketch workbench is the tool set of **Sketch pages**; a drawing page has no sketch (criterion 19's page sketch lives on a Sketch page). Convert to paths also makes the page a drawing page (criterion 8); a clone's double-click or Select original opens the sketch page (criterion 9). | 0098; criteria 8 and 9 in 0099 |
+| `0059` multiple-pages (Done), sketch pages | A sketch page's content is its sketch by ownership, objects over it count as pasteboard, its frame move carries only the sketch (criterion 9); deleting it deletes the sketch and turns its clones into paths (criterion 6). | 0099 |
+| `0098` page-kinds (Done, #279) | The kind stays fixed except Sketch to Drawing by Convert to paths (criterion 5); a general kind change is the follow-up `0104`. | 0099; 0104 |
 | `0059` multiple-pages (Done) | Add page asks for a kind (criterion 3); the size fields belong to drawing and sketch pages only (criterion 4); the page list and canvas label show the kind (criteria 2, 7). The position rule for membership (criterion 9) stays and decides what an object over a laser page is (155 A). | 0098 |
 | `0049` linked-clone (Done) | Clones of groups become possible (criterion 4 forbids them today); on an output page own placement is on by default. | 0100 |
 
@@ -96,7 +111,7 @@ An amendment of the `0059` page ADR (a page `kind` register; for Sketch, the own
 
 Concept: `concept-output-pages.md`, `concept-sketches.html` (this folder)
 Requirements: R-MFG-001 to R-MFG-010; R-EDIT-038, R-EDIT-042
-Slices: `specs/0098-page-kinds/`, `0099` to `0103` (reserved), `0028`, `0029`
+Slices: `specs/0098-page-kinds/` (Done, #279), `specs/0099-sketch-pages/`, `0100` to `0103` (reserved), `0028`, `0029`; follow-up `0104` `page-kind-change` (reserved)
 Changed by this epic: `specs/0093-laser-workbench-shell/`, `specs/0026-machine-profile/`, `specs/0066-constraint-sketcher/`, `specs/0059-multiple-pages/`, `specs/0049-linked-clone/`; superseded: `0027` (PR #269 closed unmerged)
 Related: `specs/0057-clone-overrides/`, `specs/0060-snapping/`, `specs/0090-grid/`, `specs/0046-document-shapes/`, `specs/0064-machine-connector/`, `specs/0065-extensions-sdk/`
 ADRs: 0032, 0033, 0034, 0035, 0038, 0039 (accepted); the withdrawn laser-roles ADR of the closed PR #269 (to be replaced)
