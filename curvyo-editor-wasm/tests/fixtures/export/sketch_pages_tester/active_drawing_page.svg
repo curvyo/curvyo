@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:curvyo="urn:curvyo:svg:1"
+     width="210mm" height="297mm" viewBox="0 0 210 297" curvyo:format="1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm" pagecolor="#e8e8eb" inkscape:pageopacity="1"/>
+  <path id="compound1" d="M 90 148.5 C 90 151.259575 87.759575 153.5 85 153.5 C 82.240425 153.5 80 151.259575 80 148.5 C 80 145.740425 82.240425 143.5 85 143.5 C 87.759575 143.5 90 145.740425 90 148.5 Z M 130 148.5 C 130 151.259575 127.759575 153.5 125 153.5 C 122.240425 153.5 120 151.259575 120 148.5 C 120 145.740425 122.240425 143.5 125 143.5 C 127.759575 143.5 130 145.740425 130 148.5 Z M 65 123.5 L 145 123.5 L 145 173.5 L 65 173.5 Z" sodipodi:nodetypes="cccccccccccccc" fill="none" stroke="#000000" stroke-width="0.25"/>
+</svg>
