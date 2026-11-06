@@ -171,12 +171,13 @@ double-arrow button at the far right, before the Trace button ("More trace optio
 under the values with everything else (open or closed is remembered). Its rows, top to bottom, each
 shown only when it has something to say:
 
-1. The analysis line and the **Analyse** button (see Analysis).
-2. The status line: the counts of the result (see Status).
-3. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
+1. **Parts**: the numbered chips of the parts, **Add part** and the trash (see "Parts").
+2. The analysis line and the **Analyse** button (see Analysis).
+3. The status line: the counts of the result (see Status).
+4. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
    the palette's pipette; see "Multicolour" below.
-4. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
-5. The options: four icon buttons (pressed means on, the tooltip names each), then three values.
+5. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
+6. The options: four icon buttons (pressed means on, the tooltip names each), then three values.
 
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
@@ -238,6 +239,46 @@ for text; one image at a time."
 Create paths makes the same group "Trace of ..." as without a mask, in one History step; the mask
 paths stay exactly as they are (same objects, nodes and style), so a path drawn as a cut outline
 stays in the job.
+
+## Parts
+
+A part is a piece of the picture with its own mask (Inside or Outside) and its own settings
+(Method, Threshold, Smooth and everything else). The first row of Advanced holds a chip per part,
+numbered 1, 2, 3 in the order they were made, then **Add part** (+) and the trash. Part 1 starts
+as the whole image; with mask paths it is limited to them like any other part.
+(`specs/0094-masked-composite-trace` slice 2.)
+
+- **Add part** makes the next part active: it starts with a copy of the settings of the part
+  before, no mask paths and Inside, and only the image stays selected. Select (or pick) its mask
+  paths; until it has some its chip is muted (dashed) and it adds nothing. At most 8 parts.
+- A **click on a chip** (or the arrows, Home and End on the focused chips) makes that part active:
+  its settings load into the bar and its mask paths are selected with the image. Everything the bar
+  and Advanced show then belongs to the active part; with two or more parts the bar says
+  "Part 2 of 3" after the Mask group. Pick mask paths, Shift+click, Clear mask and Inside / Outside
+  work on the active part only.
+- The **trash** removes the active part (Delete on a chip arms it too): the first press turns the
+  row soft red, the second press after a short pause removes it; the parts renumber and the part
+  before becomes active. With one part the trash is dimmed.
+- **Order**: left to right is also bottom to top. Where parts overlap, the later one wins: inside
+  its mask only its shapes exist, and the earlier parts are cut exactly at its edge, so no area is
+  traced twice.
+- **Create paths** (the Trace button) joins all parts into one group "Trace of ...", in one History
+  step: shapes that cross from one part into another are joined into one path along the seam,
+  same colours merge in Multicolour, and the mask paths stay as they are. The preview shows the
+  joined result; changing a setting traces only the active part again (with a mask change the
+  parts below it follow, since their area changes).
+- Recognise text and Recognise shapes are settings of each part: a text line or a shape belongs to
+  the part that holds its centre.
+- Parts last while the Trace tool is open: leaving the tool (Escape, S, another tool) or Create
+  paths ends them, and the next entry starts with one part. Only part 1's settings are
+  remembered, as before.
+
+With two or more parts the status line starts with "3 parts", and a later part without mask paths
+says "Part 3 has no paths". When no part has anything to trace, the bar says "0 paths: no part has
+anything to trace." A part inside the picture is traced from its own cut-out (with a margin, so the result is the
+same) unless it reads text, drops border shapes, uses Denoise or is upscaled, so several parts
+cost about as much as one trace of the whole picture. Each part reads its automatic Threshold,
+background and analysis from its own area; what you set for a part stays with it.
 
 ## Recognise text
 

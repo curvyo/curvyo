@@ -192,3 +192,52 @@ the fix.
 - **Clip.** All crossing outlines go to `boolean` as one operand, not one per island. This is equivalent under the kernel's per-operand nonzero union, provided the tracer winds holes opposite to their outer outline. A test with a ring crossing the mask edge, Inside and Outside, covers it.
 - **Failures.** A refused clip keeps the crossing shapes whole when the mask keeps their first point (no exact edge for them). A region that cannot be combined shows its own row, "0 paths: the mask paths could not be combined.".
 
+
+## Note of 2026-11-05 (slice 2 as built, implementer; Proposal, vetoable at the demo)
+- **Clips.** Each part's kept area goes to `visible_regions` bottom first (Inside: its region's
+  kernel polygons; Outside: the image's box grown by 1 mm minus the region; the whole image: that
+  box). The box keeps every clip edge off the picture border, so decision 1's reason for leaving Q
+  out of the clip holds. A part nothing later overlaps keeps its own region (its slice 1 clip, curves
+  intact); a trimmed part is clipped Inside to its visible region; a hidden one gets no job.
+  Muted parts and parts whose mask misses the image are left out of the stack.
+  (`curvyo-ui-core::trace_parts::trace_part_clips`.)
+- **Join.** A pure function of the parts' results and clips in stacking order
+  (`join_trace_parts`). An outline whose control box meets no edge of its part's clip stays as it
+  is; the others are united per fill colour with one operand per part on the same 0.001 mm grid
+  (tolerance 0.005 mm), so a shape across a seam is one path and the seam leaves no line. Pieces of
+  a single part are not united. Layers merge by exact RGB, largest area first; a single-colour part
+  counts as #000000 next to a multicolour one. Shape regions follow their outlines' new places and
+  are dropped when an outline went into a union. Text lines are concatenated. Any part TooDetailed
+  or Invalid fails the join. The palette is the active part's (its strip edits its values).
+- **Where.** The clip stays in the worker: each part is an ordinary job whose settings carry its
+  clip as slice 1's `"mask"`. The session computes the clips (cached per set of areas) and joins the
+  parts' wires into the preview and the result; Create paths is unchanged. With one part nothing of
+  this runs (criterion 33).
+- **State.** Parts are Trace tool state in the session (stable id, mask path ids, mode, the active
+  part; the active part's mask is the selection) and the parts' settings live in the frontend under
+  the stable id. Leaving the tool drops both (criterion 29); only part 1's values are remembered.
+- **Caching.** Each part's wire is kept in the page under its settings (clip included) and size, so
+  a setting change traces one part (criterion 25); a later part's mask change retraces the parts
+  below it, whose clips change.
+- **Region-only analysis per part (tester and coordinator 2026-11-06).** With two or more parts each
+  part reads its own automatic Threshold, background and analysis from its clip, once per clip, and
+  applies them as slice 1 does for a new mask (`partAutoValues`, `applyRegionAnalysis`): what the
+  maker set for that part stays. Add part copies what the maker set with the settings.
+- **Crop (criterion 31).** A part is traced from its clip's pixel box plus a margin, with the map
+  moved, so that its result is the one of the whole picture: the margin is 16 px (Denoise, the
+  smoothing and the fit stay outside the clip) or the pixel count of Ignore below's area when that
+  is more (a shape reaching into the clip is not taken for a speck). The whole picture is sent
+  instead for Recognise text (the OCR lines are in the picture's pixels), for Drop border shapes
+  (the crop's edge is no border), for Denoise (tester 2026-11-06: a thin line across the cut came
+  back 0.83 % off; margins of 32 and 64 px did not help, so the fit of a shape that crosses the cut
+  is not local), with Upscale Auto only when Auto would decide differently for the crop than for the
+  whole picture (the upscaled map's offset was fixed in PR #282), and for an Outside clip or a box that reaches the
+  picture. The same non-locality could in principle reach a long shape across the cut without
+  Denoise; no case is known. Multicolour
+  with Colours Auto counts the colours of the crop, which suits the region-only analysis
+  (Proposal). Measured: four quarter parts of a 2000 x 2000 px picture cost 0.98 x one whole
+  trace in thread CPU time (release, `acceptance_0094_cpu`); a cropped part matches its whole-picture
+  trace within 0.1 % (session test).
+- **Text.** The parts with Recognise text trace with the read lines (whole picture, no crop); the
+  fit runs once over the joined result (the preview's full trace and Create paths), as for several
+  images, so the preview's texts appear after the join.
