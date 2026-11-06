@@ -48,7 +48,7 @@ pub(super) fn is_mask_path(object: &ObjectSnapshot) -> bool {
 }
 
 impl RegionCache {
-    fn new(operands: Vec<RegionOperand>, quad: [Point; 4]) -> Self {
+    pub(super) fn new(operands: Vec<RegionOperand>, quad: [Point; 4]) -> Self {
         let region = TraceRegion::of_operands(&operands, false);
         let [beyond, within] = region.as_ref().ok().map_or_else(
             || [vec![quad.to_vec()], Vec::new()],
@@ -62,6 +62,21 @@ impl RegionCache {
             beyond,
             within,
         }
+    }
+
+    /// Whether it was made of `operands` over `quad`.
+    pub(super) fn made_of(&self, operands: &[RegionOperand], quad: [Point; 4]) -> bool {
+        self.operands == operands && self.quad == quad
+    }
+
+    /// The union (Inside), or why there is none.
+    pub(super) const fn region(&self) -> &Result<TraceRegion, TraceRegionError> {
+        &self.region
+    }
+
+    /// Whether the union covers some of the image.
+    pub(super) const fn meets(&self) -> bool {
+        self.meets
     }
 }
 

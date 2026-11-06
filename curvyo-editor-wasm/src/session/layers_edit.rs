@@ -309,8 +309,11 @@ impl Session {
         // Delete acts on what the focus shows (criterion 37, amended 2026-10-12): the whole
         // selection when the row's node is part of it, else only that node.
         let leaves = self.document.leaves_of(id);
-        let in_selection =
-            !leaves.is_empty() && leaves.iter().all(|&leaf| self.selection.contains(leaf));
+        // In the Trace tool Delete of the selection does nothing (its keys are the tool's), so a
+        // selected mask path's row deletes that path alone (`specs/0094` slice 2).
+        let in_selection = self.tool != super::Tool::Trace
+            && !leaves.is_empty()
+            && leaves.iter().all(|&leaf| self.selection.contains(leaf));
         self.panel_action(|this| {
             if in_selection {
                 this.delete_selected();
@@ -330,6 +333,8 @@ impl Session {
                 return PanelReply::Refusal(locked_object_notice(&name));
             }
             let _ = this.document.delete_objects(&[id]);
+            let objects = this.objects();
+            this.selection.retain_existing(&objects);
             PanelReply::Quiet
         })
     }

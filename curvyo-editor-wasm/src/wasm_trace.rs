@@ -17,7 +17,7 @@ fn id_text(id: NodeId) -> String {
     serde_json::to_string(&id).unwrap_or_default()
 }
 
-fn id_of(text: &str) -> Option<NodeId> {
+pub(crate) fn id_of(text: &str) -> Option<NodeId> {
     serde_json::from_str(text).ok()
 }
 
