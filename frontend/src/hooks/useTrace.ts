@@ -52,10 +52,12 @@ import { favouritesAmong } from "@/hooks/fontLibraryPage";
 import { listedFileBytes } from "@/hooks/useText";
 import type { FontFace } from "@/lib/textText";
 import { trace_auto_threshold, trace_suggest_background, trace_text_failed_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
-import { applyRegionAnalysis, forgetRegionValues } from "@/lib/traceMaskCaches";
-import { NO_VIEW, loadParams, loadPresets, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
+import { applyRegionAnalysis, forgetRegionValues, partAutoValues } from "@/lib/traceMaskCaches";
+import { NO_VIEW, joinWires, loadParams, loadPresets, partPixelsOf, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
+import { NO_PART_LINE, type PartJob, type TracePartInfo, mayCrop, partEmptyText, partKey, partsCount, readParts, traceParts } from "@/lib/traceParts";
 import type { TraceApi } from "./traceApi";
 import { useTraceMask } from "./useTraceMask";
+import { useTraceParts } from "./useTraceParts";
 import { useTracePalette } from "./useTracePalette";
 import type { HsvTriple } from "./useStylePanel";
 import { useTraceMethod } from "./useTraceMethod";
@@ -138,6 +140,25 @@ export function useTrace(
   }, [choice]);
   /** The view as last read; the sync effect below keeps it and the state together. */
   const viewRef = useRef(view);
+  /** Another part's settings into the bar (`specs/0094` slice 2): its Threshold is the image's
+   * kept one from now on, so the sync below does not put the last part's back. */
+  const loadPart = useCallback((next: TraceChoice) => {
+    choiceRef.current = next;
+    setChoice(next);
+    const id = viewRef.current.shown;
+    if (id && next.values.threshold !== null) {
+      thresholds.current.set(id, next.values.threshold);
+      makerThreshold.current.add(id);
+    }
+  }, []);
+  const partsApi = useTraceParts(getSession, onChange, view.parts, choiceRef, loadPart);
+  const partsRef = useRef(partsApi);
+  /** Each part's automatic background, read from the region it was last read for (`specs/0094`
+   * slice 2, region-only analysis per part), by part id. */
+  const partAuto = useRef(new Map<number, { region: string; background: string }>());
+  useEffect(() => {
+    partsRef.current = partsApi;
+  }, [partsApi]);
   /** Reads the palette of a new preview (`useTracePalette`, set once it exists). */
   const paletteRefresh = useRef<() => void>(() => undefined);
   /** The text is being read (`specs/0091` UX notes §3: "Reading text"). */
@@ -360,7 +381,7 @@ export function useTrace(
    * one by one, each with its own fit; Create paths fits them together), the percent in the Trace
    * button; the session then shows the texts. `false` when a newer job took over (`stale`). */
   const fitTexts = useCallback(
-    async (session: WasmSession, stale: () => boolean): Promise<boolean> => {
+    async (session: WasmSession, stale: () => boolean, report?: (p: number) => void): Promise<boolean> => {
       const fit = fitInputs();
       const request = session.trace_fit_request(fit.tolerance, fit.favourites);
       if (request === "") {
@@ -368,7 +389,7 @@ export function useTrace(
       }
       const result = await runner().fit(request, fit.loadFaces, (p) => {
         if (!stale()) {
-          setPercent(p);
+          (report ?? setPercent)(p);
         }
       });
       if (stale()) {
@@ -378,6 +399,204 @@ export function useTrace(
       return true;
     },
     [getSession, runner, setPercent, fitInputs],
+  );
+
+  /** Part `part`'s values with Remove background's Auto taking the part's own region's background. */
+  const partValues = (part: TracePartInfo): TraceValues => {
+    const v = partsRef.current.choiceOf(part).values;
+    const auto = partAuto.current.get(part.id);
+    return v.backgroundAuto && auto ? { ...v, background: auto.background } : v;
+  };
+
+  /** The settings of the active part's job (its clip and own background), empty when it adds
+   * nothing; `threshold` stands in for a Threshold not set yet. */
+  const activePartSettings = (session: WasmSession, id: string, threshold: number): string => {
+    const active = readParts(session.trace_parts()).find((p) => p.active && p.contributes);
+    if (!active) {
+      return "";
+    }
+    const v = partValues(active);
+    return settingsJson(v, v.threshold ?? threshold, partAuto.current.get(active.id)?.background ?? backgrounds.current.get(id) ?? "", active.mask);
+  };
+
+  /** Reads each contributing part's automatic Threshold, background and analysis from its own
+   * clip once per clip (region-only analysis per part, `specs/0094` slice 2); what the maker set
+   * for a part stays. `false` when a newer job took over. */
+  const resolveParts = useCallback(
+    async (session: WasmSession, id: string, stale: () => boolean): Promise<boolean> => {
+      for (const part of readParts(session.trace_parts())) {
+        if (!part.contributes || partAuto.current.get(part.id)?.region === part.mask) {
+          continue;
+        }
+        const pixels = pixelsOf(session, id, false);
+        if (!pixels) {
+          return false;
+        }
+        let read: { threshold: number; background: string; analysis: string };
+        try {
+          read = await runner().defaults(pixels, part.mask);
+        } catch (error) {
+          if (error instanceof TraceCancelled) {
+            throw error;
+          }
+          read = { threshold: trace_auto_threshold(pixels.rgba, pixels.width, pixels.height), background: trace_suggest_background(pixels.rgba, pixels.width, pixels.height), analysis: "" };
+        }
+        partAuto.current.set(part.id, { region: part.mask, background: read.background });
+        const analysis = readAnalysis(read.analysis);
+        const maker = partsRef.current.makerOf(part.id);
+        const choice = partsRef.current.choiceOf(part);
+        partsRef.current.setChoiceOf(part.id, { ...choice, values: partAutoValues(choice.values, { threshold: read.threshold, background: read.background, analysis }, maker) });
+        if (part.active && analysis) {
+          setAnalysisState({ kind: maker.size > 0 ? "custom" : "auto", analysis });
+        }
+        if (stale()) {
+          return false;
+        }
+      }
+      return true;
+    },
+    [runner],
+  );
+
+  /** The parts' jobs of image `id` (`specs/0094` slice 2): each contributing part's settings with
+   * its clip, traced one by one and kept per part (criterion 25), joined by the session into the
+   * preview, with `keep` also into the result Create paths writes; `null` when a newer job took
+   * over. */
+  const joinedJob = useCallback(
+    async (session: WasmSession, id: string, reduced: boolean, keep: boolean, lines: string, onProgress: (p: number) => void, stale: () => boolean) => {
+      const background = backgrounds.current.get(id) ?? "";
+      const auto = thresholds.current.get(id) ?? null;
+      const values = readParts(session.trace_parts()).map((part) => ({ part, v: partValues(part) }));
+      const jobs: (PartJob | null)[] = values.map(({ part, v }) => {
+        const threshold = v.threshold ?? auto;
+        if (!part.contributes || threshold === null) {
+          return null;
+        }
+        const settings = settingsJson(v, threshold, partAuto.current.get(part.id)?.background ?? background, part.mask);
+        const text = lines !== "" && readsText(v);
+        return { settings, text, key: partKey(settings, text, reduced), crop: mayCrop(v, text) };
+      });
+      const out = await traceParts(
+        {
+          pixels: (index, crop) =>
+            crop ? partPixelsOf(session, id, index, reduced, values[index].v.specks, values[index].v.upscale === 0) : pixelsOf(session, id, reduced),
+          join: (wires) => joinWires(session, id, wires, keep),
+        },
+        runner(),
+        jobs,
+        partsRef.current.cache.current,
+        lines,
+        onProgress,
+        stale,
+      );
+      return out === null ? null : { ...out, any: jobs.some((j) => j !== null) };
+    },
+    [runner],
+  );
+
+  /** The preview with two or more parts (`specs/0094` slice 2): as the single trace, the reduced
+   * copy first and the full size after, each a join of the parts; the parts that read text take
+   * the read lines and the fit runs once over the joined result. The picture's pixel count. */
+  const runJoinedPreview = useCallback(
+    async (session: WasmSession, id: string, fullAfter: boolean, stale: () => boolean, onProgress: (p: number) => void): Promise<number> => {
+      const threshold = await thresholdOf(session, id);
+      if (stale()) {
+        return 0;
+      }
+      const full = threshold === null ? null : pixelsOf(session, id, false);
+      if (threshold === null || !full) {
+        setStatus(NO_STATUS);
+        setLoading(true);
+        return 0;
+      }
+      if (!(await resolveParts(session, id, stale))) {
+        return 0;
+      }
+      // The bar's part takes the image's automatic Threshold until one is set.
+      if (choiceRef.current.values.threshold === null) {
+        choiceRef.current = { ...choiceRef.current, values: { ...choiceRef.current.values, threshold } };
+        setChoice(choiceRef.current);
+      }
+      const infos = readParts(session.trace_parts());
+      const textValues = infos.filter((p) => p.contributes).map((p) => partsRef.current.choiceOf(p).values).find((v) => readsText(v));
+      const text = textValues !== undefined && !ocrFailed.current.has(id);
+      const small = full.width <= REDUCED_SIDE && full.height <= REDUCED_SIDE;
+      const reducedOnly = previewIsReduced(full.width, full.height);
+      const fullTrace = small || (fullAfter && !reducedOnly);
+      const stages: TraceStage[] = [
+        ...(text && session.trace_ocr_lines(id) === "" ? (["read"] as const) : []),
+        ...(small ? [] : (["reduced"] as const)),
+        ...(fullTrace ? (["trace"] as const) : []),
+        ...(text && fullTrace ? (["fit"] as const) : []),
+      ];
+      const progress = new JobProgress(stages, onProgress);
+      const pixels = full.width * full.height;
+      const lines = text && textValues ? await textLines(session, id, textValues, progress.stage("read"), full, stale) : "";
+      if (stale()) {
+        return pixels;
+      }
+      setPxPerMm(1 / Math.sqrt(Math.abs(full.map[0] * full.map[3] - full.map[1] * full.map[2])));
+      if (reducedOnly) {
+        startTimers(true);
+      }
+      // The Mask view shows what the active part's tracer reads.
+      const active = infos.find((p) => p.active && p.contributes);
+      const bar = choiceRef.current.values;
+      const activeSettings = activePartSettings(session, id, threshold);
+      const show = (out: { header: Float64Array; seconds: number; any: boolean }, reduced: boolean) => {
+        paletteRefresh.current();
+        const [set, found] = session.trace_text_counts();
+        setTextCounts([set, found]);
+        setShapeCount(session.trace_shape_count());
+        setUnclipped(session.trace_unclipped_notice());
+        if (!out.any) {
+          setStatus({ ...NO_STATUS, line: NO_PART_LINE });
+          return;
+        }
+        const s = statusText(readSummary(out.header), out.seconds, pixels, reduced, zeroPathsLine(bar), colourCounts(session));
+        // A picture of text only traces to no path and is still something to create (`specs/0091`).
+        setStatus(set > 0 && !s.canCreate && s.message === "" ? { ...s, line: "", canCreate: true } : s);
+      };
+      if (!small) {
+        if (active) {
+          await maskStep(id, true, activeSettings, stale, lines);
+        }
+        const out = await joinedJob(session, id, true, false, lines, progress.stage("reduced"), stale);
+        if (out === null || stale()) {
+          return pixels;
+        }
+        if (out.missing) {
+          setLoading(true);
+          return pixels;
+        }
+        show(out, true);
+        if (!fullAfter || reducedOnly) {
+          clearTimers();
+          onChange();
+          return pixels;
+        }
+      }
+      if (active) {
+        await maskStep(id, false, activeSettings, stale, lines);
+      }
+      const out = await joinedJob(session, id, false, true, lines, progress.stage("trace"), stale);
+      if (out === null || stale()) {
+        return pixels;
+      }
+      if (out.missing) {
+        setLoading(true);
+        return pixels;
+      }
+      if (text && !(await fitTexts(session, stale, progress.stage("fit")))) {
+        return pixels;
+      }
+      results.current.set(id, "parts");
+      show(out, false);
+      clearTimers();
+      onChange();
+      return pixels;
+    },
+    [thresholdOf, resolveParts, textLines, startTimers, maskStep, joinedJob, fitTexts, clearTimers, onChange],
   );
 
   /** The preview of the shown image: the reduced copy first, the full size after (criterion 10). */
@@ -393,6 +612,23 @@ export function useTrace(
       setStopped(false);
       setFailure(null);
       setLoading(false);
+      if (readParts(viewRef.current.parts).length > 1) {
+        // `specs/0094` slice 2: the parts' join; a part whose mask misses the image adds nothing.
+        startTimers();
+        let pixels = 0;
+        try {
+          pixels = await runJoinedPreview(session, id, fullAfter, stale, (p) => {
+            if (!stale()) {
+              setPercent(p);
+            }
+          });
+        } catch (error) {
+          if (!(error instanceof TraceCancelled) && !stale()) {
+            fail(error, pixels);
+          }
+        }
+        return;
+      }
       if (viewRef.current.maskOutsideImage || viewRef.current.maskFailed) {
         // `specs/0094` criterion 7: nothing to trace, no job; the preview is empty.
         session.set_trace_preview(id, new Float64Array(7));
@@ -527,7 +763,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep, textLines, fitInputs],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep, textLines, fitInputs, runJoinedPreview],
   );
 
   const schedule = useCallback(
@@ -559,11 +795,19 @@ export function useTrace(
       next.mask === previous.mask &&
       next.maskPaths === previous.maskPaths &&
       next.maskOutsideImage === previous.maskOutsideImage &&
-      next.maskFailed === previous.maskFailed
+      next.maskFailed === previous.maskFailed &&
+      next.parts === previous.parts
     ) {
       return;
     }
-    if (next.mask !== previous.mask && next.shown) {
+    if (next.shown !== previous.shown) {
+      partsRef.current.cache.current.clear();
+      partAuto.current.clear();
+    }
+    // `specs/0094` slice 2: with two or more parts a part's values are its own; a chip pick or a
+    // part's new paths do not read the analysis again.
+    const severalParts = readParts(next.parts).length > 1 || readParts(previous.parts).length > 1;
+    if (next.mask !== previous.mask && next.shown && !severalParts) {
       // `specs/0094` criterion 9: the automatic values and the analysis of the new region; a
       // Threshold the maker set stays.
       regionReread.current.add(next.shown);
@@ -612,6 +856,8 @@ export function useTrace(
       }
       if (id) {
         const changed = ANALYSED_FIELDS.filter((f) => next.values[f] !== choiceRef.current.values[f]);
+        // `specs/0094` slice 2: what the maker set stays with the active part.
+        partsRef.current.markMaker(changed);
         if (changed.length > 0) {
           const fields = makerFields.current.get(id) ?? new Set<keyof TraceValues>();
           changed.forEach((f) => fields.add(f));
@@ -624,7 +870,10 @@ export function useTrace(
       }
       choiceRef.current = next;
       setChoice(next);
-      writeChoice(next);
+      // Only the first part's values are remembered (`specs/0094` criterion 29).
+      if (readParts(viewRef.current.parts).findIndex((p) => p.active) <= 0) {
+        writeChoice(next);
+      }
       results.current.clear();
       session?.clear_trace_results();
       session?.set_trace_preview_stale(false);
@@ -753,7 +1002,8 @@ export function useTrace(
     }
     const session = getSession();
     const current = viewRef.current;
-    if (!session || creating || current.images.length === 0 || current.maskOutsideImage || current.maskFailed) {
+    const severalParts = readParts(current.parts).length > 1;
+    if (!session || creating || current.images.length === 0 || (!severalParts && (current.maskOutsideImage || current.maskFailed))) {
       return;
     }
     const threshold = choiceRef.current.values.threshold;
@@ -768,6 +1018,56 @@ export function useTrace(
     let pixels = 0;
     void (async () => {
       try {
+        if (readParts(current.parts).length > 1) {
+          // `specs/0094` slice 2: the parts joined at full size (kept parts from the preview), one
+          // percent over the job, then one Create paths.
+          const id = current.images[0];
+          const stale = () => mine !== generation.current;
+          const progress = (p: number) => {
+            if (!stale()) {
+              setPercent(p);
+            }
+          };
+          const full = pixelsOf(session, id, false);
+          if (!full) {
+            setStatus(NO_STATUS);
+            setCreating(false);
+            setLoading(true);
+            return;
+          }
+          pixels = full.width * full.height;
+          if (previewIsReduced(full.width, full.height)) {
+            startTimers(true);
+          }
+          if (!(await resolveParts(session, id, stale))) {
+            return;
+          }
+          const infos = readParts(session.trace_parts());
+          const textValues = infos.filter((p) => p.contributes).map((p) => partsRef.current.choiceOf(p).values).find((pv) => readsText(pv));
+          const text = textValues !== undefined && !ocrFailed.current.has(id);
+          const job = new JobProgress([...(text && session.trace_ocr_lines(id) === "" ? (["read"] as const) : []), "trace", ...(text ? (["fit"] as const) : [])], progress);
+          const lines = text && textValues ? await textLines(session, id, textValues, job.stage("read"), full, stale) : "";
+          if (stale()) {
+            return;
+          }
+          const out = await joinedJob(session, id, false, true, lines, job.stage("trace"), stale);
+          if (out === null || stale()) {
+            return;
+          }
+          if (text && !session.trace_text_fitted() && !(await fitTexts(session, stale, job.stage("fit")))) {
+            return;
+          }
+          session.create_traced_paths().free();
+          const warning = session.trace_created_warning();
+          if (warning !== "") {
+            textOptionsRef.current?.onNotice(warning);
+          }
+          clearTimers();
+          setCreating(false);
+          onChange();
+          returnFocus();
+          return;
+        }
         for (const [index, id] of current.images.entries()) {
           if (v.method === PICK_COLOURS && !backgrounds.current.has(id)) {
             await thresholdOf(session, id);
@@ -838,7 +1138,7 @@ export function useTrace(
         }
       }
     })();
-  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, fitInputs, runner]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, fitInputs, runner, joinedJob, resolveParts]);
 
   // Leaving the tool ends every job.
   useEffect(() => {
@@ -850,6 +1150,7 @@ export function useTrace(
       setLoading(false);
       setReading(false);
       ocrFailed.current.clear();
+      partAuto.current.clear();
     }
   }, [active, cancelAll]);
 
@@ -868,7 +1169,12 @@ export function useTrace(
       const mine = generation.current;
       const session = getSession();
       const lines = session && readsText(choiceRef.current.values) ? session.trace_ocr_lines(id) : "";
-      maskStep(id, source.reduced, key(threshold, choiceRef.current.values, id), () => mine !== generation.current, lines).catch(() => undefined);
+      // `specs/0094` slice 2: with two or more parts the mask of the active part's own job.
+      const settings = session && readParts(viewRef.current.parts).length > 1 ? activePartSettings(session, id, threshold) : key(threshold, choiceRef.current.values, id);
+      if (settings === "") {
+        return;
+      }
+      maskStep(id, source.reduced, settings, () => mine !== generation.current, lines).catch(() => undefined);
     },
     [maskStep, maskSource, getSession],
   );
@@ -965,7 +1271,13 @@ export function useTrace(
   const session = active ? getSession() : null;
   const maskOutside = session?.trace_mask_outside() ?? false;
   const mask = view.maskPaths > 0 && view.selection === "images" ? { paths: view.maskPaths, outside: maskOutside } : null;
-  const advancedStatus = advancedStatusOf(status, palette.note, recognised, mask ? maskText(mask.outside, mask.paths) : "");
+  const parts = partsApi.parts;
+  // `specs/0094` UX notes §7: with two or more parts "3 parts" replaces the mask segment, and an
+  // active later part without paths says so last.
+  const partsSegment = parts.length > 1 ? partsCount(parts.length) : mask ? maskText(mask.outside, mask.paths) : "";
+  const shownStatus = advancedStatusOf(status, palette.note, recognised, partsSegment);
+  const emptyPart = active ? partEmptyText(parts) : "";
+  const advancedStatus = emptyPart === "" ? shownStatus : { ...shownStatus, muted: [shownStatus.muted, emptyPart].filter((t) => t !== "").join(" · ") };
   // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
   // has no paths.
   const traceBlocked =
@@ -980,7 +1292,10 @@ export function useTrace(
   const maskPick = session?.trace_mask_pick() ?? false;
   const maskRefused = session?.trace_mask_pick_refused() ?? false;
   const shownId = view.shown;
-  const suggestedBackground = shownId ? (backgrounds.current.get(shownId) ?? null) : null;
+  // With two or more parts the active part's own background (region-only analysis per part).
+  const activePart = parts.length > 1 ? parts.find((p) => p.active) : undefined;
+  const partBackground = activePart ? partAuto.current.get(activePart.id)?.background : undefined;
+  const suggestedBackground = partBackground ?? (shownId ? (backgrounds.current.get(shownId) ?? null) : null);
   return {
     active,
     available,
@@ -993,6 +1308,10 @@ export function useTrace(
     setMaskPick,
     maskRefused,
     clearMask,
+    parts,
+    selectPart: partsApi.selectPart,
+    addPart: partsApi.addPart,
+    removePart: partsApi.removePart,
     imagesLabel: imagesLabel(progress, view.images.length),
     params,
     presets,

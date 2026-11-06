@@ -6,6 +6,8 @@ import type { KeyboardEvent } from "react";
 import { useRowStarts } from "@/components/SelectToolbar";
 import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
+import { TraceParts } from "@/components/TraceParts";
+import { joinTooltip, partsCount, partsLabel } from "@/lib/traceParts";
 import { TraceField } from "@/components/TraceField";
 import { PickColoursGroup, RemoveBackgroundGroup } from "@/components/TraceColourGroup";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
@@ -288,6 +290,7 @@ function ProgressSlot({
   onRetry,
   onCreate,
   blocked,
+  tooltip = "",
 }: {
   slot: TraceSlot;
   onStop: () => void;
@@ -295,6 +298,8 @@ function ProgressSlot({
   onCreate: () => void;
   /** Why Trace cannot run, or empty (`ux-notes.md` §22.2). */
   blocked: string;
+  /** The ready button's tooltip, or empty (`specs/0094` UX notes §3: "3 parts joined"). */
+  tooltip?: string;
 }) {
   const reasonId = useId();
   if (slot.kind === "none") {
@@ -314,6 +319,13 @@ function ProgressSlot({
         {TRACE_FINISH}
       </button>
     );
+    if (blocked === "" && tooltip !== "") {
+      return (
+        <AppTooltip side="bottom" content={tooltip}>
+          {button}
+        </AppTooltip>
+      );
+    }
     return blocked === "" ? (
       button
     ) : (
@@ -545,6 +557,12 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         </div>
         <ViewPill mode={trace.viewMode} onMode={trace.setViewMode} />
         <MaskGroup trace={trace} onReturnFocus={onReturnFocus} />
+        {/* With two or more parts the bar's values are the active part's (UX notes §3). */}
+        {trace.parts.length > 1 ? (
+          <span data-trace-part-label="" className="flex h-9 items-center text-xs whitespace-nowrap text-[var(--panel-muted-fg)] tabular-nums">
+            {partsLabel(trace.parts)}
+          </span>
+        ) : null}
         <div className="flex h-9 items-center">
           <TracePresetMenu
             name="Method"
@@ -571,10 +589,10 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             onToggle={() => trace.setAdvancedOpen(!trace.advancedOpen)}
             controls={advancedId}
             labels={TRACE_EXPAND_LABELS}
-            changed={trace.advancedOpen ? null : changedAdvancedText(trace.values, trace.params)}
+            changed={trace.advancedOpen ? null : [partsCount(trace.parts.length), changedAdvancedText(trace.values, trace.params)].filter((t) => t).join(", ") || null}
             onReturnFocus={onReturnFocus}
           />
-          <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} onCreate={trace.create} blocked={trace.traceBlocked} />
+          <ProgressSlot slot={trace.slot} onStop={trace.stop} onRetry={trace.retrace} onCreate={trace.create} blocked={trace.traceBlocked} tooltip={joinTooltip(trace.parts.length)} />
         </div>
         {trace.advancedOpen ? (
           // After the expander in the DOM, so Tab reaches the Advanced controls after it
@@ -599,6 +617,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               coloursFound={trace.palette.found}
               paletteArmed={trace.pickMode === "colours" && trace.values.method !== PICK_COLOURS}
               onPalettePipette={() => trace.setPicking(trace.pickMode === "")}
+              partsRow={<TraceParts parts={trace.parts} onSelect={trace.selectPart} onAdd={trace.addPart} onRemove={trace.removePart} onReturnFocus={onReturnFocus} />}
             />
           </div>
         ) : null}

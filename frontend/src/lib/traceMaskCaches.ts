@@ -39,3 +39,22 @@ export function applyRegionAnalysis(values: TraceValues, analysis: TraceAnalysis
   }
   return { ...read, ...kept };
 }
+
+/** The automatic values read from one part's region (`specs/0094` slice 2). */
+export interface RegionDefaults {
+  threshold: number;
+  /** `#RRGGBB`, empty for a transparent background. */
+  background: string;
+  analysis: TraceAnalysis | null;
+}
+
+/** A part's values after its region's automatic values were read (`specs/0094` slice 2, coordinator
+ * 2026-11-06): the analysis applies as for a new mask, the automatic Threshold unless the maker set
+ * one for the part, and Remove background's Auto takes the region's background. */
+export function partAutoValues(values: TraceValues, defaults: RegionDefaults, maker: ReadonlySet<keyof TraceValues>): TraceValues {
+  let next = defaults.analysis ? applyRegionAnalysis(values, defaults.analysis, maker) : values;
+  if (!maker.has("threshold")) {
+    next = { ...next, threshold: defaults.analysis?.threshold ?? defaults.threshold };
+  }
+  return next.backgroundAuto ? { ...next, background: defaults.background } : next;
+}

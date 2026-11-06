@@ -526,15 +526,26 @@ async function buildScene(s: S, kinds: Kind[], extras: { second?: boolean; sketc
   await s.tab("Layers");
   const spots: Record<string, [number, number]> = {};
   if (extras.sketch) {
-    await s.clickSel('button[aria-label^="Sketch"][aria-pressed]');
-    await sleep(800);
-    await s.clickSel('button[aria-label="Rectangle"]');
-    await drag(s, [170, 820], [260, 880]);
-    await s.clickSel('button[aria-label="Select"]');
-    await s.clickSel('button[aria-label="Vector"]');
-    await sleep(600);
+    // Since `specs/0098` a sketch is a page kind: Add page with Kind Sketch, a rectangle with the
+    // sketch tools, then Page 1 again by its row (the tools follow the active page). The sketch
+    // lies on its own page, never over the picture's page (`0099` decides what a drawing object
+    // over a sketch page is), so it has no spot on the picture's page.
+    await s.tab("Document");
+    await s.clickSel('section[aria-label=Pages] button[aria-label="Add page"]');
+    await sleep(500);
+    await s.evaluate(`document.querySelector('[role=group][aria-label="Add page"] [data-kind=sketch]').click()`);
+    await sleep(300);
+    await s.evaluate(`[...document.querySelectorAll('[role=group][aria-label="Add page"] button')].find((b) => b.textContent.trim() === 'Add').click()`);
+    await waitFor("the sketch tools", async () => ((await s.evaluate(`!!document.querySelector('nav[aria-label="Sketch tools"]')`)) ? true : null), 10_000);
+    await s.clickSel('nav[aria-label="Sketch tools"] button[aria-label="Rectangle"]');
+    await drag(s, [500, 500], [600, 580]);
+    await press(s, "Escape", 27);
+    await s.tab("Document");
+    await s.clickSel('section[aria-label=Pages] button[aria-label="Page 1, drawing page"]');
+    await waitFor("the vector tools", async () => ((await s.evaluate(`!document.querySelector('nav[aria-label="Sketch tools"]')`)) ? true : null), 10_000);
+    await focusCanvas(s);
+    await press(s, "Escape", 27);
     await s.tab("Layers");
-    spots.sketch = [215, 850];
   }
   if (extras.second) {
     const file = path.join(SCRATCH, "second.png");
@@ -751,7 +762,16 @@ test("0094 c36, c35, c43: picks add and remove, the mode stays armed, the image 
     await waitFor("one path again", async () => (/Inside 1 path(?!s)/.test(await advText(s)) ? true : null), 20_000);
     assert.equal(await pickState(s), "true", "armed after a removal");
     assert.ok(!(await selectedRows(s)).some((r) => r.includes("Ellipse")), "the removed path leaves the selection");
-    await clickAt(s, scene.spots.rect);
+    // The bar with the mask and the Parts row (0094 slice 2) is 36 px taller and now covers the
+    // rectangle's spot: click a point of the rectangle's interior (x0 - 40..x0 + 100 by
+    // y0 + 10..y0 + 46, drawn in buildScene) that no part of the bar covers.
+    const bar = JSON.parse((await s.evaluate(`JSON.stringify((() => { const r = document.querySelector('${BAR}').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })())`)) as string) as number[];
+    const rectTop = scene.spots.rect[1] - 17;
+    const free: [number, number] | undefined = [-36, -20, 0, 20, 40, 60, 80, 96]
+      .flatMap((dx) => [3, 10, 18, 26, 33].map((dy) => [scene.box.x0 + dx, rectTop + dy] as [number, number]))
+      .find(([x, y]) => x < bar[0] - 2 || x > bar[2] + 2 || y < bar[1] - 2 || y > bar[3] + 2);
+    assert.ok(free, `a point of the rectangle outside the bar ${JSON.stringify(bar)}`);
+    await clickAt(s, free);
     await waitFor("no mask", async () => ((await maskState(s)) === "absent" ? true : null), 20_000);
     assert.equal(await clearPresent(s), false, "Clear mask disappears with the last path");
     assert.equal(await pickState(s), "true", "armed after the last removal");
@@ -829,7 +849,7 @@ test("0094 c37, c41: a pick, Shift+click and the Select route give the same mask
   });
 });
 
-test("0094 c38: text, a second image and a sketch are refused with the row; the picture and empty canvas do nothing; a double-click on the picture creates nothing while armed", { skip: !BROWSER, timeout: 600_000 }, async () => {
+test("0094 c38: text and a second image are refused with the row (a sketch lies on its own page since 0098); the picture and empty canvas do nothing; a double-click on the picture creates nothing while armed", { skip: !BROWSER, timeout: 600_000 }, async () => {
   await withTall(async (s) => {
     const scene = await buildScene(s, ["rect"], { second: true, sketch: true, text: true });
     const rows = await s.layerRows();
@@ -838,7 +858,8 @@ test("0094 c38: text, a second image and a sketch are refused with the row; the 
     }
     await enterTrace(s, scene);
     await arm(s);
-    for (const [name, at] of [["text", scene.spots.text], ["second image", scene.spots.second], ["sketch", scene.spots.sketch]] as const) {
+    // The sketch exists (its row) but lies on its own sketch page since `specs/0098`: no click.
+    for (const [name, at] of [["text", scene.spots.text], ["second image", scene.spots.second]] as const) {
       await clickAt(s, at);
       await waitFor(`${name} notice`, async () => ((await noticeShown(s)) ? true : null), 5000);
       assert.equal(await pickState(s), "true", `${name}: still armed`);

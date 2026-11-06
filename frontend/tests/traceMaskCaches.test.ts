@@ -6,7 +6,7 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
 import { readAnalysis, type TraceAnalysis } from "../src/lib/traceAnalysis.ts";
-import { applyRegionAnalysis, forgetRegionValues } from "../src/lib/traceMaskCaches.ts";
+import { applyRegionAnalysis, forgetRegionValues, partAutoValues } from "../src/lib/traceMaskCaches.ts";
 import { BRIGHTNESS, REMOVE_BACKGROUND, firstChoice, type TraceValues } from "../src/lib/traceText.ts";
 
 const caches = () => ({
@@ -74,4 +74,17 @@ test("a Threshold the maker set stays, an automatic Method still follows the reg
   const read = applyRegionAnalysis(start(), brightness(), new Set<keyof TraceValues>(["threshold"]));
   assert.equal(read.threshold, 33);
   assert.equal(read.method, BRIGHTNESS);
+});
+
+test("slice 2: each part takes its own region's automatic values; what the maker set for it stays", () => {
+  const analysis = null;
+  const base: TraceValues = { ...firstChoice().values, method: REMOVE_BACKGROUND, backgroundAuto: true, background: "#FFFFFF", threshold: 90 };
+  const fresh = partAutoValues(base, { threshold: 140, background: "#D8D8D8", analysis }, new Set());
+  assert.equal(fresh.background, "#D8D8D8", "the part's own background");
+  assert.equal(fresh.threshold, 140, "the part's own automatic Threshold");
+  const kept = partAutoValues(base, { threshold: 140, background: "#D8D8D8", analysis: null }, new Set<keyof TraceValues>(["threshold"]));
+  assert.equal(kept.threshold, 90, "a Threshold the maker set for the part stays");
+  assert.equal(kept.background, "#D8D8D8", "Auto still follows the region");
+  const fixed = partAutoValues({ ...base, backgroundAuto: false, background: "#00FF00" }, { threshold: 140, background: "#D8D8D8", analysis: null }, new Set());
+  assert.equal(fixed.background, "#00FF00", "a picked background stays");
 });
