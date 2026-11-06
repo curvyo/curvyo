@@ -45,6 +45,14 @@ export function PageFrames({
               : "color-mix(in srgb, var(--toolbar-icon) 65%, transparent)",
           }}
         >
+          {/* The frame cue of a page-row drop (`specs/0099` UX notes §2): 2px outside. */}
+          {page.dropTarget && (
+            <div
+              data-drop-target=""
+              className="absolute"
+              style={{ inset: -4, outline: "2px solid var(--editor-accent)" }}
+            />
+          )}
           {/* The label is never wider than its frame: the name truncates first, the word goes
               below 96 px, the whole label below 24 px (`specs/0098` UX notes §5). */}
           {page.screenWidth >= 24 && (

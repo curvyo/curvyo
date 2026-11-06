@@ -1,3 +1,5 @@
+import type { SketchRow } from "@/lib/sketchPages";
+
 /** Plain display data produced by the Rust page controller. */
 export interface PageRow {
   id: string;
@@ -27,6 +29,10 @@ export interface PageRow {
   screenY: number;
   screenWidth: number;
   screenHeight: number;
+  /** A sketch page's state and clone count (`specs/0099` criteria 14, 16), `null` otherwise. */
+  sketch: SketchRow | null;
+  /** The page a page-row drag would drop onto now (its frame cue, UX notes §2). */
+  dropTarget: boolean;
 }
 export function readPages(json: string): PageRow[] {
   return JSON.parse(json) as PageRow[];

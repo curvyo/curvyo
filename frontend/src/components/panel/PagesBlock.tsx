@@ -1,5 +1,19 @@
-import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Ban,
+  CircleCheck,
+  CircleDashed,
+  CircleX,
+  GripVertical,
+  Link2,
+  Move,
+  Plus,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { type PageRow, pageReading } from "@/lib/pages";
@@ -7,6 +21,17 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { AddPageGroup } from "@/components/panel/AddPageGroup";
 import { KindChip } from "@/components/KindChip";
 import { kindOptions } from "@/workbenches/registry";
+import {
+  deleteLabel,
+  sketchPageReading,
+  stateEmphasised,
+  stateGlyph,
+  stateWord,
+  usedByTail,
+} from "@/lib/sketchPages";
+import type { DropBadge } from "@/hooks/usePageRowDrag";
+
+const STATE_GLYPHS = { CircleDashed, CircleCheck, Move, TriangleAlert, CircleX };
 
 const buttonClass =
   "flex h-7 w-7 shrink-0 items-center justify-center rounded hover:bg-[var(--editor-accent-hover)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)] focus-visible:outline-offset-1 aria-disabled:opacity-40";
@@ -33,7 +58,11 @@ export function PagesBlock({
     y: number;
     target: number;
     moved: boolean;
+    /** A sketch row also places a linked clone when released over the canvas (`0099`). */
+    placing: boolean;
+    inList: boolean;
   } | null>(null);
+  const rowDrag = doc.rowDrag;
   const [dragTarget, setDragTarget] = useState<number | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const focusRow = (index: number) =>
@@ -52,6 +81,7 @@ export function PagesBlock({
     setEditing(null);
   };
   const cancelDrag = () => {
+    if (drag.current?.placing) rowDrag.cancel();
     drag.current = null;
     setDragTarget(null);
   };
@@ -205,6 +235,8 @@ export function PagesBlock({
                     y: e.clientY,
                     target: index,
                     moved: false,
+                    placing: page.kind === "sketch" && rowDrag.begin(page.id, page.name),
+                    inList: true,
                   };
                 }}
                 onPointerMove={(e) => {
@@ -212,6 +244,19 @@ export function PagesBlock({
                   if (!d) return;
                   if (Math.abs(e.clientY - d.y) >= 4) d.moved = true;
                   if (!d.moved) return;
+                  // Inside the list it reorders; outside it places (per move, both ways).
+                  const box = list.current?.getBoundingClientRect();
+                  d.inList =
+                    !!box &&
+                    e.clientX >= box.left &&
+                    e.clientX <= box.right &&
+                    e.clientY >= box.top &&
+                    e.clientY <= box.bottom;
+                  if (d.placing) rowDrag.move(e.clientX, e.clientY, d.inList);
+                  if (!d.inList) {
+                    setDragTarget(null);
+                    return;
+                  }
                   const rows =
                     list.current?.querySelectorAll<HTMLElement>(
                       "[data-page-row]",
@@ -226,7 +271,13 @@ export function PagesBlock({
                 }}
                 onPointerUp={() => {
                   const d = drag.current;
-                  if (d?.moved) reorder(page, d.target);
+                  if (d?.placing && d.moved && !d.inList) {
+                    drag.current = null;
+                    setDragTarget(null);
+                    rowDrag.drop();
+                    return;
+                  }
+                  if (d?.moved && d.inList) reorder(page, d.target);
                   cancelDrag();
                 }}
                 onPointerCancel={cancelDrag}
@@ -263,7 +314,11 @@ export function PagesBlock({
                   type="button"
                   data-page-name={index}
                   title={page.name}
-                  aria-label={pageReading(page.name, page.kindWord)}
+                  aria-label={
+                    page.sketch
+                      ? sketchPageReading(page.name, page.sketch.state)
+                      : pageReading(page.name, page.kindWord)
+                  }
                   className={`flex w-full min-w-0 items-center gap-1.5 text-left text-xs focus-visible:outline-2 ${page.active ? "font-semibold" : ""}`}
                   tabIndex={page.active ? 0 : -1}
                   onClick={() => doc.pageAction("activate", page.id)}
@@ -281,14 +336,11 @@ export function PagesBlock({
                   />
                 </button>
               )}
-              <div
-                className="truncate text-[11px] tabular-nums opacity-65"
-                title={page.machine ? `${page.machine} · ${page.size}` : page.size}
-              >
-                {page.machine ? `${page.machine} · ${page.size}` : page.size}
-              </div>
+              <RowLine page={page} />
             </div>
-            <div role="gridcell">
+            <div role="gridcell" className="min-w-7">
+              {/* A sketch page has no frame-only switch (`0099` criterion 5); its column stays. */}
+              {!page.sketch && (
               <Tooltip side="left" content={`Move frame only: ${page.name}`}>
                 <button
                   type="button"
@@ -321,14 +373,15 @@ export function PagesBlock({
                   </span>
                 </button>
               </Tooltip>
+              )}
             </div>
             {pages.length > 1 && (
               <div role="gridcell">
-                <Tooltip side="left" content={`Delete page: ${page.name}`}>
+                <Tooltip side="left" content={deleteLabel(page.name, page.sketch)}>
                   <button
                     type="button"
                     className={buttonClass}
-                    aria-label={`Delete page: ${page.name}`}
+                    aria-label={deleteLabel(page.name, page.sketch)}
                     tabIndex={-1}
                     onClick={() => {
                       doc.pageAction("delete", page.id);
@@ -368,7 +421,60 @@ export function PagesBlock({
       <span role="status" className="sr-only">
         {announcement}
       </span>
+      {rowDrag.badge && createPortal(<DropBadgePill badge={rowDrag.badge} />, document.body)}
     </section>
+  );
+}
+
+/** Line 2 of a row: a sketch page's state first, then its size (`0099` criterion 14). */
+function RowLine({ page }: { page: PageRow }) {
+  const sketch = page.sketch;
+  if (!sketch) {
+    const text = page.machine ? `${page.machine} · ${page.size}` : page.size;
+    return (
+      <div className="truncate text-[11px] tabular-nums opacity-65" title={text}>
+        {text}
+      </div>
+    );
+  }
+  const Glyph = STATE_GLYPHS[stateGlyph(sketch.state)];
+  const word = stateWord(sketch.state);
+  const strong = stateEmphasised(sketch.state);
+  return (
+    <div
+      className="flex min-w-0 items-center gap-1 text-[11px] tabular-nums"
+      title={`${word} · ${page.size}${usedByTail(sketch.clones)}`}
+    >
+      <span aria-hidden className={`flex shrink-0 items-center gap-1 ${strong ? "" : "opacity-65"}`}>
+        <Glyph size={12} strokeWidth={1.5} />
+        <span className="whitespace-nowrap">{word}</span>
+      </span>
+      <span aria-hidden className="min-w-0 truncate opacity-65">
+        {` · ${page.size}`}
+      </span>
+    </div>
+  );
+}
+
+/** The drop badge (UX notes §2): DOM, `aria-hidden`, no pointer events. */
+function DropBadgePill({ badge }: { badge: DropBadge }) {
+  const Glyph = badge.refused ? Ban : Link2;
+  return (
+    <div
+      aria-hidden
+      data-drop-badge=""
+      className="pointer-events-none fixed z-50 flex h-5 items-center gap-1 whitespace-nowrap rounded-lg border px-1.5 text-xs"
+      style={{
+        left: badge.x,
+        top: badge.y,
+        background: "var(--toolbar-bg)",
+        color: "var(--toolbar-icon)",
+        borderColor: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
+      }}
+    >
+      <Glyph size={12} />
+      {badge.word}
+    </div>
   );
 }
 function PagePosition({ page, doc }: { page: PageRow; doc: DocumentPanelApi }) {

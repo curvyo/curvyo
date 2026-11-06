@@ -1,3 +1,4 @@
+import { type PageRowDragApi, usePageRowDrag } from "@/hooks/usePageRowDrag";
 import { useCallback, useMemo, useState } from "react";
 
 import { readPages, type PageRow } from "@/lib/pages";
@@ -173,6 +174,8 @@ export interface DocumentPanelApi {
     y?: number,
   ) => void;
   view: DocumentView;
+  /** The drag of a page row onto the canvas (`specs/0099` criteria 8 to 10). */
+  rowDrag: PageRowDragApi;
   /** The status bar's cursor readout for a document point in millimetres. */
   cursorText: (xMm: number, yMm: number) => string;
   /** Enter, Tab or leaving a size field: `"committed"`, `"unchanged"` or
@@ -202,6 +205,8 @@ interface EditorHandle {
   syncRevision: number;
   /** Re-reads the cursor readout after a command moved the document. */
   refreshCursor: () => void;
+  /** The canvas: the row drag's coordinates, and focus after a drop (`specs/0099` criterion 8). */
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -316,6 +321,15 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
     [getSession],
   );
 
+  const rowDrag = usePageRowDrag(
+    getSession,
+    () => editor.containerRef.current,
+    () => {
+      editor.sync();
+      refresh();
+      editor.containerRef.current?.focus({ preventScroll: true });
+    },
+  );
   const pageAction: DocumentPanelApi["pageAction"] = (
     action,
     id = "",
@@ -358,6 +372,7 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
 
   return {
     pageAction,
+    rowDrag,
     view,
     cursorText,
     setSide,
