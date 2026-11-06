@@ -1,6 +1,6 @@
 // Tester cases for `specs/0025-raster-trace` slice 3 in the real app (Chromium via DevTools, set
-// CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): the View pill and the
-// peek, the progress slot (Stop, Stopped and Retry, Failed and Retry; round 3 of 2026-10-29) (a trace worker that dies at start, put
+// CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): (the View pill and the
+// peek of criterion 51 are retired, UX notes §24.1), the progress slot (Stop, Stopped and Retry, Failed and Retry; round 3 of 2026-10-29) (a trace worker that dies at start, put
 // in by a script that runs before the page: no production code is touched), a large image, several
 // images, the 100,000-node warning and the keyboard route. Harness as in `acceptance_0025_slice2_tester.test.ts`.
 
@@ -9,7 +9,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { crc32, deflateSync } from "node:zlib";
 import { removeProfile } from "./browser/removeProfile.ts";
 import { startVite, stopVite } from "./browser/vite.ts";
 
@@ -167,31 +167,6 @@ async function session(profile: string) {
 }
 
 
-/** A `width` x `height` opaque RGB PNG (96 dpi by default: no pHYs). */
-function png(width: number, height: number, rgb: [number, number, number]): Buffer {
-  const chunk = (kind: string, data: Buffer) => {
-    const len = Buffer.alloc(4);
-    len.writeUInt32BE(data.length);
-    const body = Buffer.concat([Buffer.from(kind, "latin1"), data]);
-    const crc = Buffer.alloc(4);
-    crc.writeUInt32BE(crc32(body) >>> 0);
-    return Buffer.concat([len, body, crc]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 2;
-  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: width }, () => rgb).flat())]);
-  const raw = Buffer.concat(Array.from({ length: height }, () => row));
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk("IHDR", ihdr),
-    chunk("IDAT", deflateSync(raw)),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
-}
-
 
 /** A grey 8-bit PNG; `grey(x, y)` is the grey of a pixel. */
 function pngGrey(width: number, height: number, grey: (x: number, y: number) => number): Buffer {
@@ -227,62 +202,6 @@ const ring = (x: number, y: number) => {
   const r = Math.hypot(x + 0.5 - 100, y + 0.5 - 100);
   return r < 60 && r > 20 ? 0 : 255;
 };
-
-/** Decodes an 8-bit RGB or RGBA non-interlaced PNG (a DevTools screenshot) to RGBA. */
-function decodePng(buf: Buffer): { width: number; height: number; data: Uint8Array } {
-  let at = 8;
-  let width = 0;
-  let height = 0;
-  let channels = 4;
-  const idat: Buffer[] = [];
-  while (at < buf.length) {
-    const len = buf.readUInt32BE(at);
-    const kind = buf.toString("latin1", at + 4, at + 8);
-    const body = buf.subarray(at + 8, at + 8 + len);
-    if (kind === "IHDR") {
-      width = body.readUInt32BE(0);
-      height = body.readUInt32BE(4);
-      channels = body[9] === 6 ? 4 : 3;
-    } else if (kind === "IDAT") {
-      idat.push(body);
-    }
-    at += 12 + len;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * channels;
-  const out = new Uint8Array(width * height * 4);
-  const prev = new Uint8Array(stride);
-  const cur = new Uint8Array(stride);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)];
-    for (let i = 0; i < stride; i++) {
-      const x = raw[y * (stride + 1) + 1 + i];
-      const a = i >= channels ? cur[i - channels] : 0;
-      const b = prev[i];
-      const c = i >= channels ? prev[i - channels] : 0;
-      let v = x;
-      if (filter === 1) v = x + a;
-      else if (filter === 2) v = x + b;
-      else if (filter === 3) v = x + ((a + b) >> 1);
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
-      }
-      cur[i] = v & 255;
-    }
-    for (let px = 0; px < width; px++) {
-      out[(y * width + px) * 4] = cur[px * channels];
-      out[(y * width + px) * 4 + 1] = cur[px * channels + 1];
-      out[(y * width + px) * 4 + 2] = cur[px * channels + 2];
-      out[(y * width + px) * 4 + 3] = channels === 4 ? cur[px * channels + 3] : 255;
-    }
-    prev.set(cur);
-  }
-  return { width, height, data: out };
-}
 
 type S = Awaited<ReturnType<typeof session>>;
 
@@ -336,7 +255,7 @@ const barStatus = async (s: S) =>
   (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
     const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
     if (line) return line;
-    const counts = bar?.querySelector('[data-trace-counts] > span')?.textContent.trim() ?? '';
+    const counts = bar?.querySelector('[data-trace-hidden-status]')?.textContent.trim() ?? '';
     if (counts) return counts;
     return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
 const traceReady = async (s: S) =>
@@ -348,32 +267,6 @@ const canvasRect = async (s: S) =>
   JSON.parse(
     (await s.evaluate(`JSON.stringify((() => { const r = [...document.querySelectorAll('canvas')].map((c) => c.getBoundingClientRect()).sort((a, b) => b.width * b.height - a.width * a.height)[0]; return [r.x, r.y, r.width, r.height]; })())`)) as string,
   ) as [number, number, number, number];
-/** Counts screenshot pixels inside the canvas: near black, and near the preview blue. */
-const pixels = async (s: S) => {
-  const [cx, cy, cw, ch] = await canvasRect(s);
-  const blue = JSON.parse(
-    (await s.evaluate(`(() => { const e = document.createElement('i'); e.style.color = 'var(--preview-new)'; document.body.appendChild(e);
-      const c = getComputedStyle(e).color; e.remove(); return JSON.stringify(c.match(/[\\d.]+/g).slice(0, 3).map(Number)); })()`)) as string,
-  ) as number[];
-  const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
-  const png = decodePng(Buffer.from(shot.result?.data ?? "", "base64"));
-  // The 36 px analysis row of 0089 slice F makes the bar taller, so its blue finish button (the same
-  // blue as the preview outline) now lies below canvas top + 80: sample below the bar's bottom edge.
-  const barBottom = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace]')?.getBoundingClientRect().bottom ?? 0`)) as number;
-  let black = 0;
-  let near = 0;
-  for (let y = Math.max(Math.floor(cy) + 80, Math.ceil(barBottom) + 4); y < cy + ch; y++) {
-    for (let x = Math.floor(cx) + 400; x < cx + cw - 20; x++) {
-      const i = (y * png.width + x) * 4;
-      const [r, g, b] = [png.data[i], png.data[i + 1], png.data[i + 2]];
-      if (r < 40 && g < 40 && b < 40) black++;
-      if (Math.abs(r - blue[0]) + Math.abs(g - blue[1]) + Math.abs(b - blue[2]) < 60) near++;
-    }
-  }
-  return { black, blue: near, previewBlue: blue };
-};
-const selectedRows = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('[role=row][aria-selected=true]')].map((r) => r.getAttribute('aria-label')).join('|')`)) as string;
 const rowInfo = async (s: S) =>
   JSON.parse(
     (await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=row][aria-level]')].map((r) => [r.getAttribute('aria-label'), Number(r.getAttribute('aria-level'))]))`)) as string,
@@ -471,7 +364,6 @@ const openTrace = async (s: S) => {
   await s.key("i", 73);
   await waitFor("the Trace bar", async () => ((await trace(s)) ? true : null));
 };
-const html = async (s: S, expr: string) => s.evaluate(expr);
 /** The text of every button in the bar, visible ones only. */
 const barButtons = async (s: S) =>
   JSON.parse(
@@ -524,170 +416,6 @@ const discs = (x: number, y: number) => {
 };
 const blobs = (x: number, y: number) => (Math.sin(x * 0.05) + Math.cos(y * 0.04) + Math.sin((x + y) * 0.03) > 0.4 ? 0 : 255);
 
-const mouseWheel = async (s: S, x: number, y: number, deltaY: number, ctrl = true) => {
-  await s.send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY, modifiers: ctrl ? 2 : 0 });
-  await sleep(400);
-};
-
-const keyDownOnly = (s: S, key: string, code: string, vk: number, modifiers = 0, repeat = false) =>
-  s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code, windowsVirtualKeyCode: vk, modifiers, autoRepeat: repeat });
-const keyUpOnly = (s: S, key: string, code: string, vk: number, modifiers = 0) =>
-  s.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: vk, modifiers });
-
-const viewChecked = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].filter((r) => r.getAttribute('aria-checked') === 'true').map((r) => r.getAttribute('aria-label')).join(',')`)) as string;
-const clickView = async (s: S, name: string) => {
-  await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=${name}]').setAttribute('data-t25', '1'); })()`);
-  await s.clickSel("[data-t25]");
-  await sleep(300);
-};
-
-test("0025s3 c51 in Chromium: the View pill, what each view draws, the peek, Shift+backslash (criterion 51)", { skip: !BROWSER, timeout: 400_000 }, async () => {
-  const { s, close } = await launch();
-  try {
-    await s.tab("Layers");
-    await importImage(s, "ring.png", ring);
-    await openTrace(s);
-    await settle(s);
-    // The screenshot counts below assume the bar of slice 3: the Advanced block (open in this file
-    // for the counts) is closed so its blue choices are not counted as outline.
-    await clickAria(s, "Fewer trace options");
-    await sleep(300);
-    // The pill: radiogroup "View", three icon segments with tooltips, Overlay by default, in row 1.
-    const names = (await s.evaluate(`[...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].map((r) => r.getAttribute('aria-label')).join(',')`)) as string;
-    // Mask is the second segment since `specs/0089` criterion 21 (UX notes §4).
-    assert.equal(names, "Overlay,Mask,Trace,Image");
-    assert.equal(await viewChecked(s), "Overlay");
-    const geo = JSON.parse(
-      (await s.evaluate(`JSON.stringify((() => { const g = document.querySelector('[role=radiogroup][aria-label=View]').getBoundingClientRect(); const p = document.querySelector('button[aria-label=Preset]').getBoundingClientRect(); return { sameRow: Math.abs(g.y + g.height / 2 - (p.y + p.height / 2)) < 6, rightOfPreset: g.x >= p.right, segs: [...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].map((r) => { const b = r.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }) }; })())`)) as string,
-    ) as { sameRow: boolean; rightOfPreset: boolean; segs: number[][] };
-    assert.ok(geo.sameRow && geo.rightOfPreset, `View sits right of Preset in row 1: ${JSON.stringify(geo)}`);
-    console.log("View segments (w,h):", JSON.stringify(geo.segs));
-    // Tooltips name the segment; the Image tooltip adds the key.
-    const tipOf = async (name: string) => {
-      await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=${name}]').setAttribute('data-t25', '1'); })()`);
-      const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('[data-t25]').getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
-      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 640, y: 600 });
-      await sleep(600);
-      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c[0] - 2, y: c[1] });
-      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c[0], y: c[1] });
-      await sleep(1200);
-      return (await s.evaluate(`[...new Set([...document.querySelectorAll('[role=tooltip]')].map((t) => t.textContent))].join(' | ')`)) as string;
-    };
-    const tips = [await tipOf("Overlay"), await tipOf("Trace"), await tipOf("Image")];
-    console.log("View tooltips:", JSON.stringify(tips));
-    assert.match(tips[0], /Overlay/);
-    assert.match(tips[1], /Trace/);
-    assert.match(tips[2], /Image/);
-    assert.match(tips[2], /\\/, "the Image tooltip names the key");
-
-    // What each view draws (screenshot pixels): Overlay = dim picture + blue outline.
-    const overlay = await pixels(s);
-    await clickView(s, "Trace");
-    assert.equal(await viewChecked(s), "Trace");
-    const traceView = await pixels(s);
-    await clickView(s, "Image");
-    const imageView = await pixels(s);
-    console.log("pixels overlay/trace/image:", JSON.stringify({ overlay, traceView, imageView }));
-    assert.ok(overlay.blue > 100, `Overlay draws the outline: ${overlay.blue}`);
-    assert.ok(overlay.black < imageView.black / 3, `Overlay dims the picture: ${overlay.black} vs ${imageView.black}`);
-    assert.ok(traceView.blue < overlay.blue / 5, `Trace draws no outline: ${traceView.blue}`);
-    assert.ok(traceView.black > imageView.black * 0.7, `Trace shows the result filled in black: ${traceView.black} vs ${imageView.black}`);
-    assert.ok(imageView.blue < overlay.blue / 5, `Image draws no outline: ${imageView.blue}`);
-    assert.ok(imageView.black > 1000, `Image shows the original at full strength: ${imageView.black}`);
-
-    // Zoom works in every view (the black area changes with the zoom).
-    const [cx, cy, cw, ch] = await canvasRect(s);
-    for (const view of ["Overlay", "Trace", "Image"]) {
-      await clickView(s, view);
-      const a = await pixels(s);
-      await mouseWheel(s, cx + cw * 0.6, cy + ch * 0.5, -300);
-      const b = await pixels(s);
-      await mouseWheel(s, cx + cw * 0.6, cy + ch * 0.5, 300);
-      assert.ok(b.black !== a.black || b.blue !== a.blue, `zoom changes the picture in the ${view} view`);
-    }
-    await clickView(s, "Overlay");
-
-    // The peek: hold backslash, the original shows and Image is pressed; release returns.
-    await focusCanvas(s);
-    await keyDownOnly(s, "\\", "Backslash", 220);
-    await sleep(500);
-    assert.equal(await viewChecked(s), "Image", "the pill tells the truth while the key is held");
-    const held = await pixels(s);
-    assert.ok(held.blue < overlay.blue / 5 && held.black > overlay.black * 3, `peek shows the original: ${JSON.stringify(held)}`);
-    await keyDownOnly(s, "\\", "Backslash", 220, 0, true);
-    await keyDownOnly(s, "\\", "Backslash", 220, 0, true);
-    await sleep(200);
-    assert.equal(await viewChecked(s), "Image", "key repeat changes nothing");
-    await keyUpOnly(s, "\\", "Backslash", 220);
-    await sleep(500);
-    assert.equal(await viewChecked(s), "Overlay", "release returns to the chosen view");
-    const back = await pixels(s);
-    assert.ok(Math.abs(back.blue - overlay.blue) < overlay.blue * 0.2 + 50, "the outline is back");
-    // Window blur restores.
-    await keyDownOnly(s, "\\", "Backslash", 220);
-    await sleep(300);
-    assert.equal(await viewChecked(s), "Image");
-    await s.evaluate(`window.dispatchEvent(new Event('blur'))`);
-    await sleep(300);
-    assert.equal(await viewChecked(s), "Overlay", "window blur restores the chosen view");
-    await keyUpOnly(s, "\\", "Backslash", 220);
-    // The peek from a bar button too.
-    await s.evaluate(`document.querySelector('${barQ} [role=spinbutton][aria-label=Threshold]').focus()`);
-    await keyDownOnly(s, "\\", "Backslash", 220);
-    await sleep(300);
-    const fromField = await viewChecked(s);
-    await keyUpOnly(s, "\\", "Backslash", 220);
-    console.log("peek with focus in the Threshold field (text field: expected ignored):", fromField);
-    assert.equal(fromField, "Overlay", "ignored in text fields");
-    await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); document.querySelector('button[aria-label=Preset]').setAttribute('data-t25', '1'); document.querySelector('button[aria-label=Preset]').focus(); })()`);
-    await keyDownOnly(s, "\\", "Backslash", 220);
-    await sleep(300);
-    assert.equal(await viewChecked(s), "Image", "the peek works with focus on a bar button");
-    await keyUpOnly(s, "\\", "Backslash", 220);
-    await sleep(300);
-
-    // Shift+backslash cycles Overlay -> Mask -> Trace -> Image -> Overlay (Mask since `specs/0089`
-    // criterion 21).
-    await focusCanvas(s);
-    const seen: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      await keyDownOnly(s, "|", "Backslash", 220, 8);
-      await keyUpOnly(s, "|", "Backslash", 220, 8);
-      await sleep(300);
-      seen.push(await viewChecked(s));
-    }
-    assert.deepEqual(seen, ["Mask", "Trace", "Image", "Overlay"]);
-
-    // Arrow keys in the pill move and select; one Tab stop; the view is not remembered.
-    await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-checked=true]').focus()`);
-    await press(s, "ArrowRight", 39);
-    assert.equal(await viewChecked(s), "Mask");
-    await press(s, "ArrowRight", 39);
-    assert.equal(await viewChecked(s), "Trace");
-    await press(s, "ArrowRight", 39);
-    await press(s, "ArrowRight", 39);
-    assert.equal(await viewChecked(s), "Overlay", "arrows wrap");
-    await press(s, "ArrowLeft", 37);
-    assert.equal(await viewChecked(s), "Image");
-    const tabindexes = (await s.evaluate(`[...document.querySelectorAll('[role=radiogroup][aria-label=View] [role=radio]')].map((r) => r.tabIndex).join(',')`)) as string;
-    assert.equal(tabindexes, "-1,-1,-1,0", "one Tab stop for the pill");
-    await focusCanvas(s);
-    await s.key("Escape", 27);
-    await sleep(300);
-    await openTrace(s);
-    await advancedOpen(s);
-    await settle(s);
-    assert.equal(await viewChecked(s), "Overlay", "entering the tool starts on Overlay");
-    // Nothing of this touched the document: no history step beyond the import.
-    const hist = await historyText(s);
-    assert.ok(!/Trace image/.test(hist), "views write nothing");
-  } finally {
-    await close();
-  }
-});
-
-/** Stop, "Stopped" with Retry in the slot: the checks that hold for every Stop (criterion 53, UX notes 21.2). */
 async function stopAndAgain(s: S, label: string) {
   await clickStop(s);
   await sleep(600);
@@ -864,10 +592,6 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
   }
 });
 
-const clickRadio = async (s: S, group: string, label: string) => {
-  await s.evaluate(`(() => { document.querySelectorAll('[data-t25]').forEach((e) => e.removeAttribute('data-t25')); [...document.querySelectorAll('[role=radiogroup][aria-label=${group}] [role=radio]')].find((r) => r.textContent.trim() === ${JSON.stringify(label)}).setAttribute('data-t25', '1'); })()`);
-  await s.clickSel("[data-t25]");
-};
 const advancedOpen = async (s: S) => {
   if ((await s.evaluate(`document.querySelector('${barQ} [role=spinbutton][aria-label=Corners]') === null`)) as boolean) {
     await clickAria(s, EXPAND_CLOSED);
@@ -960,7 +684,7 @@ test("0025s3 c52 in Chromium: an image over 4 Mpx, the reduced copy, full-size C
   }
 });
 
-test("0025s3 several images in Chromium: label, views, the peek and one step (criteria 46, 51)", { skip: !BROWSER, timeout: 500_000 }, async () => {
+test("0025s3 several images in Chromium: label and one step (criterion 46; the views and the peek of criterion 51 are retired, UX notes §24.1)", { skip: !BROWSER, timeout: 500_000 }, async () => {
   const { s, close } = await launch();
   try {
     await s.tab("Layers");
@@ -981,24 +705,7 @@ test("0025s3 several images in Chromium: label, views, the peek and one step (cr
     await clickText(s, "Trace");
     await settle(s);
     assert.match(await bar(s), /Tracing 1 of 3 images/);
-    await clickView(s, "Trace");
-    assert.equal(await viewChecked(s), "Trace");
-    const traceView = await pixels(s);
-    await clickView(s, "Image");
-    const imageView = await pixels(s);
-    await clickView(s, "Overlay");
-    const overlay = await pixels(s);
-    console.log("several images, pixels overlay/trace/image:", JSON.stringify({ overlay, traceView, imageView }));
-    // The selection chrome of three images is blue too (about 400 pixels); the outline adds to it only in Overlay.
-    assert.ok(overlay.blue > traceView.blue + 300 && overlay.blue > imageView.blue + 300, "the outline shows in Overlay only");
-    assert.ok(traceView.black > 5000 && imageView.black > 5000, "Trace and Image show black");
-    await focusCanvas(s);
-    await keyDownOnly(s, "\\", "Backslash", 220);
-    await sleep(400);
-    assert.equal(await viewChecked(s), "Image");
-    await keyUpOnly(s, "\\", "Backslash", 220);
-    await sleep(300);
-    assert.equal(await viewChecked(s), "Overlay");
+    assert.equal(await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View]') === null`), true, "no View pill with several images");
     // Stop with several, then trace again.
     await typeInto(s, "Smooth", "55");
     await settle(s);
@@ -1097,7 +804,7 @@ test("0025s3 c57 in Chromium: Tab order, arrows, focus rings, hit targets, roles
       if (name === "body") break;
     }
     console.log("Tab stops in the Trace tool, panel closed:", JSON.stringify(stops));
-    const want = ["About Trace", "Preset", "Overlay", "Threshold", "Smooth", "Ignore below", "More trace options"];
+    const want = ["About Trace", "Preset", "Pick mask paths", "Inside", "Clear mask", "Threshold", "Smooth", "Ignore below", "More trace options"];
     const got = stops.map((n) => n.replace(/^[a-z]+:/, "").replace(/ \d.*$/, ""));
     let at = -1;
     for (const w of want) {
@@ -1217,7 +924,6 @@ const tabLabels = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=tab]')].map((t) => t.getAttribute('aria-label')))`)) as string) as string[];
 const activeTab = async (s: S) =>
   (await s.evaluate(`[...document.querySelectorAll('[role=tab]')].find((t) => t.getAttribute('aria-selected') === 'true')?.getAttribute('aria-label') ?? null`)) as string | null;
-const panelHidden = async (s: S) => (await s.evaluate(`!document.querySelector('[role=tabpanel]')`)) as boolean;
 const dblclick = async (s: S, x: number, y: number) => {
   for (const clickCount of [1, 2]) {
     for (const type of ["mousePressed", "mouseReleased"]) {
@@ -1301,7 +1007,7 @@ test("0025s3 re c70 in Chromium: the About Trace tab and the i button (criterion
   }
 });
 
-test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, counts only in Advanced, icon toggles (criteria 4, 11, 41, 71)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, counts announced only (§24.5), icon toggles (criteria 4, 11, 41, 71)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   const { s, close } = await launch();
   try {
     await s.tab("Layers");
@@ -1315,11 +1021,11 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
       await sleep(300);
     }
     // Criterion 4 as 0089 criteria 22 and 22a reshape it: the finish button is the blue "Trace" (no
-    // "Create paths" button, no state label), and the flow is i, Preset, View, Method, Threshold,
+    // "Create paths" button, no state label), and the flow is i, Preset, the Mask group (UX notes §24.2), Method, Threshold,
     // Smooth, Tolerance, Ignore below, the expander, the finish button; no Advanced word.
     assert.ok(!(await hasButton(s, "Create paths")), "there is no Create paths button");
     await atRest(s, "with Advanced closed");
-    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "[role=radiogroup][aria-label=View]", "button[aria-label=Method]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=Tolerance]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]", "[data-trace-slot]"];
+    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "[data-trace-mask]", "button[aria-label=Method]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=Tolerance]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]", "[data-trace-slot]"];
     const boxes = [];
     for (const n of names) boxes.push((await rectOf(s, `${barQ} ${n}`)) ?? assert.fail(`missing ${n}`));
     const flow = (a: (typeof boxes)[0], b: (typeof boxes)[0]) => b.y > a.bottom - 4 || b.x >= a.right - 1;
@@ -1360,14 +1066,11 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
     const toggleBox = (await rectOf(s, `${barQ} button[aria-label=Invert]`))!;
     const denoise = (await rectOf(s, `${barQ} [role=radiogroup][aria-label=Denoise]`))!;
     assert.ok(toggleBox.y <= denoise.y + 4, "the toggles start Advanced row 1 with Denoise");
-    const counts = (await bar(s)).split("\n").map((l) => l.trim()).filter(Boolean);
-    const countsLine = counts.findIndex((l) => /^\d+ paths?, [\d,]+ nodes?, [\d.]+ s$/.test(l));
-    assert.ok(countsLine >= 0, `the counts line is in Advanced: ${JSON.stringify(counts)}`);
-    const countsBox = (await rectOf(s, `${barQ} [data-trace-counts]`))!;
-    const corners = (await rectOf(s, `${barQ} [role=spinbutton][aria-label=Corners]`))!;
-    // Amended 2026-10-31 (criterion 71, `0089` ux-notes §22.3): the status line is the second row, after the analysis row and above every control.
-    const analysisBox = (await rectOf(s, `${barQ} [data-trace-analysis]`))!;
-    assert.ok(countsBox.y >= analysisBox.bottom - 1 && countsBox.bottom <= Math.min(corners.y, denoise.y, toggleBox.y) + 1, "the status line is the second row of the block, above the controls");
+    // §24.5: no counts line is drawn, with Advanced open either; the hidden region carries them.
+    const counts = ((await s.evaluate(`(() => { const c = document.querySelector('${barQ}').cloneNode(true); c.querySelectorAll('.sr-only').forEach((e) => e.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()`)) as string).split("\n").map((l) => l.trim()).filter(Boolean);
+    assert.ok(!counts.some((l) => /\d+ paths?, [\d,]+ nodes?/.test(l)), `no counts line is drawn: ${JSON.stringify(counts)}`);
+    assert.equal(await s.evaluate(`document.querySelector('${barQ} [data-trace-counts]') === null && document.querySelector('${barQ} [data-trace-analysis]') === null`), true, "no status line, no analysis row");
+    assert.match((await s.evaluate(`document.querySelector('${barQ} [data-trace-hidden-status]').textContent`)) as string, /\d+ paths?, [\d,]+ nodes?, [\d.]+ s/, "the hidden region announces the counts with Advanced open");
     // A toggle works: Invert changes the result and the dot/tooltip on the closed expander.
     const rings = await settle(s);
     await clickAria(s, "Invert");
@@ -1529,7 +1232,7 @@ const clickRow = async (s: S, name: string) => {
 
 const PHOTO = path.resolve(FRONTEND, "..", "target", "photo", "iceberg.jpg");
 
-test("0025s3 re photo in Chromium: a 3747 x 3178 px photo (Wikimedia Commons, public domain), Photo preset, every view, Enter, undo, repeated drags (timings)", { skip: !BROWSER || !existsSync(PHOTO), timeout: 1_500_000 }, async () => {
+test("0025s3 re photo in Chromium: a 3747 x 3178 px photo (Wikimedia Commons, public domain), Photo preset, Enter, undo, repeated drags (timings; the views are retired)", { skip: !BROWSER || !existsSync(PHOTO), timeout: 1_500_000 }, async () => {
   const { s, close } = await launch(WORKER_FAULT);
   const times: [string, number][] = [];
   const t = async <T>(step: string, work: () => Promise<T>): Promise<T> => {
@@ -1566,21 +1269,6 @@ test("0025s3 re photo in Chromium: a 3747 x 3178 px photo (Wikimedia Commons, pu
     console.log("preset:", await s.evaluate(`document.querySelector('${barQ} button[aria-label=Preset]').textContent.trim()`), "| notice:", JSON.stringify(await barStatus(s)), "| longtasks:", JSON.stringify(await longtasks()));
     await advancedOpen(s);
     console.log("counts of the reduced preview:", JSON.stringify(await barStatus(s)));
-    for (const view of ["Trace", "Image", "Overlay"]) {
-      await t(`View ${view}: click until two frames`, async () => {
-        await clickView(s, view);
-        await frames();
-      });
-      console.log(`  longtasks in ${view}:`, JSON.stringify(await longtasks()));
-    }
-    await t("peek (hold backslash) until two frames", async () => {
-      await focusCanvas(s);
-      await keyDownOnly(s, "\\", "Backslash", 220);
-      await frames();
-    });
-    await keyUpOnly(s, "\\", "Backslash", 220);
-    await frames();
-    await longtasks();
     await t("zoom with the wheel until two frames", async () => {
       const [cx, cy, cw, ch] = await canvasRect(s);
       await s.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: cx + cw * 0.6, y: cy + ch * 0.5, deltaX: 0, deltaY: -300, modifiers: 2 });

@@ -1,7 +1,7 @@
 // Tester cases for `specs/0089-trace-quality-and-colour` slice M in the real app (Chromium via
 // DevTools; set CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built). Written
 // from the specification and the UX notes (criteria 25 to 29, Frage 81 A, 90 A, 92 B and the
-// lead's decision that the Mask view of Multicolour shows the palette colours segmented) before
+// lead decision, whose Mask view of Multicolour is retired with the views, UX notes §24.1) before
 // the code was read, and kept apart from `acceptance_0089_m_browser.test.ts`. Harness as in
 // `acceptance_0089_sliceE_tester.test.ts`.
 
@@ -10,7 +10,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { crc32, deflateSync } from "node:zlib";
 
 
 const BROWSER = process.env.CURVYO_E2E_BROWSER;
@@ -177,62 +177,6 @@ function rgbPng(width: number, height: number, colour: (x: number, y: number) =>
   ]);
 }
 
-/** Decodes an 8-bit RGB or RGBA non-interlaced PNG (a DevTools screenshot) to RGBA. */
-function decodePng(buf: Buffer): { width: number; height: number; data: Uint8Array } {
-  let at = 8;
-  let width = 0;
-  let height = 0;
-  let channels = 4;
-  const idat: Buffer[] = [];
-  while (at < buf.length) {
-    const len = buf.readUInt32BE(at);
-    const kind = buf.toString("latin1", at + 4, at + 8);
-    const body = buf.subarray(at + 8, at + 8 + len);
-    if (kind === "IHDR") {
-      width = body.readUInt32BE(0);
-      height = body.readUInt32BE(4);
-      channels = body[9] === 6 ? 4 : 3;
-    } else if (kind === "IDAT") {
-      idat.push(body);
-    }
-    at += 12 + len;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * channels;
-  const out = new Uint8Array(width * height * 4);
-  const prev = new Uint8Array(stride);
-  const cur = new Uint8Array(stride);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)];
-    for (let i = 0; i < stride; i++) {
-      const x = raw[y * (stride + 1) + 1 + i];
-      const a = i >= channels ? cur[i - channels] : 0;
-      const b = prev[i];
-      const c = i >= channels ? prev[i - channels] : 0;
-      let v = x;
-      if (filter === 1) v = x + a;
-      else if (filter === 2) v = x + b;
-      else if (filter === 3) v = x + ((a + b) >> 1);
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
-      }
-      cur[i] = v & 255;
-    }
-    for (let px = 0; px < width; px++) {
-      out[(y * width + px) * 4] = cur[px * channels];
-      out[(y * width + px) * 4 + 1] = cur[px * channels + 1];
-      out[(y * width + px) * 4 + 2] = cur[px * channels + 2];
-      out[(y * width + px) * 4 + 3] = channels === 4 ? cur[px * channels + 3] : 255;
-    }
-    prev.set(cur);
-  }
-  return { width, height, data: out };
-}
-
 async function launch(preload?: string) {
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -263,8 +207,6 @@ const press = async (s: S, k: string, vk: number, modifiers = 0) => {
   await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
   await sleep(350);
 };
-const canvasRect = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify((() => { const r = [...document.querySelectorAll('canvas')].map((c) => c.getBoundingClientRect()).sort((a, b) => b.width * b.height - a.width * a.height)[0]; return [r.x, r.y, r.width, r.height]; })())`)) as string) as [number, number, number, number];
 const pickMethod = async (s: S, label: string) => {
   await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
   await sleep(300);
@@ -278,39 +220,6 @@ const typeInto = async (s: S, name: string, text: string) => {
   await s.send("Input.insertText", { text });
   await press(s, "Enter", 13);
 };
-const clickView = async (s: S, name: string) => {
-  await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=${name}]').click()`);
-  await sleep(1000);
-};
-const shot = async (s: S) => {
-  const out = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
-  return decodePng(Buffer.from(out.result?.data ?? "", "base64"));
-};
-const savePng = async (s: S, name: string) => {
-  const out = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
-  writeFileSync(path.join(SCRATCH, name), Buffer.from(out.result?.data ?? "", "base64"));
-};
-type Shot = ReturnType<typeof decodePng>;
-const at = (img: Shot, x: number, y: number) => {
-  const i = (Math.round(y) * img.width + Math.round(x)) * 4;
-  return [img.data[i], img.data[i + 1], img.data[i + 2]];
-};
-const boxOf = (img: Shot, rect: number[], test: (rgb: number[]) => boolean) => {
-  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (let y = Math.ceil(rect[1]); y < rect[1] + rect[3]; y++) {
-    for (let x = Math.ceil(rect[0]); x < rect[0] + rect[2]; x++) {
-      if (test(at(img, x, y))) {
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
-      }
-    }
-  }
-  return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
-};
-const barBottom = async (s: S) => (await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().bottom`)) as number;
-const isBlack = ([r, g, b]: number[]) => r < 40 && g < 40 && b < 40;
 
 /** Imports `png` as `name` and opens the Trace bar on it. */
 async function openOn(s: S, name: string, png: Buffer) {
@@ -511,63 +420,6 @@ test("0089M tester: Multicolour is remembered as an app setting, Single colour n
     console.log("stored:", stored);
     const checked = stored.includes('\\"output\\":1') ? "Multicolour" : "";
     assert.equal(checked, "Multicolour", "Output is remembered");
-  });
-});
-
-test("0089M tester c29, lead decision: in Multicolour the Mask view shows each palette colour in its place, the background white; Single colour shows black", { skip: !BROWSER, timeout: 400_000 }, async () => {
-  await withApp(async (s) => {
-    await openOn(s, "m-mask.png", PICTURE);
-    await pickMethod(s, "Remove background");
-    const whole = await canvasRect(s);
-    const rectBelowBar = async () => {
-      const bottom = await barBottom(s);
-      return [whole[0], bottom + 4, whole[2], whole[1] + whole[3] - bottom - 4];
-    };
-    await clickView(s, "Image");
-    const rect = await rectBelowBar();
-    const image = await shot(s);
-    const near = (c: number[]) => ([r, g, b]: number[]) => distance([r, g, b], c) < 0.06;
-    // The greys are found by geometry from the red block (UI chrome has greys too).
-    const red = boxOf(image, rect, near(RED));
-    const k = (red.x1 - red.x0 + 1) / 80;
-    const sub = (x0: number, x1: number, y0: number, y1: number) => {
-      const px = red.x0 - 20 * k;
-      const py = red.y0 - 40 * k;
-      const [a, b, c, d] = [px + x0 * k, px + x1 * k - 1, py + y0 * k, py + y1 * k - 1];
-      return { x0: a, y0: c, x1: b, y1: d, cx: (a + b) / 2, cy: (c + d) / 2 };
-    };
-    const boxes = [red, boxOf(image, rect, near(GREEN)), boxOf(image, rect, near(BLUE)), sub(190, 240, 40, 130), sub(240, 290, 40, 130)];
-    for (const b of boxes) {
-      assert.ok(Number.isFinite(b.cx), "the blocks are on screen in the Image view");
-    }
-    // Single colour first: black union.
-    await clickView(s, "Mask");
-    const single = await shot(s);
-    assert.ok(isBlack(at(single, boxes[0].cx, boxes[0].cy)) && isBlack(at(single, boxes[2].cx, boxes[2].cy)), "Single colour: black");
-    await sixColours(s);
-    await waitFor("the segmented mask", async () => {
-      const m = await shot(s);
-      return distance(at(m, boxes[0].cx, boxes[0].cy), RED) < 0.06 ? true : null;
-    }, 30_000);
-    const mask = await shot(s);
-    // Every sampled interior pixel of every block shows its own colour (within the screen's rounding).
-    const wants = [RED, GREEN, BLUE, GREY_A, GREY_B];
-    boxes.forEach((b, i) => {
-      for (const fx of [0.25, 0.5, 0.75]) {
-        for (const fy of [0.25, 0.5, 0.75]) {
-          const px = at(mask, b.x0 + (b.x1 - b.x0) * fx, b.y0 + (b.y1 - b.y0) * fy);
-          assert.ok(distance(px, wants[i]) < 0.06, `block ${i} at ${fx},${fy} shows ${hex(px)}, want ${hex(wants[i])}`);
-        }
-      }
-    });
-    assert.deepEqual(at(mask, boxes[0].x0 - 8, boxes[0].cy), [255, 255, 255], "the background is white");
-    await savePng(s, "mask-multicolour.png");
-    // Excluded: the colour turns white in the Mask.
-    const names = await swatchNames(s);
-    const redHex = names.map((n) => n.slice(0, 7)).find((h) => distance(fromHex(h), RED) < 0.03)!;
-    await s.clickSel(swatch(redHex));
-    await s.clickSel(action("Exclude"));
-    await waitFor("the excluded red is white", async () => (at(await shot(s), boxes[0].cx, boxes[0].y1 - 3).every((c) => c > 240) ? true : null), 20_000);
   });
 });
 

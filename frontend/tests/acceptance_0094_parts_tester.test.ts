@@ -328,10 +328,10 @@ const barStrings = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...new Set([...document.querySelector('${BAR}').querySelectorAll('*')].flatMap((e) =>
     [e.getAttribute('aria-label'), e.getAttribute('title'), e.children.length === 0 ? e.textContent.trim() : ''].filter(Boolean)))])`)) as string) as string[];
 
-const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${ADV} [data-trace-counts]')?.textContent ?? ''`)) as string;
+const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
 const settledCounts = async (s: S) => {
   try {
-    return await waitFor("a trace result", async () => (/^(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
+    return await waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
   } catch (error) {
     throw new Error(`${String(error)}; the status reads "${await advancedStatus(s)}", the block "${await advText(s)}", the bar "${String(await s.evaluate(`document.querySelector('${BAR}')?.innerText`)).replace(/\n/g, " / ")}"`);
   }
@@ -409,7 +409,19 @@ const maskState = async (s: S) =>
     return [...g.querySelectorAll('[role=radio]')].map((r) => r.textContent.trim() + '=' + r.getAttribute('aria-checked')).join(','); })()`)) as string;
 const clickMask = (s: S, label: string) =>
   s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Mask] [role=radio]')].find((r) => r.textContent.trim() === ${JSON.stringify(label)}).click()`);
-const advText = async (s: S) => (await s.evaluate(`document.querySelector('${ADV}')?.textContent ?? ''`)) as string;
+// §24.5: the muted "Inside 1 path" and "2 parts" segments are announced by the hidden region only.
+const advText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
+/** The preview outline's pixels (the Overlay's one colour, 47,111,238, over the washed image) in a box of the picture. */
+const isOutline = ([r, g, b]: number[]) => b > 200 && r < 120 && g < 170;
+const outlineIn = (img: Shot, box: { x0: number; y0: number; x1: number; y1: number }, fx0: number, fy0: number, fx1: number, fy1: number) => {
+  let n = 0;
+  for (let y = Math.round(box.y0 + fy0 * (box.y1 - box.y0)); y <= box.y0 + fy1 * (box.y1 - box.y0); y++) {
+    for (let x = Math.round(box.x0 + fx0 * (box.x1 - box.x0)); x <= box.x0 + fx1 * (box.x1 - box.x0); x++) {
+      if (isOutline(at(img, x, y))) n++;
+    }
+  }
+  return n;
+};
 
 // ------------------------------------------------------------------ slice 2 helpers
 
@@ -548,7 +560,8 @@ test("0094 c18, c19, c32, c43: chip 1 and Add part, a new part copies the values
     };
     assert.equal(await tip(2), c[1].name.replace(/, active$/, ""), "the tooltip is the name without active");
     assert.equal(await spin(s, "Threshold"), 77, "a copy of the part before");
-    assert.equal(await maskState(s), "absent", "no mask paths yet");
+    assert.equal(await maskState(s), "Inside=true,Outside=false", "§24.4: the Mask group is drawn, Inside, with no paths yet");
+    assert.doesNotMatch(await advText(s), /Inside \d|Outside \d/, "no mask paths yet");
     assert.match((await s.evaluate(`document.querySelector('${BAR}').textContent`)) as string, /Part 2 of 2/, "the bar's state label");
     // c19: Shift+click assigns R to part 2.
     await shiftClick(s, scene.right[0], scene.right[1]);
@@ -674,11 +687,11 @@ test("0094 c25, c26: a change in one part traces only that part again; one risin
 });
 
 /** M1 drawn at `n` px. */
-const m1At = (n: number, rightPaper: [number, number, number] = [255, 255, 255]) =>
+const m1At = (n: number, rightPaper: [number, number, number] = [255, 255, 255], leftPaper: [number, number, number] = [255, 255, 255]) =>
   rgbPng(n, n, (x, y) => {
     const u = ((x + 0.5) * 1000) / n;
     const ink = m1Ink(u, ((y + 0.5) * 1000) / n);
-    return ink === "paper" ? (u >= 500 ? rightPaper : [255, 255, 255]) : ink === "grey" ? [128, 128, 128] : [0, 0, 0];
+    return ink === "paper" ? (u >= 500 ? rightPaper : leftPaper) : ink === "grey" ? [128, 128, 128] : [0, 0, 0];
   });
 
 test("0094 c26: a stop while several parts trace leaves the document unchanged, and Trace again finishes the join", { skip: !BROWSER, timeout: 500_000 }, async () => {
@@ -719,26 +732,30 @@ test("0094 c26: a stop while several parts trace leaves the document unchanged, 
 });
 
 // Was FAIL and todo (tester 2026-11-06); since 5f2f56b2 each part reads its own region.
-test("0094 Proposal (region-only analysis per part): on M2, part 2 over the grey paper finds its own background", { skip: !BROWSER, timeout: 400_000 }, async () => {
+// The grey paper under part 2 (M2), and the mirror: grey under part 1 only, white under part 2. Reading
+// the whole picture's background for part 2 passes the first (the grey wins there) and fails the mirror.
+for (const [label, left, right] of [["grey", [255, 255, 255], [0xd8, 0xd8, 0xd8]], ["white, grey under part 1", [0xd8, 0xd8, 0xd8], [255, 255, 255]]] as const) {
+test(`0094 Proposal (region-only analysis per part): on M2, part 2 over the ${label} paper finds its own background`, { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
-    const scene = await twoParts(s, m1At(400, [0xd8, 0xd8, 0xd8]), "m2.png");
+    const scene = await twoParts(s, m1At(400, [...right], [...left]), "m2.png");
     await pickMethod(s, "Remove background");
     await clickChip(s, 1);
     await pickMethod(s, "Remove background");
     await clickChip(s, 2);
     await settledCounts(s);
-    await s.evaluate(`document.querySelector('${BAR} [role=radiogroup][aria-label=View] [role=radio][aria-label=Mask]').click()`);
+    // One view only (Overlay, §24.1): content shows as the preview outline. The square is outlined; the grey paper of
+    // part 2 is background, so nothing hugs the picture's bottom edge below it (as it would if the paper were content).
     await sleep(2500);
     const img = await shot(s);
     const { box } = scene;
-    const px = (fx: number, fy: number) => at(img, box.x0 + fx * (box.x1 - box.x0), box.y0 + fy * (box.y1 - box.y0));
-    const paperRight = px(0.62, 0.85);
-    const square = px(0.75, 0.42);
-    console.log("Mask view of part 2: right paper", JSON.stringify(paperRight), "square", JSON.stringify(square));
-    assert.ok(square[0] < 100, `the square is content: ${square}`);
-    assert.ok(paperRight[0] > 200, `the grey paper of part 2 is background, not content: ${paperRight}`);
+    const squareOutline = outlineIn(img, box, 0.6, 0.3, 0.9, 0.55);
+    const bottomEdge = outlineIn(img, box, 0.55, 0.96, 0.95, 1.03);
+    console.log("outline pixels: square", squareOutline, "bottom edge below the grey paper", bottomEdge);
+    assert.ok(squareOutline > 20, `the square is content: ${squareOutline}`);
+    assert.ok(bottomEdge < 5, `the grey paper of part 2 is background, not content: ${bottomEdge}`);
   }, "", TALL[0], TALL[1]);
 });
+}
 
 test("0094 region-only analysis per part: a Threshold the maker set stays with its part through its region's read, and Add part copies it", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
@@ -855,25 +872,27 @@ test("0094 slice 2: in Trace, Delete on a selected mask path's Layers row remove
   }, "", TALL[0], TALL[1]);
 });
 
-test("0094 Proposal control (slice 1, criterion 9): one part over the grey paper alone finds its own background", { skip: !BROWSER, timeout: 400_000 }, async () => {
+for (const [label, left, right] of [["grey", [255, 255, 255], [0xd8, 0xd8, 0xd8]], ["white, grey beside it", [0xd8, 0xd8, 0xd8], [255, 255, 255]]] as const) {
+test(`0094 Proposal control (slice 1, criterion 9): one part over the ${label} paper alone finds its own background`, { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
-    const scene = await twoHalves(s, m1At(400, [0xd8, 0xd8, 0xd8]), "m2.png");
+    const scene = await twoHalves(s, m1At(400, [...right], [...left]), "m2.png");
     // One part, R only.
     await shiftClick(s, scene.right[0], scene.right[1]);
     await shiftClick(s, scene.left[0], scene.left[1]);
     await waitFor("R alone", async () => (/Inside 1 path(?!s)/.test(await advText(s)) && (await chips(s)).length === 1 ? true : null), 20_000);
     await pickMethod(s, "Remove background");
     await settledCounts(s);
-    await s.evaluate(`document.querySelector('${BAR} [role=radiogroup][aria-label=View] [role=radio][aria-label=Mask]').click()`);
     await sleep(2500);
     const img = await shot(s);
     const { box } = scene;
-    const px = (fx: number, fy: number) => at(img, box.x0 + fx * (box.x1 - box.x0), box.y0 + fy * (box.y1 - box.y0));
-    console.log("Mask view of the one part: right paper", JSON.stringify(px(0.62, 0.85)), "square", JSON.stringify(px(0.75, 0.42)));
-    assert.ok(px(0.75, 0.42)[0] < 100, "the square is content");
-    assert.ok(px(0.62, 0.85)[0] > 200, "the grey paper is background");
+    const squareOutline = outlineIn(img, box, 0.6, 0.3, 0.9, 0.55);
+    const bottomEdge = outlineIn(img, box, 0.55, 0.96, 0.95, 1.03);
+    console.log("outline pixels of the one part: square", squareOutline, "bottom edge", bottomEdge);
+    assert.ok(squareOutline > 20, "the square is content");
+    assert.ok(bottomEdge < 5, "the grey paper is background");
   }, "", TALL[0], TALL[1]);
 });
+}
 
 test("0094 determinism: the editor wasm replays the native parts record on two own instances", { skip: !BROWSER, timeout: 300_000 }, async () => {
   const native = JSON.parse(readFileSync(NATIVE, "utf8")) as {

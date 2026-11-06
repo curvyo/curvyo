@@ -345,7 +345,7 @@ const barStatus = async (s: S) =>
   (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
     const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
     if (line) return line;
-    const counts = bar?.querySelector('[data-trace-counts] > span')?.textContent.trim() ?? '';
+    const counts = bar?.querySelector('[data-trace-hidden-status]')?.textContent.trim() ?? '';
     if (counts) return counts;
     return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
 const traceReady = async (s: S) =>
@@ -427,7 +427,7 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     // Criterion 2: choosing the tool shows the bar, dims the picture, draws the preview, writes nothing.
     await s.clickSel("[data-t25]");
     const settled = await traceReady(s);
-    assert.match(settled, /^2 paths, \d+ nodes, [\d.]+ s/, "ring and hole: 2 paths");
+    assert.match(settled, /(^|\. )2 paths, \d+ nodes, [\d.]+ s/, "ring and hole: 2 paths");
     // Outside the Trace bar: its own "Recognise text" toggle is on by default (`specs/0091`
     // criterion 17), the rail's buttons are not pressed.
     const pressed = (await s.evaluate(`[...document.querySelectorAll('button[aria-pressed=true]')].filter((b) => !b.closest('[role=toolbar][aria-label=Trace]') && !b.closest('[role=toolbar][aria-label=Workbench]')).map((b) => b.getAttribute('aria-label')).join('|')`)) as string;
@@ -489,7 +489,7 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     await typeInto(s, "Threshold", "0");
     const none = await waitFor("0 paths", async () => {
       const t = await barStatus(s);
-      return /^0 paths/.test(t) ? t : null;
+      return /(^|\. )0 paths/.test(t) ? t : null;
     });
     assert.equal(none, "0 paths at this Threshold: too low.");
     assert.equal(await s.evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create paths')`), false, "there is no Create paths button");

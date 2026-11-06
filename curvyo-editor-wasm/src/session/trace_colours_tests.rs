@@ -8,7 +8,7 @@ use curvyo_ui_core::{
     TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_with,
 };
 
-use super::{Session, Tool, TraceCreateOutcome, TraceViewMode};
+use super::{Session, Tool, TraceCreateOutcome};
 
 const PNG: &[u8] =
     include_bytes!("../../../curvyo-image-core/tests/fixtures/images/png_rgba_8.png");
@@ -164,7 +164,7 @@ fn the_palette_of_the_preview_is_json() {
     assert_eq!(session.trace_palette_json(), "");
 }
 
-/// Isolate dims the other colours in the Trace view (35 %); the isolated one stays opaque.
+/// Isolate dims the other colours (35 %); the isolated one stays opaque.
 #[test]
 fn isolate_dims_the_other_colours() {
     let (mut session, image) = traced_image();
@@ -184,38 +184,6 @@ fn isolate_dims_the_other_colours() {
     };
     assert!((opacity(RED) - 0.35).abs() < 1e-9);
     assert!(opacity(BLUE) > 0.999);
-    session.set_trace_view_mode(TraceViewMode::Trace);
-    assert!(session.trace_fill_mesh(session.view()).triangle_count() > 0);
-}
-
-/// The Mask view of a multicolour trace is the segmented palette on white; Isolate mixes the
-/// other colours with white to 35 %.
-#[test]
-fn the_colour_mask_is_the_segmented_palette() {
-    let (mut session, image) = traced_image();
-    // 3 x 1 px: background, red, blue.
-    let rgba = [
-        0, 0, 0, 0, RED.r, RED.g, RED.b, 255, BLUE.r, BLUE.g, BLUE.b, 255,
-    ];
-    assert!(session.set_trace_mask(image, 3, 1, &rgba));
-    session.set_trace_view_mode(TraceViewMode::Mask);
-    let mut list = session.draw_list();
-    let pictures = session.frame_images(&mut list);
-    let pixels = pictures[0].1.pixels.clone();
-    assert_eq!(
-        pixels,
-        [
-            255, 255, 255, 255, RED.r, RED.g, RED.b, 255, BLUE.r, BLUE.g, BLUE.b, 255
-        ]
-    );
-    session.set_trace_palette_view(Vec::new(), Some(BLUE));
-    let mut list = session.draw_list();
-    let pictures = session.frame_images(&mut list);
-    let red = &pictures[0].1.pixels[4..8];
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let mixed = |c: u8| (f64::from(c) * 0.35 + 255.0 * 0.65).round() as u8;
-    assert_eq!(red, [mixed(RED.r), mixed(RED.g), mixed(RED.b), 255]);
-    assert_eq!(&pictures[0].1.pixels[8..11], [BLUE.r, BLUE.g, BLUE.b]);
 }
 
 /// Every colour excluded: the preview shows nothing, the strip still lists the palette (so a

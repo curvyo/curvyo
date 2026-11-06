@@ -1,5 +1,5 @@
-//! Tester cases for `specs/0025-raster-trace` slice 3 at the session: criteria 51 (the views, the
-//! peek, the cycle), 52 (reduced copy of a large image, the document untouched until Create
+//! Tester cases for `specs/0025-raster-trace` slice 3 at the session: criterion 51 (the one view,
+//! the Overlay; the other views, the peek and the cycle are retired), 52 (reduced copy of a large image, the document untouched until Create
 //! paths), 55 (over 20,000 nodes: one group, one step, one Layers row).
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
@@ -60,90 +60,32 @@ fn preview(session: &mut Session, image: NodeId) {
     assert!(session.set_trace_result(image, &wire));
 }
 
+/// Criterion 51 is retired (`specs/0089` UX notes §24.1): the Trace tool has one view, the Overlay.
+/// It keeps the dimmed picture and draws the outline; no view choice, peek or cycle changes that,
+/// and nothing touches the document.
 #[test]
-fn c51_the_four_views_overlay_mask_trace_image_draw_what_the_spec_says() {
+fn c51_the_one_view_is_the_overlay_with_the_picture_and_the_outline() {
     let (mut session, image) = traced(60, 60);
+    let bare = session.draw_list();
     preview(&mut session, image);
     assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay, "default");
     let overlay = session.draw_list();
-    session.set_trace_view_mode(TraceViewMode::Trace);
-    let trace = session.draw_list();
-    session.set_trace_view_mode(TraceViewMode::Image);
-    let original = session.draw_list();
     assert_eq!(overlay.images.len(), 1, "Overlay keeps the dimmed picture");
-    assert_eq!(trace.images.len(), 0, "Trace hides the image");
-    assert_eq!(original.images.len(), 1, "Image shows the original");
     assert!(
-        original.triangle_count() < overlay.triangle_count(),
-        "Image draws no outline: {} vs Overlay {}",
-        original.triangle_count(),
-        overlay.triangle_count()
+        overlay.triangle_count() > bare.triangle_count(),
+        "the outline is drawn: {} vs {} without a preview",
+        overlay.triangle_count(),
+        bare.triangle_count()
     );
-    assert!(
-        trace.triangle_count() > original.triangle_count(),
-        "Trace draws the filled result"
-    );
-    // The views never touch the document.
-    let after = unpack(9, &session.pack("t").unwrap()).unwrap();
-    assert_eq!(after.object_ids().len(), 1);
-}
-
-#[test]
-fn c51_peek_shows_the_original_while_held_and_returns() {
-    let (mut session, image) = traced(60, 60);
-    preview(&mut session, image);
-    session.set_trace_view_mode(TraceViewMode::Trace);
-    let chosen = session.draw_list();
-    session.set_trace_peek(true);
-    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Image);
-    assert_eq!(
-        session.trace_view_mode(),
-        TraceViewMode::Trace,
-        "the choice is kept"
-    );
-    assert_eq!(session.draw_list().images.len(), 1);
-    session.set_trace_peek(false);
-    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Trace);
-    assert_eq!(
-        session.draw_list().triangle_count(),
-        chosen.triangle_count()
-    );
-}
-
-#[test]
-fn c51_the_cycle_goes_overlay_trace_image_and_the_peek_ends_with_the_tool() {
-    let (mut session, image) = traced(60, 60);
-    preview(&mut session, image);
-    // Mask is the second view since `specs/0089` criterion 21 (UX notes §4).
-    for want in [
-        TraceViewMode::Mask,
-        TraceViewMode::Trace,
-        TraceViewMode::Image,
-        TraceViewMode::Overlay,
-    ] {
-        session.cycle_trace_view_mode();
-        assert_eq!(session.trace_view_mode(), want, "Shift+backslash cycles");
-    }
-    // Leaving the tool drops a held peek; entering starts on Overlay again.
-    session.set_trace_view_mode(TraceViewMode::Image);
-    session.set_trace_peek(true);
+    // Leaving the tool and entering again starts on the Overlay again.
     session.set_tool(Tool::Select);
-    assert_ne!(
-        session.shown_trace_view_mode(),
-        TraceViewMode::Image,
-        "peek ends with the tool"
-    );
-    session.set_trace_peek(true);
-    assert!(
-        session.shown_trace_view_mode() != TraceViewMode::Image
-            || session.trace_view_mode() == TraceViewMode::Image,
-        "a peek outside the Trace tool does nothing"
-    );
     session.set_tool(Tool::Trace);
+    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
+    let after = unpack(9, &session.pack("t").unwrap()).unwrap();
     assert_eq!(
-        session.trace_view_mode(),
-        TraceViewMode::Overlay,
-        "the chosen view is not remembered"
+        after.object_ids().len(),
+        1,
+        "the view never touches the document"
     );
 }
 

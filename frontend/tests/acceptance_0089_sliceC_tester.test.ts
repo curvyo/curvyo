@@ -273,11 +273,11 @@ const pickMethod = async (s: S, label: string) => {
   await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes(${JSON.stringify(label)})).click()`);
   await sleep(800);
 };
-const counts = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-counts]')?.textContent ?? ''`)) as string;
+const counts = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
 const pathsNow = async (s: S, n: number) =>
   waitFor(`${n} paths`, async () => {
     const t = await counts(s);
-    return new RegExp(`^${n} paths?,`).test(t) ? t : null;
+    return new RegExp(`(^|\\. )${n} paths?,`).test(t) ? t : null;
   }, 15_000).catch(async (e) => {
     throw new Error(`${e.message}; counts "${await counts(s)}", status "${await s.statusText()}", bar "${(await s.evaluate(`document.querySelector('${BAR}')?.innerText ?? ''`)) as string}"`);
   });
@@ -690,15 +690,15 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
           if (w > 1 && h > 1) overlaps.push(name(items[i]) + ' x ' + name(items[j]));
         }
         const outside = items.filter((e) => { const r = e.getBoundingClientRect(); return r.left < box.left - 0.5 || r.right > box.right + 0.5 || r.left < 0 || r.right > innerWidth + 0.5 || r.top < 0 || r.bottom > innerHeight + 0.5; }).map(name);
-        const clipped = [...bar.querySelectorAll('button, [role=spinbutton], span, label')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible' && e.clientWidth > 0).map(name);
-        const texts = [...bar.querySelectorAll('*')].filter((e) => e.children.length === 0 && vis(e)).map((e) => e.textContent.trim()).filter(Boolean);
+        const clipped = [...bar.querySelectorAll('button, [role=spinbutton], span, label')].filter(vis).filter((e) => !e.closest('.sr-only')).filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible' && e.clientWidth > 0).map(name);
+        const texts = [...bar.querySelectorAll('*')].filter((e) => e.children.length === 0 && vis(e) && !e.closest('.sr-only')).map((e) => e.textContent.trim()).filter(Boolean);
         const labels = items.map((e) => e.getAttribute('aria-label') || '').filter(Boolean);
         const slot = bar.querySelector('[data-trace-slot]').getBoundingClientRect();
         const lastBottom = Math.max(...items.map((e) => e.getBoundingClientRect().bottom));
         return { overlaps, outside, clipped, texts, labels, height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom), vh: innerHeight, vw: innerWidth,
           slotRightGap: Math.round(box.right - slot.right), insideBar: lastBottom <= box.bottom + 0.5 }; })())`)) as string) as {
         overlaps: string[]; outside: string[]; clipped: string[]; texts: string[]; labels: string[]; height: number; top: number; bottom: number; vh: number; vw: number; slotRightGap: number; insideBar: boolean };
-    // The row counts of ux-notes.md §22.1 (2026-10-31; 36 px rows, Advanced closed, no picks, the analysis row is
+    // The row counts of ux-notes.md §24.2 (2026-11-06; 150 px fields, 36 px rows, Advanced closed, no picks, the analysis row is
     // in Advanced): Brightness 7 / 3 rows, Remove background 8 / 3, Pick colours 7 / 3 (panel open / closed).
     const asBuilt: Record<string, [number, number]> = { Brightness: [252, 108], "Remove background": [288, 108], "Pick colours": [252, 108] };
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]')?.click()`);
@@ -726,7 +726,9 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
         assert.ok(m.insideBar, `${tag}: every control inside the bar's box`);
         assert.ok(m.top >= 0 && m.bottom <= m.vh, `${tag}: the bar is inside the window`);
         assert.ok(Math.abs(m.slotRightGap - 8) <= 2, `${tag}: finish button at the right edge (gap ${m.slotRightGap})`);
-        const expected = asBuilt[method][open ? 0 : 1];
+        // §24.5: Pick colours with nothing picked says why Trace is dimmed in the notice row (36 px of its own).
+        const notice = method === "Pick colours" ? 36 : 0;
+        const expected = asBuilt[method][open ? 0 : 1] + notice;
         assert.ok(Math.abs(m.height - expected) <= 4, `${tag}: bar height ${m.height} px, notes say ${expected} px`);
         for (const t of [...m.texts, ...m.labels]) if (HINT.test(t)) hints.push(`${tag}: "${t}"`);
         await s.send("Page.captureScreenshot", { format: "png" }).then((r) => writeFileSync(path.join(SCRATCH, `tester-${method.replace(/ /g, "-")}-${open ? "open" : "closed"}.png`), Buffer.from(((r as { result?: { data?: string } }).result?.data) ?? "", "base64")));

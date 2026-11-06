@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { ANALYSIS_LINE_JS, ANALYSIS_STATE_JS } from "./browser/traceStatus.ts";
 import { removeProfile } from "./browser/removeProfile.ts";
 import { startVite, stopVite } from "./browser/vite.ts";
 
@@ -403,13 +404,13 @@ const barStrings = async (s: S) =>
 
 const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? 'missing'`)) as string;
 const noticeHeight = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.getBoundingClientRect().height ?? -1`)) as number;
-const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${ADV} [data-trace-counts]')?.textContent ?? ''`)) as string;
+const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
 const hiddenStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? 'absent'`)) as string;
 const pickedLabel = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-picked-count]')?.textContent ?? 'none'`)) as string;
 const traceButton = (s: S) => s.evaluate(`(() => { const b = document.querySelector('${BAR} [data-trace-slot] , ${BAR} button[data-trace-slot]'); return b ? JSON.stringify({ disabled: b.getAttribute('aria-disabled'), describedby: b.getAttribute('aria-describedby'), reason: b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby'))?.textContent ?? '' : '' }) : 'null'; })()`).then((v) => JSON.parse(v as string) as { disabled: string | null; describedby: string | null; reason: string } | null);
 const paletteSwatches = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
-const settledCounts = (s: S) => waitFor("a trace result", async () => (/^(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
+const settledCounts = (s: S) => waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 const setOutput = async (s: S, label: string) => {
   await s.evaluate(`[...document.querySelectorAll('${ADV} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === ${JSON.stringify(label)}).click()`);
   await sleep(1000);
@@ -423,9 +424,9 @@ const setPanel = async (s: S, open: boolean) => {
 };
 const barHeight = async (s: S) => (await s.evaluate(`Math.round(document.querySelector('${BAR}').getBoundingClientRect().height)`)) as number;
 
-/** Shows the image, finds the first block of `colour` on screen and presses the pipette on it. */
+/** Finds the first block of `colour` on screen and presses the pipette on it. */
 async function pickAt(s: S, colour: (rgb: number[]) => boolean, modifiers = 0) {
-  await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=Image]').click()`);
+  // One view only (Overlay, UX notes §24.1): the image is washed to 35 %, so the blocks are found by their tint.
   await sleep(800);
   const [cx, , cw, ch] = await canvasRect(s);
   const found = boxOf(await shot(s), [cx, (await barBottom(s)) + 4, cw, ch], colour);
@@ -437,19 +438,20 @@ async function pickAt(s: S, colour: (rgb: number[]) => boolean, modifiers = 0) {
   await sleep(900);
   await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 2 });
 }
-const isRed = ([r, g, b]: number[]) => r > 180 && g < 50 && b < 50;
-const isBlue = ([r, g, b]: number[]) => b > 180 && r < 50 && g < 90;
+// Washed to 35 % (red 200,30,30 shows as about 236,176,176; blue 30,60,200 as about 177,187,236); the preview outline (47,111,238) is no match.
+const isRed = ([r, g, b]: number[]) => r > 200 && r - g > 40 && r - b > 40;
+const isBlue = ([r, g, b]: number[]) => b > 200 && r > 120 && b - r > 30;
 
-const ROW = `${BAR} [data-trace-analysis]`;
-const lineText = async (s: S) => (await s.evaluate(`document.querySelector('${ROW} [role=status]')?.textContent ?? ''`)) as string;
+const lineText = async (s: S) => (await s.evaluate(ANALYSIS_LINE_JS)) as string;
 const waitState = (s: S, want: string, ms = 30_000) =>
-  waitFor(`the analysis row to be ${want}`, async () => (((await s.evaluate(`document.querySelector('${ROW}')?.getAttribute('data-trace-analysis') ?? 'none'`)) as string) === want ? true : null), ms);
+  waitFor(`the analysis row to be ${want}`, async () => (((await s.evaluate(ANALYSIS_STATE_JS)) as string) === want ? true : null), ms);
 
-const BRIGHTNESS_BAR = ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
+const MASK_STOPS = ["Pick mask paths", "Mask", "Clear mask"];
+const BRIGHTNESS_BAR = ["About Trace", "Preset", ...MASK_STOPS, "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
 
 // ------------------------------------------------------------------ 0089 22 / 0025 71: the bar contents per method
 
-test("0089 tidy-up c22: the bar holds About Trace, Preset, View, Method, the one main field, Smooth, Tolerance, Ignore below, the expander and Trace for Brightness, in Single and Multicolour", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up c22 (§24.2): the bar holds About Trace, Preset, the Mask group, Method, the one main field, Smooth, Tolerance, Ignore below, the expander and Trace for Brightness, in Single and Multicolour", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
@@ -479,8 +481,8 @@ test("0089 tidy-up c22, c17: Remove background keeps the chip, hex, Auto and pip
       await setAdvanced(s, false);
       const bar = await barControls(s);
       console.log(`Remove background, ${output}:`, JSON.stringify(bar));
-      assert.deepEqual(bar.slice(0, 6), ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance"]);
-      const group = bar.slice(6, bar.indexOf("Smooth"));
+      assert.deepEqual(bar.slice(0, 7), ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance"]);
+      const group = bar.slice(7, bar.indexOf("Smooth"));
       assert.ok(group.includes("Auto") && group.some((g) => /^Pick background colour/.test(g)), `the group has Auto and the pipette: ${JSON.stringify(group)}`);
       assert.deepEqual(bar.slice(bar.indexOf("Smooth")), ["Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
       await setAdvanced(s, true);
@@ -490,7 +492,7 @@ test("0089 tidy-up c22, c17: Remove background keeps the chip, hex, Auto and pip
       await setOutput(s, output);
       await setAdvanced(s, false);
       const bar = await barControls(s);
-      assert.deepEqual(bar, ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"], `Pick colours, ${output}`);
+      assert.deepEqual(bar, ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"], `Pick colours, ${output}`);
       assert.equal(await pickedLabel(s), "None picked");
       assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-palette-swatch], ${BAR} [data-trace-swatch]').length`), 0, "no swatches with Advanced closed");
       await setAdvanced(s, true);
@@ -558,17 +560,21 @@ const countsMentions = (s: S) =>
     return JSON.stringify([...document.querySelectorAll('*')].filter((e) => e.children.length === 0 && re.test(e.textContent) && visible(e)).map((e) => e.closest('[data-trace-counts]') ? 'advanced-status' : e.closest('[data-trace-state]') ? 'notice-row' : 'other')); })()`)
     .then((v) => JSON.parse(v as string) as string[]);
 
-test("0025 tidy-up c11, c71: the result counts are drawn once, in the Advanced status line, and nowhere with Advanced closed; the hidden region announces them", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0025 tidy-up c11, c71 (§24.5): the result counts are drawn nowhere, Advanced open or closed; the hidden region announces them, always mounted, once", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
-    assert.deepEqual(await countsMentions(s), ["advanced-status"], "Advanced open: once, in the status line");
-    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-hidden-status]').length`), 0, "no second live region while Advanced is open");
+    assert.deepEqual(await countsMentions(s), [], "Advanced open: not drawn");
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-hidden-status]').length`), 1, "one hidden region while Advanced is open");
     const text = await advancedStatus(s);
+    const counts = text.match(/\d+ paths?, \d+ nodes?, [\d.]+ s/)![0];
+    assert.equal(text.split(counts).length, 2, `the counts are announced once: ${text}`);
     await setAdvanced(s, false);
     assert.deepEqual(await countsMentions(s), [], "Advanced closed: not drawn anywhere");
-    assert.ok((await hiddenStatus(s)).includes(text.match(/\d+ paths?, \d+ nodes?, [\d.]+ s/)![0]), `the hidden region announces the counts: ${await hiddenStatus(s)}`);
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-hidden-status]').length`), 1, "still one hidden region with Advanced closed");
+    assert.ok((await hiddenStatus(s)).includes(counts), `the hidden region announces the counts: ${await hiddenStatus(s)}`);
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-counts], ${BAR} [data-trace-analysis]').length`), 0, "no status line, no analysis row");
   });
 });
 
@@ -587,7 +593,7 @@ test("0089 tidy-up 22.2: a normal settled trace leaves the notice row empty and 
   });
 });
 
-test("0089 tidy-up 22.2: '0 paths at this Threshold: too low.' is in the notice row, Trace is disabled, and the zero count is not repeated in Advanced", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up 22.2: '0 paths at this Threshold: too low.' is in the notice row, Trace is disabled, and no count is announced for an empty result", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
@@ -595,7 +601,7 @@ test("0089 tidy-up 22.2: '0 paths at this Threshold: too low.' is in the notice 
     await typeInto(s, "Threshold", "0");
     await waitFor("the notice", async () => (/0 paths/.test(await noticeText(s)) ? true : null));
     assert.equal(await noticeText(s), "0 paths at this Threshold: too low.");
-    assert.equal(await advancedStatus(s), "", "no counts line for an empty result");
+    assert.ok(!/\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)), `no counts announced for an empty result: ${await advancedStatus(s)}`);
     const visible = (await s.evaluate(`document.querySelector('${BAR}').innerText`)) as string;
     assert.equal(visible.match(/0 paths/g)?.length, 1, `"0 paths" appears once: ${visible}`);
     const trace = await traceButton(s);
@@ -623,11 +629,11 @@ test("0089 tidy-up 22.2, c16: 'Too much detail: raise Ignore below.' is in the n
     await typeInto(s, "Ignore below", "0");
     await waitFor("the notice", async () => (/detail/i.test(await noticeText(s)) ? true : null), 120_000);
     assert.equal(await noticeText(s), "Too much detail: raise Ignore below.");
-    assert.equal(await advancedStatus(s), "", "no counts for an unusable result");
+    assert.ok(!/\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)), `no counts announced for an unusable result: ${await advancedStatus(s)}`);
   });
 });
 
-test("0089 tidy-up 22.2: 'Same as #xxxxxx' (a palette pick matching a colour) is a notice-row message for about 3 s; specks ignored and the counts stay in Advanced", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up 22.2: 'Same as #xxxxxx' (a palette pick matching a colour) is a notice-row message for about 3 s; specks ignored and the counts are announced by the hidden region only", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "two.png", TWO, true);
     await pickMethod(s, "Brightness");
@@ -646,23 +652,24 @@ test("0089 tidy-up 22.2: 'Same as #xxxxxx' (a palette pick matching a colour) is
     await pickMethod(s, "Brightness");
     await waitFor("specks ignored", async () => (/specks? ignored/.test(await advancedStatus(s)) ? true : null), 60_000);
     assert.equal(await noticeText(s), "", "the muted speck line is not in the notice row");
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} *')].filter((e) => e.children.length === 0 && /specks? ignored/.test(e.textContent) && !e.closest('.sr-only')).length`), 0, "not drawn anywhere");
     assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-state] *')].filter((e) => /specks? ignored/.test(e.textContent)).length`), 0);
   });
 });
 
 // ------------------------------------------------------------------ 0089 17 / ux-notes 22.2: the disabled Trace button
 
-test("0089 tidy-up c17: Pick colours with nothing picked: Trace is aria-disabled with the reason as tooltip and aria-describedby, the label says None picked, the line is in Advanced only", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up c17: Pick colours with nothing picked: Trace is aria-disabled with the reason as tooltip and aria-describedby, the label says None picked, the reason is in the notice row", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "two.png", TWO, true);
     await pickMethod(s, "Pick colours");
-    await waitFor("the Advanced line", async () => ((await advancedStatus(s)) === "0 paths: no colour picked." ? true : null));
+    await waitFor("the notice row line", async () => ((await noticeText(s)) === "0 paths: no colour picked." ? true : null));
     assert.equal(await pickedLabel(s), "None picked");
-    assert.equal(await noticeText(s), "", "not in the notice row");
+    assert.ok(!(await advancedStatus(s)).includes("no colour picked"), "§24.5: the reason moved from the status line to the notice row");
     const trace = await traceButton(s);
     assert.equal(trace?.disabled, "true");
     assert.ok(trace?.describedby, "aria-describedby is set");
-    assert.equal(trace?.reason, "0 paths: no colour picked.", "the reason is the status line text");
+    assert.equal(trace?.reason, "0 paths: no colour picked.", "the reason is the notice row text");
     // The tooltip carries the reason.
     const box = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('${BAR} [data-trace-slot]').getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as number[];
     await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: box[0] - 3, y: box[1] });
@@ -686,29 +693,32 @@ test("0089 tidy-up c17: Pick colours with nothing picked: Trace is aria-disabled
 
 // ------------------------------------------------------------------ 0025 71 / ux-notes 22.2: the hidden live region
 
-test("0089 tidy-up 22.2, c71: with Advanced closed a visually hidden polite status region announces the analysis line, the counts and the Pick colours state; it is absent while Advanced is open", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up 22.2, c71 (§24.5): one visually hidden polite status region, always mounted, announces the analysis line and the counts in that order; the Pick colours reason is the notice row's", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await waitState(s, "auto");
     await settledCounts(s);
     const line = await lineText(s);
     const counts = (await advancedStatus(s)).match(/\d+ paths?, \d+ nodes?, [\d.]+ s/)![0];
-    assert.equal(await hiddenStatus(s), "absent");
-    await setAdvanced(s, false);
-    const region = JSON.parse((await s.evaluate(`JSON.stringify((() => { const e = document.querySelector('${BAR} [data-trace-hidden-status]'); const r = e.getBoundingClientRect();
-      return { role: e.getAttribute('role'), live: e.getAttribute('aria-live'), w: r.width, h: r.height, text: e.textContent }; })())`)) as string) as { role: string; live: string; w: number; h: number; text: string };
-    assert.equal(region.role, "status");
-    assert.equal(region.live, "polite");
-    assert.ok(region.w <= 1 && region.h <= 1, `visually hidden: ${region.w} x ${region.h}`);
-    assert.ok(region.text.includes(line), `announces the analysis line "${line}": ${region.text}`);
-    assert.ok(region.text.includes(counts), `announces the counts "${counts}": ${region.text}`);
+    for (const open of [true, false]) {
+      await setAdvanced(s, open);
+      const region = JSON.parse((await s.evaluate(`JSON.stringify((() => { const e = document.querySelector('${BAR} [data-trace-hidden-status]'); const r = e.getBoundingClientRect();
+        return { role: e.getAttribute('role'), live: e.getAttribute('aria-live'), w: r.width, h: r.height, text: e.textContent }; })())`)) as string) as { role: string; live: string; w: number; h: number; text: string };
+      assert.equal(region.role, "status");
+      assert.equal(region.live, "polite");
+      assert.ok(region.w <= 1 && region.h <= 1, `visually hidden: ${region.w} x ${region.h}`);
+      assert.ok(region.text.includes(line), `announces the analysis line "${line}": ${region.text}`);
+      assert.ok(region.text.includes(counts), `announces the counts "${counts}": ${region.text}`);
+      assert.ok(region.text.indexOf(line) < region.text.indexOf(counts), "the analysis line comes first, then the counts");
+      assert.ok(region.text.includes(`${line}. `), "segments are joined by '. '");
+    }
     // It follows a change of the result.
     await typeInto(s, "Threshold", "0");
-    await waitFor("0 paths announced", async () => ((await hiddenStatus(s)).includes(counts) ? null : true));
-    // Pick colours with nothing picked.
+    await waitFor("0 paths no longer announced", async () => ((await hiddenStatus(s)).includes(counts) ? null : true));
+    // Pick colours with nothing picked: the reason is the notice row's, announced by that row.
     await pickMethod(s, "Pick colours");
-    await waitFor("the no-colour state announced", async () => ((await hiddenStatus(s)).includes("0 paths: no colour picked.") ? true : null));
-    assert.equal(await noticeText(s), "");
+    await waitFor("the reason in the notice row", async () => ((await noticeText(s)) === "0 paths: no colour picked." ? true : null));
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-state] [role=status][aria-live=polite]').length`), 1, "the notice row is a polite live region");
   });
 });
 
@@ -747,25 +757,25 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
     await pickMethod(s, "Remove background");
     const removal = await tabStops(s);
     console.log("Remove background:", JSON.stringify(removal));
-    assert.deepEqual(removal.slice(0, 6), ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance"]);
-    const group = removal.slice(6, removal.indexOf("Smooth"));
+    assert.deepEqual(removal.slice(0, 7), ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance"]);
+    const group = removal.slice(7, removal.indexOf("Smooth"));
     assert.ok(group.indexOf("Auto") >= 0 && group.findIndex((g) => /^Pick background colour/.test(g)) > group.indexOf("Auto"), `Auto, then the pipette: ${JSON.stringify(group)}`);
     assert.deepEqual(removal.slice(removal.indexOf("Smooth")), ["Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
     await pickMethod(s, "Pick colours");
     const pick = await tabStops(s);
     console.log("Pick colours:", JSON.stringify(pick));
-    assert.deepEqual(pick, ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
+    assert.deepEqual(pick, ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance", "Pick colour from the image", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
   });
 });
 
-test("0025 tidy-up c57: Tab order with Advanced open starts with Parts and Add part (0094 ux-notes §4), then Analyse, Output, Colours, palette pipette, Invert, Drop border shapes, Recognise text, Recognise shapes (0091 ux-notes §7; 0088 Part B ux-notes B2 as changed 2026-11-03: the four toggles share the Output row; drawn in Multicolour too), strip, Denoise, Upscale, Corners", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 tidy-up c57 (§24.3): Tab order with Advanced open: Output, Colours, palette pipette, the toggles, the strip, Denoise, Upscale, Corners, then Parts, Add part and Analyse last (0091 ux-notes §7; 0088 Part B ux-notes B2)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pale.png", PALE, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     const single = await tabStops(s);
     console.log("Brightness, Single, Advanced open:", JSON.stringify(single));
-    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Parts", "Add part", "Analyse", "Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Analyse"]);
     await setOutput(s, "Multicolour");
     await settledCounts(s);
     const multi = await tabStops(s);
@@ -773,7 +783,7 @@ test("0025 tidy-up c57: Tab order with Advanced open starts with Parts and Add p
     const tail = multi.slice(multi.indexOf("Trace") + 1);
     const strip = tail.filter((n) => n === "swatch" || n.startsWith("action "));
     assert.ok(strip.length >= 1 && strip.filter((n) => n === "swatch").length === 1, `the strip is one Tab stop: ${JSON.stringify(strip)}`);
-    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Parts", "Add part", "Analyse", "Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners"]);
+    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Analyse"]);
     assert.ok(tail.indexOf("swatch") > tail.indexOf("Recognise shapes") && tail.indexOf("swatch") < tail.indexOf("Denoise"), "the strip sits between Recognise shapes and Denoise (0088 Part B ux-notes B2)");
     // Pick colours has its pipette in the bar and none in Advanced.
     await pickMethod(s, "Pick colours");
@@ -787,9 +797,10 @@ test("0025 tidy-up c57: Tab order with Advanced open starts with Parts and Add p
 
 // ------------------------------------------------------------------ 0089 22 / ux-notes 22.1: the bar heights at 800 x 600
 
-test("0089 tidy-up 22.1: bar heights at 800 x 600 with Advanced closed, panel open and closed (Brightness 252 / 108, Remove background 288 / 108, Pick colours 252 / 108 px)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, panel open and closed (Brightness 252 / 108, Remove background 288 / 108, Pick colours 252 / 108 px plus the 36 px notice row of its reason)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "two.png", TWO, false);
+    // §24.2: 150 px fields pair Threshold with Smooth (150 + 8 + 150 = 308): 7 rows, 252 px, panel open.
     const expected: Record<string, [number, number]> = { Brightness: [252, 108], "Remove background": [288, 108], "Pick colours": [252, 108] };
     const seen: string[] = [];
     for (const method of ["Brightness", "Remove background", "Pick colours"]) {
@@ -798,8 +809,10 @@ test("0089 tidy-up 22.1: bar heights at 800 x 600 with Advanced closed, panel op
         await setPanel(s, open);
         const height = await barHeight(s);
         seen.push(`${method}, panel ${open ? "open" : "closed"}: ${height} px`);
-        assert.equal(await noticeText(s), "", `${method}: no notice row`);
-        assert.ok(Math.abs(height - expected[method][open ? 0 : 1]) <= 4, `${method}, panel ${open ? "open" : "closed"}: ${height} px, ux-notes 22.1 says ${expected[method][open ? 0 : 1]} px`);
+        // §24.5: nothing picked says why Trace is dimmed in the notice row (one 36 px row of its own).
+        assert.equal(await noticeText(s), method === "Pick colours" ? "0 paths: no colour picked." : "", `${method}: the notice row`);
+        const notice = method === "Pick colours" ? 36 : 0;
+        assert.ok(Math.abs(height - notice - expected[method][open ? 0 : 1]) <= 4, `${method}, panel ${open ? "open" : "closed"}: ${height} px, ux-notes 22.1 says ${expected[method][open ? 0 : 1]} px`);
       }
     }
     console.log(seen.join("\n"));
@@ -810,7 +823,7 @@ test("0089 tidy-up 22.1: bar heights at 800 x 600 with Advanced closed, panel op
   }, "", 800, 600);
 });
 
-test("0089 tidy-up 22.3: the Advanced block adds about 237 px (panel open) and 165 px (closed; 0088 Part B ux-notes B2, 40 px margin of 22.3) to the Single colour Brightness bar at 800 x 600", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.3, §24.3: the Advanced block adds about 180 px (panel open) and 90 px (closed; 0088 Part B ux-notes B2, 40 px margin of 22.3) to the Single colour Brightness bar at 800 x 600", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, false);
     await pickMethod(s, "Brightness");
@@ -827,7 +840,7 @@ test("0089 tidy-up 22.3: the Advanced block adds about 237 px (panel open) and 1
       const height = await barHeight(s);
       const added = height - closed[String(open)];
       console.log(`Advanced open, panel ${open ? "open" : "closed"}: bar ${height} px, block ${added} px`);
-      assert.ok(Math.abs(added - (open ? 237 : 165)) <= 40, `Advanced adds ${added} px, ux-notes 22.3 and 0088 B2 say about ${open ? 237 : 165}`);
+      assert.ok(Math.abs(added - (open ? 180 : 90)) <= 40, `Advanced adds ${added} px, §24.3 says about ${open ? 180 : 90}`);
     }
   }, "", 800, 600);
 });

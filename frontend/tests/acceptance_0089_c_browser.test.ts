@@ -288,7 +288,7 @@ const settled = async (s: S, paths: RegExp) =>
   waitFor(
     `counts ${paths}`,
     async () => {
-      const t = (await s.evaluate(`document.querySelector('${BAR} [data-trace-counts]')?.textContent ?? ''`)) as string;
+      const t = (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
       return paths.test(t) ? t : null;
     },
     30_000,
@@ -322,7 +322,7 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     await pickMethod(s, "Brightness");
     // Criterion 14: Brightness shows the Threshold; the Method menu lists the three methods.
     await s.evaluate(`document.querySelector('${BAR} [aria-label="More trace options"]').click()`);
-    await settled(s, /^\d+ paths?,/);
+    await settled(s, /(^|\. )\d+ paths?,/);
     assert.deepEqual(await fieldNames(s), ["Threshold", "Smooth", "Tolerance", "Ignore below"]);
     await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
     await sleep(300);
@@ -359,16 +359,16 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     const at = (hex: string) => found.get(hex)! + 15;
     await press(s, at("#FFF2A8"), cy + ch / 2);
     await waitFor("the first swatch", async () => ((await swatches(s)).join() === "#FFF2A8" ? true : null));
-    await settled(s, /^1 path,/);
+    await settled(s, /(^|\. )1 path,/);
     await press(s, at("#D9D9D9"), cy + ch / 2, 8);
     await waitFor("the second swatch", async () => ((await swatches(s)).join() === "#FFF2A8,#D9D9D9" ? true : null));
-    await settled(s, /^2 paths,/);
+    await settled(s, /(^|\. )2 paths,/);
     assert.equal(await pipettePressed(s), "true", "Pick colours stays armed");
     assert.equal(await s.evaluate(`document.querySelectorAll('[role=toolbar][aria-label=Trace]').length`), 1, "the presses selected nothing else");
     // A plain click replaces the picked colours.
     await press(s, at("#DCD6CF"), cy + ch / 2);
     await waitFor("the replaced swatch", async () => ((await swatches(s)).join() === "#DCD6CF" ? true : null));
-    await settled(s, /^1 path,/);
+    await settled(s, /(^|\. )1 path,/);
     // Esc disarms the pipette, the tool stays; the next Esc leaves the tool.
     await s.evaluate(`[...document.querySelectorAll('canvas')].map((c) => c.closest('[tabindex]')).find(Boolean)?.focus()`);
     await escape(s);
@@ -387,7 +387,7 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-background]').textContent`), "#FFFFFF");
     assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} button[aria-pressed]')].find((b) => b.textContent === 'Auto').getAttribute('aria-pressed')`), "true");
     assert.equal(await pipettePressed(s), "false");
-    await settled(s, /^3 paths,/);
+    await settled(s, /(^|\. )3 paths,/);
     // A background pick ends after one click and releases Auto.
     await s.clickSel(`${BAR} [data-trace-pipette]`);
     assert.equal(await pipettePressed(s), "true");

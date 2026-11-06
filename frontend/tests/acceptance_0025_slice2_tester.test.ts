@@ -344,7 +344,7 @@ const barStatus = async (s: S) =>
   (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
     const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
     if (line) return line;
-    const counts = bar?.querySelector('[data-trace-counts] > span')?.textContent.trim() ?? '';
+    const counts = bar?.querySelector('[data-trace-hidden-status]')?.textContent.trim() ?? '';
     if (counts) return counts;
     return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
 const traceReady = async (s: S) =>
@@ -670,13 +670,13 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSE
     await typeInto(s, "Corners", "70");
     // Criterion 44: Invert and Ignore background on the ring (outer r 60, hole r 20).
     const status0 = await settle(s);
-    assert.match(status0, /^2 paths/);
+    assert.match(status0, /(^|\. )2 paths/);
     await toggle(s, "Invert");
-    assert.match(await settle(s), /^3 paths/, "inverted: the page with the ring as a hole, and the inner disc");
+    assert.match(await settle(s), /(^|\. )3 paths/, "inverted: the page with the ring as a hole, and the inner disc");
     await toggle(s, "Drop border shapes");
-    assert.match(await settle(s), /^1 path\b/, "the page touches the border and goes");
+    assert.match(await settle(s), /(^|\. )1 path\b/, "the page touches the border and goes");
     await toggle(s, "Invert");
-    assert.match(await settle(s), /^2 paths/, "not inverted, background ignored: the ring touches no border");
+    assert.match(await settle(s), /(^|\. )2 paths/, "not inverted, background ignored: the ring touches no border");
     await toggle(s, "Drop border shapes");
     // The open block is remembered.
     await focusCanvas(s);
