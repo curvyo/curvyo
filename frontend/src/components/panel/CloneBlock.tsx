@@ -200,7 +200,15 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
         <BlockButton
           label={many ? "Select originals" : "Select original"}
           title="Selects the object this clone follows."
-          onPress={(keyboard) => clones.apply("select-original", "panel", keyboard)}
+          onPress={(keyboard) => {
+            clones.apply("select-original", "panel", keyboard);
+            // A clone of a page's sketch opens its sketch page and this block goes: focus to the
+            // canvas, mouse and key alike (`specs/0099` criterion 22).
+            if (keyboard)
+              requestAnimationFrame(() => {
+                if (!document.activeElement || document.activeElement === document.body) onReturnFocus();
+              });
+          }}
           onReturnFocus={onReturnFocus}
           onPressedAt={onPressedAt}
           onHover={(on) => clones.hover(on ? "original" : "")}

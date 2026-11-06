@@ -35,6 +35,10 @@ export type SketchView = {
   error: string | null; pending_picks: number; origin_fixed?: boolean;
   edit_constraint: string | null; affected_constraints: string[];
   annotations: SketchAnnotation[];
+  /** The Use group (`specs/0099` criteria 11, 12). */
+  usage?: { clones: number; pages: number };
+  /** Whether the sketch has something to draw (`adrs.md` note 5). */
+  drawable?: boolean;
   rail?: SketchRailTool[];
   symbols?: SketchSymbol[];
   symbols_more?: SketchSymbolMore[];

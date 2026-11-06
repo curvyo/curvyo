@@ -452,7 +452,7 @@ export function PropertiesPanel({
             ) : doc.view.content === "parameters" ? (
               <SketchParameters key={sketch.view.active ?? sketch.view.page} sketch={sketch} />
             ) : doc.view.content === "sketches" ? (
-              <SketchesPanel key={`${sketch.view.page}:${sketch.view.active}`} sketch={sketch} />
+              <SketchesPanel key={`${sketch.view.page}:${sketch.view.active}`} sketch={sketch} pages={doc.view.pages} />
             ) : doc.view.content === "snapping" ? (
               <SnappingSection snapping={snapping} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "grid" ? (
