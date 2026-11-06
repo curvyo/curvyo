@@ -1,6 +1,6 @@
 # ADR 0043: Sketch pages: content by ownership, a fixed sketch, Convert and Delete
 
-**Status:** Proposed, `needs-customer` (document model). Design by the customer (concept A of
+**Status:** Accepted 2026-11-06 (customer accepted PR #287; document model; Frage 157 A, 158 A). Design by the customer (concept A of
 `specs/0063-manufacturing-workbenches/concept-output-pages.md` §2.1, §2.7, §9); Frage 157 A and
 158 A are assumed (their defaults); the read and write rules below are the architect's
 **Proposal**. Amends, by notes on their Status lines: [ADR 0042](0042-page-kinds.md) §1, §3
