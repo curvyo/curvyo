@@ -179,6 +179,7 @@ mod trace_fit_guess;
 mod trace_fit_turn;
 mod trace_inpaint;
 mod trace_ocr;
+mod trace_parts;
 mod trace_plan;
 mod trace_region;
 mod trace_region_raster;
@@ -538,6 +539,7 @@ pub use trace_ocr::{
     LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
     OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,
 };
+pub use trace_parts::{TracePartArea, TracePartClip, join_trace_parts, trace_part_clips};
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
     trace_group_name, trace_style,

@@ -233,7 +233,7 @@ impl TraceRegion {
     }
 
     /// Whether any edge of the polygons meets the box `min`..`max` (closed).
-    fn edge_meets(&self, min: Point, max: Point) -> bool {
+    pub(crate) fn edge_meets(&self, min: Point, max: Point) -> bool {
         if max.x < self.min.x || min.x > self.max.x || max.y < self.min.y || min.y > self.max.y {
             return false;
         }
@@ -321,25 +321,7 @@ impl TraceRegion {
                 return (whole, count);
             }
         };
-        let pieces = result
-            .outlines()
-            .iter()
-            .map(|polygon| {
-                let mut path = polyline(polygon);
-                // Outer outlines (positive kernel area) take the trace's outer sign, holes the
-                // other one.
-                let wanted = if signed_area_mm2(polygon) > 0.0 {
-                    sign
-                } else {
-                    -sign
-                };
-                if path.area() * wanted < 0.0 {
-                    path = path.reverse_subpaths();
-                }
-                path
-            })
-            .collect();
-        (pieces, 0)
+        (wound_polylines(result.outlines(), sign), 0)
     }
 
     /// A traced result clipped in place (counts after the clip, `adrs.md` decision 1); the
@@ -430,9 +412,29 @@ fn first_point(path: &BezPath) -> Option<Point> {
     })
 }
 
+/// The kernel's `polygons` as polyline paths whose outer outlines (positive kernel area) have
+/// the kurbo area sign `sign` and whose holes have the other one, as the trace winds them.
+pub(crate) fn wound_polylines(polygons: &[Vec<Point>], sign: f64) -> Vec<BezPath> {
+    polygons
+        .iter()
+        .map(|polygon| {
+            let mut path = polyline(polygon);
+            let wanted = if signed_area_mm2(polygon) > 0.0 {
+                sign
+            } else {
+                -sign
+            };
+            if path.area() * wanted < 0.0 {
+                path = path.reverse_subpaths();
+            }
+            path
+        })
+        .collect()
+}
+
 /// The kurbo area sign of the trace's outer outlines: the sign of the largest outline, which no
 /// hole can be (a hole lies inside its outer outline).
-fn outer_sign(outlines: &[BezPath]) -> f64 {
+pub(crate) fn outer_sign(outlines: &[BezPath]) -> f64 {
     let largest =
         outlines.iter().map(Shape::area).fold(
             0.0_f64,
