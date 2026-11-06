@@ -12,7 +12,7 @@ use curvyo_ui_core::{
     operation_name, restore_notice, summary_shapes,
 };
 
-use super::{KeyOutcome, Session};
+use super::{KeyOutcome, Session, Workbench};
 
 /// What an undo or redo press did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -322,7 +322,13 @@ impl Session {
             self.restore_selection(snapshot);
             self.command_refusal = None;
             // A page the step removed or brought back hands the tools over (`specs/0098`).
+            let workbench = self.sketch.workbench;
             self.sync_workbench();
+            if self.sketch.workbench != workbench && self.sketch.workbench == Workbench::Sketch {
+                // A sketch page the step brought back opens with nothing selected
+                // (`specs/0099` criterion 15).
+                self.selection.clear();
+            }
         }
         let touched: Vec<_> = report.objects.iter().map(|o| (o.shape, o.role)).collect();
         let shapes = summary_shapes(&target.label, &touched);

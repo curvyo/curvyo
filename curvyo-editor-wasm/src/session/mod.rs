@@ -112,6 +112,10 @@ mod pattern;
 #[cfg(test)]
 mod pattern_tests;
 mod pen;
+mod row_drag;
+mod sketch_use;
+pub use row_drag::{DropBadge, RowDragAnswer, RowDragSource};
+pub use sketch_use::{SketchRowState, SketchUsage};
 mod pen_entry;
 mod placement;
 mod placement_view;
@@ -445,6 +449,11 @@ pub struct Session {
     background_preview: Option<curvyo_document_core::DocumentBackground>,
     page_view: curvyo_ui_core::PageViewState,
     page_drag: Option<page_drag::PageDrag>,
+    /// The page row dragged onto the canvas (`specs/0099` criterion 8): view state.
+    row_drag: Option<row_drag::RowDrag>,
+    /// The last active drawing or laser page, for Select clones with every clone on the
+    /// pasteboard (`specs/0099` criterion 12).
+    last_work_page: Option<String>,
     /// The document formats: the built-in list with the maker's file over it
     /// (`formats.rs`).
     formats: curvyo_document_core::FormatLibrary,
@@ -660,6 +669,8 @@ impl Session {
             background_preview: None,
             page_view: curvyo_ui_core::PageViewState::default(),
             page_drag: None,
+            row_drag: None,
+            last_work_page: None,
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
             covered_right: 0.0,
@@ -756,6 +767,8 @@ impl Session {
             background_preview: None,
             page_view: curvyo_ui_core::PageViewState::default(),
             page_drag: None,
+            row_drag: None,
+            last_work_page: None,
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
             covered_right: 0.0,
@@ -942,7 +955,7 @@ impl Session {
                 this.sketch_pointer_down(point);
                 return;
             }
-            this.page_view.press(&this.document.pages(), point);
+            this.press_page_view(point);
             this.sync_workbench();
 
             // Same flush as `set_tool`'s own doc comment explains: a canvas
@@ -1175,7 +1188,7 @@ impl Session {
             }
             this.pointer_position = Some(point);
             this.held.shift = shift;
-            this.page_view.press(&this.document.pages(), point);
+            this.press_page_view(point);
             match this.tool {
                 Tool::Select => {
                     if !this.dimension_pointer_up(point) {

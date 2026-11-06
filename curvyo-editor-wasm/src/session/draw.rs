@@ -84,7 +84,10 @@ impl Session {
     #[allow(clippy::too_many_lines)] // Explicit layer ordering keeps overlays auditable.
     pub fn draw_list(&self) -> DrawList {
         if self.workbench() == super::Workbench::Sketch {
-            return self.sketch_draw_list();
+            let mut list = self.sketch_draw_list();
+            // A sketch row dragged onto the canvas: its ghost over everything (`specs/0099`).
+            list.extend(self.row_drag_ghost_list());
+            return list;
         }
         let view = self.view();
         // The document is read once per frame and every step below works on
@@ -258,6 +261,7 @@ impl Session {
                 self.shown_background(),
             ));
         }
+        list.extend(self.row_drag_ghost_list());
         list
     }
 

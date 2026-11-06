@@ -52,12 +52,16 @@ impl Session {
         let Some(page) = self.page_edge_at(point) else {
             return false;
         };
-        let objects = if self.page_view.frame_only.contains(&page.id) {
+        let objects = if self.frame_moves_alone(&page) {
             Vec::new()
         } else {
-            self.contained_page_objects(&page, false)
+            self.contained_page_objects(&page)
         };
-        self.page_view.active = Some(page.id.clone());
+        // A page of another workbench (a sketch page dragged from a drawing page) activates on
+        // the release, so the drag keeps the tools it started with (`specs/0099` criterion 5).
+        if self.workbench_of_kind(&page.kind) == self.workbench() {
+            self.page_view.active = Some(page.id.clone());
+        }
         self.page_drag = Some(PageDrag {
             page,
             start: point,
@@ -88,7 +92,11 @@ impl Session {
         let _ = self
             .document
             .move_page(&drag.page.id, drag.delta, &drag.objects);
-        self.page_view.press(&self.document.pages(), point);
+        if self.workbench_of_kind(&drag.page.kind) == self.workbench() {
+            self.page_view.press(&self.document.pages(), point);
+        } else {
+            self.activate_page(&drag.page.id);
+        }
         true
     }
     pub(super) fn shown_pages(&self) -> Vec<Page> {

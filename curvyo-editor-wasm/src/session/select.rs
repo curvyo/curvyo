@@ -347,7 +347,15 @@ impl Session {
                 DoubleClickHint::None
             }
             SelectDoubleClickOutcome::EditHint => DoubleClickHint::EditHint,
-            SelectDoubleClickOutcome::Clone => DoubleClickHint::Clone,
+            // A clone of a page's sketch opens its sketch page (`specs/0099` criterion 13).
+            SelectDoubleClickOutcome::Clone => {
+                let hit = curvyo_ui_core::hit_test_objects(&objects, point, tolerance);
+                if self.open_sketch_page_of(&hit) {
+                    DoubleClickHint::None
+                } else {
+                    DoubleClickHint::Clone
+                }
+            }
             // A text opens for editing in the Text tool (`specs/0074-text-objects` criterion 10).
             SelectDoubleClickOutcome::Text(id) => {
                 self.edit_text_at(id, Some(point));

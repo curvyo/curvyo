@@ -105,11 +105,21 @@ impl Session {
         if let Some(hit) = self.trace_mask_pick_eligible(point, images) {
             return Some(PickTarget::Mask(hit));
         }
+        // A page's sketch is not pickable (ADR 0043 §2) but is still refused where it is drawn.
+        let fixed = self
+            .objects()
+            .iter()
+            .filter(|o| {
+                matches!(o, ObjectSnapshot::Sketch(_)) && self.document.is_fixed_sketch(o.id())
+            })
+            .cloned()
+            .collect::<Vec<_>>();
         let others: Vec<ObjectSnapshot> = self
             .pickable_objects()
             .iter()
             .filter(|object| !images.contains(&object.id()))
             .cloned()
+            .chain(fixed)
             .collect();
         (!hit_test_objects(&others, point, self.object_tolerance()).is_empty())
             .then_some(PickTarget::Refused)

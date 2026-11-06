@@ -61,4 +61,29 @@ impl WasmSession {
         self.session
             .move_page_to(id, curvyo_document_core::Point::new(x, y))
     }
+    /// Begins dragging the row of page `id` out of the page list (`specs/0099` criterion 8);
+    /// `false` for a row that places nothing.
+    pub fn row_drag_begin(&mut self, id: &str) -> bool {
+        self.session.row_drag_begin(id)
+    }
+    /// One pointer move of the row drag at canvas position `x`, `y` (CSS px), or off the canvas
+    /// (`on_canvas` false). JSON `{badge, target, faint}`; `badge` is `none`, `clone`,
+    /// `not_on_sketch_page` or `no_sketch`.
+    pub fn row_drag_move(&mut self, x: f64, y: f64, on_canvas: bool) -> String {
+        let point = on_canvas.then(|| self.session.screen_to_document(x, y));
+        serde_json::to_string(&self.session.row_drag_move(point)).unwrap_or_default()
+    }
+    /// Ends the row drag: places the clone where the last move allowed it. Whether it did.
+    pub fn row_drag_drop(&mut self) -> bool {
+        self.session.row_drag_drop()
+    }
+    /// Cancels the row drag; nothing is written.
+    pub fn row_drag_cancel(&mut self) {
+        self.session.row_drag_cancel();
+    }
+    /// Place clone on (`specs/0099` criterion 11): a clone of the active sketch at the centre of
+    /// page `id`, which becomes active.
+    pub fn place_sketch_clone_on(&mut self, id: &str) -> bool {
+        self.session.place_sketch_clone_on(id)
+    }
 }

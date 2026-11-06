@@ -153,6 +153,12 @@ impl WasmSession {
         self.session.select_clones().into()
     }
 
+    /// Select clones of the Sketches tab (`specs/0099` criterion 12): the active sketch's clones
+    /// on the first page that has one, which becomes active.
+    pub fn select_sketch_clones(&mut self) -> CloneResultView {
+        self.session.select_sketch_clones().into()
+    }
+
     /// What the Style tab shows about linked clones.
     #[must_use]
     pub fn clone_panel(&self) -> ClonePanelView {

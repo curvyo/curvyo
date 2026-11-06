@@ -159,16 +159,28 @@ impl Session {
     /// # Errors
     /// Refuses missing/invalid geometry or a failed document conversion.
     pub fn sketch_convert_to_path(&mut self) -> Result<(), SketchEditError> {
-        let id = self.recording(|this| {
+        let page = self.active_page().id;
+        let (id, whole_page) = self.recording(|this| {
             let snapshot = this.sketch_snapshot_for_edit()?;
             let ids = snapshot
                 .resolved
                 .all_anchors()
                 .map(|_| this.minter.mint())
                 .collect::<Vec<_>>();
-            this.document.convert_sketch_to_path(snapshot.id, &ids)?;
-            Ok::<_, SketchEditError>(snapshot.id)
+            // The page's own sketch makes the page a drawing page in the same step (`specs/0099`
+            // criterion 15); an ownership-conflict object keeps the old conversion.
+            let whole_page = this.document.page_sketch(&page) == Some(snapshot.id);
+            if whole_page {
+                this.document.convert_sketch_page(&page, &ids)?;
+            } else {
+                this.document.convert_sketch_to_path(snapshot.id, &ids)?;
+            }
+            Ok::<_, SketchEditError>((snapshot.id, whole_page))
         })?;
+        if whole_page {
+            // The drawing tools and tabs in the same frame, the paths selected.
+            self.activate_page(&page);
+        }
         self.selection.select_single(id);
         Ok(())
     }

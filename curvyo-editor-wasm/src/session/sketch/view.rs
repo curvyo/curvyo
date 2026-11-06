@@ -23,6 +23,10 @@ impl Session {
         view["dimension_position"] = json!(self.sketch.dimension_position);
         view["dimension_action"] = json!(self.sketch_dimension_action());
         view["page"] = json!(self.active_page().id);
+        // The Use group of the Sketches tab (`specs/0099` criteria 11, 12).
+        let owner = self.document.page_sketch(&self.active_page().id);
+        view["usage"] = json!(owner.map(|id| self.sketch_usage(id)).unwrap_or_default());
+        view["drawable"] = json!(owner.is_some_and(|id| self.sketch_has_geometry(id)));
         view["mode"] = json!(
             super::modes::MODES
                 .iter()

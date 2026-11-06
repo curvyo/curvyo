@@ -1,7 +1,7 @@
 //! Session commands targeting spatial page frames.
 use super::{Session, SizeOutcome};
 use curvyo_document_core::{DocumentSize, NodeId, ObjectSnapshot, Page, PageKind, Point};
-use curvyo_ui_core::object_bounds;
+use curvyo_ui_core::{PageMembership, Reach, object_bounds};
 impl Session {
     /// The current active frame, resolved after undo, merge or deletion.
     #[must_use]
@@ -32,6 +32,11 @@ impl Session {
         // The tools and tabs follow the page's kind in the same frame (`specs/0098` criterion 8).
         self.sync_workbench();
         self.sync_sketch_page();
+        if page.kind != PageKind::Sketch {
+            self.last_work_page = Some(page.id.clone());
+            // A page's sketch is selected only on its sketch page (ADR 0043 §2).
+            self.drop_fixed_sketches_from_selection();
+        }
         let (w, h) = self.viewport.canvas_size();
         let min = self.view().screen_to_document(0.0, 0.0);
         let max = self.view().screen_to_document(w, h);
@@ -131,9 +136,34 @@ impl Session {
         if other == current && current != super::Workbench::Sketch {
             return false;
         }
+        // A drawing object over a sketch page is pressed, not the page (`specs/0099` criterion 2,
+        // `adrs.md` note 3); the page's sketch is never pickable.
+        if page.kind == PageKind::Sketch
+            && current != super::Workbench::Sketch
+            && self.press_hits_object(point)
+        {
+            return false;
+        }
         let id = page.id.clone();
         self.button_down = false;
         self.activate_page(&id)
+    }
+    /// The page context of a vector press at `point`: a sketch frame is no page of a drawing
+    /// object pressed over it (`specs/0099` criterion 2); a press there that hits nothing already
+    /// activated the sketch page.
+    pub(super) fn press_page_view(&mut self, point: Point) {
+        let pages: Vec<Page> = self
+            .document
+            .pages()
+            .into_iter()
+            .filter(|p| p.kind != PageKind::Sketch)
+            .collect();
+        self.page_view.press(&pages, point);
+    }
+    /// Whether a press at `point` hits a pickable object of the context.
+    pub(super) fn press_hits_object(&self, point: Point) -> bool {
+        !curvyo_ui_core::hit_test_objects(&self.pickable_objects(), point, self.object_tolerance())
+            .is_empty()
     }
     /// Renames a frame, returning false for invalid or unchanged names.
     pub fn rename_page(&mut self, id: &str, name: &str) -> bool {
@@ -166,19 +196,29 @@ impl Session {
             self.page_view.frame_only.remove(id);
         }
     }
-    pub(super) fn contained_page_objects(&self, page: &Page, exclusive: bool) -> Vec<NodeId> {
-        let pages = self.document.pages();
+    /// The membership read of ADR 0043 §1 over every page.
+    pub(super) fn page_membership(&self) -> PageMembership {
+        PageMembership::of(&self.document, &self.document.pages())
+    }
+
+    /// What a frame move of `page` carries (`0059` criterion 9, ADR 0043 §3): the members wholly
+    /// on it; for a sketch page exactly its sketch.
+    /// Whether a frame move of `page` leaves its content: the per-user switch, which a sketch
+    /// page does not have (`specs/0099-sketch-pages` criterion 5).
+    pub(super) fn frame_moves_alone(&self, page: &Page) -> bool {
+        page.kind != PageKind::Sketch && self.page_view.frame_only.contains(&page.id)
+    }
+
+    pub(super) fn contained_page_objects(&self, page: &Page) -> Vec<NodeId> {
+        if page.kind == PageKind::Sketch {
+            return self.document.page_sketch(&page.id).into_iter().collect();
+        }
+        let membership = self.page_membership();
         self.document_read()
             .leaves
             .iter()
             .filter(|object| {
-                let (min, max) = object_bounds(object);
-                page.contains(min)
-                    && page.contains(max)
-                    && (!exclusive
-                        || !pages
-                            .iter()
-                            .any(|p| p.id != page.id && p.overlaps(min, max)))
+                membership.is_member(page, object.id(), object_bounds(object), Reach::Inside)
             })
             .map(ObjectSnapshot::id)
             .collect()
@@ -211,10 +251,10 @@ impl Session {
         let Some(page) = self.document.pages().into_iter().find(|p| p.id == id) else {
             return false;
         };
-        let objects = if self.page_view.frame_only.contains(id) {
+        let objects = if self.frame_moves_alone(&page) {
             Vec::new()
         } else {
-            self.contained_page_objects(&page, false)
+            self.contained_page_objects(&page)
         };
         self.recording(|this| {
             this.document
@@ -237,12 +277,13 @@ impl Session {
     pub(super) fn fit_active_page(&mut self) -> super::FitOutcome {
         let page = self.active_page();
         let read = self.document_read();
+        let membership = self.page_membership();
         let objects: Vec<_> = read
             .leaves
             .iter()
             .filter(|o| {
-                let (min, max) = curvyo_ui_core::object_outline_bounds(o);
-                page.overlaps(min, max)
+                let bounds = curvyo_ui_core::object_outline_bounds(o);
+                membership.is_member(&page, o.id(), bounds, Reach::Touches)
             })
             .collect();
         if objects.is_empty() {
@@ -264,25 +305,50 @@ impl Session {
             )),
         }
     }
-    pub(super) fn page_selection_includes(&self, object: &ObjectSnapshot) -> bool {
+    /// The objects of `objects` Select all takes: all of them, or the members of the active page
+    /// while a page selection context is on.
+    pub(super) fn page_selection_ids(&self, objects: &[ObjectSnapshot]) -> Vec<NodeId> {
         let page = self.active_page();
-        if self.page_view.context.as_ref() != Some(&page.id) {
-            return true;
-        }
-        let (min, max) = object_bounds(object);
-        page.overlaps(min, max)
+        let scoped = self.page_view.context.as_ref() == Some(&page.id);
+        let membership = scoped.then(|| self.page_membership());
+        objects
+            .iter()
+            .filter(|object| {
+                membership.as_ref().is_none_or(|m| {
+                    m.is_member(&page, object.id(), object_bounds(object), Reach::Touches)
+                })
+            })
+            .map(ObjectSnapshot::id)
+            .collect()
+    }
+    /// The sketch facts of a sketch page's row (`specs/0099` criteria 10, 14, 16): its state, how
+    /// many clones follow it and whether it has something to draw; `null` for other kinds.
+    fn sketch_row_json(&self, page: &Page) -> serde_json::Value {
+        let Some(state) = self.sketch_row_state(page) else {
+            return serde_json::Value::Null;
+        };
+        let owner = self.document.page_sketch(&page.id);
+        let usage = owner.map(|id| self.sketch_usage(id)).unwrap_or_default();
+        serde_json::json!({
+            "state": state,
+            "clones": usage.clones,
+            "pages": usage.pages,
+            "drawable": owner.is_some_and(|id| self.sketch_has_geometry(id)),
+        })
     }
     /// Page rows and screen rectangles, formatted for the host.
     #[must_use]
     pub fn pages_json(&self) -> String {
         let active = self.active_page().id;
+        let drop_target = self.row_drag_target();
         let pages = self
             .document_preview()
             .map_or_else(|| self.shown_pages(), |p| p.pages.clone());
         let rows:Vec<_>=pages.iter().map(|p| {
             let (x,y)=self.view().document_to_screen(p.origin);
             let chip = self.kind_chip(&p.kind);
-            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.page_view.frame_only.contains(&p.id),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale()})
+            let sketch = self.sketch_row_json(p);
+            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str())})
         }).collect();
         serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_owned())
     }
