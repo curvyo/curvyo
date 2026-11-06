@@ -352,16 +352,20 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await sleep(600);
     const advanced = JSON.parse((await s.evaluate(`JSON.stringify((() => { const block = document.querySelector('[role=toolbar][aria-label=Trace] [role=group][aria-label=Advanced]');
       const y = (e) => Math.round(e.getBoundingClientRect().top);
-      const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')];
+      // specs/0094 slice 2 (UX notes §3): the Parts row is the block's first row, above the analysis.
+      const parts = block.querySelector('[data-trace-parts]');
+      const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')].filter((e) => !parts?.contains(e));
       const counts = block.querySelector('[data-trace-counts]');
       return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
-        countsFirst: block.children[1] === counts, countsAbove: y(counts) < Math.min(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; countsFirst: boolean; countsAbove: boolean };
+        partsFirst: !!parts && block.children[0].contains(parts),
+        countsFirst: block.children[2] === counts, countsAbove: y(counts) < Math.min(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; partsFirst: boolean; countsFirst: boolean; countsAbove: boolean };
     // `0089` ux-notes §22.3 (2026-10-31, replaces Frage 92 B / UX notes 20.5 here): Output comes first, then the
     // two toggles; the status line (the counts) is the second row, above all controls, after the analysis row.
     // `specs/0091` UX notes §1: Recognise text is the third icon toggle; `specs/0088` Part B adds Recognise shapes after it.
     assert.deepEqual(advanced.names, ["Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners"]);
     assert.deepEqual(advanced.firstRow.slice(0, 1), ["Output"]);
-    assert.ok(advanced.countsFirst && advanced.countsAbove, "the status line is the second row, above the controls");
+    assert.ok(advanced.partsFirst, "the Parts row comes first (specs/0094 slice 2)");
+    assert.ok(advanced.countsFirst && advanced.countsAbove, "the status line follows the Parts row and the analysis row, above the controls");
     // 0089 Frage 84: the expander and the finish button share the last line, the button at the
     // far right (at 308 px they wrap below Ignore below, `specs/0089` ux-notes §2).
     const sameRow = (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');

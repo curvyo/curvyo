@@ -1,4 +1,5 @@
 import type { TraceAnalysisState } from "@/lib/traceAnalysis";
+import type { TracePartInfo } from "@/lib/traceParts";
 
 import type { HsvTriple } from "./useStylePanel";
 import type { TracePaletteApi } from "./useTracePalette";
@@ -36,6 +37,14 @@ export interface TraceApi {
   maskRefused: boolean;
   /** Clear mask: only the image stays selected (criterion 40). */
   clearMask: () => void;
+  /** The parts' chips (`specs/0094` slice 2, UX notes §3); one whole-image part at least. */
+  parts: TracePartInfo[];
+  /** A chip pick: the part becomes active with its settings and mask paths. */
+  selectPart: (index: number) => void;
+  /** Add part: a copy of the active part's settings, no mask paths. */
+  addPart: () => void;
+  /** Remove part `index` (after the inline confirm). */
+  removePart: (index: number) => void;
   /** "Tracing 1 of 3 images", or empty for one image. */
   imagesLabel: string;
   params: readonly TraceParam[];

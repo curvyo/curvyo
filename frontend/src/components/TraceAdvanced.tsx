@@ -1,6 +1,6 @@
 import { Contrast, ImageMinus, Pipette, ScanText, Shapes, type LucideIcon } from "lucide-react";
 import { useRef } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceField } from "@/components/TraceField";
@@ -182,6 +182,8 @@ interface TraceAdvancedProps {
   /** The palette pipette (Brightness + Multicolour) is armed. */
   paletteArmed: boolean;
   onPalettePipette: () => void;
+  /** The Parts row (`specs/0094` slice 2, UX notes §3): the block's first row. */
+  partsRow?: ReactNode;
 }
 
 /**
@@ -208,6 +210,7 @@ export function TraceAdvanced({
   coloursFound,
   paletteArmed,
   onPalettePipette,
+  partsRow,
 }: TraceAdvancedProps) {
   const param = (name: TraceParam["name"]) => params.find((p) => p.name === name);
   const denoise = param("denoise");
@@ -217,6 +220,7 @@ export function TraceAdvanced({
   return (
     <div id={id} role="group" aria-label="Advanced" className="mt-1 flex max-h-[min(60vh,360px)] flex-wrap gap-x-2 overflow-y-auto border-t border-[var(--toolbar-icon)]/25 py-1 pr-1">
       {/* 1. The analysis line and the Analyse button, always enabled (`ux-notes.md` §22.3). */}
+      {partsRow ? <div className="basis-full">{partsRow}</div> : null}
       <div data-trace-analysis={analysis.kind} className="flex min-h-9 basis-full items-center gap-2">
         <span role="status" aria-live="polite" className="min-w-0 flex-1 py-1 text-xs text-[var(--toolbar-icon)]">
           {line}

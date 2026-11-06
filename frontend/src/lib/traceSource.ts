@@ -53,6 +53,33 @@ export function pixelsOf(session: WasmSession, id: string, reduced: boolean): Tr
   return pixels;
 }
 
+/** Part `index`'s pixels of `id` for the worker, cut to its clip (`specs/0094` criterion 31);
+ * `specks` is the part's Ignore below in mm and `upscaleAuto` whether its Upscale is Auto. */
+export function partPixelsOf(session: WasmSession, id: string, index: number, reduced: boolean, specks: number, upscaleAuto: boolean): TracePixels | null {
+  const raw = session.trace_part_source(id, index, reduced, specks, upscaleAuto);
+  if (!raw) {
+    return null;
+  }
+  const pixels = { width: raw.width, height: raw.height, rgba: raw.rgba, map: Array.from(raw.map) };
+  raw.free();
+  return pixels;
+}
+
+/** The parts' wires of `id` joined by the session into the preview (with `keep` also the result
+ * Create paths writes); the joined header numbers, empty when a wire is no result. */
+export function joinWires(session: WasmSession, id: string, wires: (Float64Array | null)[], keep: boolean): Float64Array {
+  const lengths = new Uint32Array(wires.map((w) => w?.length ?? 0));
+  const all = new Float64Array(lengths.reduce((n, l) => n + l, 0));
+  let at = 0;
+  for (const wire of wires) {
+    if (wire) {
+      all.set(wire, at);
+      at += wire.length;
+    }
+  }
+  return session.set_trace_joined(id, all, lengths, keep);
+}
+
 export interface ViewState {
   selection: "empty" | "other" | "images" | "mixed";
   images: string[];
@@ -65,9 +92,11 @@ export interface ViewState {
   maskFailed: boolean;
   /** The region for the worker's settings (`{"outside", "region"}`), empty without one. */
   mask: string;
+  /** The parts' chips JSON (`specs/0094` slice 2, `traceParts.readParts`). */
+  parts: string;
 }
 
-export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskPaths: 0, maskOutsideImage: false, maskFailed: false, mask: "" };
+export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskPaths: 0, maskOutsideImage: false, maskFailed: false, mask: "", parts: "" };
 
 export function readView(session: WasmSession | null): ViewState {
   const raw = session?.trace_view();
@@ -82,6 +111,7 @@ export function readView(session: WasmSession | null): ViewState {
     maskOutsideImage: raw.mask_outside_image,
     maskFailed: raw.mask_failed,
     mask: raw.mask_paths > 0 && session ? session.trace_mask_json() : "",
+    parts: session ? session.trace_parts() : "",
   };
   raw.free();
   return view;
