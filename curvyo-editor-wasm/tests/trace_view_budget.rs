@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use cpu_time::cpu_time_of;
 use curvyo_document_core::NodeId;
-use curvyo_editor_wasm::{Session, Tool, TraceViewMode};
+use curvyo_editor_wasm::{Session, Tool};
 use curvyo_ui_core::TRACE_WIRE_HEADER;
 use image::ImageEncoder;
 
@@ -77,7 +77,7 @@ fn check(what: &str, took: Duration, budget: Duration) {
 }
 
 /// Criterion 56: pan and zoom with the traced preview of at least 100,000 nodes of a 3200 x 3200
-/// px picture, whole in view, in the Overlay and the Trace view; each frame of the moving view is
+/// px picture, whole in view, in the Overlay (the only view); each frame of the moving view is
 /// the slowest of five, and the frame at rest after the zoom (which tessellates once for the new
 /// zoom) is reported.
 #[test]
@@ -89,50 +89,47 @@ fn a_pan_or_zoom_over_a_100000_node_preview_redraws_within_16_ms() {
     println!("preview of {nodes} nodes");
     assert!(nodes >= 100_000.0);
     assert!(session.set_trace_preview(image, &wire));
-    for mode in [TraceViewMode::Overlay, TraceViewMode::Trace] {
-        session.set_trace_view_mode(mode);
-        session.set_trace_view_moving(false);
-        let (_, first) = cpu_time_of(|| session.draw_list());
-        println!(
-            "{mode:?}, first frame (tessellates): {:.2} ms CPU (reported)",
-            first.as_secs_f64() * 1000.0
-        );
-        let (_, still) = cpu_time_of(|| session.draw_list());
-        check(&format!("{mode:?}, a frame at rest"), still, FRAME);
-        let slowest = |session: &mut Session, step: &dyn Fn(&mut Session)| {
-            session.set_trace_view_moving(true);
-            (0..5)
-                .map(|_| {
-                    step(session);
-                    cpu_time_of(|| session.draw_list()).1
-                })
-                .max()
-                .unwrap()
-        };
-        let pan = slowest(&mut session, &|s| {
-            s.wheel(0.0, 40.0, 600.0, 400.0, false, false);
-        });
-        check(&format!("{mode:?}, pan"), pan, FRAME);
-        let zoom = slowest(&mut session, &|s| {
-            s.wheel(0.0, -120.0, 600.0, 400.0, false, true);
-        });
-        check(&format!("{mode:?}, zoom in"), zoom, FRAME);
-        let zoom = slowest(&mut session, &|s| {
-            s.wheel(0.0, 120.0, 600.0, 400.0, false, true);
-        });
-        check(&format!("{mode:?}, zoom out"), zoom, FRAME);
-        session.set_trace_view_moving(false);
-        let (_, rest) = cpu_time_of(|| session.draw_list());
-        println!(
-            "{mode:?}, the frame at rest after the zoom (tessellates): {:.2} ms CPU (reported)",
-            rest.as_secs_f64() * 1000.0
-        );
-    }
+    session.set_trace_view_moving(false);
+    let (_, first) = cpu_time_of(|| session.draw_list());
+    println!(
+        "first frame (tessellates): {:.2} ms CPU (reported)",
+        first.as_secs_f64() * 1000.0
+    );
+    let (_, still) = cpu_time_of(|| session.draw_list());
+    check("a frame at rest", still, FRAME);
+    let slowest = |session: &mut Session, step: &dyn Fn(&mut Session)| {
+        session.set_trace_view_moving(true);
+        (0..5)
+            .map(|_| {
+                step(session);
+                cpu_time_of(|| session.draw_list()).1
+            })
+            .max()
+            .unwrap()
+    };
+    let pan = slowest(&mut session, &|s| {
+        s.wheel(0.0, 40.0, 600.0, 400.0, false, false);
+    });
+    check("pan", pan, FRAME);
+    let zoom = slowest(&mut session, &|s| {
+        s.wheel(0.0, -120.0, 600.0, 400.0, false, true);
+    });
+    check("zoom in", zoom, FRAME);
+    let zoom = slowest(&mut session, &|s| {
+        s.wheel(0.0, 120.0, 600.0, 400.0, false, true);
+    });
+    check("zoom out", zoom, FRAME);
+    session.set_trace_view_moving(false);
+    let (_, rest) = cpu_time_of(|| session.draw_list());
+    println!(
+        "the frame at rest after the zoom (tessellates): {:.2} ms CPU (reported)",
+        rest.as_secs_f64() * 1000.0
+    );
 }
 
 /// Criterion 58: the main-thread side of a trace of a 16 Mpx picture: reading its reduced copy
 /// and its full pixels for the worker, taking a 100,000-node result as preview and as result,
-/// a changed value dropping the results, a view change, and the reduced copy of the next
+/// a changed value dropping the results, and the reduced copy of the next
 /// preview (kept from the first).
 #[test]
 fn the_main_thread_handlers_of_a_16_mpx_trace_stay_under_50_ms() {
@@ -150,8 +147,6 @@ fn the_main_thread_handlers_of_a_16_mpx_trace_stay_under_50_ms() {
     check("100,000-node result kept", took, HANDLER);
     let ((), took) = cpu_time_of(|| session.clear_trace_results());
     check("a changed value", took, HANDLER);
-    let ((), took) = cpu_time_of(|| session.cycle_trace_view_mode());
-    check("Shift+\\ to the Trace view", took, HANDLER);
     let (_, took) = cpu_time_of(|| session.trace_source(image, true).unwrap());
     check("the reduced copy again", took, HANDLER);
 }

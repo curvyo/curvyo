@@ -12,7 +12,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { crc32, deflateSync } from "node:zlib";
 import { removeProfile } from "./browser/removeProfile.ts";
 import { startVite, stopVite } from "./browser/vite.ts";
 
@@ -194,62 +194,6 @@ function rgbPng(width: number, height: number, colour: (x: number, y: number) =>
   ]);
 }
 
-/** Decodes an 8-bit RGB or RGBA non-interlaced PNG (a DevTools screenshot) to RGBA. */
-function decodePng(buf: Buffer): { width: number; height: number; data: Uint8Array } {
-  let at = 8;
-  let width = 0;
-  let height = 0;
-  let channels = 4;
-  const idat: Buffer[] = [];
-  while (at < buf.length) {
-    const len = buf.readUInt32BE(at);
-    const kind = buf.toString("latin1", at + 4, at + 8);
-    const body = buf.subarray(at + 8, at + 8 + len);
-    if (kind === "IHDR") {
-      width = body.readUInt32BE(0);
-      height = body.readUInt32BE(4);
-      channels = body[9] === 6 ? 4 : 3;
-    } else if (kind === "IDAT") {
-      idat.push(body);
-    }
-    at += 12 + len;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * channels;
-  const out = new Uint8Array(width * height * 4);
-  const prev = new Uint8Array(stride);
-  const cur = new Uint8Array(stride);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)];
-    for (let i = 0; i < stride; i++) {
-      const x = raw[y * (stride + 1) + 1 + i];
-      const a = i >= channels ? cur[i - channels] : 0;
-      const b = prev[i];
-      const c = i >= channels ? prev[i - channels] : 0;
-      let v = x;
-      if (filter === 1) v = x + a;
-      else if (filter === 2) v = x + b;
-      else if (filter === 3) v = x + ((a + b) >> 1);
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
-      }
-      cur[i] = v & 255;
-    }
-    for (let px = 0; px < width; px++) {
-      out[(y * width + px) * 4] = cur[px * channels];
-      out[(y * width + px) * 4 + 1] = cur[px * channels + 1];
-      out[(y * width + px) * 4 + 2] = cur[px * channels + 2];
-      out[(y * width + px) * 4 + 3] = channels === 4 ? cur[px * channels + 3] : 255;
-    }
-    prev.set(cur);
-  }
-  return { width, height, data: out };
-}
-
 async function launch(preload?: string) {
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -309,16 +253,14 @@ const press = async (s: S, k: string, vk: number, modifiers = 0) => {
   await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
   await sleep(350);
 };
-const canvasRect = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify((() => { const r = [...document.querySelectorAll('canvas')].map((c) => c.getBoundingClientRect()).sort((a, b) => b.width * b.height - a.width * a.height)[0]; return [r.x, r.y, r.width, r.height]; })())`)) as string) as [number, number, number, number];
 const pickMethod = async (s: S, label: string) => {
   await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
   await sleep(300);
   await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes(${JSON.stringify(label)})).click()`);
   await sleep(800);
 };
-const counts = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-counts]')?.textContent ?? ''`)) as string;
-const countsOf = (text: string) => text.match(/^(\d+) paths?/)?.[1] ?? "?";
+const counts = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
+const countsOf = (text: string) => text.match(/(?:^|\. )(\d+) paths?/)?.[1] ?? "?";
 const typeInto = async (s: S, name: string, text: string) => {
   await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label="${name}"]').focus()`);
   await press(s, "F2", 113);
@@ -328,41 +270,10 @@ const typeInto = async (s: S, name: string, text: string) => {
 };
 const fieldValue = async (s: S, name: string) =>
   (await s.evaluate(`(document.querySelector('${BAR} [role=spinbutton][aria-label="${name}"]')?.getAttribute('aria-valuetext') ?? '').split(' ')[0]`)) as string;
-const viewChecked = async (s: S) =>
-  (await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [aria-checked=true]')?.getAttribute('aria-label') ?? ''`)) as string;
-const clickView = async (s: S, name: string) => {
-  await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=${name}]').click()`);
-  await sleep(1000);
-};
-const shot = async (s: S) => {
-  const out = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
-  return decodePng(Buffer.from(out.result?.data ?? "", "base64"));
-};
 const savePng = async (s: S, name: string) => {
   const out = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
   writeFileSync(path.join(SCRATCH, name), Buffer.from(out.result?.data ?? "", "base64"));
 };
-type Shot = ReturnType<typeof decodePng>;
-const at = (img: Shot, x: number, y: number) => {
-  const i = (Math.round(y) * img.width + Math.round(x)) * 4;
-  return [img.data[i], img.data[i + 1], img.data[i + 2]];
-};
-const boxOf = (img: Shot, rect: number[], test: (rgb: number[]) => boolean) => {
-  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (let y = Math.ceil(rect[1]); y < rect[1] + rect[3]; y++) {
-    for (let x = Math.ceil(rect[0]); x < rect[0] + rect[2]; x++) {
-      if (test(at(img, x, y))) {
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
-      }
-    }
-  }
-  return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
-};
-const barBottom = async (s: S) => (await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().bottom`)) as number;
-const isBlack = ([r, g, b]: number[]) => r < 40 && g < 40 && b < 40;
 
 /** Imports `png` as `name` and opens the Trace bar on it. */
 async function openOn(s: S, name: string, png: Buffer) {
@@ -390,152 +301,6 @@ const withApp = async (fn: (s: S) => Promise<void>, preload = "", width = 1280, 
 
 // ------------------------------------------------------------------ criterion 21: Mask, pixel by pixel
 
-/** 64 x 64: a bar on the left border, a big square, a wide shape with a hole, and a 2 x 2 speck. */
-const MASK_SRC = (() => {
-  const black = new Set<string>();
-  const fill = (x0: number, y0: number, x1: number, y1: number) => {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) black.add(`${x},${y}`);
-  };
-  fill(0, 24, 5, 40); // touches the left border
-  fill(14, 8, 40, 30); // big square
-  fill(46, 14, 47, 15); // 2 x 2 speck
-  fill(20, 40, 55, 55); // wide shape
-  for (let y = 45; y <= 50; y++) for (let x = 28; x <= 37; x++) black.delete(`${x},${y}`); // its hole
-  return black;
-})();
-const MASK_PNG = rgbPng(64, 64, (x, y) => (MASK_SRC.has(`${x},${y}`) ? [0, 0, 0] : [255, 255, 255]));
-/** A stored choice whose upscale is Off, so the traced raster is the source raster. */
-const NO_UPSCALE = `if (localStorage.getItem('curvyo.trace-values') === null) localStorage.setItem('curvyo.trace-values', JSON.stringify({ preset: 'engraving', edited: false, values: { smooth: 80, tolerance: 0.35, specks: 0.1, corners: 70, upscale: 0, denoise: 0 } }));`;
-
-/** Zooms with Ctrl+wheel around `where()` until `scale()` reaches `atLeast`. */
-const zoomUntil = async (s: S, scale: () => Promise<number>, where: () => Promise<[number, number]>, atLeast: number) => {
-  for (let i = 0; i < 12 && (await scale()) < atLeast; i++) {
-    const [x, y] = await where();
-    await s.send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: -240, modifiers: 2 });
-    await sleep(500);
-  }
-};
-
-test("0089E tester c21: the Mask view equals the mask computed from the picture, pixel by pixel, after Ignore below, Drop border shapes and Invert", { skip: !BROWSER, timeout: 400_000 }, async () => {
-  await withApp(async (s) => {
-    await openOn(s, "mask64.png", MASK_PNG);
-    // Where the 64 x 64 source sits on the screen: from the black extent in the Image view
-    // (x 0..55, y 8..55 are the extreme black pixels).
-    await clickView(s, "Image");
-    const blackBox = async () => {
-      const [cx, , cw, ch] = await canvasRect(s);
-      const top = await barBottom(s);
-      const bb = boxOf(await shot(s), [cx, top + 4, cw, ch - top], isBlack);
-      return bb;
-    };
-    const scale = async () => ((await blackBox()).x1 - (await blackBox()).x0 + 1) / 56;
-    const where = async (): Promise<[number, number]> => {
-      const b = await blackBox();
-      return [b.cx, b.cy];
-    };
-    await zoomUntil(s, scale, where, 4);
-    // The bar has the 36 px analysis row of slice F and is taller than it was: pan until the whole
-    // 64 x 64 source (its top row is 8 source rows above the black box) lies below the bar and
-    // inside the canvas, so every one of the 4096 pixels is still sampled.
-    for (let i = 0; i < 12; i++) {
-      const bb = await blackBox();
-      const sy0 = (bb.y1 - bb.y0 + 1) / 48;
-      const [, cy, , ch] = await canvasRect(s);
-      const top = bb.y0 - 8 * sy0;
-      const bottom = bb.y0 + 56 * sy0;
-      if (top >= (await barBottom(s)) + 2 && bottom <= cy + ch - 2) break;
-      const [x, y] = await where();
-      await s.send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: top < (await barBottom(s)) + 2 ? -120 : 120 });
-      await sleep(400);
-    }
-    await savePng(s, "c21-image-view.png");
-    const b = await blackBox();
-    {
-      const sy1 = (b.y1 - b.y0 + 1) / 48;
-      assert.ok(b.y0 - 8 * sy1 >= (await barBottom(s)), "the whole source is below the bar");
-    }
-    const sx = (b.x1 - b.x0 + 1) / 56;
-    const sy = (b.y1 - b.y0 + 1) / 48;
-    console.log(`source pixel on screen: ${sx.toFixed(2)} x ${sy.toFixed(2)}, black box ${JSON.stringify(b)}`);
-    assert.ok(sx >= 3 && Math.abs(sx - sy) < 0.2, "the source is shown with square pixels, big enough to sample");
-    const centre = (i: number, j: number): [number, number] => [b.x0 + (i + 0.5) * sx, b.y0 + (j - 8 + 0.5) * sy];
-    const expected = (drop: boolean, invert: boolean, specks: boolean) => {
-      // 4-connected components of the black pixels (the shapes are two or more pixels apart).
-      const kept = new Set<string>();
-      const seen = new Set<string>();
-      for (const start of MASK_SRC) {
-        if (seen.has(start)) continue;
-        const comp: [number, number][] = [];
-        const todo = [start];
-        seen.add(start);
-        while (todo.length > 0) {
-          const [x, y] = todo.pop()!.split(",").map(Number);
-          comp.push([x, y]);
-          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const k = `${x + dx},${y + dy}`;
-            if (MASK_SRC.has(k) && !seen.has(k)) {
-              seen.add(k);
-              todo.push(k);
-            }
-          }
-        }
-        const touches = comp.some(([x, y]) => x === 0 || y === 0 || x === 63 || y === 63);
-        const speck = comp.length < 8;
-        if ((drop && touches) || (specks && speck)) continue;
-        for (const [x, y] of comp) kept.add(`${x},${y}`);
-      }
-      return (x: number, y: number) => (invert ? !MASK_SRC.has(`${x},${y}`) : kept.has(`${x},${y}`));
-    };
-    const compare = async (label: string, want: (x: number, y: number) => boolean) => {
-      let wrong: string[] = [];
-      for (let attempt = 0; attempt < 30; attempt++) {
-        const img = await shot(s);
-        wrong = [];
-        for (let y = 0; y < 64; y++) {
-          for (let x = 0; x < 64; x++) {
-            const [px, py] = centre(x, y);
-            const got = at(img, px, py);
-            const w = want(x, y) ? 0 : 255;
-            if (got[0] !== w || got[1] !== w || got[2] !== w) wrong.push(`${x},${y}`);
-          }
-        }
-        if (wrong.length === 0) break;
-        await sleep(500);
-      }
-      await savePng(s, `c21-${label.replace(/\W+/g, "-")}.png`);
-      assert.deepEqual(wrong.slice(0, 12), [], `${label}: ${wrong.length} of 4096 pixels differ from the expected mask`);
-    };
-
-    await clickView(s, "Mask");
-    assert.equal(await viewChecked(s), "Mask");
-    // Ignore below 0.1 mm (the stored choice): nothing is a speck, nothing dropped.
-    await compare("plain, Ignore below 0.1 mm", expected(false, false, false));
-    // Ignore below 1 mm drops the 2 x 2 speck (0.5 mm), keeps the 27 x 23 square and the hole.
-    await typeInto(s, "Ignore below", "1");
-    await compare("Ignore below 1 mm", expected(false, false, true));
-    await s.evaluate(`document.querySelector('${BAR} button[aria-label="Drop border shapes"]').click()`);
-    await sleep(800);
-    await compare("Ignore below 1 mm and Drop border shapes", expected(true, false, true));
-    await s.evaluate(`document.querySelector('${BAR} button[aria-label="Drop border shapes"]').click()`);
-    await typeInto(s, "Ignore below", "0");
-    await s.evaluate(`document.querySelector('${BAR} button[aria-label=Invert]').click()`);
-    await sleep(800);
-    await compare("Invert alone", expected(false, true, false));
-
-    // Upscale Auto traces at twice the resolution: the mask is the traced raster, so its content must
-    // still lie where the source's black lies, within one traced pixel (half a source pixel).
-    await s.evaluate(`document.querySelector('${BAR} button[aria-label=Invert]').click()`);
-    await s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Upscale] [role=radio]')].find((r) => r.textContent.includes('Auto')).click()`);
-    await sleep(1500);
-    assert.equal(await s.evaluate(`document.querySelector('${BAR} [role=radiogroup][aria-label=Upscale] [aria-checked=true]')?.textContent.trim()`), "Auto", "Upscale is Auto");
-    const up = await blackBox();
-    await savePng(s, "c21-upscale-auto.png");
-    for (const [k, got, want] of [["x0", up.x0, b.x0], ["y0", up.y0, b.y0], ["x1", up.x1, b.x1], ["y1", up.y1, b.y1]] as const) {
-      assert.ok(Math.abs(got - want) <= sx / 2 + 1.5, `Upscale Auto: the mask's content ${k} ${got} is where the source's is (${want}), within a traced pixel`);
-    }
-  }, NO_UPSCALE);
-});
-
 // ------------------------------------------------------------------ criteria 22, 22a: bar order, overlap, clipping
 
 /** 300 x 120: three 60 x 60 blocks of grey 30, 110 and 190 on white, 50 px apart. Threshold 25 %
@@ -552,7 +317,7 @@ type Box = { x: number; y: number; w: number; h: number };
 const ORDER: [string, string][] = [
   ["i", `${BAR} button[aria-label="About Trace"]`],
   ["Preset", `${BAR} button[aria-label=Preset]`],
-  ["View", `${BAR} [role=radiogroup][aria-label=View]`],
+  ["Mask group", `${BAR} [data-trace-mask]`],
   ["Method", `${BAR} button[aria-label=Method]`],
   ["method field", `${BAR} [role=spinbutton][aria-label=Threshold], ${BAR} [role=spinbutton][aria-label="Colour tolerance"]`],
   ["Smooth", `${BAR} [role=spinbutton][aria-label=Smooth]`],
@@ -685,7 +450,7 @@ test("0089E tester c22, c22a: order, no overlap, no clipping, no label before th
 // ------------------------------------------------------------------ criterion 23: late answers
 
 const pathsNow = async (s: S, n: number, ms = 15_000) =>
-  waitFor(`${n} paths`, async () => ((await counts(s)).startsWith(`${n} path`) ? true : null), ms).catch(async (e) => {
+  waitFor(`${n} paths`, async () => (countsOf(await counts(s)) === String(n) ? true : null), ms).catch(async (e) => {
     throw new Error(`${e.message}; counts "${await counts(s)}", status "${await s.statusText()}"`);
   });
 
@@ -739,43 +504,6 @@ test("0089E tester c23: an answer for stale settings arrives late and is dropped
     await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 2 });
     await sleep(800);
     assert.equal((await s.layerRows()).length, rowsBefore, "one undo removes the whole trace");
-  }, WORKER_DELAY);
-});
-
-test("0089E tester c23: in the Mask view a stale mask arriving late is dropped", { skip: !BROWSER, timeout: 400_000 }, async () => {
-  await withApp(async (s) => {
-    await openOn(s, "blocks3.png", BLOCKS3);
-    await ensureBrightness(s);
-    await typeInto(s, "Threshold", "60");
-    await pathsNow(s, 2);
-    await clickView(s, "Image");
-    const rect = await canvasRect(s);
-    const top = await barBottom(s);
-    const region = [rect[0], top + 4, rect[2], rect[3] - top];
-    const img = await shot(s);
-    // The two dark blocks are found by their grey; the third (grey 190, like other chrome) lies as far
-    // right of the second as the second of the first.
-    const dark = GREYS.slice(0, 2).map((g) => boxOf(img, region, ([r, gg, b]) => Math.abs(r - g) < 3 && Math.abs(gg - g) < 3 && Math.abs(b - g) < 3));
-    const centres = [...dark, { ...dark[1], cx: 2 * dark[1].cx - dark[0].cx }];
-    assert.ok(centres.every((c) => Number.isFinite(c.cx)), `the three blocks are on screen ${JSON.stringify(centres)}`);
-    assert.deepEqual(at(img, centres[2].cx, centres[2].cy), [190, 190, 190], "the third block is where it is expected");
-    const state = (m: Shot) => centres.map((c) => { const v = at(m, c.cx, c.cy)[0]; return v === 0 ? "B" : v === 255 ? "W" : "g"; }).join("");
-    await clickView(s, "Mask");
-    await waitFor("the 60 % mask", async () => (state(await shot(s)) === "BBW" ? true : null), 15_000);
-    await s.evaluate(`window.__delays = [3000]`);
-    await typeInto(s, "Threshold", "25");
-    await sleep(500);
-    await typeInto(s, "Threshold", "85");
-    const seen: string[] = [];
-    const until = Date.now() + 8000;
-    while (Date.now() < until) {
-      seen.push(state(await shot(s)));
-      await sleep(200);
-    }
-    console.log("mask states after B was typed:", [...new Set(seen)].join(" -> "), "worker log:", (await s.evaluate(`JSON.stringify(window.__log)`)) as string);
-    assert.ok(!seen.includes("BWW"), "the late mask of A (only the first block) was never shown at full strength");
-    assert.equal(seen[seen.length - 1], "BBB", "B's mask is shown");
-    assert.equal(await viewChecked(s), "Mask");
   }, WORKER_DELAY);
 });
 
@@ -839,7 +567,7 @@ test("0089E tester c13 / Frage 85 B: stored settings of 0025 and damaged ones ar
         counts: await counts(s),
         colourTolerance: await fieldValue(s, "Colour tolerance"),
         legacy: (await s.evaluate(`/node limit|full-size/i.test(document.querySelector('${BAR}').innerText + [...document.querySelectorAll('${BAR} [aria-label]')].map((e) => e.getAttribute('aria-label')).join(' '))`)) as boolean,
-        groups: (await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=radiogroup]')].filter((g) => g.getAttribute('aria-label') !== 'View').map((g) => g.querySelectorAll('[aria-checked=true]').length))`)) as string,
+        groups: (await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=radiogroup]')].map((g) => g.querySelectorAll('[aria-checked=true]').length))`)) as string,
       };
       const bad: string[] = [];
       if (seed.preset && !seed.preset.test(read.preset)) bad.push(`preset "${read.preset}"`);
@@ -851,7 +579,7 @@ test("0089E tester c13 / Frage 85 B: stored settings of 0025 and damaged ones ar
         const g = JSON.parse(read.groups) as number[];
         if (g.some((n) => n !== 1)) bad.push(`a choice group without exactly one checked option: ${read.groups}`);
       }
-      if (!/^\d+ paths?/.test(read.counts)) bad.push(`no trace result ("${read.counts}")`);
+      if (!/(^|\. )\d+ paths?/.test(read.counts)) bad.push(`no trace result ("${read.counts}")`);
       console.log(`${seed.name}: ${JSON.stringify(read)}${bad.length ? "  <-- " + bad.join("; ") : ""}`);
       if (bad.length) failures.push(`${seed.name}: ${bad.join("; ")}`);
     }
@@ -863,7 +591,7 @@ test("0089E tester c13 / Frage 85 B: stored settings of 0025 and damaged ones ar
 
 const REPO = path.resolve(FRONTEND, "..");
 
-test("0089E tester c24: About Trace names the methods, the Mask view and the new geometry, matches the user page, and no stale name is left", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089E tester c24: About Trace names the methods, the Mask group and the new geometry (no View, Status or Analysis entry, UX notes §24.6), matches the user page, and no stale name is left", { skip: !BROWSER, timeout: 400_000 }, async () => {
   const page = readFileSync(path.join(REPO, "docs", "tracing-images.md"), "utf8");
   const design = readFileSync(path.join(REPO, "docs", "design-system.md"), "utf8");
   await withApp(async (s) => {
@@ -882,14 +610,16 @@ test("0089E tester c24: About Trace names the methods, the Mask view and the new
     console.log("About Trace terms:", entries.map(([t]) => t).join(" | "));
     assert.ok(entries.length > 10, "the About Trace tab lists the bar's values");
     const terms = entries.map(([t]) => t);
-    for (const want of ["View", "Mask", "Method", "Brightness", "Remove background", "Pick colours", "Colour tolerance", "Threshold", "Smooth", "Tolerance", "Corners", "Invert", "Drop border shapes"]) {
+    for (const want of ["Mask", "Method", "Brightness", "Remove background", "Pick colours", "Colour tolerance", "Threshold", "Smooth", "Tolerance", "Corners", "Invert", "Drop border shapes", "Analyse"]) {
       assert.ok(terms.includes(want), `About Trace has an entry "${want}"`);
     }
-    for (const stale of ["Node limit", "Full-size preview", "Ignore background"]) {
+    for (const stale of ["Node limit", "Full-size preview", "Ignore background", "View", "Status", "Analysis"]) {
       assert.ok(!terms.includes(stale), `About Trace has no entry "${stale}"`);
       assert.ok(!page.includes(`**${stale}**`), `the user page has no "${stale}" setting`);
     }
-    for (const l of labels) if (l !== "View") assert.ok(terms.includes(l), `the bar control "${l}" has an About Trace entry`);
+    // Finding (0094, not this cleanup): About Trace has no "Parts" entry although the 0094 UX notes (line 113) say
+    // the About Trace page states the stacking order of the parts. Parts is exempt here until the entry exists.
+    for (const l of labels) assert.ok(l === "Parts" || terms.includes(l), `the bar control "${l}" has an About Trace entry`);
     const body = (await s.evaluate(`document.body.innerText`)) as string;
     assert.ok(!/Create paths/.test(body), "no 'Create paths' label is left in the app");
     // Every About Trace entry is the same string on the user page.

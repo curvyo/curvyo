@@ -294,94 +294,30 @@ fn each_trace_group_keeps_its_counts_for_the_layers_tooltip() {
     assert_eq!(traced[0]["traced"], serde_json::json!([1, 4]));
 }
 
-/// Criterion 51: Overlay first; Shift+`\` cycles Overlay, Mask, Trace, Image; the held peek shows Image
-/// without changing the choice; leaving the tool drops both.
+/// `specs/0089` UX notes §24.1 (criterion 51 retired): the Trace tool has one view, the Overlay,
+/// from every entry; the image is washed under the outline and the document is untouched. (The
+/// Rust view state of the Mask, Trace and Image views is dead code the lead removes.)
 #[test]
-fn the_view_starts_on_overlay_cycles_and_peeks() {
+fn the_one_view_is_the_overlay_that_washes_the_image_under_the_outline() {
     let mut session = Session::new(1);
-    import_images(&mut session, 1);
+    let images = import_images(&mut session, 1);
     session.set_tool(Tool::Trace);
     assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
-    // `specs/0089` criterion 21: Mask is the second view.
-    session.cycle_trace_view_mode();
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Mask);
-    session.cycle_trace_view_mode();
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Trace);
-    session.set_trace_peek(true);
-    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Image);
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Trace);
-    session.set_trace_peek(false);
-    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Trace);
-    session.cycle_trace_view_mode();
-    session.cycle_trace_view_mode();
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
-    session.set_trace_view_mode(TraceViewMode::Image);
-    session.set_trace_peek(true);
-    session.set_tool(Tool::Select);
-    session.set_tool(Tool::Trace);
     assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Overlay);
     session.set_tool(Tool::Select);
-    session.set_trace_peek(true);
     session.set_tool(Tool::Trace);
     assert_eq!(
         session.shown_trace_view_mode(),
         TraceViewMode::Overlay,
-        "no peek outside the tool"
+        "every entry starts on it"
     );
-}
-
-/// Criterion 51: Overlay washes the image under the outline; Trace shows the result filled
-/// black in place of the image (a mesh kept across frames), at half strength when stale, without
-/// the outline; Image shows the original alone. None of it touches the document.
-#[test]
-fn each_view_draws_what_it_names() {
-    let mut session = Session::new(1);
-    let images = import_images(&mut session, 1);
-    session.set_tool(Tool::Trace);
     let source = session.trace_source(images[0], false).unwrap();
     assert!(session.set_trace_preview(images[0], &wire(source.map)));
     let objects = session.objects().to_vec();
-    let artwork = |session: &Session| {
-        let mut drawn = objects.clone();
-        session.trace_artwork(&mut drawn);
-        drawn
-    };
-    let outline = outline_triangles;
-
-    let overlay = artwork(&session);
-    assert_eq!(overlay.len(), 2, "the image and its wash");
-    assert!(outline(&session) > 0);
-
-    session.set_trace_view_mode(TraceViewMode::Trace);
-    let mut traced = objects.clone();
-    assert_eq!(
-        session.trace_artwork(&mut traced),
-        Some(0),
-        "the result goes where the image was"
-    );
-    assert!(traced.is_empty(), "the image and its wash are taken out");
-    let fill = session.trace_fill_mesh(session.view());
-    assert!(fill.triangle_count() > 0);
-    assert!(
-        fill.triangles
-            .iter()
-            .all(|v| (v.color.r, v.color.g, v.color.b, v.color.a) == (0, 0, 0, 255)),
-        "black, opaque"
-    );
-    assert_eq!(outline(&session), 0, "no outline in the Trace view");
-    session.set_trace_preview_stale(true);
-    let stale = session.trace_fill_mesh(session.view());
-    assert!(
-        stale.triangles.iter().all(|v| v.color.a == 128),
-        "half strength"
-    );
-
-    session.set_trace_view_mode(TraceViewMode::Image);
-    assert_eq!(artwork(&session), objects);
-    assert_eq!(outline(&session), 0);
-    session.set_trace_view_mode(TraceViewMode::Overlay);
-    session.set_trace_peek(true);
-    assert_eq!(artwork(&session), objects, "the peek is the Image view");
+    let mut drawn = objects.clone();
+    session.trace_artwork(&mut drawn);
+    assert_eq!(drawn.len(), 2, "the image and its wash");
+    assert!(outline_triangles(&session) > 0, "the outline is drawn");
     assert_eq!(
         &session.objects()[..],
         &objects[..],

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync } from "node:zlib";
+import { ANALYSIS_STATE_JS } from "./browser/traceStatus.ts";
 import { removeProfile } from "./browser/removeProfile.ts";
 import { startVite, stopVite } from "./browser/vite.ts";
 
@@ -224,7 +225,7 @@ const PHOTO = rgbPng(640, 480, (x, y) => {
 });
 
 const rowState = async (s: S) =>
-  (await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis]')?.getAttribute('data-trace-analysis') ?? ''`)) as string;
+  (await s.evaluate(ANALYSIS_STATE_JS)) as string;
 
 const pickPreset = async (s: S, label: string) => {
   await s.evaluate(`document.querySelector('${BAR} button[aria-label=Preset]').click()`);

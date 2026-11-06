@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync, inflateSync } from "node:zlib";
+import { ANALYSIS_LINE_JS, ANALYSIS_STATE_JS } from "./browser/traceStatus.ts";
 import { removeProfile } from "./browser/removeProfile.ts";
 import { startVite, stopVite } from "./browser/vite.ts";
 
@@ -287,8 +288,8 @@ const pickMethod = async (s: S, label: string) => {
   await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes(${JSON.stringify(label)})).click()`);
   await sleep(800);
 };
-const counts = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-counts]')?.textContent ?? ''`)) as string;
-const countsOf = (text: string) => text.match(/^(\d+) paths?/)?.[1] ?? "?";
+const counts = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
+const countsOf = (text: string) => text.match(/(?:^|\. )(\d+) paths?/)?.[1] ?? "?";
 const typeInto = async (s: S, name: string, text: string) => {
   await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label="${name}"]').focus()`);
   await press(s, "F2", 113);
@@ -386,11 +387,11 @@ const TWO = rgbPng(360, 200, (x, y) => {
 // ------------------------------------------------------------------ helpers
 
 const HINT = /\b(click|press|drag|tap|hold|try|use|tip|hint|you can|choose|select a|to (pick|add|remove|create))\b/i;
-const ROW = `${BAR} [data-trace-analysis]`;
-const rowState = async (s: S) => (await s.evaluate(`document.querySelector('${ROW}')?.getAttribute('data-trace-analysis') ?? 'none'`)) as string;
-const lineText = async (s: S) => (await s.evaluate(`document.querySelector('${ROW} [role=status]')?.textContent ?? ''`)) as string;
+const ROW = `${BAR} [data-trace-analyse]`;
+const rowState = async (s: S) => (await s.evaluate(ANALYSIS_STATE_JS)) as string;
+const lineText = async (s: S) => (await s.evaluate(ANALYSIS_LINE_JS)) as string;
 const againState = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('${ROW} button')].find((b) => b.textContent === 'Analyse')?.getAttribute('aria-disabled') ?? 'missing'`)) as string;
+  (await s.evaluate(`[...document.querySelectorAll('${ROW}')].find((b) => b.textContent === 'Analyse')?.getAttribute('aria-disabled') ?? 'missing'`)) as string;
 const methodText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]')?.textContent ?? ''`)) as string;
 const presetText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Preset]')?.textContent ?? ''`)) as string;
 const pressedOf = async (s: S, label: string) => (await s.evaluate(`document.querySelector('${BAR} [aria-label="${label}"]')?.getAttribute('aria-pressed') ?? 'none'`)) as string;
@@ -399,13 +400,16 @@ const outputText = async (s: S) =>
 const swatchList = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
 const waitState = (s: S, want: string, ms = 30_000) => waitFor(`the analysis row to be ${want}`, async () => ((await rowState(s)) === want ? true : null), ms);
+/** The Analyse button and the hidden region (`ux-notes.md` §24.3, §24.5): there is no analysis row any more. */
 const rowBox = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify((() => {
-    const bar = document.querySelector('${BAR}').getBoundingClientRect(); const row = document.querySelector('${ROW}'); const r = row.getBoundingClientRect();
-    const b = [...row.querySelectorAll('button')][0]?.getBoundingClientRect(); const t = row.querySelector('[role=status]'); const cs = getComputedStyle(t);
-    return { top: r.top, height: r.height, width: r.width, barWidth: bar.width, barTop: bar.top, barHeight: bar.height, button: b ? [b.width, b.height, bar.right - b.right] : null,
-      truncated: t.scrollWidth > t.clientWidth + 1 || cs.textOverflow === 'ellipsis', fontSize: cs.fontSize, aria: t.getAttribute('aria-live'), lineHeight: t.getBoundingClientRect().height, title: t.getAttribute('title'), text: t.textContent }; })())`)) as string) as {
-    top: number; height: number; width: number; barWidth: number; barTop: number; barHeight: number; button: number[] | null; truncated: boolean; fontSize: string; aria: string | null; lineHeight: number; title: string | null; text: string };
+    const bar = document.querySelector('${BAR}').getBoundingClientRect(); const btn = document.querySelector('${ROW}'); const b = btn?.getBoundingClientRect();
+    const t = document.querySelector('${BAR} [data-trace-hidden-status]'); const cs = getComputedStyle(t); const r = t.getBoundingClientRect();
+    const rowVisible = !!document.querySelector('${BAR} [data-trace-analysis], ${BAR} [data-trace-analysis-line]');
+    const smoothTop = document.querySelector('${BAR} [role=spinbutton][aria-label=Smooth]')?.getBoundingClientRect().top ?? -1;
+    return { button: b ? [b.width, b.height, bar.right - b.right, bar.right - b.right] : null, barHeight: bar.height, smoothTop, srOnly: t.classList.contains('sr-only'), clip: cs.clip, w: r.width, h: r.height,
+      aria: t.getAttribute('aria-live'), role: t.getAttribute('role'), text: t.textContent, rowVisible }; })())`)) as string) as {
+    button: number[] | null; barHeight: number; smoothTop: number; srOnly: boolean; clip: string; w: number; h: number; aria: string | null; role: string | null; text: string; rowVisible: boolean };
 
 /** Imports `png` as `name` into the open document and opens the Trace bar on it (a new image). */
 async function importAnother(s: S, name: string, png: Buffer) {
@@ -448,7 +452,7 @@ const WORKER_DIES = `(() => {
   };
 })();`;
 
-const settleTrace = (s: S) => waitFor("a trace result", async () => (/^\d+ paths?/.test(await counts(s)) ? true : null), 60_000);
+const settleTrace = (s: S) => waitFor("a trace result", async () => (/(^|\. )\d+ paths?/.test(await counts(s)) ? true : null), 60_000);
 
 // ------------------------------------------------------------------ criterion 31, Frage 83 B: a new image
 
@@ -468,7 +472,7 @@ test("0089F tester c31, c83B: a new line drawing is analysed and its values appl
     await settleTrace(s);
     assert.ok(Number(countsOf(await counts(s))) > 0, "the new image is traced with the applied values");
     // Pressing Analyse in Auto sets the same values again (the result would be the same, criterion 34).
-    await s.clickSel(`${ROW} button`);
+    await s.clickSel(`${ROW}`);
     await sleep(800);
     assert.equal(await rowState(s), "auto");
     assert.equal(await lineText(s), line);
@@ -510,7 +514,7 @@ test("0089F tester c33, c83B: a manual change made before the analysis answer ar
     assert.ok(!/pale colours kept/.test(await lineText(s)), `the line does not claim what it did not set: ${await lineText(s)}`);
     // Analyse recovers the proposal on request.
     assert.equal(await againState(s), "missing", "Analyse is enabled after a manual change");
-    await s.clickSel(`${ROW} button`);
+    await s.clickSel(`${ROW}`);
     await waitState(s, "auto");
     assert.match(await methodText(s), /Remove background/);
     assert.match(await lineText(s), / · pale colours kept$/);
@@ -558,7 +562,7 @@ test("0089F tester c33, c86A: Analyse never touches the preset, Smooth, Toleranc
     const photo = { smooth: await fieldValue(s, "Smooth"), corners: await fieldValue(s, "Corners"), specks: await fieldValue(s, "Ignore below"), tolerance: await fieldValue(s, "Tolerance") };
     await pickMethod(s, "Brightness");
     await waitState(s, "custom");
-    await s.clickSel(`${ROW} button`);
+    await s.clickSel(`${ROW}`);
     await waitState(s, "auto");
     assert.match(await presetText(s), /^Photo/, "Analyse keeps the Photo preset");
     assert.deepEqual({ smooth: await fieldValue(s, "Smooth"), corners: await fieldValue(s, "Corners"), specks: await fieldValue(s, "Ignore below"), tolerance: await fieldValue(s, "Tolerance") }, photo, "the preset's values are not analysed values");
@@ -590,7 +594,7 @@ test("0089F tester c33, c86A: Analyse never touches the preset, Smooth, Toleranc
     console.log("before:", JSON.stringify(before));
     assert.equal(before.preset.startsWith("Photo") || before.preset.startsWith("Custom"), true, `the preset is the maker's: ${before.preset}`);
     assert.equal(before.output, "Multicolour");
-    await s.clickSel(`${ROW} button`);
+    await s.clickSel(`${ROW}`);
     await waitState(s, "auto");
     const after = await snap();
     console.log("after:", JSON.stringify(after));
@@ -603,11 +607,11 @@ test("0089F tester c33: Analyse keeps the picked colours and the Single/Multicol
     await openOn(s, "two.png", TWO);
     await waitState(s, "auto");
     await pickMethod(s, "Pick colours");
-    await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=Image]').click()`);
+    // There is one view (Overlay, `ux-notes.md` §24.1): the image is washed to 35 %, so the red block is found by its tint.
     await sleep(1000);
     const shotNow = await shot(s);
     const [cx, , cw, ch] = await canvasRect(s);
-    const red = boxOf(shotNow, [cx, (await barBottom(s)) + 4, cw, ch], ([r, g, b]) => r > 180 && g < 50 && b < 50);
+    const red = boxOf(shotNow, [cx, (await barBottom(s)) + 4, cw, ch], ([r, g, b]) => r - g > 35 && r - b > 35 && g > 100);
     assert.ok(Number.isFinite(red.cx), "the red block is on screen");
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
       await s.send("Input.dispatchMouseEvent", { type, x: red.cx, y: red.cy, button: "left", clickCount: 1 });
@@ -618,7 +622,7 @@ test("0089F tester c33: Analyse keeps the picked colours and the Single/Multicol
     await s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === 'Multicolour').click()`);
     await sleep(800);
     await waitState(s, "custom");
-    await s.clickSel(`${ROW} button`);
+    await s.clickSel(`${ROW}`);
     await waitState(s, "auto");
     assert.equal(await outputText(s), "Multicolour", "the analysis never switches Single to Multicolour or back");
     console.log("method after Analyse:", await methodText(s));
@@ -628,71 +632,58 @@ test("0089F tester c33: Analyse keeps the picked colours and the Single/Multicol
   });
 });
 
-// ------------------------------------------------------------------ the 36 px analysis row
+// ------------------------------------------------------------------ no analysis row (UX notes §24.5)
 
-/** Adjusted for `0089` ux-notes §22.3 (2026-10-31, replaces the one-line rule of §3): the row is at least 36 px, the
- * line wraps to at most two lines and is never truncated (no ellipsis, no tooltip stand-in). */
-function oneLine(box: Awaited<ReturnType<typeof rowBox>>, tag: string) {
-  assert.ok(box.height >= 35 && box.height <= 48, `${tag}: row ${box.height} px`);
-  assert.ok(box.lineHeight <= 40, `${tag}: at most two lines (16 px each plus 8 px padding) (${box.lineHeight} px high)`);
-  assert.ok(box.text.length > 0);
-  assert.equal(box.truncated, false, `${tag}: the line is never cut`);
+/** `ux-notes.md` §24.5 replaces the 36 px analysis row of §22.3: the line is announced by the hidden region only, and
+ * showing or changing it moves nothing in the bar. */
+function silent(box: Awaited<ReturnType<typeof rowBox>>, tag: string) {
+  assert.equal(box.rowVisible, false, `${tag}: no analysis row is drawn`);
+  assert.equal(box.srOnly, true, `${tag}: the region is visually hidden`);
+  assert.ok(box.w <= 1 && box.h <= 1, `${tag}: the region takes no room (${box.w} x ${box.h})`);
+  assert.equal(box.aria, "polite");
+  assert.equal(box.role, "status");
 }
 
 async function rowInEveryState(w: number, h: number) {
-  {
-    await withApp(async (s) => {
-      await s.evaluate(`window.__analysisDelay = 4000`);
-      await openOn(s, "lines.png", LINES);
-      const analysing = await rowBox(s);
-      const smoothTop = (await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label=Smooth]')?.getBoundingClientRect().top ?? -1`)) as number;
-      const state0 = await rowState(s);
-      console.log(`${w}x${h} analysing (${state0}):`, JSON.stringify(analysing));
-      assert.ok(analysing.height >= 35, `${w}x${h}: the row exists from the first frame at 36 px, got ${analysing.height}`);
-      await s.evaluate(`window.__analysisDelay = 0`);
-      await waitState(s, "auto");
-      const auto = await rowBox(s);
-      console.log(`${w}x${h} auto:`, JSON.stringify(auto), await lineText(s));
-      assert.ok(auto.height >= 35, `${w}x${h}: Auto row ${auto.height} px`);
-      assert.ok(Math.abs(auto.top - analysing.top) <= 1, `${w}x${h}: the row did not move when the result arrived (${analysing.top} -> ${auto.top})`);
-      const smoothTop2 = (await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label=Smooth]')?.getBoundingClientRect().top ?? -1`)) as number;
-      assert.ok(Math.abs(smoothTop2 - smoothTop) <= 1, `${w}x${h}: nothing below the row moved (${smoothTop} -> ${smoothTop2})`);
-      assert.ok(auto.width >= auto.barWidth - 24, `${w}x${h}: a full-width row of its own (${auto.width} of ${auto.barWidth})`);
-      assert.ok(auto.button !== null && Math.abs(auto.button[1] - 28) <= 1 && auto.button[2] >= 6 && auto.button[2] <= 16, `${w}x${h}: the button is 28 px high, inside the bar's right edge: ${JSON.stringify(auto.button)}`);
-      oneLine(auto, `${w}x${h} auto`);
-      assert.equal(auto.fontSize, "12px");
-      assert.equal(auto.aria, "polite");
-      // Custom.
-      await pickMethod(s, "Remove background");
-      await waitState(s, "custom");
-      const custom = await rowBox(s);
-      console.log(`${w}x${h} custom:`, await lineText(s));
-      assert.match(await lineText(s), /^Custom · (Graphic|Logo|Line drawing|Sketch)$/);
-      assert.ok(custom.height >= 35, `${w}x${h}: Custom row ${custom.height} px`);
-      oneLine(custom, `${w}x${h} custom`);
-    }, ANALYSIS_DELAY, w, h);
-    await withApp(async (s) => {
-      await openOn(s, "noise.png", NOISE);
-      await waitState(s, "auto");
-      const box = await rowBox(s);
-      console.log(`${w}x${h} unclear:`, await lineText(s), JSON.stringify(box));
-      assert.ok(box.height >= 35, `${w}x${h}: the 'Type unclear' row is ${box.height} px high`);
-      oneLine(box, `${w}x${h} unclear`);
-    }, "", w, h);
-  }
+  await withApp(async (s) => {
+    await s.evaluate(`window.__analysisDelay = 4000`);
+    await openOn(s, "lines.png", LINES);
+    const analysing = await rowBox(s);
+    silent(analysing, `${w}x${h} analysing`);
+    assert.equal(await rowState(s), "analysing");
+    assert.equal(await lineText(s), "Analysing...");
+    await s.evaluate(`window.__analysisDelay = 0`);
+    await waitState(s, "auto");
+    const auto = await rowBox(s);
+    silent(auto, `${w}x${h} auto`);
+    assert.match(await lineText(s), / · /, "Auto names the type and what it set");
+    assert.equal(auto.smoothTop, analysing.smoothTop, `${w}x${h}: nothing moved when the result arrived`);
+    assert.equal(auto.barHeight, analysing.barHeight, `${w}x${h}: the bar kept its height`);
+    assert.ok(auto.button !== null && Math.abs(auto.button[1] - 28) <= 1, `${w}x${h}: the Analyse button is 28 px high`);
+    await pickMethod(s, "Remove background");
+    await waitState(s, "custom");
+    silent(await rowBox(s), `${w}x${h} custom`);
+    assert.match(await lineText(s), /^Custom · (Graphic|Logo|Line drawing|Sketch)$/);
+  }, ANALYSIS_DELAY, w, h);
+  await withApp(async (s) => {
+    await openOn(s, "noise.png", NOISE);
+    await waitState(s, "auto");
+    silent(await rowBox(s), `${w}x${h} unclear`);
+    assert.match(await lineText(s), /^Type unclear/);
+  }, "", w, h);
 }
 
-test("0089F tester c31, UX 3: the analysis row is at least 36 px, full width, from the first frame, in every state, at 1280 x 800", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089F tester c31, §24.5: no analysis row; Analysing, Auto, Custom and Type unclear are announced by the hidden region and move nothing, at 1280 x 800", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await rowInEveryState(1280, 800);
 });
 
-test("0089F tester c31, UX 3: the analysis row is at most two lines (at least 36 px) in every state at 800 x 600 (panel open, 308 px); the line is never cut", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089F tester c31, §24.5: the same at 800 x 600 (panel open, 308 px)", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await rowInEveryState(800, 600);
 });
 
 // ------------------------------------------------------------------ the analysis fails
 
-test("0089F tester c31, UX 3: when the analysis fails the row says so and the trace still has a Threshold", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089F tester c31, UX 3: when the analysis fails the notice row and the hidden region say so and the trace still has a Threshold", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await s.evaluate(`window.__failWorker = true`);
     await openOn(s, "lines.png", LINES);
@@ -701,7 +692,9 @@ test("0089F tester c31, UX 3: when the analysis fails the row says so and the tr
     const line = await lineText(s);
     console.log("state:", state, "line:", JSON.stringify(line), "threshold:", await fieldValue(s, "Threshold"));
     assert.equal(state, "failed");
-    assert.equal(line, "Analysis failed · automatic Threshold used");
+    assert.equal(line, "Analysis failed · automatic Threshold used", "the hidden region says it");
+    // UX notes §24.5: a failure is the one analysis line that is shown, in the notice row.
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis-failed]')?.textContent ?? ''`), "Analysis failed · automatic Threshold used");
   }, WORKER_DIES);
 });
 

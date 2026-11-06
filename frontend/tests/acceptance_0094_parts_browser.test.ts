@@ -1,7 +1,8 @@
 // Chromium cases for `specs/0094-masked-composite-trace` slice 2, Parts and Join (criteria 18, 19,
-// 24, 28, 29, 32, 42, 43; UX notes §3 to §5, §8): the Parts row with chip 1, picks into part 1, Add
-// part with picks into part 2, a chip pick loads its mask, Create paths makes one group in one step,
-// the inline confirm removes a part, Add part stops at 8, the row at 800 x 600. Set
+// 24, 28, 29, 32, 42, 43; UX notes §3 to §5, §8; `specs/0089` UX notes §24.3: the Parts group in the
+// Advanced block's last row, after Corners, then Analyse): chip 1, picks into part 1, Add part with
+// picks into part 2, a chip pick loads its mask, Create paths makes one group in one step, the
+// inline confirm removes a part, Add part stops at 8, the last row at 800 x 600. Set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built. The harness is the one of
 // `acceptance_0094_pick_browser.test.ts`.
 import assert from "node:assert/strict";
@@ -340,9 +341,10 @@ const barStrings = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...new Set([...document.querySelector('${BAR}').querySelectorAll('*')].flatMap((e) =>
     [e.getAttribute('aria-label'), e.getAttribute('title'), e.children.length === 0 ? e.textContent.trim() : ''].filter(Boolean)))])`)) as string) as string[];
 
-const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${ADV} [data-trace-counts]')?.textContent ?? ''`)) as string;
+/** The bar's one hidden status region (`specs/0089` UX notes §24.5): it says the counts and "2 parts". */
+const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
 const traceButton = (s: S) => s.evaluate(`(() => { const b = document.querySelector('${BAR} [data-trace-slot] , ${BAR} button[data-trace-slot]'); return b ? JSON.stringify({ disabled: b.getAttribute('aria-disabled'), describedby: b.getAttribute('aria-describedby'), reason: b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby'))?.textContent ?? '' : '' }) : 'null'; })()`).then((v) => JSON.parse(v as string) as { disabled: string | null; describedby: string | null; reason: string } | null);
-const settledCounts = (s: S) => waitFor("a trace result", async () => (/^(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
+const settledCounts = (s: S) => waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 
 
 // ------------------------------------------------------------------ 0094 fixtures and helpers
@@ -412,7 +414,7 @@ const shiftClick = async (s: S, x: number, y: number) => {
 const maskState = async (s: S) =>
   (await s.evaluate(`(() => { const g = document.querySelector('${BAR} [role=radiogroup][aria-label=Mask]'); if (!g) return 'absent';
     return [...g.querySelectorAll('[role=radio]')].map((r) => r.textContent.trim() + '=' + r.getAttribute('aria-checked')).join(','); })()`)) as string;
-const advText = async (s: S) => (await s.evaluate(`document.querySelector('${ADV}')?.textContent ?? ''`)) as string;
+const advText = advancedStatus;
 
 // ------------------------------------------------------------------ slice 1b helpers
 
@@ -479,7 +481,8 @@ test("0094 c18, c19, c24, c32, c42: chip 1, picks into each part, a chip pick lo
   await withApp(async (s) => {
     const at = await pickSetup(s);
     await setAdvanced(s, true);
-    // c18: the Parts row with chip 1 (the whole image) and Add part.
+    // c18: the Parts group with its label, chip 1 (the whole image) and Add part.
+    assert.equal(await s.evaluate(`document.querySelector('${ADV} [data-trace-parts] > span[aria-hidden]')?.textContent`), "Parts");
     assert.deepEqual(await chipNames(s), ["Part 1 of 1, whole image, active"]);
     assert.equal(await s.evaluate(`document.querySelector('${ADD}')?.getAttribute('aria-disabled')`), null);
     assert.equal(await partLabel(s), "", "no part label with one part");
@@ -493,7 +496,7 @@ test("0094 c18, c19, c24, c32, c42: chip 1, picks into each part, a chip pick lo
     assert.deepEqual(await chipNames(s), ["Part 1 of 2, inside, 1 path", "Part 2 of 2, no paths, active"]);
     assert.equal(await pressedState(s), "true", "Add part leaves the mode armed");
     assert.equal(await partLabel(s), "Part 2 of 2");
-    assert.equal(await maskState(s), "absent", "part 2 has no mask yet");
+    assert.equal(await maskState(s), "Inside=true,Outside=false", "part 2 starts Inside, the group stays");
     // A pick goes into the active part only.
     await s.click(at.b[0], at.b[1]);
     await waitFor("part 2 with B", async () => ((await chipNames(s))[1] === "Part 2 of 2, inside, 1 path, active" ? true : null), 10_000);
@@ -564,4 +567,92 @@ test("0094 c18, c28, c29, c43: Add part stops at 8, the trash removes with the i
       assert.equal((await chipNames(s)).length, 1);
     },
   );
+});
+
+test("0089 §24.3: at 800 x 600 with the panel open the last row is Corners | Parts | Analyse, wrapping by whole groups", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    await pickSetup(s);
+    await setAdvanced(s, true);
+    await s.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: false });
+    await sleep(800);
+    if (await s.evaluate(`!!document.querySelector('[aria-label="Show panel"]')`)) {
+      await s.clickSel('[aria-label="Show panel"]');
+      await sleep(600);
+    }
+    const lastRow = async () =>
+      JSON.parse((await s.evaluate(`JSON.stringify((() => { const block = document.querySelector('${ADV}');
+        const top = (e) => Math.round(e.getBoundingClientRect().top);
+        const corners = block.querySelector('[role=spinbutton][aria-label=Corners]').parentElement;
+        const parts = block.querySelector('[data-trace-parts]');
+        const analyse = block.querySelector('[data-trace-analyse]');
+        const lines = [...parts.querySelectorAll('button')].map(top).sort((a, b) => a - b).filter((t, i, all) => i === 0 || t - all[i - 1] > 10).length;
+        const targets = [...block.querySelectorAll('button, [role=spinbutton]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height));
+        const inner = block.getBoundingClientRect().right - parseFloat(getComputedStyle(block).paddingRight);
+        return { cornersTop: top(corners), partsTop: top(parts), analyseTop: top(analyse), partsLines: lines,
+          partsWidth: Math.round(parts.getBoundingClientRect().width), blockWidth: Math.round(block.clientWidth),
+          analyseRight: Math.round(inner - analyse.getBoundingClientRect().right), minTarget: Math.min(...targets),
+          blockScroll: block.scrollWidth > block.clientWidth, pageScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })())`)) as string) as {
+        cornersTop: number; partsTop: number; analyseTop: number; partsLines: number; partsWidth: number; blockWidth: number; analyseRight: number; minTarget: number; blockScroll: boolean; pageScroll: boolean;
+      };
+    const shots: Record<number, Awaited<ReturnType<typeof lastRow>>> = {};
+    for (const n of [1, 3, 8]) {
+      while ((await chipNames(s)).length < n) {
+        const was = (await chipNames(s)).length;
+        await s.clickSel(ADD);
+        await waitFor(`chip ${was + 1}`, async () => ((await chipNames(s)).length === was + 1 ? true : null), 10_000);
+      }
+      await sleep(400);
+      shots[n] = await lastRow();
+      const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
+      writeFileSync(path.join(SCRATCH, `parts-${n}-800x600.png`), Buffer.from(shot.result?.data ?? "", "base64"));
+    }
+    console.log("last row at 800 x 600, 1, 3 and 8 parts:", JSON.stringify(shots));
+    for (const [n, r] of Object.entries(shots)) {
+      assert.equal(r.blockScroll || r.pageScroll, false, `no horizontal scroll with ${n} parts`);
+      assert.ok(r.minTarget >= 28, `every target at least 28 px with ${n} parts, got ${r.minTarget}`);
+      assert.ok(r.analyseRight <= 1, `Analyse at the far right with ${n} parts, ${r.analyseRight} px short`);
+      assert.ok(r.analyseTop >= r.partsTop, "Analyse after Parts");
+    }
+    // One part, 128 px: beside Corners; Analyse on its own line.
+    assert.ok(Math.abs(shots[1].partsWidth - 128) <= 2, `one part is 128 px, got ${shots[1].partsWidth}`);
+    // A 28 px control sits 4 px lower in its 36 px line than a 36 px item.
+    assert.ok(Math.abs(shots[1].partsTop - shots[1].cornersTop) <= 6, "Corners and Parts share a line with one part");
+    assert.ok(shots[1].analyseTop > shots[1].partsTop, "Analyse wraps to its own line with one part");
+    // Three parts, 192 px: Parts on its own line, Analyse beside it.
+    assert.ok(shots[3].partsTop > shots[3].cornersTop + 20, "Parts moves to its own line with three parts");
+    assert.ok(Math.abs(shots[3].analyseTop - shots[3].partsTop) <= 4, "Parts and Analyse share a line with three parts");
+    assert.equal(shots[3].partsLines, 1, "the group is one line with three parts");
+    // Eight parts: the group wraps inside itself (Add and Remove on a second line), Analyse below.
+    assert.equal(shots[8].partsLines, 2, "Add and Remove on a second line with eight parts");
+    assert.ok(shots[8].analyseTop > shots[8].partsTop, "Analyse below the parts with eight parts");
+  });
+});
+
+test("0089 §24.7: Ignore below keeps its label and the widest value apart by 10 px or more; the other fields are 150 px", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    await pickSetup(s);
+    await s.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: false });
+    await sleep(800);
+    await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label="Ignore below"]').focus()`);
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "End", code: "End", windowsVirtualKeyCode: 35 });
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "End", code: "End", windowsVirtualKeyCode: 35 });
+    await sleep(1500);
+    const m = JSON.parse((await s.evaluate(`JSON.stringify((() => {
+      const fields = [...document.querySelectorAll('${BAR} [role=spinbutton]')];
+      const f = fields.find((e) => e.getAttribute('aria-label') === 'Ignore below');
+      const [label, value] = [...f.querySelectorAll('span[aria-hidden]')].filter((x) => x.textContent.trim());
+      const number = value.firstElementChild ?? value;
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.font = getComputedStyle(number).font;
+      return { text: value.textContent.trim(), gap: value.getBoundingClientRect().left - label.getBoundingClientRect().right,
+        widest: ctx.measureText('99.99').width - ctx.measureText(number.textContent.trim()).width,
+        widths: fields.map((e) => [e.getAttribute('aria-label'), Math.round(e.getBoundingClientRect().width)]) }; })())`)) as string) as
+      { text: string; gap: number; widest: number; widths: [string, number][] };
+    console.log("Ignore below at its largest value:", JSON.stringify(m));
+    assert.match(m.text, /^10\.00\s*mm$/);
+    assert.ok(m.gap - Math.max(0, m.widest) >= 10, `"99.99 mm" keeps 10 px from the label: gap ${m.gap}, wider by ${m.widest}`);
+    for (const [name, width] of m.widths) {
+      assert.equal(width, name === "Ignore below" ? 171 : 150, `${name} is ${width} px`);
+    }
+  });
 });

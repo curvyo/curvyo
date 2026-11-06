@@ -3,7 +3,8 @@
 // button for an image (criterion 1), the Trace bar with its status from the worker (criteria 2,
 // 4, 11, 17, 58), Create paths (Enter) as one step with no notice and the group above the image
 // (criteria 12, 13, 30), Ctrl+Z (criterion 13), the key I and Escape (criterion 1), and the empty
-// bar (criterion 3); slice 3: the View pill and the backslash keys (criterion 51). Harness as in `acceptance_0058_tester.test.ts`.
+// bar (criterion 3); `specs/0089` UX notes §24: no View pill, no backslash keys, the counts only in the
+// hidden status region, the Advanced block's last row Parts then Analyse. Harness as in `acceptance_0058_tester.test.ts`.
 
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -240,8 +241,8 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
     assert.equal(lastButton, "Trace");
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
 
-    // Criteria 2, 4, 11, 71: the Trace bar with its groups; the counts from the worker are the
-    // last row of the Advanced block, never in a visible state row (the sr-only statuses may say them).
+    // Criteria 2, 4, 11, 71 and `specs/0089` UX notes §24.5: the Trace bar with its groups; the
+    // counts from the worker are never drawn, the one hidden status region says them.
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]')`)) ? true : null));
     await sleep(1500);
     assert.equal(
@@ -250,15 +251,17 @@ test("0025 in Chromium: Trace button, preview status, Create paths, undo, key I"
       "no counts with Advanced closed",
     );
     await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]').click()`);
+    const hiddenStatus = `document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-hidden-status].sr-only[role=status]')?.textContent ?? ''`;
     const status = await waitFor(
       "the trace counts",
       async () => {
-        const t = (await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]')?.textContent ?? ''`)) as string;
-        return /^1 path, 4 nodes, \d+\.\d s$/.test(t) ? t : null;
+        const t = (await s.evaluate(hiddenStatus)) as string;
+        return /(^|\. )1 path, 4 nodes, \d+\.\d s($|\. )/.test(t) ? t : null;
       },
       30_000,
     );
-    assert.match(status, /^1 path, 4 nodes/);
+    assert.match(status, /1 path, 4 nodes/);
+    assert.equal(await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts], [role=toolbar][aria-label=Trace] [data-trace-analysis]') === null`), true, "no status line, no analysis line with Advanced open");
     await s.evaluate(`document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="Fewer trace options"]').click()`);
     const fields = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=toolbar][aria-label=Trace] [role=spinbutton]')].map((i) => [i.getAttribute('aria-label'), i.getAttribute('aria-valuenow'), i.getAttribute('aria-valuemax'), i.getAttribute('aria-valuetext')]))`)) as string) as [string, string, string, string][];
     assert.deepEqual(fields.map((f) => f[0]), ["Threshold", "Smooth", "Tolerance", "Ignore below"]);
@@ -330,7 +333,7 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('[role=toolbar][aria-label=Trace] [aria-label="More trace options"]')`)) ? true : null));
     await s.evaluate(`[...document.querySelectorAll('[role=toolbar][aria-label=Trace] button')].find((b) => b.getAttribute('aria-label') === 'More trace options').click()`);
-    await waitFor("the trace counts", async () => ((await s.evaluate(`/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-counts]')?.textContent ?? '')`)) ? true : null), 30_000);
+    await waitFor("the trace counts", async () => ((await s.evaluate(`/path/.test(document.querySelector('[role=toolbar][aria-label=Trace] [data-trace-hidden-status]')?.textContent ?? '')`)) ? true : null), 30_000);
     await sleep(500);
     const overflow = async () =>
       (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]'); const edge = bar.getBoundingClientRect().right;
@@ -346,26 +349,25 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
       writeFileSync(path.join(SCRATCH, `pr-panel-${open ? "open" : "closed"}-800x600.png`), Buffer.from(shot.result?.data ?? "", "base64"));
     }
-    // UX notes 20.5: Advanced row 1 starts with Invert and Drop border shapes (0089 Frage 88 A), the counts row is
-    // the block's last; panel open, the bar keeps inside 800 px.
+    // `specs/0089` UX notes §24.3: Output first, then the toggles, the options, and last Parts and
+    // Analyse; panel open, the bar keeps inside 800 px.
     await s.clickSel('[aria-label="Show panel"]');
     await sleep(600);
     const advanced = JSON.parse((await s.evaluate(`JSON.stringify((() => { const block = document.querySelector('[role=toolbar][aria-label=Trace] [role=group][aria-label=Advanced]');
       const y = (e) => Math.round(e.getBoundingClientRect().top);
-      // specs/0094 slice 2 (UX notes §3): the Parts row is the block's first row, above the analysis.
       const parts = block.querySelector('[data-trace-parts]');
+      const corners = block.querySelector('[role=spinbutton][aria-label=Corners]');
+      const analyse = block.querySelector('[data-trace-analyse]');
       const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')].filter((e) => !parts?.contains(e));
-      const counts = block.querySelector('[data-trace-counts]');
+      const after = (a, b) => !!a && !!b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
       return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
-        partsFirst: !!parts && block.children[0].contains(parts),
-        countsFirst: block.children[2] === counts, countsAbove: y(counts) < Math.min(...controls.map(y)) }; })())`)) as string) as { names: string[]; firstRow: string[]; partsFirst: boolean; countsFirst: boolean; countsAbove: boolean };
-    // `0089` ux-notes §22.3 (2026-10-31, replaces Frage 92 B / UX notes 20.5 here): Output comes first, then the
-    // two toggles; the status line (the counts) is the second row, above all controls, after the analysis row.
+        order: after(corners, parts) && after(parts, analyse) && block.lastElementChild.contains(analyse),
+        analyseRight: Math.abs(analyse.getBoundingClientRect().right - block.getBoundingClientRect().right) < 8 }; })())`)) as string) as { names: string[]; firstRow: string[]; order: boolean; analyseRight: boolean };
     // `specs/0091` UX notes §1: Recognise text is the third icon toggle; `specs/0088` Part B adds Recognise shapes after it.
     assert.deepEqual(advanced.names, ["Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners"]);
     assert.deepEqual(advanced.firstRow.slice(0, 1), ["Output"]);
-    assert.ok(advanced.partsFirst, "the Parts row comes first (specs/0094 slice 2)");
-    assert.ok(advanced.countsFirst && advanced.countsAbove, "the status line follows the Parts row and the analysis row, above the controls");
+    assert.ok(advanced.order, "Corners, then the Parts group, then Analyse last (specs/0089 UX notes §24.3)");
+    assert.ok(advanced.analyseRight, "Analyse at the far right of its line");
     // 0089 Frage 84: the expander and the finish button share the last line, the button at the
     // far right (at 308 px they wrap below Ignore below, `specs/0089` ux-notes §2).
     const sameRow = (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
@@ -489,23 +491,12 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await sleep(400);
     await s.clickSel('[aria-label="Show panel"]');
     await sleep(600);
-    // Slice 3 (criterion 51): the View pill in row 1; held backslash presses Image, release
-    // restores, Shift+backslash cycles.
-    const checked = async () =>
-      (await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [aria-checked=true]')?.getAttribute('aria-label') ?? ''`)) as string;
+    // `specs/0089` UX notes §24.1: no View pill; backslash and Shift+backslash are free in the tool.
+    assert.equal(await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View]') === null`), true, "no View pill");
     const key = (type: string, k: string, shift = false) =>
-      s.evaluate(`window.dispatchEvent(new KeyboardEvent('${type}', { key: ${JSON.stringify(k)}, shiftKey: ${shift} })) && true`);
-    assert.equal(await checked(), "Overlay");
-    await key("keydown", "\\");
-    await sleep(200);
-    assert.equal(await checked(), "Image", "the peek presses Image");
-    await key("keyup", "\\");
-    await sleep(200);
-    assert.equal(await checked(), "Overlay");
-    await key("keydown", "|", true);
-    await sleep(200);
-    // Mask follows Overlay since `specs/0089` criterion 21.
-    assert.equal(await checked(), "Mask", "Shift+backslash cycles");
+      s.evaluate(`window.dispatchEvent(new KeyboardEvent('${type}', { key: ${JSON.stringify(k)}, shiftKey: ${shift}, cancelable: true }))`);
+    assert.equal(await key("keydown", "\\"), true, "backslash is not taken");
+    assert.equal(await key("keydown", "|", true), true, "Shift+backslash is not taken");
     // Leaving the tool with the tab active returns to the stored tab; the tab leaves the strip.
     await s.clickSel('[role=tablist][aria-label=Panel] [role=tab][aria-label="About Trace"]');
     await sleep(400);

@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import path from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync } from "node:zlib";
+import { ANALYSIS_LINE_JS, ANALYSIS_STATE_JS } from "./browser/traceStatus.ts";
 import { removeProfile } from "./browser/removeProfile.ts";
 import { startVite, stopVite } from "./browser/vite.ts";
 
@@ -232,12 +233,12 @@ const BLOCKS = rgbPng(200, 100, (x, y) => {
 });
 
 const line = async (s: S) =>
-  (await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis] [role=status]')?.textContent ?? ''`)) as string;
+  (await s.evaluate(ANALYSIS_LINE_JS)) as string;
 const rowState = async (s: S) =>
-  (await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis]')?.getAttribute('data-trace-analysis') ?? ''`)) as string;
+  (await s.evaluate(ANALYSIS_STATE_JS)) as string;
 // `ux-notes.md` §22.3 (2026-10-31): the button is "Analyse", always enabled (no aria-disabled), in Advanced.
 const againDisabled = async (s: S) =>
-  (await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-analysis] button')].find((b) => b.textContent === 'Analyse')?.getAttribute('aria-disabled') ?? 'missing'`)) as string;
+  (await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-analyse]')].find((b) => b.textContent === 'Analyse')?.getAttribute('aria-disabled') ?? 'missing'`)) as string;
 const methodLabel = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').textContent`)) as string;
 const presetLabel = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Preset]').textContent`)) as string;
 
@@ -277,7 +278,7 @@ test("0089 F in Chromium: the analysis applies to a new image, Custom after an e
     assert.equal(await presetLabel(s), preset);
 
     // Analyse again: the analysed values back in one go, Auto again.
-    await s.clickSel(`${BAR} [data-trace-analysis] button`);
+    await s.clickSel(`${BAR} [data-trace-analyse]`);
     await waitFor("Auto again", async () => ((await rowState(s)) === "auto" ? true : null));
     assert.equal(await line(s), auto);
     assert.equal(await methodLabel(s), "Remove background");

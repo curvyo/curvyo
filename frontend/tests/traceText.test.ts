@@ -56,14 +56,12 @@ import {
   REDUCED_COPY,
   RETRY,
   STOPPED,
-  TRACE_VIEWS,
   FAILED,
   STOP,
   percentText,
   failureReason,
   failureText,
-  isPeekKey,
-  isCycleKey,
+  traceAnnouncement,
   previewIsReduced,
   MAX_SWATCHES,
   PICK_COLOURS,
@@ -154,8 +152,7 @@ test("criterion 70: the info page's exact text", () => {
   "Photo: many shapes, photos trace roughly.",
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-  "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
-  "Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.",
+  "Mask: the paths that limit the trace; Pick mask paths adds or takes them out, Inside traces what lies inside them, Outside what lies outside, Clear mask takes them all out.",
   "Method: how pixels become shapes.",
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
@@ -167,8 +164,6 @@ test("criterion 70: the info page's exact text", () => {
   "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
   "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
   "Ignore below: drops shapes and holes smaller than this size in mm.",
-  "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse sets them back.",
-  "Status: the result in numbers (paths, nodes and time, specks ignored, colours) and what a colour action did.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
   "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
@@ -184,6 +179,7 @@ test("criterion 70: the info page's exact text", () => {
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
+  "Analyse: sets the method, its background and Colour tolerance, and the Threshold back to what the analysis found in the image; never the preset or other values.",
   ]);
   assert.deepEqual(infoEntryParts(TRACE_INFO_ENTRIES[1]), { term: "Logo / Line art", text: "sharp corners, clean curves." });
 });
@@ -437,32 +433,29 @@ test("criterion 35: the notices are the same strings in the user page", () => {
     TRACE_INFO_INTRO,
     ...TRACE_INFO_ENTRIES,
     failureText("out of memory at 16 Mpx"),
-    ...TRACE_VIEWS.map((v) => v.label),
   ];
   for (const text of quoted) {
     assert.ok(page.includes(text), `the page quotes "${text}"`);
   }
 });
 
-test("criterion 51 and 0089 criterion 21: the View pill's segments and the backslash keys", () => {
-  assert.deepEqual(
-    TRACE_VIEWS.map((v) => [v.mode, v.label, v.tooltip]),
-    [
-      ["overlay", "Overlay", "Overlay"],
-      ["mask", "Mask", "Mask"],
-      ["trace", "Trace", "Trace"],
-      ["image", "Image", "Image (\\)"],
-    ],
+test("0089 UX notes §24.5: the hidden region says the removed lines in their order, joined by \". \"", () => {
+  const none = { analysis: "", mask: "", counts: "", countsMuted: "", recognised: "", palette: "", emptyPart: "" };
+  assert.equal(traceAnnouncement(none), "", "nothing to say");
+  assert.equal(
+    traceAnnouncement({
+      analysis: "Custom · Line drawing",
+      mask: "Inside 2 paths",
+      counts: "7 paths, 412 nodes, 0.4 s",
+      countsMuted: "38 specks ignored, 2 regions joined",
+      recognised: "3 text lines set · 12 shapes set",
+      palette: "2 colours excluded",
+      emptyPart: "Part 3 has no paths",
+    }),
+    "Custom · Line drawing. Inside 2 paths. 7 paths, 412 nodes, 0.4 s. 38 specks ignored, 2 regions joined. 3 text lines set · 12 shapes set. 2 colours excluded. Part 3 has no paths",
   );
-  const key = (k: string, mods: Partial<KeyboardEvent> = {}) => ({ key: k, code: "", shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, repeat: false, ...mods });
-  assert.ok(isPeekKey(key("\\")));
-  assert.ok(isPeekKey(key("\\", { ctrlKey: true, altKey: true })), "AltGr on German keyboards");
-  assert.ok(!isPeekKey(key("\\", { repeat: true })));
-  assert.ok(!isPeekKey(key("\\", { shiftKey: true })));
-  assert.ok(isCycleKey(key("|", { shiftKey: true })));
-  assert.ok(isCycleKey(key("\\", { shiftKey: true })));
-  assert.ok(!isCycleKey(key("|", { shiftKey: true, repeat: true })));
-  assert.ok(!isCycleKey(key("i")));
+  assert.equal(traceAnnouncement({ ...none, counts: "7 paths, 412 nodes, 0.4 s", recognised: "12 shapes set" }), "7 paths, 412 nodes, 0.4 s. 12 shapes set", "an empty segment is absent");
+  assert.equal(traceAnnouncement({ ...none, analysis: "Analysing..." }), "Analysing...");
 });
 
 test("criteria 52 to 55: large images, stopped, failure, slow to edit", () => {

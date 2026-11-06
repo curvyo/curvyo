@@ -14,7 +14,7 @@
 mod cpu_time;
 
 use cpu_time::cpu_time_of;
-use curvyo_editor_wasm::{Session, Tool, TraceViewMode};
+use curvyo_editor_wasm::{Session, Tool};
 use curvyo_ui_core::{TRACE_PRESETS, TraceParams, trace_auto_threshold, trace_job_with};
 
 fn say(step: &str, took: std::time::Duration) {
@@ -70,28 +70,20 @@ fn a_4000_px_photo_through_the_trace_tool_step_by_step() {
     assert!(ok);
     say("preview taken (main thread)", took);
 
-    for mode in [
-        TraceViewMode::Overlay,
-        TraceViewMode::Trace,
-        TraceViewMode::Image,
-    ] {
-        let ((), took) = cpu_time_of(|| session.set_trace_view_mode(mode));
-        say(&format!("{mode:?}: switch"), took);
-        session.set_trace_view_moving(false);
-        let (_, first) = cpu_time_of(|| session.draw_list());
-        say(&format!("{mode:?}: first frame"), first);
-        let (_, again) = cpu_time_of(|| session.draw_list());
-        say(&format!("{mode:?}: next frame"), again);
-        session.set_trace_view_moving(true);
-        session.wheel(0.0, -120.0, 600.0, 400.0, false, true);
-        let (_, moving) = cpu_time_of(|| session.draw_list());
-        say(&format!("{mode:?}: frame while zooming"), moving);
-        session.set_trace_view_moving(false);
-        let (_, rest) = cpu_time_of(|| session.draw_list());
-        say(&format!("{mode:?}: frame when the view rests"), rest);
-        session.wheel(0.0, 120.0, 600.0, 400.0, false, true);
-    }
-    session.set_trace_view_mode(TraceViewMode::Overlay);
+    // One view only (the Overlay, `specs/0089` UX notes §24.1): the frames of the Mask, Trace and Image views are retired.
+    session.set_trace_view_moving(false);
+    let (_, first) = cpu_time_of(|| session.draw_list());
+    say("Overlay: first frame", first);
+    let (_, again) = cpu_time_of(|| session.draw_list());
+    say("Overlay: next frame", again);
+    session.set_trace_view_moving(true);
+    session.wheel(0.0, -120.0, 600.0, 400.0, false, true);
+    let (_, moving) = cpu_time_of(|| session.draw_list());
+    say("Overlay: frame while zooming", moving);
+    session.set_trace_view_moving(false);
+    let (_, rest) = cpu_time_of(|| session.draw_list());
+    say("Overlay: frame when the view rests", rest);
+    session.wheel(0.0, 120.0, 600.0, 400.0, false, true);
 
     let (full, took) = cpu_time_of(|| session.trace_source(image, false).unwrap());
     say("full-size pixels for the worker", took);

@@ -250,14 +250,6 @@ async function openTrace(s: S, file: string, width: number, height: number) {
   await sleep(1200);
 }
 
-const viewChecked = async (s: S) =>
-  (await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [aria-checked=true]')?.getAttribute('aria-label') ?? ''`)) as string;
-
-const clickView = async (s: S, name: string) => {
-  await s.evaluate(`document.querySelector('[role=radiogroup][aria-label=View] [role=radio][aria-label=${name}]').click()`);
-  await sleep(1200);
-};
-
 const pickMethod = async (s: S, label: string) => {
   await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
   await sleep(300);
@@ -317,7 +309,7 @@ const swatches = async (s: S) =>
 const coloursFieldText = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label=Colours]')?.textContent ?? ''`)) as string;
 
-test("0089 M in Chromium: Output, the palette and its actions, the segmented Mask, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 M in Chromium: Output, the palette and its actions, Isolate dims in the Overlay, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -350,28 +342,29 @@ test("0089 M in Chromium: Output, the palette and its actions, the segmented Mas
     assert.ok(found.some((n) => n.startsWith("#D0222A · Red")), "the red swatch names its hex and colour");
     assert.equal((await coloursFieldText(s)).replace(/\s+/g, " ").includes("Auto 3"), true, `Colours reads Auto 3: ${await coloursFieldText(s)}`);
 
-    // Where the blocks are: the Image view, below the bar (whose swatches and button are coloured).
+    // Where the blocks are: one view only (Overlay, `ux-notes.md` §24.1), the image washed to 35 %; the blocks are
+    // found by their tint, below the bar (whose swatches and button are coloured).
     const whole = await canvasRect(s);
     const barBottom = (await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().bottom`)) as number;
     const rect = [whole[0], barBottom + 4, whole[2], whole[1] + whole[3] - barBottom - 4];
-    await clickView(s, "Image");
     const image = await shot(s);
-    const red = boxOf(image, rect, ([r, g, b]) => r > 180 && g < 70 && b < 70);
-    const blue = boxOf(image, rect, ([r, g, b]) => b > 150 && r < 80 && g < 120);
+    const red = boxOf(image, rect, ([r, g, b]) => r - g > 35 && r - b > 35 && g > 100);
+    const blue = boxOf(image, rect, ([r, g, b]) => b - r > 40 && b - g > 25);
     assert.ok(Number.isFinite(red.cx) && Number.isFinite(blue.cx), "the blocks are on screen");
+    // No View pill, no Mask view (UX notes §24.1).
+    assert.equal(await s.evaluate(`!!document.querySelector('[role=radiogroup][aria-label=View]')`), false, "no View pill");
+    // The outline over each block is the Overlay's one preview colour; its pixels around the red block (the washed image has none).
+    const strong = (m: Shot, box: ReturnType<typeof boxOf>, test: (rgb: number[]) => boolean) => {
+      let n = 0;
+      for (let y = box.y0 - 4; y <= box.y1 + 4; y++) for (let x = box.x0 - 4; x <= box.x1 + 4; x++) if (test(at(m, x, y))) n++;
+      return n;
+    };
+    const redOutline = ([r, g, b]: number[]) => b > 200 && r < 120 && g < 170;
+    const redBefore = strong(await shot(s), red, redOutline);
+    console.log("outline pixels around the red block before Isolate:", redBefore);
+    assert.ok(redBefore > 20, "the outline is drawn around the red block");
 
-    // The Mask view shows each colour as found, the background white.
-    await clickView(s, "Mask");
-    await waitFor("the segmented mask", async () => {
-      const m = await shot(s);
-      const r = at(m, red.cx, red.cy);
-      const b = at(m, blue.cx, blue.cy);
-      return r[0] > 180 && r[1] < 70 && b[2] > 150 && b[0] < 80 ? true : null;
-    }, 20_000);
-    const mask = await shot(s);
-    assert.deepEqual(at(mask, red.x0 - 6, red.cy), [255, 255, 255], "the background is white in the Mask");
-
-    // Isolate (view only): the status says so, the other colours are dimmed in the Mask.
+    // Isolate (view only): the hidden region says so, the other colours are dimmed in the Overlay.
     await s.clickSel(`${BAR} [data-trace-palette-swatch="#234EB8"]`);
     const detail = (await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-detail]')?.textContent ?? ''`)) as string;
     assert.ok(detail.startsWith("#234EB8 · Blue"), detail);
@@ -379,10 +372,8 @@ test("0089 M in Chromium: Output, the palette and its actions, the segmented Mas
     assert.deepEqual(actions, ["Isolate", "Recolour", "Merge into", "Exclude"], "an automatic colour has no Remove");
     await s.clickSel(`${BAR} [data-trace-palette-action="Isolate"]`);
     await waitFor("Isolating", async () => ((await s.statusText()).includes("Isolating #234EB8") ? true : null), 10_000);
-    await waitFor("the dimmed red", async () => {
-      const r = at(await shot(s), red.cx, red.cy);
-      return r[1] > 120 ? true : null;
-    }, 10_000);
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-action="Isolate"]').getAttribute('aria-pressed')`), "true", "Isolate carries its state (aria-pressed)");
+    await waitFor("the dimmed red", async () => ((await strong(await shot(s), red, redOutline)) < redBefore * 0.5 ? true : null), 10_000);
     await s.clickSel(`${BAR} [data-trace-palette-action="Isolate"]`);
 
     // Recolour by its hex field (UX notes §7): the swatch is then named by its new colour and its
@@ -406,7 +397,7 @@ test("0089 M in Chromium: Output, the palette and its actions, the segmented Mas
     // closed first so the bar (one row taller with the analysis line) leaves the block visible.
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]').click()`);
     await sleep(500);
-    await waitFor("the excluded blue is white in the Mask", async () => (at(await shot(s), blue.cx, blue.y1 - 3).every((c) => c > 240) ? true : null), 20_000);
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]').textContent.includes('1 colour excluded')`), true, "the hidden region says it");
 
     // Criterion 29: Create paths writes one group with one filled path per traced colour, in one step.
     const before = (await s.layerRows()).length;

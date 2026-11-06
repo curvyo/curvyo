@@ -328,8 +328,8 @@ const barStrings = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...new Set([...document.querySelector('${BAR}').querySelectorAll('*')].flatMap((e) =>
     [e.getAttribute('aria-label'), e.getAttribute('title'), e.children.length === 0 ? e.textContent.trim() : ''].filter(Boolean)))])`)) as string) as string[];
 
-const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${ADV} [data-trace-counts]')?.textContent ?? ''`)) as string;
-const settledCounts = (s: S) => waitFor("a trace result", async () => (/^(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
+const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
+const settledCounts = (s: S) => waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 
 
 // ------------------------------------------------------------------ 0094 fixtures and helpers
@@ -401,7 +401,10 @@ const shiftClick = async (s: S, x: number, y: number) => {
 const maskState = async (s: S) =>
   (await s.evaluate(`(() => { const g = document.querySelector('${BAR} [role=radiogroup][aria-label=Mask]'); if (!g) return 'absent';
     return [...g.querySelectorAll('[role=radio]')].map((r) => r.textContent.trim() + '=' + r.getAttribute('aria-checked')).join(','); })()`)) as string;
-const advText = async (s: S) => (await s.evaluate(`document.querySelector('${ADV}')?.textContent ?? ''`)) as string;
+// §24.5: the muted "Inside 1 path" segment is announced by the hidden region only.
+const advText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
+/** The mask paths of the active part, as the hidden region announces them ("Inside 2 paths"); 0 without. */
+const maskPaths = async (s: S) => Number((await advText(s)).match(/(?:Inside|Outside) (\d+) paths?/)?.[1] ?? 0);
 
 // ------------------------------------------------------------------ 0094 slice 1b helpers
 const PICK = `${BAR} button[aria-label="Pick mask paths"]`;
@@ -639,16 +642,17 @@ const withTall = (fn: (s: S) => Promise<void>) => withApp(fn, ERR_HOOK, 1280, 11
 
 // ------------------------------------------------------------------ cases
 
-test("0094 c34, c35, c41, c43: the button follows View, toggles by press, Space and Enter, shows the cursor, says nothing in the bar", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 c34, c35, c41, c43: the button follows Preset, toggles by press, Space and Enter, shows the cursor, says nothing in the bar", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withTall(async (s) => {
     const scene = await buildScene(s, ["rect"]);
     await enterTrace(s, scene);
     await setAdvanced(s, false);
     // c34
-    assert.deepEqual(await barControls(s), ["About Trace", "Preset", "View", "Pick mask paths", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
+    assert.deepEqual(await barControls(s), ["About Trace", "Preset", "Pick mask paths", "Mask", "Clear mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
     assert.equal(await pickState(s), "false");
-    assert.equal(await maskState(s), "absent", "no Inside / Outside segments");
-    assert.equal(await clearPresent(s), false, "no Clear mask");
+    assert.equal(await maskPaths(s), 0, "no mask paths");
+    assert.equal(await maskState(s), "Inside=true,Outside=false", "§24.4: Inside / Outside are drawn, Inside on entry");
+    assert.equal(await clearPresent(s), true, "§24.4: Clear mask is always drawn");
     assert.equal(await s.evaluate(`document.querySelector('${PICK}').getAttribute('aria-keyshortcuts')`), null, "no shortcut");
     const size = JSON.parse((await s.evaluate(`JSON.stringify((() => { const r = document.querySelector('${PICK}').getBoundingClientRect(); return [r.width, r.height]; })())`)) as string) as number[];
     assert.ok(size[0] >= 28 && size[1] >= 28, `target size ${size}`);
@@ -698,24 +702,28 @@ test("0094 c34, c35, c41, c43: the button follows View, toggles by press, Space 
     await s.clickSel(PICK);
     assert.notEqual(await activeName(s), "Pick mask paths", "a mouse press returns focus to the canvas");
     await s.clickSel(PICK);
-    // Tab: View, then the button
-    await s.evaluate(`(document.querySelector('${BAR} [role=radiogroup][aria-label=View] [role=radio][tabindex="0"]') ?? document.querySelector('${BAR} [role=radiogroup][aria-label=View] [role=radio]')).focus()`);
+    // Tab: Preset, then the button, the Mask segments (one stop), Clear mask, Method (§24.2: the group is there without a mask).
+    await s.evaluate(`document.querySelector('${BAR} button[aria-label=Preset]').focus()`);
     await press(s, "Tab", 9);
-    assert.equal(await activeName(s), "Pick mask paths", "Tab from View lands on the button");
+    assert.equal(await activeName(s), "Pick mask paths", "Tab from Preset lands on the button");
     await press(s, "Tab", 9);
-    assert.equal(await activeName(s), "Method", "no mask: the next stop is Method");
+    assert.ok(["Inside", "Outside"].includes(await activeName(s)), "no mask: the Mask segments are a stop");
+    await press(s, "Tab", 9);
+    assert.equal(await activeName(s), "Clear mask", "no mask: Clear mask is a stop");
+    await press(s, "Tab", 9);
+    assert.equal(await activeName(s), "Method", "then Method");
   });
 });
 
-test("0094 c41: with a mask the Tab order is View, Pick mask paths, Mask, Clear mask, Method", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 c41 (§24.2): with a mask the Tab order is Preset, Pick mask paths, Mask, Clear mask, Method", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withTall(async (s) => {
     const scene = await buildScene(s, ["rect"]);
     await enterTrace(s, scene);
     await setAdvanced(s, false);
     await shiftClick(s, scene.spots.rect[0], scene.spots.rect[1]);
-    await waitFor("the Mask item", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
-    assert.deepEqual((await barControls(s)).slice(0, 7), ["About Trace", "Preset", "View", "Pick mask paths", "Mask", "Clear mask", "Method"]);
-    await s.evaluate(`(document.querySelector('${BAR} [role=radiogroup][aria-label=View] [role=radio][tabindex="0"]') ?? document.querySelector('${BAR} [role=radiogroup][aria-label=View] [role=radio]')).focus()`);
+    await waitFor("the Mask item", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    assert.deepEqual((await barControls(s)).slice(0, 6), ["About Trace", "Preset", "Pick mask paths", "Mask", "Clear mask", "Method"]);
+    await s.evaluate(`document.querySelector('${BAR} button[aria-label=Preset]').focus()`);
     const seen: string[] = [];
     for (let i = 0; i < 4; i++) {
       await press(s, "Tab", 9);
@@ -739,7 +747,7 @@ test("0094 c36, c35, c43: picks add and remove, the mode stays armed, the image 
     const before = await s.layerRows();
     await arm(s);
     await clickAt(s, scene.spots.rect);
-    await waitFor("the Mask item", async () => ((await maskState(s)) === "Inside=true,Outside=false" ? true : null), 10_000);
+    await waitFor("the Mask item", async () => ((await maskPaths(s)) > 0 && (await maskState(s)) === "Inside=true,Outside=false" ? true : null), 10_000);
     assert.equal(await pickState(s), "true", "still armed");
     const sel = await selectedRows(s);
     assert.equal(sel.length, 2, `the image plus the path: ${JSON.stringify(sel)}`);
@@ -772,8 +780,8 @@ test("0094 c36, c35, c43: picks add and remove, the mode stays armed, the image 
       .find(([x, y]) => x < bar[0] - 2 || x > bar[2] + 2 || y < bar[1] - 2 || y > bar[3] + 2);
     assert.ok(free, `a point of the rectangle outside the bar ${JSON.stringify(bar)}`);
     await clickAt(s, free);
-    await waitFor("no mask", async () => ((await maskState(s)) === "absent" ? true : null), 20_000);
-    assert.equal(await clearPresent(s), false, "Clear mask disappears with the last path");
+    await waitFor("no mask", async () => ((await maskPaths(s)) === 0 ? true : null), 20_000);
+    assert.equal(await clearPresent(s), true, "§24.4: Clear mask stays when the last path goes");
     assert.equal(await pickState(s), "true", "armed after the last removal");
     assert.deepEqual(await s.layerRows(), before, "a pick creates nothing");
     assert.doesNotMatch(await s.statusText(), /created|done|success|added|removed/i, "no success notice");
@@ -814,7 +822,7 @@ test("0094 c37, c41: a pick, Shift+click and the Select route give the same mask
     assert.equal(await selectionCount(s), 1 + kinds.length, "the image plus seven objects are selected");
     // Clear mask: only the picture stays selected, the paths are still there.
     await s.clickSel(CLEAR);
-    await waitFor("cleared", async () => ((await maskState(s)) === "absent" ? true : null), 10_000);
+    await waitFor("cleared", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
     assert.deepEqual(await selectedRows(s), [scene.imageRow]);
     assert.deepEqual((await s.layerRows()).sort(), rows.sort(), "the paths are untouched");
     // Route 2: Shift+click in the Trace tool.
@@ -825,7 +833,7 @@ test("0094 c37, c41: a pick, Shift+click and the Select route give the same mask
       await shiftClick(s, scene.spots[kind][0], scene.spots[kind][1]);
       shifted.push(await maskSegment(s));
     }
-    await waitFor("Inside again", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await waitFor("Inside again", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     const byShift = await sig();
     assert.deepEqual(byShift, byPick, "Shift+click = the picks");
     // Route 3: the Select route.
@@ -842,7 +850,7 @@ test("0094 c37, c41: a pick, Shift+click and the Select route give the same mask
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
     await sleep(1000);
     await setAdvanced(s, true);
-    await waitFor("Inside", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await waitFor("Inside", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     assert.deepEqual(await sig(), byPick, "the Select route = the picks");
   }).finally(() => {
     pace = 1;
@@ -863,7 +871,7 @@ test("0094 c38: text and a second image are refused with the row (a sketch lies 
       await clickAt(s, at);
       await waitFor(`${name} notice`, async () => ((await noticeShown(s)) ? true : null), 5000);
       assert.equal(await pickState(s), "true", `${name}: still armed`);
-      assert.equal(await maskState(s), "absent", `${name}: not added`);
+      assert.equal(await maskPaths(s), 0, `${name}: not added`);
       assert.deepEqual(await selectedRows(s), [scene.imageRow], `${name}: not selected`);
     }
     // The row replaces nothing the button needs: the button is still under the pointer.
@@ -872,11 +880,11 @@ test("0094 c38: text and a second image are refused with the row (a sketch lies 
     await clickAt(s, [scene.box.cx + 100, scene.box.y0 + 330]);
     await clickAt(s, [scene.box.x1 + 160, scene.box.y1 + 100]);
     assert.deepEqual(await selectedRows(s), [scene.imageRow]);
-    assert.equal(await maskState(s), "absent");
+    assert.equal(await maskPaths(s), 0);
     assert.equal(await pickState(s), "true");
     // The next accepted pick clears the row.
     await clickAt(s, scene.spots.rect);
-    await waitFor("the Mask item", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await waitFor("the Mask item", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     assert.equal(await noticeShown(s), false, "the next accepted pick clears the row");
     assert.ok(await s.evaluate(`!!document.querySelector('${PICK}')`));
     // A refusal after a mask exists leaves the mask alone.
@@ -924,7 +932,7 @@ test("0094 c39: the first Escape only disarms; the next leaves the tool; S, anot
     // Escape: only the mode ends.
     await arm(s);
     await clickAt(s, scene.spots.rect);
-    await waitFor("the mask", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await waitFor("the mask", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     await sleep(2000);
     const counts = await stableCounts(s);
     await press(s, "Escape", 27);
@@ -979,8 +987,8 @@ test("0094 c40, c43: Clear mask empties the mask, keeps only the picture selecte
     const clear = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('${CLEAR}').getBoundingClientRect(); return [b.width, b.height]; })())`)) as string) as number[];
     assert.ok(clear[0] >= 28 && clear[1] >= 28, `Clear mask target ${clear}`);
     await s.clickSel(CLEAR);
-    await waitFor("no mask", async () => ((await maskState(s)) === "absent" ? true : null), 10_000);
-    assert.equal(await clearPresent(s), false, "the button disappears");
+    await waitFor("no mask", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
+    assert.equal(await clearPresent(s), true, "§24.4: the button stays (a press with nothing to clear does nothing)");
     assert.deepEqual(await selectedRows(s), [scene.imageRow], "only the picture is selected");
     assert.equal(await selectionCount(s), 1);
     assert.deepEqual(await s.layerRows(), rows, "the three paths are still there, same ids");
@@ -994,9 +1002,9 @@ test("0094 c40, c43: Clear mask empties the mask, keeps only the picture selecte
     // Disarmed stays disarmed.
     await arm(s);
     await shiftClick(s, scene.spots.rect[0], scene.spots.rect[1]);
-    await waitFor("the mask", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await waitFor("the mask", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     await s.clickSel(CLEAR);
-    await waitFor("no mask", async () => ((await maskState(s)) === "absent" ? true : null), 10_000);
+    await waitFor("no mask", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
     assert.equal(await pickState(s), "false", "disarmed stays disarmed");
     assert.equal(await historyText(s), history, "still no history step");
   });
@@ -1066,7 +1074,7 @@ test("0094 c43: at 800 x 600 with the panel open the group wraps as a whole item
     await s.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 1100, deviceScaleFactor: 1, mobile: false });
     await sleep(800);
     await shiftClick(s, scene.spots.rect[0], scene.spots.rect[1]);
-    await waitFor("the mask", async () => ((await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await waitFor("the mask", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     await s.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: false });
     await sleep(800);
     const masked = await measure("masked");
