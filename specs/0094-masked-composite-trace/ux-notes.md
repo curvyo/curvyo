@@ -10,6 +10,8 @@ control or states a state. Icons are Lucide, `lucide-react` ^1.50.0 (installed 1
 
 ## 1. The Mask control in the bar (slice 1)
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.1, §24.2, §24.4):** there is no View pill, so "after the View pill" reads "after Preset"; the Mask group (Pick mask paths, Inside / Outside, Clear mask, 192 px) is always drawn, never absent from the DOM, never dimmed. Where this section says otherwise, §24 wins.
+
 **Where (Proposal, differs from the spec's "Mask row sits in Advanced").** Inside or Outside is the
 one decision that changes what a masked trace is, so it belongs to the straightforward path of the
 bar (§22 principle: choose, set the main value, trace), not to Advanced. It is drawn **only while
@@ -70,6 +72,8 @@ A stale or stopped preview keeps the 50 % rule of "Trace preview".
 
 ## 3. The Parts row (slice 2)
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.3):** the Parts row is no longer the first row of Advanced. It is the last row, after Corners, as one whole group with the muted label "Parts", followed by the Analyse button at the far right. Its content, chips, Add part and Remove part are unchanged. Where this section says otherwise, §24 wins.
+
 **Where:** the first row of the Advanced block, above the analysis row (the analysis, status and
 every control below belong to the active part, so the part is chosen first). **The row is always in the block (Proposal)**, so
 that "Add part" is findable; with one unmasked part it shows chip "1" and Add part (the spec's
@@ -121,6 +125,8 @@ would restore the chips on entry and needs a way to drop them: a text button "Cl
 row, not decided here.
 
 ## 4. Tab order and keyboard
+
+> **Superseded 2026-11-06 (`0089` UX notes §24.2, §24.3):** no View stop; the bar stops are Pick mask paths, Inside / Outside, Clear mask (always). In Advanced the Parts group and Add part come after Corners, then Analyse.
 
 Tab order in the bar: About Trace, Preset, View, **Pick mask paths**, **Mask** and **Clear mask** (when drawn), Method, main field, method
 group, Smooth, Tolerance, Ignore below, Advanced, the Advanced controls, Stop or Trace again,
@@ -203,6 +209,8 @@ only those §22.2 keeps; nothing about parts or masks is added there.
 
 ## 8. Narrow window (800 x 600, panel open, inner 308 px)
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.2, §24.3):** the Mask group is 192 px always; the Parts group wraps as one whole item with its label (128 px with one part, wrapping inside it from 7 parts); value fields are 150 px.
+
 - The bar is already full at this width; the Mask item (160 px) and the "Part 2 of 3" label
   (about 72 px) are whole flow items and wrap to the next line like Method and Smooth; dividers
   hidden at row starts. No control shrinks, truncates or turns into an icon.
@@ -235,6 +243,8 @@ item order gains Mask after View, and the Tab order sentence gains Mask and Part
 Interaction-conventions rows are unchanged.
 
 ## 11. Pick mask paths (slice 1b, Frage 130 C, customer 2026-11-05)
+
+> **Superseded 2026-11-06 (`0089` UX notes §24.4):** Inside / Outside and Clear mask are drawn from the start, not "with the first pick"; Clear mask without mask paths does nothing and is not greyed out; "after the View pill" reads "after Preset".
 
 Customer: select the mask paths after entering the Trace tool, with a button in the Trace bar. The
 selection route (Select image plus paths) and Shift+click (criterion 13) stay; the button is a

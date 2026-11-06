@@ -6,16 +6,17 @@ there only while nothing but images is selected, or one image with mask paths, s
 press **I**. Ctrl+I stays Import. The bar
 above the canvas becomes the Trace bar; the right panel gets one more tab, **About Trace**, which
 opens only when you ask for it (see "About Trace" below).
-(`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, the
-View pill, large images; `specs/0089-trace-quality-and-colour` slices D, C, E and M: the geometry,
-the methods Brightness, Remove background and Pick colours, the Mask view and Multicolour.)
+(`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, large
+images; `specs/0089-trace-quality-and-colour` slices D, C, E and M: the geometry, the methods
+Brightness, Remove background and Pick colours, and Multicolour; the bar as tidied on 2026-11-06.)
 
 ## The preview
 
 The image is washed out (a white veil over it) and the outline the trace would make is drawn over it as a thin blue line on
 a white casing, holes included. It is an overlay, not part of the drawing: it is not in the
 History, the Layers tab, a saved file or any output, and it goes when you leave the tool with
-Escape, **S** or another tool. Pan and zoom redraw it without tracing again.
+Escape, **S** or another tool. Pan and zoom redraw it without tracing again. This is the one way
+the tool shows a trace; the outline over the image shows what the tracer found.
 
 The trace runs in the background, so the editor stays responsive. While a value is dragged, a
 reduced copy of the picture (longest side 1000 pixels) is traced; on release the full picture
@@ -35,19 +36,6 @@ If a trace fails, the button says "Failed" with a red ring, with a **Retry** but
 canvas retries too); its tooltip, also read out by a screen reader, gives the reason, for example
 "Trace failed: out of memory at 16 Mpx. Your drawing is unchanged." The values stay; "Failed"
 goes with the next successful trace, a changed value, another image or leaving the tool.
-
-## View
-
-The **View** pill beside the Preset button switches what the canvas shows: **Overlay** (the
-washed-out image under the outline, where the tool starts every time), **Mask** (exactly the
-pixels the tracer turns into shapes: content black, everything else white, after Ignore below and
-Drop border shapes and at the resolution traced, so twice the image's pixels with Upscale; zoomed
-in, each pixel stays a sharp square), **Trace** (the result filled black as Create paths would make
-it, the image hidden) and **Image** (the original at full strength, no outline). Transparent pixels
-are white in the Mask, since they never become shapes; over 4 megapixels it is the reduced copy's
-mask, and after a stop it is drawn at half strength like the outline. Hold **\\** to see the image
-while it is held; **Shift+\\** steps through the four views. Neither changes the drawing; zoom
-and pan work in every view, and the pipette works in the Mask view too.
 
 With nothing selected the bar says "Click an image to trace it." and offers "Import image...".
 With something else selected it says "The selection is not an image. Click an image to trace
@@ -75,7 +63,7 @@ method starts as Brightness.
 
 ## Method
 
-The **Method** button after View chooses how pixels become shapes; only the method's own fields
+The **Method** button after the Mask group chooses how pixels become shapes; only the method's own fields
 change with it (it is remembered, like each method's Colour tolerance):
 
 - **Brightness** ("Dark and light pixels by a cut-off."): pixels darker than the Threshold.
@@ -110,28 +98,27 @@ image is never laid over white first.
 
 ## Analysis
 
-The first row of the Advanced block holds a line that says what the automatic analysis found in the
-image the preview shows, and what it set, and the blue **Analyse** button. It runs once per image, on your computer, when the image is first shown in
-the tool ("Analysing..." if that takes longer than 0.4 s), and applies its values at once. It sets
-only values that depend on the image: the method (Brightness, or Remove background when the image
-has pale or light colours that Brightness would miss), the background and Colour tolerance of
-Remove background (half way between the background and the palest colour), and the Threshold (the
-automatic one, or a lower cut when a photographed sheet has a wide shadow). It never changes the
-preset, Smooth, Tolerance, Ignore below, the Advanced values, Output or picked colours; with Pick
-colours it keeps the method and sets only the Threshold.
+An automatic analysis runs once per image, on your computer, when the image is first shown in the
+tool, and applies its values at once. It sets only values that depend on the image: the method
+(Brightness, or Remove background when the image has pale or light colours that Brightness would
+miss), the background and Colour tolerance of Remove background (half way between the background
+and the palest colour), and the Threshold (the automatic one, or a lower cut when a photographed
+sheet has a wide shadow). It never changes the preset, Smooth, Tolerance, Ignore below, the
+Advanced values, Output or picked colours; with Pick colours it keeps the method and sets only the
+Threshold.
 
-The line reads, for example, "Line drawing · scan · automatic Threshold", "Logo · pale colours
-kept" or "Graphic · photo of paper · shadow left out": the image type (Graphic, Logo, Line drawing,
-Sketch), how the image was made when it is a scan or a photo of paper, then what was set. When the
-type is unclear (a photo without a sheet of paper) it reads "Type unclear · Brightness with
-automatic Threshold" and sets just that. Once you change the method, the Threshold, the Colour
-tolerance or the background, the line reads "Custom · Line drawing" and the analysis never changes
-those values again for this image; **Analyse** sets them back to the analysis in one go (it is no
-History step; it is always available, and with nothing changed it sets the same values again). If
-you change any setting before the analysis has answered, its answer is not applied to this image:
-the line reads Custom and Analyse applies it on request. If the analysis fails the line reads
-"Analysis failed · automatic Threshold used" and the image keeps its automatic Threshold. A long
-line wraps to a second row. With the Advanced block closed a screen reader still hears the line.
+What it found is not printed; a screen reader hears it, for example "Line drawing · scan ·
+automatic Threshold", "Logo · pale colours kept" or "Graphic · photo of paper · shadow left out":
+the image type (Graphic, Logo, Line drawing, Sketch), how the image was made when it is a scan or
+a photo of paper, then what was set. When the type is unclear (a photo without a sheet of paper)
+it is "Type unclear · Brightness with automatic Threshold" and sets just that. Once you change the
+method, the Threshold, the Colour tolerance or the background ("Custom · Line drawing"), the
+analysis never changes those values again for this image; the blue **Analyse** button, last in the
+Advanced block, sets them back to the analysis in one go (it is no History step; it is always
+available, and with nothing changed it sets the same values again). If you change any setting
+before the analysis has answered, its answer is not applied to this image; Analyse applies it on
+request. If the analysis fails, the row under the values says "Analysis failed · automatic
+Threshold used" until the next Analyse or image, and the image keeps its automatic Threshold.
 Several selected images use the shown image's analysis.
 
 ## Settings
@@ -171,13 +158,14 @@ double-arrow button at the far right, before the Trace button ("More trace optio
 under the values with everything else (open or closed is remembered). Its rows, top to bottom, each
 shown only when it has something to say:
 
-1. **Parts**: the numbered chips of the parts, **Add part** and the trash (see "Parts").
-2. The analysis line and the **Analyse** button (see Analysis).
-3. The status line: the counts of the result (see Status).
-4. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
-   the palette's pipette; see "Multicolour" below.
-5. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
-6. The options: four icon buttons (pressed means on, the tooltip names each), then three values.
+1. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
+   the palette's pipette; see "Multicolour" below. Four icon buttons follow (pressed means on, the
+   tooltip names each).
+2. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
+3. The options: Denoise, Upscale and Corners.
+4. **Parts**, the numbered chips of the parts with **Add part** and the trash (see "Parts"), and at
+   the far right the blue **Analyse** button (see Analysis). Each moves to a line of its own as a
+   whole when the block is too narrow.
 
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
@@ -205,20 +193,21 @@ select the image together with them and press **Trace**. In the Trace tool, Shif
 adds it to the mask paths or takes it out again; Shift+click on empty canvas changes nothing.
 (`specs/0094-masked-composite-trace` slice 1.)
 
-**Pick mask paths**, the button after View, does the same without Shift: press it, then click each
+**Pick mask paths**, the first button after Preset, does the same without Shift: press it, then click each
 path or group on the canvas to add it to the mask or take it out again; the button stays pressed
 until you press it again, press Escape (the first Escape only ends picking and keeps the mask), or
 leave the tool. A click on a text, a sketch or a second image adds nothing and the bar says "Use
 Object to path for text; one image at a time."; a click on the traced image or on empty canvas does
 nothing, and a double-click on the image does not create paths while picking. **Clear mask** (the
 x after Inside and Outside) takes all mask paths out of the mask at once and leaves the image
-selected; the paths stay in the document. (Slice 1b.)
+selected; the paths stay in the document. Without mask paths it does nothing. (Slice 1b.)
 
 The paths together are the mask: where they overlap they count once, the hole of a compound path is
 a hole in the mask, and an open path is closed by a straight line. Their fill and stroke do not
-matter. With mask paths selected the bar shows **Inside** and **Outside** after Pick mask paths: **Inside** (the default on every
-entry into the tool) traces only what lies inside the mask, **Outside** only what lies outside it.
-The mode is not remembered and is not part of a preset.
+matter. **Inside** and **Outside**, after Pick mask paths, are always in the bar: **Inside** (the
+default on every entry into the tool) traces only what lies inside the mask, **Outside** only what
+lies outside it. Without mask paths the whole image is traced either way; the choice applies once
+the first path is added. The mode is not remembered and is not part of a preset.
 
 The trace ends exactly on the mask path: a shape that crosses it is cut there, so Inside and Outside
 of the same mask fit together without a gap or an overlap. A cut shape comes back as straight
@@ -228,13 +217,12 @@ only the pixels inside the mask. With Recognise text, a line becomes text when t
 lies inside the mask (the text is kept whole); a line outside it is neither text nor traced.
 Recognise shapes looks only at the cut result.
 
-In **Overlay** the image outside the mask is washed further (to 12 %), and the outline is drawn only
-inside it; the **Mask** view is white outside the mask; the **Trace** view shows nothing outside it.
-The status line in Advanced starts with "Inside 2 paths" or "Outside 1 path". Mask paths that cover
+In the preview the image outside the mask is washed further (to 12 %), and the outline is drawn
+only inside it. A screen reader hears "Inside 2 paths" or "Outside 1 path". Mask paths that cover
 none of the image give "0 paths: the mask is outside the image." and nothing to create; mask paths
 that cannot be combined into one area give "0 paths: the mask paths could not be combined." An image
-selected together with a text, a sketch or a second image and mask paths gives "Use Object to path
-for text; one image at a time."
+selected together with a text, a sketch or a second image and mask paths turns the bar into one row
+that says "Use Object to path for text; one image at a time.", with no Mask group and no Trace button.
 
 Create paths makes the same group "Trace of ..." as without a mask, in one History step; the mask
 paths stay exactly as they are (same objects, nodes and style), so a path drawn as a cut outline
@@ -243,8 +231,9 @@ stays in the job.
 ## Parts
 
 A part is a piece of the picture with its own mask (Inside or Outside) and its own settings
-(Method, Threshold, Smooth and everything else). The first row of Advanced holds a chip per part,
-numbered 1, 2, 3 in the order they were made, then **Add part** (+) and the trash. Part 1 starts
+(Method, Threshold, Smooth and everything else). The last row of Advanced, after Corners and
+before Analyse, holds the muted label "Parts", a chip per part, numbered 1, 2, 3 in the order they
+were made, then **Add part** (+) and the trash. Part 1 starts
 as the whole image; with mask paths it is limited to them like any other part.
 (`specs/0094-masked-composite-trace` slice 2.)
 
@@ -273,8 +262,8 @@ as the whole image; with mask paths it is limited to them like any other part.
   paths ends them, and the next entry starts with one part. Only part 1's settings are
   remembered, as before.
 
-With two or more parts the status line starts with "3 parts", and a later part without mask paths
-says "Part 3 has no paths". When no part has anything to trace, the bar says "0 paths: no part has
+With two or more parts a screen reader hears "3 parts", and for an active later part without mask
+paths "Part 3 has no paths". When no part has anything to trace, the bar says "0 paths: no part has
 anything to trace." A part inside the picture is traced from its own cut-out (with a margin, so the result is the
 same) unless it reads text, drops border shapes, uses Denoise or is upscaled, so several parts
 cost about as much as one trace of the whole picture. Each part reads its automatic Threshold,
@@ -292,8 +281,7 @@ a black and white trace before it traces the rest (`specs/0091-trace-text-recogn
 - Each line the reader is sure of (mean confidence 0.6 and a letter or digit) gets its own
   Threshold and polarity (white text on a dark box counts as text), is traced on its own, and its
   pixels are left out of the main trace and filled from their surroundings, so a shape under the
-  text stays whole. The Mask view shows the left-out pixels in grey; the Advanced status line
-  counts "3 text lines set".
+  text stays whole. A screen reader hears "3 text lines set".
 - Before the picture is traced, each line is fitted to the fonts as Recognise text does (fonts
   in the document, favourites, your fonts, the included fonts, the other installed fonts), with
   the read string as a hint and a tolerance of 1.5 picture pixels (3 % of the letter height on
@@ -331,8 +319,8 @@ turn (`specs/0088-trace-recognition` Part B). It works with Single colour and Mu
   and an outline that is only nearly a shape (a hand-drawn circle) stays a path, unmarked.
 - The simplest shape wins: a circle before an ellipse, square corners before rounded ones, a
   rectangle before a polygon, a polygon (3 to 24 sides) before a star (3 to 24 points).
-- The preview shows the shapes where the paths were, in the same fill; the Mask view is
-  unchanged. The Advanced status line adds "12 shapes set"; with none found it adds nothing.
+- The preview shows the shapes where the paths were, in the same fill. A screen reader hears
+  "12 shapes set"; with none found nothing.
 - Create paths puts the shapes into the "Trace of" group, after the path of their colour, in the
   same one step. They are ordinary shapes: rectangles, ellipses, polygons and stars with their
   handles.
@@ -361,8 +349,8 @@ count in the image (the field shows it muted, for example "Auto  6"); where colo
 each other, as in a photo, Auto takes 6 steps. Colours closer than 3 % of the colour range are
 one colour; pale colours and small accents are kept. Only areas of flat colour vote, so the
 blended pixels along edges and JPEG fringes never become colours of their own. Areas smaller than
-Ignore below join the neighbouring colour they share the longest border with ("2 regions joined"
-in the status line). With Brightness the pipette after the field adds a colour you pick to the
+Ignore below join the neighbouring colour they share the longest border with (a screen reader
+hears "2 regions joined"). With Brightness the pipette after the field adds a colour you pick to the
 palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there is
 selected instead ("Same as #3366CC"). With Pick colours the palette is exactly the picked colours
 and the field shows their number.
@@ -372,40 +360,37 @@ first, picked colours first with a small square in their corner (with Pick colou
 colour it holds the picked colours, and Remove is its one action). Arrows move through it; the selected swatch
 shows its hex value and name ("#FFF2A8 · Pale yellow") and five buttons:
 
-- **Isolate**: the other colours are drawn dimmed in every view ("Isolating #FFF2A8"); Enter
-  still creates every colour.
+- **Isolate**: the other colours are drawn dimmed in the preview (the button stays pressed; a
+  screen reader hears "Isolating #FFF2A8"); Enter still creates every colour.
 - **Recolour**: a colour picker under the row changes the colour's fill, not its shape; nothing is
   traced again. The row reads "#FFE000 (was #FFF2A8)"; **Reset** returns to the found colour.
-- **Merge into**: choose another swatch (Esc cancels; "Merging #FFF2A8 into..."): its pixels are
+- **Merge into**: choose another swatch (Esc cancels; a screen reader hears "Merging #FFF2A8
+  into..."): its pixels are
   traced with that colour, as one shape. The swatch stays, at half strength with the target's dot;
   pressing Merge into again undoes it.
 - **Exclude**: the colour becomes background and is not traced; the swatch shows a crossed circle
-  ("2 colours excluded"). Pressing it again brings the colour back.
+  (a screen reader hears "2 colours excluded"). Pressing it again brings the colour back.
 - **Remove** (picked colours only): takes the colour out of the palette. Delete on the focused
   swatch does the same.
-
-In the Mask view Multicolour shows each colour as it was found, the background white.
 
 ## Create paths
 
 ## Status
 
-The counts of a trace, for example "7 paths, 412 nodes, 0.4 s" (paths are outlines, nodes their
-anchor points, the time is that of the last full trace) and, muted, "38 specks ignored" when
-specks were dropped, are stated once, in the status line of the Advanced block; with the block
-closed they are not drawn (a screen reader still hears them). While a trace runs or after a stop
-they stay, at half strength. With Multicolour the counts name the colours first, for example "3
-colours, 7 paths, 412 nodes, 0.4 s". The status line also says what a colour action did
-("Isolating #FFF2A8", "Merging #FFF2A8 into...", "2 colours excluded") and, instead of the counts,
-"No colours found." (Multicolour found no colour in the content; the Trace button creates nothing)
-and "0 paths: no colour picked."
+The bar does not print the counts of a trace. A screen reader hears them once the result settles,
+for example "7 paths, 412 nodes, 0.4 s" (paths are outlines, nodes their anchor points, the time is
+that of the last full trace) and "38 specks ignored" when specks were dropped; with Multicolour
+the colours first, for example "3 colours, 7 paths, 412 nodes, 0.4 s". After Create paths the
+Layers tooltip of the new group gives them ("Traced: 7 paths, 412 nodes.").
 
-Results whose fix is a control of the bar show in a muted row under the values whether the
-Advanced block is open or not; the counts are then not printed again:
+What you have to act on, or what changes how the preview reads, shows in a muted row under the
+values whether the Advanced block is open or not:
 
 - "0 paths at this Threshold: too low." (or "too high."): the Trace button is dimmed and creates
   nothing; its tooltip gives the same reason. With Remove background "0 paths at this Colour
   tolerance: too high.", with Pick colours "0 paths at this Colour tolerance: too low."
+- "0 paths: no colour picked." (Pick colours with no colour) and "No colours found." (Multicolour
+  found no colour in the content): the Trace button is dimmed and creates nothing.
 - "1 path covering the whole image.": the whole picture is darker than the Threshold; Create
   paths works.
 - "Too much detail: raise Ignore below.": one shape has 65,000 holes or more.
@@ -413,6 +398,7 @@ Advanced block is open or not; the counts are then not printed again:
   still one group with one compound path, one row in Layers.
 - "Same as #3366CC": a pipette pick matched a colour that is already there; it goes after 3
   seconds.
+- "Analysis failed · automatic Threshold used" (see Analysis).
 
 ## About Trace
 
@@ -430,8 +416,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Photo: many shapes, photos trace roughly.
 - Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.
 - Engraving: keeps fine lines, drops shapes below 0.1 mm.
-- View: the image with the outline, the mask, the result alone, or the image alone. Hold \ to peek at the image; Shift+\ steps through the views.
-- Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.
+- Mask: the paths that limit the trace; Pick mask paths adds or takes them out, Inside traces what lies inside them, Outside what lies outside, Clear mask takes them all out.
 - Method: how pixels become shapes.
 - Brightness: pixels darker than the Threshold.
 - Remove background: everything unlike the background colour.
@@ -443,8 +428,6 @@ Trace turns the selected image into paths. The method decides which parts become
 - Smooth: calms the pixel steps of the outline before the fit; higher is calmer.
 - Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.
 - Ignore below: drops shapes and holes smaller than this size in mm.
-- Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse sets them back.
-- Status: the result in numbers (paths, nodes and time, specks ignored, colours) and what a colour action did.
 - Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.
 - Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.
 - Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.
@@ -460,6 +443,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Denoise: smooths out noise in the picture before tracing.
 - Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
 - Corners: higher turns more bends into sharp corners.
+- Analyse: sets the method, its background and Colour tolerance, and the Threshold back to what the analysis found in the image; never the preset or other values.
 
 ## Create paths
 

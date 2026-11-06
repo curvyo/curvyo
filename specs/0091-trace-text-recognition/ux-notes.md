@@ -25,6 +25,8 @@ trace, and one line in the Advanced status line. Nothing is announced when it wo
 
 ## 2. Preview: what each view shows
 
+> **Superseded 2026-11-06 (`0089` UX notes §24.1):** there is no View pill and no Mask, Trace or Image view, no peek and no view cycle; the canvas always shows Overlay. Only the Overlay row of this section holds; where it says otherwise, §24 wins.
+
 The preview equals the result (ADR 0023 §4), so recognised text is shown as what Create paths will make.
 
 | View | With Recognise text on (accepted lines exist) |
