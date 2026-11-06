@@ -8,7 +8,7 @@ import { TracePalette } from "@/components/TracePalette";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { TracePaletteApi } from "@/hooks/useTracePalette";
 import type { HsvTriple } from "@/hooks/useStylePanel";
-import { ANALYSE, type TraceAnalysisState, analysisLine } from "@/lib/traceAnalysis";
+import { ANALYSE } from "@/lib/traceAnalysis";
 import {
   BRIGHTNESS,
   COLOURS_PARAM,
@@ -59,7 +59,7 @@ const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
  * (the Trace button has the same colours). */
 const ACCENT_BUTTON_CLASS =
   "my-1 h-7 shrink-0 rounded-md bg-[var(--editor-accent)] text-sm text-white outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--toolbar-bg)]";
-const CELL_CLASS = "flex h-9 min-w-[168px] items-center";
+const CELL_CLASS = "flex h-9 min-w-[150px] items-center";
 
 interface ChoicePillProps {
   param: TraceParam;
@@ -159,17 +159,13 @@ function TraceToggle({ label, icon: Icon, pressed, onChange, onReturnFocus }: Tr
 interface TraceAdvancedProps {
   params: readonly TraceParam[];
   values: TraceValues;
-  /** The status line: the counts of the last result or the message replacing them, and its
-   * muted line (criterion 11). */
-  status: { text: string; muted: string };
-  /** The analysis line's state and the Analyse button (`specs/0089` criteria 31, 33). */
-  analysis: TraceAnalysisState;
+  /** The Analyse button (`specs/0089` criteria 31, 33; UX notes §24.3). */
   onAnalyse: () => void;
   /** The one colour strip (`ux-notes.md` §22.3) and the Recolour picker's conversions. */
   palette: TracePaletteApi;
   hsvOf: (rgb: number) => HsvTriple;
   rgbOf: (hue: number, saturation: number, value: number) => number;
-  /** The counts belong to an older result (a running or stopped trace): drawn at 50 %. */
+  /** The palette belongs to an older result (a running or stopped trace): drawn at 50 %. */
   countsStale: boolean;
   setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
   onEndDrag: () => void;
@@ -182,21 +178,19 @@ interface TraceAdvancedProps {
   /** The palette pipette (Brightness + Multicolour) is armed. */
   paletteArmed: boolean;
   onPalettePipette: () => void;
-  /** The Parts row (`specs/0094` slice 2, UX notes §3): the block's first row. */
-  partsRow?: ReactNode;
+  /** The Parts group (`specs/0094` slice 2; `specs/0089` UX notes §24.3): first in the last row. */
+  parts?: ReactNode;
 }
 
 /**
  * The Advanced block (`specs/0025-raster-trace` criteria 11, 41, 44, 71; UX notes 20.4, 20.5):
- * below the main rows inside the bar, after a divider: row 1 the two icon toggles (Invert,
- * Drop border shapes) and Denoise, then Upscale and Corners, the counts line always last in a
- * row of its own.
+ * below the main rows inside the bar, after a divider: the Output row with the four icon toggles,
+ * the colour strip, Denoise, Upscale and Corners, and last the Parts group and the Analyse button
+ * at the far right (`specs/0089` UX notes §24.3), wrapping by whole groups.
  */
 export function TraceAdvanced({
   params,
   values,
-  status,
-  analysis,
   onAnalyse,
   palette,
   hsvOf,
@@ -210,50 +204,15 @@ export function TraceAdvanced({
   coloursFound,
   paletteArmed,
   onPalettePipette,
-  partsRow,
+  parts,
 }: TraceAdvancedProps) {
   const param = (name: TraceParam["name"]) => params.find((p) => p.name === name);
   const denoise = param("denoise");
   const upscale = param("upscale");
   const corners = param("corners");
-  const line = analysisLine(analysis);
   return (
     <div id={id} role="group" aria-label="Advanced" className="mt-1 flex max-h-[min(60vh,360px)] flex-wrap gap-x-2 overflow-y-auto border-t border-[var(--toolbar-icon)]/25 py-1 pr-1">
-      {/* 1. The analysis line and the Analyse button, always enabled (`ux-notes.md` §22.3). */}
-      {partsRow ? <div className="basis-full">{partsRow}</div> : null}
-      <div data-trace-analysis={analysis.kind} className="flex min-h-9 basis-full items-center gap-2">
-        <span role="status" aria-live="polite" className="min-w-0 flex-1 py-1 text-xs text-[var(--toolbar-icon)]">
-          {line}
-        </span>
-        <button
-          type="button"
-          data-trace-analyse=""
-          className={`${ACCENT_BUTTON_CLASS} w-[75px]`}
-          onClick={(event) => {
-            onAnalyse();
-            if (event.detail > 0) {
-              onReturnFocus();
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              onReturnFocus();
-            }
-          }}
-        >
-          {ANALYSE}
-        </button>
-      </div>
-      {/* 2. The one status line: counts once, or the message that replaces them. */}
-      {status.text !== "" || status.muted !== "" ? (
-        <div data-trace-counts="" role="status" aria-live="polite" className={`flex min-h-9 basis-full flex-col justify-center py-1 tabular-nums ${countsStale ? "opacity-50" : ""}`}>
-          {status.text ? <span className="text-[var(--toolbar-icon)]">{status.text}</span> : null}
-          {status.muted ? <span className={`${LABEL_CLASS} opacity-70`}>{status.muted}</span> : null}
-        </div>
-      ) : null}
-      {/* 3. Output, the Colours field, the Brightness palette pipette and the toggles, one row at
+      {/* 1. Output, the Colours field, the Brightness palette pipette and the toggles, one row at
           4 px gaps so the four toggles fit beside Output at 800 x 600 with the panel open
           (`specs/0088` UX notes B2, lead 2026-11-03). */}
       <div data-trace-output-row="" className="flex flex-wrap items-center gap-x-1">
@@ -309,7 +268,7 @@ export function TraceAdvanced({
             ) : null}
           </div>
         ) : null}
-        {/* 3b. The four icon toggles share the Output row (`specs/0088` UX notes B2, lead 2026-11-03),
+        {/* 1b. The four icon toggles share the Output row (`specs/0088` UX notes B2, lead 2026-11-03),
             before the strip, Denoise, Upscale and Corners. */}
         <div className="flex h-9 items-center gap-1">
           {params
@@ -345,7 +304,7 @@ export function TraceAdvanced({
           />
         </div>
       </div>
-      {/* 4. The one colour strip with its edit actions (Multicolour palette, or the picked colours). */}
+      {/* 2. The one colour strip with its edit actions (Multicolour palette, or the picked colours). */}
       {palette.swatches.length > 0 ? (
         <div className={`basis-full ${countsStale ? "opacity-50" : ""}`}>
           <TracePalette palette={palette} hsvOf={hsvOf} rgbOf={rgbOf} />
@@ -365,6 +324,30 @@ export function TraceAdvanced({
           />
         </div>
       ) : null}
+      {/* 4. The last row: the Parts group, then Analyse at the far right; each wraps as a whole. */}
+      {parts}
+      <div className="ml-auto flex h-9 items-center">
+        <button
+          type="button"
+          data-trace-analyse=""
+          className={`${ACCENT_BUTTON_CLASS} w-[75px]`}
+          onClick={(event) => {
+            onAnalyse();
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              event.stopPropagation();
+              onReturnFocus();
+            }
+          }}
+        >
+          {ANALYSE}
+        </button>
+      </div>
     </div>
   );
 }

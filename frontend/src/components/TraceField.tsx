@@ -14,18 +14,18 @@ export interface TraceFieldProps {
   onReturnFocus: () => void;
   /** The text shown instead of the value's own (the Colours field's "Auto  6"). */
   display?: string;
-  /** The field's width, px (168 unless given). */
+  /** The field's width, px (150 unless given; `specs/0089` UX notes §24.7). */
   width?: number;
 }
 
 /** The width of a Trace bar field, px (UX notes 20.1). */
-const TRACE_FIELD_WIDTH = 168;
+const TRACE_FIELD_WIDTH = 150;
 
 const UNIT_WORDS: Readonly<Record<string, string>> = { "%": "percent", mm: "millimetres", px: "pixels" };
 
 /**
  * One value field of the Trace bar (`specs/0025-raster-trace` criteria 5 and 71, UX notes 20.1):
- * an adapter from the schema's `TraceParam` to the app's shared `ValueField`, 168 px, no reset
+ * an adapter from the schema's `TraceParam` to the app's shared `ValueField`, 150 px, no reset
  * slot. A click or a drag moves the value (the reduced copy is traced while it moves), a
  * double-click, Enter or F2 opens the number entry, the arrows step it; Ctrl+Enter creates the
  * paths, also in the entry; Escape in a drag puts the value back.

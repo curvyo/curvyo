@@ -16,6 +16,7 @@ import {
   previewIsReduced,
   READING_TEXT,
   readsText,
+  traceAnnouncement,
   textLinesText,
   shapesText,
   type TraceChoice,
@@ -42,6 +43,7 @@ import {
   ANALYSED_FIELDS,
   type TraceAnalysis,
   type TraceAnalysisState,
+  analysisLine,
   applyAnalysis,
   readAnalysis,
 } from "@/lib/traceAnalysis";
@@ -56,13 +58,11 @@ import { applyRegionAnalysis, forgetRegionValues, partAutoValues } from "@/lib/t
 import { NO_VIEW, joinWires, loadParams, loadPresets, partPixelsOf, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import { NO_PART_LINE, type PartJob, type TracePartInfo, mayCrop, partEmptyText, partKey, partsCount, readParts, traceParts } from "@/lib/traceParts";
 import type { TraceApi } from "./traceApi";
-import { useTraceMask } from "./useTraceMask";
 import { useTraceParts } from "./useTraceParts";
 import { useTracePalette } from "./useTracePalette";
 import type { HsvTriple } from "./useStylePanel";
 import { useTraceMethod } from "./useTraceMethod";
 import { useTraceProgress } from "./useTraceProgress";
-import { useTraceViewMode } from "./useTraceViewMode";
 
 export type { TraceApi } from "./traceApi";
 
@@ -110,6 +110,8 @@ export function useTrace(
   const [progress, setProgress] = useState(0);
   const [pxPerMm, setPxPerMm] = useState(0);
   const runnerRef = useRef<TraceRunner | null>(null);
+  /** A reduced preview is shown and its full-size trace follows (`ux-notes.md` §24.5). */
+  const fullFollows = useRef(false);
   const generation = useRef(0);
   const debounce = useRef<number | null>(null);
   const dragging = useRef(false);
@@ -184,12 +186,12 @@ export function useTrace(
     return runnerRef.current;
   }, []);
   useEffect(() => () => runnerRef.current?.dispose(), []);
-  const { maskStep, last: maskSource } = useTraceMask(getSession, onChange, runner);
 
 
   /** Ends whatever runs: the debounce, the jobs and their timers. */
   const cancelAll = useCallback(() => {
     generation.current += 1;
+    fullFollows.current = false;
     if (debounce.current !== null) {
       window.clearTimeout(debounce.current);
       debounce.current = null;
@@ -408,17 +410,6 @@ export function useTrace(
     return v.backgroundAuto && auto ? { ...v, background: auto.background } : v;
   };
 
-  /** The settings of the active part's job (its clip and own background), empty when it adds
-   * nothing; `threshold` stands in for a Threshold not set yet. */
-  const activePartSettings = (session: WasmSession, id: string, threshold: number): string => {
-    const active = readParts(session.trace_parts()).find((p) => p.active && p.contributes);
-    if (!active) {
-      return "";
-    }
-    const v = partValues(active);
-    return settingsJson(v, v.threshold ?? threshold, partAuto.current.get(active.id)?.background ?? backgrounds.current.get(id) ?? "", active.mask);
-  };
-
   /** Reads each contributing part's automatic Threshold, background and analysis from its own
    * clip once per clip (region-only analysis per part, `specs/0094` slice 2); what the maker set
    * for a part stays. `false` when a newer job took over. */
@@ -539,10 +530,7 @@ export function useTrace(
       if (reducedOnly) {
         startTimers(true);
       }
-      // The Mask view shows what the active part's tracer reads.
-      const active = infos.find((p) => p.active && p.contributes);
       const bar = choiceRef.current.values;
-      const activeSettings = activePartSettings(session, id, threshold);
       const show = (out: { header: Float64Array; seconds: number; any: boolean }, reduced: boolean) => {
         paletteRefresh.current();
         const [set, found] = session.trace_text_counts();
@@ -558,9 +546,6 @@ export function useTrace(
         setStatus(set > 0 && !s.canCreate && s.message === "" ? { ...s, line: "", canCreate: true } : s);
       };
       if (!small) {
-        if (active) {
-          await maskStep(id, true, activeSettings, stale, lines);
-        }
         const out = await joinedJob(session, id, true, false, lines, progress.stage("reduced"), stale);
         if (out === null || stale()) {
           return pixels;
@@ -569,15 +554,14 @@ export function useTrace(
           setLoading(true);
           return pixels;
         }
+        // The full-size result follows: the hidden region waits for it (`ux-notes.md` §24.5).
+        fullFollows.current = fullAfter && !reducedOnly;
         show(out, true);
         if (!fullAfter || reducedOnly) {
           clearTimers();
           onChange();
           return pixels;
         }
-      }
-      if (active) {
-        await maskStep(id, false, activeSettings, stale, lines);
       }
       const out = await joinedJob(session, id, false, true, lines, progress.stage("trace"), stale);
       if (out === null || stale()) {
@@ -591,12 +575,13 @@ export function useTrace(
         return pixels;
       }
       results.current.set(id, "parts");
+      fullFollows.current = false;
       show(out, false);
       clearTimers();
       onChange();
       return pixels;
     },
-    [thresholdOf, resolveParts, textLines, startTimers, maskStep, joinedJob, fitTexts, clearTimers, onChange],
+    [thresholdOf, resolveParts, textLines, startTimers, joinedJob, fitTexts, clearTimers, onChange],
   );
 
   /** The preview of the shown image: the reduced copy first, the full size after (criterion 10). */
@@ -717,10 +702,6 @@ export function useTrace(
         if (!small) {
           const reduced = pixelsOf(session, id, true);
           if (reduced) {
-            await maskStep(id, true, settings, stale, lines);
-            if (stale()) {
-              return;
-            }
             const reducedPixels = reduced.width * reduced.height;
             const out = await runner().trace(reduced, settings, progress.stage("reduced"), lines);
             if (stale()) {
@@ -738,10 +719,6 @@ export function useTrace(
             onChange();
             return;
           }
-        }
-        await maskStep(id, false, settings, stale, lines);
-        if (stale()) {
-          return;
         }
         // UX notes §2: the Trace view shows the texts in their faces; the fit decided before the
         // trace stays with its result.
@@ -763,7 +740,7 @@ export function useTrace(
         }
       }
     },
-    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, maskStep, textLines, fitInputs, runJoinedPreview],
+    [getSession, startTimers, clearTimers, thresholdOf, runner, setValues, onChange, fail, setPercent, textLines, fitInputs, runJoinedPreview],
   );
 
   const schedule = useCallback(
@@ -1156,29 +1133,6 @@ export function useTrace(
 
 
 
-  /** A change to the Mask view asks for the mask of the pixels the last preview step traced
-   * (`specs/0089` criterion 21); a running preview is not interrupted. */
-  const onViewMode = useCallback(
-    (mode: string) => {
-      const id = viewRef.current.shown;
-      const threshold = choiceRef.current.values.threshold;
-      const source = maskSource.current;
-      if (mode !== "mask" || !id || threshold === null || source?.id !== id) {
-        return;
-      }
-      const mine = generation.current;
-      const session = getSession();
-      const lines = session && readsText(choiceRef.current.values) ? session.trace_ocr_lines(id) : "";
-      // `specs/0094` slice 2: with two or more parts the mask of the active part's own job.
-      const settings = session && readParts(viewRef.current.parts).length > 1 ? activePartSettings(session, id, threshold) : key(threshold, choiceRef.current.values, id);
-      if (settings === "") {
-        return;
-      }
-      maskStep(id, source.reduced, settings, () => mine !== generation.current, lines).catch(() => undefined);
-    },
-    [maskStep, maskSource, getSession],
-  );
-  const { viewMode, setViewMode } = useTraceViewMode(active, getSession, onChange, onViewMode);
   const { setPicking, setMethod, setColourTolerance, setBackgroundAuto } = useTraceMethod({
     active,
     syncRevision,
@@ -1269,15 +1223,29 @@ export function useTrace(
     ? READING_TEXT
     : [textLinesText(...textCounts), shapesText(shapeCount)].filter((t) => t !== "").join(" · ");
   const session = active ? getSession() : null;
+  // The Mask group is always drawn (`ux-notes.md` §24.4): the mode with or without mask paths.
   const maskOutside = session?.trace_mask_outside() ?? false;
-  const mask = view.maskPaths > 0 && view.selection === "images" ? { paths: view.maskPaths, outside: maskOutside } : null;
+  const mask = { paths: view.selection === "images" ? view.maskPaths : 0, outside: maskOutside };
   const parts = partsApi.parts;
   // `specs/0094` UX notes §7: with two or more parts "3 parts" replaces the mask segment, and an
   // active later part without paths says so last.
-  const partsSegment = parts.length > 1 ? partsCount(parts.length) : mask ? maskText(mask.outside, mask.paths) : "";
-  const shownStatus = advancedStatusOf(status, palette.note, recognised, partsSegment);
-  const emptyPart = active ? partEmptyText(parts) : "";
-  const advancedStatus = emptyPart === "" ? shownStatus : { ...shownStatus, muted: [shownStatus.muted, emptyPart].filter((t) => t !== "").join(" · ") };
+  const nextAnnouncement = traceAnnouncement({
+    analysis: analysisLine(analysisState),
+    mask: parts.length > 1 ? partsCount(parts.length) : maskText(mask.outside, mask.paths),
+    counts: status.counts,
+    countsMuted: status.countsMuted,
+    recognised,
+    palette: palette.note,
+    emptyPart: active ? partEmptyText(parts) : "",
+  });
+  // Announced once the result settles (`ux-notes.md` §24.5): not while a value is dragged, and not
+  // for a reduced preview whose full-size result follows; each new result renders again.
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    if (!dragging.current && !fullFollows.current) {
+      setAnnouncement(nextAnnouncement);
+    }
+  }, [nextAnnouncement, status, busy]);
   // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
   // has no paths.
   const traceBlocked =
@@ -1321,8 +1289,6 @@ export function useTrace(
     advancedOpen,
     countsStale: busy || stopped || creating,
     slot,
-    viewMode,
-    setViewMode,
     retrace,
     creating,
     pxPerMm,
@@ -1341,7 +1307,7 @@ export function useTrace(
     suggestedBackground,
     analysis: analysisState,
     analyse,
-    advancedStatus,
+    announcement,
     traceBlocked,
     palette,
     hsvOf,
@@ -1353,13 +1319,4 @@ export function useTrace(
 function colourCounts(session: WasmSession): { colours: number; joined: number } | null {
   const info = readPalette(session.trace_palette());
   return info ? { colours: info.layers.length, joined: info.joined } : null;
-}
-
-/** The Advanced status line (`ux-notes.md` §22.2): the result counts or the message that replaces
- * them, and in the muted line the specks, the joined regions and what a palette action did. */
-function advancedStatusOf(status: TraceStatusText, note: string, text: string, mask = ""): { text: string; muted: string } {
-  // `specs/0094` UX notes §7: the mask segment ("Inside 2 paths") first.
-  const muted = [mask, [status.countsMuted, note].filter((t) => t !== "").join(", ")].filter((t) => t !== "").join(" · ");
-  // `specs/0091` UX notes §4: the text lines after the existing segments, joined by " · ".
-  return { text: status.message || status.counts, muted: [muted, text].filter((t) => t !== "").join(" · ") };
 }

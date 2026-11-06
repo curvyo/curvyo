@@ -99,18 +99,6 @@ export const REDUCED_PREVIEW_OVER_PX = 4_000_000;
 /** Over this many nodes the status warns that the result is slow to edit (criterion 55). */
 export const SLOW_TO_EDIT_NODES = 100_000;
 
-/** A view of the Trace tool (criterion 51; `specs/0089` criterion 21 adds Mask). */
-export type TraceViewMode = "overlay" | "mask" | "trace" | "image";
-
-/** The View pill's segments in order, with their tooltips (UX notes section 13, `specs/0089` UX
- * notes §4: Mask after Overlay). */
-export const TRACE_VIEWS: readonly { mode: TraceViewMode; label: string; tooltip: string }[] = [
-  { mode: "overlay", label: "Overlay", tooltip: "Overlay" },
-  { mode: "mask", label: "Mask", tooltip: "Mask" },
-  { mode: "trace", label: "Trace", tooltip: "Trace" },
-  { mode: "image", label: "Image", tooltip: "Image (\\)" },
-];
-
 /** The selection methods in menu order with their second lines (`specs/0089` criterion 14, UX
  * notes §5); the index is the settings JSON's `method`. */
 export const TRACE_METHODS: readonly { key: string; label: string; detail: string }[] = [
@@ -199,24 +187,6 @@ export function pickSwatch(swatches: readonly string[], hex: string, add: boolea
   return [...swatches, hex];
 }
 
-/** The parts of a key event the backslash keys read. */
-export interface PeekKey {
-  key: string;
-  shiftKey: boolean;
-  repeat: boolean;
-}
-
-/** Holding `\` peeks at the image (criterion 51); a repeat is ignored. Ctrl and Alt are allowed:
- * AltGr types the backslash on some layouts. */
-export function isPeekKey(event: PeekKey): boolean {
-  return event.key === "\\" && !event.shiftKey && !event.repeat;
-}
-
-/** Shift+`\` cycles the views (criterion 51); on US layouts it types "|". */
-export function isCycleKey(event: PeekKey): boolean {
-  return event.shiftKey && !event.repeat && (event.key === "|" || event.key === "\\");
-}
-
 /** Whether a picture of `width` x `height` px is previewed from its reduced copy only (criterion
  * 52). */
 export function previewIsReduced(width: number, height: number): boolean {
@@ -263,8 +233,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Photo: many shapes, photos trace roughly.",
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-  "View: the image with the outline, the mask, the result alone, or the image alone. Hold \\ to peek at the image; Shift+\\ steps through the views.",
-  "Mask: what the tracer turns into shapes, black on white (in Multicolour each colour as found), after Ignore below and Drop border shapes.",
+  "Mask: the paths that limit the trace; Pick mask paths adds or takes them out, Inside traces what lies inside them, Outside what lies outside, Clear mask takes them all out.",
   "Method: how pixels become shapes.",
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
@@ -276,8 +245,6 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Smooth: calms the pixel steps of the outline before the fit; higher is calmer.",
   "Tolerance: how far in pixels the paths may stray from the calmed outline; higher gives fewer nodes.",
   "Ignore below: drops shapes and holes smaller than this size in mm.",
-  "Analysis: names the image type and what it set for a new image: the method, its background and Colour tolerance, and the Threshold; never the preset or other values. Custom after you change one of them; Analyse sets them back.",
-  "Status: the result in numbers (paths, nodes and time, specks ignored, colours) and what a colour action did.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
   "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
@@ -293,6 +260,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
+  "Analyse: sets the method, its background and Colour tolerance, and the Threshold back to what the analysis found in the image; never the preset or other values.",
 ];
 
 /** An info entry split into its term and its text at the first ": ". */
@@ -606,6 +574,33 @@ export function statusText(
     return { ...settled, line: "1 path covering the whole image." };
   }
   return settled;
+}
+
+/** What the bar's hidden status region says (`ux-notes.md` §24.5): the lines that are no longer
+ * shown, each as it was worded. */
+export interface TraceAnnouncementParts {
+  /** The analysis line ("Analysing...", "Custom · Line drawing"). */
+  analysis: string;
+  /** "Inside 2 paths", or "3 parts" with two or more parts. */
+  mask: string;
+  /** "7 paths, 412 nodes, 0.4 s". */
+  counts: string;
+  /** "38 specks ignored, 2 regions joined". */
+  countsMuted: string;
+  /** "3 text lines set · 12 shapes set". */
+  recognised: string;
+  /** "Isolating #FFF2A8", "2 colours excluded". */
+  palette: string;
+  /** "Part 3 has no paths". */
+  emptyPart: string;
+}
+
+/** The hidden region's text (`ux-notes.md` §24.5): the segments in their order, joined by ". ",
+ * an empty segment absent. */
+export function traceAnnouncement(parts: TraceAnnouncementParts): string {
+  return [parts.analysis, parts.mask, parts.counts, parts.countsMuted, parts.recognised, parts.palette, parts.emptyPart]
+    .filter((t) => t !== "")
+    .join(". ");
 }
 
 /** "Tracing 1 of 3 images" with two or more images, else nothing (criterion 46). `done` counts the

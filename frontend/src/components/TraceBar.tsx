@@ -1,4 +1,4 @@
-import { Binary, CircleAlert, Image, Info, Layers, Spline, SquareDashedMousePointer, X } from "lucide-react";
+import { CircleAlert, Info, SquareDashedMousePointer, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { useEffect, useId, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
@@ -14,7 +14,7 @@ import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
-import { analysisLine } from "@/lib/traceAnalysis";
+import { ANALYSIS_FAILED } from "@/lib/traceAnalysis";
 import {
   CLEAR_MASK,
   maskPickStatus,
@@ -36,12 +36,11 @@ import {
   TRACE_EXPAND_LABELS,
   TRACE_INFO_PAGE_ID,
   TRACE_INFO_TITLE,
+  NO_COLOUR_PICKED_LINE,
   changedAdvancedText,
   lumaToPercent,
   percentToLuma,
   thresholdPercentParam,
-  TRACE_VIEWS,
-  type TraceViewMode,
   STOP,
   TRACE_BUTTON,
   TRACE_EMPTY,
@@ -57,6 +56,10 @@ const BUTTON_CLASS =
   "my-1 h-7 whitespace-nowrap rounded-md px-2 text-sm text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]";
 
 const LABEL_CLASS = "text-xs text-[var(--toolbar-icon)]";
+
+/** Ignore below is wider than the other value fields, px: "99.99 mm" keeps a 10 px gap to its
+ * label (`ux-notes.md` §24.7, lead 2026-11-06). */
+const SPECKS_FIELD_WIDTH = 171;
 
 /** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
 const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
@@ -100,69 +103,9 @@ export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; o
   );
 }
 
-const VIEW_ICONS: Record<TraceViewMode, typeof Image> = { overlay: Layers, mask: Binary, trace: Spline, image: Image };
-
-/** The View pill (criterion 51, UX notes section 13; `specs/0089` criterion 21): four icon
- * segments, Overlay, Mask, Trace, Image, one Tab stop, the arrows move and select; the pressed
- * segment is the view on the canvas, Image while `\` is held. */
-function ViewPill({ mode, onMode }: { mode: TraceViewMode; onMode: (mode: TraceViewMode) => void }) {
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const at = Math.max(0, TRACE_VIEWS.findIndex((v) => v.mode === mode));
-  const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
-    if (step !== 0) {
-      event.preventDefault();
-      const next = (at + step + TRACE_VIEWS.length) % TRACE_VIEWS.length;
-      onMode(TRACE_VIEWS[next].mode);
-      buttons.current[next]?.focus();
-    }
-  };
-  return (
-    <Tooltip.Provider delayDuration={400}>
-      <div role="radiogroup" aria-label="View" className="my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
-        {TRACE_VIEWS.map((view, index) => {
-          const Icon = VIEW_ICONS[view.mode];
-          const on = index === at;
-          return (
-            <Tooltip.Root key={view.mode}>
-              <Tooltip.Trigger asChild>
-                <button
-                  ref={(element) => {
-                    buttons.current[index] = element;
-                  }}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  aria-label={view.label}
-                  tabIndex={on ? 0 : -1}
-                  onClick={() => onMode(view.mode)}
-                  className={`flex h-full w-7 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
-                    on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-                  }`}
-                >
-                  <Icon size={16} aria-hidden />
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  side="bottom"
-                  sideOffset={6}
-                  className="z-50 rounded-md px-2 py-1 text-xs"
-                  style={{ background: "var(--toolbar-bg)", color: "var(--toolbar-icon)", boxShadow: "var(--panel-elevation-shadow)" }}
-                >
-                  {view.tooltip}
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          );
-        })}
-      </div>
-    </Tooltip.Provider>
-  );
-}
-
-/** The Inside / Outside segments of the Mask group (`specs/0094` UX notes §1) in the View pill's
- * segmented look; arrows move and select, no wrap. */
+/** The Inside / Outside segments of the Mask group (`specs/0094` UX notes §1) in the segmented
+ * look of the bar's pills; arrows move and select, no wrap. Selectable with no mask path
+ * (`specs/0089` UX notes §24.4). */
 function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outside: boolean) => void }) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -201,12 +144,12 @@ function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outsid
   );
 }
 
-/** The Mask group (`specs/0094` UX notes §1, §11): one flow item after the View pill, the Pick mask
- * paths toggle always, and with mask paths the Inside / Outside segments and Clear mask. A mouse
- * press hands the keyboard back to the canvas, a key keeps it; Escape on the armed toggle disarms
- * and returns to the canvas. The mode is announced politely, never shown as text. */
+/** The Mask group (`specs/0094` UX notes §1, §11; `specs/0089` UX notes §24.4): one flow item
+ * after Preset, always drawn, never dimmed: the Pick mask paths toggle, the Inside / Outside
+ * segments and Clear mask, which does nothing without mask paths. A mouse press hands the
+ * keyboard back to the canvas, a key keeps it; Escape on the armed toggle disarms and returns to
+ * the canvas. The mode is announced politely, never shown as text. */
 function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: () => void }) {
-  const pickRef = useRef<HTMLButtonElement>(null);
   const [said, setSaid] = useState("");
   const armed = trace.maskPick;
   const first = useRef(true);
@@ -222,7 +165,6 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
     <div data-trace-mask="" className="flex h-9 items-center gap-1">
       <AppTooltip side="bottom" content={PICK_MASK_PATHS}>
         <button
-          ref={pickRef}
           type="button"
           aria-label={PICK_MASK_PATHS}
           aria-pressed={armed}
@@ -246,28 +188,27 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
           <SquareDashedMousePointer size={16} strokeWidth={1.5} aria-hidden />
         </button>
       </AppTooltip>
-      {trace.mask ? <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} /> : null}
-      {trace.mask ? (
-        <AppTooltip side="bottom" content={CLEAR_MASK}>
-          <button
-            type="button"
-            aria-label={CLEAR_MASK}
-            data-trace-clear-mask=""
-            onClick={(event) => {
-              trace.clearMask();
-              // The button goes with the mask: a key press keeps the keyboard in the group.
-              if (event.detail > 0) {
-                onReturnFocus();
-              } else {
-                pickRef.current?.focus();
-              }
-            }}
-            className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
-          >
-            <X size={16} strokeWidth={1.5} aria-hidden />
-          </button>
-        </AppTooltip>
-      ) : null}
+      <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} />
+      <AppTooltip side="bottom" content={CLEAR_MASK}>
+        <button
+          type="button"
+          aria-label={CLEAR_MASK}
+          data-trace-clear-mask=""
+          onClick={(event) => {
+            // Nothing to clear: no change, focus stays (`specs/0089` UX notes §24.4).
+            if (trace.mask.paths === 0) {
+              return;
+            }
+            trace.clearMask();
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+          className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
+        >
+          <X size={16} strokeWidth={1.5} aria-hidden />
+        </button>
+      </AppTooltip>
       <span role="status" aria-live="polite" className="sr-only">
         {said}
       </span>
@@ -434,10 +375,11 @@ interface TraceBarProps {
 /**
  * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
  * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` criterion 14, Frage 84, 85 B):
- * one flow of the "i" button, Preset, View, Method, Threshold or Colour tolerance, the method's
- * pipette group, Smooth, Tolerance, Ignore below, and at the far right the expander and the
- * Trace button, wrapping by whole items; under it the notice row and, when open, the Advanced
- * block that holds everything else (`ux-notes.md` §22).
+ * one flow of the "i" button, Preset, the Mask group, Method, Threshold or Colour tolerance, the
+ * method's pipette group, Smooth, Tolerance, Ignore below, and at the far right the expander and
+ * the Trace button, wrapping by whole items; under it the notice row and, when open, the Advanced
+ * block that holds everything else (`ux-notes.md` §22, §24). One hidden status region announces
+ * the result; nothing shows it.
  * With nothing or something else selected it is one row of words.
  */
 export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
@@ -473,6 +415,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
   const field = (name: "smooth" | "tolerance" | "specks") => (
     <TraceField
       param={param(name)}
+      width={name === "specks" ? SPECKS_FIELD_WIDTH : undefined}
       value={trace.values[name]}
       onValue={(value, dragging) => trace.setValue(name, value, dragging)}
       onEndDrag={trace.endDrag}
@@ -527,7 +470,11 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       />
     ) : null;
   const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
-  const noticeShown = trace.status.line !== "" || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "" || trace.maskRefused;
+  // `ux-notes.md` §24.5: the reasons Trace is dimmed and a failed analysis join the notice row.
+  const reason = trace.status.message || (trace.traceBlocked === NO_COLOUR_PICKED_LINE ? NO_COLOUR_PICKED_LINE : "");
+  const analysisFailed = trace.analysis.kind === "failed";
+  const noticeShown =
+    trace.status.line !== "" || reason !== "" || analysisFailed || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "" || trace.maskRefused;
   return (
     <div className="pointer-events-none flex min-w-0 flex-col gap-2">
     <div
@@ -555,7 +502,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             onPick={trace.pick}
           />
         </div>
-        <ViewPill mode={trace.viewMode} onMode={trace.setViewMode} />
         <MaskGroup trace={trace} onReturnFocus={onReturnFocus} />
         {/* With two or more parts the bar's values are the active part's (UX notes §3). */}
         {trace.parts.length > 1 ? (
@@ -603,8 +549,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               id={advancedId}
               params={trace.params}
               values={trace.values}
-              status={trace.advancedStatus}
-              analysis={trace.analysis}
               onAnalyse={trace.analyse}
               palette={trace.palette}
               hsvOf={trace.hsvOf}
@@ -617,7 +561,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               coloursFound={trace.palette.found}
               paletteArmed={trace.pickMode === "colours" && trace.values.method !== PICK_COLOURS}
               onPalettePipette={() => trace.setPicking(trace.pickMode === "")}
-              partsRow={<TraceParts parts={trace.parts} onSelect={trace.selectPart} onAdd={trace.addPart} onRemove={trace.removePart} onReturnFocus={onReturnFocus} />}
+              parts={<TraceParts parts={trace.parts} onSelect={trace.selectPart} onAdd={trace.addPart} onRemove={trace.removePart} onReturnFocus={onReturnFocus} />}
             />
           </div>
         ) : null}
@@ -630,6 +574,16 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             {trace.status.line ? (
               <span data-trace-line="" className="block text-[var(--toolbar-icon)]">
                 {trace.status.line}
+              </span>
+            ) : null}
+            {reason ? (
+              <span data-trace-reason="" className="block text-[var(--toolbar-icon)]">
+                {reason}
+              </span>
+            ) : null}
+            {analysisFailed ? (
+              <span data-trace-analysis-failed="" className="block text-[var(--toolbar-icon)]">
+                {ANALYSIS_FAILED}
               </span>
             ) : null}
             {trace.status.muted ? (
@@ -647,12 +601,10 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
           </div>
         </div>
       </div>
-      {trace.advancedOpen ? null : (
-        // With Advanced closed the analysis and status lines are announced here (`ux-notes.md` §22.2).
-        <div data-trace-hidden-status="" role="status" aria-live="polite" className="sr-only">
-          {[analysisLine(trace.analysis), trace.advancedStatus.text, trace.advancedStatus.muted].filter((t) => t !== "").join(". ")}
-        </div>
-      )}
+      {/* The one hidden status region, always mounted (`ux-notes.md` §24.5). */}
+      <div data-trace-hidden-status="" role="status" aria-live="polite" className="sr-only">
+        {trace.announcement}
+      </div>
     </div>
     </div>
   );

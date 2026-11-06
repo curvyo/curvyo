@@ -32,8 +32,6 @@ export type TraceRequest =
       /** The OCR lines JSON of the picture (`specs/0091`), empty without text recognition. */
       lines: string;
     }
-  /** The mask the same trace would walk, for the Mask view (`specs/0089` criterion 21). */
-  | { type: "mask"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
   /** The text pass alone (`specs/0091` criterion 25): the read lines' own traces, before the fit. */
   | { type: "regions"; id: number; rgba: Uint8Array; width: number; height: number; map: number[]; settings: string; lines: string }
   /** The font fit of the read lines (`specs/0091` decision 4): the session's request. */
@@ -72,8 +70,6 @@ export type TraceResponse =
   | { id: number; kind: "ocr-read"; reads: string; memory: number; ms: number }
   /** The OCR lines JSON; empty with `error` set when the reader could not be used. */
   | { id: number; kind: "ocr"; lines: string; error: string; rgba: Uint8Array; ms: number }
-  /** A mask: 255 for content, 0 for the rest, row by row; `width` 0 when the picture cannot be traced. */
-  | { id: number; kind: "mask"; width: number; height: number; bits: Uint8Array; ms: number }
   | { id: number; kind: "error"; message: string }
   /** The answer to `init` (id 0): `error` is empty when the module was instantiated. */
   | { id: 0; kind: "ready"; error: string };
@@ -112,13 +108,6 @@ export interface TracePixels {
 export interface TraceOutput {
   wire: Float64Array;
   seconds: number;
-}
-
-/** The mask of the Mask view: `width` x `height` mask pixels, 255 for content. */
-export interface TraceMask {
-  width: number;
-  height: number;
-  bits: Uint8Array;
 }
 
 /** Thrown into a job's promise when it was cancelled. */
@@ -310,19 +299,6 @@ export class TraceRunner {
     }
     pixels.rgba = response.rgba;
     return response.wire;
-  }
-
-  /** The mask a trace of `pixels` with `settings` would walk (`specs/0089` criterion 21), or
-   * `null` when the picture cannot be traced; the pixels are handed over. */
-  async mask(pixels: TracePixels, settings: string, lines = ""): Promise<TraceMask | null> {
-    const response = await this.send(
-      (id) => ({ type: "mask", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, map: pixels.map, settings, lines }),
-      [pixels.rgba.buffer],
-    );
-    if (response.kind !== "mask") {
-      throw new Error(response.kind === "error" ? response.message : "unexpected reply");
-    }
-    return response.width > 0 ? { width: response.width, height: response.height, bits: response.bits } : null;
   }
 
   /** The text lines of `pixels` read with `weights` (`specs/0091` decision 1): this worker
