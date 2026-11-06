@@ -83,6 +83,8 @@ pub(super) struct TraceState {
     pub(super) mask_outside: bool,
     /// The region of the mask paths, made once per change of them (`trace_region.rs`).
     pub(super) region: std::cell::RefCell<Option<super::trace_region::RegionCache>>,
+    /// The parts of a composite trace (`trace_parts.rs`, `specs/0094` slice 2).
+    pub(super) parts: super::trace_parts::TraceParts,
 }
 
 /// The counts of each group Create paths wrote in this session, for its Layers row's tooltip
@@ -174,6 +176,10 @@ impl Session {
                 // leaves, at any depth, are mask paths when every one is path-like.
                 None => {
                     let leaves = self.document.leaves_of(*id);
+                    // A node deleted while selected (`specs/0094` criterion 27): passed over.
+                    if leaves.is_empty() && !self.document.is_group(*id) {
+                        continue;
+                    }
                     let paths = leaves
                         .iter()
                         .filter(|leaf| {
@@ -266,6 +272,12 @@ impl Session {
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
+        self.show_trace_read(image, read);
+        true
+    }
+
+    /// Shows the result `read` as the preview of `image`.
+    pub(super) fn show_trace_read(&mut self, image: NodeId, read: TraceWire) {
         // `specs/0091`: until the lines are fitted, their own outlines stand where their texts
         // will be, in the texts' fills.
         // A line whose fill the maker excluded is left out (slice 2).
@@ -280,7 +292,6 @@ impl Session {
             .map(|l| super::trace_colours::text_layer(l.fill, l.outlines.len()))
             .collect();
         self.show_trace_preview(image, read, &paths, &extra, false);
-        true
     }
 
     /// Shows `paths` (document millimetres) as the preview of `image` with the palette, layers
@@ -339,10 +350,15 @@ impl Session {
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
+        self.keep_trace_result(image, &read);
+        true
+    }
+
+    /// Keeps the full-size result `read` of `image` for Create paths.
+    pub(super) fn keep_trace_result(&mut self, image: NodeId, read: &TraceWire) {
         self.trace.results.retain(|(id, _)| *id != image);
         self.trace.results.push((image, read.clone()));
-        self.keep_trace_fit(image, &read);
-        true
+        self.keep_trace_fit(image, read);
     }
 
     /// The text lines of the shown preview: set and found (`specs/0091` UX notes §4).

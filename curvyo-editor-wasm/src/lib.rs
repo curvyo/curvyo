@@ -140,6 +140,8 @@ mod wasm_tiling;
 #[cfg(target_arch = "wasm32")]
 mod wasm_trace;
 #[cfg(target_arch = "wasm32")]
+mod wasm_trace_parts;
+#[cfg(target_arch = "wasm32")]
 mod wasm_trace_region;
 #[cfg(target_arch = "wasm32")]
 mod wasm_weld;
