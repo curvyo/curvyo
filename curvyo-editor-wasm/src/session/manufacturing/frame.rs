@@ -206,7 +206,9 @@ impl Session {
         {
             return Arc::clone(&entry.members);
         }
-        let members: Arc<[usize]> = curvyo_ui_core::placement_members(drawn, page, guides).into();
+        let membership = curvyo_ui_core::PageMembership::of(&self.document, &self.document.pages());
+        let members: Arc<[usize]> =
+            curvyo_ui_core::placement_members(drawn, page, guides, &membership).into();
         let mut entries = cache.borrow_mut();
         entries.retain(|entry| Arc::ptr_eq(&entry.drawn, drawn));
         entries.push(PlacedEntry {

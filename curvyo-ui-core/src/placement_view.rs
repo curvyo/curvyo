@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use curvyo_document_core::{Affine, NodeId, ObjectSnapshot, Page, Point, Vec2};
 
 use crate::object_bounds;
+use crate::page_membership::{PageMembership, Reach};
 
 /// The map from the drawing plane to the output page's local mm: the source page's top-left
 /// moves to the origin, then the placement's matrix applies.
@@ -17,21 +18,22 @@ pub fn placement_map(source: &Page, matrix: Affine) -> Affine {
     )))
 }
 
-/// The indexes of the objects a placement of `source` draws: members of the page under ADR 0024
-/// §1 (their bounds touch or overlap the frame), guides left out. Each is drawn in full.
+/// The indexes of the objects a placement of `source` draws: members of the page by the
+/// membership read of ADR 0043 §1 (their bounds touch or overlap a drawing frame), guides left
+/// out. Each is drawn in full.
 #[must_use]
 pub fn placement_members<S: std::hash::BuildHasher>(
     objects: &[ObjectSnapshot],
     source: &Page,
     guides: &HashSet<NodeId, S>,
+    membership: &PageMembership,
 ) -> Vec<usize> {
     objects
         .iter()
         .enumerate()
         .filter(|(_, object)| !guides.contains(&object.id()))
         .filter(|(_, object)| {
-            let (min, max) = object_bounds(object);
-            source.overlaps(min, max)
+            membership.is_member(source, object.id(), object_bounds(object), Reach::Touches)
         })
         .map(|(index, _)| index)
         .collect()
@@ -94,7 +96,8 @@ mod tests {
         let guide = rect(&document, 220.0, 10.0);
         let objects = document.read_objects().objects;
         let guides = HashSet::from([guide]);
-        let members = placement_members(&objects, &page(200.0), &guides);
+        let members =
+            placement_members(&objects, &page(200.0), &guides, &PageMembership::default());
         let ids: Vec<NodeId> = members.iter().map(|&i| objects[i].id()).collect();
         assert_eq!(ids, vec![inside, across]);
         let map = placement_map(&page(200.0), Affine::IDENTITY);

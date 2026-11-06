@@ -13,14 +13,18 @@ impl Document {
     /// Only a sketch page owns a sketch: a claim on a page of another kind reads as no owner
     /// and is never repaired on read (ADR 0042 §8).
     pub fn page_sketch(&self, page: &str) -> Option<NodeId> {
-        if !self
-            .pages()
-            .iter()
-            .any(|p| p.id == page && p.kind == crate::PageKind::Sketch)
-        {
+        if self.page_kind(page) != Some(crate::PageKind::Sketch) {
             return None;
         }
         self.claimed_sketch(page)
+    }
+
+    /// Whether `id` is the live owning sketch of a live sketch page: the sketch fixed to its page,
+    /// which no selection takes and only its page's frame move places (ADR 0043 §2).
+    #[must_use]
+    pub fn is_fixed_sketch(&self, id: NodeId) -> bool {
+        self.sketch_page(id)
+            .is_some_and(|page| self.page_sketch(&page) == Some(id))
     }
 
     /// The live sketch that page `page` claims, whatever the page's kind (the format-36

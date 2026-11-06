@@ -465,13 +465,18 @@ impl Document {
         self.commit_with_label("rename_page");
         Ok(true)
     }
-    /// Removes only the frame, preserving all objects.
+    /// Removes only the frame, preserving all objects; a sketch page goes with its sketch and an
+    /// output page with its machine data.
     /// # Errors
     /// Refuses an unknown page or the last frame.
     pub fn delete_page(&self, id: &str) -> Result<(), PageError> {
         let page = self.find_page(id)?;
         if self.pages().len() == 1 {
             return Err(PageError::LastPage);
+        }
+        // A sketch page goes with its sketch; its clones are repaired (ADR 0043 §5).
+        if let Some(owner) = self.sketch_to_delete_with(id, &page.kind) {
+            return self.delete_sketch_page(id, owner);
         }
         write(&self.loro().get_map(ROOT_MAP), id, "deleted", true);
         // The page owns its machine data: the manufacturing goes in the same step, in one tree
