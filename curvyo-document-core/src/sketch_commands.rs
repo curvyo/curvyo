@@ -264,6 +264,18 @@ impl Document {
         id: NodeId,
         ids: &[crate::AnchorId],
     ) -> Result<(), SketchEditError> {
+        self.convert_sketch_uncommitted(id, ids)?;
+        self.commit_with_label("convert_sketch_to_path");
+        Ok(())
+    }
+
+    /// The body of [`Document::convert_sketch_to_path`] without its commit: the same node id,
+    /// style and placement, the claim cleared (ADR 0026).
+    pub(crate) fn convert_sketch_uncommitted(
+        &self,
+        id: NodeId,
+        ids: &[crate::AnchorId],
+    ) -> Result<(), SketchEditError> {
         let snapshot = self
             .sketch(id)
             .ok_or_else(|| SketchEditError("missing sketch".into()))?;
@@ -299,7 +311,6 @@ impl Document {
                 .map_err(|e| SketchEditError(e.to_string()))?;
         }
         crate::path_codec::write_rotation(&meta, path.rotation);
-        self.commit_with_label("convert_sketch_to_path");
         Ok(())
     }
 }

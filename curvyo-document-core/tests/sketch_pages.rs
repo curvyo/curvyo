@@ -179,8 +179,8 @@ fn conversion_and_page_removal_preserve_claim_history_without_recentering() {
     let placement = doc.sketch(id).unwrap().placement;
     doc.delete_page(&page.id).unwrap();
     assert_eq!(doc.page_sketch(&page.id), None);
-    assert_eq!(doc.sketch(id).unwrap().placement, placement);
-    assert!(doc.sketch_ownership_conflict(id));
+    // The sketch goes with its page (`specs/0099-sketch-pages` criterion 17).
+    assert!(doc.sketch(id).is_none());
     doc.undo_step(doc.own_steps().last().unwrap().step).unwrap();
     assert_eq!(doc.page_sketch(&page.id), Some(id));
     let anchors: Vec<_> = (0..doc.sketch(id).unwrap().resolved.all_anchors().count())

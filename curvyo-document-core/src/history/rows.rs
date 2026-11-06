@@ -140,6 +140,8 @@ pub fn is_document_level_label(label: &str) -> bool {
             | "add_output_page"
             | "delete_placement"
             | "delete_page"
+            | "delete_sketch_page"
+            | "convert_sketch_page"
             | "rename_page"
             | "resize_page"
             | "move_page"

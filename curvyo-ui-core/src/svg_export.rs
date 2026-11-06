@@ -63,9 +63,6 @@ impl SvgExportOutcome {
     }
 }
 
-/// How close a box may come to the active page and still count (criterion 130 (b)).
-const PAGE_TOLERANCE_MM: f64 = 1e-6;
-
 /// The longest chain of clones the importer follows (`curvyo_svg_core::limits`).
 const MAX_USE_CHAIN: usize = curvyo_svg_core::limits::MAX_CLONE_CHAIN;
 
@@ -132,7 +129,8 @@ pub fn svg_export_of(
         .map_or(Rect::new(0.0, 0.0, 210.0, 297.0), |(_, r)| *r);
     let t = Affine::translate((-first.x0, -first.y0));
     let tree = Tree::new(nodes, laid);
-    let in_scope = tree.scope(scope.selection, options, active.as_ref().map(page_rect));
+    let membership = crate::PageMembership::of(document, &pages);
+    let in_scope = tree.scope(scope.selection, options, active.as_ref(), &membership);
     let mut parts = Parts::new(&tree, document, fonts, options, t, &in_scope);
     let mut top = Vec::new();
     for &root in &tree.roots {
@@ -226,13 +224,14 @@ impl<'a> Tree<'a> {
     }
 
     /// Which leaves are in scope (criteria 130, 131): selected (or below a selected node) and
-    /// overlapping the active page by the bounds of their unit (a layer's child or a loose
+    /// members of the active page by the bounds of their unit (a layer's child or a loose
     /// top-level node); the carriers of texts in scope with them.
     fn scope(
         &self,
         selection: &[NodeId],
         options: SvgExportOptions,
-        page: Option<Rect>,
+        page: Option<&curvyo_document_core::Page>,
+        membership: &crate::PageMembership,
     ) -> Vec<bool> {
         let n = self.nodes.len();
         let mut keep = vec![true; n];
@@ -258,7 +257,15 @@ impl<'a> Tree<'a> {
                     .iter()
                     .filter_map(|&l| self.object(l).map(bounds_of))
                     .reduce(|a, b| a.union(b));
-                let on = bounds.is_some_and(|b| overlaps(page, b));
+                // The one membership read (ADR 0043 §1): a sketch page holds only its sketch.
+                let on = bounds.is_some_and(|b| {
+                    membership.is_member(
+                        page,
+                        node.id,
+                        (Point::new(b.x0, b.y0), Point::new(b.x1, b.y1)),
+                        crate::Reach::SharesArea,
+                    )
+                });
                 if !on {
                     for l in leaves {
                         keep[l] = false;
@@ -308,18 +315,6 @@ fn bounds_of(object: &ObjectSnapshot) -> Rect {
         other => crate::object_bounds::object_outline_bounds(other),
     };
     Rect::new(min.x, min.y, max.x, max.y)
-}
-
-/// Whether the box `b` overlaps the page (criterion 130 (b)): an area in common, or a box
-/// without width or height with any part inside the closed page.
-fn overlaps(page: Rect, b: Rect) -> bool {
-    let e = PAGE_TOLERANCE_MM;
-    let flat = b.width() <= e || b.height() <= e;
-    if flat {
-        b.x1 >= page.x0 - e && b.x0 <= page.x1 + e && b.y1 >= page.y0 - e && b.y0 <= page.y1 + e
-    } else {
-        b.x1 > page.x0 + e && b.x0 < page.x1 - e && b.y1 > page.y0 + e && b.y0 < page.y1 - e
-    }
 }
 
 /// The registers of `node` as written.

@@ -227,7 +227,7 @@ fn r03_conversion_releases_claim_and_object_undo_restores_same_owner() {
     assert_eq!(d.page_sketch(&page), None);
 }
 #[test]
-fn r03_page_delete_keeps_artwork_and_undo_restores_association() {
+fn r03_page_delete_takes_its_sketch_and_undo_restores_association() {
     let d = sketch_document(80);
     let page = d
         .add_page_of(&curvyo_document_core::PageKind::Sketch)
@@ -235,9 +235,9 @@ fn r03_page_delete_keeps_artwork_and_undo_restores_association() {
     let id = create(&d, &page.id, 10.0);
     d.delete_page(&page.id).unwrap();
     let step = d.own_steps().last().unwrap().step;
-    assert!(d.sketch(id).is_some());
+    // `specs/0099-sketch-pages` criterion 17 (Frage 158 A): the sketch goes with its page.
+    assert!(d.sketch(id).is_none());
     assert_eq!(d.page_sketch(&page.id), None);
-    assert!(d.sketch_ownership_conflict(id));
     d.undo_step(step).unwrap();
     assert_eq!(d.page_sketch(&page.id), Some(id));
     assert!(!d.sketch_ownership_conflict(id));

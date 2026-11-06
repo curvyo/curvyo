@@ -335,6 +335,11 @@ mod sketch_copy;
 mod sketch_labels;
 mod sketch_outline;
 mod sketch_page;
+mod sketch_page_commands;
+pub use sketch_page_commands::{
+    CONVERT_SKETCH_PAGE_COMMIT_LABEL, DELETE_SKETCH_PAGE_COMMIT_LABEL,
+    PLACE_SKETCH_CLONE_COMMIT_LABEL,
+};
 mod sketch_parameter_repair;
 mod sketch_read;
 pub use sketch_commands::SketchEditError;

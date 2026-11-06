@@ -38,6 +38,10 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("add_sketch", "Add sketch"),
     ("edit_sketch", "Edit sketch"),
     ("convert_sketch_to_path", "Sketch to path"),
+    // `specs/0099-sketch-pages` criteria 8, 15 and 17.
+    ("place_sketch_clone", "Place sketch clone"),
+    ("convert_sketch_page", "Convert sketch to paths"),
+    ("delete_sketch_page", "Delete sketch page"),
     ("create_path", "Draw path"),
     ("extend_path", "Extend path"),
     ("connect_paths", "Connect paths"),
