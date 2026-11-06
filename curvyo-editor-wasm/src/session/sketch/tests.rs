@@ -223,8 +223,8 @@ fn conversion_switches_only_on_success_and_keeps_one_undo_step() {
     let before = session.document.sketch(id).unwrap().graph;
     let history = session.undo_len();
     session.sketch_convert_to_path().unwrap();
-    // The page stays a sketch page (`specs/0098` criterion 5); what a path on it is, is `0099`.
-    assert_eq!(session.workbench(), Workbench::Sketch);
+    // The page becomes a drawing page with the drawing tools (`specs/0099` criterion 15).
+    assert_eq!(session.workbench(), Workbench::Vector);
     assert_eq!(session.selection.ids(), &[id]);
     assert_eq!(session.undo_len(), history + 1);
     session.undo();

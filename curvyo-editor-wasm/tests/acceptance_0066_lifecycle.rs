@@ -256,8 +256,12 @@ fn s12_dimensions_redundancy_conflict_repair_and_conversion_undo() {
     assert!(!state(&s).stale);
     let id = s.active_sketch().unwrap();
     s.sketch_convert_to_path().unwrap();
-    // `0098` criterion 5: the page stays a sketch page; what a path on it is, is `0099`.
-    assert_eq!(s.workbench(), Workbench::Sketch, "the page keeps its kind");
+    // `0099` criterion 15: the page becomes a drawing page with the drawing tools.
+    assert_eq!(
+        s.workbench(),
+        Workbench::Vector,
+        "the page becomes a drawing page"
+    );
     assert_eq!(
         s.selected_object_count(),
         1,

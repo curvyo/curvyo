@@ -180,6 +180,11 @@ impl Session {
 
     /// Select original (criterion 25): the direct originals of the selected clones. View state.
     pub fn select_original(&mut self) -> CloneResult {
+        // A clone of a page's sketch opens its sketch page (`specs/0099` criterion 13).
+        let selected = self.selection.ids().to_vec();
+        if self.open_sketch_page_of(&selected) {
+            return CloneResult::done(String::new());
+        }
         let targets = select_originals(&self.object_read(), self.selection.ids());
         self.select_targets(&targets, "original")
     }
@@ -201,7 +206,7 @@ impl Session {
     ///
     /// A hidden or locked target is left out (`0050` criterion 14); with none left the selection
     /// stays and a refusal says why, with some left a status says how many (`0049` criterion 25).
-    fn select_targets(&mut self, all: &[NodeId], what: &str) -> CloneResult {
+    pub(super) fn select_targets(&mut self, all: &[NodeId], what: &str) -> CloneResult {
         if all.is_empty() {
             return CloneResult::ignored();
         }

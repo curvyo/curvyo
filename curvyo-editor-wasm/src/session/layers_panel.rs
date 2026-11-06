@@ -331,6 +331,10 @@ impl Session {
             if !node.visible || node.locked {
                 return PanelReply::Quiet;
             }
+            // A page's sketch opens its page and is never selected (`specs/0099` criterion 4).
+            if this.press_fixed_sketch_row(id) {
+                return PanelReply::Quiet;
+            }
             let rows = this.layer_rows();
             this.press_object(id, press, &rows);
             PanelReply::Quiet

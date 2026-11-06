@@ -149,6 +149,21 @@ impl Session {
                 })
                 .collect()
         };
+        // A page's sketch is fixed: no press, marquee or lasso takes it (ADR 0043 §2).
+        let pickable: Arc<[ObjectSnapshot]> = if pickable.iter().any(|o| {
+            matches!(o, ObjectSnapshot::Sketch(_)) && self.document.is_fixed_sketch(o.id())
+        }) {
+            pickable
+                .iter()
+                .filter(|o| {
+                    !(matches!(o, ObjectSnapshot::Sketch(_))
+                        && self.document.is_fixed_sketch(o.id()))
+                })
+                .cloned()
+                .collect()
+        } else {
+            pickable
+        };
         let held = Held {
             all,
             drawn: Arc::clone(&read.drawn),

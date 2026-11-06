@@ -20,12 +20,7 @@ impl Session {
         if self.tool == super::Tool::Node {
             return self.node_select_all();
         }
-        let ids: Vec<_> = self
-            .pickable_objects()
-            .iter()
-            .filter(|object| self.page_selection_includes(object))
-            .map(curvyo_document_core::ObjectSnapshot::id)
-            .collect();
+        let ids = self.page_selection_ids(&self.pickable_objects());
         let ids = self.units().widen(&ids);
         self.selection.set(&ids);
         KeyOutcome::SelectedAll
