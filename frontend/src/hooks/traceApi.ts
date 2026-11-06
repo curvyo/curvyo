@@ -10,12 +10,11 @@ import type {
   TraceSlot,
   TraceStatusText,
   TraceValues,
-  TraceViewMode,
 } from "@/lib/traceText";
 
 /** The Trace tool in the frontend (`specs/0025-raster-trace` criteria 1 to 5, 9 to 13, 15, 16,
- * 46, 51 to 54): the bar's state, the worker jobs with their timers, the progress slot, the
- * view and the peek, Create paths.
+ * 46, 52 to 54): the bar's state, the worker jobs with their timers, the progress slot, Create
+ * paths. The canvas always shows Overlay (`specs/0089` UX notes §24.1).
  * Every document decision is the session's; the trace runs in the worker. */
 export interface TraceApi {
   /** The Trace tool is the active tool. */
@@ -24,9 +23,9 @@ export interface TraceApi {
   available: boolean;
   /** What is selected, to the tool. */
   selection: "empty" | "other" | "images" | "mixed";
-  /** The Mask item (`specs/0094` UX notes §1): drawn while mask paths are selected with the
-   * image; `outside` is the chosen mode. */
-  mask: { paths: number; outside: boolean } | null;
+  /** The Mask group (`specs/0089` UX notes §24.4, always drawn): the mask paths selected with the
+   * image (0 for none) and the chosen mode, Inside on every entry. */
+  mask: { paths: number; outside: boolean };
   /** Inside (`false`) or Outside, not remembered (criterion 17). */
   setMaskOutside: (outside: boolean) => void;
   /** Pick mask paths is armed (`specs/0094` slice 1b, UX notes §11). */
@@ -57,17 +56,13 @@ export interface TraceApi {
   presetLabel: string;
   /** The Advanced block is open (criterion 41). */
   advancedOpen: boolean;
-  /** The notice row's line and muted line, the counts for the Advanced status line, and whether
-   * Enter may create (criteria 11, 71). */
+  /** The notice row's line, muted line and message, the counts for the hidden status region, and
+   * whether Enter may create (criteria 11, 71). */
   status: TraceStatusText;
-  /** The counts belong to an older result: a trace runs or was stopped (UX notes 20.4). */
+  /** The result shown belongs to an older trace: a trace runs or was stopped (UX notes 20.4). */
   countsStale: boolean;
   /** What the progress slot of row 1 shows (criteria 10, 53, 54; UX notes 21.2). */
   slot: TraceSlot;
-  /** The view on the canvas as the View pill shows it (criterion 51). */
-  viewMode: TraceViewMode;
-  /** A segment of the View pill. */
-  setViewMode: (mode: TraceViewMode) => void;
   /** Trace again after a stop, or Retry after a failure. */
   retrace: () => void;
   /** Create paths waits for full-size traces. */
@@ -105,8 +100,9 @@ export interface TraceApi {
   analysis: TraceAnalysisState;
   /** Analyse: the analysed values back to the shown image's analysis. */
   analyse: () => void;
-  /** The Advanced status line: the counts (or the message replacing them) and its muted line. */
-  advancedStatus: { text: string; muted: string };
+  /** What the bar's hidden status region says (`specs/0089` UX notes §24.5): the analysis, the
+   * mask, the counts, the recognised text and shapes, the palette state, an empty part. */
+  announcement: string;
   /** Why the Trace button is `aria-disabled`, or empty (`ux-notes.md` §22.2). */
   traceBlocked: string;
   /** The palette of a multicolour trace (`specs/0089` slice M). */

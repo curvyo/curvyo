@@ -31,10 +31,12 @@ interface TracePartsProps {
 }
 
 /**
- * The Parts row, first in the Advanced block (`specs/0094` slice 2, criteria 18, 19, 28, 32; UX
- * notes §3 to §5): one radio group of numbered chips (roving focus, the arrows, Home and End make
- * a part active), Add part, and the trash of the active part with the inline confirm of `0081`
- * (Delete on a chip arms it too). Left to right is creation and stacking order.
+ * The Parts group, first in the last row of the Advanced block (`specs/0094` slice 2, criteria 18,
+ * 19, 28, 32; UX notes §3 to §5; `specs/0089` UX notes §24.3): the muted label "Parts", one radio
+ * group of numbered chips (roving focus, the arrows, Home and End make a part active), Add part,
+ * and the trash of the active part with the inline confirm of `0081` (Delete on a chip arms it
+ * too). Left to right is creation and stacking order. It wraps as one whole item; past the
+ * block's width Add and Remove go to a second line together.
  */
 export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: TracePartsProps) {
   const arm = useDeleteArm();
@@ -99,8 +101,11 @@ export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: 
     <div
       data-trace-parts=""
       {...{ [ARM_ZONE]: ZONE }}
-      className={`flex min-h-9 flex-wrap items-center gap-1 rounded-md ${ARM_TRANSITION} ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
+      className={`flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-1 rounded-md ${ARM_TRANSITION} ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
     >
+      <span aria-hidden className="flex h-9 w-8 shrink-0 items-center text-xs text-[var(--toolbar-icon)] opacity-70">
+        {PARTS}
+      </span>
       <div role="radiogroup" aria-label={PARTS} className="flex flex-wrap items-center gap-1" onKeyDown={keyDown}>
         {parts.map((part, index) => {
           const on = index === active;
@@ -141,38 +146,40 @@ export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: 
           );
         })}
       </div>
-      <Tooltip side="bottom" content={full ? PARTS_AT_MOST : ADD_PART}>
-        <button
-          type="button"
-          aria-label={ADD_PART}
-          aria-disabled={full || undefined}
-          data-trace-add-part=""
-          onClick={() => {
-            if (!full) {
-              onAdd();
-            }
-          }}
-          className={`${ICON_BUTTON_CLASS} ${full ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : plain}`}
-        >
-          <Plus size={16} strokeWidth={1.5} aria-hidden />
-        </button>
-      </Tooltip>
-      <Tooltip side="bottom" content={canRemove ? removePartText(active, armed) : KEEP_ONE_PART}>
-        <button
-          type="button"
-          tabIndex={-1}
-          aria-label={canRemove ? removePartText(active, armed) : KEEP_ONE_PART}
-          aria-disabled={!canRemove || undefined}
-          data-trace-remove-part=""
-          {...{ [ARM_TRASH]: ZONE }}
-          onClick={pressTrash}
-          className={`${ICON_BUTTON_CLASS} ${ARM_TRANSITION} ${
-            !canRemove ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : armed ? ARMED_TRASH : plain
-          }`}
-        >
-          <Trash2 size={16} strokeWidth={1.5} aria-hidden />
-        </button>
-      </Tooltip>
+      <div className="flex h-9 items-center gap-1">
+        <Tooltip side="bottom" content={full ? PARTS_AT_MOST : ADD_PART}>
+          <button
+            type="button"
+            aria-label={ADD_PART}
+            aria-disabled={full || undefined}
+            data-trace-add-part=""
+            onClick={() => {
+              if (!full) {
+                onAdd();
+              }
+            }}
+            className={`${ICON_BUTTON_CLASS} ${full ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : plain}`}
+          >
+            <Plus size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </Tooltip>
+        <Tooltip side="bottom" content={canRemove ? removePartText(active, armed) : KEEP_ONE_PART}>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={canRemove ? removePartText(active, armed) : KEEP_ONE_PART}
+            aria-disabled={!canRemove || undefined}
+            data-trace-remove-part=""
+            {...{ [ARM_TRASH]: ZONE }}
+            onClick={pressTrash}
+            className={`${ICON_BUTTON_CLASS} ${ARM_TRANSITION} ${
+              !canRemove ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : armed ? ARMED_TRASH : plain
+            }`}
+          >
+            <Trash2 size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </Tooltip>
+      </div>
       <span role="status" aria-live="polite" className="sr-only">
         {arm.status}
       </span>

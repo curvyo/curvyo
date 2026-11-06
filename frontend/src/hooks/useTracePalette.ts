@@ -59,7 +59,7 @@ export interface TracePaletteApi {
   /** Pick colours with Single colour: the strip holds the picked colours only, and Remove is the
    * one action (`ux-notes.md` §22.3). */
   pickedOnly: boolean;
-  /** The Advanced status line's palette text ("Isolating #FFF2A8", "2 colours excluded"), or empty. */
+  /** The palette state for the hidden status region ("Isolating #FFF2A8", "2 colours excluded"), or empty. */
   note: string;
   /** "Same as #3366CC" for 3 s after a pick that matched a colour, or empty: a bar notice. */
   sameNote: string;
