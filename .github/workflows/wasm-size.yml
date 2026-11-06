@@ -22,6 +22,12 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths-ignore:
+      # A pull request that only touches documentation runs the docs workflow instead of the
+      # code gate; any other changed file in the same PR still starts this workflow.
+      - "docs/**"
+      - "specs/**"
+      - "**/*.md"
 
 permissions:
   contents: read
