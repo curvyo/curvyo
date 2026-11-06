@@ -10,6 +10,7 @@ only). Becomes Accepted when the Inkscape baseline is in, step 0 (§7) does not 
 the `curvyo-vectorize-core` slot of [ADR 0011](0011-workspace-and-crate-layout.md) §2/§3 (ADR 0003 §6).
 §5 note of 2026-11-01 (text pass before the trace in the same worker job, [ADR 0028](0028-ocr-text-in-trace.md), Proposed).
 §5 note of 2026-11-04 (a job may carry a mask region, `specs/0094-masked-composite-trace`).
+§5 note of 2026-11-05 (a composite trace is one job per part, joined in the session, `specs/0094` slice 2).
 
 ## Context
 
@@ -133,6 +134,15 @@ TypeScript timers.
 > (`curvyo-ui-core::trace_region`), whitens the Mask view outside it and reads the automatic values
 > of its pixels only (`trace_region_defaults`). `trace()` and `TraceParams` are unchanged; without
 > a mask no clip runs and the numbers are those of before.
+
+> **Note 2026-11-05 (`specs/0094-masked-composite-trace/adrs.md` slice 2 note, implementer):** a
+> composite trace is one ordinary job per part, one after another on the same worker; each part's
+> settings carry its clip (its region minus the later parts', `curvyo-ui-core::trace_part_clips`)
+> as the `"mask"` of slice 1, and a part without Recognise text or Drop border shapes sends the
+> cut-out of its clip's pixel box plus a margin (16 px, or Ignore below's area in pixels) with the
+> moved map, unless Upscale Auto would decide differently for the cut-out. The worker is unchanged. The page keeps each part's wire
+> under its own key, so a setting change traces one part; the session joins the parts' wires
+> (`join_trace_parts`) into the preview and into the result Create paths writes.
 
 The reduced copy (longest side 1000 px, area-averaged) is a function of
 `curvyo-image-core`. Create paths inserts the worker's full-size results (one per selected image,

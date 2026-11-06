@@ -144,3 +144,72 @@ trivially and is checked with slice 2.
 - Expected tester-test updates (reported, not edited): `acceptance_0094_tester` c1 (`MASKED_BAR`,
   `BRIGHTNESS_BAR` gain "Pick mask paths", masked also "Clear mask"), `0089_tidyup` c57 Tab order
   and the bar arrays.
+
+## Slice 2, parts and Join (criteria 18 to 33, 42, 43)
+
+Implementer, 2026-11-05, on `story/trace-parts` (from `main` after slice 1b). Built against
+`specification.md` slice 2 (criteria 18 to 33, 42, 43; Frage 141 A, customer 2026-11-05),
+`adrs.md` decision 5 ("Slice 2 hooks") and the note of 2026-11-04, `ux-notes.md` §3 to §8.
+
+### Affected crates/modules
+
+- **`curvyo-ui-core`**
+  - `trace_parts.rs` (new): what each part keeps after the later parts are taken out (the
+    kernel's `visible_regions` over the parts' kept areas, bottom first) and the join of the
+    parts' traced results into one `TraceWire` (seam pieces united per colour, the rest kept
+    with their curves). `trace_region.rs` lends its box test and its rewinding.
+- **`curvyo-editor-wasm`**
+  - `session/trace_parts.rs` (new): the parts as Trace tool state (stable id, mask path ids,
+    Inside/Outside, the active part; the active part's mask is the selection), add, remove,
+    activate, the chips' view, each part's clip JSON for the worker, the join of the parts'
+    wires into the preview and the result, the crop of a part's pixels.
+  - `wasm_trace_parts.rs` (new): the wasm surface of the above (`wasm_trace.rs` is already
+    above 800 lines).
+- **`frontend`**
+  - `lib/traceParts.ts` (new, no React): the parts' jobs one by one with a cache per part key,
+    one progress over the parts that are traced, the joined result.
+  - `hooks/useTraceParts.ts` (new): each part's settings, chip pick, Add part, Remove part.
+  - `components/TraceParts.tsx` (new): the Parts row in Advanced; `TraceBar.tsx` the
+    "Part 2 of 3" label and the expander dot; `TraceAdvanced.tsx` the row; `useTrace.ts` the
+    branch to the parts' jobs with two or more parts.
+- Docs: `adrs.md` dated note, `docs/adr/0023` §5 note, `docs/design-system.md` row status,
+  `docs/tracing-images.md` "Parts".
+
+### Decisions (Proposal)
+
+- With one part every path is slice 1/1b's (the same settings string, the same region, no join),
+  so goldens, determinism and the 0091 and 0088 tests stay as they are (criterion 33).
+- A part's kept area: Inside its region, Outside the image's box grown by 1 mm minus the region,
+  the whole image that box; the box keeps every region edge off the picture border (decision 1).
+  A part nothing later overlaps keeps its own region (curves intact); a trimmed one is clipped to
+  its visible region; a hidden one is not traced.
+- Join: outlines whose box meets no edge of their part's clip stay as they are; the others are
+  united per colour (one operand per part) and come back as polylines. Layers merge by exact RGB;
+  a single-colour part counts as #000000 next to a multicolour one. Any part TooDetailed or Invalid
+  fails the join. The palette strip shows the active part's palette; layers come from all parts.
+- A setting change retraces only its part (criterion 25); a later part's mask change retraces the
+  earlier ones too, because their clips change.
+- With two or more parts a part's values are its own: a new mask does not re-apply the analysis;
+  only part 1's values are remembered (criterion 29).
+- Text with parts: the parts with Recognise text on trace with the read lines; the fit runs once
+  over the joined result (the preview's full trace and Create paths), as for several images.
+- Crop (criterion 31): a part without Recognise text is traced from the crop of its clip's pixel
+  box plus a margin; with one part nothing is cropped.
+
+### Tasks
+
+1. [x] ui-core tests first: M1 and M2 with 2 and 3 parts, overlapping and not, the seam, the
+   multicolour layers, shapes (criteria 20 to 23, 21).
+2. [x] ui-core: `trace_parts.rs` clips and join (criteria 20 to 23).
+3. [x] Session tests first: chips (add with copy, cap 8, remove, renumber, activate selects its
+   paths), mask path deleted, leaving the tool, Clear mask and picks on the active part, the
+   join into preview and result, Create paths one group one step, the crop (criteria 18, 19, 24,
+   27, 28, 29, 31, 42); text in part 1 only is the core test of task 1 (criterion 30).
+4. [x] Session: `trace_parts.rs`; wasm `wasm_trace_parts.rs` (criteria 18, 19, 24, 27 to 30, 42).
+5. [x] Frontend unit tests first: the parts' jobs with a fake runner (one trace call after one
+   change, one rising progress, cancel), chip names (criteria 25, 26, 32).
+6. [x] Frontend: `traceParts.ts`, `useTraceParts.ts`, `TraceParts.tsx`, bar label and dot,
+   `useTrace.ts` branch (criteria 18, 19, 25, 26, 28, 32, 43).
+7. [x] Criterion 31: CPU time of 4 quarter parts against one trace on 2000 x 2000 px (reported).
+8. [x] Docs: adrs.md note, ADR 0023 §5, design-system, tracing-images.
+9. [ ] Full gate; Chromium files.
