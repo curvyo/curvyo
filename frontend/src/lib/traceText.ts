@@ -255,7 +255,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Ignore below: drops shapes and holes smaller than this size in mm.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
-  "Palette: the colours of a Multicolour trace beside Colours, largest area first. A click excludes a colour: it becomes background and is not traced; a second click brings it back. Shift while pointing at a colour isolates it: the others are dimmed in the preview. Shift+click deletes a colour: the others are matched again as if it had never been found.",
+  "Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Shift+click excludes a colour: it becomes background and is not traced; a second Shift+click brings it back.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
@@ -492,16 +492,16 @@ export function readSummary(wire: ArrayLike<number>): TraceSummary {
   };
 }
 
-/** What the bar says about the trace (criteria 11 and 71; `ux-notes.md` §22.2): the notice row's
- * line and its muted line (only what is fixed with a bar control or changes how the preview
- * reads), the Advanced status line (the counts and its muted line, or the `message` of a result
- * whose fix is in Advanced), and whether Enter may create. A result is stated once. */
+/** What the hidden status region says about the trace (criteria 11 and 71; `ux-notes.md` §22.2,
+ * §27: nothing of it is drawn): the former notice line and its muted line, the counts and their
+ * muted line, the `message` of a result with no colour, and whether Enter may create; a line or
+ * message without a result to create is also the dimmed Trace button's reason. */
 export interface TraceStatusText {
   line: string;
   muted: string;
   counts: string;
   countsMuted: string;
-  /** A result whose fix is in Advanced, shown in the notice row ("No colours found."). */
+  /** A result whose fix is in Advanced ("No colours found."). */
   message: string;
   canCreate: boolean;
 }
@@ -512,6 +512,19 @@ export const NO_STATUS: TraceStatusText = { line: "", muted: "", counts: "", cou
 /** Why Trace is dimmed with Pick colours and nothing picked: the button's tooltip and the hidden
  * region's text, never a notice (`ux-notes.md` §25.3). */
 export const NO_COLOUR_PICKED_LINE = "0 paths: no colour picked.";
+
+/** Why Trace is dimmed with every Multicolour palette colour deleted (`ux-notes.md` §27): the
+ * button's tooltip and the hidden region's text. */
+export const NO_PALETTE_COLOUR_LINE = "0 paths: no colour in the palette.";
+
+/** Nothing to trace (`ux-notes.md` §25.3, §27): Pick colours with no colour picked, or a
+ * Multicolour palette deleted down to no colour; the reason Trace is dimmed, else empty. */
+export function nothingToTrace(values: Pick<TraceValues, "method" | "swatches" | "output" | "keptPalette">): string {
+  if (values.method === PICK_COLOURS) {
+    return values.swatches.length === 0 ? NO_COLOUR_PICKED_LINE : "";
+  }
+  return values.output === MULTICOLOUR && values.keptPalette?.length === 0 ? NO_PALETTE_COLOUR_LINE : "";
+}
 
 /** The line of a trace without paths in a colour method (UX notes §10), or `null` for
  * Brightness, whose line follows the Threshold's direction. Pick colours with nothing picked has
@@ -554,7 +567,7 @@ export function statusText(
     colour && colour.joined > 0 ? `${plural(colour.joined, "region", "regions")} joined` : "",
   ];
   const countsMuted = muted.filter((m) => m !== "").join(", ");
-  // Over 4 Mpx the counts are the reduced copy's, and the notice row says so (criterion 52).
+  // Over 4 Mpx the counts are the reduced copy's, and the hidden region says so (criterion 52).
   const settled = { line: "", muted: reduced ? REDUCED_COPY : "", counts, countsMuted, message: "", canCreate: true };
   // An empty result states "0 paths" once: no counts then (`ux-notes.md` §22.2).
   const empty = { ...settled, counts: "", countsMuted: "", canCreate: false };
@@ -576,7 +589,7 @@ export function statusText(
   return settled;
 }
 
-/** What the bar's hidden status region says (`ux-notes.md` §24.5): the lines that are no longer
+/** What the bar's hidden status region says (`ux-notes.md` §24.5, §27): the lines that are not
  * shown, each as it was worded. */
 export interface TraceAnnouncementParts {
   /** The analysis line ("Analysing...", "Custom · Line drawing"). */
@@ -587,9 +600,12 @@ export interface TraceAnnouncementParts {
   counts: string;
   /** "38 specks ignored, 2 regions joined". */
   countsMuted: string;
+  /** The notices the bar no longer draws (`ux-notes.md` §27): "412,000 nodes. Slow to edit.",
+   * "No colours found.", "Preview from a reduced copy", "Same as #3366CC", ... */
+  notices?: readonly string[];
   /** "3 text lines set · 12 shapes set". */
   recognised: string;
-  /** "Isolating #FFF2A8", "2 colours excluded". */
+  /** "Removed #4B392F", "2 colours excluded". */
   palette: string;
   /** "Part 3 has no paths". */
   emptyPart: string;
@@ -598,12 +614,13 @@ export interface TraceAnnouncementParts {
   picked?: string;
 }
 
-/** The hidden region's text (`ux-notes.md` §24.5): the segments in their order, joined by ". ",
- * an empty segment absent. */
+/** The hidden region's text (`ux-notes.md` §24.5): the segments in their order, joined by ". "
+ * (a space after a segment with its own full stop), an empty segment absent. */
 export function traceAnnouncement(parts: TraceAnnouncementParts): string {
-  return [parts.analysis, parts.mask, parts.counts, parts.countsMuted, parts.recognised, parts.palette, parts.emptyPart, parts.picked ?? ""]
+  const segments = [parts.analysis, parts.mask, parts.counts, parts.countsMuted, ...(parts.notices ?? []), parts.recognised, parts.palette, parts.emptyPart, parts.picked ?? ""];
+  return segments
     .filter((t) => t !== "")
-    .join(". ");
+    .reduce((text, segment) => (text === "" ? segment : `${text}${text.endsWith(".") ? " " : ". "}${segment}`), "");
 }
 
 /** The hidden region's picked-colours segment (`ux-notes.md` §25.3, §25.4): the colour just
@@ -721,7 +738,8 @@ function settingsOnly(values: TraceValues, threshold: number, suggested?: string
   return JSON.stringify({
     output: values.output,
     colours: kept ? kept.length : values.colours,
-    fixed: kept ?? (multi && values.method === BRIGHTNESS ? values.fixed : []),
+    // The palette pipette's colours, with Brightness and Remove background (`ux-notes.md` §27).
+    fixed: kept ?? (multi && values.method !== PICK_COLOURS ? values.fixed : []),
     excluded: multi ? values.excluded : [],
     method: values.method,
     colour_tolerance: colourTolerance(values),

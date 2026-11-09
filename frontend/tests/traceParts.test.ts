@@ -19,7 +19,6 @@ import {
   partName,
   partTooltip,
   partsCount,
-  partsLabel,
   readParts,
   removePartText,
   traceParts,
@@ -139,11 +138,9 @@ test("criterion 32: a chip is named by its number, mode, paths and state", () =>
   assert.equal(partTooltip(1, 3, part({ paths: 2, active: true })), "Part 2 of 3, inside, 2 paths");
 });
 
-test("the bar's label, the counts and the trash name follow the parts", () => {
+test("the counts and the trash name follow the parts", () => {
   const one = [part({ active: true, whole: true })];
   const three = [part({ whole: true }), part({ paths: 1 }), part({ muted: true, active: true })];
-  assert.equal(partsLabel(one), "");
-  assert.equal(partsLabel(three), "Part 3 of 3");
   assert.equal(partsCount(1), "");
   assert.equal(partsCount(3), "3 parts");
   assert.equal(partEmptyText(three), "Part 3 has no paths");

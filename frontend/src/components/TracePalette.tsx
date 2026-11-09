@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { SwatchCell } from "@/components/TraceColourGroup";
 import type { TracePaletteApi } from "@/hooks/useTracePalette";
@@ -14,46 +14,31 @@ interface TracePaletteProps {
 
 /**
  * The palette of a multicolour trace beside Colours (`specs/0089` criteria 26 and 29, UX notes
- * §26): the swatches of the Pick colours row, one Tab stop with roving arrows; a click toggles
- * Exclude, Shift while pointing isolates, Shift+click deletes. Nothing needs colour perception:
- * the colour's code, name and state are the accessible name.
+ * §26, §27): the swatches of the Pick colours row, one Tab stop with roving arrows; a press on a
+ * swatch's x deletes its colour, Shift+click toggles Exclude, a plain click elsewhere does
+ * nothing. Nothing needs colour perception: the colour's code, name and state are the accessible
+ * name.
  */
 export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProps) {
   const [focus, setFocus] = useState(0);
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [shift, setShift] = useState(false);
   const row = useRef<HTMLDivElement>(null);
-  const { swatches, setIsolated } = palette;
+  const { swatches } = palette;
   // After a key removal: the swatch (the next one, else the previous) to focus once the new swatch list (not the old one) is drawn.
   const pendingFocus = useRef<{ target: string; hex: string } | null>(null);
   useEffect(() => {
     const pending = pendingFocus.current;
-    if (pending === null || swatches.length === 0 || swatches.some((s) => s.hex === pending.hex)) {
+    if (pending === null || swatches.some((s) => s.hex === pending.hex)) {
       return;
     }
     pendingFocus.current = null;
+    if (swatches.length === 0) {
+      // The last colour went: the keyboard goes back to the canvas.
+      onReturnFocus();
+      return;
+    }
     const index = swatches.findIndex((s) => s.hex === pending.target);
     row.current?.querySelectorAll<HTMLElement>("[data-trace-palette-swatch]")[index < 0 ? swatches.length - 1 : index]?.focus();
-  }, [swatches]);
-
-  // Shift+hover isolates (a view only); it ends with the Shift key or the hover.
-  useEffect(() => {
-    const keys = (event: globalThis.KeyboardEvent) => setShift(event.shiftKey);
-    const blur = () => setShift(false);
-    window.addEventListener("keydown", keys);
-    window.addEventListener("keyup", keys);
-    window.addEventListener("blur", blur);
-    return () => {
-      window.removeEventListener("keydown", keys);
-      window.removeEventListener("keyup", keys);
-      window.removeEventListener("blur", blur);
-    };
-  }, []);
-  const target = hovered !== null && shift && swatches.some((s) => s.hex === hovered) ? hovered : null;
-  useEffect(() => {
-    setIsolated(target);
-  }, [target, setIsolated]);
-  useEffect(() => () => setIsolated(null), [setIsolated]);
+  }, [swatches, onReturnFocus]);
 
   if (swatches.length === 0) {
     return null;
@@ -64,7 +49,6 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
     if (hex === undefined) {
       return;
     }
-    setHovered(null);
     const next = focusAfterRemoval(index, swatches.length) ?? 0;
     setFocus(next);
     palette.remove(hex);
@@ -118,21 +102,26 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
               }
               setFocus(index);
               if (event.shiftKey) {
-                remove(index, false);
-              } else {
                 palette.toggleExclude(swatch.hex);
                 onReturnFocus();
+              } else if (onRemoveGlyph(event)) {
+                remove(index, false);
               }
             }}
             onKeyDown={keyDown(index)}
-            onPointerMove={(event) => {
-              setShift(event.shiftKey);
-              setHovered(swatch.hex);
-            }}
-            onPointerLeave={() => setHovered((now) => (now === swatch.hex ? null : now))}
           />
         );
       })}
     </div>
   );
+}
+
+/** Half the x glyph with its casing, px: 12 px plus 1.5 px either side. */
+const X_REACH = 7.5;
+
+/** Whether a press landed on the swatch's x (`ux-notes.md` §27: only the x deletes), by where it
+ * landed, so it also works where the x was not drawn yet (no hover on a touch screen). */
+function onRemoveGlyph(event: MouseEvent<HTMLButtonElement>): boolean {
+  const cell = event.currentTarget.getBoundingClientRect();
+  return Math.abs(event.clientX - (cell.left + cell.width / 2)) <= X_REACH && Math.abs(event.clientY - (cell.top + cell.height / 2)) <= X_REACH;
 }

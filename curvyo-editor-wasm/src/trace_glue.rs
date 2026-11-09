@@ -5,9 +5,9 @@
 use curvyo_document_core::Length;
 use curvyo_ui_core::{
     TRACE_ADVANCED_PARAMS, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TRACE_DEFAULT_PICK_TOLERANCE,
-    TRACE_MAX_COLOURS, TRACE_METHOD_PARAMS, TRACE_MIN_COLOURS, TRACE_PARAMS, TRACE_PRESETS,
-    TraceColourParams, TraceDenoise, TraceMethod, TraceParamKind, TraceParamUnit, TraceParams,
-    TracePixelLength, TraceRgb, TraceSwatches, TraceUpscale,
+    TRACE_MAX_COLOURS, TRACE_METHOD_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceColourParams,
+    TraceDenoise, TraceMethod, TraceParamKind, TraceParamUnit, TraceParams, TracePixelLength,
+    TraceRgb, TraceSwatches, TraceUpscale,
 };
 
 /// `#RRGGBB` (or `RRGGBB`) as a colour; `None` for anything else.
@@ -140,8 +140,9 @@ fn colours(list: Option<&serde_json::Value>) -> Vec<TraceRgb> {
 }
 
 /// The multicolour values of `settings` (`specs/0089` slice M: `output` 1 for Multicolour,
-/// `colours` a count 2 to 16 or null for Auto, `fixed` and `excluded` lists of `#RRGGBB`), or
-/// `None` for Single colour (`output` missing or 0).
+/// `colours` a count 1 to 16 or null for Auto (the tracer asks for 2 unless one fixed colour is
+/// the whole palette), `fixed` and `excluded` lists of `#RRGGBB`), or `None` for Single colour
+/// (`output` missing or 0).
 #[must_use]
 pub fn trace_colour_settings(settings: &str) -> Option<TraceColourParams> {
     let json: serde_json::Value = serde_json::from_str(settings).ok()?;
@@ -152,8 +153,8 @@ pub fn trace_colour_settings(settings: &str) -> Option<TraceColourParams> {
         .get("colours")
         .and_then(serde_json::Value::as_u64)
         .map(|n| {
-            // invariant: clamped to 2 to 16 first.
-            u8::try_from(n.clamp(TRACE_MIN_COLOURS as u64, TRACE_MAX_COLOURS as u64)).unwrap_or(2)
+            // invariant: clamped to 1 to 16 first.
+            u8::try_from(n.clamp(1, TRACE_MAX_COLOURS as u64)).unwrap_or(1)
         });
     Some(TraceColourParams {
         trace: trace_settings(settings),
@@ -386,7 +387,7 @@ mod tests {
             trace_colour_settings(r#"{"output":1,"colours":1}"#)
                 .unwrap()
                 .colours,
-            Some(2)
+            Some(1)
         );
     }
 

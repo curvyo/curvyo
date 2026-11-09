@@ -100,7 +100,8 @@ becomes its mask paths plus the image (spec criterion 19). Selecting the image p
 chip is active assigns them to that part. A mouse press returns focus to the canvas like the other
 bar buttons. The bar shows a muted 12 px state label **"Part 2 of 3"** (`--panel-muted-fg`, not a
 Tab stop, after the Mask item) whenever there are two or more parts, so that the bar's values are
-never mistaken for a global setting while Advanced is closed. The expander also carries the 6 px
+never mistaken for a global setting while Advanced is closed (**superseded 2026-11-09**, customer,
+`0089` `ux-notes.md` §27: the label is removed without replacement). The expander also carries the 6 px
 accent dot with a 1 px `--toolbar-bg` ring while Advanced is closed and there are two or more parts
 (the pattern of the Text bar's row 2); its description names it: "3 parts".
 

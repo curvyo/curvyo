@@ -673,6 +673,9 @@ armed keeps the full bar and shows the same string in the notice row (`0094` cri
 
 ### 24.5 Nothing says what happened; one hidden status region (request 2)
 
+**Superseded in part by §27 (customer 2026-11-09):** there is no notice row; the list under "Stays visible" is said by
+the hidden region only.
+
 **Removed from view:** the analysis line (every state), the whole Advanced status line (counts, muted specks, joined
 regions, "Inside 2 paths" / "3 parts", "Part 3 has no paths", "3 text lines set", "12 shapes set", "1 shape set",
 and the palette states "Isolating #FFF2A8", "Merging #FFF2A8 into...", "2 colours excluded"). The state of palette
@@ -1014,11 +1017,16 @@ marked **(Proposal)** are mine and vetoable at the demo.
 
 ### 26.2 Tooltip
 
+**Superseded by §27.3:** the second line is `Shift+click: exclude`.
+
 The app tooltip (400 ms, bottom), two lines: `#4B392F · Brown` (the hex and the name of §7's table), then a tiny muted
 line `Click: exclude · Shift: isolate / delete` (10 px, 70 %). The customer asked for the shortcuts "ganz kurz in den
 tooltip": this is a deliberate exception to the no-hint rule, limited to this tooltip.
 
 ### 26.3 Pointer
+
+**Superseded by §27.2 to §27.4 (customer 2026-11-09):** no Isolate; the x deletes, Shift+click excludes, a plain click
+does nothing; no two-colour floor.
 
 - **Hover**: the tooltip only.
 - **Shift+hover = Isolate**: while Shift is held and the pointer is on a swatch, the preview draws the other colours
@@ -1062,3 +1070,90 @@ Exclude, Remove, Excluded, "Merging ... into...", "Merged into ...", "(was ...)"
 The About Trace entries Palette, Isolate, Recolour, Merge into, Exclude and Remove become one Palette entry; a Parts
 entry is added before Analyse (texts in `traceText.ts` and `docs/tracing-images.md`, a test compares them).
 
+
+## 27. No status texts, no Isolate, palette swatches like the picked colours (customer 2026-11-09, after trying #295; overrides §24.5, §25.3, §25.4 and §26 where they differ)
+
+Customer, five items: (1) no status or notice text anywhere in the Trace bar (screenshot: Multicolour, Colours 5,
+the plain line "No colours found."); (2) Isolate removed completely, the palette swatches behave as the Pick colours
+swatches; (3) with Remove background the palette pipette disappeared, it must stay usable; (4) the last one or two
+palette colours could not be removed, every colour must be removable; (5) the label "Part x of y" goes without
+replacement. Items marked **(Proposal)** are mine and vetoable at the demo.
+
+### 27.1 No visible status or notice text (items 1, 5)
+
+- **The notice row is deleted** (the `data-trace-state` row of §22.2 and §24.5 with its own live region). The bar
+  draws no status, result or notice line, Advanced open or closed. Gone from view: "Tracing 1 of 3 images",
+  "Preview from a reduced copy" and the unclipped-shapes line, "N nodes. Slow to edit.", "1 path covering the whole
+  image.", "0 paths at this Threshold / Colour tolerance: too low / too high.", "Too much detail: raise Ignore
+  below.", "This image can't be traced.", "0 paths: the mask is outside the image.", "0 paths: the mask paths could
+  not be combined.", "No colours found.", "Analysis failed · automatic Threshold used", "Same as #3366CC", the refused
+  mask pick's "Use Object to path for text; one image at a time." and the label **"Part 2 of 3"** after the Mask group
+  (`0094` UX notes §3; the Parts chips in Advanced, their names and the expander's "3 parts" stay).
+- **Stays:** controls and their states: the Trace button with Stopped / Failed and Retry (the failure reason is its
+  tooltip and hidden alert), a Trace button that cannot create is `aria-disabled` with the reason as its tooltip and
+  `aria-describedby` (unchanged rule of §22.2: a tooltip of a dimmed button is not a notice), the value fields, the
+  swatches. The bar's words with nothing traceable selected ("Click an image to trace it.", "The selection is not an
+  image...", "Use Object to path for text; one image at a time." as the one-row bar of `0094` criterion 14) are the
+  bar's content, not a notice, and stay.
+- **The hidden region** (§24.5, always mounted, `sr-only`) says every former notice exactly as it was worded, after the
+  counts and before the recognised text: segment 3a of the §24.5 order. A segment that ends with its own full stop is
+  followed by a space, not by ". ". No new strings except the reason of 27.4.
+
+### 27.2 Isolate removed (item 2)
+
+Shift+hover isolate, its dimming of the other colours' outlines in Overlay, "Isolating #RRGGBB" and the engine's
+isolated colour (session state, the dimmed draw, the wasm call) are deleted. Nothing replaces them.
+
+### 27.3 The palette swatches (item 2)
+
+The palette cells are the Pick colours cells (`SwatchCell`, one component) with the same look on hover and focus:
+the swatch fades to 40 % and the cased Lucide `X` appears (on an excluded swatch in place of its `Ban`).
+- **A press on the x deletes the colour** with the re-match semantics of §26.3 (the palette becomes the other colours,
+  every pixel matched again among them, a deleted excluded colour is no longer excluded; not a History step). After a
+  pointer delete the keyboard goes back to the canvas.
+- **Shift+click anywhere on the cell toggles Exclude** (semantics of §26.3 unchanged).
+- **A plain click elsewhere on the swatch does nothing (Proposal:** "identical to Pick colours" and "a plain click on
+  the body does nothing" are read together as: only the x deletes; the Pick colours row is unchanged, a click anywhere
+  on its cell removes).
+- **Tooltip:** `#RRGGBB · Name`, then the tiny muted line `Shift+click: exclude` (replaces `PALETTE_HINT` of §26.6).
+- **Keyboard** (unchanged from §26.4): one Tab stop, Left / Right, Home / End; Enter or Space toggles Exclude;
+  Shift+Enter, Delete or Backspace deletes, focus to the swatch now in its place, else the previous one, else (no
+  colour left) back to the canvas. Accessible name `#4B392F · Brown`, plus `, excluded`. The hidden region says
+  "Removed #RRGGBB" and "2 colours excluded" as before; "Isolating ..." is gone.
+
+### 27.4 Down to no colour (item 4)
+
+- **No floor.** The "at least two colours stay" rule of §26.3 is withdrawn: every colour can be deleted. One kept
+  colour is traced alone (the tracer keeps a fixed colour as the whole palette instead of finding a second one).
+- **With no colour left nothing is traced** (as Pick colours with nothing picked, §25.3): no job, the outline shows
+  nothing, the palette row is empty (no Tab stop), the Colours field keeps its value. Trace is `aria-disabled` with
+  the reason **"0 paths: no colour in the palette."** as tooltip and `aria-describedby` **(Proposal; new string, the
+  wording of "0 paths: no colour picked.")**; the hidden region says it once. Enter and Ctrl+Enter do nothing.
+- The palette pipette adds colours to the empty kept palette; the first pick is traced alone. A new method, a new
+  Colours value or another image starts from the found palette again (§26.3, unchanged).
+
+### 27.5 The palette pipette with Remove background (item 3)
+
+The palette pipette (`Pick palette colour from the image`, 28 px) sits before the palette row with Brightness **and
+with Remove background** (§26.1's "with Remove background no palette pipette" is withdrawn). It and the background
+pipette in the bar are two pipettes: each arms its own mode, pressing one disarms the other, the background pipette
+still ends after one pick, the palette pipette stays armed (Shift+click adds). Its picks are fixed palette colours of
+the Remove background trace as with Brightness. Leaving Multicolour disarms it with either method.
+
+### 27.6 Superseded rules
+
+- §22.2 and §24.5: the notice row and its list ("Stays visible in the bar's notice row ..."); the failed analysis as a
+  notice-row line. The hidden region of §24.5 stays and gains segment 3a (27.1).
+- §25.4: the "Same as #3366CC" notice (3 s) is said by the hidden region only.
+- §26.1: "with Remove background (no palette pipette)"; §26.2: the hint line `Click: exclude · Shift: isolate /
+  delete`; §26.3: Shift+hover = Isolate, Click = Exclude, Shift+click = delete, "At least two colours stay"; §26.6:
+  the string `PALETTE_HINT` and "Isolating #RRGGBB" in the hidden region.
+- `0094` UX notes §3: the "Part 2 of 3" state label.
+
+### 27.7 Tests that change by design
+
+Tester files: `acceptance_0089_palette_row_tester` (Isolate, click = Exclude, Shift+click = delete, the two-colour
+floor, the hint line), `acceptance_0089_m_browser` (Shift+hover Isolate, click = Exclude),
+`acceptance_0089_sliceM_tester.rs` (c29 without Isolate), the notice-row reads of `acceptance_0089_cleanup_tester`,
+`_tidyup_tester`, `_colours_row_tester`, `_sliceF_tester`, `acceptance_0025_*` and `acceptance_0094_*` (read the
+hidden region or the Trace button's description instead), and `acceptance_0094_parts_*` ("Part 2 of 2" label).

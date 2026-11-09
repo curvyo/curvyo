@@ -127,6 +127,7 @@ Slice 1
 7. Given a mask that reaches beyond the image, then the region is clipped to the image. Given a
    mask that does not touch the image, then the muted row says "0 paths: the mask is outside the
    image.", the Trace button is dimmed and creates nothing.
+   *(Amended 2026-11-09, customer, `0089` `ux-notes.md` §27: no visible notice or status text in the Trace bar; this text is said by the hidden status region, and where nothing can be created Trace is dimmed with it as its tooltip.)*
 8. Given the image rotated by 30 degrees and scaled to 60 mm width, or in addition skewed, and R1
    transformed the same way, then criteria 2 and 4 hold with the same numbers.
 9. Given M2 with Remove background on the right half (a mask over the right half, Inside), then the
@@ -228,6 +229,7 @@ Slice 1b
     time." and the mode stays armed; the next accepted pick clears the row. A text, a second
     image or a sketch over a mask-eligible object does not stop its pick. A click where nothing
     but the traced image or empty canvas lies changes nothing, and a double-click on the image creates no paths.
+    *(Amended 2026-11-09, customer, `0089` `ux-notes.md` §27: no visible notice or status text in the Trace bar; this text is said by the hidden status region, and where nothing can be created Trace is dimmed with it as its tooltip.)*
 39. Given the mode armed, when Escape is pressed, then only the mode ends (selection, mask and
     preview kept); the next Escape stops a running trace if there is one, the one after leaves the
     tool (the order of 0025). Given the tool left by S, another tool or Create paths and entered

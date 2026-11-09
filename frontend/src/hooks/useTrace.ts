@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
 import {
-  BRIGHTNESS,
   MULTICOLOUR,
   MASK_FAILED,
   MASK_OUTSIDE_IMAGE,
-  NO_COLOUR_PICKED_LINE,
   NO_STATUS,
+  TRACE_MIXED,
+  nothingToTrace,
   maskText,
   PICK_COLOURS,
   zeroPathsLine,
@@ -475,7 +475,7 @@ export function useTrace(
       const values = readParts(session.trace_parts()).map((part) => ({ part, v: partValues(part) }));
       const jobs: (PartJob | null)[] = values.map(({ part, v }) => {
         const threshold = v.threshold ?? auto;
-        if (!part.contributes || threshold === null) {
+        if (!part.contributes || threshold === null || nothingToTrace(v) !== "") {
           return null;
         }
         const settings = settingsJson(v, threshold, partAuto.current.get(part.id)?.background ?? background, part.mask);
@@ -636,9 +636,10 @@ export function useTrace(
         onChange();
         return;
       }
-      if (noColourPicked(choiceRef.current.values)) {
-        // Pick colours with nothing picked traces nothing: no "0 paths" outcome, the outline
-        // shows nothing until the first colour (`ux-notes.md` §25.3).
+      if (nothingToTrace(choiceRef.current.values) !== "") {
+        // Pick colours with nothing picked, or a palette with every colour deleted, traces
+        // nothing: no "0 paths" outcome, the outline shows nothing until the first colour
+        // (`ux-notes.md` §25.3, §27).
         session.set_trace_preview(id, new Float64Array(7));
         setUnclipped("");
         setStatus(NO_STATUS);
@@ -884,7 +885,7 @@ export function useTrace(
     [getSession, schedule],
   );
 
-  const palette = useTracePalette({ active, values, getSession, onChange, apply, choiceRef });
+  const palette = useTracePalette({ active, values, getSession, apply, choiceRef });
   useEffect(() => {
     paletteRefresh.current = palette.refresh;
   }, [palette.refresh]);
@@ -892,9 +893,9 @@ export function useTrace(
   const setValue = useCallback(
     <K extends keyof TraceValues>(name: K, value: TraceValues[K], isDragging = false) => {
       dragging.current = isDragging;
-      // Leaving Multicolour in Brightness disarms the palette pipette (UX notes §7).
+      // Leaving Multicolour disarms the palette pipette (UX notes §7, §27).
       const session = getSession();
-      if (name === "output" && value !== MULTICOLOUR && choiceRef.current.values.method === BRIGHTNESS && session?.trace_pick_mode() === "colours") {
+      if (name === "output" && value !== MULTICOLOUR && choiceRef.current.values.method !== PICK_COLOURS && session?.trace_pick_mode() === "colours") {
         session.set_trace_pick("");
       }
       if (name === "threshold" && viewRef.current.shown && typeof value === "number") {
@@ -997,8 +998,8 @@ export function useTrace(
       return;
     }
     const threshold = choiceRef.current.values.threshold;
-    // Nothing picked: Enter and Ctrl+Enter do nothing, silently (`ux-notes.md` §25.3).
-    if (threshold === null || noColourPicked(choiceRef.current.values) || (!status.canCreate && results.current.size > 0)) {
+    // Nothing to trace: Enter and Ctrl+Enter do nothing, silently (`ux-notes.md` §25.3, §27).
+    if (threshold === null || nothingToTrace(choiceRef.current.values) !== "" || (!status.canCreate && results.current.size > 0)) {
       return;
     }
     const v = { ...choiceRef.current.values, threshold };
@@ -1267,15 +1268,30 @@ export function useTrace(
   const parts = partsApi.parts;
   // `specs/0094` UX notes §7: with two or more parts "3 parts" replaces the mask segment, and an
   // active later part without paths says so last.
+  const pickMode = session?.trace_pick_mode() ?? "";
+  const maskPick = session?.trace_mask_pick() ?? false;
+  const maskRefused = session?.trace_mask_pick_refused() ?? false;
+  // The bar draws no notice (`ux-notes.md` §27): the hidden region says them as they were worded.
+  const notices = [
+    imagesLabel(progress, view.images.length),
+    status.line,
+    status.message,
+    [status.muted, unclipped].filter((t) => t !== "").join(" "),
+    palette.sameNote,
+    maskRefused ? TRACE_MIXED : "",
+    // Pick colours says its own reason last (`picked`).
+    active && values.method !== PICK_COLOURS ? nothingToTrace(values) : "",
+  ];
   const nextAnnouncement = traceAnnouncement({
     analysis: analysisLine(analysisState),
     mask: parts.length > 1 ? partsCount(parts.length) : maskText(mask.outside, mask.paths),
     counts: status.counts,
     countsMuted: status.countsMuted,
+    notices,
     recognised,
     palette: palette.note,
     emptyPart: active ? partEmptyText(parts) : "",
-    picked: active && values.method === PICK_COLOURS ? pickedAnnouncement(removed !== null && removed.left === values.swatches.join() ? removed.hex : null, noColourPicked(values)) : "",
+    picked: active && values.method === PICK_COLOURS ? pickedAnnouncement(removed !== null && removed.left === values.swatches.join() ? removed.hex : null, nothingToTrace(values) !== "") : "",
   });
   // Announced once the result settles (`ux-notes.md` §24.5): not while a value is dragged, and not
   // for a reduced preview whose full-size result follows; each new result renders again.
@@ -1285,19 +1301,9 @@ export function useTrace(
       setAnnouncement(nextAnnouncement);
     }
   }, [nextAnnouncement, status, busy]);
-  // A disabled Trace button states why (`ux-notes.md` §22.2): nothing picked, or a result that
+  // A disabled Trace button states why (`ux-notes.md` §22.2): nothing to trace, or a result that
   // has no paths.
-  const traceBlocked =
-    slot.kind !== "none"
-      ? ""
-      : noColourPicked(values)
-        ? NO_COLOUR_PICKED_LINE
-        : status.canCreate
-          ? ""
-          : status.line || status.message;
-  const pickMode = session?.trace_pick_mode() ?? "";
-  const maskPick = session?.trace_mask_pick() ?? false;
-  const maskRefused = session?.trace_mask_pick_refused() ?? false;
+  const traceBlocked = slot.kind !== "none" ? "" : nothingToTrace(values) || (status.canCreate ? "" : status.line || status.message);
   const shownId = view.shown;
   // With two or more parts the active part's own background (region-only analysis per part).
   const activePart = parts.length > 1 ? parts.find((p) => p.active) : undefined;
@@ -1307,19 +1313,15 @@ export function useTrace(
     active,
     available,
     selection: view.selection,
-    // The notice row's muted line gains the unclipped shapes (`specs/0094`).
-    status: unclipped === "" ? status : { ...status, muted: [status.muted, unclipped].filter((t) => t !== "").join(" ") },
     mask,
     setMaskOutside,
     maskPick,
     setMaskPick,
-    maskRefused,
     clearMask,
     parts,
     selectPart: partsApi.selectPart,
     addPart: partsApi.addPart,
     removePart: partsApi.removePart,
-    imagesLabel: imagesLabel(progress, view.images.length),
     params,
     presets,
     values,
@@ -1345,17 +1347,11 @@ export function useTrace(
     removePicked,
     disarmPick,
     suggestedBackground,
-    analysis: analysisState,
     analyse,
     announcement,
     traceBlocked,
     palette,
   };
-}
-
-/** Pick colours with no colour picked: nothing to trace (`ux-notes.md` §25.3). */
-function noColourPicked(values: Pick<TraceValues, "method" | "swatches">): boolean {
-  return values.method === PICK_COLOURS && values.swatches.length === 0;
 }
 
 /** The colours and joined regions of the shown multicolour preview, `null` for one colour. */

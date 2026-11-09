@@ -302,3 +302,48 @@ fn a_deleted_colour_is_matched_again_pixel_by_pixel_among_the_kept_colours() {
     // 16 + 8 columns of 12 rows each side.
     assert_eq!((pixels(a), pixels(b)), (24 * 12, 28 * 12), "{kept:?}");
 }
+
+/// Customer 2026-11-09: a palette can be deleted down to one colour; the last kept colour is
+/// traced alone (nothing found anew), and a kept palette with no colour does not fail the job.
+#[test]
+fn a_kept_palette_of_one_colour_is_traced_alone_and_none_does_not_fail() {
+    let rgba: Vec<u8> = (0..40 * 20)
+        .flat_map(|i| {
+            let (x, y) = (i % 40, i / 40);
+            let c = if !(4..36).contains(&x) || !(4..16).contains(&y) {
+                TraceRgb::new(255, 255, 255)
+            } else if x < 20 {
+                RED
+            } else {
+                BLUE
+            };
+            [c.r, c.g, c.b, 255]
+        })
+        .collect();
+    let mut params = TraceColourParams::new(TraceParams {
+        selection: TraceMethod::RemoveBackground {
+            background: Some(TraceRgb::new(255, 255, 255)),
+            tolerance: 40,
+        },
+        specks: Length::from_mm(0.0),
+        ..TraceParams::with_threshold(128)
+    });
+    let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    params.fixed = vec![RED];
+    params.colours = Some(1);
+    let wire = trace_colour_job_with(&rgba, 40, 20, map, &params, &mut |_| {});
+    let palette: Vec<TraceRgb> = read_trace_wire(&wire)
+        .unwrap()
+        .palette
+        .iter()
+        .map(|e| e.colour)
+        .collect();
+    assert_eq!(palette, [RED], "the one kept colour, nothing found anew");
+    params.fixed.clear();
+    params.colours = Some(0);
+    let none = trace_colour_job_with(&rgba, 40, 20, map, &params, &mut |_| {});
+    assert!(
+        read_trace_wire(&none).is_some(),
+        "an empty kept palette still answers"
+    );
+}

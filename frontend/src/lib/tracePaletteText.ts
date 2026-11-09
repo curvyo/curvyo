@@ -8,12 +8,9 @@
 /** The name of the swatch row (UX notes §26). */
 export const PALETTE = "Palette";
 
-/** The tooltip's second line, the swatch's ways of use (customer 2026-11-09: "ganz kurz"). */
-export const PALETTE_HINT = "Click: exclude · Shift: isolate / delete";
-
-export function isolatingNote(hex: string): string {
-  return `Isolating ${hex}`;
-}
+/** The tooltip's second line, the swatch's way to exclude (customer 2026-11-09: "ganz kurz";
+ * its x deletes, as the Pick colours swatches). */
+export const PALETTE_HINT = "Shift+click: exclude";
 
 export function sameAsNote(hex: string): string {
   return `Same as ${hex}`;
@@ -62,25 +59,21 @@ export function paletteKey(
   }
 }
 
-/** The fewest colours a palette keeps after a delete (the Colours field's lowest count). */
-export const MIN_PALETTE = 2;
-
-/** The palette edits after deleting `hex` from the shown `palette` (UX notes §26, Proposal): the
+/** The palette edits after deleting `hex` from the shown `palette` (UX notes §26, §27): the
  * palette becomes exactly the other colours, matched again as if `hex` had never been in it,
- * and `hex` is no longer excluded; `null` when `hex` is not shown or only `MIN_PALETTE` colours
- * are left. */
+ * and `hex` is no longer excluded; down to no colour; `null` when `hex` is not shown. */
 export function deleteFromPalette(
   palette: readonly string[],
   excluded: readonly string[],
   hex: string,
 ): { keptPalette: string[]; excluded: string[] } | null {
-  if (!palette.includes(hex) || palette.length <= MIN_PALETTE) {
+  if (!palette.includes(hex)) {
     return null;
   }
   return { keptPalette: palette.filter((c) => c !== hex), excluded: excluded.filter((c) => c !== hex) };
 }
 
-/** The pipette of the palette (Brightness + Multicolour) adds a fixed colour (UX notes §7). */
+/** The pipette of the Multicolour palette adds a fixed colour (UX notes §7, §27). */
 export const PICK_PALETTE_COLOUR = "Pick palette colour from the image";
 
 /** `#RRGGBB` as its channels. */

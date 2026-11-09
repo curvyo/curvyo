@@ -1,4 +1,3 @@
-import type { TraceAnalysisState } from "@/lib/traceAnalysis";
 import type { TracePartInfo } from "@/lib/traceParts";
 
 import type { TracePaletteApi } from "./useTracePalette";
@@ -7,7 +6,6 @@ import type {
   TraceParam,
   TracePreset,
   TraceSlot,
-  TraceStatusText,
   TraceValues,
 } from "@/lib/traceText";
 
@@ -31,8 +29,6 @@ export interface TraceApi {
   maskPick: boolean;
   /** Arms or disarms Pick mask paths. */
   setMaskPick: (armed: boolean) => void;
-  /** The last pick hit a text, a sketch or a second image: the notice row says so (criterion 38). */
-  maskRefused: boolean;
   /** Clear mask: only the image stays selected (criterion 40). */
   clearMask: () => void;
   /** The parts' chips (`specs/0094` slice 2, UX notes §3); one whole-image part at least. */
@@ -43,8 +39,6 @@ export interface TraceApi {
   addPart: () => void;
   /** Remove part `index` (after the inline confirm). */
   removePart: (index: number) => void;
-  /** "Tracing 1 of 3 images", or empty for one image. */
-  imagesLabel: string;
   params: readonly TraceParam[];
   /** The presets in menu order (criterion 59). */
   presets: readonly TracePreset[];
@@ -55,9 +49,6 @@ export interface TraceApi {
   presetLabel: string;
   /** The Advanced block is open (criterion 41). */
   advancedOpen: boolean;
-  /** The notice row's line, muted line and message, the counts for the hidden status region, and
-   * whether Enter may create (criteria 11, 71). */
-  status: TraceStatusText;
   /** The result shown belongs to an older trace: a trace runs or was stopped (UX notes 20.4). */
   countsStale: boolean;
   /** What the progress slot of row 1 shows (criteria 10, 53, 54; UX notes 21.2). */
@@ -88,8 +79,9 @@ export interface TraceApi {
   setBackgroundAuto: () => void;
   /** What the pipette is armed for: "background", "colours" or "" (UX notes §6). */
   pickMode: string;
-  /** Arms the pipette for the current method, or disarms it. */
-  setPicking: (armed: boolean) => void;
+  /** Arms the pipette for the current method (`palette`: the Multicolour palette's, `ux-notes.md`
+   * §27), or disarms it. */
+  setPicking: (armed: boolean, palette?: boolean) => void;
   /** Disarms an armed pipette as Escape does; `false` when it was not armed (`ux-notes.md` §25.4). */
   disarmPick: () => boolean;
   /** Takes a colour out of Pick colours' picked colours (`ux-notes.md` §25.4): not a history step. */
@@ -97,13 +89,11 @@ export interface TraceApi {
   /** The automatic background of the shown image (`#RRGGBB`, empty: transparent; `null` before
    * it is read). */
   suggestedBackground: string | null;
-  /** The shown image's analysis line state (`specs/0089` slice F, UX notes §3). */
-  analysis: TraceAnalysisState;
   /** Analyse: the analysed values back to the shown image's analysis. */
   analyse: () => void;
   /** What the bar's hidden status region says (`specs/0089` UX notes §24.5): the analysis, the
-   * mask, the counts, the recognised text and shapes, the palette state, an empty part, the
-   * picked colour removed and the empty set (§25.3, §25.4). */
+   * mask, the counts, the notices the bar does not draw (§27), the recognised text and shapes, the
+   * palette state, an empty part, the picked colour removed and the empty set (§25.3, §25.4). */
   announcement: string;
   /** Why the Trace button is `aria-disabled`, or empty (`ux-notes.md` §22.2). */
   traceBlocked: string;
