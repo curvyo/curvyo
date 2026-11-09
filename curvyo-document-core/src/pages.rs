@@ -479,6 +479,8 @@ impl Document {
             return self.delete_sketch_page(id, owner);
         }
         write(&self.loro().get_map(ROOT_MAP), id, "deleted", true);
+        // Its placed pages go in the same step, on every laser page (`0100` criterion 24).
+        self.remove_placements_of(id);
         // The page owns its machine data: the manufacturing goes in the same step, in one tree
         // delete, so one undo restores the page with its copy, fixtures and placements
         // (ADR 0042 §5, `specs/0098-page-kinds` criterion 16).

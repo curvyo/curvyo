@@ -252,6 +252,16 @@ impl Document {
             return Err(TilingError::EmptySource);
         }
         check_depth(&tree, tiling, &sources, leaf_ids.len() > 1)?;
+        let into = tiling.or_else(|| {
+            sources
+                .first()
+                .and_then(|&s| crate::group_tree::group_parent(&tree, tree_id_of(s)))
+        });
+        if let Some(into) = into
+            && crate::clone_cycle::would_cycle_in(&tree, leaf_ids.iter().copied(), into)
+        {
+            return Err(TilingError::InsideOwnOriginal);
+        }
         check_cells(request)?;
         let leaves = leaf_ids
             .iter()

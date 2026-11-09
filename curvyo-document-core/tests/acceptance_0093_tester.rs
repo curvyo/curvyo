@@ -402,19 +402,21 @@ fn ac13_deleting_twice_or_the_last_page_is_refused() {
 }
 
 #[test]
-fn ac5_a_placement_of_a_deleted_page_is_kept_and_undo_brings_the_page_back() {
+// Amended by `specs/0100-bring-content-in` criterion 24: deleting a drawing page removes its
+// placements in the same step; one undo brings both back.
+fn ac5_a_placement_of_a_deleted_page_goes_with_it_and_undo_brings_both_back() {
     let d = Document::new(1);
     let second = d.add_page();
     let id = add(&d);
     let d = with_placement(&d, &second.id);
     d.delete_page(&second.id).unwrap();
     let m = d.manufacturing(id).unwrap();
-    assert_eq!(m.placements.len(), 1, "no orphan repair (ADR 0032 §7)");
-    assert_eq!(m.placements[0].page, second.id);
+    assert_eq!(m.placements.len(), 0);
     let reopened = unpack(2, &pack(&d, "0.1.0").unwrap()).unwrap();
-    assert_eq!(reopened.manufacturing(id).unwrap().placements.len(), 1);
+    assert_eq!(reopened.manufacturing(id).unwrap().placements.len(), 0);
     undo_last(&d);
     assert!(d.pages().iter().any(|p| p.id == second.id));
+    assert_eq!(d.manufacturing(id).unwrap().placements.len(), 1);
 }
 
 // ---- criterion 12 ----------------------------------------------------------------------------

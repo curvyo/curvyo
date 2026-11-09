@@ -129,6 +129,10 @@ impl Document {
         write_stroke_width: bool,
     ) -> Result<(), ObjectEditError> {
         check_numbers(results, write_stroke_width)?;
+        // A placed page's frame object writes its link (`specs/0100` criterion 17).
+        if let Some(done) = self.transform_with_placements(results, write_stroke_width) {
+            return done;
+        }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let planned = results
             .iter()

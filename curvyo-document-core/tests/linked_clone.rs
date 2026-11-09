@@ -199,7 +199,8 @@ fn ac3_a_clone_of_a_clone_is_a_chain() {
 }
 
 #[test]
-fn ac4_a_group_or_a_missing_source_is_refused_and_nothing_is_converted() {
+// Amended by `specs/0100-bring-content-in` criterion 8: a group is an original; a layer is not.
+fn ac4_a_layer_or_a_missing_source_is_refused_and_nothing_is_converted() {
     let d = Document::new(1);
     let a = square(&d, 1, origin());
     let b = square(&d, 2, origin());
@@ -208,11 +209,12 @@ fn ac4_a_group_or_a_missing_source_is_refused_and_nothing_is_converted() {
         width: Length::from_mm(10.0),
         height: Length::from_mm(10.0),
     });
-    let group = d.group_objects(&[a, b]).unwrap();
+    let _group = d.group_objects(&[a, b]).unwrap();
+    let layer = d.new_layer(None);
     let before = d.export_json().unwrap();
     let conversions = rect_conversion(&d, r);
     assert_eq!(
-        d.linked_clone(&[r, group], &conversions),
+        d.linked_clone(&[r, layer], &conversions),
         Err(CloneError::NotClonable)
     );
     d.delete_objects(&[r]).unwrap();

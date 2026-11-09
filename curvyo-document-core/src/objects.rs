@@ -30,6 +30,12 @@ use crate::units::Vec2;
 /// (ADR 0009 §2), not a defect in this crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum ObjectEditError {
+    /// A placed page would have no overlap with its own laser page (`specs/0100` criterion 18).
+    #[error("A placed page stays on its laser page.")]
+    OffPage,
+    /// A placed page cannot be grouped (`specs/0100` criterion 19).
+    #[error("A placed page cannot be grouped.")]
+    PlacedPage,
     /// An original sketch copy requires a distinct empty destination page.
     #[error("the destination page already has a sketch; use a linked clone or convert to paths")]
     SketchPageOccupied,
@@ -155,7 +161,21 @@ impl Document {
     /// # Errors
     /// [`ObjectEditError::NoSuchObject`] if any named id no longer exists.
     pub fn translate_objects(&self, ids: &[NodeId], offset: Vec2) -> Result<(), ObjectEditError> {
-        self.translate_objects_holding(ids, offset, false)
+        // A placed page moves on its laser page, writing its link (`specs/0100` criterion 17).
+        let (placed, rest) = self.split_placements(ids);
+        if placed.is_empty() {
+            return self.translate_objects_holding(ids, offset, false);
+        }
+        let t = crate::affine::Affine::translation(offset);
+        self.batch("translate_objects", |d| {
+            let moves: Vec<_> = placed.iter().map(|&id| (id, t)).collect();
+            d.move_placements(&moves, "translate_objects")?;
+            if rest.is_empty() {
+                Ok(())
+            } else {
+                d.translate_objects_holding(&rest, offset, false)
+            }
+        })
     }
 
     /// Page movement keeps every unselected clone at its global position, without
@@ -256,7 +276,9 @@ impl Document {
         } else {
             self.own_placement_clones()
         };
-        let decided = crate::clone_transform::clone_matrices_after(&links, &own_placement, ids, g);
+        let moved = self.with_whole_groups(&links, ids.iter().map(|&id| (id, g)).collect());
+        let decided =
+            crate::clone_transform::clone_matrices_after_maps(&links, &own_placement, &moved);
         let hold = self
             .plan_hold(&links, &decided)
             .map_err(ObjectEditError::CloneOutOfRange)?;
@@ -355,6 +377,12 @@ impl Document {
         text_shifts: &std::collections::HashMap<NodeId, crate::units::Length>,
         target_page: Option<&str>,
     ) -> Result<Vec<NodeId>, ObjectEditError> {
+        // A placed page is copied onto its own laser page (`specs/0100` criterion 19).
+        if let Some(done) =
+            self.duplicate_with_placements(sources, offset, text_shifts, target_page)
+        {
+            return done;
+        }
         let mut seen = HashSet::with_capacity(sources.len());
         let sources: Vec<&CopySource> = sources.iter().filter(|s| seen.insert(s.id)).collect();
         let tree = self.loro().get_tree(OBJECTS_TREE);
@@ -476,6 +504,12 @@ impl Document {
     /// as the kind `rotated` describes, or one of a path's anchors is
     /// gone.
     pub fn rotate_object(&self, rotated: &ObjectSnapshot) -> Result<(), ObjectEditError> {
+        if self.is_placement(rotated.id()) {
+            return self.batch("rotate_object", |d| {
+                d.transform_placement_results(std::slice::from_ref(rotated), "rotate_object")
+                    .map(|_| ())
+            });
+        }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(rotated.id());
         if !leaf_exists(&tree, tree_id) {
@@ -584,6 +618,18 @@ impl Document {
     /// Does not panic in practice: every tree id deleted below was just
     /// confirmed present in the same tree handle.
     pub fn delete_objects(&self, ids: &[NodeId]) -> Result<(), ObjectEditError> {
+        // A placed page: only the reference goes (`specs/0098` criterion 12).
+        let (placed, rest) = self.split_placements(ids);
+        if !placed.is_empty() {
+            return self.batch("delete_objects", |d| {
+                d.remove_placement_nodes(&placed);
+                if rest.is_empty() {
+                    Ok(())
+                } else {
+                    d.delete_objects(&rest)
+                }
+            });
+        }
         let ids = dedup_ids(ids);
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_ids: Vec<TreeID> = ids
@@ -724,7 +770,7 @@ fn copy_subtree(
 
 /// The keys of the history lineage: a copy gets its own (`specs/0041-object-history`
 /// criterion 37), never the source's.
-const LINEAGE_KEYS: &[&str] = &[
+pub(crate) const LINEAGE_KEYS: &[&str] = &[
     KEY_CLONE_OF,
     KEY_HISTORY_FLOOR,
     crate::sketch_page::PAGE_KEY,
@@ -734,7 +780,7 @@ const LINEAGE_KEYS: &[&str] = &[
 /// value, a nested map or movable list (a path's anchors) entry by entry. Only
 /// the keys in `skip` are named here, so a register added later is copied with
 /// no change.
-fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap, skip: &[&str]) {
+pub(crate) fn copy_map(from: &loro::LoroMap, into: &loro::LoroMap, skip: &[&str]) {
     for key in from.keys() {
         if skip.contains(&&*key) {
             continue;

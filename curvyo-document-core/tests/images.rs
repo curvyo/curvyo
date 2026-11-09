@@ -7,9 +7,8 @@ use std::io::{Cursor, Read};
 use std::sync::Arc;
 
 use curvyo_document_core::{
-    Affine, AssetError, AssetHash, CloneError, CopySource, Document, INITIAL_LAYER_NAME,
-    ImageInsertError, MAX_PROJECT_ASSET_BYTES, NewImage, NodeKind, ObjectSnapshot, Vec2, pack,
-    unpack,
+    Affine, AssetError, AssetHash, CopySource, Document, INITIAL_LAYER_NAME, ImageInsertError,
+    MAX_PROJECT_ASSET_BYTES, NewImage, NodeKind, ObjectSnapshot, Vec2, pack, unpack,
 };
 
 const PNG: &[u8] = include_bytes!("../../curvyo-image-core/tests/fixtures/images/png_rgba_8.png");
@@ -196,13 +195,15 @@ fn ac17_the_project_cap_refuses_and_writes_nothing() {
 }
 
 #[test]
-fn ac38_an_image_is_never_an_original_of_a_linked_clone() {
+// Amended by `specs/0100-bring-content-in` criterion 8: an image is an original.
+fn ac38_an_image_is_an_original_of_a_linked_clone() {
     let document = Document::new(1);
     let id = document.add_images(&[image(PNG, 0.0)]).unwrap()[0];
-    assert_eq!(
-        document.linked_clone(&[id], &[]),
-        Err(CloneError::NotClonable)
-    );
+    let clone = document.linked_clone(&[id], &[]).unwrap()[0];
+    let Some(curvyo_document_core::ObjectSnapshot::Clone(read)) = document.object(clone) else {
+        panic!("a clone")
+    };
+    assert!(read.is_picture());
 }
 
 #[test]

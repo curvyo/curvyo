@@ -421,6 +421,9 @@ pub enum TilingError {
     /// The conversions are not exactly the primitive source leaves.
     #[error("Could not tile: every shape needs one conversion to a path.")]
     Conversions,
+    /// An instance would lie inside what its source draws (ADR 0045 §4).
+    #[error("A clone cannot go inside its own original.")]
+    InsideOwnOriginal,
 }
 
 /// `color` with its hue turned by `shift`, its saturation and lightness kept (the HSL model).

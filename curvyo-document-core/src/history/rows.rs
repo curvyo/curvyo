@@ -139,6 +139,7 @@ pub fn is_document_level_label(label: &str) -> bool {
             | "add_sketch_page"
             | "add_output_page"
             | "delete_placement"
+            | "place_page"
             | "delete_page"
             | "delete_sketch_page"
             | "convert_sketch_page"

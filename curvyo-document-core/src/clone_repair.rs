@@ -9,7 +9,6 @@ use loro::{LoroTree, TreeID};
 use crate::clone_codec::{CloneLink, write_clone_link};
 use crate::clone_write::unlink_meta;
 use crate::document::Document;
-use crate::object_read::read_one_clone;
 use crate::path_model::{AnchorId, NodeId, PathSnapshot};
 
 /// What one repair did, for the notice of criterion 31.
@@ -31,6 +30,8 @@ const REPAIR_ID_SPACE: u64 = 1 << 63;
 enum Fix {
     Repoint(NodeId, CloneLink),
     Unlink(NodeId, PathSnapshot, f64),
+    /// A clone of a group, text, image or primitive: a copy of its root (ADR 0045 §5).
+    Copy(Box<crate::clone_model::CloneSnapshot>),
 }
 
 impl Document {
@@ -83,10 +84,14 @@ impl Document {
                     },
                 ));
             } else if !links.contains_key(&node)
-                && let Some(read) = read_one_clone(tree, clone)
+                && let Some(read) = self.read_clone(clone)
             {
-                let opacity = crate::clone_write::source_opacity(tree, &read);
-                fixes.push(Fix::Unlink(clone, read.resolved, opacity));
+                if self.unlinks_as_copy(&read) {
+                    fixes.push(Fix::Copy(Box::new(read)));
+                } else {
+                    let opacity = crate::clone_write::source_opacity(tree, &read);
+                    fixes.push(Fix::Unlink(clone, read.resolved, opacity));
+                }
             }
         }
         let copies = self.style_copies(&gone, &fixes);
@@ -102,6 +107,11 @@ impl Document {
                     if let Some(meta) = meta_of(tree, clone) {
                         write_clone_link(&meta, link);
                         repair.repointed += 1;
+                    }
+                }
+                Fix::Copy(read) => {
+                    if self.unlink_as_copy_uncommitted(&read).is_ok() {
+                        repair.unlinked += 1;
                     }
                 }
                 Fix::Unlink(clone, mut path, opacity) => {
@@ -131,6 +141,7 @@ impl Document {
             .iter()
             .filter_map(|fix| match fix {
                 Fix::Unlink(id, ..) => Some(*id),
+                Fix::Copy(read) => Some(read.id()),
                 Fix::Repoint(..) => None,
             })
             .collect();
@@ -140,7 +151,8 @@ impl Document {
             .iter()
             .filter_map(|object| match object {
                 crate::primitive_model::ObjectSnapshot::Clone(clone)
-                    if !clone.chain.own_style
+                    if !clone.is_picture()
+                        && !clone.chain.own_style
                         && gone.contains(&clone.chain.style_source)
                         && !gone.contains(&clone.id())
                         && !unlinked.contains(&clone.id()) =>

@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use crate::affine::Affine;
 use crate::clone_codec::CloneLink;
 use crate::clone_model::{CloneChain, CloneSnapshot};
+use crate::clone_picture::{Pending, RootRef, Structure};
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::primitive_model::{ObjectSnapshot, PrimitiveSnapshot};
 use crate::style_model::Style;
@@ -177,25 +178,33 @@ impl Resolution {
 /// Where the resolution of one leaf stands.
 #[derive(Debug, Clone, Copy)]
 enum State {
-    /// A path: the root of its own chain.
+    /// A path, compound path, sketch, primitive, text or image: the root of its own chain
+    /// (ADR 0045 §1).
     Root,
-    /// A primitive or a broken clone: not an original.
+    /// A broken clone, a dimension or an unreadable leaf: not an original.
     NotOrigin,
     /// A clone not visited yet.
     Pending,
     /// A clone on the stack of the walk in progress.
     OnStack,
-    /// A resolved clone: the index of its root, its depth, its composed matrix and the index of
-    /// its style source (`None`: the root).
-    Resolved(usize, usize, Affine, Option<usize>),
+    /// A resolved clone: its root, its depth, its composed matrix and the index of its style
+    /// source (`None`: the root).
+    Resolved(RootRef, usize, Affine, Option<usize>),
     /// A clone that cannot be resolved.
     Orphan,
 }
 
-/// Resolves every clone of `leaves` (stacking order). No recursion: a chain or ring of any length
-/// costs one stack entry per clone. Whether a clone is an orphan depends only on the leaves, not
-/// on the order of the walk.
+/// Resolves every clone of `leaves` (stacking order) without the tree around them: a clone of a
+/// group is an orphan here. See [`resolve_in`].
 pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
+    resolve_in(leaves, None)
+}
+
+/// Resolves every clone of `leaves` (stacking order); with `structure`, the containers of the
+/// leaves, a clone of a group draws the group's drawn subtree (ADR 0045 §2). No recursion: a
+/// chain or ring of any length costs one stack entry per clone. Whether a clone is an orphan
+/// depends only on the leaves, not on the order of the walk.
+pub(crate) fn resolve_in(leaves: Vec<RawLeaf>, structure: Option<&Structure>) -> Resolution {
     let index: HashMap<NodeId, usize> = leaves
         .iter()
         .enumerate()
@@ -204,28 +213,37 @@ pub(crate) fn resolve(leaves: Vec<RawLeaf>) -> Resolution {
     let mut states: Vec<State> = leaves
         .iter()
         .map(|leaf| match leaf {
-            RawLeaf::Path(_) | RawLeaf::Sketch(_) => State::Root,
-            RawLeaf::Primitive(_)
-            | RawLeaf::BrokenClone(_)
+            RawLeaf::Path(_)
+            | RawLeaf::Sketch(_)
+            | RawLeaf::Primitive(_)
             | RawLeaf::Text(_)
             | RawLeaf::Image(_)
-            | RawLeaf::Dimension(_)
-            | RawLeaf::TextClone(_)
-            | RawLeaf::Unreadable(_) => State::NotOrigin,
+            | RawLeaf::TextClone(_) => State::Root,
+            RawLeaf::BrokenClone(_) | RawLeaf::Dimension(_) | RawLeaf::Unreadable(_) => {
+                State::NotOrigin
+            }
             RawLeaf::Clone(..) => State::Pending,
         })
         .collect();
+    let empty = Structure::default();
+    let structure = structure.unwrap_or(&empty);
     for start in 0..leaves.len() {
         if matches!(states[start], State::Pending) {
-            walk(start, &leaves, &index, &mut states);
+            walk(start, &leaves, &index, structure, &mut states);
         }
     }
-    assemble(leaves, &states, &index)
+    assemble(leaves, &states, &index, structure)
 }
 
 /// Follows the chain from the clone at `start` until it meets a root, a resolved clone or a dead
 /// end, then unwinds the stack, composing each matrix once.
-fn walk(start: usize, leaves: &[RawLeaf], index: &HashMap<NodeId, usize>, states: &mut [State]) {
+fn walk(
+    start: usize,
+    leaves: &[RawLeaf],
+    index: &HashMap<NodeId, usize>,
+    structure: &Structure,
+    states: &mut [State],
+) {
     let mut stack = vec![start];
     states[start] = State::OnStack;
     let base = loop {
@@ -234,10 +252,13 @@ fn walk(start: usize, leaves: &[RawLeaf], index: &HashMap<NodeId, usize>, states
             break None;
         };
         let Some(&next) = index.get(&link.origin) else {
+            if structure.is_group(link.origin) {
+                break Some((RootRef::Group(link.origin), 0, Affine::IDENTITY, None));
+            }
             break None;
         };
         match states[next] {
-            State::Root => break Some((next, 0, Affine::IDENTITY, None)),
+            State::Root => break Some((RootRef::Leaf(next), 0, Affine::IDENTITY, None)),
             State::Resolved(root, depth, composed, source) => {
                 break Some((root, depth, composed, source));
             }
@@ -269,21 +290,48 @@ fn walk(start: usize, leaves: &[RawLeaf], index: &HashMap<NodeId, usize>, states
     }
 }
 
-/// Builds the result from the resolved states, in input order. Each resolved clone's outline is
-/// mapped once; a clone whose mapped outline is not finite is an orphan, and so is every clone
-/// behind it (decided in depth order, so each original is decided before its clones).
-fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usize>) -> Resolution {
+/// Every clone whose chain ends at an outline root, its outline mapped once (a clone whose mapped
+/// outline is not finite stays `None`), with `(depth, index)` of each; and the clones whose chain
+/// ends at a picture root, left for [`crate::clone_picture::resolve_pictures`].
+#[allow(clippy::type_complexity)]
+fn outline_clones(
+    leaves: &[RawLeaf],
+    states: &[State],
+) -> (
+    Vec<Option<CloneSnapshot>>,
+    Vec<Pending>,
+    Vec<(usize, usize)>,
+) {
     let mut clones: Vec<Option<CloneSnapshot>> = vec![None; leaves.len()];
     let mut by_depth: Vec<(usize, usize)> = Vec::new();
     let mut shared: HashMap<usize, std::sync::Arc<PathSnapshot>> = HashMap::new();
-    let failed = refine_sketch_roots(&leaves, states, &mut shared);
+    let mut pictures: Vec<Pending> = Vec::new();
+    let failed = refine_sketch_roots(leaves, states, &mut shared);
     for (i, (leaf, state)) in leaves.iter().zip(states).enumerate() {
-        if let (RawLeaf::Clone(id, link, overrides), State::Resolved(root, depth, composed, source)) =
+        let (RawLeaf::Clone(id, link, overrides), State::Resolved(root, depth, composed, source)) =
             (leaf, *state)
-            && !failed.contains(&root)
-            && let Some(root_path) = root_path(&leaves[root])
+        else {
+            continue;
+        };
+        let root = match root {
+            RootRef::Leaf(root) if root_path_of(&leaves[root], &mut shared, root).is_some() => root,
+            RootRef::Leaf(_) | RootRef::Group(_) => {
+                pictures.push(Pending {
+                    at: i,
+                    id: *id,
+                    link: *link,
+                    own_placement: overrides.own_placement,
+                    root,
+                    depth,
+                    composed,
+                });
+                continue;
+            }
+        };
+        if !failed.contains(&root)
+            && let Some(root_outline) = shared.get(&root).cloned()
         {
-            let root_outline = shared_outline(&mut shared, root, root_path);
+            let root_path = &*root_outline;
             let (style_source, style) = match source.map(|s| &leaves[s]) {
                 Some(RawLeaf::Clone(
                     source_id,
@@ -307,6 +355,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
                     own_style: overrides.own_style.is_some(),
                     style_source,
                     root_outline,
+                    picture: None,
                 },
             );
             if let Some(style) = style {
@@ -318,6 +367,19 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
             }
         }
     }
+    (clones, pictures, by_depth)
+}
+
+/// Builds the result from the resolved states, in input order. Each resolved clone's outline is
+/// mapped once; a clone whose mapped outline is not finite is an orphan, and so is every clone
+/// behind it (decided in depth order, so each original is decided before its clones).
+fn assemble(
+    leaves: Vec<RawLeaf>,
+    states: &[State],
+    index: &HashMap<NodeId, usize>,
+    structure: &Structure,
+) -> Resolution {
+    let (mut clones, pictures, mut by_depth) = outline_clones(&leaves, states);
     by_depth.sort_unstable();
     for (_, i) in by_depth {
         let RawLeaf::Clone(_, link, _) = &leaves[i] else {
@@ -337,6 +399,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
         texts_on: HashMap::new(),
     };
     let mut text_clones = Vec::new();
+    let waiting: HashSet<usize> = pictures.iter().map(|p| p.at).collect();
     for (i, leaf) in leaves.into_iter().enumerate() {
         let object = match leaf {
             RawLeaf::Path(path) => Some(ObjectSnapshot::Path(path)),
@@ -350,6 +413,7 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
                 None
             }
             RawLeaf::Unreadable(_) => None,
+            RawLeaf::Clone(..) if waiting.contains(&i) => None,
             RawLeaf::Clone(id, ..) | RawLeaf::BrokenClone(id) => {
                 if let Some(clone) = clones[i].take() {
                     result
@@ -373,6 +437,23 @@ fn assemble(leaves: Vec<RawLeaf>, states: &[State], index: &HashMap<NodeId, usiz
     }
     result.orphans.extend(filled.orphans);
     resolve_followers(&mut result);
+    // Clones of groups, texts and images last: they draw what the followers resolved
+    // (ADR 0045 §2 and §3).
+    let mut picture_orphans = Vec::new();
+    crate::clone_picture::resolve_pictures(
+        &pictures,
+        &mut result.leaves,
+        structure,
+        index,
+        &mut picture_orphans,
+        &mut result.clones_of,
+    );
+    if !picture_orphans.is_empty() {
+        result.orphans.extend(picture_orphans);
+        result
+            .orphans
+            .sort_by_key(|id| index.get(id).copied().unwrap_or(usize::MAX));
+    }
     result
 }
 
@@ -730,12 +811,24 @@ mod tests {
     }
 }
 
-fn root_path(leaf: &RawLeaf) -> Option<&PathSnapshot> {
-    match leaf {
-        RawLeaf::Path(path) => Some(path),
-        RawLeaf::Sketch(sketch) => Some(&sketch.resolved),
-        _ => None,
-    }
+/// The outline of an outline root (ADR 0045 §1), shared by every clone of it: a path's, a
+/// sketch's (refined once, [`refine_sketch_roots`]) or a primitive's drawn outline. `None` for a
+/// picture root.
+fn root_path_of(
+    leaf: &RawLeaf,
+    shared: &mut HashMap<usize, std::sync::Arc<PathSnapshot>>,
+    at: usize,
+) -> Option<()> {
+    let path = match leaf {
+        RawLeaf::Path(path) => path.clone(),
+        RawLeaf::Sketch(sketch) => sketch.resolved.clone(),
+        RawLeaf::Primitive(primitive) => crate::clone_picture::primitive_path(primitive),
+        _ => return None,
+    };
+    shared
+        .entry(at)
+        .or_insert_with(|| std::sync::Arc::new(path));
+    Some(())
 }
 
 /// Refines one analytic root for the most magnified chain, independently of visibility.
@@ -746,7 +839,7 @@ fn refine_sketch_roots(
 ) -> HashSet<usize> {
     let mut stretches: HashMap<usize, f64> = HashMap::new();
     for state in states {
-        if let State::Resolved(root, _, map, _) = state
+        if let State::Resolved(RootRef::Leaf(root), _, map, _) = state
             && matches!(leaves[*root], RawLeaf::Sketch(_))
         {
             // Frobenius norm conservatively bounds linear stretch. Placement's norm is
@@ -779,15 +872,4 @@ fn refine_sketch_roots(
         }
     }
     failed
-}
-
-fn shared_outline(
-    shared: &mut HashMap<usize, std::sync::Arc<PathSnapshot>>,
-    root: usize,
-    path: &PathSnapshot,
-) -> std::sync::Arc<PathSnapshot> {
-    shared
-        .entry(root)
-        .or_insert_with(|| std::sync::Arc::new(path.clone()))
-        .clone()
 }

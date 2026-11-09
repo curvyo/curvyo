@@ -124,6 +124,9 @@ impl Document {
     /// # Panics
     /// Does not panic in practice: every tree operation below acts on nodes just confirmed live.
     pub fn group_objects(&self, ids: &[NodeId]) -> Result<NodeId, ObjectEditError> {
+        if !self.split_placements(ids).0.is_empty() {
+            return Err(ObjectEditError::PlacedPage);
+        }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let mut seen = HashSet::new();
         let members: Vec<TreeID> = ids

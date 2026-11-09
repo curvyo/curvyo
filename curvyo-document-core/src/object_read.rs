@@ -7,7 +7,8 @@ use loro::{LoroMap, LoroTree, TreeID};
 
 use crate::clone_codec::{is_clone_meta, read_clone_link};
 use crate::clone_model::CloneSnapshot;
-use crate::clone_read::{ObjectRead, RawLeaf, RawOverrides, resolve};
+use crate::clone_picture::Structure;
+use crate::clone_read::{ObjectRead, RawLeaf, RawOverrides, resolve, resolve_in};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::path_codec::{leaf_exists, read_path_snapshot};
 use crate::path_model::NodeId;
@@ -20,19 +21,46 @@ impl Document {
     /// decision 3). The session reads this once per document version.
     #[must_use]
     pub fn read_objects(&self) -> ObjectRead {
+        let (leaves, structure) = self.raw_leaves_with_structure();
+        resolve_in(leaves, Some(&structure)).into_read()
+    }
+
+    /// Every leaf as stored, in stacking order, with the containers and registers a clone of a
+    /// group needs (ADR 0045 §2). One pre-order pass; manufacturings are skipped.
+    pub(crate) fn raw_leaves_with_structure(&self) -> (Vec<RawLeaf>, Structure) {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let leaves = crate::group_tree::leaves_under(&tree, None)
+        let mut leaves = Vec::new();
+        let mut structure = Structure::default();
+        let mut stack: Vec<(TreeID, Option<NodeId>)> = crate::group_tree::children_of(&tree, None)
             .into_iter()
-            .filter_map(|leaf| {
-                let id = NodeId::from_parts(leaf.peer, leaf.counter);
-                if let Some(sketch) = self.sketch(id) {
-                    Some(RawLeaf::Sketch(Box::new(sketch)))
-                } else {
-                    raw_leaf(&tree, leaf)
-                }
-            })
+            .rev()
+            .map(|id| (id, None))
             .collect();
-        resolve(leaves).into_read()
+        while let Some((node, parent)) = stack.pop() {
+            let id = NodeId::from_parts(node.peer, node.counter);
+            let Ok(meta) = tree.get_meta(node) else {
+                continue;
+            };
+            let registers = crate::node_registers::read_registers(&meta);
+            if crate::group_tree::meta_is_group(&meta) {
+                let layer = crate::group_tree::is_layer_node(&tree, node);
+                structure.container(id, parent, &registers, layer);
+                stack.extend(
+                    crate::group_tree::children_of(&tree, Some(node))
+                        .into_iter()
+                        .rev()
+                        .map(|child| (child, Some(id))),
+                );
+                continue;
+            }
+            let raw = match self.sketch(id) {
+                Some(sketch) => RawLeaf::Sketch(Box::new(sketch)),
+                None => raw_from_meta(id, &meta),
+            };
+            leaves.push(raw);
+            structure.leaf(parent, &registers);
+        }
+        (leaves, structure)
     }
 
     /// The stored link of the clone `id`, or `None` when `id` is not a live clone leaf with a
@@ -150,8 +178,23 @@ pub(crate) fn read_one_clone(tree: &LoroTree, id: NodeId) -> Option<CloneSnapsho
 }
 
 impl Document {
+    /// The clone `id` resolved, through its own chain or, for a picture root, the whole read.
+    pub(crate) fn read_clone(&self, id: NodeId) -> Option<CloneSnapshot> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        if chain_ends_at_picture(&tree, id) {
+            return match self.read_objects().get(id)? {
+                ObjectSnapshot::Clone(clone) => Some(clone.clone()),
+                _ => None,
+            };
+        }
+        read_one_clone(&tree, id)
+    }
+
     pub(crate) fn read_cached_clone(&self, id: NodeId) -> Option<CloneSnapshot> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
+        if chain_ends_at_picture(&tree, id) {
+            return self.read_clone(id);
+        }
         read_clone_with(&tree, id, |leaf| {
             self.sketch(NodeId::from_parts(leaf.peer, leaf.counter))
                 .map(|sketch| RawLeaf::Sketch(Box::new(sketch)))
@@ -190,4 +233,33 @@ fn read_clone_with(
         ObjectSnapshot::Clone(clone) => Some(clone),
         _ => None,
     }
+}
+
+/// Whether the chain of the clone `id` ends at something other than a path, sketch or primitive
+/// (a group, text or image, ADR 0045 §1), read from the links alone: such a clone is read through
+/// the whole document.
+fn chain_ends_at_picture(tree: &LoroTree, id: NodeId) -> bool {
+    let mut seen = HashSet::new();
+    let mut current = id;
+    while seen.insert(current) {
+        let tree_id = TreeID::new(current.peer, current.counter);
+        if !crate::path_codec::node_exists(tree, tree_id) {
+            return false;
+        }
+        let Ok(meta) = tree.get_meta(tree_id) else {
+            return false;
+        };
+        if crate::group_tree::meta_is_group(&meta) {
+            return true;
+        }
+        if is_clone_meta(&meta) {
+            match read_clone_link(&meta) {
+                Some(link) => current = link.origin,
+                None => return false,
+            }
+            continue;
+        }
+        return crate::text_codec::is_text_meta(&meta) || crate::image_codec::is_image_meta(&meta);
+    }
+    false
 }

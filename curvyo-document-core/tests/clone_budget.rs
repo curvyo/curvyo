@@ -169,3 +169,52 @@ fn ac41_switching_and_reading_ten_thousand_clones_with_overrides() {
     println!("move of the original holding back {CLONES} clones: {took:?} (target 3 s)");
     assert_eq!(document.take_clone_hold().held, CLONES);
 }
+
+/// A group of 100 closed paths of 100 nodes, side by side.
+fn group_of_paths(document: &Document) -> (NodeId, Vec<NodeId>) {
+    let paths: Vec<NodeId> = (0..100_u64)
+        .map(|p| {
+            let anchors: Vec<NewAnchor> = (0..100_u64)
+                .map(|k| {
+                    let angle = k as f64 / 100.0 * std::f64::consts::TAU;
+                    NewAnchor::corner(
+                        AnchorId::new(1, p * 1000 + k),
+                        Point::new(
+                            (p as f64).mul_add(25.0, 10.0 * angle.cos()),
+                            20.0 + 10.0 * angle.sin(),
+                        ),
+                    )
+                })
+                .collect();
+            document.create_path(&anchors, true)
+        })
+        .collect();
+    (document.group_objects(&paths).unwrap(), paths)
+}
+
+/// `specs/0100-bring-content-in` criterion 22 (c): 100 clones of a group of 100 paths of 100
+/// nodes (10,000 drawn leaves) read within 300 ms, and the read after a node edit in the group
+/// within 150 ms (`0049` criteria 43 and 44).
+#[test]
+fn ac22c_reading_a_hundred_clones_of_a_group_of_a_hundred_paths() {
+    let document = Document::new(1);
+    let (group, paths) = group_of_paths(&document);
+    let clones: u32 = if cfg!(debug_assertions) { 10 } else { 100 };
+    for k in 0..clones {
+        document
+            .place_linked_clones(&[group], Vec2::new(0.0, f64::from(k) * 50.0 + 100.0))
+            .unwrap();
+    }
+    let (read, took) = cpu_time_of(|| document.read_objects());
+    assert_eq!(read.objects.len(), 100 + usize::try_from(clones).unwrap());
+    check("read of 100 group clones", took, READ_BUDGET);
+    document
+        .translate_objects(&[paths[50]], Vec2::new(1.0, 0.0))
+        .unwrap();
+    let (_, took) = cpu_time_of(|| document.read_objects());
+    check(
+        "read after a node edit in the group",
+        took,
+        Duration::from_millis(150),
+    );
+}

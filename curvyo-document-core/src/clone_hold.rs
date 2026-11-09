@@ -21,6 +21,10 @@ use crate::objects::ObjectEditError;
 use crate::path_model::{NodeId, PathSnapshot};
 use crate::primitive_model::ObjectSnapshot;
 
+/// Two maps of a group's leaves closer than this (per matrix entry) are one map: the group moves
+/// whole.
+const WHOLE_MAP_TOLERANCE: f64 = 1e-9;
+
 /// What the held-back rule did in the last transform, for its notices (`0057` criteria 7 and 8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CloneHold {
@@ -135,9 +139,49 @@ impl Document {
                 ))
             })
             .collect();
+        let moved = self.with_whole_groups(links, moved);
         let decided = clone_matrices_after_maps(links, &held, &moved);
         self.plan_hold(links, &decided)
             .map_err(ObjectEditError::CloneOutOfRange)
+    }
+
+    /// `moved` and every group that a clone follows whose leaves all move by one map: the group
+    /// is then transformed whole by that map (ADR 0045 §6), so a clone of it with own placement is
+    /// held back; a group of which only some leaves move is edited, and its clones follow.
+    pub(crate) fn with_whole_groups(
+        &self,
+        links: &CloneLinks,
+        mut moved: Vec<(NodeId, Affine)>,
+    ) -> Vec<(NodeId, Affine)> {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let by_id: std::collections::HashMap<NodeId, Affine> = moved.iter().copied().collect();
+        let mut groups: Vec<NodeId> = links
+            .values()
+            .map(|&(origin, _)| origin)
+            .filter(|origin| {
+                let node = TreeID::new(origin.peer, origin.counter);
+                crate::path_codec::node_exists(&tree, node)
+                    && crate::group_tree::is_group_node(&tree, node)
+            })
+            .collect();
+        groups.sort_unstable_by_key(|g| (g.peer, g.counter));
+        groups.dedup();
+        for group in groups {
+            let leaves = crate::group_tree::leaves_under(
+                &tree,
+                Some(TreeID::new(group.peer, group.counter)),
+            );
+            let mut maps = leaves
+                .iter()
+                .map(|leaf| by_id.get(&NodeId::from_parts(leaf.peer, leaf.counter)));
+            let Some(Some(&first)) = maps.next() else {
+                continue;
+            };
+            if maps.all(|map| map.is_some_and(|m| m.approx_eq(first, WHOLE_MAP_TOLERANCE))) {
+                moved.push((group, first));
+            }
+        }
+        moved
     }
 
     /// Writes `plan`, uncommitted, in the commit of the transform, and records its counts.
