@@ -432,29 +432,6 @@ pub fn invite_link_server(text: &str) -> String {
     InviteLink::parse(text).map_or_else(|_| String::new(), |link| link.server)
 }
 
-/// The inline confirm of Share workspace; `taken_in_json` names the documents shared on their
-/// own that are taken in, `not_added_json` the ones left out (JSON arrays of names).
-#[wasm_bindgen]
-#[must_use]
-pub fn workspace_share_confirm_text(
-    name: &str,
-    documents: usize,
-    server: &str,
-    taken_in_json: &str,
-    not_added_json: &str,
-) -> String {
-    let taken_in: Vec<String> = serde_json::from_str(taken_in_json).unwrap_or_default();
-    let not_added: Vec<String> = serde_json::from_str(not_added_json).unwrap_or_default();
-    texts::workspace_share_confirm_text(name, documents, server, &taken_in, &not_added)
-}
-
-/// The sentence of criterion 26.
-#[wasm_bindgen]
-#[must_use]
-pub fn workspace_invite_sentence() -> String {
-    texts::WORKSPACE_INVITE_SENTENCE.to_owned()
-}
-
 /// "Not added: Lid, Base." for the names in `names_json`.
 #[wasm_bindgen]
 #[must_use]

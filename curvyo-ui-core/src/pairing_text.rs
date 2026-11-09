@@ -3,11 +3,6 @@
 
 use crate::share_text::{cut_label, server_shown};
 
-/// The sentence under the pairing code (criterion 1).
-pub const PAIR_SENTENCE: &str = "The device that enters this code can sync the workspaces you \
-                                 choose, and you can remove it again. The server can tell which \
-                                 devices belong together, not their names.";
-
 /// The opener's status while the code is shown.
 pub const WAITING_FOR_OTHER: &str = "Waiting for the other device.";
 

@@ -85,7 +85,6 @@ impl DeviceGroupGlue {
             .map(|w| serde_json::json!({"id": hex(&w.id), "name": w.name, "on": w.on, "left": w.left}))
             .collect();
         let devices = participants.len().max(1);
-        let synced_any = self.list.workspaces().iter().any(|w| w.on);
         let renewals = facts.iter().filter(|f| f.rotate_pending).count();
         serde_json::json!({
             "room": hex(&self.room.0),
@@ -94,7 +93,6 @@ impl DeviceGroupGlue {
             "rows": rows,
             "count": texts::devices_count_text(devices),
             "workspaces": workspaces,
-            "one_device_warning": if synced_any && devices == 1 { texts::ONE_DEVICE_WARNING } else { "" },
             "renewal": if renewals > 0 { texts::key_renewal_pending_text(renewals) } else { String::new() },
             "alerts": alerts,
         })

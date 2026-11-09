@@ -5,7 +5,7 @@ use curvyo_crypto_core::MemberId;
 use curvyo_document_core::EndReason;
 use curvyo_sync_core::{ClientOutput, ConnectionId, RefusalReason, SessionEvent};
 use curvyo_ui_core::presence::PresencePayload;
-use curvyo_ui_core::share_text::{JoinRefusal, NOT_ADMITTED_NOTICE};
+use curvyo_ui_core::share_text::{JoinRefusal, NOT_ADMITTED_NOTICE, NOT_ADMITTED_WORKSPACE_NOTICE};
 
 use super::Session;
 use super::sync::{BACK_ONLINE_AFTER_MS, JoinPhase, SyncEnd, SyncLink, TransportAction};
@@ -251,7 +251,12 @@ fn refused(link: &mut SyncLink, reason: RefusalReason) {
         };
         link.join = Some(JoinPhase::Refused(refusal));
     } else if reason == RefusalReason::NotAMember {
-        link.notice(NOT_ADMITTED_NOTICE.to_owned(), true);
+        let text = if link.workspace.is_some() {
+            NOT_ADMITTED_WORKSPACE_NOTICE
+        } else {
+            NOT_ADMITTED_NOTICE
+        };
+        link.notice(text.to_owned(), true);
     }
     link.online = false;
     link.ended = Some(if reason == RefusalReason::Removed {

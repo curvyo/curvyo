@@ -196,19 +196,6 @@ pub fn pill_name(online_people: usize, state: ConnectionState) -> String {
     format!("Collaboration, {people}, {state}")
 }
 
-/// The inline confirm of Share (UX notes §2.2), the one place the privacy fact is said.
-#[must_use]
-pub fn share_confirm_text(server: &str) -> String {
-    format!(
-        "Upload this document to {}? It leaves this computer encrypted; the server cannot read it.",
-        server_shown(server)
-    )
-}
-
-/// The sentence of criterion 2, verbatim.
-pub const INVITE_SENTENCE: &str =
-    "Anyone with this link can edit this document once, until it expires.";
-
 /// "Expires Tue 14:32." for an expiry in seconds since the Unix epoch, shown in local time
 /// `offset_minutes` east of UTC.
 #[must_use]
@@ -226,20 +213,6 @@ pub fn expiry_text(expires_unix: u64, offset_minutes: i32) -> String {
     )
 }
 
-/// The removal dialog's sentence (criterion 32, ADR 0010 §8): removal does not reach back.
-/// (Proposal: the words; the label is cut to 24 characters.)
-#[must_use]
-pub fn removal_confirm_text(label: &str) -> String {
-    let label = if label.is_empty() {
-        "This participant".to_owned()
-    } else {
-        cut_label(label, 24)
-    };
-    format!(
-        "Remove {label}? Removing does not reach back: {label} keeps what is already on that computer and gets no later changes."
-    )
-}
-
 /// What a removed device shows (criterion 33).
 pub const REMOVED_NOTICE: &str =
     "You were removed from this document. Your copy stays on this device.";
@@ -252,6 +225,10 @@ pub const LEFT_NOTICE: &str = "You left this document. Your copy stays on this d
 /// (criterion 27; Proposal, the UX notes name no text for it).
 pub const NOT_ADMITTED_NOTICE: &str =
     "The server did not let this device in: it is not a participant of this document.";
+
+/// [`NOT_ADMITTED_NOTICE`] for a shared workspace's room: a workspace is never called a document.
+pub const NOT_ADMITTED_WORKSPACE_NOTICE: &str =
+    "The server did not let this device in: it is not a participant of this workspace.";
 
 /// The refusal of a join or a link (UX notes §2.5).
 #[must_use]
@@ -353,10 +330,6 @@ mod tests {
             ConnectionState::NotConnected.tab_line("ws://192.168.1.20:8080"),
             "Not connected to 192.168.1.20:8080."
         );
-        assert_eq!(
-            share_confirm_text("ws://192.168.1.20:8080"),
-            "Upload this document to 192.168.1.20:8080? It leaves this computer encrypted; the server cannot read it."
-        );
     }
 
     #[test]
@@ -368,9 +341,6 @@ mod tests {
             state.tab_line("ws://h:1"),
             "Resyncing from the server's snapshot."
         );
-        let text = removal_confirm_text("Ben");
-        assert!(text.starts_with("Remove Ben? Removing does not reach back"));
-        assert!(removal_confirm_text("").starts_with("Remove This participant?"));
         assert_eq!(
             join_refusal_text(JoinRefusal::Expired, ""),
             "This link has expired. Ask for a new one."

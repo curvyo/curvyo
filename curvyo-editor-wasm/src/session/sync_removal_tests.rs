@@ -275,3 +275,29 @@ fn labels_are_kept_between_runs() {
         "the label known first wins"
     );
 }
+
+/// Customer 2026-11-09: Stop sharing is for the only participant left; it ends the share here
+/// and the saved file carries no share record.
+#[test]
+fn the_only_participant_left_stops_sharing() {
+    let (mut net, a, b) = shared_pair();
+    assert_eq!(net.s(a).stop_sharing(), Err(SessionError::NotAdmin));
+    let ben = member_of(&net.devices[a].session, "Ben");
+    net.s(a).remove_participant(&ben).unwrap();
+    net.pump();
+    net.run(1_000);
+    assert!(
+        net.devices[b]
+            .session
+            .sync
+            .as_ref()
+            .is_some_and(|l| l.ended.is_some())
+    );
+    net.s(a).stop_sharing().unwrap();
+    net.pump();
+    net.run(1_000);
+    assert!(!net.devices[a].session.is_shared());
+    let bytes = net.s(a).pack_for_save().unwrap();
+    let file = curvyo_document_core::unpack(1, &bytes).unwrap();
+    assert!(file.share().is_none(), "no share record in the file");
+}

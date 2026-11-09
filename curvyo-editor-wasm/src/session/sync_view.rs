@@ -88,7 +88,6 @@ impl Session {
             "admin": is_admin,
             "online": link.online,
             "participants": participants,
-            "former": if is_admin { former_rows(link) } else { Vec::new() },
             "join": join,
             "ended": link.ended.map(|e| match e {
                 SyncEnd::Removed => "removed",
@@ -162,53 +161,6 @@ fn ended_name(reason: EndReason) -> &'static str {
         EndReason::Removed => "removed",
         EndReason::Left => "left",
     }
-}
-
-/// The Removed or left rows an admin sees (`specs/0097` criterion 17): every former
-/// participant with its last known label (empty when none was kept) and fingerprint. One this
-/// device added back stays here, `adding`, until the relay confirms the add (ADR 0041 decision
-/// 11).
-fn former_rows(link: &SyncLink) -> Vec<Value> {
-    let Some(keyring) = link.client.keyring() else {
-        return Vec::new();
-    };
-    let adding: Vec<MemberId> = pending_of(link, PendingKind::Add);
-    let confirmed = link.client.confirmed_keyring();
-    let mut former = keyring.former_participants();
-    if let Some(confirmed) = confirmed.as_ref() {
-        former.extend(
-            confirmed
-                .former_participants()
-                .into_iter()
-                .filter(|i| adding.contains(&i.member)),
-        );
-    }
-    former.sort_by_key(|i| i.member.0);
-    former.dedup_by_key(|i| i.member);
-    former
-        .into_iter()
-        .map(|identity| {
-            let label = link
-                .labels
-                .get(&identity.member)
-                .map(|l| cut_label(l, 24))
-                .unwrap_or_default();
-            let left = confirmed
-                .as_ref()
-                .filter(|_| adding.contains(&identity.member))
-                .map_or_else(
-                    || curvyo_sync_core::left_by_own_hand(keyring, &identity.member),
-                    |k| curvyo_sync_core::left_by_own_hand(k, &identity.member),
-                );
-            json!({
-                "member": super::sync::hex(&identity.member.0),
-                "label": label,
-                "fingerprint": identity.fingerprint(),
-                "left": left,
-                "adding": adding.contains(&identity.member),
-            })
-        })
-        .collect()
 }
 
 /// The participants an own act of `kind` waits on the relay for.

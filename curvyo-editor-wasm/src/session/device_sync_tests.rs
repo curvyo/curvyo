@@ -171,6 +171,95 @@ fn the_facts_name_members_presence_and_state() {
     ));
 }
 
+/// Customer 2026-11-09: the workspace's only admin leaves its devices: nothing is written, the
+/// link ends and the room keeps it as it was; a second admin makes the leave a real removal.
+#[test]
+fn the_only_admin_leaves_a_synced_workspace_without_writing() {
+    let (mut net, a, _) = shared_workspace();
+    let me = net.s(a).sync.as_ref().unwrap().client.me();
+    assert!(net.s(a).leave_synced_workspace());
+    net.pump();
+    net.run(500);
+    assert!(!net.s(a).sync_online());
+    let keyring = net.s(a).sync.as_ref().unwrap().client.keyring().unwrap();
+    assert!(!keyring.was_removed(&me), "no removal was written");
+    assert!(keyring.role(&me).is_some());
+}
+
+/// Customer feedback on PR #281: a workspace room that does not let a device in says
+/// "workspace", never "document".
+#[test]
+fn a_workspace_room_that_refuses_a_device_says_workspace() {
+    let (mut net, _a, _) = shared_workspace();
+    let b = net.add(Session::new(0xb3));
+    let now = net.now;
+    assert!(
+        net.s(b)
+            .join_synced_workspace(SERVER, WORKSPACE, "Box job", "Ben", &seeds(2, 0), now)
+    );
+    net.pump();
+    net.run(2_000);
+    let notices: Vec<_> = std::iter::from_fn(|| net.s(b).take_sync_notice()).collect();
+    assert_eq!(
+        notices,
+        vec![(
+            curvyo_ui_core::share_text::NOT_ADMITTED_WORKSPACE_NOTICE.to_owned(),
+            true
+        )]
+    );
+}
+
+/// Share tab feedback (2026-11-09): a device that left its devices and still found the room in
+/// its marker is told it was removed, never that it is no participant. The client clears the
+/// marker on a leave, so this reopen does not happen; the relay's answer stays `Removed`.
+#[test]
+fn a_device_that_left_and_resumes_from_its_old_marker_is_removed_not_refused() {
+    let (mut net, a, _) = shared_workspace();
+    let group = group();
+    net.s(a).reconcile_workspace(&group, true).unwrap();
+    net.pump();
+    let b = net.add(Session::new(0xb4));
+    let now = net.now;
+    assert!(
+        net.s(b)
+            .join_synced_workspace(SERVER, WORKSPACE, "Box job", "Ben", &seeds(2, 0), now)
+    );
+    net.pump();
+    net.run(1_000);
+    let marker = net.s(b).take_workspace_marker().unwrap();
+    let keys: Vec<(u32, [u8; 32])> = net
+        .s(b)
+        .take_key_update()
+        .map(|(_, keys)| keys)
+        .unwrap_or_default();
+    assert!(net.s(b).leave_synced_workspace());
+    net.pump();
+    net.run(500);
+    net.devices[b].session = Session::new(0xb5);
+    let now = net.now;
+    assert!(net.s(b).resume_workspace(
+        &marker.share_json,
+        &marker.keyring_log,
+        &marker.list,
+        "Box job",
+        "Ben",
+        keys,
+        &seeds(2, 1),
+        now,
+    ));
+    net.pump();
+    net.run(1_000);
+    assert!(net.s(b).workspace_removed());
+    let notices: Vec<_> = std::iter::from_fn(|| net.s(b).take_sync_notice()).collect();
+    assert_eq!(
+        notices,
+        vec![(
+            curvyo_ui_core::workspace_tree_text::WORKSPACE_REMOVED_TEXT.to_owned(),
+            true
+        )]
+    );
+}
+
 /// Criterion 27: a device that leaves writes its own removal; the admin then renews the key.
 #[test]
 fn a_device_that_leaves_writes_its_removal_and_the_admin_renews_the_key() {

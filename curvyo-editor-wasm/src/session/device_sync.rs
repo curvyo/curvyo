@@ -162,14 +162,17 @@ impl Session {
     }
 
     /// Leave my devices in this synced workspace (criterion 27, ADR 0040 decision 8): this
-    /// device writes its own `RemoveMember` and the link ends; the files stay. `false` while
-    /// offline or without a workspace link (nothing was written).
+    /// device writes its own `RemoveMember` and the link ends; the files stay. Where no other
+    /// admin would remain it writes nothing and only the link ends: the room keeps its other
+    /// participants (customer 2026-11-09). `false` while offline or without a workspace link
+    /// (nothing was written).
     pub fn leave_synced_workspace(&mut self) -> bool {
         let Some(link) = self.sync.as_mut().filter(|l| l.workspace.is_some()) else {
             return false;
         };
-        if link.client.leave().is_err() {
-            return false;
+        match link.client.leave() {
+            Ok(()) | Err(curvyo_sync_core::SessionError::LastAdmin) => {}
+            Err(_) => return false,
         }
         self.sync_pump();
         if let Some(link) = self.sync.as_mut() {
