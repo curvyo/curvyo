@@ -123,8 +123,8 @@ function PickedSwatch({ hex, stop, onPress, onKey }: { hex: string; stop: boolea
 }
 
 /** Pick colours' group in the bar (`ux-notes.md` §25.4): the pipette and the picked colours beside
- * it, one Tab stop with roving arrows; a press on a swatch removes its colour. The group keeps the
- * width of eight colours, so the bar does not move as colours come and go. */
+ * it, one Tab stop with roving arrows; a press on a swatch removes its colour. The group is as
+ * wide as its content (customer 2026-11-09). */
 export function PickColoursGroup({ swatches, armed, onPipette, onRemove, onReturnFocus }: PickColoursProps) {
   const [focus, setFocus] = useState(0);
   const row = useRef<HTMLDivElement>(null);
@@ -166,12 +166,12 @@ export function PickColoursGroup({ swatches, armed, onPipette, onRemove, onRetur
     }
   };
   return (
-    <div data-trace-colours="picked" role="group" aria-label={PICKED_COLOURS} className="flex min-h-9 min-w-[220px] items-start">
+    <div data-trace-colours="picked" role="group" aria-label={PICKED_COLOURS} className="flex min-h-9 items-start">
       <span className="flex h-9 items-center">
         <PipetteButton label={PICK_COLOUR} armed={armed} onToggle={onPipette} onReturnFocus={onReturnFocus} />
       </span>
       {/* 24 px cells touch, so the 20 px swatches are 4 px apart; the row's margins put the first
-          4 px after the pipette and keep eight colours at 220 px. */}
+          4 px after the pipette; eight colours make 220 px. */}
       <div ref={row} className="my-1 mr-[-2px] ml-[2px] flex flex-wrap">
         {swatches.map((hex, index) => (
           <PickedSwatch key={hex} hex={hex} stop={index === at} onPress={(byKey) => remove(index, byKey)} onKey={keyDown(index)} />

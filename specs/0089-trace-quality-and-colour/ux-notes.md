@@ -898,16 +898,13 @@ order of the palette in Multicolour (stable, §7).
 
 **Many colours.** The maximum stays **8** (spec criterion 17). A ninth pick does nothing, silently, the pipette stays
 armed (the notice "8 colours picked" no longer exists, §22.1). Width: 28 + 4 + 8 x 20 + 7 x 4 = **220 px at 8**.
-**The group reserves 220 px at all times (min-width 220, Proposal)** so the bar does not jump when colours come and go:
-without it Colour tolerance (150) + 8 + the group would pair on one line up to 5 swatches (148 px, 306 of 308) and break
-to the next line at the sixth. With the reserve, at 800 x 600:
-
-| | Panel open (308) | Panel closed (588) |
-|---|---|---|
-| Rows (Advanced closed, Pick colours) | **7 rows**, as before: [i, Preset] [Mask] [Method] [Colour tolerance] [Colours row 220] [Smooth, Tolerance] [Ignore below, expander, Trace] | **3 rows**: [i, Preset, Mask, Method 552] [Colour tolerance, Colours row 220, Smooth 536] [Tolerance, Ignore below, expander, Trace 448] |
-
-The reserve is invisible (no frame, no placeholder). Inside the group the swatches wrap **by whole swatches** only if a
-bar were narrower than 220 px (not a case at 800 x 600): pipette stays on the first line, the next line starts under
+**Dynamic width (customer decision 2026-11-09, replaces the 220 px reserve):** the group is as wide as its content,
+28 + 24 per colour (the pipette alone with no colour picked, nothing reserved behind it). The bar flows by whole
+groups as everywhere: at 800 x 600 with the panel open (308) Colour tolerance (150) + 8 + the group share a line up
+to 5 colours (148 px) and the group takes its own line from the sixth; with the panel closed (588) everything stays
+in the rows of §24.2. The bar never scrolls horizontally and never grows wider than the space it has; only the
+swatches add width. No frame, no placeholder. Inside the group the swatches wrap **by whole swatches** only if a bar
+were narrower than 220 px (not a case at 800 x 600): pipette stays on the first line, the next line starts under
 the first swatch, 28 px line pitch; nothing scrolls, nothing is clipped, no ellipsis.
 
 **Look.** Rest: the swatch as above. **Hover and keyboard focus**: the swatch fades to **40 % opacity** and a Lucide
@@ -930,7 +927,8 @@ swatch at the same place, else the previous one, else the pipette. Removing the 
 **Keyboard.** The swatches are **one Tab stop** with roving tabindex, as the palette strip (§7, §11): Left / Right move,
 Home / End jump, the focused swatch is the stop; Tab order of the group: pipette, the swatch row (one stop), then
 Smooth. With no colours picked the row has no stop. **(Proposal; with 8 stops the bar would cost 8 Tab presses on the way
-to Trace.)** The pipette's own Space toggle and Esc are unchanged.
+to Trace.)** The pipette's own Space toggle and Esc are unchanged. **A right press on the canvas disarms the armed
+pipette exactly as Esc does** (the same step, picks nothing, no context menu; customer 2026-11-09).
 
 ### 25.5 Strings, code and docs
 
@@ -969,7 +967,7 @@ earlier UX notes (§12 strings, §22.1 row 6 and 8, §22.3 item 4, §24.2 items 
 - `frontend/tests/acceptance_0089_cleanup_tester.test.ts`: **§24.2, §24.7 value fields** (line ~577: the 215 px item
   with readout becomes 171 px alone), **§24.2 bar order** (line ~610, widths), **§24.5 hidden region** (827-898: the new
   "Removed #RRGGBB" and the empty-set announcement), **§24.5 empty Multicolour result** (line ~910, unchanged) and
-  **§24.2, §24.3 800 x 600** (line ~927: 6 rows, Pick colours 7 rows / 3 rows, the group reserve 220).
+  **§24.2, §24.3 800 x 600** (line ~927: 6 rows, Pick colours 7 rows / 3 rows; the group reserve 220 was dropped 2026-11-09, §25.4).
 - `frontend/tests/traceText.test.ts`: `pickedCountText` case (line ~530, delete); `specksHint` cases (406-407, delete);
   `zeroPathsLine` / `statusText` "no colour picked" cases (539-545: no `message` in the notice, `canCreate` false);
   the About strings (line 160 and the comparison with `docs/tracing-images.md`).

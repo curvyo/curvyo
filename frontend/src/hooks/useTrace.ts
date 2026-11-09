@@ -1212,6 +1212,18 @@ export function useTrace(
     onChange();
   }, [getSession, onChange]);
 
+  /** Disarms the armed pipette, Escape's last step and a right press on the canvas (`ux-notes.md`
+   * §25.4); `false` when it was not armed. */
+  const disarmPick = useCallback((): boolean => {
+    const session = active ? getSession() : null;
+    if (!session || session.trace_pick_mode() === "") {
+      return false;
+    }
+    session.set_trace_pick("");
+    onChange();
+    return true;
+  }, [active, getSession, onChange]);
+
   const keyDown = useCallback(
     (event: KeyboardEvent): boolean => {
       if (!active) {
@@ -1239,14 +1251,12 @@ export function useTrace(
         palette.cancelMerge();
         return true;
       }
-      if (event.key === "Escape" && session && session.trace_pick_mode() !== "") {
-        session.set_trace_pick("");
-        onChange();
-        return true;
+      if (event.key === "Escape") {
+        return disarmPick();
       }
       return false;
     },
-    [active, create, creating, stop, getSession, onChange, palette],
+    [active, create, creating, stop, getSession, onChange, palette, disarmPick],
   );
 
 
@@ -1347,6 +1357,7 @@ export function useTrace(
     pickMode,
     setPicking,
     removePicked,
+    disarmPick,
     suggestedBackground,
     analysis: analysisState,
     analyse,

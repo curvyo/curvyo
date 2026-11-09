@@ -91,6 +91,8 @@ export interface TraceApi {
   pickMode: string;
   /** Arms the pipette for the current method, or disarms it. */
   setPicking: (armed: boolean) => void;
+  /** Disarms an armed pipette as Escape does; `false` when it was not armed (`ux-notes.md` §25.4). */
+  disarmPick: () => boolean;
   /** Takes a colour out of Pick colours' picked colours (`ux-notes.md` §25.4): not a history step. */
   removePicked: (hex: string) => void;
   /** The automatic background of the shown image (`#RRGGBB`, empty: transparent; `null` before
