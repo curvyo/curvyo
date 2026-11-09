@@ -323,12 +323,7 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
         if (!entries) {
           return "refused";
         }
-        const shareDeps = {
-          label: label(),
-          keysFor: (room: string) => keys(room),
-          progress: report,
-        };
-        const prepared = await prepareShare(entries, identity.identity, shareDeps, chosen.id);
+        const prepared = await prepareShare(entries, { progress: report }, chosen.id);
         try {
           id = toHex(prepared.id);
           switchingRef.current.add(id);
@@ -356,7 +351,7 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
             switchingRef.current.delete(id);
             return notAdmitted(first);
           }
-          await commitShare(prepared, shareDeps, chosen.id);
+          await commitShare(prepared, chosen.id);
           await invoke<string>("register_synced_workspace", { id, path: chosen.path }).catch(() => "");
           runner.held = false;
         } finally {

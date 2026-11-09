@@ -1,6 +1,5 @@
 //! Thin host bridge for the membership lifecycle (`specs/0097-membership-lifecycle`): roles,
-//! leave, Change keys now, Add back, the return check, Sync again, Keep as it is, the person
-//! leave of a synced workspace and the membership notices. Every command answers with an empty
+//! leave, Change keys now, the person leave of a synced workspace and the membership notices. Every command answers with an empty
 //! string on success, else the sentence why not.
 
 use curvyo_sync_core::SessionError;
@@ -44,9 +43,9 @@ impl WasmSession {
         refusal(self.session.rotate_share_keys())
     }
 
-    /// Leave this document (named `name` in the notice) or this workspace (one device).
-    pub fn leave_share(&mut self, name: &str) -> String {
-        refusal(self.session.leave_share(name))
+    /// Leave this workspace (one device).
+    pub fn leave_share(&mut self) -> String {
+        refusal(self.session.leave_share())
     }
 
     /// A workspace's ended record for the marker's `share.ended.json`, empty while it goes on.

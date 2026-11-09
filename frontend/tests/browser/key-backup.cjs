@@ -209,11 +209,9 @@ function backupFiles(data) {
     });
     await setServer(page, wssAddress);
     await shot(page, '0-share');
-    const join = panel(page).getByRole('button', { name: 'Join my devices', exact: true });
-    const why = await join.getAttribute('aria-describedby');
-    if (why) console.log('Join is disabled:', await page.locator(`[id="${why}"]`).innerText());
-    await join.click();
-    await panel(page).getByLabel('Pairing code', { exact: true }).fill(code);
+    // One Join field takes the device code (`specs/0105` criterion 16).
+    await panel(page).getByRole('button', { name: 'Join…', exact: true }).click();
+    await panel(page).getByLabel('Link or code', { exact: true }).fill(code);
     await panel(page).getByLabel('Device name', { exact: true }).fill('ZQX-PC-7731');
     await panel(page).getByRole('button', { name: 'Connect', exact: true }).click();
     await until('D compares words', async () => JSON.parse(attempt.view_json()).phase === 'compare');
@@ -252,7 +250,7 @@ function backupFiles(data) {
     await cdp.send('Storage.clearDataForOrigin', { origin: new URL(url).origin, storageTypes: 'all' });
     await page.reload({ waitUntil: 'networkidle' });
     await setServer(page, wssAddress);
-    await until('R shows Join my devices', () => shown(page, 'Join my devices'));
+    await until('R shows Join…', () => shown(page, 'Join…'));
     assert.equal(await devicesList(page).count(), 1);
 
     step('Restore with passkey brings the same device back into the group, with no other device online');
@@ -291,9 +289,28 @@ function backupFiles(data) {
     await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: passkeys });
     passkeys = await authenticator(cdp, false);
     await panel(page).getByRole('button', { name: 'Back up with passkey', exact: true }).click();
-    await until('the no-PRF sentence', () => shown(page, 'This browser or passkey cannot lock keys. The keys stay in this browser only.'));
+    await until('the no-PRF sentence', () => shown(page, 'This device or passkey cannot lock keys. The keys stay on this device only.'));
     assert.equal(backupFiles(relay.data).length, 0, 'still no backup on the server');
     await shot(page, '4-no-prf');
+
+    step('0105 criteria 3 and 19: the browser\'s Join field refuses a person\'s link and a 1. link, and sends nothing');
+    const sockets = [];
+    page.on('websocket', (socket) => sockets.push(socket.url()));
+    const secret = crypto.randomBytes(48).toString('base64url');
+    const nowhere = 'curvyo://join?server=ws%3A%2F%2F127.0.0.1%3A9';
+    // 0105 criterion 9: the browser makes no workspaces; only the line says so.
+    assert.ok(await shown(page, 'Sharing works on workspaces, made in the desktop app.'));
+    assert.equal(await panel(page).getByRole('button', { name: 'Make a workspace for this file', exact: true }).count(), 0);
+    await panel(page).getByRole('button', { name: 'Join…', exact: true }).click();
+    const joinField = panel(page).getByLabel('Link or code', { exact: true });
+    await joinField.fill(`${nowhere}#2.${secret}`);
+    await until('the desktop refusal', () => shown(page, 'Open this link in the desktop app.'));
+    await joinField.fill(`${nowhere}#1.${secret}`);
+    await until('the document link refusal', () => shown(page, 'This link is for a single shared document. Documents are now shared in workspaces: ask for a workspace invite.'));
+    await page.waitForTimeout(1500);
+    assert.deepEqual(sockets.filter((u) => u.includes(':9')), [], 'no connection to the link\'s server');
+    assert.equal(await panel(page).getByRole('button', { name: 'Join', exact: true }).count(), 0, 'nothing to join');
+    await shot(page, '5-join-refusals');
 
     assert.deepEqual(errors, []);
     step('PASS');

@@ -1,25 +1,24 @@
-//! The session's binding of the relay session (`specs/0092-cooperative-editing` criteria 1 to
-//! 7, 14 to 19, 21): two or three editing sessions against one in-process relay, with the
-//! transport carried out as the host would (`TransportAction`s) on a virtual clock.
+//! The session's binding of the relay session (`specs/0092-cooperative-editing` criteria 6, 7,
+//! 14 to 19, 21, through a shared workspace's open document since `specs/0105`): two or three
+//! editing sessions against one in-process relay, with the transport carried out as the host
+//! would (`TransportAction`s) on a virtual clock.
 
 use curvyo_document_core::Point;
 use serde_json::Value;
 
 use super::align_test_support::{click, draw_rect};
-use super::sync_test_support::{Device, Net, ROOM, SERVER, STEP_MS, seeds, shared_pair, view};
+use super::sync_test_support::{
+    Device, Net, STEP_MS, join_open, kept, reopen, seeds, share_open, shared_pair, view,
+};
 use super::{Session, Tool};
 
-/// Criteria 1 and 3: sharing writes a genesis with A as the only admin, uploads, lists "this
-/// device"; joining by the link admits B automatically, replaces B's blank document by A's,
-/// opens it unsaved, and both lists show both participants with colours and fingerprints.
+/// Sharing writes a genesis with A as the only admin, uploads, lists "this device"; joining by
+/// the link admits B automatically, B opens A's document, and both lists show both participants
+/// with colours and fingerprints.
 #[test]
 fn share_and_join_converge_and_list_both_participants() {
     let (mut net, a, b) = shared_pair();
     assert_eq!(net.json(a), net.json(b), "B holds A's document");
-    assert!(
-        net.devices[b].session.is_dirty(),
-        "a joined document opens unsaved"
-    );
     for i in [a, b] {
         let v = view(&net.devices[i].session);
         assert_eq!(v["shared"], true);
@@ -40,32 +39,32 @@ fn share_and_join_converge_and_list_both_participants() {
     assert_eq!(va["admin"], true);
     assert_eq!(view(&net.devices[b].session)["admin"], false);
     assert_eq!(va["epoch"], 0);
+    // `specs/0105` criterion 14: one person per label, the own one first.
+    let people = va["people"].as_array().unwrap();
+    assert_eq!(people[0]["line"], "Anna (you) · Admin · 1 device");
+    assert_eq!(people[1]["line"], "Ben · Member · 1 device");
+    assert_eq!(people[1]["members"][0], va["participants"][1]["member"]);
 }
 
-/// UX notes §2.5: the joiner's Share tab stays shown when the room's document replaces the blank
-/// one ("the tab switches to the shared state").
+/// `specs/0105` criterion 20: the joiner's Share tab stays shown while it joins; nothing of its
+/// own session is replaced.
 #[test]
 fn a_join_keeps_the_share_tab_shown() {
     let mut net = Net::new();
     let mut a = Session::new(0xa1);
     draw_rect(&mut a, (10.0, 10.0), (40.0, 30.0));
-    let a = net.add(a);
+    let a = share_open(&mut net, a);
     let now = net.now;
-    net.s(a)
-        .share_document(SERVER, "Anna", ROOM, &seeds(1, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(200);
     let (link, _) = net.s(a).create_invite(24 * 3600, now).unwrap();
     net.pump();
     let b = net.add(Session::new(0xb2));
     assert!(net.s(b).press_panel_tab("share"));
     net.s(b)
-        .join_document(&link, "Ben", &seeds(2, 0), now)
+        .join_workspace(&link, "Ben", "Box job", &seeds(2, 0), now)
         .unwrap();
     net.pump();
     net.run(1_000);
-    assert_eq!(net.json(a), net.json(b), "B holds A's document");
+    assert_eq!(view(&net.devices[b].session)["join"]["phase"], "done");
     assert_eq!(
         net.devices[b].session.panel_content(),
         curvyo_ui_core::PanelContent::Share
@@ -140,23 +139,18 @@ fn presence_shows_pointer_selection_drag_and_marker() {
     assert_eq!(net.devices[b].session.presence_marks_json(), "[]");
 }
 
-/// Criterion 5: a saved shared document keeps its room and keyring and reconnects when
-/// reopened, without an invite, with the keys from the store.
+/// `specs/0095` criterion 33: a saved document of the shared workspace reopens with the marker
+/// and reconnects without an invite, with the keys from the store.
 #[test]
 fn a_saved_shared_document_reopens_and_reconnects() {
     let (mut net, a, b) = shared_pair();
-    let (room, keys) = net.s(b).take_key_update().expect("B's epoch keys to store");
-    assert_eq!(room, super::sync::hex(&ROOM));
-    let bytes = net.s(b).pack_for_save().unwrap();
-    net.s(b).mark_saved();
+    let files = kept(&mut net, b);
     net.set_link(b, false);
     // A edits while B is closed.
     draw_rect(net.s(a), (90.0, 90.0), (95.0, 95.0));
     net.run(100);
-    let mut reopened = Session::open(0xb3, &bytes).unwrap();
+    let reopened = reopen(&net, 0xb3, files, "Ben", &seeds(2, 1));
     assert!(reopened.is_shared());
-    let now = net.now;
-    assert!(reopened.resume_shared("Ben", keys, &seeds(2, 1), now));
     net.devices[b] = Device {
         session: reopened,
         conn: None,
@@ -196,37 +190,31 @@ fn offline_edits_merge_when_the_network_is_back() {
     assert_eq!(notice, Some(("Back online.".to_owned(), false)));
 }
 
-/// Criterion 4: a used link is refused with its reason and shows nothing of the document.
+/// Criterion 4 (`specs/0095` 29): a used link is refused with its reason and hands out nothing.
 #[test]
 fn a_used_link_is_refused_and_shows_nothing() {
     let mut net = Net::new();
-    let a = net.add(Session::new(0xa1));
+    let a = share_open(&mut net, Session::new(0xa1));
     let now = net.now;
-    net.s(a)
-        .share_document(SERVER, "Anna", ROOM, &seeds(1, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(200);
     let (link, _) = net.s(a).create_invite(3_600, now).unwrap();
-    let b = net.add(Session::new(0xb2));
-    net.s(b)
-        .join_document(&link, "Ben", &seeds(2, 0), now)
-        .unwrap();
-    net.run(1_000);
+    net.pump();
+    let _b = join_open(&mut net, &link, "Ben", 2, 0xb2);
     let c = net.add(Session::new(0xc3));
     draw_rect(net.s(c), (1.0, 1.0), (2.0, 2.0));
     let blank = net.json(c);
     net.s(c)
-        .join_document(&link, "Cleo", &seeds(3, 0), now)
+        .join_workspace(&link, "Cleo", "Box job", &seeds(3, 0), now)
         .unwrap();
+    net.pump();
     net.run(1_000);
     let v = view(&net.devices[c].session);
     assert_eq!(v["join"]["phase"], "refused");
     assert_eq!(v["join"]["text"], "This link was already used.");
     assert_eq!(net.json(c), blank, "nothing of A's document");
+    assert_eq!(net.s(c).take_workspace_writes().len(), 0);
     assert!(
         Session::new(1)
-            .join_document("not a link", "x", &seeds(4, 0), now)
+            .join_workspace("not a link", "x", "y", &seeds(4, 0), now)
             .is_err()
     );
 }
@@ -304,19 +292,12 @@ fn frame_start_budget_for_one_remote_edit_in_1000_objects() {
             height: Length::from_mm(4.0),
         });
     }
-    let a = net.add(a);
+    let a = share_open(&mut net, a);
     let now = net.now;
-    net.s(a)
-        .share_document(SERVER, "Anna", ROOM, &seeds(1, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(200);
     let (link, _) = net.s(a).create_invite(3_600, now).unwrap();
-    let b = net.add(Session::new(0xb2));
-    net.s(b)
-        .join_document(&link, "Ben", &seeds(2, 0), now)
-        .unwrap();
-    net.run(2_000);
+    net.pump();
+    let b = join_open(&mut net, &link, "Ben", 2, 0xb2);
+    net.run(1_000);
     assert_eq!(net.json(a), net.json(b));
     let mut worst = std::time::Duration::ZERO;
     let mut idle = std::time::Duration::ZERO;
@@ -339,15 +320,19 @@ fn frame_start_budget_for_one_remote_edit_in_1000_objects() {
     }
 }
 
-/// Criterion 27: a copy of A's shared file reopened on a device the keyring does not list is
-/// refused by the relay; the session ends, says so once and does not reconnect.
+/// Criterion 27: a copy of A's shared workspace reopened on a device the keyring does not list
+/// is refused by the relay; the session ends, says so once and does not reconnect.
 #[test]
 fn a_copy_on_a_device_that_is_no_participant_is_refused_and_stops() {
     let (mut net, a, _) = shared_pair();
-    let bytes = net.s(a).pack_for_save().unwrap();
-    let mut copy = Session::open(0xc9, &bytes).unwrap();
-    let now = net.now;
-    assert!(copy.resume_shared("Eve", Vec::new(), &seeds(9, 1), now));
+    let files = kept(&mut net, a);
+    let copy = reopen(
+        &net,
+        0xc9,
+        (files.0, files.1, Vec::new()),
+        "Eve",
+        &seeds(9, 1),
+    );
     let c = net.add(copy);
     net.pump();
     net.run(30_000);
@@ -357,7 +342,7 @@ fn a_copy_on_a_device_that_is_no_participant_is_refused_and_stops() {
     assert_eq!(
         device.session.take_sync_notice(),
         Some((
-            curvyo_ui_core::share_text::NOT_ADMITTED_NOTICE.to_owned(),
+            curvyo_ui_core::share_text::NOT_ADMITTED_WORKSPACE_NOTICE.to_owned(),
             true
         ))
     );

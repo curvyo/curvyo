@@ -1,7 +1,7 @@
 // The Share tab's My devices block (`specs/0096-own-devices-sync` ux-notes 2 to 9): the rows,
 // and where the decision rows, the workspace pick, the pairing and backup blocks go.
 
-import { ChevronDown, ChevronRight, Globe, LogIn, LogOut, Monitor, MonitorSmartphone, Unlink } from "lucide-react";
+import { ChevronDown, ChevronRight, Globe, LogOut, Monitor, MonitorSmartphone, Unlink } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ALERT, APPLY, ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
@@ -9,7 +9,7 @@ import { useArm } from "@/hooks/useArm";
 import { EntryField } from "@/components/panel/EntryField";
 import { DecisionRow, PickWorkspaces } from "@/components/panel/DeviceChoices";
 import { BackupLines, KeyBackupRow, RestoreButton } from "@/components/panel/KeyBackupBlock";
-import { JoinerBlock, OpenerBlock } from "@/components/panel/PairingBlocks";
+import { OpenerBlock } from "@/components/panel/PairingBlocks";
 import type { DevicesApi, DeviceRow } from "@/hooks/useDevices";
 import { type KeyBackupApi, useKeyBackup } from "@/hooks/useKeyBackup";
 import {
@@ -17,6 +17,7 @@ import {
   devices_removed_alert,
   devices_text,
   key_backup_text,
+  sharing_word,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 interface MyDevicesBlockProps {
@@ -200,18 +201,16 @@ function DeviceRowView({
 
 /**
  * The Share tab's My devices block (`specs/0096-own-devices-sync` ux-notes section 2): the
- * removed alert, the device list, the one-device warning, and Add a device / Join my devices
- * with their pairing blocks.
+ * removed alert, the device list, the one-device warning, and Add device with its pairing block
+ * (a new device joins by the Join field, `specs/0105` criterion 16).
  */
 export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, frozenWarning = "" }: MyDevicesBlockProps) {
   const backup = useKeyBackup(given);
   // A passkey backup is a state of the own row (ADR 0040 decision 13).
   const devices = backup.backedUp ? { ...given, browserLines: [key_backup_text("backed-up"), ...given.browserLines] } : given;
   const { view, pairing } = devices;
-  const [joining, setJoining] = useState(false);
   const block = useRef<HTMLElement>(null);
   const addButton = useRef<HTMLButtonElement>(null);
-  const joinButton = useRef<HTMLButtonElement>(null);
   /** Where the focus goes after the next render: a row (member, "own"), or a button. */
   const focusNext = useRef<string | null>(null);
 
@@ -225,19 +224,22 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
       ? view.rows
       : [{ member: "", label: devices.deviceName, fingerprint: "", own: true, seen: "" }];
   const openerBlock = pairing?.opener ? pairing.view : null;
-  const joinerView = pairing && !pairing.opener ? pairing.view : null;
   // The device just paired by this one, whose workspaces are chosen now (ux-notes 3.1).
   const picking = devices.justPaired;
 
   // Focus rules (ux-notes 10): a closed pairing block returns to the button that opened it; the
   // new device's first row after its pairing; after a Remove the next row, else the previous,
-  // else Add a device.
-  const opened = openerBlock !== null || picking !== "" ? "add" : joining ? "join" : "";
+  // else Add device.
+  const opened = openerBlock !== null || picking !== "" ? "add" : "";
   const wasOpen = useRef(opened);
   const wasPaired = useRef(paired);
   useEffect(() => {
     if (wasOpen.current !== "" && opened === "") {
-      focusNext.current = wasOpen.current === "join" && paired && !wasPaired.current ? "row:own" : wasOpen.current;
+      focusNext.current = wasOpen.current;
+    }
+    // A device that just joined my devices by the Join field: its own row.
+    if (paired && !wasPaired.current) {
+      focusNext.current = "row:own";
     }
     wasOpen.current = opened;
     wasPaired.current = paired;
@@ -246,7 +248,7 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
       return;
     }
     focusNext.current = null;
-    const button = target === "add" ? addButton.current : target === "join" ? joinButton.current : null;
+    const button = target === "add" ? addButton.current : null;
     const row = target.startsWith("row:")
       ? block.current?.querySelector<HTMLElement>(`[data-row-first="${target.slice(4)}"]`)
       : null;
@@ -277,7 +279,6 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
             type="button"
             className={`${BUTTON} ${OUTLINE} w-[60px]`}
             onClick={() => {
-              focusNext.current = "join";
               devices.dismissRemoved();
             }}
           >
@@ -357,8 +358,6 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
             }
           }}
         />
-      ) : joining && !paired ? (
-        <JoinerBlock devices={devices} view={joinerView} server={server} onClose={() => setJoining(false)} />
       ) : (
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-2">
@@ -367,7 +366,7 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
               type="button"
               aria-disabled={addReason !== ""}
               aria-describedby={addReason ? reasonId : undefined}
-              className={`${BUTTON} ${APPLY} w-[148px]`}
+              className={`${BUTTON} ${APPLY} px-3`}
               onClick={() => {
                 if (addReason === "") {
                   devices.addDevice();
@@ -375,25 +374,8 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
               }}
             >
               <MonitorSmartphone {...GLYPH} />
-              Add a device
+              {sharing_word("add-device")}
             </button>
-            {paired ? null : (
-              <button
-                ref={joinButton}
-                type="button"
-                aria-disabled={joinReason !== ""}
-                aria-describedby={joinReason ? reasonId : undefined}
-                className={`${BUTTON} ${OUTLINE} w-[148px]`}
-                onClick={() => {
-                  if (joinReason === "") {
-                    setJoining(true);
-                  }
-                }}
-              >
-                <LogIn {...GLYPH} />
-                Join my devices
-              </button>
-            )}
           </div>
           {!paired && devices.browser ? (
             <>

@@ -25,12 +25,11 @@ pub(crate) struct ShareCache(Mutex<HashMap<PathBuf, ShareMap>>);
 /// The sharing members of one workspace's files, by path.
 type ShareMap = HashMap<Vec<String>, (u64, u64, ShareMembers)>;
 
-/// One document file of a shared scan: its `share.json` text, whether it has a keyring.
+/// One document file of a shared scan: its `share.json` text.
 #[derive(Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct SharedFilePayload {
     path: Vec<String>,
     share: Option<String>,
-    keyring: bool,
 }
 
 /// One document `index.json` names.
@@ -85,7 +84,6 @@ pub(crate) fn shared_scan(
                 .share_json
                 .as_ref()
                 .map(|bytes| String::from_utf8_lossy(bytes).into_owned()),
-            keyring: members.keyring,
         });
         fresh.insert(entry.path.clone(), (entry.size, entry.modified, members));
     }
@@ -250,7 +248,6 @@ mod tests {
                 .unwrap()
                 .contains("\"format_version\":2")
         );
-        assert!(!lid.keyring);
         assert_eq!(scan.documents[1].share, None);
         assert_eq!(
             scan.known,

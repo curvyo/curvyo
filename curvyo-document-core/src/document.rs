@@ -488,9 +488,11 @@ pub struct Document {
     pub(crate) writable_cache: std::cell::RefCell<Option<crate::history::WritableUndo>>,
     /// The picture bytes the image nodes name (ADR 0017 §2); not in the Loro log.
     pub(crate) assets: std::cell::RefCell<crate::assets::AssetStore>,
-    /// Where the document syncs and its keyring, when it is shared (ADR 0031 decision 9); kept in
-    /// the container, not in the Loro log.
-    pub(crate) share: std::cell::RefCell<Option<crate::container_share::Sharing>>,
+    /// The workspace and id of a workspace document (ADR 0037 decision 3); kept in the container,
+    /// not in the Loro log.
+    pub(crate) share: std::cell::RefCell<Option<crate::container_share::WorkspaceShareRecord>>,
+    /// The file held the share members of a document shared on its own (ADR 0044 decision 3).
+    pub(crate) legacy_share: std::cell::Cell<bool>,
 }
 
 impl Document {
@@ -563,6 +565,7 @@ impl Document {
             sketch_cache: std::cell::RefCell::default(),
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
+            legacy_share: std::cell::Cell::default(),
         }
     }
 
@@ -629,6 +632,7 @@ impl Document {
             sketch_cache: std::cell::RefCell::default(),
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
+            legacy_share: std::cell::Cell::default(),
         })
     }
 

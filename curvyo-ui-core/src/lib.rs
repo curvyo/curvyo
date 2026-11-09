@@ -144,6 +144,7 @@ mod shape_knobs;
 mod shape_placement;
 mod shape_tool_common;
 pub mod share_text;
+pub mod sharing_text;
 mod skew_entry;
 mod skew_math;
 mod snapping;

@@ -36,6 +36,7 @@ import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 import type { ProjectApi } from "@/hooks/useProject";
 import type { WorkspaceApi } from "@/hooks/useWorkspace";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
+import { useMakeWorkspace } from "@/hooks/useMakeWorkspace";
 import type { DevicesApi } from "@/hooks/useDevices";
 import { syncedHeader } from "@/lib/devicesApi";
 import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
@@ -122,6 +123,7 @@ export function PropertiesPanel({
       workspace.dismissRemoved();
     },
   };
+  const makeWorkspace = useMakeWorkspace(project, workspace);
   const panelId = useId();
   const asideRef = useRef<HTMLElement>(null);
   /** A shortcut asked for the first control: it is focused once the chosen
@@ -446,6 +448,7 @@ export function PropertiesPanel({
                     <WorkspaceSection
                       workspace={workspace}
                       sharedLine={syncedHeader(devicesForTabs, collab.view) ?? collab.view.workspace?.headerLine}
+                      documentLine={collab.view.workspace?.openInWorkspace ? collab.view.workspace.documentLine : undefined}
                       devicesRemoved={devicesForTabs.view?.removed ? devicesForTabs.dismissRemoved : undefined}
                       onReturnFocus={returnFocus}
                     />
@@ -455,7 +458,9 @@ export function PropertiesPanel({
             ) : doc.view.content === "share" ? (
               <ShareTab
                 collab={collab}
-                saved={project.info.path !== null}
+                desktop={isTauri}
+                makeWorkspace={makeWorkspace}
+                visible={open}
                 onReturnFocus={returnFocus}
                 devices={devicesForTabs}
                 membership={membership}

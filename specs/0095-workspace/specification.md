@@ -1,6 +1,6 @@
 # Workspace: several documents together, shared as a whole
 
-Status: Done, slice 1 (PR #264)
+Status: Done (PR #264, PR (this one)): slice 1; take-in, `Moved` and WS-SEPARATE B superseded by `0105`
 Priority: Should
 Origin: Customer (request of 2026-11-03, translated): a workspace feature, several documents together. Earlier customer words (COOP-SCOPE, 2026-11-03): "even several documents shared, but we do not have several documents yet, that needs a workspace feature." Customer decisions of 2026-11-03 are recorded below and applied. What is marked Proposal is the product owner's until the customer accepts it.
 

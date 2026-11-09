@@ -155,7 +155,7 @@ impl Session {
             return;
         }
         self.sync_pump();
-        self.end_share(EndReason::Left, "");
+        self.end_share(EndReason::Left);
         if let Some(link) = self.sync.as_mut() {
             link.actions.push_back(super::sync::TransportAction::Close);
         }

@@ -48,7 +48,15 @@ impl Session {
         match file_kind(bytes) {
             FileKind::Svg => Self::open_svg(peer, bytes, file_name),
             FileKind::Project => {
-                Self::open(peer, bytes).map_err(|error| super::map_open_error(&error).to_owned())
+                let mut session = Self::open(peer, bytes)
+                    .map_err(|error| super::map_open_error(&error).to_owned())?;
+                // A file shared on its own by an older build opens local (`specs/0105`
+                // criterion 4): one notice says so.
+                if session.document.legacy_share() {
+                    session.open_notice =
+                        Some(curvyo_ui_core::sharing_text::LEGACY_SHARE_NOTICE.to_owned());
+                }
+                Ok(session)
             }
             FileKind::Image | FileKind::Other => Err(NEITHER_PROJECT_NOR_SVG.to_owned()),
         }
@@ -61,7 +69,8 @@ impl Session {
         self.saved == DocumentVersion::never()
     }
 
-    /// The notice of an Open of an SVG that brought in nothing, once; empty otherwise.
+    /// The notice of an Open of an SVG that brought in nothing, or of a file shared on its own by
+    /// an older build, once; empty otherwise.
     pub fn take_open_notice(&mut self) -> String {
         self.open_notice.take().unwrap_or_default()
     }
@@ -225,6 +234,35 @@ mod tests {
     use super::*;
 
     const SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="400mm" height="400mm" viewBox="0 0 400 400"><rect x="200" y="200" width="40" height="20"/><circle cx="300" cy="210" r="10"/></svg>"#;
+
+    /// `specs/0105` criterion 4: the golden `shared_v34.curvyo` and `ended_v36.curvyo` open as
+    /// editable local documents with one notice, no link and no "(shared)"; a plain file has none.
+    #[test]
+    fn a_file_shared_on_its_own_opens_local_with_one_notice() {
+        for name in ["shared_v34.curvyo", "ended_v36.curvyo"] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../curvyo-document-core/tests/fixtures")
+                .join(name);
+            let bytes = std::fs::read(&path).unwrap();
+            let mut session = Session::open_file(3, &bytes, name).unwrap();
+            // open_writes_nothing: the file is untouched and the open is no step.
+            assert_eq!(std::fs::read(&path).unwrap(), bytes, "{name}");
+            assert_eq!(session.document.own_steps().len(), 0, "{name}");
+            assert_eq!(
+                session.take_open_notice(),
+                curvyo_ui_core::sharing_text::LEGACY_SHARE_NOTICE,
+                "{name}"
+            );
+            assert_eq!(session.take_open_notice(), "", "once");
+            assert!(!session.is_shared());
+            assert!(!session.document.is_shared(), "{name}");
+            assert_eq!(session.sync_next_action(), None, "no connection");
+        }
+        let plain =
+            curvyo_document_core::pack(&curvyo_document_core::Document::new(4), "t").unwrap();
+        let mut session = Session::open_file(3, &plain, "plain.curvyo").unwrap();
+        assert_eq!(session.take_open_notice(), "");
+    }
 
     #[test]
     fn ac2_an_svg_opens_untitled_dirty_and_without_history() {

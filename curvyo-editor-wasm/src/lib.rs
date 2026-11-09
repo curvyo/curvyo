@@ -156,7 +156,6 @@ mod wasm_workspace;
 #[cfg(target_arch = "wasm32")]
 mod wasm_workspace_sync;
 #[cfg(target_arch = "wasm32")]
-mod wasm_workspace_take_in;
 #[cfg(target_arch = "wasm32")]
 mod wasm_workspace_tree;
 
@@ -182,8 +181,7 @@ pub use session::{
 };
 pub use session::{
     BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, ListEdit,
-    MarkerFiles, PreparedShare, SyncSeeds, TakeIn, TransportAction, WorkspaceLink, WorkspaceWrite,
-    take_in_allowed, take_in_check,
+    MarkerFiles, PreparedShare, SyncSeeds, TransportAction, WorkspaceLink, WorkspaceWrite,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{DropBadge, RowDragAnswer, RowDragSource, SketchRowState, SketchUsage};
@@ -205,7 +203,9 @@ pub use trace_glue::{
     trace_colour_settings, trace_mask_region, trace_params_json, trace_presets_json,
     trace_settings,
 };
-pub use workspace_share_builder::{NotAdded, ShareFiles, WorkspaceShareBuilder};
+pub use workspace_share_builder::{
+    NotAdded, ShareFiles, WorkspaceShareBuilder, restamp_workspace_record,
+};
 
 #[cfg(target_arch = "wasm32")]
 pub use wasm_api::{WasmSession, init_panic_hook};

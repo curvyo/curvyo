@@ -1,5 +1,6 @@
-//! Thin host bridge for cooperative editing (`specs/0092-cooperative-editing`): the transport's
-//! inputs and outputs, the Share tab's reads and commands, and the presence overlay.
+//! Thin host bridge for cooperative editing in a shared workspace (`specs/0092-cooperative-editing`,
+//! `specs/0105`): the transport's inputs and outputs, the Share tab's reads and commands, and the
+//! presence overlay.
 //!
 //! Time arrives as the host's `Date.now()` and entropy as bytes of `crypto.getRandomValues`
 //! (ADR 0031 decision 6); keys come from the credential store through the host.
@@ -9,7 +10,7 @@ use curvyo_ui_core::share_text;
 use serde_json::json;
 use wasm_bindgen::prelude::*;
 
-use crate::session::{SyncSeeds, TransportAction, unhex};
+use crate::session::TransportAction;
 use crate::wasm_api::WasmSession;
 
 /// The next thing the transport does (`kind`: `connect`, `send` or `close`).
@@ -32,93 +33,11 @@ pub(crate) fn millis(now: f64) -> Millis {
     Millis(now.max(0.0) as u64)
 }
 
-pub(crate) fn seeds(identity: &[u8], nonce: &[u8], entropy: &[u8]) -> Option<SyncSeeds> {
-    Some(SyncSeeds {
-        identity: identity.try_into().ok()?,
-        nonce: nonce.try_into().ok()?,
-        entropy: entropy.try_into().ok()?,
-    })
-}
-
 /// How long an invite link is valid: 24 hours, no choice (customer 2026-11-09).
 const INVITE_VALID_SECONDS: u64 = 24 * 3600;
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// Shares the open document on `server` (criterion 1); `room` is 16 random bytes. Empty on
-    /// success, else the sentence of the failure.
-    #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).
-    pub fn share_document(
-        &mut self,
-        server: &str,
-        label: &str,
-        room: &[u8],
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> String {
-        let (Some(seeds), Ok(room)) = (seeds(identity, nonce, entropy), room.try_into()) else {
-            return "Could not share.".to_owned();
-        };
-        match self
-            .session
-            .share_document(server, label, room, &seeds, millis(now))
-        {
-            Ok(()) => String::new(),
-            Err(_) => "Could not share.".to_owned(),
-        }
-    }
-
-    /// Joins by an invite link (criterion 3). Empty when the join started, else the refusal.
-    #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).
-    pub fn join_document(
-        &mut self,
-        link: &str,
-        label: &str,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> String {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return share_text::join_refusal_text(share_text::JoinRefusal::Invalid, "");
-        };
-        match self.session.join_document(link, label, &seeds, millis(now)) {
-            Ok(()) => String::new(),
-            Err(refusal) => share_text::join_refusal_text(refusal, ""),
-        }
-    }
-
-    /// Reconnects a shared document opened from its file; `keys_json` is `[[epoch, "hex"], ...]`
-    /// from the credential store.
-    #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).
-    pub fn resume_shared(
-        &mut self,
-        label: &str,
-        keys_json: &str,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> bool {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return false;
-        };
-        self.session
-            .resume_shared(label, epoch_keys(keys_json), &seeds, millis(now))
-    }
-
-    /// Whether the open document is shared.
-    pub fn is_shared(&self) -> bool {
-        self.session.is_shared()
-    }
-
-    /// The shared document's room as hex, empty when not shared.
-    pub fn shared_room_hex(&self) -> String {
-        self.session.shared_room_hex()
-    }
-
     /// The socket opened.
     pub fn sync_connected(&mut self, now: f64) {
         self.session.sync_connected(millis(now));
@@ -282,15 +201,6 @@ impl WasmSession {
     }
 }
 
-/// The epoch keys of `keys_json` (`[[epoch, "hex"], ...]`, the credential store's); malformed
-/// entries are left out.
-pub(crate) fn epoch_keys(keys_json: &str) -> Vec<(u32, [u8; 32])> {
-    let keys: Vec<(u32, String)> = serde_json::from_str(keys_json).unwrap_or_default();
-    keys.into_iter()
-        .filter_map(|(n, hex)| Some((n, unhex::<32>(&hex)?)))
-        .collect()
-}
-
 /// A typed server address normalised (`ws://host:port`), empty when it is not one.
 #[wasm_bindgen]
 #[must_use]
@@ -318,4 +228,70 @@ pub fn invite_expiry_text(expires: f64, offset_minutes: i32) -> String {
 #[must_use]
 pub fn participant_initials(label: &str) -> String {
     share_text::initials(label)
+}
+
+/// A fixed word of the workspace-only sharing model (`specs/0105`) by key; empty for an unknown
+/// key.
+#[wasm_bindgen]
+#[must_use]
+pub fn sharing_word(key: &str) -> String {
+    use curvyo_ui_core::sharing_text as texts;
+    match key {
+        "legacy-notice" => texts::LEGACY_SHARE_NOTICE,
+        "document-link" => texts::DOCUMENT_LINK_REFUSAL,
+        "desktop-link" => texts::DESKTOP_LINK_REFUSAL,
+        "works-on-workspaces" => texts::SHARING_WORKS_ON_WORKSPACES,
+        "workspaces-on-desktop" => texts::WORKSPACES_ON_DESKTOP,
+        "make-workspace" => texts::MAKE_WORKSPACE,
+        "sync-to-my-devices" => texts::SYNC_TO_MY_DEVICES,
+        "sync-confirm" => texts::SYNC_CONFIRM,
+        "invite-person" => texts::INVITE_PERSON,
+        "join" => texts::JOIN,
+        "join-field" => texts::JOIN_FIELD,
+        "add-device" => texts::ADD_DEVICE,
+        _ => "",
+    }
+    .to_owned()
+}
+
+/// The inline confirm of Make a workspace for this file (`specs/0105` criterion 8).
+#[wasm_bindgen]
+#[must_use]
+pub fn sharing_make_workspace_confirm(folder: &str, file: &str) -> String {
+    curvyo_ui_core::sharing_text::make_workspace_confirm(folder, file)
+}
+
+/// The Workspace block's state word: Local, Synced or Shared (`specs/0105` criterion 10).
+#[wasm_bindgen]
+#[must_use]
+pub fn sharing_workspace_state(synced: bool, others: bool) -> String {
+    curvyo_ui_core::sharing_text::workspace_state(synced, others).to_owned()
+}
+
+/// Why Invite person is greyed, its tooltip; empty when it works (customer feedback on PR #298).
+#[wasm_bindgen]
+#[must_use]
+#[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)] // The host's facts cross as flat arguments.
+pub fn sharing_invite_blocker(
+    desktop: bool,
+    workspace_open: bool,
+    server_set: bool,
+    server_reachable: bool,
+    name_set: bool,
+    linked: bool,
+    admin: bool,
+    busy: bool,
+) -> String {
+    curvyo_ui_core::sharing_text::invite_blocker(&curvyo_ui_core::sharing_text::InviteFacts {
+        desktop,
+        workspace_open,
+        server_set,
+        server_reachable,
+        name_set,
+        linked,
+        admin,
+        busy,
+    })
+    .unwrap_or_default()
+    .to_owned()
 }

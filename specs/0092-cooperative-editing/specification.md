@@ -1,6 +1,6 @@
 # Cooperative editing: several people in one document at the same time
 
-Status: Done, slice 1 (PR #253); slice 2 outlined (criteria 41–45)
+Status: Done (PR #253, PR (this one)): slice 1; single-document sharing removed and criteria 1 to 5, 33, 40 to 45 superseded by `0105`; criteria 6 to 31 and 35 to 39 hold through a shared workspace
 Priority: Must
 Origin: Customer (request of 2026-11-02, translated): "Start with cooperative work at the same time on several clients: spec, plan and ADR if needed." The requirement itself is older and already accepted: R-COLLAB-001 to -013 and ADR 0004 (2026-10-02): "not just sync, cooperative work from the start, similar to the Zed editor, but for vectors. Two people on two instances must be able to work in the same file at the same time."
 

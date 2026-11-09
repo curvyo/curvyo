@@ -11,6 +11,7 @@ use super::Session;
 use super::sync_test_support::{SERVER, seeds};
 use super::workspace_sync::WorkspaceWrite;
 use super::workspace_sync_tests::{WORKSPACE, shared_workspace};
+use curvyo_sync_core::SessionError;
 
 /// The device group of A (`seeds(1, _)`) and B (`seeds(2, _)`), both admins.
 pub(super) fn group() -> Keyring {
@@ -105,6 +106,60 @@ fn switching_on_admits_a_paired_device_and_off_removes_it() {
     net.pump();
     net.run(500);
     assert!(net.s(b).workspace_removed());
+}
+
+/// `specs/0105` criterion 12, ADR 0044 decision 7: once Sync off removed my other devices, this
+/// device ends its link without a keyring entry and holds none: the workspace is Local, its
+/// document's file has no record, and nothing is left to reconnect.
+#[test]
+fn sync_off_leaves_this_device_without_a_link() {
+    let (mut net, a, _) = shared_workspace();
+    let group = group();
+    net.s(a).reconcile_workspace(&group, true).unwrap();
+    net.pump();
+    let b = net.add(Session::new(0xb2));
+    let now = net.now;
+    assert!(
+        net.s(b)
+            .join_synced_workspace(SERVER, WORKSPACE, "Box job", "Ben", &seeds(2, 0), now)
+    );
+    net.pump();
+    net.run(1_000);
+    assert_eq!(
+        net.s(a).stop_sharing(),
+        Err(SessionError::NotAdmin),
+        "B is still in it"
+    );
+    net.s(a).reconcile_workspace(&group, false).unwrap();
+    net.pump();
+    net.run(500);
+    let entries = net
+        .s(a)
+        .sync
+        .as_ref()
+        .unwrap()
+        .client
+        .keyring_entries()
+        .len();
+    net.s(a).stop_sharing().unwrap();
+    net.pump();
+    net.s(a).drop_ended_link();
+    assert!(!net.s(a).has_workspace_link());
+    assert!(!net.s(a).is_shared());
+    assert!(net.s(a).take_workspace_marker().is_none());
+    let file = curvyo_document_core::unpack(1, &net.s(a).pack_for_save().unwrap()).unwrap();
+    assert!(file.workspace_share().is_none());
+    let room = net
+        .relay
+        .room(&curvyo_sync_core::RoomId(WORKSPACE))
+        .unwrap();
+    assert_eq!(
+        room.stored().keyring.len(),
+        entries,
+        "no keyring entry for the end"
+    );
+    net.run(2_000);
+    assert_eq!(net.s(a).sync_next_action(), None, "no reconnect");
 }
 
 /// Criterion 17: where this device is a member but not an admin, nothing is written and the

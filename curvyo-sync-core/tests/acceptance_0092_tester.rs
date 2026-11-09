@@ -683,7 +683,10 @@ fn t17_offline_reported_within_5_s_and_presence_disappears() {
     let file = net.clients[b].file.clone().unwrap();
     let opened = curvyo_document_core::unpack(77, &file).unwrap();
     assert!(opened.object(id).is_some(), "saved offline");
-    assert!(opened.share().is_some());
+    assert!(
+        net.clients[b].saved.is_some(),
+        "its share is kept beside the file"
+    );
 }
 
 /// Criterion 21: after a merge, B's undo stack is unchanged by A's edits and A's undo, and A's

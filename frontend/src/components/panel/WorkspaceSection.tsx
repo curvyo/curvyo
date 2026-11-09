@@ -30,6 +30,9 @@ interface WorkspaceSectionProps {
   /** The header line of a shared workspace ("Shared, 2 people", "Receiving 7 of 20"), from the
    * Share view; absent while the workspace is local. */
   sharedLine?: string;
+  /** "Shared through workspace Box job" for an open document of a synced or shared workspace
+   * (`specs/0105` criterion 2). */
+  documentLine?: string;
   /** This device was removed from my devices: the alert shows here too, and this dismisses
    * both (`specs/0096-own-devices-sync` ux-notes 7.2). */
   devicesRemoved?: () => void;
@@ -43,7 +46,7 @@ interface WorkspaceSectionProps {
  * empty state with Open workspace… and the recent workspaces, the tree, the inline name field of a
  * new entry and the action slot. Desktop only.
  */
-export function WorkspaceSection({ workspace, sharedLine, devicesRemoved, onReturnFocus }: WorkspaceSectionProps) {
+export function WorkspaceSection({ workspace, sharedLine, documentLine, devicesRemoved, onReturnFocus }: WorkspaceSectionProps) {
   const [focusedRow, setFocusedRow] = useState<WorkspaceRowData | null>(null);
   const rootDrop = useRef<HTMLParagraphElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -88,6 +91,7 @@ export function WorkspaceSection({ workspace, sharedLine, devicesRemoved, onRetu
             <p role="status" className="truncate text-xs text-[var(--panel-muted-fg)]">
               {sharedLine ?? workspace.view.header}
             </p>
+            {documentLine ? <p className="truncate text-xs text-[var(--panel-muted-fg)]">{documentLine}</p> : null}
           </div>
         ) : (
           <p className="flex-1 text-sm font-semibold text-[var(--toolbar-icon)]">Workspace</p>

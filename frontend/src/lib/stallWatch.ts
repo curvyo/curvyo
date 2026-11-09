@@ -1,4 +1,4 @@
-// The watchdog of a share or a switch of "Sync to my devices" (customer feedback on PR #281): it
+// The watchdog of a share or a switch of "Sync" (customer feedback on PR #281): it
 // fails once nothing moved for `STALL_MS`, never because a large upload simply takes long.
 
 /** How long a share or a switch may make no progress before it fails with a retry (ms). */

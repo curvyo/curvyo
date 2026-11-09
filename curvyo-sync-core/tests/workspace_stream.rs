@@ -1,15 +1,14 @@
 //! The plaintext formats of a workspace room (`specs/0095-workspace` criteria 28, 34 and 43, ADR
-//! 0037 decisions 5, 7 and 10): the inner record header, the snapshot stream and its parts, the
-//! `Moved` payload and when a snapshot is due.
+//! 0037 decisions 5 and 7): the inner record header, the snapshot stream and its parts and when
+//! a snapshot is due.
 
 #![allow(clippy::unwrap_used)]
 
 use std::path::PathBuf;
 
 use curvyo_sync_core::{
-    Moved, PART_BYTES, PART_PADDING, SnapshotAssembler, StreamEntry, StreamError,
-    decode_inner_record, decode_moved, encode_inner_record, encode_moved, encode_snapshot_stream,
-    snapshot_due, split_snapshot,
+    PART_BYTES, PART_PADDING, SnapshotAssembler, StreamEntry, StreamError, decode_inner_record,
+    encode_inner_record, encode_snapshot_stream, snapshot_due, split_snapshot,
 };
 
 const LIST: [u8; 16] = [0x11; 16];
@@ -39,10 +38,6 @@ fn golden_workspace_stream_v1() {
     let mut bytes = Vec::new();
     bytes.extend(encode_inner_record(LID, 0x0102_0304_0506_0708, b"update"));
     bytes.extend(encode_snapshot_stream(&entries()));
-    bytes.extend(encode_moved(&Moved {
-        workspace: LIST,
-        document: LID,
-    }));
     let path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/workspace_stream_v1.bin");
     if std::env::var_os("CURVYO_UPDATE_GOLDEN").is_some() {
@@ -157,18 +152,6 @@ fn a_damaged_stream_is_refused() {
         assembler.push_part(&split_snapshot(&newer, [1; 16])[0]),
         Err(StreamError::FormatTooNew)
     );
-}
-
-/// ADR 0037 decision 10: the `Moved` record of a taken-in document.
-#[test]
-fn a_moved_payload_round_trips_and_is_told_apart_from_updates() {
-    let moved = Moved {
-        workspace: LIST,
-        document: LID,
-    };
-    assert_eq!(decode_moved(&encode_moved(&moved)), Some(moved));
-    assert_eq!(decode_moved(b"\x00\x00\x00\x00loro"), None);
-    assert_eq!(decode_moved(&encode_moved(&moved)[..20]), None);
 }
 
 /// ADR 0037 decision 7: a snapshot is due when the tail reaches max(4 MiB, half the last

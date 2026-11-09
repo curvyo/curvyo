@@ -22,11 +22,6 @@ impl Session {
             let Some(link) = self.sync.as_mut() else {
                 return;
             };
-            if link.ended == Some(SyncEnd::Moved) {
-                // A room taken into a workspace is never joined again from here (criterion 49).
-                let _ = link.client.drain();
-                return;
-            }
             let outputs = link.client.drain();
             if outputs.is_empty() {
                 return;
@@ -153,19 +148,15 @@ impl Session {
                 link.resyncing = true;
                 link.peers.clear();
             }
-            SessionEvent::CheckResult(outcome) => self.check_answered(outcome),
         }
     }
 
-    /// The relay stored a push: the `Moved` record, a document update, or the list's.
+    /// The relay stored a push: a document update, or the list's.
     fn sync_acked(&mut self, client_id: u64) {
         let Some(link) = self.sync.as_mut() else {
             return;
         };
-        if link.moved_push == Some(client_id) {
-            link.moved_stored = true;
-            link.revision = link.revision.wrapping_add(1);
-        } else if let Some(version) = link.pushed.remove(&client_id) {
+        if let Some(version) = link.pushed.remove(&client_id) {
             link.synced = version;
         } else {
             self.workspace_list_acked(client_id);
@@ -183,9 +174,9 @@ impl Session {
         }
     }
 
-    /// This device was removed from the room: a document becomes a local file again that keeps
-    /// its ended record (ADR 0041 decision 6), so does the open document of a workspace
-    /// (`specs/0095-workspace` criterion 44). After its own leave the record says "left".
+    /// This device was removed from the room: the workspace's marker keeps the ended record (ADR
+    /// 0041 decision 6) and its open document stays a local file (`specs/0095-workspace`
+    /// criterion 44). After its own leave the record says "left".
     fn sync_removed(&mut self) {
         let Some(link) = self.sync.as_ref() else {
             return;
@@ -199,12 +190,11 @@ impl Session {
         } else {
             EndReason::Removed
         };
-        let name = link.leave_name.clone();
-        self.end_share(reason, &name);
+        self.end_share(reason);
     }
 
     pub(super) fn upload_snapshot(&mut self, covers_seq: u64) {
-        if self.sync.as_ref().is_none_or(|s| s.awaiting_document) {
+        if self.sync.is_none() {
             return;
         }
         // The share record belongs to this replica's file, never to the room's snapshot.
@@ -243,20 +233,20 @@ fn refused(link: &mut SyncLink, reason: RefusalReason) {
     if link.ended == Some(SyncEnd::Left) {
         return;
     }
-    if link.awaiting_document {
-        let refusal = match reason {
-            RefusalReason::Used => JoinRefusal::Used,
-            RefusalReason::Expired => JoinRefusal::Expired,
-            _ => JoinRefusal::Invalid,
-        };
-        link.join = Some(JoinPhase::Refused(refusal));
-    } else if reason == RefusalReason::NotAMember {
+    if reason == RefusalReason::NotAMember {
         let text = if link.workspace.is_some() {
             NOT_ADMITTED_WORKSPACE_NOTICE
         } else {
             NOT_ADMITTED_NOTICE
         };
         link.notice(text.to_owned(), true);
+    } else if link.join.is_some_and(|j| j != JoinPhase::Done) {
+        let refusal = match reason {
+            RefusalReason::Used => JoinRefusal::Used,
+            RefusalReason::Expired => JoinRefusal::Expired,
+            _ => JoinRefusal::Invalid,
+        };
+        link.join = Some(JoinPhase::Refused(refusal));
     }
     link.online = false;
     link.ended = Some(if reason == RefusalReason::Removed {

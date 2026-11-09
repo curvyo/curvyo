@@ -194,8 +194,8 @@ fn removal_while_offline_and_rotation_across_members() {
     // only once it learned it, and it no longer syncs.
     net.close_app(b);
     let file = net.clients[b].file.clone().unwrap();
-    let opened = curvyo_document_core::unpack(9, &file).unwrap();
-    let log = decode_log(&opened.share().unwrap().keyring_log).unwrap();
+    curvyo_document_core::unpack(9, &file).unwrap();
+    let log = decode_log(&net.clients[b].saved.as_ref().unwrap().keyring_log).unwrap();
     assert_ne!(log, [] as [curvyo_crypto_core::keyring::Entry; 0]);
 }
 

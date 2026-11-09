@@ -1395,27 +1395,27 @@ fn c15_the_document_id_is_kept_in_the_file() {
     let bytes = pack(&document, "test").unwrap();
     let opened = unpack(6, &bytes).unwrap();
     assert_eq!(opened.workspace_share(), Some(record));
-    assert!(opened.share().is_none(), "no room record beside it");
+    assert!(!opened.legacy_share(), "no room record beside it");
     // Clearing it gives a plain local file.
     opened.set_workspace_share(None);
     let plain = unpack(7, &pack(&opened, "test").unwrap()).unwrap();
-    assert!(plain.workspace_share().is_none() && plain.share().is_none());
+    assert!(plain.workspace_share().is_none() && !plain.is_shared());
 }
 
 /// ADR 0037 decision 12: the container's format number is not raised by this story: a `0092`
-/// file of format 34 still opens with its room record, and the workspace fixture opens with its
-/// workspace record.
+/// file of format 34 still opens (as a local file since ADR 0044 decision 3), and the workspace
+/// fixture opens with its workspace record.
 #[test]
 fn c3_older_shared_files_and_workspace_files_open() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let v34 = std::fs::read(dir.join("shared_v34.curvyo")).unwrap();
     let opened = unpack(3, &v34).unwrap();
-    assert!(opened.share().is_some(), "a 0092 file keeps its room");
+    assert!(opened.legacy_share(), "a 0092 file opens local");
     assert!(opened.workspace_share().is_none());
     let ws = std::fs::read(dir.join("workspace_shared_v35.curvyo")).unwrap();
     let opened = unpack(4, &ws).unwrap();
     let record = opened.workspace_share().expect("a workspace record");
-    assert!(opened.share().is_none());
+    assert!(!opened.legacy_share());
     // A save keeps the record.
     let again = unpack(5, &pack(&opened, "test").unwrap()).unwrap();
     assert_eq!(again.workspace_share(), Some(record));

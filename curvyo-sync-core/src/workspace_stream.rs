@@ -1,6 +1,6 @@
 //! The plaintext formats inside a workspace room's sealed records (ADR 0037 decisions 5, 7 and
-//! 10): the inner record header, the snapshot stream cut into fixed-size parts, the `Moved`
-//! payload, and the rule that says when a workspace snapshot is due.
+//! 10): the inner record header, the snapshot stream cut into fixed-size parts, and the rule
+//! that says when a workspace snapshot is due.
 //!
 //! Everything here is sealed before it leaves a client; the relay sees only the envelopes, their
 //! sizes and their number.
@@ -21,9 +21,6 @@ const INNER_HEADER: usize = 16 + 8;
 const ENTRY_HEADER: usize = 16 + 8;
 /// `format_version u8, count u32`.
 const STREAM_HEADER: usize = 1 + 4;
-/// The first bytes of a `Moved` payload; an update's first four bytes are a short epoch length,
-/// so the two never meet.
-const MOVED_MAGIC: &[u8; 8] = b"CVMOVED1";
 
 /// Why workspace stream bytes were refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -246,37 +243,6 @@ fn read_u32(bytes: &[u8]) -> Result<(u32, &[u8]), StreamError> {
         .split_first_chunk::<4>()
         .ok_or(StreamError::Malformed)?;
     Ok((u32::from_le_bytes(*value), rest))
-}
-
-/// The sealed payload a take-in appends to a document's old room: the document now lives in the
-/// workspace (ADR 0037 decision 10).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Moved {
-    /// The workspace that took the document in.
-    pub workspace: [u8; 16],
-    /// The document's id there.
-    pub document: [u8; 16],
-}
-
-/// `"CVMOVED1" ‖ workspace ‖ document`.
-#[must_use]
-pub fn encode_moved(moved: &Moved) -> Vec<u8> {
-    let mut out = Vec::with_capacity(MOVED_MAGIC.len() + 32);
-    out.extend_from_slice(MOVED_MAGIC);
-    out.extend_from_slice(&moved.workspace);
-    out.extend_from_slice(&moved.document);
-    out
-}
-
-/// The `Moved` payload `bytes` hold, `None` for any other record.
-#[must_use]
-pub fn decode_moved(bytes: &[u8]) -> Option<Moved> {
-    let rest = bytes.strip_prefix(MOVED_MAGIC)?;
-    let (workspace, document) = rest.split_first_chunk::<16>()?;
-    Some(Moved {
-        workspace: *workspace,
-        document: (*document).try_into().ok()?,
-    })
 }
 
 /// Whether a workspace snapshot is due: the tail since the last snapshot has reached

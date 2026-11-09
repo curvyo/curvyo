@@ -16,8 +16,6 @@ use crate::session::{APP_VERSION, PreparedShare};
 /// Why a scanned document stays out of the shared workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotAdded {
-    /// It is shared on its own with people who are not members of the workspace (criterion 49).
-    SharedOnItsOwn,
     /// It cannot be read.
     Unreadable,
     /// Its name or a folder's breaks a list naming rule, or differs from the name of a
@@ -40,10 +38,6 @@ pub struct WorkspaceShareBuilder {
     documents: Vec<StreamEntry>,
     files: ShareFiles,
     not_added: Vec<(Vec<String>, NotAdded)>,
-    /// The workspace's members at Share: this device alone.
-    members: Vec<curvyo_crypto_core::Identity>,
-    /// Documents shared on their own that were taken in, with their new id (criterion 42).
-    taken_in: Vec<(Vec<String>, [u8; 16])>,
 }
 
 impl WorkspaceShareBuilder {
@@ -63,22 +57,7 @@ impl WorkspaceShareBuilder {
             documents: Vec::new(),
             files: Vec::new(),
             not_added: Vec::new(),
-            members: Vec::new(),
-            taken_in: Vec::new(),
         }
-    }
-
-    /// The workspace's first member, this device: a document shared on its own whose
-    /// participants are all members is taken in (criterion 42, ADR 0037 decision 10).
-    pub fn set_member(&mut self, member: curvyo_crypto_core::Identity) {
-        self.members = vec![member];
-    }
-
-    /// The documents shared on their own that were taken in: their path and new document id;
-    /// each needs its `Moved` record once the workspace is shared.
-    #[must_use]
-    pub fn taken_in(&self) -> &[(Vec<String>, [u8; 16])] {
-        &self.taken_in
     }
 
     fn created(&mut self) -> Created {
@@ -145,13 +124,6 @@ impl WorkspaceShareBuilder {
     ) -> Result<(), NotAdded> {
         let (file, folder) = path.split_last().ok_or(NotAdded::Name)?;
         let opened = unpack(self.peer, bytes).map_err(|_| NotAdded::Unreadable)?;
-        let taken_in = opened.share().is_some();
-        if taken_in {
-            match crate::session::take_in_check(bytes, &self.members) {
-                crate::session::TakeIn::Allowed { .. } => opened.set_share(None),
-                _ => return Err(NotAdded::SharedOnItsOwn),
-            }
-        }
         let parent = self.folder(folder)?;
         if self.files.iter().any(|(added, _)| same_path(added, path)) {
             return Err(NotAdded::Name);
@@ -171,9 +143,6 @@ impl WorkspaceShareBuilder {
             bytes: bytes.clone(),
         });
         self.files.push((path.to_vec(), bytes));
-        if taken_in {
-            self.taken_in.push((path.to_vec(), document));
-        }
         Ok(())
     }
 
@@ -211,6 +180,21 @@ impl WorkspaceShareBuilder {
     }
 }
 
+/// The document file `current` (as it is on disk now) given the workspace record of `prepared`,
+/// the file Share built from an earlier read (`specs/0105`, a Save during the upload): nothing of
+/// `current` is lost, and the record keeps the prepared synced version, so what changed since goes
+/// out as edits once the document is open. `None` when either does not open or `prepared` holds
+/// no workspace record.
+#[must_use]
+pub fn restamp_workspace_record(current: &[u8], prepared: &[u8]) -> Option<Vec<u8>> {
+    let record = curvyo_document_core::container_share_members(prepared)
+        .share_json
+        .and_then(|json| WorkspaceShareRecord::from_share_json(&json))?;
+    let document = unpack(1, current).ok()?;
+    document.set_workspace_share(Some(record));
+    pack(&document, APP_VERSION).ok()
+}
+
 /// Whether two paths name the same entry under the list's naming rule (case aside).
 fn same_path(a: &[String], b: &[String]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| same_entry_name(x, y))
@@ -218,7 +202,7 @@ fn same_path(a: &[String], b: &[String]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use curvyo_document_core::{Document, EntryKind, ShareRecord};
+    use curvyo_document_core::{Document, EntryKind};
     use curvyo_sync_core::SnapshotAssembler;
 
     use super::*;
@@ -247,21 +231,8 @@ mod tests {
             builder.add_document(&p("Junk.curvyo"), b"junk", [0x33; 16]),
             Err(NotAdded::Unreadable)
         );
-        let shared = Document::new(4);
-        shared.set_share(Some(ShareRecord {
-            server: "ws://a".to_owned(),
-            room: [1; 16],
-            server_seq: 0,
-            synced_version: shared.version(),
-            keyring_log: vec![1],
-        }));
-        let own = pack(&shared, "test").unwrap();
-        assert_eq!(
-            builder.add_document(&p("Base.curvyo"), &own, [0x44; 16]),
-            Err(NotAdded::SharedOnItsOwn)
-        );
         assert_eq!(builder.document_count(), 2);
-        assert_eq!(builder.not_added().len(), 2);
+        assert_eq!(builder.not_added().len(), 1);
         let (share, files) = builder.finish([9; 16]);
         let paths: Vec<Vec<String>> = share.list.entries().into_iter().map(|e| e.path).collect();
         assert!(paths.contains(&p("Old")));
@@ -287,5 +258,35 @@ mod tests {
         }
         let ids: Vec<[u8; 16]> = streams.iter().map(|s| s.stream).collect();
         assert_eq!(ids, vec![[0x57; 16], [0x11; 16], [0x22; 16]]);
+    }
+
+    /// A Save between the read and the commit: the newer file keeps its content and gets the
+    /// record with the prepared synced version.
+    #[test]
+    fn a_newer_file_takes_the_prepared_record() {
+        let original = Document::new(3);
+        let read = pack(&original, "test").unwrap();
+        let mut builder = WorkspaceShareBuilder::new([0x57; 16], 9, 1_800_000_000, [3; 16]);
+        builder
+            .add_document(&p("Lid.curvyo"), &read, [0x11; 16])
+            .unwrap();
+        let (_, files) = builder.finish([9; 16]);
+        let saved = unpack(4, &read).unwrap();
+        let _ = saved.create_rect(curvyo_document_core::RectBounds {
+            origin: curvyo_document_core::Point::new(0.0, 0.0),
+            width: curvyo_document_core::Length::from_mm(5.0),
+            height: curvyo_document_core::Length::from_mm(5.0),
+        });
+        let current = pack(&saved, "test").unwrap();
+        let stamped = unpack(5, &restamp_workspace_record(&current, &files[0].1).unwrap()).unwrap();
+        assert_eq!(stamped.read_objects().objects.len(), 1, "the save is kept");
+        let record = stamped.workspace_share().unwrap();
+        assert_eq!(record.document, [0x11; 16]);
+        assert_eq!(record.synced_version, original.version());
+        assert_eq!(
+            restamp_workspace_record(&current, &read),
+            None,
+            "no record to give"
+        );
     }
 }

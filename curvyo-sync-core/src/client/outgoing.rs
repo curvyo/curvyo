@@ -4,7 +4,7 @@
 use curvyo_crypto_core::keyring::{Entry, Keyring, Payload, Role};
 use curvyo_crypto_core::{EnvelopeKind, Identity, InviteKey, MemberId};
 
-use super::{ClientSession, History, InviteSecret, OutItem, SessionError, SessionEvent, State};
+use super::{ClientSession, InviteSecret, OutItem, SessionError, SessionEvent, State};
 use crate::frame::{ClientFrame, MAX_MESSAGE_LEN, RecordKind};
 use crate::time::Millis;
 
@@ -278,16 +278,13 @@ impl ClientSession {
     }
 
     /// Adds a former participant back as a member (ADR 0041 decision 5): no invite, the
-    /// identity from [`Keyring::former_participants`]. [`History::Full`] wraps every epoch key
-    /// this device holds; [`History::FromNow`] the current one only and asks for a snapshot
-    /// under it for the device to start from (ADR 0010 §9). No rotation, no role but member.
-    /// Admin only.
+    /// identity from [`Keyring::former_participants`], every epoch key this device holds
+    /// wrapped to it (ADR 0044 decision 4). No rotation, no role but member. Admin only.
     ///
     /// # Errors
     /// `NotAdmin`, `NotAMember` (this device, or `member` never was a participant),
-    /// `AlreadyMember`, `NoKey` (from now on without the current key), `Offline`, `Ended`,
-    /// `Crypto`.
-    pub fn add_back(&mut self, member: MemberId, history: History) -> Result<(), SessionError> {
+    /// `AlreadyMember`, `Offline`, `Ended`, `Crypto`.
+    pub fn add_back(&mut self, member: MemberId) -> Result<(), SessionError> {
         self.require_admin()?;
         let keyring = self.keys.keyring().ok_or(SessionError::NotAMember)?;
         if keyring.role(&member).is_some() {
@@ -298,21 +295,11 @@ impl ClientSession {
             .into_iter()
             .find(|identity| identity.member == member)
             .ok_or(SessionError::NotAMember)?;
-        let entry = match history {
-            History::Full => {
-                self.keys
-                    .write_addition(identity, Role::Member, true, &mut self.entropy)?
-            }
-            History::FromNow => self
-                .keys
-                .write_current_addition(identity, &mut self.entropy)?,
-        };
+        let entry = self
+            .keys
+            .write_addition(identity, Role::Member, true, &mut self.entropy)?;
         self.send_entries(&[entry])?;
-        if history == History::FromNow {
-            self.rotated();
-        } else {
-            self.event(SessionEvent::KeyringChanged);
-        }
+        self.event(SessionEvent::KeyringChanged);
         Ok(())
     }
 

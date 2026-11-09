@@ -144,7 +144,7 @@ function Editor() {
   });
   // Ctrl+V and Ctrl+C for images (`specs/0087-image-clipboard-and-drop`).
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
-  const collab = useCollaboration(editor, project);
+  const collab = useCollaboration(editor);
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).

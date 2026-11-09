@@ -33,12 +33,8 @@ import { membership_clock_time, membership_word } from "@/wasm-bindings/curvyo_e
 
 /** A removed or left file or workspace as the Removed block shows it (ux-notes 7). */
 export interface EndedShown {
-  workspace: boolean;
   left: boolean;
   server: string;
-  /** "" before Check, else the session's check state. */
-  check: string;
-  addedBy: string;
 }
 
 export interface MembershipApi {
@@ -112,19 +108,10 @@ export function useMembership(
   const ownActRef = useRef(false);
   /** Change keys now was pressed here: its end is a canvas notice. */
   const rotatingRef = useRef(false);
-  // This device's own leave of a document waits for the server; once it is confirmed the file
-  // holds the ended record "left" and is saved again.
-  const leavingRef = useRef(false);
-  useEffect(() => {
-    if (leavingRef.current && view.ended === "left") {
-      leavingRef.current = false;
-      refs.current.project.save();
-    }
-  }, [view.ended]);
   const roomRef = useRef("");
 
   const live = view.live && (view.shared || view.workspace != null);
-  const room = live ? (view.workspace?.id ?? getSession()?.shared_room_hex() ?? "") : "";
+  const room = live ? (view.workspace?.id ?? "") : "";
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
@@ -201,21 +188,8 @@ export function useMembership(
   }, [workspaceOpen, sharedOpen]);
 
   const endedFacts = endedMarker ? parseEnded(endedMarker.ended_json) : null;
-  const documentEnded = !view.live && (view.ended === "removed" || view.ended === "left") && !view.checkWorkspace;
-  let ended: EndedShown | null = null;
-  if (view.check !== undefined && view.checkWorkspace !== undefined) {
-    ended = {
-      workspace: view.checkWorkspace,
-      left: view.ended === "left",
-      server: view.server ?? "",
-      check: view.check,
-      addedBy: view.addedBy ?? "",
-    };
-  } else if (endedFacts && workspaceOpen && !sharedOpen) {
-    ended = { workspace: true, left: endedFacts.left, server: endedFacts.server, check: "", addedBy: "" };
-  } else if (documentEnded && view.endedRoom) {
-    ended = { workspace: false, left: view.ended === "left", server: view.server ?? "", check: "", addedBy: "" };
-  }
+  const ended: EndedShown | null =
+    endedFacts && workspaceOpen && !sharedOpen ? { left: endedFacts.left, server: endedFacts.server } : null;
 
   const drive = useCallback((session: NonNullable<ReturnType<typeof getSession>>) => refs.current.collab.drive(session), []);
 
@@ -243,18 +217,14 @@ export function useMembership(
   }, [act]);
   const remove = useCallback((member: string) => act((s) => s.remove_participant(member)), [act]);
   const stopSharing = useCallback((): string => {
-    const workspaceLink = view.workspace != null;
     const refusal = act((s) => s.stop_sharing());
     if (refusal === "") {
-      // The folder or the file is local from now on: no share files are left to reconnect.
-      if (workspaceLink) {
-        void invoke("clear_workspace_marker_share").catch(() => undefined);
-      } else {
-        refs.current.project.save();
-      }
+      // The folder is local from now on: no link and no share files are left to reconnect.
+      getSession()?.drop_ended_link();
+      void invoke("clear_workspace_marker_share").catch(() => undefined);
     }
     return refusal;
-  }, [act, view.workspace]);
+  }, [act, getSession]);
 
   const personLeave = devices.openSynced && view.workspace != null;
   const leave = useCallback((): string => {
@@ -265,15 +235,8 @@ export function useMembership(
       }
       return refusal;
     }
-    const refusal = act((s) => s.leave_share(refs.current.workspace.open ? "" : documentName(refs.current.project)));
-    if (refusal === "" && view.workspace == null) {
-      // The keyring log with the pending leave is saved now: a leave not yet confirmed goes out
-      // on the next open (ADR 0041 decision 11); the ended record is saved once it is.
-      leavingRef.current = true;
-      refs.current.project.save();
-    }
-    return refusal;
-  }, [act, personLeave, view.workspace]);
+    return act((s) => s.leave_share());
+  }, [act, personLeave]);
 
   const leftRoom = endedFacts?.room ?? "";
   const clearLeftMark = useCallback(() => {

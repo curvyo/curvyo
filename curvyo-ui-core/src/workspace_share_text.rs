@@ -6,38 +6,6 @@ use crate::share_text::ConnectionState;
 /// The join's waiting line (`ux-notes.md` section 8).
 pub const WORKSPACE_WAITING_TEXT: &str = "Waiting for a member to let you in";
 
-/// The sentences about documents shared on their own that a share takes in, and those it leaves
-/// out, each with a leading space; empty for none.
-#[must_use]
-pub fn takeover_text(taken_in: &[String], not_added: &[String]) -> String {
-    let taken_in = match taken_in {
-        [] => String::new(),
-        [one] => format!(
-            " {one} is shared on its own. It becomes part of the workspace and its own link \
-             stops working."
-        ),
-        [first, rest @ ..] => {
-            let others = match rest.len() {
-                1 => "1 other document".to_owned(),
-                n => format!("{n} other documents"),
-            };
-            format!(
-                " {first} and {others} are shared on their own. They become part of the \
-                 workspace and their own links stop working."
-            )
-        }
-    };
-    let outside = if not_added.is_empty() {
-        String::new()
-    } else {
-        format!(
-            " Not added: {} (shared with people outside this workspace).",
-            not_added.join(", ")
-        )
-    };
-    format!("{taken_in}{outside}")
-}
-
 /// The Workspace block's state at the right of its heading: "1 person", "2 people".
 #[must_use]
 pub fn people_text(people: usize) -> String {

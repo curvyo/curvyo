@@ -52,7 +52,6 @@ fn the_sharing_members_are_read_without_opening_the_document() {
     let lid = share_members(&root, &p("Lid.curvyo")).unwrap();
     let record = WorkspaceShareRecord::from_share_json(&lid.share_json.unwrap()).unwrap();
     assert_eq!(record.document, LID);
-    assert!(!lid.keyring);
     assert_eq!(
         share_members(&root, &p("Plain.curvyo")).unwrap(),
         ShareMembers::default()

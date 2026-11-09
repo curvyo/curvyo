@@ -82,7 +82,7 @@ pub struct DiskPlan {
     pub ops: Vec<DiskOp>,
     /// Moves another program made, for the list.
     pub list_changes: Vec<ListPlace>,
-    /// Documents whose file was removed by another program: "Missing on this computer".
+    /// Documents whose file was removed by another program: "Missing on this device".
     pub missing: Vec<ListNodeId>,
     /// Files not in the shared workspace, sorted.
     pub outside: Vec<WorkspacePath>,

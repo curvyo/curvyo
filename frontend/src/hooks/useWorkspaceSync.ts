@@ -51,7 +51,7 @@ export interface JoinFolder {
 
 export interface WorkspaceSyncApi {
   share: SharePhase;
-  /** Names of documents Share left out (shared on their own, unreadable). */
+  /** Names of documents Share left out (unreadable, or a name the list refuses). */
   notAdded: string[];
   /** Shares the open workspace (after the unsaved-changes check). */
   shareWorkspace: () => void;
@@ -63,7 +63,7 @@ export interface WorkspaceSyncApi {
   /** Joins the workspace of a `2.` link into the chosen folder. */
   joinWorkspace: (link: string) => void;
   /** The open workspace is a shared one (its marker names a room, or the session carries its
-   * link): the Share tab shows no `0092` Document block for it. */
+   * link). */
   sharedOpen: boolean;
 }
 
@@ -194,14 +194,7 @@ export function useWorkspaceSync(
 
 
   const { pump: pumpWriter, stop: stopWriter } = useWorkspaceWriter(getSession, collab.drive, writingRef);
-  useSharedTree(
-    getSession,
-    project,
-    workspace,
-    writingRef,
-    (room) => refs.current.collab.deviceKeys(room, () => undefined),
-    collab.name,
-  );
+  useSharedTree(getSession, project, workspace, writingRef);
 
   const opened = workspace.open ? workspace.name : "";
   useEffect(() => {
@@ -390,7 +383,7 @@ export function useWorkspaceSync(
     };
     sharingRef.current = true;
     try {
-      // The device's identity first: a document shared on this device alone is taken in.
+      // The device's identity first: the genesis names it.
       const keys = await collab.deviceKeys("", () => void runShareRef.current(run));
       if (cancelled()) {
         return;
@@ -400,15 +393,13 @@ export function useWorkspaceSync(
         return;
       }
       const deps = {
-        label: collab.name,
-        keysFor: (room: string) => collab.deviceKeys(room, () => undefined),
         progress: (done: number, total: number) => {
           if (shareRunRef.current === run) {
             setShare({ kind: "uploading", done, total });
           }
         },
       };
-      const prepared = await prepareShare(entries, keys.identity, deps);
+      const prepared = await prepareShare(entries, deps);
       const { builder } = prepared;
       try {
         if (cancelled()) {
@@ -443,8 +434,9 @@ export function useWorkspaceSync(
           setShare({ kind: "failed", text: `Could not share: ${failure}` });
           return;
         }
-        await commitShare(prepared, deps);
+        // The open document takes its record first, so any Save from now on writes it.
         adoptOpenDocument(getSession(), builder, ws.openPathNow());
+        await commitShare(prepared);
       } finally {
         builder.free();
       }

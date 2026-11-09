@@ -80,9 +80,9 @@ export interface DevicesApi {
   /** The name of this device (separate from "Name shown to others"). */
   deviceName: string;
   setDeviceName: (text: string) => string;
-  /** Add a device: this device shows a code. */
+  /** Add device: this device shows a code. */
   addDevice: () => void;
-  /** Join my devices with `code` into the Synced workspaces folder. */
+  /** Join… with a device `code` into the Synced workspaces folder. */
   joinDevices: (code: string) => void;
   /** The opener's Pair. */
   pair: () => void;

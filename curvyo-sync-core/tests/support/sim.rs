@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, VecDeque};
 
 use curvyo_crypto_core::keyring::{Role, decode_log, encode_log};
 use curvyo_crypto_core::{EpochKey, Identity};
-use curvyo_document_core::{Document, DocumentVersion, ShareRecord, pack, unpack};
+use curvyo_document_core::{Document, DocumentVersion, pack, unpack};
 use curvyo_sync_core::{
     ClientOutput, ClientSession, ConnectionId, InviteSecret, Millis, RecordKind, Relay,
     RelayOutput, RoomId, SessionConfig, SessionEvent, SessionStart, StoreOp, StoredRoom,
@@ -25,6 +25,16 @@ enum Msg {
 }
 
 /// One app instance: its session, its replica and its saved file.
+/// Where a closed client synced and its keyring, kept beside its file as a workspace's marker
+/// keeps them (ADR 0037 decision 1).
+#[derive(Debug, Clone)]
+pub struct SavedShare {
+    pub room: RoomId,
+    pub server_seq: u64,
+    pub synced_version: DocumentVersion,
+    pub keyring_log: Vec<u8>,
+}
+
 pub struct Client {
     pub device: u8,
     pub session: Option<ClientSession>,
@@ -48,6 +58,8 @@ pub struct Client {
     pub epoch_keys: Vec<(u32, EpochKey)>,
     /// The saved `.curvyo` file, after `close_app`.
     pub file: Option<Vec<u8>>,
+    /// What the host keeps beside the file to reconnect (a workspace marker's share files).
+    pub saved: Option<SavedShare>,
     /// Imports the document refused (criterion 25 path).
     pub import_failures: usize,
     sessions_started: u64,
@@ -71,6 +83,7 @@ impl Client {
             synced_version: DocumentVersion::never(),
             epoch_keys: Vec::new(),
             file: None,
+            saved: None,
             import_failures: 0,
             sessions_started: 0,
         }
@@ -311,19 +324,18 @@ impl Net {
         }
     }
 
-    /// Client `i` saves its document with its share record and closes the app.
+    /// Client `i` saves its document, keeps its share beside it and closes the app.
     pub fn close_app(&mut self, i: usize) {
         self.drop_connection(i);
         let client = &mut self.clients[i];
         let session = client.session.take().expect("a session");
         let doc = client.doc.take().expect("a replica");
-        doc.set_share(Some(ShareRecord {
-            server: "ws://relay.test:8787".to_owned(),
-            room: session.room().0,
+        client.saved = Some(SavedShare {
+            room: session.room(),
             server_seq: session.cursor(),
             synced_version: client.synced_version.clone(),
             keyring_log: encode_log(&session.keyring_entries()).unwrap(),
-        }));
+        });
         client.epoch_keys = session.epoch_keys();
         client.file = Some(pack(&doc, "sim").unwrap());
     }
@@ -334,12 +346,15 @@ impl Net {
         let peer = self.clients[i].peer_id();
         let file = self.clients[i].file.clone().expect("a saved file");
         let doc = unpack(peer, &file).unwrap();
-        let record = doc.share().expect("a shared file");
+        let record = self.clients[i]
+            .saved
+            .clone()
+            .expect("a share kept beside the file");
         let keyring = decode_log(&record.keyring_log).unwrap();
         let epoch_keys = self.clients[i].epoch_keys.clone();
         let mut config = self.config(
             i,
-            RoomId(record.room),
+            record.room,
             record.server_seq,
             SessionStart::Member {
                 keyring,

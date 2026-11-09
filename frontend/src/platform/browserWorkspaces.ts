@@ -325,9 +325,8 @@ export const browserWorkspaceCommands: Record<string, (args?: Record<string, unk
       .map(([, entry]) => {
         const members = JSON.parse(container_share_members(entry.bytes ?? new Uint8Array())) as {
           share: string | null;
-          keyring: boolean;
         };
-        return { path: entry.path, share: members.share, keyring: members.keyring };
+        return { path: entry.path, share: members.share };
       });
     return {
       entries: await scan(id),

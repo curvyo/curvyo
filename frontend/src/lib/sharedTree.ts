@@ -8,7 +8,7 @@ import { samePath } from "./workspaceRows.ts";
 export interface SharedScan {
   entries: unknown[];
   folders: string[][];
-  documents: { path: string[]; share: string | null; keyring: boolean }[];
+  documents: { path: string[]; share: string | null }[];
   known: { document: string; path: string[] }[];
 }
 

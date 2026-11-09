@@ -47,6 +47,7 @@ mod svg_export;
 #[cfg(target_os = "linux")]
 mod svg_preview;
 mod workspace;
+mod workspace_around;
 mod workspace_share;
 mod workspace_shared;
 
@@ -161,6 +162,8 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         devices::find_workspace_copy,
         devices::workspace_summary,
         workspace::pick_workspace,
+        workspace_around::workspace_folder_for_file,
+        workspace_around::make_workspace_for_file,
         workspace::open_recent_workspace,
         workspace::recent_workspaces,
         workspace::remove_recent_workspace,

@@ -1,6 +1,6 @@
 //! The membership lifecycle in the editing session (`specs/0097-membership-lifecycle` criteria
-//! 1 to 5, 7, 10 to 12, 15 to 21, 30), against one in-process relay: roles, leave, Change keys
-//! now, the ended record, Add back, the return check, Sync again and Keep as it is.
+//! 1 to 5, 7, 10 to 12, 15, 16, 30), against one in-process relay through a shared workspace:
+//! roles, leave, Change keys now and the marker's ended record.
 
 use std::io::Cursor;
 
@@ -10,7 +10,7 @@ use curvyo_sync_core::SessionError;
 use serde_json::Value;
 
 use super::Session;
-use super::sync_test_support::{Net, SERVER, seeds, shared_pair, view};
+use super::sync_test_support::{Net, SERVER, join_open, seeds, shared_pair, view};
 
 /// The epoch keys one device stored.
 type StoredKeys = Vec<(u32, [u8; 32])>;
@@ -21,12 +21,7 @@ fn shared_three() -> (Net, [usize; 3], Vec<StoredKeys>) {
     let now = net.now;
     let (link, _) = net.s(a).create_invite(3_600, now).unwrap();
     net.pump();
-    let c = net.add(Session::new(0xc3));
-    net.s(c)
-        .join_document(&link, "Cleo", &seeds(3, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(1_000);
+    let c = join_open(&mut net, &link, "Cleo", 3, 0xc3);
     let mut keys = Vec::new();
     for i in [a, b, c] {
         keys.push(
@@ -95,7 +90,7 @@ fn rows_offer_role_actions_and_a_promotion_is_a_notice() {
         net.s(a).set_participant_role(&anna, false),
         Err(SessionError::LastAdmin)
     );
-    assert_eq!(net.s(a).leave_share("Poster"), Err(SessionError::LastAdmin));
+    assert_eq!(net.s(a).leave_share(), Err(SessionError::LastAdmin));
     let seen_by_c = net.s(c).share_admin_set();
     let ben = member_of(&net.devices[a].session, "Ben");
     net.s(a).set_participant_role(&ben, true).unwrap();
@@ -113,26 +108,28 @@ fn rows_offer_role_actions_and_a_promotion_is_a_notice() {
     assert_eq!(row(&net.devices[c].session, "Anna")["admin"], false);
 }
 
-/// Criteria 10 to 13: B leaves; its file is local with the ended record "left", it is told
-/// so; A sees the pending rotation until Change keys now.
+/// Criteria 10 to 13: B leaves; the marker's ended record says "left", B is told so and its
+/// open document keeps its `share.json` v2; A sees the pending rotation until Change keys now.
 #[test]
 fn a_leave_keeps_the_way_back_and_asks_for_new_keys() {
     let (mut net, [a, b, _], _) = shared_three();
-    net.s(b).leave_share("Poster").unwrap();
+    net.s(b).leave_share().unwrap();
     net.run(1_000);
-    let ended = net.devices[b].session.document.ended_share().unwrap();
+    let ended = net.devices[b].session.workspace_ended_record().unwrap();
     assert_eq!(ended.ended, EndReason::Left);
     assert_eq!(ended.server, SERVER);
     assert!(!net.devices[b].session.is_shared());
     assert_eq!(view(&net.devices[b].session)["ended"], "left");
     assert!(
-        notices(net.s(b)).contains(&"You left Poster. Your copy stays on this device.".to_owned()),
-        "the leaver's notice names the file (ux-notes 5.2)"
+        notices(net.s(b))
+            .iter()
+            .any(|t| t.starts_with("You left Box job")),
+        "the leaver's notice names the workspace (ux-notes 5.2)"
     );
     let file = curvyo_document_core::pack(&net.devices[b].session.document, "t").unwrap();
     let names = member_names(&file);
-    assert!(names.iter().any(|n| n == "share.ended.json"), "{names:?}");
-    assert!(!names.iter().any(|n| n == "share.json"));
+    assert!(names.iter().any(|n| n == "share.json"), "{names:?}");
+    assert!(!names.iter().any(|n| n == "share.ended.json"));
     // Nothing more goes out from B.
     let connects = net.devices[b].connects;
     net.run(5_000);

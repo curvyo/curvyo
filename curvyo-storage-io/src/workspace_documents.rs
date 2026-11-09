@@ -81,8 +81,6 @@ pub fn probe_document(root: &Path, path: &[String]) -> Result<DocumentProbe, Wor
 
 /// The container's `share.json` member.
 pub(crate) const SHARE_MEMBER: &str = "share.json";
-/// The keyring member of a document shared on its own room.
-const KEYRING_MEMBER: &str = "keyring.log";
 /// The largest `share.json` read.
 const MAX_SHARE_BYTES: u64 = 64 * 1024;
 
@@ -92,8 +90,6 @@ const MAX_SHARE_BYTES: u64 = 64 * 1024;
 pub struct ShareMembers {
     /// The bytes of `share.json`, when present and readable.
     pub share_json: Option<Vec<u8>>,
-    /// Whether a `keyring.log` is present: the document is shared on its own room.
-    pub keyring: bool,
 }
 
 /// The sharing members of the document at `path`; a file that is no container has none.
@@ -113,11 +109,7 @@ pub fn share_members(root: &Path, path: &[String]) -> Result<ShareMembers, Works
         Member::Read(bytes) => Some(bytes),
         Member::Missing | Member::TooLarge | Member::Broken => None,
     };
-    let keyring = archive.index_for_name(KEYRING_MEMBER).is_some();
-    Ok(ShareMembers {
-        share_json,
-        keyring,
-    })
+    Ok(ShareMembers { share_json })
 }
 
 enum Member {

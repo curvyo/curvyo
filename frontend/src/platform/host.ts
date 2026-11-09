@@ -297,6 +297,13 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   // workspaces only.
   pick_join_folder: () => ({ kind: "cancelled" }),
   start_joined_workspace: () => ({ kind: "refused", code: "not-found" }),
+  // Make a workspace for this file is desktop only (`specs/0105` criterion 9).
+  workspace_folder_for_file: () => {
+    throw new Error("the browser makes no workspaces");
+  },
+  make_workspace_for_file: () => {
+    throw new Error("the browser makes no workspaces");
+  },
   recent_workspaces: ws("recent_workspaces"),
   remove_recent_workspace: ws("remove_recent_workspace"),
   pick_workspace: ws("pick_workspace"),

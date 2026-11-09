@@ -1,22 +1,25 @@
-// Browser journey of `specs/0092-cooperative-editing` slice 1 (plan task 27): a local
-// `curvyo-sync-server` on a temporary data directory and two browser contexts, A and B, each its
-// own device (own storage, own in-page keys). A shares a saved document (criterion 1), creates an
-// invite (2), B joins by pasting it (3); both draw and see the other's rectangles (6) and pointer,
-// selection and "is editing this" marker (14, 15); a drag shows live in B and ends as one step
-// (7); B goes offline (17), both edit, B comes back and both hold every edit (18); A removes B
-// (32), whose copy stays and who is told so.
+// Browser journey of `specs/0092-cooperative-editing` on a shared workspace (`specs/0105`
+// criterion 23: the workspace is the only unit of sharing): a local `curvyo-sync-server` on a
+// temporary data directory and two browser contexts, A and B, each its own device with a faked
+// desktop host (`support/fake-workspace-host.cjs`) on real folders under target/0092-browser/. A
+// shares a workspace with one document by Invite person, B joins by the link and opens the same
+// document; both draw and see the other's rectangles (6) and pointer, selection and "is editing
+// this" marker (14, 15); a drag shows live in B and ends as one step (7); B goes offline (17),
+// both edit, B comes back and both hold every edit (18); A removes B (32), whose copy stays and
+// who is told so.
 //
 // Needs `target/debug/curvyo-sync-server` (`cargo build -p curvyo-sync-server`) and a production
 // preview (`npm run build`, `npx vite preview --host 127.0.0.1 --port 1421`); starts the preview
 // itself unless CURVYO_BROWSER_URL is set. Screenshots and saved files: target/0092-browser/.
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
-const { spawn, execFileSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '../../..');
 const out = path.join(root, 'target/0092-browser');
+fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 const children = [];
 process.on('exit', () => {
@@ -71,14 +74,19 @@ async function until(what, check, timeout = 10000) {
   }
 }
 
+const { FAKE_HOST, makeHost, zip } = require('./support/fake-workspace-host.cjs');
+
 async function device(browser, url, label) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  const host = makeHost(out, label);
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`${label}: ${e.stack || e.message}`));
+  await page.exposeFunction('__host', (cmd, args, bytes) => host.handle(cmd, args, bytes));
+  await page.addInitScript(FAKE_HOST);
   await page.goto(url, { waitUntil: 'networkidle' });
   const canvas = await page.locator('canvas').first().boundingBox();
-  return { context, page, errors, label, canvas, saves: 0 };
+  return { context, page, errors, label, canvas, host };
 }
 
 const tab = async (d, name) => { await d.page.getByRole('tab', { name: new RegExp(`^${name}`) }).click(); await settle(d.page); };
@@ -96,22 +104,20 @@ async function rect(d, x, y, w, h) {
   await settle(d.page);
 }
 
-/** Saves through the File tab (a download in the browser) and returns the document's objects. */
+/** Saves the open workspace document through the File tab and returns its objects. */
 async function saved(d) {
   await tab(d, 'File');
-  const download = d.page.waitForEvent('download');
-  await d.page.getByRole('button', { name: 'Save', exact: true }).click();
-  d.saves += 1;
-  const file = path.join(out, `${d.label}-${d.saves}.curvyo`);
-  await (await download).saveAs(file);
-  const json = execFileSync('python3', ['-c', 'import zipfile,sys; print(zipfile.ZipFile(sys.argv[1]).read("document.json").decode())', file], { encoding: 'utf8' });
-  const members = execFileSync('python3', ['-c', 'import zipfile,sys; print("\\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))', file], { encoding: 'utf8' }).split('\n');
+  await panel(d).getByRole('button', { name: 'Save', exact: true }).click();
+  await settle(d.page, 300);
+  const file = path.join(d.host.state.root, 'Poster.curvyo');
   const flat = (nodes) => nodes.flatMap((n) => (n.shape === 'layer' || n.shape === 'group' ? flat(n.objects || []) : [n]));
-  return { objects: flat(JSON.parse(json).objects), members, file };
+  return { objects: flat(zip('json', file).objects), file };
 }
 
 const panel = (d) => d.page.locator('[role=tabpanel]');
-const participants = (d) => d.page.getByRole('list', { name: 'Participants' }).locator('li');
+const participants = (d) => d.page.getByRole('list', { name: 'Participants' }).locator('li[data-member]');
+const tree = (d) => d.page.getByRole('treegrid', { name: 'Workspace documents' });
+const row = (d, name) => tree(d).getByRole('row', { name: new RegExp(`^${name}\\b`) });
 const pill = (d) => d.page.locator('button[aria-label^="Collaboration"]');
 /** The other participant's chips on the canvas (the presence overlay is `aria-hidden`). */
 const chip = (d, text) => d.page.locator('div.pointer-events-none.absolute.inset-0 span', { hasText: text });
@@ -134,8 +140,15 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     A = await device(browser, url, 'A');
     B = await device(browser, url, 'B');
 
-    step('Criterion 1');
-    // Criterion 1: a saved document, the server and name set, Share with its confirm.
+    step('0105 criterion 23 setup: A shares a workspace of one document by Invite person');
+    await tab(A, 'File');
+    await panel(A).getByRole('button', { name: 'Open workspace…', exact: true }).click();
+    await tree(A).waitFor();
+    await panel(A).getByRole('region', { name: 'Workspace' }).getByLabel('New document', { exact: true }).click();
+    const newName = panel(A).getByRole('textbox', { name: 'Name of the new document' });
+    await newName.fill('Poster');
+    await newName.press('Enter');
+    await settle(A.page, 400);
     await rect(A, 300, 200, 120, 80);
     const first = await saved(A);
     assert.equal(first.objects.length, 1);
@@ -146,45 +159,38 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     const name = panel(A).getByLabel('Name shown to others', { exact: true });
     await name.fill('Anna');
     await name.press('Enter');
-    await panel(A).getByText('Connected', { exact: true }).waitFor();
-    // Share asks nothing (customer 2026-11-09: no confirm sentences in the Share tab).
-    await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
-    await panel(A).getByText(/^Shared on /).waitFor({ timeout: 10000 });
-    await until('A connected', async () => (await panel(A).getByText('Connected', { exact: true }).count()) === 1);
+    await panel(A).getByText('Connected', { exact: true }).first().waitFor();
+    await panel(A).getByRole('button', { name: 'Invite person', exact: true }).click();
+    await panel(A).getByRole('group', { name: /leave this device encrypted/ }).getByRole('button', { name: 'Invite person', exact: true }).click();
+    const linkField = panel(A).getByLabel('Invite link', { exact: true });
+    await linkField.waitFor({ timeout: 30000 });
+    const link = await linkField.inputValue();
+    assert.match(link, /^curvyo:\/\/join\?server=[^#]+#2\.[A-Za-z0-9_-]+$/, link);
     assert.equal(await participants(A).count(), 1);
     const own = await participants(A).first().innerText();
     assert.match(own, /Anna\s*this device/);
     assert.match(own, /[A-Z2-7]{4} [A-Z2-7]{4}/, 'the own row shows a fingerprint');
     assert.equal(await pill(A).count(), 1, 'the collaboration pill shows');
-    const sharedFile = await saved(A);
-    assert(sharedFile.members.includes('share.json') && sharedFile.members.includes('keyring.log'), `shared file members: ${sharedFile.members}`);
-    await tab(A, 'Share');
     await shot(A, '01-a-shared');
 
-    step('Criterion 2');
-    // Criterion 2: Invite writes a link valid for 24 hours at once; its secret follows '#'.
-    await panel(A).getByRole('button', { name: 'Invite', exact: true }).click();
-    const linkField = panel(A).getByLabel('Invite link', { exact: true });
-    await linkField.waitFor();
-    const link = await linkField.inputValue();
-    assert.match(link, /^curvyo:\/\/join\?server=[^#]+#1\.[A-Za-z0-9_-]+$/, link);
-    // The invite shows its expiry without a sentence (customer 2026-11-09).
-    assert.doesNotMatch(await panel(A).innerText(), /Anyone with this link/);
-    assert.match(await panel(A).innerText(), /Expires /);
-    await shot(A, '02-a-invite');
-
-    step('Criterion 3');
-    // Criterion 3: B pastes the link, gives a name, waits, is admitted and shows the document.
+    step('B joins by the link and opens the same document');
     await tab(B, 'Share');
-    await panel(B).getByRole('button', { name: /^Open shared document/ }).click();
-    await panel(B).getByLabel('Invite link', { exact: true }).fill(link);
+    await panel(B).getByRole('button', { name: 'Join…', exact: true }).click();
+    await panel(B).getByLabel('Link or code', { exact: true }).fill(link);
     const bName = panel(B).getByLabel('Name shown to others', { exact: true }).last();
     await bName.fill('Ben');
     await bName.press('Enter');
+    await panel(B).getByRole('button', { name: /^Choose folder/ }).click();
     const joinStart = Date.now();
     await panel(B).getByRole('button', { name: 'Join', exact: true }).click();
-    await until('B joined', async () => (await participants(B).count()) === 2, 15000);
+    await until('B has the file', async () => B.host.state.root !== null && fs.existsSync(path.join(B.host.state.root, 'Poster.curvyo')), 30000);
     timings.join = Date.now() - joinStart;
+    await tab(B, 'File');
+    await until('B\'s tree shows Poster', async () => (await row(B, 'Poster').count()) === 1);
+    await row(B, 'Poster').click();
+    await settle(B.page, 800);
+    await tab(B, 'Share');
+    await until('B lists both', async () => (await participants(B).count()) === 2, 15000);
     await until('A lists B', async () => (await participants(A).count()) === 2);
     // Labels travel with the first presence message (heartbeat 2 s).
     await until('B names both', async () => {
@@ -194,6 +200,9 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     await until('A names B', async () => (await participants(A).allInnerTexts()).some((t) => /Ben/.test(t)), 5000);
     await shot(B, '03-b-joined');
     assert.equal((await saved(B)).objects.length, 1, 'B holds A\'s rectangle');
+    await tab(A, 'File');
+    await row(A, 'Poster').click();
+    await settle(A.page, 800);
 
     step('Criterion 6');
     // Criterion 6: a rectangle each way.
@@ -281,7 +290,7 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     await settle(A.page, 450);
     await removeBen.click();
     await until('A lists only itself', async () => (await participants(A).count()) === 1);
-    await until('B told', async () => (await B.page.getByText('You were removed from this document. Your copy stays on this device.').count()) >= 1, 8000);
+    await until('B told', async () => (await B.page.getByText('You were removed from this workspace. Your copies stay on this device.').count()) >= 1, 8000);
     await shot(A, '09-a-removed-b');
     await shot(B, '10-b-removed');
     const kept = await saved(B);
@@ -291,7 +300,7 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     assert.equal((await saved(B)).objects.length, countBefore + 6, 'B gets no later change');
 
     assert.deepEqual([...A.errors, ...B.errors], []);
-    console.log(`PASS browser 0092: share, invite, join, live edits both ways, presence and marker, live drag, offline and merge, removal; timings ${JSON.stringify(timings)}`);
+    console.log(`PASS browser 0092 on a shared workspace: invite person, join, live edits both ways, presence and marker, live drag, offline and merge, removal; timings ${JSON.stringify(timings)}`);
   } catch (error) {
     for (const d of [A, B]) {
       if (d) {

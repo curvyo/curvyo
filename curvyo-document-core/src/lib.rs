@@ -194,8 +194,8 @@ pub use clones::{
 pub use container::{CURRENT_LORO_SNAPSHOT_VERSION, pack, pack_snapshot, unpack};
 pub use container_ended::{ENDED_FORMAT_VERSION, EndReason, EndedRecord};
 pub use container_share::{
-    CURRENT_SHARE_FORMAT_VERSION, ContainerShareMembers, ShareRecord, WorkspaceRoomRecord,
-    WorkspaceShareRecord, container_share_members,
+    CURRENT_SHARE_FORMAT_VERSION, ContainerShareMembers, WorkspaceRoomRecord, WorkspaceShareRecord,
+    container_share_members,
 };
 pub use corner_radii::{Corner, CornerRadii, SHARP_CORNER_EPSILON_MM, effective_corner_radii};
 pub use devices_list::{

@@ -14,14 +14,14 @@ const SENTENCE_NAME_MAX: usize = 40;
 /// The row state of a file that is not part of the shared workspace (criterion 41).
 pub const NOT_IN_WORKSPACE_TEXT: &str = "Not in the shared workspace";
 /// The row state of a document the list names whose file was removed (criterion 41).
-pub const MISSING_TEXT: &str = "Missing on this computer";
+pub const MISSING_TEXT: &str = "Missing on this device";
 /// The row state of a document whose file has not arrived yet (criterion 35).
 pub const RECEIVING_TEXT: &str = "Receiving...";
 /// The notice of a folder move the loop rule did not apply (criterion 39).
 pub const LOOP_NOTICE: &str = "Folder move skipped: it would loop.";
 /// The block the File tab shows on a device removed from the workspace (criterion 44).
 pub const WORKSPACE_REMOVED_TEXT: &str =
-    "You were removed from this workspace. Your copies stay on this computer.";
+    "You were removed from this workspace. Your copies stay on this device.";
 /// The Deleted list's line when it is empty (`ux-notes.md` section 5).
 pub const NO_DELETED_TEXT: &str = "No deleted documents.";
 
@@ -98,7 +98,7 @@ pub fn shared_delete_confirm_text(name: &str, folder: bool, documents: usize) ->
         (true, n) => format!("{name} and its {n} documents"),
     };
     format!(
-        "Delete {subject} for everyone? Every computer moves it to its trash. You can restore it \
+        "Delete {subject} for everyone? Every device moves it to its trash. You can restore it \
          from Deleted."
     )
 }
@@ -120,66 +120,6 @@ pub fn restored_text(name: &str) -> String {
 #[must_use]
 pub fn added_text(name: &str) -> String {
     format!("Added {} to the workspace.", cut(name, SENTENCE_NAME_MAX))
-}
-
-/// The confirm of taking a document shared on its own into the workspace (criterion 42,
-/// `ux-notes.md` section 6).
-#[must_use]
-pub fn take_in_confirm_text(name: &str, people: usize, workspace: &str) -> String {
-    let people = match people {
-        1 => "1 person".to_owned(),
-        n => format!("{n} people"),
-    };
-    format!(
-        "{} is shared on its own with {people}. Take it into {}? Its own link stops working. \
-         People of {} can edit it.",
-        cut(name, SENTENCE_NAME_MAX),
-        cut(name_of(workspace), SENTENCE_NAME_MAX),
-        cut(name_of(workspace), SENTENCE_NAME_MAX),
-    )
-}
-
-/// The alert of a document that cannot be taken in (criterion 49).
-#[must_use]
-pub fn take_in_refused_text(name: &str, workspace: &str) -> String {
-    format!(
-        "{} was not added: it is shared with people who are not in {}.",
-        cut(name, SENTENCE_NAME_MAX),
-        cut(name_of(workspace), SENTENCE_NAME_MAX)
-    )
-}
-
-/// The alert of a take-in whose document's own room cannot be reached (ADR 0037 decision 10,
-/// **Proposal**): nothing was changed, the document keeps syncing on its own room.
-#[must_use]
-pub fn take_in_unreachable_text(name: &str) -> String {
-    format!(
-        "{} was not added: its own room cannot be reached. Try again when connected.",
-        cut(name, SENTENCE_NAME_MAX)
-    )
-}
-
-/// The notice of a document whose own room was taken into a workspace, shown on a copy that
-/// still syncs it (criterion 49); `workspace` empty when this device does not know its name.
-#[must_use]
-pub fn moved_into_workspace_text(name: &str, workspace: &str) -> String {
-    let place = if workspace.is_empty() {
-        "a shared workspace".to_owned()
-    } else {
-        format!("the workspace {}", item(workspace))
-    };
-    format!(
-        "{} is now part of {place}. This copy is a local file.",
-        item(name)
-    )
-}
-
-fn name_of(workspace: &str) -> &str {
-    if workspace.is_empty() {
-        "a shared workspace"
-    } else {
-        workspace
-    }
 }
 
 #[cfg(test)]
@@ -221,7 +161,7 @@ mod tests {
     fn confirms_and_statuses_read_as_the_ux_notes_say() {
         assert_eq!(
             shared_delete_confirm_text("Sides", true, 6),
-            "Delete Sides and its 6 documents for everyone? Every computer moves it to its \
+            "Delete Sides and its 6 documents for everyone? Every device moves it to its \
              trash. You can restore it from Deleted."
         );
         assert_eq!(
@@ -236,24 +176,7 @@ mod tests {
             deleted_while_open_text("Ben"),
             "Deleted by Ben. Save as to keep it."
         );
-        assert_eq!(
-            take_in_confirm_text("Lid", 2, "Box job"),
-            "Lid is shared on its own with 2 people. Take it into Box job? Its own link stops \
-             working. People of Box job can edit it."
-        );
-        assert_eq!(
-            take_in_refused_text("Lid", "Box job"),
-            "Lid was not added: it is shared with people who are not in Box job."
-        );
-        assert_eq!(
-            take_in_unreachable_text("Lid"),
-            "Lid was not added: its own room cannot be reached. Try again when connected."
-        );
         assert_eq!(restored_text("Lid"), "Restored Lid.");
         assert_eq!(added_text("Lid"), "Added Lid to the workspace.");
-        assert_eq!(
-            moved_into_workspace_text("This document", ""),
-            "This document is now part of a shared workspace. This copy is a local file."
-        );
     }
 }

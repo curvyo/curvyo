@@ -1,15 +1,15 @@
 //! The formats of the membership lifecycle (`specs/0097-membership-lifecycle` criteria 13, 16,
 //! 20 and 33; ADR 0041 decisions 3 and 6): the ended record `share.ended.json` version 1 as a
-//! container member and a marker file, and the devices list's optional `left` mark. Regenerate
-//! the goldens with `UPDATE_0097_FIXTURES=1`.
+//! marker file, the container member of `0097` builds read as a legacy local file (ADR 0044
+//! decision 3), and the devices list's optional `left` mark. The marker goldens regenerate with
+//! `UPDATE_0097_FIXTURES=1`; `ended_v36.curvyo` is a legacy input.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::io::{Cursor, Read, Write};
 
 use curvyo_document_core::{
-    DevicesList, Document, EndReason, EndedRecord, Length, Point, RectBounds, ShareRecord, pack,
-    pack_snapshot, unpack,
+    DevicesList, Document, EndReason, EndedRecord, Length, Point, RectBounds, pack, unpack,
 };
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -82,63 +82,15 @@ fn with_member(bytes: &[u8], name: &str, with: Option<&[u8]>) -> Vec<u8> {
     writer.finish().unwrap().into_inner()
 }
 
-/// Criteria 13 and 20: an ended file keeps `share.ended.json` in place of `share.json` and
-/// `keyring.log`, opens as a local file and round-trips the record; a relay snapshot never
-/// carries it.
-#[test]
-fn an_ended_file_is_local_and_keeps_its_way_back() {
-    let document = document();
-    document.set_share(Some(ShareRecord {
-        server: "ws://x".to_owned(),
-        room: [7; 16],
-        server_seq: 1,
-        synced_version: document.version(),
-        keyring_log: vec![1, 2, 3],
-    }));
-    let record = ended(&document, EndReason::Left);
-    document.set_ended_share(Some(record.clone()));
-    assert!(!document.is_shared());
-    assert_eq!(document.share(), None);
-    let bytes = pack(&document, "t").unwrap();
-    let names = names(&bytes);
-    assert!(names.iter().any(|n| n == "share.ended.json"), "{names:?}");
-    assert!(
-        !names
-            .iter()
-            .any(|n| n == "share.json" || n == "keyring.log")
-    );
-    let opened = unpack(2, &bytes).unwrap();
-    assert_eq!(opened.ended_share(), Some(record));
-    assert_eq!(opened.share(), None);
-    assert_eq!(opened.workspace_share(), None);
-    assert!(!opened.is_shared());
-    let snapshot = pack_snapshot(&document, "t").unwrap();
-    assert!(
-        !self::names(&snapshot)
-            .iter()
-            .any(|n| n == "share.ended.json")
-    );
-    // Sync again replaces it with a share record; clearing it leaves a plain file.
-    opened.set_ended_share(None);
-    assert_eq!(
-        unpack(3, &pack(&opened, "t").unwrap())
-            .unwrap()
-            .ended_share(),
-        None
-    );
-}
-
-/// The golden `share_ended_v1.json` (marker file) and `ended_v36.curvyo` (container member).
+/// The golden `share_ended_v1.json` (marker file); `specs/0105` criteria 4 and 5: the legacy
+/// container `ended_v36.curvyo` opens as an editable local document with the legacy flag, and
+/// saved it holds no ended record and opens without the flag.
 #[test]
 fn golden_share_ended_v1() {
     let json_path = fixture("share_ended_v1.json");
-    let container_path = fixture("ended_v36.curvyo");
     if updating() {
-        let document = document();
-        let record = ended(&document, EndReason::Removed);
+        let record = ended(&document(), EndReason::Removed);
         std::fs::write(&json_path, record.to_bytes().unwrap()).unwrap();
-        document.set_ended_share(Some(record));
-        std::fs::write(&container_path, pack(&document, "golden").unwrap()).unwrap();
     }
     let json = std::fs::read(&json_path).unwrap();
     let value: serde_json::Value = serde_json::from_slice(&json).unwrap();
@@ -154,22 +106,23 @@ fn golden_share_ended_v1() {
     assert_eq!(record.room, [7; 16]);
     assert_eq!(record.heads, vec![[0x41; 32], [0x42; 32]]);
 
-    let bytes = std::fs::read(&container_path).unwrap();
+    let bytes = std::fs::read(fixture("ended_v36.curvyo")).unwrap();
+    assert!(
+        member(&bytes, "share.ended.json").is_some(),
+        "a legacy input"
+    );
     let opened = unpack(2, &bytes).unwrap();
-    let kept = opened.ended_share().expect("an ended record");
-    assert_eq!(kept.server_seq, 42);
-    assert_eq!(kept.synced_version, opened.version());
-    assert_eq!(kept.ended, EndReason::Removed);
+    assert!(opened.legacy_share());
     assert!(!opened.is_shared());
+    let saved = pack(&opened, "t").unwrap();
+    assert!(!names(&saved).iter().any(|n| n.starts_with("share")));
+    assert!(!unpack(3, &saved).unwrap().legacy_share());
 }
 
 /// Criterion 33 and ADR 0041 decision 6: `manifest.json` lists no members (its keys are
-/// unchanged), so a build that does not know `share.ended.json` reads members by name and never
-/// sees it: the v35 reader read `share.json`, `keyring.log`, `document.loro` and `manifest.json`
-/// by name and assets by their `assets/` names (checked against `git show` of that build; no v35
-/// binary is run here). This build opens a container with any unknown member the same way.
+/// unchanged), so this build opens a container with any unknown member like a plain one.
 #[test]
-fn builds_that_do_not_know_the_ended_record_open_the_file_as_local() {
+fn an_unknown_member_opens_the_file_as_local() {
     let bytes = std::fs::read(fixture("ended_v36.curvyo")).unwrap();
     let manifest: serde_json::Value =
         serde_json::from_slice(&member(&bytes, "manifest.json").unwrap()).unwrap();
@@ -188,7 +141,7 @@ fn builds_that_do_not_know_the_ended_record_open_the_file_as_local() {
     let unknown = with_member(&bytes, "share.ended.json", None);
     let unknown = with_member(&unknown, "something.new.json", Some(&ended));
     let opened = unpack(2, &unknown).unwrap();
-    assert_eq!(opened.ended_share(), None);
+    assert!(!opened.legacy_share());
     assert!(!opened.is_shared());
     assert_eq!(
         opened.export_json().unwrap(),
@@ -196,8 +149,8 @@ fn builds_that_do_not_know_the_ended_record_open_the_file_as_local() {
     );
 }
 
-/// Damaged variants: a newer or malformed ended record opens the file as local with no way back
-/// (Proposal), never as an open error; beside a `share.json` the ended record is ignored.
+/// Damaged variants of the marker's record are no way back (Proposal); in a container any of
+/// them is a legacy local file, never an open error.
 #[test]
 fn a_damaged_or_newer_ended_record_is_no_way_back() {
     let newer_path = fixture("share_ended_v2.json");
@@ -220,7 +173,7 @@ fn a_damaged_or_newer_ended_record_is_no_way_back() {
         assert_eq!(EndedRecord::from_bytes(&json), None);
         let container = with_member(&bytes, "share.ended.json", Some(&json));
         let opened = unpack(2, &container).unwrap();
-        assert_eq!(opened.ended_share(), None);
+        assert!(opened.legacy_share());
         assert!(!opened.is_shared());
     }
     assert_eq!(EndedRecord::from_bytes(b"not json"), None);
@@ -237,13 +190,6 @@ fn a_damaged_or_newer_ended_record_is_no_way_back() {
         ),
         None
     );
-    // With a share record beside it, the share record counts.
-    let shared = std::fs::read(fixture("shared_v34.curvyo")).unwrap();
-    let ended = member(&bytes, "share.ended.json").unwrap();
-    let both = with_member(&shared, "share.ended.json", Some(&ended));
-    let opened = unpack(2, &both).unwrap();
-    assert!(opened.share().is_some());
-    assert_eq!(opened.ended_share(), None);
 }
 
 const W1: [u8; 16] = [0x57; 16];

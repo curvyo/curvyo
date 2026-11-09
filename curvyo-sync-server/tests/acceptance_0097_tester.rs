@@ -1,6 +1,6 @@
 //! Tester acceptance tests for `specs/0097-membership-lifecycle` against the real server
-//! (criteria 20 and 26): the return check right after an add back, through real sockets, and
-//! the check's traffic.
+//! (criteria 20 and 26): an added-back device starting again right after the add back, through
+//! real sockets (the return check is retired, ADR 0044 decision 5).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -10,18 +10,20 @@ use std::time::Duration;
 
 use curvyo_crypto_core::keyring::Role;
 use curvyo_document_core::{Document, Length, Point, RectBounds};
-use curvyo_sync_core::{CheckOutcome, History, RoomId, SessionEvent, SessionStart};
+use curvyo_sync_core::{RoomId, SessionEvent, SessionStart};
 use support::{Captured, Device, converged, identity, now, run_until, start};
 
-fn outcome(device: &Device) -> Option<CheckOutcome> {
-    device.events.iter().rev().find_map(|e| match e {
-        SessionEvent::CheckResult(o) => Some(*o),
+/// Whether the device was admitted (`Online`) or refused, once either happened.
+fn outcome(device: &Device) -> Option<bool> {
+    device.events.iter().find_map(|e| match e {
+        SessionEvent::Online => Some(true),
+        SessionEvent::Refused(_) => Some(false),
         _ => None,
     })
 }
 
 /// A shares in `room`, B joins, A removes B; then A adds B back and, `gap` after A's session
-/// handed the entry to its socket, B runs its return check. The check's answers per room.
+/// handed the entry to its socket, B starts again from its kept keyring. The answers per room.
 async fn first_checks(gap: Duration, rooms: std::ops::Range<u8>) -> Vec<String> {
     let data = tempfile::tempdir().unwrap();
     let log = Captured::default();
@@ -58,14 +60,9 @@ async fn first_checks(gap: Duration, rooms: std::ops::Range<u8>) -> Vec<String> 
             .await
             .is_some()
         );
-        let heads = b.session.keyring().unwrap().heads();
+        let keyring = b.session.keyring_entries();
         let epoch_keys = b.session.epoch_keys();
-        let history = if round % 2 == 0 {
-            History::Full
-        } else {
-            History::FromNow
-        };
-        a.session.add_back(ben, history).unwrap();
+        a.session.add_back(ben).unwrap();
         // What A's Share tab shows at once: B listed again, before the relay has the entry.
         assert_eq!(a.session.keyring().unwrap().role(&ben), Some(Role::Member));
         a.step().await;
@@ -76,10 +73,9 @@ async fn first_checks(gap: Duration, rooms: std::ops::Range<u8>) -> Vec<String> 
             2,
             &url,
             room,
-            SessionStart::ReturnCheck {
+            SessionStart::Member {
+                keyring,
                 epoch_keys,
-                then_leave: false,
-                heads,
             },
         );
         let took = run_until(&mut [&mut check, &mut a], Duration::from_secs(10), |d| {
@@ -91,9 +87,9 @@ async fn first_checks(gap: Duration, rooms: std::ops::Range<u8>) -> Vec<String> 
             "criterion 26: an answer within 5 s, {took:?}"
         );
         let answer = outcome(&check);
-        if answer != Some(CheckOutcome::AddedBack) {
+        if answer != Some(true) {
             wrong.push(format!(
-                "room {round:#x} {history:?}: {answer:?} after {took:?}, fetched keyring {}",
+                "room {round:#x}: {answer:?} after {took:?}, fetched keyring {}",
                 if check.session.keyring().is_some() {
                     "yes"
                 } else {
@@ -106,16 +102,15 @@ async fn first_checks(gap: Duration, rooms: std::ops::Range<u8>) -> Vec<String> 
     wrong
 }
 
-/// Criterion 26 as the maker meets it: B presses Check once A has told B (here 300 ms after
-/// A's add back left A's session); the first check says "added back" within 5 s, for both
-/// history choices, through the real server.
+/// Criterion 26 as the maker meets it: B starts again once A has told B (here 300 ms after A's
+/// add back left A's session); B is admitted within 5 s through the real server.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn the_first_check_after_an_add_back_says_added_back() {
+async fn the_first_start_after_an_add_back_is_admitted() {
     let wrong = first_checks(Duration::from_millis(300), 0x90..0x96).await;
     assert!(wrong.is_empty(), "first checks: {wrong:?}");
 }
 
-/// The flaky first check, reproduced: B's check starts right after A's session handed the
+/// The flaky first start, reproduced: B starts right after A's session handed the
 /// add back to its socket (A lists B again at once). Through the real server every such first
 /// check answers "not yet" (refused as removed): A's small `Keyring` frame waits in A's TCP
 /// stack (Nagle: no `TCP_NODELAY` on the client socket, and neither the server nor the test
@@ -125,7 +120,7 @@ async fn the_first_check_after_an_add_back_says_added_back() {
 /// keyring entries, so A's list shows B before the relay has the add.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "FINDING (low): a check started within ~40 ms of the add back answers 'not yet' (A's UI lists B before the relay holds the add; Nagle on the client socket)"]
-async fn a_check_right_after_the_add_back_says_added_back() {
+async fn a_start_right_after_the_add_back_is_admitted() {
     let wrong = first_checks(Duration::ZERO, 0xa0..0xa6).await;
     assert!(wrong.is_empty(), "first checks: {wrong:?}");
 }

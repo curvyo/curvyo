@@ -22,6 +22,7 @@ mod recent_workspaces;
 mod room_keys;
 mod svg_fonts;
 mod workspace;
+mod workspace_around;
 mod workspace_deleted;
 mod workspace_documents;
 mod workspace_ended;
@@ -56,6 +57,7 @@ pub use workspace::{
     create_document, create_folder, fresh_workspace_id, marker_text, move_entry, open_workspace,
     parse_marker, scan_workspace, trash_entry,
 };
+pub use workspace_around::{make_workspace_around, workspace_folder_for};
 pub use workspace_deleted::{
     DELETED_DIR, keep_deleted, read_deleted, restore_deleted, write_deleted,
 };
