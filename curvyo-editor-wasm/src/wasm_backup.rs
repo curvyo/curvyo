@@ -127,7 +127,7 @@ fn failure_kind(outcome: &BackupOutcome) -> String {
 }
 
 /// A fixed word of the backup by key: `backed-up`, `back-up`, `remove`, `restore`, `waiting`,
-/// `working`, `stored`, `removed`, `restored`, `remove-confirm`, or an
+/// `working`, `stored`, `removed`, `restored`, or an
 /// outcome kind (`no-prf`, `cancelled`, ...); empty for another key.
 #[wasm_bindgen]
 #[must_use]
@@ -142,15 +142,7 @@ pub fn key_backup_text(key: &str) -> String {
         "stored" => texts::STORED_NOTICE,
         "removed" => texts::REMOVED_NOTICE,
         "restored" => texts::RESTORED_NOTICE,
-        "remove-confirm" => texts::REMOVE_CONFIRM,
         other => texts::outcome_text(other),
     }
     .to_owned()
-}
-
-/// The consequence sentence before a backup, naming `server`.
-#[wasm_bindgen]
-#[must_use]
-pub fn key_backup_sentence(server: &str) -> String {
-    texts::back_up_sentence(server)
 }

@@ -373,17 +373,44 @@ fn a_newer_list_update_is_refused_and_reported_once() {
     assert_eq!(glue.list().switched_on(), vec![[0x77; 16]]);
 }
 
-/// `specs/0097` criterion 14 (ADR 0041 decision 1, a change of `0096` criterion 27): the group's
-/// only admin device cannot leave; with a second device it can.
+/// Customer 2026-11-09 (reverses `specs/0097` criterion 14): the group's last device leaves and
+/// the group ends here, without a write and also offline; with a second device a leave is its
+/// own removal.
 #[test]
-fn the_groups_only_device_cannot_leave_it() {
+fn the_groups_last_device_leaves_and_the_group_ends_here() {
     let mut net = Net::new();
+    let alone = net.add(
+        DeviceGroupGlue::create(
+            SERVER,
+            [0x6f; 16],
+            "Desktop",
+            &seeds(3),
+            13,
+            Millis(net.now),
+        )
+        .unwrap(),
+    );
+    net.run(500);
+    assert!(net.devices[alone].0.is_last_device());
+    let written = net.devices[alone].0.client.keyring_entries().len();
+    assert_eq!(net.devices[alone].0.leave(), Ok(()));
+    assert!(net.devices[alone].0.removed());
+    assert_eq!(net.devices[alone].0.client.keyring_entries().len(), written);
+
+    let offline =
+        DeviceGroupGlue::create(SERVER, [0x70; 16], "Box", &seeds(4), 14, Millis(net.now));
+    let mut offline = offline.unwrap();
+    assert_eq!(
+        offline.leave(),
+        Ok(()),
+        "the last device leaves offline too"
+    );
+    assert!(offline.removed());
+
     let a = net.add(
         DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
     );
     net.run(500);
-    assert_eq!(net.devices[a].0.leave(), Err(SessionError::LastAdmin));
-    assert!(!net.devices[a].0.removed());
     net.devices[a].0.add_device(identity(2), "Laptop");
     net.run(200);
     let b = net.add(

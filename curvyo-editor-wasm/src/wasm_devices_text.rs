@@ -5,63 +5,11 @@
 use curvyo_ui_core::devices_text as texts;
 use wasm_bindgen::prelude::*;
 
-/// The sentence under the pairing code (criterion 1).
-#[wasm_bindgen]
-#[must_use]
-pub fn devices_pair_sentence() -> String {
-    curvyo_ui_core::pairing_text::PAIR_SENTENCE.to_owned()
-}
-
-/// The privacy sentence of choosing workspaces (criteria 9 and 30).
-#[wasm_bindgen]
-#[must_use]
-pub fn devices_privacy_sentence() -> String {
-    texts::PRIVACY_SENTENCE.to_owned()
-}
-
 /// The removed device's alert (criterion 24).
 #[wasm_bindgen]
 #[must_use]
 pub fn devices_removed_alert() -> String {
     texts::REMOVED_ALERT.to_owned()
-}
-
-/// The Leave confirm.
-#[wasm_bindgen]
-#[must_use]
-pub fn devices_leave_confirm() -> String {
-    texts::LEAVE_CONFIRM.to_owned()
-}
-
-/// The Remove confirm for the device named `label`.
-#[wasm_bindgen]
-#[must_use]
-pub fn devices_remove_confirm(label: &str) -> String {
-    texts::remove_device_confirm_text(label, false)
-}
-
-/// The switch-on confirm.
-#[wasm_bindgen]
-#[must_use]
-pub fn devices_sync_on_confirm(
-    name: &str,
-    documents: usize,
-    only_device: bool,
-    taken_in_json: &str,
-    not_added_json: &str,
-) -> String {
-    let taken_in: Vec<String> = serde_json::from_str(taken_in_json).unwrap_or_default();
-    let not_added: Vec<String> = serde_json::from_str(not_added_json).unwrap_or_default();
-    texts::sync_on_confirm_text(name, documents, only_device, &taken_in, &not_added)
-}
-
-/// The switch-off confirm naming the other devices (JSON array of names).
-#[wasm_bindgen]
-#[must_use]
-pub fn devices_sync_off_confirm(name: &str, devices_json: &str, others_json: &str) -> String {
-    let devices: Vec<String> = serde_json::from_str(devices_json).unwrap_or_default();
-    let others: Vec<String> = serde_json::from_str(others_json).unwrap_or_default();
-    texts::sync_off_confirm_text(name, &devices, &others)
 }
 
 /// The switch's line while on.
@@ -164,15 +112,12 @@ pub fn devices_connect_copy(name: &str, path: &str) -> String {
     texts::connect_copy_text(name, path)
 }
 
-/// The browser's fixed sentences by key (9, criteria 34, 37 to 39): `loss`, `own-row`,
-/// `not-persisted`, `cannot-start`, `needs-tls`, `other-tab`; empty for another key.
+/// The browser's fixed sentences by key (9, criteria 37 to 39): `cannot-start`, `needs-tls`,
+/// `other-tab`; empty for another key.
 #[wasm_bindgen]
 #[must_use]
 pub fn devices_browser_text(key: &str) -> String {
     match key {
-        "loss" => texts::BROWSER_LOSS_SENTENCE,
-        "own-row" => texts::BROWSER_OWN_ROW_LINE,
-        "not-persisted" => texts::BROWSER_NOT_PERSISTED_LINE,
         "cannot-start" => texts::BROWSER_CANNOT_START,
         "needs-tls" => texts::BROWSER_NEEDS_TLS,
         "other-tab" => texts::BROWSER_OTHER_TAB,
@@ -182,7 +127,8 @@ pub fn devices_browser_text(key: &str) -> String {
 }
 
 /// A fixed text of My devices and the switch by `key` (`sync-failed`, `not-connected`,
-/// `not-admin-here`, `only-this-device`); empty for an unknown key.
+/// `not-admin-here`, `sharing`, `stopping`, `sharing-header`, `share-stalled`, `try-again`,
+/// `only-this-device`); empty for an unknown key.
 #[wasm_bindgen]
 #[must_use]
 pub fn devices_text(key: &str) -> String {
@@ -190,6 +136,11 @@ pub fn devices_text(key: &str) -> String {
         "sync-failed" => texts::SYNC_FAILED,
         "not-connected" => texts::NOT_CONNECTED,
         "not-admin-here" => texts::NOT_ADMIN_HERE,
+        "sharing" => texts::SHARING_LINE,
+        "stopping" => texts::STOPPING_LINE,
+        "sharing-header" => texts::SHARING_HEADER,
+        "share-stalled" => texts::SHARE_STALLED,
+        "try-again" => texts::TRY_AGAIN,
         "only-this-device" => return texts::devices_count_text(1),
         _ => "",
     }

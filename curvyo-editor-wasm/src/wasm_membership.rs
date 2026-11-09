@@ -9,7 +9,6 @@ use wasm_bindgen::prelude::*;
 use crate::session::unhex;
 use crate::wasm_api::WasmSession;
 use crate::wasm_devices::WasmDeviceGroup;
-use crate::wasm_sync::{epoch_keys, millis, seeds};
 
 /// The sentence of a refused membership command (`curvyo-ui-core::membership_text`).
 fn refusal(result: Result<(), SessionError>) -> String {
@@ -18,7 +17,7 @@ fn refusal(result: Result<(), SessionError>) -> String {
         Ok(()) => String::new(),
         Err(SessionError::Offline) => texts::NOT_CONNECTED.to_owned(),
         Err(SessionError::NotAdmin) => texts::NOT_ADMIN.to_owned(),
-        Err(SessionError::LastAdmin) => texts::ONLY_ADMIN.to_owned(),
+        Err(SessionError::LastAdmin) => texts::ONLY_ADMIN_REFUSED.to_owned(),
         Err(_) => texts::COULD_NOT.to_owned(),
     }
 }
@@ -35,15 +34,14 @@ impl WasmSession {
         refusal(self.session.set_participant_role(member_hex, admin))
     }
 
+    /// Stop sharing: the only participant ends the share here (customer 2026-11-09).
+    pub fn stop_sharing(&mut self) -> String {
+        refusal(self.session.stop_sharing())
+    }
+
     /// Change keys now.
     pub fn rotate_share_keys(&mut self) -> String {
         refusal(self.session.rotate_share_keys())
-    }
-
-    /// Add back `member_hex`: a document with every key (`full_history`) or from now on, a
-    /// workspace always with every key.
-    pub fn add_back_participant(&mut self, member_hex: &str, full_history: bool) -> String {
-        refusal(self.session.add_back_participant(member_hex, full_history))
     }
 
     /// Leave this document (named `name` in the notice) or this workspace (one device).
@@ -63,92 +61,6 @@ impl WasmSession {
     #[must_use]
     pub fn share_removed_by_hex(&self) -> String {
         self.session.share_removed_by().unwrap_or_default()
-    }
-
-    /// Check whether I was added back (document); `keys_json` is the credential store's.
-    pub fn check_added_back(
-        &mut self,
-        keys_json: &str,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> bool {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return false;
-        };
-        self.session
-            .check_added_back(epoch_keys(keys_json), &seeds, millis(now))
-    }
-
-    /// Check whether I was added back (workspace), from the marker's `share.ended.json`.
-    #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).
-    pub fn check_workspace_added_back(
-        &mut self,
-        ended_json: &[u8],
-        keys_json: &str,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> bool {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return false;
-        };
-        self.session.check_workspace_added_back(
-            ended_json,
-            epoch_keys(keys_json),
-            &seeds,
-            millis(now),
-        )
-    }
-
-    /// Sync again (document) after the check answered "added back".
-    pub fn sync_again(
-        &mut self,
-        label: &str,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> bool {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return false;
-        };
-        self.session.sync_again(label, &seeds, millis(now))
-    }
-
-    /// Sync again (workspace) with the marker's `list.loro`.
-    #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).
-    pub fn workspace_sync_again(
-        &mut self,
-        list: &[u8],
-        name: &str,
-        label: &str,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> bool {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return false;
-        };
-        self.session
-            .workspace_sync_again(list, name, label, &seeds, millis(now))
-    }
-
-    /// Keep as it is after "added back": one own leave entry.
-    pub fn keep_as_it_is(
-        &mut self,
-        identity: &[u8],
-        nonce: &[u8],
-        entropy: &[u8],
-        now: f64,
-    ) -> bool {
-        let Some(seeds) = seeds(identity, nonce, entropy) else {
-            return false;
-        };
-        self.session.keep_as_it_is(&seeds, millis(now))
     }
 
     /// The admin set to keep per room as the last seen one, as a JSON array of hex ids.

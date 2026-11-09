@@ -95,40 +95,6 @@ fn a_leave_saved_unsent_ends_on_the_next_open() {
     assert_eq!(ended.ended, EndReason::Left);
 }
 
-/// Criteria 20, 26 and 29a: an add back written into a dead link stays in Removed or left as
-/// "adding" and says nothing; once the relay holds it the row moves to Participants and "Ben
-/// was added back." shows.
-#[test]
-fn an_add_back_is_announced_once_the_relay_holds_it() {
-    let (mut net, [a, _b, _c]) = shared_three();
-    let ben = row(&net.devices[a].session, "Ben")["member"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    net.s(a).remove_participant(&ben).unwrap();
-    net.run(1_000);
-    let _ = notices(net.s(a));
-    net.set_link(a, false);
-    net.s(a).add_back_participant(&ben, true).unwrap();
-    net.run(500);
-    let former = view(&net.devices[a].session)["former"].clone();
-    assert_eq!(former[0]["member"], ben.as_str(), "{former}");
-    assert_eq!(former[0]["adding"], true);
-    assert_eq!(row(&net.devices[a].session, "Ben"), Value::Null);
-    assert!(!notices(net.s(a)).iter().any(|n| n.contains("added back")));
-    net.set_link(a, true);
-    net.run(15_000);
-    assert_eq!(
-        view(&net.devices[a].session)["former"],
-        Value::Array(Vec::new())
-    );
-    assert_eq!(row(&net.devices[a].session, "Ben")["pending"], Value::Null);
-    assert!(
-        notices(net.s(a)).contains(&"Ben was added back.".to_owned()),
-        "the success line after the confirmation"
-    );
-}
-
 /// Criterion 29a: a removal and a role change into a dead link keep their rows busy, with no
 /// further act offered, until the relay confirms them.
 #[test]

@@ -1,13 +1,14 @@
 //! `Session`'s participant commands of the Share tab (`specs/0092` criteria 32 to 34,
 //! `specs/0097` criteria 2 to 5, 10 to 15, 17 to 19): roles, removal with key rotation, leave,
-//! Change keys now, Add back, and the device's cache of the labels other participants announced.
+//! Change keys now, Stop sharing, and the device's cache of the labels other participants
+//! announced.
 
 use std::collections::BTreeMap;
 
 use curvyo_crypto_core::MemberId;
 use curvyo_crypto_core::keyring::{Payload, Role};
 use curvyo_document_core::{EndReason, EndedRecord};
-use curvyo_sync_core::{History, SessionError};
+use curvyo_sync_core::SessionError;
 use curvyo_ui_core::share_text::{LEFT_NOTICE, REMOVED_NOTICE};
 
 use super::Session;
@@ -71,31 +72,6 @@ impl Session {
         Ok(())
     }
 
-    /// Adds the former participant `member_hex` back as a member (criteria 17 to 19, 23): a
-    /// document with every epoch key this device holds (`full_history`) or the current one and
-    /// a fresh snapshot; a workspace always with every key (WS-HISTORY B). Admin only.
-    ///
-    /// # Errors
-    /// As [`curvyo_sync_core::ClientSession::add_back`].
-    pub fn add_back_participant(
-        &mut self,
-        member_hex: &str,
-        full_history: bool,
-    ) -> Result<(), SessionError> {
-        let member = member_of(member_hex)?;
-        let link = self.sync.as_mut().ok_or(SessionError::Ended)?;
-        let history = if full_history || link.workspace.is_some() {
-            History::Full
-        } else {
-            History::FromNow
-        };
-        link.client.add_back(member, history)?;
-        link.adding_back.insert(member);
-        link.revision = link.revision.wrapping_add(1);
-        self.sync_pump();
-        Ok(())
-    }
-
     /// Leave (criteria 10, 13 and 15): this device writes its own `RemoveMember` and keeps
     /// syncing, shown as "Leaving...", until the relay confirms it or refuses this device as
     /// removed (ADR 0041 decisions 2 and 11); then a document keeps its ended record "left" in
@@ -118,6 +94,38 @@ impl Session {
         name.trim().clone_into(&mut link.leave_name);
         link.revision = link.revision.wrapping_add(1);
         self.sync_pump();
+        Ok(())
+    }
+
+    /// Stop sharing (customer 2026-11-09, STOP-SHARING by one by one): the only participant
+    /// left ends the share here. Nothing is written, as nobody else would read it; the link
+    /// closes and the document keeps no share record (a workspace's marker loses its share
+    /// files on the host).
+    ///
+    /// # Errors
+    /// `Ended` without a live link; `NotAdmin` while anyone else is still a participant.
+    pub fn stop_sharing(&mut self) -> Result<(), SessionError> {
+        let link = self
+            .sync
+            .as_mut()
+            .filter(|l| l.ended.is_none())
+            .ok_or(SessionError::Ended)?;
+        let me = link.client.me();
+        let alone = link
+            .client
+            .keyring()
+            .is_some_and(|k| k.participants().iter().all(|p| p.identity.member == me));
+        if !alone {
+            return Err(SessionError::NotAdmin);
+        }
+        link.actions.clear();
+        link.actions.push_back(super::sync::TransportAction::Close);
+        link.ended = Some(SyncEnd::Refused);
+        link.online = false;
+        link.peers.clear();
+        link.revision = link.revision.wrapping_add(1);
+        self.document.set_share(None);
+        self.document.set_workspace_share(None);
         Ok(())
     }
 

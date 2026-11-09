@@ -396,17 +396,19 @@ impl WasmDeviceGroup {
         }
     }
 
-    /// Leave my devices: empty, or the refusal's sentence.
+    /// Leave my devices: empty, or the refusal's sentence. The last device always leaves: the
+    /// group ends here (customer 2026-11-09).
     pub fn leave(&mut self) -> String {
         match self.glue.leave() {
             Ok(()) => String::new(),
-            // ADR 0041 decision 1: the group's only admin device stays (`specs/0097`; a change
-            // of `0096` behaviour, where the last device could leave).
-            Err(curvyo_sync_core::SessionError::LastAdmin) => {
-                curvyo_ui_core::membership_text::GROUP_ONLY_ADMIN.to_owned()
-            }
             Err(_) => texts::NOT_CONNECTED.to_owned(),
         }
+    }
+
+    /// Whether this device is the group's last admin device, whose Leave ends the group here.
+    #[must_use]
+    pub fn is_last_device(&self) -> bool {
+        self.glue.is_last_device()
     }
 
     /// The files to write when changed, or when `host_changed` (the host's part of `group.json`

@@ -32,14 +32,9 @@ fn no_membership_text_says_access_was_revoked() {
     let mut all: Vec<String> = Vec::new();
     for n in names {
         all.extend([
-            text::leave_document_confirm(n),
-            text::leave_workspace_confirm(n, 1, &[]),
-            text::leave_workspace_confirm(n, 17, &["B2".to_owned(), "B3".to_owned()]),
             text::left_notice(n, true),
             text::left_notice(n, false),
             text::you_left_line(n),
-            text::make_member_confirm(n),
-            text::admin_removal_confirm_text(n),
             text::remove_name(n),
             text::not_applied_text(n, true),
             text::not_applied_text(n, false),
@@ -47,14 +42,7 @@ fn no_membership_text_says_access_was_revoked() {
             text::mutual_removal_text(&[n.to_owned()], false),
             text::rotation_pending_text(&[(n.to_owned(), true)], true),
             text::rotation_pending_text(&[(n.to_owned(), false)], false),
-            text::make_admin_confirm(n, None),
-            back::full_history_line(n),
-            back::from_now_on_line(n),
-            back::add_back_common(n),
-            back::workspace_add_back(n, "Box job", 3),
             back::added_back_notice(n),
-            back::added_back_prompt(n, "Poster"),
-            back::keep_consequence(n),
             back::ended_heading(n, true),
             back::ended_heading(n, false),
         ]);
@@ -69,17 +57,9 @@ fn no_membership_text_says_access_was_revoked() {
     }
     all.extend(
         [
-            text::ONLY_ADMIN,
-            text::GROUP_ONLY_ADMIN,
+            text::ONLY_ADMIN_REFUSED,
             text::PERSON_ONLY_ADMIN,
             text::PERSON_LEAVE_REFUSED,
-            text::ONE_ADMIN_LINE,
-            text::ONLY_OWN_ADMINS_LINE,
-            text::STEP_DOWN_CONFIRM,
-            back::NOT_ADDED_BACK_YET,
-            back::CHECK_UNVERIFIED,
-            back::CHECK_NOT_FOUND,
-            back::MERGE_SENTENCE,
         ]
         .map(str::to_owned),
     );
@@ -108,27 +88,4 @@ fn no_text_module_literal_says_access_was_revoked() {
             .collect();
         check(&literals);
     }
-}
-
-/// Criteria 10 and 18/22: the leave confirm says what stays and that the key is still held;
-/// From now on says the app withholds keys, never that the person cannot read, and that the
-/// returning person keeps what it had.
-#[test]
-fn leave_and_from_now_on_say_what_is_kept() {
-    let leave = text::leave_document_confirm("Poster");
-    assert!(leave.contains("copy stays"), "{leave}");
-    assert!(leave.contains("still holds the key"), "{leave}");
-    let leave = text::leave_workspace_confirm("Box job", 3, &[]);
-    assert!(leave.contains("still holds the key"), "{leave}");
-    let from_now = back::from_now_on_line("Ben");
-    assert!(
-        from_now.contains("The app does not give Ben the keys"),
-        "{from_now}"
-    );
-    assert!(
-        from_now.contains("Ben still holds the keys Ben had before"),
-        "{from_now}"
-    );
-    let left = text::left_notice("Poster", false);
-    assert!(left.contains("Your copy stays"), "{left}");
 }

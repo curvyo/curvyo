@@ -41,21 +41,6 @@ pub const REMOVED_NOTICE: &str = "Backup removed from the server.";
 /// The notice after a restore.
 pub const RESTORED_NOTICE: &str = "This device was restored from its passkey backup.";
 
-/// The consequence sentence before a backup: what leaves the browser and where it goes.
-#[must_use]
-pub fn back_up_sentence(server: &str) -> String {
-    format!(
-        "This device's keys are locked by a passkey and stored on {server}. The server cannot \
-         open them. Restoring needs the same passkey and this server. The server sees when the \
-         backup is stored or read. Whoever has this passkey can act as this device until you \
-         remove it from your devices."
-    )
-}
-
-/// The confirm before Remove backup.
-pub const REMOVE_CONFIRM: &str = "Remove the backup? The server deletes it. Clearing site data \
-                                  then loses this device.";
-
 /// The answer to an ended exchange by the outcome's kind (`refused-unknown` and so on); empty
 /// for a kind without words.
 #[must_use]
@@ -75,11 +60,6 @@ pub fn outcome_text(kind: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_sentence_names_the_server() {
-        assert!(back_up_sentence("wss://sync.example.org").contains("wss://sync.example.org"));
-    }
 
     #[test]
     fn every_outcome_of_the_page_has_words() {

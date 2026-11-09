@@ -40,6 +40,9 @@ pub(crate) fn seeds(identity: &[u8], nonce: &[u8], entropy: &[u8]) -> Option<Syn
     })
 }
 
+/// How long an invite link is valid: 24 hours, no choice (customer 2026-11-09).
+const INVITE_VALID_SECONDS: u64 = 24 * 3600;
+
 #[wasm_bindgen]
 impl WasmSession {
     /// Shares the open document on `server` (criterion 1); `room` is 16 random bytes. Empty on
@@ -221,11 +224,12 @@ impl WasmSession {
         self.session.set_share_label(label);
     }
 
-    /// Writes an invite valid for `seconds`: `{"link", "expires"}`, or `{"error"}`.
-    pub fn create_invite(&mut self, seconds: f64, now: f64) -> String {
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let seconds = seconds.max(0.0) as u64;
-        match self.session.create_invite(seconds, millis(now)) {
+    /// Writes an invite valid for 24 hours: `{"link", "expires"}`, or `{"error"}`.
+    pub fn create_invite(&mut self, now: f64) -> String {
+        match self
+            .session
+            .create_invite(INVITE_VALID_SECONDS, millis(now))
+        {
             Ok((link, expires)) => json!({"link": link, "expires": expires}).to_string(),
             Err(error) => {
                 let text = match error {
@@ -296,33 +300,12 @@ pub fn server_shown(address: &str) -> String {
     share_text::server_shown(address).to_owned()
 }
 
-/// The inline confirm of Share, naming the server.
-#[wasm_bindgen]
-#[must_use]
-pub fn share_confirm_text(server: &str) -> String {
-    share_text::share_confirm_text(server)
-}
-
-/// The sentence of criterion 2.
-#[wasm_bindgen]
-#[must_use]
-pub fn invite_sentence() -> String {
-    share_text::INVITE_SENTENCE.to_owned()
-}
-
 /// "Expires Tue 14:32." in local time `offset_minutes` east of UTC.
 #[wasm_bindgen]
 #[must_use]
 pub fn invite_expiry_text(expires: f64, offset_minutes: i32) -> String {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     share_text::expiry_text(expires.max(0.0) as u64, offset_minutes)
-}
-
-/// The removal dialog's sentence for the participant `label` (criterion 32).
-#[wasm_bindgen]
-#[must_use]
-pub fn removal_confirm_text(label: &str) -> String {
-    share_text::removal_confirm_text(label)
 }
 
 /// A participant's initials.

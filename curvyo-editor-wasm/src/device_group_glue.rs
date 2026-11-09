@@ -381,17 +381,30 @@ impl DeviceGroupGlue {
     }
 
     /// This device leaves the group (criterion 27): its own `RemoveMember`, then the session
-    /// ends; the host forgets `devices/` and the group's keys.
+    /// ends; the host forgets `devices/` and the group's keys. The group's last admin device
+    /// writes nothing and the group ends here (customer 2026-11-09, reversing `specs/0097`
+    /// criterion 14), also while offline.
     ///
     /// # Errors
     /// `Offline` (nothing written), `NotAMember`.
     pub fn leave(&mut self) -> Result<(), SessionError> {
-        self.client.leave()?;
-        self.pump();
+        if !self.is_last_device() {
+            self.client.leave()?;
+            self.pump();
+        }
         self.removed = true;
         self.actions.push_back(TransportAction::Close);
         self.bump();
         Ok(())
+    }
+
+    /// Whether no other admin device would remain once this one left (with DEV-ROLE A: it is
+    /// the group's only device).
+    #[must_use]
+    pub fn is_last_device(&self) -> bool {
+        self.client
+            .keyring()
+            .is_none_or(|keyring| !curvyo_sync_core::admin_remains(keyring, &[self.client.me()]))
     }
 
     /// The files to write when they changed since the last call.

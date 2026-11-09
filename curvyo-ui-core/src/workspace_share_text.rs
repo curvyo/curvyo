@@ -1,37 +1,10 @@
 //! The words of a shared workspace in the Share tab and the File tab's header line
 //! (`specs/0095-workspace` criteria 25 to 29, `ux-notes.md` sections 2.1, 4, 8 and 9).
 
-use crate::share_text::{ConnectionState, server_shown};
-
-/// The sentence of criterion 26 under a workspace invite.
-pub const WORKSPACE_INVITE_SENTENCE: &str =
-    "Anyone with this link can edit every document of this workspace once, until it expires.";
+use crate::share_text::ConnectionState;
 
 /// The join's waiting line (`ux-notes.md` section 8).
 pub const WORKSPACE_WAITING_TEXT: &str = "Waiting for a member to let you in";
-
-/// The inline confirm of Share workspace (section 4): the workspace, its document count and
-/// the server, the one place the privacy fact is said; the documents shared on their own that
-/// are taken in (criterion 42) and the ones that stay out (criterion 49) are named beforehand.
-#[must_use]
-pub fn workspace_share_confirm_text(
-    name: &str,
-    documents: usize,
-    server: &str,
-    taken_in: &[String],
-    not_added: &[String],
-) -> String {
-    let count = match documents {
-        1 => "1 document".to_owned(),
-        n => format!("{n} documents"),
-    };
-    let text = format!(
-        "Upload the workspace {name} ({count}) to {}? Names, folders and files leave this \
-         computer encrypted; the server cannot read them.",
-        server_shown(server)
-    );
-    format!("{text}{}", takeover_text(taken_in, not_added))
-}
 
 /// The sentences about documents shared on their own that a share takes in, and those it leaves
 /// out, each with a leading space; empty for none.
@@ -127,44 +100,6 @@ pub fn join_folder_refusal_text(code: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Section 4: the confirm names the workspace, its count, the server, the documents taken
-    /// in (criterion 42) and the ones left out (criterion 49).
-    #[test]
-    fn the_share_confirm_names_the_workspace_and_what_stays_out() {
-        assert_eq!(
-            workspace_share_confirm_text("Box job", 14, "ws://192.168.1.20:8080", &[], &[]),
-            "Upload the workspace Box job (14 documents) to 192.168.1.20:8080? Names, folders \
-             and files leave this computer encrypted; the server cannot read them."
-        );
-        let text = workspace_share_confirm_text(
-            "Box job",
-            1,
-            "ws://192.168.1.20:8080",
-            &[],
-            &["Lid".to_owned(), "Base".to_owned()],
-        );
-        assert!(text.contains("(1 document)"));
-        assert!(
-            text.ends_with(" Not added: Lid, Base (shared with people outside this workspace).")
-        );
-        let one = workspace_share_confirm_text("Box job", 3, "ws://h:1", &["Lid".to_owned()], &[]);
-        assert!(one.ends_with(
-            " Lid is shared on its own. It becomes part of the workspace and its own link stops \
-             working."
-        ));
-        let three = workspace_share_confirm_text(
-            "Box job",
-            3,
-            "ws://h:1",
-            &["Lid".to_owned(), "Base".to_owned(), "Side".to_owned()],
-            &[],
-        );
-        assert!(three.ends_with(
-            " Lid and 2 other documents are shared on their own. They become part of the \
-             workspace and their own links stop working."
-        ));
-    }
 
     /// Sections 2.1 and 8: the header line and the join texts.
     #[test]

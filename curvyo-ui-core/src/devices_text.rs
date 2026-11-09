@@ -4,28 +4,20 @@
 
 use crate::share_text::{cut_label, server_shown};
 
-/// The privacy sentence of choosing workspaces and of the first switch-on (criteria 9 and 30).
-pub const PRIVACY_SENTENCE: &str = "Names, folders and files leave this device encrypted, to your \
-                                    own devices only. The server can tell which devices belong \
-                                    together, not their names.";
-
-/// The two sentences of criterion 28 while only this device is paired.
-pub const LOSS_SENTENCES: &str = "If you lose this device, the copy on the server cannot be \
-                                  opened by anyone. Pair a second device to have a backup.";
-
-/// The persistent warning while a workspace is synced and this is the only device (2.2).
-pub const ONE_DEVICE_WARNING: &str = "Only this device is paired. If you lose it, the copy on the \
-                                      server cannot be opened by anyone. Pair a second device as \
-                                      a backup.";
-
 /// The removed device's alert (criterion 24).
 pub const REMOVED_ALERT: &str =
     "This device was removed from your devices. Your copies stay here as local files.";
 
-/// The confirm of Leave my devices (7.1).
-pub const LEAVE_CONFIRM: &str = "Leave your devices? This device stops syncing and keeps its \
-                                 copies as local files. Your other devices renew the keys the \
-                                 next time they connect.";
+/// The line under the switch while its switch-on runs and nothing is uploaded yet.
+pub const SHARING_LINE: &str = "Sharing...";
+/// The line under the switch while it is switched off.
+pub const STOPPING_LINE: &str = "Stopping...";
+/// The heading's state while the workspace is being shared (the switch-on or Share workspace).
+pub const SHARING_HEADER: &str = "Sharing";
+/// The alert of a switch-on or Share workspace that made no progress for too long.
+pub const SHARE_STALLED: &str = "Could not share: the server did not answer in time.";
+/// The retry control's name and tooltip (the switch row and the Server field).
+pub const TRY_AGAIN: &str = "Try again";
 
 /// The name of a device the group's keyring lists but the devices list names not (yet).
 pub const UNNAMED_DEVICE: &str = "A device";
@@ -126,82 +118,8 @@ pub fn documents_text(documents: usize) -> String {
     }
 }
 
-/// The confirm of switching a workspace on (6.2): the documents shared on their own it takes in
-/// and those it leaves out (`taken_in`, `not_added`, as Share workspace), and the loss
-/// sentences while no other device is paired.
-#[must_use]
-pub fn sync_on_confirm_text(
-    name: &str,
-    documents: usize,
-    only_device: bool,
-    taken_in: &[String],
-    not_added: &[String],
-) -> String {
-    let loss = if only_device {
-        format!(" {LOSS_SENTENCES}")
-    } else {
-        String::new()
-    };
-    format!(
-        "Sync {} ({}) to your devices? {PRIVACY_SENTENCE}{}{loss}",
-        cut_label(name, 24),
-        documents_text(documents),
-        crate::workspace_share_text::takeover_text(taken_in, not_added)
-    )
-}
-
 /// The switch row's alert when switching on failed (6.2).
 pub const SYNC_FAILED: &str = "Could not sync: cannot reach the server.";
-
-/// The confirm of switching a workspace off (6.3), naming the other devices and who else keeps
-/// sharing it.
-#[must_use]
-pub fn sync_off_confirm_text(name: &str, devices: &[String], others: &[String]) -> String {
-    let name = cut_label(name, 24);
-    let devices_part = match devices {
-        [] => String::new(),
-        [one] => format!(
-            " {} keeps its copy as local files and gets no later changes. It is removed from \
-             this workspace.",
-            cut_label(one, 24)
-        ),
-        many => format!(
-            " {} keep their copies as local files and get no later changes. They are removed \
-             from this workspace.",
-            join_and(many)
-        ),
-    };
-    let shared = if others.is_empty() {
-        String::new()
-    } else {
-        format!(" {name} stays shared with {}.", join_and(others))
-    };
-    format!("Stop syncing {name}?{devices_part}{shared}")
-}
-
-fn join_and(names: &[String]) -> String {
-    let names: Vec<String> = names.iter().map(|n| cut_label(n, 24)).collect();
-    match names.as_slice() {
-        [] => String::new(),
-        [one] => one.clone(),
-        [init @ .., last] => format!("{} and {last}", init.join(", ")),
-    }
-}
-
-/// The confirm of Remove on a device's row (7.1).
-#[must_use]
-pub fn remove_device_confirm_text(label: &str, browser: bool) -> String {
-    let label = cut_label(label, 24);
-    let place = if browser {
-        "in that browser".to_owned()
-    } else {
-        format!("on {label}")
-    };
-    format!(
-        "Remove {label}? It stops syncing. Removing does not reach back: the copies already \
-         {place} stay there as local files."
-    )
-}
 
 /// The row's line while a removal renews keys: "Renewing keys, 1 of 2 workspaces".
 #[must_use]
@@ -431,18 +349,6 @@ pub fn could_not_sync_text(names: &[String], problem: SyncProblem<'_>) -> String
 /// The line under the pick list's row of a workspace in which this device is only a member.
 pub const NOT_ADMIN_HERE: &str = "Not an admin here";
 
-/// The browser's loss sentence in its join block and at pairing (criterion 34, 9).
-pub const BROWSER_LOSS_SENTENCE: &str = "This browser keeps its keys in site data. If you clear \
-                                         site data, this device is lost and has to be paired \
-                                         again.";
-
-/// The fourth line of the browser's own row (9).
-pub const BROWSER_OWN_ROW_LINE: &str = "Clearing site data removes this device.";
-
-/// The own row's line when the browser refused persistent storage (9, Proposal).
-pub const BROWSER_NOT_PERSISTED_LINE: &str =
-    "This browser may delete this device's data when space runs low.";
-
 /// Why a browser cannot start a device group: it pairs with a desktop first (ADR 0040 note).
 pub const BROWSER_CANNOT_START: &str = "Pair this browser from a desktop device first.";
 
@@ -572,46 +478,6 @@ mod tests {
             seen_text(false, Some(NOV_4_2026_1203_UTC), now, 60, false),
             "Last seen 13:03"
         );
-    }
-
-    #[test]
-    fn confirms_name_workspaces_and_devices() {
-        assert_eq!(
-            sync_on_confirm_text("Box job", 14, true, &[], &[]),
-            format!(
-                "Sync Box job (14 documents) to your devices? {PRIVACY_SENTENCE} {LOSS_SENTENCES}"
-            )
-        );
-        assert_eq!(
-            sync_on_confirm_text(
-                "Box job",
-                3,
-                false,
-                &["Lid".to_owned(), "Base".to_owned()],
-                &["Hinge".to_owned()]
-            ),
-            format!(
-                "Sync Box job (3 documents) to your devices? {PRIVACY_SENTENCE} Lid and 1 other \
-                 document are shared on their own. They become part of the workspace and their \
-                 own links stop working. Not added: Hinge (shared with people outside this \
-                 workspace)."
-            )
-        );
-        assert_eq!(
-            sync_off_confirm_text(
-                "Box job",
-                &["Laptop".to_owned(), "Phone".to_owned()],
-                &["Ben".to_owned()]
-            ),
-            "Stop syncing Box job? Laptop and Phone keep their copies as local files and get no \
-             later changes. They are removed from this workspace. Box job stays shared with Ben."
-        );
-        assert_eq!(
-            remove_device_confirm_text("Laptop", false),
-            "Remove Laptop? It stops syncing. Removing does not reach back: the copies already on \
-             Laptop stay there as local files."
-        );
-        assert!(remove_device_confirm_text("Chrome", true).contains("in that browser"));
     }
 
     #[test]
