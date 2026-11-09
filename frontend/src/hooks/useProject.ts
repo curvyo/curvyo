@@ -219,6 +219,11 @@ function isTextField(element: Element | null): element is HTMLElement {
  * and its gate, the dirty flag) are the session's; this hook runs the commands and keeps the host
  * told.
  */
+/** The tab a replaced session keeps: File (the tree) and Share (a Share in progress). */
+function keptTab(active: string): "file" | "share" | null {
+  return active === "file" || active === "share" ? active : null;
+}
+
 export function useProject(deps: ProjectDeps): ProjectApi {
   const depsRef = useRef(deps);
   useEffect(() => {
@@ -350,14 +355,15 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         return false;
       }
       const { editor, onOpenError } = depsRef.current;
-      const inFileTab = depsRef.current.panel.view.activeTab === "file";
+      const kept = keptTab(depsRef.current.panel.view.activeTab);
       try {
         await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName), () =>
           editor.openFile(bytes, fileName),
         );
-        // A new session starts on its own tab; switching from the tree keeps the File tab.
-        if (inFileTab) {
-          depsRef.current.panel.pressTab("file");
+        // A new session starts on its own tab; switching from the tree keeps the File tab, and
+        // a Share that reopens the document keeps the Share tab (customer 2026-11-09).
+        if (kept) {
+          depsRef.current.panel.pressTab(kept);
         }
       } catch (error) {
         onOpenError(String(error), OPEN_FILE_TITLE);
@@ -929,10 +935,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       request({ kind: "then", ends, then }, refocus ? { refocus } : "outside"),
     openWorkspaceDocument,
     resetToEmpty: async () => {
-      const inFileTab = depsRef.current.panel.view.activeTab === "file";
+      const kept = keptTab(depsRef.current.panel.view.activeTab);
       await resetProject();
-      if (inFileTab) {
-        depsRef.current.panel.pressTab("file");
+      if (kept) {
+        depsRef.current.panel.pressTab(kept);
       }
     },
     setFileState,

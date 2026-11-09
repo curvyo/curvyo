@@ -11,6 +11,10 @@ interface PanelSwitchProps {
   onReturnFocus: () => void;
   /** The roving-focus key of a list that owns this control. */
   control?: string;
+  /** Armed to turn off (the armed pattern): the track turns `--destructive`. */
+  armed?: boolean;
+  /** Extra attributes of the switch button (the armed pattern's control id). */
+  extra?: Record<string, string>;
 }
 
 /**
@@ -25,11 +29,14 @@ export function PanelSwitch({
   onCheckedChange,
   onReturnFocus,
   control,
+  armed = false,
+  extra,
 }: PanelSwitchProps) {
   return (
     <label className="flex items-center gap-2 text-sm text-[var(--toolbar-icon)]">
       <span aria-hidden>{label}</span>
       <SwitchPrimitive.Root
+        {...extra}
         checked={checked}
         aria-label={name ?? label}
         data-control={control}
@@ -46,7 +53,12 @@ export function PanelSwitch({
             onReturnFocus();
           }
         }}
-        className="relative h-[18px] w-8 shrink-0 rounded-full border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)]"
+        data-armed={armed ? "" : undefined}
+        className={`relative h-[18px] w-8 shrink-0 rounded-full border outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] ${
+          armed
+            ? "border-[var(--destructive)] bg-[var(--destructive)]"
+            : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] bg-transparent data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)]"
+        }`}
       >
         <SwitchPrimitive.Thumb className="block h-3 w-3 translate-x-[2px] rounded-full bg-[var(--toolbar-icon)] transition-none data-[state=checked]:translate-x-[16px] data-[state=checked]:bg-[var(--toolbar-icon-active-fg)]" />
       </SwitchPrimitive.Root>

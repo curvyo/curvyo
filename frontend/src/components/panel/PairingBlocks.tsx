@@ -1,15 +1,13 @@
 // The pairing blocks of My devices (`specs/0096-own-devices-sync` ux-notes 3 and 4): the old
 // device's code and compare step, and the new device's join block, with the check words.
 
-import { FolderOpen, TriangleAlert } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ALERT, APPLY, BUTTON, FIELD, MUTED, OUTLINE, SURFACE } from "@/components/panel/devicesUi";
 import type { DevicesApi, PairingView } from "@/hooks/useDevices";
 import { formatPairCode, pairCodeComplete } from "@/lib/pairCode";
 import {
-  devices_browser_text,
-  devices_pair_sentence,
   devices_waiting_for_other,
   server_shown,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
@@ -114,7 +112,6 @@ export function OpenerBlock({ devices, view, server }: { devices: DevicesApi; vi
       <p role="status" aria-live="polite" className="sr-only">
         {view.announce ?? ""}
       </p>
-      <p className="text-xs text-[var(--toolbar-icon)]">{devices_pair_sentence()}</p>
       <p role="status" aria-live="polite" className={MUTED}>
         {view.wrong ? view.wrong : devices_waiting_for_other()}
       </p>
@@ -297,12 +294,7 @@ export function JoinerBlock({
           }}
         />
       </label>
-      {devices.browser ? (
-        <p className="flex items-start gap-1 text-xs text-[var(--toolbar-icon)]">
-          <TriangleAlert size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />
-          {devices_browser_text("loss")}
-        </p>
-      ) : (
+      {devices.browser ? null : (
         <div className="flex flex-col gap-1">
           <span className="text-xs text-[var(--toolbar-icon)]">Synced workspaces folder</span>
           <p className={`${MUTED} truncate`} title={devices.syncedFolder.path || "~/Curvyo"}>

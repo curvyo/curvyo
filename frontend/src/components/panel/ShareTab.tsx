@@ -1,15 +1,14 @@
 import { Share2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-import { APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { APPLY, BUTTON, MUTED } from "@/components/panel/devicesUi";
 import { EndedBlock } from "@/components/panel/EndedBlock";
-import { FormerList } from "@/components/panel/FormerList";
 import { AdminChangeLine, MembershipNotices } from "@/components/panel/MembershipNotices";
 import { MyDevicesBlock } from "@/components/panel/MyDevicesBlock";
 import { ParticipantList } from "@/components/panel/ParticipantList";
 import { InviteBlock, JoinBlock } from "@/components/panel/ShareInviteJoin";
 import { SettingField } from "@/components/panel/ShareSettingField";
-import { WorkspaceShareBlock } from "@/components/panel/WorkspaceShareBlock";
+import { TryAgain, WorkspaceShareBlock } from "@/components/panel/WorkspaceShareBlock";
 import type { CollaborationApi } from "@/hooks/useCollaboration";
 import type { DevicesApi } from "@/hooks/useDevices";
 import type { MembershipApi } from "@/hooks/useMembership";
@@ -17,12 +16,9 @@ import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { myDeviceIds, syncedHeader } from "@/lib/devicesApi";
 import { frozenWarning } from "@/lib/frozenWarning";
 import {
-  membership_leave_confirm,
   membership_you_left_line,
   normalize_server_address,
   server_shown,
-  share_confirm_text,
-  workspace_invite_sentence,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The open workspace as the Share tab's Workspace block needs it (`specs/0095-workspace`). */
@@ -57,7 +53,6 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
   // A session that carries a shared workspace's link shows the workspace in the Workspace block
   // and only a line in the Document block (`specs/0095-workspace` ux-notes section 9).
   const workspaceView = view.workspace ?? null;
-  const [confirming, setConfirming] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState("");
   const reasonId = useId();
@@ -85,26 +80,8 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
   // My own devices among the participants of a synced workspace (0096 ux-notes 6.1).
   const myDevices = myDeviceIds(devices);
   const others = view.participants.filter((p) => !p.self && !myDevices.has(p.member)).map((p) => p.label);
-  const leaveText = membership_leave_confirm(
-    membership.name,
-    workspaceView != null,
-    workspace?.documents ?? 0,
-    JSON.stringify(membership.personLeave ? (devices?.otherNames ?? []) : []),
-  );
   const participantList =
-    view.participants.length > 0 ? (
-      <>
-        <ParticipantList view={view} myDevices={myDevices} leaveText={leaveText} membership={membership} />
-        {view.admin ? (
-          <FormerList
-            former={view.former ?? []}
-            workspace={workspaceView != null}
-            documents={workspace?.documents ?? 0}
-            membership={membership}
-          />
-        ) : null}
-      </>
-    ) : null;
+    view.participants.length > 0 ? <ParticipantList view={view} myDevices={myDevices} membership={membership} /> : null;
   const notices = <MembershipNotices view={view} membership={membership} />;
   // A workspace the maker left from every device: the switch says so (ux-notes 5.4).
   const workspaceId = workspaceView?.id ?? "";
@@ -139,9 +116,21 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
               onCommit={collab.setServer}
             />
             {reachLine ? (
-              <p role="status" aria-live="polite" className={MUTED}>
-                {reachLine}
-              </p>
+              <div className="flex items-center gap-2">
+                <p role="status" aria-live="polite" className={`${MUTED} min-w-0 flex-1`}>
+                  {reachLine}
+                </p>
+                {collab.reach === "unreachable" ? (
+                  <TryAgain
+                    onPress={() => {
+                      // Checks the server again and retries every waiting link at once.
+                      collab.checkServer();
+                      collab.reconnect();
+                      devices?.retryNow();
+                    }}
+                  />
+                ) : null}
+              </div>
             ) : null}
           </>
         )}
@@ -192,7 +181,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
           sync={workspace.sync}
           invite={
             workspaceView ? (
-              <InviteBlock collab={collab} onReturnFocus={onReturnFocus} sentence={workspace_invite_sentence()} />
+              <InviteBlock collab={collab} />
             ) : null
           }
           participants={workspaceView ? participantList : null}
@@ -206,18 +195,50 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
                   on: devices.openSynced,
                   reason: serverReason,
                   switching: devices.switching,
-                  failed: devices.switchFailed,
+                  failure: devices.switchFailure,
                   otherNames: devices.otherNames,
                   others,
                   // An ended workspace is never shared anew by the switch (`specs/0097` 5.4).
                   switchOn: ended?.workspace ? membership.clearLeftMark : devices.switchOn,
                   switchOff: devices.switchOff,
+                  cancel: devices.cancelSwitch,
+                  reconnect: () => {
+                    collab.reconnect();
+                    devices.retryNow();
+                  },
                   leftLine: leftLine,
                   onReturnFocus,
                 }
               : undefined
           }
         />
+      ) : null}
+
+      {/* The session carries a shared workspace's link while no workspace is open in the tree
+          (a document of it opened on its own, a join still settling): its people, Invite and
+          Stop sharing stay reachable (customer 2026-11-09). */}
+      {workspaceView && !workspace?.open && !workspaceView.joining ? (
+        <section aria-label={`Workspace ${workspaceView.name}`} className="flex flex-col gap-2 border-b border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] pb-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="min-w-0 truncate text-sm font-semibold text-[var(--toolbar-icon)]" title={workspaceView.name}>
+              {workspaceView.name}
+            </p>
+            <span className={MUTED}>{view.live ? workspaceView.people : "Not shared"}</span>
+          </div>
+          {view.live ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm text-[var(--toolbar-icon)]">Shared on {view.serverShown}</p>
+                <p role="status" aria-live="polite" className={MUTED}>
+                  {workspaceView.receiving ?? view.stateLine}
+                </p>
+              </div>
+              {notices}
+              {view.admin ? <InviteBlock collab={collab} /> : null}
+              {participantList}
+            </>
+          ) : null}
+        </section>
       ) : null}
 
       {workspaceView ? (
@@ -239,44 +260,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
                 {view.stateLine}
               </p>
             </div>
-          ) : ended?.check === "addedBack" ? null : confirming ? (
-            <div
-              role="group"
-              aria-label={share_confirm_text(server)}
-              className="flex flex-col gap-2"
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setConfirming(false);
-                }
-              }}
-            >
-              <p className="text-xs text-[var(--toolbar-icon)]">{share_confirm_text(server)}</p>
-              <div className="flex flex-wrap gap-2">
-                <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={() => setConfirming(false)}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className={`${BUTTON} ${APPLY} w-[76px]`}
-                  onClick={() => {
-                    setConfirming(false);
-                    setShareError("");
-                    setSharing(true);
-                    void collab.share().then((error) => {
-                      setSharing(false);
-                      if (error) {
-                        setShareError(`Could not share: ${error}`);
-                      }
-                    });
-                  }}
-                >
-                  Share
-                </button>
-              </div>
-            </div>
-          ) : (
+          ) : ended?.check === "addedBack" ? null : (
             <div className="flex flex-col gap-1">
               <button
                 type="button"
@@ -286,7 +270,15 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
                 className={`${BUTTON} ${APPLY} w-[118px]`}
                 onClick={() => {
                   if (reason === "" && !sharing) {
-                    setConfirming(true);
+                    // Share asks nothing (customer 2026-11-09: no confirm sentences here).
+                    setShareError("");
+                    setSharing(true);
+                    void collab.share().then((error) => {
+                      setSharing(false);
+                      if (error) {
+                        setShareError(`Could not share: ${error}`);
+                      }
+                    });
                   }
                 }}
               >
@@ -307,7 +299,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
           )}
 
           {shared ? notices : null}
-          {shared && view.admin ? <InviteBlock collab={collab} onReturnFocus={onReturnFocus} /> : null}
+          {shared && view.admin ? <InviteBlock collab={collab} /> : null}
 
           {participantList}
         </>

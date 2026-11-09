@@ -1,15 +1,14 @@
 // The browser's passkey key backup in My devices (`specs/0096-own-devices-sync` ux-notes 9.1,
-// ADR 0040 decision 13): on a paired browser Back up with passkey (an Apply confirm naming the
-// server) or Remove backup (a destructive confirm); on a browser without a group Restore with
+// ADR 0040 decision 13): on a paired browser Back up with passkey (at once; the passkey prompt
+// confirms) or Remove backup (an armed button); on a browser without a group Restore with
 // passkey beside Join my devices. One status or alert line under them.
 
 import { KeyRound } from "lucide-react";
-import { useRef, useState } from "react";
 
-import { ALERT, APPLY, BUTTON, DestructiveConfirm, MUTED, OUTLINE } from "@/components/panel/devicesUi";
-import { useReturnFocus } from "@/hooks/useReturnFocus";
+import { ALERT, ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { useArm } from "@/hooks/useArm";
 import type { KeyBackupApi } from "@/hooks/useKeyBackup";
-import { key_backup_sentence, key_backup_text, normalize_server_address } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { key_backup_text } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** The busy line or the last run's sentence. */
 function BackupLines({ backup }: { backup: KeyBackupApi }) {
@@ -35,79 +34,42 @@ function BackupLines({ backup }: { backup: KeyBackupApi }) {
 }
 
 /** Back up with passkey or Remove backup, on a paired browser. */
-export function KeyBackupRow({ backup, server }: { backup: KeyBackupApi; server: string }) {
-  const [confirming, setConfirming] = useState(false);
-  const button = useRef<HTMLButtonElement>(null);
-  // Cancel, Escape and the action return the focus to the button the confirm replaced.
-  const armReturn = useReturnFocus(!confirming, () => button.current);
-  const close = () => {
-    armReturn();
-    setConfirming(false);
-  };
+export function KeyBackupRow({ backup }: { backup: KeyBackupApi }) {
+  const arm = useArm("key-backup");
   if (!backup.available) {
     return <p className={MUTED}>{key_backup_text("no-prf")}</p>;
   }
   const busy = backup.busy !== "";
   return (
     <div className="flex flex-col gap-1">
-      {confirming && backup.backedUp ? (
-        <DestructiveConfirm
-          text={key_backup_text("remove-confirm")}
-          label={key_backup_text("remove")}
-          action="Remove"
-          onCancel={close}
-          onConfirm={() => {
-            close();
-            backup.remove();
-            return "";
-          }}
-        />
-      ) : confirming ? (
-        <div
-          role="group"
-          aria-label={key_backup_text("back-up")}
-          className="flex flex-col gap-2 py-1"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              close();
-            }
-          }}
-        >
-          <p className="text-xs text-[var(--toolbar-icon)]">{key_backup_sentence(normalize_server_address(server))}</p>
-          <div className="flex flex-wrap gap-2">
-            <button autoFocus type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className={`${BUTTON} ${APPLY} w-[76px]`}
-              onClick={() => {
-                close();
+      <span {...arm.zone} className="flex">
+          <button
+            {...arm.control}
+            type="button"
+            aria-disabled={busy}
+            className={`${BUTTON} ${arm.armed ? ARMED : OUTLINE} w-[176px]`}
+            onClick={() => {
+              if (busy) {
+                return;
+              }
+              if (backup.backedUp) {
+                // Remove backup is armed: a second press removes it (customer feedback, PR #281).
+                arm.press(() => {
+                  backup.remove();
+                  return "";
+                });
+              } else {
+                // Back up asks nothing: the passkey prompt is the confirmation (customer
+                // 2026-11-09: no confirm sentences in the Share tab).
                 backup.backUp();
-              }}
-            >
-              Back up
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          ref={button}
-          type="button"
-          aria-disabled={busy}
-          className={`${BUTTON} ${OUTLINE} w-[176px]`}
-          onClick={() => {
-            if (!busy) {
-              setConfirming(true);
-            }
-          }}
-        >
-          <KeyRound size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
-          {key_backup_text(backup.backedUp ? "remove" : "back-up")}
-        </button>
-      )}
+              }
+            }}
+          >
+            <KeyRound size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+            {key_backup_text(backup.backedUp ? "remove" : "back-up")}
+          </button>
+      </span>
+      {backup.backedUp ? <ArmLines arm={arm} /> : null}
       <BackupLines backup={backup} />
     </div>
   );

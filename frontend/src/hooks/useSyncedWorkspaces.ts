@@ -118,8 +118,9 @@ export interface SyncedWorkspacesApi {
   syncChosen: (chosen: OfferedWorkspace[]) => void;
   progress: string;
   alerts: string[];
-  /** Leave my devices in every background workspace; whether all of them could. */
-  leaveAll: () => Promise<boolean>;
+  /** Leave my devices in every background workspace, then the workspaces `local` names (ids)
+   * become plain local files; whether every removal went out. */
+  leaveAll: (local: string[]) => Promise<boolean>;
   /** Stops every background session (this device left or was removed). */
   stopAll: () => Promise<void>;
   /** The network is back. */
@@ -610,7 +611,7 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
     [switchOnClosed, unreachableChanged],
   );
 
-  const leaveAll = useCallback(async () => {
+  const leaveAll = useCallback(async (local: string[]) => {
     let all = true;
     for (const runner of [...backgroundWorkspaces().values()]) {
       const id = runner.id;
@@ -622,8 +623,14 @@ export function useSyncedWorkspaces(deps: SyncedWorkspacesDeps): SyncedWorkspace
     for (const runner of [...backgroundWorkspaces().values()]) {
       await runner.stop();
     }
+    // The group ends here: the workspaces `local` names stay as plain local files (customer
+    // 2026-11-09), also one whose removal could not go out.
+    for (const id of local) {
+      await invoke("clear_workspace_marker_share", { workspace: id }).catch(() => undefined);
+    }
     return all;
   }, []);
+
 
   const stopAll = useCallback(async () => {
     for (const runner of [...backgroundWorkspaces().values()]) {

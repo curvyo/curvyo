@@ -1,10 +1,11 @@
 // The Share tab's My devices block (`specs/0096-own-devices-sync` ux-notes 2 to 9): the rows,
 // and where the decision rows, the workspace pick, the pairing and backup blocks go.
 
-import { ChevronDown, ChevronRight, Globe, LogIn, LogOut, Monitor, MonitorSmartphone, TriangleAlert, Unlink } from "lucide-react";
+import { ChevronDown, ChevronRight, Globe, LogIn, LogOut, Monitor, MonitorSmartphone, Unlink } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ALERT, APPLY, BUTTON, DestructiveConfirm, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { ALERT, APPLY, ARMED, ArmLines, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
+import { useArm } from "@/hooks/useArm";
 import { EntryField } from "@/components/panel/EntryField";
 import { DecisionRow, PickWorkspaces } from "@/components/panel/DeviceChoices";
 import { BackupLines, KeyBackupRow, RestoreButton } from "@/components/panel/KeyBackupBlock";
@@ -13,8 +14,6 @@ import type { DevicesApi, DeviceRow } from "@/hooks/useDevices";
 import { type KeyBackupApi, useKeyBackup } from "@/hooks/useKeyBackup";
 import {
   devices_browser_text,
-  devices_leave_confirm,
-  devices_remove_confirm,
   devices_removed_alert,
   devices_text,
   key_backup_text,
@@ -51,14 +50,14 @@ function DeviceRowView({
   onRemoved: (member: string) => void;
   onReturnFocus: () => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const arm = useArm(`device:${row.member || "own"}`);
   const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const action = useRef<HTMLButtonElement>(null);
   const first = useRef<HTMLButtonElement | null>(null);
   const returnTo = useRef<"action" | "first" | null>(null);
   useEffect(() => {
-    if (!confirming && !renaming && returnTo.current) {
+    if (!renaming && returnTo.current) {
       (returnTo.current === "action" ? action.current : (first.current ?? action.current))?.focus();
       returnTo.current = null;
     }
@@ -146,17 +145,33 @@ function DeviceRowView({
         {row.removing ? (
           <span aria-hidden className="w-7 shrink-0" />
         ) : (
-          <button
-            ref={action}
-            type="button"
-            data-row-first={details.length > 0 ? undefined : row.member || "own"}
-            title={row.own ? "Leave my devices" : "Remove"}
-            aria-label={row.own ? "Leave my devices" : `Remove ${row.label}`}
-            className={`${BUTTON} ${OUTLINE} w-7 border-transparent`}
-            onClick={() => setConfirming(true)}
-          >
-            {row.own ? <LogOut {...GLYPH} /> : <Unlink {...GLYPH} />}
-          </button>
+          <span {...arm.zone} className="flex">
+            <button
+              {...arm.control}
+              ref={action}
+              type="button"
+              data-row-first={details.length > 0 ? undefined : row.member || "own"}
+              title={row.own ? "Leave my devices" : "Remove"}
+              aria-label={row.own ? "Leave my devices" : `Remove ${row.label}`}
+              className={`${BUTTON} w-7 ${arm.armed ? ARMED : `${OUTLINE} border-transparent`}`}
+              onClick={() =>
+                arm.press(() => {
+                  const refusal = row.own ? devices.leave() : devices.remove(row.member);
+                  if (refusal === "") {
+                    if (row.own) {
+                      // A passkey backup of a device that left is deleted (ADR 0040 decision 13).
+                      backup.forget();
+                    } else {
+                      onRemoved(row.member);
+                    }
+                  }
+                  return refusal;
+                })
+              }
+            >
+              {row.own ? <LogOut {...GLYPH} /> : <Unlink {...GLYPH} />}
+            </button>
+          </span>
         )}
       </div>
       {lines.map((line, index) => (
@@ -178,30 +193,7 @@ function DeviceRowView({
           ))}
         </ul>
       ) : null}
-      {confirming ? (
-        <DestructiveConfirm
-          text={row.own ? devices_leave_confirm() : devices_remove_confirm(row.label)}
-          label={row.own ? "Leave my devices" : `Remove ${row.label}`}
-          action={row.own ? "Leave" : "Remove"}
-          onCancel={() => {
-            returnTo.current = "action";
-            setConfirming(false);
-          }}
-          onConfirm={() => {
-            const refusal = row.own ? devices.leave() : devices.remove(row.member);
-            if (refusal === "") {
-              setConfirming(false);
-              if (row.own) {
-                // A passkey backup of a device that left is deleted (ADR 0040 decision 13).
-                backup.forget();
-              } else {
-                onRemoved(row.member);
-              }
-            }
-            return refusal;
-          }}
-        />
-      ) : null}
+      <ArmLines arm={arm} />
     </li>
   );
 }
@@ -213,11 +205,8 @@ function DeviceRowView({
  */
 export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, frozenWarning = "" }: MyDevicesBlockProps) {
   const backup = useKeyBackup(given);
-  // A passkey backup keeps this device when site data is cleared (ADR 0040 decision 13).
-  const lossLine = devices_browser_text("own-row");
-  const devices = backup.backedUp
-    ? { ...given, browserLines: given.browserLines.map((line) => (line === lossLine ? key_backup_text("backed-up") : line)) }
-    : given;
+  // A passkey backup is a state of the own row (ADR 0040 decision 13).
+  const devices = backup.backedUp ? { ...given, browserLines: [key_backup_text("backed-up"), ...given.browserLines] } : given;
   const { view, pairing } = devices;
   const [joining, setJoining] = useState(false);
   const block = useRef<HTMLElement>(null);
@@ -352,13 +341,7 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
             </p>
           ))
         : null}
-      {paired && view.one_device_warning ? (
-        <p role="status" className="flex items-start gap-1 text-xs text-[var(--toolbar-icon)]">
-          <TriangleAlert {...GLYPH} className="shrink-0" />
-          {view.one_device_warning}
-        </p>
-      ) : null}
-      {paired && devices.browser && !openerBlock ? <KeyBackupRow backup={backup} server={server} /> : null}
+      {paired && devices.browser && !openerBlock ? <KeyBackupRow backup={backup} /> : null}
       {openerBlock ? (
         <OpenerBlock devices={devices} view={openerBlock} server={server} />
       ) : picking !== "" ? (

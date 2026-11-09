@@ -13,11 +13,10 @@ import { useSharedTree } from "@/hooks/useSharedTree";
 import { useWorkspaceWriter } from "@/hooks/useWorkspaceWriter";
 import { claimOpenRoom, endedBySwitchOff, openRoomNow, releaseOpenRoom } from "@/lib/backgroundWorkspace";
 import { parseEnded } from "@/lib/endedRecord";
+import { STALL_MS } from "@/lib/stallWatch";
 import { commitShare, prepareShare } from "@/lib/workspaceShare";
-import type { SharedScan } from "@/lib/sharedTree";
 import type { WorkspaceAnswer } from "@/lib/workspaceRows";
 import { invoke } from "@/platform/host";
-import { answerBytes } from "@/lib/binaryArgs";
 import {
   invite_link_server,
   invite_link_workspace,
@@ -25,7 +24,7 @@ import {
   normalize_server_address,
   workspace_removed_text,
   devices_no_longer_synced_notice,
-  workspace_share_take_in,
+  devices_text,
   type WasmSession,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
@@ -49,24 +48,15 @@ export interface JoinFolder {
   refusal: string;
 }
 
-/** The documents shared on their own that Share takes in or leaves out (criteria 42, 49). */
-export interface ShareCheck {
-  takenIn: string[];
-  outside: string[];
-}
-
-const NO_CHECK: ShareCheck = { takenIn: [], outside: [] };
 
 export interface WorkspaceSyncApi {
   share: SharePhase;
-  /** What the last `checkShare` found, for the Share confirm. */
-  shareCheck: ShareCheck;
-  /** Finds the documents shared on their own before the Share confirm names them. */
-  checkShare: () => Promise<void>;
   /** Names of documents Share left out (shared on their own, unreadable). */
   notAdded: string[];
   /** Shares the open workspace (after the unsaved-changes check). */
   shareWorkspace: () => void;
+  /** Cancels a running Share: nothing is written, the open document comes back. */
+  cancelShare: () => void;
   joinFolder: JoinFolder;
   /** Choose folder… of a workspace join. */
   chooseJoinFolder: () => void;
@@ -95,11 +85,6 @@ function fromHex(hex: string): Uint8Array {
 function folderName(path: string): string {
   const parts = path.split(/[\\/]/).filter((part) => part !== "");
   return parts[parts.length - 1] ?? path;
-}
-
-/** A document's name as rows show it: its file name without `.curvyo`. */
-function documentName(path: readonly string[]): string {
-  return (path[path.length - 1] ?? "").replace(/\.curvyo$/i, "");
 }
 
 /** The workspace id (hex) named by a marker's `share.json`. */
@@ -140,12 +125,16 @@ export function useWorkspaceSync(
   });
   const [share, setShare] = useState<SharePhase>({ kind: "idle" });
   const [notAdded, setNotAdded] = useState<string[]>([]);
-  const [shareCheck, setShareCheck] = useState<ShareCheck>(NO_CHECK);
   const [joinFolder, setJoinFolder] = useState<JoinFolder>({ path: "", refusal: "" });
   // The workspace (by name) found shared; another or a closed one is not.
   const [sharedName, setSharedName] = useState("");
   /** While Share runs, the marker is not written: the files are committed only on success. */
   const sharingRef = useRef(false);
+  /** The Share run that may go on; Cancel and the watchdog count it up. */
+  const shareRunRef = useRef(0);
+  /** The run that started last, and the document a Share closed and has not reopened yet. */
+  const startedRef = useRef(0);
+  const reopenRef = useRef<string[] | null>(null);
   /** The workspace id of a join, until the chosen folder became the workspace. */
   const joiningRef = useRef<string | null>(null);
   const joinedIndexRef = useRef(new Map<string, string[]>());
@@ -155,7 +144,7 @@ export function useWorkspaceSync(
   const removedRef = useRef<WasmSession | null>(null);
   // The retries after a passphrase reach the latest callbacks.
   const resumeRef = useRef<() => Promise<void>>(async () => undefined);
-  const runShareRef = useRef<() => Promise<void>>(async () => undefined);
+  const runShareRef = useRef<(run: number, pressed: string[] | null) => Promise<void>>(async () => undefined);
   const startJoinRef = useRef<(link: string, folder: string) => Promise<void>>(async () => undefined);
 
   /** Writes `index.json` for the documents named. */
@@ -358,15 +347,19 @@ export function useWorkspaceSync(
     return () => window.clearInterval(timer);
   }, [getSession, pumpWriter, showHistoryNotice, writeIndex, writeJoined]);
 
-  /** Waits for the shared workspace's first connection; "" once connected, else the reason. */
+  /** Waits for the shared workspace's first connection; "" once connected, else the reason
+   * ("cancelled" once Share was cancelled; the caller leaves the room then). */
   const connected = useCallback(
-    () =>
+    (run: number) =>
       new Promise<string>((resolve) => {
         const started = Date.now();
         const timer = window.setInterval(() => {
           const session = getSession();
           const state = session ? shareState(session) : "";
-          if (state === "connected") {
+          if (shareRunRef.current !== run) {
+            window.clearInterval(timer);
+            resolve("cancelled");
+          } else if (state === "connected") {
             window.clearInterval(timer);
             resolve("");
           } else if (state === "not-connected" || Date.now() - started > SHARE_WAIT_MS) {
@@ -384,16 +377,25 @@ export function useWorkspaceSync(
 
   /** Share workspace (criterion 25): every document read and prepared in memory, the room made,
    * the snapshot uploaded; only then the files, the new id and the marker are written. */
-  const runShare = useCallback(async () => {
+  const runShare = useCallback(async (run: number, pressed: string[] | null) => {
     const { workspace: ws, collab } = refs.current;
     const server = normalize_server_address(collab.server);
-    const reopen = ws.openPath;
+    // A run that follows a cancelled one before it reopened the document reopens it instead.
+    const reopen = reopenRef.current ?? pressed ?? ws.openPathNow() ?? ws.openPath;
+    reopenRef.current = reopen;
+    startedRef.current = run;
     const entries: ScannedEntryData[] = ws.scanned();
+    /** Cancelled meanwhile (Cancel, the switch turned off, the watchdog): nothing is written. */
+    const cancelled = () => shareRunRef.current !== run;
+    let finished = false;
     sharingRef.current = true;
     try {
       await refs.current.project.resetToEmpty();
       // The device's identity first: a document shared on this device alone is taken in.
-      const keys = await collab.deviceKeys("", () => void runShareRef.current());
+      const keys = await collab.deviceKeys("", () => void runShareRef.current(run, reopen));
+      if (cancelled()) {
+        return;
+      }
       if (!keys) {
         setShare({ kind: "idle" });
         return;
@@ -401,11 +403,18 @@ export function useWorkspaceSync(
       const deps = {
         label: collab.name,
         keysFor: (room: string) => collab.deviceKeys(room, () => undefined),
-        progress: (done: number, total: number) => setShare({ kind: "uploading", done, total }),
+        progress: (done: number, total: number) => {
+          if (shareRunRef.current === run) {
+            setShare({ kind: "uploading", done, total });
+          }
+        },
       };
       const prepared = await prepareShare(entries, keys.identity, deps);
       const { builder } = prepared;
       try {
+        if (cancelled()) {
+          return;
+        }
         setNotAdded(prepared.notAdded);
         const session = getSession();
         if (!session) {
@@ -424,7 +433,13 @@ export function useWorkspaceSync(
           Date.now(),
         );
         collab.drive(session);
-        const failure = error || (await connected());
+        const failure = error || (await connected(run));
+        if (failure === "cancelled" || (failure === "" && shareRunRef.current !== run)) {
+          // The room may exist on the server now; this device leaves it and nothing is written.
+          session.leave_sync();
+          collab.drive(session);
+          return;
+        }
         if (failure) {
           setShare({ kind: "failed", text: `Could not share: ${failure}` });
           return;
@@ -433,6 +448,8 @@ export function useWorkspaceSync(
       } finally {
         builder.free();
       }
+      finished = true;
+      reopenRef.current = null;
       sharingRef.current = false;
       lastMarkerRef.current = 0;
       setShare({ kind: "idle" });
@@ -442,41 +459,46 @@ export function useWorkspaceSync(
       }
     } finally {
       sharingRef.current = false;
+      // A Share that did not finish brings the document back as it was (previous state),
+      // unless a newer run started meanwhile: that one reopens it.
+      if (!finished && startedRef.current === run) {
+        reopenRef.current = null;
+        // Without a document to reopen, an empty one replaces the session that tried, so no
+        // link of the attempt is left on it (a later switch-on shares anew).
+        await (reopen ? ws.reopen(reopen) : refs.current.project.resetToEmpty()).catch(() => undefined);
+      }
     }
   }, [connected, getSession]);
 
-  const checkShare = useCallback(async () => {
-    const scan = await invoke<SharedScan>("scan_shared_workspace").catch(() => null);
-    const candidates = scan?.documents.filter((d) => d.keyring) ?? [];
-    if (candidates.length === 0) {
-      setShareCheck(NO_CHECK);
-      return;
-    }
-    const keys = await refs.current.collab.deviceKeys("", () => undefined);
-    if (!keys) {
-      setShareCheck(NO_CHECK);
-      return;
-    }
-    const found: ShareCheck = { takenIn: [], outside: [] };
-    for (const candidate of candidates) {
-      const bytes = await invoke<ArrayBuffer>("read_workspace_document", { path: candidate.path })
-        .then(answerBytes)
-        .catch(() => null);
-      const kind = bytes ? workspace_share_take_in(bytes, fromHex(keys.identity)) : "plain";
-      if (kind === "allowed") {
-        found.takenIn.push(documentName(candidate.path));
-      } else if (kind === "refused") {
-        found.outside.push(documentName(candidate.path));
-      }
-    }
-    setShareCheck(found);
-  }, []);
-
   const shareWorkspace = useCallback(() => {
+    shareRunRef.current += 1;
+    const run = shareRunRef.current;
+    // The document open at the press comes back after the Share, whatever ends it meanwhile.
+    const pressed = refs.current.workspace.openPathNow();
     setShare({ kind: "idle" });
     setNotAdded([]);
-    refs.current.project.replaceThen("share-workspace", () => runShareRef.current());
+    refs.current.project.replaceThen("share-workspace", () => runShareRef.current(run, pressed));
   }, []);
+
+  /** Cancels a Share that runs: back to idle at once; the run stops at its next step, leaves a
+   * room it made and reopens the document (customer feedback on PR #281). */
+  const cancelShare = useCallback(() => {
+    shareRunRef.current += 1;
+    setShare({ kind: "idle" });
+  }, []);
+
+  // A Share that made no progress for `STALL_MS` fails with its reason and can be tried again.
+  const shareKey = share.kind === "uploading" ? `uploading:${share.done}` : share.kind;
+  useEffect(() => {
+    if (share.kind !== "uploading" && share.kind !== "waiting") {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      shareRunRef.current += 1;
+      setShare({ kind: "failed", text: devices_text("share-stalled") });
+    }, STALL_MS);
+    return () => window.clearTimeout(timer);
+  }, [share.kind, shareKey]);
 
   const chooseJoinFolder = useCallback(() => {
     void invoke<{ kind: string; path?: string; code?: string }>("pick_join_folder")
@@ -551,10 +573,9 @@ export function useWorkspaceSync(
   const sharedOpen = opened !== "" && sharedName === opened;
   return {
     share,
-    shareCheck,
-    checkShare,
     notAdded,
     shareWorkspace,
+    cancelShare,
     joinFolder,
     chooseJoinFolder,
     joinWorkspace,

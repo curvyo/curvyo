@@ -9,7 +9,6 @@ import type { OfferedWorkspace } from "@/hooks/useSyncedWorkspaces";
 import {
   devices_already_synced,
   devices_documents_text,
-  devices_privacy_sentence,
   devices_text,
   devices_workspaces_for,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
@@ -103,9 +102,7 @@ export function PickWorkspaces({
           ))}
         </ul>
       ) : null}
-      <p className="text-xs text-[var(--toolbar-icon)]">
-        {frozenWarning ? `${devices_privacy_sentence()} ${frozenWarning}` : devices_privacy_sentence()}
-      </p>
+      {frozenWarning ? <p className="text-xs text-[var(--toolbar-icon)]">{frozenWarning}</p> : null}
       <div className="flex flex-wrap gap-2">
         <button ref={notNow} type="button" className={`${BUTTON} ${OUTLINE} w-[90px]`} onClick={() => onDone([])}>
           Not now
