@@ -2,17 +2,14 @@
 // local `curvyo-sync-server` on a temporary data directory and three browser contexts A (Anna),
 // B (Ben) and C (Cleo), each its own device.
 //
-// Document: A shares, B and C join; the second-admin line shows and goes when A makes Ben an admin
-// (criteria 2, 7); A makes Ben a member again (3); A, the only admin, cannot leave (14); A removes
-// Ben, whose Removed block checks "not yet" (13, 20); A adds Ben back with Full history and Ben
-// syncs again (17, 18, 21); A removes and adds Ben back once more and Ben keeps it as it is: Ben
-// left, A sees the rotation pending and changes the keys (11, 12, 21). The first check after A
-// lists Ben again says "added back" (26): A's list waits for the relay's confirmation (ADR 0041
-// decision 11). Through one relay a mutual removal removes one admin; the frozen room of criteria
-// 27 to 29 comes from crossed demotions, which `curvyo-sync-core` tests (`sim_confirmation`)
-// cover. Workspace: a faked desktop host (`support/fake-workspace-host.cjs`)
-// for A and B; A removes Ben and adds Ben back with no history choice, Ben syncs again (23). The
-// relay's data holds no label, name or content (31).
+// Document: A shares, B and C join; there is no second-admin line (customer 2026-11-09); A makes
+// Ben an admin (criterion 2, armed, no sentence) and a member again (3); A, the only admin, finds
+// Leave and Step down greyed (14); A removes Ben, whose Removed block is its heading only, with
+// no Check and no "Removed or left" list on A (add back dropped, customer 2026-11-09); A makes a
+// new invite and Ben joins again and syncs; Ben leaves and A changes the keys (11, 12).
+// Workspace: a faked desktop host (`support/fake-workspace-host.cjs`) for A and B; A removes Ben,
+// makes a new invite and Ben joins again into a new folder and syncs. The relay's data holds no
+// label, name or content (31).
 //
 // Needs `target/debug/curvyo-sync-server` (`cargo build -p curvyo-sync-server`) and a production
 // preview (`npm run build`, `npx vite preview --host localhost --port 1421`); starts the preview
@@ -109,7 +106,6 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
 const shown = (d, text) => d.page.getByText(text, { exact: true }).count().then((n) => n > 0);
 const exists = (d, ...rel) => fs.existsSync(path.join(d.host.state.root, ...rel));
 
-const ONE_ADMIN = 'Only this device is an admin. If you lose it, nobody can add or remove people. Make someone else an admin.';
 
 async function rect(d, x, y, w, h) {
   await tool(d, 'Rectangle');
@@ -148,51 +144,38 @@ async function invite(d) {
   const done = panel(d).getByRole('button', { name: 'Done', exact: true });
   if ((await done.count()) > 0) await done.click();
   await panel(d).getByRole('button', { name: 'Invite', exact: true }).click();
-  await panel(d).getByRole('button', { name: 'Create link', exact: true }).click();
   const field = panel(d).getByLabel('Invite link', { exact: true });
   await field.waitFor();
   return field.inputValue();
 }
 
-/** A confirm opened by `opener` (accessible name), confirmed by `action` after the guard. */
-async function confirmAct(d, opener, group, action) {
-  await panel(d).getByRole('button', { name: opener, exact: true }).click();
-  const ask = panel(d).getByRole('group', { name: group, exact: true });
-  await ask.waitFor();
+/** The armed act `name` (customer feedback on PR #281): the first press arms it and nothing
+ * else shows, a second press inside the 400 ms guard does nothing, one after it acts. */
+async function armAct(d, name) {
+  const button = panel(d).getByRole('button', { name, exact: true });
+  await button.click();
   await settle(d.page, 450);
-  await ask.getByRole('button', { name: action, exact: true }).click();
-  return ask;
+  await button.click();
+  return button;
 }
 
 const role = async (d, label) => (await row(d, label).innerText()).split('\n').map((l) => l.trim()).find((l) => /^(Admin|Member)/.test(l)) ?? '';
 
-/** The admin opens Removed or left and adds `label` back; `full` checks the history choice. */
-async function addBack(d, label, history) {
+/** `d` opens the invite link `link` of a document as `name`. */
+async function joinDocument(d, link, name) {
   await tab(d, 'Share');
-  const disclosure = panel(d).getByRole('button', { name: /^Removed or left \(\d+\)$/ });
-  if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click();
-  await panel(d).getByRole('button', { name: `Add back ${label}`, exact: true }).click();
-  const dialog = panel(d).getByRole('group', { name: `Add back ${label}`, exact: true });
-  await dialog.waitFor();
-  const radios = dialog.getByRole('radiogroup', { name: 'History' });
-  if (history) {
-    assert.equal(await dialog.getByRole('radio', { name: /^Full history/ }).getAttribute('aria-checked'), 'true', 'Full history is preselected');
-  } else {
-    assert.equal(await radios.count(), 0, 'a workspace has no history choice');
+  await panel(d).getByRole('button', { name: /^Open shared document/ }).click();
+  await panel(d).getByLabel('Invite link', { exact: true }).fill(link);
+  const field = panel(d).getByLabel('Name shown to others', { exact: true }).last();
+  await field.fill(name);
+  await field.press('Enter');
+  await panel(d).getByRole('button', { name: 'Join', exact: true }).click();
+  // A removed copy with unsaved changes asks first (the File tab's check): it is not needed.
+  const discard = panel(d).getByRole('button', { name: 'Discard', exact: true });
+  if (await discard.waitFor({ timeout: 1500 }).then(() => true, () => false)) {
+    await settle(d.page, 450);
+    await discard.click();
   }
-  await dialog.getByRole('button', { name: 'Add back', exact: true }).click();
-  return dialog;
-}
-
-/** The removed or left device presses Check; returns once an answer shows. */
-async function check(d) {
-  await tab(d, 'Share');
-  await panel(d).getByRole('button', { name: 'Check whether I was added back', exact: true }).click();
-  // The answer of an earlier check goes while this one runs ("Checking..." or the prompt).
-  await until(`${d.label} checks`, async () => (await panel(d).getByRole('button', { name: 'Checking...', exact: true }).count()) > 0
-    || (await panel(d).getByText(/added (you )?back to .*Sync again\?$/).count()) > 0, 5000).catch(() => undefined);
-  await until(`${d.label} has an answer`, async () => (await panel(d).getByRole('button', { name: 'Checking...', exact: true }).count()) === 0 &&
-    (await shown(d, 'Not added back yet.')) || (await panel(d).getByText(/added (you )?back to .*Sync again\?$/).count()) > 0, 15000);
 }
 
 (async () => {
@@ -214,104 +197,99 @@ async function check(d) {
 
     /** How long the UI took to show each change after the press (ms), for the lead's report. */
     const timings = {};
-    step('Share, join twice; the second-admin line on the only admin (criterion 7)');
+    step('Share, join twice; no second-admin line (customer 2026-11-09)');
     await rect(A, 300, 200, 120, 80);
     await download(A);
     await setUp(A, relay.address, 'Anna');
     await panel(A).getByText('Reachable', { exact: true }).waitFor();
+    // Share asks nothing (customer 2026-11-09: no confirm sentences in the Share tab).
     await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
-    await panel(A).getByRole('group', { name: /^Upload this document to/ }).getByRole('button', { name: 'Share', exact: true }).click();
     timings.shareConnected = await until('A connected', async () => (await panel(A).getByText('Connected', { exact: true }).count()) === 1, 10000);
     for (const [d, name] of [[B, 'Ben'], [C, 'Cleo']]) {
-      const link = await invite(A);
-      await tab(d, 'Share');
-      await panel(d).getByRole('button', { name: /^Open shared document/ }).click();
-      await panel(d).getByLabel('Invite link', { exact: true }).fill(link);
-      const field = panel(d).getByLabel('Name shown to others', { exact: true }).last();
-      await field.fill(name);
-      await field.press('Enter');
-      await panel(d).getByRole('button', { name: 'Join', exact: true }).click();
+      await joinDocument(d, await invite(A), name);
       timings[`${name}Joined`] = await until(`${name} joined`, async () => (await row(A, name).count()) === 1, 15000);
     }
     await until('A names Ben and Cleo', async () => (await row(A, 'Ben').count()) === 1 && (await row(A, 'Cleo').count()) === 1, 8000);
     await tab(A, 'Share');
-    assert.ok(await shown(A, ONE_ADMIN), 'the only admin sees the second-admin line');
+    assert.equal(await panel(A).getByText(/^Only this device is an admin/).count(), 0, 'no second-admin line');
     assert.equal(await role(A, 'Ben'), 'Member');
     await shot(A, '01-a-one-admin');
     await assertPanelFits(A.page, '01-a-one-admin');
 
-    step('Criteria 2 and 7: A makes Ben an admin; the line goes; Cleo is told');
-    await confirmAct(A, 'Make Ben an admin', 'Make Ben an admin', 'Make admin');
+    step('Criterion 2: A makes Ben an admin (armed, no sentence); Cleo is told');
+    const makeAdmin = panel(A).getByRole('button', { name: 'Make Ben an admin', exact: true });
+    await makeAdmin.click();
+    await settle(A.page, 200);
+    assert.equal(await panel(A).getByText(/^Make Ben an admin\?/).count(), 0, 'no sentence under the armed button');
+    assert.ok((await role(A, 'Ben')).startsWith('Member'), 'the first press only arms');
+    await settle(A.page, 300);
+    await makeAdmin.click();
     timings.makeAdmin = await until('Ben is an admin in A', async () => (await role(A, 'Ben')).startsWith('Admin'), 8000);
-    await until('the nudge is gone', async () => !(await shown(A, ONE_ADMIN)), 5000);
     await tab(C, 'Share');
     timings.cleoSeesRole = timings.makeAdmin + (await until('Cleo sees the change', async () => (await panel(C).getByText('Ben is now an admin').count()) >= 1, 8000));
     await shot(C, '02-c-ben-admin');
     await assertPanelFits(C.page, '02-c-ben-admin');
 
     step('Criterion 3: A makes Ben a member again');
-    await confirmAct(A, 'Make Ben a member', 'Make Ben a member', 'Make member');
+    await armAct(A, 'Make Ben a member');
     timings.makeMember = await until('Ben is a member in A', async () => (await role(A, 'Ben')).startsWith('Member'), 8000);
 
-    step('Criterion 14: the only admin cannot leave');
+    step('Criterion 14: the only admin cannot leave or step down; both are greyed with the reason');
     const leave = row(A, 'Anna').getByRole('button', { name: /^Leave / });
-    assert.equal(await leave.getAttribute('aria-disabled'), 'true');
-    assert.equal(await leave.getAttribute('title'), 'You are the only admin');
-    // aria-disabled keeps it focusable and pressable: the press says why (ux-notes 3.3).
-    await leave.click({ force: true });
-    await until('A is told why', async () => shown(A, 'You are the only admin. Make someone else an admin first.'), 3000);
-    assert.equal(await panel(A).getByRole('group', { name: /^Leave / }).count(), 0, 'no leave confirm opens');
+    const stepDown = row(A, 'Anna').locator('[data-slot="role"]');
+    for (const greyed of [leave, stepDown]) {
+      assert.equal(await greyed.getAttribute('aria-disabled'), 'true');
+      assert.equal(await greyed.getAttribute('title'), 'You are the only admin');
+      assert.equal(await greyed.getAttribute('aria-description'), 'You are the only admin');
+      // A press does nothing: no sentence, no refusal text (customer 2026-11-09).
+      await greyed.click({ force: true });
+      await settle(A.page, 500);
+      await greyed.click({ force: true });
+    }
+    assert.equal(await panel(A).getByText(/Make someone else an admin first/).count(), 0, 'no refusal sentence');
+    assert.equal(await panel(A).getByText(/^Step down as admin\?/).count(), 0, 'nothing armed');
     assert.equal(await participants(A).count(), 3);
+    assert.ok((await role(A, 'Anna')).startsWith('Admin'));
 
-    step('Criteria 13 and 20: A removes Ben; Ben checks: not yet');
-    await confirmAct(A, 'Remove Ben', 'Remove Ben', 'Remove');
+    step('Criterion 13: A removes Ben; Ben\'s Removed block is its heading; no Removed or left list');
+    await armAct(A, 'Remove Ben');
     timings.remove = await until('A lists two', async () => (await participants(A).count()) === 2, 8000);
     timings.benTold = timings.remove + (await until('Ben is told', async () => shown(B, 'You were removed from this document. Your copy stays on this device.'), 8000));
     await tab(B, 'Share');
     await until('Ben sees the Removed block', async () => (await panel(B).getByText(/^You were removed from /).count()) >= 1, 8000);
-    assert.ok(await shown(B, `Contacts ${relay.address}.`), 'the block says what Check contacts');
-    await check(B);
-    assert.ok(await shown(B, 'Not added back yet.'));
-    await shot(B, '03-b-not-yet');
-    await assertPanelFits(B.page, '03-b-not-yet');
+    assert.equal(await panel(B).getByRole('button', { name: /^Check whether I was added back/ }).count(), 0, 'no Check');
+    assert.equal(await panel(A).getByRole('button', { name: /^Removed or left/ }).count(), 0, 'no Removed or left list');
+    await shot(B, '03-b-removed');
+    await assertPanelFits(B.page, '03-b-removed');
 
-    step('Criteria 17, 18 and 21: A adds Ben back with Full history; Ben syncs again');
-    await addBack(A, 'Ben', true);
-    timings.addBack = await until('A lists Ben again', async () => (await row(A, 'Ben').count()) === 1, 8000);
-    // Criterion 26: A lists Ben only once the relay holds the add (ADR 0041 decision 11), so
-    // the first check finds it.
-    await check(B);
-    assert.ok(await shown(B, 'Anna added you back to this document. Sync again?'), 'the first check after "Added" says added back');
-    await shot(B, '04-b-added-back');
-    await assertPanelFits(B.page, '04-b-added-back');
-    await panel(B).getByRole('button', { name: 'Sync again', exact: true }).click();
-    timings.syncAgain = await until('Ben is a participant again', async () => (await participants(B).count()) === 3, 15000);
-    // PR #281 review: it took 4.6 s while the first save held the page and the connection timed out.
-    assert.ok(timings.syncAgain < 1000, `Sync again took ${timings.syncAgain} ms`);
-
-    step('Criteria 11, 12 and 21: removed and added back again, Ben keeps it as it is');
-    await tab(A, 'Share');
-    await confirmAct(A, 'Remove Ben', 'Remove Ben', 'Remove');
-    await until('A lists two', async () => (await participants(A).count()) === 2, 8000);
-    await until('Ben sees the Removed block', async () => {
+    step('Share tab feedback 3: A makes a new invite; the removed Ben joins again and syncs');
+    await joinDocument(B, await invite(A), 'Ben');
+    timings.rejoin = await until('A lists Ben again', async () => (await row(A, 'Ben').count()) === 1, 15000);
+    await until('Ben lists three', async () => {
       await tab(B, 'Share');
-      return (await panel(B).getByRole('button', { name: 'Check whether I was added back', exact: true }).count()) === 1;
-    }, 8000);
-    await addBack(A, 'Ben', true);
-    await until('A lists Ben again', async () => (await row(A, 'Ben').count()) === 1, 8000);
-    await check(B);
-    await panel(B).getByRole('button', { name: 'Keep as it is', exact: true }).click();
-    timings.keepAsItIs = await until('Ben left', async () => (await panel(B).getByText(/^You left /).count()) >= 1, 15000);
+      return (await participants(B).count()) === 3;
+    }, 15000);
+    await until('Ben is connected', async () => (await panel(B).getByText('Connected', { exact: true }).count()) >= 1, 15000);
+    assert.equal(await panel(B).getByText(/^You were removed from /).count(), 0, 'the old removal no longer blocks');
+    await shot(B, '04-b-joined-again');
+
+    step('Criteria 11 and 12: Ben leaves (armed); A sees the rotation pending and changes the keys');
+    await tab(B, 'Share');
+    const benLeave = row(B, 'Ben').locator('[data-slot="action"]');
+    await benLeave.click();
+    await settle(B.page, 450);
+    await benLeave.click();
+    timings.leave = await until('Ben left', async () => (await panel(B).getByText(/^You left /).count()) >= 1, 15000);
+    await tab(A, 'Share');
     await until('A lists two', async () => (await participants(A).count()) === 2, 8000);
     await until('A sees the rotation pending', async () => (await panel(A).getByText('Ben left. The keys have not been changed yet.').count()) >= 1, 8000);
     await shot(A, '05-a-rotation-pending');
     await assertPanelFits(A.page, '05-a-rotation-pending');
-    const epochBefore = await panel(A).getByText(/^Key epoch \d+$/).innerText();
     await panel(A).getByRole('button', { name: 'Change keys now', exact: true }).click();
-    await until('the keys changed', async () => (await panel(A).getByText(/^Key epoch \d+$/).innerText()) !== epochBefore, 8000);
+    await until('the keys changed', () => shown(A, 'Keys changed.'), 8000);
     await until('the notice is gone', async () => (await panel(A).getByText('Ben left. The keys have not been changed yet.').count()) === 0, 8000);
 
-    step('Criterion 23: a workspace; A removes Ben and adds Ben back with no history choice');
+    step('Share tab feedback 3: a workspace; A removes Ben, Ben joins again by a new invite and syncs');
     const WA = await device(browser, url, 'WA', true);
     const WB = await device(browser, url, 'WB', true);
     all.push(WA, WB);
@@ -330,7 +308,6 @@ async function check(d) {
     await setUp(WA, relay.address, 'Anna');
     await panel(WA).getByText('Reachable', { exact: true }).first().waitFor();
     await panel(WA).getByRole('button', { name: 'Share workspace', exact: true }).click();
-    await panel(WA).getByRole('group', { name: /^Upload the workspace / }).getByRole('button', { name: 'Share', exact: true }).click();
     timings.workspaceShared = await until('A shared the workspace', async () => {
       await tab(WA, 'Share');
       return (await panel(WA).getByText(/^Shared on /).count()) >= 1;
@@ -349,27 +326,65 @@ async function check(d) {
       await tab(WA, 'Share');
       return (await row(WA, 'Ben').count()) === 1;
     }, 15000);
-    await confirmAct(WA, 'Remove Ben', 'Remove Ben', 'Remove');
+    await armAct(WA, 'Remove Ben');
     timings.workspaceRemove = await until('Ben keeps the ended record', async () => exists(WB, MARKER, 'share.ended.json') && !exists(WB, MARKER, 'share.json'), 15000);
-    await check(WB);
-    assert.ok(await shown(WB, 'Not added back yet.'));
-    const dialog = await addBack(WA, 'Ben', false);
-    assert.equal(await dialog.count(), 0, 'the dialog closed');
-    await until('A lists Ben again', async () => (await row(WA, 'Ben').count()) === 1, 8000);
-    await check(WB);
-    await shot(WB, '07-wb-added-back');
-    await assertPanelFits(WB.page, '07-wb-added-back');
-    await panel(WB).getByRole('button', { name: 'Sync again', exact: true }).click();
-    timings.workspaceSyncAgain = await until('Ben syncs the workspace again', async () => exists(WB, MARKER, 'share.json') && !exists(WB, MARKER, 'share.ended.json'), 15000);
+    await until('Ben is told', async () => (await WB.page.getByText('You were removed from this workspace. Your copies stay on this computer.').count()) >= 1, 15000);
+    const wsAgain = await invite(WA);
+    WB.host.state.joinName = 'Joined box again';
+    await tab(WB, 'Share');
+    await panel(WB).getByRole('button', { name: /^Join shared workspace/ }).click();
+    await panel(WB).getByLabel('Invite link', { exact: true }).fill(wsAgain);
+    await panel(WB).getByRole('button', { name: /^Choose folder/ }).click();
+    await panel(WB).getByRole('button', { name: 'Join', exact: true }).click();
+    timings.workspaceRejoin = await until('Ben has the file again', async () => WB.host.state.root !== null && WB.host.state.root.endsWith('Joined box again') && exists(WB, 'Lid.curvyo'), 30000);
+    await until('A lists Ben again', async () => {
+      await tab(WA, 'Share');
+      return (await row(WA, 'Ben').count()) === 1;
+    }, 15000);
     await until('Ben lists two', async () => {
       await tab(WB, 'Share');
       return (await participants(WB).count()) === 2;
     }, 15000);
-    assert.ok(exists(WB, 'Lid.curvyo'), 'Ben keeps the document');
+    await shot(WB, '07-wb-joined-again');
+    await assertPanelFits(WB.page, '07-wb-joined-again');
+
+    step('Share tab feedback round 4: Anna makes Ben admin, steps down and leaves; Ben, the only admin, keeps the workspace block, invites and can stop sharing');
+    await tab(WA, 'Share');
+    await armAct(WA, 'Make Ben an admin');
+    await until('Ben is an admin in A', async () => (await role(WA, 'Ben')).startsWith('Admin'), 8000);
+    const stepDownA = row(WA, 'Anna').locator('[data-slot="role"]');
+    await stepDownA.click();
+    await settle(WA.page, 450);
+    await stepDownA.click();
+    await until('Anna is a member', async () => (await role(WA, 'Anna')).startsWith('Member'), 8000);
+    const leaveA = row(WA, 'Anna').locator('[data-slot="action"]');
+    await leaveA.click();
+    await settle(WA.page, 450);
+    await leaveA.click();
+    await until('Ben lists only himself', async () => {
+      await tab(WB, 'Share');
+      return (await participants(WB).count()) === 1;
+    }, 15000);
+    await shot(WB, '08-wb-only-admin');
+    assert.equal(await panel(WB).getByRole('region', { name: /^Workspace / }).count(), 1, 'the workspace block shows');
+    assert.equal(await panel(WB).getByRole('button', { name: 'Invite', exact: true }).count(), 1, 'Ben can invite');
+    await assertPanelFits(WB.page, '08-wb-only-admin');
+    // Stop sharing, armed, for the only participant left: the workspace is local again.
+    const stop = panel(WB).getByRole('button', { name: 'Stop sharing', exact: true });
+    await stop.click();
+    await settle(WB.page, 450);
+    assert.ok(exists(WB, MARKER, 'share.json'), 'the first press only arms');
+    await stop.click();
+    timings.stopSharing = await until('the marker has no share files', async () => !exists(WB, MARKER, 'share.json'), 10000);
+    await until('Ben\'s workspace is not shared', async () => {
+      await tab(WB, 'Share');
+      return (await panel(WB).getByText('Not shared', { exact: true }).count()) >= 1;
+    }, 10000);
+    await shot(WB, '09-wb-stopped');
 
     assert.deepEqual(all.flatMap((d) => d.errors), []);
     console.log(`timings (ms): ${JSON.stringify(timings)}`);
-    console.log('PASS browser 0097: roles and the nudge, last admin, removal and check, add back with Full history, keep as it is and change keys, workspace add back without a history choice');
+    console.log('PASS browser 0097: roles armed without sentences, last admin greyed, removal without add back, a removed device joins again by a new invite (document and workspace), leave and change keys');
   } catch (error) {
     for (const d of all) {
       await shot(d, `failed-${d.label}`).catch(() => undefined);
