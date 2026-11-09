@@ -153,7 +153,7 @@ impl Session {
             if !position.x.0.is_finite() || !position.y.0.is_finite() {
                 return Err(SketchEditError("Dimension position must be finite".into()));
             }
-            let changed = self.recording(|this| {
+            let changed = self.recording_unguarded(|this| {
                 this.document.batch("edit_sketch", |doc| {
                     let changed = doc.apply_sketch_delta(
                         snapshot.id,

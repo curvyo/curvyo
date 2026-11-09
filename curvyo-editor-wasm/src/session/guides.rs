@@ -166,7 +166,7 @@ impl Session {
         let anchor_ids: Vec<_> = (0..count).map(|_| self.minter.mint()).collect();
         self.select.cancel_entry();
         let ids = self
-            .recording(|this| {
+            .recording_unguarded(|this| {
                 let loaded = this.document.load_template(&nodes, &anchor_ids);
                 if let Ok(ids) = &loaded {
                     this.selection.set(ids);

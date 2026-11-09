@@ -93,7 +93,7 @@ impl Session {
             .document
             .move_page(&drag.page.id, drag.delta, &drag.objects);
         if self.workbench_of_kind(&drag.page.kind) == self.workbench() {
-            self.page_view.press(&self.document.pages(), point);
+            self.page_view.press(&self.document.pages(), point, false);
         } else {
             self.activate_page(&drag.page.id);
         }

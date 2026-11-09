@@ -29,6 +29,13 @@ pub struct GroupingResult {
     pub notice: String,
 }
 
+impl Default for GroupingResult {
+    /// A refused or ignored command: nothing happened, no notice.
+    fn default() -> Self {
+        Self::ignored()
+    }
+}
+
 impl GroupingResult {
     fn ignored() -> Self {
         Self {

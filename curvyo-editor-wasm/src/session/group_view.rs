@@ -57,7 +57,7 @@ const PER_OBJECT_BOX_LIMIT: usize = 500;
 impl Session {
     /// The group of the selection over `objects`, in the Select tool only.
     fn group_in(&self, objects: &[ObjectSnapshot]) -> Option<GroupSelection> {
-        if self.tool != Tool::Select {
+        if !self.select_box_tool() {
             return None;
         }
         SelectTool::group_of(objects, &self.selection)
@@ -268,6 +268,21 @@ impl Session {
     /// (`specs/0019-multi-object-transform/` UX notes, section 13).
     #[must_use]
     pub fn selection_announcement(&self) -> String {
+        let built = self.selection_announcement_as_built();
+        // An out-of-context selection says where it lies (`specs/0106` UX notes §2); a single
+        // object without an announcement of its own is named by its kind.
+        if self.tool != Tool::Select {
+            return built;
+        }
+        let suffix = self.out_of_context_suffix();
+        match (built.is_empty(), suffix.is_empty()) {
+            (_, true) => built,
+            (true, false) => self.selection_subject() + &suffix,
+            (false, false) => built + &suffix,
+        }
+    }
+
+    fn selection_announcement_as_built(&self) -> String {
         // The Node tool's count after a marquee or Ctrl+A (`0053` criterion 24).
         if self.tool == Tool::Node {
             return self.node_selection_announcement();

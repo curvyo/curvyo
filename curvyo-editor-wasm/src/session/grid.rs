@@ -101,7 +101,7 @@ impl Session {
         let page = self.active_page();
         let mut grid = page.grid;
         edit(&mut grid);
-        match self.recording(|this| this.document.set_page_grid(&page.id, grid)) {
+        match self.recording_unguarded(|this| this.document.set_page_grid(&page.id, grid)) {
             Ok(changed) => Ok(changed),
             // The active page always exists; should it not, nothing is written and no notice
             // shows.

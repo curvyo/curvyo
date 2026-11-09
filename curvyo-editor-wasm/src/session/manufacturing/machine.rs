@@ -140,7 +140,7 @@ impl Session {
             right: origin.is_right(),
             bottom: origin.is_bottom(),
         };
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.document
                 .set_manufacturing_profile(id, &map, page, anchor, change)
                 .unwrap_or(false)

@@ -54,10 +54,11 @@ pub enum KeyHint {
 }
 
 /// What `Session::key_down` did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum KeyOutcome {
     /// The gate or the key table said no: nothing happened, and the page's
     /// default for the key is not to be prevented.
+    #[default]
     Ignored,
     /// The active tool changed.
     ToolChanged,
@@ -301,8 +302,26 @@ impl Session {
         }
     }
 
+    /// Enter: a move-only selection's page becomes active (`specs/0106` UX notes §4); one
+    /// selected text, or the Text tool with nothing selected, starts edit mode
+    /// (`specs/0074-text-objects` criterion 10); one selected group is entered.
+    fn enter_key(&mut self) -> KeyOutcome {
+        if self.enter_switch() {
+            return KeyOutcome::Consumed;
+        }
+        if self.text_enter() {
+            return KeyOutcome::TextEditStarted;
+        }
+        self.sync_context();
+        if self.enter_selected_group() {
+            KeyOutcome::EnteredGroup
+        } else {
+            KeyOutcome::Ignored
+        }
+    }
+
     /// The facts of the session the key table reads.
-    fn key_state(&self) -> KeyState {
+    pub(super) fn key_state(&self) -> KeyState {
         KeyState {
             tool: self.tool,
             operation_in_flight: self.operation_in_flight(),
@@ -334,6 +353,16 @@ impl Session {
     /// [`KeyOutcome::Ignored`], so Ctrl+R and Ctrl+S keep their page and menu
     /// behaviour.
     pub fn key_down(&mut self, input: KeyInput<'_>) -> KeyOutcome {
+        self.edit_context.refused = false;
+        let repeat = input.repeat;
+        let outcome = self.key_down_dispatch(input);
+        // A chord that reached a guarded edit with a move-only selection says so once
+        // (`specs/0106` criterion 9).
+        self.note_refused_key(repeat);
+        outcome
+    }
+
+    fn key_down_dispatch(&mut self, input: KeyInput<'_>) -> KeyOutcome {
         // A document preview pauses editing: every key of the table, undo and redo included
         // (`specs/0042-history-branches` criterion 19).
         if self.document_preview_active() {
@@ -343,7 +372,10 @@ impl Session {
             return outcome;
         }
         if self.workbench() == super::Workbench::Sketch {
-            return self.sketch_key(input);
+            return match self.sketch_drawing_key(&input) {
+                Some(outcome) => outcome,
+                None => self.sketch_key(input),
+            };
         }
         if let Some(outcome) = self.mode_key(&input) {
             return outcome;
@@ -408,19 +440,7 @@ impl Session {
                 }
             }
             KeyAction::Flip(axis) => KeyOutcome::Flipped(axis, self.flip_selection(axis)),
-            KeyAction::EnterGroup => {
-                // One selected text, or the Text tool with nothing selected: edit mode
-                // (`specs/0074-text-objects` criterion 10).
-                if self.text_enter() {
-                    return KeyOutcome::TextEditStarted;
-                }
-                self.sync_context();
-                if self.enter_selected_group() {
-                    KeyOutcome::EnteredGroup
-                } else {
-                    KeyOutcome::Ignored
-                }
-            }
+            KeyAction::EnterGroup => self.enter_key(),
             KeyAction::Reorder(how) => self.reorder_selection(how),
             KeyAction::Nudge(arrow) => {
                 let event = NudgeEvent {
@@ -610,7 +630,7 @@ impl Session {
     /// toolbar's Delete button): removes every selected object when the
     /// Select or Node tool is active. A no-op for every other tool.
     pub fn delete_selected(&mut self) {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.flush_select_bar_preview();
             this.flush_style_preview();
             match this.tool {

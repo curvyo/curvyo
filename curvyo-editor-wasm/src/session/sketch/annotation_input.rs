@@ -93,7 +93,7 @@ impl Session {
     }
 
     /// Whether sketch geometry is within pick reach of `point`.
-    fn sketch_geometry_at(&self, point: Point) -> bool {
+    pub(in crate::session) fn sketch_geometry_at(&self, point: Point) -> bool {
         let (Ok(snapshot), Some(local)) =
             (self.sketch_snapshot_for_edit(), self.sketch_local(point))
         else {
@@ -168,8 +168,8 @@ impl Session {
         let Some(id) = self.sketch.active else {
             return true;
         };
-        let result =
-            self.recording(|this| this.document.set_sketch_label(id, &drag.id, drag.current));
+        let result = self
+            .recording_unguarded(|this| this.document.set_sketch_label(id, &drag.id, drag.current));
         self.sketch.error = result.err().map(|e| e.to_string());
         true
     }

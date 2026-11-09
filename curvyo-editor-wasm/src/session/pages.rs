@@ -2,6 +2,9 @@
 use super::{Session, SizeOutcome};
 use curvyo_document_core::{DocumentSize, NodeId, ObjectSnapshot, Page, PageKind, Point};
 use curvyo_ui_core::{PageMembership, Reach, object_bounds};
+
+/// How far a press may travel, in screen px, and still be a click that activates a page.
+const CLICK_SLOP_PX: f64 = 4.0;
 impl Session {
     /// The current active frame, resolved after undo, merge or deletion.
     #[must_use]
@@ -14,26 +17,9 @@ impl Session {
     }
     /// Activates a row, panning only when the frame is outside the viewport.
     pub fn activate_page(&mut self, id: &str) -> bool {
-        // One decode of the frame list per call: with hundreds of frames it dominates the cost.
-        let pages = self.document.pages();
-        let Some(page) = pages.iter().find(|p| p.id == id).cloned() else {
+        let Some((page, changed, left)) = self.switch_active_page(id) else {
             return false;
         };
-        let changed = self.page_view.active(&pages).is_none_or(|p| p.id != id);
-        if changed {
-            // A page switch cancels the open tiling bar (`0069` criterion 35).
-            self.tiling = None;
-        }
-        self.page_view.active = Some(id.to_owned());
-        let left = self.sketch.workbench;
-        // The tools and tabs follow the page's kind in the same frame (`specs/0098` criterion 8).
-        self.sync_workbench();
-        self.sync_sketch_page();
-        if page.kind != PageKind::Sketch {
-            self.last_work_page = Some(page.id.clone());
-            // A page's sketch is selected only on its sketch page (ADR 0043 §2).
-            self.drop_fixed_sketches_from_selection();
-        }
         let (w, h) = self.viewport.canvas_size();
         let min = self.view().screen_to_document(0.0, 0.0);
         let max = self.view().screen_to_document(w, h);
@@ -53,9 +39,41 @@ impl Session {
         }
         true
     }
+
+    /// Activates the page `id` without moving the view: the switch of a double-click or Enter
+    /// on an out-of-context object (`specs/0106` criteria 13 to 16, UX notes §4).
+    pub(super) fn activate_page_in_place(&mut self, id: &str) -> bool {
+        self.switch_active_page(id).is_some()
+    }
+
+    /// Makes `id` the active page: tools, tabs and the sketch follow. The page, whether it
+    /// changed and the workbench left; `None` for an unknown page.
+    fn switch_active_page(&mut self, id: &str) -> Option<(Page, bool, super::Workbench)> {
+        // One decode of the frame list per call: with hundreds of frames it dominates the cost.
+        let pages = self.document.pages();
+        let page = pages.iter().find(|p| p.id == id).cloned()?;
+        let changed = self.page_view.active(&pages).is_none_or(|p| p.id != id);
+        if changed {
+            // A page switch cancels the open tiling bar (`0069` criterion 35).
+            self.tiling = None;
+            self.note_active_drawing_page();
+        }
+        self.page_view.active = Some(id.to_owned());
+        let left = self.sketch.workbench;
+        // The tools and tabs follow the page's kind in the same frame (`specs/0098` criterion 8).
+        self.sync_workbench();
+        self.sync_sketch_page();
+        self.note_active_drawing_page();
+        if page.kind != PageKind::Sketch {
+            self.last_work_page = Some(page.id.clone());
+            // A page's sketch is selected only on its sketch page (ADR 0043 §2).
+            self.drop_fixed_sketches_from_selection();
+        }
+        Some((page, changed, left))
+    }
     /// Adds and activates the next drawing page as one history step.
     pub fn add_page(&mut self) -> String {
-        let page = self.recording(|this| this.document.add_page());
+        let page = self.recording_unguarded(|this| this.document.add_page());
         self.activate_page(&page.id);
         page.id
     }
@@ -69,7 +87,7 @@ impl Session {
             "sketch" => PageKind::Sketch,
             process => return self.add_output_page_with(process, profile),
         };
-        let page = self.recording(|this| this.document.add_page_of(&kind).ok())?;
+        let page = self.recording_unguarded(|this| this.document.add_page_of(&kind).ok())?;
         self.activate_page(&page.id);
         Some(page.id)
     }
@@ -133,11 +151,11 @@ impl Session {
         if other == current && current != super::Workbench::Sketch {
             return false;
         }
-        // A drawing object over a sketch page is pressed, not the page (`specs/0099` criterion 2,
-        // `adrs.md` note 3); the page's sketch is never pickable.
-        if page.kind == PageKind::Sketch
-            && current != super::Workbench::Sketch
-            && self.press_hits_object(point)
+        // A press on an object of any context selects it and keeps the active page
+        // (`specs/0106` criterion 2); the page's sketch is never pickable. On a sketch page a
+        // press on sketch geometry wins (criterion 3).
+        if self.press_reaches_selection(point)
+            && (current != super::Workbench::Sketch || !self.sketch_geometry_at(point))
         {
             return false;
         }
@@ -149,14 +167,68 @@ impl Session {
     /// object pressed over it (`specs/0099` criterion 2); a press there that hits nothing already
     /// activated the sketch page.
     pub(super) fn press_page_view(&mut self, point: Point) {
-        let pages: Vec<Page> = self
-            .document
+        let pages = self.non_sketch_pages();
+        // A press on an object keeps the active page (`specs/0106` criterion 2). With the Select
+        // tool an empty press activates its page on the release of a click, so neither a move
+        // nor a marquee started there switches the page (criteria 2, 3 and 5).
+        let hit = self.press_reaches_selection(point);
+        let defer = !hit && self.tool == super::Tool::Select;
+        self.edit_context.empty_press = defer.then_some(point);
+        self.page_view.press(&pages, point, hit || defer);
+        self.note_active_drawing_page();
+    }
+
+    /// The release of a vector press: an empty Select click activates the page it was in.
+    pub(super) fn release_page_view(&mut self, point: Point) {
+        let Some(press) = self.edit_context.empty_press.take() else {
+            return;
+        };
+        if press.vector_to(point).length() * self.view().scale() > CLICK_SLOP_PX {
+            return;
+        }
+        let pages = self.non_sketch_pages();
+        self.page_view.press(&pages, press, false);
+        self.note_active_drawing_page();
+    }
+
+    fn non_sketch_pages(&self) -> Vec<Page> {
+        self.document
             .pages()
             .into_iter()
             .filter(|p| p.kind != PageKind::Sketch)
-            .collect();
-        self.page_view.press(&pages, point);
+            .collect()
     }
+    /// Whether a press at `point` reaches an object or the Select tool's box and handles of the
+    /// selection: such a press never activates a page (`specs/0106` criteria 2 and 5).
+    pub(super) fn press_reaches_selection(&self, point: Point) -> bool {
+        self.press_hits_object(point)
+            || (self.tool == super::Tool::Select && self.press_reaches_selection_box(point))
+    }
+
+    /// Whether a press at `point` reaches the selection's box or one of its handles.
+    pub(super) fn press_reaches_selection_box(&self, point: Point) -> bool {
+        // On a sketch page the page's sketch is selected and has no box (ADR 0043 §2).
+        if self.selection.ids().is_empty() || self.workbench() == super::Workbench::Sketch {
+            return false;
+        }
+        let objects = self.objects();
+        !matches!(
+            curvyo_ui_core::classify_press(
+                &objects,
+                &self.pickable_objects(),
+                &self.selection,
+                point,
+                self.object_tolerance(),
+                self.transform_handle_tolerances(),
+                curvyo_ui_core::Modifiers {
+                    alt: false,
+                    ..self.held
+                },
+            ),
+            curvyo_ui_core::PressTarget::Empty | curvyo_ui_core::PressTarget::Lasso
+        )
+    }
+
     /// Whether a press at `point` hits a pickable object of the context.
     pub(super) fn press_hits_object(&self, point: Point) -> bool {
         !curvyo_ui_core::hit_test_objects(&self.pickable_objects(), point, self.object_tolerance())
@@ -164,7 +236,7 @@ impl Session {
     }
     /// Renames a frame, returning false for invalid or unchanged names.
     pub fn rename_page(&mut self, id: &str, name: &str) -> bool {
-        self.recording(|this| this.document.rename_page(id, name).unwrap_or(false))
+        self.recording_unguarded(|this| this.document.rename_page(id, name).unwrap_or(false))
     }
     /// Deletes a frame, choosing the adjacent row if it was active.
     pub fn delete_page(&mut self, id: &str) -> bool {
@@ -173,7 +245,7 @@ impl Session {
             return false;
         };
         let active = self.active_page().id == id;
-        let changed = self.recording(|this| this.document.delete_page(id).is_ok());
+        let changed = self.recording_unguarded(|this| this.document.delete_page(id).is_ok());
         if changed && active {
             let pages = self.document.pages();
             self.page_view.active = Some(pages[index.min(pages.len() - 1)].id.clone());
@@ -183,7 +255,7 @@ impl Session {
     }
     /// Reorders a frame without changing its position.
     pub fn reorder_page(&mut self, id: &str, index: usize) -> bool {
-        self.recording(|this| this.document.reorder_page(id, index).unwrap_or(false))
+        self.recording_unguarded(|this| this.document.reorder_page(id, index).unwrap_or(false))
     }
     /// Sets the per-user frame-only movement switch.
     pub fn set_page_frame_only(&mut self, id: &str, on: bool) {
@@ -253,7 +325,7 @@ impl Session {
         } else {
             self.contained_page_objects(&page)
         };
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.document
                 .move_page(id, page.origin.vector_to(origin), &objects)
                 .unwrap_or(false)
@@ -302,20 +374,16 @@ impl Session {
             )),
         }
     }
-    /// The objects of `objects` Select all takes: all of them, or the members of the active page
-    /// while a page selection context is on.
+    /// The objects of `objects` Select all takes.
     pub(super) fn page_selection_ids(&self, objects: &[ObjectSnapshot]) -> Vec<NodeId> {
-        let page = self.active_page();
-        let scoped = self.page_view.context.as_ref() == Some(&page.id);
-        let membership = scoped.then(|| self.page_membership());
+        // Select all is "edit everything here": the objects in context of the active page
+        // (`specs/0106` criterion 3).
+        let targets: std::collections::HashSet<NodeId> =
+            self.edit_targets().iter().map(ObjectSnapshot::id).collect();
         objects
             .iter()
-            .filter(|object| {
-                membership.as_ref().is_none_or(|m| {
-                    m.is_member(&page, object.id(), object_bounds(object), Reach::Touches)
-                })
-            })
             .map(ObjectSnapshot::id)
+            .filter(|id| targets.contains(id))
             .collect()
     }
     /// The sketch facts of a sketch page's row (`specs/0099` criteria 10, 14, 16): its state, how
@@ -338,6 +406,8 @@ impl Session {
     pub fn pages_json(&self) -> String {
         let active = self.active_page().id;
         let drop_target = self.row_drag_target();
+        // The pages a move-only selection belongs to: semibold labels (`specs/0106` UX §2).
+        let homes = self.home_page_ids();
         let pages = self
             .document_preview()
             .map_or_else(|| self.shown_pages(), |p| p.pages.clone());
@@ -345,7 +415,7 @@ impl Session {
             let (x,y)=self.view().document_to_screen(p.origin);
             let chip = self.kind_chip(&p.kind);
             let sketch = self.sketch_row_json(p);
-            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str())})
+            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str()),"home":homes.contains(&p.id)})
         }).collect();
         serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_owned())
     }

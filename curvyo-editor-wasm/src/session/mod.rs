@@ -55,6 +55,10 @@ mod document;
 mod document_presets;
 mod drag_swap;
 mod draw;
+mod edit_context;
+#[cfg(test)]
+mod edit_context_tests;
+mod edit_context_view;
 mod file_chord;
 mod flip;
 mod formats;
@@ -107,6 +111,7 @@ mod offset_chip;
 mod offset_view;
 mod open_error;
 mod page_drag;
+mod page_tree_panel;
 mod pages;
 mod panel_tabs;
 mod pattern;
@@ -115,6 +120,7 @@ mod pattern_tests;
 mod pen;
 mod place_on;
 mod row_drag;
+mod sketch_moves;
 mod sketch_use;
 use clone_drop::DropMode;
 pub use row_drag::{DropBadge, RowDragAnswer, RowDragSource};
@@ -465,6 +471,8 @@ pub struct Session {
     /// The last active drawing or laser page, for Select clones with every clone on the
     /// pasteboard (`specs/0099` criterion 12).
     last_work_page: Option<String>,
+    /// Move versus edit: the cached scope and the last active drawing page (`specs/0106`).
+    edit_context: edit_context::EditContext,
     /// The document formats: the built-in list with the maker's file over it
     /// (`formats.rs`).
     formats: curvyo_document_core::FormatLibrary,
@@ -683,6 +691,7 @@ impl Session {
             row_drag: None,
             clone_drops: clone_drop::CloneDropState::default(),
             last_work_page: None,
+            edit_context: edit_context::EditContext::default(),
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
             covered_right: 0.0,
@@ -782,6 +791,7 @@ impl Session {
             row_drag: None,
             clone_drops: clone_drop::CloneDropState::default(),
             last_work_page: None,
+            edit_context: edit_context::EditContext::default(),
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
             covered_right: 0.0,
@@ -874,7 +884,7 @@ impl Session {
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
         self.end_snapping_drag();
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             // Flushes any pending ratio-slider preview against the
             // selection it was actually previewed against, before anything
             // else can change that selection (architect re-verification: a
@@ -933,8 +943,9 @@ impl Session {
     /// handles and segments (`specs/0055-compound-path-node-editing` criterion 1).
     fn paths(&self) -> Vec<curvyo_document_core::PathSnapshot> {
         // A hidden or locked path is no target of the Node tool or the Pen
-        // (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
-        self.pickable_objects()
+        // (`specs/0050-layers-and-objects-panel` criteria 19 and 20), nor a path out of context
+        // (`specs/0106` criterion 10).
+        self.edit_targets()
             .iter()
             .filter_map(|object| match object {
                 ObjectSnapshot::Path(path) => Some(path.clone()),
@@ -945,7 +956,7 @@ impl Session {
 
     /// The pointer went down at `point` (document space).
     pub fn pointer_down(&mut self, point: Point, shift: bool) {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let Some(point) = sanitized_point(point) else {
                 return;
             };
@@ -966,7 +977,9 @@ impl Session {
                 return;
             }
             if this.workbench() == Workbench::Sketch {
-                this.sketch_pointer_down(point);
+                if !this.sketch_press_on_drawing(point, shift) {
+                    this.sketch_pointer_down(point);
+                }
                 return;
             }
             this.press_page_view(point);
@@ -1017,6 +1030,12 @@ impl Session {
                     }
                 }
                 Tool::Node => {
+                    // A press on an object out of context, or on a move-only selection's box,
+                    // is the Select tool's (`specs/0106` criterion 10).
+                    if this.node_press_as_select(point) {
+                        this.button_down = false;
+                        return;
+                    }
                     if this.kept_point_pointer_down(point) {
                         return;
                     }
@@ -1071,7 +1090,9 @@ impl Session {
         self.held.shift = shift;
         self.held.ctrl = constrain;
         if self.workbench() == Workbench::Sketch {
-            self.sketch_pointer_hover(point);
+            if !self.sketch_drawing_hover(point, self.held) {
+                self.sketch_pointer_hover(point);
+            }
             return;
         }
         if self.colour_pick_move(point) || self.trace_pick_move(point) {
@@ -1146,7 +1167,7 @@ impl Session {
         if self.operation_in_flight() || self.button_down {
             return false;
         }
-        let changed = self.recording(|this| this.document.set_snapping(snapping));
+        let changed = self.recording_unguarded(|this| this.document.set_snapping(snapping));
         if changed {
             self.snapping.update_stored(self.document.snapping());
             self.end_snapping_drag();
@@ -1161,7 +1182,7 @@ impl Session {
     /// `object-transform`, by the Select tool's own resize/rotate commit
     /// alongside `shift` (acceptance criteria 5, 7, 16, 17).
     pub fn pointer_up(&mut self, point: Point, shift: bool, constrain: bool) {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.button_down = false;
             if this.tiling_release_press() {
                 return;
@@ -1182,7 +1203,9 @@ impl Session {
             this.held.shift = shift;
             this.held.ctrl = constrain;
             if this.workbench() == Workbench::Sketch {
-                this.sketch_pointer_up(point);
+                if !this.sketch_drawing_release(point, shift, constrain) {
+                    this.sketch_pointer_up(point);
+                }
                 return;
             }
             if this.page_drag_end(point) {
@@ -1194,7 +1217,7 @@ impl Session {
             if std::mem::take(&mut this.clone_drops.escaped) {
                 return;
             }
-            this.press_page_view(point);
+            this.release_page_view(point);
             match this.tool {
                 Tool::Select => {
                     if !this.dimension_pointer_up(point) {
@@ -1249,14 +1272,28 @@ impl Session {
             }
             return DoubleClickHint::None;
         }
-        self.recording(|this| -> DoubleClickHint {
+        self.recording_unguarded(|this| -> DoubleClickHint {
             let Some(point) = sanitized_point(point) else {
                 return DoubleClickHint::None;
             };
             if this.workbench() == Workbench::Sketch {
+                // A drawing object over the sketch page opens its own page (`specs/0106`
+                // criterion 16).
+                if let Some(hint) = this.sketch_double_click_on_drawing(point) {
+                    return hint;
+                }
                 // A dimension's text opens the entry box there (AC31, AC33).
                 this.sketch_edit_dimension_at(point);
                 return DoubleClickHint::None;
+            }
+            // On an out-of-context object the first double-click only makes its page active
+            // (`specs/0106` criteria 13 to 16).
+            if matches!(
+                this.tool,
+                Tool::Select | Tool::Node | Tool::Text | Tool::Offset
+            ) && let Some(hint) = this.double_click_switch(point)
+            {
+                return hint;
             }
             // On the position handle of a text on path: its entry box (`0080`, customer
             // 2026-10-24).

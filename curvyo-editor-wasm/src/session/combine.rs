@@ -11,10 +11,11 @@ use super::Session;
 use super::refusal::RefusalMarks;
 
 /// What [`Session::apply_combine`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CombineOutcome {
     /// Nothing: the Select tool is not active, a drag is in flight or a typed entry is open, or
     /// the write could not be made.
+    #[default]
     Ignored,
     /// The operands were replaced by one compound path.
     Applied {

@@ -16,11 +16,12 @@ use super::Session;
 use super::text::{NEW_TEXT_ID, edit_id};
 
 /// What a typed value, a reset or a commit did (criterion 7; UX notes §0.4).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum LayoutOutcome {
     /// Written as asked.
     Set,
     /// Nothing changed.
+    #[default]
     Unchanged,
     /// Not a number.
     Invalid,

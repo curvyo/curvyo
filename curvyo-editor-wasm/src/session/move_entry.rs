@@ -71,7 +71,7 @@ impl Session {
         second: &str,
         mode: MoveEntryMode,
     ) -> EntryOutcome {
-        self.recording(|this| -> EntryOutcome {
+        self.recording_unguarded(|this| -> EntryOutcome {
             if this.open_move_entry().is_none() {
                 this.select.cancel_entry();
                 return EntryOutcome::Unchanged;

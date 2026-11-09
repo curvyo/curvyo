@@ -99,9 +99,11 @@ fn ac12_unset_and_stale_context_select_all_but_hover_does_not_replace_pressed_co
     let second = rect(&d, p.origin.x + 10.0, 10.0, 20.0);
     let mut s = Session::open(606, &pack(&d, "acceptance").unwrap()).unwrap();
     s.set_tool(Tool::Select);
+    // Superseded by `specs/0106` criterion 3: Select all takes the objects in context of the
+    // active page only, also before any press.
     select_all(&mut s);
     s.delete_selected();
-    assert_eq!(opened(&s).object_ids(), []);
+    assert_eq!(opened(&s).object_ids(), vec![second]);
     s.undo();
     press(&mut s, Point::new(100.0, 100.0));
     s.pointer_hover(Point::new(p.origin.x + 100.0, 100.0), false, false);
@@ -113,7 +115,7 @@ fn ac12_unset_and_stale_context_select_all_but_hover_does_not_replace_pressed_co
     s.activate_page(&p.id);
     select_all(&mut s);
     s.delete_selected();
-    assert_eq!(opened(&s).object_ids(), []);
+    assert_eq!(opened(&s).object_ids(), vec![first]);
 }
 
 #[test]

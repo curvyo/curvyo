@@ -327,7 +327,7 @@ impl Session {
                 Planned::Svg { import: None, .. } => {}
             }
         }
-        let (ids, layer) = self.recording(|this| {
+        let (ids, layer) = self.recording_unguarded(|this| {
             let written = this.document.batch(label, |document| {
                 let mut ids = Vec::new();
                 let mut layer = None;

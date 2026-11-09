@@ -99,7 +99,7 @@ impl Session {
             self.pen_entries.entry = None;
             let point = end.anchor.point;
             let threshold = self.drag_threshold();
-            self.recording(|this| {
+            self.recording_unguarded(|this| {
                 this.pen.pointer_down_action(point, PressAction::Join(end));
                 this.pen
                     .pointer_up(&mut this.minter, &this.document, point, threshold);

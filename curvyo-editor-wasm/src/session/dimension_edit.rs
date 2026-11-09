@@ -74,7 +74,8 @@ impl Session {
             return false;
         };
         if drag.moved {
-            let _ = self.recording(|this| this.document.set_dimension_place(drag.id, drag.place));
+            let _ = self
+                .recording_unguarded(|this| this.document.set_dimension_place(drag.id, drag.place));
         }
         true
     }
@@ -159,24 +160,26 @@ impl Session {
             return false;
         }
         let made = self.recording(|this| {
-            this.document.batch(
-                curvyo_document_core::CONVERT_DIMENSION_COMMIT_LABEL,
-                |document| {
-                    if !others.is_empty() {
-                        let _ = document.set_guide(others, false);
-                    }
-                    document.convert_dimensions(&conversions)
-                },
-            )
+            this.document
+                .batch(
+                    curvyo_document_core::CONVERT_DIMENSION_COMMIT_LABEL,
+                    |document| {
+                        if !others.is_empty() {
+                            let _ = document.set_guide(others, false);
+                        }
+                        document.convert_dimensions(&conversions)
+                    },
+                )
+                .ok()
         });
         match made {
-            Ok(groups) => {
+            Some(groups) => {
                 let mut ids = others.to_vec();
                 ids.extend(groups);
                 self.selection.set(&ids);
                 true
             }
-            Err(_) => false,
+            None => false,
         }
     }
 }

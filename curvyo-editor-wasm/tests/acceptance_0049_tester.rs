@@ -344,7 +344,8 @@ fn ac1_ac5_linked_clone_of_three_selected_objects() {
     let before = labels(&s).len();
     let r = s.linked_clone();
     assert_eq!(r.code(), "done");
-    assert_eq!(r.notice, "Created 3 linked clones.");
+    // No notice after a success (customer rule 2026-10-31, `specs/0106` UX review).
+    assert_eq!(r.notice, "");
     assert!(!r.notice.contains("No undo yet"));
     let ids = doc_of(&s).object_ids();
     assert_eq!(ids.len(), 6);
@@ -372,7 +373,7 @@ fn ac5_the_notice_for_one_clone_is_singular() {
     square(&d, 0);
     let mut s = open(&d);
     click(&mut s, mid(0));
-    assert_eq!(s.linked_clone().notice, "Created 1 linked clone.");
+    assert_eq!(s.linked_clone().notice, "");
 }
 
 #[test]

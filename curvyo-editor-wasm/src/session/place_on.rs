@@ -86,7 +86,7 @@ impl Session {
         };
         let source = self.active_page();
         let translation = clamped_translation(&source, &target, bounds);
-        let placed = self.recording(|this| {
+        let placed = self.recording_unguarded(|this| {
             this.leave_to_level(0);
             this.document.set_draw_parent(this.draw_parent(None));
             this.document

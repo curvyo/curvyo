@@ -138,9 +138,10 @@ pub struct TraceSource {
 }
 
 /// What [`Session::create_traced_paths`] did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TraceCreateOutcome {
     /// Nothing: not the Trace tool, no image, or a result is missing or has no outline.
+    #[default]
     Ignored,
     /// The groups were written in one step.
     Created {
@@ -522,7 +523,8 @@ impl Session {
                 return;
             }
         }
-        let pickable = self.pickable_objects();
+        // An object out of context is no operand (`specs/0106` criterion 10).
+        let pickable = self.edit_targets();
         let tolerance = self.object_tolerance();
         let Some(&hit) = hit_test_objects(&pickable, point, tolerance).first() else {
             if !shift {
@@ -554,7 +556,8 @@ impl Session {
         if self.trace_mask_pick() {
             return DoubleClickHint::None;
         }
-        let pickable = self.pickable_objects();
+        // An object out of context is no operand (`specs/0106` criterion 10).
+        let pickable = self.edit_targets();
         let tolerance = self.object_tolerance();
         let hit = hit_test_objects(&pickable, point, tolerance)
             .first()

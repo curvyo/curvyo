@@ -69,7 +69,7 @@ impl Session {
     /// Sets the display unit, one commit that moves nothing (criterion 36).
     /// Returns whether it changed.
     pub fn set_display_unit(&mut self, unit: DisplayUnit) -> bool {
-        self.recording(|this| -> bool { this.document.set_display_unit(unit) })
+        self.recording_unguarded(|this| -> bool { this.document.set_display_unit(unit) })
     }
 
     /// Whether the document has any object: Fit to content is offered only
@@ -121,7 +121,7 @@ impl Session {
     /// within 1e-9 mm of the current one writes nothing. Ignored while the Pen
     /// has an unfinished path.
     pub(super) fn resize_document_to(&mut self, wanted: DocumentSize) -> SizeOutcome {
-        self.recording(|this| -> SizeOutcome {
+        self.recording_unguarded(|this| -> SizeOutcome {
             if this.pen_path_unfinished() {
                 return SizeOutcome::Unchanged;
             }
@@ -138,7 +138,7 @@ impl Session {
 
     /// Fits the document to the extent of all objects (criteria 22 to 27a).
     pub fn fit_document(&mut self) -> FitOutcome {
-        self.recording(|this| -> FitOutcome {
+        self.recording_unguarded(|this| -> FitOutcome {
             if this.pen_path_unfinished() {
                 return FitOutcome::Blocked;
             }

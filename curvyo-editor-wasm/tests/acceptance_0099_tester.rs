@@ -357,12 +357,13 @@ fn ac3_sketch_select_all_delete_and_presses_act_on_sketch_geometry_only() {
     assert_eq!(f.s.workbench(), Workbench::Sketch);
     f.s.set_sketch_tool(SketchTool::Select);
     let over_before = doc(&f.s).object(f.over).unwrap();
-    // A press on the drawing object reaches empty canvas: nothing selected, nothing moves.
+    // Amended by `specs/0106` criterion 3: a press on the drawing object off sketch geometry
+    // selects it move-only, and a drag moves it; the sketch page stays active.
     let on_rect = Point::new(f.sketch_page.origin.x + 5.0, f.sketch_page.origin.y + 10.0);
     click(&mut f.s, on_rect);
     assert!(
-        !selected(&mut f.s).contains(&f.over),
-        "the drawing object is not picked"
+        selected(&mut f.s).contains(&f.over),
+        "the drawing object is selected move-only"
     );
     assert!(sketch_selection(&f.s).is_empty());
     drag(
@@ -370,11 +371,12 @@ fn ac3_sketch_select_all_delete_and_presses_act_on_sketch_geometry_only() {
         on_rect,
         Point::new(on_rect.x + 30.0, on_rect.y + 30.0),
     );
-    assert_eq!(
+    assert_ne!(
         doc(&f.s).object(f.over).unwrap(),
         over_before,
-        "a drag never moves it"
+        "a drag moves it"
     );
+    let over_before = doc(&f.s).object(f.over).unwrap();
     // Ctrl+A and Delete act on the sketch only.
     key(&mut f.s, "a", true);
     assert!(
@@ -1006,11 +1008,13 @@ fn ac13_select_original_of_clones_of_two_sketches_activates_the_first_sketch_pag
         .unwrap();
     // The new sketch page goes first in the list.
     d.reorder_page(&other.id, 0).unwrap();
+    // Both on the pasteboard, where Select all on a drawing page takes them (`specs/0106`
+    // criterion 3 keeps Select all to the objects in context).
     let a = d
-        .place_linked_clone(f.sketch, Vec2::new(-800.0, 0.0))
+        .place_linked_clone(f.sketch, Vec2::new(0.0, -2000.0))
         .unwrap();
     let b = d
-        .place_linked_clone(other_sketch, Vec2::new(-900.0, 0.0))
+        .place_linked_clone(other_sketch, Vec2::new(0.0, -2300.0))
         .unwrap();
     let mut s = open_session(&d);
     s.activate_page("first");

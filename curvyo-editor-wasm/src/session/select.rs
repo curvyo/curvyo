@@ -168,7 +168,13 @@ impl Session {
     /// (`docs/design-system.md`, "Transform handle layout"), converted from
     /// screen pixels to document millimetres.
     pub(super) fn transform_handle_tolerances(&self) -> TransformHandleTolerances {
-        TransformHandleTolerances::at_scale(self.view().scale())
+        let mut tolerances = TransformHandleTolerances::at_scale(self.view().scale());
+        // A move-only selection draws no parameter handle, so none can be pressed
+        // (`specs/0106` criterion 10, UX notes §2).
+        if self.edit_scope() == curvyo_ui_core::Scope::MoveOnly {
+            tolerances.param_min_side_mm = f64::INFINITY;
+        }
+        tolerances
     }
 
     /// Acceptance criteria 1, 4-18: dispatches a press to the Select
@@ -227,8 +233,12 @@ impl Session {
         let snap_offset = self
             .snap_offset_for_move()
             .unwrap_or(curvyo_document_core::Vec2::ZERO);
-        // Over a laser page the release decides by its own flags (`specs/0100` criteria 1 to 4).
-        if self.clone_drop_release(point, snap_offset) {
+        // Over a laser page the release decides by its own flags (`specs/0100` criteria 1 to 4);
+        // a click that never left the dead zone is no drop (a Shift-click toggles,
+        // `specs/0106` criterion 3).
+        if self.select.live_move(point, shift, ctrl).is_some()
+            && self.clone_drop_release(point, snap_offset)
+        {
             self.end_snapping_drag();
             return;
         }

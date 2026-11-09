@@ -31,7 +31,7 @@ pub(super) struct ManufacturingState {
 
 impl Session {
     /// The manufacturing of the active page, `None` on another page or when it is gone.
-    pub(super) fn active_manufacturing(&self) -> Option<ManufacturingSnapshot> {
+    pub(in crate::session) fn active_manufacturing(&self) -> Option<ManufacturingSnapshot> {
         match self.workbench() {
             Workbench::Manufacturing(id) => self.document.manufacturing(id),
             _ => None,

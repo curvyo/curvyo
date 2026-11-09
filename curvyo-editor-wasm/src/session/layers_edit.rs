@@ -107,7 +107,7 @@ impl Session {
         let Some(id) = parse_id(id) else {
             return PanelReply::Quiet;
         };
-        self.panel_action(|this| {
+        self.panel_edit(|this| {
             if this.panel.fresh_layer.take() == Some(id) {
                 this.document.continue_step();
             }
@@ -185,7 +185,9 @@ impl Session {
             } else {
                 ""
             },
-            "field": !targets.is_empty(),
+            // Opacity is an edit: hidden for a move-only selection (`specs/0106` criterion 9).
+            "field": !targets.is_empty()
+                && (matches!(target, OpacityTarget::Layer(_)) || !self.selection_move_only()),
             "layer": matches!(target, OpacityTarget::Layer(_)),
             "value": value,
             "bar": bar,
@@ -221,7 +223,7 @@ impl Session {
     /// The Opacity field commits `percent` to every target, in one step (criterion 26).
     pub fn commit_layer_opacity(&mut self, value: f64) -> PanelReply {
         self.panel.opacity_preview = None;
-        self.panel_action(|this| {
+        self.panel_edit(|this| {
             let (targets, _) = this.opacity_target();
             let Ok(opacity) = Opacity::new((value / 100.0).clamp(0.0, 1.0)) else {
                 return PanelReply::Quiet;
@@ -407,7 +409,7 @@ impl Session {
         ) else {
             return PanelReply::Quiet;
         };
-        self.panel_action(|this| {
+        self.panel_edit(|this| {
             this.panel.fresh_layer = None;
             let plan = this.drop_plan(pressed, target, place);
             match this.document.move_nodes(&plan) {
@@ -441,7 +443,7 @@ impl Session {
         let Some(focused) = parse_id(focused) else {
             return PanelReply::Quiet;
         };
-        self.panel_action(|this| {
+        self.panel_edit(|this| {
             this.panel.fresh_layer = None;
             let nodes = this.row_targets(focused);
             match this.run_reorder(&nodes, how) {

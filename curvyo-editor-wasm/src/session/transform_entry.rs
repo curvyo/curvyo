@@ -299,7 +299,7 @@ impl Session {
         second: &str,
         last_edited: usize,
     ) -> EntryOutcome {
-        self.recording(|this| -> EntryOutcome {
+        self.recording_unguarded(|this| -> EntryOutcome {
             if this.open_entry().is_none()
                 && this.open_param_entry().is_none()
                 && this.open_skew_entry().is_none()

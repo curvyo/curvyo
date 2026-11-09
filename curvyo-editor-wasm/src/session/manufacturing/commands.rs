@@ -28,7 +28,7 @@ impl Session {
         let chosen = picked.is_some();
         let profile = picked.unwrap_or_else(|| self.initial_machine_profile());
         let copy = write_copy(&ProfileCopy::of(&profile));
-        let page = self.recording(|this| {
+        let page = self.recording_unguarded(|this| {
             this.document
                 .add_output_page(NewOutputPage {
                     process,
@@ -49,7 +49,7 @@ impl Session {
     /// Deletes the placement `id` of the active laser page (`0098` criterion 12): only the
     /// reference goes, in one step.
     pub fn delete_placement(&mut self, id: NodeId) -> bool {
-        let deleted = self.recording(|this| this.document.delete_placement(id).is_ok());
+        let deleted = self.recording_unguarded(|this| this.document.delete_placement(id).is_ok());
         if deleted {
             let kept: Vec<NodeId> = self
                 .selection
@@ -71,7 +71,7 @@ impl Session {
         let fixture = contribution.fixture_kind(kind)?;
         let stored = format!("{}/{}", manufacturing.process, fixture.id);
         let params = Param::defaults(&fixture.params);
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.document
                 .add_fixture(manufacturing.id, &stored, fixture.label, &params)
                 .ok()
@@ -83,7 +83,7 @@ impl Session {
         if !self.fixture_of_active(id) {
             return false;
         }
-        self.recording(|this| this.document.delete_fixture(id).is_ok())
+        self.recording_unguarded(|this| this.document.delete_fixture(id).is_ok())
     }
 
     /// Hides or shows the fixture `id` (criterion 10's eye button; one undo step).
@@ -91,7 +91,7 @@ impl Session {
         if !self.fixture_of_active(id) {
             return false;
         }
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.document
                 .set_fixture_visible(id, visible)
                 .unwrap_or(false)
@@ -124,7 +124,7 @@ impl Session {
         };
         let mut params = fixture.params.clone();
         params.insert(key.to_owned(), accepted.to_stored());
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.document
                 .set_fixture_params(id, &params)
                 .unwrap_or(false)

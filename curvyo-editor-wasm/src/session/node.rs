@@ -54,6 +54,10 @@ impl Session {
     /// selection` "editing set"): the selected paths when the selection holds one, else every
     /// path [`Session::paths`] gives. The Node tool draws and hit-tests these only.
     pub(super) fn node_paths(&self) -> Vec<PathSnapshot> {
+        // A move-only selection shows no nodes at all (`specs/0106` criterion 10).
+        if self.edit_scope() == curvyo_ui_core::Scope::MoveOnly {
+            return Vec::new();
+        }
         let mut paths = self.paths();
         if self.cuts_node_set(&paths) {
             paths.retain(|path| self.selection.contains(path.id));

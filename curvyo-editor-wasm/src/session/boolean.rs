@@ -11,10 +11,11 @@ use super::refusal::RefusalMarks;
 use super::{Session, Tool};
 
 /// What [`Session::apply_boolean`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum BooleanOutcome {
     /// Nothing: the Select tool is not active, a drag is in flight or a typed entry is open (the
     /// entry is not discarded), or the objects went away.
+    #[default]
     Ignored,
     /// The operands were replaced by one object.
     Applied {

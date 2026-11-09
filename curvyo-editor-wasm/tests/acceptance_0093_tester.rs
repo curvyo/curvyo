@@ -347,7 +347,9 @@ fn ac12_an_unknown_process_opens_with_vector_tools_and_saves_back_unchanged() {
     assert_eq!(workbenches(&s)["page"]["word"], "Unknown kind");
     s.set_tool(Tool::Select);
     key(&mut s, "a", true);
-    assert_eq!(s.selected_object_count(), 1);
+    // The rectangle lies on the drawing page: Select all on the unknown page, a drawing page for
+    // the context rule, leaves it out (`specs/0106` criteria 1 and 3).
+    assert_eq!(s.selected_object_count(), 0);
     s.escape();
     let saved = s.pack("0.1.0").unwrap();
     assert_eq!(stored_vv(&saved), stored_vv(&bytes), "saved back unchanged");

@@ -122,7 +122,9 @@ fn select_all_uses_last_canvas_page_context_or_the_whole_drawing() {
         ..KeyInput::default()
     });
     s.delete_selected();
-    assert_eq!(document(&s).object_ids(), []);
+    // A pasteboard press keeps the active page, and Select all takes its objects in context
+    // only (`specs/0106` criterion 3).
+    assert_eq!(document(&s).object_ids().len(), 1);
 }
 #[test]
 fn active_page_falls_back_and_does_not_persist() {

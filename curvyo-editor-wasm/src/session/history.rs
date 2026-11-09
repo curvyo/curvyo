@@ -96,11 +96,27 @@ impl Session {
         }
     }
 
+    /// The guarded write of every edit command (`specs/0106` criterion 9, `adrs.md` decision 4):
+    /// with a move-only selection the body does not run, nothing is written and no step is
+    /// recorded; otherwise as [`Session::recording_unguarded`]. A command is guarded unless it
+    /// opts out, so a new command is an edit by default.
+    pub(super) fn recording<R: Default>(&mut self, body: impl FnOnce(&mut Self) -> R) -> R {
+        self.sync_context();
+        if self.edit_scope() == curvyo_ui_core::Scope::MoveOnly {
+            self.edit_context.refused = true;
+            return R::default();
+        }
+        self.recording_unguarded(body)
+    }
+
     /// Runs `body`, which may commit steps, and puts every step it started on the undo stack with
     /// the selection before it ran and the one it left. Every entry point that writes the
-    /// document goes through here, so one maker's interaction is one stack entry.
-    pub(super) fn recording<R>(&mut self, body: impl FnOnce(&mut Self) -> R) -> R {
+    /// document goes through here, so one maker's interaction is one stack entry. Only move
+    /// commands, commands that are not about the selection and the input dispatchers call it
+    /// directly; every other command calls [`Session::recording`].
+    pub(super) fn recording_unguarded<R>(&mut self, body: impl FnOnce(&mut Self) -> R) -> R {
         self.sync_context();
+        let move_only = self.edit_scope() == curvyo_ui_core::Scope::MoveOnly;
         // The repair count belongs to this command alone (review S2).
         let _ = self.document.take_clone_repair();
         let _ = self.document.take_kept_carriers();
@@ -115,6 +131,18 @@ impl Session {
         }
         // An edit ends an object preview; the object is drawn as it now is (`0042` criterion 18).
         self.end_object_preview();
+        // The second net: an edit reached through an unguarded entry with a move-only selection.
+        debug_assert!(
+            !move_only
+                || self
+                    .document
+                    .own_steps_from(self.history.recorded)
+                    .iter()
+                    .all(|step| step.reverts.is_some()
+                        || curvyo_ui_core::step_scope(&step.label)
+                            != curvyo_ui_core::StepScope::Edit),
+            "an edit step was written for a move-only selection"
+        );
         self.record_new_steps(&before);
         // An entered group the step removed is left now, and a screen reader is told (`0023`
         // criterion 20).
