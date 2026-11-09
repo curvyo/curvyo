@@ -67,8 +67,6 @@ export interface TraceApi {
   retrace: () => void;
   /** Create paths waits for full-size traces. */
   creating: boolean;
-  /** Working-image pixels per millimetre of the shown image, for the Specks readout. */
-  pxPerMm: number;
   /** A value from a field; `dragging` traces the reduced copy only (criterion 10). */
   setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
   /** A pick in the Preset menu (criteria 40, 60, 66): every preset value at once. */
@@ -93,6 +91,8 @@ export interface TraceApi {
   pickMode: string;
   /** Arms the pipette for the current method, or disarms it. */
   setPicking: (armed: boolean) => void;
+  /** Takes a colour out of Pick colours' picked colours (`ux-notes.md` §25.4): not a history step. */
+  removePicked: (hex: string) => void;
   /** The automatic background of the shown image (`#RRGGBB`, empty: transparent; `null` before
    * it is read). */
   suggestedBackground: string | null;
@@ -101,7 +101,8 @@ export interface TraceApi {
   /** Analyse: the analysed values back to the shown image's analysis. */
   analyse: () => void;
   /** What the bar's hidden status region says (`specs/0089` UX notes §24.5): the analysis, the
-   * mask, the counts, the recognised text and shapes, the palette state, an empty part. */
+   * mask, the counts, the recognised text and shapes, the palette state, an empty part, the
+   * picked colour removed and the empty set (§25.3, §25.4). */
   announcement: string;
   /** Why the Trace button is `aria-disabled`, or empty (`ux-notes.md` §22.2). */
   traceBlocked: string;

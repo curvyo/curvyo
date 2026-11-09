@@ -304,7 +304,8 @@ export function TraceAdvanced({
           />
         </div>
       </div>
-      {/* 2. The one colour strip with its edit actions (Multicolour palette, or the picked colours). */}
+      {/* 2. The colour strip with its edit actions: Multicolour with Colours Auto only; Pick colours
+          show their colours beside the pipette (`ux-notes.md` §25.4, Frage 142 A). */}
       {palette.swatches.length > 0 ? (
         <div className={`basis-full ${countsStale ? "opacity-50" : ""}`}>
           <TracePalette palette={palette} hsvOf={hsvOf} rgbOf={rgbOf} />

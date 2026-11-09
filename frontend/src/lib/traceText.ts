@@ -169,10 +169,18 @@ export const PICK_TOOLTIP = "Pick a colour from the image";
 export const AUTO = "Auto";
 export const NO_BACKGROUND = "none";
 
-/** The pipette's count label in the bar with Pick colours (`ux-notes.md` §22.1): the state in
- * which Trace can run ("3 picked") or cannot ("None picked"). */
-export function pickedCountText(count: number): string {
-  return count === 0 ? "None picked" : `${count} picked`;
+/** The name of Pick colours' group of the pipette and the picked colours (`ux-notes.md` §22.4, §25.4). */
+export const PICKED_COLOURS = "Picked colours";
+
+/** The accessible name of a picked colour's swatch beside the pipette (`ux-notes.md` §25.4):
+ * what a press does; its tooltip is the colour code alone. */
+export function removePickedLabel(hex: string): string {
+  return `Remove ${hex}`;
+}
+
+/** What the hidden status region says after a picked colour was taken out (`ux-notes.md` §25.4). */
+export function removedPickedText(hex: string): string {
+  return `Removed ${hex}`;
 }
 
 /** The swatches after a pick of `hex` (Frage 89 A): a click replaces them with this one, Shift
@@ -238,7 +246,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
   "Background: the colour Remove background leaves out; Auto takes it from the image border.",
-  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours are shown and edited in Advanced.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette.",
   "Pipette: takes a colour from the image under a click; Esc ends it.",
   "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
@@ -452,12 +460,6 @@ export function valueText(param: TraceParam, value: number): string {
   return param.kind === "integer" ? String(Math.round(value)) : value.toFixed(2);
 }
 
-/** The muted pixel readout of Specks ("~ 2 px", criterion 4; the field shows the mm): the size on the canvas. */
-export function specksHint(mm: number, pxPerMm: number): string {
-  const px = Math.round(mm * pxPerMm);
-  return px < 1 ? "< 1 px" : `~ ${px} px`;
-}
-
 /** Thousands with a comma ("1,204"). */
 export function grouped(n: number): string {
   return Math.round(n).toLocaleString("en-US");
@@ -500,8 +502,7 @@ export interface TraceStatusText {
   muted: string;
   counts: string;
   countsMuted: string;
-  /** A message the Advanced status line shows instead of the counts ("No colours found.",
-   * "0 paths: no colour picked."). */
+  /** A result whose fix is in Advanced, shown in the notice row ("No colours found."). */
   message: string;
   canCreate: boolean;
 }
@@ -509,14 +510,16 @@ export interface TraceStatusText {
 /** No state, no counts. */
 export const NO_STATUS: TraceStatusText = { line: "", muted: "", counts: "", countsMuted: "", message: "", canCreate: false };
 
-/** The result line of Pick colours with nothing picked. */
+/** Why Trace is dimmed with Pick colours and nothing picked: the button's tooltip and the hidden
+ * region's text, never a notice (`ux-notes.md` §25.3). */
 export const NO_COLOUR_PICKED_LINE = "0 paths: no colour picked.";
 
 /** The line of a trace without paths in a colour method (UX notes §10), or `null` for
- * Brightness, whose line follows the Threshold's direction. */
+ * Brightness, whose line follows the Threshold's direction. Pick colours with nothing picked has
+ * no line, empty (`ux-notes.md` §25.3: it is not traced, and a joined part says nothing either). */
 export function zeroPathsLine(values: Pick<TraceValues, "method" | "swatches">): string | null {
   if (values.method === PICK_COLOURS) {
-    return values.swatches.length === 0 ? NO_COLOUR_PICKED_LINE : "0 paths at this Colour tolerance: too low.";
+    return values.swatches.length === 0 ? "" : "0 paths at this Colour tolerance: too low.";
   }
   return values.method === REMOVE_BACKGROUND ? "0 paths at this Colour tolerance: too high." : null;
 }
@@ -563,9 +566,7 @@ export function statusText(
     // The direction from the histogram: more than half the picture below the Threshold means it
     // is too high, otherwise too low (UX notes section 7).
     const direction = summary.foregroundPixels * 2 > pixels ? "too high" : "too low";
-    const line = zeroLine ?? `0 paths at this Threshold: ${direction}.`;
-    // Nothing picked is fixed in Advanced, where the status line says it (22.2).
-    return line === NO_COLOUR_PICKED_LINE ? { ...empty, message: line } : { ...empty, line };
+    return { ...empty, line: zeroLine ?? `0 paths at this Threshold: ${direction}.` };
   }
   if (summary.nodes > SLOW_TO_EDIT_NODES) {
     return { ...settled, line: `${grouped(summary.nodes)} nodes. Slow to edit.` };
@@ -593,14 +594,23 @@ export interface TraceAnnouncementParts {
   palette: string;
   /** "Part 3 has no paths". */
   emptyPart: string;
+  /** "Removed #3366CC", "0 paths: no colour picked." (`ux-notes.md` §25.3, §25.4); last, as it
+   * ends with its own full stop. */
+  picked?: string;
 }
 
 /** The hidden region's text (`ux-notes.md` §24.5): the segments in their order, joined by ". ",
  * an empty segment absent. */
 export function traceAnnouncement(parts: TraceAnnouncementParts): string {
-  return [parts.analysis, parts.mask, parts.counts, parts.countsMuted, parts.recognised, parts.palette, parts.emptyPart]
+  return [parts.analysis, parts.mask, parts.counts, parts.countsMuted, parts.recognised, parts.palette, parts.emptyPart, parts.picked ?? ""]
     .filter((t) => t !== "")
     .join(". ");
+}
+
+/** The hidden region's picked-colours segment (`ux-notes.md` §25.3, §25.4): the colour just
+ * taken out, then the reason Trace is dimmed when nothing is left. */
+export function pickedAnnouncement(removed: string | null, nothingPicked: boolean): string {
+  return [removed === null ? "" : removedPickedText(removed), nothingPicked ? NO_COLOUR_PICKED_LINE : ""].filter((t) => t !== "").join(". ");
 }
 
 /** "Tracing 1 of 3 images" with two or more images, else nothing (criterion 46). `done` counts the

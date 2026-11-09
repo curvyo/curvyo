@@ -36,7 +36,6 @@ import {
   TRACE_EXPAND_LABELS,
   TRACE_INFO_PAGE_ID,
   TRACE_INFO_TITLE,
-  NO_COLOUR_PICKED_LINE,
   changedAdvancedText,
   lumaToPercent,
   percentToLuma,
@@ -49,7 +48,6 @@ import {
   TRACE_STATE_LABEL,
   TRACE_TOOLTIP,
   type TraceParam,
-  specksHint,
 } from "@/lib/traceText";
 
 const BUTTON_CLASS =
@@ -327,17 +325,6 @@ function ProgressSlot({
   );
 }
 
-/** A field with its muted readout beside it (the Specks pixel hint, criterion 4). */
-function WithHint({ hint, children }: { hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2">
-      {children}
-      {/* The readout's room is kept while the pixel size is unknown, so the rows do not jump when it appears. */}
-      <span className={`w-9 shrink-0 whitespace-pre ${LABEL_CLASS} opacity-70`}>{hint ?? ""}</span>
-    </div>
-  );
-}
-
 /** The "i" button (criterion 70, UX notes 21.1): shows the About Trace tab, or returns to the tab
  * and panel state before it; pressed while that tab is shown. A mouse press hands the keyboard
  * back to the canvas, a key keeps it. */
@@ -463,15 +450,17 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       />
     ) : method === PICK_COLOURS ? (
       <PickColoursGroup
-        count={trace.values.swatches.length}
+        swatches={trace.values.swatches}
         armed={trace.pickMode === "colours"}
         onPipette={() => trace.setPicking(trace.pickMode === "")}
+        onRemove={trace.removePicked}
         onReturnFocus={onReturnFocus}
       />
     ) : null;
   const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
-  // `ux-notes.md` §24.5: the reasons Trace is dimmed and a failed analysis join the notice row.
-  const reason = trace.status.message || (trace.traceBlocked === NO_COLOUR_PICKED_LINE ? NO_COLOUR_PICKED_LINE : "");
+  // `ux-notes.md` §24.5: a result whose fix is in Advanced and a failed analysis join the notice
+  // row; nothing picked is only the Trace button's reason (§25.3).
+  const reason = trace.status.message;
   const analysisFailed = trace.analysis.kind === "failed";
   const noticeShown =
     trace.status.line !== "" || reason !== "" || analysisFailed || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "" || trace.maskRefused;
@@ -524,11 +513,8 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         {colourGroup}
         <div className="flex h-9 items-center">{field("smooth")}</div>
         <div className="flex h-9 items-center">{field("tolerance")}</div>
-        <div className="flex h-9 items-center gap-2">
-          <WithHint hint={trace.pxPerMm > 0 ? specksHint(trace.values.specks, trace.pxPerMm) : undefined}>
-            {field("specks")}
-          </WithHint>
-        </div>
+        {/* Ignore below alone, no pixel readout (`ux-notes.md` §25.1). */}
+        <div className="flex h-9 items-center">{field("specks")}</div>
         <div className="ml-auto flex h-9 items-center gap-2">
           <ExpandButton
             open={trace.advancedOpen}

@@ -58,3 +58,41 @@ export function partAutoValues(values: TraceValues, defaults: RegionDefaults, ma
   }
   return next.backgroundAuto ? { ...next, background: defaults.background } : next;
 }
+
+/** What the worker reads from one region of an image: the automatic Threshold, the background
+ * (`#RRGGBB`, empty for transparent) and the analysis JSON. */
+export interface RegionRead {
+  threshold: number;
+  background: string;
+  analysis: string;
+}
+
+/** The automatic values of image `id` in mask region `mask` (`specs/0089` UX notes §25.2): a
+ * region read before in this session answers from `cache` without a new read; a read that fails
+ * or is cancelled is not kept. */
+export async function readRegion(cache: Map<string, RegionRead>, id: string, mask: string, read: () => Promise<RegionRead>): Promise<RegionRead> {
+  const key = `${id}\n${mask}`;
+  const kept = cache.get(key);
+  if (kept) {
+    return kept;
+  }
+  const fresh = await read();
+  cache.set(key, fresh);
+  return fresh;
+}
+
+/** The values the bar shows right after the view changed (`specs/0089` UX notes §25.2): a new
+ * region of the same image keeps them until its analysis answers; a new image starts from its kept
+ * Threshold (`known`, or none yet) and its suggested background. */
+export function viewValues(values: TraceValues, sameImage: boolean, known: number | undefined, background: string | undefined): TraceValues {
+  if (sameImage) {
+    return values;
+  }
+  return { ...values, threshold: known ?? null, background: values.backgroundAuto ? (background ?? null) : values.background };
+}
+
+/** The values once a new region's analysis answered (`specs/0089` UX notes §25.2): it applies
+ * once, keeping what the maker set; a failed analysis (`null`) changes nothing. */
+export function regionAnswer(values: TraceValues, analysis: TraceAnalysis | null, maker: ReadonlySet<keyof TraceValues>): TraceValues {
+  return analysis ? applyRegionAnalysis(values, analysis, maker) : values;
+}

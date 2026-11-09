@@ -17,6 +17,7 @@ import {
   READING_TEXT,
   readsText,
   traceAnnouncement,
+  pickedAnnouncement,
   textLinesText,
   shapesText,
   type TraceChoice,
@@ -54,7 +55,7 @@ import { favouritesAmong } from "@/hooks/fontLibraryPage";
 import { listedFileBytes } from "@/hooks/useText";
 import type { FontFace } from "@/lib/textText";
 import { trace_auto_threshold, trace_suggest_background, trace_text_failed_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
-import { applyRegionAnalysis, forgetRegionValues, partAutoValues } from "@/lib/traceMaskCaches";
+import { type RegionRead, forgetRegionValues, partAutoValues, readRegion, regionAnswer, viewValues } from "@/lib/traceMaskCaches";
 import { NO_VIEW, joinWires, loadParams, loadPresets, partPixelsOf, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import { NO_PART_LINE, type PartJob, type TracePartInfo, mayCrop, partEmptyText, partKey, partsCount, readParts, traceParts } from "@/lib/traceParts";
 import type { TraceApi } from "./traceApi";
@@ -108,7 +109,6 @@ export function useTrace(
   const [loading, setLoading] = useState(false);
   /** The image the job is on (0-based): the first until Create paths moves on (criterion 46). */
   const [progress, setProgress] = useState(0);
-  const [pxPerMm, setPxPerMm] = useState(0);
   const runnerRef = useRef<TraceRunner | null>(null);
   /** A reduced preview is shown and its full-size trace follows (`ux-notes.md` §24.5). */
   const fullFollows = useRef(false);
@@ -128,6 +128,9 @@ export function useTrace(
   const makerFields = useRef(new Map<string, Set<keyof TraceValues>>());
   /** The images whose analysis is read again for a new mask region. */
   const regionReread = useRef(new Set<string>());
+  /** Each region's automatic values, by image and mask, read once while the tool is used
+   * (`ux-notes.md` §25.2). */
+  const regionReads = useRef(new Map<string, RegionRead>());
   /** The images whose analysed values the maker changed since the analysis was applied. */
   const customised = useRef(new Set<string>());
   const [analysisState, setAnalysisState] = useState<TraceAnalysisState>({ kind: "none" });
@@ -174,6 +177,9 @@ export function useTrace(
   const [shapeCount, setShapeCount] = useState(0);
   /** "1 shape crosses the mask edge unclipped." for the shown preview (`specs/0094`), or empty. */
   const [unclipped, setUnclipped] = useState("");
+  /** The colour last taken out of the picked colours, and the set it left, for the hidden region
+   * ("Removed #RRGGBB", `ux-notes.md` §25.4); it is said until the set changes again. */
+  const [removed, setRemoved] = useState<{ hex: string; left: string } | null>(null);
   const textOptionsRef = useRef(textOptions);
   useEffect(() => {
     textOptionsRef.current = textOptions;
@@ -293,9 +299,10 @@ export function useTrace(
           }
         }, ANALYSING_AFTER_MS);
       }
-      let defaults: Awaited<ReturnType<TraceRunner["defaults"]>>;
+      let defaults: RegionRead;
+      const mask = viewRef.current.mask;
       try {
-        defaults = await runner().defaults(pixels, viewRef.current.mask);
+        defaults = await readRegion(regionReads.current, id, mask, () => runner().defaults(pixels, mask));
       } catch (error) {
         if (error instanceof TraceCancelled) {
           // A newer job takes over (it shows "Analysing..." again after its 400 ms); Stop has
@@ -323,22 +330,31 @@ export function useTrace(
         // image is then dropped and the line reads Custom).
         const analysis = readAnalysis(defaults.analysis);
         analyses.current.set(id, analysis);
-        if (regionReread.current.delete(id) && analysis) {
+        if (regionReread.current.delete(id)) {
           // `specs/0094`: a new mask region; what the analysis filled in follows the region, what
-          // the maker set stays.
+          // the maker set stays. The bar showed the old values until now and changes once; a
+          // failed analysis keeps them (`ux-notes.md` §25.2).
           const maker = makerFields.current.get(id) ?? new Set<keyof TraceValues>();
+          const shown = choiceRef.current.values.threshold;
           if (!makerThreshold.current.has(id)) {
-            thresholds.current.set(id, analysis.threshold);
+            const next = analysis?.threshold ?? shown;
+            if (next !== null) {
+              thresholds.current.set(id, next);
+            }
           }
-          const values = applyRegionAnalysis(choiceRef.current.values, analysis, maker);
-          choiceRef.current = { ...choiceRef.current, values };
-          setChoice(choiceRef.current);
-          writeChoice(choiceRef.current);
+          const values = regionAnswer(choiceRef.current.values, analysis, maker);
+          if (values !== choiceRef.current.values) {
+            choiceRef.current = { ...choiceRef.current, values };
+            setChoice(choiceRef.current);
+            writeChoice(choiceRef.current);
+          }
           if (viewRef.current.shown === id) {
-            setAnalysisState({ kind: maker.size > 0 ? "custom" : "auto", analysis });
+            setAnalysisState(analysis ? { kind: maker.size > 0 ? "custom" : "auto", analysis } : { kind: "failed" });
           }
           const kept = thresholds.current.get(id);
-          return kept ?? analysis.threshold;
+          if (kept !== undefined) {
+            return kept;
+          }
         }
         const edited = known !== undefined || editedEarly.current.has(id);
         if (analysis && edited) {
@@ -526,7 +542,6 @@ export function useTrace(
       if (stale()) {
         return pixels;
       }
-      setPxPerMm(1 / Math.sqrt(Math.abs(full.map[0] * full.map[3] - full.map[1] * full.map[2])));
       if (reducedOnly) {
         startTimers(true);
       }
@@ -622,6 +637,16 @@ export function useTrace(
         onChange();
         return;
       }
+      if (noColourPicked(choiceRef.current.values)) {
+        // Pick colours with nothing picked traces nothing: no "0 paths" outcome, the outline
+        // shows nothing until the first colour (`ux-notes.md` §25.3).
+        session.set_trace_preview(id, new Float64Array(7));
+        setUnclipped("");
+        setStatus(NO_STATUS);
+        paletteRefresh.current();
+        onChange();
+        return;
+      }
       startTimers();
       const onProgress = (p: number) => {
         if (!stale()) {
@@ -692,7 +717,6 @@ export function useTrace(
           const created = textSet > 0 && !s.canCreate && s.message === "" ? { ...s, line: "", canCreate: true } : s;
           return failedText && created.line === "" ? { ...created, line: trace_text_failed_notice() } : created;
         };
-        setPxPerMm(1 / Math.sqrt(Math.abs(full.map[0] * full.map[3] - full.map[1] * full.map[2])));
         pixels = full.width * full.height;
         // Over 4 Mpx the preview is the reduced copy only; Create paths traces at full size
         // (criterion 52).
@@ -810,13 +834,12 @@ export function useTrace(
           : { kind: customised.current.has(next.shown) ? "custom" : "auto", analysis: shownAnalysis },
     );
     if (active && next.shown) {
+      // A new region of the same image keeps the shown values until its analysis answers
+      // (`ux-notes.md` §25.2).
+      const sameImage = next.shown === previous.shown;
       const known = thresholds.current.get(next.shown);
       const background = backgrounds.current.get(next.shown);
-      setValues((v) => ({
-        ...v,
-        threshold: known ?? null,
-        background: v.backgroundAuto ? (background ?? null) : v.background,
-      }));
+      setValues((v) => viewValues(v, sameImage, known, background));
       void runPreview(true);
     }
   }, [syncRevision, active, getSession, cancelAll, runPreview, setValues]);
@@ -984,7 +1007,8 @@ export function useTrace(
       return;
     }
     const threshold = choiceRef.current.values.threshold;
-    if (threshold === null || (!status.canCreate && results.current.size > 0)) {
+    // Nothing picked: Enter and Ctrl+Enter do nothing, silently (`ux-notes.md` §25.3).
+    if (threshold === null || noColourPicked(choiceRef.current.values) || (!status.canCreate && results.current.size > 0)) {
       return;
     }
     const v = { ...choiceRef.current.values, threshold };
@@ -1128,6 +1152,8 @@ export function useTrace(
       setReading(false);
       ocrFailed.current.clear();
       partAuto.current.clear();
+      regionReads.current.clear();
+      setRemoved(null);
     }
   }, [active, cancelAll]);
 
@@ -1145,6 +1171,22 @@ export function useTrace(
     backgrounds,
     palettePick: palette.pick,
   });
+
+  /** Takes `hex` out of the picked colours: a settings change, not a history step; the preview
+   * traces again after the debounce (`ux-notes.md` §25.4). */
+  const removePicked = useCallback(
+    (hex: string) => {
+      const current = choiceRef.current;
+      const swatches = current.values.swatches.filter((s) => s !== hex);
+      if (swatches.length === current.values.swatches.length) {
+        return;
+      }
+      dragging.current = false;
+      setRemoved({ hex, left: swatches.join() });
+      apply({ ...current, values: { ...current.values, swatches } });
+    },
+    [apply],
+  );
 
   /** The Mask item (`specs/0094` UX notes §1): the session's mode; the view's region changes, so
    * the sync above traces again. */
@@ -1237,6 +1279,7 @@ export function useTrace(
     recognised,
     palette: palette.note,
     emptyPart: active ? partEmptyText(parts) : "",
+    picked: active && values.method === PICK_COLOURS ? pickedAnnouncement(removed !== null && removed.left === values.swatches.join() ? removed.hex : null, noColourPicked(values)) : "",
   });
   // Announced once the result settles (`ux-notes.md` §24.5): not while a value is dragged, and not
   // for a reduced preview whose full-size result follows; each new result renders again.
@@ -1251,7 +1294,7 @@ export function useTrace(
   const traceBlocked =
     slot.kind !== "none"
       ? ""
-      : values.method === PICK_COLOURS && values.swatches.length === 0
+      : noColourPicked(values)
         ? NO_COLOUR_PICKED_LINE
         : status.canCreate
           ? ""
@@ -1291,7 +1334,6 @@ export function useTrace(
     slot,
     retrace,
     creating,
-    pxPerMm,
     setValue,
     pick,
     setAdvancedOpen,
@@ -1304,6 +1346,7 @@ export function useTrace(
     setBackgroundAuto,
     pickMode,
     setPicking,
+    removePicked,
     suggestedBackground,
     analysis: analysisState,
     analyse,
@@ -1313,6 +1356,11 @@ export function useTrace(
     hsvOf,
     rgbOf,
   };
+}
+
+/** Pick colours with no colour picked: nothing to trace (`ux-notes.md` §25.3). */
+function noColourPicked(values: Pick<TraceValues, "method" | "swatches">): boolean {
+  return values.method === PICK_COLOURS && values.swatches.length === 0;
 }
 
 /** The colours and joined regions of the shown multicolour preview, `null` for one colour. */

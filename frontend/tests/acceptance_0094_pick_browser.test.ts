@@ -3,7 +3,9 @@
 // pick two paths, pick again removes,
 // Clear mask, Escape disarms, leaving the tool disarms, a text and a second image are refused with
 // the row, the Tab order and the group at 800 x 600, and an outline-only circle over the picture
-// picked by a click inside it. Set CURVYO_E2E_BROWSER=/path/to/chromium; the
+// picked by a click inside it; and `specs/0089` UX notes §25: the Threshold changes once over an
+// Inside / Outside switch, the picked colours beside the pipette at 800 x 600. Set
+// CURVYO_E2E_BROWSER=/path/to/chromium; the
 // wasm bindings must be built. The harness is the one of `acceptance_0094_tester.test.ts`.
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -730,4 +732,208 @@ test("0094 c35, c36, c38: an outline-only circle over the picture is picked by a
     assert.ok(await s.evaluate(`!!document.querySelector('${BAR}')`), "the picture stays selected in the tool");
     assert.equal(await pressedState(s), "true", "still armed");
   });
+});
+
+// ------------------------------------------------------------------ `specs/0089` UX notes §25
+
+/** The Threshold field's values as the page shows them, every change recorded from now on. */
+const recordThreshold = (s: S) =>
+  s.evaluate(`(() => {
+    const field = () => document.querySelector('${BAR} [role=spinbutton][aria-label=Threshold]');
+    window.__thresholds = [field()?.getAttribute('aria-valuetext') ?? 'absent'];
+    const see = () => { const v = field()?.getAttribute('aria-valuetext') ?? 'absent'; if (window.__thresholds[window.__thresholds.length - 1] !== v) window.__thresholds.push(v); };
+    new MutationObserver(see).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-valuetext'] });
+    window.setInterval(see, 5);
+  })()`);
+const recorded = async (s: S) => JSON.parse((await s.evaluate(`JSON.stringify(window.__thresholds)`)) as string) as string[];
+
+test("0089 §25.2: Inside / Outside changes the Threshold at most once, never through a blank or a default; a region seen before at once", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    const at = await pickSetup(s);
+    await s.clickSel(PICK);
+    await s.click(at.a[0], at.a[1]);
+    await waitFor("the first mask path", async () => ((await maskPaths(s)) === 1 ? true : null), 10_000);
+    await s.clickSel(PICK);
+    await settledCounts(s);
+    await sleep(800);
+    const radio = (label: string) => `${BAR} [role=radiogroup][aria-label=Mask] [role=radio]:nth-child(${label === "Inside" ? 1 : 2})`;
+    for (const [mode, seen] of [["Outside", false], ["Inside", true], ["Outside", true]] as const) {
+      await recordThreshold(s);
+      await s.clickSel(radio(mode));
+      await waitFor(`${mode} 1 path`, async () => (new RegExp(`${mode} 1 path(?!s)`).test(await advancedStatus(s)) ? true : null), 20_000);
+      await settledCounts(s);
+      await sleep(1000);
+      const values = await recorded(s);
+      console.log(`Threshold over the switch to ${mode}${seen ? " (seen before)" : ""}:`, JSON.stringify(values));
+      assert.ok(values.length <= 2, `the value changes at most once, got ${JSON.stringify(values)}`);
+      for (const v of values) {
+        assert.match(v, /^\d+ percent$/, `never blank or absent, got ${JSON.stringify(v)}`);
+      }
+    }
+  });
+});
+
+const STRIPES = [
+  [230, 40, 40], [40, 160, 60], [50, 90, 220], [240, 200, 40], [200, 60, 200], [60, 200, 210], [250, 140, 60], [150, 150, 150],
+] as const;
+/** Eight vertical colour stripes with a black bar across the middle (for `pictureBox`), narrow
+ * enough to be seen whole at 800 x 600 with the panel open. */
+const STRIPES_PNG = rgbPng(240, 400, (x, y) => (y >= 192 && y < 208 ? [0, 0, 0] : [...STRIPES[Math.floor(x / 30)]] as [number, number, number]));
+const hexOf = (c: readonly number[]) => `#${c.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+
+const pickedRow = async (s: S) =>
+  JSON.parse(
+    (await s.evaluate(`JSON.stringify((() => {
+      const g = document.querySelector('${BAR} [data-trace-colours=picked]');
+      const r = (e) => { const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height }; };
+      const cells = [...g.querySelectorAll('[data-trace-picked-swatch]')];
+      return {
+        group: r(g), pipette: r(g.querySelector('[data-trace-pipette]')), bar: r(document.querySelector('${BAR} [data-trace-row]')),
+        cells: cells.map(r), swatches: cells.map((c) => r(c.firstElementChild)), names: cells.map((c) => c.getAttribute('aria-label')),
+        stops: cells.map((c) => c.tabIndex), scroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        strip: !!document.querySelector('${BAR} [role=listbox][aria-label=Palette]'), detail: !!document.querySelector('${BAR} [data-trace-palette-detail]'),
+        label: g.textContent.trim(), reason: document.querySelector('${BAR} [data-trace-reason]')?.textContent ?? '',
+      };
+    })())`)) as string,
+  ) as {
+    group: { x: number; y: number; w: number; h: number }; pipette: { x: number; y: number; w: number; h: number }; bar: { x: number; y: number; w: number; h: number };
+    cells: { x: number; y: number; w: number; h: number }[]; swatches: { x: number; y: number; w: number; h: number }[]; names: string[]; stops: number[];
+    scroll: boolean; strip: boolean; detail: boolean; label: string; reason: string;
+  };
+
+test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours sit beside the pipette; the bar does not move from 0 to 8; remove by click and key", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(
+    async (s) => {
+      const file = path.join(SCRATCH, "stripes.png");
+      writeFileSync(file, STRIPES_PNG);
+      await s.tab("Layers");
+      await s.choose("[data-import-button]", file);
+      await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("stripes.png")) ? true : null));
+      await sleep(800);
+      const box = await pictureBox(s);
+      // At 100 % the picture is 240 px wide; its bar's left end can be under the Select bar, so the
+      // right end places it.
+      const w = 240;
+      const x0 = box.x1 + 1 - w;
+      const point = (i: number): [number, number] => [x0 + ((i + 0.5) * w) / 8, box.cy + 0.35 * w];
+      await openTrace(s);
+      // Advanced closed: at 800 x 600 the open block covers the picture's lower half.
+      await setAdvanced(s, false);
+      await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
+      await sleep(300);
+      await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes('Pick colours')).click()`);
+      await sleep(1000);
+      const empty = await pickedRow(s);
+      assert.equal(empty.cells.length, 0);
+      assert.equal(empty.label, "", "no count label, no text");
+      assert.equal(empty.reason, "", "no notice-row line when nothing is picked");
+      const blocked = (await traceButton(s))!;
+      assert.equal(blocked.disabled, "true", "Trace is dimmed");
+      assert.equal(blocked.reason, "0 paths: no colour picked.", "with the reason as its description");
+      await waitFor("the empty-set announcement", async () => ((await advancedStatus(s)).includes("0 paths: no colour picked.") ? true : null), 10_000);
+      const rows: Record<number, Awaited<ReturnType<typeof pickedRow>>> = { 0: empty };
+      for (let i = 0; i < 9; i++) {
+        const [x, y] = point(i % 8);
+        if (i === 0) {
+          await s.click(x, y);
+        } else if (i === 8) {
+          // A ninth pick (the black bar) does nothing.
+          await shiftClick(s, x, box.cy);
+        } else {
+          await shiftClick(s, x, y);
+        }
+        const want = Math.min(i + 1, 8);
+        rows[i + 1] = await waitFor(`${want} picked`, async () => {
+          const row = await pickedRow(s);
+          return row.cells.length === want ? row : null;
+        }, 10_000);
+      }
+      const eight = rows[8];
+      console.log("Picked colours at 800 x 600 (0, 1, 5, 8):", JSON.stringify([0, 1, 5, 8].map((n) => ({ n, group: rows[n].group, bar: rows[n].bar }))));
+      assert.deepEqual(eight.names, STRIPES.map((c) => `Remove ${hexOf(c)}`), "pick order, new picks at the end");
+      assert.deepEqual(rows[9].names, eight.names, "the ninth is ignored");
+      assert.deepEqual(eight.stops, [0, -1, -1, -1, -1, -1, -1, -1], "one Tab stop");
+      for (const n of [1, 5, 8]) {
+        for (const k of ["x", "y", "w", "h"] as const) {
+          assert.ok(Math.abs(rows[n].group[k] - empty.group[k]) < 0.5, `the group does not move or resize at ${n} (${k})`);
+          assert.ok(Math.abs(rows[n].bar[k] - empty.bar[k]) < 0.5, `the bar does not jump at ${n} (${k})`);
+        }
+        assert.equal(rows[n].scroll, false, "no horizontal scroll");
+      }
+      assert.ok(Math.abs(empty.group.w - 220) < 0.5, `the group reserves 220 px, got ${empty.group.w}`);
+      assert.ok(new Set(eight.cells.map((c) => Math.round(c.y))).size === 1, "eight colours on one line");
+      assert.ok(Math.abs(eight.swatches[0].x - (eight.pipette.x + eight.pipette.w) - 4) < 0.5, "4 px after the pipette");
+      for (let i = 0; i < 8; i++) {
+        assert.ok(eight.cells[i].w >= 24 && eight.cells[i].h >= 28, `target ${i} is at least 24 x 28, got ${eight.cells[i].w} x ${eight.cells[i].h}`);
+        assert.ok(Math.abs(eight.swatches[i].w - 20) < 0.5 && Math.abs(eight.swatches[i].h - 20) < 0.5, "20 px swatches");
+        if (i > 0) {
+          assert.ok(Math.abs(eight.swatches[i].x - (eight.swatches[i - 1].x + 20) - 4) < 0.5, "4 px gaps");
+        }
+      }
+      assert.ok(eight.swatches[7].x + 20 <= eight.group.x + eight.group.w + 0.5, "eight colours fit the reserve");
+      // The tooltip is the colour code after 400 ms of hover.
+      const third = eight.cells[2];
+      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: third.x + third.w / 2, y: third.y + third.h / 2 });
+      await sleep(700);
+      assert.equal(await s.evaluate(`document.querySelector('[role=tooltip]')?.textContent ?? ''`), hexOf(STRIPES[2]));
+      // Keyboard focus fades the swatch to 40 % and shows the x (hover does the same with a hover
+      // device, which headless Chromium does not have), and shows the tooltip too.
+      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 700, y: 560 });
+      await sleep(300);
+      await s.evaluate(`document.querySelector('${BAR} [data-trace-pipette]').focus()`);
+      await press(s, "Tab", 9);
+      const focused = JSON.parse((await s.evaluate(`JSON.stringify((() => { const c = document.activeElement;
+        return { name: c.getAttribute('aria-label'), opacity: getComputedStyle(c.firstElementChild).opacity, x: getComputedStyle(c.lastElementChild).display,
+          hover: c.className.includes('group') && c.firstElementChild.className.includes('group-hover:opacity-40'), tip: document.querySelector('[role=tooltip]')?.textContent ?? '' }; })())`)) as string) as { name: string; opacity: string; x: string; hover: boolean; tip: string };
+      assert.equal(focused.name, `Remove ${hexOf(STRIPES[0])}`, "Tab from the pipette reaches the row's stop");
+      assert.equal(focused.opacity, "0.4");
+      assert.notEqual(focused.x, "none", "the x shows");
+      assert.ok(focused.hover, "hover has the same look");
+      assert.equal(focused.tip, hexOf(STRIPES[0]), "the tooltip shows on focus");
+      // A click removes it; the keyboard goes back to the canvas; no history step.
+      const undoBefore = await s.evaluate(`document.querySelector('[aria-label=Undo]')?.getAttribute('aria-disabled') ?? document.querySelector('[aria-label=Undo]')?.disabled`);
+      await s.click(third.x + third.w / 2, third.y + third.h / 2);
+      const seven = await waitFor("7 picked", async () => {
+        const row = await pickedRow(s);
+        return row.cells.length === 7 ? row : null;
+      }, 10_000);
+      assert.equal(seven.names.includes(`Remove ${hexOf(STRIPES[2])}`), false);
+      assert.equal(await s.evaluate(`!!document.activeElement?.closest('[data-trace-colours]')`), false, "a pointer removal hands the keyboard back");
+      await waitFor("Removed announced", async () => ((await advancedStatus(s)).includes(`Removed ${hexOf(STRIPES[2])}`) ? true : null), 10_000);
+      assert.equal(await s.evaluate(`document.querySelector('[aria-label=Undo]')?.getAttribute('aria-disabled') ?? document.querySelector('[aria-label=Undo]')?.disabled`), undoBefore, "not a history step");
+      for (const k of ["x", "y", "w", "h"] as const) {
+        assert.ok(Math.abs(seven.bar[k] - empty.bar[k]) < 0.5, `the bar does not jump on removal (${k})`);
+      }
+      // Keys: End, then Delete removes the last; focus goes to the previous one.
+      await s.evaluate(`document.querySelector('${BAR} [data-trace-picked-swatch][tabindex="0"]').focus()`);
+      await press(s, "End", 35);
+      assert.equal(await focusedName(s), `Remove ${hexOf(STRIPES[7])}`);
+      await press(s, "Delete", 46);
+      await waitFor("6 picked", async () => ((await pickedRow(s)).cells.length === 6 ? true : null), 10_000);
+      await sleep(200);
+      assert.equal(await focusedName(s), `Remove ${hexOf(STRIPES[6])}`, "focus moves to the previous swatch");
+      await press(s, "Home", 36);
+      await press(s, "ArrowRight", 39);
+      assert.equal(await focusedName(s), `Remove ${hexOf(STRIPES[1])}`);
+      await press(s, "Backspace", 8);
+      await waitFor("5 picked", async () => ((await pickedRow(s)).cells.length === 5 ? true : null), 10_000);
+      await sleep(200);
+      assert.equal(await focusedName(s), `Remove ${hexOf(STRIPES[3])}`, "focus moves to the swatch now in its place");
+      assert.equal((await s.layerRows()).filter((r) => r?.includes("stripes.png")).length, 1, "the image is not deleted by the key");
+      // Frage 142 A: Pick colours has no strip and no detail row, with Single colour or Multicolour.
+      await setAdvanced(s, true);
+      const single = await pickedRow(s);
+      assert.equal(single.strip || single.detail, false, "no strip and no detail row, Single colour");
+      await s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent.includes('Multicolour')).click()`);
+      await settledCounts(s);
+      await sleep(800);
+      const multi = await pickedRow(s);
+      assert.equal(multi.strip || multi.detail, false, "no strip and no detail row, Multicolour");
+      assert.equal(multi.cells.length, 5, "the same row beside the pipette");
+      assert.equal(multi.scroll, false);
+    },
+    "",
+    800,
+    600,
+  );
 });
