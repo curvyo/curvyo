@@ -1,6 +1,6 @@
 //! Builds the label map of a multicolour trace (`specs/0089` adrs.md §10, criteria 26, 27,
 //! 29) from the cleaned mask of the single-colour path: the palette, every content pixel's
-//! colour, the maker's exclusions and merges, small colour regions joined.
+//! colour, the maker's exclusions, small colour regions joined.
 
 use curvyo_document_core::Affine;
 
@@ -28,7 +28,7 @@ pub(crate) struct ColourMap {
     /// Traced pixels per source pixel (2 after Upscale).
     pub unit: usize,
     pub palette: Vec<Entry>,
-    /// Per palette entry: the traced pixels it was assigned before exclusions, merges and joins.
+    /// Per palette entry: the traced pixels it was assigned before exclusions and joins.
     pub assigned: Vec<u64>,
     pub joined: usize,
     pub specks_removed: u64,
@@ -80,7 +80,7 @@ pub(crate) fn colour_map(
     let (entries, background) = entries(&source, params, &masked.labels, poller)?;
     poller.check(Phase::Tracing, 0, 1)?;
     let (mut out, assigned) = labelled(&source, &masked.labels, &entries, background, poller)?;
-    let targets = targets(&entries, &params.excluded, &params.merged);
+    let targets = targets(&entries, &params.excluded);
     for label in &mut out {
         if *label != 0 {
             *label = targets[*label as usize - 1];
@@ -269,34 +269,19 @@ fn flat(source: &Source<'_>, (x, y): (usize, usize)) -> bool {
 }
 
 /// The label every palette entry ends as: `0` when one of `excluded` is within the merge
-/// distance of it, the target's label when it is merged into another entry (`merged` as from,
-/// into), else its own; chains of merges are followed, a cycle keeps its colours.
-fn targets(entries: &[Entry], excluded: &[Rgb8], merged: &[(Rgb8, Rgb8)]) -> Vec<u32> {
+/// distance of it, else its own.
+fn targets(entries: &[Entry], excluded: &[Rgb8]) -> Vec<u32> {
     let matches =
         |entry: &Entry, colour: Rgb8| distance(bytes(entry.colour), bytes(colour)) < MERGE_DISTANCE;
-    let find = |colour: Rgb8| entries.iter().position(|e| matches(e, colour));
-    let mut into: Vec<Option<usize>> = vec![None; entries.len()];
-    for &(from, to) in merged {
-        if let (Some(f), Some(t)) = (find(from), find(to))
-            && f != t
-        {
-            into[f] = Some(t);
-        }
-    }
-    (0..entries.len())
-        .map(|i| {
-            let mut at = i;
-            for _ in 0..entries.len() {
-                match into[at] {
-                    Some(t) if t != i => at = t,
-                    _ => break,
-                }
-            }
-            if excluded.iter().any(|&c| matches(&entries[at], c)) {
+    entries
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| {
+            if excluded.iter().any(|&c| matches(entry, c)) {
                 0
             } else {
                 // invariant: at most 16 entries.
-                u32::try_from(at + 1).unwrap_or(0)
+                u32::try_from(i + 1).unwrap_or(0)
             }
         })
         .collect()
@@ -307,25 +292,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exclusions_and_merges_find_their_entries() {
+    fn exclusions_find_their_entries() {
         let e = |r, g, b| Entry {
             colour: Rgb8::new(r, g, b),
             fixed: false,
         };
         let entries = [e(200, 0, 0), e(0, 0, 200), e(0, 200, 0)];
-        // Green merged into blue, red excluded (given 2 bytes off).
-        let t = targets(
-            &entries,
-            &[Rgb8::new(202, 0, 0)],
-            &[(Rgb8::new(0, 200, 0), Rgb8::new(0, 0, 200))],
-        );
-        assert_eq!(t, [0, 2, 2]);
-        // Merged into an excluded colour: background.
-        let t = targets(
-            &entries,
-            &[Rgb8::new(0, 0, 200)],
-            &[(Rgb8::new(0, 200, 0), Rgb8::new(0, 0, 200))],
-        );
-        assert_eq!(t, [1, 0, 0]);
+        // Red excluded (given 2 bytes off).
+        assert_eq!(targets(&entries, &[Rgb8::new(202, 0, 0)]), [0, 2, 3]);
     }
 }

@@ -331,7 +331,7 @@ change.
     each region filling what it fills with the switch off within 2 %. The wire is unchanged.
 17. **Place and fill.** Per colour (one for black and white): the colour's leftover compound path
     first, then its primitives and holed compounds in outline order, all in the "Trace of" group
-    and in the colour's fill (recolours apply). Names are the primitives' own. One step, as before.
+    and in the colour's fill (recolours applied until their removal, 2026-11-09). Names are the primitives' own. One step, as before.
 18. **Determinism (criterion 13).** Fixed order, no hash maps, no platform trigonometry; the
     shape sections of the golden pictures are recorded natively
     (`curvyo-editor-wasm/tests/fixtures/trace_shapes_native.json`) and the editor wasm gives them

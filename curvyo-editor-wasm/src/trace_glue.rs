@@ -140,8 +140,8 @@ fn colours(list: Option<&serde_json::Value>) -> Vec<TraceRgb> {
 }
 
 /// The multicolour values of `settings` (`specs/0089` slice M: `output` 1 for Multicolour,
-/// `colours` a count 2 to 16 or null for Auto, `fixed` and `excluded` lists of `#RRGGBB`,
-/// `merged` a list of `[from, into]`), or `None` for Single colour (`output` missing or 0).
+/// `colours` a count 2 to 16 or null for Auto, `fixed` and `excluded` lists of `#RRGGBB`), or
+/// `None` for Single colour (`output` missing or 0).
 #[must_use]
 pub fn trace_colour_settings(settings: &str) -> Option<TraceColourParams> {
     let json: serde_json::Value = serde_json::from_str(settings).ok()?;
@@ -155,27 +155,11 @@ pub fn trace_colour_settings(settings: &str) -> Option<TraceColourParams> {
             // invariant: clamped to 2 to 16 first.
             u8::try_from(n.clamp(TRACE_MIN_COLOURS as u64, TRACE_MAX_COLOURS as u64)).unwrap_or(2)
         });
-    let merged = json
-        .get("merged")
-        .and_then(serde_json::Value::as_array)
-        .map(|list| {
-            list.iter()
-                .filter_map(|pair| {
-                    let pair = pair.as_array()?;
-                    Some((
-                        parse_hex(pair.first()?.as_str()?)?,
-                        parse_hex(pair.get(1)?.as_str()?)?,
-                    ))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
     Some(TraceColourParams {
         trace: trace_settings(settings),
         colours: count,
         fixed: colours(json.get("fixed")),
         excluded: colours(json.get("excluded")),
-        merged,
     })
 }
 
@@ -389,17 +373,13 @@ mod tests {
         assert_eq!(trace_colour_settings(r#"{"output":0}"#), None);
         let p = trace_colour_settings(
             r##"{"output":1,"colours":40,"fixed":["#FF0000","x"],"excluded":["#00FF00"],
-                "merged":[["#0000FF","#FF0000"],["bad"]],"threshold":90}"##,
+                "threshold":90}"##,
         )
         .unwrap();
         assert_eq!(p.trace.threshold, 90);
         assert_eq!(p.colours, Some(16));
         assert_eq!(p.fixed, [TraceRgb::new(255, 0, 0)]);
         assert_eq!(p.excluded, [TraceRgb::new(0, 255, 0)]);
-        assert_eq!(
-            p.merged,
-            [(TraceRgb::new(0, 0, 255), TraceRgb::new(255, 0, 0))]
-        );
         let auto = trace_colour_settings(r#"{"output":1,"colours":null}"#).unwrap();
         assert_eq!(auto.colours, None);
         assert_eq!(

@@ -36,7 +36,7 @@ use serde_json::Value;
 
 const TOLERANCE_MM: f64 = 0.3;
 const BW: &str = r#"{"threshold":128}"#;
-const MULTI: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"merged":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
+const MULTI: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
 
 const POSTER: [&str; 8] = [
     "Größe",

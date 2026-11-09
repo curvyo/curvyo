@@ -1,7 +1,7 @@
 //! Assigns every content pixel of a multicolour trace to one palette colour (`specs/0089`
 //! adrs.md §10, criterion 27): the nearest colour, or the dominant one of a two-colour blend
 //! that explains the pixel far better (anti-aliased seams between colours and toward the
-//! background); excluded colours become background, merged ones their target; regions below
+//! background); excluded colours become background; regions below
 //! Ignore below join the colour neighbour with the longest shared border.
 //!
 //! Labels are `0` for background and `i + 1` for palette entry `i`. Regions of one label are

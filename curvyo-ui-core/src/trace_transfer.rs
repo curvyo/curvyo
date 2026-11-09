@@ -83,7 +83,7 @@ pub struct TracePaletteWire {
     pub colour: TraceRgb,
     /// The maker picked it.
     pub fixed: bool,
-    /// Traced pixels it took before exclusions, merges and joins.
+    /// Traced pixels it took before exclusions and joins.
     pub pixels: u64,
 }
 

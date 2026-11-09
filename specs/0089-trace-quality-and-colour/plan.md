@@ -945,7 +945,11 @@ alone); no core crate, no format change, nothing persisted changes (`excluded`, 
   `PaletteView` and `set_trace_palette_view` (now `set_trace_isolated`), the recolour arms of
   `with_leftovers` and `write_texts`, the `hsvOf` / `rgbOf` props, `merged` in the frontend values,
   their strings and tests (`trace_colours_tests.rs`, `trace_text_colour_tests.rs`,
-  `acceptance_0089_sliceM_tester.rs`, `traceMulticolour.test.ts`).
+  `acceptance_0089_sliceM_tester.rs`, `traceMulticolour.test.ts`); then the merge support with no
+  caller left: `ColourParams::merged` and its arm of `targets` (vectorize-core), the text-fill
+  arm in `trace_text_colour.rs`, the glue's `merged` parse, and their tests (`colour.rs`,
+  vectorize `acceptance_0089_sliceM_tester.rs`, `acceptance_0091_slice2_tester.rs`); results
+  without merges unchanged.
 - [x] P4: About Trace entries, `docs/tracing-images.md`, `docs/design-system.md`, `specification.md`
   criteria 17 and 29 (amended), ux-notes §26 and §25.4 marked superseded.
 - [x] P5: Chromium: `acceptance_0089_m_browser` (tooltip, Shift+hover, click, five colours at

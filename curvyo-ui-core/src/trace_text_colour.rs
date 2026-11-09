@@ -209,11 +209,6 @@ fn line_fills(
                 background.is_none_or(|b| nearest(region.under, &with_background) != Some(b));
             let candidates = if on_shape { &with_background } else { &colours };
             let fill = nearest(region.colour, candidates).unwrap_or(region.colour);
-            let fill = params
-                .merged
-                .iter()
-                .find(|(from, _)| *from == fill)
-                .map_or(fill, |&(_, into)| into);
             let excluded = params
                 .excluded
                 .iter()
@@ -435,19 +430,6 @@ mod tests {
             &mut |_| {},
         );
         assert!(!read_trace_wire(&kept).unwrap().texts.lines[0].excluded);
-    }
-
-    /// Merge into applies to a text as to its paths.
-    #[test]
-    fn a_merged_colour_fills_the_text_with_its_target() {
-        let mut merged = params();
-        merged.merged = vec![(rgb(RED), rgb(BLUE))];
-        let wire =
-            trace_text_colour_job_with(&red_on_white(), W, H, MAP, &merged, &[line()], &mut |_| {});
-        assert_eq!(
-            read_trace_wire(&wire).unwrap().texts.lines[0].fill,
-            Some(rgb(BLUE))
-        );
     }
 
     /// Criteria 24/12 and 24/13: no lines, the plain colour job; the same input twice, the same

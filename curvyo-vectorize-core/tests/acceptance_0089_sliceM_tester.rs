@@ -883,7 +883,7 @@ fn c29_layers_largest_first_ties_by_colour_value_independent_of_position() {
 }
 
 #[test]
-fn c29_exclude_makes_the_colour_background_and_merge_into_reassigns_it() {
+fn c29_exclude_makes_the_colour_background() {
     let p = render(160, 160, 0, &rect_scene(RED, GREEN, BLUE));
     let mut cp = params(WHITE);
     cp.excluded = vec![rgb(GREEN)];
@@ -897,16 +897,6 @@ fn c29_exclude_makes_the_colour_background_and_merge_into_reassigns_it() {
         "the green region is background"
     );
     assert_eq!(counts[(110 * 4 * 640 + 110 * 4) as usize], 1, "blue stays");
-
-    let mut cp = params(WHITE);
-    cp.merged = vec![(rgb(GREEN), rgb(BLUE))];
-    let t = run(&p, &cp);
-    assert_eq!(t.layers.len(), 2);
-    assert!(layer_near(&t, GREEN, 0.03).is_none());
-    let blue = layer_near(&t, BLUE, 0.03).unwrap();
-    assert!(covers(&t, blue, 110.0, 50.0) && covers(&t, blue, 110.0, 110.0));
-    // The merged colour's region now has no border to the other one: blue is one piece.
-    assert_eq!(t.layers[blue].outlines.len(), 1);
 }
 
 #[test]

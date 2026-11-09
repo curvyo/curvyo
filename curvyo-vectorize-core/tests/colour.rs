@@ -187,10 +187,9 @@ fn criterion_28_neighbours_share_one_boundary() {
 }
 
 /// Criterion 29: one layer per colour, largest area first (ties by colour value); Exclude makes
-/// a colour background, Merge into traces it as the target's; the same input gives the same
-/// result.
+/// a colour background; the same input gives the same result.
 #[test]
-fn criterion_29_layers_exclude_and_merge() {
+fn criterion_29_layers_and_exclude() {
     let s = scene("adjacent-straight");
     let drawn = s.draw();
     let p = ColourParams::new(params_for(&drawn.picture));
@@ -205,12 +204,6 @@ fn criterion_29_layers_exclude_and_merge() {
         .find(|e| e.colour.b > 150)
         .unwrap()
         .colour;
-    let yellow = result
-        .palette
-        .iter()
-        .find(|e| e.colour.g > 150)
-        .unwrap()
-        .colour;
     let mut excluded = p.clone();
     excluded.excluded = vec![blue];
     let without = run(&drawn.picture, &excluded);
@@ -218,18 +211,6 @@ fn criterion_29_layers_exclude_and_merge() {
     assert!(without.layers.iter().all(|l| l.sample != blue));
     // The palette still lists it (the strip shows it excluded).
     assert_eq!(without.palette.len(), 3);
-    let mut merged = p.clone();
-    merged.merged = vec![(yellow, blue)];
-    let together = run(&drawn.picture, &merged);
-    assert_eq!(together.layers.len(), 2);
-    let blue_layer = together.layers.iter().find(|l| l.sample == blue).unwrap();
-    let before: u64 = result
-        .layers
-        .iter()
-        .filter(|l| l.sample == blue || l.sample == yellow)
-        .map(|l| l.pixels)
-        .sum();
-    assert_eq!(blue_layer.pixels, before);
 }
 
 /// Pick colours with Multicolour: the palette is exactly the picked colours (Frage 90 A).

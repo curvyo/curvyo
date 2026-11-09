@@ -42,8 +42,8 @@ use proptest::prelude::*;
 const OFF: &str = r#"{"threshold":128}"#;
 const ON: &str = r#"{"threshold":128,"shapes":true}"#;
 const OFF_EXPLICIT: &str = r#"{"threshold":128,"shapes":false}"#;
-const MULTI_ON: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"merged":[],"method":0,"background":null,"swatches":[],"threshold":128,"shapes":true}"#;
-const MULTI_OFF: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"merged":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
+const MULTI_ON: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"method":0,"background":null,"swatches":[],"threshold":128,"shapes":true}"#;
+const MULTI_OFF: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
 /// Pixels per mm of every picture here.
 const PX: f64 = 10.0;
 /// The specification's tolerance at 10 px/mm, in mm.
