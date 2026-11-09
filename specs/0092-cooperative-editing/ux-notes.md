@@ -338,3 +338,10 @@ participants (the overlay is drawn from presence data only, 4 pointers and 4 box
 - **BACK-ONLINE:** the "Back online." notice after more than 5 s offline. Default: yes.
 - **EXPIRY-CHOICES:** 1 hour, 24 hours, 7 days. Default 24 hours (criterion 2 Proposal).
 - **FOLLOW:** following another participant's viewport is out of scope (spec); not designed, no cue reserved.
+
+## 14. Amendment (customer, 2026-11-09)
+
+- Invite has no validity choice: one press writes a link valid for 24 hours (the default lives in Rust) and shows it. INVITE-REVOKE keeps no control.
+- The key epoch is not shown in the Share tab.
+- STOP-SHARING: the only participant left gets **Stop sharing** (armed, no sentence) in its row's action slot; others leave or are removed one by one first. Nothing is written; the share record of the file (or the workspace marker's share files) is removed.
+- Share and Share workspace keep the Share tab shown while the document is closed and reopened.

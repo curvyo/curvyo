@@ -191,7 +191,14 @@ second code path, while epoch keys remain raw in wasm anyway; it protects one ke
    records; then `reconcile` in every workspace, with a count (criterion 23). Any other admin
    device that comes online completes what is left. "Leave my devices" on B: B writes its own
    `RemoveMember` in the group room and each synced workspace, forgets those epoch keys and
-   `devices/`, keeps files (ADR 0010 §8); the next admin device rotates (decision 5). A removed
+   `devices/`, keeps files (ADR 0010 §8); the next admin device rotates (decision 5). The
+   group's **last device** may leave too (customer 2026-11-09, reversing the refusal `0097` had
+   added): it writes nothing in the group room, the group ends on this device, also offline, and
+   every synced workspace becomes plain local files (its marker loses its share files). In a
+   workspace room where it is the last admin it writes no `RemoveMember` either; the room keeps
+   its other participants, without an admin, and the Leave sentence says so beforehand. Every
+   synced workspace a device leaves this way is local afterwards, so reopening it never connects
+   to the room it left. A removed
    device learns it from its group keyring or `Refused{removed}` and keeps its files as local
    (ADR 0037 decision 9).
    Consequence of DEV-ROLE A stated here: a stolen device that stays in the group is an admin and

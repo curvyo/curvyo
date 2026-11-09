@@ -51,6 +51,26 @@ Which spec owns what (Proposal): this spec owns every way a participant enters, 
 
 ## Acceptance criteria (slice 1)
 
+**Amendment (customer feedback on PR #281, 2026-11-09).** These customer decisions override the
+criteria below where they conflict:
+- Role acts, Remove and Leave are armed buttons with **no sentence**: the confirm texts of
+  criteria 4 and 10 and the second-admin line of criteria 7 and 8 are gone. Step down and Leave
+  of the only admin are greyed with the reason "You are the only admin" (criteria 5 and 14),
+  never refused with a sentence after a press. The Share tab keeps labels, states and real
+  errors only.
+- The "Removed or left" list and Add back are dropped: criteria 17 to 26 and 33 no longer apply.
+  The Removed block shows its heading only.
+- 42 (new). Given B was removed from D or W, when an admin makes a new invite and B joins with
+  it, then B joins again as a new participant and syncs; the old removal does not block it, and
+  B's old link and file are still refused as removed.
+- "Leave my devices" on the group's last device is allowed (`0096` criterion 27, ADR 0040
+  decision 8).
+- 43 (new, customer 2026-11-09). Given B is the only participant left of D or W (every other one
+  left or was removed), then B's row offers Stop sharing (armed); it ends the share on B without
+  writing anything and the file or folder is local again. The Share tab shows W's block, Invite
+  and Participants also while no workspace is open in the tree. No key epoch is shown; an invite
+  is always valid for 24 hours.
+
 Setup as `0092` "Acceptance criteria": instances A, B and C of the desktop app, each with its own data directory and credential store, so each is a different maker; one `curvyo-sync-server`; the same server address in each. A also has a second computer A2, paired with A as in `0096` (own data directory). D is a shared document with A as admin, B and C as members (joined by invite link). W is a shared workspace (3 documents) with the same people. "Within 2 s" means on a LAN server with both online, as `0092` criterion 6 and `0096` criterion 16. Where the UI is named it is the Share tab; `ux-engineer` fills "UX notes". Every criterion holds for D and for W unless it names one. Criteria marked [ADR] depend on a mechanism ADR 0041 still has to decide.
 
 ### The participant list and roles

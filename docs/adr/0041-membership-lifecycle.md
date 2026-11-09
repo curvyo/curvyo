@@ -105,11 +105,25 @@ link stays stuck longer than any retry) and would make more connections per pres
 criterion 33 allows; the admin's screen showing the add only once it is confirmed is honest
 and costs nothing. **Chosen.**
 
+## Amendment (customer feedback on PR #281, 2026-11-09)
+
+Add back by the "Removed or left" list (decision 5) and the return check with Sync again and Keep
+as it is (decision 6, the way back) are dropped from the app: the customer never asked for them.
+The way back is a new invite: the relay lets a removed identity that starts from nothing
+(`since_seq` 0) offer a claim of a new invite, and refuses it as removed for anything else (a
+reconnect from a cursor, the old link); the keyring already counts an add after the removal
+(ADR 0010 §8). A joiner is not ended as removed while its claim waits for the relay. The core's
+`add_back` and the check outcome stay in `curvyo-sync-core` until the architect retires them.
+Armed acts have no sentence; Step down and Leave of the only admin are greyed.
+
 ## Decision
 
 1. **Roles.** Make admin, Make member and Step down are `SetRole`, as ADR 0010 §4 already
    validates; one row is one device (DEVICE-OR-PERSON A). Any admin may change any role
-   (WHO-PROMOTES A). The client refuses Step down, Leave and a demotion when afterwards no admin
+   (WHO-PROMOTES A). Exception (customer 2026-11-09): "Leave my devices" on the group's last
+   device is never refused; it ends the group on that device (ADR 0040 decision 8). Step down and
+   Leave of the only admin are greyed with the reason as tooltip and description instead of
+   refusing a press with a sentence. The client refuses Step down, Leave and a demotion when afterwards no admin
    would remain outside the devices the act removes or demotes: one device for Step down,
    Leave of a document or of an unsynced workspace, and demotion; **every device of the maker's
    group** for the person leave of decision 3 (LAST-ADMIN A). Otherwise a maker whose own devices
