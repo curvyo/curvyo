@@ -15,6 +15,9 @@
     missing_docs
 )]
 
+#[path = "support/older_build.rs"]
+mod older_build;
+
 use std::io::{Cursor, Read};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -484,7 +487,8 @@ fn ac09_missing_face_press_replaces_it() {
     select_at(&mut s, pt(14.0, 16.0));
     s.press_weight(WeightBand::Light);
     load(&mut s);
-    let bytes = s.pack("0.1.0").unwrap();
+    // A build without embedded fonts writes the file (`0107` embeds the Light face otherwise).
+    let bytes = older_build::without_embedded_fonts(&s.pack("0.1.0").unwrap());
     let mut s = Session::open(80, &bytes).unwrap();
     s.set_clock(clock);
     s.resize_viewport(1200.0, 800.0);
