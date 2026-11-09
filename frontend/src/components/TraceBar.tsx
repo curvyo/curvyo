@@ -7,14 +7,13 @@ import { useRowStarts } from "@/components/SelectToolbar";
 import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
 import { TraceParts } from "@/components/TraceParts";
-import { joinTooltip, partsCount, partsLabel } from "@/lib/traceParts";
+import { joinTooltip, partsCount } from "@/lib/traceParts";
 import { TraceField } from "@/components/TraceField";
 import { PickColoursGroup, RemoveBackgroundGroup } from "@/components/TraceColourGroup";
 import { TracePresetMenu } from "@/components/TracePresetMenu";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
 import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
-import { ANALYSIS_FAILED } from "@/lib/traceAnalysis";
 import {
   CLEAR_MASK,
   maskPickStatus,
@@ -364,9 +363,10 @@ interface TraceBarProps {
  * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` criterion 14, Frage 84, 85 B):
  * one flow of the "i" button, Preset, the Mask group, Method, Threshold or Colour tolerance, the
  * method's pipette group, Smooth, Tolerance, Ignore below, and at the far right the expander and
- * the Trace button, wrapping by whole items; under it the notice row and, when open, the Advanced
- * block that holds everything else (`ux-notes.md` §22, §24). One hidden status region announces
- * the result; nothing shows it.
+ * the Trace button, wrapping by whole items; under it, when open, the Advanced block that holds
+ * everything else (`ux-notes.md` §22, §24). The bar draws no status or notice text (§27): one
+ * hidden status region announces the result and the notices, the dimmed Trace button names its
+ * reason.
  * With nothing or something else selected it is one row of words.
  */
 export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
@@ -445,7 +445,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         auto={trace.values.backgroundAuto}
         armed={trace.pickMode === "background"}
         onAuto={trace.setBackgroundAuto}
-        onPipette={() => trace.setPicking(trace.pickMode === "")}
+        onPipette={() => trace.setPicking(trace.pickMode !== "background")}
         onReturnFocus={onReturnFocus}
       />
     ) : method === PICK_COLOURS ? (
@@ -458,12 +458,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
       />
     ) : null;
   const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
-  // `ux-notes.md` §24.5: a result whose fix is in Advanced and a failed analysis join the notice
-  // row; nothing picked is only the Trace button's reason (§25.3).
-  const reason = trace.status.message;
-  const analysisFailed = trace.analysis.kind === "failed";
-  const noticeShown =
-    trace.status.line !== "" || reason !== "" || analysisFailed || trace.status.muted !== "" || trace.imagesLabel !== "" || trace.palette.sameNote !== "" || trace.maskRefused;
   return (
     <div className="pointer-events-none flex min-w-0 flex-col gap-2">
     <div
@@ -492,12 +486,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
           />
         </div>
         <MaskGroup trace={trace} onReturnFocus={onReturnFocus} />
-        {/* With two or more parts the bar's values are the active part's (UX notes §3). */}
-        {trace.parts.length > 1 ? (
-          <span data-trace-part-label="" className="flex h-9 items-center text-xs whitespace-nowrap text-[var(--panel-muted-fg)] tabular-nums">
-            {partsLabel(trace.parts)}
-          </span>
-        ) : null}
         <div className="flex h-9 items-center">
           <TracePresetMenu
             name="Method"
@@ -528,7 +516,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         </div>
         {trace.advancedOpen ? (
           // After the expander in the DOM, so Tab reaches the Advanced controls after it
-          // (criterion 57, UX notes 21.2); drawn below the notice row, full width. Its own width
+          // (criterion 57, UX notes 21.2); drawn below the main rows, full width. Its own width
           // never widens the bar: the bar is as wide as its controls (customer 2026-10-31).
           <div className={`order-last basis-full ${FOLLOWS_WIDTH_CLASS}`}>
             <TraceAdvanced
@@ -544,46 +532,11 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               onReturnFocus={onReturnFocus}
               coloursFound={trace.palette.found}
               paletteArmed={trace.pickMode === "colours" && trace.values.method !== PICK_COLOURS}
-              onPalettePipette={() => trace.setPicking(trace.pickMode === "")}
+              onPalettePipette={() => trace.setPicking(trace.pickMode !== "colours", true)}
               parts={<TraceParts parts={trace.parts} onSelect={trace.selectPart} onAdd={trace.addPart} onRemove={trace.removePart} onReturnFocus={onReturnFocus} />}
             />
           </div>
         ) : null}
-        {/* The notice row (`ux-notes.md` §22.2): only what is fixed with a bar control or changes how
-            the preview reads, always mounted with its live region, no height while empty; drawn
-            under the main rows and above the Advanced block. */}
-        <div data-trace-state="" className={`order-[9998] basis-full ${FOLLOWS_WIDTH_CLASS} ${noticeShown ? "flex min-h-9 items-center gap-3" : ""}`}>
-          <div role="status" aria-live="polite" className={noticeShown ? "flex flex-col py-1 tabular-nums" : ""}>
-            {trace.imagesLabel ? <span className={`block ${LABEL_CLASS}`}>{trace.imagesLabel}</span> : null}
-            {trace.status.line ? (
-              <span data-trace-line="" className="block text-[var(--toolbar-icon)]">
-                {trace.status.line}
-              </span>
-            ) : null}
-            {reason ? (
-              <span data-trace-reason="" className="block text-[var(--toolbar-icon)]">
-                {reason}
-              </span>
-            ) : null}
-            {analysisFailed ? (
-              <span data-trace-analysis-failed="" className="block text-[var(--toolbar-icon)]">
-                {ANALYSIS_FAILED}
-              </span>
-            ) : null}
-            {trace.status.muted ? (
-              <span data-trace-muted="" className={`block ${LABEL_CLASS} opacity-70`}>
-                {trace.status.muted}
-              </span>
-            ) : null}
-            {trace.palette.sameNote ? <span className={`block ${LABEL_CLASS}`}>{trace.palette.sameNote}</span> : null}
-            {/* A pick refused (`specs/0094` criterion 38): the criterion 14 string, only while it holds. */}
-            {trace.maskRefused ? (
-              <span data-trace-mask-refused="" className={`block ${LABEL_CLASS} opacity-70`}>
-                {TRACE_MIXED}
-              </span>
-            ) : null}
-          </div>
-        </div>
       </div>
       {/* The one hidden status region, always mounted (`ux-notes.md` §24.5). */}
       <div data-trace-hidden-status="" role="status" aria-live="polite" className="sr-only">

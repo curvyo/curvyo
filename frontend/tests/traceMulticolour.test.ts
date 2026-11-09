@@ -30,7 +30,6 @@ import {
   colourName,
   deleteFromPalette,
   excludedNote,
-  isolatingNote,
   paletteKey,
   paletteSwatchLabel,
   paletteTooltip,
@@ -71,9 +70,10 @@ test("criteria 26, 29: the settings JSON carries Output, Colours and the palette
   const json = JSON.parse(settingsJson(v, 128));
   assert.deepEqual([json.output, json.colours, json.fixed, json.excluded], [1, 5, ["#FF0000"], ["#00FF00"]]);
   assert.equal("merged" in json, false, "Merge into is gone (ux-notes §26)");
-  // Fixed palette colours exist for Brightness only (Pick colours takes its swatches); Single
-  // colour sends no palette edits.
-  assert.deepEqual(JSON.parse(settingsJson({ ...v, method: REMOVE_BACKGROUND }, 128)).fixed, []);
+  // Fixed palette colours exist for Brightness and Remove background (the palette pipette stays
+  // there, customer 2026-11-09); Pick colours takes its swatches; Single colour sends no palette
+  // edits.
+  assert.deepEqual(JSON.parse(settingsJson({ ...v, method: REMOVE_BACKGROUND }, 128)).fixed, ["#FF0000"]);
   assert.deepEqual(JSON.parse(settingsJson({ ...v, method: PICK_COLOURS }, 128)).fixed, []);
   const single = JSON.parse(settingsJson({ ...v, output: SINGLE_COLOUR }, 128));
   assert.deepEqual([single.output, single.excluded, single.fixed], [0, [], []]);
@@ -98,16 +98,20 @@ test("ux-notes §26: a kept palette is traced as exactly its colours, with eithe
   assert.deepEqual(viewValues(v, true, undefined, undefined).keptPalette, ["#FF0000", "#0000FF"]);
 });
 
-test("ux-notes §26: deleting a colour keeps exactly the others and un-excludes it; two colours stay", () => {
+test("ux-notes §26, §27: deleting a colour keeps exactly the others and un-excludes it, down to no colour", () => {
   const shown = ["#D0222A", "#234EB8", "#F2C20E"];
   assert.deepEqual(deleteFromPalette(shown, ["#234EB8", "#F2C20E"], "#234EB8"), { keptPalette: ["#D0222A", "#F2C20E"], excluded: ["#F2C20E"] });
   assert.equal(deleteFromPalette(shown, [], "#000000"), null, "a colour not shown");
-  assert.equal(deleteFromPalette(["#D0222A", "#234EB8"], [], "#234EB8"), null, "Multicolour keeps two colours");
+  assert.deepEqual(deleteFromPalette(["#D0222A", "#234EB8"], [], "#234EB8"), { keptPalette: ["#D0222A"], excluded: [] });
+  assert.deepEqual(deleteFromPalette(["#D0222A"], ["#D0222A"], "#D0222A"), { keptPalette: [], excluded: [] }, "the last colour goes too");
+  // One kept colour is traced as it alone; none is not traced (`useTrace`), so it sends no count.
+  const one = JSON.parse(settingsJson({ ...firstChoice().values, output: MULTICOLOUR, keptPalette: ["#D0222A"] }, 128));
+  assert.deepEqual([one.fixed, one.colours], [["#D0222A"], 1]);
 });
 
 test("ux-notes §26: the swatch tooltip, name and keys", () => {
   assert.equal(paletteTooltip("#4B392F"), "#4B392F · Brown");
-  assert.equal(PALETTE_HINT, "Click: exclude · Shift: isolate / delete");
+  assert.equal(PALETTE_HINT, "Shift+click: exclude");
   assert.equal(paletteSwatchLabel("#4B392F", false), "#4B392F · Brown");
   assert.equal(paletteSwatchLabel("#4B392F", true), "#4B392F · Brown, excluded");
   assert.deepEqual(paletteKey("ArrowRight", false, 1, 3), { move: 2 });
@@ -151,7 +155,6 @@ test("UX notes §7: the swatch row's order, the colour names and the palette's w
   assert.equal(coloursText(null, null), "Auto");
   assert.equal(coloursText(null, 6), "Auto  6");
   assert.equal(coloursText(9, 6), "9");
-  assert.equal(isolatingNote("#FFF2A8"), "Isolating #FFF2A8");
   assert.equal(excludedNote(2), "2 colours excluded");
   assert.equal(excludedNote(1), "1 colour excluded");
   assert.equal(sameAsNote("#3366CC"), "Same as #3366CC");

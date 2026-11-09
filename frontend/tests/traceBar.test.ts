@@ -27,6 +27,10 @@ after(async () => {
 
 const noop = () => undefined;
 
+async function paletteStub(): Promise<Record<string, unknown>> {
+  return { swatches: [], found: null, joined: 0, excluded: () => false, toggleExclude: noop, remove: noop, pick: noop, note: "", sameNote: "", refresh: noop };
+}
+
 async function barHtml(overrides: Record<string, unknown> = {}): Promise<string> {
   const react = await import("react");
   const dom = await import("react-dom/server");
@@ -35,10 +39,7 @@ async function barHtml(overrides: Record<string, unknown> = {}): Promise<string>
   const text = await server.ssrLoadModule("/src/lib/traceText.ts");
   const presets = text.TRACE_PRESETS_FALLBACK as { label: string }[];
   const choice = (text.firstChoice as (p: unknown) => { values: Record<string, unknown> })(presets);
-  const palette = {
-    swatches: [], found: null, joined: 0, excluded: () => false, isolated: null, setIsolated: noop, toggleExclude: noop, remove: noop,
-    pick: noop, note: "", sameNote: "", refresh: noop,
-  };
+  const palette = await paletteStub();
   const trace = {
     active: true, available: true, selection: "images", mask: { paths: 0, outside: false }, setMaskOutside: noop,
     maskPick: false, setMaskPick: noop, maskRefused: false, clearMask: noop,
@@ -129,9 +130,38 @@ test("§24.5: no analysis line, no status line; one hidden region, Advanced open
   }
 });
 
-test("§24.5: the reasons Trace is dimmed and a failed analysis are notice-row lines", async () => {
-  const blocked = await barHtml({ status: { line: "", muted: "", counts: "", countsMuted: "", message: "No colours found.", canCreate: false }, traceBlocked: "No colours found." });
-  assert.match(blocked, /data-trace-reason=""[^>]*>No colours found\.</);
-  const failed = await barHtml({ analysis: { kind: "failed" } });
-  assert.match(failed, /data-trace-analysis-failed=""[^>]*>Analysis failed · automatic Threshold used</);
+test("§27: the bar shows no status or notice text; Trace keeps its reason as tooltip and description", async () => {
+  const notices = {
+    status: { line: "412,000 nodes. Slow to edit.", muted: "Preview from a reduced copy", counts: "", countsMuted: "", message: "No colours found.", canCreate: false },
+    traceBlocked: "No colours found.",
+    analysis: { kind: "failed" },
+    imagesLabel: "Tracing 1 of 3 images",
+    maskRefused: true,
+    palette: { ...((await paletteStub()) as object), sameNote: "Same as #3366CC" },
+    parts: [
+      { id: 1, paths: 1, outside: false, whole: false, muted: false, active: false, contributes: true, mask: "" },
+      { id: 2, paths: 0, outside: false, whole: false, muted: true, active: true, contributes: false, mask: "" },
+    ],
+    announcement: "412,000 nodes. Slow to edit.",
+  };
+  for (const advancedOpen of [false, true]) {
+    const html = await barHtml({ ...notices, advancedOpen });
+    assert.doesNotMatch(html, /data-trace-(state|line|reason|muted|analysis-failed|mask-refused|part-label)/, "no notice row, no part label");
+    const visible = html.replace(/<div data-trace-hidden-status=""[^>]*>[^<]*<\/div>/, "").replace(/<span id="[^"]*" hidden="">[^<]*<\/span>/g, "").replace(/<[^>]*>/g, " ");
+    for (const text of ["Slow to edit", "reduced copy", "No colours found", "Analysis failed", "Tracing 1 of 3", "Same as #", "Part 2 of 2", "one image at a time"]) {
+      assert.ok(!visible.includes(text), `"${text}" is not drawn`);
+    }
+    assert.match(html, /<span id="[^"]*" hidden="">No colours found\.<\/span>/, "the dimmed Trace button's description");
+    assert.match(html, /data-trace-hidden-status=""[^>]*>412,000 nodes\. Slow to edit\.</, "the hidden region keeps it");
+  }
+});
+
+test("§27 (customer 2026-11-09): with Remove background the Multicolour palette keeps its pipette", async () => {
+  const text = await server.ssrLoadModule("/src/lib/traceText.ts");
+  const choice = (text.firstChoice as () => { values: Record<string, unknown> })();
+  for (const method of [text.BRIGHTNESS, text.REMOVE_BACKGROUND]) {
+    const html = await barHtml({ advancedOpen: true, values: { ...choice.values, threshold: 128, output: text.MULTICOLOUR, method } });
+    const output = /data-trace-output-row=""([\s\S]*?)data-trace-colours="palette"([\s\S]*?)<\/div><\/span><\/div>/.exec(html)?.[0] ?? html;
+    assert.match(output, /aria-label="Pick palette colour from the image"/, `method ${String(method)}`);
+  }
 });

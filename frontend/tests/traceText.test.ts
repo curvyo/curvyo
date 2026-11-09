@@ -72,6 +72,7 @@ import {
   pickSwatch,
   progressHoldLeft,
   zeroPathsLine,
+  nothingToTrace,
 } from "../src/lib/traceText.ts";
 
 const [threshold, smooth, tolerance, specks] = TRACE_PARAMS_FALLBACK;
@@ -164,7 +165,7 @@ test("criterion 70: the info page's exact text", () => {
   "Ignore below: drops shapes and holes smaller than this size in mm.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
-  "Palette: the colours of a Multicolour trace beside Colours, largest area first. A click excludes a colour: it becomes background and is not traced; a second click brings it back. Shift while pointing at a colour isolates it: the others are dimmed in the preview. Shift+click deletes a colour: the others are matched again as if it had never been found.",
+  "Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Shift+click excludes a colour: it becomes background and is not traced; a second Shift+click brings it back.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
@@ -447,6 +448,11 @@ test("0089 UX notes §24.5: the hidden region says the removed lines in their or
   );
   assert.equal(traceAnnouncement({ ...none, counts: "7 paths, 412 nodes, 0.4 s", recognised: "12 shapes set" }), "7 paths, 412 nodes, 0.4 s. 12 shapes set", "an empty segment is absent");
   assert.equal(traceAnnouncement({ ...none, analysis: "Analysing..." }), "Analysing...");
+  // `ux-notes.md` §27: the notices the bar no longer draws follow the counts, a full stop kept once.
+  assert.equal(
+    traceAnnouncement({ ...none, counts: "1 path, 412,000 nodes, 2.0 s", notices: ["412,000 nodes. Slow to edit.", "", "Preview from a reduced copy"], recognised: "12 shapes set" }),
+    "1 path, 412,000 nodes, 2.0 s. 412,000 nodes. Slow to edit. Preview from a reduced copy. 12 shapes set",
+  );
 });
 
 test("criteria 52 to 55: large images, stopped, failure, slow to edit", () => {
@@ -530,6 +536,15 @@ test("specs/0089 criterion 17, Frage 89 A: a click replaces the picked colours, 
   assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: ["#FFFFFF"] }), "0 paths at this Colour tolerance: too low.");
   assert.equal(zeroPathsLine({ method: REMOVE_BACKGROUND, swatches: [] }), "0 paths at this Colour tolerance: too high.");
   assert.equal(zeroPathsLine({ method: 0, swatches: [] }), null);
+  // `ux-notes.md` §27: nothing to trace, and why Trace is dimmed.
+  const base = { method: 0, swatches: [] as string[], output: 1, keptPalette: null as string[] | null };
+  assert.equal(nothingToTrace({ ...base, method: PICK_COLOURS }), "0 paths: no colour picked.");
+  assert.equal(nothingToTrace({ ...base, method: PICK_COLOURS, swatches: ["#FFFFFF"] }), "");
+  assert.equal(nothingToTrace({ ...base, keptPalette: [] }), "0 paths: no colour in the palette.");
+  assert.equal(nothingToTrace({ ...base, method: REMOVE_BACKGROUND, keptPalette: [] }), "0 paths: no colour in the palette.");
+  assert.equal(nothingToTrace({ ...base, keptPalette: ["#FFFFFF"] }), "");
+  assert.equal(nothingToTrace(base), "", "the found palette");
+  assert.equal(nothingToTrace({ ...base, output: 0, keptPalette: [] }), "", "Single colour has no palette");
   // No notice, no message: Trace is only dimmed with the reason (`ux-notes.md` §25.3).
   const nothing = statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, zeroPathsLine({ method: PICK_COLOURS, swatches: [] }));
   assert.deepEqual([nothing.message, nothing.line, nothing.canCreate], ["", "", false]);

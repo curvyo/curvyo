@@ -1,5 +1,5 @@
 import { Ban, Pipette, X, type LucideIcon } from "lucide-react";
-import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 
 import { Swatch } from "@/components/panel/Swatch";
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
@@ -110,21 +110,16 @@ interface SwatchCellProps {
   stop: boolean;
   label: string;
   tooltip: ReactNode;
-  /** A picked colour: hover and focus fade it and show the x. */
-  removable?: boolean;
-  /** An excluded palette colour: at 40 % with the `Ban` glyph. */
+  /** An excluded palette colour: at 40 % with the `Ban` glyph, the x instead on hover and focus. */
   excluded?: boolean;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
-  /** Enter and every move: the palette reads Shift from them (Shift+hover isolates). */
-  onPointerMove?: (event: PointerEvent<HTMLButtonElement>) => void;
-  onPointerLeave?: () => void;
 }
 
-/** One colour of a swatch row (`ux-notes.md` §25.4, §26): a 24 x 28 button around the 20 px
- * swatch; the cells touch, so the swatches are 4 px apart. */
-export function SwatchCell({ hex, kind, stop, label, tooltip, removable = false, excluded = false, onClick, onKeyDown, onPointerMove, onPointerLeave }: SwatchCellProps) {
-  const fade = removable ? "group-hover:opacity-40 group-focus-visible:opacity-40" : excluded ? "opacity-40" : "";
+/** One colour of a swatch row (`ux-notes.md` §25.4, §26, §27): a 24 x 28 button around the 20 px
+ * swatch; the cells touch, so the swatches are 4 px apart. Hover and focus fade it and show the x. */
+export function SwatchCell({ hex, kind, stop, label, tooltip, excluded = false, onClick, onKeyDown }: SwatchCellProps) {
+  const fade = excluded ? "opacity-40" : "group-hover:opacity-40 group-focus-visible:opacity-40";
   return (
     <AppTooltip side="bottom" content={tooltip}>
       <button
@@ -135,15 +130,12 @@ export function SwatchCell({ hex, kind, stop, label, tooltip, removable = false,
         tabIndex={stop ? 0 : -1}
         onClick={onClick}
         onKeyDown={onKeyDown}
-        onPointerEnter={onPointerMove}
-        onPointerMove={onPointerMove}
-        onPointerLeave={onPointerLeave}
         className="group relative flex h-7 w-6 shrink-0 cursor-default items-center justify-center outline-none"
       >
         <span aria-hidden className={`block size-5 rounded-[4px] border border-[var(--swatch-border)] ${fade}`} style={{ background: hex }} />
         <span aria-hidden className="pointer-events-none absolute size-5 rounded-[4px] group-focus-visible:ring-2 group-focus-visible:ring-[var(--editor-accent)]" />
-        {removable ? <CasedGlyph icon={X} className="hidden group-hover:block group-focus-visible:block" /> : null}
-        {excluded ? <CasedGlyph icon={Ban} className="block" /> : null}
+        <CasedGlyph icon={X} className="hidden group-hover:block group-focus-visible:block" />
+        {excluded ? <CasedGlyph icon={Ban} className="block group-hover:hidden group-focus-visible:hidden" /> : null}
       </button>
     </AppTooltip>
   );
@@ -208,7 +200,6 @@ export function PickColoursGroup({ swatches, armed, onPipette, onRemove, onRetur
             stop={index === at}
             label={removePickedLabel(hex)}
             tooltip={hex}
-            removable
             onClick={(event) => remove(index, event.detail === 0)}
             onKeyDown={keyDown(index)}
           />

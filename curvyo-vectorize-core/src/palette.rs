@@ -78,17 +78,23 @@ type Found = ([f64; 3], u64);
 
 /// The palette of the flat colours `samples` and the ridge pixels of `lines` (`count`: `None`
 /// for the automatic count, else the number of colours wanted, both within [`MIN_COLOURS`] and
-/// [`MAX_COLOURS`] with `fixed` included), the `fixed` colours first and kept exactly, then the
-/// found colours by their pixels, most first (ties by value). Lines only take the slots the
-/// flat colours leave.
+/// [`MAX_COLOURS`] with `fixed` included; one fixed colour may be the whole palette), the
+/// `fixed` colours first and kept exactly, then the found colours by their pixels, most first
+/// (ties by value). Lines only take the slots the flat colours leave.
 pub(crate) fn palette(
     samples: &[[u8; 3]],
     lines: &Lines,
     count: Option<usize>,
     fixed: &[Rgb8],
 ) -> Vec<Entry> {
-    let wanted = count.map(|n| n.clamp(MIN_COLOURS, MAX_COLOURS));
     let fixed_n = fixed.len().min(MAX_COLOURS);
+    // A palette deleted down to its last colour keeps it alone (customer 2026-11-09).
+    let lowest = if fixed_n == 0 {
+        MIN_COLOURS
+    } else {
+        fixed_n.min(MIN_COLOURS)
+    };
+    let wanted = count.map(|n| n.clamp(lowest, MAX_COLOURS));
     let free = wanted.unwrap_or(MAX_COLOURS).saturating_sub(fixed_n);
     let mut found = flat_colours(samples, wanted.is_none(), free, fixed_n);
     let slots = free.saturating_sub(found.len());

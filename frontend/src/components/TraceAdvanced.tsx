@@ -9,7 +9,6 @@ import { Tooltip } from "@/components/ui/tooltip";
 import type { TracePaletteApi } from "@/hooks/useTracePalette";
 import { ANALYSE } from "@/lib/traceAnalysis";
 import {
-  BRIGHTNESS,
   COLOURS_PARAM,
   MULTICOLOUR,
   OUTPUT,
@@ -153,7 +152,7 @@ function TraceToggle({ label, icon: Icon, pressed, onChange, onReturnFocus }: Tr
   );
 }
 
-/** The palette pipette of Brightness + Multicolour (UX notes §7): pressed while armed; a mouse
+/** The palette pipette of Multicolour (UX notes §7, §27): pressed while armed; a mouse
  * press hands the keyboard back to the canvas. */
 function PalettePipette({ armed, onPipette, onReturnFocus }: { armed: boolean; onPipette: () => void; onReturnFocus: () => void }) {
   return (
@@ -198,7 +197,7 @@ interface TraceAdvancedProps {
   id: string;
   /** The colours Auto found in the last result, `null` before one. */
   coloursFound: number | null;
-  /** The palette pipette (Brightness + Multicolour) is armed. */
+  /** The palette pipette (Multicolour without Pick colours) is armed. */
   paletteArmed: boolean;
   onPalettePipette: () => void;
   /** The Parts group (`specs/0094` slice 2; `specs/0089` UX notes §24.3): first in the last row. */
@@ -270,7 +269,8 @@ export function TraceAdvanced({
               </span>
             )}
             <span className="flex min-h-9 items-start">
-              {values.method === BRIGHTNESS ? <PalettePipette armed={paletteArmed} onPipette={onPalettePipette} onReturnFocus={onReturnFocus} /> : null}
+              {/* The palette pipette with Brightness and Remove background (customer 2026-11-09). */}
+              {values.method === PICK_COLOURS ? null : <PalettePipette armed={paletteArmed} onPipette={onPalettePipette} onReturnFocus={onReturnFocus} />}
               {/* The palette's swatches beside the pipette (`ux-notes.md` §26): the cells of the
                   Pick colours row; Pick colours has its own row in the bar. */}
               <TracePalette palette={palette} stale={countsStale} onReturnFocus={onReturnFocus} />

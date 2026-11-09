@@ -63,12 +63,6 @@ export function partTooltip(index: number, count: number, part: TracePartInfo): 
   return partName(index, count, { ...part, active: false });
 }
 
-/** The bar's muted label with two or more parts: "Part 2 of 3"; empty with one. */
-export function partsLabel(parts: readonly TracePartInfo[]): string {
-  const at = parts.findIndex((p) => p.active);
-  return parts.length < 2 || at < 0 ? "" : `Part ${at + 1} of ${parts.length}`;
-}
-
 /** "3 parts", or empty with one (the status segment and the expander's description). */
 export function partsCount(count: number): string {
   return count < 2 ? "" : `${count} parts`;

@@ -28,8 +28,8 @@ x (or a first Escape) stops the trace: the button says "Stopped" (its tooltip: "
 date"), the old outline stays at half strength, and its **Retry** traces again, as do Enter, a
 double-click on the image or changing a value.
 
-For an image over 4 megapixels the preview is always the reduced copy, and a muted line says
-"Preview from a reduced copy"; the counts are those of the copy. Create paths then traces the
+For an image over 4 megapixels the preview is always the reduced copy (a screen reader hears
+"Preview from a reduced copy"); the counts are those of the copy. Create paths then traces the
 full picture with the progress in the button at once; the drawing is not changed until it finishes.
 
 If a trace fails, the button says "Failed" with a red ring, with a **Retry** button (Enter on the
@@ -117,8 +117,8 @@ analysis never changes those values again for this image; the blue **Analyse** b
 Advanced block, sets them back to the analysis in one go (it is no History step; it is always
 available, and with nothing changed it sets the same values again). If you change any setting
 before the analysis has answered, its answer is not applied to this image; Analyse applies it on
-request. If the analysis fails, the row under the values says "Analysis failed · automatic
-Threshold used" until the next Analyse or image, and the image keeps its automatic Threshold.
+request. If the analysis fails, the image keeps its automatic Threshold (a screen reader hears
+"Analysis failed · automatic Threshold used") until the next Analyse or image.
 Several selected images use the shown image's analysis.
 
 ## Settings
@@ -240,9 +240,8 @@ as the whole image; with mask paths it is limited to them like any other part.
   paths; until it has some its chip is muted (dashed) and it adds nothing. At most 8 parts.
 - A **click on a chip** (or the arrows, Home and End on the focused chips) makes that part active:
   its settings load into the bar and its mask paths are selected with the image. Everything the bar
-  and Advanced show then belongs to the active part; with two or more parts the bar says
-  "Part 2 of 3" after the Mask group. Pick mask paths, Shift+click, Clear mask and Inside / Outside
-  work on the active part only.
+  and Advanced show then belongs to the active part (the active chip is the only mark of it).
+  Pick mask paths, Shift+click, Clear mask and Inside / Outside work on the active part only.
 - The **trash** removes the active part (Delete on a chip arms it too): the first press turns the
   row soft red, the second press after a short pause removes it; the parts renumber and the part
   before becomes active. With one part the trash is dimmed.
@@ -347,32 +346,31 @@ each other, as in a photo, Auto takes 6 steps. Colours closer than 3 % of the co
 one colour; pale colours and small accents are kept. Only areas of flat colour vote, so the
 blended pixels along edges and JPEG fringes never become colours of their own. Areas smaller than
 Ignore below join the neighbouring colour they share the longest border with (a screen reader
-hears "2 regions joined"). With Brightness the pipette after the field adds a colour you pick to the
-palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there adds
-nothing and the bar says "Same as #3366CC" for 3 seconds. With Pick colours the palette is exactly the picked colours
-beside the pipette and the field shows their number.
+hears "2 regions joined"). With Brightness and with Remove background the pipette after the field
+adds a colour you pick to the palette (it stays armed; Shift+click adds more, Esc ends it); a
+colour that is already there adds nothing (a screen reader hears "Same as #3366CC"). With Pick
+colours the palette is exactly the picked colours beside the pipette and the field shows their
+number.
 
-The **palette** is the row of swatches right after Colours (with Brightness after the palette
-pipette), one per colour, largest area first, colours picked with the palette pipette first. The
-swatches look and sit like the picked colours of Pick colours: 20 px squares 4 px apart, the row
-as wide as its colours, so the bar does not grow a row for them (with Pick colours there is no
-palette row; the picked colours sit beside the pipette in the bar). Pointing at a swatch shows
-its colour code and name ("#4B392F · Brown") and, small, "Click: exclude · Shift: isolate /
-delete":
+The **palette** is the row of swatches right after the palette pipette, one per colour, largest
+area first, colours picked with the palette pipette first. The swatches are the picked colours of
+Pick colours: 20 px squares 4 px apart, the row as wide as its colours, so the bar does not grow a
+row for them (with Pick colours there is no palette row; the picked colours sit beside the pipette
+in the bar). Pointing at a swatch fades it and shows an x; its tooltip gives its colour code and
+name ("#4B392F · Brown") and, small, "Shift+click: exclude":
 
-- **Click**: excludes the colour: it becomes background and is not traced; the swatch is drawn
-  faded with a crossed circle (a screen reader hears "2 colours excluded"). A second click brings
-  it back.
-- **Shift while pointing**: isolates the colour: the other colours are drawn dimmed in the preview
-  (a screen reader hears "Isolating #4B392F") until Shift is released or the pointer leaves the
-  swatch. It is a view only; Enter still creates every colour.
-- **Shift+click**: deletes the colour. The palette becomes the other colours, and every pixel is
+- **The x**: deletes the colour. The palette becomes the other colours, and every pixel is
   matched again among them, as if the deleted colour had never been found: each of its pixels
   goes to the colour nearest to it (to the background only where that colour is excluded). With
   Colours at Auto the field then shows the smaller count ("Auto  5"); a set count stays as it is.
-  A screen reader hears "Removed #4B392F". At least two
-  colours stay; a delete of one of the last two does nothing. A new method, a new Colours value
-  or another image starts from the found palette again.
+  A screen reader hears "Removed #4B392F". Every colour can be deleted; with none left nothing is
+  traced and the Trace button is dimmed (its tooltip: "0 paths: no colour in the palette."), and
+  the palette pipette adds colours again. A new method, a new Colours value or another image
+  starts from the found palette again.
+- **Shift+click**: excludes the colour: it becomes background and is not traced; the swatch is
+  drawn faded with a crossed circle (a screen reader hears "2 colours excluded"). A second
+  Shift+click brings it back.
+- A plain click elsewhere on the swatch does nothing.
 
 On the keyboard the swatches are one Tab stop: the arrows, Home and End move between them, Enter
 or Space excludes, Shift+Enter, Delete or Backspace deletes. A swatch's name gives its colour code,
@@ -388,23 +386,20 @@ that of the last full trace) and "38 specks ignored" when specks were dropped; w
 the colours first, for example "3 colours, 7 paths, 412 nodes, 0.4 s". After Create paths the
 Layers tooltip of the new group gives them ("Traced: 7 paths, 412 nodes.").
 
-What you have to act on, or what changes how the preview reads, shows in a muted row under the
-values whether the Advanced block is open or not:
+The bar shows no status or notice line at all. When a result cannot be created, the Trace button
+is dimmed and its tooltip gives the reason; a screen reader hears it as well:
 
-- "0 paths at this Threshold: too low." (or "too high."): the Trace button is dimmed and creates
-  nothing; its tooltip gives the same reason. With Remove background "0 paths at this Colour
-  tolerance: too high.", with Pick colours "0 paths at this Colour tolerance: too low."
-- "No colours found." (Multicolour found no colour in the content): the Trace button is dimmed and
-  creates nothing. Pick colours with no colour picked shows no line here; the dimmed Trace button
-  gives the reason, "0 paths: no colour picked.", as its tooltip.
-- "1 path covering the whole image.": the whole picture is darker than the Threshold; Create
-  paths works.
+- "0 paths at this Threshold: too low." (or "too high."); with Remove background "0 paths at this
+  Colour tolerance: too high.", with Pick colours "0 paths at this Colour tolerance: too low."
+- "No colours found." (Multicolour found no colour in the content).
+- "0 paths: no colour picked." (Pick colours with no colour picked) and "0 paths: no colour in
+  the palette." (every palette colour deleted).
 - "Too much detail: raise Ignore below.": one shape has 65,000 holes or more.
-- "412,000 nodes. Slow to edit.": more than 100,000 nodes; Create paths works, and the result is
-  still one group with one compound path, one row in Layers.
-- "Same as #3366CC": a pipette pick matched a colour that is already there; it goes after 3
-  seconds.
-- "Analysis failed · automatic Threshold used" (see Analysis).
+
+A screen reader also hears what used to be shown as notices: "1 path covering the whole image.",
+"412,000 nodes. Slow to edit." (more than 100,000 nodes; Create paths works, and the result is
+still one group with one compound path, one row in Layers), "Preview from a reduced copy",
+"Same as #3366CC" and "Analysis failed · automatic Threshold used".
 
 ## About Trace
 
@@ -436,7 +431,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Ignore below: drops shapes and holes smaller than this size in mm.
 - Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.
 - Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.
-- Palette: the colours of a Multicolour trace beside Colours, largest area first. A click excludes a colour: it becomes background and is not traced; a second click brings it back. Shift while pointing at a colour isolates it: the others are dimmed in the preview. Shift+click deletes a colour: the others are matched again as if it had never been found.
+- Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Shift+click excludes a colour: it becomes background and is not traced; a second Shift+click brings it back.
 - Invert: traces what the method leaves out; transparent pixels never become shapes.
 - Drop border shapes: drops shapes that touch the image border.
 - Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.
@@ -457,8 +452,8 @@ largest area at the bottom. The image stays visible and unchanged
 under it; hide or move it as usual. The new groups are selected and the Select tool is active; no
 notice appears, the selected group is the feedback. The tooltip of the group's row in the Layers
 tab says "Traced: 7 paths, 412 nodes." (until the app is closed). It is one step "Trace image" in the History: Ctrl+Z removes every group of it. With
-several images selected the bar says "Tracing 1 of 3 images" and the preview shows the image you
-clicked last; every image is traced with the same settings. If only the reduced copy has been
+several images selected the preview shows the image you clicked last (a screen reader hears
+"Tracing 1 of 3 images"); every image is traced with the same settings. If only the reduced copy has been
 traced, Create paths waits for the full picture; Escape stops before anything is added.
 
 The result is ordinary paths: they move, scale, rotate and edit like any group, take part in

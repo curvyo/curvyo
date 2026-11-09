@@ -81,7 +81,7 @@ async function barHtml(overrides: Record<string, unknown> = {}, values: Record<s
   const presets = text.TRACE_PRESETS_FALLBACK as { label: string }[];
   const choice = (text.firstChoice as (p: unknown) => { values: Record<string, unknown> })(presets);
   const palette = {
-    swatches: [], found: null, joined: 0, excluded: () => false, isolated: null, setIsolated: noop, toggleExclude: noop, remove: noop,
+    swatches: [], found: null, joined: 0, excluded: () => false, toggleExclude: noop, remove: noop,
     pick: noop, note: "", sameNote: "", refresh: noop,
   };
   const trace = {
@@ -136,9 +136,7 @@ test("§25.3: with nothing picked: no swatch, no Tab stop, no label, no notice; 
   const picked = group(html);
   assert.doesNotMatch(picked, /data-trace-picked-swatch/);
   assert.doesNotMatch(picked, /None picked/);
-  assert.doesNotMatch(html, /data-trace-reason/, "no notice-row line");
-  const notice = html.slice(html.indexOf("data-trace-state"), html.indexOf("data-trace-hidden-status"));
-  assert.doesNotMatch(notice, /no colour picked/, "the notice row does not say it");
+  assert.doesNotMatch(html, /data-trace-(state|reason)/, "no notice row (ux-notes §27)");
   assert.match(html, /data-trace-slot="none" aria-disabled="true" aria-describedby="[^"]+"/);
   assert.match(html, new RegExp(`<span id="[^"]+" hidden="">${NO_COLOUR_PICKED_LINE.replace(".", "\\.")}</span>`));
 });
