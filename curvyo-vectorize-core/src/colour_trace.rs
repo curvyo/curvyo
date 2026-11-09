@@ -88,20 +88,6 @@ pub struct ColourTrace {
     pub diagnostics: Diagnostics,
 }
 
-/// The label map of a multicolour trace as a picture for the Mask view (`specs/0089` UX notes
-/// §4, the segmented palette): every content pixel in its palette colour, the rest transparent.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ColourMask {
-    /// Width in mask pixels (twice the picture's after Upscale).
-    pub width: u32,
-    /// Height in mask pixels.
-    pub height: u32,
-    /// Straight-alpha RGBA8, row by row.
-    pub rgba: Vec<u8>,
-    /// Mask pixel corners to document millimetres.
-    pub pixel_map: Affine,
-}
-
 /// Traces `raster` in colours: the content of the selection method (as [`crate::trace`]) is
 /// split into the palette's colours, and every colour becomes one layer of closed outlines;
 /// two neighbouring colours share the same fitted boundary and a triple junction is one node.
@@ -195,38 +181,18 @@ fn palette_of(cm: &ColourMap) -> Vec<PaletteEntry> {
         .collect()
 }
 
-/// The segmented palette [`trace_colours`] would walk for the same arguments, made by the same
-/// code, with the palette it found.
+/// The palette [`trace_colours`] would find for the same arguments, made by the same code.
 ///
 /// # Errors
 /// As [`trace_colours`].
-pub fn colour_mask(
+pub fn colour_palette(
     raster: Raster<'_>,
     pixel_map: Affine,
     params: &ColourParams,
     poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
-) -> Result<(ColourMask, Vec<PaletteEntry>), TraceError> {
+) -> Result<Vec<PaletteEntry>, TraceError> {
     check(raster, pixel_map)?;
     let mut poller = Poller::new(poll);
     let cm = colour_map(raster, pixel_map, params, &mut poller)?;
-    let rgba = cm
-        .labels
-        .iter()
-        .flat_map(|&l| match l.checked_sub(1) {
-            Some(i) => {
-                let c = cm.palette[i as usize].colour;
-                [c.r, c.g, c.b, 255]
-            }
-            None => [0, 0, 0, 0],
-        })
-        .collect();
-    Ok((
-        ColourMask {
-            width: u32::try_from(cm.width).unwrap_or(u32::MAX),
-            height: u32::try_from(cm.height).unwrap_or(u32::MAX),
-            rgba,
-            pixel_map: cm.map,
-        },
-        palette_of(&cm),
-    ))
+    Ok(palette_of(&cm))
 }

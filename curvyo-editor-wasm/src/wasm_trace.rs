@@ -6,7 +6,7 @@
 use curvyo_document_core::NodeId;
 use wasm_bindgen::prelude::*;
 
-use crate::session::{TraceCreateOutcome, TracePickMode, TraceSelection, TraceViewMode};
+use crate::session::{TraceCreateOutcome, TracePickMode, TraceSelection};
 use crate::wasm_api::WasmSession;
 
 fn count(n: usize) -> u32 {
@@ -250,125 +250,6 @@ pub fn trace_text_regions_job(
     )
 }
 
-/// As [`trace_mask_job`] with the OCR `lines`: the pixels left out for text at 128, in
-/// Multicolour as opaque grey (`specs/0091` UX notes §2).
-#[wasm_bindgen]
-#[must_use]
-pub fn trace_text_mask_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    map: &[f64],
-    settings: &str,
-    lines: &str,
-) -> Option<TraceMaskJs> {
-    let map6: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    text_mask(rgba, width, height, map6, settings, lines)
-        .map(|mask| crate::wasm_trace_region::in_region(mask, width, map6, settings))
-}
-
-/// The mask of [`trace_text_mask_job`] before the region.
-fn text_mask(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    map6: [f64; 6],
-    settings: &str,
-    lines: &str,
-) -> Option<TraceMaskJs> {
-    if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
-        return curvyo_ui_core::trace_text_colour_mask_job(
-            rgba,
-            width,
-            height,
-            map6,
-            &colour,
-            &crate::trace_glue::read_ocr_lines(lines, width),
-        )
-        .map(|mask| TraceMaskJs {
-            width: mask.width,
-            height: mask.height,
-            bits: mask.rgba,
-        });
-    }
-    curvyo_ui_core::trace_text_mask_job(
-        rgba,
-        width,
-        height,
-        map6,
-        &crate::trace_glue::trace_settings(settings),
-        &crate::trace_glue::read_ocr_lines(lines, width),
-    )
-    .map(|mask| TraceMaskJs {
-        width: mask.width,
-        height: mask.height,
-        bits: mask.bits,
-    })
-}
-
-/// The mask the trace of the same arguments walks (`specs/0089` criterion 21), for the worker's
-/// Mask view: `width` x `height` mask pixels (twice the picture's after Upscale), `bits` row by
-/// row, 255 for content and 0 for the rest; with Multicolour four bytes per pixel, the segmented
-/// palette in straight RGBA (the background transparent); `undefined` when the picture cannot
-/// be traced.
-#[wasm_bindgen]
-#[must_use]
-pub fn trace_mask_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    map: &[f64],
-    settings: &str,
-) -> Option<TraceMaskJs> {
-    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    plain_mask(rgba, width, height, map, settings)
-        .map(|mask| crate::wasm_trace_region::in_region(mask, width, map, settings))
-}
-
-/// The mask of [`trace_mask_job`] before the region.
-fn plain_mask(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    map: [f64; 6],
-    settings: &str,
-) -> Option<TraceMaskJs> {
-    if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
-        return curvyo_ui_core::trace_colour_mask_job(rgba, width, height, map, &colour).map(
-            |mask| TraceMaskJs {
-                width: mask.width,
-                height: mask.height,
-                bits: mask.rgba,
-            },
-        );
-    }
-    curvyo_ui_core::trace_mask_job(
-        rgba,
-        width,
-        height,
-        map,
-        &crate::trace_glue::trace_settings(settings),
-    )
-    .map(|mask| TraceMaskJs {
-        width: mask.width,
-        height: mask.height,
-        bits: mask.bits,
-    })
-}
-
-/// A mask for the Mask view.
-#[wasm_bindgen]
-#[derive(Debug, Clone, Default)]
-pub struct TraceMaskJs {
-    /// Width in mask pixels.
-    pub width: u32,
-    /// Height in mask pixels.
-    pub height: u32,
-    /// Row by row, 255 for content, 0 for the rest.
-    #[wasm_bindgen(getter_with_clone)]
-    pub bits: Vec<u8>,
-}
-
 /// The presets as JSON (criteria 59 and 60), in menu order: a list of `{key, label, detail,
 /// values: {smooth, specks, corners, upscale, denoise}}`.
 #[wasm_bindgen]
@@ -571,12 +452,6 @@ impl WasmSession {
         id_of(id).is_some_and(|id| self.session.set_trace_result(id, wire))
     }
 
-    /// Keeps the worker's mask of image `id` (`width` x `height`, `bits` non-zero for content)
-    /// for the Mask view; `false` when the bits do not match the size.
-    pub fn set_trace_mask(&mut self, id: &str, width: u32, height: u32, bits: &[u8]) -> bool {
-        id_of(id).is_some_and(|id| self.session.set_trace_mask(id, width, height, bits))
-    }
-
     /// Forgets the full-size results (a value changed).
     pub fn clear_trace_results(&mut self) {
         self.session.clear_trace_results();
@@ -590,8 +465,8 @@ impl WasmSession {
     }
 
     /// The maker's palette view (`specs/0089` criterion 29): `recolours` a JSON list of `[from,
-    /// to]` `#RRGGBB` pairs (fills only, no trace), `isolated` a `#RRGGBB` or empty; the preview,
-    /// the Mask view and Create paths follow.
+    /// to]` `#RRGGBB` pairs (fills only, no trace), `isolated` a `#RRGGBB` or empty; the preview
+    /// and Create paths follow.
     pub fn set_trace_palette_view(&mut self, recolours: &str, isolated: &str) {
         let pairs: Vec<(curvyo_ui_core::TraceRgb, curvyo_ui_core::TraceRgb)> =
             serde_json::from_str::<Vec<(String, String)>>(recolours)
@@ -606,42 +481,6 @@ impl WasmSession {
                 .collect();
         self.session
             .set_trace_palette_view(pairs, crate::trace_glue::parse_hex(isolated));
-    }
-
-    /// The view on the canvas, as the View pill shows it (criterion 51): `"overlay"`, `"mask"`,
-    /// `"trace"` or `"image"`; Image while `\` is held.
-    #[must_use]
-    pub fn trace_view_mode(&self) -> String {
-        match self.session.shown_trace_view_mode() {
-            TraceViewMode::Overlay => "overlay",
-            TraceViewMode::Mask => "mask",
-            TraceViewMode::Trace => "trace",
-            TraceViewMode::Image => "image",
-        }
-        .to_string()
-    }
-
-    /// Chooses the view `mode` (`"overlay"`, `"mask"`, `"trace"` or `"image"`; anything else is
-    /// ignored).
-    pub fn set_trace_view_mode(&mut self, mode: &str) {
-        let mode = match mode {
-            "overlay" => TraceViewMode::Overlay,
-            "mask" => TraceViewMode::Mask,
-            "trace" => TraceViewMode::Trace,
-            "image" => TraceViewMode::Image,
-            _ => return,
-        };
-        self.session.set_trace_view_mode(mode);
-    }
-
-    /// Shift+`\`: the next view.
-    pub fn cycle_trace_view_mode(&mut self) {
-        self.session.cycle_trace_view_mode();
-    }
-
-    /// `\` held (`true`) or released.
-    pub fn set_trace_peek(&mut self, held: bool) {
-        self.session.set_trace_peek(held);
     }
 
     /// The view is moving (`true`) or has rested for 150 ms (`false`): while it moves, the Trace

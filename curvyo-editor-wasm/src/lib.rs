@@ -193,8 +193,7 @@ pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
 pub use session::{TilingStatus, circle_handle};
 pub use session::{
-    TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TraceViewMode,
-    TracedText,
+    TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TracedText,
 };
 pub use session::{align_command_from_code, distribute_from_code};
 pub use trace_analysis_glue::analysis_json as trace_analysis_json;

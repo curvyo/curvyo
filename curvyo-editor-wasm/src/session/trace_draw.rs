@@ -1,13 +1,9 @@
-//! What the Trace tool draws in each of its views (`specs/0025-raster-trace` criteria 2, 8, 51,
-//! 56 and 68; `specs/0089` criterion 21): the wash, the hollow outline of Overlay, the mask of
-//! Mask, the filled result of Trace, nothing of its own in Image, from meshes kept across frames.
-
-use std::collections::HashSet;
+//! What the Trace tool draws (`specs/0025-raster-trace` criteria 2, 8, 56 and 68): the wash and
+//! the hollow preview outline, from a mesh kept across frames.
 
 use curvyo_document_core::{
-    AnchorId, AnchorKind, AnchorSnapshot, Angle, Color, Fill, ImageSnapshot, NodeId,
-    ObjectSnapshot, Opacity, PathSnapshot, Point, Stroke, Style, SubpathSnapshot, Vec2,
-    ViewTransform,
+    AnchorId, AnchorKind, AnchorSnapshot, Angle, Color, Fill, ImageSnapshot, ObjectSnapshot,
+    Opacity, PathSnapshot, Point, Stroke, Style, Vec2, ViewTransform,
 };
 use curvyo_render_core::{DrawList, PreviewAnchor};
 
@@ -19,68 +15,7 @@ use super::{Session, Tool};
 /// image dimmed to 35 % by white at 65 % on the light theme (the only theme so far).
 const TRACE_WASH: f64 = 0.65;
 
-/// What the Trace tool shows of the traced image (criterion 51, UX notes section 13).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum TraceViewMode {
-    /// The image dimmed under the hollow preview outline.
-    #[default]
-    Overlay,
-    /// The mask handed to the tracer, black content on white, in place of the image
-    /// (`specs/0089` criterion 21).
-    Mask,
-    /// The result filled as Create paths would make it, the image hidden.
-    Trace,
-    /// The original at full strength, no outline.
-    Image,
-}
-
-impl TraceViewMode {
-    /// The next view of Shift+`\`: Overlay, Mask, Trace, Image, Overlay (`specs/0089` UX notes
-    /// §4).
-    #[must_use]
-    pub const fn next(self) -> Self {
-        match self {
-            Self::Overlay => Self::Mask,
-            Self::Mask => Self::Trace,
-            Self::Trace => Self::Image,
-            Self::Image => Self::Overlay,
-        }
-    }
-}
-
 impl Session {
-    /// The chosen view of the Trace tool (criterion 51); the peek does not change it.
-    #[must_use]
-    pub fn trace_view_mode(&self) -> TraceViewMode {
-        self.trace.view_mode
-    }
-
-    /// The view on the canvas: Image while `\` is held, else the chosen one; the View pill
-    /// shows this one, so it always tells the truth (UX notes section 13).
-    #[must_use]
-    pub fn shown_trace_view_mode(&self) -> TraceViewMode {
-        if self.trace.peek {
-            TraceViewMode::Image
-        } else {
-            self.trace.view_mode
-        }
-    }
-
-    /// Chooses the view (a segment of the View pill).
-    pub fn set_trace_view_mode(&mut self, mode: TraceViewMode) {
-        self.trace.view_mode = mode;
-    }
-
-    /// Shift+`\`: the next view after the chosen one.
-    pub fn cycle_trace_view_mode(&mut self) {
-        self.trace.view_mode = self.trace.view_mode.next();
-    }
-
-    /// `\` pressed (`true`) or released, the window blurred or the tool left (`false`).
-    pub fn set_trace_peek(&mut self, held: bool) {
-        self.trace.peek = held && self.tool == Tool::Trace;
-    }
-
     /// The view is moving (`true`) or has rested (`false`, the host's 150 ms without a change of
     /// the view): while it moves the kept meshes are drawn at any zoom, at rest they are made
     /// again for the zoom (criterion 56).
@@ -88,37 +23,11 @@ impl Session {
         self.trace.moving = moving;
     }
 
-    /// The artwork of the Trace tool in the shown view (criterion 51): Overlay washes the traced
-    /// images; Mask puts the mask in place of the shown image (`trace_mask.rs`); Trace takes the shown image out and returns where the filled result goes
-    /// ([`Session::trace_fill_mesh`]), washing the other selected images; Image leaves the
-    /// artwork as it is.
-    pub(super) fn trace_artwork(&self, objects: &mut Vec<ObjectSnapshot>) -> Option<usize> {
-        match self.shown_trace_view_mode() {
-            TraceViewMode::Overlay => {
-                self.trace_wash(objects);
-                self.trace_region_wash(objects);
-                None
-            }
-            TraceViewMode::Image => None,
-            TraceViewMode::Mask => {
-                self.trace_wash(objects);
-                self.trace_mask_in(objects);
-                None
-            }
-            TraceViewMode::Trace => {
-                self.trace_wash(objects);
-                let shown = self.trace_view().shown?;
-                let at = objects.iter().position(
-                    |object| matches!(object, ObjectSnapshot::Image(image) if image.id == shown),
-                )?;
-                // The image and the wash directly above it, which carries its id.
-                objects.remove(at);
-                if objects.get(at).is_some_and(|object| object.id() == shown) {
-                    objects.remove(at);
-                }
-                Some(at)
-            }
-        }
+    /// The artwork of the Trace tool (criteria 2, 68 b): the traced images washed, and the
+    /// region the trace is limited to.
+    pub(super) fn trace_artwork(&self, objects: &mut Vec<ObjectSnapshot>) {
+        self.trace_wash(objects);
+        self.trace_region_wash(objects);
     }
 
     /// The traced images washed to 35 % (criteria 2 and 68 b): a white quad at 65 % directly
@@ -136,42 +45,6 @@ impl Session {
             }
             at += 1;
         }
-    }
-
-    /// The filled result of the shown image in the Trace view, black (half strength when stale),
-    /// tessellated once per result and zoom (criteria 51, 56); empty without a result.
-    pub(super) fn trace_fill_mesh(&self, view: ViewTransform) -> DrawList {
-        let shown = self.trace_view().shown;
-        let Some(preview) = self
-            .trace
-            .preview
-            .as_ref()
-            .filter(|p| Some(p.image) == shown)
-        else {
-            return DrawList::default();
-        };
-        let frame = MeshFrame {
-            scale: view.scale(),
-            stale: preview.stale,
-            visible: None,
-            moving: self.trace.moving,
-        };
-        preview.fill_mesh.draw(frame, || {
-            let fills: Vec<ObjectSnapshot> = preview
-                .fills
-                .iter()
-                .map(|fill| {
-                    let mut fill = fill.clone();
-                    if preview.stale {
-                        let half = fill.style.fill.opacity.get() * 0.5;
-                        fill.style.fill.opacity = Opacity::new(half).unwrap_or(Opacity::OPAQUE);
-                    }
-                    ObjectSnapshot::Path(fill)
-                })
-                .collect();
-            let list = curvyo_render_core::build_artwork_with_guides(&fills, &HashSet::new(), view);
-            (list, None)
-        })
     }
 
     /// The visible part of the canvas in document millimetres; `None` before the canvas has a
@@ -195,7 +68,7 @@ impl Session {
     /// of `list` (criteria 8, 56): the outlines that meet the visible part grown by its own size
     /// on every side, tessellated as one mesh and kept across frames.
     pub(super) fn trace_draw_into(&self, view: ViewTransform, list: &mut DrawList) {
-        if self.tool != Tool::Trace || self.shown_trace_view_mode() != TraceViewMode::Overlay {
+        if self.tool != Tool::Trace {
             return;
         }
         let Some(preview) = &self.trace.preview else {
@@ -294,54 +167,6 @@ fn wash_over(image: &ImageSnapshot) -> PathSnapshot {
         },
         anchors,
         extra_subpaths: Vec::new(),
-        rotation: Angle::from_radians(0.0),
-    }
-}
-
-/// The preview `outlines` of `image` as one black compound path without stroke, as Create paths
-/// writes it (criterion 13), for the Trace view (`trace_colours.rs` sets a colour's fill); it
-/// carries the image's id and is never a document node.
-pub(super) fn filled_result(image: NodeId, outlines: &[Vec<PreviewAnchor>]) -> PathSnapshot {
-    let mut n = 0_u64;
-    let mut subpaths = outlines.iter().map(|outline| {
-        outline
-            .iter()
-            .map(|&(point, handle_in, handle_out)| {
-                n += 1;
-                AnchorSnapshot {
-                    id: AnchorId::new(0, n),
-                    point,
-                    handle_in,
-                    handle_out,
-                    kind: AnchorKind::Corner,
-                }
-            })
-            .collect::<Vec<_>>()
-    });
-    let anchors = subpaths.next().unwrap_or_default();
-    let extra_subpaths = subpaths
-        .map(|anchors| SubpathSnapshot {
-            closed: true,
-            anchors,
-        })
-        .collect();
-    PathSnapshot {
-        id: image,
-        closed: true,
-        style: Style {
-            stroke: Stroke {
-                enabled: false,
-                ..Stroke::default()
-            },
-            fill: Fill {
-                enabled: true,
-                color: Color { r: 0, g: 0, b: 0 },
-                opacity: Opacity::OPAQUE,
-                ..Fill::default()
-            },
-        },
-        anchors,
-        extra_subpaths,
         rotation: Angle::from_radians(0.0),
     }
 }

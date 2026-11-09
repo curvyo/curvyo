@@ -98,55 +98,6 @@ pub fn trace(
     trace_with(raster, pixel_map, params, &geometry, poll).map(|(result, _)| result)
 }
 
-/// The binary image a trace turns into outlines (`specs/0089` criterion 21): the selection
-/// after Denoise and Upscale, with Drop border shapes and Specks applied, at the traced
-/// resolution; the Mask view draws exactly this.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Mask {
-    /// Width in mask pixels (twice the picture's after Upscale).
-    pub width: u32,
-    /// Height in mask pixels.
-    pub height: u32,
-    /// Row-major, top row first: 255 for content, 0 for the rest.
-    pub bits: Vec<u8>,
-    /// Mask pixel corners to document millimetres (the picture's map, halved after Upscale).
-    pub pixel_map: Affine,
-}
-
-/// The mask [`trace`] would walk for the same arguments, made by the same code.
-///
-/// # Errors
-/// As [`trace`], except [`TraceError::TooDetailed`], which only the outlines can meet.
-pub fn mask(
-    raster: Raster<'_>,
-    pixel_map: Affine,
-    params: &TraceParams,
-    poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
-) -> Result<Mask, TraceError> {
-    check(raster, pixel_map)?;
-    let mut poller = Poller::new(poll);
-    let masked = masked(raster, pixel_map, params, &mut poller)?;
-    let labels = &masked.labels;
-    let bits = labels
-        .ids
-        .iter()
-        .map(|&id| {
-            if labels.regions[id as usize].foreground {
-                255
-            } else {
-                0
-            }
-        })
-        .collect::<Vec<u8>>();
-    let height = bits.len().checked_div(labels.width).unwrap_or(0);
-    Ok(Mask {
-        width: u32::try_from(labels.width).unwrap_or(u32::MAX),
-        height: u32::try_from(height).unwrap_or(u32::MAX),
-        bits,
-        pixel_map: masked.map,
-    })
-}
-
 /// Refuses bytes that do not match the size and a map that is not finite or not invertible.
 pub(crate) fn check(raster: Raster<'_>, pixel_map: Affine) -> Result<(), TraceError> {
     if raster.checked_pixels().is_none() {

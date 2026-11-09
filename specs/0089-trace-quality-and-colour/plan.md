@@ -879,9 +879,10 @@ Follow-up (lead 2026-11-06): at 150 px "Ignore below" overlapped its value, so t
 171 px (`SPECKS_FIELD_WIDTH` in `TraceBar.tsx`), checked in Chromium at the largest value; the hidden
 region waits for the full-size result after a reduced preview, so it announces once per edit. The Rust view state
 (`TraceViewMode`, `set_trace_view_mode`, `cycle_trace_view_mode`, `set_trace_peek`,
-`set_trace_mask`, the Mask and Trace drawing) and the wasm exports `trace_mask_job` /
-`trace_text_mask_job` are no longer called by the app; tester Rust tests use them, so they go once
-those tests are retired.
+`set_trace_mask`, the Mask and Trace drawing), the wasm exports `trace_mask_job` /
+`trace_text_mask_job`, the core `Mask` / `mask`, `ColourMask` and the mask jobs of `curvyo-ui-core`
+were deleted with their tests in `refactor: remove the dead trace view and mask code` (the
+multicolour palette stays as `colour_palette`). Traced results are unchanged.
 
 ## Colours row and bar fixes (2026-11-09, `ux-notes.md` §25)
 

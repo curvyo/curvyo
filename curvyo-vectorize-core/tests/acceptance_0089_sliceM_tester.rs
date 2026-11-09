@@ -33,7 +33,7 @@ use std::ops::ControlFlow;
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     ColourParams, ColourTrace, DEFAULT_BACKGROUND_TOLERANCE, PixelLength, Raster, Rgb8, Selection,
-    Swatches, TraceParams, colour_mask, trace_colours,
+    Swatches, TraceParams, trace_colours,
 };
 use kurbo::{BezPath, ParamCurve, ParamCurveArclen, ParamCurveNearest, PathSeg, Point, Shape};
 
@@ -918,47 +918,6 @@ fn c29_the_trace_is_deterministic_and_stable_under_unrelated_edits() {
     let mut cp = params(WHITE);
     cp.excluded = vec![Rgb8::new(250, 0, 250)];
     assert_eq!(a.layers, run(&p, &cp).layers);
-}
-
-#[test]
-fn c29_mask_view_is_the_segmented_palette_not_a_black_union() {
-    let p = render(160, 160, 0, &rect_scene(RED, GREEN, BLUE));
-    let (mask, palette) = colour_mask(
-        p.raster(),
-        Affine::scale(MM, MM),
-        &params(WHITE),
-        &mut |_| ControlFlow::Continue(()),
-    )
-    .unwrap();
-    assert_eq!(palette.len(), 3);
-    let at = |x: usize, y: usize| {
-        let i = (y * mask.width as usize + x) * 4;
-        [
-            mask.rgba[i],
-            mask.rgba[i + 1],
-            mask.rgba[i + 2],
-            mask.rgba[i + 3],
-        ]
-    };
-    let scale = mask.width as usize / 160;
-    for (x, y, want) in [(50, 80, RED), (110, 50, GREEN), (110, 110, BLUE)] {
-        let px = at(x * scale, y * scale);
-        assert_eq!(px[3], 255);
-        assert!(
-            dist([px[0], px[1], px[2]], want) < 0.03,
-            "{px:?} vs {want:?}"
-        );
-        assert!(
-            palette
-                .iter()
-                .any(|e| [e.colour.r, e.colour.g, e.colour.b] == [px[0], px[1], px[2]])
-        );
-    }
-    assert_eq!(
-        at(5 * scale, 5 * scale)[3],
-        0,
-        "the background is transparent"
-    );
 }
 
 // ---------------------------------------------------------------------------------------------

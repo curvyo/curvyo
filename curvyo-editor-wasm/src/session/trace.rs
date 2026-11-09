@@ -14,8 +14,8 @@ use curvyo_ui_core::{
 };
 
 use super::select::DoubleClickHint;
-use super::trace_colours::{PaletteView, filled_layers, with_leftovers};
-use super::trace_draw::{TraceViewMode, preview_anchors};
+use super::trace_colours::{PaletteView, with_leftovers};
+use super::trace_draw::preview_anchors;
 use super::trace_mesh::MeshCache;
 use super::trace_text::leftovers_of;
 use super::{Session, Tool};
@@ -29,9 +29,6 @@ pub(super) struct TracePreview {
     pub(super) boxes: Vec<(Point, Point)>,
     /// A stopped job left it out of date: drawn at half strength.
     pub(super) stale: bool,
-    /// The result as Create paths would write it, filled (black, or one path per colour), for
-    /// the Trace view (criterion 51); built once per result and palette view.
-    pub(super) fills: Vec<curvyo_document_core::PathSnapshot>,
     /// A multicolour result's layers and palette (`specs/0089` slice M); empty for one colour.
     pub(super) layers: Vec<TraceLayerWire>,
     pub(super) palette: Vec<TracePaletteWire>,
@@ -48,8 +45,6 @@ pub(super) struct TracePreview {
     pub(super) unclipped: usize,
     /// The tessellated hollow outline, kept across frames (criterion 56).
     pub(super) outline_mesh: MeshCache,
-    /// The tessellated filled result of the Trace view, kept across frames (criterion 56).
-    pub(super) fill_mesh: MeshCache,
 }
 
 /// What the Trace tool keeps between events; nothing of it is in the document.
@@ -60,10 +55,6 @@ pub(super) struct TraceState {
     pub(super) preview: Option<TracePreview>,
     /// The full-size results Create paths writes, per image.
     pub(super) results: Vec<(NodeId, TraceWire)>,
-    /// The chosen view; Overlay on every entry into the tool (UX notes section 13).
-    pub(super) view_mode: TraceViewMode,
-    /// `\` is held: the Image view shows until it is released (criterion 51).
-    pub(super) peek: bool,
     /// The view is moving (a pan or zoom has not rested yet): the kept meshes are drawn as they
     /// are, whatever the zoom (criterion 56).
     pub(super) moving: bool,
@@ -71,8 +62,6 @@ pub(super) struct TraceState {
     pub(super) pick: super::trace_pick::TracePick,
     /// Pick mask paths (`trace_mask_pick.rs`, `specs/0094` slice 1b).
     pub(super) mask_pick: super::trace_mask_pick::MaskPick,
-    /// The mask of the Mask view (`trace_mask.rs`).
-    pub(super) mask: super::trace_mask::TraceMaskState,
     /// Recolours and Isolate of a multicolour preview (`trace_colours.rs`).
     pub(super) palette_view: PaletteView,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
@@ -320,13 +309,11 @@ impl Session {
         } else {
             read.layers.iter().chain(extra).copied().collect()
         };
-        let fills = filled_layers(image, &outlines, &fill_layers, &self.trace.palette_view);
         self.trace.preview = Some(TracePreview {
             image,
             outlines,
             boxes,
             stale,
-            fills,
             layers: read.layers,
             palette: read.palette,
             fill_layers,
@@ -335,16 +322,14 @@ impl Session {
             shape_count: read.shapes.iter().map(TraceShapeRegion::primitives).sum(),
             unclipped: read.unclipped,
             outline_mesh: MeshCache::default(),
-            fill_mesh: MeshCache::default(),
         });
     }
 
-    /// Marks the preview and the mask out of date (a stopped job) or current again.
+    /// Marks the preview out of date (a stopped job) or current again.
     pub fn set_trace_preview_stale(&mut self, stale: bool) {
         if let Some(preview) = &mut self.trace.preview {
             preview.stale = stale;
         }
-        self.set_trace_mask_stale(stale);
     }
 
     /// Keeps the worker's full-size result `wire` for `image` for Create paths; `false` when the

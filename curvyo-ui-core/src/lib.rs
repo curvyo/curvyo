@@ -259,15 +259,15 @@ pub use curvyo_svg_core::SvgDrawing;
 /// The Trace tool's settings schema (criterion 6), passed through for the host.
 pub use curvyo_vectorize_core::{
     ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, AnalysisReport as TraceAnalysis,
-    Capture as TraceCapture, ColourMask as TraceColourMask, ColourParams as TraceColourParams,
+    Capture as TraceCapture, ColourParams as TraceColourParams,
     DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
     DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
     ImageType as TraceImageType, MAX_COLOURS as TRACE_MAX_COLOURS,
-    METHOD_PARAMS as TRACE_METHOD_PARAMS, MIN_COLOURS as TRACE_MIN_COLOURS, Mask as TraceMask,
-    PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind,
-    ParamUnit as TraceParamUnit, PixelLength as TracePixelLength, PropertyKind as TraceProperty,
-    Reason as TraceReason, Rgb8 as TraceRgb, Selection as TraceMethod, Swatches as TraceSwatches,
-    TraceParams, Upscale as TraceUpscale,
+    METHOD_PARAMS as TRACE_METHOD_PARAMS, MIN_COLOURS as TRACE_MIN_COLOURS, PARAMS as TRACE_PARAMS,
+    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
+    PixelLength as TracePixelLength, PropertyKind as TraceProperty, Reason as TraceReason,
+    Rgb8 as TraceRgb, Selection as TraceMethod, Swatches as TraceSwatches, TraceParams,
+    Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
@@ -552,27 +552,22 @@ pub use trace_region::{
     RegionOperand, TRACE_REGION_TOLERANCE, TraceRegion, TraceRegionError, mask_operand,
     unclipped_notice,
 };
-pub use trace_region_raster::{
-    TraceRegionDefaults, trace_region_defaults, trace_whiten_outside_region,
-};
+pub use trace_region_raster::{TraceRegionDefaults, trace_region_defaults};
 pub use trace_shapes::{
     SHAPE_TOLERANCE_PX, SHAPE_TOLERANCE_SHARE, TraceBand, TraceShapeRegion, primitive_path,
     recognise_shapes, trace_add_shapes,
 };
 pub use trace_text::{TextPass, TextRegion, text_pass};
-pub use trace_text_colour::{
-    trace_text_colour_job_in, trace_text_colour_job_with, trace_text_colour_mask_job,
-};
+pub use trace_text_colour::{trace_text_colour_job_in, trace_text_colour_job_with};
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
 pub use trace_text_wire::{
-    LEFT_OUT_LEVEL, TraceTextWire, TraceTexts, trace_text_job_in, trace_text_job_with,
-    trace_text_mask_job, trace_text_regions_in, trace_text_regions_with,
+    TraceTextWire, TraceTexts, trace_text_job_in, trace_text_job_with, trace_text_regions_in,
+    trace_text_regions_with,
 };
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,
-    trace_analyse, trace_auto_threshold, trace_colour_job_in, trace_colour_job_with,
-    trace_colour_mask_job, trace_job, trace_job_in, trace_job_with, trace_mask_job,
-    trace_sample_colour, trace_suggest_background,
+    trace_analyse, trace_auto_threshold, trace_colour_job_in, trace_colour_job_with, trace_job,
+    trace_job_in, trace_job_with, trace_sample_colour, trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

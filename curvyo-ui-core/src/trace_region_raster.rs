@@ -82,35 +82,6 @@ fn first_centre(x: f64, w: usize) -> usize {
     }
 }
 
-/// The Mask view of a masked trace (criterion 10): the pixels of `bits` (a `width` x `height`
-/// mask, `channels` bytes per pixel, the picture's grid times its Upscale factor; the picture is
-/// `picture_width` px wide and mapped by `pixel_map`) that the trace does not keep are made white
-/// (0 in a one-byte mask, opaque white in an RGBA one).
-pub fn trace_whiten_outside_region(
-    bits: &mut [u8],
-    channels: usize,
-    width: u32,
-    height: u32,
-    picture_width: u32,
-    pixel_map: [f64; 6],
-    region: &TraceRegion,
-) {
-    let factor = f64::from(width) / f64::from(picture_width.max(1));
-    let map = Affine::from_array(pixel_map).compose(Affine::scale(1.0 / factor, 1.0 / factor));
-    let Some(kept) = region_pixels(region, map, width, height) else {
-        return;
-    };
-    for (i, _) in kept.iter().enumerate().filter(|(_, k)| !**k) {
-        if let Some(px) = bits.get_mut(i * channels..(i + 1) * channels) {
-            if channels == 1 {
-                px[0] = 0;
-            } else {
-                px.fill(255);
-            }
-        }
-    }
-}
-
 /// What the region-only analysis of a picture proposes (criterion 9).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraceRegionDefaults {

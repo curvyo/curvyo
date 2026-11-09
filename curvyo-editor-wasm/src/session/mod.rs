@@ -226,14 +226,11 @@ mod trace_colours;
 #[cfg(test)]
 mod trace_colours_tests;
 mod trace_draw;
-mod trace_mask;
 mod trace_mask_pick;
 #[cfg(test)]
 mod trace_mask_pick_hit_tests;
 #[cfg(test)]
 mod trace_mask_pick_tests;
-#[cfg(test)]
-mod trace_mask_tests;
 mod trace_mesh;
 mod trace_parts;
 #[cfg(test)]
@@ -337,7 +334,6 @@ pub use text_style::StyleOutcome;
 pub use tiling::TilingStatus;
 pub use tiling_handles::circle_handle;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
-pub use trace_draw::TraceViewMode;
 pub use trace_pick::TracePickMode;
 pub use trace_text_write::TracedText;
 pub use weld::WeldOutcome;

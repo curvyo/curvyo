@@ -350,7 +350,8 @@ half-pixel features are reported only until slice G.
   counts, foreground_pixels, diagnostics }`, `ColourLayer { sample, fixed, pixels, outlines }`,
   `PaletteEntry`, `ColourMask` (RGBA, for the Mask view), `Diagnostics::joined_regions`,
   `MIN_COLOURS`, `MAX_COLOURS`, `DEFAULT_COLOURS`. The label map stays inside the crate.
-  `colour_mask` returns the segmented palette as RGBA (the lead's brief), not a binary union.
+  `colour_mask` returned the segmented palette as RGBA (the lead's brief), not a binary union;
+  it went with the Mask view (§24.1) and left `colour_palette`, the palette alone.
 - **Trial M1:** ours in sRGB passes criterion 26 on every fixture (incl. AA + JPEG 75 and the
   near-greys); Oklab not built; visioncortex was not re-added (removed in D, hash maps).
 - **Shared fit:** each colour loop is a `Chain` with its junction vertices pinned as corners at

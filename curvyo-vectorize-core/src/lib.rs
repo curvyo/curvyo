@@ -59,7 +59,7 @@ pub use analysis::{
 };
 pub use background::{sample_colour, suggest_background};
 pub use colour_trace::{
-    ColourLayer, ColourMask, ColourParams, ColourTrace, PaletteEntry, colour_mask, trace_colours,
+    ColourLayer, ColourParams, ColourTrace, PaletteEntry, colour_palette, trace_colours,
 };
 pub use palette::{DEFAULT_COLOURS, MAX_COLOURS, MIN_COLOURS};
 pub use params::{
@@ -74,6 +74,4 @@ pub use schema::{
     ParamKind, ParamSpec, ParamUnit,
 };
 pub use select::{DEFAULT_BACKGROUND_TOLERANCE, DEFAULT_PICK_TOLERANCE, selected};
-pub use trace::{
-    Counts, Diagnostics, MAX_HOLES_PER_REGION, Mask, TraceError, TraceResult, mask, trace,
-};
+pub use trace::{Counts, Diagnostics, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};

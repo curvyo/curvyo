@@ -1,6 +1,5 @@
 //! `specs/0094-masked-composite-trace` slice 1 in the core: the reference fixtures M1 and M2, the
-//! clip of a trace to a mask region (criteria 2 to 8 and 15), the Mask view's white outside the
-//! region (criterion 10), the region-only analysis (criterion 9) and the text and shape passes
+//! clip of a trace to a mask region (criteria 2 to 8 and 15), the region-only analysis (criterion 9) and the text and shape passes
 //! with a mask (criterion 11, on a synthetic picture with synthetic OCR lines: the reference
 //! poster needs the OCR weights).
 
@@ -13,8 +12,8 @@ use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_ar
 use curvyo_ui_core::{
     OcrLine, TRACE_REGION_TOLERANCE, TraceColourParams, TraceParams, TraceRegion, TraceRegionError,
     TraceRgb, TraceWire, read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
-    trace_job_with, trace_mask_job, trace_region_defaults, trace_suggest_background,
-    trace_text_job_in, trace_text_regions_in, trace_whiten_outside_region, unclipped_notice,
+    trace_job_with, trace_region_defaults, trace_suggest_background, trace_text_job_in,
+    trace_text_regions_in, unclipped_notice,
 };
 use kurbo::{BezPath, PathEl, Shape};
 
@@ -488,40 +487,6 @@ fn c9_remove_background_reads_only_the_region() {
         !paints(&wire.outlines, Point::new(25.0, 50.0)),
         "nothing left of the mask"
     );
-}
-
-#[test]
-fn c10_the_mask_view_is_white_outside_the_region() {
-    let mut mask = trace_mask_job(m1(), SIDE, SIDE, MAP, &params()).unwrap();
-    let at = |mask: &curvyo_vectorize_core::Mask, x: usize, y: usize| {
-        let f = mask.width as usize / SIDE as usize;
-        mask.bits[(y * f) * mask.width as usize + x * f]
-    };
-    assert_eq!(at(&mask, 100, 500), 255, "the disc is content");
-    assert_eq!(at(&mask, 900, 500), 255, "the bar is content");
-    let mut outside = mask.clone();
-    trace_whiten_outside_region(
-        &mut outside.bits,
-        1,
-        mask.width,
-        mask.height,
-        SIDE,
-        MAP,
-        &r1(true),
-    );
-    assert_eq!(at(&outside, 100, 500), 0, "R1 Outside: white inside R1");
-    assert_eq!(at(&outside, 900, 500), 255, "and the tracer's mask outside");
-    trace_whiten_outside_region(
-        &mut mask.bits,
-        1,
-        mask.width,
-        mask.height,
-        SIDE,
-        MAP,
-        &r1(false),
-    );
-    assert_eq!(at(&mask, 900, 500), 0, "R1 Inside: white outside R1");
-    assert_eq!(at(&mask, 100, 500), 255);
 }
 
 /// A 200 x 200 px picture, 1 px per mm: two dark "lines" (bars) at y = 40 and y = 140 and a

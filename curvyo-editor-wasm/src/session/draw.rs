@@ -18,12 +18,10 @@ use super::reference_view::{reference_box_list, reference_marks_list};
 use super::{Session, Tool};
 
 impl Session {
-    /// The artwork of `objects`; with `fill_at`, the Trace view's kept mesh of the result where
-    /// the image was (`specs/0025-raster-trace` criterion 56).
+    /// The artwork of `objects`.
     pub(super) fn artwork_list(
         &self,
         objects: &[ObjectSnapshot],
-        fill_at: Option<usize>,
         guides: &std::collections::HashSet<curvyo_document_core::NodeId>,
         view: ViewTransform,
     ) -> DrawList {
@@ -43,22 +41,12 @@ impl Session {
                 Cow::Borrowed(part)
             }
         }
-        // Entries of shapes gone from the read are dropped once, before either part expands, so
-        // the second part never drops the first part's entries (ADR 0029 §6).
+        // Entries of shapes gone from the read are dropped once, before the pieces expand
+        // (ADR 0029 §6).
         self.patterns
             .borrow_mut()
             .retain_only(&objects.iter().map(ObjectSnapshot::id).collect());
-        let Some(at) = fill_at else {
-            return build_artwork_with_guides(&drawn(self, objects), guides, view);
-        };
-        let mut list = build_artwork_with_guides(&drawn(self, &objects[..at]), guides, view);
-        list.extend(self.trace_fill_mesh(view));
-        list.extend(build_artwork_with_guides(
-            &drawn(self, &objects[at..]),
-            guides,
-            view,
-        ));
-        list
+        build_artwork_with_guides(&drawn(self, objects), guides, view)
     }
 
     /// Builds this frame's draw list from the document's current state,
@@ -137,14 +125,13 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
-        // The Trace tool washes the images it traces or shows its result filled, by its view
-        // (`specs/0025-raster-trace` criteria 2, 51, 68).
-        let fill_at = (self.tool == Tool::Trace)
-            .then(|| self.trace_artwork(artwork_objects.to_mut()))
-            .flatten();
+        // The Trace tool washes the images it traces (`specs/0025-raster-trace` criteria 2, 68).
+        if self.tool == Tool::Trace {
+            self.trace_artwork(artwork_objects.to_mut());
+        }
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);
-        let mut list = self.artwork_list(&artwork_objects, fill_at, &guides, view);
+        let mut list = self.artwork_list(&artwork_objects, &guides, view);
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));
         list.extend(self.kept_point_list());

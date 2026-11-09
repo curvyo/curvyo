@@ -35,20 +35,12 @@ pub(super) struct MeshFrame {
 }
 
 impl MeshCache {
-    /// The kept mesh when this frame can draw it, else `build` (which returns the mesh and the
-    /// area it covers) kept for the next frames. A moving view draws the kept mesh at any zoom
-    /// and offset, so a pan or zoom never tessellates; once it rests, a mesh of another zoom, or
-    /// one that does not cover the visible part, is made again.
-    pub(super) fn draw(
-        &self,
-        frame: MeshFrame,
-        build: impl FnOnce() -> (DrawList, Option<(Point, Point)>),
-    ) -> DrawList {
-        self.with(frame, build, DrawList::clone)
-    }
-
-    /// [`MeshCache::draw`] handing the mesh to `read` instead of a copy: an overlay mesh of a
-    /// hundred thousand nodes is tens of megabytes, copied once into the frame, not twice.
+    /// Hands `read` the kept mesh when this frame can draw it, else the one `build` (which
+    /// returns the mesh and the area it covers) makes and keeps for the next frames. A moving
+    /// view draws the kept mesh at any zoom and offset, so a pan or zoom never tessellates; once
+    /// it rests, a mesh of another zoom, or one that does not cover the visible part, is made
+    /// again. An overlay mesh of a hundred thousand nodes is tens of megabytes: `read` sees it
+    /// in place, it is not copied.
     pub(super) fn with<R>(
         &self,
         frame: MeshFrame,
@@ -115,20 +107,20 @@ mod tests {
                 Some((Point::new(-10.0, -10.0), Point::new(20.0, 20.0))),
             )
         };
-        cache.draw(frame(1.0, false), build);
-        cache.draw(frame(1.0, false), build);
+        cache.with(frame(1.0, false), build, |_| ());
+        cache.with(frame(1.0, false), build, |_| ());
         assert_eq!(builds.get(), 1, "same zoom, inside the area");
-        cache.draw(frame(2.0, true), build);
+        cache.with(frame(2.0, true), build, |_| ());
         assert_eq!(builds.get(), 1, "a zoom in motion draws the kept mesh");
-        cache.draw(frame(2.0, false), build);
+        cache.with(frame(2.0, false), build, |_| ());
         assert_eq!(builds.get(), 2, "at rest the new zoom is tessellated");
         let mut far = frame(2.0, false);
         far.visible = Some((Point::new(50.0, 50.0), Point::new(60.0, 60.0)));
-        cache.draw(far, build);
+        cache.with(far, build, |_| ());
         assert_eq!(builds.get(), 3, "a rested pan past the area");
         let mut stale = frame(2.0, true);
         stale.stale = true;
-        cache.draw(stale, build);
+        cache.with(stale, build, |_| ());
         assert_eq!(builds.get(), 4, "a change of strength always");
     }
 }

@@ -3,7 +3,7 @@
 //! main trace walks the filled picture, and the accepted lines follow the outlines.
 
 use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Mask as TraceMask, Rgb8, TraceParams};
+use curvyo_vectorize_core::{Rgb8, TraceParams};
 use kurbo::{BezPath, Vec2};
 
 use crate::trace_ocr::OcrLine;
@@ -11,7 +11,7 @@ use crate::trace_region::TraceRegion;
 use crate::trace_text::TextPass;
 use crate::trace_text::text_pass;
 use crate::trace_transfer::{
-    TraceStatus, count, read_outlines, status_only, trace_job_in, trace_mask_job, write_outline,
+    TraceStatus, count, read_outlines, status_only, trace_job_in, write_outline,
 };
 
 /// The number that opens the text section (no count is negative).
@@ -24,9 +24,6 @@ const FILL_MARK: f64 = -2.0;
 /// The number that opens the excluded lines after the fills (their count and places); absent when
 /// the maker excluded none of the lines' fills.
 const EXCLUDED_MARK: f64 = -3.0;
-
-/// The level of a left-out pixel in the Mask view (UX notes §2: flat mid grey).
-pub const LEFT_OUT_LEVEL: u8 = 128;
 
 /// One accepted line of a result.
 #[derive(Debug, Clone, PartialEq)]
@@ -227,45 +224,6 @@ pub fn trace_text_regions_in(
     wire
 }
 
-/// The mask the trace of the same arguments walks (`specs/0089` criterion 21), the pixels the
-/// text pass leaves out at [`LEFT_OUT_LEVEL`] (UX notes §2); without lines exactly
-/// [`trace_mask_job`].
-#[must_use]
-pub fn trace_text_mask_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &TraceParams,
-    lines: &[OcrLine],
-) -> Option<TraceMask> {
-    if lines.is_empty() {
-        return trace_mask_job(rgba, width, height, pixel_map, params);
-    }
-    let pass = text_pass(
-        rgba,
-        width,
-        height,
-        Affine::from_array(pixel_map),
-        params,
-        lines,
-    );
-    let mut mask = trace_mask_job(&pass.rgba, width, height, pixel_map, params)?;
-    let (w, mw) = (width as usize, mask.width as usize);
-    let factor = (mw / w.max(1)).max(1);
-    for (i, _) in pass.left_out.iter().enumerate().filter(|(_, out)| **out) {
-        let (x, y) = (i % w, i / w);
-        for dy in 0..factor {
-            for dx in 0..factor {
-                if let Some(bit) = mask.bits.get_mut((y * factor + dy) * mw + x * factor + dx) {
-                    *bit = LEFT_OUT_LEVEL;
-                }
-            }
-        }
-    }
-    Some(mask)
-}
-
 /// The text section at the start of `tail` (it starts with [`TEXT_MARK`]) and the numbers it
 /// took; `None` unless it is well formed.
 pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
@@ -417,15 +375,5 @@ mod tests {
         );
         let read = read_trace_wire(&plain).unwrap();
         assert_eq!(read.texts, TraceTexts::default());
-    }
-
-    #[test]
-    fn the_mask_shows_left_out_pixels_grey() {
-        let params = TraceParams::with_threshold(128);
-        let mask = trace_text_mask_job(&picture(), 40, 20, MAP, &params, &[line("I")]).unwrap();
-        let factor = (mask.width / 40) as usize;
-        let at = |x: usize, y: usize| mask.bits[(y * factor) * mask.width as usize + x * factor];
-        assert_eq!(at(20, 10), LEFT_OUT_LEVEL);
-        assert_eq!(at(2, 2), 0);
     }
 }
