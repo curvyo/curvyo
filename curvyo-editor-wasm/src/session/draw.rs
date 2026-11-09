@@ -73,6 +73,9 @@ impl Session {
     pub fn draw_list(&self) -> DrawList {
         if self.workbench() == super::Workbench::Sketch {
             let mut list = self.sketch_draw_list();
+            // Drawing objects selected over the sketch page: the box and handles of `0019`
+            // (`specs/0106` criterion 7).
+            list.extend(self.sketch_page_drawing_overlay());
             // A sketch row dragged onto the canvas: its ghost over everything (`specs/0099`).
             list.extend(self.row_drag_ghost_list());
             list.extend(self.clone_drop_ghost_list());

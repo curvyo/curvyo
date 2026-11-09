@@ -67,7 +67,7 @@ impl Session {
         let Some((source, step, shown_id)) = target else {
             return CloneOutcome::Refused;
         };
-        let result = self.recording(|this| {
+        let result = self.recording_unguarded(|this| {
             let minter = &mut this.minter;
             this.document
                 .clone_version(source, step, &mut || minter.mint())
@@ -131,7 +131,7 @@ impl Session {
         // ends text edit mode and writes its one step (`specs/0074-text-objects` criteria 7, 9).
         self.finish_text_edit();
         self.end_history_preview();
-        let result = self.recording(|this| {
+        let result = self.recording_unguarded(|this| {
             let result = this.document.go_to_version(step, subject, source);
             // An apply can remove a selected object: the selection keeps only what exists, as
             // after an undo of a draw.

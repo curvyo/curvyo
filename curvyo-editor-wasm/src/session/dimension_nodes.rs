@@ -62,7 +62,8 @@ impl Session {
         let Some((id, index, _)) = self.kept_point_drag.take() else {
             return false;
         };
-        let _ = self.recording(|this| this.document.move_dimension_point(id, index, point));
+        let _ =
+            self.recording_unguarded(|this| this.document.move_dimension_point(id, index, point));
         true
     }
 

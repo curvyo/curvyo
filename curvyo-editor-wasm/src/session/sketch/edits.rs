@@ -168,7 +168,7 @@ impl Session {
         &mut self,
         delta: &SketchDelta,
     ) -> Result<bool, SketchEditError> {
-        let result = self.recording(|this| {
+        let result = self.recording_unguarded(|this| {
             this.sync_sketch_page();
             if let Some(id) = this.active_sketch() {
                 this.sketch_snapshot_for_edit()?;

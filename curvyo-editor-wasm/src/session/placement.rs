@@ -348,7 +348,7 @@ impl Session {
     /// with the first invalid field (criterion 23). Returns whether a shape was placed. A layer
     /// locked or hidden meanwhile ends the placement with the notice and writes nothing.
     pub fn place_placement(&mut self) -> bool {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let live = this.placement_live();
             let settings = this.poly_star.settings();
             let unit = this.display_unit();

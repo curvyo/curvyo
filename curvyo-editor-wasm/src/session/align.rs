@@ -145,7 +145,7 @@ impl Session {
         let on_page = reference.on_page();
         let (key, page) = (self.key_object, self.active_page_box());
         let units = self.press_units(reference);
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let objects = this.objects();
             let all = this.units();
             let input = AlignInput {
@@ -180,7 +180,7 @@ impl Session {
         let gap = gap_mm.map(Length::from_mm);
         let page = self.active_page_box();
         let units = self.press_units(reference);
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let objects = this.objects();
             let all = this.units();
             let input = AlignInput {
@@ -204,7 +204,7 @@ impl Session {
         if !self.ready_for_bar_command() {
             return AlignOutcome::NothingSelected;
         }
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let objects = this.objects();
             let all = this.units();
             let input = AlignInput {

@@ -137,11 +137,12 @@ fn the_sketch_select_never_takes_a_drawing_object_over_its_page() {
     let rect = rect_at(&mut s, x, y, 30.0, 20.0);
     s.activate_page(&sketch_page);
     click(&mut s, Point::new(x, y + 10.0));
-    assert!(!s.selection.ids().contains(&rect));
-    assert!(
-        s.selection.ids().iter().all(|&id| id == sketch),
-        "only the sketch is the sketch workbench's object"
-    );
+    // Amended by `specs/0106` criterion 3: off sketch geometry the press selects the drawing
+    // object move-only, never together with the sketch, and the sketch page stays active.
+    assert_eq!(s.selection.ids(), [rect]);
+    assert!(!s.selection.ids().contains(&sketch));
+    assert_eq!(s.active_page().id, sketch_page);
+    assert_eq!(s.edit_scope(), curvyo_ui_core::Scope::MoveOnly);
 }
 
 #[test]

@@ -281,7 +281,7 @@ impl Session {
             let place = self.measure_place(&measuring, pointer);
             let value =
                 curvyo_document_core::measure(measuring.kind, &measuring.points, place.sector);
-            let placed = self.recording(|this| {
+            let placed = self.recording_unguarded(|this| {
                 this.document
                     .add_dimension(measuring.kind, measuring.slots, place)
             });

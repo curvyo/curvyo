@@ -28,7 +28,7 @@ impl Session {
         if self.selection_is_texts_on_path() && self.flip_text_paths() {
             return FlipOutcome::Flipped;
         }
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let objects = this.objects();
             flip_selection(&this.document, &objects, &this.selection, axis)
         })

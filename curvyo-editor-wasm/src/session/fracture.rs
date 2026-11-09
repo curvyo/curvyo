@@ -12,10 +12,11 @@ use super::Session;
 use super::refusal::RefusalMarks;
 
 /// What [`Session::apply_fracture`] or [`Session::apply_flatten`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum StackOutcome {
     /// Nothing: the Select tool is not active, a drag is in flight or a typed entry is open, or
     /// the write could not be made.
+    #[default]
     Ignored,
     /// Operands were replaced or removed.
     Applied {

@@ -123,7 +123,8 @@ impl Session {
     /// The topmost pickable text whose line box holds `point` (criterion 25).
     pub(super) fn text_at(&self, point: Point) -> Option<TextSnapshot> {
         let tolerance = self.object_tolerance().as_mm();
-        self.pickable_objects()
+        // A text out of context is empty canvas to the Text tool (`specs/0106` criterion 10).
+        self.edit_targets()
             .iter()
             .rev()
             .find_map(|object| match object {
@@ -254,12 +255,12 @@ impl Session {
     /// Ends edit mode (Escape, a click outside, a tool switch): one step "Add text" or "Edit
     /// text", or none. Returns whether edit mode was on.
     pub fn finish_text_edit(&mut self) -> bool {
-        self.recording(Self::finish_text_edit_inner)
+        self.recording_unguarded(Self::finish_text_edit_inner)
     }
 
     /// Writes the session as its step and edit mode goes on (a Save in edit mode, UX notes §2).
     pub fn checkpoint_text_edit(&mut self) {
-        self.recording(Self::checkpoint_text_edit_inner);
+        self.recording_unguarded(Self::checkpoint_text_edit_inner);
     }
 
     /// [`Session::checkpoint_text_edit`] inside a command that records.

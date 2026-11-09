@@ -111,7 +111,8 @@ fn ac45_linked_clone_and_unlink_of_ten_thousand() {
     assert_eq!(session.selected_object_count(), COUNT);
     let (made, took) = cpu_time_of(|| session.linked_clone());
     check(&format!("Linked clone of {COUNT}"), took, COMMAND_BUDGET);
-    assert_eq!(made.notice, format!("Created {COUNT} linked clones."));
+    // No notice after a success (customer rule 2026-10-31, `specs/0106` UX review).
+    assert_eq!(made.notice, "");
     let (unlinked, took) = cpu_time_of(|| session.unlink_clones());
     check(&format!("Unlink clone of {COUNT}"), took, COMMAND_BUDGET);
     assert_eq!(unlinked.notice, format!("Unlinked {COUNT} clones."));

@@ -54,7 +54,7 @@ impl Session {
     /// one place among its siblings, one step (`move_nodes`, criterion 32's rules), announced
     /// as Alt+Up and Alt+Down are.
     pub fn step_layer_target(&mut self, how: Reorder) -> PanelReply {
-        self.panel_action(|this| {
+        self.panel_edit(|this| {
             this.panel.fresh_layer = None;
             let targets = this.panel_targets();
             if targets.is_empty() {

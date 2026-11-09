@@ -14,10 +14,11 @@ use super::Session;
 use super::refusal::RefusalMarks;
 
 /// What [`Session::apply_stroke_to_path`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum StrokeToPathOutcome {
     /// Nothing: no subject, the Select tool is not active, a drag is in flight or a typed entry
     /// is open, or the write could not be made.
+    #[default]
     Ignored,
     /// Strokes became filled outlines.
     Applied {

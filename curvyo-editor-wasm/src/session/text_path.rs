@@ -7,9 +7,10 @@ use curvyo_ui_core::TextRefusal;
 use super::Session;
 
 /// What Object to path did, for its notice.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ObjectToPathOutcome {
     /// Nothing to convert, or the tool is not ready.
+    #[default]
     Ignored,
     /// Converted.
     Converted,

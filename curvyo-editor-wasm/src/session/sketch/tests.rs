@@ -41,7 +41,8 @@ fn construction_commits_only_explicit_records_and_clone_reentry_routes_original(
     assert_eq!(session.undo_len(), 2);
     let graph = session.document.sketch(id).unwrap().graph;
     assert_eq!(graph.entities.len(), 9);
-    let clone = session.recording(|this| this.document.linked_clone(&[id], &[]).unwrap()[0]);
+    let clone =
+        session.recording_unguarded(|this| this.document.linked_clone(&[id], &[]).unwrap()[0]);
     assert!(session.enter_sketch(clone));
     assert_eq!(session.active_sketch(), Some(id));
     assert!(matches!(

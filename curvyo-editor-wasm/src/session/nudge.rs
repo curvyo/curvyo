@@ -29,7 +29,7 @@ impl Session {
     /// One arrow-key event: the selection moves by the event's distance in one
     /// `translate_objects` commit, or nothing happens and the maker is told why.
     pub(super) fn nudge_selection(&mut self, event: NudgeEvent) -> KeyOutcome {
-        self.recording(|this| this.nudge_in_run(event))
+        self.recording_unguarded(|this| this.nudge_in_run(event))
     }
 
     fn nudge_in_run(&mut self, event: NudgeEvent) -> KeyOutcome {

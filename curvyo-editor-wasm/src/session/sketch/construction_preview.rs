@@ -177,7 +177,7 @@ impl Session {
     /// # Errors
     /// Rejects missing previews or a revision changed since preview construction.
     pub fn sketch_commit_preview(&mut self) -> Result<bool, SketchEditError> {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let snapshot = this.sketch_snapshot_for_edit()?;
             let preview = this
                 .sketch

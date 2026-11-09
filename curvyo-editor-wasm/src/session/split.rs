@@ -12,10 +12,11 @@ use super::Session;
 use super::refusal::RefusalMarks;
 
 /// What [`Session::apply_split`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum SplitOutcome {
     /// Nothing: the Select tool is not active, a drag is in flight or a typed entry is open, or
     /// the write could not be made.
+    #[default]
     Ignored,
     /// Compound paths were replaced by their parts.
     Applied {
@@ -33,9 +34,10 @@ pub enum SplitOutcome {
 }
 
 /// What [`Session::apply_break_apart`] did.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum BreakApartOutcome {
     /// Nothing, as for [`SplitOutcome::Ignored`].
+    #[default]
     Ignored,
     /// Compound paths were replaced by one path per outline.
     Applied {

@@ -34,7 +34,7 @@ pub struct TextBarView {
 }
 
 /// What a typed or stepped size did (criterion 12).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextSizeOutcome {
     /// Set as typed.
     Set,
@@ -43,6 +43,7 @@ pub enum TextSizeOutcome {
     /// Set to the smallest size: "Size set to 0.1 mm, the smallest size."
     ClampedToMin,
     /// Not a number.
+    #[default]
     Invalid,
 }
 

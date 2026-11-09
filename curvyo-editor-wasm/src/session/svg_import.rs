@@ -189,7 +189,7 @@ impl Session {
         let name = import_layer_name(file_name);
         self.cache_pictures(&import);
         let (layer, _) = self
-            .recording(|this| {
+            .recording_unguarded(|this| {
                 let inserted =
                     this.document
                         .insert_drawing(&name, &import.nodes, &ids, &import.assets);

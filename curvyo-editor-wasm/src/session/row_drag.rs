@@ -348,7 +348,8 @@ impl Session {
             at.x - out.origin.x - src.size.width.as_mm() / 2.0,
             at.y - out.origin.y - src.size.height.as_mm() / 2.0,
         ));
-        let placed = self.recording(|this| this.document.place_page(laser, source, matrix).ok());
+        let placed =
+            self.recording_unguarded(|this| this.document.place_page(laser, source, matrix).ok());
         let Some(id) = placed else {
             return false;
         };
@@ -389,8 +390,8 @@ impl Session {
         self.leave_to_level(0);
         self.selection.clear();
         self.document.set_draw_parent(self.draw_parent(None));
-        let placed =
-            self.recording(|this| this.document.place_linked_clone(sketch, translation).ok());
+        let placed = self
+            .recording_unguarded(|this| this.document.place_linked_clone(sketch, translation).ok());
         let Some(clone) = placed else {
             return false;
         };

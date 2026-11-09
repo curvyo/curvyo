@@ -15,8 +15,9 @@ use curvyo_ui_core::{
 use super::shapes::LiveReadout;
 use super::{Session, Tool};
 
-/// What the end-node index was built for: the document read and the entered group.
-type EndIndexKey = (DocumentVersion, Option<NodeId>);
+/// What the end-node index was built for: the document read, the entered group and the active
+/// page, whose context decides which paths are targets (`specs/0106` criterion 10).
+type EndIndexKey = (DocumentVersion, Option<NodeId>, String);
 
 /// What the Pen caches and remembers between events (`specs/0034-pen-path-extension`): the index
 /// of the end nodes of open paths, rebuilt only when the document changes (criterion 24), and the
@@ -63,7 +64,7 @@ impl Session {
         self.end_snapping_drag();
         // A finish closes an open entry chip without adding (`0072` criterion 22).
         self.cancel_pen_entry();
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.pen.finish(&this.document);
         });
     }
@@ -114,7 +115,11 @@ impl Session {
     /// document changed since it was built.
     pub(super) fn with_end_index<R>(&self, f: impl FnOnce(&EndNodeIndex) -> R) -> R {
         // Only the open paths of the entered group are targets (`0023` criterion 30).
-        let key = (self.document.version(), self.context_group());
+        let key = (
+            self.document.version(),
+            self.context_group(),
+            self.active_page().id,
+        );
         let mut cache = self.pen_cue.ends.borrow_mut();
         if cache.as_ref().is_none_or(|(held, _)| *held != key) {
             // Only open paths that are direct children of the context are targets, so a path

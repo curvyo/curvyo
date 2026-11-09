@@ -23,9 +23,10 @@ pub(super) struct Pick {
 }
 
 /// What a press of On path did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextPathPress {
     /// Nothing: no single text is the subject.
+    #[default]
     Ignored,
     /// Pick mode started.
     Picking,

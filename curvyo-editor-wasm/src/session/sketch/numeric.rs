@@ -160,7 +160,7 @@ impl Session {
     /// Refuses missing/invalid geometry or a failed document conversion.
     pub fn sketch_convert_to_path(&mut self) -> Result<(), SketchEditError> {
         let page = self.active_page().id;
-        let (id, whole_page) = self.recording(|this| {
+        let (id, whole_page) = self.recording_unguarded(|this| {
             let snapshot = this.sketch_snapshot_for_edit()?;
             let ids = snapshot
                 .resolved

@@ -83,6 +83,8 @@ struct RowsKey {
     active: Option<NodeId>,
     entered: Option<NodeId>,
     unit: curvyo_document_core::DisplayUnit,
+    /// The active laser page whose own tree the list shows (`specs/0106` criterion 17).
+    laser: Option<String>,
 }
 
 impl PartialEq for RowsKey {
@@ -93,6 +95,7 @@ impl PartialEq for RowsKey {
             && self.active == other.active
             && self.entered == other.entered
             && self.unit == other.unit
+            && self.laser == other.laser
     }
 }
 
@@ -106,7 +109,7 @@ pub(super) struct PanelState {
     /// layer (criterion 13).
     pub(super) target_layer: bool,
     /// The selection was last made from the list: no automatic scroll (criterion 12).
-    from_list: bool,
+    pub(super) from_list: bool,
     /// The first selected object the list last scrolled to.
     scrolled_to: Option<NodeId>,
     /// The row the host should scroll into view, until it takes it.
@@ -146,6 +149,8 @@ impl Session {
             active: self.active_layer(),
             entered: self.context_group(),
             unit: self.document.display_unit(),
+            laser: matches!(self.workbench(), super::Workbench::Manufacturing(_))
+                .then(|| self.active_page().id),
         };
         if let Some((held, rows)) = self.panel.rows.borrow().as_ref()
             && *held == key
@@ -153,18 +158,18 @@ impl Session {
             return Arc::clone(rows);
         }
         let selected: HashSet<NodeId> = key.selected.iter().copied().collect();
-        let rows = Arc::new(
-            LayerRows::build(
-                &key.nodes,
-                &key.expansion,
-                RowFacts {
-                    selected: &selected,
-                    active_layer: key.active,
-                    entered: key.entered,
-                },
-            )
-            .with_dimension_unit(&key.nodes, key.unit),
-        );
+        let facts = RowFacts {
+            selected: &selected,
+            active_layer: key.active,
+            entered: key.entered,
+        };
+        // A laser page lists its own tree, every other page the document's layers (Frage 166 A).
+        let rows = if key.laser.is_some() {
+            self.laser_page_rows(&key.nodes, &key.expansion, facts)
+        } else {
+            LayerRows::build(&key.nodes, &key.expansion, facts)
+        };
+        let rows = Arc::new(rows.with_dimension_unit(&key.nodes, key.unit));
         *self.panel.rows.borrow_mut() = Some((key, Arc::clone(&rows)));
         rows
     }
@@ -228,12 +233,21 @@ impl Session {
             .selected_units()
             .first()
             .and_then(|&id| self.shown_row_of(&rows, id));
-        let window: Vec<Value> = rows
-            .window(first, count)
+        let shown = rows.window(first, count);
+        // A row of an object on another page says where it lies (`specs/0106` UX notes §5); a
+        // laser page's own tree holds its own objects only.
+        let home_lines = if matches!(self.workbench(), super::Workbench::Manufacturing(_)) {
+            vec![String::new(); shown.len()]
+        } else {
+            let ids: Vec<NodeId> = shown.iter().map(|row| row.id).collect();
+            self.home_row_lines(&ids)
+        };
+        let window: Vec<Value> = shown
             .iter()
             .enumerate()
             .map(|(offset, row)| {
                 let mut json = row_json(row, first + offset);
+                json["homeLine"] = Value::from(home_lines[offset].clone());
                 // The trace group's tooltip repeats the success notice (`0025` criteria 30, 68).
                 json["traced"] = self
                     .traced_counts(row.id)
@@ -249,6 +263,8 @@ impl Session {
             "canDeleteLayer": self.active_layer().is_some(),
             "toolbar": self.layer_toolbar_json(),
             "firstSelected": first_selected,
+            // A laser page lists its own tree: no layer to add (`specs/0106` UX notes §5).
+            "laserTree": matches!(self.workbench(), super::Workbench::Manufacturing(_)),
             "rows": window,
         })
         .to_string()
@@ -306,11 +322,23 @@ impl Session {
         if self.pen_path_unfinished() {
             return PanelReply::Hint(FINISH_PEN_FIRST.to_owned());
         }
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             let reply = action(this);
             this.sync_context();
             reply
         })
+    }
+
+    /// [`Session::panel_action`] for a panel edit of the selection (rename, opacity, reorder): a
+    /// move-only selection is refused with the notice of `specs/0106` criterion 9.
+    pub(super) fn panel_edit(
+        &mut self,
+        action: impl FnOnce(&mut Self) -> PanelReply,
+    ) -> PanelReply {
+        if let Some(notice) = self.not_editable() {
+            return PanelReply::Refusal(notice);
+        }
+        self.panel_action(action)
     }
 
     /// A press on the row `id` (criteria 10, 11, 13 and 14).
@@ -324,6 +352,9 @@ impl Session {
                 this.press_layer(id);
                 return PanelReply::Quiet;
             }
+            if this.press_placed_page_row(id) {
+                return PanelReply::Quiet;
+            }
             let read = this.document_read();
             let Some(node) = read.nodes.iter().find(|node| node.id == id) else {
                 return PanelReply::Quiet;
@@ -335,6 +366,7 @@ impl Session {
             if this.press_fixed_sketch_row(id) {
                 return PanelReply::Quiet;
             }
+
             let rows = this.layer_rows();
             this.press_object(id, press, &rows);
             PanelReply::Quiet
@@ -511,6 +543,10 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         "chainLine": row.chain_line,
         "overridesLine": row.overrides_line,
         "refusal": row_refusal(row).unwrap_or(""),
+        // A laser page's tree (`specs/0106` criteria 17 to 19): the placed page a row is shown
+        // through, read-only inner rows, and the rows that are no document node.
+        "via": row.via,
+        "readOnly": row.read_only,
         "rowAction": match row.kind {
             RowKind::Layer => "select-contents",
             // `0050` criterion 38: a clone row's action is Select original (`0049`).

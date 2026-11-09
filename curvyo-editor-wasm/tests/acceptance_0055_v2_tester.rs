@@ -387,7 +387,8 @@ fn the_node_tool_edits_the_source_of_a_clone_of_a_compound_path_and_the_clone_fo
     let mut s = session_of(&d, Tool::Select);
     assert_eq!(key(&mut s, "a", true), KeyOutcome::SelectedAll);
     let made = s.linked_clone();
-    assert_eq!(made.notice, "Created 1 linked clone.");
+    // No notice after a success (customer rule 2026-10-31, `specs/0106` UX review).
+    assert_eq!(made.notice, "");
     s.set_tool(Tool::Node);
     assert!(s.node_selection_is_clones(), "only the clone is selected");
     assert!(s.node_toolbar_state().clone_only);

@@ -41,6 +41,7 @@ impl Session {
     /// there, else Document) and the Sketch workbench enters the page's sketch. Not a history
     /// step; nothing is written.
     pub(in crate::session) fn sync_workbench(&mut self) {
+        self.note_active_drawing_page();
         let to = self.workbench();
         let from = self.sketch.workbench;
         if to != from {
@@ -125,7 +126,7 @@ impl Session {
         if let Some(id) = self.document.page_sketch(&self.active_page().id) {
             return Ok(id);
         }
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             if let Some(layer) = this.active_layer()
                 && this.document_read().inert.contains(&layer)
             {

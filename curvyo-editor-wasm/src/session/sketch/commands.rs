@@ -29,7 +29,7 @@ impl Session {
         relations: &[(ConstraintId, Constraint)],
         joins: &[(curvyo_sketch_core::Position, curvyo_sketch_core::EntityId)],
     ) -> Result<bool, SketchEditError> {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             this.sync_sketch_page();
             let base = this.sketch_creation_base()?;
             let version = this.document.version();

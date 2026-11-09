@@ -89,7 +89,7 @@ impl Session {
         reference: ReferencePoint,
     ) -> EntryOutcome {
         // Recorded as one step of the maker's, like the Enter of the same chip.
-        self.recording(|this| -> EntryOutcome {
+        self.recording_unguarded(|this| -> EntryOutcome {
             if this.reference_entry().is_none() {
                 this.select.cancel_entry();
                 return EntryOutcome::Unchanged;

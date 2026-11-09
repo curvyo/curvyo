@@ -37,7 +37,10 @@ fn ac1_2_5_linked_clone_converts_a_shape_selects_the_clones_and_says_so() {
     assert!(session.linked_clone_shown());
     let result = session.linked_clone();
     assert_eq!(result.kind, CloneKind::Done);
-    assert_eq!(result.notice, "Created 2 linked clones.");
+    assert_eq!(
+        result.notice, "",
+        "no notice after a success (customer rule 2026-10-31)"
+    );
     assert_eq!(kind_of(&session, a), "path", "converted silently");
     let ids = session.document.object_ids();
     assert_eq!(ids.len(), 4);
@@ -381,7 +384,7 @@ fn ac17_a_refused_root_edit_names_the_clone() {
         )
         .unwrap();
     let far = AnchorId::new(1, 1);
-    let refused = session.recording(|this| {
+    let refused = session.recording_unguarded(|this| {
         this.document
             .move_anchors(&[(o, far, Point::new(10.0, 0.0))])
     });

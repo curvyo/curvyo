@@ -75,9 +75,10 @@ struct Cached {
 }
 
 /// What a release or the chip's Enter did (criterion 24).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum OffsetOutcome {
     /// Nothing: no drag, a distance of 0, or no operand.
+    #[default]
     Ignored,
     /// Written in one commit; the results are selected.
     Applied {
@@ -257,7 +258,8 @@ impl Session {
             return;
         }
         let objects = self.objects();
-        let pickable = self.pickable_objects();
+        // An object out of context is no operand (`specs/0106` criterion 10).
+        let pickable = self.edit_targets();
         let tolerance = self.object_tolerance();
         if let Some(&hit) = hit_test_objects(&pickable, point, tolerance).first() {
             let units = self.units();

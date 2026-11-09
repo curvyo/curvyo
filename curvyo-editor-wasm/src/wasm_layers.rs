@@ -30,6 +30,11 @@ impl WasmSession {
             .layers_view_json(first as usize, count as usize)
     }
 
+    /// The Fixtures row's eye of a laser page's tree (`specs/0106` criterion 17).
+    pub fn set_layer_fixtures_shown(&mut self, shown: bool) -> bool {
+        self.session.set_layer_fixtures_shown(shown)
+    }
+
     /// The subject line of the Layers tab.
     #[must_use]
     pub fn layers_subject(&self) -> String {

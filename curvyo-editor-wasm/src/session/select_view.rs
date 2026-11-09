@@ -34,7 +34,7 @@ impl Session {
     /// where the result equals the committed objects. The cached
     /// The cached `held` modifiers let this be read at render time.
     pub(super) fn select_live_edit_in(&self, objects: &[ObjectSnapshot]) -> Option<LiveEdit> {
-        if self.tool != Tool::Select {
+        if !self.select_box_tool() {
             return None;
         }
         let cursor = self.pointer_position?;
@@ -153,7 +153,7 @@ impl Session {
         if self.tool == Tool::Trace && self.trace_mask_pick() {
             return self.trace_mask_pick_decoration(objects, history_hovered);
         }
-        if self.tool != Tool::Select {
+        if !self.select_box_tool() {
             return SelectDecorationInput {
                 history_hovered,
                 ..SelectDecorationInput::default()
@@ -300,7 +300,7 @@ impl Session {
         if let Some(handles) = self.text_path_handles() {
             return handles;
         }
-        if self.tool != Tool::Select {
+        if !self.select_box_tool() {
             return TransformDecorationInput::default();
         }
         let tolerances = self.transform_handle_tolerances();

@@ -36,6 +36,13 @@ pub struct CloneResult {
     pub notice: String,
 }
 
+impl Default for CloneResult {
+    /// A refused or ignored command: nothing happened, no notice.
+    fn default() -> Self {
+        Self::ignored()
+    }
+}
+
 impl CloneResult {
     pub(super) fn ignored() -> Self {
         Self {
@@ -93,7 +100,7 @@ impl Session {
     /// the clones selected; shapes are converted to paths first. A selected clone eight levels
     /// deep refuses all of it and outlines the offenders.
     pub fn linked_clone(&mut self) -> CloneResult {
-        self.recording(|this| {
+        self.recording_unguarded(|this| {
             if !this.rail_command_ready() {
                 return CloneResult::ignored();
             }
@@ -126,7 +133,8 @@ impl Session {
                         this.node.clear_selection();
                         this.selection.set(&clones);
                         this.hovered_object = None;
-                        CloneResult::done(format!("Created {}.", linked(clones.len())))
+                        // No notice after a success (customer rule 2026-10-31).
+                        CloneResult::done(String::new())
                     }
                     Err(CloneError::TooDeep(offenders)) => {
                         this.command_refusal = Some(RefusalMarks::new(offenders, &this.selection));
@@ -348,7 +356,7 @@ impl Session {
     /// the notice for the host ([`Session::take_orphan_notice`]).
     pub(super) fn remove_orphans_after_open(&mut self) {
         let _ = self.document.take_clone_repair();
-        let removed = self.recording(|this| this.document.remove_orphan_clones());
+        let removed = self.recording_unguarded(|this| this.document.remove_orphan_clones());
         let mut parts = Vec::new();
         match removed {
             0 => {}
@@ -422,12 +430,4 @@ impl Session {
                 .iter()
                 .all(|object| matches!(object, ObjectSnapshot::Clone(_)))
     }
-}
-
-/// "1 linked clone" / "3 linked clones".
-fn linked(count: usize) -> String {
-    format!(
-        "{count} linked {}",
-        if count == 1 { "clone" } else { "clones" }
-    )
 }
