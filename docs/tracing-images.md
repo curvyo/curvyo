@@ -76,12 +76,12 @@ change with it (it is remembered, like each method's Colour tolerance):
   including the soft edge toward the background, so pale colours and near-greys can be traced on
   their own. The pipette is armed on choosing the method; a click on the image picks its colour (it
   replaces the picked ones), **Shift+click** adds one (up to 8); the pipette stays armed until Esc
-  or a press on its button. Beside the pipette the bar says how many colours are picked ("3 picked",
-  "None picked"); the swatches themselves are shown once, in the Advanced block, where a click
-  selects one and its Remove button takes it out; Delete removes the focused swatch. Picked colours
-  that touch become one shape. The picked colours belong to this use of the tool and are not
-  remembered. With none the Trace button is dimmed and its tooltip gives the reason, "0 paths: no
-  colour picked."
+  or a press on its button. The picked colours sit beside the pipette as small swatches, in the
+  order you picked them; pointing at one shows its colour code ("#3366CC") and an x, and a click
+  takes the colour out (Delete, Backspace, Enter or Space on the focused swatch do the same; the
+  arrows move between them). Picked colours that touch become one shape. The picked colours belong
+  to this use of the tool and are not remembered. With none nothing is traced, and the Trace button
+  is dimmed; its tooltip gives the reason, "0 paths: no colour picked."
 
 **Colour tolerance** (0 to 100; 40 for Remove background, 19 for Pick colours at first use): how far
 a colour may be from the background or a picked colour and still count as it; it grows with the
@@ -137,8 +137,7 @@ Several selected images use the shown image's analysis.
   changes; long straight edges become single lines.
 - **Ignore below** (specks, 0 to 10 mm, default 0.5 mm): shapes and holes smaller than a square of
   this side are dropped (a speck becomes background, a small hole is filled). The size is measured
-  on the placed image in millimetres; the muted readout gives it in image pixels ("0.50 mm  ~ 2
-  px"). Dark pixels that touch only at a corner count as one shape, so a thin diagonal line stays
+  on the placed image in millimetres. Dark pixels that touch only at a corner count as one shape, so a thin diagonal line stays
   one path.
 
 The fields work like every value field of the app: a click sets the value at the pointer, a drag
@@ -353,11 +352,12 @@ Ignore below join the neighbouring colour they share the longest border with (a 
 hears "2 regions joined"). With Brightness the pipette after the field adds a colour you pick to the
 palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there is
 selected instead ("Same as #3366CC"). With Pick colours the palette is exactly the picked colours
-and the field shows their number.
+beside the pipette and the field shows their number.
 
-The **palette** is the colour strip in the Advanced block: one swatch per colour, largest area
-first, picked colours first with a small square in their corner (with Pick colours and Single
-colour it holds the picked colours, and Remove is its one action). Arrows move through it; the selected swatch
+The **palette** is the colour strip in the Advanced block, shown for Multicolour with Colours Auto
+(with Pick colours there is no strip; the picked colours sit beside the pipette): one swatch per
+colour, largest area first, colours picked with the palette pipette first with a small square in
+their corner. Arrows move through it; the selected swatch
 shows its hex value and name ("#FFF2A8 · Pale yellow") and five buttons:
 
 - **Isolate**: the other colours are drawn dimmed in the preview (the button stays pressed; a
@@ -389,8 +389,9 @@ values whether the Advanced block is open or not:
 - "0 paths at this Threshold: too low." (or "too high."): the Trace button is dimmed and creates
   nothing; its tooltip gives the same reason. With Remove background "0 paths at this Colour
   tolerance: too high.", with Pick colours "0 paths at this Colour tolerance: too low."
-- "0 paths: no colour picked." (Pick colours with no colour) and "No colours found." (Multicolour
-  found no colour in the content): the Trace button is dimmed and creates nothing.
+- "No colours found." (Multicolour found no colour in the content): the Trace button is dimmed and
+  creates nothing. Pick colours with no colour picked shows no line here; the dimmed Trace button
+  gives the reason, "0 paths: no colour picked.", as its tooltip.
 - "1 path covering the whole image.": the whole picture is darker than the Threshold; Create
   paths works.
 - "Too much detail: raise Ignore below.": one shape has 65,000 holes or more.
@@ -421,7 +422,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Brightness: pixels darker than the Threshold.
 - Remove background: everything unlike the background colour.
 - Background: the colour Remove background leaves out; Auto takes it from the image border.
-- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours are shown and edited in Advanced.
+- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette.
 - Pipette: takes a colour from the image under a click; Esc ends it.
 - Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.

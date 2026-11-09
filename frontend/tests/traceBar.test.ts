@@ -38,7 +38,7 @@ async function barHtml(overrides: Record<string, unknown> = {}): Promise<string>
   const palette = {
     swatches: [], found: null, joined: 0, selected: null, select: noop, state: () => "normal", isolated: null, merging: null,
     isolate: noop, recolour: noop, startMerge: noop, mergeInto: noop, cancelMerge: noop, toggleExclude: noop, remove: noop,
-    pick: noop, pickedOnly: false, note: "", sameNote: "", refresh: noop,
+    pick: noop, note: "", sameNote: "", refresh: noop,
   };
   const trace = {
     active: true, available: true, selection: "images", mask: { paths: 0, outside: false }, setMaskOutside: noop,
@@ -46,9 +46,9 @@ async function barHtml(overrides: Record<string, unknown> = {}): Promise<string>
     parts: [{ id: 1, paths: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }],
     selectPart: noop, addPart: noop, removePart: noop, imagesLabel: "", params: text.TRACE_PARAMS_FALLBACK, presets,
     values: { ...choice.values, threshold: 128 }, choice, presetLabel: presets[0].label, advancedOpen: false,
-    status: text.NO_STATUS, countsStale: false, slot: { kind: "none" }, retrace: noop, creating: false, pxPerMm: 4,
+    status: text.NO_STATUS, countsStale: false, slot: { kind: "none" }, retrace: noop, creating: false,
     setValue: noop, pick: noop, setAdvancedOpen: noop, endDrag: noop, stop: noop, create: noop, keyDown: () => false,
-    setMethod: noop, setColourTolerance: noop, setBackgroundAuto: noop, pickMode: "", setPicking: noop,
+    setMethod: noop, setColourTolerance: noop, setBackgroundAuto: noop, pickMode: "", setPicking: noop, removePicked: noop,
     suggestedBackground: null, analysis: { kind: "none" }, analyse: noop, announcement: "", traceBlocked: "",
     palette, hsvOf: () => [0, 0, 0], rgbOf: () => 0,
     ...overrides,

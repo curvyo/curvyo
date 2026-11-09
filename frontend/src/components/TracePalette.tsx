@@ -87,7 +87,7 @@ interface TracePaletteProps {
  * The palette of a multicolour trace (`specs/0089` criteria 26 and 29, UX notes §7): a strip of
  * swatches (one Tab stop, the arrows move and select; picked colours carry a square corner mark,
  * an excluded colour the Ban glyph at 40 %, a merged one its target's dot at 50 %) and, for the
- * selected swatch, the detail row with its hex and name and the five actions (Pick colours with Single colour: Remove only); Recolour opens the
+ * selected swatch, the detail row with its hex and name and the five actions (Multicolour with Colours Auto only, `ux-notes.md` §25.4); Recolour opens the
  * Style section's inline picker under it. Nothing needs colour perception: every state is a
  * shape and words in the accessible name.
  */
@@ -204,20 +204,16 @@ export function TracePalette({ palette, hsvOf, rgbOf }: TracePaletteProps) {
             {detailState.excluded ? ` · ${EXCLUDED}` : ""}
             {detailState.mergedInto ? ` · ${mergedIntoText(detailState.mergedInto)}` : ""}
           </span>
-          {palette.pickedOnly ? null : (
-            <>
-              <Action label={ISOLATE} icon={Eye} pressed={palette.isolated === detail.hex} onPress={() => palette.isolate(detail.hex)} />
-              <Action label={RECOLOUR} icon={Paintbrush} pressed={picking} onPress={() => setPicking((p) => !p)} />
-              <Action
-                label={MERGE_INTO}
-                icon={Merge}
-                pressed={merging === detail.hex || detailState.mergedInto !== null}
-                disabled={swatches.length < 2}
-                onPress={() => palette.startMerge(detail.hex)}
-              />
-              <Action label={EXCLUDE} icon={Ban} pressed={detailState.excluded} onPress={() => palette.toggleExclude(detail.hex)} />
-            </>
-          )}
+          <Action label={ISOLATE} icon={Eye} pressed={palette.isolated === detail.hex} onPress={() => palette.isolate(detail.hex)} />
+          <Action label={RECOLOUR} icon={Paintbrush} pressed={picking} onPress={() => setPicking((p) => !p)} />
+          <Action
+            label={MERGE_INTO}
+            icon={Merge}
+            pressed={merging === detail.hex || detailState.mergedInto !== null}
+            disabled={swatches.length < 2}
+            onPress={() => palette.startMerge(detail.hex)}
+          />
+          <Action label={EXCLUDE} icon={Ban} pressed={detailState.excluded} onPress={() => palette.toggleExclude(detail.hex)} />
           {detail.fixed ? <Action label={REMOVE} icon={X} onPress={() => palette.remove(detail.hex)} /> : null}
         </div>
       ) : null}

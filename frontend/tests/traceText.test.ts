@@ -14,7 +14,6 @@ import {
   textLinesText,
   shapesText,
   NO_STATUS,
-  pickedCountText,
   TRACE_BAR_DESCRIPTION,
   TRACE_EXPAND_LABELS,
   changedAdvancedText,
@@ -39,7 +38,6 @@ import {
   readChoice,
   readSummary,
   settingsJson,
-  specksHint,
   statusText,
   stepOnGrid,
   valueAt,
@@ -157,7 +155,7 @@ test("criterion 70: the info page's exact text", () => {
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
   "Background: the colour Remove background leaves out; Auto takes it from the image border.",
-  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours are shown and edited in Advanced.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette.",
   "Pipette: takes a colour from the image under a click; Esc ends it.",
   "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
@@ -403,8 +401,6 @@ test("criteria 13 and 46: notices and labels", () => {
   assert.equal(tracedTooltip(1, 1), "Traced: 1 path, 1 node.");
   assert.equal(imagesLabel(0, 3), "Tracing 1 of 3 images");
   assert.equal(imagesLabel(0, 1), "");
-  assert.equal(specksHint(0.5, 3.78), "~ 2 px");
-  assert.equal(specksHint(0.1, 3.78), "< 1 px");
   assert.equal(TRACE_TOOLTIP, "Trace tool (I)");
   assert.equal(TRACE_BAR_DESCRIPTION, "Enter creates the paths");
   assert.deepEqual(TRACE_EXPAND_LABELS, { closed: "More trace options", open: "Fewer trace options" });
@@ -526,8 +522,6 @@ test("specs/0089 criterion 14: the methods, their fields in the settings JSON", 
   assert.equal(colourTolerance(picking), 19);
   const full = ["#000001", "#000002", "#000003", "#000004", "#000005", "#000006", "#000007", "#000008"];
   assert.deepEqual(pickSwatch(full, "#000009", true), full);
-  // The bar's pipette label states what is picked (`ux-notes.md` §22.1).
-  assert.deepEqual([0, 1, 3].map(pickedCountText), ["None picked", "1 picked", "3 picked"]);
 });
 
 test("specs/0089 criterion 17, Frage 89 A: a click replaces the picked colours, Shift adds up to 8", () => {
@@ -536,13 +530,14 @@ test("specs/0089 criterion 17, Frage 89 A: a click replaces the picked colours, 
   assert.deepEqual(pickSwatch(["#111111"], "#111111", true), ["#111111"], "no twin");
   const full = Array.from({ length: MAX_SWATCHES }, (_, i) => `#00000${i}`);
   assert.deepEqual(pickSwatch(full, "#FFFFFF", true), full, "a ninth is not added");
-  assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: [] }), "0 paths: no colour picked.");
+  // Nothing picked is not traced and has no line (`ux-notes.md` §25.3).
+  assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: [] }), "");
   assert.equal(zeroPathsLine({ method: PICK_COLOURS, swatches: ["#FFFFFF"] }), "0 paths at this Colour tolerance: too low.");
   assert.equal(zeroPathsLine({ method: REMOVE_BACKGROUND, swatches: [] }), "0 paths at this Colour tolerance: too high.");
   assert.equal(zeroPathsLine({ method: 0, swatches: [] }), null);
-  // Nothing picked is fixed in Advanced: the status line says it, the notice row does not (`ux-notes.md` §22.2).
-  const nothing = statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, "0 paths: no colour picked.");
-  assert.deepEqual([nothing.message, nothing.line, nothing.canCreate], ["0 paths: no colour picked.", "", false]);
+  // No notice, no message: Trace is only dimmed with the reason (`ux-notes.md` §25.3).
+  const nothing = statusText(readSummary([0, 0, 0, 0, 0, 0, 0]), 0.1, 100, false, zeroPathsLine({ method: PICK_COLOURS, swatches: [] }));
+  assert.deepEqual([nothing.message, nothing.line, nothing.canCreate], ["", "", false]);
 });
 
 test("customer 2026-10-30: the finish button reads Trace; its progress shows after 400 ms and holds 300 ms", () => {

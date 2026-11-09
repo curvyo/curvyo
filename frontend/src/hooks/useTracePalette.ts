@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from
 
 import type { WasmSession } from "@/lib/editorSession";
 import {
-  BRIGHTNESS,
   MULTICOLOUR,
   PICK_COLOURS,
   type TraceChoice,
@@ -29,6 +28,8 @@ import {
 /** How long "Same as ..." stays, ms (`ux-notes.md` §22.2). */
 const SAME_NOTICE_MS = 3000;
 
+const NO_SWATCHES: PaletteSwatch[] = [];
+
 /** What the palette shows of `hex`: excluded, merged into another, its fill. */
 export interface SwatchState {
   excluded: boolean;
@@ -37,7 +38,8 @@ export interface SwatchState {
 }
 
 export interface TracePaletteApi {
-  /** The strip in order; empty without a multicolour preview. */
+  /** The strip in order; empty without a multicolour preview and with Pick colours, whose colours
+   * sit beside the pipette (`ux-notes.md` §25.4, Frage 142 A). */
   swatches: PaletteSwatch[];
   /** The colours Auto found (the Colours field's muted count), `null` before a result. */
   found: number | null;
@@ -56,9 +58,6 @@ export interface TracePaletteApi {
   remove: (hex: string) => void;
   /** A pipette pick in Brightness + Multicolour: a new fixed colour, or the swatch it equals. */
   pick: (hex: string) => void;
-  /** Pick colours with Single colour: the strip holds the picked colours only, and Remove is the
-   * one action (`ux-notes.md` §22.3). */
-  pickedOnly: boolean;
   /** The palette state for the hidden status region ("Isolating #FFF2A8", "2 colours excluded"), or empty. */
   note: string;
   /** "Same as #3366CC" for 3 s after a pick that matched a colour, or empty: a bar notice. */
@@ -99,9 +98,11 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
     onChange();
   }, [active, recolours, isolated, getSession, onChange]);
 
-  // Leaving the tool forgets the palette's session state.
+  // Leaving the tool forgets the palette's session state; so does Pick colours, which has no strip
+  // whose controls could undo an Isolate or a Recolour (`ux-notes.md` §25.4).
+  const picking = values.method === PICK_COLOURS;
   useEffect(() => {
-    if (!active) {
+    if (!active || picking) {
       setInfo(null);
       setSelected(null);
       setMerging(null);
@@ -109,7 +110,7 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
       setRecolours({});
       setSame(null);
     }
-  }, [active]);
+  }, [active, picking]);
 
   const edit = useCallback(
     (change: (v: TraceChoice["values"]) => Partial<TraceChoice["values"]>) => {
@@ -173,9 +174,7 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
   const remove = useCallback(
     (hex: string) => {
       setSelected(null);
-      edit((v) =>
-        v.method === BRIGHTNESS ? { fixed: v.fixed.filter((f) => f !== hex) } : { swatches: v.swatches.filter((s) => s !== hex) },
-      );
+      edit((v) => ({ fixed: v.fixed.filter((f) => f !== hex) }));
     },
     [edit],
   );
@@ -209,11 +208,7 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
   }, []);
 
   const multi = values.output === MULTICOLOUR;
-  const pickedOnly = !multi && values.method === PICK_COLOURS;
-  const shown = useMemo<PaletteSwatch[]>(
-    () => (multi ? swatches : pickedOnly ? values.swatches.map((hex) => ({ hex, fixed: true, pixels: 0 })) : []),
-    [multi, pickedOnly, swatches, values.swatches],
-  );
+  const shown = multi && !picking ? swatches : NO_SWATCHES;
   const excludedCount = swatches.filter((s) => values.excluded.includes(s.hex)).length;
   const note = !multi
     ? ""
@@ -241,7 +236,6 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
     toggleExclude,
     remove,
     pick,
-    pickedOnly,
     note,
     sameNote: !multi || same === null ? "" : sameAsNote(same),
     refresh,

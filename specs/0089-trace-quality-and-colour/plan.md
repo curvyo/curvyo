@@ -882,3 +882,43 @@ region waits for the full-size result after a reduced preview, so it announces o
 `set_trace_mask`, the Mask and Trace drawing) and the wasm exports `trace_mask_job` /
 `trace_text_mask_job` are no longer called by the app; tester Rust tests use them, so they go once
 those tests are retired.
+
+## Colours row and bar fixes (2026-11-09, `ux-notes.md` §25)
+
+Branch `story/trace-colours-row`. Frontend only (`TraceBar.tsx`, `TraceColourGroup.tsx`,
+`TraceAdvanced.tsx`, `TracePalette.tsx`, `useTrace.ts`, `useTracePalette.ts`, `traceText.ts`,
+`traceMaskCaches.ts`); no Rust change, traced results unchanged (goldens and determinism green).
+
+- [x] C1 (§25.1): Ignore below without its readout: `specksHint`, `WithHint`, `pxPerMm` (state,
+  `TraceApi` field) removed; the item is the 171 px field alone.
+- [x] C2 (§25.2): a new region keeps the shown Threshold (and background) until its analysis
+  answers, then changes once; a failed region analysis keeps the old value; a region analysed
+  earlier in the session comes from a per-region cache (`regionDefaults` in `traceMaskCaches.ts`,
+  keyed by image and mask) at once; a value the maker set in the meantime wins. Unit tests with a
+  fake runner record the field's values over a switch.
+- [x] C3 (§25.3): Pick colours with no colour traces nothing (empty preview, no status, no "0 paths"
+  outcome), the notice row has no line for it (`statusText`'s `message` route for it and
+  `zeroPathsLine`'s empty-set arm removed); Trace stays `aria-disabled` with the reason as tooltip and
+  `aria-describedby`; Enter and Ctrl+Enter do nothing; the hidden region says the reason.
+- [x] C4 (§25.3): `pickedCountText` and the count span removed.
+- [x] C5 (§25.4): the picked colours row beside the pipette (`PickedColours` in
+  `TraceColourGroup.tsx`): 20 px swatches 4 px apart in pick order, 24 x 28 cells, the group reserves
+  220 px, hover and focus fade to 40 % with an x, tooltip `#RRGGBB`, name "Remove #RRGGBB", one Tab stop
+  with roving arrows, Home / End, Delete / Backspace / Enter / Space remove (focus to the next, else
+  the previous, else the pipette; a pointer removal returns focus to the canvas); no history step;
+  the hidden region says "Removed #RRGGBB". Unit tests on the server-rendered row and the pure focus
+  rule.
+- [x] C6 (§25.4, Frage 142 A): the strip and its detail row only for Multicolour with Colours Auto
+  (`useTracePalette` shows no swatches for Pick colours; `pickedOnly`, its branch in `TracePalette` and
+  the swatches arm of `remove` removed); Isolate, merging and the selection are cleared while the strip
+  is hidden. The Multicolour-Auto palette tests stay unchanged.
+- [x] C7 (§25.5): `docs/design-system.md` rows (Trace bar, Trace notices, Trace Output and palette,
+  Trace value field, new Trace picked colours), `docs/tracing-images.md` and the About text in
+  `traceText.ts`.
+- [ ] C8: own tests updated (`traceText.test.ts`, `traceBar.test.ts`, `acceptance_0025_browser`,
+  `trace_text_browser`, the 0094 pick and parts browser files); Chromium at 800 x 600, panel open: the
+  bar does not move between 0 and 8 colours, the row at 8 colours, no horizontal scroll, targets at
+  least 24 x 28.
+
+Validation: `npx tsc -b --noEmit`, `npx oxlint`, `npm test`, the own Chromium files one by one, the
+Rust trace crates' tests, the full §7 gate once at the end.
