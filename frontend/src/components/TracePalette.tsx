@@ -24,6 +24,17 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
   const [shift, setShift] = useState(false);
   const row = useRef<HTMLDivElement>(null);
   const { swatches, setIsolated } = palette;
+  // After a key removal: the swatch (the next one, else the previous) to focus once the new swatch list (not the old one) is drawn.
+  const pendingFocus = useRef<{ target: string; hex: string } | null>(null);
+  useEffect(() => {
+    const pending = pendingFocus.current;
+    if (pending === null || swatches.length === 0 || swatches.some((s) => s.hex === pending.hex)) {
+      return;
+    }
+    pendingFocus.current = null;
+    const index = swatches.findIndex((s) => s.hex === pending.target);
+    row.current?.querySelectorAll<HTMLElement>("[data-trace-palette-swatch]")[index < 0 ? swatches.length - 1 : index]?.focus();
+  }, [swatches]);
 
   // Shift+hover isolates (a view only); it ends with the Shift key or the hover.
   useEffect(() => {
@@ -48,9 +59,6 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
     return null;
   }
   const at = Math.min(focus, swatches.length - 1);
-  const focusSwatch = (index: number) => {
-    requestAnimationFrame(() => row.current?.querySelectorAll<HTMLElement>("[data-trace-palette-swatch]")[index]?.focus());
-  };
   const remove = (index: number, byKey: boolean) => {
     const hex = swatches[index]?.hex;
     if (hex === undefined) {
@@ -61,7 +69,7 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
     setFocus(next);
     palette.remove(hex);
     if (byKey) {
-      focusSwatch(next);
+      pendingFocus.current = { target: swatches[index + 1]?.hex ?? swatches[index - 1]?.hex ?? "", hex };
     } else {
       onReturnFocus();
     }
