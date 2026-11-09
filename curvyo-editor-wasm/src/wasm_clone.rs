@@ -62,6 +62,9 @@ pub struct ClonePanelView {
     pub placement_row: bool,
     /// Whether every selected clone is a text clone (Unlink makes texts).
     pub texts: bool,
+    /// Whether the Style row, the greyed rows and Spread colours are shown: not while a clone
+    /// of a group, text or image is selected (`specs/0100` criterion 9).
+    pub style_row: bool,
     /// Spread colours is enabled: two or more clones are selected (criterion 42).
     pub spread_ready: bool,
     /// The muted summary of the greyed Stroke header: "0.5 mm", or "None" when off.
@@ -185,6 +188,7 @@ impl WasmSession {
                 .to_owned(),
             placement_row: block.as_ref().is_none_or(|b| b.placement_row),
             texts: block.as_ref().is_some_and(|b| b.texts),
+            style_row: block.as_ref().is_none_or(|b| b.style_row),
             spread_ready: self.session.spread_colours_ready(),
             stroke_summary: block.as_ref().map_or_else(String::new, |b| {
                 if b.summary.stroke.enabled {

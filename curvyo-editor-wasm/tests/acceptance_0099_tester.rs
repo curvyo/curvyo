@@ -819,9 +819,12 @@ fn ac10_the_row_state_empty_follows_0098_no_geometry_and_no_parameter() {
 }
 
 #[test]
-fn ac8_a_drawing_page_row_places_nothing_in_this_slice() {
+// Amended by `specs/0100-bring-content-in` criterion 13: a drawing page row places the page;
+// a laser row still only reorders.
+fn ac8_a_laser_page_row_places_nothing() {
     let mut f = fixture();
-    assert!(!f.s.row_drag_begin(&f.second.id));
+    assert!(f.s.row_drag_begin(&f.second.id));
+    f.s.row_drag_cancel();
     assert!(!f.s.row_drag_begin(&f.laser.id));
     assert!(!f.s.row_drag_drop());
     assert_eq!(f.s.undo_len(), 0);

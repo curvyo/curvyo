@@ -1,4 +1,4 @@
-import { TriangleAlert } from "lucide-react";
+import { Frame, TriangleAlert } from "lucide-react";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
@@ -483,6 +483,7 @@ export function PropertiesPanel({
                   manufacturing && contribution ? (
                     <ManifestTab
                       contribution={contribution}
+                      pages={doc.view.pages}
                       view={manufacturing}
                       workbenches={workbenches}
                       unit={doc.view.unit}
@@ -495,7 +496,10 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "style" ? (
-              <StyleSection panel={panel} clones={editor.clones} onReturnFocus={returnFocus} />
+              <>
+                <PlacedPageBlock text={getSession()?.placed_page_block() ?? ""} />
+                <StyleSection panel={panel} clones={editor.clones} onReturnFocus={returnFocus} />
+              </>
             ) : doc.view.content === "layers" ? (
               <LayersTab
                 getSession={getSession}
@@ -598,4 +602,16 @@ function historyCount(editor: EditorSession): number {
   // `syncRevision` makes this read again after every change of the session.
   void editor.syncRevision;
   return editor.getSession()?.history_len() ?? 0;
+}
+
+/** A selected placed page's Style block (`specs/0100` criterion 17): "Placed page of Coaster."
+ * and no buttons; nothing otherwise. */
+function PlacedPageBlock({ text }: { text: string }) {
+  if (!text) return null;
+  return (
+    <div role="group" aria-label="Placed page" className="flex items-start gap-1 text-sm text-[var(--toolbar-icon)]">
+      <Frame size={16} aria-hidden className="mt-0.5 shrink-0" />
+      <span>{text}</span>
+    </div>
+  );
 }

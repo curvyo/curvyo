@@ -93,20 +93,5 @@ export function selectClonesLabel(clones: number): string {
 }
 
 /** What the drop badge says, from the session's badge kind (UX notes §2). */
-export type DropBadgeKind = "none" | "clone" | "not_on_sketch_page" | "no_sketch";
-
-/** The badge word; the page name truncates at 24 characters. `null`: no badge. */
-export function badgeWord(kind: DropBadgeKind, pageName: string): string | null {
-  switch (kind) {
-    case "none":
-      return null;
-    case "clone":
-      return "Linked clone";
-    case "not_on_sketch_page":
-      return "Not on a sketch page";
-    case "no_sketch": {
-      const name = pageName.length > 24 ? `${pageName.slice(0, 23)}…` : pageName;
-      return `${name} has no sketch yet`;
-    }
-  }
-}
+// One decoder and one word table for both drags (`specs/0100` `adrs.md` note 4).
+export { type DropBadgeKind, badgeWord } from "./dragAnswer.ts";

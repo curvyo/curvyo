@@ -6,6 +6,7 @@ mod commands;
 mod frame;
 mod machine;
 mod machine_view;
+mod placed_drag;
 #[cfg(test)]
 mod tests;
 mod view_json;
@@ -14,6 +15,8 @@ use curvyo_document_core::{ManufacturingSnapshot, NodeId};
 use curvyo_ui_core::ExtensionSettings;
 
 use super::{Session, Workbench};
+
+pub(super) use placed_drag::{NOT_GROUPED_NOTICE, OFF_PAGE_NOTICE};
 
 /// What the session keeps for laser pages.
 #[derive(Debug, Default)]
@@ -24,8 +27,6 @@ pub(super) struct ManufacturingState {
     pub(super) placed: frame::PlacedCache,
     /// The maker's machine profiles and the last pick (`specs/0026-machine-profile`).
     pub(super) machine: machine::MachineState,
-    /// The placement a press selected (`specs/0098-page-kinds` criterion 12).
-    pub(super) selected_placement: Option<NodeId>,
 }
 
 impl Session {
@@ -67,32 +68,23 @@ impl Session {
         self.sync_workbench();
     }
 
-    /// The selected placement, while it still exists.
+    /// The first selected placed page: placed pages are objects of the one selection
+    /// (`specs/0100` criterion 17).
     #[must_use]
     pub fn selected_placement(&self) -> Option<NodeId> {
-        let id = self.manufacturing.selected_placement?;
-        self.document
-            .manufacturings()
-            .iter()
-            .any(|m| m.placements.iter().any(|p| p.id == id))
-            .then_some(id)
-    }
-
-    /// A press with the Select tool on the placed content of a laser page (`0098` criterion 12):
-    /// selects the placement and clears the drawing selection. `false` when the press is on no
-    /// placement, which also clears a selected one.
-    pub(super) fn output_placement_press(&mut self, point: curvyo_document_core::Point) -> bool {
-        let hit = self.placement_at(point);
-        self.manufacturing.selected_placement = hit;
-        if hit.is_some() {
-            self.selection.clear();
+        let placed = self.placement_ids();
+        if placed.is_empty() {
+            return None;
         }
-        hit.is_some()
+        self.selection
+            .ids()
+            .iter()
+            .copied()
+            .find(|id| placed.contains(id))
     }
 
-    /// Delete with a placement selected removes the reference only.
-    pub(super) fn delete_selected_placement(&mut self) -> bool {
-        self.selected_placement()
-            .is_some_and(|id| self.delete_placement(id))
+    /// The ids of every placed page, read once.
+    pub(super) fn placement_ids(&self) -> std::collections::HashSet<NodeId> {
+        self.document.placed_pages().iter().map(|p| p.id).collect()
     }
 }

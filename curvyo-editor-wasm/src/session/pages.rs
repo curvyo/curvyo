@@ -25,9 +25,6 @@ impl Session {
             self.tiling = None;
         }
         self.page_view.active = Some(id.to_owned());
-        if changed {
-            self.manufacturing.selected_placement = None;
-        }
         let left = self.sketch.workbench;
         // The tools and tabs follow the page's kind in the same frame (`specs/0098` criterion 8).
         self.sync_workbench();

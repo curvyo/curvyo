@@ -43,7 +43,13 @@ impl Session {
             &self.selection,
             cursor,
             self.held.shift,
-            self.held.ctrl && !self.held.alt,
+            // A Linked clone drop leaves the originals and their box where they are, like a
+            // copy (`specs/0100` criterion 2).
+            (self.held.ctrl && !self.held.alt)
+                || matches!(
+                    self.clone_drop_mode(),
+                    super::DropMode::Copy | super::DropMode::Clone | super::DropMode::Nothing
+                ),
             self.snap_result().map_or(Vec2::ZERO, |r| r.offset),
         )
     }

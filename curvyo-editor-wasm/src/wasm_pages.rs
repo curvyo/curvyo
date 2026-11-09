@@ -68,7 +68,7 @@ impl WasmSession {
     }
     /// One pointer move of the row drag at canvas position `x`, `y` (CSS px), or off the canvas
     /// (`on_canvas` false). JSON `{badge, target, faint}`; `badge` is `none`, `clone`,
-    /// `not_on_sketch_page` or `no_sketch`.
+    /// `not_on_sketch_page`, `no_sketch`, `placed_page` or `only_on_laser_page`.
     pub fn row_drag_move(&mut self, x: f64, y: f64, on_canvas: bool) -> String {
         let point = on_canvas.then(|| self.session.screen_to_document(x, y));
         serde_json::to_string(&self.session.row_drag_move(point)).unwrap_or_default()
@@ -85,5 +85,43 @@ impl WasmSession {
     /// page `id`, which becomes active.
     pub fn place_sketch_clone_on(&mut self, id: &str) -> bool {
         self.session.place_sketch_clone_on(id)
+    }
+    /// The answer of the Select move in flight over the canvas (`specs/0100` criteria 1 to 5):
+    /// JSON `{badge, target, faint}` with `badge` `none`, `clone` (Linked clone), `move` or
+    /// `copy`; an empty string while no move is in flight.
+    pub fn clone_drop_answer(&self) -> String {
+        self.session
+            .clone_drop_answer()
+            .and_then(|answer| serde_json::to_string(&answer).ok())
+            .unwrap_or_default()
+    }
+    /// The notice of the last cloning drop (guides left out, depth refusal), once; empty if
+    /// none.
+    pub fn take_clone_drop_notice(&mut self) -> String {
+        self.session.take_clone_drop_notice()
+    }
+    /// Place page (`specs/0100` criterion 15): places drawing page `id` at the centre of the
+    /// active laser page. Whether it did.
+    pub fn place_page_on_active(&mut self, id: &str) -> bool {
+        self.session.place_page_on_active(id)
+    }
+    /// The laser pages Place on… offers (`specs/0100` criterion 25): JSON
+    /// `[{id, name, width_mm, height_mm}]`; empty hides the button.
+    pub fn place_on_targets(&self) -> String {
+        serde_json::to_string(&self.session.place_on_targets()).unwrap_or_default()
+    }
+    /// Place on… laser page `id` (criterion 25). Whether clones were placed.
+    pub fn place_on(&mut self, id: &str) -> bool {
+        self.session.place_on(id)
+    }
+    /// The selected placed page's Style block (`specs/0100` criterion 17): "Placed page of
+    /// <name>." with the name cut at 40 characters; empty when none is selected.
+    pub fn placed_page_block(&self) -> String {
+        self.session.placed_page_block()
+    }
+    /// The name tags of the placed pages (`specs/0100` UX notes §5): JSON `[{id, name, x, y,
+    /// width, selected}]` in canvas CSS px.
+    pub fn placed_pages_json(&self) -> String {
+        self.session.placed_pages_json()
     }
 }

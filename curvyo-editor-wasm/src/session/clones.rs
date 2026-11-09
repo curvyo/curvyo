@@ -82,10 +82,10 @@ impl Session {
     /// Whether the Linked clone button is in the Select bar (criterion 4).
     #[must_use]
     pub fn linked_clone_shown(&self) -> bool {
-        // Never for a selection that holds an image (`specs/0058-bitmap-import` criterion 38).
+        // An image is an original since `specs/0100` criterion 8; a placed page never is.
         self.tool == Tool::Select
             && linked_clone_shown(&self.selection, &self.units())
-            && !self.selection_holds_image()
+            && self.selected_placement().is_none()
             && !self.selection_only_dimensions()
     }
 

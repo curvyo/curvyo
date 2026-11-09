@@ -200,9 +200,9 @@ export function StyleSection({ panel, clones, onReturnFocus }: StyleSectionProps
               <StrokeSection panel={panel} onReturnFocus={onReturnFocus} />
               {fill}
             </>
-          ) : (
+          ) : clones.panel.styleRow ? (
             <GreyedStyleHeaders clones={clones} />
-          )}
+          ) : null}
         </div>
         {spacer > 0 ? <div aria-hidden style={{ height: spacer }} /> : null}
       </div>

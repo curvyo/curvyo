@@ -1,28 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
-import { type DropBadgeKind, badgeWord } from "@/lib/sketchPages";
-
-/** The drop badge beside the pointer (UX notes §2 "Drop badge"). */
-export interface DropBadge {
-  word: string;
-  refused: boolean;
-  x: number;
-  y: number;
-}
-
-/** The answer of one `row_drag_move`. */
-interface Answer {
-  badge: DropBadgeKind;
-  target: string | null;
-  faint: boolean;
-}
+import type { DropBadge } from "@/components/DropBadgePill";
+import { badgeWord, decodeDragAnswer, isRefusal } from "@/lib/dragAnswer";
 
 /** About the badge's size, for the mirror at a viewport edge. */
 const BADGE_W = 200;
 const BADGE_H = 20;
 const OFFSET = 16;
 
-function badgePlace(x: number, y: number): { x: number; y: number } {
+export function badgePlace(x: number, y: number): { x: number; y: number } {
   const right = x + OFFSET + BADGE_W > window.innerWidth;
   const below = y + OFFSET + BADGE_H > window.innerHeight;
   return {
@@ -83,17 +69,18 @@ export function usePageRowDrag(
     const under = document.elementFromPoint(clientX, clientY);
     const onCanvas = !inList && !!area && !!under && area.contains(under);
     const rect = area?.getBoundingClientRect();
-    const answer = JSON.parse(
-      session.row_drag_move(
-        clientX - (rect?.left ?? 0),
-        clientY - (rect?.top ?? 0),
-        onCanvas,
-      ),
-    ) as Answer;
+    const answer = decodeDragAnswer(
+      session.row_drag_move(clientX - (rect?.left ?? 0), clientY - (rect?.top ?? 0), onCanvas),
+    );
+    if (!answer) {
+      setCursor(false);
+      setBadge(null);
+      return;
+    }
     const word = badgeWord(answer.badge, drag.name);
-    const refused = answer.badge === "not_on_sketch_page" || answer.badge === "no_sketch";
+    const refused = isRefusal(answer.badge);
     setCursor(refused);
-    setBadge(word ? { word, refused, ...badgePlace(clientX, clientY) } : null);
+    setBadge(word ? { kind: answer.badge, word, refused, ...badgePlace(clientX, clientY) } : null);
   };
   /** The release: places the clone where the session allows it. Whether it did. */
   const drop = () => {

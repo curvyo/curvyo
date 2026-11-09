@@ -34,6 +34,7 @@ mod background_view;
 mod boolean;
 #[cfg(test)]
 mod box_refit_tests;
+mod clone_drop;
 mod clone_overrides;
 #[cfg(test)]
 mod clone_tests;
@@ -112,8 +113,10 @@ mod pattern;
 #[cfg(test)]
 mod pattern_tests;
 mod pen;
+mod place_on;
 mod row_drag;
 mod sketch_use;
+use clone_drop::DropMode;
 pub use row_drag::{DropBadge, RowDragAnswer, RowDragSource};
 pub use sketch_use::{SketchRowState, SketchUsage};
 mod pen_entry;
@@ -457,6 +460,8 @@ pub struct Session {
     page_drag: Option<page_drag::PageDrag>,
     /// The page row dragged onto the canvas (`specs/0099` criterion 8): view state.
     row_drag: Option<row_drag::RowDrag>,
+    /// The cloning drop of a Select move onto a laser page (`specs/0100`).
+    clone_drops: clone_drop::CloneDropState,
     /// The last active drawing or laser page, for Select clones with every clone on the
     /// pasteboard (`specs/0099` criterion 12).
     last_work_page: Option<String>,
@@ -676,6 +681,7 @@ impl Session {
             page_view: curvyo_ui_core::PageViewState::default(),
             page_drag: None,
             row_drag: None,
+            clone_drops: clone_drop::CloneDropState::default(),
             last_work_page: None,
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
@@ -774,6 +780,7 @@ impl Session {
             page_view: curvyo_ui_core::PageViewState::default(),
             page_drag: None,
             row_drag: None,
+            clone_drops: clone_drop::CloneDropState::default(),
             last_work_page: None,
             viewport: Viewport::new(),
             canvas_css_width: 0.0,
@@ -942,6 +949,7 @@ impl Session {
             let Some(point) = sanitized_point(point) else {
                 return;
             };
+            this.clone_drops.escaped = false;
             // A press during a preview only ends it (`specs/0042-history-branches` criterion 18).
             if this.history_preview_takes_press() {
                 return;
@@ -997,18 +1005,6 @@ impl Session {
             this.button_down = true;
             match this.tool {
                 Tool::Select => {
-                    // A press on placed content and on no drawing object selects the placement
-                    // (`specs/0098` criterion 12).
-                    let on_object = !curvyo_ui_core::hit_test_objects(
-                        &this.objects(),
-                        point,
-                        this.object_tolerance(),
-                    )
-                    .is_empty();
-                    if !on_object && this.output_placement_press(point) {
-                        this.button_down = false;
-                        return;
-                    }
                     if !this.dimension_pointer_down(point, shift) {
                         this.select_pointer_down(point, shift);
                     }
@@ -1194,6 +1190,10 @@ impl Session {
             }
             this.pointer_position = Some(point);
             this.held.shift = shift;
+            // The release of a drag Escape cancelled does nothing at all.
+            if std::mem::take(&mut this.clone_drops.escaped) {
+                return;
+            }
             this.press_page_view(point);
             match this.tool {
                 Tool::Select => {

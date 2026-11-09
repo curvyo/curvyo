@@ -83,6 +83,10 @@ impl Session {
         {
             return "move".to_owned();
         }
+        // A placed page dragged fully off its laser page (`specs/0100` UX notes §5).
+        if self.placed_live().iter().any(|(_, (_, _, off))| *off) {
+            return "not-allowed".to_owned();
+        }
         if let Some(hint) = self.gesture_cursor() {
             return hint.to_string();
         }

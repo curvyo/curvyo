@@ -1,3 +1,4 @@
+import { usePlaceOn } from "@/hooks/usePlaceOn";
 import { useSketch } from "@/hooks/useSketch";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
@@ -98,6 +99,7 @@ function Editor() {
   };
   const preview = useFontPreview({ node: editor.text.bar.sampleNode, sample: editor.text.bar.sample });
   const { getSession } = editor;
+  const placeOn = usePlaceOn(editor);
   const keepViewOrigin = useCallback(
     (delta: number) => getSession()?.keep_view_origin_for_panel_toggle(delta),
     [getSession],
@@ -213,6 +215,7 @@ function Editor() {
               linkedCloneShown={editor.clones.shown}
               onLinkedClone={() => editor.clones.apply("linked-clone")}
               linkedCloneNotice={editor.clones.barNotice}
+              placeOn={placeOn}
               traceShown={editor.trace.available}
               onTrace={() => editor.setTool("trace")}
               recognise={{

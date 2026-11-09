@@ -516,7 +516,8 @@ fn ac12_a_placement_of_an_older_file_can_be_selected_and_deleted_and_undo_restor
     s.set_tool(Tool::Select);
     click(&mut s, Point::new(o.x + 25.0, o.y + 5.0));
     let picked = s.selected_placement().expect("the placement is hit");
-    assert_eq!(s.selected_object_count(), 0, "its inside is not selected");
+    // Amended by `specs/0100` criterion 17: the placed page is the one selection.
+    assert_eq!(s.selected_object_count(), 1, "its inside is not selected");
     let steps = s.undo_len();
     assert!(s.delete_placement(picked));
     assert_eq!(s.undo_len(), steps + 1);
@@ -968,7 +969,8 @@ fn ac21_activating_pages_of_alternating_kinds_stays_within_50_ms_cpu() {
 }
 
 #[test]
-fn ac12_a_placement_is_not_moved_by_a_drag_in_this_slice() {
+// Amended by `specs/0100-bring-content-in` criterion 17: a drag moves a placed page now.
+fn ac12_a_placement_is_moved_by_a_drag_since_0100() {
     let mut s = open(&core_fixture("laser_workbench_v36.curvyo"));
     let laser = rows(&s).into_iter().find(|r| r["kind"] == LASER).unwrap();
     assert!(s.activate_page(laser["id"].as_str().unwrap()));
@@ -981,7 +983,9 @@ fn ac12_a_placement_is_not_moved_by_a_drag_in_this_slice() {
     s.pointer_down(a, false);
     s.pointer_hover(b, false, false);
     s.pointer_up(b, false, false);
-    assert_eq!(opened(&s).manufacturings()[0].placements, before);
+    let after = opened(&s).manufacturings()[0].placements.clone();
+    assert_eq!(after.len(), before.len());
+    assert_ne!(after, before, "the pressed placement moved");
 }
 
 // ---- accepted `0093` criteria 6, 8, 9, 13 kept by criterion 12: placements of older files ------
@@ -1147,7 +1151,8 @@ fn ac12_0093_9_grid_lines_are_drawn_below_the_placed_drawing() {
 }
 
 #[test]
-fn ac12_0093_13_deleting_the_placed_drawing_page_empties_the_placement_and_undo_restores() {
+// Amended by `specs/0100-bring-content-in` criterion 24: the placement goes with its page.
+fn ac12_0093_13_deleting_the_placed_drawing_page_removes_the_placement_and_undo_restores() {
     let (bytes, laser, o) = placed_file((10.0, 20.0), (50.0, 40.0));
     let mut s = open(&bytes);
     assert!(s.delete_page("first"));
@@ -1155,8 +1160,8 @@ fn ac12_0093_13_deleting_the_placed_drawing_page_empties_the_placement_and_undo_
     assert!(red_box_right_of(&s, o.x).is_none(), "draws nothing");
     assert_eq!(
         opened(&s).manufacturings()[0].placements.len(),
-        1,
-        "and is kept"
+        0,
+        "and is removed with its page"
     );
     let _ = s.undo();
     assert!(red_box_right_of(&s, o.x).is_some());
@@ -1175,9 +1180,15 @@ fn ac12_0093_7_the_inside_of_a_placed_page_stays_read_only() {
     s.pointer_hover(Point::new(a.x + 20.0, a.y + 20.0), false, false);
     s.pointer_up(Point::new(a.x + 20.0, a.y + 20.0), false, false);
     key(&mut s, "ArrowRight", false);
+    // Amended by `specs/0100` criterion 17: the placed page itself is the selection; no
+    // drawing object inside it is.
+    assert!(
+        s.selected_placement().is_some(),
+        "the placed page is selected"
+    );
     assert_eq!(
         s.selected_object_count(),
-        0,
+        1,
         "the drawing object is not selected"
     );
     assert_eq!(

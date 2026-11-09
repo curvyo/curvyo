@@ -281,14 +281,11 @@ fn c14_only_a_clone_of_a_path_is_a_mask_path() {
         let kind = session.linked_clone().kind;
         (kind, session.selection.ids()[0])
     };
-    assert_eq!(
-        clone(&mut session, image).0,
-        super::clones::CloneKind::Ignored
-    );
-    assert_eq!(
-        clone(&mut session, text).0,
-        super::clones::CloneKind::Ignored
-    );
+    // Since `specs/0100` an image and a text are originals too; their clones are no mask path.
+    let (kind, image_clone) = clone(&mut session, image);
+    assert_eq!(kind, super::clones::CloneKind::Done);
+    let (kind, _) = clone(&mut session, text);
+    assert_eq!(kind, super::clones::CloneKind::Done);
     let (kind, path_clone) = clone(&mut session, path);
     assert_eq!(kind, super::clones::CloneKind::Done);
     assert!(matches!(
@@ -302,6 +299,8 @@ fn c14_only_a_clone_of_a_path_is_a_mask_path() {
     let view = session.trace_view();
     assert_eq!(view.selection, TraceSelection::Images);
     assert_eq!(view.mask, [path_clone]);
+    session.selection.set(&[image, image_clone]);
+    assert!(!session.trace_view().mask.contains(&image_clone));
 }
 
 /// Terms ("Mask path"): a group counts as the paths in it (architect review 2026-11-04).

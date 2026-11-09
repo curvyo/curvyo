@@ -38,6 +38,9 @@ export interface ClonePanelState {
   placementRow: boolean;
   /** Whether every selected clone is a text clone (Unlink makes texts, `0080` criterion 41). */
   texts: boolean;
+  /** Whether the Style row, the greyed rows and Spread colours are shown: not with a clone of a
+   * group, text or image selected (`specs/0100` criterion 9). */
+  styleRow: boolean;
   /** Spread colours is enabled (two or more clones). */
   spreadReady: boolean;
   /** The greyed headers' summaries (the first clone's effective style). */
@@ -59,6 +62,7 @@ export const NO_CLONE_PANEL: ClonePanelState = {
   style: "original",
   placementRow: true,
   texts: false,
+  styleRow: true,
   spreadReady: false,
   strokeSummary: "",
   strokeHex: "",
@@ -125,7 +129,17 @@ export function cloneBlockLines(panel: ClonePanelState): { title: string; chain:
 /** The tooltip of Unlink clone: a linked clone becomes a path, a text clone a text (`0080`
  * criterion 41). */
 export function unlinkTitle(panel: ClonePanelState): string {
-  return panel.texts
-    ? "Turns the clone into an ordinary text. Text, place and style stay."
-    : "Turns the clone into an ordinary path. Shape and style stay.";
+  if (panel.texts) return "Turns the clone into an ordinary text. Text, place and style stay.";
+  // A clone of a group, text or image unlinks into its root's kind (`specs/0100` criterion 10).
+  if (!panel.styleRow) {
+    if (panel.count > 1) return "Turns each clone into an ordinary object. Shape and style stay.";
+    if (panel.original.startsWith("Group ")) {
+      return "Turns the clone into an ordinary group. Content and style stay.";
+    }
+    if (panel.original.startsWith("Image ")) {
+      return "Turns the clone into an ordinary image. Picture and place stay.";
+    }
+    return "Turns the clone into an ordinary text. Text, place and style stay.";
+  }
+  return "Turns the clone into an ordinary path. Shape and style stay.";
 }

@@ -101,7 +101,8 @@ fn ac37_outline_commands_refuse_a_selection_with_an_image() {
     let mut session = Session::new(1);
     import(&mut session, &[(PNG, "a.png")]);
     assert!(session.refuse_images());
-    assert!(!session.linked_clone_shown(), "criterion 38");
+    // `specs/0100` criterion 8: an image is an original now.
+    assert!(session.linked_clone_shown(), "0100 criterion 8");
     assert!(!session.select_bar_state().object_to_path);
     session.selection.set(&[]);
     assert!(!session.refuse_images());

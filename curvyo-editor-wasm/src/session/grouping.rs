@@ -74,6 +74,13 @@ impl Session {
     /// than 32 levels deep (criterion 5). Nothing happens unless two objects are selected, the
     /// Select tool is active, no drag runs and no entry is open.
     pub fn group_selection(&mut self) -> GroupingResult {
+        // A placed page is never grouped (`specs/0100` criterion 19).
+        if self.selected_placement().is_some() {
+            return GroupingResult {
+                kind: GroupingKind::Refused,
+                notice: super::manufacturing::NOT_GROUPED_NOTICE.to_owned(),
+            };
+        }
         self.recording(|this| {
             if !this.rail_command_ready() || !this.grouping_availability().group {
                 return GroupingResult::ignored();
