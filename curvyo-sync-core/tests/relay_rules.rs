@@ -883,3 +883,169 @@ fn a_restored_relay_serves_its_parts_and_protocol_1_still_connects() {
     );
     assert_eq!(snapshot_records(&out, conn).len(), 2);
 }
+
+/// A room where device 2 claimed invite 5 and was then removed; invite 6 is still open.
+/// Returns the relay, the admin's connection and the entries in order.
+fn room_with_removed_device() -> (Relay, ConnectionId, Vec<Entry>) {
+    let (mut relay, admin_conn, g) = room_with_admin();
+    let admin = device(1);
+    let keyring = |relay: &mut Relay, entry: &Entry| {
+        send(
+            relay,
+            admin_conn,
+            &ClientFrame::Keyring {
+                entry: entry.encode().unwrap(),
+            },
+        )
+    };
+    let invite = |n: u8| {
+        Entry::sign(
+            vec![g.try_hash().unwrap()],
+            &admin,
+            Payload::AddPendingInvite {
+                invite_id: InviteKey::from_seed(&[n; 32]).unwrap().invite_id(),
+                role: Role::Member,
+                expires: NOW.unix_seconds() + 24 * 3600,
+            },
+        )
+        .unwrap()
+    };
+    let own = invite(5);
+    let open = invite(6);
+    keyring(&mut relay, &own);
+    keyring(&mut relay, &open);
+    let b = device(2);
+    let (conn, _) = handshake(&mut relay, &b, ROOM, 0);
+    let first = claim(&b, &[&own, &open], 5);
+    let out = send(
+        &mut relay,
+        conn,
+        &ClientFrame::Keyring {
+            entry: first.encode().unwrap(),
+        },
+    );
+    assert!(matches!(sends(&out, conn)[0], RelayFrame::Welcome { .. }));
+    let removal = Entry::sign(
+        vec![first.try_hash().unwrap()],
+        &admin,
+        Payload::RemoveMember {
+            member: b.identity().member,
+        },
+    )
+    .unwrap();
+    let out = keyring(&mut relay, &removal);
+    assert_eq!(refused(&out, conn), Some(RefusalReason::Removed));
+    relay.disconnect(conn);
+    (relay, admin_conn, vec![g, own, open, first, removal])
+}
+
+/// Join rule review finding 1 (`specs/0105` adrs): a removed device that probes its own old,
+/// already claimed invite within 24 hours is refused as removed and gets no keyring frame.
+#[test]
+fn a_removed_device_probing_its_claimed_invite_is_refused_as_removed() {
+    let (mut relay, _, _) = room_with_removed_device();
+    let (conn, out) = handshake(&mut relay, &device(2), ROOM, 0);
+    assert_eq!(sends(&out, conn), []);
+    let out = send(
+        &mut relay,
+        conn,
+        &ClientFrame::Keyring {
+            entry: claim(&device(2), &[], 5).encode().unwrap(),
+        },
+    );
+    assert_eq!(refused(&out, conn), Some(RefusalReason::Removed));
+    assert!(
+        !sends(&out, conn)
+            .iter()
+            .any(|f| matches!(f, RelayFrame::Keyring { .. }))
+    );
+}
+
+/// Finding 2: a backdated claim (built on heads from before its removal) is not admitted and
+/// not stored, whether it claims its own used invite or a still open one.
+#[test]
+fn a_backdated_claim_of_a_removed_device_is_not_admitted_or_stored() {
+    let (mut relay, admin_conn, entries) = room_with_removed_device();
+    let [_, own, open, _, _] = &entries[..] else {
+        panic!("five entries");
+    };
+    for (n, parents) in [(5, vec![own]), (6, vec![own, open])] {
+        let (conn, _) = handshake(&mut relay, &device(2), ROOM, 0);
+        let out = send(
+            &mut relay,
+            conn,
+            &ClientFrame::Keyring {
+                entry: claim(&device(2), &parents, n).encode().unwrap(),
+            },
+        );
+        assert_eq!(
+            refused(&out, conn),
+            Some(RefusalReason::Removed),
+            "invite {n}"
+        );
+        assert!(
+            !sends(&out, conn)
+                .iter()
+                .any(|f| matches!(f, RelayFrame::Welcome { .. } | RelayFrame::Keyring { .. })),
+            "invite {n}"
+        );
+        assert!(sends(&out, admin_conn).is_empty(), "invite {n}");
+        assert_eq!(stores(&out), 0, "invite {n}");
+    }
+    assert_eq!(
+        relay.room(&ROOM).unwrap().stored().keyring.len(),
+        entries.len()
+    );
+}
+
+/// Finding 3 (c): the removed device still joins again by a fresh invite on the current heads.
+#[test]
+fn a_removed_device_is_admitted_by_a_fresh_invite_on_current_heads() {
+    let (mut relay, admin_conn, entries) = room_with_removed_device();
+    let fresh = Entry::sign(
+        vec![entries[4].try_hash().unwrap()],
+        &device(1),
+        Payload::AddPendingInvite {
+            invite_id: InviteKey::from_seed(&[7; 32]).unwrap().invite_id(),
+            role: Role::Member,
+            expires: NOW.unix_seconds() + 24 * 3600,
+        },
+    )
+    .unwrap();
+    send(
+        &mut relay,
+        admin_conn,
+        &ClientFrame::Keyring {
+            entry: fresh.encode().unwrap(),
+        },
+    );
+    let (conn, _) = handshake(&mut relay, &device(2), ROOM, 0);
+    let out = send(
+        &mut relay,
+        conn,
+        &ClientFrame::Keyring {
+            entry: claim(&device(2), &[], 7).encode().unwrap(),
+        },
+    );
+    assert!(
+        sends(&out, conn)
+            .iter()
+            .all(|f| matches!(f, RelayFrame::Keyring { .. }))
+    );
+    let out = send(
+        &mut relay,
+        conn,
+        &ClientFrame::Keyring {
+            entry: claim(&device(2), &[&fresh], 7).encode().unwrap(),
+        },
+    );
+    assert!(matches!(sends(&out, conn)[0], RelayFrame::Welcome { .. }));
+    assert!(
+        relay
+            .room(&ROOM)
+            .unwrap()
+            .keyring()
+            .role(&device(2).identity().member)
+            .is_some()
+    );
+}

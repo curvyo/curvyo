@@ -397,20 +397,35 @@ impl RoomLog {
         from: Option<ConnectionId>,
         out: &mut Vec<RelayOutput>,
     ) -> bool {
-        let Ok(hash) = entry.try_hash() else {
+        let Some(keyring) = self.candidate(&entry) else {
             return false;
         };
+        self.append_replayed(entry, keyring, bytes, from, out);
+        true
+    }
+
+    /// The keyring with `entry` appended, if the entry is new and accepted; nothing is stored.
+    pub(super) fn candidate(&self, entry: &Entry) -> Option<Keyring> {
+        let hash = entry.try_hash().ok()?;
         if self.keyring.is_accepted(&hash) {
-            return false;
+            return None;
         }
         let mut all: Vec<Entry> = self.entries.iter().map(|(e, _)| e.clone()).collect();
         all.push(entry.clone());
-        let Ok(keyring) = Keyring::replay(&all) else {
-            return false;
-        };
-        if !keyring.is_accepted(&hash) {
-            return false;
-        }
+        let keyring = Keyring::replay(&all).ok()?;
+        keyring.is_accepted(&hash).then_some(keyring)
+    }
+
+    /// Stores `entry` with its replayed `keyring` (from [`Self::candidate`]), sends it to the
+    /// others and closes the connections it removed.
+    pub(super) fn append_replayed(
+        &mut self,
+        entry: Entry,
+        keyring: Keyring,
+        bytes: &[u8],
+        from: Option<ConnectionId>,
+        out: &mut Vec<RelayOutput>,
+    ) {
         self.keyring = keyring;
         self.entries.push((entry, bytes.to_vec()));
         out.push(RelayOutput::Store(StoreOp::Keyring {
@@ -425,7 +440,6 @@ impl RoomLog {
             out,
         );
         self.close_removed(out);
-        true
     }
 
     /// Closes every admitted connection whose member the keyring no longer lists.
