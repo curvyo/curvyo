@@ -5,6 +5,8 @@
 (residue) and §5 (repair); ADR 0015 said overrides need a new ADR. Asked by
 `specs/0057-clone-overrides`.
 
+Note 2026-11-09: §1 to §4 amended by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): `own_placement` works for every root, a group counts as transformed when its whole subtree is mapped by one T; `own_style` only for outline roots (path, compound path, primitive, sketch), residue on clones of groups, texts and images.
+
 ## Context
 
 ADR 0015 lets a clone read outline, style and opacity live from the root of its chain, and
