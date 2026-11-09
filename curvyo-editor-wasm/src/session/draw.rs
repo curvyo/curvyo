@@ -87,6 +87,7 @@ impl Session {
             let mut list = self.sketch_draw_list();
             // A sketch row dragged onto the canvas: its ghost over everything (`specs/0099`).
             list.extend(self.row_drag_ghost_list());
+            list.extend(self.clone_drop_ghost_list());
             return list;
         }
         let view = self.view();
@@ -262,6 +263,7 @@ impl Session {
             ));
         }
         list.extend(self.row_drag_ghost_list());
+        list.extend(self.clone_drop_ghost_list());
         list
     }
 

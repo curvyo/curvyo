@@ -81,10 +81,9 @@ fn an_empty_sketch_shows_the_refusal_badge_and_places_nothing() {
     assert_eq!(answer.badge, DropBadge::NoSketch);
     assert!(!s.row_drag_drop());
     assert_eq!(s.undo_len(), steps);
-    assert!(
-        !s.row_drag_begin(FIRST_PAGE_ID),
-        "a drawing row places nothing yet"
-    );
+    // Since `0100` a drawing row places a page; a laser row only reorders.
+    let laser = s.add_page_of_kind("curvyo.laser", None).unwrap();
+    assert!(!s.row_drag_begin(&laser), "a laser row only reorders");
 }
 
 #[test]
@@ -112,4 +111,77 @@ fn a_drop_past_the_clone_limit_is_refused_and_changes_nothing() {
     assert_eq!(s.undo_len(), steps);
     assert_eq!(s.document.version(), before);
     assert_eq!(s.active_page().id, sketch_page);
+}
+
+/// A laser page next to the drawing page; its id and centre.
+fn laser(s: &mut Session) -> (String, Point) {
+    let id = s.add_page_of_kind("curvyo.laser", None).unwrap();
+    let c = centre(s, &id);
+    (id, c)
+}
+
+#[test]
+fn criterion_13_a_drawing_page_row_dropped_on_a_laser_page_places_it_in_one_step() {
+    let mut s = Session::new(100_013);
+    let (laser, at) = laser(&mut s);
+    s.activate_page(FIRST_PAGE_ID);
+    let steps = s.undo_len();
+    assert!(s.row_drag_begin(FIRST_PAGE_ID));
+    let answer = s.row_drag_move(Some(at));
+    assert_eq!(answer.badge, DropBadge::PlacedPage);
+    assert_eq!(answer.target.as_deref(), Some(laser.as_str()));
+    assert!(s.row_drag_drop());
+    assert_eq!(s.undo_len(), steps + 1);
+    assert_eq!(s.active_page().id, laser);
+    let placed = s.selected_placement().unwrap();
+    let frame = s.placed_frame(placed).unwrap();
+    let mid = Point::new(
+        f64::midpoint(frame[0].x, frame[2].x),
+        f64::midpoint(frame[0].y, frame[2].y),
+    );
+    assert!(
+        mid.vector_to(at).length() < 5.0,
+        "centred under the pointer"
+    );
+}
+
+#[test]
+fn criterion_14_a_drawing_page_row_elsewhere_says_only_on_a_laser_page_and_places_nothing() {
+    let mut s = Session::new(100_014);
+    laser(&mut s);
+    s.activate_page(FIRST_PAGE_ID);
+    let steps = s.undo_len();
+    assert!(s.row_drag_begin(FIRST_PAGE_ID));
+    let answer = s.row_drag_move(Some(centre(&s, FIRST_PAGE_ID)));
+    assert_eq!(answer.badge, DropBadge::OnlyOnLaserPage);
+    assert!(answer.faint);
+    assert!(!s.row_drag_drop());
+    assert_eq!(s.undo_len(), steps);
+}
+
+#[test]
+fn criterion_17_18_a_placed_page_drags_on_its_laser_page_and_snaps_back_off_it() {
+    let mut s = Session::new(100_017);
+    let (laser, at) = laser(&mut s);
+    assert!(s.place_page_on_active(FIRST_PAGE_ID));
+    assert_eq!(s.active_page().id, laser);
+    let placed = s.selected_placement().unwrap();
+    s.set_tool(crate::session::Tool::Select);
+    let before = s.placed_frame(placed).unwrap();
+    // A press anywhere in the frame selects and drags it.
+    s.pointer_down(at, false);
+    s.pointer_hover(Point::new(at.x + 10.0, at.y), false, false);
+    s.pointer_up(Point::new(at.x + 10.0, at.y), false, false);
+    let after = s.placed_frame(placed).unwrap();
+    assert!((after[0].x - before[0].x - 10.0).abs() < 1e-9);
+    // Far off the page: refused, nothing written, the notice.
+    let steps = s.undo_len();
+    s.pointer_down(at, false);
+    s.pointer_up(Point::new(at.x + 10_000.0, at.y), false, false);
+    assert_eq!(s.undo_len(), steps);
+    assert_eq!(
+        s.take_transform_notice(),
+        "A placed page stays on its laser page."
+    );
+    assert_eq!(s.placed_frame(placed).unwrap(), after);
 }

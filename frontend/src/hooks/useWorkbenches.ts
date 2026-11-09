@@ -109,6 +109,9 @@ export function useWorkbenches(editor: EditorSession) {
       editor.setTool("select");
       return run((session) => session.add_page_of_kind(kind, profile)) ?? "";
     },
+    /** Place page (`specs/0100` criterion 15): drawing page `id` at the active laser page's
+     * centre. Whether it was placed. */
+    placePage: (id: string) => run((session) => session.place_page_on_active(id)) ?? false,
     /** Edit work area of a user profile (criterion 15): a library write; the notice. */
     setProfileWorkArea: (id: string, width: number, height: number) =>
       run((session) => session.set_profile_work_area(id, width, height, Date.now())) ?? "",

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 011c91d43f087c167b5cbd39265388b568354cd7110152fb5bd42b62a685ed5a # shrinks to d = RandomDocument { texts: [RandomText { face: 0, size: 3.0, at: (20.0, 30.0), anchor: 0, mode: 0, upright: false, letter: None, word: None, lines: ["AV"], dx: [], rotate: [], turn: Some(77.12438281698616) }], images: [], stroked: [], sketch: None }

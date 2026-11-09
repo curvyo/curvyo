@@ -214,8 +214,14 @@ impl Session {
             self.held.ctrl && !self.held.alt,
             snap_offset,
         )?;
+        // Over a laser page the Drop badge says Copy: the readout does not say it again
+        // (`specs/0100` UX review).
+        let copy_word = live.copy
+            && self
+                .clone_drop_answer()
+                .is_none_or(|a| a.badge == super::DropBadge::None);
         Some(LiveReadout {
-            text: move_readout_text(live.offset, live.copy),
+            text: move_readout_text(live.offset, copy_word),
             anchor,
         })
     }

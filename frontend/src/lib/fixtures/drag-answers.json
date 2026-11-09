@@ -1,0 +1,42 @@
+[
+  {
+    "badge": "none",
+    "target": null,
+    "faint": false
+  },
+  {
+    "badge": "clone",
+    "target": "mfg-1-2",
+    "faint": false
+  },
+  {
+    "badge": "not_on_sketch_page",
+    "target": null,
+    "faint": true
+  },
+  {
+    "badge": "no_sketch",
+    "target": null,
+    "faint": false
+  },
+  {
+    "badge": "move",
+    "target": "mfg-1-2",
+    "faint": false
+  },
+  {
+    "badge": "copy",
+    "target": "mfg-1-2",
+    "faint": false
+  },
+  {
+    "badge": "placed_page",
+    "target": "mfg-1-2",
+    "faint": false
+  },
+  {
+    "badge": "only_on_laser_page",
+    "target": null,
+    "faint": true
+  }
+]

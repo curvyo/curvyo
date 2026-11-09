@@ -1,3 +1,5 @@
+import { DropBadgePill } from "@/components/DropBadgePill";
+import { badgeWord } from "@/lib/dragAnswer";
 import { Minus, MoveDiagonal, MoveHorizontal, MoveVertical, Plus } from "lucide-react";
 import { useLayoutEffect, useState } from "react";
 
@@ -52,8 +54,22 @@ export function MoveBadges({ badges, containerRef }: MoveBadgesProps) {
     badges.remove ? ("remove" as const) : null,
     badges.lock ? (`lock-${badges.lock}` as const) : null,
   ].filter((badge) => badge !== null);
+  // The Drop badge of a move over a laser page, right-below the hotspot (`specs/0100` UX notes
+  // §2): glyph and word; it replaces the plus badge.
+  const dropBadge = badges.drop ? (
+    <DropBadgePill
+      position="absolute"
+      badge={{
+        kind: badges.drop,
+        word: badgeWord(badges.drop, "") ?? "",
+        refused: false,
+        x: badges.x + 16,
+        y: badges.y + 16,
+      }}
+    />
+  ) : null;
   if (shown.length === 0) {
-    return null;
+    return dropBadge;
   }
   // Left of the pointer unless the outermost badge would leave the canvas.
   const outermost = BADGE_OFFSET_PX + (shown.length - 1) * SECOND_BADGE_SHIFT_PX + BADGE_PX / 2;
@@ -62,6 +78,7 @@ export function MoveBadges({ badges, containerRef }: MoveBadgesProps) {
   const drop = mirrored && readoutBelow ? CLASH_DROP_PX : 0;
   return (
     <>
+      {dropBadge}
       {shown.map((kind, index) => {
         const reach =
           (mirrored ? MIRRORED_OFFSET_PX : BADGE_OFFSET_PX) + index * SECOND_BADGE_SHIFT_PX;

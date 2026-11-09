@@ -205,6 +205,8 @@ impl Session {
         if self.select.drag_in_flight() {
             self.begin_snapping_drag_for_selection();
         }
+        // A move may end as a cloning drop on a laser page (`specs/0100`).
+        self.clone_drop_begin();
     }
 
     /// Acceptance criteria 3, 15-18, 20, 41: commits whatever move/resize/
@@ -225,16 +227,28 @@ impl Session {
         let snap_offset = self
             .snap_offset_for_move()
             .unwrap_or(curvyo_document_core::Vec2::ZERO);
+        // Over a laser page the release decides by its own flags (`specs/0100` criteria 1 to 4).
+        if self.clone_drop_release(point, snap_offset) {
+            self.end_snapping_drag();
+            return;
+        }
+        let target = self.clone_drop_target();
+        // Ctrl with Alt over a laser page is a copy (criterion 4).
+        let alt = self.held.alt && self.clone_drop_mode() != super::DropMode::Copy;
+        self.clone_drop_cancel();
         let recovery = self.select.pointer_up_snapped(
             &self.document,
             &objects,
             &mut self.selection,
             point,
-            Modifiers::new(shift, ctrl).with_alt(self.held.alt),
+            Modifiers::new(shift, ctrl).with_alt(alt),
             &mut self.minter,
             snap_offset,
         );
         self.end_snapping_drag();
+        if let Some(page) = target {
+            self.activate_page(&page);
+        }
         // A release that set an axis to 0.01 mm says so (`0056` criterion 15).
         self.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
         if self.has_unrecorded_steps() {
@@ -283,6 +297,9 @@ impl Session {
         self.select
             .pointer_moved(point, modifiers, &mut self.selection);
         self.snap_offset_for_move();
+        if self.select.drag_in_flight() {
+            self.clone_drop_update(point);
+        }
         let objects = self.objects();
         // Nothing lights up while a drag runs; hover returns after release.
         // Otherwise hover lights the object a press at this point would

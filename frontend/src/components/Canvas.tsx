@@ -5,6 +5,7 @@ import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanva
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
+import { PlacedPageTags } from "@/components/PlacedPageTags";
 import { EditHintChip } from "@/components/EditHintChip";
 import { HandleHintChip } from "@/components/HandleHintChip";
 import { KeyHintChip } from "@/components/KeyHintChip";
@@ -171,7 +172,8 @@ export function Canvas({ editor, sketch, onDropFiles, overlay, showPageFrames = 
         />
 
       </NodeContextMenu>
-      {showPageFrames && <PageFrames getSession={editor.getSession} />}
+      {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} />}
+      {showPageFrames && <PlacedPageTags getSession={editor.getSession} />}
       <SketchAnnotations sketch={sketch} />
       {sketch.view.workbench !== "sketch" && (
         <MeasureOverlay getSession={editor.getSession} measuring={editor.tool === "measure"} />

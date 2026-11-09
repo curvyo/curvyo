@@ -93,6 +93,14 @@ impl Session {
         live: Option<&LiveEdit>,
     ) -> DragSwap {
         let mut swap = DragSwap::default();
+        // A Linked clone drop leaves the originals where they started; its ghost travels
+        // (`specs/0100` criterion 2).
+        let live = live.filter(|_| {
+            !matches!(
+                self.clone_drop_mode(),
+                super::DropMode::Clone | super::DropMode::Nothing
+            )
+        });
         if let Some(live) = live {
             swap.copy = live.copy;
             swap.moved.extend(live.objects.iter().cloned());

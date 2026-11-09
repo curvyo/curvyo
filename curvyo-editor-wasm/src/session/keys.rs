@@ -444,6 +444,7 @@ impl Session {
     /// its step 2 and 3 are one, see [`Session::escape`].
     pub(super) fn cancel_drag_in_flight(&mut self) -> bool {
         self.end_snapping_drag();
+        self.clone_drop_cancel();
         if self.page_drag.take().is_some() {
             return true;
         }
@@ -452,6 +453,7 @@ impl Session {
                 let was = self.select.drag_in_flight();
                 if was {
                     self.select.escape();
+                    self.clone_drops.escaped = self.button_down;
                 }
                 was
             }
@@ -608,10 +610,6 @@ impl Session {
     /// toolbar's Delete button): removes every selected object when the
     /// Select or Node tool is active. A no-op for every other tool.
     pub fn delete_selected(&mut self) {
-        // A selected placement goes alone (`specs/0098` criterion 12).
-        if self.delete_selected_placement() {
-            return;
-        }
         self.recording(|this| {
             this.flush_select_bar_preview();
             this.flush_style_preview();

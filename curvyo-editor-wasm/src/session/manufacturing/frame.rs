@@ -10,6 +10,12 @@ use curvyo_render_core::{DrawList, GridStroke, RgbaColor, build_artwork};
 
 use super::super::Session;
 
+/// The alpha of a placed page drawn off its laser page during a drag, in percent (UX notes §5).
+const OFF_PAGE_PERCENT: u16 = 40;
+
+/// The alpha of a placed page's frame mark (UX notes §5: 65 %).
+const FRAME_MARK_ALPHA: u8 = 166;
+
 /// Below this the linear part of a placement matrix is not a uniform scale (tolerance of the
 /// tessellation scale only; the vertices are mapped exactly).
 const UNIFORM_EPS: f64 = 1e-9;
@@ -71,52 +77,120 @@ impl Session {
         }
         let view = self.view();
         let read = self.document_read();
-        for manufacturing in &manufacturings {
-            let Some(page) = manufacturing.page.as_ref() else {
-                continue;
-            };
-            let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
-            for (_, map, members) in self.placements_of(manufacturing) {
-                let map = to_plane.compose(map);
-                let objects: Vec<ObjectSnapshot> = members
-                    .iter()
-                    .map(|&index| read.drawn[index].clone())
-                    .collect();
-                let tessellation =
-                    ViewTransform::new(view.scale() * linear_scale(map), Point::new(0.0, 0.0));
-                let mut art = build_artwork(&objects, tessellation);
-                art.map_positions(|p| map.apply_point(p));
-                list.extend(art);
-            }
-        }
-        list
-    }
-
-    /// The marks over every output page: a selected placement's box and the machine origin
-    /// marker (view only, never artwork).
-    pub(in crate::session) fn output_pages_overlay(&self) -> DrawList {
-        let mut list = DrawList::default();
-        let manufacturings = self.document.manufacturings();
-        if manufacturings.is_empty() {
-            return list;
-        }
-        let view = self.view();
-        let read = self.document_read();
-        let selected = self.selected_placement();
+        let live = self.placed_live();
         for manufacturing in &manufacturings {
             let Some(page) = manufacturing.page.as_ref() else {
                 continue;
             };
             let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
             for (id, map, members) in self.placements_of(manufacturing) {
-                if selected == Some(id)
-                    && let Some((min, max)) =
-                        curvyo_ui_core::placed_bounds(&read.drawn, &members, to_plane.compose(map))
+                let objects: Vec<ObjectSnapshot> = members
+                    .iter()
+                    .map(|&index| read.drawn[index].clone())
+                    .collect();
+                // A placed page in a Select drag is drawn where a release puts it, a copy beside
+                // the original; off its laser page at 40 % (`specs/0100` UX notes §5).
+                let mut drawn = vec![(Affine::IDENTITY, false)];
+                if let Some(&(t, copy, off)) =
+                    live.iter().find(|(lid, ..)| *lid == id).map(|(_, l)| l)
                 {
-                    let corners = [min, Point::new(max.x, min.y), max, Point::new(min.x, max.y)];
-                    list.extend(curvyo_render_core::build_offset_grown_box(corners, view));
+                    if copy {
+                        drawn.push((t, off));
+                    } else {
+                        drawn = vec![(t, off)];
+                    }
+                }
+                for (t, faint) in drawn {
+                    let map = t.compose(to_plane.compose(map));
+                    let tessellation =
+                        ViewTransform::new(view.scale() * linear_scale(map), Point::new(0.0, 0.0));
+                    let mut art = build_artwork(&objects, tessellation);
+                    art.map_positions(|p| map.apply_point(p));
+                    if faint {
+                        for vertex in &mut art.triangles {
+                            // 40 % of an alpha in 0..=255, integer arithmetic.
+                            vertex.color.a =
+                                u8::try_from(u16::from(vertex.color.a) * OFF_PAGE_PERCENT / 100)
+                                    .unwrap_or(u8::MAX);
+                        }
+                    }
+                    list.extend(art);
                 }
             }
+        }
+        list
+    }
+
+    /// The live map of each placed page in the Select edit in flight: the map from where it is to
+    /// where a release puts it, whether that is a copy, and whether it would be off its page.
+    pub(in crate::session) fn placed_live(&self) -> Vec<(NodeId, (Affine, bool, bool))> {
+        let objects = self.objects();
+        let Some(live) = self.select_live_edit_in(&objects) else {
+            return Vec::new();
+        };
+        live.objects
+            .iter()
+            .filter_map(|moved| {
+                let ObjectSnapshot::Image(after) = moved else {
+                    return None;
+                };
+                let placed = self.document.placed_page(after.id)?;
+                let Some(ObjectSnapshot::Image(before)) =
+                    objects.iter().find(|o| o.id() == after.id)
+                else {
+                    return None;
+                };
+                let t = after.placement.compose(before.placement.inverse()?);
+                let corners = [
+                    Point::new(0.0, 0.0),
+                    Point::new(1.0, 0.0),
+                    Point::new(1.0, 1.0),
+                    Point::new(0.0, 1.0),
+                ]
+                .map(|p| after.placement.apply_point(p));
+                let off = !curvyo_document_core::overlaps_page(&corners, &placed.output);
+                Some((after.id, (t, live.copy, off)))
+            })
+            .collect()
+    }
+
+    /// The frame mark of every placed page (UX notes §5): its source frame under its matrix, one
+    /// device pixel wide in the toolbar ink at 65 %; a mark, never output.
+    pub(in crate::session) fn placed_frame_marks(&self) -> DrawList {
+        let placed = self.document.placed_pages();
+        if placed.is_empty() {
+            return DrawList::default();
+        }
+        let mut ink = curvyo_render_core::grid_ink(self.shown_background());
+        ink.a = FRAME_MARK_ALPHA;
+        let strokes: Vec<GridStroke> = placed
+            .iter()
+            .filter_map(|p| self.placed_frame(p.id))
+            .flat_map(|c| {
+                (0..4).map(move |i| GridStroke {
+                    start: c[i],
+                    end: c[(i + 1) % 4],
+                    emphasis: 1.0,
+                    alpha: 1.0,
+                })
+            })
+            .collect();
+        curvyo_render_core::build_grid_lines(&strokes, ink, self.view(), self.device_pixel_ratio)
+    }
+
+    /// The marks over every output page: a selected placement's box and the machine origin
+    /// marker (view only, never artwork).
+    pub(in crate::session) fn output_pages_overlay(&self) -> DrawList {
+        let mut list = self.placed_frame_marks();
+        let manufacturings = self.document.manufacturings();
+        if manufacturings.is_empty() {
+            return list;
+        }
+        let view = self.view();
+        for manufacturing in &manufacturings {
+            let Some(page) = manufacturing.page.as_ref() else {
+                continue;
+            };
             if self.process_enabled(&manufacturing.process)
                 && let Some(copy) = manufacturing.profile.as_ref()
             {
@@ -127,28 +201,9 @@ impl Session {
         list
     }
 
-    /// The placement whose placed content lies under `point`, the topmost first.
-    pub(in crate::session) fn placement_at(&self, point: Point) -> Option<NodeId> {
-        let read = self.document_read();
-        self.document
-            .manufacturings()
-            .iter()
-            .rev()
-            .find_map(|manufacturing| {
-                let page = manufacturing.page.as_ref()?;
-                let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
-                self.placements_of(manufacturing)
-                    .into_iter()
-                    .rev()
-                    .find(|(_, map, members)| {
-                        curvyo_ui_core::placed_bounds(&read.drawn, members, to_plane.compose(*map))
-                            .is_some_and(|(min, max)| {
-                                (min.x..=max.x).contains(&point.x)
-                                    && (min.y..=max.y).contains(&point.y)
-                            })
-                    })
-                    .map(|(id, _, _)| id)
-            })
+    /// The frame corners of placed page `id` as drawn now (with a drag in flight).
+    pub(in crate::session) fn placed_frame(&self, id: NodeId) -> Option<[Point; 4]> {
+        self.document.placed_page(id)?.frame_corners()
     }
 
     /// The union of the placed content's bounds on the output page, page-local (the overhang

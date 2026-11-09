@@ -244,6 +244,8 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
             onPressedAt={onPressedAt}
           />
         )}
+        {panel.styleRow && (
+          <>
         <OverrideRow
           label="Style"
           segments={STYLE_SEGMENTS}
@@ -274,6 +276,8 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
             Spread colours
           </button>
         </Tooltip>
+          </>
+        )}
       </div>
     </div>
   );

@@ -43,9 +43,15 @@ impl DocumentRead {
         // Each text is laid out once per read: drawing, hit tests and bounds read the outline
         // (`specs/0074-text-objects`, ADR 0020 §2).
         for read in &mut nodes {
-            if let curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) = &mut read.kind
-            {
-                text.outline = fonts.lay_out(text).map(Arc::new);
+            match &mut read.kind {
+                curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) => {
+                    text.outline = fonts.lay_out(text).map(Arc::new);
+                }
+                // The texts a clone of a group or text draws are laid out under its matrix.
+                curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
+                    lay_out_picture(clone, fonts);
+                }
+                _ => {}
             }
         }
         let nodes: Arc<[NodeRead]> = nodes.into();
@@ -95,6 +101,31 @@ impl DocumentRead {
             guides: Arc::new(guides),
         }
     }
+}
+
+/// Lays out every text leaf of `clone`'s picture that has no outline yet.
+fn lay_out_picture(clone: &mut curvyo_document_core::CloneSnapshot, fonts: &TextFonts) {
+    let Some(picture) = &clone.chain.picture else {
+        return;
+    };
+    if !picture
+        .iter()
+        .any(|leaf| matches!(leaf, ObjectSnapshot::Text(text) if text.outline.is_none()))
+    {
+        return;
+    }
+    let laid: Arc<[ObjectSnapshot]> = picture
+        .iter()
+        .map(|leaf| match leaf {
+            ObjectSnapshot::Text(text) if text.outline.is_none() => {
+                let mut text = text.clone();
+                text.outline = fonts.lay_out(&text).map(Arc::new);
+                ObjectSnapshot::Text(text)
+            }
+            other => other.clone(),
+        })
+        .collect();
+    clone.chain.picture = Some(laid);
 }
 
 /// The cached read and whether a drag holds it.

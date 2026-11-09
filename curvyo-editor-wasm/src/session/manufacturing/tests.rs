@@ -225,13 +225,13 @@ fn ac12_a_placement_from_an_older_file_is_drawn_selected_and_deleted() {
     assert!(session.activate_page(&page.id));
     // The rectangle of page 1 is drawn on the laser page at its placed position.
     let at = Point::new(page.origin.x + 25.0, page.origin.y + 5.0);
-    let placed = session.placement_at(at);
-    assert_eq!(placed, Some(made.placements[0].id));
+    let placed = Some(made.placements[0].id);
     session.set_tool(Tool::Select);
     session.pointer_down(at, false);
     session.pointer_up(at, false, false);
+    // Since `0100` a placed page is an object of the one selection.
     assert_eq!(session.selected_placement(), placed);
-    assert!(session.selection.is_empty());
+    assert_eq!(session.selection.ids(), &[made.placements[0].id]);
     let steps = session.history_len();
     session.delete_selected();
     assert_eq!(session.history_len(), steps + 1);

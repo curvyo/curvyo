@@ -49,7 +49,11 @@ impl Session {
     fn panel_scope_non_empty(&self) -> bool {
         // Clones have no style of their own and stay out of the style scope, but the Style tab
         // shows their clone block (`0049` criteria 22 and 24, UX review must-fix 1).
-        !self.style_scope().ids.is_empty() || self.clone_subject().is_some()
+        // A placed page has no style either; the Style tab shows its block (`specs/0100`
+        // criterion 17).
+        !self.style_scope().ids.is_empty()
+            || self.clone_subject().is_some()
+            || self.selected_placement().is_some()
     }
 
     /// Runs `change` on the tab state. The state is a `Cell` because a read of

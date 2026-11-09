@@ -166,9 +166,12 @@ impl Session {
         }
         let objects = self.objects();
         let mut images = Vec::with_capacity(ids.len());
+        let placed = self.placement_ids();
         let (mut masks, mut refused) = (0, 0);
         for id in ids {
             match objects.iter().find(|object| object.id() == *id) {
+                // A placed page's frame object is no picture (`specs/0100` criterion 17).
+                Some(ObjectSnapshot::Image(_)) if placed.contains(id) => refused += 1,
                 Some(ObjectSnapshot::Image(image)) => images.push(image.clone()),
                 Some(object) if super::trace_region::is_mask_path(object) => masks += 1,
                 Some(_) => refused += 1,

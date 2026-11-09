@@ -51,7 +51,14 @@ impl Session {
     pub fn delete_placement(&mut self, id: NodeId) -> bool {
         let deleted = self.recording(|this| this.document.delete_placement(id).is_ok());
         if deleted {
-            self.manufacturing.selected_placement = None;
+            let kept: Vec<NodeId> = self
+                .selection
+                .ids()
+                .iter()
+                .copied()
+                .filter(|&selected| selected != id)
+                .collect();
+            self.selection.set(&kept);
         }
         deleted
     }

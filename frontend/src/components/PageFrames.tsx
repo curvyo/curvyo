@@ -5,8 +5,11 @@ import { KindChip } from "@/components/KindChip";
 /** Screen-sized page chrome above the un-clipped drawing. Geometry comes from Rust. */
 export function PageFrames({
   getSession,
+  dropTarget = null,
 }: {
   getSession: () => WasmSession | null;
+  /** The laser page a canvas drag of objects is over (its badge is no refusal): frame cue. */
+  dropTarget?: string | null;
 }) {
   const [json, setJson] = useState("[]");
   useEffect(() => {
@@ -46,7 +49,7 @@ export function PageFrames({
           }}
         >
           {/* The frame cue of a page-row drop (`specs/0099` UX notes §2): 2px outside. */}
-          {page.dropTarget && (
+          {(page.dropTarget || page.id === dropTarget) && (
             <div
               data-drop-target=""
               className="absolute"
@@ -57,6 +60,7 @@ export function PageFrames({
               below 96 px, the whole label below 24 px (`specs/0098` UX notes §5). */}
           {page.screenWidth >= 24 && (
             <span
+              data-page-label=""
               className="absolute bottom-full left-0 mb-1 flex max-w-full items-center gap-1.5 whitespace-nowrap text-xs"
               style={{ color: "var(--toolbar-icon)" }}
             >

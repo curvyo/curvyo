@@ -426,7 +426,9 @@ fn ac3_a_clone_of_a_selected_clone_makes_a_chain() {
 }
 
 #[test]
-fn ac4_not_offered_for_a_group_nothing_selected_or_another_tool() {
+// Amended by `specs/0100-bring-content-in` criterion 8: a group is an original, so Linked clone
+// is offered for it.
+fn ac4_offered_for_a_group_not_for_nothing_selected_or_another_tool() {
     let d = Document::new(1);
     square(&d, 0);
     square(&d, 1);
@@ -436,11 +438,9 @@ fn ac4_not_offered_for_a_group_nothing_selected_or_another_tool() {
     ctrl_a(&mut s);
     assert!(s.linked_clone_shown());
     s.group_selection();
-    assert!(!s.linked_clone_shown(), "a group is selected");
-    let before = doc_of(&s).export_loro_snapshot().unwrap();
-    assert_eq!(s.linked_clone().code(), "ignored");
-    assert_eq!(clone_count(&s), 0);
-    drop(before);
+    assert!(s.linked_clone_shown(), "a group is selected");
+    assert_eq!(s.linked_clone().code(), "done");
+    assert_eq!(clone_count(&s), 1, "one clone of the group");
     // A selection of a path and a group: not offered, nothing converted.
     let d = Document::new(1);
     let a = rect_at(&d, 20.0, 20.0, 30.0, 30.0);

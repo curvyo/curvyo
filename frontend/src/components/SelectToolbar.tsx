@@ -1,3 +1,4 @@
+import { InlinePickList, type PickRow } from "@/components/InlinePickList";
 import { CircleAlert, Link, Unlink } from "lucide-react";
 import { AlignmentGroup } from "@/components/AlignmentGroup";
 import type { OrientationCode, WritingModeCode } from "@/lib/textWritingText";
@@ -104,6 +105,8 @@ export interface SelectToolbarProps {
   onLinkedClone: () => void;
   /** The notice of the last Linked clone, 4 px under the button (UX notes). */
   linkedCloneNotice: CloneBarNotice | null;
+  /** Place on… (`specs/0100` criterion 25): the laser pages; none hides the button. */
+  placeOn?: { rows: PickRow[]; onPick: (id: string) => void };
   /** The Trace button: shown with only images selected (`specs/0025-raster-trace` criterion 1). */
   traceShown?: boolean;
   onTrace?: () => void;
@@ -643,6 +646,7 @@ export function SelectToolbar({
   strokeToPath,
   linkedCloneShown,
   onLinkedClone,
+  placeOn,
   linkedCloneNotice,
   traceShown = false,
   onTrace,
@@ -783,7 +787,20 @@ export function SelectToolbar({
   // (`specs/0085-stroke-to-path` UX notes, "Button").
   const strokeToPathShown = Boolean(strokeToPath?.shown);
   const linkedClone = linkedCloneShown ? (
-    <LinkedCloneButton key="linked-clone" onLinkedClone={onLinkedClone} onReturnFocus={onReturnFocus} notice={linkedCloneNotice} />
+    <div key="linked-clone" className="flex items-start gap-1">
+      <LinkedCloneButton onLinkedClone={onLinkedClone} onReturnFocus={onReturnFocus} notice={linkedCloneNotice} />
+      {placeOn && placeOn.rows.length > 0 && (
+        // The list opens under the button, over the canvas, and closes on a choice or Escape.
+        <div className="relative my-1 w-fit has-[[role=listbox]]:w-60">
+          <InlinePickList
+            label="Place on…"
+            className={`${BUTTON_CLASS} flex items-center gap-1`}
+            rows={placeOn.rows}
+            onPick={placeOn.onPick}
+          />
+        </div>
+      )}
+    </div>
   ) : null;
   if (bar.objectToPathShown || strokeToPathShown) {
     const convert = (

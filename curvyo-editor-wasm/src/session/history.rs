@@ -105,9 +105,14 @@ impl Session {
         let _ = self.document.take_clone_repair();
         let _ = self.document.take_kept_carriers();
         let _ = self.document.take_clone_refusal();
+        let _ = self.document.take_placement_refusal();
         let before = self.selection_snapshot();
         self.document.set_step_time((self.history.clock)());
         let result = body(self);
+        // A placed page kept on its laser page says so (`specs/0100` criterion 18).
+        if self.document.take_placement_refusal() {
+            self.transform_notice = Some(super::manufacturing::OFF_PAGE_NOTICE);
+        }
         // An edit ends an object preview; the object is drawn as it now is (`0042` criterion 18).
         self.end_object_preview();
         self.record_new_steps(&before);

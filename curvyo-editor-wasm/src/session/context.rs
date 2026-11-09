@@ -123,7 +123,15 @@ impl Session {
         let units =
             Arc::new(Units::build(&self.document, context).with_inert(Arc::clone(&read.inert)));
         let objects = match context {
-            None => Arc::clone(&all),
+            // Placed pages are objects of the root, under the drawing (`specs/0100` criterion 17).
+            None => {
+                let frames = self.document.placed_page_objects();
+                if frames.is_empty() {
+                    Arc::clone(&all)
+                } else {
+                    frames.into_iter().chain(all.iter().cloned()).collect()
+                }
+            }
             Some(group) => {
                 let leaves: HashSet<NodeId> = self.document.leaves_of(group).into_iter().collect();
                 all.iter()

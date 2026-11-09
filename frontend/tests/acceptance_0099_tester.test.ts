@@ -224,11 +224,13 @@ test("AC10/14: an empty sketch page row reads Empty, is not drawable, and its dr
   assert.equal(s.place_sketch_clone_on(drawing.id), false);
 });
 
-test("AC8: a drawing page row does not start a place drag in this slice", skipWasm, async () => {
+// Amended by `specs/0100-bring-content-in` criteria 13 and 14: a drawing page row starts a
+// place drag; over the drawing page itself it says "Only on a laser page" and places nothing.
+test("AC8: a drawing page row places nothing outside a laser page", skipWasm, async () => {
   const s = await open();
-  assert.equal(s.row_drag_begin("first"), false);
+  assert.equal(s.row_drag_begin("first"), true);
   const answer = JSON.parse(s.row_drag_move(10, 10, true)) as { badge: string };
-  assert.equal(answer.badge, "none");
+  assert.notEqual(answer.badge, "placed_page");
   assert.equal(s.row_drag_drop(), false);
   s.row_drag_cancel();
 });

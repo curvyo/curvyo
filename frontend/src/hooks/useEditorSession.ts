@@ -1,4 +1,5 @@
 import { createSketchPresentation, type SketchPresentation } from "@/lib/sketchPresentation";
+import { type DropBadgeKind, decodeDragAnswer } from "@/lib/dragAnswer";
 import { type SketchView } from "@/lib/sketchView";
 import { viewTool } from "@/lib/viewTool";
 
@@ -574,12 +575,17 @@ export interface MoveBadgeState {
   remove: boolean;
   /** The lock badge's axis: `""` (none), `"x"` or `"y"`, or `"angle"` for a Sketch direction. */
   lock: "" | "x" | "y" | "angle";
+  /** The Drop badge of a Select move over a laser page (`specs/0100` criterion 2); it replaces
+   * the plus badge for as long as it shows. */
+  drop: DropBadgeKind | null;
+  /** The laser page the drag is over: it gets the frame cue (UX notes §2 "Frame cue"). */
+  dropTarget: string | null;
   /** The pointer hotspot. */
   x: number;
   y: number;
 }
 
-const NO_BADGES: MoveBadgeState = { copy: false, remove: false, lock: "", x: 0, y: 0 };
+const NO_BADGES: MoveBadgeState = { copy: false, remove: false, lock: "", drop: null, dropTarget: null, x: 0, y: 0 };
 
 /** A key that could not act, shown for 2 s next to the pointer
  * (`specs/0010-edit-interaction-polish/` criterion 59). */
@@ -1069,8 +1075,12 @@ export function useEditorSession(
     const raw = session.move_indicators();
     // Ctrl+Z and the like are a key chord, not a Ctrl click in waiting: no plus or minus.
     const chord = modifierTrackerRef.current.chord;
+    const answer = decodeDragAnswer(session.clone_drop_answer());
+    const drop = answer && answer.badge !== "none" ? answer.badge : null;
     const next: MoveBadgeState = {
-      copy: last !== null && !chord && raw.copy_badge,
+      drop,
+      dropTarget: drop === null || answer === null ? null : answer.target,
+      copy: last !== null && !chord && raw.copy_badge && drop === null,
       remove: last !== null && !chord && raw.remove_badge,
       lock: last !== null && (raw.lock === "x" || raw.lock === "y" || raw.lock === "angle") ? raw.lock : "",
       x: last?.x ?? 0,
@@ -1081,7 +1091,9 @@ export function useEditorSession(
       previous.copy === next.copy &&
       previous.remove === next.remove &&
       previous.lock === next.lock &&
-      (!next.copy && !next.remove && next.lock === ""
+      previous.drop === next.drop &&
+      previous.dropTarget === next.dropTarget &&
+      (!next.copy && !next.remove && next.lock === "" && next.drop === null
         ? true
         : previous.x === next.x && previous.y === next.y)
         ? previous
@@ -1243,6 +1255,11 @@ export function useEditorSession(
       const notice = session.take_transform_notice();
       if (notice !== "") {
         history.showNotice(notice, FLIP_NOTICE_MS, "canvas");
+      }
+      // A cloning drop that left guides out or was refused says so (`specs/0100` criterion 6).
+      const dropNotice = session.take_clone_drop_notice();
+      if (dropNotice !== "") {
+        history.showNotice(dropNotice, FLIP_NOTICE_MS, "canvas");
       }
       // A resize that mirrored says so politely: "Resized. Mirrored left to right."
       const announcement = session.take_transform_announcement();
@@ -2497,6 +2514,8 @@ export function useEditorSession(
     const last = lastPointerRef.current;
     if (last) {
       session.pointer_hover(last.x, last.y, shift, ctrl, alt);
+      // The Drop badge follows Alt and Ctrl with the pointer at rest (`specs/0100` criterion 2).
+      syncBadges(session);
       // An Offset drag keeps its own readout through a modifier change (`0038` criteria 15, 19).
       const offsetReadout =
         session.tool() === "offset" ? offsetLiveReadout(session, last.x, last.y) : null;

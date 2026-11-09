@@ -1,12 +1,10 @@
 import {
   ArrowDown,
   ArrowUp,
-  Ban,
   CircleCheck,
   CircleDashed,
   CircleX,
   GripVertical,
-  Link2,
   Move,
   Plus,
   Trash2,
@@ -29,7 +27,7 @@ import {
   stateWord,
   usedByTail,
 } from "@/lib/sketchPages";
-import type { DropBadge } from "@/hooks/usePageRowDrag";
+import { DropBadgePill } from "@/components/DropBadgePill";
 
 const STATE_GLYPHS = { CircleDashed, CircleCheck, Move, TriangleAlert, CircleX };
 
@@ -235,7 +233,9 @@ export function PagesBlock({
                     y: e.clientY,
                     target: index,
                     moved: false,
-                    placing: page.kind === "sketch" && rowDrag.begin(page.id, page.name),
+                    placing:
+                      (page.kind === "sketch" || page.kind === "drawing") &&
+                      rowDrag.begin(page.id, page.name),
                     inList: true,
                   };
                 }}
@@ -456,27 +456,6 @@ function RowLine({ page }: { page: PageRow }) {
   );
 }
 
-/** The drop badge (UX notes §2): DOM, `aria-hidden`, no pointer events. */
-function DropBadgePill({ badge }: { badge: DropBadge }) {
-  const Glyph = badge.refused ? Ban : Link2;
-  return (
-    <div
-      aria-hidden
-      data-drop-badge=""
-      className="pointer-events-none fixed z-50 flex h-5 items-center gap-1 whitespace-nowrap rounded-lg border px-1.5 text-xs"
-      style={{
-        left: badge.x,
-        top: badge.y,
-        background: "var(--toolbar-bg)",
-        color: "var(--toolbar-icon)",
-        borderColor: "color-mix(in srgb, var(--toolbar-icon) 25%, transparent)",
-      }}
-    >
-      <Glyph size={12} />
-      {badge.word}
-    </div>
-  );
-}
 function PagePosition({ page, doc }: { page: PageRow; doc: DocumentPanelApi }) {
   return (
     <div className="flex gap-2 text-xs">

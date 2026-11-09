@@ -2,15 +2,19 @@ import { Eye, EyeOff, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
+import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { fixtureRowKey, focusAfterRemove, tabStopRow } from "@/lib/fixtureRowKeys";
+import type { PageRow } from "@/lib/pages";
 import { WorkbenchIcon } from "@/workbenches/icons";
 import type { ManifestBlock, ManifestParam, ManifestWorkbenchContribution } from "@/workbenches/registry";
 
 interface ManifestTabProps {
   contribution: ManifestWorkbenchContribution;
+  /** The document's pages: Place page lists the drawing pages (`specs/0100` criterion 15). */
+  pages: PageRow[];
   view: ManufacturingView;
   workbenches: WorkbenchesApi;
   /** The document's display unit (the Machine block's work area line). */
@@ -24,7 +28,7 @@ interface ManifestTabProps {
  * (`specs/0026-machine-profile`) and `FixtureList` in the manifest's order. Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, view, workbenches, unit, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, pages, view, workbenches, unit, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
   return (
     <div className="flex flex-col gap-4">
@@ -33,6 +37,7 @@ export function ManifestTab({ contribution, view, workbenches, unit, onReturnFoc
           key={`${block.kind}-${index}`}
           block={block}
           contribution={contribution}
+          pages={pages}
           view={view}
           workbenches={workbenches}
           unit={unit}
@@ -46,6 +51,7 @@ export function ManifestTab({ contribution, view, workbenches, unit, onReturnFoc
 function Block({
   block,
   contribution,
+  pages,
   view,
   workbenches,
   unit,
@@ -56,7 +62,10 @@ function Block({
       return <NoticeBlock text={view.notices[block.id]} />;
     case "machine_profile":
       return view.machine ? (
-        <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} />
+        <>
+          <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} />
+          <PlacePage pages={pages} workbenches={workbenches} onReturnFocus={onReturnFocus} />
+        </>
       ) : null;
     case "fixture_list":
       return (
@@ -344,5 +353,37 @@ function FixtureList({
         })}
       </ul>
     </section>
+  );
+}
+
+/** The full-width outline look of "Fit to content" (`specs/0100` UX notes §4). */
+const placeButton =
+  "flex h-7 w-full items-center justify-between rounded border border-[color-mix(in_srgb,var(--toolbar-icon)_40%,transparent)] px-2 text-xs pointer-coarse:min-h-9";
+
+/** Place page (`specs/0100` criterion 15): the drawing pages in list order with their size;
+ * choosing one places it at the laser page's centre, focus goes to the canvas. Hidden when the
+ * project has no drawing page. */
+function PlacePage({
+  pages,
+  workbenches,
+  onReturnFocus,
+}: {
+  pages: PageRow[];
+  workbenches: WorkbenchesApi;
+  onReturnFocus: () => void;
+}) {
+  const drawing = pages.filter((page) => page.kind === "drawing");
+  if (drawing.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      <InlinePickList
+        label="Place page"
+        className={placeButton}
+        rows={drawing.map((page) => ({ id: page.id, name: page.name, detail: page.size }))}
+        onPick={(id) => {
+          if (workbenches.placePage(id)) onReturnFocus();
+        }}
+      />
+    </div>
   );
 }
