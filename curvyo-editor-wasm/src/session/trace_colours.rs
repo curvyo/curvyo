@@ -1,15 +1,11 @@
-//! The Trace tool's multicolour side (`specs/0089-trace-quality-and-colour` slice M, criteria
-//! 29, UX notes §7 and §26): the palette of the shown preview for the swatch row, and Isolate
-//! (the other colours dimmed in the preview).
+//! The Trace tool's multicolour side (`specs/0089-trace-quality-and-colour` slice M, criterion
+//! 29, UX notes §7 and §26): the colours Create paths writes and the palette of the shown
+//! preview for the swatch row.
 
 use curvyo_document_core::Color;
 use curvyo_ui_core::{TraceColour, TraceLayerWire, TraceRgb};
 
 use super::Session;
-use super::trace_mesh::MeshCache;
-
-/// How strongly the colours Isolate does not pick are drawn (UX notes §7: 35 %).
-pub(super) const DIMMED: f64 = 0.35;
 
 /// A trace colour as a document colour.
 pub(super) fn color(c: TraceRgb) -> Color {
@@ -83,18 +79,6 @@ pub(super) fn with_leftovers(
     (out, colours, places)
 }
 
-/// The layer of every outline (`None` for a single-colour result).
-pub(super) fn outline_layers(layers: &[TraceLayerWire], outlines: usize) -> Vec<Option<usize>> {
-    if layers.is_empty() {
-        return vec![None; outlines];
-    }
-    layers
-        .iter()
-        .enumerate()
-        .flat_map(|(k, layer)| std::iter::repeat_n(Some(k), layer.outlines))
-        .collect()
-}
-
 /// The colours the shown result fills, for its colour count: its layers' colours, then the
 /// palette colours only its texts use (`specs/0091` slice 2), so the count and the strip agree.
 fn used_colours(preview: &super::trace::TracePreview) -> Vec<TraceRgb> {
@@ -133,18 +117,5 @@ impl Session {
             "joined": preview.joined,
         })
         .to_string()
-    }
-
-    /// Sets the isolated colour (`specs/0089` UX notes §26: Shift+hover on a swatch): the other
-    /// colours' outlines are drawn dimmed at once, nothing is traced again and nothing is written
-    /// differently.
-    pub fn set_trace_isolated(&mut self, isolated: Option<TraceRgb>) {
-        if isolated == self.trace.isolated {
-            return;
-        }
-        self.trace.isolated = isolated;
-        if let Some(preview) = &mut self.trace.preview {
-            preview.outline_mesh = MeshCache::default();
-        }
     }
 }

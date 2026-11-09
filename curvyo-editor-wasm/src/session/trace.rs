@@ -62,8 +62,6 @@ pub(super) struct TraceState {
     pub(super) pick: super::trace_pick::TracePick,
     /// Pick mask paths (`trace_mask_pick.rs`, `specs/0094` slice 1b).
     pub(super) mask_pick: super::trace_mask_pick::MaskPick,
-    /// The colour Isolate shows of a multicolour preview, the others dimmed (`trace_colours.rs`).
-    pub(super) isolated: Option<curvyo_ui_core::TraceRgb>,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).

@@ -1,6 +1,6 @@
 //! Tester cases for `specs/0089-trace-quality-and-colour` slice M at the session (criterion 29):
 //! one group with one filled compound path per colour named by its hex, the largest at the
-//! bottom, one undo step, Isolate that never changes what is written. Written from the
+//! bottom, one undo step, every colour written opaque. Written from the
 //! specification; the results come from `trace_colour_job_with` over the pixels the session
 //! itself decoded.
 
@@ -228,12 +228,11 @@ fn c29_create_paths_is_one_undo_step_and_redo_brings_it_back() {
 }
 
 #[test]
-fn c29_isolate_is_view_only_create_paths_still_writes_every_colour_opaque() {
+fn c29_create_paths_writes_every_colour_opaque() {
     let (mut session, _, _) = traced();
-    session.set_trace_isolated(Some(BLUE));
     session.create_traced_paths();
     let (_, paths) = group_paths(&mut session);
-    assert_eq!(paths.len(), 3, "Enter still creates every colour");
+    assert_eq!(paths.len(), 3, "Enter creates every colour");
     let d = doc(&mut session);
     for n in d.read_nodes() {
         if paths.iter().any(|(_, p)| p.id == n.id) {

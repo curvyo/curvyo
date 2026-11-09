@@ -464,13 +464,6 @@ impl WasmSession {
         self.session.trace_palette_json()
     }
 
-    /// The isolated palette colour (`specs/0089` UX notes §26: Shift+hover on a swatch), a
-    /// `#RRGGBB` or empty for none: the preview dims the other colours; nothing is traced again.
-    pub fn set_trace_isolated(&mut self, isolated: &str) {
-        self.session
-            .set_trace_isolated(crate::trace_glue::parse_hex(isolated));
-    }
-
     /// The view is moving (`true`) or has rested for 150 ms (`false`): while it moves, the Trace
     /// tool's kept meshes are drawn at any zoom (criterion 56).
     pub fn set_trace_view_moving(&mut self, moving: bool) {
