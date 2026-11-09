@@ -1,6 +1,6 @@
 # Move versus edit: everything moves anywhere, editing happens in the object's own page context
 
-Status: Ready (2026-11-09; `adrs.md` and `ux-notes.md` exist, no ADR file and no format change; Fragen 164 to 166 open with defaults A)
+Status: Done (PR #299; Fragen 164 to 166 answered A by default with the acceptance)
 Priority: Must
 Origin: Customer (2026-11-05, translated): "Objects can be moved anywhere: pasteboard, over a laser page, over a sketch page. Moving always works; editing only in the context of an active vector page or a matching manufacturing page." Customer direction 2026-11-05 for this slice: moving always works, anywhere (outside a page, over laser pages, over sketch pages); editing only in the context of an active vector page or the matching manufacturing page; Text, Layers, Snapping, Grid and Share tabs exist on laser pages. Frage 156 A (PASTEBOARD-EDIT, answered 2026-11-05: pasteboard objects are editable while a drawing page is active; with a laser or sketch page active they only move; a double-click switches to the last drawing page). Slice 3, part 2 of `specs/0063-manufacturing-workbenches/` (concept A, `concept-output-pages.md` §2.7, sketch i). Split from `0100` on 2026-11-09. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
