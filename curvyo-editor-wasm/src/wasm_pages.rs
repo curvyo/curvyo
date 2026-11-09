@@ -115,7 +115,7 @@ impl WasmSession {
         self.session.place_on(id)
     }
     /// The selected placed page's Style block (`specs/0100` criterion 17): "Placed page of
-    /// <name>." with the name cut at 40 characters; empty when none is selected.
+    /// `name`." with the name cut at 40 characters; empty when none is selected.
     pub fn placed_page_block(&self) -> String {
         self.session.placed_page_block()
     }

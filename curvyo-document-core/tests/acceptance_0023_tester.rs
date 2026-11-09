@@ -603,6 +603,8 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("image_")
             // `0069-tiling` (format 33) is a later build: a tiling is a group.
             || name.starts_with("tiling_")
+            // `0100-bring-content-in` (format 38) is a later build: its golden holds a group.
+            || name.starts_with("bring_content_in_")
         {
             continue;
         }
