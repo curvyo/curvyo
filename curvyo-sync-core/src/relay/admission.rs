@@ -1,6 +1,8 @@
 //! The relay's admission rule (ADR 0031 decision 5): a connection is admitted if the room's
 //! keyring lists its proven identity as a current member, if its first keyring entry is a valid
-//! genesis of an unknown room, or a valid, unexpired claim of an open invite.
+//! genesis of an unknown room, or a valid, unexpired claim of an open invite after which the
+//! keyring lists it. A removed identity is refused as removed unless its claim makes it a member
+//! again.
 
 use std::collections::BTreeMap;
 
@@ -163,6 +165,9 @@ pub(super) fn genesis_or_claim(
         .keyring()
         .invite(invite_id)
         .ok_or(RefusalReason::NotAMember)?;
+    if invite.claimed_by.is_some() && removed {
+        return Err(RefusalReason::Removed);
+    }
     if invite.claimed_by.is_some_and(|m| m != claimant.member) {
         return Err(RefusalReason::Used);
     }
@@ -173,9 +178,13 @@ pub(super) fn genesis_or_claim(
         log.send_keyring(connection, out);
         return Ok(None);
     }
-    if !log.append_entry(entry, bytes, Some(connection), out) {
-        return Err(RefusalReason::Protocol);
+    // A claim admits only if the keyring then lists the claimant: a removed device's claim
+    // built on heads from before its removal is valid but leaves it removed, and is not stored.
+    let keyring = log.candidate(&entry).ok_or(RefusalReason::Protocol)?;
+    if keyring.role(&claimant.member).is_none() {
+        return Err(not_member);
     }
+    log.append_replayed(entry, keyring, bytes, Some(connection), out);
     log.admit(connection, claimant.member, claimant.since_seq, out);
     admitted
 }

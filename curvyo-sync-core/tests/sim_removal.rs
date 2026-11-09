@@ -200,7 +200,7 @@ fn removal_while_offline_and_rotation_across_members() {
 }
 
 /// Share tab feedback (customer 2026-11-09): a removed device joins again by a fresh invite and
-/// syncs; its old link is still refused as removed.
+/// syncs (the old link at the frame level: `relay_rules.rs`).
 #[test]
 fn a_removed_device_joins_again_by_a_new_invite() {
     let (mut net, [a, b, c, _]) = four(5);
