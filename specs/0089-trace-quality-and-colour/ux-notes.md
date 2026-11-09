@@ -1051,8 +1051,8 @@ its place, else the previous one. Isolate has no key (it is a pointer view). Acc
 
 Recolour (the Style picker under the row, Reset, "#FFE000 (was #FFF2A8)", the session's recolour view), Merge into
 (the choosing mode, "Merging ... into...", the merged dot, Esc cancelling it), the detail row, the five action icons,
-the selected swatch and the listbox semantics. The engine's merge support (`merged` in the vectorize core and the
-wasm glue) has no caller in the app any more; it stays for the architect to decide (a core public API).
+the selected swatch and the listbox semantics, and the engine's merge support (`merged` in the vectorize core, the
+text colours and the wasm glue), which had no caller left (customer rule: what a PR obsoletes goes in the same PR).
 
 ### 26.6 Strings
 

@@ -99,7 +99,8 @@ Constants marked Proposal are tuned by the harness (decision 8) and vetoable at 
    Pick colours' colour, else the suggested background): what is under the text after the filling
    decides (nearer a palette colour than the background: on a shape). So white text on a coloured
    box is white, and pale text on the paper takes a palette colour, never the paper's (lead
-   2026-11-02). The maker's Merge into and recolours apply to texts as to paths; a text whose fill
+   2026-11-02). (Merge into and recolours, which applied to texts as to paths, were removed
+   2026-11-09, `0089` ux-notes §26.) A text whose fill
    the maker excluded is left out, as the shapes of that colour are (lead 2026-11-02), and the
    wire names such lines after the fills. The status line's colour count includes the palette
    colours only texts fill. Leftover outlines of a line join the layer of its

@@ -29,9 +29,9 @@
     ],
     "multicolour": true,
     "off_fnv": "e430e9e21933dae5",
-    "off_settings": "{\"output\":1,\"colours\":null,\"fixed\":[],\"excluded\":[],\"merged\":[],\"method\":0,\"background\":null,\"swatches\":[],\"threshold\":128}",
+    "off_settings": "{\"output\":1,\"colours\":null,\"fixed\":[],\"excluded\":[],\"method\":0,\"background\":null,\"swatches\":[],\"threshold\":128}",
     "on_fnv": "2d89311a55c18354",
-    "on_settings": "{\"output\":1,\"colours\":null,\"fixed\":[],\"excluded\":[],\"merged\":[],\"method\":0,\"background\":null,\"swatches\":[],\"threshold\":128,\"shapes\":true}",
+    "on_settings": "{\"output\":1,\"colours\":null,\"fixed\":[],\"excluded\":[],\"method\":0,\"background\":null,\"swatches\":[],\"threshold\":128,\"shapes\":true}",
     "shapes": 2,
     "width": 1000
   },

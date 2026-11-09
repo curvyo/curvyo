@@ -16,7 +16,7 @@ use curvyo_ui_core::trace_colour_job_with;
 use serde_json::Value;
 
 /// The frontend's first-use Multicolour settings (`settingsJson`): Brightness, automatic count.
-const MULTI: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"merged":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
+const MULTI: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
 /// Multicolour with Remove background on the white paper.
 const MULTI_RB: &str =
     r##"{"output":1,"colours":null,"method":1,"background":"#ffffff","threshold":128}"##;

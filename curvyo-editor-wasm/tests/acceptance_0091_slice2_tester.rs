@@ -41,7 +41,7 @@ use serde_json::Value;
 
 const TOLERANCE_MM: f64 = 0.3;
 /// The frontend's first-use Multicolour settings (`settingsJson`): Brightness, automatic count.
-const MULTI: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"merged":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
+const MULTI: &str = r#"{"output":1,"colours":null,"fixed":[],"excluded":[],"method":0,"background":null,"swatches":[],"threshold":128}"#;
 /// Multicolour with Remove background on the white paper.
 const MULTI_RB: &str =
     r##"{"output":1,"colours":null,"method":1,"background":"#ffffff","threshold":128}"##;
@@ -962,21 +962,6 @@ fn fill_of(r: &Run, s: &str) -> Option<TraceRgb> {
         .into_iter()
         .find(|t| t.string == s)
         .map(|t| rgb(t.style.fill.color))
-}
-
-/// Decision 6 note: the maker's Merge into applies to texts as to paths (green merged into blue
-/// sets "Übermaß" in blue).
-#[test]
-fn s2_c23_merge_into_applies_to_texts() {
-    let model = model();
-    let merged =
-        r##"{"output":1,"colours":4,"method":0,"threshold":128,"merged":[["#1e963c","#1e3cc8"]]}"##;
-    let r = run_with(&model, "colour_poster.png", merged);
-    assert_eq!(
-        fill_of(&r, "Übermaß"),
-        Some(TraceRgb::new(30, 60, 200)),
-        "green merged into blue"
-    );
 }
 
 /// Criterion 23 as amended (lead 2026-11-02): a text whose fill colour the maker excluded is left

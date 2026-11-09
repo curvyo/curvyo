@@ -194,7 +194,7 @@ no clock, no I/O, the caller owns it. `trace()` is `Tracer::default().trace(..)`
 | S4 outlines | fitted pixel outlines | S3, `smoothing_px`, `tolerance_px` |
 
 The mm mapping runs on every call (cheap). Multicolour palette edits (§10) invalidate from S2;
-recolouring invalidates nothing. `editor-wasm` keeps one `Tracer` per worker instance; the page sends
+Isolate invalidates nothing (recolouring removed 2026-11-09). `editor-wasm` keeps one `Tracer` per worker instance; the page sends
 the pixels only when the S0 key changes. A settings change while a job runs **no longer terminates
 the worker** (that would drop the cache): the page keeps at most one queued job (the latest), every
 answer carries the settings generation, and an answer for an older generation is dropped (criterion
@@ -265,7 +265,7 @@ same stages, scored with the truth-free subset of the harness metrics. Applying 
   fixed: bool, outlines: Vec<BezPath> }`, layers ordered by pixel area descending, ties by `sample`
   (integer areas, so stable). The label map never leaves the crate. `ui-core` maps a layer to one
   compound path with fill = `sample`, stroke off, in one group. Recolour changes the fill only (no
-  refit); Exclude and Merge into change label assignment (S2 onward).
+  refit); Exclude and Merge into change label assignment (S2 onward). *(Amended 2026-11-09, `ux-notes.md` §26: Recolour and Merge into are removed; `ColourParams` has no `merged` any more, a deleted palette colour is traced as the kept palette's fixed colours.)*
 - Trial M1: visioncortex's colour clustering against our palette + label map. visioncortex's
   colour path uses hash maps, so it can only win if it is run-to-run deterministic; expected
   outcome: ours. Stacked mode later needs no contract change.
@@ -346,7 +346,7 @@ half-pixel features are reported only until slice G.
   merge below 0.03; fixed colours kept exactly), `segment.rs` (label map, joins), `edges.rs`
   (edge table and colour loops), `colour_map.rs` (mask to label map), `shared_fit.rs` (one fit
   per edge), `colour_trace.rs` (public). Public additions: `trace_colours`, `colour_mask`,
-  `ColourParams { trace, colours, fixed, excluded, merged }`, `ColourTrace { palette, layers,
+  `ColourParams { trace, colours, fixed, excluded }` (`merged` removed 2026-11-09), `ColourTrace { palette, layers,
   counts, foreground_pixels, diagnostics }`, `ColourLayer { sample, fixed, pixels, outlines }`,
   `PaletteEntry`, `ColourMask` (RGBA, for the Mask view), `Diagnostics::joined_regions`,
   `MIN_COLOURS`, `MAX_COLOURS`, `DEFAULT_COLOURS`. The label map stays inside the crate.
@@ -365,8 +365,8 @@ half-pixel features are reported only until slice G.
   and the later palette entry over the earlier, and the edge passes around the other's pixels.
 - **ui-core/wasm:** the colour job appends the palette, the layers and the joined count after the
   outlines (`read_trace_wire` reads both forms); `TraceTarget::colours` gives one path per colour
-  in `plan_trace` (existing node kinds, no format change); recolours and Isolate are session state
-  (fills only, no job).
+  in `plan_trace` (existing node kinds, no format change); Isolate is session state (no job;
+  recolours removed 2026-11-09, `ux-notes.md` §26).
 - **No new crate, dependency, trait or format change.** Memory: the label map adds 4 B/px and the
   edge vertices are proportional to boundary length.
 

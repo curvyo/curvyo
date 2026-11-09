@@ -31,8 +31,6 @@ pub struct ColourParams {
     pub fixed: Vec<Rgb8>,
     /// Palette colours that become background (Exclude), matched within the merge distance.
     pub excluded: Vec<Rgb8>,
-    /// Palette colours traced as another one (Merge into: from, into).
-    pub merged: Vec<(Rgb8, Rgb8)>,
 }
 
 impl ColourParams {
@@ -44,7 +42,6 @@ impl ColourParams {
             colours: None,
             fixed: Vec::new(),
             excluded: Vec::new(),
-            merged: Vec::new(),
         }
     }
 }
@@ -56,14 +53,14 @@ pub struct PaletteEntry {
     pub colour: Rgb8,
     /// The maker picked it (or it is a picked colour of Pick colours).
     pub fixed: bool,
-    /// Traced pixels it took before exclusions, merges and joins.
+    /// Traced pixels it took before exclusions and joins.
     pub pixels: u64,
 }
 
 /// The outlines of one colour: one compound path in the document.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColourLayer {
-    /// Its colour (a merged colour's layer is its target's).
+    /// Its colour.
     pub sample: Rgb8,
     /// Its colour is a fixed one.
     pub fixed: bool,
