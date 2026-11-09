@@ -84,6 +84,7 @@ mod drawing_content;
 mod drawing_insert;
 mod ellipse_arc;
 mod error;
+mod font_assets;
 mod format_edit;
 mod format_library;
 mod format_library_file;

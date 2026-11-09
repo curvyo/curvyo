@@ -162,6 +162,9 @@ mod device_facts;
 mod device_sync;
 #[cfg(test)]
 mod device_sync_tests;
+mod document_fonts;
+#[cfg(test)]
+mod document_fonts_tests;
 #[cfg(test)]
 mod membership_tests;
 #[cfg(test)]
@@ -844,6 +847,7 @@ impl Session {
         session.remove_orphans_after_open();
         // The first page's kind decides the tools (`specs/0098` criterion 8).
         session.sync_workbench();
+        session.refresh_document_fonts();
         Ok(session)
     }
 
@@ -853,6 +857,7 @@ impl Session {
     /// # Errors
     /// See [`curvyo_document_core::pack`].
     pub fn pack(&self, app_version: &str) -> Result<Vec<u8>, SaveError> {
+        self.embed_used_fonts();
         curvyo_document_core::pack(&self.document, app_version)
     }
 

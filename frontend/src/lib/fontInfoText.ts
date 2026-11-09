@@ -80,7 +80,10 @@ export function fileLine(file: string, size: number | null): string {
 }
 
 /** The File row's block line (criterion 2). */
-export function blockText(block: "curvyo" | "included" | "system", desktop: boolean): string {
+export function blockText(block: "document" | "curvyo" | "included" | "system", desktop: boolean): string {
+  if (block === "document") {
+    return "Document Fonts";
+  }
   if (block === "included") {
     return "Included";
   }

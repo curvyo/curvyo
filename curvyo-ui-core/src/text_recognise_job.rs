@@ -110,7 +110,8 @@ fn later_tier(face: &ListedFace, favourite_keys: &[String]) -> FaceTier {
         return FaceTier::Favourites;
     }
     match face.block {
-        FontBlock::Curvyo => FaceTier::Installed,
+        // A document face is one of the document's own fonts, so it never reaches a later tier.
+        FontBlock::Curvyo | FontBlock::Document => FaceTier::Installed,
         FontBlock::Included => FaceTier::Included,
         FontBlock::System => FaceTier::System,
     }

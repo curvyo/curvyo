@@ -106,7 +106,7 @@ export function sizeStep(shift: boolean, ctrl: boolean): number {
 /** One listed face, as the session lists it. */
 export interface FontFace {
   index: number;
-  block: "curvyo" | "included" | "system";
+  block: "document" | "curvyo" | "included" | "system";
   family: string;
   style: string;
   id: string;
@@ -115,6 +115,9 @@ export interface FontFace {
   loaded: boolean;
   /** A single-line face: its row draws the name in its own centre lines (`0076` criterion 6). */
   singleLine?: boolean;
+  /** A Document Fonts face: whether a face of the same family and style is installed
+   * (`specs/0107-document-fonts` criterion 11). */
+  installed?: boolean;
 }
 
 /** What the Fonts tab shows (criteria 15 to 19, 29). */
@@ -160,6 +163,7 @@ export interface FontBlockRows {
 }
 
 const BLOCK_TITLES: Record<FontFace["block"], string> = {
+  document: "Document Fonts",
   curvyo: "Curvyo fonts",
   included: "Included",
   system: "This computer",
@@ -176,17 +180,22 @@ function styleRank(style: string): number {
  * case-insensitive, faces Regular first, filtered by a case-insensitive substring of the family
  * name (criterion 17) and by `inGroup`, the chosen strip cell (`0075` criterion 2). A block without a
  * family is left out, except "This computer" on the desktop before the system list arrives (it
- * shows "Reading…") and while `keepSystem` (its fonts are being checked). */
+ * shows "Reading…") and while `keepSystem` (its fonts are being checked). The Document Fonts block (`0107`) is only listed with
+ * `withDocument`: the Fonts tab shows it, the library's facts do not. */
 export function fontBlocks(
   data: FontsTabData,
   search: string,
   desktop: boolean,
   inGroup?: (family: FontFamily) => boolean,
   keepSystem = false,
+  withDocument = false,
 ): FontBlockRows[] {
   const needle = search.trim().toLowerCase();
   const blocks: FontBlockRows[] = [];
-  for (const block of ["curvyo", "included", "system"] as const) {
+  const order = withDocument
+    ? (["document", "curvyo", "included", "system"] as const)
+    : (["curvyo", "included", "system"] as const);
+  for (const block of order) {
     const families = new Map<string, FontFace[]>();
     for (const face of data.faces) {
       if (face.block !== block) {

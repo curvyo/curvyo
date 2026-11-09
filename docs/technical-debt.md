@@ -2347,3 +2347,17 @@ promise; the result is visible and either clone can be deleted.
 
 **Resolution:** none planned. If old shared files ever matter, run the migration only on the
 device that holds the room's newest snapshot, or derive the clone's identity from the sketch's.
+
+## Document fonts (`0107`, ADR 0047, 2026-11-09)
+
+- **Unused embedded fonts stay in the file until the document wipe.** A font a text no longer uses
+  keeps its `assets/<hash>.bin` (history and undo may need it), like pictures. Pruning on save
+  would break undo of a text deletion.
+- **Fonts are Stored, not compressed.** TrueType and CFF fonts compress by about 40 to 60 percent;
+  a file with a CJK font is large. Compressing the font members is a follow-up that needs a member
+  flag or extension and a reader change.
+- **"Installed" compares family and style names**, not bytes (FONT-INSTALL-MEANING default): a
+  same-named font with other bytes counts as installed and the embedded bytes still draw the text.
+- **Embedding follows OS/2 `fsType`** value 2 (restricted licence) as not embedded
+  (FONT-LICENCE default A); other restrictions (preview and print only) are treated as allowed.
+- **Fonts count against the 512 MiB asset budget** shared with pictures; no limit of our own.

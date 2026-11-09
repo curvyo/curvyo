@@ -412,6 +412,18 @@ impl WasmSession {
         self.session.add_font_file(id, bytes)
     }
 
+    /// Embeds the fonts the texts use and lists them as the Document Fonts block
+    /// (`specs/0107-document-fonts`); the Fonts tab calls it when it is shown.
+    pub fn sync_document_fonts(&mut self) {
+        self.session.sync_document_fonts();
+    }
+
+    /// The font file of the embedded face listed as `id`, for Install (criterion 14).
+    #[must_use]
+    pub fn document_font_file(&self, id: &str) -> Option<Vec<u8>> {
+        self.session.document_font_file(id)
+    }
+
     /// What the Fonts tab lists and marks, as JSON (see `Session::fonts_tab_json`).
     #[must_use]
     pub fn fonts_tab_json(&self) -> String {

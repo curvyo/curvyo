@@ -138,9 +138,10 @@ impl Document {
         self.assets.borrow().total_bytes()
     }
 
-    /// Keeps only the assets that an image in the tree names (the document wipe, ADR 0017 §2).
+    /// Keeps only the assets that an image or a text's font in the tree names (the document wipe,
+    /// ADR 0017 §2, ADR 0047 decision 2).
     pub(crate) fn prune_assets(&self) {
-        let alive = self
+        let mut alive: std::collections::HashSet<AssetHash> = self
             .read_objects()
             .objects
             .iter()
@@ -149,6 +150,7 @@ impl Document {
                 _ => None,
             })
             .collect();
+        alive.extend(self.used_font_hashes());
         self.assets.borrow_mut().retain(&alive);
     }
 }

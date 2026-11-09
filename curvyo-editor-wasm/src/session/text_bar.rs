@@ -129,6 +129,7 @@ impl Session {
             curvyo_ui_core::FontBlock::Curvyo => "curvyo",
             curvyo_ui_core::FontBlock::Included => "included",
             curvyo_ui_core::FontBlock::System => "system",
+            curvyo_ui_core::FontBlock::Document => "document",
         };
         let faces: Vec<serde_json::Value> = self
             .fonts
@@ -145,6 +146,8 @@ impl Session {
                     "loaded": face.key.is_some(),
                     "faceIndex": face.index,
                     "singleLine": face.kind == curvyo_document_core::FontKind::SingleLine,
+                    "installed": face.block == curvyo_ui_core::FontBlock::Document
+                        && self.fonts.is_installed(face),
                 })
             })
             .collect();
@@ -165,6 +168,12 @@ impl Session {
     #[must_use]
     pub fn texts_using_family(&self, family: &str) -> usize {
         let key = curvyo_ui_core::family_key(family);
+        let in_curvyo = |family_key: &str| {
+            self.fonts.faces().iter().any(|face| {
+                face.block == curvyo_ui_core::FontBlock::Curvyo
+                    && curvyo_ui_core::family_key(&face.family) == family_key
+            })
+        };
         self.document
             .object_ids()
             .into_iter()
@@ -173,8 +182,12 @@ impl Session {
                 self.current_face_index(&text.font)
                     .and_then(|index| self.fonts.faces().get(index))
                     .is_some_and(|face| {
-                        face.block == curvyo_ui_core::FontBlock::Curvyo
-                            && curvyo_ui_core::family_key(&face.family) == key
+                        // A text drawn from the document's own copy of a font that is also in
+                        // the Curvyo folder counts as a use of that Curvyo family.
+                        let own = face.block == curvyo_ui_core::FontBlock::Curvyo
+                            || (face.block == curvyo_ui_core::FontBlock::Document
+                                && in_curvyo(&key));
+                        own && curvyo_ui_core::family_key(&face.family) == key
                     })
             })
             .count()

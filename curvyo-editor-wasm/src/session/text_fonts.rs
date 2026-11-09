@@ -3,6 +3,8 @@
 //! ones still wanted, and the layout in the resolved face.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use curvyo_document_core::{FontKind, FontRef, TextOutline, TextSnapshot};
 use curvyo_text_core::{FaceKey, FaceKind, FaceStore};
@@ -41,6 +43,9 @@ pub(crate) struct TextFonts {
     generation: u64,
     /// The listed faces a layout asked for that are not loaded, by their index in `faces`.
     wanted: RefCell<Vec<usize>>,
+    /// The bytes of every font file handed in, by the hash of the file, for embedding the fonts a
+    /// document uses (ADR 0047); shared with the parsed faces, never copied.
+    files: BTreeMap<String, Arc<Vec<u8>>>,
 }
 
 impl TextFonts {
@@ -133,8 +138,12 @@ impl TextFonts {
     /// never panics, criterion 32).
     pub(crate) fn add_file(&mut self, host_id: &str, bytes: &[u8]) -> bool {
         let mut any = false;
+        let shared = Arc::new(bytes.to_vec());
         for face in self.faces.iter_mut().filter(|f| f.host_id == host_id) {
-            if let Ok(key) = self.store.add(bytes.to_vec(), face.index) {
+            if let Ok(key) = self.store.add_shared(Arc::clone(&shared), face.index) {
+                self.files
+                    .entry(key.hash.to_hex())
+                    .or_insert_with(|| Arc::clone(&shared));
                 face.key = Some(key);
                 // The engine knows the kind from the bytes; a listing that guessed wrong is
                 // corrected, so matching compares the real kinds.
@@ -147,6 +156,30 @@ impl TextFonts {
         self.wanted.borrow_mut().clear();
         self.generation += 1;
         any
+    }
+
+    /// Whether a face of the same family, style and kind is listed in the Curvyo folder, the
+    /// included fonts or on this computer (ADR 0047 decision 5).
+    pub(crate) fn is_installed(&self, face: &ListedFace) -> bool {
+        let key = curvyo_ui_core::family_key(&face.family);
+        self.faces.iter().any(|other| {
+            other.block != FontBlock::Document
+                && other.kind == face.kind
+                && curvyo_ui_core::family_key(&other.family) == key
+                && other.style.eq_ignore_ascii_case(&face.style)
+        })
+    }
+
+    /// The bytes of the font file with the hash `hash` (64 hex digits), when it was handed in.
+    pub(crate) fn file_bytes(&self, hash: &str) -> Option<Arc<Vec<u8>>> {
+        self.files.get(hash).cloned()
+    }
+
+    /// Whether a face of the document block of host id `host_id` is not parsed yet.
+    pub(crate) fn needs_file(&self, host_id: &str) -> bool {
+        self.faces
+            .iter()
+            .any(|face| face.host_id == host_id && face.key.is_none())
     }
 
     /// The host ids of the files a layout asked for and that are not loaded, each once.

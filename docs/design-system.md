@@ -1490,6 +1490,15 @@ Decisions: `specs/0045-document-formats-library/specification.md`, "UX notes". I
 | Broken file | Block at the top of the format area: 1px `--field-invalid` border, alert glyph, `--field-invalid` 12px text, outline button "Set file aside". Stars, edit, delete, Add, Import, Export and the Show switches are not in the tree while it shows |
 | Keyboard | The list body is one Tab stop with roving focus; Up and Down between headers and rows, Left and Right between a row's controls, Enter or Space presses (the switch: Space). Add format, Import and Export are separate stops |
 
+## Fonts tab: Document Fonts group (`0107`, 2026-11-09)
+
+| Element | Rule |
+|---|---|
+| Group | "Document Fonts" is the first block of the tree, a header like "Curvyo fonts" with the family count, pinned like the others. Rows are family rows (name in its own face, star, tag line, faces on open). Only fonts a text of the open document uses are listed |
+| Installed row | A face with the same family, style and kind is listed in Curvyo fonts, Included or This computer: star and + (tags) work as in other groups, nothing sits at the trash position (no trash, no install icon) |
+| Not installed row | Star disabled at 40%, tag line `inert` at 40%, the install icon (Lucide `FilePlus` 16px at 1.5px, the icon of Add font in the search row) at the trash position, tooltip "Install font", accessible name "Install <family>". One press, no armed state; the file goes through Add font (notices, archive handling) and the Curvyo block gains the family |
+| Never | A Document Fonts row has no trash can. No hint text, badge or banner. Keyboard: Insert installs the focused not-installed row; Ctrl+D and F2 do nothing on it |
+
 ## Properties panel: Fonts tab (`0074`, 2026-10-20)
 
 Decisions: `specs/0074-text-objects/specification.md`, "UX notes" section 4.

@@ -4,6 +4,8 @@
 // caret and selection and draws them; nothing here edits text.
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { setDocumentFontReader } from "@/lib/fontFaceLoader";
+
 import type { WasmSession } from "@/lib/editorSession";
 import {
   EMPTY_FONTS,
@@ -216,8 +218,8 @@ export function fontListingReady(): Promise<void> {
 
 /** The host's listing of a block as it arrived, with the class bytes and stamps the session does
  * not keep (the font library reads them). */
-export function hostListing(block: "curvyo" | "included" | "system"): Listed["faces"] {
-  return lists[block]?.faces ?? [];
+export function hostListing(block: "document" | "curvyo" | "included" | "system"): Listed["faces"] {
+  return block === "document" ? [] : (lists[block]?.faces ?? []);
 }
 
 /** The Curvyo block's font folders and their documents (`0083` criterion 4). */
@@ -354,6 +356,11 @@ export function useText(
   containerRef: React.RefObject<HTMLDivElement | null>,
 ): TextApi {
   const [editing, setEditing] = useState(false);
+  const getSessionRef = useRef(getSession);
+  getSessionRef.current = getSession;
+  useEffect(() => {
+    setDocumentFontReader((id) => getSessionRef.current()?.document_font_file(id) ?? undefined);
+  }, []);
   const [bar, setBar] = useState<TextBarState>(EMPTY_BAR);
   /** The last "Put on path" for the polite region, with a sequence so a repeat is spoken. */
   const [pathAnnouncement, setPathAnnouncement] = useState<{ text: string; seq: number }>({ text: "", seq: 0 });
@@ -384,6 +391,8 @@ export function useText(
   }, []);
 
   const listHostFonts = useCallback(() => {
+    // The fonts the texts use are embedded and listed as Document Fonts (`0107`).
+    getSessionRef.current()?.sync_document_fonts();
     // The browser's Curvyo fonts are the files added there (`0075` criterion 28).
     const folder = invoke<Listed>("font_folder_list")
       .then((listed) => {

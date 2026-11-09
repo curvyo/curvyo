@@ -1,6 +1,6 @@
 // The keys of the Fonts tab's tree (`specs/0074-text-objects` UX notes §4,
 // `specs/0075-font-library` UX notes §6 and tags amendment §8): moving over rows, expanding and
-// collapsing, picking, Ctrl+D for the star, F2 and Shift+F2 for tags, Delete to arm and Delete or
+// collapsing, picking, Ctrl+D for the star, F2 and Shift+F2 for tags, Insert to install a Document font, Delete to arm and Delete or
 // Enter to press the armed Remove trash (`specs/0081-inline-delete-confirm` criterion 7), Escape to
 // the canvas, and typing into the search.
 import { type Row, familyKey } from "./fontRows.ts";
@@ -21,6 +21,11 @@ export interface FontTreeKeyContext {
   star: (family: FontFamily) => void;
   /** A press on the family's Remove trash (arms it, or removes when armed). */
   pressRemove: (family: FontFamily) => void;
+  /** Install on a Document Fonts family that is not installed (`specs/0107-document-fonts`);
+   * `undefined` where no row can install. */
+  install?: (family: FontFamily) => void;
+  /** Whether a Document Fonts family is greyed (not installed): star and tags do nothing. */
+  greyed?: (family: FontFamily) => boolean;
   /** Whether the family's Remove trash is armed. */
   isArmed: (family: FontFamily) => boolean;
   /** F2: the add field of the family's tag line. */
@@ -46,7 +51,7 @@ export function onFontTreeKey(event: React.KeyboardEvent<HTMLElement>, ctx: Font
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
     // Ctrl+D stars the family of the focused row (UX notes §6); the bookmark key is taken.
     event.preventDefault();
-    if (row && row.kind !== "missing" && row.kind !== "header") {
+    if (row && row.kind !== "missing" && row.kind !== "header" && !ctx.greyed?.(row.family)) {
       ctx.star(row.family);
     }
     return;
@@ -98,11 +103,20 @@ export function onFontTreeKey(event: React.KeyboardEvent<HTMLElement>, ctx: Font
       // amendment §8).
       if (row && row.kind !== "missing" && row.kind !== "header") {
         event.preventDefault();
+        if (ctx.greyed?.(row.family)) {
+          return;
+        }
         if (event.shiftKey) {
           ctx.focusTagLine(row.family);
         } else {
           ctx.openAddTag(row.family);
         }
+      }
+      return;
+    case "Insert":
+      if ((row?.kind === "family" || row?.kind === "face") && ctx.greyed?.(row.family)) {
+        event.preventDefault();
+        ctx.install?.(row.family);
       }
       return;
     case "Delete":
