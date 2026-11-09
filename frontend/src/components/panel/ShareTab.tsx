@@ -44,6 +44,9 @@ interface ShareTabProps {
   membership: MembershipApi;
 }
 
+/** How often the reachability line re-checks the server while the tab is shown (ms). */
+const REACH_POLL_MS = 5000;
+
 /**
  * The Share tab (`specs/0092-cooperative-editing` UX notes §2): the server and name settings,
  * Share with its inline confirm, Invite, the participant list and Open shared document.
@@ -59,14 +62,18 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
   const shared = view.shared && view.live;
   const server = normalize_server_address(collab.server);
   const { checkServer } = collab;
-  // A check runs when the tab is shown with a server set, never in the background otherwise. A
-  // removed or left file contacts nothing until Check is pressed (`specs/0097` criterion 33).
   const ended = membership.ended;
+  // While the tab is shown with a server set and no link, the reachability line re-checks every
+  // 5 s; a link shows its own state. The check stops with the tab (ADR 0044 decision 9).
+  const linked = view.live && (view.shared || workspaceView != null);
   useEffect(() => {
-    if (server !== "" && !shared && !ended) {
-      checkServer();
+    if (server === "" || linked) {
+      return undefined;
     }
-  }, [server, shared, ended, checkServer]);
+    checkServer();
+    const timer = window.setInterval(checkServer, REACH_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [server, linked, checkServer]);
 
   const serverReason =
     server === ""
@@ -93,7 +100,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
     collab.reach === "reaching"
       ? "Reaching..."
       : collab.reach === "reachable"
-        ? "Reachable"
+        ? "Connected"
         : collab.reach === "unreachable"
           ? `Cannot reach ${server_shown(server)}.`
           : "";
@@ -101,7 +108,7 @@ export function ShareTab({ collab, saved, onReturnFocus, workspace, devices, mem
     <div className="flex flex-col gap-3">
       <AdminChangeLine membership={membership} />
       <div className="flex flex-col gap-2">
-        {view.live && (view.shared || workspaceView != null) ? (
+        {linked ? (
           <div className="flex flex-col gap-1">
             <span className="text-xs text-[var(--toolbar-icon)]">Server</span>
             <p className="truncate text-sm text-[var(--toolbar-icon)]">{view.serverShown}</p>

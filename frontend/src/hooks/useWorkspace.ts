@@ -98,9 +98,7 @@ export interface WorkspaceApi {
   rescan: () => Promise<void>;
   /** Takes a host answer that opened a workspace (a joined one, criterion 27). */
   adoptOpened: (answer: WorkspaceAnswer) => void;
-  /** Opens the document at `path` without the check (it was just closed by Share). */
-  reopen: (path: string[]) => Promise<void>;
-  /** Closes the workspace without the check (a join replaces it after the check). */
+  /** Closes the workspace for a join; the open document stays open. */
   closeNow: () => Promise<void>;
   /** A shared workspace's tree (criteria 35 to 41): the Deleted list's rows. */
   deleted: readonly DeletedRow[];
@@ -375,11 +373,10 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
       .catch(() => undefined);
   }, []);
 
-  /** Closes the workspace without the check (it ran already). */
+  /** Closes the workspace for a join: its link ends, the open document stays open. */
   const closeNow = useCallback(async () => {
     // Closing a shared workspace disconnects its room (criterion 21).
     endWorkspaceLink(editorRef.current.getSession());
-    await projectRef.current.resetToEmpty();
     await invoke("close_workspace").catch(() => undefined);
     clearWorkspace();
     setShowRecent(false);
@@ -388,7 +385,14 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
 
   const close = useCallback(
     (refocus: () => void) => {
-      projectRef.current.replaceThen("close-workspace", closeNow, refocus);
+      projectRef.current.replaceThen(
+        "close-workspace",
+        async () => {
+          await closeNow();
+          await projectRef.current.resetToEmpty();
+        },
+        refocus,
+      );
     },
     [closeNow],
   );
@@ -762,7 +766,6 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
     scanned: () => scannedRef.current,
     rescan,
     adoptOpened: adopt,
-    reopen: openDocument,
     closeNow,
     deleted,
     restore: (row: DeletedRow) => sharedRef.current?.restore(row),

@@ -128,3 +128,22 @@ export async function commitShare(prepared: PreparedShare, deps: ShareDeps, work
     workspace,
   }).catch(() => undefined);
 }
+
+/** After the commit: the open document at `path` takes the record of the file Share wrote for it,
+ * in its own session (`specs/0105` criterion 20). */
+export function adoptOpenDocument(
+  session: { adopt_workspace_document(file: Uint8Array): boolean } | null,
+  builder: WasmWorkspaceShare,
+  path: readonly string[] | null,
+): void {
+  if (!session || !path) {
+    return;
+  }
+  const wanted = JSON.stringify(path);
+  for (let index = 0; index < builder.file_count(); index += 1) {
+    if (builder.file_path(index) === wanted) {
+      session.adopt_workspace_document(builder.file_bytes(index));
+      return;
+    }
+  }
+}

@@ -194,6 +194,23 @@ impl Session {
         self.sync_pump();
     }
 
+    /// Share workspace's commit for the open document (`specs/0105` criterion 20): `file`, the
+    /// container Share wrote for it, gives the open document its workspace record in place, and
+    /// the document becomes the link's stream; the session, its view and its tab stay. `false`
+    /// when `file` holds no workspace record.
+    pub fn adopt_workspace_document(&mut self, file: &[u8]) -> bool {
+        let Some(record) = curvyo_document_core::container_share_members(file)
+            .share_json
+            .and_then(|json| WorkspaceShareRecord::from_share_json(&json))
+        else {
+            return false;
+        };
+        self.document.set_workspace_share(Some(record));
+        self.bind_workspace_stream();
+        self.sync_pump();
+        true
+    }
+
     /// Makes the open document the link's stream when it is a document of the workspace.
     fn bind_workspace_stream(&mut self) {
         let record = self.document.workspace_share();

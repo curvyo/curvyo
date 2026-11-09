@@ -355,3 +355,76 @@ fn forty_nine_busy_documents_cost_the_open_session_less_than_a_frame() {
         assert!(worst <= std::time::Duration::from_millis(16), "{worst:?}");
     }
 }
+
+/// `specs/0105` criterion 20: Share workspace runs on the session of the open document and
+/// keeps it: the file Share wrote gives the open document its record in place, the document is
+/// the link's stream at once (an edit reaches a joiner who opened it), and the panel's tab and
+/// an edit made before the adoption stay.
+#[test]
+fn share_keeps_the_open_document_session_and_adopts_its_record() {
+    let mut net = Net::new();
+    let mut lid = Session::new(0xa1);
+    draw_rect(&mut lid, (10.0, 10.0), (40.0, 30.0));
+    let lid_bytes = pack(&lid.document, "test").unwrap();
+    let mut builder = WorkspaceShareBuilder::new(WORKSPACE, 0xa1, 1_800_000_000, [4; 16]);
+    builder
+        .add_document(&p("Lid.curvyo"), &lid_bytes, LID)
+        .unwrap();
+    let (prepared, files) = builder.finish([6; 16]);
+    assert!(lid.press_panel_tab("share"));
+    let a = net.add(lid);
+    let now = net.now;
+    net.s(a)
+        .share_workspace(SERVER, "Anna", "Box job", prepared, &seeds(1, 0), now)
+        .unwrap();
+    net.pump();
+    net.run(200);
+    assert_eq!(net.s(a).document.workspace_share(), None);
+    draw_rect(net.s(a), (60.0, 10.0), (70.0, 20.0));
+    assert!(net.s(a).adopt_workspace_document(&files[0].1));
+    assert_eq!(net.s(a).document.workspace_share().unwrap().document, LID);
+    assert_eq!(net.s(a).panel_tabs.get().active().name(), "share");
+    let (link, _) = net.s(a).create_invite(24 * 3600, now).unwrap();
+    net.pump();
+    let b = net.add(Session::new(0xb2));
+    net.s(b)
+        .join_workspace(&link, "Ben", "Box job", &seeds(2, 0), now)
+        .unwrap();
+    net.pump();
+    net.run(1_000);
+    let lid_file = net
+        .s(b)
+        .take_workspace_writes()
+        .into_iter()
+        .find_map(|w| match w {
+            WorkspaceWrite::Document {
+                document, bytes, ..
+            } if document == LID => Some(bytes),
+            _ => None,
+        })
+        .expect("B gets Lid");
+    net.s(b).workspace_document_written(LID);
+    open_document(&mut net, b, 0xb3, &lid_file);
+    net.run(500);
+    assert_eq!(
+        objects(net.s(b)),
+        2,
+        "the edit made before the adoption reaches B"
+    );
+    draw_rect(net.s(a), (80.0, 10.0), (90.0, 20.0));
+    net.run(300);
+    assert_eq!(objects(net.s(b)), 3, "A's open document is the stream");
+    assert!(!net.s(a).adopt_workspace_document(b"not a container"));
+}
+
+/// A Share that failed or was cancelled leaves no link of its attempt on the kept session.
+#[test]
+fn a_dropped_share_attempt_leaves_the_session_without_a_link() {
+    let (mut net, a, _) = shared_workspace();
+    net.s(a).drop_ended_link();
+    assert!(net.s(a).has_workspace_link(), "a live link stays");
+    net.s(a).leave_sync();
+    net.s(a).drop_ended_link();
+    assert!(!net.s(a).has_workspace_link());
+    assert_eq!(view(net.s(a))["shared"], false);
+}

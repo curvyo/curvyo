@@ -146,7 +146,7 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     const name = panel(A).getByLabel('Name shown to others', { exact: true });
     await name.fill('Anna');
     await name.press('Enter');
-    await panel(A).getByText('Reachable', { exact: true }).waitFor();
+    await panel(A).getByText('Connected', { exact: true }).waitFor();
     // Share asks nothing (customer 2026-11-09: no confirm sentences in the Share tab).
     await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
     await panel(A).getByText(/^Shared on /).waitFor({ timeout: 10000 });

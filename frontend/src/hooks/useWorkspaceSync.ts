@@ -14,7 +14,7 @@ import { useWorkspaceWriter } from "@/hooks/useWorkspaceWriter";
 import { claimOpenRoom, endedBySwitchOff, openRoomNow, releaseOpenRoom } from "@/lib/backgroundWorkspace";
 import { parseEnded } from "@/lib/endedRecord";
 import { STALL_MS } from "@/lib/stallWatch";
-import { commitShare, prepareShare } from "@/lib/workspaceShare";
+import { adoptOpenDocument, commitShare, prepareShare } from "@/lib/workspaceShare";
 import type { WorkspaceAnswer } from "@/lib/workspaceRows";
 import { invoke } from "@/platform/host";
 import {
@@ -132,9 +132,6 @@ export function useWorkspaceSync(
   const sharingRef = useRef(false);
   /** The Share run that may go on; Cancel and the watchdog count it up. */
   const shareRunRef = useRef(0);
-  /** The run that started last, and the document a Share closed and has not reopened yet. */
-  const startedRef = useRef(0);
-  const reopenRef = useRef<string[] | null>(null);
   /** The workspace id of a join, until the chosen folder became the workspace. */
   const joiningRef = useRef<string | null>(null);
   const joinedIndexRef = useRef(new Map<string, string[]>());
@@ -144,7 +141,7 @@ export function useWorkspaceSync(
   const removedRef = useRef<WasmSession | null>(null);
   // The retries after a passphrase reach the latest callbacks.
   const resumeRef = useRef<() => Promise<void>>(async () => undefined);
-  const runShareRef = useRef<(run: number, pressed: string[] | null) => Promise<void>>(async () => undefined);
+  const runShareRef = useRef<(run: number) => Promise<void>>(async () => undefined);
   const startJoinRef = useRef<(link: string, folder: string) => Promise<void>>(async () => undefined);
 
   /** Writes `index.json` for the documents named. */
@@ -376,23 +373,25 @@ export function useWorkspaceSync(
   );
 
   /** Share workspace (criterion 25): every document read and prepared in memory, the room made,
-   * the snapshot uploaded; only then the files, the new id and the marker are written. */
-  const runShare = useCallback(async (run: number, pressed: string[] | null) => {
+   * the snapshot uploaded; only then the files, the new id and the marker are written. It runs on
+   * the open document's session and keeps it: the open document takes its record in place, so
+   * nothing closes or reopens and the Share tab stays (`specs/0105` criterion 20). */
+  const runShare = useCallback(async (run: number) => {
     const { workspace: ws, collab } = refs.current;
     const server = normalize_server_address(collab.server);
-    // A run that follows a cancelled one before it reopened the document reopens it instead.
-    const reopen = reopenRef.current ?? pressed ?? ws.openPathNow() ?? ws.openPath;
-    reopenRef.current = reopen;
-    startedRef.current = run;
     const entries: ScannedEntryData[] = ws.scanned();
     /** Cancelled meanwhile (Cancel, the switch turned off, the watchdog): nothing is written. */
     const cancelled = () => shareRunRef.current !== run;
-    let finished = false;
+    /** A run that did not finish leaves no link of its attempt on the session. */
+    const abandon = (session: WasmSession) => {
+      session.leave_sync();
+      collab.drive(session);
+      session.drop_ended_link();
+    };
     sharingRef.current = true;
     try {
-      await refs.current.project.resetToEmpty();
       // The device's identity first: a document shared on this device alone is taken in.
-      const keys = await collab.deviceKeys("", () => void runShareRef.current(run, reopen));
+      const keys = await collab.deviceKeys("", () => void runShareRef.current(run));
       if (cancelled()) {
         return;
       }
@@ -436,52 +435,36 @@ export function useWorkspaceSync(
         const failure = error || (await connected(run));
         if (failure === "cancelled" || (failure === "" && shareRunRef.current !== run)) {
           // The room may exist on the server now; this device leaves it and nothing is written.
-          session.leave_sync();
-          collab.drive(session);
+          abandon(session);
           return;
         }
         if (failure) {
+          abandon(session);
           setShare({ kind: "failed", text: `Could not share: ${failure}` });
           return;
         }
         await commitShare(prepared, deps);
+        adoptOpenDocument(getSession(), builder, ws.openPathNow());
       } finally {
         builder.free();
       }
-      finished = true;
-      reopenRef.current = null;
-      sharingRef.current = false;
       lastMarkerRef.current = 0;
       setShare({ kind: "idle" });
       void ws.rescan();
-      if (reopen) {
-        await ws.reopen(reopen);
-      }
     } finally {
       sharingRef.current = false;
-      // A Share that did not finish brings the document back as it was (previous state),
-      // unless a newer run started meanwhile: that one reopens it.
-      if (!finished && startedRef.current === run) {
-        reopenRef.current = null;
-        // Without a document to reopen, an empty one replaces the session that tried, so no
-        // link of the attempt is left on it (a later switch-on shares anew).
-        await (reopen ? ws.reopen(reopen) : refs.current.project.resetToEmpty()).catch(() => undefined);
-      }
     }
   }, [connected, getSession]);
 
   const shareWorkspace = useCallback(() => {
     shareRunRef.current += 1;
-    const run = shareRunRef.current;
-    // The document open at the press comes back after the Share, whatever ends it meanwhile.
-    const pressed = refs.current.workspace.openPathNow();
     setShare({ kind: "idle" });
     setNotAdded([]);
-    refs.current.project.replaceThen("share-workspace", () => runShareRef.current(run, pressed));
+    void runShareRef.current(shareRunRef.current);
   }, []);
 
-  /** Cancels a Share that runs: back to idle at once; the run stops at its next step, leaves a
-   * room it made and reopens the document (customer feedback on PR #281). */
+  /** Cancels a Share that runs: back to idle at once; the run stops at its next step and leaves a
+   * room it made (customer feedback on PR #281). */
   const cancelShare = useCallback(() => {
     shareRunRef.current += 1;
     setShare({ kind: "idle" });
@@ -551,21 +534,21 @@ export function useWorkspaceSync(
     startJoinRef.current = startJoin;
   });
 
+  /** Joins on the session that is open: an open workspace closes (its link ends), the open
+   * document stays, so the Share tab stays (`specs/0105` criterion 20). */
   const joinWorkspace = useCallback(
     (link: string) => {
       const folder = joinFolder.path;
       if (folder === "") {
         return;
       }
-      refs.current.project.replaceThen("join", async () => {
+      void (async () => {
         const ws = refs.current.workspace;
         if (ws.open) {
           await ws.closeNow();
-        } else {
-          await refs.current.project.resetToEmpty();
         }
         await startJoinRef.current(link, folder);
-      });
+      })();
     },
     [joinFolder.path],
   );

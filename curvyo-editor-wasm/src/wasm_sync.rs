@@ -275,6 +275,11 @@ impl WasmSession {
     pub fn leave_sync(&mut self) {
         self.session.leave_sync();
     }
+
+    /// Drops an ended link (a Share that failed or was cancelled).
+    pub fn drop_ended_link(&mut self) {
+        self.session.drop_ended_link();
+    }
 }
 
 /// The epoch keys of `keys_json` (`[[epoch, "hex"], ...]`, the credential store's); malformed
