@@ -1,6 +1,6 @@
 # Bring content in: drag designs onto a laser page as live linked clones or placed pages
 
-Status: Ready (2026-11-09; `adrs.md` and `ux-notes.md` exist; ADR 0045 is Proposed and is accepted with the PR; Frage 163 answered B by the customer 2026-11-09, criterion 25)
+Status: Done (PR #296; ADR 0045 accepted with the PR; Frage 163 B, criterion 25)
 Priority: Must
 Origin: Customer (2026-11-05, translated): "Content arrives as linked clones by drag, or is made directly there. Outputs are compositions with connecting elements. Easy, no unnecessary steps." "You position the pages of the documents on the work area; they snap in by fitting size, can be dragged there, etc. You can still scale and rotate there, without changing the original drawing. Changes in the original drawing carry over live" (2026-10-17). Slice 3 of `specs/0063-manufacturing-workbenches/` (concept A, `concept-output-pages.md` §2.3, §2.7, §5 flows 2 and 3, §8, §9; sketches b, d, i). Frage 150 A (a drag makes a linked clone with its own position) and 155 A (an object moved onto a laser page is its own item by position, Not assigned). Builds on `0098` (#279) and `0099` (#287), whose page-row drag is reused. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
