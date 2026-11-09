@@ -17,6 +17,9 @@
     missing_docs
 )]
 
+#[path = "support/older_build.rs"]
+mod older_build;
+
 use std::io::{Cursor, Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -534,7 +537,9 @@ fn ac19_ac22_the_missing_font_refusal_comes_first() {
     let mut s = fresh();
     add_text(&mut s, "EMS Readability", pt(20.0, 40.0), "Ab");
     add_text(&mut s, "Hershey Sans 1-stroke", pt(20.0, 90.0), "Cd");
-    let bytes = s.pack("0.1.0").unwrap();
+    // The file as a build without embedded fonts writes it (`0107`: a session now embeds the
+    // fonts its texts use, so the font would not be missing on the other computer).
+    let bytes = older_build::without_embedded_fonts(&s.pack("0.1.0").unwrap());
 
     // Another computer without Hershey Sans 1-stroke opens the project.
     let mut s = prepare(Session::open(32, &bytes).unwrap(), "Hershey Sans 1-stroke");
