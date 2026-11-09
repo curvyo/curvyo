@@ -1,29 +1,18 @@
 /**
  * The words and plain rules of a multicolour trace's palette (`specs/0089` slice M, UX notes §7,
- * §10, §12): the strip's order, the swatch names for makers who do not see the colour, the five
- * actions and their notices. No React and no wasm, so node tests can check them.
+ * §26): the swatch row's order, the swatch names for makers who do not see the colour, the keys
+ * of a swatch, the palette after a delete and the announcements. No React and no wasm, so node
+ * tests can check them.
  */
 
-/** The palette's name, its actions and their words (UX notes §7, §10, §12). */
+/** The name of the swatch row (UX notes §26). */
 export const PALETTE = "Palette";
-export const ISOLATE = "Isolate";
-export const RECOLOUR = "Recolour";
-export const RESET = "Reset";
-export const MERGE_INTO = "Merge into";
-export const EXCLUDE = "Exclude";
-export const REMOVE = "Remove";
-export const EXCLUDED = "Excluded";
+
+/** The tooltip's second line, the swatch's ways of use (customer 2026-11-09: "ganz kurz"). */
+export const PALETTE_HINT = "Click: exclude · Shift: isolate / delete";
 
 export function isolatingNote(hex: string): string {
   return `Isolating ${hex}`;
-}
-
-export function mergingNote(hex: string): string {
-  return `Merging ${hex} into...`;
-}
-
-export function mergedIntoText(hex: string): string {
-  return `Merged into ${hex}`;
 }
 
 export function sameAsNote(hex: string): string {
@@ -34,27 +23,61 @@ export function excludedNote(count: number): string {
   return `${count} ${count === 1 ? "colour" : "colours"} excluded`;
 }
 
-/** The detail row's text of a recoloured swatch: "#FFE000 (was #FFF2A8)". */
-export function recolouredText(fill: string, was: string): string {
-  return `${fill} (was ${was})`;
+/** A swatch's tooltip line: "#4B392F · Brown". */
+export function paletteTooltip(hex: string): string {
+  return `${hex} · ${colourName(hex)}`;
 }
 
-/** The message of a refused Recolour hex. */
-export const RECOLOUR_HEX_MESSAGE = "Enter 6 hex digits";
-
-/** The Recolour hex field's text as `#RRGGBB` (six digits, `#` optional), or `null`. */
-export function recolourHex(text: string): string | null {
-  const digits = text.trim().replace(/^#/, "");
-  return /^[0-9A-Fa-f]{6}$/.test(digits) ? `#${digits.toUpperCase()}` : null;
+/** A swatch's accessible name: its colour code and name, then "excluded" when it is. */
+export function paletteSwatchLabel(hex: string, excluded: boolean): string {
+  return excluded ? `${paletteTooltip(hex)}, excluded` : paletteTooltip(hex);
 }
 
-/**
- * A swatch's name before its state words: the hex and name of the colour it is drawn in,
- * "#FFE000 (was #FFF2A8) · Yellow" once recoloured (UX notes §7: the detail row's text).
- */
-export function swatchName(hex: string, fill: string): string {
-  const shown = fill === hex ? hex : recolouredText(fill, hex);
-  return `${shown} · ${colourName(fill)}`;
+/** What a key on swatch `index` of `count` does (UX notes §26): move the roving stop, toggle
+ * Exclude (Enter, Space), delete (Shift+Enter, Delete, Backspace), or nothing. */
+export function paletteKey(
+  key: string,
+  shift: boolean,
+  index: number,
+  count: number,
+): { move: number } | { toggle: number } | { remove: number } | null {
+  switch (key) {
+    case "ArrowRight":
+      return { move: Math.min(count - 1, index + 1) };
+    case "ArrowLeft":
+      return { move: Math.max(0, index - 1) };
+    case "Home":
+      return { move: 0 };
+    case "End":
+      return { move: count - 1 };
+    case "Enter":
+      return shift ? { remove: index } : { toggle: index };
+    case " ":
+      return { toggle: index };
+    case "Delete":
+    case "Backspace":
+      return { remove: index };
+    default:
+      return null;
+  }
+}
+
+/** The fewest colours a palette keeps after a delete (the Colours field's lowest count). */
+export const MIN_PALETTE = 2;
+
+/** The palette edits after deleting `hex` from the shown `palette` (UX notes §26, Proposal): the
+ * palette becomes exactly the other colours, matched again as if `hex` had never been in it,
+ * and `hex` is no longer excluded; `null` when `hex` is not shown or only `MIN_PALETTE` colours
+ * are left. */
+export function deleteFromPalette(
+  palette: readonly string[],
+  excluded: readonly string[],
+  hex: string,
+): { keptPalette: string[]; excluded: string[] } | null {
+  if (!palette.includes(hex) || palette.length <= MIN_PALETTE) {
+    return null;
+  }
+  return { keptPalette: palette.filter((c) => c !== hex), excluded: excluded.filter((c) => c !== hex) };
 }
 
 /** The pipette of the palette (Brightness + Multicolour) adds a fixed colour (UX notes §7). */
@@ -81,7 +104,7 @@ export function sameColour(palette: readonly string[], hex: string): string | nu
   return null;
 }
 
-/** A colour's name from a fixed hue and lightness table (UX notes §7: the swatch's name for
+/** A colour's name from a fixed hue and lightness table (UX notes §7, §26: the swatch's name for
  * makers who do not see the colour): greys by lightness, else the hue word, "Pale" when light,
  * "Dark" when dark, dark orange is "Brown". */
 export function colourName(hex: string): string {
@@ -124,7 +147,7 @@ export function colourName(hex: string): string {
   return word[0].toUpperCase() + word.slice(1);
 }
 
-/** One colour of the strip. */
+/** One colour of the swatch row. */
 export interface PaletteSwatch {
   hex: string;
   fixed: boolean;
@@ -139,7 +162,7 @@ export interface PaletteInfo {
   joined: number;
 }
 
-/** The strip's order (UX notes §7): picked colours first, then by area, most first (ties by
+/** The swatch row's order (UX notes §7): picked colours first, then by area, most first (ties by
  * value). */
 export function stripOrder(colours: readonly PaletteSwatch[]): PaletteSwatch[] {
   return [...colours].sort((a, b) => Number(b.fixed) - Number(a.fixed) || b.pixels - a.pixels || a.hex.localeCompare(b.hex));

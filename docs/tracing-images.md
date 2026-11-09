@@ -157,12 +157,11 @@ double-arrow button at the far right, before the Trace button ("More trace optio
 under the values with everything else (open or closed is remembered). Its rows, top to bottom, each
 shown only when it has something to say:
 
-1. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, and with Brightness
-   the palette's pipette; see "Multicolour" below. Four icon buttons follow (pressed means on, the
-   tooltip names each).
-2. The colour strip, the one place swatches are shown, with the actions of the selected swatch.
-3. The options: Denoise, Upscale and Corners.
-4. **Parts**, the numbered chips of the parts with **Add part** and the trash (see "Parts"), and at
+1. **Output** (Single colour, Multicolour) and, with Multicolour, **Colours**, with Brightness
+   the palette's pipette, and the palette's swatches; see "Multicolour" below. Four icon buttons
+   follow (pressed means on, the tooltip names each).
+2. The options: Denoise, Upscale and Corners.
+3. **Parts**, the numbered chips of the parts with **Add part** and the trash (see "Parts"), and at
    the far right the blue **Analyse** button (see Analysis). Each moves to a line of its own as a
    whole when the block is too narrow.
 
@@ -297,8 +296,7 @@ a black and white trace before it traces the rest (`specs/0091-trace-text-recogn
 - With Multicolour the same happens before the colour trace: the palette is the one of the
   picture as it is (a colour only the text has stays in it), the shapes under the text stay whole,
   and each text takes the palette colour nearest its letters, or the background colour (white
-  text on a red box is white text above the whole box). Recolouring a palette colour recolours
-  its texts too.
+  text on a red box is white text above the whole box).
 - Text turned upside down, or standing at about 90° either way, is read too: a line the reader
   is unsure of, or one steeper than 45°, is read once more turned round, the surer reading is
   kept, and its text is turned to match, so it reads the right way round on the canvas. Lines
@@ -350,28 +348,35 @@ one colour; pale colours and small accents are kept. Only areas of flat colour v
 blended pixels along edges and JPEG fringes never become colours of their own. Areas smaller than
 Ignore below join the neighbouring colour they share the longest border with (a screen reader
 hears "2 regions joined"). With Brightness the pipette after the field adds a colour you pick to the
-palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there is
-selected instead ("Same as #3366CC"). With Pick colours the palette is exactly the picked colours
+palette (it stays armed; Shift+click adds more, Esc ends it); a colour that is already there adds
+nothing and the bar says "Same as #3366CC" for 3 seconds. With Pick colours the palette is exactly the picked colours
 beside the pipette and the field shows their number.
 
-The **palette** is the colour strip in the Advanced block, shown for Multicolour with Colours Auto
-(with Pick colours there is no strip; the picked colours sit beside the pipette): one swatch per
-colour, largest area first, colours picked with the palette pipette first with a small square in
-their corner. Arrows move through it; the selected swatch
-shows its hex value and name ("#FFF2A8 · Pale yellow") and five buttons:
+The **palette** is the row of swatches right after Colours (with Brightness after the palette
+pipette), one per colour, largest area first, colours picked with the palette pipette first. The
+swatches look and sit like the picked colours of Pick colours: 20 px squares 4 px apart, the row
+as wide as its colours, so the bar does not grow a row for them (with Pick colours there is no
+palette row; the picked colours sit beside the pipette in the bar). Pointing at a swatch shows
+its colour code and name ("#4B392F · Brown") and, small, "Click: exclude · Shift: isolate /
+delete":
 
-- **Isolate**: the other colours are drawn dimmed in the preview (the button stays pressed; a
-  screen reader hears "Isolating #FFF2A8"); Enter still creates every colour.
-- **Recolour**: a colour picker under the row changes the colour's fill, not its shape; nothing is
-  traced again. The row reads "#FFE000 (was #FFF2A8)"; **Reset** returns to the found colour.
-- **Merge into**: choose another swatch (Esc cancels; a screen reader hears "Merging #FFF2A8
-  into..."): its pixels are
-  traced with that colour, as one shape. The swatch stays, at half strength with the target's dot;
-  pressing Merge into again undoes it.
-- **Exclude**: the colour becomes background and is not traced; the swatch shows a crossed circle
-  (a screen reader hears "2 colours excluded"). Pressing it again brings the colour back.
-- **Remove** (picked colours only): takes the colour out of the palette. Delete on the focused
-  swatch does the same.
+- **Click**: excludes the colour: it becomes background and is not traced; the swatch is drawn
+  faded with a crossed circle (a screen reader hears "2 colours excluded"). A second click brings
+  it back.
+- **Shift while pointing**: isolates the colour: the other colours are drawn dimmed in the preview
+  (a screen reader hears "Isolating #4B392F") until Shift is released or the pointer leaves the
+  swatch. It is a view only; Enter still creates every colour.
+- **Shift+click**: deletes the colour. The palette becomes the other colours, and every pixel is
+  matched again among them, as if the deleted colour had never been found: each of its pixels
+  goes to the colour nearest to it (to the background only where that colour is excluded). With
+  Colours at Auto the field then shows the smaller count ("Auto  5"); a set count stays as it is.
+  A screen reader hears "Removed #4B392F". At least two
+  colours stay; a delete of one of the last two does nothing. A new method, a new Colours value
+  or another image starts from the found palette again.
+
+On the keyboard the swatches are one Tab stop: the arrows, Home and End move between them, Enter
+or Space excludes, Shift+Enter, Delete or Backspace deletes. A swatch's name gives its colour code,
+its name and "excluded" when it is.
 
 ## Create paths
 
@@ -422,7 +427,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Brightness: pixels darker than the Threshold.
 - Remove background: everything unlike the background colour.
 - Background: the colour Remove background leaves out; Auto takes it from the image border.
-- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette.
+- Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette; a click on one takes it out.
 - Pipette: takes a colour from the image under a click; Esc ends it.
 - Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.
 - Threshold: pixels darker than this brightness (0 to 100 %) become shapes.
@@ -431,12 +436,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Ignore below: drops shapes and holes smaller than this size in mm.
 - Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.
 - Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.
-- Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.
-- Isolate: shows one colour and dims the others; Enter still creates every colour.
-- Recolour: gives a colour another fill without tracing again.
-- Merge into: traces a colour as another one, as one shape.
-- Exclude: makes a colour background; it is not traced.
-- Remove: takes a picked colour out of the palette.
+- Palette: the colours of a Multicolour trace beside Colours, largest area first. A click excludes a colour: it becomes background and is not traced; a second click brings it back. Shift while pointing at a colour isolates it: the others are dimmed in the preview. Shift+click deletes a colour: the others are matched again as if it had never been found.
 - Invert: traces what the method leaves out; transparent pixels never become shapes.
 - Drop border shapes: drops shapes that touch the image border.
 - Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.
@@ -444,6 +444,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Denoise: smooths out noise in the picture before tracing.
 - Upscale: doubles small images before tracing; Auto does it below 1 Mpx.
 - Corners: higher turns more bends into sharp corners.
+- Parts: pieces of the picture, each with its own mask and settings; Add part makes the next one, the trash removes the active one, and Create paths joins them into one group.
 - Analyse: sets the method, its background and Colour tolerance, and the Threshold back to what the analysis found in the image; never the preset or other values.
 
 ## Create paths
@@ -451,7 +452,7 @@ Trace turns the selected image into paths. The method decides which parts become
 The blue **Trace** button at the far right of the bar, Enter on the canvas, Ctrl+Enter in a field,
 or a double-click on the image adds one group "Trace of <image name>" directly above each image, with one compound
 path inside, filled black, without stroke, holes as holes. With Multicolour the group holds one
-compound path per colour, filled with that colour (or its recolour), named by its hex value,
+compound path per colour, filled with that colour, named by its hex value,
 largest area at the bottom. The image stays visible and unchanged
 under it; hide or move it as usual. The new groups are selected and the Select tool is active; no
 notice appears, the selected group is the feedback. The tooltip of the group's row in the Layers

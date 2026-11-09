@@ -747,7 +747,6 @@ const focusedStop = async (s: S) =>
     if (!e.closest('${BAR}')) return 'outside';
     const group = e.closest('[role=radiogroup]'); if (group) return group.getAttribute('aria-label');
     if (e.hasAttribute('data-trace-palette-swatch')) return 'swatch';
-    if (e.hasAttribute('data-trace-palette-action')) return 'action ' + e.getAttribute('data-trace-palette-action');
     return e.getAttribute('aria-label') || e.textContent.trim(); })()`)) as string;
 
 async function tabStops(s: S) {
@@ -785,7 +784,7 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
   });
 });
 
-test("0025 tidy-up c57 (§24.3): Tab order with Advanced open: Output, Colours, palette pipette, the toggles, the strip, Denoise, Upscale, Corners, then Parts, Add part and Analyse last (0091 ux-notes §7; 0088 Part B ux-notes B2)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 tidy-up c57 (§24.3, §26): Tab order with Advanced open: Output, Colours, palette pipette, the palette swatches, the toggles, Denoise, Upscale, Corners, then Parts, Add part and Analyse last (0091 ux-notes §7; 0088 Part B ux-notes B2)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pale.png", PALE, true);
     await pickMethod(s, "Brightness");
@@ -798,10 +797,8 @@ test("0025 tidy-up c57 (§24.3): Tab order with Advanced open: Output, Colours, 
     const multi = await tabStops(s);
     console.log("Brightness, Multicolour, Advanced open:", JSON.stringify(multi));
     const tail = multi.slice(multi.indexOf("Trace") + 1);
-    const strip = tail.filter((n) => n === "swatch" || n.startsWith("action "));
-    assert.ok(strip.length >= 1 && strip.filter((n) => n === "swatch").length === 1, `the strip is one Tab stop: ${JSON.stringify(strip)}`);
-    assert.deepEqual(tail.filter((n) => n !== "swatch" && !n.startsWith("action ")), ["Output", "Colours", "Pick palette colour from the image", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Analyse"]);
-    assert.ok(tail.indexOf("swatch") > tail.indexOf("Recognise shapes") && tail.indexOf("swatch") < tail.indexOf("Denoise"), "the strip sits between Recognise shapes and Denoise (0088 Part B ux-notes B2)");
+    assert.equal(tail.filter((n) => n === "swatch").length, 1, `the swatch row is one Tab stop: ${JSON.stringify(tail)}`);
+    assert.deepEqual(tail, ["Output", "Colours", "Pick palette colour from the image", "swatch", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Analyse"], "the swatches follow the palette pipette (ux-notes §26)");
     // Pick colours has its pipette in the bar and none in Advanced.
     await pickMethod(s, "Pick colours");
     await setOutput(s, "Single colour");

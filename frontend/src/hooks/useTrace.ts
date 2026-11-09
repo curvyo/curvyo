@@ -61,7 +61,6 @@ import { NO_PART_LINE, type PartJob, type TracePartInfo, mayCrop, partEmptyText,
 import type { TraceApi } from "./traceApi";
 import { useTraceParts } from "./useTraceParts";
 import { useTracePalette } from "./useTracePalette";
-import type { HsvTriple } from "./useStylePanel";
 import { useTraceMethod } from "./useTraceMethod";
 import { useTraceProgress } from "./useTraceProgress";
 
@@ -886,15 +885,6 @@ export function useTrace(
   );
 
   const palette = useTracePalette({ active, values, getSession, onChange, apply, choiceRef });
-  // The Recolour picker converts as the Style section does (Rust's rounding).
-  const hsvOf = useCallback((rgb: number): HsvTriple => {
-    const [hue, saturation, value] = getSession()?.colour_hsv(rgb) ?? [-1, 0, 0];
-    return [hue, saturation, value];
-  }, [getSession]);
-  const rgbOf = useCallback(
-    (hue: number, saturation: number, value: number) => getSession()?.hsv_colour(hue, saturation, value) ?? 0,
-    [getSession],
-  );
   useEffect(() => {
     paletteRefresh.current = palette.refresh;
   }, [palette.refresh]);
@@ -1246,17 +1236,13 @@ export function useTrace(
         return true;
       }
       // Esc order (UX notes §6): a running trace stops first, then the armed pipette disarms,
-      // then the tool is left; a Merge into waiting for its target is cancelled before the tool.
-      if (event.key === "Escape" && palette.merging) {
-        palette.cancelMerge();
-        return true;
-      }
+      // then the tool is left.
       if (event.key === "Escape") {
         return disarmPick();
       }
       return false;
     },
-    [active, create, creating, stop, getSession, onChange, palette, disarmPick],
+    [active, create, creating, stop, getSession, onChange, disarmPick],
   );
 
 
@@ -1364,8 +1350,6 @@ export function useTrace(
     announcement,
     traceBlocked,
     palette,
-    hsvOf,
-    rgbOf,
   };
 }
 

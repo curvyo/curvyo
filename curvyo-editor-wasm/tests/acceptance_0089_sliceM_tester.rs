@@ -1,8 +1,8 @@
 //! Tester cases for `specs/0089-trace-quality-and-colour` slice M at the session (criterion 29):
 //! one group with one filled compound path per colour named by its hex, the largest at the
-//! bottom, one undo step, a recolour that never refits, Isolate that never changes what is
-//! written. Written from the specification; the results come from `trace_colour_job_with` over
-//! the pixels the session itself decoded.
+//! bottom, one undo step, Isolate that never changes what is written. Written from the
+//! specification; the results come from `trace_colour_job_with` over the pixels the session
+//! itself decoded.
 
 #![allow(
     clippy::unwrap_used,
@@ -228,51 +228,9 @@ fn c29_create_paths_is_one_undo_step_and_redo_brings_it_back() {
 }
 
 #[test]
-fn c29_recolour_changes_fills_and_never_the_outlines() {
-    let (mut plain, _, _) = traced();
-    plain.create_traced_paths();
-    let (_, base) = group_paths(&mut plain);
-
-    let (mut session, _, _) = traced();
-    let orange = TraceRgb::new(250, 120, 0);
-    session.set_trace_palette_view(vec![(RED, orange), (BLUE, GREEN)], None);
-    session.create_traced_paths();
-    let (_, recoloured) = group_paths(&mut session);
-    assert_eq!(recoloured.len(), base.len());
-    for ((_, a), (_, b)) in base.iter().zip(&recoloured) {
-        for (x, y) in geometry(a).iter().zip(geometry(b)) {
-            assert!((x - y).abs() < 1e-9, "outline changed: {x} vs {y}");
-        }
-        assert_eq!(geometry(a).len(), geometry(b).len());
-    }
-    let fills: Vec<TraceRgb> = recoloured.iter().map(|(_, p)| fill(p)).collect();
-    let want: Vec<TraceRgb> = base
-        .iter()
-        .map(|(_, p)| match fill(p) {
-            c if c == RED => orange,
-            c if c == BLUE => GREEN,
-            c => c,
-        })
-        .collect();
-    assert_eq!(fills, want);
-    // The order and the number of paths do not follow the new colours.
-    assert_eq!(fills[0], orange);
-}
-
-#[test]
-fn c29_resetting_the_recolour_writes_the_original_fills() {
-    let (mut session, _, _) = traced();
-    session.set_trace_palette_view(vec![(RED, GREEN)], None);
-    session.set_trace_palette_view(Vec::new(), None);
-    session.create_traced_paths();
-    let (_, paths) = group_paths(&mut session);
-    assert!(paths.iter().any(|(_, p)| fill(p) == RED));
-}
-
-#[test]
 fn c29_isolate_is_view_only_create_paths_still_writes_every_colour_opaque() {
     let (mut session, _, _) = traced();
-    session.set_trace_palette_view(Vec::new(), Some(BLUE));
+    session.set_trace_isolated(Some(BLUE));
     session.create_traced_paths();
     let (_, paths) = group_paths(&mut session);
     assert_eq!(paths.len(), 3, "Enter still creates every colour");

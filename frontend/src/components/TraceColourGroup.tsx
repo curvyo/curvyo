@@ -1,5 +1,5 @@
-import { Pipette, X } from "lucide-react";
-import { useRef, useState, type KeyboardEvent } from "react";
+import { Ban, Pipette, X, type LucideIcon } from "lucide-react";
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 
 import { Swatch } from "@/components/panel/Swatch";
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
@@ -92,31 +92,58 @@ interface PickColoursProps {
   onReturnFocus: () => void;
 }
 
-/** One picked colour (`ux-notes.md` §25.4): a 24 x 28 button around the 20 px swatch; hover and
- * focus fade it to 40 % and show an x on a casing; the tooltip is the colour code, the name says
- * what a press does. */
-function PickedSwatch({ hex, stop, onPress, onKey }: { hex: string; stop: boolean; onPress: (byKey: boolean) => void; onKey: (event: KeyboardEvent<HTMLButtonElement>) => void }) {
+/** A glyph centred over a swatch on a 3 px `--toolbar-bg` casing, so it reads on any colour. */
+function CasedGlyph({ icon: Icon, className }: { icon: LucideIcon; className: string }) {
   return (
-    <AppTooltip side="bottom" content={hex}>
+    <span aria-hidden className={`pointer-events-none absolute ${className}`}>
+      <Icon size={12} absoluteStrokeWidth strokeWidth={7.5} className="absolute text-[var(--toolbar-bg)]" />
+      <Icon size={12} absoluteStrokeWidth strokeWidth={1.5} className="relative text-[var(--toolbar-icon)]" />
+    </span>
+  );
+}
+
+interface SwatchCellProps {
+  hex: string;
+  /** Which row it belongs to: its data attribute (`data-trace-picked-swatch`, `data-trace-palette-swatch`). */
+  kind: "picked" | "palette";
+  /** The row's one Tab stop. */
+  stop: boolean;
+  label: string;
+  tooltip: ReactNode;
+  /** A picked colour: hover and focus fade it and show the x. */
+  removable?: boolean;
+  /** An excluded palette colour: at 40 % with the `Ban` glyph. */
+  excluded?: boolean;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  /** Enter and every move: the palette reads Shift from them (Shift+hover isolates). */
+  onPointerMove?: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPointerLeave?: () => void;
+}
+
+/** One colour of a swatch row (`ux-notes.md` §25.4, §26): a 24 x 28 button around the 20 px
+ * swatch; the cells touch, so the swatches are 4 px apart. */
+export function SwatchCell({ hex, kind, stop, label, tooltip, removable = false, excluded = false, onClick, onKeyDown, onPointerMove, onPointerLeave }: SwatchCellProps) {
+  const fade = removable ? "group-hover:opacity-40 group-focus-visible:opacity-40" : excluded ? "opacity-40" : "";
+  return (
+    <AppTooltip side="bottom" content={tooltip}>
       <button
         type="button"
-        aria-label={removePickedLabel(hex)}
-        data-trace-picked-swatch={hex}
+        aria-label={label}
+        data-trace-picked-swatch={kind === "picked" ? hex : undefined}
+        data-trace-palette-swatch={kind === "palette" ? hex : undefined}
         tabIndex={stop ? 0 : -1}
-        onClick={(event) => onPress(event.detail === 0)}
-        onKeyDown={onKey}
+        onClick={onClick}
+        onKeyDown={onKeyDown}
+        onPointerEnter={onPointerMove}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
         className="group relative flex h-7 w-6 shrink-0 cursor-default items-center justify-center outline-none"
       >
-        <span
-          aria-hidden
-          className="block size-5 rounded-[4px] border border-[var(--swatch-border)] group-hover:opacity-40 group-focus-visible:opacity-40"
-          style={{ background: hex }}
-        />
+        <span aria-hidden className={`block size-5 rounded-[4px] border border-[var(--swatch-border)] ${fade}`} style={{ background: hex }} />
         <span aria-hidden className="pointer-events-none absolute size-5 rounded-[4px] group-focus-visible:ring-2 group-focus-visible:ring-[var(--editor-accent)]" />
-        <span aria-hidden className="pointer-events-none absolute hidden group-hover:block group-focus-visible:block">
-          <X size={12} absoluteStrokeWidth strokeWidth={7.5} className="absolute text-[var(--toolbar-bg)]" />
-          <X size={12} absoluteStrokeWidth strokeWidth={1.5} className="relative text-[var(--toolbar-icon)]" />
-        </span>
+        {removable ? <CasedGlyph icon={X} className="hidden group-hover:block group-focus-visible:block" /> : null}
+        {excluded ? <CasedGlyph icon={Ban} className="block" /> : null}
       </button>
     </AppTooltip>
   );
@@ -174,7 +201,17 @@ export function PickColoursGroup({ swatches, armed, onPipette, onRemove, onRetur
           4 px after the pipette; eight colours make 220 px. */}
       <div ref={row} className="my-1 mr-[-2px] ml-[2px] flex flex-wrap">
         {swatches.map((hex, index) => (
-          <PickedSwatch key={hex} hex={hex} stop={index === at} onPress={(byKey) => remove(index, byKey)} onKey={keyDown(index)} />
+          <SwatchCell
+            key={hex}
+            hex={hex}
+            kind="picked"
+            stop={index === at}
+            label={removePickedLabel(hex)}
+            tooltip={hex}
+            removable
+            onClick={(event) => remove(index, event.detail === 0)}
+            onKeyDown={keyDown(index)}
+          />
         ))}
       </div>
     </div>

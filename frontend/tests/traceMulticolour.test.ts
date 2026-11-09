@@ -16,6 +16,7 @@ import {
   TRACE_PRESETS_FALLBACK,
   changedAdvancedText,
   coloursText,
+  editChoice,
   firstChoice,
   readChoice,
   readSummary,
@@ -25,19 +26,20 @@ import {
   writeChoice,
 } from "../src/lib/traceText.ts";
 import {
+  PALETTE_HINT,
   colourName,
+  deleteFromPalette,
   excludedNote,
   isolatingNote,
-  mergedIntoText,
-  mergingNote,
+  paletteKey,
+  paletteSwatchLabel,
+  paletteTooltip,
   readPalette,
-  recolouredText,
-  recolourHex,
   sameAsNote,
-  swatchName,
   sameColour,
   stripOrder,
 } from "../src/lib/tracePaletteText.ts";
+import { viewValues } from "../src/lib/traceMaskCaches.ts";
 
 function memoryStorage() {
   const store = new Map<string, string>();
@@ -53,7 +55,7 @@ test("criterion 25: Output is Single colour or Multicolour, an app setting; Colo
   writeChoice({ ...first, values: { ...first.values, output: MULTICOLOUR, colours: 9, fixed: ["#FF0000"], excluded: ["#00FF00"] } }, storage);
   const read = readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage);
   assert.deepEqual([read.values.output, read.values.colours], [MULTICOLOUR, 9]);
-  assert.deepEqual([read.values.fixed, read.values.excluded, read.values.merged], [[], [], []], "palette edits belong to the session");
+  assert.deepEqual([read.values.fixed, read.values.excluded, read.values.keptPalette], [[], [], null], "palette edits belong to the session");
   // Out of range or unreadable: clamped, or Auto.
   storage.store.set("curvyo.trace-values", JSON.stringify({ preset: "logo", values: {}, output: 1, colours: 40 }));
   assert.equal(readChoice(TRACE_PARAMS_FALLBACK, TRACE_PRESETS_FALLBACK, storage).values.colours, 16);
@@ -65,19 +67,63 @@ test("criterion 25: Output is Single colour or Multicolour, an app setting; Colo
 });
 
 test("criteria 26, 29: the settings JSON carries Output, Colours and the palette edits", () => {
-  const v = { ...firstChoice().values, output: MULTICOLOUR, colours: 5, fixed: ["#FF0000"], excluded: ["#00FF00"], merged: [["#0000FF", "#FF0000"] as const] };
+  const v = { ...firstChoice().values, output: MULTICOLOUR, colours: 5, fixed: ["#FF0000"], excluded: ["#00FF00"] };
   const json = JSON.parse(settingsJson(v, 128));
-  assert.deepEqual([json.output, json.colours, json.fixed, json.excluded, json.merged], [1, 5, ["#FF0000"], ["#00FF00"], [["#0000FF", "#FF0000"]]]);
+  assert.deepEqual([json.output, json.colours, json.fixed, json.excluded], [1, 5, ["#FF0000"], ["#00FF00"]]);
+  assert.equal("merged" in json, false, "Merge into is gone (ux-notes §26)");
   // Fixed palette colours exist for Brightness only (Pick colours takes its swatches); Single
   // colour sends no palette edits.
   assert.deepEqual(JSON.parse(settingsJson({ ...v, method: REMOVE_BACKGROUND }, 128)).fixed, []);
   assert.deepEqual(JSON.parse(settingsJson({ ...v, method: PICK_COLOURS }, 128)).fixed, []);
   const single = JSON.parse(settingsJson({ ...v, output: SINGLE_COLOUR }, 128));
-  assert.deepEqual([single.output, single.excluded, single.merged, single.fixed], [0, [], [], []]);
+  assert.deepEqual([single.output, single.excluded, single.fixed], [0, [], []]);
   assert.equal(JSON.parse(settingsJson({ ...v, method: BRIGHTNESS, colours: null }, 128)).colours, null);
 });
 
-test("UX notes §7: the strip's order, the swatch names and the palette's words", () => {
+test("ux-notes §26: a kept palette is traced as exactly its colours, with either method, never with Pick colours", () => {
+  const v = { ...firstChoice().values, output: MULTICOLOUR, colours: null, fixed: ["#FF0000"], keptPalette: ["#FF0000", "#0000FF"] };
+  for (const method of [BRIGHTNESS, REMOVE_BACKGROUND]) {
+    const json = JSON.parse(settingsJson({ ...v, method }, 128));
+    assert.deepEqual([json.fixed, json.colours], [["#FF0000", "#0000FF"], 2], `method ${method}`);
+  }
+  const pick = JSON.parse(settingsJson({ ...v, method: PICK_COLOURS }, 128));
+  assert.deepEqual([pick.fixed, pick.colours], [[], null]);
+  assert.deepEqual(JSON.parse(settingsJson({ ...v, output: SINGLE_COLOUR }, 128)).fixed, []);
+  // A new method, Colours count or image ends it; another value keeps it.
+  const choice = { ...firstChoice(), values: v };
+  assert.equal(editChoice(choice, "method", REMOVE_BACKGROUND).values.keptPalette, null);
+  assert.equal(editChoice(choice, "colours", 4).values.keptPalette, null);
+  assert.deepEqual(editChoice(choice, "smooth", 40).values.keptPalette, ["#FF0000", "#0000FF"]);
+  assert.equal(viewValues(v, false, undefined, undefined).keptPalette, null);
+  assert.deepEqual(viewValues(v, true, undefined, undefined).keptPalette, ["#FF0000", "#0000FF"]);
+});
+
+test("ux-notes §26: deleting a colour keeps exactly the others and un-excludes it; two colours stay", () => {
+  const shown = ["#D0222A", "#234EB8", "#F2C20E"];
+  assert.deepEqual(deleteFromPalette(shown, ["#234EB8", "#F2C20E"], "#234EB8"), { keptPalette: ["#D0222A", "#F2C20E"], excluded: ["#F2C20E"] });
+  assert.equal(deleteFromPalette(shown, [], "#000000"), null, "a colour not shown");
+  assert.equal(deleteFromPalette(["#D0222A", "#234EB8"], [], "#234EB8"), null, "Multicolour keeps two colours");
+});
+
+test("ux-notes §26: the swatch tooltip, name and keys", () => {
+  assert.equal(paletteTooltip("#4B392F"), "#4B392F · Brown");
+  assert.equal(PALETTE_HINT, "Click: exclude · Shift: isolate / delete");
+  assert.equal(paletteSwatchLabel("#4B392F", false), "#4B392F · Brown");
+  assert.equal(paletteSwatchLabel("#4B392F", true), "#4B392F · Brown, excluded");
+  assert.deepEqual(paletteKey("ArrowRight", false, 1, 3), { move: 2 });
+  assert.deepEqual(paletteKey("ArrowRight", false, 2, 3), { move: 2 });
+  assert.deepEqual(paletteKey("ArrowLeft", false, 0, 3), { move: 0 });
+  assert.deepEqual(paletteKey("Home", false, 2, 3), { move: 0 });
+  assert.deepEqual(paletteKey("End", false, 0, 3), { move: 2 });
+  assert.deepEqual(paletteKey("Enter", false, 1, 3), { toggle: 1 });
+  assert.deepEqual(paletteKey(" ", false, 1, 3), { toggle: 1 });
+  assert.deepEqual(paletteKey("Enter", true, 1, 3), { remove: 1 });
+  assert.deepEqual(paletteKey("Delete", false, 1, 3), { remove: 1 });
+  assert.deepEqual(paletteKey("Backspace", false, 1, 3), { remove: 1 });
+  assert.equal(paletteKey("a", false, 1, 3), null);
+});
+
+test("UX notes §7: the swatch row's order, the colour names and the palette's words", () => {
   const palette = readPalette(
     JSON.stringify({
       colours: [
@@ -106,20 +152,9 @@ test("UX notes §7: the strip's order, the swatch names and the palette's words"
   assert.equal(coloursText(null, 6), "Auto  6");
   assert.equal(coloursText(9, 6), "9");
   assert.equal(isolatingNote("#FFF2A8"), "Isolating #FFF2A8");
-  assert.equal(mergingNote("#FFF2A8"), "Merging #FFF2A8 into...");
-  assert.equal(mergedIntoText("#3366CC"), "Merged into #3366CC");
   assert.equal(excludedNote(2), "2 colours excluded");
   assert.equal(excludedNote(1), "1 colour excluded");
   assert.equal(sameAsNote("#3366CC"), "Same as #3366CC");
-  assert.equal(recolouredText("#FFE000", "#FFF2A8"), "#FFE000 (was #FFF2A8)");
-  // The Recolour hex field: six digits, with or without "#", any case.
-  assert.equal(recolourHex("ffe000"), "#FFE000");
-  assert.equal(recolourHex(" #FfE000 "), "#FFE000");
-  assert.equal(recolourHex("#FE0"), null);
-  assert.equal(recolourHex("#GGE000"), null);
-  // A swatch is named by the colour it is drawn in; a recoloured one also by its old hex.
-  assert.equal(swatchName("#FFF2A8", "#FFF2A8"), "#FFF2A8 · Pale yellow");
-  assert.equal(swatchName("#FFF2A8", "#3366CC"), `#3366CC (was #FFF2A8) · ${colourName("#3366CC")}`);
   // A pick within the merge distance (0.03 of the sRGB cube, 7.65 bytes) is the same colour.
   assert.equal(sameColour(["#3366CC", "#FFF2A8"], "#3567CA"), "#3366CC");
   assert.equal(sameColour(["#D9D9D9"], "#DCD6CF"), null);

@@ -923,3 +923,34 @@ Branch `story/trace-colours-row`. Frontend only (`TraceBar.tsx`, `TraceColourGro
 
 Validation: `npx tsc -b --noEmit`, `npx oxlint`, `npm test`, the own Chromium files one by one, the
 Rust trace crates' tests, the full §7 gate once at the end.
+
+## The Multicolour palette as a swatch row (2026-11-09, `ux-notes.md` §26)
+
+Same branch. Frontend (`TracePalette.tsx`, `TraceColourGroup.tsx`, `TraceAdvanced.tsx`,
+`TraceBar.tsx`, `useTracePalette.ts`, `useTrace.ts`, `traceApi.ts`, `tracePaletteText.ts`,
+`traceText.ts`, `traceMaskCaches.ts`) and `curvyo-editor-wasm` (the recolour view removed, Isolate
+alone); no core crate, no format change, nothing persisted changes (`excluded`, `fixed` and the new
+`keptPalette` are session values, `writeChoice` never stored them).
+
+- [x] P1 (criterion 29, §26.1, §26.2): the palette is a swatch row beside Colours and the palette
+  pipette, built from the Pick colours cell (`SwatchCell`, shared); tooltip `#RRGGBB · Name` and the
+  tiny line "Click: exclude · Shift: isolate / delete"; excluded swatches at 40 % with `Ban`.
+- [x] P2 (criterion 29, §26.3, §26.4): a click or Enter / Space toggles Exclude; Shift+hover
+  isolates (view only, ends with Shift or the hover); Shift+click, Shift+Enter, Delete and Backspace
+  delete. Delete keeps the other shown colours as `keptPalette`, which `settingsJson` sends as the
+  fixed colours and their count, so the tracer matches every pixel again among them (the
+  `with_palette` path of `trace_text_colour.rs`); two colours stay at least. Unit tests:
+  `paletteKey`, `deleteFromPalette`, the settings JSON and where the kept palette ends.
+- [x] P3 (§26.5): Recolour, Merge into, the detail row, the actions and the selection removed:
+  `PaletteView` and `set_trace_palette_view` (now `set_trace_isolated`), the recolour arms of
+  `with_leftovers` and `write_texts`, the `hsvOf` / `rgbOf` props, `merged` in the frontend values,
+  their strings and tests (`trace_colours_tests.rs`, `trace_text_colour_tests.rs`,
+  `acceptance_0089_sliceM_tester.rs`, `traceMulticolour.test.ts`).
+- [x] P4: About Trace entries, `docs/tracing-images.md`, `docs/design-system.md`, `specification.md`
+  criteria 17 and 29 (amended), ux-notes §26 and §25.4 marked superseded.
+- [x] P5: Chromium: `acceptance_0089_m_browser` (tooltip, Shift+hover, click, five colours at
+  800 x 600 in one line, Shift+click delete), the tester files `acceptance_0089_sliceM_tester`,
+  `_colours_row_tester`, `_tidyup_tester` (Tab order) and `0094_pick_browser` (selector) adapted.
+
+Validation: `npm test`, `npx tsc -b --noEmit`, `npx oxlint`, the changed Chromium files one by one,
+the editor-wasm trace tests, the full §7 gate once at the end.

@@ -1,6 +1,6 @@
 //! The Trace tool's multicolour side (`specs/0089-trace-quality-and-colour` slice M, criteria
-//! 29 and UX notes §7): the palette of the shown preview for the strip, the maker's recolours
-//! (fills only, no refit) and Isolate (the other colours dimmed in every view).
+//! 29, UX notes §7 and §26): the palette of the shown preview for the swatch row, and Isolate
+//! (the other colours dimmed in the preview).
 
 use curvyo_document_core::Color;
 use curvyo_ui_core::{TraceColour, TraceLayerWire, TraceRgb};
@@ -10,28 +10,6 @@ use super::trace_mesh::MeshCache;
 
 /// How strongly the colours Isolate does not pick are drawn (UX notes §7: 35 %).
 pub(super) const DIMMED: f64 = 0.35;
-
-/// The maker's view of the palette: recolours (palette colour to fill) and the isolated colour.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(super) struct PaletteView {
-    pub(super) recolours: Vec<(TraceRgb, TraceRgb)>,
-    pub(super) isolated: Option<TraceRgb>,
-}
-
-impl PaletteView {
-    /// The fill of the palette colour `colour`: its recolour, or itself.
-    pub(super) fn fill(&self, colour: TraceRgb) -> TraceRgb {
-        self.recolours
-            .iter()
-            .find(|(from, _)| *from == colour)
-            .map_or(colour, |&(_, to)| to)
-    }
-
-    /// Whether `colour` is drawn dimmed: another colour is isolated.
-    pub(super) fn dimmed(&self, colour: TraceRgb) -> bool {
-        self.isolated.is_some_and(|isolated| isolated != colour)
-    }
-}
 
 /// A trace colour as a document colour.
 pub(super) fn color(c: TraceRgb) -> Color {
@@ -53,14 +31,13 @@ pub(super) fn text_layer(fill: Option<TraceRgb>, outlines: usize) -> TraceLayerW
 
 /// The outlines and colours Create paths writes for a result of `outlines` in `layers` with the
 /// `leftovers` of its text lines (`specs/0091` decision 6): one colour, all in the black path;
-/// multicolour, each leftover in the layer of its fill (recoloured as the layer), or in a path of
-/// its fill after the layers when no layer has it. The third value is where each of `outlines`
+/// multicolour, each leftover in the layer of its fill, or in a path of its fill after the layers
+/// when no layer has it. The third value is where each of `outlines`
 /// went (`specs/0088` Part B: the recognised shapes follow their outlines).
 pub(super) fn with_leftovers(
     outlines: &[kurbo::BezPath],
     layers: &[TraceLayerWire],
     leftovers: &[(kurbo::BezPath, TraceRgb)],
-    view: &PaletteView,
 ) -> (Vec<kurbo::BezPath>, Vec<TraceColour>, Vec<usize>) {
     if layers.is_empty() {
         let mut all = outlines.to_vec();
@@ -80,7 +57,7 @@ pub(super) fn with_leftovers(
         let before = out.len();
         out.extend(own.map(|(p, _)| p.clone()));
         colours.push(TraceColour {
-            fill: color(view.fill(layer.colour)),
+            fill: color(layer.colour),
             outlines: layer.outlines + out.len() - before,
         });
     }
@@ -99,7 +76,7 @@ pub(super) fn with_leftovers(
                 .map(|(p, _)| p.clone()),
         );
         colours.push(TraceColour {
-            fill: color(view.fill(fill)),
+            fill: color(fill),
             outlines: out.len() - before,
         });
     }
@@ -158,21 +135,14 @@ impl Session {
         .to_string()
     }
 
-    /// Sets the recolours (palette colour to fill) and the isolated colour: the preview's fills,
-    /// outline strengths and the Mask view follow at once, nothing is traced again (criterion 29).
-    pub fn set_trace_palette_view(
-        &mut self,
-        recolours: Vec<(TraceRgb, TraceRgb)>,
-        isolated: Option<TraceRgb>,
-    ) {
-        let view = PaletteView {
-            recolours,
-            isolated,
-        };
-        if view == self.trace.palette_view {
+    /// Sets the isolated colour (`specs/0089` UX notes §26: Shift+hover on a swatch): the other
+    /// colours' outlines are drawn dimmed at once, nothing is traced again and nothing is written
+    /// differently.
+    pub fn set_trace_isolated(&mut self, isolated: Option<TraceRgb>) {
+        if isolated == self.trace.isolated {
             return;
         }
-        self.trace.palette_view = view;
+        self.trace.isolated = isolated;
         if let Some(preview) = &mut self.trace.preview {
             preview.outline_mesh = MeshCache::default();
         }

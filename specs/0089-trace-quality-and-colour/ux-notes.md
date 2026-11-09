@@ -867,10 +867,12 @@ row under Output, the detail row ("#000000 · Black") and the corner marks, in S
 **Multicolour with Pick colours uses the same row** and nothing else; its palette is exactly the picked colours
 (Frage 90) and Colours stays greyed out.
 
-**Rule (lead decision 2026-11-09, Proposal, Frage 142 default A): the palette strip with its detail row and its
+**Superseded by §26 (customer 2026-11-09):** the rule and the table below no longer hold for Multicolour without Pick colours; its palette is a swatch row beside Colours with no detail row and no actions.
+
+~~**Rule (lead decision 2026-11-09, Proposal, Frage 142 default A): the palette strip with its detail row and its
 actions (Isolate, Recolour, Merge into, Exclude, Remove for fixed colours) is an accepted feature and stays, but only
 for Multicolour with Colours Auto, where it works on the colours of the result. The customer's request concerned the
-picked colours; they move into the swatch row beside the pipette and have no strip and no detail row.**
+picked colours; they move into the swatch row beside the pipette and have no strip and no detail row.**~~
 
 **What the Advanced block shows, by case** (Output row, options and last row as in §24.3 in all four):
 
@@ -981,8 +983,82 @@ earlier UX notes (§12 strings, §22.1 row 6 and 8, §22.3 item 4, §24.2 items 
 
 ### 25.7 Question for the customer
 
-**Frage 142 (TRACE-STRIP): The palette strip and its actions.** The picked colours move into the swatch row beside the
+**Answered 2026-11-09 by the customer, neither A nor B: see §26.** **Frage 142 (TRACE-STRIP): The palette strip and its actions.** The picked colours move into the swatch row beside the
 pipette. What happens to the strip with its detail row and the actions Isolate, Recolour, Merge into, Exclude?
 A: the strip and actions stay, only for Multicolour with Colours Auto (the traced palette); Pick colours have no
 strip and no detail row. B: the strip and the actions go away completely, also for Multicolour Auto. C: the strip
 stays everywhere, only the detail row text "#RRGGBB · Name x" goes. **Recommendation and default: A.**
+
+## 26. The Multicolour palette as a swatch row (customer 2026-11-09; supersedes the strip, the detail row and the actions of §7, §22.3 item 4, §24.3 and §25.4)
+
+Customer, after trying #295 with Multicolour and Colours Auto: the strip wrapped the Advanced block into a swatch row
+plus a detail row ("#4B392F · Brown" and four icons). Decisions: the palette swatches line up beside the pipette like
+the Pick colours swatches; no detail row, no action icons; Recolour and Merge into go without replacement. Items
+marked **(Proposal)** are mine and vetoable at the demo.
+
+### 26.1 Where and how it looks
+
+- In the Output row's Multicolour group: `[Colours 120] 4 [palette pipette 28] [swatch] [swatch] ...` with Brightness;
+  with Remove background (no palette pipette) the row follows the Colours field at the group's 4 px gap
+  **(Proposal)**. Pick colours shows no palette row (its colours sit beside the bar's pipette, §25.4).
+- The cells are the Pick colours cells (`SwatchCell`, one component): swatch 20 x 20, 4 px radius, 1 px
+  `--swatch-border`, hit cell 24 x 28, cells touch (4 px between swatches), 4 px after the pipette. The row is as wide
+  as its colours (24 per colour), `role="group"` "Palette", and wraps by whole swatches only when the bar is narrower
+  than the row (16 colours are 384 px, wider than the 308 px bar at 800 x 600 with the panel open). No frame, no
+  label, no count.
+- Order as before: colours picked with the palette pipette first, then by area. The corner mark of picked colours goes
+  **(Proposal; the customer asked for the Pick colours look)**.
+- **Excluded**: the swatch at 40 % with a Lucide `Ban`, 12 px, 1.5 px stroke, on the 3 px `--toolbar-bg` casing of the
+  x of §25.4. No hover fade and no x (a click does not delete here).
+- Focus: the 2 px `--editor-accent` ring of §25.4. The row is at 50 % while a new result is computed.
+
+### 26.2 Tooltip
+
+The app tooltip (400 ms, bottom), two lines: `#4B392F · Brown` (the hex and the name of §7's table), then a tiny muted
+line `Click: exclude · Shift: isolate / delete` (10 px, 70 %). The customer asked for the shortcuts "ganz kurz in den
+tooltip": this is a deliberate exception to the no-hint rule, limited to this tooltip.
+
+### 26.3 Pointer
+
+- **Hover**: the tooltip only.
+- **Shift+hover = Isolate**: while Shift is held and the pointer is on a swatch, the preview draws the other colours
+  at 35 % (as §7). It ends when Shift is released or the pointer leaves. A view only: not traced again, nothing
+  written differently, no history step. The hidden region says "Isolating #4B392F".
+- **Click = Exclude on / off**: the colour becomes background and is not traced; a second click brings it back.
+  Semantics as before (a settings change of the tool, traced again, not a History step; the hidden region says
+  "2 colours excluded"). A pointer press returns the keyboard to the canvas.
+- **Shift+click = delete** (customer 2026-11-09, refined the same day): the colour is taken out of the palette and the
+  trace matches every pixel again among the remaining colours, exactly as if the palette had never held it. Nothing
+  becomes background through the delete itself (that is Exclude); a pixel nearest a remaining colour that is excluded
+  goes to the background with it. Built as: the shown palette without the colour becomes the kept palette, traced
+  as fixed colours with their count (the path `trace_text_colour` already uses to trace with a given palette), so the
+  tracer finds no new colour and assigns each pixel to the nearest kept colour. A deleted excluded colour is no longer
+  excluded. The Colours field keeps its value: at Auto it shows the new count ("Auto  5"), a set count stays as it is
+  **(Proposal)**. The hidden region says
+  "Removed #4B392F". **(Proposal)** At least two colours stay: a delete of one of the last two does nothing,
+  silently. A new method, a new Colours value or another image drops the kept palette and starts from the found one;
+  a palette-pipette pick while it is kept adds to it. There is no undo for a delete other than those (it is a settings
+  change of the tool, as Exclude and a pick are).
+
+### 26.4 Keyboard
+
+One Tab stop with roving tabindex (after the palette pipette, before Invert): Left / Right, Home / End move;
+**Enter or Space** toggles Exclude; **Shift+Enter, Delete or Backspace** deletes, focus then goes to the swatch now in
+its place, else the previous one. Isolate has no key (it is a pointer view). Accessible name: `#4B392F · Brown`, with
+`, excluded` when excluded.
+
+### 26.5 Removed
+
+Recolour (the Style picker under the row, Reset, "#FFE000 (was #FFF2A8)", the session's recolour view), Merge into
+(the choosing mode, "Merging ... into...", the merged dot, Esc cancelling it), the detail row, the five action icons,
+the selected swatch and the listbox semantics. The engine's merge support (`merged` in the vectorize core and the
+wasm glue) has no caller in the app any more; it stays for the architect to decide (a core public API).
+
+### 26.6 Strings
+
+New: `PALETTE_HINT` "Click: exclude · Shift: isolate / delete"; the tooltip `#RRGGBB · Name`; the accessible name with
+", excluded"; the hidden region's "Removed #RRGGBB" (the §25.4 string). Gone: Isolate, Recolour, Reset, Merge into,
+Exclude, Remove, Excluded, "Merging ... into...", "Merged into ...", "(was ...)", "Enter 6 hex digits".
+The About Trace entries Palette, Isolate, Recolour, Merge into, Exclude and Remove become one Palette entry; a Parts
+entry is added before Analyse (texts in `traceText.ts` and `docs/tracing-images.md`, a test compares them).
+

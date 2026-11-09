@@ -193,50 +193,6 @@ fn the_small_colour_poster_gives_coloured_texts_above_whole_shapes() {
     assert_eq!(first, second, "criterion 24/13");
 }
 
-/// Criterion 23 with the maker's recolour: a text in a recoloured palette colour follows it.
-#[test]
-fn a_recoloured_palette_colour_recolours_its_text() {
-    let model = model();
-    let (mut session, image) = session_with("colour/colour_small.png");
-    let source = session.trace_source(image, false).unwrap();
-    let lines = trace_read_text(
-        &model,
-        &source.rgba,
-        source.width,
-        source.height,
-        &mut |_| std::ops::ControlFlow::Continue(()),
-    )
-    .unwrap();
-    assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let params = colour_params();
-    let wire = trace_text_colour_job_with(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &params,
-        &lines,
-        &mut |_| {},
-    );
-    assert!(session.set_trace_preview(image, &wire));
-    assert!(session.set_trace_result(image, &wire));
-    // The fit from the result (Create paths without a preview's fit).
-    let request = session.trace_fit_request(0.3, &[]).unwrap();
-    assert!(session.set_trace_fit(&request, &fit(&request)));
-    session.set_trace_palette_view(
-        vec![(TraceRgb::new(208, 34, 42), TraceRgb::new(0, 0, 255))],
-        None,
-    );
-    let TraceCreateOutcome::Created { .. } = session.create_traced_paths() else {
-        panic!("nothing created");
-    };
-    let out = written(&session, image);
-    let fill_of = |s: &str| out.texts.iter().find(|t| t.0 == s).map(|t| t.1);
-    assert_eq!(fill_of("Rote Farbe"), Some(rgb(0, 0, 255)), "{out:?}");
-    assert_eq!(fill_of("OFFEN"), Some(WHITE), "{out:?}");
-    assert_eq!(out.paths, vec![(rgb(0, 0, 255), 1)]);
-}
-
 /// The truth of the multicolour poster, top to bottom, with each line's colour.
 const COLOUR_POSTER: [(&str, Color); 5] = [
     ("Rote Farbe", RED),

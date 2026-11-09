@@ -155,7 +155,7 @@ test("criterion 70: the info page's exact text", () => {
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
   "Background: the colour Remove background leaves out; Auto takes it from the image border.",
-  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette; a click on one takes it out.",
   "Pipette: takes a colour from the image under a click; Esc ends it.",
   "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
@@ -164,12 +164,7 @@ test("criterion 70: the info page's exact text", () => {
   "Ignore below: drops shapes and holes smaller than this size in mm.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
-  "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
-  "Isolate: shows one colour and dims the others; Enter still creates every colour.",
-  "Recolour: gives a colour another fill without tracing again.",
-  "Merge into: traces a colour as another one, as one shape.",
-  "Exclude: makes a colour background; it is not traced.",
-  "Remove: takes a picked colour out of the palette.",
+  "Palette: the colours of a Multicolour trace beside Colours, largest area first. A click excludes a colour: it becomes background and is not traced; a second click brings it back. Shift while pointing at a colour isolates it: the others are dimmed in the preview. Shift+click deletes a colour: the others are matched again as if it had never been found.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
@@ -177,6 +172,7 @@ test("criterion 70: the info page's exact text", () => {
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
+  "Parts: pieces of the picture, each with its own mask and settings; Add part makes the next one, the trash removes the active one, and Create paths joins them into one group.",
   "Analyse: sets the method, its background and Colour tolerance, and the Threshold back to what the analysis found in the image; never the preset or other values.",
   ]);
   assert.deepEqual(infoEntryParts(TRACE_INFO_ENTRIES[1]), { term: "Logo / Line art", text: "sharp corners, clean curves." });
@@ -201,7 +197,7 @@ test("criteria 41, 43 (removed): no Node limit and no Full-size preview in the s
     "fixed",
     "ignoreBackground",
     "invert",
-    "merged",
+    "keptPalette",
     "method",
     "output",
     "pickTolerance",
@@ -249,7 +245,7 @@ test("criteria 5 and 66: the choice is an app setting; Threshold starts automati
     colours: null,
     fixed: [],
     excluded: [],
-    merged: [],
+    keptPalette: null,
   });
   const edited = editChoice(pickPreset(first, TRACE_PRESETS_FALLBACK[2]), "smooth", 90);
   writeChoice(
@@ -347,7 +343,6 @@ test("criteria 40, 59, 60: presets, Custom as stored state", () => {
     colours: null,
     fixed: [],
     excluded: [],
-    merged: [],
   });
 });
 
