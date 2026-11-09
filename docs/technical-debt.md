@@ -10,6 +10,17 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## Concurrent moves can orphan clones through containment (`0100`, 2026-11-09)
+
+ADR 0045 §4 refuses a command that would put a clone inside a group its original draws, but two
+legal moves by two peers (one moves clone C of G1 into G2, the other moves G2 into G1) merge into
+a cycle. The reader makes those clones orphans and the repair after the merge deletes them, as for
+the other link residue ADR 0015 leaves for the sharing story. An undo or object undo can build one
+too; only the reader catches it.
+
+**Resolution:** when the sharing story handles merge residue (ADR 0015 Consequences), lift the
+later-moved clone out of the group (ADR 0014 §11) instead of deleting it.
+
 ## The pairing code's secret is `Copy` and never wiped (`0096`, 2026-11-04)
 
 `PairSecret` in `curvyo-crypto-core::pair_code` (ADR 0040 decision 4) is a `Copy` 25-bit value, so

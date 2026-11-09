@@ -8,6 +8,8 @@
 `specs/0058-bitmap-import`. The numbers behind the decoder choice are confirmed by the spike in "Before
 the build".
 
+Note 2026-11-09: "Clones" amended by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): an image may be a linked clone's original; the clone draws its pixels under the composed matrix.
+
 ## Context
 
 The customer wants a PNG, JPEG or WebP in the drawing, first as the input of the Trace tool

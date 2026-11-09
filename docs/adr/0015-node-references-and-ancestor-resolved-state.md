@@ -7,6 +7,8 @@ It supersedes one sentence of [ADR 0002](0002-document-model-units-and-svg-round
 inheritance"), and 0002's Status line points here. Asked by `specs/0049-linked-clone` and
 `specs/0050-layers-and-objects-panel`.
 
+Note 2026-11-09: §1, §3, §5 and §6 amended by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): an origin may also be a primitive, text, image or group (still the one `clone_link` way); a clone on a cycle through containment (clone → origin, group → child) is an orphan and commands that would build one are refused; Unlink and the removal repair of a primitive, group, text or image root make an independent copy, not a path; the read hands a picture-root clone its drawn leaves, mapped, memoised per group.
+
 ## Context
 
 ADR 0002 §5 rules out inheritance, so that concurrent edits never contend on a shared parent

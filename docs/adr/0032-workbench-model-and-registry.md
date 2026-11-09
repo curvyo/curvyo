@@ -7,6 +7,8 @@ Persistence details: [ADR 0033](0033-manufacturing-data-in-the-project-file.md).
 contract: [ADR 0034](0034-extension-contract-compiled-in.md).
 Note 2026-11-05: §1 to §5 and §9 amended by [ADR 0042](0042-page-kinds.md) (proposed; customer feedback of 2026-11-05 reversed WB-PAGE-VIS A and WB-PLACE-DEFAULT A): the output page is listed and in the plane, the workbench follows the active page, no switcher, no Add manufacturing.
 
+Note 2026-11-09: §6 and §9 amended by [ADR 0045](0045-clones-of-groups-texts-images-and-movable-placed-pages.md) (proposed, `needs-customer`, spec `0100`): a placement is selected and moved, turned, scaled, duplicated and copied on its laser page by every transform writer (one `placement_link` write); a result off its own page's frame is refused; placed by `place_page`.
+
 ## Context
 
 Two workbenches exist today: Vector (the drawing) and Sketch (ADR 0026). Both are a session enum

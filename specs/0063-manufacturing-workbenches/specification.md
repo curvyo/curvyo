@@ -29,13 +29,14 @@ Every slice is one story and one PR that the customer can try end to end.
 |---|---|---|---|---|
 | 1 | [`0098`](../0098-page-kinds/) `page-kinds` | Page kinds, no switcher | Add page asks Drawing, Sketch or Laser; the tools and tabs follow the active page; the workbench switcher is gone; the laser page is a normal listed page. | Must |
 | 2 | [`0099`](../0099-sketch-pages/) `sketch-pages` | Sketch pages | A sketch page holds its sketch and nothing else; the sketch is fixed to its page and is used elsewhere only as a linked clone (page-row drag or Place clone on); Convert to paths makes it a drawing page; deleting it turns its clones into paths. | Should |
-| 3 | `0100` `bring-content-in` | Bring content in, move versus edit | Dragging a design onto the laser page makes a live linked clone (Alt moves, Ctrl copies), a dragged page row a placed page; objects move anywhere but are edited only in their page's context. | Must |
+| 3a | [`0100`](../0100-bring-content-in/) `bring-content-in` | Bring content in | Dragging a design onto the laser page makes a live linked clone (Alt moves, Ctrl copies), a dragged page row a placed page; clones of groups, texts and images; placed pages move and export. | Must |
+| 3b | `0106` `move-versus-edit` | Move versus edit | Objects move anywhere but are edited only in their page's context; a double-click activates the context; the laser page's own Layers tree. | Must |
 | 4 | `0101` `laser-operations` | Operations | An ordered list of operations per laser page, assigned to any object, group, clone or placed page, with Show, Output and the Cuts last switch. Replaces `0027`. | Must |
 | 5a | `0102` `laser-fixtures` | Fixtures as objects | Grid with tapes and major lines, holders with slots, clamps and stops as selectable objects of the bed, each Active or not; parts and pages snap into slots by fitting size. | Should |
 | 5b | `0103` `fixture-jobs` | Fixture jobs | A fixture carries its own operations (engrave the board outlines once), listed below the work with Output off by default. | Should |
 | 6 | `0028`, `0029` | Settings and output | Power and speed per operation from the material library; preview, gate and G-code that read the operation list in order, holes before outlines inside a cut. | Must |
 
-Slice 5 of the concept (`concept-output-pages.md` §9) is split in two (Proposal): fixtures are useful without fixture jobs, and fixture jobs need the operations of slice 4. Slices 2 and 3 can run in parallel; `0099` names which drag goes where (its split table): sketch page rows are 0099, drawing page rows and canvas drags are 0100, and the page-row drag is built by whichever merges first.
+Slice 3 is split in two (Proposal, 2026-11-09, `0100` "Split of slice 3"): the model change (group clones, movable placed pages, a format bump) is on the road to the first job; the edit-context rule touches every edit tool and is demoable on its own. Slice 5 of the concept (`concept-output-pages.md` §9) is split in two (Proposal): fixtures are useful without fixture jobs, and fixture jobs need the operations of slice 4. Slices 2 and 3 can run in parallel; `0099` names which drag goes where (its split table): sketch page rows are 0099, drawing page rows and canvas drags are 0100, and the page-row drag is built by whichever merges first.
 
 ### Follow-up: changing a page's kind (`0104`, not scheduled)
 
