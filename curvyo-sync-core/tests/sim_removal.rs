@@ -198,3 +198,39 @@ fn removal_while_offline_and_rotation_across_members() {
     let log = decode_log(&opened.share().unwrap().keyring_log).unwrap();
     assert_ne!(log, [] as [curvyo_crypto_core::keyring::Entry; 0]);
 }
+
+/// Share tab feedback (customer 2026-11-09): a removed device joins again by a fresh invite and
+/// syncs; its old link is still refused as removed.
+#[test]
+fn a_removed_device_joins_again_by_a_new_invite() {
+    let (mut net, [a, b, c, _]) = four(5);
+    remove(&mut net, a, 2);
+    net.run(2_000);
+    assert!(net.clients[b].session().has_ended());
+    net.close_app(b);
+    net.reopen(b);
+    net.run(2_000);
+    let refused_at = net.clients[b].events.len();
+    assert!(
+        net.clients[b].events[..refused_at]
+            .contains(&SessionEvent::Refused(RefusalReason::Removed))
+    );
+    let secret = net.invite(a, 24 * 3600);
+    net.set_link(b, false);
+    net.set_link(b, true);
+    net.join(b, secret);
+    let rejoined = |n: &Net| {
+        n.clients[a].session().keyring().is_some_and(|k| {
+            k.participants()
+                .iter()
+                .any(|p| p.identity.member == member(2))
+        })
+    };
+    assert!(
+        net.run_until(10_000, |n| rejoined(n) && n.converged(&[a, b, c]))
+            .is_some()
+    );
+    assert!(!net.clients[b].session().has_ended());
+    net.edit(b, |d| rect(d, 70.0));
+    assert!(net.run_until(3_000, |n| n.converged(&[a, b, c])).is_some());
+}

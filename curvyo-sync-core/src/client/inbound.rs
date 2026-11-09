@@ -249,10 +249,16 @@ impl ClientSession {
     }
 
     /// Ends the session as removed when the confirmed keyring no longer lists this device; an
-    /// own leave the relay has not confirmed goes out first (ADR 0041 decision 11).
+    /// own leave the relay has not confirmed goes out first (ADR 0041 decision 11). A device
+    /// that was removed and claims a new invite is not removed while its own claim waits for
+    /// the relay's confirmation (customer 2026-11-09).
     fn removed_here(&mut self) -> bool {
         let me = self.keys.me();
-        if !self.confirmed_keyring().is_some_and(|k| k.was_removed(&me)) {
+        let unclaimed = matches!(self.start, Start::Join { claimed: false, .. });
+        if unclaimed
+            || !self.confirmed_keyring().is_some_and(|k| k.was_removed(&me))
+            || self.keys.keyring().is_some_and(|k| k.role(&me).is_some())
+        {
             return false;
         }
         self.end_removed();
