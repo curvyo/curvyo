@@ -1,6 +1,6 @@
 # Sharing concept: the workspace is the only unit of sharing
 
-Status: Done (PR (this one))
+Status: Done (PR #298)
 Priority: Must
 Origin: Customer (DOC-SHARE-REMOVE B, 2026-11-06: "wir gehen immer auf Workspace"; the other decisions below, 2026-11-09). The wording of the texts is a Proposal until the demo.
 

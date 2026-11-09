@@ -1,6 +1,6 @@
 # Sync across the maker's own computers
 
-Status: Done (PR #270, PR (this one)): slice 1 desktop and browser; the switch and Share workspace merged into one Sync switch by `0105`
+Status: Done (PR #270, PR #298): slice 1 desktop and browser; the switch and Share workspace merged into one Sync switch by `0105`
 Priority: Must
 Origin: Customer (request of 2026-11-04, translated): sync the workspace across my own computers, slice 2 of `0095`. The maker pairs a second computer once with the first; afterwards the workspaces sync automatically through the server without an invite link, still end to end encrypted, and the server sees nothing but ciphertext (WS-META of `0095`). Standing requirements: R-SYS-004, R-COLLAB-003 (always available, not conditional on a sync folder), R-COLLAB-006. What is marked Proposal is the product owner's until the customer accepts it.
 
