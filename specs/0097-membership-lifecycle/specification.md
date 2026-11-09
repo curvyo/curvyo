@@ -1,6 +1,6 @@
 # Membership lifecycle: admins, leaving, adding back, verified join
 
-Status: Draft (2026-11-05, product owner; customer decisions of 2026-11-05 applied; becomes Ready once ADR 0041 and the UX notes exist, nothing else blocks it)
+Status: In progress (built in PR #281 and #294 with the amendments below; Done at the merge of `0105`)
 Priority: Must
 Origin: Customer (request of 2026-11-05, translated): "membership management" = slice 2 of `0092` (criteria 41 to 45 there, R-COLLAB-009 to -012): a second admin for other people, leave, add a removed participant back with the choice "full history" or "from now on" (ADR 0010 §9), the verified-fingerprint join (ADR 0010 §7: the invitee shows a fingerprint, an admin confirms it by comparing, the participant is added without an invite link), and two admins who remove each other at the same time (ADR 0010 §5). To apply to shared documents (`0092`) and shared workspaces (`0095`, ADR 0037), and to stay consistent with `0096` (own devices). What is marked Proposal is the product owner's until the customer accepts it.
 
@@ -65,6 +65,21 @@ criteria below where they conflict:
   B's old link and file are still refused as removed.
 - "Leave my devices" on the group's last device is allowed (`0096` criterion 27, ADR 0040
   decision 8).
+- **PR #294 as built (customer, 2026-11-09), overrides the criteria below:**
+  - Criterion 1: no key epoch number is shown anywhere. Criterion 11 and 12 keep the
+    "Change keys" notice and button, without an epoch number.
+  - Criterion 5: Step down of the only admin is greyed with "You are the only admin"; it is not
+    pressable and not refused afterwards. The "Make someone else an admin first" sentence is gone.
+  - Criterion 14: Leave of the only admin (other participants exist) is greyed and armed the
+    same way. Leave of the only participant is not offered; criterion 43 (Stop sharing) replaces
+    "out of scope". The last device of a group may leave (criterion 16 stays for the rest).
+  - Criteria 4, 10, 11 (sentence), 18, 20, 21, 22, 23, 24, 25, 26: the dialogs and sentences
+    are gone with the confirm texts; a rejoin is a new invite (criterion 42), not Add back.
+  - Invite validity is fixed at 24 hours; no choice is offered.
+  - The "(Proposal)" UX hints about "Removed or left" and the add back dialog are obsolete.
+- **Superseded by `0105` (DOC-SHARE-REMOVE B):** every "for D" half; the History choice (18, 22)
+  and Frage 160; the document part of 33. Criteria hold for W only. `0105` sets this spec Done
+  at merge.
 - 43 (new, customer 2026-11-09). Given B is the only participant left of D or W (every other one
   left or was removed), then B's row offers Stop sharing (armed); it ends the share on B without
   writing anything and the file or folder is local again. The Share tab shows W's block, Invite

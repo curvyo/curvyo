@@ -62,6 +62,24 @@ roles. The Leave sentence names those workspaces, but nothing deletes the empty 
 **Resolution:** a relay message that retires a room its last admin leaves (protocol change), or
 a Make admin offer before the leave; both wait for the customer.
 
+## Rooms and keys of documents shared on their own stay behind (`0105`, ADR 0044, 2026-11-09)
+
+Since sharing a single document is removed, a `0092` document room stays on the relay with its
+last state, and its epoch keys stay in the credential store or the browser key file, unused.
+Nothing reads them; the file opens as a local document (ADR 0044 decision 3).
+
+**Resolution:** a room deletion message (protocol change, ADR 0031 has none) and a key cleanup
+by room id; both wait for a story.
+
+## `heads` in the marker's ended record is written but not read (`0105`, ADR 0044, 2026-11-09)
+
+With the return check retired, `Keyring::admitted_after` goes, and nothing reads
+`EndedRecord.heads` any more. The field stays in `share.ended.json` v2 (a format we write,
+golden `share_ended_v2.json`), so older builds read it unchanged.
+
+**Resolution:** drop it at the next `share.ended.json` version change, or reuse it if a way back
+without an invite returns.
+
 ## From now on is a client rule (`0097`, 2026-11-05, ADR 0041 decision 7)
 
 "From now on" withholds the epochs created while a returning member was away only because
