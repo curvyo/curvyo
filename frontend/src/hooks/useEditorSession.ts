@@ -1263,6 +1263,12 @@ export function useEditorSession(
       if (dropNotice !== "") {
         history.showNotice(dropNotice, FLIP_NOTICE_MS, "canvas");
       }
+      // An edit chord on a move-only selection, or a double-click with no drawing page, says so
+      // in the refusal look (`specs/0106` criteria 9 and 14).
+      const contextNotice = session.take_context_notice();
+      if (contextNotice !== "") {
+        history.showNotice(contextNotice, FLIP_NOTICE_MS, "canvas", "alert");
+      }
       // A resize that mirrored says so politely: "Resized. Mirrored left to right."
       const announcement = session.take_transform_announcement();
       if (announcement !== "") {
@@ -2397,6 +2403,8 @@ export function useEditorSession(
         };
         doubleClickPressRef.current = null;
         const hintCode = session.double_click(press.x, press.y, press.shift, press.ctrl);
+        // A double-click that found no drawing page to open says so (`specs/0106` criterion 14).
+        showTransformNotice(session);
         if (hintCode === "offset_chip") {
           // The chip mounts with the next sync and takes the focus (`0038` criterion 53).
         } else if (hintCode === "create_trace") {
@@ -2657,6 +2665,8 @@ export function useEditorSession(
         MAC,
         event.timeStamp,
       );
+      // A refused edit chord or Enter with several homes (`specs/0106` criterion 9).
+      showTransformNotice(session);
       const offsetKey = offsetKeyOutcome(outcome);
       if (offsetKey.ignored) {
         return;
@@ -2723,6 +2733,7 @@ export function useEditorSession(
       strokeToPathReady,
       sketchView.workbench,
       sketchPresentation,
+      showTransformNotice,
     ],
   );
 

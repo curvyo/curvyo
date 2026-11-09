@@ -22,6 +22,9 @@ interface CloneBlockProps {
   onReturnFocus: () => void;
   /** The pressed button's box, for the notice that shows 4 px under it (UX notes "Focus"). */
   onPressedAt: (button: DOMRect) => void;
+  /** A move-only selection (`specs/0106` UX notes §3): the name row and the select buttons only;
+   * Unlink, Placement, Style and Spread colours are hidden. */
+  moveOnly?: boolean;
 }
 
 /** A button of the block: a mouse press returns the focus to the canvas, a key press keeps it
@@ -182,7 +185,7 @@ function OverrideRow({
  * original (chains only) and Unlink clone, then the Placement and Style rows and Spread colours
  * (`specs/0057-clone-overrides`). Inline, no popup.
  */
-export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockProps) {
+export function CloneBlock({ clones, onReturnFocus, onPressedAt, moveOnly = false }: CloneBlockProps) {
   const { panel } = clones;
   if (!panel.clonesOnly) {
     return null;
@@ -223,14 +226,17 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
             onHover={(on) => clones.hover(on ? "root" : "")}
           />
         )}
-        <BlockButton
-          label={many ? "Unlink clones" : "Unlink clone"}
-          title={unlinkTitle(panel)}
-          onPress={(keyboard) => clones.apply("unlink", "panel", keyboard)}
-          onReturnFocus={onReturnFocus}
-          onPressedAt={onPressedAt}
-        />
+        {moveOnly ? null : (
+          <BlockButton
+            label={many ? "Unlink clones" : "Unlink clone"}
+            title={unlinkTitle(panel)}
+            onPress={(keyboard) => clones.apply("unlink", "panel", keyboard)}
+            onReturnFocus={onReturnFocus}
+            onPressedAt={onPressedAt}
+          />
+        )}
       </div>
+      {moveOnly ? null : (
       <div className="mt-2 flex flex-col gap-2">
         {panel.placementRow && (
           <OverrideRow
@@ -279,6 +285,7 @@ export function CloneBlock({ clones, onReturnFocus, onPressedAt }: CloneBlockPro
           </>
         )}
       </div>
+      )}
     </div>
   );
 }

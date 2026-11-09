@@ -67,6 +67,13 @@ export interface LayerRowData {
   refusal: string;
   /** "select-contents" for a layer row, else "". */
   rowAction: string;
+  /** A row inside an expanded placed page of a laser page's tree: the placed page it is shown
+   * through; null elsewhere (`specs/0106` criterion 18). */
+  via?: { peer: string; counter: number } | null;
+  /** A row inside a placed page: live and read-only, no eye, lock, drag or rename. */
+  readOnly?: boolean;
+  /** "On Laser 1": the tooltip's muted line of a row whose object lies on another page. */
+  homeLine?: string;
 }
 
 /** The Opacity field at the bottom of the tab (criterion 26). */
@@ -106,6 +113,8 @@ export interface LayersViewData {
   toolbar: LayerToolbarData;
   /** The first selected row, or null (Shift+Ctrl+L scrolls to it). */
   firstSelected: number | null;
+  /** A laser page lists its own tree: no layer to add (`specs/0106` criterion 17). */
+  laserTree?: boolean;
   rows: LayerRowData[];
 }
 
@@ -180,9 +189,29 @@ export function idText(id: { peer: string; counter: number } | null): string {
   return id === null ? "" : JSON.stringify(id);
 }
 
-/** A stable React key for a row. */
+/** A stable React key for a row: a laser page's root and Fixtures rows share the page's id, and
+ * a row inside a placed page is keyed by the placed page too (`specs/0106` criterion 18). */
 export function rowKey(row: LayerRowData): string {
-  return `${row.id.peer}:${row.id.counter}`;
+  const via = row.via ? `${row.via.peer}:${row.via.counter}/` : "";
+  const plain =
+    row.kind === "page-root" || row.kind === "fixtures" || row.kind === "note" ? `${row.kind}/` : "";
+  return `${plain}${via}${row.id.peer}:${row.id.counter}`;
+}
+
+/** The kinds of a laser page's tree that are no document object: no eye, lock, drag or rename. */
+export function isPlainRow(row: LayerRowData): boolean {
+  return (
+    row.kind === "page-root" ||
+    row.kind === "fixtures" ||
+    row.kind === "placed-page" ||
+    row.kind === "note" ||
+    row.readOnly === true
+  );
+}
+
+/** The id a press on `row` selects: a row inside a placed page selects the placed page. */
+export function pressedId(row: LayerRowData): { peer: string; counter: number } {
+  return row.via ?? row.id;
 }
 
 /** The indent of a row, px: 16 per level below the top, at most six levels (criterion 6). */

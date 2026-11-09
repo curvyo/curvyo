@@ -13,6 +13,8 @@ interface StatusBarProps {
   nodeCountText?: string | null;
   /** The active page's kind chip, first in the right block (`specs/0098` criterion 6). */
   kind?: KindInfo | null;
+  /** "Rectangle · Drawing 2" while the selection is move-only (`specs/0106` UX notes §2). */
+  contextText?: string;
 }
 
 /**
@@ -24,7 +26,7 @@ interface StatusBarProps {
  * (`specs/0015-document-size-and-rulers/` criteria 12 and 21): fixed decimals
  * and the display unit written once, formatted in Rust.
  */
-export function StatusBar({ cursorText, sizeText, zoomPercent, nodeCountText, kind }: StatusBarProps) {
+export function StatusBar({ cursorText, sizeText, zoomPercent, nodeCountText, kind, contextText }: StatusBarProps) {
   return (
     // Three columns, not `justify-between`, so the zoom stays centred however wide the right
     // segment grows with the node count (`0053` UX notes).
@@ -34,7 +36,10 @@ export function StatusBar({ cursorText, sizeText, zoomPercent, nodeCountText, ki
     >
       {/* `whitespace-pre` keeps the two spaces between x and y; `tabular-nums`
           keeps the unit at the end from moving with the digits. */}
-      <span className="min-w-0 truncate whitespace-pre tabular-nums">{cursorText}</span>
+      <span className="min-w-0 truncate whitespace-pre tabular-nums">
+        {cursorText}
+        {contextText ? `    ${contextText}` : ""}
+      </span>
       <span>{zoomPercent}%</span>
       <span className="flex items-center justify-end gap-4 whitespace-pre tabular-nums">
         {nodeCountText && (

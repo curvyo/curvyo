@@ -45,6 +45,8 @@ import type { AlignApi } from "@/hooks/useAlign";
 import { LINKED_CLONE_TOOLTIP } from "@/lib/cloneText";
 
 export interface SelectToolbarProps {
+  /** The selection holds an object out of context: move commands only (`specs/0106`). */
+  moveOnly?: boolean;
   scaleStrokeWidth: boolean;
   onSetScaleStrokeWidth: (on: boolean) => void;
   scaleCornerRadius: boolean;
@@ -615,6 +617,7 @@ function LinkedCloneButton({
  * groups when the canvas is narrower than the row.
  */
 export function SelectToolbar({
+  moveOnly = false,
   scaleStrokeWidth,
   onSetScaleStrokeWidth,
   scaleCornerRadius,
@@ -665,6 +668,9 @@ export function SelectToolbar({
   const objectToPathRef = useRef<HTMLDivElement>(null);
   const objectToPathShift = useNoticeShift(objectToPathRef, objectToPathNotice);
   const groups: React.ReactNode[] = [];
+  // A move-only selection (`specs/0106` criterion 11, UX notes §3): the move groups stay in their
+  // places, every edit control is hidden, not dimmed.
+  const edits = !moveOnly;
   // The arrange groups directly after Guide, before the kind groups, in every selection state of
   // the Select tool, so they do not move with the selection; Grid from two selected objects
   // (`specs/0061-align-and-distribute/` UX notes, "Placement" and "Grid group").
@@ -677,10 +683,10 @@ export function SelectToolbar({
   }
   // The Tile slot after the arrange groups, before the kind groups, in every selection state of
   // the Select tool, so the bar does not jump (`specs/0069-tiling` UX notes §1).
-  if (tile) {
+  if (tile && edits) {
     groups.push(<TileGroup key="tile" slot={tile.slot} onEnter={tile.onEnter} onRelease={tile.onRelease} onReturnFocus={onReturnFocus} />);
   }
-  if (bar.radiusShown) {
+  if (bar.radiusShown && edits) {
     groups.push(
       <div key="rectangle" className={GROUP_CLASS}>
         <RadiusField bar={bar} onSetRadius={onSetRadius} onReturnFocus={onReturnFocus} />
@@ -701,7 +707,7 @@ export function SelectToolbar({
       </div>,
     );
   }
-  if (bar.pointsShown || bar.ratioShown) {
+  if ((bar.pointsShown || bar.ratioShown) && edits) {
     groups.push(
       <div key={"star"} className={GROUP_CLASS}>
         {bar.pointsShown && <PointsField bar={bar} onSetPointCount={onSetPointCount} />}
@@ -724,17 +730,17 @@ export function SelectToolbar({
     );
   }
   // After the kind groups: the ellipse group, then the curve group (UX notes, "Select bar").
-  if (arcBar.state.ellipseShown) {
+  if (arcBar.state.ellipseShown && edits) {
     groups.push(<EllipseKindGroup key="ellipse" arc={arcBar} onReturnFocus={onReturnFocus} />);
     groups.push(<ArcFieldGroup key="arc-fields" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
-  if (arcBar.state.curveShown && !arcBar.state.ellipseShown) {
+  if (arcBar.state.curveShown && !arcBar.state.ellipseShown && edits) {
     groups.push(<CurveGroup key="curve" arc={arcBar} onReturnFocus={onReturnFocus} />);
   }
   // The Text controls' row 1 in place, in the Text bar's order (`specs/0084-text-bar-second-row`
   // criteria 6 and 8): Font and Size, Alignment, Style, the expand button. Row 2 is the bottom
   // line of the pill, under every other row.
-  const textShown = Boolean(textBar?.shown && onShowFonts && onSetTextSize && onPreviewTextSize);
+  const textShown = Boolean(edits && textBar?.shown && onShowFonts && onSetTextSize && onPreviewTextSize);
   const row2Id = useId();
   if (textBar && textShown && onShowFonts && onSetTextSize && onPreviewTextSize) {
     groups.push(
@@ -785,7 +791,7 @@ export function SelectToolbar({
   }
   // Object to path and Stroke to path are one group "Convert", 4 px apart, so they wrap together
   // (`specs/0085-stroke-to-path` UX notes, "Button").
-  const strokeToPathShown = Boolean(strokeToPath?.shown);
+  const strokeToPathShown = Boolean(edits && strokeToPath?.shown);
   const linkedClone = linkedCloneShown ? (
     <div key="linked-clone" className="flex items-start gap-1">
       <LinkedCloneButton onLinkedClone={onLinkedClone} onReturnFocus={onReturnFocus} notice={linkedCloneNotice} />
@@ -802,10 +808,10 @@ export function SelectToolbar({
       )}
     </div>
   ) : null;
-  if (bar.objectToPathShown || strokeToPathShown) {
+  if ((edits && bar.objectToPathShown) || strokeToPathShown) {
     const convert = (
       <div role="group" aria-label="Convert" className="flex items-start gap-1">
-      {bar.objectToPathShown && (
+      {edits && bar.objectToPathShown && (
       <div className="relative">
         <button
           type="button"
@@ -854,11 +860,11 @@ export function SelectToolbar({
     // Select bar"); no link glyph, which the Link corners toggle already uses.
     groups.push(linkedClone);
   }
-  if (traceShown && onTrace) {
+  if (traceShown && onTrace && edits) {
     // Last, in a group of its own, so no earlier control moves (`0025` UX notes section 1).
     groups.push(<TraceButton key="trace" onTrace={onTrace} onReturnFocus={onReturnFocus} />);
   }
-  if (recognise && (recognise.shown || recognise.notice)) {
+  if (recognise && (recognise.shown || recognise.notice) && edits) {
     // Last, in a group of its own, so no earlier control moves (`0088` UX notes §1).
     groups.push(
       <RecogniseTextButton
@@ -912,9 +918,11 @@ export function SelectToolbar({
          * (`specs/0046-document-shapes` criterion 9, UX review 2). */}
         <div className="flex items-start gap-1">
           <FlipGroup enabled={flipEnabled} flip={flip} onReturnFocus={onReturnFocus} />
-          <div className="py-1">
-            <GuideButton state={guideState} onToggle={onToggleGuide} onReturnFocus={onReturnFocus} />
-          </div>
+          {edits ? (
+            <div className="py-1">
+              <GuideButton state={guideState} onToggle={onToggleGuide} onReturnFocus={onReturnFocus} />
+            </div>
+          ) : null}
         </div>
       </div>
       {groups.map((group, index) => (

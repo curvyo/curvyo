@@ -27,6 +27,9 @@ import type { Tool } from "@/hooks/useEditorSession";
 import { SELECT_KEYS_TOOLTIP } from "@/lib/nudgeText";
 
 interface ToolRailProps {
+  /** The selection is move-only (`specs/0106` criterion 11): the Grouping, Path and Boolean
+   * commands are hidden, not dimmed. */
+  moveOnly?: boolean;
   tool: Tool;
   /** How many objects are selected; with the Select tool active and one or
    * more selected the plain letters R and S act on the selection, so the
@@ -161,6 +164,7 @@ function OffsetGlyph() {
  */
 export function ToolRail({
   tool,
+  moveOnly = false,
   selectionCount,
   onSelect,
   onReturnFocus,
@@ -250,12 +254,12 @@ export function ToolRail({
               onReturnFocus={onReturnFocus}
             />
           </div>
-          <GroupCommands
+          {moveOnly ? null : <GroupCommands
             commands={grouping}
             selectTool={tool === "select"}
             mac={MAC}
             onReturnFocus={onReturnFocus}
-          />
+          />}
           {/* The Path tools card (`specs/0038-path-offset` criterion 1): tools, not commands. */}
           <div
             role="toolbar"
@@ -292,16 +296,20 @@ export function ToolRail({
         </div>
         {/* Column B: the Path card and, 8px below it, the Boolean card. */}
         <div className="flex w-12 flex-col gap-2">
-          <PathCommands
-            commands={commands.path}
-            selectTool={tool === "select"}
-            onReturnFocus={onReturnFocus}
-          />
-          <BooleanCommands
-            commands={commands.booleans}
-            selectTool={tool === "select"}
-            onReturnFocus={onReturnFocus}
-          />
+          {moveOnly ? null : (
+            <>
+              <PathCommands
+                commands={commands.path}
+                selectTool={tool === "select"}
+                onReturnFocus={onReturnFocus}
+              />
+              <BooleanCommands
+                commands={commands.booleans}
+                selectTool={tool === "select"}
+                onReturnFocus={onReturnFocus}
+              />
+            </>
+          )}
         </div>
         <BooleanNotice notice={commands.notice} />
       </div>
