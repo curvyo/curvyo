@@ -112,12 +112,13 @@ pub enum InvalidReason {
 }
 
 /// What [`TransformEntry::commit`] did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EntryOutcome {
     /// One commit was made.
     Committed,
     /// Nothing was written: untouched text, an equal value, or a stale
     /// object. The entry closes.
+    #[default]
     Unchanged,
     /// A field was refused: nothing was written and the entry stays open.
     Invalid {
