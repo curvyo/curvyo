@@ -278,11 +278,10 @@ pub use curvyo_vectorize_core::{
     DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
     DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
     ImageType as TraceImageType, MAX_COLOURS as TRACE_MAX_COLOURS,
-    METHOD_PARAMS as TRACE_METHOD_PARAMS, MIN_COLOURS as TRACE_MIN_COLOURS, PARAMS as TRACE_PARAMS,
-    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
-    PixelLength as TracePixelLength, PropertyKind as TraceProperty, Reason as TraceReason,
-    Rgb8 as TraceRgb, Selection as TraceMethod, Swatches as TraceSwatches, TraceParams,
-    Upscale as TraceUpscale,
+    METHOD_PARAMS as TRACE_METHOD_PARAMS, PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS,
+    ParamKind as TraceParamKind, ParamUnit as TraceParamUnit, PixelLength as TracePixelLength,
+    PropertyKind as TraceProperty, Reason as TraceReason, Rgb8 as TraceRgb,
+    Selection as TraceMethod, Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
