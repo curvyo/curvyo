@@ -397,8 +397,9 @@ const presetText = async (s: S) => (await s.evaluate(`document.querySelector('${
 const pressedOf = async (s: S, label: string) => (await s.evaluate(`document.querySelector('${BAR} [aria-label="${label}"]')?.getAttribute('aria-pressed') ?? 'none'`)) as string;
 const outputText = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [role=radiogroup][aria-label=Output] [aria-checked=true]')?.textContent ?? ''`)) as string;
+// §25.4: the picked colours are the swatch row beside the pipette, not the Advanced strip.
 const swatchList = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=group][aria-label="Picked colours"] [data-trace-picked-swatch]')].map((e) => e.getAttribute('data-trace-picked-swatch')))`)) as string) as string[];
 const waitState = (s: S, want: string, ms = 30_000) => waitFor(`the analysis row to be ${want}`, async () => ((await rowState(s)) === want ? true : null), ms);
 /** The Analyse button and the hidden region (`ux-notes.md` §24.3, §24.5): there is no analysis row any more. */
 const rowBox = async (s: S) =>

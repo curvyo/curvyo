@@ -743,6 +743,46 @@ test("0094 item 2: a mask added with Shift+click re-reads the automatic Threshol
   });
 });
 
+test("0089 §25.2: the automatic Threshold changes once per Inside / Outside switch: the old value stays until the region's analysis answers, then one change; no default, no blank in between", { skip: !BROWSER, timeout: 300_000 }, async () => {
+  await withApp(async (s) => {
+    await halfMasked(s, GREY_RIGHT_PNG, "right", true);
+    assert.ok((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true"));
+    await settledAnalysis(s);
+    const inside = await fieldValue(s, "Threshold");
+    assert.ok(inside !== null, "a Threshold field");
+    // Record every value of the field (and its slider position) from now on.
+    await s.evaluate(`(() => { const f = document.querySelector(${JSON.stringify(field("Threshold"))}); window.__seen = [f.getAttribute('aria-valuetext') + '|' + f.getAttribute('aria-valuenow')];
+      new MutationObserver(() => { const v = f.getAttribute('aria-valuetext') + '|' + f.getAttribute('aria-valuenow'); if (window.__seen.at(-1) !== v) window.__seen.push(v); })
+        .observe(f, { subtree: true, childList: true, characterData: true, attributes: true }); })()`);
+    const seen = async () => JSON.parse((await s.evaluate(`JSON.stringify(window.__seen)`)) as string) as string[];
+    const first = (await seen())[0];
+    await clickMask(s, "Outside");
+    await settledAnalysis(s);
+    const outside = await fieldValue(s, "Threshold");
+    const afterOutside = await seen();
+    console.log("Threshold over Inside -> Outside:", JSON.stringify(afterOutside));
+    assert.notEqual(outside, inside, "fixture: the two regions have different automatic Thresholds");
+    assert.equal(afterOutside.length, 2, `one change only: ${JSON.stringify(afterOutside)}`);
+    assert.equal(afterOutside[0], first, "the old value was kept until the answer");
+    // Back: the region was analysed before, so it comes from the cache at once, one change.
+    await clickMask(s, "Inside");
+    await settledAnalysis(s);
+    const afterInside = await seen();
+    console.log("Threshold over Outside -> Inside:", JSON.stringify(afterInside));
+    assert.equal(await fieldValue(s, "Threshold"), inside, "the region's value again");
+    assert.equal(afterInside.length, 3, `one more change only: ${JSON.stringify(afterInside)}`);
+    assert.equal(afterInside[2], first, "and it is the first region's value");
+    // A value the maker set wins over the answer.
+    await typeInto(s, "Threshold", "33");
+    await sleep(500);
+    const before = (await seen()).length;
+    await clickMask(s, "Outside");
+    await settledAnalysis(s);
+    assert.equal(await fieldValue(s, "Threshold"), "33", "the maker's value stays over the switch");
+    assert.equal((await seen()).length, before, "no change at all");
+  });
+});
+
 // Re-test 2026-11-05: FAILS. A new mask forgets the analysis (`frontend/src/hooks/useTrace.ts:547`),
 // and the fresh analysis is applied as if the maker had edited nothing (`useTrace.ts:292-306`:
 // `edited` sees only a kept Threshold or an edit before the first analysis), so a Method the

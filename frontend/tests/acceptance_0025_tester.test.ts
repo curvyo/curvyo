@@ -443,7 +443,7 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
     assert.equal(await fieldValue(s, "Threshold"), "50", "criterion 9: automatic value of a 0/255 picture (luma 128) shown as 50 %");
     assert.equal(await fieldValue(s, "Smooth"), "80");
     assert.equal(await fieldValue(s, "Ignore below"), "0.50");
-    assert.match(bar, /~\s*\d+ px/, "the muted pixel readout");
+    assert.doesNotMatch(bar, /[~<]\s*\d+ px/, "ux-notes §25.1: the pixel readout is gone");
     assert.deepEqual(await s.layerRows(), rowsBefore, "criterion 7: no node, no layer row");
     assert.equal(await historyText(s), historyBefore, "criterion 7: no history step");
     const during = await pixels(s);
