@@ -7,14 +7,19 @@
 // both show the same four check words and A presses Pair (criteria 1 to 3). A keeps the open
 // workspace checked and presses Sync these: it arrives on B under the Synced workspaces folder
 // without any input there (8 to 10). B opens it; an edit on either side reaches the other (18).
-// A switches the workspace off (the confirm names B, B is told, 13); B edits its copy and closes
+// A switches the workspace off (armed, B is told, 13); B edits its copy and closes
 // it; A switches on again and B's Connect this folder sends B's edit to A without B opening the
 // document (14). A removes B: B is told and keeps its files (23, 24), and A, now the only device
 // of a synced workspace, shows the one-device warning (28). The server's data holds none of the
 // names (30). PR #281 feedback: the removed B pairs again with the same identity and is listed
 // again on both; the server stops before Sync these of two closed workspaces, one alert names
 // both, and it goes once the restarted server lets them in; the Share tab fits its panel in every
-// state shown (`support/panel-overflow.cjs`); the run prints how long each change took. Browser pairing and the passkey backup are `key-backup.cjs`.
+// state shown (`support/panel-overflow.cjs`); the run prints how long each change took. Share tab
+// feedback (2026-11-09): the Server row's Try again; a switch-on whose server never answers turns
+// off again at once, fails with Try again after its bound and switches on once the server is up;
+// Remove, Leave my devices and the switch-off are armed; the last device may leave and every
+// workspace it synced reopens local, never refused as "not a participant". Browser pairing and
+// the passkey backup are `key-backup.cjs`.
 //
 // The fake host mirrors `curvyo-app`'s commands closely enough for the page; their Rust side is
 // covered by `curvyo-app` and `curvyo-storage-io` tests, not here.
@@ -53,6 +58,23 @@ async function waitFor(url) {
     await sleep(200);
   }
   throw new Error(`no server at ${url}`);
+}
+
+/** A server on `address` that accepts the WebSocket upgrade and then never answers: reachable,
+ * but a share or a sync there never gets anywhere (customer feedback on PR #281). */
+function silentRelay(address) {
+  const http = require('node:http');
+  const [host, port] = address.split(':');
+  const server = http.createServer();
+  const sockets = [];
+  server.on('upgrade', (request, socket) => {
+    const accept = crypto.createHash('sha1').update(`${request.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64');
+    socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+    sockets.push(socket);
+  });
+  return new Promise((resolve) => server.listen(Number(port), host, () => resolve({
+    stop: () => new Promise((done) => { for (const socket of sockets) socket.destroy(); server.close(() => done()); }),
+  })));
 }
 
 /** The relay on a free port with a fresh data directory, or again on `again`'s address and data. */
@@ -237,7 +259,7 @@ function makeHost(label) {
     recent_workspaces: () => recentRows(),
     remove_recent_workspace: (a) => { state.recents.splice(a.index, 1); return recentRows(); },
     pick_workspace: () => {
-      const folder = path.join(home, 'ZQX-WS-7731');
+      const folder = path.join(home, state.pickName || 'ZQX-WS-7731');
       fs.mkdirSync(folder, { recursive: true });
       return open(folder);
     },
@@ -523,7 +545,7 @@ async function checkWords(d) {
     await codeGroup.waitFor({ timeout: 15000 });
     const code = (await codeGroup.innerText()).trim();
     assert.match(code, /^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
-    assert.ok(await shown(A, 'The device that enters this code can sync the workspaces you choose, and you can remove it again. The server can tell which devices belong together, not their names.'));
+    assert.ok(!(await shown(A, 'The device that enters this code can sync the workspaces you choose, and you can remove it again. The server can tell which devices belong together, not their names.')), 'no hint sentence');
     await shot(A, '01-a-code');
     await assertPanelFits(A.page, 'A shows its code');
     await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).click();
@@ -580,14 +602,16 @@ async function checkWords(d) {
     assert.ok(await shown(A, 'Synced, 2 devices'), 'the Workspace block says it is synced to my devices');
     await shot(A, '05-a-synced');
 
-    step('Criterion 13: A switches the workspace off; the confirm names B; B keeps a local copy');
+    step('Criterion 13: A switches the workspace off (armed, no sentence); B keeps a local copy');
     const syncSwitch = panel(A).getByRole('switch', { name: 'Sync to my devices' });
+    // Off is armed (customer feedback on PR #281): the first press arms the switch, a second press
+    // after the guard turns it off; no sentence (customer 2026-11-09).
     await syncSwitch.click();
-    const off = panel(A).getByRole('group', { name: 'Stop syncing ZQX-WS-7731' });
-    await off.waitFor();
-    assert.match(await off.innerText(), /ZQX-PC-B keeps its copy as local files and gets no later changes\./);
+    await settle(A.page, 200);
+    assert.equal(await panel(A).getByText(/keeps its copy as local files/).count(), 0, 'no sentence');
+    assert.equal(await syncSwitch.getAttribute('aria-checked'), 'true', 'the first press only arms');
     await sleep(450);
-    await off.getByRole('button', { name: 'Stop syncing', exact: true }).click();
+    await syncSwitch.click();
     const switchOffMs = await until('A\'s switch is off', async () => (await syncSwitch.getAttribute('aria-checked')) === 'false', 30000);
     await until('B is told', () => shown(B, 'ZQX-WS-7731 is no longer synced. Your copy stays here.'), 30000);
 
@@ -599,10 +623,8 @@ async function checkWords(d) {
     await panel(B).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
     await settle(B.page, 500);
     await tab(A, 'Share');
+    // On asks nothing (customer 2026-11-09).
     await syncSwitch.click();
-    const on = panel(A).getByRole('group', { name: 'Sync ZQX-WS-7731 to your devices' });
-    await on.waitFor();
-    await on.getByRole('button', { name: 'Sync', exact: true }).click();
     const switchOnMs = await until('A\'s switch is on', async () => (await syncSwitch.getAttribute('aria-checked')) === 'true', 30000);
     await tab(B, 'Share');
     const connect = panel(B).getByRole('button', { name: 'Connect this folder', exact: true });
@@ -617,12 +639,10 @@ async function checkWords(d) {
     await tab(A, 'Share');
 
     step('Criteria 23 and 24: A removes B; B is told and keeps its files');
-    await panel(A).getByRole('button', { name: 'Remove ZQX-PC-B', exact: true }).click();
-    const ask = panel(A).getByRole('group', { name: 'Remove ZQX-PC-B' });
-    await ask.waitFor();
-    assert.match(await ask.innerText(), /Removing does not reach back: the copies already on ZQX-PC-B stay there as local files\./);
+    const removeB = panel(A).getByRole('button', { name: 'Remove ZQX-PC-B', exact: true });
+    await removeB.click();
     await sleep(450);
-    await ask.getByRole('button', { name: 'Remove', exact: true }).click();
+    await removeB.click();
     const removeMs = await until('A lists only itself', async () => (await devicesList(A).count()) === 1, 30000);
     await tab(B, 'Share');
     await until('B is told', () => shown(B, 'This device was removed from your devices. Your copies stay here as local files.'), 30000);
@@ -630,8 +650,9 @@ async function checkWords(d) {
     await shot(B, '07-b-removed');
     await assertPanelFits(B.page, 'B was removed');
 
-    step('Criterion 28: A is the only device of a synced workspace: the warning stays');
-    await until('the one-device warning', () => shown(A, 'Only this device is paired. If you lose it, the copy on the server cannot be opened by anyone. Pair a second device as a backup.'), 15000);
+    step('Customer 2026-11-09: no one-device warning');
+    await settle(A.page, 1500);
+    assert.ok(!(await shown(A, 'Only this device is paired. If you lose it, the copy on the server cannot be opened by anyone. Pair a second device as a backup.')));
     await shot(A, '08-a-one-device');
 
     step('Criterion 30: the server\'s data holds none of the names or the code');
@@ -714,9 +735,146 @@ async function checkWords(d) {
     }
     const arriveMs = Date.now() - backAt;
     await shot(A, '11-a-back');
+    let live = restarted;
+
+    step('Share tab feedback 2: the server row says it cannot reach the server and Try again checks again');
+    B.host.state.pickName = 'ZQX-WS-NEW';
+    await tab(B, 'File');
+    await panel(B).getByRole('button', { name: 'Open workspace…', exact: true }).click();
+    await tree(B).waitFor();
+    await panel(B).getByRole('region', { name: 'Workspace' }).getByLabel('New document', { exact: true }).click();
+    const newDoc = panel(B).getByRole('textbox', { name: 'Name of the new document' });
+    await newDoc.fill('ZQX-DOC-NEW');
+    await newDoc.press('Enter');
+    await settle(B.page, 400);
+    await rect(B, 300, 200, 60, 60);
+    await save(B);
+    const newRow = row(B, 'ZQX-DOC-NEW');
+    console.log(`the new document's row after New document: aria-selected=${await newRow.getAttribute('aria-selected')}`);
+    live.stop();
+    await sleep(1000);
+    await tab(B, 'Share');
+    const serverField = panel(B).getByLabel('Server', { exact: true });
+    for (const text of ['ws://127.0.0.1:9', address]) {
+      await serverField.fill(text);
+      await serverField.press('Enter');
+      await settle(B.page, 300);
+    }
+    const tryServer = panel(B).getByRole('button', { name: 'Try again', exact: true });
+    await until('the server row offers Try again', async () => (await tryServer.count()) === 1, 10000);
+    assert.equal(await tryServer.getAttribute('aria-label'), 'Try again');
+    await shot(B, '12-b-server-try-again');
+    live = await startRelay(live);
+    await tryServer.click();
+    await panel(B).getByText('Reachable', { exact: true }).first().waitFor({ timeout: 10000 });
+
+    step('Share tab feedback 1: a switch-on whose server never answers turns off again at once');
+    live.stop();
+    await sleep(500);
+    const silent = await silentRelay(live.address);
+    await tab(B, 'File');
+    await newRow.click();
+    await settle(B.page, 500);
+    assert.equal(await newRow.getAttribute('aria-selected'), 'true', 'the document is open before the switch');
+    await tab(B, 'Share');
+    const newSwitch = panel(B).getByRole('switch', { name: 'Sync to my devices' });
+    const workspaceBlock = panel(B).getByRole('region', { name: 'Workspace ZQX-WS-NEW' });
+    await newSwitch.click();
+    // Share closes the document while it prepares (as Share workspace): back to the Share tab.
+    await tab(B, 'Share');
+    await until('the switch runs', async () => (await newSwitch.getAttribute('aria-checked')) === 'true', 5000);
+    await until('the header says Sharing', async () => (await workspaceBlock.innerText()).includes('Sharing'), 5000);
+    assert.ok(!(await workspaceBlock.innerText()).includes('Not shared'), 'never "Not shared" while it shares');
+    await shot(B, '13-b-sharing');
+    const cancelAt = Date.now();
+    await newSwitch.click();
+    await until('the switch is off again', async () => (await newSwitch.getAttribute('aria-checked')) === 'false', 2000);
+    const cancelMs = Date.now() - cancelAt;
+    // The attempt's session is replaced (the document comes back, or an empty one): Share again.
+    await settle(B.page, 1500);
+    await tab(B, 'Share');
+    await until('the header says Not shared again', async () => (await workspaceBlock.innerText()).includes('Not shared'), 5000);
+    await tab(B, 'File');
+    await until('the document is open again after the cancel', async () => (await newRow.getAttribute('aria-selected')) === 'true', 10000);
+    assert.equal(await B.page.getByText(/did not let this device in/).count(), 0);
+    await tab(B, 'Share');
+
+    step('Share tab feedback 1: a switch-on that never gets an answer fails with Try again, which works once the server is up');
+    await until('the server reads reachable', () => shown(B, 'Reachable'), 10000);
+    await newSwitch.click();
+    await tab(B, 'Share');
+    const tryAgain = workspaceBlock.getByRole('button', { name: 'Try again', exact: true });
+    // The attempt's session is replaced when it fails, which shows another tab: Share again.
+    const failMs = await until('the switch fails with Try again', async () => {
+      if ((await newSwitch.count()) === 0) await tab(B, 'Share');
+      return (await tryAgain.count()) === 1;
+    }, 45000);
+    assert.equal(await newSwitch.getAttribute('aria-checked'), 'false');
+    assert.ok((await workspaceBlock.getByRole('alert').allInnerTexts()).some((t) => t.startsWith('Could not ')), 'the alert says why');
+    assert.ok(!(await workspaceBlock.innerText()).includes('Uploading...'), 'no endless Uploading');
+    await tab(B, 'File');
+    await until('the document is open again after the failure', async () => (await newRow.getAttribute('aria-selected')) === 'true', 10000);
+    await tab(B, 'Share');
+    await shot(B, '14-b-switch-failed');
+    await assertPanelFits(B.page, 'B shows the failed switch');
+    await silent.stop();
+    live = await startRelay(live);
+    await tryAgain.click();
+    await tab(B, 'Share');
+    const retryMs = await until('the switch is on after Try again', async () => {
+      if ((await newSwitch.count()) === 0) await tab(B, 'Share');
+      return (await newSwitch.getAttribute('aria-checked')) === 'true' && (await shown(B, 'In sync with 1 device'));
+    }, 60000);
+    await until('the new workspace arrives on A', async () => fs.existsSync(path.join(A.host.syncedFolder, 'ZQX-WS-NEW')), 60000);
+
+    step('Share tab feedback 3 and 4: B leaves its devices (armed); its workspace reopens local, never refused');
+    const leaveB = panel(B).getByRole('button', { name: 'Leave my devices', exact: true });
+    await leaveB.click();
+    await sleep(450);
+    await leaveB.click();
+    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).waitFor({ timeout: 15000 });
+    await until('B\'s marker has no share files', async () => !fs.existsSync(path.join(B.host.home, 'ZQX-WS-NEW', MARKER, 'share.json')), 10000);
+    await tab(B, 'File');
+    await panel(B).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
+    await settle(B.page, 500);
+    await panel(B).getByRole('button', { name: /^ZQX-WS-NEW/ }).first().click();
+    await tree(B).waitFor({ timeout: 15000 });
+    await row(B, 'ZQX-DOC-NEW').click();
+    await settle(B.page, 3000);
+    await tab(B, 'Share');
+    assert.ok((await panel(B).getByRole('region', { name: 'Workspace ZQX-WS-NEW' }).innerText()).includes('Not shared'));
+    assert.equal(await B.page.getByText(/did not let this device in/).count(), 0, 'no refusal after the reopen');
+
+    step('Share tab feedback 3: A, now the last device, may leave; the group ends and its workspaces stay local');
+    await tab(A, 'Share');
+    await until('A is the only device', async () => (await devicesList(A).count()) === 1, 30000);
+    const leaveA = panel(A).getByRole('button', { name: 'Leave my devices', exact: true });
+    await leaveA.click();
+    await shot(A, '15-a-leave-last');
+    await sleep(450);
+    await leaveA.click();
+    await panel(A).getByRole('button', { name: 'Join my devices', exact: true }).waitFor({ timeout: 15000 });
+    assert.ok(!(await shown(A, 'This device is the only one that can manage your devices. Pair another device first.')));
+    for (const name of ['ZQX-WS-7731', 'ZQX-WS-NEW', ...closed]) {
+      const where = name === 'ZQX-WS-7731' ? path.join(A.host.home, name) : name === 'ZQX-WS-NEW' ? path.join(A.host.syncedFolder, name) : path.join(out, 'A', name);
+      await until(`${name} is local on A`, async () => !fs.existsSync(path.join(where, MARKER, 'share.json')), 15000);
+    }
+    await tab(A, 'File');
+    await panel(A).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
+    await settle(A.page, 500);
+    await panel(A).getByRole('button', { name: /^ZQX-WS-7731/ }).first().click();
+    await tree(A).waitFor({ timeout: 15000 });
+    await row(A, 'ZQX-DOC-7731').click();
+    await settle(A.page, 3000);
+    await tab(A, 'Share');
+    assert.ok((await panel(A).getByRole('region', { name: 'Workspace ZQX-WS-7731' }).innerText()).includes('Not shared'));
+    assert.equal(await A.page.getByText(/did not let this device in/).count(), 0, 'no refusal after the reopen');
+    await shot(A, '16-a-local-again');
+
     console.log(`timings: Sync these to the file on B ${arrivalMs} ms, switch off ${switchOffMs} ms, switch on ${switchOnMs} ms, remove ${removeMs} ms`);
     console.log(`timings: code shown ${codeShownMs} ms, words ${wordsMs} ms, paired ${pairMs} ms, outage alert ${alertMs} ms, alert gone ${clearMs} ms after the restart, both arrived ${arriveMs} ms after it`);
-    restarted.stop();
+    console.log(`timings: switch turned back ${cancelMs} ms, failed switch shown ${failMs} ms, on after Try again ${retryMs} ms`);
+    live.stop();
 
     assert.deepEqual([...A.errors, ...B.errors], []);
     console.log('PASS browser 0096: pair with code and words, sync these, arrival, edits both ways, switch off and on, connect this folder, remove, one-device warning, server data blind, a removed device pairs again');

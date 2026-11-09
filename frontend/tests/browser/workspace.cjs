@@ -182,23 +182,20 @@ async function newEntry(d, kind, name) {
     await name.press('Enter');
     await panel(A).getByText('Reachable', { exact: true }).first().waitFor();
     await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
-    await panel(A).getByRole('group', { name: /^Upload this document to/ }).getByRole('button', { name: 'Share', exact: true }).click();
     await panel(A).getByText(/^Shared on /).first().waitFor({ timeout: 10000 });
     await save(A);
     await until('Solo carries its own keyring', async () => zip('members', path.join(A.host.state.root, 'Solo.curvyo')).keyring);
 
-    step('Criteria 25 and 42: Share workspace names Solo beforehand and takes it in');
+    step('Criteria 25 and 42: Share workspace takes Solo in (no confirm, customer 2026-11-09)');
     await tab(A, 'Share');
     await panel(A).getByRole('button', { name: 'Share workspace', exact: true }).click();
-    const confirm = panel(A).getByRole('group', { name: /^Upload the workspace Box job \(3 documents\)/ });
-    await confirm.waitFor();
-    assert.match(await confirm.innerText(), /Solo is shared on its own\. It becomes part of the workspace and its own link stops working\./);
-    await shot(A, '01-a-share-confirm');
-    await confirm.getByRole('button', { name: 'Share', exact: true }).click();
+    // The Share tab stays while Share closes and reopens the document (customer 2026-11-09).
+    const shareTab = A.page.getByRole('tab', { name: /^Share/ });
     await until('A shared the workspace', async () => {
-      await tab(A, 'Share');
+      assert.equal(await shareTab.getAttribute('aria-selected'), 'true', 'the Share tab stays');
       return (await panel(A).getByText(/^Shared on /).count()) >= 1;
     }, 30000);
+    assert.equal(await panel(A).getByRole('button', { name: 'Invite', exact: true }).count(), 1, 'Invite is right there');
     await until('Solo is a workspace document', async () => {
       const members = zip('members', path.join(A.host.state.root, 'Solo.curvyo'));
       return !members.keyring && members.share && JSON.parse(members.share).format_version === 2;
@@ -207,12 +204,13 @@ async function newEntry(d, kind, name) {
 
     step('Criterion 26: a 2. invite');
     await panel(A).getByRole('button', { name: 'Invite', exact: true }).click();
-    await panel(A).getByRole('button', { name: 'Create link', exact: true }).click();
     const linkField = panel(A).getByLabel('Invite link', { exact: true });
     await linkField.waitFor();
     const link = await linkField.inputValue();
     assert.match(link, /^curvyo:\/\/join\?server=[^#]+#2\.[A-Za-z0-9_-]+$/, link);
-    assert.match(await panel(A).innerText(), /Anyone with this link can edit every document of this workspace once, until it expires\./);
+    // The invite shows its expiry without a sentence (customer 2026-11-09).
+    assert.doesNotMatch(await panel(A).innerText(), /Anyone with this link/);
+    assert.match(await panel(A).innerText(), /Expires /);
 
     step('Criteria 27 and 28: B joins into an empty folder and receives every document');
     await tab(B, 'Share');
@@ -310,11 +308,10 @@ async function newEntry(d, kind, name) {
 
     step('Criteria 43 and 44: A removes B; B\'s workspace turns local');
     await tab(A, 'Share');
-    await panel(A).getByRole('button', { name: 'Remove Ben', exact: true }).click();
-    const removeAsk = panel(A).getByRole('group', { name: /^Remove Ben/ });
-    await removeAsk.waitFor();
+    const removeBen = panel(A).getByRole('button', { name: 'Remove Ben', exact: true });
+    await removeBen.click();
     await settle(A.page, 600);
-    await removeAsk.getByRole('button', { name: 'Remove', exact: true }).click();
+    await removeBen.click();
     await until('A lists only itself', async () => (await participants(A).count()) === 1, 15000);
     await until('B told', async () => (await B.page.getByText('You were removed from this workspace. Your copies stay on this computer.').count()) >= 1, 15000);
     await until('B\'s marker share files are gone', async () => !exists(B, MARKER, 'share.json'), 8000);
@@ -322,7 +319,8 @@ async function newEntry(d, kind, name) {
     // the Share tab shows the Removed block instead of the plain not-shared state.
     assert(exists(B, MARKER, 'share.ended.json'), 'B keeps the ended record');
     await tab(B, 'Share');
-    await until('B\'s Share tab shows the Removed block', async () => (await panel(B).getByRole('button', { name: 'Check whether I was added back', exact: true }).count()) === 1, 8000);
+    // The Removed block is its heading (add back dropped, customer 2026-11-09).
+    await until('B\'s Share tab shows the Removed block', async () => (await panel(B).getByText(/^You were removed from /).count()) >= 1, 8000);
     await until('B\'s Share tab says Not shared', async () => (await panel(B).getByText('Not shared', { exact: true }).count()) >= 1, 8000);
     assert.equal(await panel(B).getByRole('button', { name: 'Share workspace', exact: true }).count(), 1, 'Share workspace is available again');
     await shot(B, '07-b-removed');

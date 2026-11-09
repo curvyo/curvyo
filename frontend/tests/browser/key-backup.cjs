@@ -232,9 +232,8 @@ function backupFiles(data) {
     await shot(page, '1-paired');
 
     step('R backs its keys up with a passkey');
+    // Back up asks nothing: the passkey prompt confirms (customer 2026-11-09).
     await panel(page).getByRole('button', { name: 'Back up with passkey', exact: true }).click();
-    assert.ok(await shown(page, `This device's keys are locked by a passkey and stored on ${wssAddress}. The server cannot open them. Restoring needs the same passkey and this server. The server sees when the backup is stored or read. Whoever has this passkey can act as this device until you remove it from your devices.`));
-    await panel(page).getByRole('button', { name: 'Back up', exact: true }).click();
     await until('the backup is stored', () => shown(page, 'Keys backed up with a passkey.'));
     assert.ok(await shown(page, 'Keys backed up with a passkey. Clearing site data does not lose this device.'));
     const files = backupFiles(relay.data);
@@ -280,18 +279,18 @@ function backupFiles(data) {
     }, 20000);
 
     step('Remove backup deletes it on the server');
+    // Remove backup is armed (customer feedback on PR #281): a second press removes it.
     await panel(page).getByRole('button', { name: 'Remove backup', exact: true }).click();
     await sleep(450);
-    await panel(page).getByRole('button', { name: 'Remove', exact: true }).click();
+    await panel(page).getByRole('button', { name: 'Remove backup', exact: true }).click();
     await until('the backup is removed', () => shown(page, 'Backup removed from the server.'));
     assert.equal(backupFiles(relay.data).length, 0, 'no backup on the server');
-    assert.ok(await shown(page, 'Clearing site data removes this device.'));
+    assert.ok(!(await shown(page, 'Clearing site data removes this device.')), 'no loss hint');
 
     step('A passkey without PRF stores nothing and says so');
     await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId: passkeys });
     passkeys = await authenticator(cdp, false);
     await panel(page).getByRole('button', { name: 'Back up with passkey', exact: true }).click();
-    await panel(page).getByRole('button', { name: 'Back up', exact: true }).click();
     await until('the no-PRF sentence', () => shown(page, 'This browser or passkey cannot lock keys. The keys stay in this browser only.'));
     assert.equal(backupFiles(relay.data).length, 0, 'still no backup on the server');
     await shot(page, '4-no-prf');

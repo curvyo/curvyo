@@ -147,10 +147,8 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     await name.fill('Anna');
     await name.press('Enter');
     await panel(A).getByText('Reachable', { exact: true }).waitFor();
+    // Share asks nothing (customer 2026-11-09: no confirm sentences in the Share tab).
     await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
-    const confirm = panel(A).getByRole('group', { name: /^Upload this document to/ });
-    await confirm.waitFor();
-    await confirm.getByRole('button', { name: 'Share', exact: true }).click();
     await panel(A).getByText(/^Shared on /).waitFor({ timeout: 10000 });
     await until('A connected', async () => (await panel(A).getByText('Connected', { exact: true }).count()) === 1);
     assert.equal(await participants(A).count(), 1);
@@ -164,14 +162,15 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     await shot(A, '01-a-shared');
 
     step('Criterion 2');
-    // Criterion 2: Invite with 24 hours, the sentence, a link whose secret follows '#'.
+    // Criterion 2: Invite writes a link valid for 24 hours at once; its secret follows '#'.
     await panel(A).getByRole('button', { name: 'Invite', exact: true }).click();
-    await panel(A).getByRole('button', { name: 'Create link', exact: true }).click();
     const linkField = panel(A).getByLabel('Invite link', { exact: true });
     await linkField.waitFor();
     const link = await linkField.inputValue();
     assert.match(link, /^curvyo:\/\/join\?server=[^#]+#1\.[A-Za-z0-9_-]+$/, link);
-    assert.match(await panel(A).innerText(), /Anyone with this link can edit this document once, until it expires\./);
+    // The invite shows its expiry without a sentence (customer 2026-11-09).
+    assert.doesNotMatch(await panel(A).innerText(), /Anyone with this link/);
+    assert.match(await panel(A).innerText(), /Expires /);
     await shot(A, '02-a-invite');
 
     step('Criterion 3');
@@ -272,18 +271,16 @@ const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`
     step('Criterion 32');
     // Criterion 32: A removes B; Remove ignores the first 400 ms; epoch 1; B is told.
     await tab(A, 'Share');
-    await panel(A).getByRole('button', { name: 'Remove Ben', exact: true }).click();
-    // Since 0097 the confirm group carries the short name of its act; the sentence is its text.
-    const ask = panel(A).getByRole('group', { name: 'Remove Ben', exact: true });
-    await ask.waitFor();
-    assert.match(await ask.innerText(), /^Remove Ben\? Removing does not reach back/);
-    await ask.getByRole('button', { name: 'Remove', exact: true }).click();
+    // Remove is armed (customer feedback on PR #281): the first press arms it (no sentence), a
+    // second press inside 400 ms does nothing, one after it removes.
+    const removeBen = panel(A).getByRole('button', { name: 'Remove Ben', exact: true });
+    await removeBen.click();
+    await removeBen.click();
     await settle(A.page, 100);
     assert.equal(await participants(A).count(), 2, 'a press in the first 400 ms does not remove');
     await settle(A.page, 450);
-    await ask.getByRole('button', { name: 'Remove', exact: true }).click();
+    await removeBen.click();
     await until('A lists only itself', async () => (await participants(A).count()) === 1);
-    await panel(A).getByText('Key epoch 1', { exact: true }).waitFor();
     await until('B told', async () => (await B.page.getByText('You were removed from this document. Your copy stays on this device.').count()) >= 1, 8000);
     await shot(A, '09-a-removed-b');
     await shot(B, '10-b-removed');

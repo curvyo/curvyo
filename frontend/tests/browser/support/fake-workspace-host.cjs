@@ -169,7 +169,7 @@ function makeHost(out, label) {
       return null;
     },
     pick_join_folder: () => {
-      state.joinFolder = path.join(home, 'Joined box');
+      state.joinFolder = path.join(home, state.joinName || 'Joined box');
       fs.mkdirSync(state.joinFolder, { recursive: true });
       return { kind: 'picked', path: state.joinFolder };
     },
