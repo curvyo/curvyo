@@ -404,3 +404,11 @@ goes through Reconnecting); keyboard-only run of every action; coarse targets; 8
 - **WS-UNDO-MOVE:** "Undo move" for 10s in the action slot (criterion 16 Proposal). Default: yes.
 - **WS-NEW-CHORD:** no chord for New document or Open workspace in slice 1 (every frequent chord of the file
   buttons is already taken; the File tab buttons are the route). Default: none.
+
+## 15. Amendment: armed Remove (customer feedback on PR #281, 2026-11-09)
+
+Remove in the participant list (section 4) is the **armed action** of `docs/design-system.md` (customer feedback on PR #281, 2026-11-09): the first press arms the button (filled `--destructive`, white glyph; Make admin keeps the Apply look) and shows the sentence as a polite status line under the row, a press within 400 ms is ignored, the second press acts; it disarms after 4 s, on Escape, on a press elsewhere or when the focus leaves the row. No Cancel button and no confirm group; a refusal shows as `role="alert"` under the row and the button disarms. The sentence of section 4 is its status line. Share workspace keeps its Apply inline confirm; a Share that makes no progress for 30 s fails with its reason and Share workspace can be pressed again; the block header reads "Sharing" while it runs.
+
+## 16. Amendment: no confirm (customer feedback on PR #281, 2026-11-09)
+
+- Share workspace and Share act at once, without the inline confirm and its sentence; the documents taken in are no longer named beforehand ("Not added: ..." stays as a status line afterwards). The Invite block shows the expiry without the sentence. Remove is armed without a sentence.

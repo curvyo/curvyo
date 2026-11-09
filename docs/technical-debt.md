@@ -41,6 +41,16 @@ are exposed by `Keyring::held_back()`, the maker sees a notice, Make admin and p
 first, and `reconcile` adds group devices only as members in such a room, so no automatic write
 releases them. The room stays frozen until a person adds an admin.
 
+## The last device's leave leaves rooms behind (customer feedback on PR #281, 2026-11-09)
+
+"Leave my devices" on the group's last device writes nothing (ADR 0040 decision 8): the group
+room and every workspace room where it was the last admin stay on the server. A workspace room
+that keeps other participants has no admin from then on: nobody there can add, remove or change
+roles. The Leave sentence names those workspaces, but nothing deletes the empty group room.
+
+**Resolution:** a relay message that retires a room its last admin leaves (protocol change), or
+a Make admin offer before the leave; both wait for the customer.
+
 ## From now on is a client rule (`0097`, 2026-11-05, ADR 0041 decision 7)
 
 "From now on" withholds the epochs created while a returning member was away only because

@@ -44,7 +44,7 @@ Inline confirm under the row (Apply look, not destructive; nothing is lost; role
 
 - **Make member** (another admin): confirm, destructive look (400 ms guard), Cancel focused: "Make Ben a member? Ben can no longer invite, remove or change roles; Ben keeps editing." Buttons **Cancel** and **Make member**. Any admin may do this to any admin (customer decision); deny wins when two admins act at once and the list simply shows the end state.
 - **Step down** (own row): "Step down as admin? You keep editing. You can no longer invite, remove or change roles." Buttons **Cancel** and **Step down** (destructive look). The row loses its admin actions in place; the canvas notice "You are no longer an admin." (status).
-- **Only admin:** Step down and Leave are `aria-disabled` (40%, Tab stop kept, tooltip names the reason). Pressing one shows a `role="alert"` line under the row in `--field-invalid`: "You are the only admin. Make someone else an admin first." and moves focus to the first role slot of a member's row, which is the next step. No confirm opens.
+- **Only admin:** Step down (whenever this device is the room's only admin) and Leave (the only admin among several participants) are greyed: `aria-disabled` (40%, Tab stop kept), the reason "You are the only admin" as tooltip and `aria-description`. A press does nothing: no alert, no armed state (customer 2026-11-09; the sentence "You are the only admin. Make someone else an admin first." is gone).
 - Pressing Make member or Remove on an admin where the client knows replay would drop it (the stale-removal case, section 6) opens the confirm as usual; the result is the dropped line of section 6, not an error.
 
 ### 3.4 Remove (unchanged from `0092` 2.4 and `0095` 8, with one addition)
@@ -233,3 +233,18 @@ Participants as admin, member, own row, my other device, unknown label ("A devic
 - **MEM-VERIFIED-DIRECTION:** decided: the admin's device shows the code, the invitee types it, as `0096`; ADR 0041 decision 8 confirms. The spec outline (criterion 37) is to follow.
 - **MEM-KEEP (Frage 162):** "Keep as it is" leaves again (ADR 0041 default A, 7.3); answer B removes the second leave entry and ends the block instead.
 - **MEM-LINE-VERIFIED:** the spec's line "Verified: you compare a fingerprint, no link can be forwarded" is dropped (customer rule on hints); the button label "Add by comparing words" names the control. Default: dropped.
+
+## 12. Amendment: armed actions (customer feedback on PR #281, 2026-11-09)
+
+Every act of sections 3.2 to 3.4 and 5.1 (Make admin, Make member, Step down, Remove, Leave) is the **armed action** of `docs/design-system.md` (customer feedback on PR #281, 2026-11-09): the first press arms the button (filled `--destructive`, white glyph; Make admin keeps the Apply look) and shows the sentence as a polite status line under the row, a press within 400 ms is ignored, the second press acts; it disarms after 4 s, on Escape, on a press elsewhere or when the focus leaves the row. No Cancel button and no confirm group; a refusal shows as `role="alert"` under the row and the button disarms. The sentences of those sections stay word for word; they are the status line of the armed button instead of the text of an inline confirm, and "Buttons **Cancel** and ..." no longer applies. Focus stays on the pressed button while armed; after the act the focus rules of section 10 apply (Step down to the row's Leave, Remove to the next row, Leave to the Removed block heading). The Add back dialog (8.2) keeps its inline confirm: it holds a choice.
+
+## 13. Amendment: no sentences, no add back (customer feedback on PR #281, 2026-11-09)
+
+- The armed acts of section 12 show **no sentence**; the sentences of sections 3.2 to 3.4 and 5.1 are gone, and so is the second-admin line (3.5). Only labels, states and real errors stay in the Share tab.
+- The "Removed or left" list and Add back (section 8) are dropped, and with them Check, the add-back prompt, Sync again and Keep as it is (section 7). The Removed block is its heading.
+- A removed device joins again with a new invite: Open shared document... or Join shared workspace... with the new link, as a first join (a workspace into a folder it chooses).
+
+## 14. Amendment: the only admin alone (customer, 2026-11-09)
+
+- A device whose session carries a shared workspace's link while no workspace is open in the tree shows the workspace's block anyway (name, people, Shared on, notices, Invite for an admin, Participants), so an only admin left alone can still invite or stop sharing.
+- Stop sharing as `0092` UX notes section 14.
