@@ -1238,10 +1238,12 @@ export function useEditorSession(
   // the canvas handlers keep their dependencies (`specs/0025-raster-trace` criterion 12).
   const traceKeyRef = useRef(trace.keyDown);
   const traceCreateRef = useRef(trace.create);
+  const traceDisarmRef = useRef(trace.disarmPick);
   useEffect(() => {
     traceKeyRef.current = trace.keyDown;
     traceCreateRef.current = trace.create;
-  }, [trace.keyDown, trace.create]);
+    traceDisarmRef.current = trace.disarmPick;
+  }, [trace.keyDown, trace.create, trace.disarmPick]);
   const { refresh: refreshClones, handleKeyOutcome: handleCloneOutcome } = clones;
   const flip = useFlip(getSession, syncFromSession, history.showNotice);
   const align = useAlign(getSession, syncFromSession, alignBar);
@@ -2160,8 +2162,10 @@ export function useEditorSession(
       // A right press while the eyedropper is picking ends picking and writes
       // nothing; no tool sees it and no context menu opens
       // (`specs/0017-style-panel-rework` criterion 26).
+      // The Trace pipette ends as Escape ends it (`specs/0089` UX notes §25.4).
       if (event.button === 2 && session.cursor_hint() === "eyedropper") {
         event.preventDefault();
+        traceDisarmRef.current();
         session.end_colour_pick();
         setCursorHint(session.cursor_hint());
         syncFromSession();

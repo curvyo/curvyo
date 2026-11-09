@@ -129,7 +129,7 @@ test("§25.4: the picked colours are buttons beside the pipette, in pick order, 
   assert.deepEqual(stops, ["0", "-1", "-1"], "one Tab stop, roving");
   assert.ok(html.indexOf("data-trace-pipette") < html.indexOf("data-trace-picked-swatch"), "the pipette comes first");
   assert.doesNotMatch(html, /picked<|None picked|data-trace-picked-count/, "no count label");
-  assert.match(html, /min-w-\[220px\]/, "the group reserves the width of 8 colours");
+  assert.doesNotMatch(html, /min-w-/, "the group is as wide as its content, nothing reserved (customer 2026-11-09)");
 });
 
 test("§25.3: with nothing picked: no swatch, no Tab stop, no label, no notice; Trace dimmed with its reason", async () => {

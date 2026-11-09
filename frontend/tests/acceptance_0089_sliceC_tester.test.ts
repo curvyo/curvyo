@@ -699,8 +699,9 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
           slotRightGap: Math.round(box.right - slot.right), insideBar: lastBottom <= box.bottom + 0.5 }; })())`)) as string) as {
         overlaps: string[]; outside: string[]; clipped: string[]; texts: string[]; labels: string[]; height: number; top: number; bottom: number; vh: number; vw: number; slotRightGap: number; insideBar: boolean };
     // The row counts of ux-notes.md §25.1, §25.4 (2026-11-09; Ignore below 171 px joins the expander and Trace, the colours group
-    // reserves 220 px; Advanced closed, no picks): Brightness 6 / 3 rows, Remove background 7 / 3, Pick colours 7 / 3.
-    const asBuilt: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [252, 108] };
+    // is as wide as its content, customer 2026-11-09; Advanced closed, no picks): Brightness 6 / 3 rows, Remove background 7 / 3,
+    // Pick colours 6 / 3 (the pipette alone shares Colour tolerance's line).
+    const asBuilt: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [216, 108] };
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]')?.click()`);
     await sleep(400);
     const all: string[] = [];

@@ -814,11 +814,11 @@ test("0025 tidy-up c57 (§24.3): Tab order with Advanced open: Output, Colours, 
 
 // ------------------------------------------------------------------ 0089 22 / ux-notes 22.1: the bar heights at 800 x 600
 
-test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, panel open and closed (§25.1, §25.4: Brightness 216 / 108, Remove background 252 / 108, Pick colours 252 / 108 px, no notice row)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, panel open and closed (§25.1, §25.4: Brightness 216 / 108, Remove background 252 / 108, Pick colours 216 / 108 px, no notice row)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "two.png", TWO, false);
-    // §25.1: Ignore below (171) joins the expander and Trace on the last row, so Brightness is 6 rows, 216 px and Remove background loses the same row, 288 to 252 px, panel open; Pick colours keeps 7 rows (§25.4: the group reserves 220 px).
-    const expected: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [252, 108] };
+    // §25.1: Ignore below (171) joins the expander and Trace on the last row, so Brightness is 6 rows, 216 px and Remove background loses the same row, 288 to 252 px, panel open; Pick colours with nothing picked is 6 rows too (§25.4: the group is as wide as its content, customer 2026-11-09).
+    const expected: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [216, 108] };
     const seen: string[] = [];
     for (const method of ["Brightness", "Remove background", "Pick colours"]) {
       await pickMethod(s, method);
@@ -832,14 +832,14 @@ test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, 
       }
     }
     console.log(seen.join("\n"));
-    // §25.4: Colour tolerance and the colours group (220 px reserved) share a line with the panel closed, and have lines of their own with it open.
+    // §25.4: nothing is reserved behind the pipette, so with nothing picked Colour tolerance and the pipette share a line
+    // with the panel open and closed.
     const centres = async () => JSON.parse((await s.evaluate(`JSON.stringify(['[aria-label="Colour tolerance"]', '[data-trace-pipette]'].map((q) => { const r = document.querySelector('${BAR} ' + q).getBoundingClientRect(); return Math.round((r.top + r.bottom) / 2); }))`)) as string) as number[];
-    await setPanel(s, false);
-    const closedTops = await centres();
-    assert.ok(Math.abs(closedTops[0] - closedTops[1]) <= 3, `panel closed: Colour tolerance and the pipette on one line: ${JSON.stringify(closedTops)}`);
-    await setPanel(s, true);
-    const openTops = await centres();
-    assert.ok(openTops[1] - openTops[0] >= 28, `panel open: the colours row is on the next line: ${JSON.stringify(openTops)}`);
+    for (const open of [false, true]) {
+      await setPanel(s, open);
+      const tops = await centres();
+      assert.ok(Math.abs(tops[0] - tops[1]) <= 3, `panel ${open ? "open" : "closed"}: Colour tolerance and the pipette on one line: ${JSON.stringify(tops)}`);
+    }
   }, "", 800, 600);
 });
 

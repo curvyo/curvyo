@@ -1,6 +1,6 @@
 // Tester cases for the Trace bar fixes of 2026-11-09 (`specs/0089-trace-quality-and-colour/ux-notes.md` §25.4): the
 // picked colours as a swatch row beside the pipette (size, order, 8 at most, hover and focus look, tooltip, removal,
-// roving Tab stop), the bar that does not move between 0 and 8 colours, and the palette strip with its detail row
+// roving Tab stop), the group as wide as its content (customer 2026-11-09), and the palette strip with its detail row
 // only for Multicolour with Colours Auto. Real app in Chromium (CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings
 // must be built). Harness as in `acceptance_0089_tidyup_tester.test.ts`.
 
@@ -450,8 +450,8 @@ test("0089 §25.4: the swatch row sits right after the pipette (20 x 20, 4 px ra
     await withPicks(s, 0);
     assert.deepEqual(await hexes(s), [], "nothing picked: no swatch");
     assert.equal(await s.evaluate(`document.querySelectorAll('${GROUP}').length`), 1, "one group named Picked colours");
-    const empty = { trace: await rectOf(s, `${BAR} [data-trace-slot]`), smooth: await rectOf(s, `${BAR} [role=spinbutton][aria-label=Smooth]`), height: await barHeight(s), group: await rectOf(s, GROUP) };
-    assert.ok(empty.group!.w >= 219.5 && empty.group!.w <= 221, `the group reserves 220 px with no colour: ${empty.group!.w}`);
+    const empty = { height: await barHeight(s), group: await rectOf(s, GROUP) };
+    assert.ok(Math.abs(empty.group!.w - 28) <= 0.5, `nothing reserved: the group is the pipette alone with no colour: ${empty.group!.w}`);
     const picked: string[] = [];
     for (let i = 0; i < 8; i++) {
       await pickStripe(s, i, i > 0);
@@ -459,12 +459,13 @@ test("0089 §25.4: the swatch row sits right after the pipette (20 x 20, 4 px ra
       assert.deepEqual(await hexes(s), picked, `after ${i + 1} picks: first picked first, the new one at the end`);
       assert.deepEqual(await visibleBarTexts(s), [], "no label, count or notice text");
       assert.equal(await noticeText(s), "", "no notice for a pick");
-      // The bar does not move between 0 and 8 colours (§25.4 reserve).
-      const now = { trace: await rectOf(s, `${BAR} [data-trace-slot]`), smooth: await rectOf(s, `${BAR} [role=spinbutton][aria-label=Smooth]`), height: await barHeight(s), group: await rectOf(s, GROUP) };
-      assert.deepEqual(now.trace, empty.trace, `${i + 1} colours: Trace has not moved`);
-      assert.deepEqual(now.smooth, empty.smooth, `${i + 1} colours: Smooth has not moved`);
-      assert.equal(now.height, empty.height, `${i + 1} colours: the bar keeps its height`);
-      assert.equal(now.group!.w, empty.group!.w, `${i + 1} colours: the group keeps its width`);
+      // The group grows by the swatches only (§25.4, customer 2026-11-09): 28 + 24 per colour, its swatches on one line;
+      // the bar flows by whole groups (one row more at most) and stays inside the window.
+      const now = { height: await barHeight(s), group: await rectOf(s, GROUP) };
+      assert.ok(Math.abs(now.group!.w - (28 + 24 * (i + 1))) <= 0.5, `${i + 1} colours: the group is ${now.group!.w} px, 28 + 24 per colour`);
+      assert.equal(now.group!.h, empty.group!.h, `${i + 1} colours: the swatches stay on one line`);
+      assert.ok(now.height <= empty.height + 36, `${i + 1} colours: the bar is ${now.height} px, one row more at most than ${empty.height}`);
+      assert.equal(await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().right <= innerWidth + 0.5 && document.scrollingElement.scrollWidth <= innerWidth + 1`), true, `${i + 1} colours: the bar fits the window`);
     }
     // Geometry at eight.
     const pipette = (await rectOf(s, `${GROUP} [data-trace-pipette]`))!;
@@ -499,31 +500,54 @@ test("0089 §25.4: the swatch row sits right after the pipette (20 x 20, 4 px ra
   });
 });
 
-test("0089 §25.4: at 800 x 600 the bar is 252 / 108 px (panel open / closed) with no colour and with eight; Colour tolerance, the group and Smooth keep their places", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §25.4: at 800 x 600 the bar never scrolls or leaves the window from 0 to 8 colours; with the panel open the group shares Colour tolerance's line up to 5 colours and takes its own line from the sixth; the Advanced block does not wrap", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await withPicks(s, 0);
-    await viewport(s, 800, 600);
     const survey = async () => {
-      const out: Record<string, unknown> = {};
+      await viewport(s, 800, 600);
+      const out: Record<string, { height: number; group: Rect; tol: Rect; fits: boolean }> = {};
       for (const open of [true, false]) {
         await setPanel(s, open);
-        out[String(open)] = { height: await barHeight(s), trace: await rectOf(s, `${BAR} [data-trace-slot]`), smooth: await rectOf(s, `${BAR} [role=spinbutton][aria-label=Smooth]`), tol: await rectOf(s, `${BAR} [role=spinbutton][aria-label="Colour tolerance"]`), group: await rectOf(s, GROUP) };
+        out[String(open)] = {
+          height: await barHeight(s),
+          group: (await rectOf(s, GROUP))!,
+          tol: (await rectOf(s, `${BAR} [role=spinbutton][aria-label="Colour tolerance"]`))!,
+          fits: (await s.evaluate(`(() => { const b = document.querySelector('${BAR}'); const r = b.getBoundingClientRect(); return b.scrollWidth <= b.clientWidth + 1 && document.scrollingElement.scrollWidth <= innerWidth + 1 && r.right <= innerWidth + 0.5; })()`)) as boolean,
+        };
       }
+      await setPanel(s, true);
+      await viewport(s, 1280, 800);
       return out;
     };
-    const zero = await survey();
-    assert.equal((zero.true as { height: number }).height, 252, "panel open: 7 rows");
-    assert.equal((zero.false as { height: number }).height, 108, "panel closed: 3 rows");
-    await setPanel(s, true);
-    await viewport(s, 1280, 800);
+    const sameLine = (a: Rect, b: Rect) => Math.abs(a.y + a.h / 2 - (b.y + b.h / 2)) <= 3;
+    const seen: Record<number, Awaited<ReturnType<typeof survey>>> = { 0: await survey() };
     for (let i = 0; i < 8; i++) {
       await pickStripe(s, i, i > 0);
+      seen[i + 1] = await survey();
     }
     assert.equal((await hexes(s)).length, 8);
+    console.log("800 x 600 by colours:", JSON.stringify(Object.entries(seen).map(([n, v]) => ({ n, open: v.true.height, closed: v.false.height, group: v.true.group.w }))));
+    for (const [n, v] of Object.entries(seen)) {
+      for (const open of ["true", "false"] as const) {
+        assert.ok(v[open].fits, `${n} colours, panel ${open === "true" ? "open" : "closed"}: no sideways scroll, inside the window`);
+        assert.ok(Math.abs(v[open].group.w - (28 + 24 * Number(n))) <= 0.5, `${n} colours: the group is as wide as its content`);
+        assert.equal(v[open].group.h, seen[0][open].group.h, `${n} colours: the swatches stay on one line`);
+      }
+      assert.equal(v.false.height, 108, `${n} colours, panel closed: 3 rows`);
+      assert.ok(sameLine(v.false.tol, v.false.group), `${n} colours, panel closed: Colour tolerance and the group share a line`);
+      const shares = Number(n) <= 5;
+      assert.equal(sameLine(v.true.tol, v.true.group), shares, `${n} colours, panel open: the group ${shares ? "shares" : "leaves"} Colour tolerance's line`);
+      assert.equal(v.true.height, shares ? 216 : 252, `${n} colours, panel open: ${shares ? 6 : 7} rows`);
+    }
+    // The Advanced block keeps its rows at 800 x 600 with eight colours.
     await viewport(s, 800, 600);
-    assert.deepEqual(await survey(), zero, "eight colours: every rect of the bar as with none");
-    // Nothing clipped or scrolled.
-    assert.equal(await s.evaluate(`(() => { const b = document.querySelector('${BAR}'); return b.scrollWidth > b.clientWidth + 1 || document.scrollingElement.scrollWidth > innerWidth + 1; })()`), false, "no sideways scroll");
+    await setAdvanced(s, true);
+    for (const open of [true, false]) {
+      await setPanel(s, open);
+      const wraps = (await s.evaluate(`(() => { const a = document.querySelector('${ADV}'); if (!a) return 'absent';
+        return [...a.querySelectorAll('[role=radiogroup], [role=spinbutton], button')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.right > a.getBoundingClientRect().right + 0.5 || e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible'); }).map((e) => e.getAttribute('aria-label') || e.textContent.trim()).join(','); })()`)) as string;
+      assert.equal(wraps, "", `panel ${open ? "open" : "closed"}: nothing in Advanced runs over or is clipped`);
+    }
   });
 });
 

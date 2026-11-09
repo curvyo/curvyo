@@ -4,7 +4,8 @@
 // Clear mask, Escape disarms, leaving the tool disarms, a text and a second image are refused with
 // the row, the Tab order and the group at 800 x 600, and an outline-only circle over the picture
 // picked by a click inside it; and `specs/0089` UX notes §25: the Threshold changes once over an
-// Inside / Outside switch, the picked colours beside the pipette at 800 x 600. Set
+// Inside / Outside switch, the picked colours beside the pipette at 800 x 600, a right press disarms the
+// pipette as Esc does. Set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the
 // wasm bindings must be built. The harness is the one of `acceptance_0094_tester.test.ts`.
 import assert from "node:assert/strict";
@@ -801,7 +802,7 @@ const pickedRow = async (s: S) =>
     scroll: boolean; strip: boolean; detail: boolean; label: string; reason: string;
   };
 
-test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours sit beside the pipette; the bar does not move from 0 to 8; remove by click and key", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours sit beside the pipette; the group grows by the swatches only, the bar never scrolls; remove by click and key", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(
     async (s) => {
       const file = path.join(SCRATCH, "stripes.png");
@@ -853,14 +854,13 @@ test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours s
       assert.deepEqual(eight.names, STRIPES.map((c) => `Remove ${hexOf(c)}`), "pick order, new picks at the end");
       assert.deepEqual(rows[9].names, eight.names, "the ninth is ignored");
       assert.deepEqual(eight.stops, [0, -1, -1, -1, -1, -1, -1, -1], "one Tab stop");
-      for (const n of [1, 5, 8]) {
-        for (const k of ["x", "y", "w", "h"] as const) {
-          assert.ok(Math.abs(rows[n].group[k] - empty.group[k]) < 0.5, `the group does not move or resize at ${n} (${k})`);
-          assert.ok(Math.abs(rows[n].bar[k] - empty.bar[k]) < 0.5, `the bar does not jump at ${n} (${k})`);
-        }
+      // Customer 2026-11-09: the group is as wide as its content, nothing reserved behind the pipette.
+      for (const n of [0, 1, 5, 8]) {
+        assert.ok(Math.abs(rows[n].group.w - (28 + 24 * n)) < 0.5, `the group is 28 + 24 per colour at ${n}, got ${rows[n].group.w}`);
+        assert.ok(Math.abs(rows[n].group.h - empty.group.h) < 0.5, `one line at ${n}`);
+        assert.ok(Math.abs(rows[n].bar.w - empty.bar.w) < 0.5, `the bar keeps its width at ${n}`);
         assert.equal(rows[n].scroll, false, "no horizontal scroll");
       }
-      assert.ok(Math.abs(empty.group.w - 220) < 0.5, `the group reserves 220 px, got ${empty.group.w}`);
       assert.ok(new Set(eight.cells.map((c) => Math.round(c.y))).size === 1, "eight colours on one line");
       assert.ok(Math.abs(eight.swatches[0].x - (eight.pipette.x + eight.pipette.w) - 4) < 0.5, "4 px after the pipette");
       for (let i = 0; i < 8; i++) {
@@ -870,7 +870,7 @@ test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours s
           assert.ok(Math.abs(eight.swatches[i].x - (eight.swatches[i - 1].x + 20) - 4) < 0.5, "4 px gaps");
         }
       }
-      assert.ok(eight.swatches[7].x + 20 <= eight.group.x + eight.group.w + 0.5, "eight colours fit the reserve");
+      assert.ok(eight.swatches[7].x + 20 <= eight.group.x + eight.group.w + 0.5, "eight colours fit the group");
       // The tooltip is the colour code after 400 ms of hover.
       const third = eight.cells[2];
       await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: third.x + third.w / 2, y: third.y + third.h / 2 });
@@ -901,9 +901,8 @@ test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours s
       assert.equal(await s.evaluate(`!!document.activeElement?.closest('[data-trace-colours]')`), false, "a pointer removal hands the keyboard back");
       await waitFor("Removed announced", async () => ((await advancedStatus(s)).includes(`Removed ${hexOf(STRIPES[2])}`) ? true : null), 10_000);
       assert.equal(await s.evaluate(`document.querySelector('[aria-label=Undo]')?.getAttribute('aria-disabled') ?? document.querySelector('[aria-label=Undo]')?.disabled`), undoBefore, "not a history step");
-      for (const k of ["x", "y", "w", "h"] as const) {
-        assert.ok(Math.abs(seven.bar[k] - empty.bar[k]) < 0.5, `the bar does not jump on removal (${k})`);
-      }
+      assert.ok(Math.abs(seven.group.w - (28 + 24 * 7)) < 0.5, `a removal shrinks the group by one swatch, got ${seven.group.w}`);
+      assert.ok(Math.abs(seven.bar.w - empty.bar.w) < 0.5 && !seven.scroll, "the bar keeps its width, no scroll");
       // Keys: End, then Delete removes the last; focus goes to the previous one.
       await s.evaluate(`document.querySelector('${BAR} [data-trace-picked-swatch][tabindex="0"]').focus()`);
       await press(s, "End", 35);
@@ -936,4 +935,55 @@ test("0089 §25.3, §25.4: at 800 x 600 with the panel open the picked colours s
     800,
     600,
   );
+});
+
+test("0089 §25.4: a right press on the canvas disarms the Pick colours pipette as Esc does: same state, nothing picked, no context menu", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    const file = path.join(SCRATCH, "stripes.png");
+    writeFileSync(file, STRIPES_PNG);
+    await s.tab("Layers");
+    await s.choose("[data-import-button]", file);
+    await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("stripes.png")) ? true : null));
+    await sleep(800);
+    const box = await pictureBox(s);
+    const on: [number, number] = [box.x1 - 120, box.cy + 80];
+    await openTrace(s);
+    await setAdvanced(s, false);
+    await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
+    await sleep(300);
+    await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes('Pick colours')).click()`);
+    await sleep(1000);
+    await s.evaluate(`window.__menus = []; window.addEventListener('contextmenu', (e) => window.__menus.push(e.defaultPrevented));`);
+    const pipette = `${BAR} [data-trace-colours=picked] [data-trace-pipette]`;
+    const state = async () =>
+      JSON.parse((await s.evaluate(`JSON.stringify({ pressed: document.querySelector('${pipette}').getAttribute('aria-pressed'),
+        picked: document.querySelectorAll('${BAR} [data-trace-picked-swatch]').length, bar: !!document.querySelector('${BAR}'),
+        cursor: (() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0]; const e = c.closest('[style*="cursor"]'); return e ? e.style.cursor : ''; })() })`)) as string) as { pressed: string; picked: number; bar: boolean; cursor: string };
+    const arm = async () => {
+      if ((await state()).pressed !== "true") {
+        await s.clickSel(pipette);
+        await sleep(300);
+      }
+      await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: on[0], y: on[1] });
+      await sleep(300);
+      assert.equal((await state()).pressed, "true", "the pipette is armed");
+    };
+    await arm();
+    const armed = await state();
+    await focusCanvas(s);
+    await press(s, "Escape", 27);
+    await sleep(300);
+    const byEscape = await state();
+    assert.equal(byEscape.pressed, "false", "Esc disarms");
+    assert.notEqual(byEscape.cursor, armed.cursor, "Esc ends the eyedropper cursor");
+    await arm();
+    await s.send("Input.dispatchMouseEvent", { type: "mousePressed", x: on[0], y: on[1], button: "right", buttons: 2, clickCount: 1 });
+    await s.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: on[0], y: on[1], button: "right", buttons: 0, clickCount: 1 });
+    await sleep(600);
+    const byRight = await state();
+    assert.deepEqual(byRight, byEscape, "a right press leaves the state Esc leaves");
+    assert.equal(byRight.picked, 0, "a right press picks nothing");
+    const menus = JSON.parse((await s.evaluate(`JSON.stringify(window.__menus)`)) as string) as boolean[];
+    assert.ok(menus.every(Boolean), `no native context menu: ${JSON.stringify(menus)}`);
+  });
 });
