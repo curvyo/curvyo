@@ -617,11 +617,13 @@ test("0089E tester c24: About Trace names the methods, the Mask group and the ne
       assert.ok(!terms.includes(stale), `About Trace has no entry "${stale}"`);
       assert.ok(!page.includes(`**${stale}**`), `the user page has no "${stale}" setting`);
     }
-    // Finding (0094, not this cleanup): About Trace has no "Parts" entry although the 0094 UX notes (line 113) say
-    // the About Trace page states the stacking order of the parts. Parts is exempt here until the entry exists.
-    for (const l of labels) assert.ok(l === "Parts" || terms.includes(l), `the bar control "${l}" has an About Trace entry`);
-    const body = (await s.evaluate(`document.body.innerText`)) as string;
-    assert.ok(!/Create paths/.test(body), "no 'Create paths' label is left in the app");
+    // ux-notes §26.6: the Parts entry now exists (before Analyse), so no control is exempt any more.
+    assert.ok(terms.includes("Parts"), "About Trace has the Parts entry");
+    assert.ok(terms.indexOf("Parts") < terms.indexOf("Analyse"), "Parts comes before Analyse");
+    for (const l of labels) assert.ok(terms.includes(l), `the bar control "${l}" has an About Trace entry`);
+    // The Parts entry explains that Create paths joins the parts (§26.6); no control, tooltip or name is "Create paths" any more.
+    const named = (await s.evaluate(`JSON.stringify([...document.querySelectorAll('button, [role=button], [aria-label], [title]')].filter((e) => /Create paths/.test((e.getAttribute('aria-label') ?? '') + ' ' + (e.getAttribute('title') ?? '') + ' ' + (e.children.length === 0 ? e.textContent : ''))).map((e) => e.outerHTML.slice(0, 80)))`)) as string;
+    assert.deepEqual(JSON.parse(named), [], "no 'Create paths' label is left in the app");
     // Every About Trace entry is the same string on the user page.
     const missing = entries.filter(([t, x]) => !page.includes(`- ${t}: ${x}`)).map(([t, x]) => `${t}: ${x}`);
     assert.deepEqual(missing, [], "each About Trace entry appears word for word in docs/tracing-images.md");
