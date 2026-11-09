@@ -1,7 +1,6 @@
 # ADR 0045: Clones of groups, texts and images, and movable placed pages
 
-**Status:** Proposed 2026-11-09, `needs-customer` (document model and file format; accepted with
-the `0100` PR, as ADR 0042 and 0043 were). Amends, by notes on their Status lines:
+**Status:** Accepted 2026-11-09 (customer accepted PR #296; document model and file format). Amends, by notes on their Status lines:
 [ADR 0015](0015-node-references-and-ancestor-resolved-state.md) §1, §3, §5, §6 (wider origins,
 no cycle through containment, repair as a copy, the read of a drawn subtree);
 [ADR 0016](0016-clone-overrides.md) §1 to §4 (own placement for every root, own style only for
