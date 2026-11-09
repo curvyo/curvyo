@@ -66,6 +66,9 @@ fn path_bounds(path: &PathSnapshot) -> (Point, Point) {
 /// criterion 14: "extended here to paths too").
 #[must_use]
 pub fn object_bounds(object: &ObjectSnapshot) -> (Point, Point) {
+    if let Some(picture) = object.picture() {
+        return union_of(picture.iter().map(object_bounds));
+    }
     match object {
         // The selection box of a text is its line box (`specs/0074-text-objects`, UX notes §5).
         ObjectSnapshot::Text(text) => crate::text_box::line_box_bounds(text),
@@ -107,6 +110,9 @@ fn dimension_bounds(dimension: &curvyo_document_core::DimensionSnapshot) -> (Poi
 /// unrotated frame box) and without the stroke width.
 #[must_use]
 pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
+    if let Some(picture) = object.picture() {
+        return union_of(picture.iter().map(object_outline_bounds));
+    }
     match object {
         ObjectSnapshot::Text(text) if text.outline.is_none() => {
             crate::text_box::line_box_bounds(text)
@@ -169,6 +175,18 @@ pub fn content_bounds(document: &Document) -> Option<(Point, Point)> {
                 Point::new(max.x.max(other_max.x), max.y.max(other_max.y)),
             )
         })
+}
+
+/// The box around every box of `boxes`; a point at the origin for none.
+fn union_of(boxes: impl Iterator<Item = (Point, Point)>) -> (Point, Point) {
+    boxes
+        .reduce(|(a, b), (c, d)| {
+            (
+                Point::new(a.x.min(c.x), a.y.min(c.y)),
+                Point::new(b.x.max(d.x), b.y.max(d.y)),
+            )
+        })
+        .unwrap_or((Point::new(0.0, 0.0), Point::new(0.0, 0.0)))
 }
 
 #[cfg(test)]

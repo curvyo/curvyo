@@ -8,7 +8,7 @@
   <g id="g1">
     <g id="g2">
       <path id="path2" d="M 79.375 79.375 L 41.275 145.366136 L 110.015766 185.053636" sodipodi:nodetypes="ccc" fill="#000000" stroke="none" fill-rule="nonzero"/>
-      <use id="use1" xlink:href="#path2" transform="matrix(-1.0000000000000002 0 0 1.0000000000000002 158.75 0)"/>
+      <use id="use1" xlink:href="#path2" transform="matrix(-1 0 0 1 158.75 0)"/>
     </g>
     <g id="g3">
       <path id="path3" d="M 79.375 79.375 L 41.275 13.383864 L -27.465766 53.071364" sodipodi:nodetypes="ccc" fill="#000000" stroke="none" fill-rule="nonzero"/>

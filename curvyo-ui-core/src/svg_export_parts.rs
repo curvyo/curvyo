@@ -123,6 +123,21 @@ impl<'t, 'a> Parts<'t, 'a> {
         let object = self.tree.object(i)?;
         let t = self.t;
         match object {
+            // A clone of a group, text or image: one group of its drawn leaves (ADR 0045 §8).
+            ObjectSnapshot::Clone(clone) if clone.is_picture() => {
+                let children = clone
+                    .chain
+                    .picture
+                    .iter()
+                    .flat_map(|p| p.iter())
+                    .filter_map(|leaf| self.drawn_leaf(leaf))
+                    .collect();
+                Some(ExportNode::Group {
+                    state,
+                    layer: false,
+                    children,
+                })
+            }
             ObjectSnapshot::Clone(clone) => {
                 if let Some((origin, m)) = self.tree.as_use(i, &self.written) {
                     let kind = ExportKind::Use {
@@ -162,6 +177,89 @@ impl<'t, 'a> Parts<'t, 'a> {
             }),
             // A dimension is never output (ADR 0027).
             ObjectSnapshot::Dimension(_) => None,
+        }
+    }
+
+    /// One leaf a picture clone or a placed page draws, already in place: a path or primitive as
+    /// its shape, a text, an image, a clone as what it draws.
+    fn drawn_leaf(&mut self, leaf: &ObjectSnapshot) -> Option<ExportNode> {
+        match leaf {
+            ObjectSnapshot::Text(text) => self.text(text, ExportState::default()),
+            ObjectSnapshot::Image(image) => Some(ExportNode::Image {
+                state: ExportState::default(),
+                image: Box::new(export_image(image, self.document, self.t)?),
+            }),
+            ObjectSnapshot::Clone(clone) if clone.is_picture() => {
+                let children = clone
+                    .chain
+                    .picture
+                    .iter()
+                    .flat_map(|p| p.iter())
+                    .filter_map(|inner| self.drawn_leaf(inner))
+                    .collect();
+                Some(ExportNode::Group {
+                    state: ExportState::default(),
+                    layer: false,
+                    children,
+                })
+            }
+            ObjectSnapshot::Dimension(_) => None,
+            ObjectSnapshot::Sketch(sketch) => self.shape(
+                &ObjectSnapshot::Path(sketch.resolved.clone()),
+                ExportState::default(),
+            ),
+            other => self.shape(other, ExportState::default()),
+        }
+    }
+
+    /// Every placed page as one group of its source page's members under its global matrix
+    /// (ADR 0045 §8): on `laser` only when given (Active page only), else on every laser page.
+    /// Fixtures, the origin marker, the placement box and the work-area text are never written.
+    pub(crate) fn placed_pages(
+        &mut self,
+        laid: &curvyo_document_core::ObjectRead,
+        pages: &[curvyo_document_core::Page],
+        membership: &crate::PageMembership,
+        laser: Option<&curvyo_document_core::Page>,
+        out: &mut Vec<ExportNode>,
+    ) {
+        let guides: HashSet<curvyo_document_core::NodeId> = self
+            .tree
+            .nodes
+            .iter()
+            .filter(|n| n.guide || !n.visible)
+            .map(|n| n.id)
+            .collect();
+        for placed in self.document.placed_pages() {
+            if laser.is_some_and(|page| page.id != placed.output.id) {
+                continue;
+            }
+            let (Some(source), Some(map)) = (placed.source.as_ref(), placed.global_map()) else {
+                continue;
+            };
+            let Some(source) = pages.iter().find(|p| p.id == source.id) else {
+                continue;
+            };
+            let members = crate::placement_members(&laid.objects, source, &guides, membership);
+            let children: Vec<ExportNode> = members
+                .iter()
+                .filter_map(|&at| {
+                    let mapped = curvyo_document_core::map_leaf(&laid.objects[at], map);
+                    self.drawn_leaf(&mapped)
+                })
+                .collect();
+            if children.is_empty() {
+                continue;
+            }
+            self.objects += 1;
+            out.push(ExportNode::Group {
+                state: ExportState {
+                    name: Some(format!("Placed page of {}", source.name)),
+                    ..ExportState::default()
+                },
+                layer: false,
+                children,
+            });
         }
     }
 

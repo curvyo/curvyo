@@ -16,6 +16,13 @@ pub fn faded(object: &ObjectSnapshot, opacity: Opacity) -> ObjectSnapshot {
     if opacity == Opacity::OPAQUE {
         return shown;
     }
+    // A clone of a group, text or image fades every leaf it draws (ADR 0045 §2).
+    if let ObjectSnapshot::Clone(clone) = &mut shown
+        && let Some(picture) = &clone.chain.picture
+    {
+        clone.chain.picture = Some(picture.iter().map(|leaf| faded(leaf, opacity)).collect());
+        return shown;
+    }
     if let ObjectSnapshot::Image(image) = &mut shown {
         // invariant: a product of numbers in 0..=1 lies in 0..=1.
         image.shown_opacity =

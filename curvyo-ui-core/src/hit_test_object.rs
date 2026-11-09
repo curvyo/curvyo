@@ -60,6 +60,11 @@ where
 /// rotation about the centre cannot leave it). A hover over thousands of
 /// objects rejects almost all of them here, before any outline is built.
 fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) -> bool {
+    if let Some(picture) = object.picture() {
+        return picture
+            .iter()
+            .all(|leaf| certainly_farther_than(leaf, point, margin));
+    }
     match object {
         // A text is hit anywhere inside the box of its lines (`specs/0074-text-objects`
         // criterion 25).
@@ -116,6 +121,16 @@ pub(crate) fn distance_to_object(
     if certainly_farther_than(object, point, tolerance.as_mm()) {
         return None;
     }
+    // A clone of a group, text or image is hit where its original's leaves would be (ADR 0045).
+    if let Some(picture) = object.picture() {
+        return picture
+            .iter()
+            .filter_map(|leaf| {
+                distance_to_object(leaf, point, tolerance)
+                    .or_else(|| fills_point(leaf, point).then_some(0.0))
+            })
+            .min_by(f64::total_cmp);
+    }
     match object {
         // Every outline of a compound path counts: the stroke of any of them
         // picks the object (criterion 33).
@@ -169,6 +184,9 @@ pub(crate) fn distance_to_object(
 /// whether it is closed: a path's own outlines (one, or several for a compound
 /// path), a primitive's rotation-aware outline.
 fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
+    if let Some(picture) = object.picture() {
+        return picture.iter().flat_map(outlines_of).collect();
+    }
     match object {
         // Marquee and lasso take a text on path when all its letter boxes are inside
         // (`specs/0080-text-on-path` criterion 28).
@@ -237,6 +255,9 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
 /// compound path's interior is the nonzero winding over all its outlines, so
 /// a hole is not inside it (`specs/0016-boolean-operations` criterion 33).
 pub(crate) fn fills_point(object: &ObjectSnapshot, point: Point) -> bool {
+    if let Some(picture) = object.picture() {
+        return picture.iter().any(|leaf| fills_point(leaf, point));
+    }
     if !object.style().fill.paints() || certainly_farther_than(object, point, 0.0) {
         return false;
     }

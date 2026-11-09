@@ -323,3 +323,39 @@ fn selected_bounds(
             )
         })
 }
+
+impl SelectTool {
+    /// Ends the move drag in flight without writing and returns the snapped offset a release at
+    /// `point` with `modifiers` would commit (`specs/0100-bring-content-in` `adrs.md` note 3):
+    /// the cloning drop places clones there instead. The selection gains the object a Shift
+    /// press added. `None`, and the drag kept, when no move is in flight; `None` when the drag
+    /// never left the dead zone.
+    pub fn end_move_uncommitted(
+        &mut self,
+        selection: &mut ObjectSelection,
+        units: &Units,
+        point: Point,
+        modifiers: Modifiers,
+        snap_offset: Vec2,
+    ) -> Option<Vec2> {
+        let SelectDrag::Moving(drag) = &self.drag else {
+            return None;
+        };
+        let drag = drag.clone();
+        self.drag = SelectDrag::None;
+        if !drag.origin.is_active_at(point) {
+            return None;
+        }
+        if let Some(id) = drag.joins {
+            selection.add_all(units.leaves_with(&id));
+        }
+        let offset = drag.resolve(point, modifiers, snap_offset).offset;
+        (offset.length() > MOVE_EQUAL_EPSILON_MM).then_some(offset)
+    }
+
+    /// Whether a move drag (not a resize, rotate, marquee or lasso) is in flight.
+    #[must_use]
+    pub const fn is_moving(&self) -> bool {
+        matches!(self.drag, SelectDrag::Moving(_))
+    }
+}

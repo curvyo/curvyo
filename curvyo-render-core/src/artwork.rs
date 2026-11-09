@@ -79,38 +79,53 @@ pub fn build_artwork_with_guides(
             draw_guide(&mut list, object, style, view, &mut budgets);
             continue;
         }
-        match object {
-            // A clone with a rigid map of a plain root reuses the root's tessellation
-            // (`specs/0049-linked-clone` criterion 44).
-            ObjectSnapshot::Clone(clone) if shared.draw(&mut list, clone, view) => {}
-            ObjectSnapshot::Path(path)
-            | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot {
-                resolved: path, ..
-            }) => {
-                draw_path(&mut list, path, view, &mut budgets);
-            }
-            ObjectSnapshot::Sketch(sketch) => {
-                draw_path(&mut list, &sketch.resolved, view, &mut budgets);
-            }
-            ObjectSnapshot::Primitive(primitive) => {
-                draw_primitive(&mut list, primitive, view, &mut budgets);
-            }
-            // A text is drawn through the outlines the session laid out (ADR 0020 §2: what
-            // you see is what is cut); a text not laid out yet draws nothing.
-            ObjectSnapshot::Text(text) => {
-                if let Some(outline) = &text.outline {
-                    draw_path(&mut list, &outline.glyphs, view, &mut budgets);
-                }
-            }
-            // An image is a layer of its own that the host fills with its texture
-            // (`specs/0058-bitmap-import` criterion 27).
-            ObjectSnapshot::Image(image) => list.push_image(image),
-            // A dimension is drawn by its marks over the artwork, laid out for the view by the
-            // session (`specs/0070-measure-and-dimension`, ADR 0027); it is never artwork.
-            ObjectSnapshot::Dimension(_) => {}
-        }
+        draw_one(&mut list, &mut shared, object, view, &mut budgets);
     }
     list
+}
+
+/// One object of the artwork, a clone of a group, text or image as each of its leaves.
+fn draw_one(
+    list: &mut DrawList,
+    shared: &mut SharedOutlines,
+    object: &ObjectSnapshot,
+    view: ViewTransform,
+    budgets: &mut FrameBudgets,
+) {
+    match object {
+        // A clone of a group, text or image draws its original's leaves (ADR 0045 §3).
+        ObjectSnapshot::Clone(clone) if clone.is_picture() => {
+            for leaf in clone.chain.picture.iter().flat_map(|p| p.iter()) {
+                draw_one(list, shared, leaf, view, budgets);
+            }
+        }
+        // A clone with a rigid map of a plain root reuses the root's tessellation
+        // (`specs/0049-linked-clone` criterion 44).
+        ObjectSnapshot::Clone(clone) if shared.draw(list, clone, view) => {}
+        ObjectSnapshot::Path(path)
+        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+            draw_path(list, path, view, budgets);
+        }
+        ObjectSnapshot::Sketch(sketch) => {
+            draw_path(list, &sketch.resolved, view, budgets);
+        }
+        ObjectSnapshot::Primitive(primitive) => {
+            draw_primitive(list, primitive, view, budgets);
+        }
+        // A text is drawn through the outlines the session laid out (ADR 0020 §2: what
+        // you see is what is cut); a text not laid out yet draws nothing.
+        ObjectSnapshot::Text(text) => {
+            if let Some(outline) = &text.outline {
+                draw_path(list, &outline.glyphs, view, budgets);
+            }
+        }
+        // An image is a layer of its own that the host fills with its texture
+        // (`specs/0058-bitmap-import` criterion 27).
+        ObjectSnapshot::Image(image) => list.push_image(image),
+        // A dimension is drawn by its marks over the artwork, laid out for the view by the
+        // session (`specs/0070-measure-and-dimension`, ADR 0027); it is never artwork.
+        ObjectSnapshot::Dimension(_) => {}
+    }
 }
 
 /// One guide: the outlines of `object` stroked with the marking `style`, no markers.
