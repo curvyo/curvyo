@@ -158,7 +158,7 @@ export function useFontLibrary(
       return;
     }
     // Later entries win for a family listed twice: system, then included, then Curvyo.
-    const order = { system: 0, included: 1, curvyo: 2 };
+    const order = { system: 0, included: 1, curvyo: 2, document: -1 };
     const sorted = [...families].sort((a, b) => order[a.block] - order[b.block]);
     const facts = sorted.map((family) => {
       const face = representative(family);

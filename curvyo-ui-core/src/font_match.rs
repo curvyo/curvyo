@@ -16,6 +16,9 @@ pub enum FontBlock {
     Included,
     /// Installed on the computer (desktop only).
     System,
+    /// Embedded in the open document (ADR 0047); sorts last so installed copies keep their
+    /// order, and the face of a text whose bytes match is found there too.
+    Document,
 }
 
 /// One face the host listed.
@@ -70,6 +73,16 @@ pub fn match_face(font: &FontRef, faces: &[ListedFace]) -> FaceMatch {
             && family_key(&face.family) == family_key(&font.family)
             && face.style.to_lowercase() == font.style.to_lowercase()
     };
+    // The file's own bytes beat an installed font of the same name with other bytes
+    // (ADR 0047 decision 4, FONT-SAME-NAME A).
+    let embedded = faces
+        .iter()
+        .filter(|face| face.block == FontBlock::Document)
+        .filter(same_name)
+        .find_map(|face| face.key);
+    if let Some(key) = embedded {
+        return FaceMatch::Face(key);
+    }
     let best = faces
         .iter()
         .enumerate()

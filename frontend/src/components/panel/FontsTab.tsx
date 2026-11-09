@@ -23,6 +23,8 @@ import { useFontLibrary } from "@/hooks/useFontLibrary";
 import { useDeleteArm } from "@/hooks/useDeleteArm";
 import { useFontTagLine } from "@/hooks/useFontTagLine";
 import { useFontDrop } from "@/hooks/useFontDrop";
+import { readFaceBytes } from "@/lib/fontFaceLoader";
+import { fontFileName } from "@/lib/fontFileName";
 import { isTauri } from "@/platform/host";
 import { armedRemoveLabel, checkingText, emptyTagText, removedText } from "@/lib/fontLibraryText";
 import { documentsGoing } from "@/lib/fontInfoText";
@@ -104,7 +106,7 @@ export function FontsTab({
     [lib, chosen, kept],
   );
   const blocks = useMemo(
-    () => fontBlocks(data, search, isTauri, chosen === "all" ? undefined : inCell, chosen === "cuttable" && checking),
+    () => fontBlocks(data, search, isTauri, chosen === "all" ? undefined : inCell, chosen === "cuttable" && checking, true),
     [data, search, chosen, inCell, checking],
   );
   const currentFace = data.current?.index ?? null;
@@ -196,7 +198,34 @@ export function FontsTab({
   /** A maker's press keeps the row in view until the strip cell or the search changes. */
   const keep = (family: string) => setKept((before) => new Set(before).add(family));
 
+  /** A Document Fonts family with a face that is not installed: its star and tags are greyed and
+   * it offers Install (`specs/0107-document-fonts` criteria 11 and 12). */
+  const greyed = (family: FontFamily) => family.block === "document" && !family.faces.every((face) => face.installed);
+  const [installing, setInstalling] = useState<string | null>(null);
+  const installFamily = async (family: FontFamily) => {
+    const key = familyKey(family);
+    setInstalling(key);
+    try {
+      const files = await Promise.all(
+        family.faces
+          .filter((face) => !face.installed)
+          .map(async (face) => {
+            const bytes = new Uint8Array(await readFaceBytes(face));
+            return new File([bytes], fontFileName(face, bytes));
+          }),
+      );
+      await lib.addFonts({ files });
+    } catch {
+      // The notice of Add font reports a refusal; an unreadable embedded file keeps the row.
+    } finally {
+      setInstalling(null);
+    }
+  };
+
   const star = (family: FontFamily) => {
+    if (greyed(family)) {
+      return;
+    }
     keep(family.family);
     lib.toggleFavourite(family.family);
   };
@@ -266,6 +295,8 @@ export function FontsTab({
       pickFamily,
       pickFace: (face) => onPick(face, true),
       star,
+      greyed,
+      install: (family) => void installFamily(family),
       pressRemove: (family) => pressRemove(family, true),
       isArmed: (family) => arm.armed === `font:${familyKey(family)}`,
       openAddTag: (family) => openAddTag(family, true),
@@ -326,7 +357,7 @@ export function FontsTab({
   const total = useMemo(
     () =>
       searching
-        ? fontBlocks(data, "", isTauri, chosen === "all" ? undefined : inCell).reduce((sum, b) => sum + b.families.length, 0)
+        ? fontBlocks(data, "", isTauri, chosen === "all" ? undefined : inCell, false, true).reduce((sum, b) => sum + b.families.length, 0)
         : shownFamilies,
     [searching, data, chosen, inCell, shownFamilies],
   );
@@ -463,6 +494,11 @@ export function FontsTab({
                   }
                   zone={row.family.block === "curvyo" ? `font:${row.key}` : undefined}
                   trash={row.family.block === "curvyo" ? trashOf(row.family) : undefined}
+                  install={
+                    greyed(row.family)
+                      ? { onPress: () => void installFamily(row.family), busy: installing === row.key }
+                      : undefined
+                  }
                   notice={<TabNotice notice={lib.notice} anchor="row" row={row.key} rowHeight={row.height} />}
                   style={style}
                   onFocus={() => setFocusKey(row.key)}

@@ -89,6 +89,14 @@ impl FaceStore {
     /// # Errors
     /// [`TextError::FaceTooLarge`] or [`TextError::Unreadable`] for bytes that hold no usable face.
     pub fn add(&mut self, bytes: Vec<u8>, index: u32) -> Result<FaceKey, TextError> {
+        self.add_shared(Arc::new(bytes), index)
+    }
+
+    /// [`FaceStore::add`] for bytes the caller keeps a handle on (the embedded copy of ADR 0047).
+    ///
+    /// # Errors
+    /// As [`FaceStore::add`].
+    pub fn add_shared(&mut self, bytes: Arc<Vec<u8>>, index: u32) -> Result<FaceKey, TextError> {
         if bytes.len() > crate::limits::MAX_FACE_BYTES {
             return Err(TextError::FaceTooLarge);
         }
@@ -97,7 +105,7 @@ impl FaceStore {
             index,
         };
         if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
-            slot.insert(Arc::new(Face::new(Arc::new(bytes), index)?));
+            slot.insert(Arc::new(Face::new(bytes, index)?));
         }
         Ok(key)
     }

@@ -2,7 +2,7 @@
 // `specs/0075-font-library` UX tags amendment §2): block headers, the Missing row, a family row of
 // two lines (its name in its own face with chevron, current mark, Curvyo trash, star and face
 // count; under it the tag line), a face row.
-import { ChevronDown, ChevronRight, Star, Trash2, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, FilePlus, Star, Trash2, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Tooltip } from "@/components/ui/tooltip";
@@ -52,6 +52,9 @@ interface FamilyRowProps {
   zone?: string;
   /** The Remove trash of a Curvyo family (`specs/0081-inline-delete-confirm` criterion 1). */
   trash?: TrashProps;
+  /** The install icon of a Document Fonts family that is not installed; its star and tag line
+   * are greyed (`specs/0107-document-fonts` criteria 11 to 14). */
+  install?: { onPress: () => void; busy: boolean };
   /** A notice anchored under the row, right-aligned to the trash (`0081` UX notes §7). */
   notice?: ReactNode;
   style: React.CSSProperties;
@@ -113,6 +116,7 @@ export function FamilyRow({
   tagLine,
   zone,
   trash,
+  install,
   notice,
   style,
   onFocus,
@@ -123,6 +127,7 @@ export function FamilyRow({
   const cssFamily = cssFamilyOf(family.faces[0].id);
   const lines = family.faces[0].singleLine ? linePreviewOf(family.faces[0].id)?.family : undefined;
   const faces = family.faces.length;
+  const greyed = install !== undefined;
   const tagsPart = tagNames.length > 0 ? `, tags ${tagNames.join(", ")}` : "";
   const name = `${familyName(family)}${favourite ? ", favourite" : ""}${tagsPart}`;
   const tip = [
@@ -180,10 +185,32 @@ export function FamilyRow({
             {notice}
           </span>
         ) : null}
+        {install ? (
+          <span className="relative flex shrink-0">
+            <Tooltip side="left" content="Install font">
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={`Install ${family.family}`}
+                disabled={install.busy}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  install.onPress();
+                }}
+                className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] text-[var(--panel-muted-fg)] hover:bg-[var(--editor-accent-hover)]"
+              >
+                <FilePlus size={16} strokeWidth={1.5} aria-hidden />
+              </button>
+            </Tooltip>
+            {notice}
+          </span>
+        ) : null}
         <Tooltip side="left" content="Favourite">
           <button
             type="button"
             tabIndex={-1}
+            disabled={greyed}
             aria-pressed={favourite}
             aria-label={`Favourite: ${family.family}`}
             onMouseDown={(event) => event.preventDefault()}
@@ -191,7 +218,7 @@ export function FamilyRow({
               event.stopPropagation();
               onStar();
             }}
-            className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] hover:bg-[var(--editor-accent-hover)]"
+            className="flex h-7 w-6 shrink-0 items-center justify-center rounded-[5px] hover:bg-[var(--editor-accent-hover)] disabled:opacity-40 disabled:hover:bg-transparent"
           >
             <Star
               size={16}
@@ -203,7 +230,13 @@ export function FamilyRow({
         </Tooltip>
         <span className="pr-2 text-xs tabular-nums text-[var(--panel-muted-fg)]">{faces}</span>
       </div>
-      {tagLine}
+      {greyed ? (
+        <div inert aria-hidden className="opacity-40">
+          {tagLine}
+        </div>
+      ) : (
+        tagLine
+      )}
     </div>
   );
 }

@@ -34,6 +34,7 @@ impl Session {
         };
         // Pictures are only scanned for when the store grew: reading every object per commit
         // would cost a 1,000-object document its frame budget (criterion 13).
+        self.embed_used_fonts();
         let asset_total = self.document.asset_bytes();
         let new_assets: Vec<AssetHash> = if asset_total == link.asset_total {
             Vec::new()
@@ -96,6 +97,9 @@ impl Session {
         }
         if let Some(seq) = rejected {
             self.record_rejected(seq);
+        }
+        if changed {
+            self.refresh_document_fonts();
         }
         if changed {
             self.drop_gone_from_selection();
@@ -174,5 +178,6 @@ fn received_assets(document: &curvyo_document_core::Document) -> BTreeSet<AssetH
             ObjectSnapshot::Image(image) => Some(image.asset.clone()),
             _ => None,
         })
+        .chain(document.used_font_hashes())
         .collect()
 }

@@ -49,17 +49,35 @@ export function cssFamilyOf(id: string): string | undefined {
  * once share one read (`specs/0077-font-preview` adrs.md decision 2). */
 const reading = new Map<string, Promise<ArrayBuffer>>();
 
-/** The bytes of the listed face's file: fetched for an included font, from the host otherwise. */
+/** Reads the file of an embedded face from the open document (`specs/0107-document-fonts`). */
+let documentReader: (id: string) => Uint8Array | undefined = () => undefined;
+
+/** The session's reader of embedded font files, set by the text hook. */
+export function setDocumentFontReader(reader: (id: string) => Uint8Array | undefined): void {
+  documentReader = reader;
+}
+
+/** The bytes of the listed face's file: from the document for an embedded font, fetched for an
+ * included font, from the host otherwise. */
 export function readFaceBytes(face: ListedFace): Promise<ArrayBuffer> {
   const pending = reading.get(face.id);
   if (pending) {
     return pending;
   }
-  const read: Promise<ArrayBuffer> = (
-    face.block === "included"
-      ? fetch(`${import.meta.env.BASE_URL}fonts/${face.id}`).then((r) => r.arrayBuffer())
-      : invoke<ArrayBuffer>("font_bytes", { id: face.id })
-  ).finally(() => reading.delete(face.id));
+  const source =
+    face.block === "document"
+      ? new Promise<ArrayBuffer>((resolve, reject) => {
+          const bytes = documentReader(face.id);
+          if (bytes) {
+            resolve(bytes.slice().buffer);
+          } else {
+            reject(new Error("embedded font not found"));
+          }
+        })
+      : face.block === "included"
+        ? fetch(`${import.meta.env.BASE_URL}fonts/${face.id}`).then((r) => r.arrayBuffer())
+        : invoke<ArrayBuffer>("font_bytes", { id: face.id });
+  const read: Promise<ArrayBuffer> = source.finally(() => reading.delete(face.id));
   reading.set(face.id, read);
   return read;
 }

@@ -197,6 +197,7 @@ impl Session {
         if self.sync.is_none() {
             return;
         }
+        self.embed_used_fonts();
         // The share record belongs to this replica's file, never to the room's snapshot.
         let Ok(bytes) = curvyo_document_core::pack_snapshot(&self.document, super::APP_VERSION)
         else {
