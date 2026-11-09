@@ -25,7 +25,7 @@ pub fn draw_refused_notice(layer: &str, locked: bool) -> String {
     }
 }
 
-use crate::layer_rows::{Cause, LayerRow, percent};
+use crate::layer_rows::{Cause, LayerRow, RowKind, percent};
 
 /// "Hidden by layer Cut": the state an ancestor gives a row.
 fn by(cause: &Cause) -> String {
@@ -76,6 +76,9 @@ pub fn inherited_lines(row: &LayerRow) -> (String, String) {
 /// (criterion 41); a collapsed container with a selected descendant adds "contains the selection".
 #[must_use]
 pub fn row_accessible_name(row: &LayerRow) -> String {
+    if row.page_tree {
+        return page_tree_name(row);
+    }
     let kind = match row.kind {
         crate::layer_rows::RowKind::Clone => "linked clone".to_owned(),
         other => other.word().to_lowercase(),
@@ -96,6 +99,10 @@ pub fn row_accessible_name(row: &LayerRow) -> String {
 /// empty when the row is neither hidden nor locked.
 #[must_use]
 pub fn row_state_line(row: &LayerRow) -> String {
+    // A placed page shows its source live and read-only (`specs/0106` UX notes §5).
+    if row.kind == RowKind::PlacedPage {
+        return "Live, read-only".to_owned();
+    }
     let mut words: Vec<String> = state_words(row)
         .into_iter()
         .filter(|word| !word.starts_with("opacity"))
@@ -107,6 +114,42 @@ pub fn row_state_line(row: &LayerRow) -> String {
         }
     }
     words.join(", ")
+}
+
+/// The name of a row of a laser page's own tree (`specs/0106` UX notes §5): "Rectangle, own
+/// item", "Linked clone of Path 3f9a1c", "Placed page of Coaster, 50 objects, read-only",
+/// "Rectangle, in placed page, read-only", "Fixtures, shown".
+fn page_tree_name(row: &LayerRow) -> String {
+    let mut parts = match row.kind {
+        RowKind::PageRoot => vec![row.name.clone(), "laser page".to_owned()],
+        RowKind::Note => vec![row.name.clone()],
+        RowKind::Fixtures => vec![
+            row.name.clone(),
+            if row.own.visible { "shown" } else { "hidden" }.to_owned(),
+        ],
+        RowKind::PlacedPage => vec![
+            row.name.clone(),
+            objects_count_text(row.container.map_or(0, |c| c.children)),
+            "read-only".to_owned(),
+        ],
+        _ if row.read_only => vec![
+            row.name.clone(),
+            "in placed page".to_owned(),
+            "read-only".to_owned(),
+        ],
+        RowKind::Clone => vec![format!(
+            "Linked {}",
+            row.name.strip_prefix("Clone").map_or_else(
+                || format!("clone {}", row.name),
+                |rest| format!("clone{rest}")
+            )
+        )],
+        _ => vec![row.name.clone(), "own item".to_owned()],
+    };
+    if !row.read_only && !matches!(row.kind, RowKind::PlacedPage | RowKind::Fixtures) {
+        parts.extend(state_words(row));
+    }
+    parts.join(", ")
 }
 
 /// Why a press on a hidden or locked row selects nothing (criterion 14): "Hidden" or "Locked";

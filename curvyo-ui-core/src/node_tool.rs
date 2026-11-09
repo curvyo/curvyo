@@ -122,9 +122,10 @@ pub enum JoinBlock {
 
 /// What [`NodeTool::split_selected`] did (`specs/0055-compound-path-node-editing` criterion 6):
 /// on a compound path the result stays one object, so the host says what happened.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodeSplitOutcome {
     /// Nothing was split.
+    #[default]
     None,
     /// An ordinary path was split or opened (`0006` criteria 13 and 14).
     Path,

@@ -72,6 +72,8 @@ mod image_placement;
 pub mod key_backup_text;
 mod layer_move;
 mod layer_rows;
+mod page_tree_rows;
+pub use page_tree_rows::{PageTree, PlacedPageRow};
 mod layer_text;
 mod linked_clone;
 mod marquee;
@@ -110,6 +112,18 @@ mod pen_entry_text;
 mod pen_target;
 mod pen_tool;
 pub use page_membership::{PageMembership, Reach};
+mod edit_context;
+mod edit_context_text;
+mod step_scope;
+pub use edit_context::{
+    ActivePage, ContextKind, ContextPages, DoubleClickTarget, Home, Scope, double_click_target,
+    in_context, scope,
+};
+pub use edit_context_text::{
+    NO_DRAWING_PAGE_NOTICE, OutsideHomes, home_row_line, not_editable_notice, out_of_context_line,
+    out_of_context_status, out_of_context_suffix,
+};
+pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod placement_view;
 mod poly_star_tool;
 pub mod presence;

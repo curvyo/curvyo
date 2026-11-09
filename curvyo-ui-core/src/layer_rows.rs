@@ -39,6 +39,15 @@ pub enum RowKind {
     Image,
     /// A dimension object (`specs/0070-measure-and-dimension`).
     Dimension,
+    /// The laser page a laser page's tree is rooted at (`specs/0106` criterion 17).
+    PageRoot,
+    /// A placed page on a laser page (`specs/0106` criterion 18).
+    PlacedPage,
+    /// The Fixtures row of a laser page's tree (`specs/0106` criterion 17).
+    Fixtures,
+    /// A muted line in a laser page's tree: "Empty", "Nothing on this page yet." (`specs/0106`
+    /// UX notes §5); not focusable, no node.
+    Note,
 }
 
 impl RowKind {
@@ -79,6 +88,10 @@ impl RowKind {
             Self::Text => "Text",
             Self::Image => "Image",
             Self::Dimension => "Dimension",
+            Self::PageRoot => "Page",
+            Self::PlacedPage => "Placed page",
+            Self::Fixtures => "Fixtures",
+            Self::Note => "Note",
         }
     }
 
@@ -99,6 +112,10 @@ impl RowKind {
             Self::Text => "text",
             Self::Image => "image",
             Self::Dimension => "dimension",
+            Self::PageRoot => "page-root",
+            Self::PlacedPage => "placed-page",
+            Self::Fixtures => "fixtures",
+            Self::Note => "note",
         }
     }
 }
@@ -192,6 +209,13 @@ pub struct LayerRow {
     /// For a linked clone with overrides, the next muted line: "Own placement, own style", only
     /// the parts that apply (`specs/0057-clone-overrides` criterion 28); empty otherwise.
     pub overrides_line: String,
+    /// The placed page a row inside an expanded placed page is shown through, so one source
+    /// placed twice has distinct rows (`specs/0106` criterion 18); `None` elsewhere.
+    pub via: Option<NodeId>,
+    /// A row inside a placed page: live and read-only (no eye, lock, drag or rename).
+    pub read_only: bool,
+    /// A row of a laser page's own tree (`specs/0106` criteria 17 to 19): named as there.
+    pub page_tree: bool,
 }
 
 impl LayerRow {
@@ -199,6 +223,17 @@ impl LayerRow {
     #[must_use]
     pub fn expanded(&self) -> bool {
         self.container.is_some_and(|container| container.expanded)
+    }
+
+    /// Whether it is the row of its node itself: not shown through a placed page, not the root or
+    /// Fixtures row of a laser page's tree.
+    #[must_use]
+    pub fn is_own(&self) -> bool {
+        self.via.is_none()
+            && !matches!(
+                self.kind,
+                RowKind::PageRoot | RowKind::Fixtures | RowKind::Note
+            )
     }
 
     /// The opacity readout ("60%"), shown only when it is not 100 % (criterion 6).
@@ -528,6 +563,9 @@ impl<'a> Tree<'a> {
                 }
                 _ => String::new(),
             },
+            via: None,
+            read_only: false,
+            page_tree: false,
         }
     }
 }
@@ -621,16 +659,29 @@ impl LayerRows {
         &self.rows[start..end]
     }
 
-    /// The row index of `id`, if its row is shown.
+    /// The row index of `id`, if its row is shown: its own row, not one inside a placed page
+    /// and not the root or Fixtures row of a laser page's tree.
     #[must_use]
     pub fn index_of(&self, id: NodeId) -> Option<usize> {
-        self.rows.iter().position(|row| row.id == id)
+        self.rows
+            .iter()
+            .position(|row| row.id == id && row.is_own())
     }
 
-    /// The row of `id`, if it is shown.
+    /// The row of `id`, if it is shown (as [`LayerRows::index_of`]).
     #[must_use]
     pub fn row(&self, id: NodeId) -> Option<&LayerRow> {
-        self.rows.iter().find(|row| row.id == id)
+        self.rows.iter().find(|row| row.id == id && row.is_own())
+    }
+
+    /// The rows in order, for a builder that adds to them.
+    pub(crate) fn from_rows(rows: Vec<LayerRow>, objects: usize) -> Self {
+        Self { rows, objects }
+    }
+
+    /// The rows, for a builder that takes them apart.
+    pub(crate) fn into_rows(self) -> Vec<LayerRow> {
+        self.rows
     }
 
     /// The rows from the row of `anchor` to the row of `clicked`, either way round, that share

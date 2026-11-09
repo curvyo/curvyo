@@ -53,6 +53,8 @@ impl Reach {
 pub struct PageMembership {
     /// Each fixed sketch and the id of the sketch page that owns it.
     owners: HashMap<NodeId, String>,
+    /// Each placed page and the id of the laser page that owns it (`specs/0106` criterion 1).
+    placements: HashMap<NodeId, String>,
 }
 
 impl PageMembership {
@@ -76,7 +78,19 @@ impl PageMembership {
     pub fn from_owners(owners: impl IntoIterator<Item = (NodeId, String)>) -> Self {
         Self {
             owners: owners.into_iter().collect(),
+            placements: HashMap::new(),
         }
+    }
+
+    /// The read with the given `(placed page, laser page id)` owners added: a placed page is a
+    /// member of its laser page by ownership and of no other page (`specs/0106` criterion 1).
+    #[must_use]
+    pub fn with_placements(
+        mut self,
+        placements: impl IntoIterator<Item = (NodeId, String)>,
+    ) -> Self {
+        self.placements = placements.into_iter().collect();
+        self
     }
 
     /// Whether `id` is the owning sketch of a sketch page.
@@ -96,6 +110,9 @@ impl PageMembership {
     ) -> bool {
         if page.kind == PageKind::Sketch {
             return self.owners.get(&id) == Some(&page.id);
+        }
+        if let Some(owner) = self.placements.get(&id) {
+            return *owner == page.id;
         }
         !self.is_fixed(id) && reach.holds(page, min, max)
     }
@@ -190,6 +207,24 @@ mod tests {
             .collect();
         assert_eq!(ids, ["drawing"]);
         assert!(!read().is_member(&pages[0], rect(), both, Reach::Inside));
+    }
+
+    #[test]
+    fn a_placed_page_is_a_member_of_its_laser_page_only() {
+        let kind = PageKind::Output {
+            manufacturing: node(9),
+            process: "curvyo.laser".to_owned(),
+        };
+        let laser = page("laser", 300.0, kind);
+        let pages = vec![pages()[0].clone(), laser];
+        let placed = node(3);
+        let membership = read().with_placements([(placed, "laser".to_owned())]);
+        let over_drawing = (Point::new(10.0, 10.0), Point::new(20.0, 20.0));
+        let ids: Vec<_> = membership
+            .pages_of(&pages, placed, over_drawing, Reach::Touches)
+            .map(|p| p.id.as_str())
+            .collect();
+        assert_eq!(ids, ["laser"]);
     }
 
     #[test]

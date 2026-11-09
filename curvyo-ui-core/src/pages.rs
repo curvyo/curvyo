@@ -20,13 +20,18 @@ impl PageViewState {
             .find(|p| Some(&p.id) == self.active.as_ref())
             .or_else(|| pages.first())
     }
-    /// Records a canvas press without inventing context for panel actions.
-    pub fn press(&mut self, pages: &[Page], point: Point) {
+    /// Records a canvas press without inventing context for panel actions. A press that `hit`
+    /// an object keeps the active page (`specs/0106` criterion 2); a press on empty canvas inside
+    /// a frame activates it.
+    pub fn press(&mut self, pages: &[Page], point: Point, hit: bool) {
         let page = self
             .active(pages)
             .filter(|p| p.contains(point))
             .or_else(|| pages.iter().rev().find(|p| p.contains(point)));
         self.context = page.map(|p| p.id.clone());
+        if hit {
+            return;
+        }
         if let Some(page) = page {
             self.active = Some(page.id.clone());
         }
