@@ -805,3 +805,186 @@ dot stay in the bar. 7. About Trace loses View and Status, keeps one Analyse ent
 reassigned. 9. The pixel mask stays in the tracer; only its view goes.
 
 Decided (lead, 2026-11-06, Proposal): 150 px (10.7 %), so Threshold and Smooth pair at 308 px and the bar needs one row less. (Was Frage BAR-W, A 151 or B 150.)
+
+## 25. Colours row and bar fixes of 2026-11-09 (customer, after trying the merged bar #288 with Pick colours; overrides §24 and earlier where they differ)
+
+Customer, five requests: (1) no "< 1 px" readout beside Ignore below; (2) the automatic Threshold does not flicker
+when Inside and Outside are switched; (3) no notice "0 paths: no colour picked."; (4) no "None picked" / "1 picked"
+label; (5) the picked colours are small swatches beside the pipette, each removable with an x, and the detail row
+and the swatch strip row under Output are gone. Items marked **(Proposal)** are mine and vetoable at the demo.
+Principle of §24 unchanged: a state is carried by the control that owns it; here the picked colours are the pipette's
+own state and are shown once, next to it. No hint labels (customer rule 2026-10-16), no success notice (§23).
+
+### 25.1 Ignore below without a readout (request 1)
+
+The pixel readout ("~ 2 px", "< 1 px") and its 36 px slot and 8 px gap are deleted; no tooltip, no hidden text takes
+its place. The item is the field alone: **171 px** (28 px high). The 171 px rule **stays**, unchanged in cause: it is
+what "99.99 mm" needs to keep a 10 px gap to the label (§24.7), and the readout never had a say in it. Every other
+value field stays 150. Consequence for the wrap at 800 x 600 (arithmetic; the PR re-measures): panel open, Ignore
+below 171 + 8 + expander 28 + 8 + Trace 75 = 290 fits in 308, so Ignore below no longer has a line of its own. Brightness
+goes from 7 rows (252 px) to **6 rows (216 px)**: [i, Preset] [Mask group] [Method] [Threshold, Smooth] [Tolerance]
+[Ignore below, expander, Trace 290]. Panel closed (588): 3 rows, unchanged, row 3 is [Ignore below, expander, Trace].
+
+### 25.2 Automatic Threshold changes once (request 2)
+
+Rule: **the field's value and the preview change at most once per switch, and never through a default.**
+Switching Inside / Outside starts the analysis of the new region (§24.4, `0094`). Until it answers:
+- the field keeps showing the **old value** (it is not reset, not blanked, not shown as the whole-image or a stored
+  default value), the slider keeps its position, the field is not dimmed and shows no "Analysing" mark (analysis text
+  is not visible, §24.5);
+- the preview is not re-traced with the old Threshold for the new region (the outline stays as it is, no stale
+  mark, because it is still the current result until the new region is known) **(Proposal)**;
+- when the analysis answers, the value changes **once** to the new region's value, and the preview re-traces once with
+  it (150 ms debounce as always). A region analysed earlier in the session is taken from the cache at once: one change,
+  no waiting. If the maker edits the Threshold before the answer, the maker's value wins and the answer does not
+  touch it (`0094`, "what the analysis filled in follows the region, what the maker set stays").
+- A failed region analysis keeps the old value, no second change (the notice-row failure line of §24.5 still applies).
+The same rule holds for Part chips and for a mask path added or cleared: any change of region shows old value, then
+the new one, once.
+
+### 25.3 No notice, no label when no colour is picked (requests 3, 4)
+
+- **No visible text about picked colours anywhere in the bar or the notice row.** Gone: the notice row line "0 paths:
+  no colour picked." (§24.5 moved it there; that move is withdrawn), the label "None picked" / "N picked" (§22.1,
+  §24.2 item 6), the count span.
+- With nothing picked **nothing is traced and nothing is announced as a result**: no "0 paths" outcome is computed
+  for Pick colours with an empty set, so no line can flash. The outline shows nothing until the first colour exists.
+- **Trace is `aria-disabled`** (not enabled) with the reason as its tooltip and `aria-describedby`, as in §22.2 and
+  Multicolour "No colours found." **(Proposal; an enabled button that does nothing when pressed is worse than a
+  button that says why.)** Tooltip text is the existing string "0 paths: no colour picked." (no new string; a tooltip
+  of a dimmed button is not a notice and not a hint). Enter and Ctrl+Enter do nothing, silently.
+- Screen readers: the hidden region (sr-only, always mounted, §24.5) announces "0 paths: no colour picked." once when
+  the last colour is removed or when Pick colours is entered with none, and nothing else about the count.
+  Nothing is announced for a colour picked (the swatch appearing next to the pipette is the feedback) except the
+  removal below.
+
+### 25.4 The picked colours row (request 5)
+
+**Where.** In the first row's Method group of Pick colours, directly after the pipette: `[pipette 28] 4 [swatch] 4
+[swatch] ...`. One `role="group"` named "Picked colours" (the name of §22.4, kept). No label, no count, no hint.
+It replaces the Advanced strip and its detail row **for Pick colours only**: gone for picked colours are the strip
+row under Output, the detail row ("#000000 · Black") and the corner marks, in Single colour **and** in Multicolour.
+**Multicolour with Pick colours uses the same row** and nothing else; its palette is exactly the picked colours
+(Frage 90) and Colours stays greyed out.
+
+**Rule (lead decision 2026-11-09, Proposal, Frage 142 default A): the palette strip with its detail row and its
+actions (Isolate, Recolour, Merge into, Exclude, Remove for fixed colours) is an accepted feature and stays, but only
+for Multicolour with Colours Auto, where it works on the colours of the result. The customer's request concerned the
+picked colours; they move into the swatch row beside the pipette and have no strip and no detail row.**
+
+**What the Advanced block shows, by case** (Output row, options and last row as in §24.3 in all four):
+
+| Output, method | Colours strip + detail row in Advanced | Picked colours |
+|---|---|---|
+| Single colour, Brightness | none (no palette) | none |
+| Single colour, Pick colours | **none** | the swatch row beside the pipette, 8 at most |
+| Multicolour, Colours Auto (Brightness) | **yes, unchanged** (§7, §22.3 item 4, §24.3): strip of the traced palette, the detail row of the selected swatch with Isolate, Recolour, Merge into, Exclude, Remove for fixed colours; the palette pipette stays in the Output row | fixed palette colours (Advanced pipette) live in the strip as before |
+| Multicolour, Pick colours | **none** | the swatch row beside the pipette; Colours greyed out (Frage 90) |
+
+So exactly **one of the four, Multicolour with Colours Auto, still has the strip and the detail row.** Nothing wraps
+because of picked colours in any case.
+
+**Size and spacing.** Swatch **20 x 20**, 4 px radius, `--swatch-border` 1 px, the colour opaque (a pick is
+`#RRGGBB`, alpha ignored, no checkerboard); 20 fits the 28 px control height, centred in the 36 px row (same as the
+colour chip of Remove background). **4 px gaps**, as proposed. Hit target per swatch **24 x 28** (the swatch plus 2 px
+either side, 4 px above and below): the cells touch, nothing overlaps, WCAG 2.5.8 (24 x 24) is met; 28 wide is not
+reachable at a 4 px gap without overlapping cells, and 8 px gaps would waste width **(Proposal)**.
+
+**Order.** The order of picking: first picked first, a new pick **appears at once at the end** of the row (pipette
+stays armed, Shift+click adds). A plain click replaces the whole set with that one swatch (§6, Frage 89 A), the row
+shows one swatch. A colour within the merge distance of an existing one adds nothing and the existing "Same as
+#3366CC" notice (3 s) stays; it explains why nothing happened, it is not a success notice. The same order is the
+order of the palette in Multicolour (stable, §7).
+
+**Many colours.** The maximum stays **8** (spec criterion 17). A ninth pick does nothing, silently, the pipette stays
+armed (the notice "8 colours picked" no longer exists, §22.1). Width: 28 + 4 + 8 x 20 + 7 x 4 = **220 px at 8**.
+**The group reserves 220 px at all times (min-width 220, Proposal)** so the bar does not jump when colours come and go:
+without it Colour tolerance (150) + 8 + the group would pair on one line up to 5 swatches (148 px, 306 of 308) and break
+to the next line at the sixth. With the reserve, at 800 x 600:
+
+| | Panel open (308) | Panel closed (588) |
+|---|---|---|
+| Rows (Advanced closed, Pick colours) | **7 rows**, as before: [i, Preset] [Mask] [Method] [Colour tolerance] [Colours row 220] [Smooth, Tolerance] [Ignore below, expander, Trace] | **3 rows**: [i, Preset, Mask, Method 552] [Colour tolerance, Colours row 220, Smooth 536] [Tolerance, Ignore below, expander, Trace 448] |
+
+The reserve is invisible (no frame, no placeholder). Inside the group the swatches wrap **by whole swatches** only if a
+bar were narrower than 220 px (not a case at 800 x 600): pipette stays on the first line, the next line starts under
+the first swatch, 28 px line pitch; nothing scrolls, nothing is clipped, no ellipsis.
+
+**Look.** Rest: the swatch as above. **Hover and keyboard focus**: the swatch fades to **40 % opacity** and a Lucide
+`X`, 12 px, 1.5 px stroke, centred, appears; the glyph is drawn over a 3 px `--toolbar-bg` casing so it reads on any
+swatch colour in both themes. Focus adds the 2 px `--editor-accent` ring (4 px radius, outside the swatch). The
+pointer is the default arrow, not a hand **(Proposal; the x is the signal)**. No transition (motion tokens: none for
+a state flip, as for the toggles), `prefers-reduced-motion` irrelevant.
+**Tooltip.** The app tooltip (`delayDuration` 400 ms, side bottom) with the colour code `#RRGGBB` upper-case, nothing
+else, no name ("Black" is gone with the detail row). It also shows on keyboard focus. The tooltip is the colour code,
+not an operating hint, so it stays within the no-hints rule.
+**The x deletes.** A click anywhere on the 24 x 28 cell removes that colour; the accessible name is
+**"Remove #RRGGBB"** and the element is a `button` (Enter, Space, Delete, Backspace remove it as well). The tooltip
+and the name differ on purpose: the tooltip says what the colour is, the name says what the button does.
+**Removal is not a history step** (as a pick, §6 and §21: a settings change, preview re-traces after 150 ms), no undo, no
+confirm (deleting a swatch is as cheap as picking it again; no inline confirm, it is not a row action), no notice. After a
+pointer removal the keyboard goes back to the canvas as for the pipette; after a key removal focus moves to the next
+swatch at the same place, else the previous one, else the pipette. Removing the last colour leaves the empty state of
+25.3. The sr-only region announces "Removed #RRGGBB" **(Proposal; a screen-reader user cannot see the row change)**.
+
+**Keyboard.** The swatches are **one Tab stop** with roving tabindex, as the palette strip (§7, §11): Left / Right move,
+Home / End jump, the focused swatch is the stop; Tab order of the group: pipette, the swatch row (one stop), then
+Smooth. With no colours picked the row has no stop. **(Proposal; with 8 stops the bar would cost 8 Tab presses on the way
+to Trace.)** The pipette's own Space toggle and Esc are unchanged.
+
+### 25.5 Strings, code and docs
+
+**Remove from code** (visible output): `pickedCountText` and "None picked" / "N picked"; the count span
+(`data-trace-picked-count`) in `PickColoursGroup`; the readout of Ignore below (`specksHint`, "~ 2 px", "< 1 px",
+the `WithHint` wrapper for it); the visible use of `NO_COLOUR_PICKED_LINE` as a notice (it stays as the Trace button's
+tooltip, `aria-describedby` and the hidden-region text) and the `message` route of `statusText` that put it in the
+notice row; the strip, detail row and corner marks **for Pick colours** in `TraceAdvanced.tsx` (the strip and detail row
+stay for Multicolour with Colours Auto with all their actions and strings: "#RRGGBB · Name", Isolate, Recolour, Merge
+into, Exclude, Remove; the name table stays); the About text "The picked colours are shown
+and edited in Advanced." (becomes "The picked colours sit beside the pipette."), and the same in
+`docs/tracing-images.md` (a test compares them). The 215 px item width of §24.2 row 9 becomes 171.
+**New strings:** tooltip `#RRGGBB`; accessible name "Remove #RRGGBB"; group name "Picked colours" (existing);
+sr-only "Removed #RRGGBB".
+
+**`docs/design-system.md` rows that change** (the implementer edits them in the same PR): *Trace bar* (Pick colours group:
+pipette plus the swatch row, not the count label; "Ignore below (mm, with the muted pixel readout ...)" becomes "Ignore
+below, 171 px, no readout"; "0 paths: no colour picked." leaves the notice-row list and stays the Trace button's
+reason; "The bar has no ... swatches" becomes "the only swatches in the bar are the picked colours beside the
+pipette"), *Trace notices* (same list), *Trace Output and palette* (the colour strip and detail row show only for Multicolour with Colours Auto, not for
+Pick colours in either Output; the wording "Pick colours in either Output: the picked colours as the same strip" goes), *Trace value field* (Ignore below 171, no readout item), and a new row *Trace picked colours*
+(sizes, look, tooltip, keyboard of 25.4). The *Keyboard map* "Trace tool" row gets nothing.
+
+**Specification and notes the product owner amends:** `specification.md` criterion 17 (the label, "the bar shows no
+swatches", "each swatch is shown once in the colour strip of the Advanced block"), 22 (order text), and the notice list;
+earlier UX notes (§12 strings, §22.1 row 6 and 8, §22.3 item 4, §24.2 items 6 and 9, §24.5 reasons) are overridden here.
+
+### 25.6 Tests that need updating (the tester rewrites them)
+
+- `frontend/tests/acceptance_0089_tidyup_tester.test.ts`: the helper `pickedLabel` (line ~409) and its uses (the
+  Pick colours bar test around 496-508, which checks "None picked", "1 picked" and "not a Tab stop"); **c17, c29**
+  ("a picked colour is one swatch, in the Advanced strip only; the bar says '2 picked'", line ~515, now: swatches in
+  the bar, none in Advanced, no label); **c17 "Pick colours with nothing picked"** (line ~662: no notice, label gone,
+  Trace `aria-disabled` with tooltip and `aria-describedby` "0 paths: no colour picked."; the line ~718-720 notice
+  checks); the 800 x 600 row test with `[data-trace-picked-count]` (line ~821) and the notice expectation at ~813.
+- `frontend/tests/acceptance_0089_cleanup_tester.test.ts`: **§24.2, §24.7 value fields** (line ~577: the 215 px item
+  with readout becomes 171 px alone), **§24.2 bar order** (line ~610, widths), **§24.5 hidden region** (827-898: the new
+  "Removed #RRGGBB" and the empty-set announcement), **§24.5 empty Multicolour result** (line ~910, unchanged) and
+  **§24.2, §24.3 800 x 600** (line ~927: 6 rows, Pick colours 7 rows / 3 rows, the group reserve 220).
+- `frontend/tests/traceText.test.ts`: `pickedCountText` case (line ~530, delete); `specksHint` cases (406-407, delete);
+  `zeroPathsLine` / `statusText` "no colour picked" cases (539-545: no `message` in the notice, `canCreate` false);
+  the About strings (line 160 and the comparison with `docs/tracing-images.md`).
+- Browser journeys for 0089 (`acceptance_0089_c_browser`, `_m_browser`, `_e_browser`) where they read the Pick colours
+  bar, the Advanced strip or the Ignore below box; `acceptance_0089_sliceE_tester` and `traceMulticolour.test.ts`
+  only where they use Pick colours to get swatches; the Isolate / Recolour / Merge into / Exclude cases on
+  Multicolour with Colours Auto **stay unchanged** and must still pass. **New tests:** swatch row (size 20, gap 4, cell 24 x 28, order, 8 maximum, ninth ignored), fade and x on
+  hover and focus, tooltip `#RRGGBB` after 400 ms, remove by click and by Delete with focus rules, removal is no history
+  step, the bar does not move between 0 and 8 colours, Pick colours (Single or Multicolour) shows no strip and no detail row while Multicolour with Colours Auto still does, the Threshold changes
+  once on Inside / Outside (record the field value over the switch: old value, then new value, no other).
+
+### 25.7 Question for the customer
+
+**Frage 142 (TRACE-STRIP): The palette strip and its actions.** The picked colours move into the swatch row beside the
+pipette. What happens to the strip with its detail row and the actions Isolate, Recolour, Merge into, Exclude?
+A: the strip and actions stay, only for Multicolour with Colours Auto (the traced palette); Pick colours have no
+strip and no detail row. B: the strip and the actions go away completely, also for Multicolour Auto. C: the strip
+stays everywhere, only the detail row text "#RRGGBB · Name x" goes. **Recommendation and default: A.**
