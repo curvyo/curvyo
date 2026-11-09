@@ -1,8 +1,9 @@
 // Tester cases for the Multicolour palette as a swatch row (`specs/0089-trace-quality-and-colour/ux-notes.md` §26), written
 // from §26 before the code was read: one row beside the palette pipette, no detail row / Recolour / Merge into, tooltip,
-// Click = Exclude, Shift+hover = Isolate, Shift+click = delete (the result equals a trace with the smaller palette, compared
-// as wires on an own wasm instance), at least two colours stay, one line at 800 x 600, keys, the right press, About Trace
-// and the user page. Real app in Chromium (CURVYO_E2E_BROWSER). Harness as in `acceptance_0089_sliceM_tester.test.ts`.
+// keys, one line at 800 x 600, the right press, About Trace and the user page. Changed by design with §27 (customer
+// 2026-11-09): no Isolate; the x deletes (the result equals a trace with the smaller palette, compared as wires on an own
+// wasm instance) down to no colour; Shift+click excludes; a plain click elsewhere does nothing; the palette pipette stays
+// with Remove background. Real app in Chromium (CURVYO_E2E_BROWSER). Harness as in `acceptance_0089_sliceM_tester.test.ts`.
 
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -201,14 +202,18 @@ async function launch(preload?: string) {
 const BAR = "[role=toolbar][aria-label=Trace]";
 type S = Awaited<ReturnType<typeof session>>;
 
-/** A Shift+click on the middle of `sel` (CDP modifiers 8 = Shift). */
-const shiftClick = async (s: S, sel: string) => {
+/** A click on `sel` at (`dx`, `dy`) from its middle (CDP modifiers 8 = Shift). */
+const clickOn = async (s: S, sel: string, modifiers = 0, dx = 0, dy = 0) => {
   const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x: c[0], y: c[1], button: "left", clickCount: 1, modifiers: 8 });
+    await s.send("Input.dispatchMouseEvent", { type, x: c[0] + dx, y: c[1] + dy, button: "left", clickCount: 1, modifiers });
   }
   await sleep(300);
 };
+/** A Shift+click on the middle of `sel`: Exclude on or off (§27). */
+const shiftClick = (s: S, sel: string) => clickOn(s, sel, 8);
+/** A click on the swatch's x, in its middle (shown on hover): delete (§27). */
+const clickX = (s: S, sel: string) => clickOn(s, sel);
 const press = async (s: S, k: string, vk: number, modifiers = 0) => {
   await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
   await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
@@ -381,7 +386,7 @@ test("0089 §26 tester: the palette is one row of 20 x 20 swatches in 24 x 28 ce
   });
 });
 
-test("0089 §26 tester: with Brightness the row follows the palette pipette on its line; with Remove background it follows Colours; Pick colours has no row", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §26, §27 tester: the row follows the palette pipette on its line with Brightness and with Remove background; Pick colours has no row", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pipe.png", PICTURE);
     await pickMethod(s, "Brightness");
@@ -395,10 +400,11 @@ test("0089 §26 tester: with Brightness the row follows the palette pipette on i
     assert.ok(Math.abs(first[1] + first[3] / 2 - (p[1] + p[3] / 2)) <= 4, "same line as the pipette");
     await pickMethod(s, "Remove background");
     await waitFor("swatches", async () => ((await swatchNames(s)).length >= 2 ? true : null), 30_000);
-    assert.equal(await s.evaluate(`!!document.querySelector('${pipette}')`), false, "no palette pipette with Remove background");
-    const field = (await rects(s, `${BAR} [role=spinbutton][aria-label="Colours"]`))[0];
+    // §27 (customer 2026-11-09): the palette pipette stays with Remove background.
+    const p2 = (await rects(s, pipette))[0];
+    assert.ok(p2, "the palette pipette stays with Remove background");
     const row = (await rects(s, `${PALETTE} [data-trace-palette-swatch]`))[0];
-    assert.ok(row[0] > field[0] + field[2] && row[0] - (field[0] + field[2]) < 40, `the row follows the Colours field: gap ${row[0] - (field[0] + field[2])}`);
+    assert.ok(row[0] >= p2[0] + p2[2] && row[0] - (p2[0] + p2[2]) <= 8, `the row follows the pipette: gap ${row[0] - (p2[0] + p2[2])}`);
     await pickMethod(s, "Pick colours");
     await sleep(800);
     assert.equal(await s.evaluate(`!!document.querySelector('${PALETTE}')`), false, "no palette row with Pick colours");
@@ -420,49 +426,51 @@ test("0089 §26 tester: tooltip is '#RRGGBB · Name' plus the shortcut line; a p
     const lines = tip.split("\n").map((l) => l.trim()).filter(Boolean);
     assert.equal(lines.length, 2, `two lines: ${JSON.stringify(lines)}`);
     assert.equal(lines[0], first, "line 1 is hex · name");
-    assert.equal(lines[1], "Click: exclude · Shift: isolate / delete");
-    assert.ok(!/Isolating|excluded|Removed/.test(await hiddenStatus(s)), `hover alone isolates, excludes and removes nothing: ${await hiddenStatus(s)}`);
+    assert.equal(lines[1], "Shift+click: exclude");
+    assert.ok(!/excluded|Removed/.test(await hiddenStatus(s)), `hover alone excludes and removes nothing: ${await hiddenStatus(s)}`);
     assert.equal((await swatchNames(s)).length, 6);
     await away(s);
   });
 });
 
-test("0089 §26 tester: Click excludes and a second click brings the colour back; Shift+hover isolates until Shift is released or the pointer leaves", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §27 tester: Shift+click excludes and a second Shift+click brings the colour back; a plain click beside the x does nothing; there is no Isolate", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "click.png", PICTURE);
     await pickMethod(s, "Remove background");
     await sixColours(s);
     const hexes = await hexesOf(s);
     const target = hexes[1];
-    await s.clickSel(swatch(target));
+    await shiftClick(s, swatch(target));
     await waitFor("excluded", async () => ((await swatchNames(s)).find((n) => n.startsWith(target))?.endsWith(", excluded") ? true : null), 20_000);
     await waitFor("status", async () => ((await hiddenStatus(s)).includes("1 colour excluded") ? true : null), 10_000);
     const req = await settled(s);
     assert.ok((JSON.parse(req.settings) as { excluded: string[] }).excluded.includes(target), "the trace carries the exclusion");
     assert.equal((await swatchNames(s)).length, 6, "an excluded colour stays in the row");
     const rowsBefore = (await s.layerRows()).length;
-    await s.clickSel(swatch(target));
+    await shiftClick(s, swatch(target));
     await waitFor("back", async () => (!(await swatchNames(s)).find((n) => n.startsWith(target))?.includes("excluded") ? true : null), 20_000);
     assert.ok(!(await hiddenStatus(s)).includes("excluded"), await hiddenStatus(s));
     assert.equal((await s.layerRows()).length, rowsBefore, "no document change");
     await away(s);
     await settled(s);
     const before = (await lastRequest(s))!.n;
+    // A plain click on the swatch's edge (outside the 12 px x) does nothing.
+    await clickOn(s, swatch(hexes[2]), 0, -8, -8);
+    await sleep(1500);
+    assert.equal((await swatchNames(s)).length, 6, "nothing deleted");
+    assert.ok(!(await swatchNames(s))[2].endsWith(", excluded"), "nothing excluded");
+    assert.equal((await lastRequest(s))!.n, before, "nothing traced again");
+    // Shift held while pointing changes nothing either (Isolate is gone).
     await moveTo(s, swatch(hexes[2]), 8);
     await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
-    await waitFor("Isolating", async () => ((await hiddenStatus(s)).includes(`Isolating ${hexes[2]}`) ? true : null), 5_000);
+    await sleep(800);
+    assert.ok(!(await hiddenStatus(s)).includes("Isolating"), await hiddenStatus(s));
     await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
-    await waitFor("Isolating ends with Shift", async () => (!(await hiddenStatus(s)).includes("Isolating") ? true : null), 5_000);
-    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
-    await waitFor("Isolating again", async () => ((await hiddenStatus(s)).includes("Isolating") ? true : null), 5_000);
     await away(s);
-    await waitFor("Isolating ends with the pointer", async () => (!(await hiddenStatus(s)).includes("Isolating") ? true : null), 5_000);
-    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
-    assert.equal((await lastRequest(s))!.n, before, "Isolate traced nothing again");
   }, RECORD);
 });
 
-test("0089 §26 tester: Shift+click deletes a colour; the result equals a trace with the smaller palette (wires exactly); the others stay; below two colours is refused", { skip: !BROWSER, timeout: 600_000 }, async () => {
+test("0089 §26, §27 tester: the x deletes a colour; the result equals a trace with the smaller palette (wires exactly); the others stay; down to no colour, then nothing is traced and Trace is dimmed", { skip: !BROWSER, timeout: 600_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "del.png", PICTURE);
     await pickMethod(s, "Remove background");
@@ -470,12 +478,12 @@ test("0089 §26 tester: Shift+click deletes a colour; the result equals a trace 
     const hexes = await hexesOf(s);
     const gone = hexes.find((h) => distance(fromHex(h), RED) < 0.03)!;
     const keptExcluded = hexes.find((h) => distance(fromHex(h), BLUE) < 0.03)!;
-    await s.clickSel(swatch(keptExcluded));
+    await shiftClick(s, swatch(keptExcluded));
     await sleep(1500);
-    await s.clickSel(swatch(gone));
+    await shiftClick(s, swatch(gone));
     await sleep(2500);
     const before = await settled(s);
-    await shiftClick(s, swatch(gone));
+    await clickX(s, swatch(gone));
     const left = await waitFor("five swatches", async () => {
       const l = await hexesOf(s);
       return l.length === 5 ? l : null;
@@ -495,21 +503,27 @@ test("0089 §26 tester: Shift+click deletes a colour; the result equals a trace 
     assert.ok(w.app.length > 50, "a real wire");
     assert.deepEqual(w.app, w.mine, "wires identical to a trace with the smaller palette");
     assert.ok((await hiddenStatus(s)).includes(`Removed ${gone}`), await hiddenStatus(s));
-    for (const h of left.slice(0, 3)) {
-      await shiftClick(s, swatch(h));
+    for (const h of left.slice(0, 4)) {
+      await clickX(s, swatch(h));
       await sleep(2000);
     }
-    const two = await waitFor("two swatches", async () => {
+    const one = await waitFor("one swatch", async () => {
       const l = await hexesOf(s);
-      return l.length === 2 ? l : null;
+      return l.length === 1 ? l : null;
     }, 40_000);
-    await settled(s);
-    const n2 = (await lastRequest(s))!.n;
-    await shiftClick(s, swatch(two[0]));
+    await sleep(1500);
+    const last = await settled(s);
+    const sentOne = JSON.parse(last.settings) as { fixed: string[]; colours: number };
+    assert.deepEqual([sentOne.fixed, sentOne.colours], [one, 1], "one kept colour is traced alone");
+    await clickX(s, swatch(one[0]));
+    await waitFor("no swatch", async () => ((await hexesOf(s)).length === 0 ? true : null), 40_000);
     await sleep(2500);
-    assert.deepEqual(await hexesOf(s), two, "a delete of one of the last two is refused");
-    assert.equal((await lastRequest(s))!.n, n2, "and traces nothing");
-    assert.ok(!/error|cannot|refus/i.test(await s.statusText()), `silent: ${await s.statusText()}`);
+    assert.equal((await lastRequest(s))!.n, last.n, "no colour left: nothing is traced");
+    const trace = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('${BAR} [data-trace-slot]'); const d = b.getAttribute('aria-describedby'); return { disabled: b.getAttribute('aria-disabled'), reason: d ? document.getElementById(d)?.textContent ?? '' : '' }; })())`)) as string) as { disabled: string | null; reason: string };
+    assert.deepEqual(trace, { disabled: "true", reason: "0 paths: no colour in the palette." }, "Trace is dimmed with the reason");
+    assert.ok((await hiddenStatus(s)).includes("0 paths: no colour in the palette."), await hiddenStatus(s));
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} *')].some((e) => e.children.length === 0 && !e.closest('.sr-only, [hidden]') && e.textContent.includes('no colour'))`), false, "no visible message");
+    assert.equal(await s.evaluate(`!!document.querySelector('${BAR} [data-trace-pipette][aria-label="Pick palette colour from the image"]')`), true, "the palette pipette stays");
     await typeInto(s, "Colours", "4");
     await waitFor("four swatches from a fresh find", async () => ((await swatchNames(s)).length === 4 ? true : null), 30_000);
     await sleep(1500);
@@ -619,5 +633,5 @@ test("0089 §26.6 tester: About Trace has one Palette entry, a Parts entry befor
   assert.ok(!/recolou?r|merge into|\bView pill\b|"View"/i.test(page), "the user page has no Recolour, Merge into or View pill");
   assert.ok(page.includes("## Parts"), "the user page has the Parts section");
   const design = readFileSync(path.resolve(FRONTEND, "..", "docs", "design-system.md"), "utf8");
-  assert.ok(design.includes("Click: exclude · Shift: isolate / delete"), "the design system names the tooltip line");
+  assert.ok(design.includes('"Shift+click: exclude"'), "the design system names the tooltip line (§27)");
 });

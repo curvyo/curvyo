@@ -562,7 +562,7 @@ test("0094 c18, c19, c32, c43: chip 1 and Add part, a new part copies the values
     assert.equal(await spin(s, "Threshold"), 77, "a copy of the part before");
     assert.equal(await maskState(s), "Inside=true,Outside=false", "§24.4: the Mask group is drawn, Inside, with no paths yet");
     assert.doesNotMatch(await advText(s), /Inside \d|Outside \d/, "no mask paths yet");
-    assert.match((await s.evaluate(`document.querySelector('${BAR}').textContent`)) as string, /Part 2 of 2/, "the bar's state label");
+    assert.doesNotMatch((await s.evaluate(`document.querySelector('${BAR}').textContent`)) as string, /Part 2 of 2/, "`specs/0089` ux-notes §27: no state label in the bar");
     // c19: Shift+click assigns R to part 2.
     await shiftClick(s, scene.right[0], scene.right[1]);
     await waitFor("part 2 has R", async () => ((await chips(s))[1].name === "Part 2 of 2, inside, 1 path, active" ? true : null), 20_000);

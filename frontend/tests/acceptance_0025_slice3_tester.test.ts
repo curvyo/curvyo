@@ -249,12 +249,10 @@ const typeInto = async (s: S, name: string, text: string) => {
   await s.send("Input.insertText", { text });
   await press(s, "Enter", 13);
 };
-// The state row's line (UX notes 20.4), else the counts line of the Advanced block, else an empty
-// bar's words.
+// The hidden status region (`specs/0089` ux-notes §24.5, §27: the bar draws no status line), else an
+// empty bar's words.
 const barStatus = async (s: S) =>
   (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
-    const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
-    if (line) return line;
     const counts = bar?.querySelector('[data-trace-hidden-status]')?.textContent.trim() ?? '';
     if (counts) return counts;
     return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
@@ -635,9 +633,10 @@ test("0025s3 c52 in Chromium: an image over 4 Mpx, the reduced copy, full-size C
     await openTrace(s);
     const status = await traceReady(s);
     console.log("large image status:", status, "|", JSON.stringify(await mutedLines(s)));
-    assert.match(await bar(s), /Preview from a reduced copy/);
+    // `specs/0089` ux-notes §27: said by the hidden status region, not drawn.
+    assert.match(await barStatus(s), /Preview from a reduced copy/);
     await advancedOpen(s);
-    assert.match(await bar(s), /Preview from a reduced copy/, "the preview is always the reduced copy");
+    assert.match(await barStatus(s), /Preview from a reduced copy/, "the preview is always the reduced copy");
 
     // Create paths traces at full size: the progress pill at once, document untouched meanwhile.
     // (The real worker needs well under a second here; its answer is held back 5 s.)
@@ -747,7 +746,8 @@ test("0025s3 c55 in Chromium: over 100,000 nodes the status warns, Enter creates
     console.log("status of the dense trace:", JSON.stringify(status), "| bar:", JSON.stringify(await mutedLines(s)));
     const n = nodesOf(status);
     assert.ok(n > 100_000, `the fixture has over 100,000 nodes: ${n}`);
-    assert.match(status, /^[\d,]+ nodes\. Slow to edit\.$/, "the exact wording of criterion 55 (comma separators)");
+    // `specs/0089` ux-notes §27: said by the hidden status region as one of its segments.
+    assert.match(status, /(^|\. )[\d,]+ nodes\. Slow to edit\.( |$)/, "the exact wording of criterion 55 (comma separators)");
     assert.ok(/\d{1,3}(,\d{3})+ nodes/.test(status), "comma separators");
     const t0 = Date.now();
     await createPaths(s);

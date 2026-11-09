@@ -402,8 +402,9 @@ const barStrings = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...new Set([...document.querySelector('${BAR}').querySelectorAll('*')].flatMap((e) =>
     [e.getAttribute('aria-label'), e.getAttribute('title'), e.children.length === 0 ? e.textContent.trim() : ''].filter(Boolean)))])`)) as string) as string[];
 
-const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? 'missing'`)) as string;
-const noticeHeight = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.getBoundingClientRect().height ?? -1`)) as number;
+// `ux-notes.md` §27 (customer 2026-11-09): the notice row is gone; a former notice is said by the hidden region only.
+const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? ''`)) as string;
+const noticeHeight = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.getBoundingClientRect().height ?? 0`)) as number;
 const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
 const hiddenStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? 'absent'`)) as string;
 /** §25.3: no visible text about picked colours ("None picked", "N picked", "no colour picked") anywhere in the bar. */
@@ -600,47 +601,48 @@ test("0089 tidy-up 22.2: a normal settled trace leaves the notice row empty and 
   });
 });
 
-test("0089 tidy-up 22.2: '0 paths at this Threshold: too low.' is in the notice row, Trace is disabled, and no count is announced for an empty result", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up 22.2, §27: '0 paths at this Threshold: too low.' is Trace's reason and announced, not drawn; no count is announced for an empty result", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     await typeInto(s, "Threshold", "0");
-    await waitFor("the notice", async () => (/0 paths/.test(await noticeText(s)) ? true : null));
-    assert.equal(await noticeText(s), "0 paths at this Threshold: too low.");
+    await waitFor("the announcement", async () => ((await hiddenStatus(s)).includes("0 paths at this Threshold: too low.") ? true : null));
+    assert.equal(await noticeText(s), "");
     assert.ok(!/\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)), `no counts announced for an empty result: ${await advancedStatus(s)}`);
-    const visible = (await s.evaluate(`document.querySelector('${BAR}').innerText`)) as string;
-    assert.equal(visible.match(/0 paths/g)?.length, 1, `"0 paths" appears once: ${visible}`);
+    const visible = (await s.evaluate(`(() => { const c = document.querySelector('${BAR}').cloneNode(true); c.querySelectorAll('.sr-only, [hidden]').forEach((e) => e.remove()); document.body.appendChild(c); const t = c.innerText; c.remove(); return t; })()`)) as string;
+    assert.ok(!/0 paths/.test(visible), `"0 paths" is not drawn: ${visible}`);
     const trace = await traceButton(s);
     assert.equal(trace?.disabled, "true", "ux-notes 22.2: Trace is disabled for an empty result");
+    assert.equal(trace?.reason, "0 paths at this Threshold: too low.", "§27: the reason is Trace's description");
   });
 });
 
-test("0089 tidy-up 22.2: '1 path covering the whole image.' is in the notice row", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up 22.2, §27: '1 path covering the whole image.' is announced, not drawn", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "dark.png", DARK, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     await typeInto(s, "Threshold", "128");
     await sleep(500);
-    await waitFor("the notice", async () => (/covering/.test(await noticeText(s)) ? true : null));
-    assert.equal(await noticeText(s), "1 path covering the whole image.");
+    await waitFor("the announcement", async () => ((await hiddenStatus(s)).includes("1 path covering the whole image.") ? true : null));
+    assert.equal(await noticeText(s), "");
     console.log("Advanced status with '1 path covering the whole image':", JSON.stringify(await advancedStatus(s)), JSON.stringify(await traceButton(s)));
   });
 });
 
-test("0089 tidy-up 22.2, c16: 'Too much detail: raise Ignore below.' is in the notice row (and the criterion's own wording)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.2, c16, §27: 'Too much detail: raise Ignore below.' is announced, not drawn (and the criterion's own wording)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "holes.png", HOLES, true);
     await pickMethod(s, "Brightness");
     await typeInto(s, "Ignore below", "0");
-    await waitFor("the notice", async () => (/detail/i.test(await noticeText(s)) ? true : null), 120_000);
-    assert.equal(await noticeText(s), "Too much detail: raise Ignore below.");
+    await waitFor("the announcement", async () => ((await hiddenStatus(s)).includes("Too much detail: raise Ignore below.") ? true : null), 120_000);
+    assert.equal(await noticeText(s), "");
     assert.ok(!/\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)), `no counts announced for an unusable result: ${await advancedStatus(s)}`);
   });
 });
 
-test("0089 tidy-up 22.2: 'Same as #xxxxxx' (a palette pick matching a colour) is a notice-row message for about 3 s; specks ignored and the counts are announced by the hidden region only", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up 22.2, §27: 'Same as #xxxxxx' (a palette pick matching a colour) is announced for about 3 s, not drawn; specks ignored and the counts are announced by the hidden region only", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "two.png", TWO, true);
     await pickMethod(s, "Brightness");
@@ -649,10 +651,10 @@ test("0089 tidy-up 22.2: 'Same as #xxxxxx' (a palette pick matching a colour) is
     await s.clickSel(`${ADV} [data-trace-pipette=palette]`);
     // The automatic palette already holds the red, so the first pick selects it and says so.
     await pickAt(s, isRed);
-        await waitFor("Same as", async () => (/^Same as #[0-9A-F]{6}$/i.test(await noticeText(s)) ? true : null), 2500);
-    assert.ok((await noticeHeight(s)) >= 30, "the notice row has a row of its own");
-    await waitFor("the notice gone", async () => ((await noticeText(s)) === "" ? true : null), 6000);
-    assert.ok((await noticeHeight(s)) < 1);
+    await waitFor("Same as", async () => (/Same as #[0-9A-F]{6}/i.test(await hiddenStatus(s)) ? true : null), 2500);
+    assert.equal(await noticeText(s), "", "not drawn");
+    assert.ok((await noticeHeight(s)) < 1, "no notice row");
+    await waitFor("the announcement gone", async () => (!/Same as/.test(await hiddenStatus(s)) ? true : null), 6000);
   });
   await withApp(async (s) => {
     await openOn(s, "specks.png", SPECKS, true);
@@ -660,7 +662,39 @@ test("0089 tidy-up 22.2: 'Same as #xxxxxx' (a palette pick matching a colour) is
     await waitFor("specks ignored", async () => (/specks? ignored/.test(await advancedStatus(s)) ? true : null), 60_000);
     assert.equal(await noticeText(s), "", "the muted speck line is not in the notice row");
     assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} *')].filter((e) => e.children.length === 0 && /specks? ignored/.test(e.textContent) && !e.closest('.sr-only')).length`), 0, "not drawn anywhere");
-    assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-state] *')].filter((e) => /specks? ignored/.test(e.textContent)).length`), 0);
+  });
+});
+
+test("0089 §27 (customer 2026-11-09): with Remove background the palette pipette stays and adds a colour; every palette colour can be deleted, then nothing is traced and Trace is dimmed; a pick starts again", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    await openOn(s, "two.png", TWO, true);
+    await pickMethod(s, "Remove background");
+    await setOutput(s, "Multicolour");
+    await settledCounts(s);
+    const pipette = `${ADV} [data-trace-pipette=palette]`;
+    assert.equal(await s.evaluate(`!!document.querySelector('${pipette}')`), true, "the palette pipette with Remove background");
+    const found = await paletteSwatches(s);
+    assert.ok(found.length >= 2, JSON.stringify(found));
+    // Delete every colour with its x (a press in the swatch's middle).
+    for (const hex of found) {
+      const [x, y] = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector('[data-trace-palette-swatch="${hex}"]').getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as number[];
+      for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+        await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+      }
+      await waitFor(`${hex} deleted`, async () => (!(await paletteSwatches(s)).includes(hex) ? true : null), 30_000);
+    }
+    assert.deepEqual(await paletteSwatches(s), [], "no colour left");
+    await waitFor("Trace dimmed", async () => ((await traceButton(s))?.reason === "0 paths: no colour in the palette." ? true : null), 10_000);
+    assert.equal((await traceButton(s))?.disabled, "true");
+    assert.equal(await noticeText(s), "", "no visible message");
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} *')].some((e) => e.children.length === 0 && !e.closest('.sr-only, [hidden]') && e.textContent.includes('no colour'))`), false);
+    // The palette pipette picks into the empty palette (not the background).
+    await s.clickSel(pipette);
+    await pickAt(s, isRed);
+    await waitFor("one colour picked", async () => ((await paletteSwatches(s)).length === 1 ? true : null), 30_000);
+    await settledCounts(s);
+    assert.equal((await traceButton(s))?.disabled, null, "Trace works again");
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [aria-pressed][aria-label="Pick background colour from the image"]')?.getAttribute('aria-pressed')`), "false", "the background pipette was not armed");
   });
 });
 
@@ -735,7 +769,7 @@ test("0089 tidy-up 22.2, c71 (§24.5): one visually hidden polite status region,
     await waitFor("the reason in the hidden region", async () => ((await hiddenStatus(s)).includes("0 paths: no colour picked.") ? true : null));
     assert.equal((await hiddenStatus(s)).split("no colour picked").length - 1, 1, "announced once");
     assert.equal(await noticeText(s), "", "not drawn in the notice row");
-    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-state] [role=status][aria-live=polite]').length`), 1, "the notice row is a polite live region");
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-state]').length`), 0, "§27: there is no notice row");
   });
 });
 

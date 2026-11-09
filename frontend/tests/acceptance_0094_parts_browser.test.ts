@@ -420,10 +420,8 @@ const advText = advancedStatus;
 
 const PICK = `${BAR} button[aria-label="Pick mask paths"]`;
 const CLEAR = `${BAR} button[aria-label="Clear mask"]`;
-const REFUSED = "Use Object to path for text; one image at a time.";
 const pressedState = async (s: S) => (await s.evaluate(`document.querySelector('${PICK}')?.getAttribute('aria-pressed') ?? 'absent'`)) as string;
 const hasClear = async (s: S) => (await s.evaluate(`!!document.querySelector('${CLEAR}')`)) as boolean;
-const refusedShown = async (s: S) => (await s.evaluate(`!!document.querySelector('${BAR} [data-trace-mask-refused]')`)) as boolean;
 const canvasCursor = async (s: S) =>
   (await s.evaluate(`(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
     const e = c.closest('[style*="cursor"]'); return e ? e.style.cursor : ''; })()`)) as string;
@@ -495,7 +493,7 @@ test("0094 c18, c19, c24, c32, c42: chip 1, picks into each part, a chip pick lo
     await waitFor("chip 2", async () => ((await chipNames(s)).length === 2 ? true : null), 10_000);
     assert.deepEqual(await chipNames(s), ["Part 1 of 2, inside, 1 path", "Part 2 of 2, no paths, active"]);
     assert.equal(await pressedState(s), "true", "Add part leaves the mode armed");
-    assert.equal(await partLabel(s), "Part 2 of 2");
+    assert.equal(await partLabel(s), "", "`specs/0089` ux-notes §27: no 'Part 2 of 2' label");
     assert.equal(await maskState(s), "Inside=true,Outside=false", "part 2 starts Inside, the group stays");
     // A pick goes into the active part only.
     await s.click(at.b[0], at.b[1]);
@@ -508,7 +506,7 @@ test("0094 c18, c19, c24, c32, c42: chip 1, picks into each part, a chip pick lo
     await waitFor("part 1 active", async () => ((await chipNames(s))[0] === "Part 1 of 2, inside, 1 path, active" ? true : null), 10_000);
     assert.equal(await maskState(s), "Inside=true,Outside=false");
     assert.equal(await pressedState(s), "true");
-    assert.equal(await partLabel(s), "Part 1 of 2");
+    assert.equal(await partLabel(s), "");
     // c42: Clear mask empties part 1 only.
     await s.clickSel(CLEAR);
     await waitFor("part 1 whole again", async () => ((await chipNames(s))[0] === "Part 1 of 2, whole image, active" ? true : null), 10_000);
