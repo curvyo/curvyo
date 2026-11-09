@@ -127,7 +127,7 @@ async function download(d) {
   await (await file).saveAs(path.join(out, `${d.label}-${d.saves}.curvyo`));
 }
 
-/** The server and the name shown to others, then waits for "Reachable". */
+/** The server and the name shown to others, then waits for "Connected". */
 async function setUp(d, address, name) {
   await tab(d, 'Share');
   const server = panel(d).getByLabel('Server', { exact: true });
@@ -201,7 +201,7 @@ async function joinDocument(d, link, name) {
     await rect(A, 300, 200, 120, 80);
     await download(A);
     await setUp(A, relay.address, 'Anna');
-    await panel(A).getByText('Reachable', { exact: true }).waitFor();
+    await panel(A).getByText('Connected', { exact: true }).waitFor();
     // Share asks nothing (customer 2026-11-09: no confirm sentences in the Share tab).
     await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
     timings.shareConnected = await until('A connected', async () => (await panel(A).getByText('Connected', { exact: true }).count()) === 1, 10000);
@@ -306,7 +306,7 @@ async function joinDocument(d, link, name) {
     await panel(WA).getByRole('button', { name: 'Save', exact: true }).click();
     await settle(WA.page, 300);
     await setUp(WA, relay.address, 'Anna');
-    await panel(WA).getByText('Reachable', { exact: true }).first().waitFor();
+    await panel(WA).getByText('Connected', { exact: true }).first().waitFor();
     await panel(WA).getByRole('button', { name: 'Share workspace', exact: true }).click();
     timings.workspaceShared = await until('A shared the workspace', async () => {
       await tab(WA, 'Share');

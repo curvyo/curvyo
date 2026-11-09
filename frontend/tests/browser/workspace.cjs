@@ -67,6 +67,12 @@ async function startRelay() {
 // ---- the fake desktop host (shared with `membership.cjs`) --------------------------------------
 
 const { FAKE_HOST, MARKER, makeHost: hostIn, zip } = require('./support/fake-workspace-host.cjs');
+const { watchTabs, tabsSeen } = require('./support/tab-watch.cjs');
+/** Every tab selected since `watchTabs` was the Share tab (`specs/0105` criterion 20). */
+async function stayedOnShare(d, what) {
+  const seen = await tabsSeen(d.page);
+  assert(seen.length > 0 && seen.every((t) => /^Share/.test(t)), `${what}: the tabs seen were ${JSON.stringify(seen)}`);
+}
 const makeHost = (label) => hostIn(out, label);
 
 // ---- the journey -------------------------------------------------------------------------------
@@ -180,7 +186,7 @@ async function newEntry(d, kind, name) {
     const name = panel(A).getByLabel('Name shown to others', { exact: true });
     await name.fill('Anna');
     await name.press('Enter');
-    await panel(A).getByText('Reachable', { exact: true }).first().waitFor();
+    await panel(A).getByText('Connected', { exact: true }).first().waitFor();
     await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
     await panel(A).getByText(/^Shared on /).first().waitFor({ timeout: 10000 });
     await save(A);
@@ -188,13 +194,11 @@ async function newEntry(d, kind, name) {
 
     step('Criteria 25 and 42: Share workspace takes Solo in (no confirm, customer 2026-11-09)');
     await tab(A, 'Share');
+    await watchTabs(A.page);
     await panel(A).getByRole('button', { name: 'Share workspace', exact: true }).click();
-    // The Share tab stays while Share closes and reopens the document (customer 2026-11-09).
-    const shareTab = A.page.getByRole('tab', { name: /^Share/ });
-    await until('A shared the workspace', async () => {
-      assert.equal(await shareTab.getAttribute('aria-selected'), 'true', 'the Share tab stays');
-      return (await panel(A).getByText(/^Shared on /).count()) >= 1;
-    }, 30000);
+    await until('A shared the workspace', async () => (await panel(A).getByText(/^Shared on /).count()) >= 1, 30000);
+    await settle(A.page, 500);
+    await stayedOnShare(A, 'Share workspace');
     assert.equal(await panel(A).getByRole('button', { name: 'Invite', exact: true }).count(), 1, 'Invite is right there');
     await until('Solo is a workspace document', async () => {
       const members = zip('members', path.join(A.host.state.root, 'Solo.curvyo'));
@@ -221,6 +225,7 @@ async function newEntry(d, kind, name) {
     await bName.press('Enter');
     await panel(B).getByRole('button', { name: /^Choose folder/ }).click();
     const joinStart = Date.now();
+    await watchTabs(B.page);
     await panel(B).getByRole('button', { name: 'Join', exact: true }).click();
     await until('B has every file', async () => B.host.state.root !== null
       && ['Lid.curvyo', 'Base.curvyo', 'Solo.curvyo'].every((f) => exists(B, f)), 30000);
@@ -230,6 +235,7 @@ async function newEntry(d, kind, name) {
       return (await participants(B).count()) === 2;
     }, 15000);
     await until('A lists B', async () => (await participants(A).count()) === 2, 15000);
+    await stayedOnShare(B, 'Join');
     assert.equal(objects(B, 'Lid.curvyo').length, 1, 'B holds A\'s Lid');
     await tab(B, 'File');
     await until('B\'s tree shows the documents', async () => (await row(B, 'Solo').count()) === 1);

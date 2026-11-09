@@ -245,6 +245,12 @@ impl WasmSession {
         }
     }
 
+    /// After Share's commit: the open document takes the record of `file`, the container Share
+    /// wrote for it, in place (`specs/0105` criterion 20). `false` without one.
+    pub fn adopt_workspace_document(&mut self, file: &[u8]) -> bool {
+        self.session.adopt_workspace_document(file)
+    }
+
     /// Joins the workspace of a `2.` link (criterion 27). Empty when the join started, else
     /// the refusal.
     #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).

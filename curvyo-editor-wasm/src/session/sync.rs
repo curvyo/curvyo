@@ -439,6 +439,14 @@ impl Session {
         }
     }
 
+    /// Drops a link that ended (a Share that failed or was cancelled, after [`Self::leave_sync`]
+    /// and the transport took its close), so the Share tab shows the state before the attempt.
+    pub fn drop_ended_link(&mut self) {
+        if self.sync.as_ref().is_some_and(|link| link.ended.is_some()) {
+            self.sync = None;
+        }
+    }
+
     /// The share record a save writes into the file (`share.json`, `keyring.log`); `None`
     /// without a live session or before the document arrived.
     pub(super) fn sync_share_record(&self) -> Option<ShareRecord> {

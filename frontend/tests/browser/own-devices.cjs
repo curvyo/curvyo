@@ -493,7 +493,7 @@ async function setServer(d, address, name) {
   const person = panel(d).getByLabel('Name shown to others', { exact: true });
   await person.fill(name);
   await person.press('Enter');
-  await panel(d).getByText('Reachable', { exact: true }).first().waitFor();
+  await panel(d).getByText('Connected', { exact: true }).first().waitFor();
 }
 
 /** The four check words of the compare group on `d`'s screen. */
@@ -766,7 +766,18 @@ async function checkWords(d) {
     await shot(B, '12-b-server-try-again');
     live = await startRelay(live);
     await tryServer.click();
-    await panel(B).getByText('Reachable', { exact: true }).first().waitFor({ timeout: 10000 });
+    await panel(B).getByText('Connected', { exact: true }).first().waitFor({ timeout: 10000 });
+
+    step('0105 criterion 21: the line follows the server every 5 s without a press');
+    live.stop();
+    const stoppedAt = Date.now();
+    await until('the line says the server cannot be reached', async () => (await panel(B).getByText(/^Cannot reach /).count()) > 0, 10000);
+    const downMs = Date.now() - stoppedAt;
+    assert.ok(!(await shown(B, 'Connected')), 'no other line says Connected');
+    live = await startRelay(live);
+    const upAt = Date.now();
+    await until('the line says Connected', () => shown(B, 'Connected'), 10000);
+    console.log(`reachability: unreachable after ${downMs} ms, Connected ${Date.now() - upAt} ms after the restart`);
 
     step('Share tab feedback 1: a switch-on whose server never answers turns off again at once');
     live.stop();
@@ -800,7 +811,7 @@ async function checkWords(d) {
     await tab(B, 'Share');
 
     step('Share tab feedback 1: a switch-on that never gets an answer fails with Try again, which works once the server is up');
-    await until('the server reads reachable', () => shown(B, 'Reachable'), 10000);
+    await until('the server reads connected', () => shown(B, 'Connected'), 10000);
     await newSwitch.click();
     await tab(B, 'Share');
     const tryAgain = workspaceBlock.getByRole('button', { name: 'Try again', exact: true });

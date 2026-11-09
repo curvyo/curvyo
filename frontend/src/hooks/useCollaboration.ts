@@ -228,6 +228,9 @@ function carry(transport: SyncTransport | null, session: Parameters<SyncTranspor
   transport?.drain();
 }
 
+/** How long a reachability probe waits for the socket to open (ms, ADR 0044 decision 9). */
+const PROBE_GIVE_UP_MS = 4000;
+
 const NO_VIEW: ShareView = { shared: false, live: false, subject: "Not shared", participants: [] };
 
 export function useCollaboration(editor: EditorSession, project: ProjectApi): CollaborationApi {
@@ -381,26 +384,42 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
     void invoke("set_shared", { shared: sharedNow }).catch(() => undefined);
   }, [sharedNow]);
 
+  /** One probe at a time; the address the shown answer is for. */
+  const probingRef = useRef(false);
+  const reachForRef = useRef("");
+  /** Opens a WebSocket to the server and closes it as soon as it opens, nothing sent (ADR 0044
+   * decision 9); given up after 4 s. A repeat keeps the last answer shown until it has its own. */
   const checkServer = useCallback(() => {
     const address = normalize_server_address(server);
     if (address === "") {
+      reachForRef.current = "";
       setReach("idle");
       return;
     }
-    setReach("reaching");
+    if (probingRef.current) {
+      return;
+    }
+    probingRef.current = true;
+    if (reachForRef.current !== address) {
+      reachForRef.current = address;
+      setReach("reaching");
+    }
     let settled = false;
     const settle = (result: Reach) => {
       if (!settled) {
         settled = true;
-        setReach(result);
+        probingRef.current = false;
+        if (reachForRef.current === address) {
+          setReach(result);
+        }
       }
     };
     try {
-      const socket = new WebSocket(`${address}/`);
+      const socket = new WebSocket(address);
       const timeout = window.setTimeout(() => {
         socket.close();
         settle("unreachable");
-      }, 4000);
+      }, PROBE_GIVE_UP_MS);
       socket.onopen = () => {
         window.clearTimeout(timeout);
         socket.close();
