@@ -684,7 +684,7 @@ test("0089F tester c31, §24.5: the same at 800 x 600 (panel open, 308 px)", { s
 
 // ------------------------------------------------------------------ the analysis fails
 
-test("0089F tester c31, UX 3: when the analysis fails the notice row and the hidden region say so and the trace still has a Threshold", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089F tester c31, UX 3: when the analysis fails the hidden region says so (nothing is drawn, ux-notes §27) and the trace still has a Threshold", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await s.evaluate(`window.__failWorker = true`);
     await openOn(s, "lines.png", LINES);
@@ -694,8 +694,8 @@ test("0089F tester c31, UX 3: when the analysis fails the notice row and the hid
     console.log("state:", state, "line:", JSON.stringify(line), "threshold:", await fieldValue(s, "Threshold"));
     assert.equal(state, "failed");
     assert.equal(line, "Analysis failed · automatic Threshold used", "the hidden region says it");
-    // UX notes §24.5: a failure is the one analysis line that is shown, in the notice row.
-    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-analysis-failed]')?.textContent ?? ''`), "Analysis failed · automatic Threshold used");
+    // UX notes §27 (customer 2026-11-09): no notice row, the failure is not drawn.
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} *')].some((e) => e.children.length === 0 && !e.closest('.sr-only, [hidden]') && e.textContent.includes('Analysis failed'))`), false);
   }, WORKER_DIES);
 });
 

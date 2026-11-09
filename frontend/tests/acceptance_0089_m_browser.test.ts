@@ -1,7 +1,7 @@
 // `specs/0089-trace-quality-and-colour` slice M in the real app (Chromium via DevTools; set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): Output in Advanced
-// (criterion 25), the palette's swatch row with its count, tooltip, Exclude, Isolate and delete
-// (criteria 26, 29, ux-notes §26), Create paths as one group of one filled path per colour in one
+// (criterion 25), the palette's swatch row with its count, tooltip and Exclude (criteria 26, 29,
+// ux-notes §26, §27: no Isolate, Shift+click excludes), Create paths as one group of one filled path per colour in one
 // step, and the bar at 800 x 600. Harness as in `acceptance_0089_e_browser.test.ts`.
 
 import assert from "node:assert/strict";
@@ -312,10 +312,10 @@ const swatchSel = (hex: string) => `${BAR} [data-trace-palette-swatch="${hex}"]`
 const centre = async (s: S, sel: string) =>
   JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
 
-/** The pointer over `sel`, with Shift held when `shift` (CDP modifiers 8). */
-const hover = async (s: S, sel: string, shift = false) => {
+/** The pointer over `sel`. */
+const hover = async (s: S, sel: string) => {
   const [x, y] = await centre(s, sel);
-  await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, modifiers: shift ? 8 : 0 });
+  await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, modifiers: 0 });
   await sleep(300);
 };
 
@@ -325,21 +325,14 @@ const away = async (s: S) => {
   await sleep(300);
 };
 
-const shiftClick = async (s: S, sel: string) => {
+const shiftClick = (s: S, sel: string) => clickCentre(s, sel, 8);
+
+/** A press in the middle of `sel`: on a palette swatch that is its x, which deletes (§27). */
+const clickCentre = async (s: S, sel: string, modifiers = 0) => {
   const [x, y] = await centre(s, sel);
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers: 8 });
+    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers });
   }
-  await sleep(300);
-};
-
-const holdShift = async (s: S) => {
-  await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
-  await sleep(300);
-};
-
-const releaseShift = async (s: S) => {
-  await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
   await sleep(300);
 };
 
@@ -348,7 +341,7 @@ const hiddenStatus = async (s: S) => (await s.evaluate(`document.querySelector('
 const coloursFieldText = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label=Colours]')?.textContent ?? ''`)) as string;
 
-test("0089 M in Chromium: Output, the palette row with its tooltip, Shift+hover Isolate dims in the Overlay, a click excludes, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 M in Chromium: Output, the palette row with its tooltip, a Shift+click excludes, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -392,17 +385,6 @@ test("0089 M in Chromium: Output, the palette row with its tooltip, Shift+hover 
     assert.ok(Number.isFinite(red.cx) && Number.isFinite(blue.cx), "the blocks are on screen");
     // No View pill, no Mask view (UX notes §24.1).
     assert.equal(await s.evaluate(`!!document.querySelector('[role=radiogroup][aria-label=View]')`), false, "no View pill");
-    // The outline over each block is the Overlay's one preview colour; its pixels around the red block (the washed image has none).
-    const strong = (m: Shot, box: ReturnType<typeof boxOf>, test: (rgb: number[]) => boolean) => {
-      let n = 0;
-      for (let y = box.y0 - 4; y <= box.y1 + 4; y++) for (let x = box.x0 - 4; x <= box.x1 + 4; x++) if (test(at(m, x, y))) n++;
-      return n;
-    };
-    const redOutline = ([r, g, b]: number[]) => b > 200 && r < 120 && g < 170;
-    const redBefore = strong(await shot(s), red, redOutline);
-    console.log("outline pixels around the red block before Isolate:", redBefore);
-    assert.ok(redBefore > 20, "the outline is drawn around the red block");
-
     // ux-notes §26: no detail row and no action buttons; the tooltip is the code and name, and the
     // short second line.
     assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-palette-detail], ${BAR} [data-trace-palette-action]').length`), 0, "no detail row, no actions");
@@ -412,33 +394,16 @@ test("0089 M in Chromium: Output, the palette row with its tooltip, Shift+hover 
       return t.includes("#234EB8") ? t : null;
     }, 5_000);
     assert.ok(tip.includes("#234EB8 · Blue"), tip);
-    assert.ok(tip.includes("Click: exclude · Shift: isolate / delete"), tip);
-    assert.ok(!(await hiddenStatus(s)).includes("Isolating"), "a plain hover isolates nothing");
+    assert.ok(tip.includes("Shift+click: exclude"), tip);
 
-    // Shift+hover isolates (view only): pressing Shift over the swatch; the hidden region says so,
-    // the other colours are dimmed; releasing Shift ends it.
-    await holdShift(s);
-    await waitFor("Isolating", async () => ((await hiddenStatus(s)).includes("Isolating #234EB8") ? true : null), 10_000);
-    await waitFor("the dimmed red", async () => ((await strong(await shot(s), red, redOutline)) < redBefore * 0.5 ? true : null), 10_000);
-    await releaseShift(s);
-    await waitFor("Isolate ends with Shift", async () => (!(await hiddenStatus(s)).includes("Isolating") ? true : null), 10_000);
-    await waitFor("the red at full strength", async () => ((await strong(await shot(s), red, redOutline)) > redBefore * 0.8 ? true : null), 10_000);
-    // Pointing with Shift already held isolates too; it ends when the pointer leaves.
-    await away(s);
-    await hover(s, swatchSel("#234EB8"), true);
-    await waitFor("Isolating again", async () => ((await hiddenStatus(s)).includes("Isolating #234EB8") ? true : null), 10_000);
-    await away(s);
-    await releaseShift(s);
-    await waitFor("Isolate ends with the hover", async () => (!(await hiddenStatus(s)).includes("Isolating") ? true : null), 10_000);
-
-    // A click excludes: the colour becomes background; the swatch stays with its mark; a second
-    // click brings it back, a third excludes again.
-    await s.clickSel(swatchSel("#234EB8"));
+    // A Shift+click excludes (§27): the colour becomes background; the swatch stays with its mark;
+    // a second one brings it back, a third excludes again.
+    await shiftClick(s, swatchSel("#234EB8"));
     await waitFor("1 colour excluded", async () => ((await hiddenStatus(s)).includes("1 colour excluded") ? true : null), 20_000);
     assert.ok((await swatches(s)).some((n) => n === "#234EB8 · Blue, excluded"), (await swatches(s)).join(" | "));
-    await s.clickSel(swatchSel("#234EB8"));
+    await shiftClick(s, swatchSel("#234EB8"));
     await waitFor("back in", async () => ((await swatches(s)).includes("#234EB8 · Blue") ? true : null), 20_000);
-    await s.clickSel(swatchSel("#234EB8"));
+    await shiftClick(s, swatchSel("#234EB8"));
     await waitFor("excluded again", async () => ((await swatches(s)).includes("#234EB8 · Blue, excluded") ? true : null), 20_000);
     // Sampled near the block's bottom edge: the grown bar's shadow falls on its top; Advanced is
     // closed first so the bar (one row taller with the analysis line) leaves the block visible.
@@ -483,7 +448,7 @@ const FIVE = rgbPng(300, 80, (x, y) => {
   return FIVE_COLOURS[Math.min(4, Math.floor((x - 10) / 56))];
 });
 
-test("0089 M in Chromium (ux-notes §26): at 800 x 600 five Multicolour colours sit in one line beside Colours, the bar never leaves the window; Shift+click deletes and the rest are matched again", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 M in Chromium (ux-notes §26): at 800 x 600 five Multicolour colours sit in one line beside Colours, the bar never leaves the window; the x deletes and the rest are matched again", { skip: !BROWSER, timeout: 400_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -535,10 +500,10 @@ test("0089 M in Chromium (ux-notes §26): at 800 x 600 five Multicolour colours 
       await check("panel toggled");
     }
 
-    // Shift+click deletes the brown: four swatches, exactly the others; the brown area is matched again.
+    // The x deletes the brown (§27): four swatches, exactly the others; the brown area is matched again.
     const brown = "#4B392F";
     assert.ok(found.some((n) => n.startsWith(brown)), found.join(" | "));
-    await shiftClick(s, swatchSel(brown));
+    await clickCentre(s, swatchSel(brown));
     const left = await waitFor("four swatches", async () => {
       const list = (await swatches(s)).map((n) => n.slice(0, 7));
       return list.length === 4 ? list : null;

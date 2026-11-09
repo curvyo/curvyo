@@ -428,7 +428,8 @@ const CLEAR = `${BAR} button[aria-label="Clear mask"]`;
 const REFUSED = "Use Object to path for text; one image at a time.";
 const pressedState = async (s: S) => (await s.evaluate(`document.querySelector('${PICK}')?.getAttribute('aria-pressed') ?? 'absent'`)) as string;
 const hasClear = async (s: S) => (await s.evaluate(`!!document.querySelector('${CLEAR}')`)) as boolean;
-const refusedShown = async (s: S) => (await s.evaluate(`!!document.querySelector('${BAR} [data-trace-mask-refused]')`)) as boolean;
+// `specs/0089` ux-notes §27: the refused pick is said by the hidden status region, never drawn.
+const refusedShown = async (s: S) => (await s.evaluate(`(document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? '').includes(${JSON.stringify(REFUSED)})`)) as boolean;
 const canvasCursor = async (s: S) =>
   (await s.evaluate(`(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
     const e = c.closest('[style*="cursor"]'); return e ? e.style.cursor : ''; })()`)) as string;
@@ -637,7 +638,7 @@ test("0094 c38: a text and a second image are refused with the row, the mode sta
     await waitFor("the mask is empty again", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
     await s.click(textAt[0] + 10, textAt[1] - 4);
     await waitFor("the refused row for the text", async () => ((await refusedShown(s)) ? true : null), 10_000);
-    assert.match(await s.evaluate(`document.querySelector('${BAR}').textContent`) as string, new RegExp(REFUSED.replace(/[.;]/g, "\\$&")));
+    assert.equal(await s.evaluate(`[...document.querySelectorAll('${BAR} *')].some((e) => e.children.length === 0 && !e.closest('.sr-only, [hidden]') && e.textContent.includes(${JSON.stringify(REFUSED)}))`), false, "not drawn");
     assert.equal(await pressedState(s), "true", "still armed");
     assert.equal(await maskPaths(s), 0, "nothing added");
     assert.ok(await s.evaluate(`!!document.querySelector('${PICK}')`), "the bar keeps its controls");
@@ -793,7 +794,7 @@ const pickedRow = async (s: S) =>
         cells: cells.map(r), swatches: cells.map((c) => r(c.firstElementChild)), names: cells.map((c) => c.getAttribute('aria-label')),
         stops: cells.map((c) => c.tabIndex), scroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
         strip: !!document.querySelector('${BAR} [role=group][aria-label=Palette]'), detail: !!document.querySelector('${BAR} [data-trace-palette-detail]'),
-        label: g.textContent.trim(), reason: document.querySelector('${BAR} [data-trace-reason]')?.textContent ?? '',
+        label: g.textContent.trim(), reason: document.querySelector('${BAR} [data-trace-state]')?.textContent ?? '',
       };
     })())`)) as string,
   ) as {

@@ -427,8 +427,8 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
     await sleep(400);
     const layout = async () =>
       JSON.parse((await s.evaluate(`JSON.stringify((() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
-        const row = bar.querySelector('[data-trace-state]').parentElement;
-        const items = [...row.children].filter((e) => !e.matches('[data-trace-state], .basis-full') && e.getBoundingClientRect().width > 0);
+        const row = bar.querySelector('[data-trace-row]');
+        const items = [...row.children].filter((e) => !e.matches('.basis-full') && e.getBoundingClientRect().width > 0);
         // A line is 36 px; a 28 px control with its 4 px margin starts 4 px lower in the same line.
         const tops = items.map((e) => Math.round(e.getBoundingClientRect().top)).sort((x, y) => x - y).filter((t, i, all) => i === 0 || t - all[i - 1] > 10);
         const ex = bar.querySelector('button[aria-expanded][aria-controls]').getBoundingClientRect();

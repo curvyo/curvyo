@@ -202,11 +202,11 @@ async function launch(preload?: string) {
 const BAR = "[role=toolbar][aria-label=Trace]";
 type S = Awaited<ReturnType<typeof session>>;
 
-/** A Shift+click on the middle of `sel` (CDP modifiers 8 = Shift). */
-const shiftClick = async (s: S, sel: string) => {
+/** A click on the middle of `sel`: on a palette swatch that is its x, which deletes (ux-notes §27). */
+const clickX = async (s: S, sel: string) => {
   const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x: c[0], y: c[1], button: "left", clickCount: 1, modifiers: 8 });
+    await s.send("Input.dispatchMouseEvent", { type, x: c[0], y: c[1], button: "left", clickCount: 1 });
   }
   await sleep(300);
 };
@@ -364,7 +364,7 @@ test("0089M tester c25, c26, c29: Output sits in Advanced, the palette is exactl
   });
 });
 
-test("0089M tester c29 (ux-notes §26): Shift+click deletes a colour, the others are matched again, one Create paths is one group of them in one undo step", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089M tester c29 (ux-notes §26, §27): the x deletes a colour, the others are matched again, one Create paths is one group of them in one undo step", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "m-three.png", PICTURE);
     await pickMethod(s, "Remove background");
@@ -373,7 +373,7 @@ test("0089M tester c29 (ux-notes §26): Shift+click deletes a colour, the others
     const near = (c: number[]) => hexes.find((h) => distance(fromHex(h), c) < 0.03)!;
     const red = near(RED);
     // Delete red: the palette is the other five, exactly.
-    await shiftClick(s, swatch(red));
+    await clickX(s, swatch(red));
     const left = await waitFor("five swatches", async () => {
       const list = (await swatchNames(s)).map((n) => n.slice(0, 7));
       return list.length === 5 ? list : null;

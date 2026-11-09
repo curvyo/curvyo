@@ -489,7 +489,8 @@ const setPanel = async (s: S, open: boolean) => {
     await sleep(700);
   }
 };
-const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? 'missing'`)) as string;
+// `ux-notes.md` §27 (customer 2026-11-09): the notice row is gone; a former notice is said by the hidden region only.
+const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? ''`)) as string;
 const rectOf = async (s: S, sel: string) =>
   JSON.parse((await s.evaluate(`JSON.stringify((() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect();
     return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom }; })())`)) as string) as { x: number; y: number; w: number; h: number; right: number; bottom: number } | null;
@@ -811,15 +812,15 @@ test("0089 §24.4: with a path Clear mask removes it and a key press keeps focus
   });
 });
 
-test("0089 §24.4: a mask outside the picture says so in the notice row, Trace is aria-disabled with the same text, and the Mask group stays", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.4, §27: a mask outside the picture dims Trace with the reason as its description and announcement, nothing is drawn, and the Mask group stays", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await maskedOn(s, "outside");
-    await waitFor("the reason", async () => ((await noticeText(s)) === "0 paths: the mask is outside the image." ? true : null), 30_000);
+    await waitFor("the reason", async () => (((await traceButton(s)) as { reason: string } | null)?.reason === "0 paths: the mask is outside the image." ? true : null), 30_000);
     const trace = (await traceButton(s)) as { disabled: string | null; reason: string };
     assert.equal(trace.disabled, "true");
-    assert.equal(trace.reason, "0 paths: the mask is outside the image.", "tooltip and description are the notice text");
+    assert.equal(await noticeText(s), "", "not drawn");
     assert.equal(await s.evaluate(`!!document.querySelector('${BAR} [data-trace-mask]')`), true, "the group stays");
-    assert.ok(!(await hiddenRegion(s)).includes("outside the image"), "the reason is the notice row's, announced there");
+    assert.ok((await hiddenRegion(s)).includes("0 paths: the mask is outside the image."), "the hidden region says it");
   });
 });
 
@@ -908,17 +909,19 @@ test("0089 §24.5: the analysis line is announced and never drawn", { skip: !BRO
   });
 });
 
-test("0089 §24.5: an empty Multicolour result says why in the notice row, Trace is aria-disabled with the same text as tooltip and description, and Advanced has no status line (\"No colours found.\" is covered by traceMulticolour.test.ts)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.5, §27: an empty Multicolour result dims Trace with the reason as tooltip, description and announcement, draws no text, and Advanced has no status line (\"No colours found.\" is covered by traceMulticolour.test.ts)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "white.png", rgbPng(120, 120, () => [255, 255, 255]), true);
     await pickMethod(s, "Brightness");
     await setOutput(s, "Multicolour");
-    await waitFor("the notice", async () => (/^0 paths/.test(await noticeText(s)) || (await noticeText(s)) === "No colours found." ? true : null), 30_000);
-    const notice = await noticeText(s);
-    console.log("white picture, Multicolour, notice:", JSON.stringify(notice));
+    const reason = async () => ((await traceButton(s)) as { reason: string } | null)?.reason ?? "";
+    await waitFor("the reason", async () => (/^0 paths/.test(await reason()) || (await reason()) === "No colours found." ? true : null), 30_000);
+    const notice = await reason();
+    console.log("white picture, Multicolour, reason:", JSON.stringify(notice));
     const trace = (await traceButton(s)) as { disabled: string | null; reason: string };
     assert.equal(trace.disabled, "true", "Trace is dimmed");
-    assert.equal(trace.reason, notice, "tooltip and description are the notice-row text");
+    assert.equal(await noticeText(s), "", "not drawn");
+    assert.ok((await hiddenRegion(s)).includes(notice), "the hidden region says it");
     assert.equal(await s.evaluate(`document.querySelectorAll('${ADV} [data-trace-counts]').length`), 0, "no status line in Advanced");
   });
 });

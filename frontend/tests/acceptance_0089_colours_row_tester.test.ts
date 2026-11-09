@@ -365,7 +365,7 @@ const hexes = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${SWATCH}')].map((e) => e.getAttribute('data-trace-picked-swatch')))`)) as string) as string[];
 const names = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${SWATCH}')].map((e) => e.getAttribute('aria-label')))`)) as string) as string[];
-const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? 'missing'`)) as string;
+const noticeText = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-state]')?.textContent ?? ''`)) as string;
 const hiddenStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? 'absent'`)) as string;
 const barHeight = async (s: S) => (await s.evaluate(`Math.round(document.querySelector('${BAR}').getBoundingClientRect().height)`)) as number;
 const visibleBarTexts = async (s: S) =>

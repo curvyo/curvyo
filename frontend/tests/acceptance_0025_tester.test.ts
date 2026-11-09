@@ -339,12 +339,10 @@ const typeInto = async (s: S, name: string, text: string) => {
   await s.send("Input.insertText", { text });
   await press(s, "Enter", 13);
 };
-// The state row's line (UX notes 20.4), else the counts line of the Advanced block, else an empty
-// bar's words.
+// The hidden status region (`specs/0089` ux-notes §24.5, §27: the bar draws no status line), else an
+// empty bar's words.
 const barStatus = async (s: S) =>
   (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
-    const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
-    if (line) return line;
     const counts = bar?.querySelector('[data-trace-hidden-status]')?.textContent.trim() ?? '';
     if (counts) return counts;
     return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
@@ -491,7 +489,7 @@ test("0025 in Chromium: Trace button, key I, bar, preview, fields, leaving (crit
       const t = await barStatus(s);
       return /(^|\. )0 paths/.test(t) ? t : null;
     });
-    assert.equal(none, "0 paths at this Threshold: too low.");
+    assert.ok(none.includes("0 paths at this Threshold: too low."), none);
     assert.equal(await s.evaluate(`[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Create paths')`), false, "there is no Create paths button");
     const rowsNone = await rowInfo(s);
     await focusCanvas(s);
@@ -724,8 +722,9 @@ test("0025 in Chromium: several images, empty states, zero and whole results (cr
     assert.ok(await buttonByText(s, "Trace"), "Trace shows for several images");
     await s.clickSel("[data-t25]");
     await traceReady(s);
-    const bar = (await s.evaluate(`document.body.innerText`)) as string;
-    // Criterion 46: the label counts the job (the first image until Create paths moves on).
+    const bar = await barStatus(s);
+    // Criterion 46: the label counts the job (the first image until Create paths moves on); since
+    // `specs/0089` ux-notes §27 the hidden status region says it.
     assert.match(bar, /Tracing 1 of 3 images/);
     await press(s, "Enter", 13);
     // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
@@ -757,7 +756,7 @@ test("0025 in Chromium: empty and whole-page results (criterion 15)", { skip: !B
     await focusCanvas(s);
     await s.key("i", 73);
     const white = await traceReady(s);
-    assert.equal(white, "0 paths at this Threshold: too low.");
+    assert.ok(white.includes("0 paths at this Threshold: too low."), white);
     await press(s, "Enter", 13);
     await sleep(500);
     assert.ok(!(await rowInfo(s)).some(([n]) => /Trace of/.test(n ?? "")), "Enter creates nothing for 0 paths");
@@ -767,7 +766,7 @@ test("0025 in Chromium: empty and whole-page results (criterion 15)", { skip: !B
     await focusCanvas(s);
     await s.key("i", 73);
     const black = await traceReady(s);
-    assert.equal(black, "1 path covering the whole image.");
+    assert.ok(black.includes("1 path covering the whole image."), black);
     await focusCanvas(s);
     await press(s, "Enter", 13);
     await waitFor("the group", async () => ((await rowInfo(s)).some(([n]) => /Trace of black/.test(n ?? "")) ? true : null));

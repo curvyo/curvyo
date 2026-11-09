@@ -338,12 +338,10 @@ const typeInto = async (s: S, name: string, text: string) => {
   await s.send("Input.insertText", { text });
   await press(s, "Enter", 13);
 };
-// The state row's line (UX notes 20.4), else the counts line of the Advanced block, else an empty
-// bar's words.
+// The hidden status region (`specs/0089` ux-notes §24.5, §27: the bar draws no status line), else an
+// empty bar's words.
 const barStatus = async (s: S) =>
   (await s.evaluate(`(() => { const bar = document.querySelector('[role=toolbar][aria-label=Trace]');
-    const line = bar?.querySelector('[data-trace-line]')?.textContent.trim() ?? '';
-    if (line) return line;
     const counts = bar?.querySelector('[data-trace-hidden-status]')?.textContent.trim() ?? '';
     if (counts) return counts;
     return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter((t) => /Click an image|not an image/.test(t)).join(' | '); })()`)) as string;
@@ -622,10 +620,10 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSE
     await focusCanvas(s);
     await s.key("i", 73);
     await settle(s);
-    // `0089` ux-notes §22.2/22.3 (2026-10-31): the Advanced block holds live regions of its own, so "the status row" is the bar's notice row.
+    // `0089` ux-notes §27 (2026-11-09): the bar has no status row any more; the rows above the block stay put.
     const geometry = async () =>
       JSON.parse(
-        (await s.evaluate(`JSON.stringify((() => { const y = (q) => document.querySelector(q).getBoundingClientRect().y; const a = document.querySelector('[role=toolbar][aria-label=Trace] button[aria-expanded][aria-controls]'); return { preset: y('button[aria-label=Preset]'), threshold: y('[role=spinbutton][aria-label=Threshold]'), smooth: y('[role=spinbutton][aria-label=Smooth]'), status: y('[role=toolbar][aria-label=Trace] [data-trace-state]'), advanced: a.getBoundingClientRect().y, disabled: a.disabled || a.getAttribute('aria-disabled'), expanded: a.getAttribute('aria-expanded') }; })())`)) as string,
+        (await s.evaluate(`JSON.stringify((() => { const y = (q) => document.querySelector(q).getBoundingClientRect().y; const a = document.querySelector('[role=toolbar][aria-label=Trace] button[aria-expanded][aria-controls]'); return { preset: y('button[aria-label=Preset]'), threshold: y('[role=spinbutton][aria-label=Threshold]'), smooth: y('[role=spinbutton][aria-label=Smooth]'), advanced: a.getBoundingClientRect().y, disabled: a.disabled || a.getAttribute('aria-disabled'), expanded: a.getAttribute('aria-expanded') }; })())`)) as string,
       ) as Record<string, number | string | boolean | null>;
     // The block starts open in this file (the counts live there); close it first.
     if ((await geometry()).expanded === "true") {
@@ -640,7 +638,7 @@ test("0025s2 in Chromium: the Advanced block (criteria 41, 44)", { skip: !BROWSE
     await sleep(400);
     const open = await geometry();
     assert.equal(open.expanded, "true");
-    for (const k of ["preset", "threshold", "smooth", "status", "advanced"]) {
+    for (const k of ["preset", "threshold", "smooth", "advanced"]) {
       assert.equal(open[k], closed[k], `${k} row does not move when the block opens`);
     }
     // Contents.
