@@ -22,7 +22,7 @@ use crate::invite::InviteId;
 use crate::wrap::Wrap;
 use crate::{CryptoError, DocumentId};
 use graph::Graph;
-use state::{Admission, EpochState, MemberState, State};
+use state::{Admission, State};
 
 /// A current participant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,33 +136,6 @@ impl Keyring {
             })
             .map(|i| self.graph.hashes[i])
             .collect()
-    }
-
-    /// Whether an accepted admission of `member` (an `AddMember`, or the `ClaimInvite` of an
-    /// invite) builds on every entry of `heads`: the device was added after the keyring it knew
-    /// when its share ended (ADR 0041 decision 6). A keyring cut off before `heads`, one that
-    /// lacks any of them, or empty `heads` say no.
-    #[must_use]
-    pub fn admitted_after(&self, member: &MemberId, heads: &[EntryHash]) -> bool {
-        let Some(known) = heads
-            .iter()
-            .map(|head| self.graph.hashes.iter().position(|h| h == head))
-            .collect::<Option<Vec<usize>>>()
-            .filter(|known| !known.is_empty())
-        else {
-            return false;
-        };
-        (0..self.accepted.len())
-            .filter(|&i| self.accepted[i])
-            .any(|i| {
-                let admits = match &self.graph.entries[i].payload {
-                    Payload::AddMember { identity, .. } | Payload::ClaimInvite { identity, .. } => {
-                        identity.member == *member
-                    }
-                    _ => false,
-                };
-                admits && known.iter().all(|h| self.graph.ancestors[i].contains(h))
-            })
     }
 
     /// The current participants, ordered by member id.
@@ -285,8 +258,8 @@ impl Keyring {
     }
 
     /// The `RewrapEpoch` entries `me` can write (ADR 0031 decision 6a): for each epoch `me`
-    /// holds, each current member without a wrap of it, except an epoch withheld from a member
-    /// added back "from now on" (ADR 0041 decision 7). A member admitted by an invite and
+    /// holds, each current member without a wrap of it (ADR 0044 decision 4). A member admitted
+    /// by an invite and
     /// holding no key yet is left out once the invite's expiry is not after `now` (seconds
     /// since the Unix epoch, the caller's clock; ADR 0031 decision 8).
     #[must_use]
@@ -298,7 +271,7 @@ impl Keyring {
         let mut missing = Vec::new();
         for epoch in self.state.epochs.iter().filter(|e| e.holds(me)) {
             for member in self.state.members.values() {
-                if epoch.holds(&member.identity.member) || self.withheld(member, epoch) {
+                if epoch.holds(&member.identity.member) {
                     continue;
                 }
                 if let Admission::Claimed(invite_id) = member.admission {
@@ -320,21 +293,5 @@ impl Keyring {
         missing.sort();
         missing.dedup();
         missing
-    }
-
-    /// ADR 0041 decision 7 (a rule of this client, not of validity): an epoch that began before
-    /// the member's latest direct `AddMember` and that the add did not wrap was left out on
-    /// purpose ("From now on"), so it is not repaired.
-    fn withheld(&self, member: &MemberState, epoch: &EpochState) -> bool {
-        let Admission::Added(index) = member.admission else {
-            return false;
-        };
-        let Payload::AddMember { wraps, .. } = &self.graph.entries[index].payload else {
-            return false;
-        };
-        self.graph.is_ancestor(epoch.index, index)
-            && !wraps
-                .iter()
-                .any(|w| w.epoch == epoch.epoch.number && w.wrap.key_id() == epoch.epoch.key_id)
     }
 }

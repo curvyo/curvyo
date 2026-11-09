@@ -127,3 +127,7 @@ the relay" to rooms of documents shared on their own.
 
 - 2026-11-09: the join rule of PR #294 is reviewed in `arch-review-join-rule.md` (CHANGES
   REQUESTED, a `fix/` PR).
+- 2026-11-09 (customer feedback on PR #298): no Sync switch per workspace. ADR 0044 decision 7
+  holds with Invite person as the On (Share in its one confirm, with my devices in a device group)
+  and Stop sharing or "Sync to my devices" off as the Off; Invite person is greyed with its reason
+  (`curvyo-ui-core::sharing_text::invite_blocker`). No format, frame or protocol change.

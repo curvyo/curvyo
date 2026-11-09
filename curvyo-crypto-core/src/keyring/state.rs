@@ -64,8 +64,6 @@ pub(crate) struct MemberState {
 pub(crate) struct EpochState {
     pub(crate) epoch: EpochRef,
     pub(crate) entry: EntryHash,
-    /// The graph index of the entry that created it.
-    pub(crate) index: usize,
     /// Every wrap of this key, in replay order (`NewEpoch` or `Genesis`, `AddMember`, `RewrapEpoch`).
     pub(crate) wraps: Vec<(MemberId, Wrap)>,
 }
@@ -314,7 +312,6 @@ fn push_epoch(
             key_id: first.wrap.key_id(),
         },
         entry: graph.hashes[index],
-        index,
         wraps: wraps.iter().map(|w| (w.member, w.wrap)).collect(),
     });
 }

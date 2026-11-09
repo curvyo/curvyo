@@ -116,7 +116,7 @@ export function useDevices(
   const addingRef = useRef<Uint8Array | null>(null);
   /** The record's folders changed since the group's files were written. */
   const foldersDirtyRef = useRef(false);
-  /** Whether the pairing on screen is this device's code (Add a device). */
+  /** Whether the pairing on screen is this device's code (Add device). */
   const openerRef = useRef(false);
   const pendingSwitchRef = useRef<"" | "on" | "off">("");
   const [view, setView] = useState<DevicesView | null>(null);
@@ -426,6 +426,16 @@ export function useDevices(
         },
         () => undefined,
       );
+    }
+    if (pending === "off" && answer !== "") {
+      // My other devices are out: this device ends its link too, without a keyring entry, and the
+      // marker drops its share files, so the workspace is Local here and reopens without a
+      // connection (`specs/0105` criterion 12, ADR 0044 decision 7).
+      if (session.stop_sharing() === "") {
+        refs.current.collab.drive(session);
+        session.drop_ended_link();
+        void invoke("clear_workspace_marker_share").catch(() => undefined);
+      }
     }
     if (pending !== "" && answer !== "") {
       pendingSwitchRef.current = "";

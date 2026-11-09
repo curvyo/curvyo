@@ -11,8 +11,8 @@ use std::collections::BTreeSet;
 use curvyo_crypto_core::keyring::{Entry, EntryHash, Keyring, Payload, Role};
 use curvyo_document_core::{Document, Length, NodeId, Point, RectBounds};
 use curvyo_sync_core::{
-    ClientSession, ConnectionId, History, MembershipNotice, Millis, PendingAct, PendingKind,
-    RelayFrame, SessionConfig, SessionError, SessionEvent, SessionStart, membership_notices,
+    ClientSession, ConnectionId, MembershipNotice, Millis, PendingAct, PendingKind, RelayFrame,
+    SessionConfig, SessionError, SessionEvent, SessionStart, membership_notices,
 };
 use support::sim::{Net, shared};
 use support::{ROOM, device, member, seed};
@@ -100,7 +100,7 @@ fn every_act_written_into_a_dead_link_reaches_the_room() {
     net.edit(a, |d| rect(d, 70.0));
     assert!(net.run_until(20_000, |n| n.converged(&[a, b])).is_some());
 
-    into_dead_link(&mut net, a, |s| s.add_back(member(C), History::Full));
+    into_dead_link(&mut net, a, |s| s.add_back(member(C)));
     net.run(10_000);
     assert_eq!(stored_keyring(&net).role(&member(C)), Some(Role::Member));
 }
@@ -276,7 +276,7 @@ fn an_add_back_is_pending_until_the_relay_holds_it() {
     let (mut net, [a, _b, _c]) = three(205);
     act(&mut net, a, |s| s.remove(member(B)));
     net.run(1_000);
-    act(&mut net, a, |s| s.add_back(member(B), History::Full));
+    act(&mut net, a, |s| s.add_back(member(B)));
     let pending = vec![PendingAct {
         member: member(B),
         kind: PendingKind::Add,

@@ -18,8 +18,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use curvyo_document_core::{
-    Created, DiskOp, DiskState, Document, DocumentVersion, ScannedDocument, ShareRecord,
-    WorkspaceList, WorkspaceShareRecord, pack, plan_disk, unpack,
+    Created, DiskOp, DiskState, Document, DocumentVersion, ScannedDocument, WorkspaceList,
+    WorkspaceShareRecord, pack, plan_disk, unpack,
 };
 use curvyo_storage_io::{
     IndexEntry, JoinFolderError, MARKER_DIR, MARKER_FILE, MarkerShare, RecentWorkspaces,
@@ -590,7 +590,7 @@ fn c27_join_folder_rules() {
 }
 
 /// Criterion 44: a removed device keeps every document as a local file (content intact, no
-/// workspace record), a document shared on its own keeps its own room, other files and the kept
+/// workspace record), a legacy document shared on its own is left as it is, other files and the kept
 /// deleted copies stay; the marker's share files go, `workspace.toml` stays.
 #[test]
 fn c44_a_removed_device_keeps_its_documents_as_local_files() {
@@ -638,7 +638,7 @@ fn c44_a_removed_device_keeps_its_documents_as_local_files() {
     assert_eq!(open_workspace(&root, [1; 16]).unwrap(), WS, "marker stays");
     let lid = unpack(9, &read_document(&root, &p("Lid.curvyo")).unwrap()).unwrap();
     assert!(lid.workspace_share().is_none(), "a plain local file now");
-    assert!(lid.share().is_none());
+    assert!(!lid.is_shared());
     assert_eq!(lid.export_json().unwrap(), json, "content intact");
     let other = unpack(9, &read_document(&root, &p("Other.curvyo")).unwrap()).unwrap();
     assert_eq!(
@@ -647,8 +647,8 @@ fn c44_a_removed_device_keeps_its_documents_as_local_files() {
         "another workspace's record is not touched"
     );
     assert_eq!(read_document(&root, &p("Own.curvyo")).unwrap(), own);
-    let own_opened: Option<ShareRecord> = unpack(9, &own).unwrap().share();
-    assert!(own_opened.is_some());
+    // The legacy file is not touched (it opens local, ADR 0044 decision 3).
+    assert!(unpack(9, &own).unwrap().legacy_share());
     assert_eq!(std::fs::read(root.join("notes.txt")).unwrap(), b"keep");
     assert_eq!(read_deleted(&root, doc_id(5)).unwrap(), b"kept");
     // Idempotent: a second call (a crash in between) does no harm.

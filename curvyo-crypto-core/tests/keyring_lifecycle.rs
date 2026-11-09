@@ -1,6 +1,7 @@
 //! The keyring facts the membership lifecycle reads (`specs/0097` criteria 5, 11, 12, 14, 17,
-//! 18, 22, 27 and 28; ADR 0041 decisions 1, 2, 4, 5 and 7): held-back denials, a pending
-//! rotation, former participants and the repair that respects a withheld epoch.
+//! 18, 22, 27 and 28; ADR 0041 decisions 1, 2, 4 and 5; ADR 0044 decision 4): held-back
+//! denials, a pending rotation, former participants and the repair of every epoch a member
+//! lacks.
 
 #![allow(
     clippy::unwrap_used,
@@ -263,10 +264,10 @@ fn owed_to(
         .collect()
 }
 
-/// Criteria 18, 19 and 22, ADR 0041 decision 7 (Frage 160 A): "From now on" wraps the current
-/// epoch only, and no member repairs the epoch that began while B was away.
+/// ADR 0044 decision 4: an add back that wraps the current epoch only leaves epoch 1, which
+/// began while B was away, to be repaired by every member that holds it; no epoch is withheld.
 #[test]
-fn from_now_on_is_not_undone_by_repair() {
+fn an_add_back_with_the_current_epoch_only_is_repaired() {
     let Away {
         a,
         b,
@@ -284,18 +285,16 @@ fn from_now_on_is_not_undone_by_repair() {
         "B keeps what B had"
     );
     assert!(!keyring.holds(&id(&b), epoch(1, &epoch_key(1))));
-    assert!(keyring.holds(&id(&b), epoch(2, &epoch_key(2))));
     for member in [&a, &c, &d] {
-        assert_eq!(
-            owed_to(&keyring, member, &b),
-            vec![],
-            "nobody repairs epoch 1"
-        );
+        let owed: Vec<u32> = owed_to(&keyring, member, &b)
+            .iter()
+            .map(|m| m.epoch.number)
+            .collect();
+        assert_eq!(owed, vec![1], "epoch 1 is repaired");
     }
 }
 
-/// Criterion 22, ADR 0041 decision 7: a rotation concurrent with the add back is not withheld
-/// (ADR 0031 6a repairs it); only ancestors of the add are.
+/// A rotation concurrent with the add back is repaired too (ADR 0031 6a).
 #[test]
 fn a_rotation_concurrent_with_the_add_back_is_still_repaired() {
     let Away {
@@ -310,14 +309,12 @@ fn a_rotation_concurrent_with_the_add_back_is_still_repaired() {
     let e3 = new_epoch(&[head], &d, 3, &epoch_key(3), &[&a, &c, &d]);
     let all: Vec<&Entry> = entries.iter().chain([&back, &e3]).collect();
     let keyring = replay(&all);
-    assert_eq!(
-        owed_to(&keyring, &d, &b),
-        vec![MissingWrap {
-            epoch: epoch(3, &epoch_key(3)),
-            recipient: identity(&b),
-        }]
-    );
-    assert_eq!(owed_to(&keyring, &c, &b).len(), 1);
+    let owed: Vec<u32> = owed_to(&keyring, &d, &b)
+        .iter()
+        .map(|m| m.epoch.number)
+        .collect();
+    assert_eq!(owed, vec![1, 3]);
+    assert_eq!(owed_to(&keyring, &c, &b).len(), 2, "C holds both too");
 }
 
 /// Criterion 23 and COOP-JOIN A: a member who came back by an invite still gets every epoch;
@@ -347,45 +344,4 @@ fn an_invite_claim_or_a_full_history_add_gets_every_epoch() {
     let keyring = replay(&all);
     assert!(keyring.holds(&id(&b), epoch(1, &epoch_key(1))));
     assert_eq!(owed_to(&keyring, &c, &b), vec![]);
-}
-
-/// ADR 0041 decision 6: the return check's anchor. B kept the keyring heads it knew when its
-/// share ended; only an admission of B that builds on all of them is an add back. The keyring
-/// cut off before B's removal (B's first add is no descendant), an earlier add back, or a
-/// keyring that lacks a stored head all say no.
-#[test]
-fn only_an_admission_after_the_stored_heads_is_an_add_back() {
-    let (a, b) = (device(1), device(2));
-    let g = genesis(&a);
-    let add_b = add(&[&g], &a, &b, Role::Member);
-    let rm_b = remove(&[&add_b], &a, &b);
-    let back = add(&[&rm_b], &a, &b, Role::Member);
-    let rm_again = remove(&[&back], &a, &b);
-    let back_again = add(&[&rm_again], &a, &b, Role::Member);
-
-    // B saw its first removal: its heads are [rm_b].
-    let heads = [hash(&rm_b)];
-    let cut_off = replay(&[&g, &add_b]);
-    assert_eq!(cut_off.role(&id(&b)), Some(Role::Member), "B is listed");
-    assert!(
-        !cut_off.admitted_after(&id(&b), &heads),
-        "a cut-off keyring"
-    );
-    let added_back = replay(&[&g, &add_b, &rm_b, &back]);
-    assert!(added_back.admitted_after(&id(&b), &heads));
-
-    // B was removed again after that add back: the earlier add back is no answer.
-    let heads = [hash(&rm_again)];
-    assert!(!added_back.admitted_after(&id(&b), &heads), "a rollback");
-    let all = replay(&[&g, &add_b, &rm_b, &back, &rm_again, &back_again]);
-    assert!(all.admitted_after(&id(&b), &heads));
-
-    // No heads, or a head the keyring lacks, proves nothing.
-    assert!(!all.admitted_after(&id(&b), &[]));
-    let unknown = remove(&[&back_again], &a, &b);
-    assert!(!all.admitted_after(&id(&b), &[hash(&unknown)]));
-    assert!(
-        !all.admitted_after(&id(&a), &heads),
-        "A was never added after them"
-    );
 }

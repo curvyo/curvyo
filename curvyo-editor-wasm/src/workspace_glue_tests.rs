@@ -104,7 +104,7 @@ fn shared_rows_carry_their_state_and_delete_is_for_everyone() {
     };
     assert_eq!(row("Lid")["state"], "outside");
     assert_eq!(row("Lid")["time"], "Not in the shared workspace");
-    assert_eq!(row("Gone")["time"], "Missing on this computer");
+    assert_eq!(row("Gone")["time"], "Missing on this device");
     assert_eq!(row("New")["state"], "receiving");
     let deleted: Value =
         serde_json::from_str(&glue.plan(r#"{"kind":"delete","path":["Sides"]}"#)).unwrap();
@@ -130,12 +130,10 @@ fn a_moved_folder_stays_expanded() {
 #[test]
 fn a_copy_is_the_same_drawing_without_the_share_record() {
     let original = curvyo_document_core::Document::new(7);
-    original.set_share(Some(curvyo_document_core::ShareRecord {
-        server: "ws://192.168.1.20:8787".to_owned(),
-        room: [3; 16],
-        server_seq: 4,
+    original.set_workspace_share(Some(curvyo_document_core::WorkspaceShareRecord {
+        workspace: [3; 16],
+        document: [4; 16],
         synced_version: curvyo_document_core::DocumentVersion::never(),
-        keyring_log: vec![1, 2, 3],
     }));
     let bytes = curvyo_document_core::pack(&original, "0.1.0").unwrap();
     let copy = workspace_copy_bytes(&bytes, "0.1.0").unwrap();
@@ -143,9 +141,9 @@ fn a_copy_is_the_same_drawing_without_the_share_record() {
     assert!(
         curvyo_document_core::unpack(8, &bytes)
             .unwrap()
-            .share()
+            .workspace_share()
             .is_some()
     );
-    assert!(reopened.share().is_none());
+    assert!(reopened.workspace_share().is_none());
     assert!(workspace_copy_bytes(b"not a zip", "0.1.0").is_err());
 }

@@ -220,25 +220,107 @@ pub(super) fn view(session: &Session) -> Value {
     serde_json::from_str(&session.share_view_json()).unwrap()
 }
 
-/// A shares a document holding one rectangle; B joins by A's invite.
+/// The open document's id in the workspace of [`shared_pair`].
+pub(super) const DOC: [u8; 16] = [0x5d; 16];
+
+/// Device 1 ("Anna") shares a workspace (room [`ROOM`]) of the one document `session` holds,
+/// from that document's session, which takes its record in place; its index.
+pub(super) fn share_open(net: &mut Net, session: Session) -> usize {
+    let bytes = curvyo_document_core::pack(&session.document, "test").unwrap();
+    let mut builder = crate::WorkspaceShareBuilder::new(ROOM, 0xa1, 1_800_000_000, [4; 16]);
+    builder
+        .add_document(&["Poster.curvyo".to_owned()], &bytes, DOC)
+        .unwrap();
+    let (prepared, files) = builder.finish([6; 16]);
+    let a = net.add(session);
+    let now = net.now;
+    net.s(a)
+        .share_workspace(SERVER, "Anna", "Box job", prepared, &seeds(1, 0), now)
+        .unwrap();
+    net.pump();
+    net.run(200);
+    assert!(net.s(a).adopt_workspace_document(&files[0].1));
+    a
+}
+
+/// `label` (device `device`, Loro peer `peer`) joins by `link` and opens the document; its
+/// index.
+pub(super) fn join_open(net: &mut Net, link: &str, label: &str, device: u8, peer: u64) -> usize {
+    let now = net.now;
+    let b = net.add(Session::new(peer));
+    net.s(b)
+        .join_workspace(link, label, "Box job", &seeds(device, 0), now)
+        .unwrap();
+    net.pump();
+    net.run(1_000);
+    let file = net
+        .s(b)
+        .take_workspace_writes()
+        .into_iter()
+        .find_map(|w| match w {
+            super::workspace_sync::WorkspaceWrite::Document {
+                document, bytes, ..
+            } if document == DOC => Some(bytes),
+            _ => None,
+        })
+        .expect("the joiner receives the document");
+    net.s(b).workspace_document_written(DOC);
+    let link = net.s(b).take_workspace_link().expect("a workspace link");
+    let mut opened = Session::open(peer, &file).unwrap();
+    opened.attach_workspace_link(link);
+    net.devices[b].session = opened;
+    net.pump();
+    net.run(300);
+    b
+}
+
+/// What a device keeps on disk to reopen a shared workspace: the open document's file, the
+/// marker's three files and the epoch keys (for the credential store).
+pub(super) type Kept = (Vec<u8>, super::MarkerFiles, Vec<(u32, [u8; 32])>);
+
+/// What device `i` keeps on disk to reopen the shared workspace.
+pub(super) fn kept(net: &mut Net, i: usize) -> Kept {
+    let (_, keys) = net.s(i).take_key_update().unwrap_or_default();
+    let file = net.s(i).pack_for_save().unwrap();
+    net.s(i).mark_saved();
+    let marker = net.s(i).take_workspace_marker().expect("the marker files");
+    (file, marker, keys)
+}
+
+/// A session opened from `file` that resumes the workspace from `marker` and `keys`, as
+/// `label` with `seeds`.
+pub(super) fn reopen(
+    net: &Net,
+    peer: u64,
+    (file, marker, keys): Kept,
+    label: &str,
+    seeds: &SyncSeeds,
+) -> Session {
+    let mut reopened = Session::open(peer, &file).unwrap();
+    assert!(reopened.resume_workspace(
+        &marker.share_json,
+        &marker.keyring_log,
+        &marker.list,
+        "Box job",
+        label,
+        keys,
+        seeds,
+        net.now,
+    ));
+    reopened
+}
+
+/// A shares a workspace of one document holding one rectangle, from that document's session;
+/// B ("Ben") joins by A's invite and opens the document (`specs/0105`: the workspace is the
+/// only unit of sharing).
 pub(super) fn shared_pair() -> (Net, usize, usize) {
     let mut net = Net::new();
     let mut a = Session::new(0xa1);
     draw_rect(&mut a, (10.0, 10.0), (40.0, 30.0));
-    let a = net.add(a);
+    let a = share_open(&mut net, a);
     let now = net.now;
-    net.s(a)
-        .share_document(SERVER, "Anna", ROOM, &seeds(1, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(200);
     let (link, _) = net.s(a).create_invite(24 * 3600, now).unwrap();
     net.pump();
-    let b = net.add(Session::new(0xb2));
-    net.s(b)
-        .join_document(&link, "Ben", &seeds(2, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(1_000);
+    let b = join_open(&mut net, &link, "Ben", 2, 0xb2);
     (net, a, b)
 }

@@ -22,9 +22,9 @@ use curvyo_crypto_core::keyring::{
 use curvyo_crypto_core::{DocumentId, EpochKey, MemberId, wrap_epoch_key};
 use curvyo_document_core::{Document, Length, NodeId, Point, RectBounds};
 use curvyo_sync_core::{
-    CheckOutcome, ClientFrame, ClientSession, DeviceAction, History, MembershipNotice,
-    RefusalReason, SessionError, SessionEvent, SessionStart, Target, WorkspaceInput, admin_remains,
-    admin_set, membership_notices, reconcile, reconcile_with_left,
+    ClientSession, DeviceAction, MembershipNotice, RefusalReason, SessionError, SessionEvent,
+    SessionStart, Target, WorkspaceInput, admin_remains, admin_set, membership_notices, reconcile,
+    reconcile_with_left,
 };
 use support::sim::{Net, shared};
 use support::{ROOM, device, member};
@@ -838,69 +838,28 @@ fn a_leave_written_into_a_dead_link_reaches_the_room() {
     }
 }
 
-/// B's return check with heads and keys as the ended record and credential store keep them.
-fn check(
-    net: &mut Net,
-    b: usize,
-    then_leave: bool,
-    heads: &[EntryHash],
-) -> (Vec<ClientFrame>, Option<CheckOutcome>, u64) {
-    let from = net.clients[b].sent.len();
-    let epoch_keys = net.clients[b].epoch_keys.clone();
-    net.start(
-        b,
-        ROOM,
-        0,
-        SessionStart::ReturnCheck {
-            epoch_keys,
-            then_leave,
-            heads: heads.to_vec(),
-        },
-    );
-    let start = net.now;
-    let mut outcome = None;
+/// B starts again as a member from the keyring and keys it kept, as an added-back device does
+/// (the return check is retired, ADR 0044 decision 5): whether the relay admitted it within 10 s
+/// (`Online`) or refused it, and how long that took.
+fn rejoin(net: &mut Net, b: usize) -> (Option<bool>, u64) {
+    let session = net.clients[b].session();
+    let start = SessionStart::Member {
+        keyring: session.keyring_entries(),
+        epoch_keys: session.epoch_keys(),
+    };
+    let from = net.clients[b].events.len();
+    net.start(b, ROOM, 0, start);
+    let begun = net.now;
+    let mut answer = None;
     net.run_until(10_000, |n| {
-        outcome = n.clients[b].events.iter().rev().find_map(|e| match e {
-            SessionEvent::CheckResult(o) => Some(*o),
+        answer = n.clients[b].events[from..].iter().find_map(|e| match e {
+            SessionEvent::Online => Some(true),
+            SessionEvent::Refused(_) => Some(false),
             _ => None,
         });
-        outcome.is_some() && n.clients[b].session().has_ended()
+        answer.is_some()
     });
-    let took = net.now.since(start);
-    let frames = net.clients[b].sent[from..]
-        .iter()
-        .map(|m| ClientFrame::decode(m).unwrap())
-        .collect();
-    // Only the outcome of this check (events of earlier checks are older).
-    (frames, outcome, took)
-}
-
-fn only_check_frames(frames: &[ClientFrame]) -> bool {
-    frames.iter().all(|f| {
-        matches!(
-            f,
-            ClientFrame::Hello {
-                since_seq: u64::MAX,
-                ..
-            } | ClientFrame::Proof { .. }
-                | ClientFrame::Ping
-        )
-    })
-}
-
-/// Criteria 20, 21 and 33: "Keep as it is" chosen before any add back sends nothing beyond
-/// Hello, Proof and Ping, writes no leave and answers "not yet".
-#[test]
-fn keep_as_it_is_while_still_removed_sends_nothing_else() {
-    let (mut net, [a, b, _c]) = three(71);
-    act(&mut net, a, |s| s.remove(member(B)));
-    net.run(1_000);
-    let heads = net.clients[b].session().keyring().unwrap().heads();
-    let entries_before = net.store[&ROOM].keyring.len();
-    let (frames, outcome, _) = check(&mut net, b, true, &heads);
-    assert_eq!(outcome, Some(CheckOutcome::NotYet));
-    assert!(only_check_frames(&frames), "{frames:?}");
-    assert_eq!(net.store[&ROOM].keyring.len(), entries_before);
+    (answer, net.now.since(begun))
 }
 
 /// Criteria 13 and 33: after a leave or a removal the device makes no connection attempt by
@@ -970,92 +929,57 @@ fn the_first_admins_rotation_clears_the_pending_rotation_for_all() {
     assert!(net.run_until(3_000, |n| n.converged(&[a, c, d])).is_some());
 }
 
-/// Criterion 26 and the flaky first check of the browser journey: when does the relay hold A's
-/// add back, measured from the call, for both history choices; and does a check started at any
-/// moment after A's own keyring lists B answer "added back"?
+/// Criterion 26: the relay holds A's add back within 1 s of the call, and B, starting again
+/// from its kept keyring at any moment after that, is admitted within 5 s.
 #[test]
-fn the_first_check_right_after_an_add_back() {
-    for history in [History::Full, History::FromNow] {
-        for seed in 80..86 {
-            let (mut net, [a, b, _c]) = three(seed);
-            act(&mut net, a, |s| s.remove(member(B)));
-            net.run(1_000);
-            let heads = net.clients[b].session().keyring().unwrap().heads();
-            act(&mut net, a, |s| s.add_back(member(B), history));
-            let listed_at_a = net.clients[a]
-                .session()
-                .keyring()
-                .unwrap()
-                .role(&member(B))
-                .is_some();
-            let start = net.now;
-            let stored_after = net.run_until(5_000, |n| {
-                stored_has(n, |p, _| matches!(p, Payload::AddMember { identity, .. } if identity.member == member(B)))
-            });
-            eprintln!(
-                "{history:?} seed {seed}: A lists B at once = {listed_at_a}, relay stores the add \
-                 after {stored_after:?} ms"
-            );
-            assert!(stored_after.is_some());
-            assert!(
-                net.now.since(start) <= 1_000,
-                "{history:?}: the add reaches the relay in 1 s"
-            );
-            let (frames, outcome, took) = check(&mut net, b, false, &heads);
-            assert_eq!(
-                outcome,
-                Some(CheckOutcome::AddedBack),
-                "{history:?} seed {seed}"
-            );
-            assert!(only_check_frames(&frames));
-            assert!(took <= 5_000, "criterion 26: {took} ms");
-        }
+fn the_first_rejoin_right_after_an_add_back() {
+    for seed in 80..86 {
+        let (mut net, [a, b, _c]) = three(seed);
+        act(&mut net, a, |s| s.remove(member(B)));
+        net.run(1_000);
+        act(&mut net, a, |s| s.add_back(member(B)));
+        let start = net.now;
+        let stored_after = net.run_until(5_000, |n| {
+            stored_has(n, |p, _| matches!(p, Payload::AddMember { identity, .. } if identity.member == member(B)))
+        });
+        assert!(stored_after.is_some());
+        assert!(
+            net.now.since(start) <= 1_000,
+            "the add reaches the relay in 1 s"
+        );
+        let (answer, took) = rejoin(&mut net, b);
+        assert_eq!(answer, Some(true), "seed {seed}");
+        assert!(took <= 5_000, "criterion 26: {took} ms");
     }
 }
 
-/// Criterion 26, the race itself: B's check starts in the same step as A's add back (the
-/// maker says "check now" while A clicks). The answer may be "not yet" while the add is in
-/// flight, but a second check a moment later must say "added back"; measured per seed.
+/// Criterion 26, the race itself: B starts again in the same step as A's add back. It may be
+/// refused while the add is in flight, but a second start a moment later is admitted.
 #[test]
-fn a_check_racing_the_add_back_answers_not_yet_then_added_back() {
-    let mut first_not_yet = 0;
+fn a_rejoin_racing_the_add_back_is_admitted_on_the_second_try() {
+    let mut first_refused = 0;
     for seed in 90..110 {
         let (mut net, [a, b, _c]) = three(seed);
         act(&mut net, a, |s| s.remove(member(B)));
         net.run(1_000);
-        let heads = net.clients[b].session().keyring().unwrap().heads();
-        session(&mut net, a)
-            .add_back(member(B), History::Full)
-            .unwrap();
-        let epoch_keys = net.clients[b].epoch_keys.clone();
-        net.start(
-            b,
-            ROOM,
-            0,
-            SessionStart::ReturnCheck {
-                epoch_keys,
-                then_leave: false,
-                heads: heads.clone(),
-            },
-        );
-        net.pump(a);
-        net.run(2_000);
-        let first = net.clients[b].events.iter().rev().find_map(|e| match e {
-            SessionEvent::CheckResult(o) => Some(*o),
-            _ => None,
-        });
-        if first == Some(CheckOutcome::NotYet) {
-            first_not_yet += 1;
+        session(&mut net, a).add_back(member(B)).unwrap();
+        let (first, _) = {
+            net.pump(a);
+            rejoin(&mut net, b)
+        };
+        if first == Some(false) {
+            first_refused += 1;
+            let (second, _) = rejoin(&mut net, b);
+            assert_eq!(second, Some(true), "seed {seed}");
+        } else {
+            assert_eq!(first, Some(true), "seed {seed}");
         }
-        let (_, second, _) = check(&mut net, b, false, &heads);
-        assert_eq!(second, Some(CheckOutcome::AddedBack), "seed {seed}");
     }
-    eprintln!("a check started with the add back said 'not yet' in {first_not_yet} of 20 runs");
+    eprintln!("a start with the add back was refused in {first_refused} of 20 runs");
 }
 
 /// Criterion 25: an admin cannot put a leaver back to work silently: after the add back the
-/// leaver's file (no session running) stays out until B checks and chooses; the relay sees no
-/// connection of B.
+/// leaver's file (no session running) stays out; the relay sees no connection of B.
 #[test]
 fn an_add_back_does_not_wake_the_leaver() {
     let (mut net, [a, b, _c]) = three(74);
@@ -1063,28 +987,24 @@ fn an_add_back_does_not_wake_the_leaver() {
     net.run(1_000);
     let connects = net.clients[b].connect_times.len();
     let sent = net.clients[b].sent.len();
-    act(&mut net, a, |s| s.add_back(member(B), History::Full));
+    act(&mut net, a, |s| s.add_back(member(B)));
     net.run(10_000);
     assert_eq!(net.clients[b].connect_times.len(), connects);
     assert_eq!(net.clients[b].sent.len(), sent);
 }
 
-/// Criterion 20 / ADR 0041 decision 6: a relay that serves only part of the keyring (cut
-/// before A's add back) gets "not yet", never "added back"; refusal is a denial, not a fake.
+/// Criterion 20: a removed device that starts again without an add back is refused as removed.
 #[test]
-fn a_relay_refusing_the_returning_device_gives_not_yet() {
+fn a_removed_device_starting_again_is_refused_as_removed() {
     let (mut net, [a, b, _c]) = three(75);
     act(&mut net, a, |s| s.remove(member(B)));
     net.run(1_000);
-    let heads = net.clients[b].session().keyring().unwrap().heads();
-    // B's check is answered "removed" by the relay (no add back happened).
-    let (_, outcome, _) = check(&mut net, b, false, &heads);
-    assert_eq!(outcome, Some(CheckOutcome::NotYet));
+    let (answer, _) = rejoin(&mut net, b);
+    assert_eq!(answer, Some(false));
     assert!(
         net.clients[b]
             .events
-            .iter()
-            .any(|e| matches!(e, SessionEvent::CheckResult(CheckOutcome::NotYet)))
+            .contains(&SessionEvent::Refused(RefusalReason::Removed))
     );
 }
 
@@ -1126,8 +1046,8 @@ fn edits_after_a_removal_into_a_dead_link_still_reach_the_others() {
 }
 
 /// Criteria 20 and 26 for the admin the relay cut off in a same-step mutual removal: its own
-/// keyring (and so its ended record's heads) holds its removal of the winner and the rotation,
-/// which the relay never stored. When the winner adds it back, its check must say "added back".
+/// keyring holds its removal of the winner and the rotation, which the relay never stored. When
+/// the winner adds it back, it is admitted again.
 #[test]
 fn the_cut_off_admin_of_a_mutual_removal_can_be_added_back() {
     let (mut net, [a, _b, c]) = three(50);
@@ -1144,17 +1064,15 @@ fn the_cut_off_admin_of_a_mutual_removal_can_be_added_back() {
         (c, a, A)
     };
     assert!(net.clients[loser].saw(&SessionEvent::Removed));
-    let heads = net.clients[loser].session().keyring().unwrap().heads();
-    act(&mut net, winner, |s| s.add_back(member(l), History::Full));
+    act(&mut net, winner, |s| s.add_back(member(l)));
     net.run(1_000);
-    let (_, outcome, _) = check(&mut net, loser, false, &heads);
-    assert_eq!(outcome, Some(CheckOutcome::AddedBack));
+    assert_eq!(rejoin(&mut net, loser).0, Some(true));
 }
 
 /// The same for the leaver whose leave went into a dead link. Since ADR 0041 decision 11 the
 /// leave is resent once the link is back, so the room lists B as left and A's removal of B is
-/// refused "not a member" (expectation changed with the architect's amendment); B's ended heads
-/// are its confirmed heads. After A adds B back, B's check must say "added back".
+/// refused "not a member" (expectation changed with the architect's amendment); B's confirmed
+/// heads are its keyring's. After A adds B back, B is admitted again.
 #[test]
 fn a_leaver_whose_leave_was_lost_can_be_added_back() {
     let (mut net, [a, b, _c]) = three(65);
@@ -1175,8 +1093,7 @@ fn a_leaver_whose_leave_was_lost_can_be_added_back() {
         session(&mut net, a).remove(member(B)),
         Err(SessionError::NotAMember)
     );
-    act(&mut net, a, |s| s.add_back(member(B), History::Full));
+    act(&mut net, a, |s| s.add_back(member(B)));
     net.run(1_000);
-    let (_, outcome, _) = check(&mut net, b, false, &heads);
-    assert_eq!(outcome, Some(CheckOutcome::AddedBack));
+    assert_eq!(rejoin(&mut net, b).0, Some(true));
 }

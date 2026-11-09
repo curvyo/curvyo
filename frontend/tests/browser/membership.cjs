@@ -2,14 +2,15 @@
 // local `curvyo-sync-server` on a temporary data directory and three browser contexts A (Anna),
 // B (Ben) and C (Cleo), each its own device.
 //
-// Document: A shares, B and C join; there is no second-admin line (customer 2026-11-09); A makes
-// Ben an admin (criterion 2, armed, no sentence) and a member again (3); A, the only admin, finds
-// Leave and Step down greyed (14); A removes Ben, whose Removed block is its heading only, with
-// no Check and no "Removed or left" list on A (add back dropped, customer 2026-11-09); A makes a
-// new invite and Ben joins again and syncs; Ben leaves and A changes the keys (11, 12).
-// Workspace: a faked desktop host (`support/fake-workspace-host.cjs`) for A and B; A removes Ben,
-// makes a new invite and Ben joins again into a new folder and syncs. The relay's data holds no
-// label, name or content (31).
+// Everything runs on a shared workspace (`specs/0105`: the workspace is the only unit of sharing)
+// with a faked desktop host (`support/fake-workspace-host.cjs`) per device. A invites, B and C
+// join; there is no second-admin line (customer 2026-11-09); A makes Ben an admin (criterion 2,
+// armed, no sentence) and a member again (3); A, the only admin, finds Leave and Step down greyed
+// (14); A removes Ben, whose Removed block is its heading only, with no Check and no "Removed or
+// left" list on A (add back dropped, customer 2026-11-09); A makes a new invite and Ben joins
+// again into a new folder and syncs; Ben leaves and A changes the keys (11, 12). A second pair:
+// Anna makes Ben admin, steps down and leaves; Ben, the only participant left, stops sharing. The
+// relay's data holds no label, name or content (31).
 //
 // Needs `target/debug/curvyo-sync-server` (`cargo build -p curvyo-sync-server`) and a production
 // preview (`npm run build`, `npx vite preview --host localhost --port 1421`); starts the preview
@@ -79,18 +80,15 @@ async function until(what, check, timeout = 10000) {
   }
 }
 
-/** One device; with `host`, a faked desktop host on real folders. */
-async function device(browser, url, label, host = false) {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+/** One device with a faked desktop host on real folders. */
+async function device(browser, url, label) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`${label}: ${e.stack || e.message}`));
-  const d = { context, page, errors, label, host: null, saves: 0 };
-  if (host) {
-    d.host = makeHost(out, label);
-    await page.exposeFunction('__host', (cmd, args, bytes) => d.host.handle(cmd, args, bytes));
-    await page.addInitScript(FAKE_HOST);
-  }
+  const d = { context, page, errors, label, host: makeHost(out, label) };
+  await page.exposeFunction('__host', (cmd, args, bytes) => d.host.handle(cmd, args, bytes));
+  await page.addInitScript(FAKE_HOST);
   await page.goto(url, { waitUntil: 'networkidle' });
   d.canvas = await page.locator('canvas').first().boundingBox();
   return d;
@@ -100,7 +98,7 @@ const panel = (d) => d.page.locator('[role=tabpanel]');
 const tab = async (d, name) => { await d.page.getByRole('tab', { name: new RegExp(`^${name}`) }).click(); await settle(d.page); };
 const tool = async (d, name) => { await d.page.getByRole('button', { name: new RegExp(`^${name} tool`) }).click(); await settle(d.page); };
 const at = (d, x, y) => ({ x: d.canvas.x + x, y: d.canvas.y + y });
-const participants = (d) => panel(d).getByRole('list', { name: 'Participants' }).locator('li');
+const participants = (d) => panel(d).getByRole('list', { name: 'Participants' }).locator('li[data-member]');
 const row = (d, label) => participants(d).filter({ hasText: label });
 const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`) });
 const shown = (d, text) => d.page.getByText(text, { exact: true }).count().then((n) => n > 0);
@@ -118,15 +116,6 @@ async function rect(d, x, y, w, h) {
   await settle(d.page);
 }
 
-/** Saves a browser document through the File tab (a download). */
-async function download(d) {
-  await tab(d, 'File');
-  const file = d.page.waitForEvent('download');
-  await panel(d).getByRole('button', { name: 'Save', exact: true }).click();
-  d.saves += 1;
-  await (await file).saveAs(path.join(out, `${d.label}-${d.saves}.curvyo`));
-}
-
 /** The server and the name shown to others, then waits for "Connected". */
 async function setUp(d, address, name) {
   await tab(d, 'Share');
@@ -138,15 +127,51 @@ async function setUp(d, address, name) {
   await field.press('Enter');
 }
 
-/** A creates an invite link in its Share tab. */
+/** A creates an invite link in its Share tab: Invite person, in a Local workspace with the one
+ * confirm that turns Sync on (`specs/0105` criterion 11). */
 async function invite(d) {
   await tab(d, 'Share');
   const done = panel(d).getByRole('button', { name: 'Done', exact: true });
   if ((await done.count()) > 0) await done.click();
-  await panel(d).getByRole('button', { name: 'Invite', exact: true }).click();
+  await panel(d).getByRole('button', { name: 'Invite person', exact: true }).first().click();
+  const ask = panel(d).getByRole('group', { name: /leave this device encrypted/ });
+  if (await ask.waitFor({ timeout: 1000 }).then(() => true, () => false)) {
+    await ask.getByRole('button', { name: 'Invite person', exact: true }).click();
+  }
   const field = panel(d).getByLabel('Invite link', { exact: true });
-  await field.waitFor();
+  await field.waitFor({ timeout: 30000 });
   return field.inputValue();
+}
+
+/** `d` joins the workspace of `link` as `name` into the folder `folder`. */
+async function joinWorkspace(d, link, name, folder) {
+  d.host.state.joinName = folder;
+  await tab(d, 'Share');
+  await panel(d).getByRole('button', { name: 'Join…', exact: true }).click();
+  await panel(d).getByLabel('Link or code', { exact: true }).fill(link);
+  const field = panel(d).getByLabel('Name shown to others', { exact: true }).last();
+  if ((await field.inputValue()) !== name) {
+    await field.fill(name);
+    await field.press('Enter');
+  }
+  await panel(d).getByRole('button', { name: /^Choose folder/ }).click();
+  await panel(d).getByRole('button', { name: 'Join', exact: true }).click();
+}
+
+/** `d` opens a workspace folder with one saved document `doc` holding a rectangle. */
+async function workspaceWithDocument(d, doc) {
+  await tab(d, 'File');
+  await panel(d).getByRole('button', { name: 'Open workspace…', exact: true }).click();
+  await panel(d).getByRole('treegrid', { name: 'Workspace documents' }).waitFor();
+  await panel(d).getByRole('region', { name: 'Workspace' }).getByLabel('New document', { exact: true }).click();
+  const docName = panel(d).getByRole('textbox', { name: 'Name of the new document' });
+  await docName.fill(doc);
+  await docName.press('Enter');
+  await settle(d.page, 400);
+  await rect(d, 300, 200, 80, 60);
+  await tab(d, 'File');
+  await panel(d).getByRole('button', { name: 'Save', exact: true }).click();
+  await settle(d.page, 300);
 }
 
 /** The armed act `name` (customer feedback on PR #281): the first press arms it and nothing
@@ -160,23 +185,6 @@ async function armAct(d, name) {
 }
 
 const role = async (d, label) => (await row(d, label).innerText()).split('\n').map((l) => l.trim()).find((l) => /^(Admin|Member)/.test(l)) ?? '';
-
-/** `d` opens the invite link `link` of a document as `name`. */
-async function joinDocument(d, link, name) {
-  await tab(d, 'Share');
-  await panel(d).getByRole('button', { name: /^Open shared document/ }).click();
-  await panel(d).getByLabel('Invite link', { exact: true }).fill(link);
-  const field = panel(d).getByLabel('Name shown to others', { exact: true }).last();
-  await field.fill(name);
-  await field.press('Enter');
-  await panel(d).getByRole('button', { name: 'Join', exact: true }).click();
-  // A removed copy with unsaved changes asks first (the File tab's check): it is not needed.
-  const discard = panel(d).getByRole('button', { name: 'Discard', exact: true });
-  if (await discard.waitFor({ timeout: 1500 }).then(() => true, () => false)) {
-    await settle(d.page, 450);
-    await discard.click();
-  }
-}
 
 (async () => {
   const relay = await startRelay();
@@ -197,17 +205,16 @@ async function joinDocument(d, link, name) {
 
     /** How long the UI took to show each change after the press (ms), for the lead's report. */
     const timings = {};
-    step('Share, join twice; no second-admin line (customer 2026-11-09)');
-    await rect(A, 300, 200, 120, 80);
-    await download(A);
+    step('Invite, join twice; no second-admin line (customer 2026-11-09)');
+    await workspaceWithDocument(A, 'Poster');
     await setUp(A, relay.address, 'Anna');
-    await panel(A).getByText('Connected', { exact: true }).waitFor();
-    // Share asks nothing (customer 2026-11-09: no confirm sentences in the Share tab).
-    await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
-    timings.shareConnected = await until('A connected', async () => (await panel(A).getByText('Connected', { exact: true }).count()) === 1, 10000);
+    await panel(A).getByText('Connected', { exact: true }).first().waitFor();
     for (const [d, name] of [[B, 'Ben'], [C, 'Cleo']]) {
-      await joinDocument(d, await invite(A), name);
-      timings[`${name}Joined`] = await until(`${name} joined`, async () => (await row(A, name).count()) === 1, 15000);
+      await joinWorkspace(d, await invite(A), name, `${name} box`);
+      timings[`${name}Joined`] = await until(`${name} joined`, async () => {
+        await tab(A, 'Share');
+        return (await row(A, name).count()) === 1;
+      }, 15000);
     }
     await until('A names Ben and Cleo', async () => (await row(A, 'Ben').count()) === 1 && (await row(A, 'Cleo').count()) === 1, 8000);
     await tab(A, 'Share');
@@ -254,7 +261,7 @@ async function joinDocument(d, link, name) {
     step('Criterion 13: A removes Ben; Ben\'s Removed block is its heading; no Removed or left list');
     await armAct(A, 'Remove Ben');
     timings.remove = await until('A lists two', async () => (await participants(A).count()) === 2, 8000);
-    timings.benTold = timings.remove + (await until('Ben is told', async () => shown(B, 'You were removed from this document. Your copy stays on this device.'), 8000));
+    timings.benTold = timings.remove + (await until('Ben is told', async () => shown(B, 'You were removed from this workspace. Your copies stay on this device.'), 8000));
     await tab(B, 'Share');
     await until('Ben sees the Removed block', async () => (await panel(B).getByText(/^You were removed from /).count()) >= 1, 8000);
     assert.equal(await panel(B).getByRole('button', { name: /^Check whether I was added back/ }).count(), 0, 'no Check');
@@ -263,7 +270,7 @@ async function joinDocument(d, link, name) {
     await assertPanelFits(B.page, '03-b-removed');
 
     step('Share tab feedback 3: A makes a new invite; the removed Ben joins again and syncs');
-    await joinDocument(B, await invite(A), 'Ben');
+    await joinWorkspace(B, await invite(A), 'Ben', 'Ben box again');
     timings.rejoin = await until('A lists Ben again', async () => (await row(A, 'Ben').count()) === 1, 15000);
     await until('Ben lists three', async () => {
       await tab(B, 'Share');
@@ -289,55 +296,16 @@ async function joinDocument(d, link, name) {
     await until('the keys changed', () => shown(A, 'Keys changed.'), 8000);
     await until('the notice is gone', async () => (await panel(A).getByText('Ben left. The keys have not been changed yet.').count()) === 0, 8000);
 
-    step('Share tab feedback 3: a workspace; A removes Ben, Ben joins again by a new invite and syncs');
-    const WA = await device(browser, url, 'WA', true);
-    const WB = await device(browser, url, 'WB', true);
+    step('A second pair: Anna shares Lid, Ben joins');
+    const WA = await device(browser, url, 'WA');
+    const WB = await device(browser, url, 'WB');
     all.push(WA, WB);
-    await tab(WA, 'File');
-    await panel(WA).getByRole('button', { name: 'Open workspace…', exact: true }).click();
-    await panel(WA).getByRole('treegrid', { name: 'Workspace documents' }).waitFor();
-    await panel(WA).getByRole('region', { name: 'Workspace' }).getByLabel('New document', { exact: true }).click();
-    const docName = panel(WA).getByRole('textbox', { name: 'Name of the new document' });
-    await docName.fill('Lid');
-    await docName.press('Enter');
-    await settle(WA.page, 400);
-    await rect(WA, 300, 200, 80, 60);
-    await tab(WA, 'File');
-    await panel(WA).getByRole('button', { name: 'Save', exact: true }).click();
-    await settle(WA.page, 300);
+    await workspaceWithDocument(WA, 'Lid');
     await setUp(WA, relay.address, 'Anna');
     await panel(WA).getByText('Connected', { exact: true }).first().waitFor();
-    await panel(WA).getByRole('button', { name: 'Share workspace', exact: true }).click();
-    timings.workspaceShared = await until('A shared the workspace', async () => {
-      await tab(WA, 'Share');
-      return (await panel(WA).getByText(/^Shared on /).count()) >= 1;
-    }, 30000);
-    const wsLink = await invite(WA);
-    await tab(WB, 'Share');
-    await panel(WB).getByRole('button', { name: /^Join shared workspace/ }).click();
-    await panel(WB).getByLabel('Invite link', { exact: true }).fill(wsLink);
-    const wbName = panel(WB).getByLabel('Name shown to others', { exact: true }).last();
-    await wbName.fill('Ben');
-    await wbName.press('Enter');
-    await panel(WB).getByRole('button', { name: /^Choose folder/ }).click();
-    await panel(WB).getByRole('button', { name: 'Join', exact: true }).click();
+    await joinWorkspace(WB, await invite(WA), 'Ben', 'Joined box');
     timings.workspaceJoined = await until('Ben has the file', async () => WB.host.state.root !== null && exists(WB, 'Lid.curvyo'), 30000);
     await until('A lists Ben', async () => {
-      await tab(WA, 'Share');
-      return (await row(WA, 'Ben').count()) === 1;
-    }, 15000);
-    await armAct(WA, 'Remove Ben');
-    timings.workspaceRemove = await until('Ben keeps the ended record', async () => exists(WB, MARKER, 'share.ended.json') && !exists(WB, MARKER, 'share.json'), 15000);
-    await until('Ben is told', async () => (await WB.page.getByText('You were removed from this workspace. Your copies stay on this computer.').count()) >= 1, 15000);
-    const wsAgain = await invite(WA);
-    WB.host.state.joinName = 'Joined box again';
-    await tab(WB, 'Share');
-    await panel(WB).getByRole('button', { name: /^Join shared workspace/ }).click();
-    await panel(WB).getByLabel('Invite link', { exact: true }).fill(wsAgain);
-    await panel(WB).getByRole('button', { name: /^Choose folder/ }).click();
-    await panel(WB).getByRole('button', { name: 'Join', exact: true }).click();
-    timings.workspaceRejoin = await until('Ben has the file again', async () => WB.host.state.root !== null && WB.host.state.root.endsWith('Joined box again') && exists(WB, 'Lid.curvyo'), 30000);
-    await until('A lists Ben again', async () => {
       await tab(WA, 'Share');
       return (await row(WA, 'Ben').count()) === 1;
     }, 15000);
@@ -345,8 +313,8 @@ async function joinDocument(d, link, name) {
       await tab(WB, 'Share');
       return (await participants(WB).count()) === 2;
     }, 15000);
-    await shot(WB, '07-wb-joined-again');
-    await assertPanelFits(WB.page, '07-wb-joined-again');
+    await shot(WB, '07-wb-joined');
+    await assertPanelFits(WB.page, '07-wb-joined');
 
     step('Share tab feedback round 4: Anna makes Ben admin, steps down and leaves; Ben, the only admin, keeps the workspace block, invites and can stop sharing');
     await tab(WA, 'Share');
@@ -367,7 +335,7 @@ async function joinDocument(d, link, name) {
     }, 15000);
     await shot(WB, '08-wb-only-admin');
     assert.equal(await panel(WB).getByRole('region', { name: /^Workspace / }).count(), 1, 'the workspace block shows');
-    assert.equal(await panel(WB).getByRole('button', { name: 'Invite', exact: true }).count(), 1, 'Ben can invite');
+    assert.equal(await panel(WB).getByRole('button', { name: 'Invite person', exact: true }).count(), 1, 'Ben can invite');
     await assertPanelFits(WB.page, '08-wb-only-admin');
     // Stop sharing, armed, for the only participant left: the workspace is local again.
     const stop = panel(WB).getByRole('button', { name: 'Stop sharing', exact: true });
@@ -376,15 +344,15 @@ async function joinDocument(d, link, name) {
     assert.ok(exists(WB, MARKER, 'share.json'), 'the first press only arms');
     await stop.click();
     timings.stopSharing = await until('the marker has no share files', async () => !exists(WB, MARKER, 'share.json'), 10000);
-    await until('Ben\'s workspace is not shared', async () => {
+    await until('Ben\'s workspace is Local', async () => {
       await tab(WB, 'Share');
-      return (await panel(WB).getByText('Not shared', { exact: true }).count()) >= 1;
+      return (await panel(WB).getByText('Local', { exact: true }).count()) >= 1;
     }, 10000);
     await shot(WB, '09-wb-stopped');
 
     assert.deepEqual(all.flatMap((d) => d.errors), []);
     console.log(`timings (ms): ${JSON.stringify(timings)}`);
-    console.log('PASS browser 0097: roles armed without sentences, last admin greyed, removal without add back, a removed device joins again by a new invite (document and workspace), leave and change keys');
+    console.log('PASS browser 0097 on shared workspaces: roles armed without sentences, last admin greyed, removal without add back, a removed device joins again by a new invite, leave and change keys, stop sharing');
   } catch (error) {
     for (const d of all) {
       await shot(d, `failed-${d.label}`).catch(() => undefined);

@@ -6,6 +6,8 @@
 //! with a [`WorkspaceChannel`]. Records of the open document are applied as in `0092`; the
 //! others wait for the host's background writer.
 
+use std::collections::BTreeSet;
+
 use curvyo_crypto_core::keyring::decode_log;
 use curvyo_crypto_core::{EpochKey, IdentityKeys};
 use curvyo_document_core::{
@@ -168,6 +170,26 @@ impl Session {
             .is_some_and(|s| s.workspace.is_some() && s.ended.is_none())
     }
 
+    /// Whether this device was removed from its shared workspace or left it (criteria 44,
+    /// 45): the link keeps its ended record ([`Session::workspace_ended_record`]) and the
+    /// workspace is a local one.
+    #[must_use]
+    pub fn workspace_removed(&self) -> bool {
+        self.sync.as_ref().is_some_and(|l| {
+            l.workspace.is_some()
+                && matches!(
+                    l.ended,
+                    Some(super::sync::SyncEnd::Removed | super::sync::SyncEnd::Left)
+                )
+        })
+    }
+
+    /// Whether the session is connected and caught up.
+    #[must_use]
+    pub fn sync_online(&self) -> bool {
+        self.sync.as_ref().is_some_and(|l| l.online)
+    }
+
     /// Takes the workspace's link out of this session (the maker switches documents); `None`
     /// when it carries none or the link has ended (left, removed, refused). Records applied to
     /// this document but not in its file go back to the background queue.
@@ -216,6 +238,7 @@ impl Session {
         let record = self.document.workspace_share();
         let assets = self.referenced_assets();
         let asset_total = self.document.asset_bytes();
+        let version = self.document.version();
         let Some(link) = self.sync.as_mut() else {
             return;
         };
@@ -228,10 +251,14 @@ impl Session {
             .map(|r| r.document);
         let waiting = channel.switch_stream(stream);
         let synced = record.map_or_else(DocumentVersion::never, |r| r.synced_version);
+        // Pictures placed since the acknowledged version (offline, before a reopen) go out with
+        // the edits: the file does not say which the room holds, so every referenced picture is
+        // sent again; the room's copies are idempotent (ADR 0031 decision 9, Proposal).
+        let unsynced = version != synced;
         link.exported = synced.clone();
         link.synced = synced;
-        link.assets = assets;
-        link.asset_total = asset_total;
+        link.assets = if unsynced { BTreeSet::new() } else { assets };
+        link.asset_total = if unsynced { 0 } else { asset_total };
         for item in waiting {
             let kind = match item.kind {
                 BackgroundKind::Update => RecordKind::Update,

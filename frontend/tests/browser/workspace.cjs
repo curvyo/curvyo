@@ -1,12 +1,14 @@
 // Browser journey of `specs/0095-workspace` slice 1 (plan task 27): a local `curvyo-sync-server`
 // on a temporary data directory and two browser contexts, A and B, each its own device with a
 // faked desktop host (`window.__TAURI_INTERNALS__`, as `acceptance_0087_browser.test.ts`) whose
-// workspace commands run on real folders under target/0095-browser/. A opens an empty folder as a
-// workspace, creates documents, shares one of them on its own (`0092`) and then the whole
-// workspace: the Share confirm names the document taken in (criteria 25, 42). B joins by the `2.`
-// link into an empty folder (26 to 28); A's create, rename, move and delete reach B's disk with
-// notices naming Anna, B restores the deleted document for both (35 to 40); a live edit in one
-// open document reaches the other side (30); A removes B, whose workspace turns local (43, 44).
+// workspace commands run on real folders under target/0095-browser/. A makes a workspace for a
+// saved file (`specs/0105` criteria 7, 8), then opens an empty folder as a workspace, creates
+// documents and invites a person from the Local workspace: one confirm turns Sync on and shows the
+// `2.` link (0105 criterion 11). B joins by the link in the one Join field into an empty folder
+// (26 to 28); A's create, rename, move and delete reach B's disk with notices naming Anna, B
+// restores the deleted document for both (35 to 40); a live edit in one open document reaches the
+// other side (30); A removes B, whose workspace turns local (43, 44). The Share tab stays selected
+// through Make a workspace, Invite person and Join (0105 criterion 20).
 //
 // The fake host mirrors `curvyo-app`'s workspace commands closely enough for the page; their
 // Rust side is covered by `curvyo-storage-io` and `curvyo-app` tests, not here.
@@ -107,7 +109,7 @@ const tool = async (d, name) => { await d.page.getByRole('button', { name: new R
 const at = (d, x, y) => ({ x: d.canvas.x + x, y: d.canvas.y + y });
 const tree = (d) => d.page.getByRole('treegrid', { name: 'Workspace documents' });
 const row = (d, name) => tree(d).getByRole('row', { name: new RegExp(`^${name}\\b`) });
-const participants = (d) => d.page.getByRole('list', { name: 'Participants' }).locator('li');
+const participants = (d) => d.page.getByRole('list', { name: 'Participants' }).locator('li[data-member]');
 const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`) });
 const exists = (d, ...rel) => fs.existsSync(path.join(d.host.state.root, ...rel));
 const objects = (d, ...rel) => {
@@ -161,9 +163,41 @@ async function newEntry(d, kind, name) {
     A = await device(browser, url, 'A');
     B = await device(browser, url, 'B');
 
+    step('0105 criteria 7, 8 and 20: Make a workspace for a saved file; the Share tab stays');
+    await rect(A, 300, 200, 40, 40);
+    await save(A);
+    await tab(A, 'Share');
+    assert.equal(await panel(A).getByText('Sharing works on workspaces.', { exact: true }).count(), 1);
+    // Customer feedback on PR #298: with no workspace open, Invite person is greyed and says why.
+    const greyInvite = panel(A).getByRole('button', { name: 'Invite person', exact: true });
+    assert.equal(await greyInvite.getAttribute('aria-disabled'), 'true');
+    assert.equal(await greyInvite.getAttribute('aria-description'), 'Open a workspace first.');
+    await greyInvite.hover();
+    await A.page.getByRole('tooltip').filter({ hasText: 'Open a workspace first.' }).first().waitFor({ timeout: 3000 });
+    await greyInvite.click({ force: true });
+    await settle(A.page, 300);
+    assert.equal(await panel(A).getByRole('group', { name: /leave this device encrypted/ }).count(), 0, 'a press does nothing');
+    await A.page.mouse.move(5, 5);
+    await panel(A).getByRole('button', { name: 'Make a workspace for this file', exact: true }).click();
+    const madeIn = path.join(A.host.home, 'save 1');
+    await panel(A).getByText(`New folder ${madeIn}${path.sep}. save 1.curvyo moves into it.`, { exact: true }).waitFor();
+    await watchTabs(A.page);
+    await panel(A).getByRole('button', { name: 'Make workspace', exact: true }).click();
+    await until('the file is in its new workspace', async () => A.host.state.root === madeIn
+      && fs.existsSync(path.join(madeIn, 'save 1.curvyo')) && fs.existsSync(path.join(madeIn, MARKER, 'workspace.toml')));
+    assert(!fs.existsSync(path.join(A.host.home, 'save 1.curvyo')), 'the file moved');
+    await panel(A).getByRole('region', { name: 'Workspace save 1' }).getByText('Local', { exact: true }).waitFor();
+    assert.equal(await panel(A).getByRole('switch').count(), 0, 'no Sync switch (customer feedback on PR #298)');
+    await stayedOnShare(A, 'Make a workspace');
+    await tab(A, 'File');
+    await until('the file stays open at its new path', async () => (await row(A, 'save 1').getAttribute('aria-selected')) === 'true');
+
     step('Criteria 1 and 13: A opens an empty folder and creates documents');
     await tab(A, 'File');
+    await panel(A).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
+    await settle(A.page, 300);
     await panel(A).getByRole('button', { name: 'Open workspace…', exact: true }).click();
+    await until('Box job is open', async () => A.host.state.root?.endsWith('Box job'));
     await tree(A).waitFor();
     assert(exists(A, MARKER, 'workspace.toml'), 'the marker is written');
     await newEntry(A, 'New document', 'Lid');
@@ -178,7 +212,7 @@ async function newEntry(d, kind, name) {
     assert.equal(objects(A, 'Lid.curvyo').length, 1);
     assert.equal(objects(A, 'Base.curvyo').length, 1);
 
-    step('Criterion 42 setup: Solo is shared on its own');
+    step('0105 criteria 11 and 20: Invite person of a Local workspace turns Sync on in one confirm');
     await tab(A, 'Share');
     const server = panel(A).getByLabel('Server', { exact: true });
     await server.fill(`ws://${relay.address}`);
@@ -187,39 +221,62 @@ async function newEntry(d, kind, name) {
     await name.fill('Anna');
     await name.press('Enter');
     await panel(A).getByText('Connected', { exact: true }).first().waitFor();
-    await panel(A).getByRole('button', { name: 'Share', exact: true }).click();
-    await panel(A).getByText(/^Shared on /).first().waitFor({ timeout: 10000 });
-    await save(A);
-    await until('Solo carries its own keyring', async () => zip('members', path.join(A.host.state.root, 'Solo.curvyo')).keyring);
-
-    step('Criteria 25 and 42: Share workspace takes Solo in (no confirm, customer 2026-11-09)');
-    await tab(A, 'Share');
+    const workspaceA = panel(A).getByRole('region', { name: 'Workspace Box job' });
+    await workspaceA.getByText('Local', { exact: true }).waitFor();
     await watchTabs(A.page);
-    await panel(A).getByRole('button', { name: 'Share workspace', exact: true }).click();
-    await until('A shared the workspace', async () => (await panel(A).getByText(/^Shared on /).count()) >= 1, 30000);
+    // A slow disk holds Share's file writes back long enough for an edit and a Save after the
+    // documents were read and before Solo's file is written (the race of the tester's finding).
+    A.host.state.delays = { replace_workspace_document: 2000 };
+    await workspaceA.getByRole('button', { name: 'Invite person', exact: true }).click();
+    const syncAsk = workspaceA.getByRole('group', { name: 'Names, folders and files leave this device encrypted.' });
+    await syncAsk.waitFor();
+    await syncAsk.getByRole('button', { name: 'Invite person', exact: true }).click();
+    await until('Share writes its files', async () => A.host.state.calls.includes('replace_workspace_document'), 30000);
+    step('0105: an edit and Ctrl+S during the upload are kept, with the workspace record');
+    await rect(A, 520, 420, 30, 30);
+    await A.page.keyboard.press('Control+s');
+    await settle(A.page, 300);
+    const linkField = panel(A).getByLabel('Invite link', { exact: true });
+    await linkField.waitFor({ timeout: 30000 });
+    A.host.state.delays = {};
+    await until('Solo holds both rectangles and its record', async () => {
+      const members = zip('members', path.join(A.host.state.root, 'Solo.curvyo'));
+      return objects(A, 'Solo.curvyo').length === 2 && members.share && JSON.parse(members.share).format_version === 2;
+    }, 15000);
     await settle(A.page, 500);
-    await stayedOnShare(A, 'Share workspace');
-    assert.equal(await panel(A).getByRole('button', { name: 'Invite', exact: true }).count(), 1, 'Invite is right there');
+    await stayedOnShare(A, 'Invite person');
+    assert.equal(await workspaceA.getByRole('group', { name: /leave this device/ }).count(), 0, 'one dialog, not two');
+    await workspaceA.getByText('Synced', { exact: true }).waitFor();
     await until('Solo is a workspace document', async () => {
       const members = zip('members', path.join(A.host.state.root, 'Solo.curvyo'));
       return !members.keyring && members.share && JSON.parse(members.share).format_version === 2;
     }, 30000);
     await shot(A, '02-a-shared');
 
-    step('Criterion 26: a 2. invite');
-    await panel(A).getByRole('button', { name: 'Invite', exact: true }).click();
-    const linkField = panel(A).getByLabel('Invite link', { exact: true });
-    await linkField.waitFor();
+    step('Criterion 26: a 2. invite, 24 hours, no choice');
     const link = await linkField.inputValue();
     assert.match(link, /^curvyo:\/\/join\?server=[^#]+#2\.[A-Za-z0-9_-]+$/, link);
     // The invite shows its expiry without a sentence (customer 2026-11-09).
     assert.doesNotMatch(await panel(A).innerText(), /Anyone with this link/);
     assert.match(await panel(A).innerText(), /Expires /);
+    // The open document took its record in its own session: it is the workspace's stream.
+    await tab(A, 'File');
+    await until('the File tab names the workspace', async () => (await panel(A).getByText('Shared through workspace Box job', { exact: true }).count()) === 1);
+    await tab(A, 'Share');
 
     step('Criteria 27 and 28: B joins into an empty folder and receives every document');
     await tab(B, 'Share');
-    await panel(B).getByRole('button', { name: /^Join shared workspace/ }).click();
-    await panel(B).getByLabel('Invite link', { exact: true }).fill(link);
+    await panel(B).getByRole('button', { name: 'Join…', exact: true }).click();
+    // 0105 criterion 3: a 1. link is refused with its reason and nothing is sent (no socket to
+    // the link's server, which is not running).
+    const sockets = [];
+    B.page.on('websocket', (socket) => sockets.push(socket.url()));
+    const oneLink = `curvyo://join?server=ws%3A%2F%2F127.0.0.1%3A9#1.${require('node:crypto').randomBytes(48).toString('base64url')}`;
+    await panel(B).getByLabel('Link or code', { exact: true }).fill(oneLink);
+    await panel(B).getByText('This link is for a single shared document. Documents are now shared in workspaces: ask for a workspace invite.', { exact: true }).waitFor();
+    await settle(B.page, 1500);
+    assert.deepEqual(sockets.filter((u) => u.includes(':9')), [], 'no request for a 1. link');
+    await panel(B).getByLabel('Link or code', { exact: true }).fill(link);
     const bName = panel(B).getByLabel('Name shown to others', { exact: true }).last();
     await bName.fill('Ben');
     await bName.press('Enter');
@@ -236,7 +293,12 @@ async function newEntry(d, kind, name) {
     }, 15000);
     await until('A lists B', async () => (await participants(A).count()) === 2, 15000);
     await stayedOnShare(B, 'Join');
+    // 0105 criterion 16: with another person in it the state is Shared; Join… is still there.
+    await tab(A, 'Share');
+    await workspaceA.getByText('Shared', { exact: true }).waitFor({ timeout: 10000 });
+    assert.equal(await panel(A).getByRole('button', { name: 'Join…', exact: true }).count(), 1, 'Join… while shared');
     assert.equal(objects(B, 'Lid.curvyo').length, 1, 'B holds A\'s Lid');
+    await until('the edit made during the upload reaches B', async () => objects(B, 'Solo.curvyo').length === 2, 15000);
     await tab(B, 'File');
     await until('B\'s tree shows the documents', async () => (await row(B, 'Solo').count()) === 1);
     await shot(B, '03-b-joined');
@@ -295,6 +357,8 @@ async function newEntry(d, kind, name) {
     await tab(A, 'File');
     await row(A, 'Bottom').click();
     await settle(A.page, 800);
+    // 0105 criterion 2: the File tab says how the open document is shared.
+    await until('the File tab names the workspace', async () => (await panel(A).getByText('Shared through workspace Box job', { exact: true }).count()) === 1);
     await tab(B, 'File');
     await row(B, 'Bottom').click();
     await settle(B.page, 800);
@@ -319,7 +383,7 @@ async function newEntry(d, kind, name) {
     await settle(A.page, 600);
     await removeBen.click();
     await until('A lists only itself', async () => (await participants(A).count()) === 1, 15000);
-    await until('B told', async () => (await B.page.getByText('You were removed from this workspace. Your copies stay on this computer.').count()) >= 1, 15000);
+    await until('B told', async () => (await B.page.getByText('You were removed from this workspace. Your copies stay on this device.').count()) >= 1, 15000);
     await until('B\'s marker share files are gone', async () => !exists(B, MARKER, 'share.json'), 8000);
     // Since 0097 (ADR 0041 decision 6) the marker keeps the ended record for the way back, and
     // the Share tab shows the Removed block instead of the plain not-shared state.
@@ -327,13 +391,13 @@ async function newEntry(d, kind, name) {
     await tab(B, 'Share');
     // The Removed block is its heading (add back dropped, customer 2026-11-09).
     await until('B\'s Share tab shows the Removed block', async () => (await panel(B).getByText(/^You were removed from /).count()) >= 1, 8000);
-    await until('B\'s Share tab says Not shared', async () => (await panel(B).getByText('Not shared', { exact: true }).count()) >= 1, 8000);
-    assert.equal(await panel(B).getByRole('button', { name: 'Share workspace', exact: true }).count(), 1, 'Share workspace is available again');
+    await until('B\'s Share tab says Local', async () => (await panel(B).getByText('Local', { exact: true }).count()) >= 1, 8000);
+    assert.equal(await panel(B).getByRole('button', { name: 'Invite person', exact: true }).count(), 1, 'Invite person is available again');
     await shot(B, '07-b-removed');
     for (const f of ['Bottom.curvyo', 'Solo.curvyo', 'Cover.curvyo']) assert(exists(B, f), `B keeps ${f}`);
 
     assert.deepEqual([...A.errors, ...B.errors], []);
-    console.log(`PASS browser 0095: open, create, share with take-in, invite 2., join, create/rename/move/delete/restore both ways, live edit, removal; timings ${JSON.stringify(timings)}`);
+    console.log(`PASS browser 0095: make a workspace for a file, open, create, invite person from Local, join, create/rename/move/delete/restore both ways, live edit, removal; the Share tab stays; timings ${JSON.stringify(timings)}`);
   } catch (error) {
     for (const d of [A, B]) {
       if (d) {

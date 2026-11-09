@@ -1,7 +1,7 @@
 // The browser's passkey key backup in My devices (`specs/0096-own-devices-sync` ux-notes 9.1,
 // ADR 0040 decision 13): on a paired browser Back up with passkey (at once; the passkey prompt
 // confirms) or Remove backup (an armed button); on a browser without a group Restore with
-// passkey beside Join my devices. One status or alert line under them.
+// passkey beside Add device. One status or alert line under them.
 
 import { KeyRound } from "lucide-react";
 

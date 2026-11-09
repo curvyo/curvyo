@@ -11,7 +11,7 @@ use curvyo_crypto_core::keyring::{Keyring, Role, decode_log, encode_log};
 use curvyo_crypto_core::{EpochKey, Identity, IdentityKeys, MemberId};
 use curvyo_document_core::{DevicesList, DocumentVersion};
 use curvyo_sync_core::{
-    ClientSession, ConnectionId, DeviceAction, History, Millis, RecordKind, RoomId, SessionConfig,
+    ClientSession, ConnectionId, DeviceAction, Millis, RecordKind, RoomId, SessionConfig,
     SessionError, SessionStart, Target, reconcile,
 };
 
@@ -493,7 +493,7 @@ impl DeviceGroupGlue {
             return Ok(());
         }
         if keyring.was_removed(&identity.member) {
-            self.client.add_back(identity.member, History::Full)?;
+            self.client.add_back(identity.member)?;
             return self.client.set_role(identity.member, Role::Admin);
         }
         self.client.add_member(identity, Role::Admin)

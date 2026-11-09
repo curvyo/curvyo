@@ -7,7 +7,6 @@ import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 
 import type { ProjectApi } from "@/hooks/useProject";
 import type { SharedTreeHooks, WorkspaceApi } from "@/hooks/useWorkspace";
-import { type RoomKeys, openOldRoom } from "@/lib/movedPush";
 import { type DeletedRow, type DiskStep, type SharedScan, parseDeleted, parseDiskPlan, sharedStates, trashChoice } from "@/lib/sharedTree";
 import { SCAN_MS, type WorkspaceOp, fileNameOf } from "@/lib/workspaceRows";
 import { invoke } from "@/platform/host";
@@ -17,14 +16,7 @@ import {
   workspace_deleted_while_open_text,
   workspace_follow_failed,
   workspace_restored_text,
-  workspace_take_in_confirm_text,
-  workspace_take_in_refused_text,
-  workspace_take_in_unreachable_text,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
-
-/** The alert when the old room could not be told (Proposal: the document is in the workspace
- * anyway; its own link keeps admitting until a member of it reads `Moved`). */
-const MOVED_FAILED = "Could not reach the document's own room. Its old link may still work.";
 
 function random(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
@@ -52,12 +44,10 @@ export function useSharedTree(
   project: ProjectApi,
   workspace: WorkspaceApi,
   writingRef: MutableRefObject<Promise<void>>,
-  keysFor: (room: string) => Promise<RoomKeys | null>,
-  label: string,
 ): void {
-  const refs = useRef({ project, workspace, keysFor, label });
+  const refs = useRef({ project, workspace });
   useEffect(() => {
-    refs.current = { project, workspace, keysFor, label };
+    refs.current = { project, workspace };
   });
   const runningRef = useRef(false);
   const indexRef = useRef("");
@@ -253,7 +243,8 @@ export function useSharedTree(
     [edit, getSession, runTick],
   );
 
-  /** Add to workspace (criterion 41): the file gets a fresh document id and joins the list. */
+  /** Add to workspace (criterion 41): the file gets a fresh document id and joins the list; a
+   * file shared on its own by an older build joins like any other (ADR 0044 decision 3). */
   const addToWorkspace = useCallback(
     (path: readonly string[]) => {
       void (async () => {
@@ -265,53 +256,16 @@ export function useSharedTree(
         if (!bytes) {
           return;
         }
-        const original = new Uint8Array(bytes);
         const ws = refs.current.workspace;
         const name = fileNameOf([...path]).replace(/\.curvyo$/i, "");
-        const check = JSON.parse(session.workspace_take_in_check(original)) as { kind: string; people?: number };
-        if (check.kind === "refused") {
-          // Criterion 49: it keeps syncing on its own room.
-          ws.showAlert(workspace_take_in_refused_text(name, ws.name));
+        const document = toHex(random(16));
+        if (edit(session, { kind: "create-document", path, document }) !== "") {
           return;
         }
-        const add = async () => {
-          const current = sharedSession(getSession);
-          if (!current) {
-            return;
-          }
-          // ADR 0037 decision 10 (Proposal): the old room must be reachable before anything
-          // changes; otherwise the document is not taken in and keeps syncing on its own.
-          const oldRoom =
-            check.kind === "allowed"
-              ? await openOldRoom(original, refs.current.label, (room) => refs.current.keysFor(room))
-              : null;
-          if (check.kind === "allowed" && !oldRoom) {
-            ws.showAlert(workspace_take_in_unreachable_text(name));
-            return;
-          }
-          const document = toHex(random(16));
-          if (edit(current, { kind: "create-document", path, document }) !== "") {
-            oldRoom?.close();
-            return;
-          }
-          const adopted = current.workspace_adopt_document(document, original);
-          if (oldRoom) {
-            // The state is in the workspace, then `Moved` ends the old room.
-            const stored = await oldRoom.push(current.workspace_id_hex(), document);
-            oldRoom.close();
-            if (!stored) {
-              ws.showAlert(MOVED_FAILED);
-            }
-          }
-          await invoke("replace_workspace_document", { path }, adopted).catch(() => undefined);
-          ws.showStatus(workspace_added_text(name));
-          runTick();
-        };
-        if (check.kind === "allowed") {
-          ws.ask(workspace_take_in_confirm_text(name, check.people ?? 0, ws.name), "Take in", () => void add());
-        } else {
-          await add();
-        }
+        const adopted = session.workspace_adopt_document(document, new Uint8Array(bytes));
+        await invoke("replace_workspace_document", { path }, adopted).catch(() => undefined);
+        ws.showStatus(workspace_added_text(name));
+        runTick();
       })();
     },
     [edit, getSession, runTick],

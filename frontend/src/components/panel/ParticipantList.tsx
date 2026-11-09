@@ -1,10 +1,11 @@
-// The Share tab's participants (`specs/0097-membership-lifecycle` ux-notes 3): one row per
-// device with its role line, a role slot and an action slot, their inline confirms, and the
-// second-admin line on top. Words come from Rust; every act is an armed button (customer
-// feedback on PR #281): a first press arms it and shows its sentence, a second performs it.
+// The Share tab's participants (`specs/0097-membership-lifecycle` ux-notes 3, grouped by person
+// since `specs/0105` criterion 14): one row per device with its role line, a role slot and an
+// action slot, their inline confirms, and the second-admin line on top. Words come from Rust;
+// every act is an armed button (customer feedback on PR #281): a first press arms it, a second
+// performs it.
 
-import { CircleOff, LogOut, ShieldMinus, ShieldPlus, UserMinus } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ChevronRight, CircleOff, LogOut, ShieldMinus, ShieldPlus, UserMinus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { APPLY, ARMED, ArmLines, BUTTON, OUTLINE } from "@/components/panel/devicesUi";
 import { useArm } from "@/hooks/useArm";
@@ -192,7 +193,34 @@ function ParticipantRow({
   );
 }
 
-/** The Participants list of a shared document or workspace (criteria 1 to 9, 14, 16). */
+/** One person of the people view (`specs/0105` criterion 14): its line, which expands to one row
+ * per device; roles, Remove and Leave act on a device. */
+function PersonGroup({
+  line,
+  children,
+}: {
+  line: string;
+  children: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  return (
+    <li className="flex flex-col">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        className="flex min-h-[32px] items-center gap-1 text-left text-sm text-[var(--toolbar-icon)]"
+        onClick={() => setExpanded((now) => !now)}
+      >
+        <ChevronRight {...GLYPH} className={`shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`} />
+        <span className="min-w-0 truncate">{line}</span>
+      </button>
+      {expanded ? <ul className="flex flex-col pl-5">{children}</ul> : null}
+    </li>
+  );
+}
+
+/** The Participants list of a shared workspace (`specs/0097` criteria 1 to 9, 14, 16), grouped by
+ * person for display (`specs/0105` criterion 14). */
 export function ParticipantList({
   view,
   myDevices,
@@ -219,6 +247,21 @@ export function ParticipantList({
       list.current.focus();
     }
   }, [members]);
+  const row = (participant: ShareParticipant) => (
+    <ParticipantRow
+      key={participant.fingerprint}
+      participant={participant}
+      myDevice={myDevices.has(participant.member)}
+      onlyAdmin={onlyAdmin}
+      lastAdmin={lastAdmin}
+      alone={view.participants.length === 1}
+      name={membership.name}
+      membership={membership}
+      list={list}
+    />
+  );
+  const people = view.people ?? [];
+  const grouped = new Set(people.flatMap((person) => person.members));
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between">
@@ -236,19 +279,15 @@ export function ParticipantList({
           if (list.current && !list.current.contains(event.relatedTarget as Node | null)) list.current.dataset.hadFocus = "";
         }}
       >
-        {view.participants.map((participant) => (
-          <ParticipantRow
-            key={participant.fingerprint}
-            participant={participant}
-            myDevice={myDevices.has(participant.member)}
-            onlyAdmin={onlyAdmin}
-            lastAdmin={lastAdmin}
-            alone={view.participants.length === 1}
-            name={membership.name}
-            membership={membership}
-            list={list}
-          />
+        {people.map((person) => (
+          <PersonGroup key={person.members.join(",")} line={person.line}>
+            {person.members
+              .map((member) => view.participants.find((p) => p.member === member))
+              .filter((p): p is ShareParticipant => p !== undefined)
+              .map(row)}
+          </PersonGroup>
         ))}
+        {view.participants.filter((p) => !grouped.has(p.member)).map(row)}
       </ul>
     </div>
   );

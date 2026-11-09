@@ -184,8 +184,6 @@ mod sync_presence;
 mod sync_records;
 #[cfg(test)]
 mod sync_removal_tests;
-mod sync_return;
-mod sync_start;
 #[cfg(test)]
 mod sync_test_support;
 #[cfg(test)]
@@ -271,9 +269,6 @@ mod workspace_removal_tests;
 mod workspace_sync;
 #[cfg(test)]
 mod workspace_sync_tests;
-mod workspace_take_in;
-#[cfg(test)]
-mod workspace_take_in_tests;
 mod workspace_tree;
 #[cfg(test)]
 mod workspace_tree_tests;
@@ -354,7 +349,6 @@ pub use workspace_sync::{
     BackgroundItem, BackgroundKind, DocumentPlace, MarkerFiles, PreparedShare, WorkspaceLink,
     WorkspaceWrite,
 };
-pub use workspace_take_in::{TakeIn, take_in_allowed, take_in_check};
 pub use workspace_tree::{DiskAnswer, DiskScan, DiskStep, ListEdit};
 
 // Re-exported only for `wasm_api`'s own `LiveReadout` wrapper (its only

@@ -25,8 +25,8 @@ mod workspace_stream;
 
 pub use backup::{BackupExchange, BackupOutcome};
 pub use client::{
-    CheckOutcome, ClientOutput, ClientSession, History, InviteSecret, PendingAct, PendingKind,
-    SNAPSHOT_BYTES, SNAPSHOT_RECORDS, SessionConfig, SessionError, SessionEvent, SessionStart,
+    ClientOutput, ClientSession, InviteSecret, PendingAct, PendingKind, SNAPSHOT_BYTES,
+    SNAPSHOT_RECORDS, SessionConfig, SessionError, SessionEvent, SessionStart,
 };
 pub use devices::{
     DeviceAction, Plan, Target, WorkspaceInput, may_readmit, reconcile, reconcile_with_left,
@@ -51,7 +51,7 @@ pub use relay::{
 pub use server_address::normalize_server_address;
 pub use time::Millis;
 pub use workspace_stream::{
-    InnerHeader, Moved, PART_BYTES, PART_PADDING, SNAPSHOT_STREAM_VERSION, SnapshotAssembler,
-    StreamEntry, StreamError, decode_inner_record, decode_moved, encode_inner_record, encode_moved,
-    encode_snapshot_stream, snapshot_due, split_snapshot,
+    InnerHeader, PART_BYTES, PART_PADDING, SNAPSHOT_STREAM_VERSION, SnapshotAssembler, StreamEntry,
+    StreamError, decode_inner_record, encode_inner_record, encode_snapshot_stream, snapshot_due,
+    split_snapshot,
 };

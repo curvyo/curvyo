@@ -9,7 +9,6 @@ use curvyo_crypto_core::MemberId;
 use curvyo_crypto_core::keyring::{Payload, Role};
 use curvyo_document_core::{EndReason, EndedRecord};
 use curvyo_sync_core::SessionError;
-use curvyo_ui_core::share_text::{LEFT_NOTICE, REMOVED_NOTICE};
 
 use super::Session;
 use super::sync::{SyncEnd, SyncLink, hex, unhex};
@@ -74,16 +73,14 @@ impl Session {
 
     /// Leave (criteria 10, 13 and 15): this device writes its own `RemoveMember` and keeps
     /// syncing, shown as "Leaving...", until the relay confirms it or refuses this device as
-    /// removed (ADR 0041 decisions 2 and 11); then a document keeps its ended record "left" in
-    /// place of its share record, a workspace hands the host the marker's
-    /// ([`Session::workspace_ended_record`]). The room's keys stay in the credential store.
-    /// Refused while this device is the only admin. `name` is the document's as the leaver's
-    /// notice says it ("" for "this document").
+    /// removed (ADR 0041 decisions 2 and 11); then the workspace hands the host the marker's
+    /// ended record "left" ([`Session::workspace_ended_record`]). The room's keys stay in the
+    /// credential store. Refused while this device is the only admin.
     ///
     /// # Errors
     /// `LastAdmin`, `NotAMember`, `Offline`, `Ended`, `Crypto` as
     /// [`curvyo_sync_core::ClientSession::leave`].
-    pub fn leave_share(&mut self, name: &str) -> Result<(), SessionError> {
+    pub fn leave_share(&mut self) -> Result<(), SessionError> {
         let link = self
             .sync
             .as_mut()
@@ -91,7 +88,6 @@ impl Session {
             .ok_or(SessionError::Ended)?;
         link.client.leave()?;
         link.leaving = true;
-        name.trim().clone_into(&mut link.leave_name);
         link.revision = link.revision.wrapping_add(1);
         self.sync_pump();
         Ok(())
@@ -99,7 +95,7 @@ impl Session {
 
     /// Stop sharing (customer 2026-11-09, STOP-SHARING by one by one): the only participant
     /// left ends the share here. Nothing is written, as nobody else would read it; the link
-    /// closes and the document keeps no share record (a workspace's marker loses its share
+    /// closes and the document keeps no share record (the workspace's marker loses its share
     /// files on the host).
     ///
     /// # Errors
@@ -124,20 +120,18 @@ impl Session {
         link.online = false;
         link.peers.clear();
         link.revision = link.revision.wrapping_add(1);
-        self.document.set_share(None);
+        // The open document is no stream of the room any more: its next save writes no record.
+        if let Some(channel) = link.workspace.as_mut() {
+            channel.switch_stream(None);
+        }
         self.document.set_workspace_share(None);
         Ok(())
     }
 
-    /// The share of this link ended by removal or leave: a document keeps the ended record in
-    /// place of `share.json` and `keyring.log`, a workspace's link keeps the marker's for the
-    /// host (ADR 0041 decision 6). A joiner that never received the document keeps nothing.
-    /// `name` names the document in a leave's notice ("" for "this document").
-    pub(super) fn end_share(&mut self, reason: EndReason, name: &str) {
-        // The cursor counts the records already opened: they go into the document first.
-        if self.sync.as_ref().is_some_and(|l| l.workspace.is_none()) {
-            self.sync_apply_remote();
-        }
+    /// The share of this link ended by removal or leave: the workspace's link keeps the
+    /// marker's ended record for the host (ADR 0041 decision 6); the open document keeps its
+    /// `share.json` v2 like every document of the folder and is local while the marker holds it.
+    pub(super) fn end_share(&mut self, reason: EndReason) {
         let Some(link) = self.sync.as_mut() else {
             return;
         };
@@ -147,29 +141,18 @@ impl Session {
             EndReason::Removed => SyncEnd::Removed,
             EndReason::Left => SyncEnd::Left,
         });
-        let record = ended_record(link, reason);
-        if link.workspace.is_none() {
-            let text = match reason {
-                EndReason::Removed => REMOVED_NOTICE.to_owned(),
-                EndReason::Left if name.trim().is_empty() => LEFT_NOTICE.to_owned(),
-                EndReason::Left => curvyo_ui_core::membership_text::left_notice(name.trim(), false),
-            };
-            link.notice(text, reason == EndReason::Removed);
-            let joined = !link.awaiting_document;
-            self.document.set_ended_share(joined.then_some(record));
-        } else {
-            let text = match (reason, link.workspace.as_ref()) {
-                // `specs/0097` ux-notes 5.2: a leave says what stays, not "removed".
-                (EndReason::Left, Some(channel)) => {
-                    curvyo_ui_core::membership_text::left_notice(&channel.name, true)
-                }
-                _ => curvyo_ui_core::workspace_tree_text::WORKSPACE_REMOVED_TEXT.to_owned(),
-            };
-            link.notice(text, reason == EndReason::Removed);
-            // The open document keeps its `share.json` v2 like every document of the folder
-            // (ADR 0041 decision 6): it is local while the marker holds the ended record.
-            link.workspace_ended = Some(record);
-        }
+        let Some(record) = ended_record(link, reason) else {
+            return;
+        };
+        let text = match (reason, link.workspace.as_ref()) {
+            // `specs/0097` ux-notes 5.2: a leave says what stays, not "removed".
+            (EndReason::Left, Some(channel)) => {
+                curvyo_ui_core::membership_text::left_notice(&channel.name, true)
+            }
+            _ => curvyo_ui_core::workspace_tree_text::WORKSPACE_REMOVED_TEXT.to_owned(),
+        };
+        link.notice(text, reason == EndReason::Removed);
+        link.workspace_ended = Some(record);
     }
 
     /// The ended record of a shared workspace this link carried, for the marker's
@@ -229,9 +212,10 @@ impl Session {
     }
 }
 
-/// Where this link synced and how far, as its ended record: a document's room and cursor, or a
-/// workspace's id and the marker's cursor and list version.
-fn ended_record(link: &SyncLink, ended: EndReason) -> EndedRecord {
+/// Where this workspace's link synced and how far, as its ended record: the workspace's id,
+/// the marker's cursor and the list's version; `None` for a link of no workspace.
+fn ended_record(link: &SyncLink, ended: EndReason) -> Option<EndedRecord> {
+    let channel = link.workspace.as_ref()?;
     // Only entries the relay confirmed: an own entry it never stored is no head (ADR 0041
     // decision 11).
     let heads = link
@@ -240,22 +224,12 @@ fn ended_record(link: &SyncLink, ended: EndReason) -> EndedRecord {
         .into_iter()
         .map(|h| h.0)
         .collect();
-    match link.workspace.as_ref() {
-        None => EndedRecord {
-            server: link.server.clone(),
-            room: link.client.room().0,
-            server_seq: link.client.cursor(),
-            synced_version: link.synced.clone(),
-            ended,
-            heads,
-        },
-        Some(channel) => EndedRecord {
-            server: link.server.clone(),
-            room: channel.workspace,
-            server_seq: channel.marker_cursor,
-            synced_version: channel.list_synced.clone(),
-            ended,
-            heads,
-        },
-    }
+    Some(EndedRecord {
+        server: link.server.clone(),
+        room: channel.workspace,
+        server_seq: channel.marker_cursor,
+        synced_version: channel.list_synced.clone(),
+        ended,
+        heads,
+    })
 }

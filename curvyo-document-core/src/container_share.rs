@@ -1,48 +1,34 @@
-//! The container members that make a file shared (ADR 0031 decision 9, ADR 0037 decision 3,
-//! ADR 0004 §1): `share.json` version 1 with `keyring.log` for a document shared on its own
-//! (both present or both absent), or `share.json` version 2 alone for a workspace document.
-//! A shared workspace's marker directory keeps a `share.json` of the version 1 shape too
-//! (ADR 0037 decision 1), read and written here as bytes. A removed or left document keeps
-//! `share.ended.json` instead (`crate::container_ended`).
+//! The container member that makes a file a workspace document (ADR 0037 decision 3, ADR 0044
+//! decision 3): `share.json` version 2. A shared workspace's marker directory keeps a
+//! `share.json` of the version 1 shape (ADR 0037 decision 1), read and written here as bytes.
+//! Files a build of `0092` or `0097` shared on their own (`share.json` version 1, `keyring.log`,
+//! `share.ended.json`) open as local documents with [`crate::Document::legacy_share`] set, and
+//! the next save drops those members.
 
 use std::io::{Cursor, Read};
 
 use serde::{Deserialize, Serialize};
 use zip::ZipArchive;
 
-use crate::container_ended::{ENDED_MEMBER, EndedRecord};
+use crate::container_ended::ENDED_MEMBER;
 use crate::document::DocumentVersion;
 use crate::error::{OpenError, SaveError};
 
 const SHARE_MEMBER: &str = "share.json";
-const KEYRING_MEMBER: &str = "keyring.log";
+/// The keyring of a document shared on its own: read only to recognise a legacy file.
+const LEGACY_KEYRING_MEMBER: &str = "keyring.log";
 
-/// The newest `format_version` of `share.json` this build reads. A document shared on its own is
-/// written as version 1, a workspace document as version 2.
+/// The newest `format_version` of `share.json` this build reads. A workspace document is written
+/// as version 2; version 1 was a document shared on its own and is read as a legacy file.
 pub const CURRENT_SHARE_FORMAT_VERSION: u32 = 2;
-/// `share.json` of a document shared on its own room.
+/// The marker's `share.json` shape; in a container, a document shared on its own (legacy).
 const ROOM_SHARE_VERSION: u32 = 1;
 /// `share.json` of a workspace document.
 const WORKSPACE_SHARE_VERSION: u32 = 2;
 
-/// The bytes the keyring log member may hold at most when read (64 MiB, the relay's message
-/// limit); a longer member is damage.
-const MAX_KEYRING_BYTES: u64 = 64 * 1024 * 1024;
-
-/// Where a shared document syncs, how far it has synced, and its keyring, as kept in its file.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ShareRecord {
-    /// The relay address the maker chose, for example `ws://192.168.1.20:8787`.
-    pub server: String,
-    /// The opaque room id on that relay.
-    pub room: [u8; 16],
-    /// The relay sequence of the last record this replica received.
-    pub server_seq: u64,
-    /// The version the relay acknowledged last; updates after it are pushed on connect.
-    pub synced_version: DocumentVersion,
-    /// The signed keyring log (ADR 0010 §2), opaque to this crate.
-    pub keyring_log: Vec<u8>,
-}
+/// The bytes `share.json` may hold at most when read (64 MiB, the relay's message limit); a
+/// longer member is damage.
+const MAX_SHARE_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Which workspace a workspace document belongs to and its identity there, as kept in its file
 /// (`share.json` version 2). The identity is never derived from the file's name or place.
@@ -124,61 +110,31 @@ impl WorkspaceShareRecord {
         if version.format_version != WORKSPACE_SHARE_VERSION {
             return None;
         }
-        match read_workspace_share(bytes).ok()? {
-            Sharing::Workspace(record) => Some(record),
-            Sharing::Room(_) | Sharing::Ended(_) => None,
-        }
+        read_workspace_share(bytes).ok()
     }
-}
-
-/// The record a file carries: at most one of the three kinds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Sharing {
-    /// Shared on its own room.
-    Room(ShareRecord),
-    /// A document of a shared workspace.
-    Workspace(WorkspaceShareRecord),
-    /// A removed or left document shared on its own room: a local file (ADR 0041 decision 6).
-    Ended(EndedRecord),
 }
 
 impl crate::Document {
-    /// The share record of a document shared on its own room, `None` otherwise.
-    #[must_use]
-    pub fn share(&self) -> Option<ShareRecord> {
-        match self.share.borrow().as_ref() {
-            Some(Sharing::Room(record)) => Some(record.clone()),
-            _ => None,
-        }
-    }
-
-    /// Sets the room record written with the next save, replacing a workspace record, or clears
-    /// either; not a history step. A removed device clears it and keeps a plain local file
-    /// (R-COLLAB-010).
-    pub fn set_share(&self, record: Option<ShareRecord>) {
-        self.set_sharing(record.map(Sharing::Room));
-    }
-
     /// The record of a workspace document, `None` otherwise (`specs/0095-workspace` criterion
     /// 15).
     #[must_use]
     pub fn workspace_share(&self) -> Option<WorkspaceShareRecord> {
-        match self.share.borrow().as_ref() {
-            Some(Sharing::Workspace(record)) => Some(record.clone()),
-            _ => None,
-        }
+        self.share.borrow().clone()
     }
 
-    /// Sets the workspace record written with the next save, replacing a room record, or clears
-    /// either; not a history step.
+    /// Sets the workspace record written with the next save, or clears it; not a history step.
     pub fn set_workspace_share(&self, record: Option<WorkspaceShareRecord>) {
-        self.set_sharing(record.map(Sharing::Workspace));
+        self.commit_state.set_shared(record.is_some());
+        *self.share.borrow_mut() = record;
     }
 
-    pub(crate) fn set_sharing(&self, sharing: Option<Sharing>) {
-        let shared = matches!(sharing, Some(Sharing::Room(_) | Sharing::Workspace(_)));
-        self.commit_state.set_shared(shared);
-        *self.share.borrow_mut() = sharing;
+    /// Whether the file this document was opened from held the share members of a document
+    /// shared on its own (`share.json` version 1, `keyring.log`, `share.ended.json`; ADR 0044
+    /// decision 3): it opened as a local document, and the next save drops them. Read only,
+    /// for one notice.
+    #[must_use]
+    pub fn legacy_share(&self) -> bool {
+        self.legacy_share.get()
     }
 }
 
@@ -205,68 +161,35 @@ struct ShareJsonVersion {
     format_version: u32,
 }
 
-/// The members of `sharing`: `share.json`, then `keyring.log` for a room record.
-pub(crate) fn share_members(sharing: &Sharing) -> Result<Vec<(&'static str, Vec<u8>)>, SaveError> {
-    match sharing {
-        Sharing::Room(record) => {
-            let json = ShareJson {
-                format_version: ROOM_SHARE_VERSION,
-                server: record.server.clone(),
-                room: hex(&record.room),
-                server_seq: record.server_seq,
-                synced_version: record.synced_version.to_text(),
-            };
-            let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
-            Ok(vec![
-                (SHARE_MEMBER, json),
-                (KEYRING_MEMBER, record.keyring_log.clone()),
-            ])
-        }
-        Sharing::Workspace(record) => {
-            let json = WorkspaceShareJson {
-                format_version: WORKSPACE_SHARE_VERSION,
-                workspace: hex(&record.workspace),
-                document: hex(&record.document),
-                synced_version: record.synced_version.to_text(),
-            };
-            let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
-            Ok(vec![(SHARE_MEMBER, json)])
-        }
-        Sharing::Ended(record) => Ok(vec![(ENDED_MEMBER, record.to_bytes()?)]),
-    }
+/// The member `share.json` (version 2) of a workspace document's record.
+pub(crate) fn share_member(
+    record: &WorkspaceShareRecord,
+) -> Result<(&'static str, Vec<u8>), SaveError> {
+    let json = WorkspaceShareJson {
+        format_version: WORKSPACE_SHARE_VERSION,
+        workspace: hex(&record.workspace),
+        document: hex(&record.document),
+        synced_version: record.synced_version.to_text(),
+    };
+    let json = serde_json::to_vec(&json).map_err(|_| SaveError::Container)?;
+    Ok((SHARE_MEMBER, json))
 }
 
-/// The share record of `archive`, `None` for a file that was never shared. Without
-/// `share.json` and `keyring.log` an ended record `share.ended.json` is read; beside a complete
-/// share set it is ignored (Proposal); beside a partial one (a version 1 record without its
-/// keyring or the other way round) the file is not shared and keeps the ended record (ADR 0041
-/// decision 6).
+/// What a container's share members say (ADR 0044 decision 3): the workspace record, and whether
+/// legacy members of a document shared on its own are present (the file opens as local).
 ///
 /// # Errors
-/// [`OpenError::Damaged`] for a partial share set without an ended record, a version 2 record
-/// beside a keyring, or a malformed `share.json`; [`OpenError::FormatTooNew`] for a
-/// `share.json` newer than this build reads.
+/// [`OpenError::Damaged`] for a malformed `share.json` or a version 2 record beside a keyring;
+/// [`OpenError::FormatTooNew`] for a `share.json` newer than this build reads.
 pub(crate) fn read_share(
     archive: &mut ZipArchive<Cursor<&[u8]>>,
-) -> Result<Option<Sharing>, OpenError> {
-    let json = read_optional(archive, SHARE_MEMBER, MAX_KEYRING_BYTES)?;
-    let keyring = read_optional(archive, KEYRING_MEMBER, MAX_KEYRING_BYTES)?;
+) -> Result<(Option<WorkspaceShareRecord>, bool), OpenError> {
+    let json = read_optional(archive, SHARE_MEMBER, MAX_SHARE_BYTES)?;
+    let keyring = archive.index_for_name(LEGACY_KEYRING_MEMBER).is_some();
     let Some(json) = json else {
-        return match keyring {
-            // A removed or left file; an ended record this build cannot read is no way back.
-            None => Ok(read_ended(archive)),
-            Some(_) if has_member(archive, ENDED_MEMBER) => Ok(read_ended(archive)),
-            Some(_) => Err(OpenError::Damaged),
-        };
+        let ended = archive.index_for_name(ENDED_MEMBER).is_some();
+        return Ok((None, keyring || ended));
     };
-    if keyring.is_none() && has_member(archive, ENDED_MEMBER) {
-        // A version 1 record without its keyring beside an ended record: the share ended.
-        let room_record = serde_json::from_slice::<ShareJsonVersion>(&json)
-            .is_ok_and(|v| v.format_version == ROOM_SHARE_VERSION);
-        if room_record {
-            return Ok(read_ended(archive));
-        }
-    }
     let version: ShareJsonVersion =
         serde_json::from_slice(&json).map_err(|_| OpenError::Damaged)?;
     if version.format_version > CURRENT_SHARE_FORMAT_VERSION {
@@ -275,46 +198,23 @@ pub(crate) fn read_share(
             supported: CURRENT_SHARE_FORMAT_VERSION,
         });
     }
-    match (version.format_version, keyring) {
-        (WORKSPACE_SHARE_VERSION, None) => read_workspace_share(&json).map(Some),
-        (ROOM_SHARE_VERSION, Some(keyring_log)) => read_room_share(&json, keyring_log).map(Some),
+    match version.format_version {
+        WORKSPACE_SHARE_VERSION if keyring => Err(OpenError::Damaged),
+        // A stray ended record beside a workspace record is no legacy file: the record counts.
+        WORKSPACE_SHARE_VERSION => Ok((Some(read_workspace_share(&json)?), false)),
+        ROOM_SHARE_VERSION => Ok((None, true)),
         _ => Err(OpenError::Damaged),
     }
 }
 
-/// The ended record of `archive`; `None` when there is none or this build cannot read it.
-fn read_ended(archive: &mut ZipArchive<Cursor<&[u8]>>) -> Option<Sharing> {
-    read_optional(archive, ENDED_MEMBER, MAX_KEYRING_BYTES)
-        .ok()
-        .flatten()
-        .and_then(|bytes| EndedRecord::from_bytes(&bytes))
-        .map(Sharing::Ended)
-}
-
-fn has_member(archive: &mut ZipArchive<Cursor<&[u8]>>, name: &str) -> bool {
-    archive.index_for_name(name).is_some()
-}
-
-fn read_room_share(json: &[u8], keyring_log: Vec<u8>) -> Result<Sharing, OpenError> {
-    let json: ShareJson = serde_json::from_slice(json).map_err(|_| OpenError::Damaged)?;
-    Ok(Sharing::Room(ShareRecord {
-        server: json.server,
-        room: unhex(&json.room).ok_or(OpenError::Damaged)?,
-        server_seq: json.server_seq,
-        synced_version: DocumentVersion::from_text(&json.synced_version)
-            .ok_or(OpenError::Damaged)?,
-        keyring_log,
-    }))
-}
-
-fn read_workspace_share(json: &[u8]) -> Result<Sharing, OpenError> {
+fn read_workspace_share(json: &[u8]) -> Result<WorkspaceShareRecord, OpenError> {
     let json: WorkspaceShareJson = serde_json::from_slice(json).map_err(|_| OpenError::Damaged)?;
-    Ok(Sharing::Workspace(WorkspaceShareRecord {
+    Ok(WorkspaceShareRecord {
         workspace: unhex(&json.workspace).ok_or(OpenError::Damaged)?,
         document: unhex(&json.document).ok_or(OpenError::Damaged)?,
         synced_version: DocumentVersion::from_text(&json.synced_version)
             .ok_or(OpenError::Damaged)?,
-    }))
+    })
 }
 
 /// What a container says about its sharing, read without opening the document.
@@ -322,12 +222,9 @@ fn read_workspace_share(json: &[u8]) -> Result<Sharing, OpenError> {
 pub struct ContainerShareMembers {
     /// The bytes of `share.json`, when present and not too large.
     pub share_json: Option<Vec<u8>>,
-    /// Whether a `keyring.log` is present: the document is shared on its own room.
-    pub keyring: bool,
 }
 
-/// The raw `share.json` of the container `bytes` and whether it holds a keyring, read without
-/// opening the document: what a shared workspace's scan needs per file where no file system
+/// The raw `share.json` of the container `bytes`, read without opening the document: what a shared workspace's scan needs per file where no file system
 /// does it (`specs/0096-own-devices-sync` criterion 35, the browser). A file that is no
 /// container, or whose `share.json` is too large, has neither.
 #[must_use]
@@ -335,14 +232,10 @@ pub fn container_share_members(bytes: &[u8]) -> ContainerShareMembers {
     let Ok(mut archive) = ZipArchive::new(Cursor::new(bytes)) else {
         return ContainerShareMembers::default();
     };
-    let share_json = read_optional(&mut archive, SHARE_MEMBER, MAX_KEYRING_BYTES)
+    let share_json = read_optional(&mut archive, SHARE_MEMBER, MAX_SHARE_BYTES)
         .ok()
         .flatten();
-    let keyring = archive.index_for_name(KEYRING_MEMBER).is_some();
-    ContainerShareMembers {
-        share_json,
-        keyring,
-    }
+    ContainerShareMembers { share_json }
 }
 
 fn read_optional(
@@ -412,7 +305,6 @@ mod tests {
                 .unwrap()
                 .contains("\"format_version\":2")
         );
-        assert!(!members.keyring);
         let none = ContainerShareMembers::default();
         assert_eq!(container_share_members(b"plain"), none);
         let plain = crate::pack(&crate::Document::new(4), "t").unwrap();

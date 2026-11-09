@@ -1,11 +1,8 @@
 //! The ended record `share.ended.json` version 1 (ADR 0041 decision 6): where a removed or left
-//! file synced, kept in place of `share.json` and `keyring.log` so the maker can check whether
-//! they were added back. A file holding it is a local file to every build.
-//!
-//! It is an optional container member that `manifest.json` does not list, so builds that do not
-//! know it never read it, and a workspace's marker keeps the same file. A record this build
-//! cannot read (newer `format_version`, malformed) means "no way back", never an open error
-//! **(Proposal)**.
+//! shared workspace synced, kept in its marker directory. A record this build cannot read (newer
+//! `format_version`, malformed) means "no way back", never an error **(Proposal)**. Builds of
+//! `0097` also wrote it into containers of documents shared on their own; such a file opens as a
+//! local document (ADR 0044 decision 3).
 
 use serde::{Deserialize, Serialize};
 
@@ -128,21 +125,4 @@ fn unhex_hash(text: &str) -> Option<[u8; 32]> {
         half.copy_from_slice(&unhex(part)?);
     }
     Some(hash)
-}
-
-impl crate::Document {
-    /// The ended record of a removed or left file, `None` otherwise.
-    #[must_use]
-    pub fn ended_share(&self) -> Option<EndedRecord> {
-        match self.share.borrow().as_ref() {
-            Some(crate::container_share::Sharing::Ended(record)) => Some(record.clone()),
-            _ => None,
-        }
-    }
-
-    /// Replaces any share record with the ended record written with the next save (in place of
-    /// `share.json` and `keyring.log`), or clears it; not a history step. The file is local.
-    pub fn set_ended_share(&self, record: Option<EndedRecord>) {
-        self.set_sharing(record.map(crate::container_share::Sharing::Ended));
-    }
 }

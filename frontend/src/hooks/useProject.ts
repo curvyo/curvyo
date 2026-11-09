@@ -53,7 +53,6 @@ type Action =
   | { kind: "close" }
   | { kind: "quit" }
   | { kind: "handover"; path: string; bytes: number[] }
-  | { kind: "join"; then: () => void }
   /** A workspace action (`specs/0095-workspace`): `then` runs once the check let it. */
   | { kind: "then"; ends: ReplacingKind; then: () => Promise<void> | void };
 
@@ -122,11 +121,10 @@ export interface ProjectApi {
   discard: () => void;
   /** Cancel or Escape in the check. */
   cancel: () => void;
-  /** Open shared document (`specs/0092-cooperative-editing` criterion 3): the unsaved-changes
-   * check when needed, then a blank project, then `then` starts the join on it. */
-  replaceForJoin: (then: () => void) => void;
-  /** Save, as the File tab's button (a shared document's file keeps its room). */
+  /** Save, as the File tab's button. */
   save: () => void;
+  /** Save, awaited: `"saved"`, `"cancelled"` or `"failed"`. */
+  saveNow: () => Promise<"saved" | "cancelled" | "failed">;
   /** A workspace action that replaces or ends the open project (`specs/0095-workspace` criteria
    * 9, 17, 21): the unsaved-changes check when needed, then `then`. Cancel calls `refocus`. */
   replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void) => void;
@@ -340,6 +338,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         /* The window title falls behind, but the document itself opened fine. */
       });
       setInfo({ fileName: name, path });
+      // A file shared on its own by an older build opens local, with one notice (`specs/0105`).
+      if (opened.notice !== "") {
+        editor.showHistoryNotice(opened.notice, 8000);
+      }
     },
     [setInfo],
   );
@@ -352,12 +354,16 @@ export function useProject(deps: ProjectDeps): ProjectApi {
       const { editor, onOpenError } = depsRef.current;
       const inFileTab = depsRef.current.panel.view.activeTab === "file";
       try {
-        await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName), () =>
+        const opened = await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName), () =>
           editor.openFile(bytes, fileName),
         );
         // A new session starts on its own tab; switching from the tree keeps the File tab.
         if (inFileTab) {
           depsRef.current.panel.pressTab("file");
+        }
+        // A file shared on its own by an older build opens local, with one notice (`specs/0105`).
+        if (opened.notice !== "") {
+          editor.showHistoryNotice(opened.notice, 8000);
         }
       } catch (error) {
         onOpenError(String(error), OPEN_FILE_TITLE);
@@ -610,14 +616,6 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         case "handover":
           await openBytes(action.path, action.bytes);
           break;
-        case "join":
-          // Joining replaces the open project by a blank one the room's document then fills
-          // (`specs/0092-cooperative-editing` UX notes §2.5).
-          await resetProject();
-          // The Share tab stays shown while the join runs ("the tab switches to the shared state").
-          depsRef.current.panel.pressTab("share");
-          action.then();
-          break;
         case "quit":
           await quit();
           break;
@@ -663,7 +661,9 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         }
         editor.markSaved();
         refreshDirty();
-        setInfo({ fileName: outcome.file_name, path: outcome.path });
+        // A Save writes the same file: a workspace document keeps its place in the tree (its
+        // title), so the tree still knows it is open; Save as names the new file.
+        setInfo({ fileName: outcome.file_name, path: saveAs ? outcome.path : (infoRef.current.path ?? outcome.path) });
         // No notice for a successful save: the title and the clean marker are the feedback
         // (customer rule of 2026-10-31).
         return "saved";
@@ -923,8 +923,8 @@ export function useProject(deps: ProjectDeps): ProjectApi {
     discard,
     cancel,
     exportSvg: (options: SvgExportOptions, mouse: boolean) => void exportSvg(options, mouse),
-    replaceForJoin: (then: () => void) => request({ kind: "join", then }, "outside"),
     save: () => void save(false),
+    saveNow: () => save(false),
     replaceThen: (ends: ReplacingKind, then: () => Promise<void> | void, refocus?: () => void) =>
       request({ kind: "then", ends, then }, refocus ? { refocus } : "outside"),
     openWorkspaceDocument,

@@ -178,9 +178,8 @@ fn away() -> (Vec<Entry>, [IdentityKeys; 3]) {
     (log, [a, b, c])
 }
 
-/// Criterion 22, "a concurrent full-history add wins": A adds B back "from now on" while C
-/// adds B back with full history. B ends up holding epoch 1 in every order, and no repair is
-/// owed or withheld wrongly.
+/// Criterion 22: A adds B back with the current epoch only while C adds B back with every
+/// epoch. B ends up holding epoch 1 in every order, and no repair is owed.
 #[test]
 fn a_concurrent_full_history_add_back_wins_over_from_now_on() {
     let (log, [a, b, c]) = away();
@@ -201,118 +200,36 @@ fn a_concurrent_full_history_add_back_wins_over_from_now_on() {
     assert_eq!(keyring.missing_wraps(&id(&a), 0), Vec::new());
 }
 
-/// Criterion 22 the other way round in time: "from now on" first, then (after it) a Full add
-/// back is impossible since B is a member; but a later removal and a Full add back gives B
-/// the withheld epoch.
+/// ADR 0044 decision 4 (no epoch is withheld any more): D, a newer admin, holds only epoch 2
+/// and adds B back with it; epoch 1, which only A and C hold, is owed to B by both of them, and
+/// once C repairs it B holds every epoch.
 #[test]
-fn a_later_full_add_back_ends_the_withholding() {
+fn a_returning_member_gets_an_epoch_only_a_third_member_held() {
     let (log, [a, b, c]) = away();
-    let from_now = add(&[log.last().unwrap()], &a, &b, Role::Member, &[2]);
-    let again = remove(&[&from_now], &a, &b);
-    let full = add(&[&again], &c, &b, Role::Member, &[0, 1, 2]);
-    let all: Vec<&Entry> = log.iter().chain([&from_now, &again, &full]).collect();
+    let d = device(4);
+    let add_d = add(&[log.last().unwrap()], &a, &d, Role::Admin, &[2]);
+    let back = add(&[&add_d], &d, &b, Role::Member, &[2]);
+    let all: Vec<&Entry> = log.iter().chain([&add_d, &back]).collect();
     let keyring = replay(&all);
-    assert!(keyring.holds(&id(&b), epoch(1, &epoch_key(1))));
-}
-
-/// Criteria 18 and 22: "from now on" withholds only epochs that began while B was away; B
-/// still holds epoch 0 (its old wrap), and the withheld epoch 1 is not owed to B by anyone,
-/// while a member admitted later by a full add is owed nothing either.
-#[test]
-fn from_now_on_keeps_what_b_held_before() {
-    let (log, [a, b, c]) = away();
-    let from_now = add(&[log.last().unwrap()], &a, &b, Role::Member, &[2]);
-    let all: Vec<&Entry> = log.iter().chain([&from_now]).collect();
-    check_exhaustively(&all);
-    let keyring = replay(&all);
-    assert!(keyring.holds(&id(&b), epoch(0, &epoch_key(0))));
-    assert!(!keyring.holds(&id(&b), epoch(1, &epoch_key(1))));
-    assert!(keyring.holds(&id(&b), epoch(2, &epoch_key(2))));
+    assert!(!keyring.holds(&id(&d), epoch(1, &epoch_key(1))));
     for writer in [&a, &c] {
+        let owed: Vec<u32> = keyring
+            .missing_wraps(&id(writer), 0)
+            .iter()
+            .filter(|w| w.recipient.member == id(&b))
+            .map(|w| w.epoch.number)
+            .collect();
+        assert_eq!(owed, vec![1], "epoch 1 is repaired for B");
+    }
+    let repair = support::rewrap(&[&back], &c, 1, &epoch_key(1), &b, 0x44);
+    let all: Vec<&Entry> = log.iter().chain([&add_d, &back, &repair]).collect();
+    let keyring = replay(&all);
+    for n in 0..=2u8 {
         assert!(
-            keyring
-                .missing_wraps(&id(writer), 0)
-                .iter()
-                .all(|w| w.recipient.member != id(&b)),
-            "nobody repairs a withheld epoch for B"
+            keyring.holds(&id(&b), epoch(u32::from(n), &epoch_key(n))),
+            "B holds epoch {n}"
         );
     }
-    assert_eq!(keyring.rotation_pending(), Vec::new());
-    assert_eq!(keyring.former_participants(), Vec::new());
-}
-
-/// Criterion 22 + ADR 0041 decision 7: an epoch C created concurrently with A's "from now on"
-/// add back (not an ancestor of it) is still repaired for B.
-#[test]
-fn a_rotation_concurrent_with_from_now_on_is_repaired() {
-    let (log, [a, b, c]) = away();
-    let head = log.last().unwrap();
-    let from_now = add(&[head], &a, &b, Role::Member, &[2]);
-    let e3 = new_epoch(&[head], &c, 3, &epoch_key(3), &[&a, &c]);
-    let all: Vec<&Entry> = log.iter().chain([&from_now, &e3]).collect();
-    let keyring = replay(&all);
-    let owed: Vec<u32> = keyring
-        .missing_wraps(&id(&c), 0)
-        .iter()
-        .filter(|w| w.recipient.member == id(&b))
-        .map(|w| w.epoch.number)
-        .collect();
-    assert_eq!(owed, vec![3], "only the concurrent epoch is repaired");
-}
-
-/// Criteria 20 and 26, ADR 0041 decision 6: B was removed, added back, removed again. A relay
-/// that serves the keyring cut off before the second removal (with the first add back in it)
-/// cannot make the second check say "added back": `admitted_after` with the heads of the
-/// second ending is false. A real second add back says yes.
-#[test]
-fn an_earlier_add_back_served_again_is_not_admitted_after_the_second_ending() {
-    let (log, [a, b, _c]) = away();
-    let first_removal = &log[3];
-    let first_heads = vec![hash(log.last().unwrap())];
-    let back = add(&[log.last().unwrap()], &a, &b, Role::Member, &[0, 1, 2]);
-    let second_removal = remove(&[&back], &a, &b);
-    let second_heads = vec![hash(&second_removal)];
-
-    let cut: Vec<&Entry> = log.iter().chain([&back]).collect();
-    let keyring = replay(&cut);
-    assert!(keyring.admitted_after(&id(&b), &first_heads));
-    assert!(
-        !keyring.admitted_after(&id(&b), &second_heads),
-        "a keyring cut before the second removal is no add back"
-    );
-    // The heads of the first ending are an ancestor, still not enough for the second check.
-    assert!(!keyring.admitted_after(&id(&b), &[hash(first_removal), hash(&second_removal)]));
-
-    let full: Vec<&Entry> = log.iter().chain([&back, &second_removal]).collect();
-    let keyring = replay(&full);
-    assert_eq!(keyring.role(&id(&b)), None);
-    assert!(!keyring.admitted_after(&id(&b), &second_heads));
-
-    let back_again = add(&[&second_removal], &a, &b, Role::Member, &[2]);
-    let full: Vec<&Entry> = log
-        .iter()
-        .chain([&back, &second_removal, &back_again])
-        .collect();
-    let keyring = replay(&full);
-    assert!(keyring.admitted_after(&id(&b), &second_heads));
-    assert!(keyring.admitted_after(&id(&b), &first_heads));
-}
-
-/// ADR 0041 decision 6: heads the device knew may include entries concurrent with its removal
-/// (another member's edit of the keyring); an add back that builds on only some of them is no
-/// proof, one that merges them all is.
-#[test]
-fn admitted_after_needs_every_stored_head() {
-    let (log, [a, b, c]) = away();
-    let head = log.last().unwrap();
-    let side = new_epoch(&[head], &c, 3, &epoch_key(3), &[&a, &c]);
-    let heads = vec![hash(head), hash(&side)];
-    let partial = add(&[head], &a, &b, Role::Member, &[0, 1, 2]);
-    let all: Vec<&Entry> = log.iter().chain([&side, &partial]).collect();
-    assert!(!replay(&all).admitted_after(&id(&b), &heads));
-    let merged = add(&[head, &side], &a, &b, Role::Member, &[0, 1, 2, 3]);
-    let all: Vec<&Entry> = log.iter().chain([&side, &merged]).collect();
-    assert!(replay(&all).admitted_after(&id(&b), &heads));
 }
 
 /// Criterion 17: former participants are the removed and the left, and leave the list when

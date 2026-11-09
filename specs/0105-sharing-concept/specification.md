@@ -1,6 +1,6 @@
 # Sharing concept: the workspace is the only unit of sharing
 
-Status: Ready
+Status: Done (PR (this one))
 Priority: Must
 Origin: Customer (DOC-SHARE-REMOVE B, 2026-11-06: "wir gehen immer auf Workspace"; the other decisions below, 2026-11-09). The wording of the texts is a Proposal until the demo.
 
@@ -16,7 +16,7 @@ The workspace (a folder of `.curvyo` documents) is the only unit that is synced 
 
 - DOC-SHARE-REMOVE: B. Sharing a single document is removed everywhere.
 - SHARE-UNIT: A. "Make a workspace for it" for a file outside a workspace.
-- ONE-SWITCH: A. One Sync switch per workspace; Invite turns it on.
+- ONE-SWITCH: A, amended by the customer on PR #298 (2026-11-09): no Sync switch; Invite person starts sharing as needed, "Sync to my devices" stays for a device group.
 - PEOPLE-VIEW: A. Participants grouped by person for display; roles and Remove stay per device.
 - MEMBER-DEVICES: C. As built (`0096` criterion 17): a workspace I was invited into does not reach my other devices by itself.
 - JOIN-FLOW: A. One Join field.
@@ -44,15 +44,15 @@ Setup: desktop instances A and B (each its own data directory and credential sto
 ### Make a workspace for it (SHARE-UNIT A)
 
 7. Given a file F outside any workspace, then the Share tab shows one line "Sharing works on workspaces." and one button "Make a workspace for this file".
-8. Given the button, then an inline confirm names the new folder `<F's parent>/<F's name>/` and says the file moves there; if that folder exists the name gets " 2", " 3"; it is never F's current parent folder. Given Confirm, then the folder is created, F (saved first if it had unsaved changes, with no change lost) is moved into it, the folder opens as a Local workspace with F still open at its new path, and the Workspace block offers Sync and Invite person. Given Cancel, nothing changes on disk.
+8. Given the button, then an inline confirm names the new folder `<F's parent>/<F's name>/` and says the file moves there; if that folder exists the name gets " 2", " 3"; it is never F's current parent folder. Given Confirm, then the folder is created, F (saved first if it had unsaved changes, with no change lost) is moved into it, the folder opens as a Local workspace with F still open at its new path, and the Workspace block offers Invite person. Given Cancel, nothing changes on disk.
 9. Given the browser, then the button is not offered and the line says that workspaces are made in the desktop app.
 
-### One Sync switch (ONE-SWITCH A)
+### Starting to share (ONE-SWITCH A as amended on PR #298)
 
-10. Given a new or opened Local workspace, then it shows "Local" and one switch Sync (off). Switching it on shows one confirm saying that names, folders and files leave this computer encrypted; after Confirm the workspace shows "Synced" and appears on A2 within 30 s for 20 documents of 1,000 objects (as `0096` criterion 10).
-11. Given a Local workspace, when the maker chooses Invite person and confirms, then Sync is turned on in the same confirm (one dialog, not two) and the invite link is shown. The invite is valid 24 hours; no validity choice is offered.
-12. Given a Shared workspace (another person is in it), then the Sync switch is greyed with the reason "Other people are in this workspace"; given only the maker's own devices, the switch can be turned off and the workspace is Local again on every device that had it.
-13. Given the Share tab, then there is no separate "Share workspace", "Sync to my devices" or "Stop syncing" control.
+10. Given a new or opened Local workspace, then it shows "Local" and no Sync switch. Sharing starts through Invite person (criterion 11), Join (criterion 16) or, on a device in a device group, "Sync to my devices" (`0096`, acting at once); after that the workspace shows "Synced" and appears on A2 within 30 s for 20 documents of 1,000 objects (as `0096` criterion 10).
+11. Given a Local workspace, when the maker chooses Invite person, then one confirm says that names, folders and files leave this device encrypted; after it the workspace starts sharing and the invite link is shown (one dialog, not two). The invite is valid 24 hours; no validity choice is offered. Given Invite person cannot work, then it is greyed and its tooltip says why: "Open a workspace first." (no workspace open), "Set a server address first.", "The server cannot be reached.", "Enter a name first.", "Only an admin can invite.", "Sharing is starting.", and in the browser "Invite people from the desktop app." (texts from `curvyo-ui-core`).
+12. Given only the maker's own devices are in a workspace, then the sole participant's "Stop sharing" (criterion 15), or "Sync to my devices" off on a device in a device group, makes it Local again on every device that had it: no link, the marker's share files gone, no reconnect on reopen. With other people in it, "Sync to my devices" off removes only the maker's other devices.
+13. Given the Share tab, then there is no "Sync" switch, no separate "Share workspace" and no "Stop syncing" control.
 
 ### People (PEOPLE-VIEW A, STOP-SHARING B)
 
@@ -71,7 +71,7 @@ Setup: desktop instances A and B (each its own data directory and credential sto
 
 ### Share tab stays; server reachability
 
-20. Given the Share tab is shown, when the maker makes a workspace for a file, switches Sync on, invites a person, joins, or adds a device, then the selected tab is the Share tab before, during and after; the Document tab is never shown in between (a browser journey records every tab selection).
+20. Given the Share tab is shown, when the maker makes a workspace for a file, switches "Sync to my devices" on, invites a person, joins, or adds a device, then the selected tab is the Share tab before, during and after; the Document tab is never shown in between (a browser journey records every tab selection).
 21. Given a server address is set and the Share tab is shown, then the reachability line re-checks about every 5 s. Given the test server is stopped, then the line says the server cannot be reached within 10 s; given it is started again, the line says "Connected" within 10 s, without the maker pressing anything. Given no server address, no check is made. The check stops when the Share tab is not shown.
 22. Given a failure line such as "Could not sync Box job: cannot reach the server.", then it disappears as soon as it stops being true.
 
@@ -85,7 +85,7 @@ Setup: desktop instances A and B (each its own data directory and credential sto
 
 - `0092`: criteria 1 to 5, 33 (the document's own room), 40 to 45. Criteria 6 to 31 and 35 to 39 stay and hold through a workspace's open document.
 - `0095`: criteria 12, 42, 49 (a separately shared file, take-in, `Moved`), the version `1.` exception in 27, the single-document rooms in 47, WS-SEPARATE B.
-- `0096`: criterion 9 ("Share workspace" button) merges into Sync; criterion 13 ("Stop syncing" with others in the workspace) cannot exist any more (criterion 12 here).
+- `0096`: criterion 9 ("Share workspace" button) merges into Invite person; criterion 13 ("Stop syncing" with others in the workspace) cannot exist any more (criterion 12 here).
 - `0097`: every "for D" half; criteria 18 and 22 (History choice); document part of 33 (Frage 160, READD-DEFAULT). The amendments of PR #281 and #294 stay.
 
 ## Out of scope
@@ -111,4 +111,4 @@ This slice also closes the whole sharing feature. When it merges, `0092`, `0095`
 
 Requirements: R-COLLAB-001, R-COLLAB-007 to R-COLLAB-013, R-SYS-002, R-SYS-007 in `docs/requirements.md` (wording "shared document" becomes "shared workspace" with this slice).
 ADRs: `adrs.md` in this folder (architect). Related: `specs/0092-cooperative-editing/`, `specs/0095-workspace/`, `specs/0096-own-devices-sync/`, `specs/0097-membership-lifecycle/`.
-PR: none yet (earlier work: #281, #294).
+PR: (this one) (earlier work: #281, #294).

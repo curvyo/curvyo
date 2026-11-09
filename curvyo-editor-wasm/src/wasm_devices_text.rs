@@ -194,14 +194,13 @@ pub fn devices_browser_storage_full(name: &str, used: f64, quota: f64) -> String
 }
 
 /// What a shared workspace's scan needs of one document file where there is no file system (the
-/// browser's workspace store, criterion 35): `{"share": text or null, "keyring": bool}`.
+/// browser's workspace store, criterion 35): `{"share": text or null}`.
 #[wasm_bindgen]
 #[must_use]
 pub fn container_share_members(bytes: &[u8]) -> String {
     let members = curvyo_document_core::container_share_members(bytes);
     serde_json::json!({
         "share": members.share_json.map(|s| String::from_utf8_lossy(&s).into_owned()),
-        "keyring": members.keyring,
     })
     .to_string()
 }

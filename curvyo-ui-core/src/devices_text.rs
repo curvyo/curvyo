@@ -350,13 +350,13 @@ pub fn could_not_sync_text(names: &[String], problem: SyncProblem<'_>) -> String
 pub const NOT_ADMIN_HERE: &str = "Not an admin here";
 
 /// Why a browser cannot start a device group: it pairs with a desktop first (ADR 0040 note).
-pub const BROWSER_CANNOT_START: &str = "Pair this browser from a desktop device first.";
+pub const BROWSER_CANNOT_START: &str = "Pair this device from a desktop device first.";
 
 /// Why a browser cannot pair with a server that has no `wss://` address (ADR 0040 decision 9).
 pub const BROWSER_NEEDS_TLS: &str = "A browser needs a server address that starts with wss://.";
 
 /// Another tab of this browser already runs this device (criterion 39).
-pub const BROWSER_OTHER_TAB: &str = "This device is open in another tab of this browser.";
+pub const BROWSER_OTHER_TAB: &str = "This device is open in another tab.";
 
 /// What the browser holds against what it may hold (criterion 37): "Stored 120 MB of 300 MB in
 /// this browser: Box job, Poster."
@@ -368,7 +368,7 @@ pub fn browser_storage_text(used: u64, quota: u64, workspaces: &[String]) -> Str
         format!(": {}", workspaces.join(", "))
     };
     format!(
-        "Stored {} of {} in this browser{names}.",
+        "Stored {} of {} on this device{names}.",
         megabytes(used),
         megabytes(quota)
     )
@@ -378,7 +378,7 @@ pub fn browser_storage_text(used: u64, quota: u64, workspaces: &[String]) -> Str
 #[must_use]
 pub fn browser_storage_full_text(name: &str, used: u64, quota: u64) -> String {
     format!(
-        "{} could not be stored: this browser holds {} of {}. Nothing was cut; free space or \
+        "{} could not be stored: this device holds {} of {}. Nothing was cut; free space or \
          stop syncing a workspace here.",
         cut_label(name, 24),
         megabytes(used),
@@ -451,11 +451,11 @@ mod tests {
         );
         assert_eq!(
             browser_storage_text(120_000_000, 300_000_001, &["Box job".to_owned()]),
-            "Stored 120 MB of 301 MB in this browser: Box job."
+            "Stored 120 MB of 301 MB on this device: Box job."
         );
         assert_eq!(
             browser_storage_text(0, 0, &[]),
-            "Stored 0 MB of 0 MB in this browser."
+            "Stored 0 MB of 0 MB on this device."
         );
         assert!(browser_storage_full_text("Lid", 1, 2).starts_with("Lid could not be stored"));
     }

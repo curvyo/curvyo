@@ -1,6 +1,6 @@
 # Membership lifecycle: admins, leaving, adding back, verified join
 
-Status: In progress (built in PR #281 and #294 with the amendments below; Done at the merge of `0105`)
+Status: Done (PR #281, #294, PR (this one)); the "for D" halves and criteria 18, 22 superseded by `0105`
 Priority: Must
 Origin: Customer (request of 2026-11-05, translated): "membership management" = slice 2 of `0092` (criteria 41 to 45 there, R-COLLAB-009 to -012): a second admin for other people, leave, add a removed participant back with the choice "full history" or "from now on" (ADR 0010 §9), the verified-fingerprint join (ADR 0010 §7: the invitee shows a fingerprint, an admin confirms it by comparing, the participant is added without an invite link), and two admins who remove each other at the same time (ADR 0010 §5). To apply to shared documents (`0092`) and shared workspaces (`0095`, ADR 0037), and to stay consistent with `0096` (own devices). What is marked Proposal is the product owner's until the customer accepts it.
 

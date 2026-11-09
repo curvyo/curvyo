@@ -1,13 +1,14 @@
 //! Own keyring acts in the editing session wait for the relay's confirmation (ADR 0041 decision
-//! 11, `specs/0097-membership-lifecycle` criteria 10, 20, 26 and 29a): the rows say so, a leave
-//! keeps the file shared until it is confirmed, "was added back" waits for the relay.
+//! 11, `specs/0097-membership-lifecycle` criteria 10, 26 and 29a, through a shared workspace):
+//! the rows say so, a leave keeps the workspace shared until it is confirmed, "was added back"
+//! waits for the relay.
 
 use curvyo_crypto_core::keyring::Keyring;
 use curvyo_document_core::EndReason;
 use serde_json::Value;
 
 use super::Session;
-use super::sync_test_support::{Device, Net, seeds, shared_pair, view};
+use super::sync_test_support::{Device, Net, join_open, kept, reopen, seeds, shared_pair, view};
 
 /// A, B and C, converged.
 fn shared_three() -> (Net, [usize; 3]) {
@@ -15,12 +16,7 @@ fn shared_three() -> (Net, [usize; 3]) {
     let now = net.now;
     let (link, _) = net.s(a).create_invite(3_600, now).unwrap();
     net.pump();
-    let c = net.add(Session::new(0xc3));
-    net.s(c)
-        .join_document(&link, "Cleo", &seeds(3, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(1_000);
+    let c = join_open(&mut net, &link, "Cleo", 3, 0xc3);
     (net, [a, b, c])
 }
 
@@ -39,28 +35,28 @@ fn notices(session: &mut Session) -> Vec<String> {
 }
 
 /// Criteria 10 and 29a: a leave written into a dead link shows "Leaving" on the own row, keeps
-/// the file shared with the leave in its keyring log, and ends as "left" once the link is back;
-/// the ended record's heads are entries the room holds.
+/// the workspace shared, and ends as "left" once the link is back; the marker's ended record's
+/// heads are entries the room holds.
 #[test]
 fn a_leave_stays_pending_and_shared_until_confirmed() {
     let (mut net, [a, b, _]) = shared_three();
     net.set_link(b, false);
-    net.s(b).leave_share("Poster").unwrap();
+    net.s(b).leave_share().unwrap();
     net.run(500);
     assert_eq!(row(&net.devices[b].session, "Ben")["pending"], "leaving");
     assert!(net.devices[b].session.is_shared());
-    let saved = curvyo_document_core::unpack(9, &net.s(b).pack_for_save().unwrap()).unwrap();
     assert!(
-        saved.share().is_some(),
-        "shared on disk until the leave is confirmed"
+        net.devices[b].session.workspace_ended_record().is_none(),
+        "shared until the leave is confirmed"
     );
-    assert!(saved.ended_share().is_none());
     net.set_link(b, true);
     net.run(15_000);
-    let ended = net.devices[b].session.document.ended_share().unwrap();
+    let ended = net.devices[b].session.workspace_ended_record().unwrap();
     assert_eq!(ended.ended, EndReason::Left);
     assert!(
-        notices(net.s(b)).contains(&"You left Poster. Your copy stays on this device.".to_owned())
+        notices(net.s(b))
+            .iter()
+            .any(|t| t.starts_with("You left Box job"))
     );
     assert_eq!(row(&net.devices[a].session, "Ben"), Value::Null);
     let link = net.devices[a].session.sync.as_ref().unwrap();
@@ -75,13 +71,11 @@ fn a_leave_stays_pending_and_shared_until_confirmed() {
 #[test]
 fn a_leave_saved_unsent_ends_on_the_next_open() {
     let (mut net, [_a, b, _]) = shared_three();
-    let (_, keys) = net.s(b).take_key_update().unwrap();
     net.set_link(b, false);
-    net.s(b).leave_share("Poster").unwrap();
-    let bytes = net.s(b).pack_for_save().unwrap();
-    let mut reopened = Session::open(0xb4, &bytes).unwrap();
-    let now = net.now;
-    assert!(reopened.resume_shared("Ben", keys, &seeds(2, 2), now));
+    net.s(b).leave_share().unwrap();
+    net.run(100);
+    let files = kept(&mut net, b);
+    let reopened = reopen(&net, 0xb4, files, "Ben", &seeds(2, 2));
     assert_eq!(row(&reopened, "Ben")["pending"], "leaving");
     net.devices[b] = Device {
         session: reopened,
@@ -91,7 +85,7 @@ fn a_leave_saved_unsent_ends_on_the_next_open() {
     };
     net.pump();
     net.run(2_000);
-    let ended = net.devices[b].session.document.ended_share().unwrap();
+    let ended = net.devices[b].session.workspace_ended_record().unwrap();
     assert_eq!(ended.ended, EndReason::Left);
 }
 
@@ -123,5 +117,5 @@ fn a_removal_and_a_role_change_stay_pending_until_confirmed() {
     assert_eq!(row(&net.devices[a].session, "Ben")["pending"], Value::Null);
     assert_eq!(row(&net.devices[a].session, "Ben")["admin"], true);
     assert_eq!(row(&net.devices[a].session, "Cleo"), Value::Null);
-    assert!(net.devices[c].session.document.ended_share().is_some());
+    assert!(net.devices[c].session.workspace_ended_record().is_some());
 }

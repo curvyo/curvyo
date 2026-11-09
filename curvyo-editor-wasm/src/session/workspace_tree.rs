@@ -258,7 +258,6 @@ impl Session {
             .ok_or(SessionError::Ended)?
             .workspace;
         let adopted = unpack(self.peer, bytes).map_err(|_| SessionError::Ended)?;
-        adopted.set_share(None);
         adopted.set_workspace_share(Some(WorkspaceShareRecord {
             workspace,
             document,

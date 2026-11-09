@@ -40,7 +40,6 @@ pub struct WasmWorkspaceShare {
     prepared: Option<PreparedShare>,
     files: crate::workspace_share_builder::ShareFiles,
     not_added: Vec<String>,
-    taken_in: Vec<(Vec<String>, [u8; 16])>,
 }
 
 #[wasm_bindgen]
@@ -59,29 +58,7 @@ impl WasmWorkspaceShare {
             prepared: None,
             files: Vec::new(),
             not_added: Vec::new(),
-            taken_in: Vec::new(),
         }
-    }
-
-    /// The device identity (64 bytes of entropy, as the sessions take it): a document shared on
-    /// its own with this device alone is taken in (criterion 42).
-    pub fn set_identity(&mut self, identity: &[u8]) {
-        let (Some(builder), Ok(entropy)) = (self.builder.as_mut(), identity.try_into()) else {
-            return;
-        };
-        builder.set_member(curvyo_crypto_core::IdentityKeys::from_entropy(&entropy).identity());
-    }
-
-    /// The documents shared on their own that were taken in: `[{path, document}]` (hex ids),
-    /// each needs its `Moved` record once the workspace is shared.
-    #[must_use]
-    pub fn taken_in_json(&self) -> String {
-        let rows: Vec<serde_json::Value> = self
-            .taken_in
-            .iter()
-            .map(|(path, id)| serde_json::json!({"path": path, "document": hex(id)}))
-            .collect();
-        serde_json::Value::Array(rows).to_string()
     }
 
     /// Adds a scanned folder (`path` as a JSON array).
@@ -92,7 +69,7 @@ impl WasmWorkspaceShare {
     }
 
     /// Adds a scanned document under the fresh id `document` (16 bytes): empty when added, else
-    /// `shared-on-its-own`, `unreadable` or `name`.
+    /// `unreadable` or `name`.
     pub fn add_document(&mut self, path: &str, bytes: &[u8], document: &[u8]) -> String {
         let (Some(builder), Ok(document)) = (self.builder.as_mut(), document.try_into()) else {
             return "unreadable".to_owned();
@@ -106,7 +83,6 @@ impl WasmWorkspaceShare {
                     .map_or("", |n| curvyo_document_core::document_name(n));
                 self.not_added.push(name.to_owned());
                 match reason {
-                    NotAdded::SharedOnItsOwn => "shared-on-its-own",
                     NotAdded::Unreadable => "unreadable",
                     NotAdded::Name => "name",
                 }
@@ -133,7 +109,6 @@ impl WasmWorkspaceShare {
     pub fn prepare(&mut self, snapshot_id: &[u8]) {
         let id: [u8; 16] = snapshot_id.try_into().unwrap_or_default();
         if let Some(builder) = self.builder.take() {
-            self.taken_in = builder.taken_in().to_vec();
             let (prepared, files) = builder.finish(id);
             self.prepared = Some(prepared);
             self.files = files;
@@ -243,6 +218,18 @@ impl WasmSession {
             Ok(()) => String::new(),
             Err(_) => "Could not share.".to_owned(),
         }
+    }
+
+    /// Whether this device was removed from its shared workspace (criteria 44, 45).
+    #[must_use]
+    pub fn workspace_removed(&self) -> bool {
+        self.session.workspace_removed()
+    }
+
+    /// Whether the session is connected and caught up.
+    #[must_use]
+    pub fn sync_online(&self) -> bool {
+        self.session.sync_online()
     }
 
     /// After Share's commit: the open document takes the record of `file`, the container Share
@@ -458,4 +445,19 @@ pub fn workspace_uploading_text(done: usize, total: usize) -> String {
 #[must_use]
 pub fn join_folder_refusal_text(code: &str) -> String {
     texts::join_folder_refusal_text(code).to_owned()
+}
+
+/// The block on a removed device (criterion 44).
+#[wasm_bindgen]
+#[must_use]
+pub fn workspace_removed_text() -> String {
+    curvyo_ui_core::workspace_tree_text::WORKSPACE_REMOVED_TEXT.to_owned()
+}
+
+/// The document on disk now (`current`) given the workspace record of the file Share prepared
+/// (`prepared`), for a file saved during the upload (`specs/0105`); empty when it cannot.
+#[wasm_bindgen]
+#[must_use]
+pub fn workspace_restamp_record(current: &[u8], prepared: &[u8]) -> Vec<u8> {
+    crate::workspace_share_builder::restamp_workspace_record(current, prepared).unwrap_or_default()
 }

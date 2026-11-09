@@ -128,13 +128,17 @@ export function JoinerBlock({
   view,
   server,
   onClose,
+  code: given,
 }: {
   devices: DevicesApi;
   view: PairingView | null;
   server: string;
   onClose: () => void;
+  /** The code typed into the Join field (`specs/0105` criterion 16): no field of its own. */
+  code?: string;
 }) {
-  const [code, setCode] = useState("");
+  const [typed, setCode] = useState("");
+  const code = given ?? typed;
   const [name, setName] = useState(devices.deviceName);
   const reasonId = useId();
   const alertId = useId();
@@ -243,6 +247,7 @@ export function JoinerBlock({
         }
       }}
     >
+      {given === undefined ? (
       <label className="flex flex-col gap-1">
         <span className="text-xs text-[var(--toolbar-icon)]">Pairing code</span>
         <input
@@ -265,6 +270,7 @@ export function JoinerBlock({
           }}
         />
       </label>
+      ) : null}
       {problem !== "" ? (
         <div className="flex flex-col gap-1">
           <p id={alertId} role="alert" className={ALERT}>

@@ -22,11 +22,6 @@ impl Session {
     /// See [`curvyo_document_core::pack`].
     pub fn pack_for_save(&mut self) -> Result<Vec<u8>, SaveError> {
         let version = self.document.version();
-        // A shared document's file keeps its room, cursor and keyring (`share.json`,
-        // `keyring.log`, ADR 0031 decision 9), so it reconnects when reopened (criterion 5).
-        if let Some(record) = self.sync_share_record() {
-            self.document.set_share(Some(record));
-        }
         // A document of a shared workspace keeps its workspace and id (`specs/0095-workspace`
         // criterion 15); the records applied so far are in the file once it is written.
         if let Some(record) = self.workspace_share_record() {

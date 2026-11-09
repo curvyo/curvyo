@@ -7,7 +7,6 @@ use curvyo_document_core::{AssetHash, DocumentVersion, ObjectSnapshot};
 use curvyo_sync_core::{RecordKind, SessionError};
 
 use super::Session;
-use super::sync::JoinPhase;
 
 impl Session {
     /// Pushes the local commits since the last export as one update, after the bytes of any
@@ -16,7 +15,7 @@ impl Session {
         let Some(link) = self.sync.as_ref() else {
             return;
         };
-        if link.awaiting_document || link.ended.is_some() {
+        if link.ended.is_some() {
             return;
         }
         let version = self.document.version();
@@ -90,9 +89,6 @@ impl Session {
         let mut changed = false;
         let mut rejected: Option<u64> = None;
         for (seq, kind, bytes) in records {
-            if kind == RecordKind::Update && self.moved_away(&bytes) {
-                return changed;
-            }
             match self.apply_record(kind, &bytes) {
                 Some(applied) => changed |= applied,
                 None => rejected = rejected.or(Some(seq)),
@@ -117,10 +113,7 @@ impl Session {
     /// Applies one remote record: `Some(true)` when the document changed, `None` when the record
     /// did not import and is rejected (criterion 25).
     fn apply_record(&mut self, kind: RecordKind, bytes: &[u8]) -> Option<bool> {
-        let awaiting = self.sync.as_ref().is_some_and(|s| s.awaiting_document);
         match kind {
-            // A joiner's blank placeholder takes no update before the room's snapshot.
-            RecordKind::Update if awaiting => Some(false),
             RecordKind::Update => self.document.import_updates(bytes).ok().map(|()| true),
             RecordKind::Asset => {
                 let Ok(hash) = self.document.insert_asset(bytes) else {
@@ -131,14 +124,7 @@ impl Session {
                 }
                 Some(true)
             }
-            RecordKind::Snapshot => {
-                let merged = if awaiting {
-                    self.adopt_snapshot(bytes)
-                } else {
-                    self.merge_snapshot(bytes)
-                };
-                merged.then_some(true)
-            }
+            RecordKind::Snapshot => self.merge_snapshot(bytes).then_some(true),
         }
     }
 
@@ -154,37 +140,6 @@ impl Session {
             .filter(|id| self.document.object(*id).is_some())
             .collect();
         self.selection.set(&kept);
-    }
-
-    /// A joiner's first snapshot replaces its blank placeholder (criterion 3): the document
-    /// opens as an unsaved "Untitled" document. `false` when the bytes do not open.
-    pub(super) fn adopt_snapshot(&mut self, bytes: &[u8]) -> bool {
-        let Ok(mut fresh) = Session::open(self.peer, bytes) else {
-            return false;
-        };
-        let Some(mut link) = self.sync.take() else {
-            return false;
-        };
-        link.awaiting_document = false;
-        link.join = Some(JoinPhase::Done);
-        link.assets = fresh.referenced_assets();
-        link.exported = fresh.document.version();
-        link.synced = fresh.document.version();
-        // The file of the room is never this device's: nothing marks it saved (JOIN-SAVE).
-        fresh.saved = DocumentVersion::never();
-        fresh.document.set_share(None);
-        fresh.sync = Some(link);
-        fresh.formats = std::mem::replace(&mut self.formats, Self::builtin_formats());
-        fresh.formats_broken = self.formats_broken.take();
-        fresh.fonts = std::mem::take(&mut self.fonts);
-        // The joiner keeps looking at the Share tab (UX notes §2.5).
-        std::mem::swap(&mut fresh.panel_tabs, &mut self.panel_tabs);
-        fresh.viewport = self.viewport;
-        fresh.canvas_css_width = self.canvas_css_width;
-        fresh.covered_right = self.covered_right;
-        fresh.device_pixel_ratio = self.device_pixel_ratio;
-        *self = fresh;
-        true
     }
 
     /// A member's snapshot (its cursor lay before the room's snapshot, or it resyncs) merges

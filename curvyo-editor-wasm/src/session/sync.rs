@@ -10,8 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use curvyo_crypto_core::MemberId;
-use curvyo_crypto_core::keyring::encode_log;
-use curvyo_document_core::{AssetHash, DocumentVersion, ShareRecord};
+use curvyo_document_core::{AssetHash, DocumentVersion};
 use curvyo_sync_core::{ClientSession, ConnectionId, InviteLink, Millis, RecordKind, SessionError};
 use curvyo_ui_core::presence::PresencePayload;
 use curvyo_ui_core::share_text::{ConnectionState, JoinRefusal};
@@ -70,8 +69,6 @@ pub enum SyncEnd {
     Removed,
     /// The relay refused the session.
     Refused,
-    /// The document was taken into a shared workspace (`specs/0095-workspace` criterion 49).
-    Moved,
     /// This device left by its own `RemoveMember` (`specs/0097` criteria 10 and 15).
     Left,
 }
@@ -107,9 +104,6 @@ pub(super) struct SyncLink {
     /// The labels seen for each member this session (adrs.md decision 5: cached outside the
     /// document).
     pub(super) labels: BTreeMap<MemberId, String>,
-    /// Whether a joiner still waits for the document (its own is a blank placeholder that must
-    /// never go out).
-    pub(super) awaiting_document: bool,
     pub(super) join: Option<JoinPhase>,
     pub(super) online: bool,
     pub(super) ever_online: bool,
@@ -139,13 +133,6 @@ pub(super) struct SyncLink {
     pub(super) workspace: Option<Box<super::workspace_channel::WorkspaceChannel>>,
     /// The highest sequence applied to the open document when a save packed it.
     pub(super) packed_through: Option<u64>,
-    /// The push of a take-in's `Moved` record, and whether the relay stored it.
-    pub(super) moved_push: Option<u64>,
-    pub(super) moved_stored: bool,
-    /// The answer of a return check this link ran (ADR 0041 decision 6).
-    pub(super) check: Option<curvyo_sync_core::CheckOutcome>,
-    /// A return check's link: the ended record it checks and whether it is a workspace's.
-    pub(super) returning: Option<(curvyo_document_core::EndedRecord, bool)>,
     /// A shared workspace's link that ended by removal or leave: the marker's ended record for
     /// the host to write (ADR 0041 decision 6).
     pub(super) workspace_ended: Option<curvyo_document_core::EndedRecord>,
@@ -156,8 +143,6 @@ pub(super) struct SyncLink {
     /// device's own leave waits for the relay (ADR 0041 decisions 2, 3 and 11): however the
     /// removal arrives, the ended record says "left".
     pub(super) leaving: bool,
-    /// The document's name for the leaver's notice ("" for "this document").
-    pub(super) leave_name: String,
     /// The own keyring acts the relay had not confirmed at the last pump (ADR 0041 decision 11).
     pub(super) pending: Vec<curvyo_sync_core::PendingAct>,
     /// The participants this device added back whose add the relay has not confirmed yet: their
@@ -185,7 +170,6 @@ impl SyncLink {
             remote: VecDeque::new(),
             peers: BTreeMap::new(),
             labels: BTreeMap::new(),
-            awaiting_document: false,
             join: None,
             online: false,
             ever_online: false,
@@ -205,14 +189,9 @@ impl SyncLink {
             revision: 1,
             workspace: None,
             packed_through: None,
-            moved_push: None,
-            moved_stored: false,
-            check: None,
-            returning: None,
             workspace_ended: None,
             leave_after_snapshot: false,
             leaving,
-            leave_name: String::new(),
             pending: Vec::new(),
             adding_back: BTreeSet::new(),
         }
@@ -260,31 +239,15 @@ impl Session {
         self.sync = Some(link);
     }
 
-    /// Whether the open document is shared (a live session or a share record in its file).
+    /// Whether this session carries a live link.
     #[must_use]
     pub fn is_shared(&self) -> bool {
-        self.sync.as_ref().is_some_and(|s| s.ended.is_none()) || self.document.share().is_some()
-    }
-
-    /// The share record's room as lowercase hex, for the credential store; empty when the
-    /// document is not shared.
-    #[must_use]
-    pub fn shared_room_hex(&self) -> String {
-        let room = self
-            .sync
-            .as_ref()
-            .map(|s| s.client.room().0)
-            .or_else(|| self.document.share().map(|r| r.room));
-        room.map(|r| hex(&r)).unwrap_or_default()
+        self.sync.as_ref().is_some_and(|s| s.ended.is_none())
     }
 
     /// The transport opened its socket.
     pub fn sync_connected(&mut self, now: Millis) {
-        if let Some(link) = self
-            .sync
-            .as_mut()
-            .filter(|l| l.ended != Some(SyncEnd::Moved))
-        {
+        if let Some(link) = self.sync.as_mut() {
             link.now = now;
             link.client.connected(now);
         }
@@ -293,11 +256,7 @@ impl Session {
 
     /// The transport's socket closed or could not open.
     pub fn sync_disconnected(&mut self, now: Millis) {
-        if let Some(link) = self
-            .sync
-            .as_mut()
-            .filter(|l| l.ended != Some(SyncEnd::Moved))
-        {
+        if let Some(link) = self.sync.as_mut() {
             link.now = now;
             if !link.ever_online && !link.failed_first {
                 link.failed_first = true;
@@ -310,11 +269,7 @@ impl Session {
 
     /// One binary message arrived.
     pub fn sync_received(&mut self, bytes: &[u8], now: Millis) {
-        if let Some(link) = self
-            .sync
-            .as_mut()
-            .filter(|l| l.ended != Some(SyncEnd::Moved))
-        {
+        if let Some(link) = self.sync.as_mut() {
             link.now = now;
             link.last_heard = now;
             link.client.received(bytes, now);
@@ -414,11 +369,7 @@ impl Session {
         let secret = link.client.invite(expires)?;
         let text = InviteLink {
             server: link.server.clone(),
-            kind: if link.workspace.is_some() {
-                curvyo_sync_core::InviteKind::Workspace
-            } else {
-                curvyo_sync_core::InviteKind::Document
-            },
+            kind: curvyo_sync_core::InviteKind::Workspace,
             secret,
         }
         .to_text();
@@ -445,22 +396,6 @@ impl Session {
         if self.sync.as_ref().is_some_and(|link| link.ended.is_some()) {
             self.sync = None;
         }
-    }
-
-    /// The share record a save writes into the file (`share.json`, `keyring.log`); `None`
-    /// without a live session or before the document arrived.
-    pub(super) fn sync_share_record(&self) -> Option<ShareRecord> {
-        let link = self.sync.as_ref()?;
-        if link.awaiting_document || link.ended.is_some() || link.workspace.is_some() {
-            return None;
-        }
-        Some(ShareRecord {
-            server: link.server.clone(),
-            room: link.client.room().0,
-            server_seq: link.client.cursor(),
-            synced_version: link.synced.clone(),
-            keyring_log: encode_log(&link.client.keyring_entries()).ok()?,
-        })
     }
 }
 

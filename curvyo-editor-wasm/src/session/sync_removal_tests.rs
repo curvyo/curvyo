@@ -1,15 +1,16 @@
 //! Removal, rejected updates, pictures added offline and the label cache of a shared session
-//! (`specs/0092-cooperative-editing` criteria 19, 25, 32 to 34), against one in-process relay.
+//! (`specs/0092-cooperative-editing` criteria 19, 25, 32 to 34, through a shared workspace since
+//! `specs/0105`), against one in-process relay.
 
 use std::collections::BTreeMap;
 
 use curvyo_sync_core::{RecordKind, SessionError};
-use curvyo_ui_core::share_text::REMOVED_NOTICE;
+use curvyo_ui_core::workspace_tree_text::WORKSPACE_REMOVED_TEXT as REMOVED_NOTICE;
 use serde_json::Value;
 
 use super::Session;
 use super::align_test_support::draw_rect;
-use super::sync_test_support::{Device, Net, seeds, shared_pair, view};
+use super::sync_test_support::{Device, Net, join_open, kept, reopen, seeds, shared_pair, view};
 
 const PNG: &[u8] =
     include_bytes!("../../../curvyo-image-core/tests/fixtures/images/png_rgba_8.png");
@@ -20,12 +21,7 @@ fn shared_three() -> (Net, usize, usize, usize) {
     let now = net.now;
     let (link, _) = net.s(a).create_invite(3_600, now).unwrap();
     net.pump();
-    let c = net.add(Session::new(0xc3));
-    net.s(c)
-        .join_document(&link, "Cleo", &seeds(3, 0), now)
-        .unwrap();
-    net.pump();
-    net.run(1_000);
+    let c = join_open(&mut net, &link, "Cleo", 3, 0xc3);
     (net, a, b, c)
 }
 
@@ -118,7 +114,7 @@ fn an_admin_removes_a_participant_with_a_key_rotation() {
         notices(net.s(a)).iter().all(|(_, alert)| !alert),
         "A shows no error"
     );
-    // The saved file of B is a plain document.
+    // The saved file of B opens without a link.
     let bytes = net.s(b).pack_for_save().unwrap();
     assert!(!Session::open(0xb9, &bytes).unwrap().is_shared());
 }
@@ -215,8 +211,7 @@ fn a_rejected_update_is_shown_once_and_resyncs_from_the_snapshot() {
 #[test]
 fn a_picture_added_offline_before_a_reopen_is_pushed_on_connect() {
     let (mut net, a, b) = shared_pair();
-    let (_, keys) = net.s(b).take_key_update().unwrap();
-    let saved = net.s(b).pack_for_save().unwrap();
+    let (saved, marker, keys) = kept(&mut net, b);
     net.set_link(b, false);
     // B opens the file without a connection, places a picture and saves.
     let mut offline = Session::open(0xb4, &saved).unwrap();
@@ -225,9 +220,13 @@ fn a_picture_added_offline_before_a_reopen_is_pushed_on_connect() {
     let _ = offline.import_finish(false);
     let with_picture = offline.pack_for_save().unwrap();
     // Reopened with the network back: the picture and the edit reach A.
-    let mut reopened = Session::open(0xb5, &with_picture).unwrap();
-    let now = net.now;
-    assert!(reopened.resume_shared("Ben", keys, &seeds(2, 2), now));
+    let reopened = reopen(
+        &net,
+        0xb5,
+        (with_picture, marker, keys),
+        "Ben",
+        &seeds(2, 2),
+    );
     net.devices[b] = Device {
         session: reopened,
         conn: None,
@@ -251,18 +250,15 @@ fn a_picture_added_offline_before_a_reopen_is_pushed_on_connect() {
 #[test]
 fn labels_are_kept_between_runs() {
     let (mut net, a, b) = shared_pair();
-    let kept = net.devices[a].session.share_labels();
+    let labels_kept = net.devices[a].session.share_labels();
     let ben = member_of(&net.devices[a].session, "Ben");
-    assert_eq!(kept.get(&ben).map(String::as_str), Some("Ben"));
+    assert_eq!(labels_kept.get(&ben).map(String::as_str), Some("Ben"));
     // A reopens its file while B is away: Ben is named from the kept labels.
-    let (_, keys) = net.s(a).take_key_update().unwrap();
-    let saved = net.s(a).pack_for_save().unwrap();
+    let files = kept(&mut net, a);
     net.set_link(b, false);
-    let mut reopened = Session::open(0xa5, &saved).unwrap();
-    let now = net.now;
-    assert!(reopened.resume_shared("Anna", keys, &seeds(1, 3), now));
-    assert_eq!(labels(&reopened), ["Anna", "Participant"]);
-    let mut stale = kept.clone();
+    let mut reopened = reopen(&net, 0xa5, files, "Anna", &seeds(1, 3));
+    assert_eq!(labels(&reopened), ["Anna", "A device"]);
+    let mut stale = labels_kept.clone();
     stale.insert("not hex".to_owned(), "x".to_owned());
     reopened.remember_share_labels(&stale);
     assert_eq!(labels(&reopened), ["Anna", "Ben"]);
@@ -299,5 +295,8 @@ fn the_only_participant_left_stops_sharing() {
     assert!(!net.devices[a].session.is_shared());
     let bytes = net.s(a).pack_for_save().unwrap();
     let file = curvyo_document_core::unpack(1, &bytes).unwrap();
-    assert!(file.share().is_none(), "no share record in the file");
+    assert!(
+        file.workspace_share().is_none(),
+        "no share record in the file"
+    );
 }

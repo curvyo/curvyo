@@ -202,10 +202,7 @@ fn decision_11_odd_entries_hide_only_themselves() {
 fn criterion_35_v34_v35_files_share_members() {
     let shared = fixture("shared_v34.curvyo");
     let members = container_share_members(&shared);
-    assert!(
-        members.share_json.is_some() || members.keyring,
-        "{members:?}"
-    );
+    assert!(members.share_json.is_some(), "{members:?}");
     unpack(1, &shared).unwrap();
 
     let ws = fixture("workspace_shared_v35.curvyo");
@@ -216,7 +213,6 @@ fn criterion_35_v34_v35_files_share_members() {
     let plain = fixture("laser_workbench_v35.curvyo");
     let members = container_share_members(&plain);
     assert!(members.share_json.is_none());
-    assert!(!members.keyring);
     unpack(1, &plain).unwrap();
 
     // Not a container at all.

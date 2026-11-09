@@ -98,6 +98,9 @@ export interface WorkspaceApi {
   rescan: () => Promise<void>;
   /** Takes a host answer that opened a workspace (a joined one, criterion 27). */
   adoptOpened: (answer: WorkspaceAnswer) => void;
+  /** Make a workspace for this file (`specs/0105` criterion 8): the folder opened around the open
+   * file, which stays open at `path`. */
+  adoptMade: (answer: WorkspaceAnswer, path: string[]) => void;
   /** Closes the workspace for a join; the open document stays open. */
   closeNow: () => Promise<void>;
   /** A shared workspace's tree (criteria 35 to 41): the Deleted list's rows. */
@@ -766,6 +769,13 @@ export function useWorkspace(editor: EditorSession, project: ProjectApi): Worksp
     scanned: () => scannedRef.current,
     rescan,
     adoptOpened: adopt,
+    adoptMade: (answer: WorkspaceAnswer, path: string[]) => {
+      adopt(answer);
+      if (answer.kind === "opened") {
+        setOpenPath(path);
+        projectRef.current.setFileState(fileNameOf(path), titleOf(path), false);
+      }
+    },
     closeNow,
     deleted,
     restore: (row: DeletedRow) => sharedRef.current?.restore(row),

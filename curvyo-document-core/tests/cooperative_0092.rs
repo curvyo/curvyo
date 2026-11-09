@@ -1,13 +1,14 @@
 //! Document-core additions of `specs/0092-cooperative-editing` (ADR 0031 decisions 3, 9 and 9a):
-//! the page frame register, the shared-file container members, the version text and received
-//! assets.
+//! the page frame register, the version text, received assets, and how a file shared on its
+//! own reads since ADR 0044 decision 3 (a local document).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::io::{Cursor, Read, Write};
 
 use curvyo_document_core::{
     AssetHash, CURRENT_FORMAT_VERSION, Document, DocumentSize, DocumentVersion, Length, NodeId,
-    ObjectSnapshot, OpenError, Point, RectBounds, ShareRecord, Vec2, pack, pack_snapshot, unpack,
+    ObjectSnapshot, OpenError, Point, RectBounds, Vec2, WorkspaceShareRecord, pack, pack_snapshot,
+    unpack,
 };
 
 const EPS: f64 = 1e-9;
@@ -352,56 +353,30 @@ fn damaged_frames_are_refused_on_open() {
     }
 }
 
-// ---------------------------------------------------------------- share.json (decision 9)
+// ---------------------------------------------------------------- share.json (ADR 0044)
 
-fn share_record(document: &Document) -> ShareRecord {
-    ShareRecord {
-        server: "ws://192.168.1.20:8787".to_owned(),
-        room: [7; 16],
-        server_seq: 42,
+fn workspace_record(document: &Document) -> WorkspaceShareRecord {
+    WorkspaceShareRecord {
+        workspace: [7; 16],
+        document: [8; 16],
         synced_version: document.version(),
-        keyring_log: vec![1, 2, 3, 4, 5],
     }
-}
-
-#[test]
-fn a_shared_file_round_trips_its_share_record() {
-    let document = Document::new(1);
-    rect(&document, 0.0, 0.0);
-    assert_eq!(document.share(), None);
-    assert!(!document.is_shared());
-    let record = share_record(&document);
-    document.set_share(Some(record.clone()));
-    assert!(document.is_shared());
-    let opened = unpack(2, &pack(&document, "t").unwrap()).unwrap();
-    assert_eq!(opened.share(), Some(record));
-    assert!(opened.is_shared());
-    // A removed device keeps a plain local file (R-COLLAB-010).
-    opened.set_share(None);
-    let plain = unpack(3, &pack(&opened, "t").unwrap()).unwrap();
-    assert_eq!(plain.share(), None);
-    assert!(!plain.is_shared());
 }
 
 #[test]
 fn a_relay_snapshot_carries_no_share_record() {
     let document = Document::new(1);
     rect(&document, 0.0, 0.0);
-    document.set_share(Some(share_record(&document)));
+    document.set_workspace_share(Some(workspace_record(&document)));
     let bytes = pack_snapshot(&document, "t").unwrap();
     let names: Vec<String> = zip::ZipArchive::new(Cursor::new(&bytes))
         .unwrap()
         .file_names()
         .map(|name| name.unwrap().into_owned())
         .collect();
-    assert!(
-        !names
-            .iter()
-            .any(|n| n == "share.json" || n == "keyring.log"),
-        "{names:?}"
-    );
+    assert!(!names.iter().any(|n| n == "share.json"), "{names:?}");
     let opened = unpack(2, &bytes).unwrap();
-    assert_eq!(opened.share(), None);
+    assert_eq!(opened.workspace_share(), None);
     assert_eq!(
         opened.export_json().unwrap(),
         document.export_json().unwrap()
@@ -410,32 +385,31 @@ fn a_relay_snapshot_carries_no_share_record() {
     assert!(
         unpack(3, &pack(&document, "t").unwrap())
             .unwrap()
-            .share()
+            .workspace_share()
             .is_some()
     );
 }
 
+/// `specs/0105` criteria 4 and 5 (LEGACY-SHARE A): the golden `shared_v34.curvyo` (share record
+/// v1 and keyring) opens as an editable local document with the legacy flag; saved, it holds
+/// neither `share.json` nor `keyring.log` and opens without the flag.
 #[test]
-fn golden_shared_v34() {
-    let path = fixture_path("shared_v34.curvyo");
-    if std::env::var_os("UPDATE_0092_FIXTURES").is_some() {
-        let document = Document::new(34);
-        rect(&document, 0.0, 0.0);
-        document.set_share(Some(share_record(&document)));
-        std::fs::write(&path, pack(&document, "golden").unwrap()).unwrap();
-    }
-    let bytes = std::fs::read(&path).unwrap();
+fn golden_shared_v34_opens_as_a_local_document() {
+    let bytes = std::fs::read(fixture_path("shared_v34.curvyo")).unwrap();
+    assert!(member(&bytes, "keyring.log").is_some(), "a legacy input");
     let opened = unpack(2, &bytes).unwrap();
-    let share = opened.share().expect("shared");
-    assert_eq!(share.server, "ws://192.168.1.20:8787");
-    assert_eq!(share.room, [7; 16]);
-    assert_eq!(share.server_seq, 42);
-    assert_eq!(share.keyring_log, vec![1, 2, 3, 4, 5]);
-    assert_eq!(share.synced_version, opened.version());
-    let json = member(&bytes, "share.json").unwrap();
-    let value: serde_json::Value = serde_json::from_slice(&json).unwrap();
-    assert_eq!(value["format_version"], 1);
-    assert_eq!(value["room"], "07070707070707070707070707070707");
+    assert!(opened.legacy_share());
+    assert!(!opened.is_shared());
+    assert_eq!(opened.workspace_share(), None);
+    assert_eq!(opened.read_objects().objects.len(), 1);
+    rect(&opened, 20.0, 0.0);
+    let saved = pack(&opened, "t").unwrap();
+    assert_eq!(member(&saved, "share.json"), None);
+    assert_eq!(member(&saved, "keyring.log"), None);
+    assert_eq!(member(&saved, "share.ended.json"), None);
+    let again = unpack(3, &saved).unwrap();
+    assert!(!again.legacy_share());
+    assert_eq!(again.read_objects().objects.len(), 2);
 }
 
 fn member(bytes: &[u8], name: &str) -> Option<Vec<u8>> {
@@ -469,32 +443,36 @@ fn with_member(bytes: &[u8], name: &str, with: Option<&[u8]>) -> Vec<u8> {
     writer.finish().unwrap().into_inner()
 }
 
+/// ADR 0044 decision 3, the read table: a record v1 without its keyring or a keyring alone opens
+/// local with the flag; a `share.json` that is no JSON is damage, a v2 record beside a keyring
+/// too, and a newer version is too new.
 #[test]
-fn a_share_record_without_its_keyring_or_malformed_is_damaged() {
+fn legacy_share_members_read_by_the_table() {
     let bytes = std::fs::read(fixture_path("shared_v34.curvyo")).unwrap();
-    let no_keyring = with_member(&bytes, "keyring.log", None);
-    assert!(matches!(unpack(2, &no_keyring), Err(OpenError::Damaged)));
-    let no_share = with_member(&bytes, "share.json", None);
-    assert!(matches!(unpack(2, &no_share), Err(OpenError::Damaged)));
-    for bad in [
-        &b"not json"[..],
-        br#"{"format_version":1,"server":"ws://x","room":"0707","server_seq":1,"synced_version":""}"#,
-        br#"{"format_version":1,"server":"ws://x","room":"07070707070707070707070707070707","server_seq":-1,"synced_version":""}"#,
-        br#"{"format_version":1,"server":"ws://x","room":"07070707070707070707070707070707","server_seq":1,"synced_version":"nope"}"#,
+    for local in [
+        with_member(&bytes, "keyring.log", None),
+        with_member(&bytes, "share.json", None),
+        with_member(
+            &bytes,
+            "share.json",
+            Some(br#"{"format_version":1,"server":"ws://x","room":"0707","server_seq":1,"synced_version":""}"#),
+        ),
     ] {
-        let damaged = with_member(&bytes, "share.json", Some(bad));
-        assert!(
-            matches!(unpack(2, &damaged), Err(OpenError::Damaged)),
-            "{}",
-            String::from_utf8_lossy(bad)
-        );
+        let opened = unpack(2, &local).unwrap();
+        assert!(opened.legacy_share() && opened.workspace_share().is_none());
     }
+    let damaged = with_member(&bytes, "share.json", Some(b"not json"));
+    assert!(matches!(unpack(2, &damaged), Err(OpenError::Damaged)));
+    let document = Document::new(1);
+    document.set_workspace_share(Some(workspace_record(&document)));
+    let v2 = pack(&document, "t").unwrap();
+    let both = with_member(&v2, "keyring.log", Some(&[1, 2, 3]));
+    assert!(matches!(unpack(2, &both), Err(OpenError::Damaged)));
     let newer = with_member(
         &bytes,
         "share.json",
         Some(br#"{"format_version":3,"server":"ws://x","room":"07070707070707070707070707070707","server_seq":1,"synced_version":""}"#),
     );
-    // Version 2 is a workspace document's record (`specs/0095-workspace`, ADR 0037 decision 3).
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {

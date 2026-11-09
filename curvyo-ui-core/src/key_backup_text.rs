@@ -19,8 +19,8 @@ pub const WAITING: &str = "Waiting for the passkey...";
 pub const WORKING: &str = "Talking to the server...";
 
 /// The honest answer when the browser or its passkey has no PRF: the keys stay in `IndexedDB` only.
-pub const NO_PRF: &str = "This browser or passkey cannot lock keys. The keys stay in this \
-                          browser only.";
+pub const NO_PRF: &str = "This device or passkey cannot lock keys. The keys stay on this \
+                          device only.";
 /// The maker closed the passkey prompt, or the browser refused it.
 pub const CANCELLED: &str = "No passkey was used. Nothing changed.";
 /// The server has no backup for this passkey.

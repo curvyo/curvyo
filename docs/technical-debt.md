@@ -64,9 +64,10 @@ a Make admin offer before the leave; both wait for the customer.
 
 ## Rooms and keys of documents shared on their own stay behind (`0105`, ADR 0044, 2026-11-09)
 
-Since sharing a single document is removed, a `0092` document room stays on the relay with its
-last state, and its epoch keys stay in the credential store or the browser key file, unused.
-Nothing reads them; the file opens as a local document (ADR 0044 decision 3).
+Since sharing a single document is removed, a `0092` document room (also one a `0095` take-in
+left with its `Moved` record) stays on the relay with its last state, and its epoch keys stay in
+the credential store or the browser key file, unused. Nothing reads them; the file opens as a
+local document (ADR 0044 decision 3).
 
 **Resolution:** a room deletion message (protocol change, ADR 0031 has none) and a key cleanup
 by room id; both wait for a story.
@@ -80,32 +81,26 @@ golden `share_ended_v2.json`), so older builds read it unchanged.
 **Resolution:** drop it at the next `share.ended.json` version change, or reuse it if a way back
 without an invite returns.
 
-## From now on is a client rule (`0097`, 2026-11-05, ADR 0041 decision 7)
+## Sync on after Sync off is a new workspace (`0105` criterion 12, ADR 0044 decision 7, 2026-11-09)
 
-"From now on" withholds the epochs created while a returning member was away only because
-current clients do not write `RewrapEpoch` for them (`missing_wraps`). The keyring would accept
-such a rewrap, so a build without the rule, or a member who wants to, can still hand the keys
-over; any member can pass on the content outside the app anyway. The dialog says "the app does
-not give B the keys", never "B cannot read".
+Sync off now ends this device's link and drops the marker's share files on every device, so the
+workspace is Local. Sync on again is a normal Share: a new workspace id and room. A copy another
+device kept from before (same folder, old id) is therefore not offered "Connect this folder"
+(`0096` criteria 13 and 14 match copies by workspace id); the new workspace arrives there as a
+second folder, and edits made in the old copy stay in it. "Connect this folder" still works for
+a copy with the same id (Rust tests `connect_this_folder_*`).
 
-**Resolution:** accepted (Frage 160 A, default). A keyring validity rule (Frage 160 B) would bind
-it for honest replays at the cost of an ADR 0010 rule change and a period in which old and new
-replays disagree.
+**Resolution:** if makers miss the merge, match an old copy by the devices list's earlier entry for
+the same folder (a devices list change, architect first).
 
-## Return check heads (`0097`, 2026-11-05, ADR 0041 decision 6)
+## Not every Share tab text is in `curvyo-ui-core` (`0105` criterion 18, 2026-11-09)
 
-The return check counts "added back" only for an admission of this device that builds on every
-keyring head its `share.ended.json` kept. This closes the limitation the first build had (a relay
-serving the room's real keyring cut off before the device's `RemoveMember` made the device look
-added back, plan open point 3): such a keyring holds no admission after the heads, so the check
-says "could not be checked". The cost: a head this device wrote that the relay never stored (a
-leave or rewrap sent just before the connection broke) can never be an ancestor of an add back,
-so that device never sees "added back"; its way back is an invite link. The same holds for a
-device whose credential store lost the room's keys (no wrap of a key it held).
+The words test of criterion 18 covers the share text modules of `curvyo-ui-core`. A few labels of
+the Share tab are still literals in the frontend ("Server", "Name shown to others", the
+passphrase field, "Make workspace", "Cancel", "Choose folder...", "Join", "Copy", "Done").
+None says "computer" or "this browser" (checked by hand); they are not covered by the test.
 
-**Resolution:** resolved by ADR 0041 decision 11 (2026-11-05): `heads` are the heads of the
-entries the relay confirmed, so an own entry it never stored is never a head. The lost-keys case
-stays.
+**Resolution:** move them into `sharing_text` the next time the Share tab changes.
 
 ## A mutual removal does not freeze a room through one relay (`0097`, 2026-11-05, criterion 27)
 
@@ -123,10 +118,10 @@ connection), and from keyrings merged outside one relay; the browser journey
 
 Grown past the module limit of CLAUDE.md §5 by the membership lifecycle, each by the person
 leave, the `left` reconcile or the ended record of the group it already drives:
-`frontend/src/hooks/useDevices.ts` (878), `useSyncedWorkspaces.ts` (600),
-`frontend/src/lib/backgroundWorkspace.ts` (588), `PropertiesPanel.tsx` (586),
-`useCollaboration.ts` (571), `useWorkspaceSync.ts` (563) and
-`curvyo-editor-wasm/src/device_group_glue.rs` (566). Splitting them is a refactoring outside the
+`frontend/src/hooks/useDevices.ts` (930), `useSyncedWorkspaces.ts` (600),
+`frontend/src/lib/backgroundWorkspace.ts` (588), `PropertiesPanel.tsx` (621),
+`useWorkspaceSync.ts` (558) and `curvyo-editor-wasm/src/device_group_glue.rs` (566);
+`useCollaboration.ts` shrank to 445 with `0105`. Splitting them is a refactoring outside the
 story.
 
 **Resolution:** split `useDevices.ts` into pairing, group list and person leave, and
@@ -2297,24 +2292,6 @@ macOS (which normalises file names) the two files can collide on disk.
 
 **Resolution:** NFC before every comparison and on every name written, with a dependency
 (`unicode-normalization`) and an ADR note; tests with decomposed names from a macOS peer.
-
-## A taken-in document's old room stays on the relay (`0095` criterion 42, ADR 0037 decision 10)
-
-After a take-in, the document's own `0092` room holds its last state and the `Moved` record. No
-client syncs it again and nobody is admitted there, but the relay keeps its data (ADR 0031 has no
-room deletion).
-
-**Resolution:** room deletion in the relay protocol (an admin-signed frame), with server
-retention in a later `0092` slice.
-
-## Changes pushed to an old room after `Moved` stay local (`0095` criterion 42, ADR 0037 decision 10)
-
-A member of a document's own room who edits it while another member takes it into a workspace
-pushes changes to the old room that arrive after `Moved`. They are not carried into the workspace:
-that member's copy becomes a local file holding them, and the member is told so.
-
-**Resolution:** a push across the take-in instant (the taking device merges the old room's tail
-up to `Moved` into the workspace stream), with an ADR 0037 addendum.
 
 ## A missing document whose records keep arriving holds the marker cursor back (`0095` criterion 41, 2026-11-03)
 

@@ -50,6 +50,14 @@ function makeHost(out, label) {
     return path.join(state.root, ...rel);
   };
   const marker = (name) => path.join(state.root, MARKER, name);
+  /** The folder Make a workspace for this file makes: named after the file, " 2", " 3" on a clash. */
+  const freeFolder = (file) => {
+    const stem = path.basename(file).replace(/\.curvyo$/i, '');
+    for (let n = 1; ; n += 1) {
+      const folder = path.join(path.dirname(file), n === 1 ? stem : `${stem} ${n}`);
+      if (!fs.existsSync(folder)) return folder;
+    }
+  };
   const scan = () => {
     const found = [];
     const walk = (dir, rel) => {
@@ -127,18 +135,23 @@ function makeHost(out, label) {
       if (answer.error) throw answer.error;
       return { raw: Buffer.from(answer.thumbnail, 'hex') };
     },
-    confirm_workspace_document_opened: (a) => { state.project = a.path; return null; },
-    reset_project: () => { state.project = null; return null; },
+    confirm_workspace_document_opened: (a) => { state.project = a.path; state.outside = null; return null; },
+    reset_project: () => { state.project = null; state.outside = null; return null; },
     save_project_bytes: (a) => {
       const bytes = Buffer.from(a.bytes);
       if (state.project && state.root && !a.saveAs) {
         fs.writeFileSync(at(state.project), bytes);
         return { kind: 'saved', file_name: state.project[state.project.length - 1], path: at(state.project) };
       }
+      if (state.outside && !a.saveAs) {
+        fs.writeFileSync(state.outside, bytes);
+        return { kind: 'saved', file_name: path.basename(state.outside), path: state.outside };
+      }
       state.saves += 1;
-      const file = path.join(home, `save-${state.saves}.curvyo`);
+      const file = path.join(home, `save ${state.saves}.curvyo`);
       fs.writeFileSync(file, bytes);
-      return { kind: 'saved', file_name: a.fileName, path: file };
+      state.outside = file;
+      return { kind: 'saved', file_name: path.basename(file), path: file };
     },
     workspace_marker_share: () => {
       if (!state.root || !fs.existsSync(marker('share.json'))) return null;
@@ -168,6 +181,23 @@ function makeHost(out, label) {
       fs.writeFileSync(marker('index.json'), JSON.stringify({ format_version: 1, documents }));
       return null;
     },
+    // `specs/0105` criterion 8: Make a workspace for this file, as `curvyo-app` does it.
+    workspace_folder_for_file: () => {
+      if (!state.outside) throw 'not-found';
+      return `${freeFolder(state.outside)}${path.sep}`;
+    },
+    make_workspace_for_file: () => {
+      const file = state.outside;
+      if (!file || !fs.existsSync(file)) throw 'not-found';
+      const folder = freeFolder(file);
+      fs.mkdirSync(folder);
+      const name = path.basename(file);
+      fs.renameSync(file, path.join(folder, name));
+      state.outside = null;
+      const answer = open(folder);
+      state.project = [name];
+      return { answer, path: [name] };
+    },
     pick_join_folder: () => {
       state.joinFolder = path.join(home, state.joinName || 'Joined box');
       fs.mkdirSync(state.joinFolder, { recursive: true });
@@ -178,7 +208,7 @@ function makeHost(out, label) {
       const entries = scan();
       const documents = entries.filter((e) => e.kind === 'document').map((e) => {
         const members = zip('members', at(e.path));
-        return { path: e.path, share: members.share ?? null, keyring: !!members.keyring };
+        return { path: e.path, share: members.share ?? null };
       });
       const known = Object.entries(readIndex()).map(([document, entry]) => ({ document, path: entry.path }));
       return { entries, folders: entries.filter((e) => e.kind === 'folder').map((e) => e.path), documents, known };
@@ -225,10 +255,14 @@ function makeHost(out, label) {
     state,
     home,
     /** One command from the page: `{value}`, `{raw: hex}` or `{error}`. */
-    handle(cmd, argsJson, bytesHex) {
+    /** `state.delays[cmd]` holds a command back by that many ms (a slow disk, for the race of a
+     * Save during Share's upload). */
+    async handle(cmd, argsJson, bytesHex) {
       state.calls.push(cmd);
       const command = commands[cmd];
       if (!command) return { value: null };
+      const delay = state.delays?.[cmd];
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
       try {
         const answer = command(JSON.parse(argsJson), bytesHex == null ? null : Buffer.from(bytesHex, 'hex'));
         if (answer && answer.raw) return { raw: answer.raw.toString('hex') };

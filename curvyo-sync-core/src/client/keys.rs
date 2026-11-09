@@ -18,8 +18,6 @@ use crate::entropy::Entropy;
 /// The keyring entries a client knows, their replay, and the epoch keys it holds.
 pub(super) struct Keys {
     pub(super) identity: IdentityKeys,
-    /// The keys from the credential store, held before any entry was replayed.
-    prior: Vec<KeyId>,
     document_id: DocumentId,
     entries: Vec<Entry>,
     hashes: Vec<EntryHash>,
@@ -38,7 +36,6 @@ impl Keys {
     ) -> Self {
         Self {
             identity,
-            prior: Vec::new(),
             document_id,
             entries: Vec::new(),
             hashes: Vec::new(),
@@ -80,26 +77,8 @@ impl Keys {
     /// Keeps keys from the credential store.
     pub(super) fn add_keys(&mut self, keys: Vec<(u32, EpochKey)>) {
         for (epoch, key) in keys {
-            self.prior.push(key.key_id());
             self.held.insert(key.key_id(), (epoch, key));
         }
-    }
-
-    /// Whether the keyring wraps to this device a key it held from the credential store, and
-    /// the wrap opens to that same key (ADR 0041 decision 6).
-    pub(super) fn anchored(&self) -> bool {
-        let Some(keyring) = &self.keyring else {
-            return false;
-        };
-        keyring
-            .wraps_for(&self.me())
-            .into_iter()
-            .filter(|(_, wrap)| self.prior.contains(&wrap.key_id()))
-            .any(|(epoch, wrap)| {
-                let held = self.held.get(&wrap.key_id()).map(|(_, key)| key.as_bytes());
-                unwrap_epoch_key(&wrap, epoch.number, self.document_id, &self.identity)
-                    .is_ok_and(|key| Some(key.as_bytes()) == held)
-            })
     }
 
     /// Adds entries and replays. Returns whether anything new was accepted.
@@ -258,28 +237,6 @@ impl Keys {
         self.write(Payload::AddMember {
             identity,
             role,
-            wraps,
-        })
-    }
-
-    /// `AddMember` of the former participant `identity` as a member with a wrap of the current
-    /// epoch key only ("From now on", ADR 0010 §9, ADR 0041 decision 5).
-    pub(super) fn write_current_addition(
-        &mut self,
-        identity: Identity,
-        entropy: &mut Entropy,
-    ) -> Result<Entry, SessionError> {
-        let keyring = self.keyring.as_ref().ok_or(SessionError::NotAMember)?;
-        let current = keyring.current_epoch();
-        let (epoch, key) = self.held.get(&current.key_id).ok_or(SessionError::NoKey)?;
-        let wrap = wrap_epoch_key(key, *epoch, self.document_id, &identity, entropy.secret())?;
-        let wraps = vec![EpochWrap {
-            epoch: *epoch,
-            wrap,
-        }];
-        self.write(Payload::AddMember {
-            identity,
-            role: Role::Member,
             wraps,
         })
     }

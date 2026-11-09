@@ -98,7 +98,7 @@ impl Session {
         let Some(link) = self.sync.as_ref() else {
             return;
         };
-        if link.ended.is_some() || link.awaiting_document {
+        if link.ended.is_some() {
             return;
         }
         let Ok(bytes) = serde_json::to_vec(&self.own_presence()) else {

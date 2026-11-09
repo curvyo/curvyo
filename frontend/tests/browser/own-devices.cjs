@@ -3,7 +3,7 @@
 // desktop device with a faked desktop host (`window.__TAURI_INTERNALS__`, as `workspace.cjs`)
 // whose workspace and device-group commands run on real folders under target/0096-browser/.
 //
-// A opens a workspace with a document; Add a device shows a code, B types it in Join my devices,
+// A opens a workspace with a document; Add device shows a code, B types it in the Join field,
 // both show the same four check words and A presses Pair (criteria 1 to 3). A keeps the open
 // workspace checked and presses Sync these: it arrives on B under the Synced workspaces folder
 // without any input there (8 to 10). B opens it; an edit on either side reaches the other (18).
@@ -462,6 +462,22 @@ const tree = (d) => d.page.getByRole('treegrid', { name: 'Workspace documents' }
 const row = (d, name) => tree(d).getByRole('row', { name: new RegExp(`^${name}\\b`) });
 const devicesList = (d) => panel(d).getByRole('list', { name: 'My devices' }).locator(':scope > li');
 const shown = (d, text) => d.page.getByText(text, { exact: true }).count().then((n) => n > 0);
+const { watchTabs, tabsSeen } = require('./support/tab-watch.cjs');
+/** Every tab selected since `watchTabs` was the Share tab (`specs/0105` criterion 20). */
+async function stayedOnShare(d, what) {
+  const seen = await tabsSeen(d.page);
+  assert(seen.length > 0 && seen.every((t) => /^Share/.test(t)), `${what}: the tabs seen were ${JSON.stringify(seen)}`);
+}
+/** Join… with a device code (`specs/0105` criterion 16): one field, then Connect. */
+async function joinWithCode(d, code) {
+  await panel(d).getByRole('button', { name: 'Join…', exact: true }).click();
+  await panel(d).getByLabel('Link or code', { exact: true }).fill(code);
+  await panel(d).getByRole('button', { name: 'Connect', exact: true }).click();
+}
+/** Switches "Sync to my devices" on: it acts at once (`0096`, customer 2026-11-09). */
+async function syncOn(d, toggle) {
+  await toggle.click();
+}
 const shot = (d, name) => d.page.screenshot({ path: path.join(out, `${name}.png`) });
 const objects = (file) => {
   const flat = (nodes) => nodes.flatMap((n) => (n.shape === 'layer' || n.shape === 'group' ? flat(n.objects || []) : [n]));
@@ -540,7 +556,8 @@ async function checkWords(d) {
     await setServer(B, address, 'Anna');
     assert.equal(await devicesList(A).count(), 1, 'only this device before pairing');
     await assertPanelFits(A.page, 'A before pairing');
-    await panel(A).getByRole('button', { name: 'Add a device', exact: true }).click();
+    await watchTabs(A.page);
+    await panel(A).getByRole('button', { name: 'Add device', exact: true }).click();
     const codeGroup = panel(A).getByRole('group', { name: /^[0-9A-Z](, [0-9A-Z]){7}$/ });
     await codeGroup.waitFor({ timeout: 15000 });
     const code = (await codeGroup.innerText()).trim();
@@ -548,9 +565,8 @@ async function checkWords(d) {
     assert.ok(!(await shown(A, 'The device that enters this code can sync the workspaces you choose, and you can remove it again. The server can tell which devices belong together, not their names.')), 'no hint sentence');
     await shot(A, '01-a-code');
     await assertPanelFits(A.page, 'A shows its code');
-    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).click();
-    await panel(B).getByLabel('Pairing code', { exact: true }).fill(code.toLowerCase().replace('-', ' '));
-    await panel(B).getByRole('button', { name: 'Connect', exact: true }).click();
+    await watchTabs(B.page);
+    await joinWithCode(B, code.toLowerCase().replace('-', ' '));
     const wordsA = await checkWords(A);
     const wordsB = await checkWords(B);
     assert.equal(wordsA.length, 4);
@@ -566,6 +582,8 @@ async function checkWords(d) {
     await panel(A).getByRole('button', { name: 'Pair', exact: true }).click();
     await until('A lists two devices', async () => (await devicesList(A).count()) === 2, 20000);
     await until('B lists two devices', async () => (await devicesList(B).count()) === 2, 20000);
+    await stayedOnShare(A, 'Add device');
+    await stayedOnShare(B, 'Join with a device code');
     const pick = panel(A).getByRole('list', { name: 'Workspaces to sync' });
     await pick.waitFor({ timeout: 15000 });
     assert.ok(await pick.getByRole('checkbox').first().isChecked(), 'the open workspace is checked');
@@ -599,7 +617,7 @@ async function checkWords(d) {
       return objects(aFile).length === 3;
     }, 20000);
     await tab(A, 'Share');
-    assert.ok(await shown(A, 'Synced, 2 devices'), 'the Workspace block says it is synced to my devices');
+    assert.ok(await panel(A).getByRole('region', { name: 'Workspace ZQX-WS-7731' }).getByText('Synced', { exact: true }).count(), 'the Workspace block says Synced');
     await shot(A, '05-a-synced');
 
     step('Criterion 13: A switches the workspace off (armed, no sentence); B keeps a local copy');
@@ -615,7 +633,23 @@ async function checkWords(d) {
     const switchOffMs = await until('A\'s switch is off', async () => (await syncSwitch.getAttribute('aria-checked')) === 'false', 30000);
     await until('B is told', () => shown(B, 'ZQX-WS-7731 is no longer synced. Your copy stays here.'), 30000);
 
-    step('Criterion 14: B edits offline from the room and closes the workspace; A switches on again; Connect this folder sends B\'s edit without B opening the document');
+    step('0105 criterion 12: after Sync off A is Local: no link, no marker share files, no reconnect on reopen');
+    const aBlock = panel(A).getByRole('region', { name: 'Workspace ZQX-WS-7731' });
+    await until('A says Local', async () => (await aBlock.innerText()).includes('Local'), 15000);
+    await until('A\'s marker has no share files', async () => !fs.existsSync(path.join(A.host.state.root, MARKER, 'share.json')), 10000);
+    await tab(A, 'File');
+    await panel(A).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
+    await settle(A.page, 500);
+    await panel(A).getByRole('button', { name: /^ZQX-WS-7731/ }).first().click();
+    await tree(A).waitFor({ timeout: 15000 });
+    await row(A, 'ZQX-DOC-7731').click();
+    await settle(A.page, 3000);
+    await tab(A, 'Share');
+    assert.ok((await aBlock.innerText()).includes('Local'), 'reopened Local');
+    assert.equal(await panel(A).getByRole('list', { name: 'Participants' }).count(), 0, 'no link after the reopen');
+    assert.equal(await syncSwitch.getAttribute('aria-checked'), 'false');
+
+    step('0105 criterion 12: B edits its local copy; Sync on again is a new workspace that arrives on B as a second folder, the old copy stays local');
     await rect(B, 500, 600, 30, 30);
     await save(B);
     assert.equal(objects(bFile).length, 4);
@@ -623,19 +657,16 @@ async function checkWords(d) {
     await panel(B).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
     await settle(B.page, 500);
     await tab(A, 'Share');
-    // On asks nothing (customer 2026-11-09).
-    await syncSwitch.click();
+    await watchTabs(A.page);
+    await syncOn(A, syncSwitch);
     const switchOnMs = await until('A\'s switch is on', async () => (await syncSwitch.getAttribute('aria-checked')) === 'true', 30000);
-    await tab(B, 'Share');
-    const connect = panel(B).getByRole('button', { name: 'Connect this folder', exact: true });
-    await connect.waitFor({ timeout: 40000 });
-    await shot(B, '06-b-decision');
-    await assertPanelFits(B.page, 'B decides about its copy');
-    await connect.click();
-    await until('A holds B\'s offline rectangle', async () => {
-      await save(A);
-      return objects(aFile).length === 4;
-    }, 40000);
+    await stayedOnShare(A, 'Sync on');
+    const second = path.join(B.host.syncedFolder, 'ZQX-WS-7731 2', 'ZQX-DOC-7731.curvyo');
+    await until('the new workspace arrives on B', async () => fs.existsSync(second) && objects(second).length === 3, 40000);
+    assert.equal(objects(bFile).length, 4, 'B\'s old copy keeps its edit as a local file');
+    await tab(A, 'File');
+    await row(A, 'ZQX-DOC-7731').click();
+    await settle(A.page, 800);
     await tab(A, 'Share');
 
     step('Criteria 23 and 24: A removes B; B is told and keeps its files');
@@ -682,19 +713,19 @@ async function checkWords(d) {
     });
     const identityB = B.host.state.identity;
     await panel(B).getByRole('region', { name: 'My devices' }).getByRole('button', { name: 'OK', exact: true }).click();
-    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).waitFor({ timeout: 15000 });
-    await assertPanelFits(B.page, 'B removed, Add a device and Join my devices');
+    await panel(B).getByRole('button', { name: 'Join…', exact: true }).waitFor({ timeout: 15000 });
+    await assertPanelFits(B.page, 'B removed, Add device and Join');
     await shot(B, '09-b-unpaired');
     await tab(A, 'Share');
     let pairedAt = Date.now();
-    await panel(A).getByRole('button', { name: 'Add a device', exact: true }).click();
+    await panel(A).getByRole('button', { name: 'Add device', exact: true }).click();
     const again = panel(A).getByRole('group', { name: /^[0-9A-Z](, [0-9A-Z]){7}$/ });
     await again.waitFor({ timeout: 15000 });
     const codeShownMs = Date.now() - pairedAt;
     const secondCode = (await again.innerText()).trim();
-    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).click();
+    await panel(B).getByRole('button', { name: 'Join…', exact: true }).click();
+    await panel(B).getByLabel('Link or code', { exact: true }).fill(secondCode);
     await assertPanelFits(B.page, 'B joining again');
-    await panel(B).getByLabel('Pairing code', { exact: true }).fill(secondCode);
     pairedAt = Date.now();
     await panel(B).getByRole('button', { name: 'Connect', exact: true }).click();
     await checkWords(A);
@@ -790,52 +821,42 @@ async function checkWords(d) {
     await tab(B, 'Share');
     const newSwitch = panel(B).getByRole('switch', { name: 'Sync to my devices' });
     const workspaceBlock = panel(B).getByRole('region', { name: 'Workspace ZQX-WS-NEW' });
-    await newSwitch.click();
-    // Share closes the document while it prepares (as Share workspace): back to the Share tab.
-    await tab(B, 'Share');
+    await syncOn(B, newSwitch);
     await until('the switch runs', async () => (await newSwitch.getAttribute('aria-checked')) === 'true', 5000);
     await until('the header says Sharing', async () => (await workspaceBlock.innerText()).includes('Sharing'), 5000);
-    assert.ok(!(await workspaceBlock.innerText()).includes('Not shared'), 'never "Not shared" while it shares');
+    assert.ok(!(await workspaceBlock.innerText()).includes('Local'), 'never "Local" while it shares');
     await shot(B, '13-b-sharing');
     const cancelAt = Date.now();
     await newSwitch.click();
     await until('the switch is off again', async () => (await newSwitch.getAttribute('aria-checked')) === 'false', 2000);
     const cancelMs = Date.now() - cancelAt;
-    // The attempt's session is replaced (the document comes back, or an empty one): Share again.
+    // The open document stays open on its session (`specs/0105` criterion 20).
     await settle(B.page, 1500);
-    await tab(B, 'Share');
-    await until('the header says Not shared again', async () => (await workspaceBlock.innerText()).includes('Not shared'), 5000);
+    await until('the header says Local again', async () => (await workspaceBlock.innerText()).includes('Local'), 5000);
     await tab(B, 'File');
-    await until('the document is open again after the cancel', async () => (await newRow.getAttribute('aria-selected')) === 'true', 10000);
+    await until('the document is still open after the cancel', async () => (await newRow.getAttribute('aria-selected')) === 'true', 10000);
     assert.equal(await B.page.getByText(/did not let this device in/).count(), 0);
     await tab(B, 'Share');
 
     step('Share tab feedback 1: a switch-on that never gets an answer fails with Try again, which works once the server is up');
     await until('the server reads connected', () => shown(B, 'Connected'), 10000);
-    await newSwitch.click();
-    await tab(B, 'Share');
+    await watchTabs(B.page);
+    await syncOn(B, newSwitch);
     const tryAgain = workspaceBlock.getByRole('button', { name: 'Try again', exact: true });
-    // The attempt's session is replaced when it fails, which shows another tab: Share again.
-    const failMs = await until('the switch fails with Try again', async () => {
-      if ((await newSwitch.count()) === 0) await tab(B, 'Share');
-      return (await tryAgain.count()) === 1;
-    }, 45000);
+    const failMs = await until('the switch fails with Try again', async () => (await tryAgain.count()) === 1, 45000);
+    await stayedOnShare(B, 'a failed Sync on');
     assert.equal(await newSwitch.getAttribute('aria-checked'), 'false');
     assert.ok((await workspaceBlock.getByRole('alert').allInnerTexts()).some((t) => t.startsWith('Could not ')), 'the alert says why');
     assert.ok(!(await workspaceBlock.innerText()).includes('Uploading...'), 'no endless Uploading');
     await tab(B, 'File');
-    await until('the document is open again after the failure', async () => (await newRow.getAttribute('aria-selected')) === 'true', 10000);
+    await until('the document is still open after the failure', async () => (await newRow.getAttribute('aria-selected')) === 'true', 10000);
     await tab(B, 'Share');
     await shot(B, '14-b-switch-failed');
     await assertPanelFits(B.page, 'B shows the failed switch');
     await silent.stop();
     live = await startRelay(live);
     await tryAgain.click();
-    await tab(B, 'Share');
-    const retryMs = await until('the switch is on after Try again', async () => {
-      if ((await newSwitch.count()) === 0) await tab(B, 'Share');
-      return (await newSwitch.getAttribute('aria-checked')) === 'true' && (await shown(B, 'In sync with 1 device'));
-    }, 60000);
+    const retryMs = await until('the switch is on after Try again', async () => (await newSwitch.getAttribute('aria-checked')) === 'true' && (await shown(B, 'In sync with 1 device')), 60000);
     await until('the new workspace arrives on A', async () => fs.existsSync(path.join(A.host.syncedFolder, 'ZQX-WS-NEW')), 60000);
 
     step('Share tab feedback 3 and 4: B leaves its devices (armed); its workspace reopens local, never refused');
@@ -843,7 +864,7 @@ async function checkWords(d) {
     await leaveB.click();
     await sleep(450);
     await leaveB.click();
-    await panel(B).getByRole('button', { name: 'Join my devices', exact: true }).waitFor({ timeout: 15000 });
+    await panel(B).getByRole('button', { name: 'Join…', exact: true }).waitFor({ timeout: 15000 });
     await until('B\'s marker has no share files', async () => !fs.existsSync(path.join(B.host.home, 'ZQX-WS-NEW', MARKER, 'share.json')), 10000);
     await tab(B, 'File');
     await panel(B).getByRole('region', { name: 'Workspace' }).getByLabel('Close workspace', { exact: true }).click();
@@ -853,7 +874,7 @@ async function checkWords(d) {
     await row(B, 'ZQX-DOC-NEW').click();
     await settle(B.page, 3000);
     await tab(B, 'Share');
-    assert.ok((await panel(B).getByRole('region', { name: 'Workspace ZQX-WS-NEW' }).innerText()).includes('Not shared'));
+    assert.ok((await panel(B).getByRole('region', { name: 'Workspace ZQX-WS-NEW' }).innerText()).includes('Local'));
     assert.equal(await B.page.getByText(/did not let this device in/).count(), 0, 'no refusal after the reopen');
 
     step('Share tab feedback 3: A, now the last device, may leave; the group ends and its workspaces stay local');
@@ -864,7 +885,7 @@ async function checkWords(d) {
     await shot(A, '15-a-leave-last');
     await sleep(450);
     await leaveA.click();
-    await panel(A).getByRole('button', { name: 'Join my devices', exact: true }).waitFor({ timeout: 15000 });
+    await panel(A).getByRole('button', { name: 'Join…', exact: true }).waitFor({ timeout: 15000 });
     assert.ok(!(await shown(A, 'This device is the only one that can manage your devices. Pair another device first.')));
     for (const name of ['ZQX-WS-7731', 'ZQX-WS-NEW', ...closed]) {
       const where = name === 'ZQX-WS-7731' ? path.join(A.host.home, name) : name === 'ZQX-WS-NEW' ? path.join(A.host.syncedFolder, name) : path.join(out, 'A', name);
@@ -878,7 +899,7 @@ async function checkWords(d) {
     await row(A, 'ZQX-DOC-7731').click();
     await settle(A.page, 3000);
     await tab(A, 'Share');
-    assert.ok((await panel(A).getByRole('region', { name: 'Workspace ZQX-WS-7731' }).innerText()).includes('Not shared'));
+    assert.ok((await panel(A).getByRole('region', { name: 'Workspace ZQX-WS-7731' }).innerText()).includes('Local'));
     assert.equal(await A.page.getByText(/did not let this device in/).count(), 0, 'no refusal after the reopen');
     await shot(A, '16-a-local-again');
 
@@ -888,7 +909,7 @@ async function checkWords(d) {
     live.stop();
 
     assert.deepEqual([...A.errors, ...B.errors], []);
-    console.log('PASS browser 0096: pair with code and words, sync these, arrival, edits both ways, switch off and on, connect this folder, remove, one-device warning, server data blind, a removed device pairs again');
+    console.log('PASS browser 0096: pair with code and words, sync these, arrival, edits both ways, switch off to Local and on as a new workspace, remove, one-device warning, server data blind, a removed device pairs again');
   } finally {
     await browser.close();
   }

@@ -1,7 +1,7 @@
 //! Tester's acceptance tests for `specs/0095-workspace` in `curvyo-sync-core`, written from the
 //! specification and the public API before reading the implementation: the invite version `2.`
 //! (criteria 26, 27, 29), the workspace snapshot stream and its parts (criteria 28, 34), the
-//! inner record header and `Moved` (criteria 34, 42, 49), the snapshot rule (ADR 0037 decision
+//! inner record header (criterion 34; `Moved` retired by ADR 0044), the snapshot rule (ADR 0037 decision
 //! 7), and removal with key rotation through the in-process relay (criteria 43 to 46), with two
 //! workspaces on one relay (criterion 47).
 
@@ -20,11 +20,11 @@ use std::collections::VecDeque;
 
 use curvyo_crypto_core::{EnvelopeHeader, EnvelopeKind, open};
 use curvyo_sync_core::{
-    ClientFrame, ClientOutput, ClientSession, ConnectionId, InviteKind, InviteLink, Millis, Moved,
+    ClientFrame, ClientOutput, ClientSession, ConnectionId, InviteKind, InviteLink, Millis,
     PART_BYTES, PART_PADDING, RecordKind, RefusalReason, Relay, RelayOutput, RoomId,
     SNAPSHOT_STREAM_VERSION, SessionConfig, SessionEvent, SessionStart, SnapshotAssembler,
-    StreamEntry, StreamError, decode_inner_record, decode_moved, encode_inner_record, encode_moved,
-    encode_snapshot_stream, snapshot_due, split_snapshot,
+    StreamEntry, StreamError, decode_inner_record, encode_inner_record, encode_snapshot_stream,
+    snapshot_due, split_snapshot,
 };
 use support::{device, member, seed};
 
@@ -219,29 +219,6 @@ fn c34_inner_records_round_trip() {
     assert_eq!(decode_inner_record(&empty).unwrap().1, b"");
     assert!(decode_inner_record(&record[..23]).is_err());
     assert!(decode_inner_record(&[]).is_err());
-}
-
-/// Criteria 42 and 49: `Moved` round-trips and no other record reads as one.
-#[test]
-fn c42_moved_round_trips_and_nothing_else_is_moved() {
-    let moved = Moved {
-        workspace: [1; 16],
-        document: [2; 16],
-    };
-    let bytes = encode_moved(&moved);
-    assert_eq!(decode_moved(&bytes), Some(moved));
-    assert_eq!(decode_moved(&bytes[..bytes.len() - 1]), None);
-    let mut longer = bytes.clone();
-    longer.push(0);
-    assert_eq!(decode_moved(&longer), None);
-    assert_eq!(decode_moved(b""), None);
-    assert_eq!(decode_moved(b"CVMOVED"), None);
-    // A real Loro update of a document never reads as Moved.
-    let document = curvyo_document_core::Document::new(1);
-    let update = document
-        .export_updates(&curvyo_document_core::DocumentVersion::never())
-        .unwrap();
-    assert_eq!(decode_moved(&update), None);
 }
 
 /// ADR 0037 decision 7: a snapshot is due at max(4 MiB, half the last snapshot) of tail bytes or

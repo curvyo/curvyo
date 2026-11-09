@@ -1,13 +1,13 @@
 //! `share.json` version 2 of a workspace document (`specs/0095-workspace` criteria 15 and 36,
-//! ADR 0037 decision 3): the workspace and the document id, no relay and no keyring; version 1
-//! of a document shared on its own is still read.
+//! ADR 0037 decision 3): the workspace and the document id, no relay and no keyring; a document
+//! shared on its own (version 1) reads as a local file (ADR 0044 decision 3).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::io::{Cursor, Read, Write};
 
 use curvyo_document_core::{
-    Document, Length, OpenError, Point, RectBounds, ShareRecord, WorkspaceRoomRecord,
-    WorkspaceShareRecord, pack, pack_snapshot, unpack,
+    Document, Length, OpenError, Point, RectBounds, WorkspaceRoomRecord, WorkspaceShareRecord,
+    pack, pack_snapshot, unpack,
 };
 
 fn fixture_path(name: &str) -> std::path::PathBuf {
@@ -67,28 +67,22 @@ fn a_workspace_document_round_trips_its_record() {
     let document = drawn();
     document.set_workspace_share(Some(record(&document)));
     assert!(document.is_shared());
-    assert_eq!(document.share(), None);
     let bytes = pack(&document, "t").unwrap();
     assert!(member(&bytes, "keyring.log").is_none());
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.workspace_share(), Some(record(&document)));
-    assert_eq!(opened.share(), None);
+    assert!(!opened.legacy_share());
     assert!(opened.is_shared());
 }
 
-/// A file holds one record: setting one replaces the other, clearing leaves a local file.
+/// A legacy file given a workspace record holds that record only; clearing it leaves a local
+/// file.
 #[test]
 fn a_file_holds_one_share_record_at_most() {
-    let document = drawn();
-    document.set_share(Some(ShareRecord {
-        server: "ws://x".to_owned(),
-        room: [7; 16],
-        server_seq: 1,
-        synced_version: document.version(),
-        keyring_log: vec![1],
-    }));
+    let legacy = std::fs::read(fixture_path("shared_v34.curvyo")).unwrap();
+    let document = unpack(1, &legacy).unwrap();
     document.set_workspace_share(Some(record(&document)));
-    assert_eq!(document.share(), None);
+    assert!(member(&pack(&document, "t").unwrap(), "keyring.log").is_none());
     let opened = unpack(2, &pack(&document, "t").unwrap()).unwrap();
     assert_eq!(opened.workspace_share(), Some(record(&document)));
     opened.set_workspace_share(None);
@@ -164,16 +158,9 @@ fn a_malformed_or_newer_version_2_record_is_refused() {
 /// A version 2 record beside a keyring is damage: a workspace document has no keyring of its own.
 #[test]
 fn a_version_2_record_with_a_keyring_is_damaged() {
-    let document = drawn();
-    document.set_share(Some(ShareRecord {
-        server: "ws://x".to_owned(),
-        room: [7; 16],
-        server_seq: 1,
-        synced_version: document.version(),
-        keyring_log: vec![1],
-    }));
+    let legacy = std::fs::read(fixture_path("shared_v34.curvyo")).unwrap();
     let bytes = with_share_json(
-        &pack(&document, "t").unwrap(),
+        &legacy,
         br#"{"format_version":2,"workspace":"11111111111111111111111111111111","document":"d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0","synced_version":""}"#,
     );
     assert!(matches!(unpack(2, &bytes), Err(OpenError::Damaged)));
@@ -264,4 +251,33 @@ fn a_document_builds_from_the_updates_of_its_whole_stream() {
         Document::from_updates(77, &later).is_err(),
         "updates without the stream's start make no document"
     );
+}
+
+/// `specs/0105` (tester finding): a workspace document with a stray `share.ended.json` is a
+/// workspace document, not a legacy file.
+#[test]
+fn a_stray_ended_record_beside_a_workspace_record_is_no_legacy_file() {
+    let document = drawn();
+    document.set_workspace_share(Some(record(&document)));
+    let bytes = pack(&document, "t").unwrap();
+    let mut archive = zip::ZipArchive::new(Cursor::new(&bytes[..])).unwrap();
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for index in 0..archive.len() {
+        let mut file = archive.by_index(index).unwrap();
+        let name = file.name().unwrap().into_owned();
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        writer
+            .start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(&data).unwrap();
+    }
+    writer
+        .start_file("share.ended.json", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    writer.write_all(b"{}").unwrap();
+    let stray = writer.finish().unwrap().into_inner();
+    let opened = unpack(2, &stray).unwrap();
+    assert!(!opened.legacy_share());
+    assert_eq!(opened.workspace_share(), Some(record(&document)));
 }
