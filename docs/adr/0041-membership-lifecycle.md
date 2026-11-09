@@ -20,6 +20,8 @@ no customer question: no frame, no protocol version, no format and no server cha
 relay), decision 6 (`heads` are confirmed heads). On acceptance this also amends ADR 0031
 decision 5 (the client's resend after the catch-up, wording only).
 
+**Superseded in part by [ADR 0044](0044-workspace-only-unit-of-sharing.md)** (customer, 2026-11-06 DOC-SHARE-REMOVE B, accepted 2026-11-09): decision 2 for a document; decision 5 (no History choice: an add back always wraps every held epoch; `add_back` stays for re-pairing own devices); decision 6 (the ended record lives only in a workspace marker, a container's record is read as local; the return check is retired); decision 7 (`withheld` removed); Frage 160 moot. The 2026-11-09 amendment's join rule gets two relay checks (ADR 0044 decision 5). Decisions 1, 3, 4 and 8 to 11 unchanged.
+
 ## Context
 
 Slice 1 of `0092` and `0095` built invite, admission and removal with rotation. ADR 0010 already

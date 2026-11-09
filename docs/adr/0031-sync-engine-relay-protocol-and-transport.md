@@ -10,6 +10,8 @@ the customer" executes ADRs 0004, 0008, 0009, 0010 and 0014 as accepted. Archite
 snapshot as `Record`, `Pong` ends the catch-up, `removed` refusal, wrap layout, key file format,
 dependencies).
 
+**Superseded in part by [ADR 0044](0044-workspace-only-unit-of-sharing.md)** (customer, 2026-11-06 DOC-SHARE-REMOVE B, accepted 2026-11-09): decision 2 (one connection per synced workspace, not per open shared document), decision 5's "one document per room" (rooms are workspace rooms and the device group room), decision 8 (`1.` links are refused on the device) and decision 9 (container `share.json` v1 and `keyring.log` are no longer written and read as a local document). Protocol, envelope, relay, snapshots and keys are unchanged.
+
 ## Context
 
 ADRs 0004/0008/0009/0010 fix *what* cooperative editing is: Loro replicas, a blind relay that

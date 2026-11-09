@@ -9,6 +9,8 @@ workspace. Asked by `specs/0095-workspace` slice 1. Extends ADR 0031 (rooms, fra
 invite versions) and ADR 0004 §1 (files beside the documents); amends nothing accepted. Choices
 marked (Proposal) are the architect's, vetoable at the demo.
 
+**Superseded in part by [ADR 0044](0044-workspace-only-unit-of-sharing.md)** (customer, 2026-11-06 DOC-SHARE-REMOVE B, accepted 2026-11-09): WS-SEPARATE B and decision 10 (take-in) entirely; in decision 11 the sentences on a member also in a `0092` room and on take-in timing; in decision 12 the `Moved` payload. A `0092` file in a workspace folder is an ordinary workspace document.
+
 ## Context
 
 ADR 0031 shares one document per room; the relay checks every envelope against the room's keyring
