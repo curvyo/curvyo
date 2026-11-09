@@ -7,7 +7,6 @@ use curvyo_document_core::{
 };
 use curvyo_render_core::{DrawList, PreviewAnchor};
 
-use super::trace_colours::{DIMMED, outline_layers};
 use super::trace_mesh::MeshFrame;
 use super::{Session, Tool};
 
@@ -92,36 +91,22 @@ impl Session {
                     Point::new(max.x + x, max.y + y),
                 )
             });
-            // The colours Isolate leaves out are drawn at 35 % (`specs/0089` UX notes §7).
-            let layer_of = outline_layers(&preview.fill_layers, preview.outlines.len());
-            let isolated = self.trace.isolated;
-            let (mut bright, mut dim): (Vec<Vec<PreviewAnchor>>, Vec<Vec<PreviewAnchor>>) =
-                (Vec::new(), Vec::new());
-            for ((outline, (lo, hi)), layer) in
-                preview.outlines.iter().zip(&preview.boxes).zip(layer_of)
-            {
-                let seen = area.is_none_or(|(min, max)| {
-                    lo.x <= max.x && hi.x >= min.x && lo.y <= max.y && hi.y >= min.y
-                });
-                if !seen {
-                    continue;
-                }
-                let dimmed = layer
-                    .is_some_and(|k| isolated.is_some_and(|c| c != preview.fill_layers[k].colour));
-                if dimmed {
-                    dim.push(outline.clone());
-                } else {
-                    bright.push(outline.clone());
-                }
-            }
+            let seen: Vec<Vec<PreviewAnchor>> = preview
+                .outlines
+                .iter()
+                .zip(&preview.boxes)
+                .filter(|(_, (lo, hi))| {
+                    area.is_none_or(|(min, max)| {
+                        lo.x <= max.x && hi.x >= min.x && lo.y <= max.y && hi.y >= min.y
+                    })
+                })
+                .map(|(outline, _)| outline.clone())
+                .collect();
             let strength = if preview.stale { 0.5 } else { 1.0 };
-            let mut list = curvyo_render_core::build_preview_outline(&bright, view, strength);
-            if !dim.is_empty() {
-                let other =
-                    curvyo_render_core::build_preview_outline(&dim, view, strength * DIMMED);
-                list.triangles.extend_from_slice(&other.triangles);
-            }
-            (list, area)
+            (
+                curvyo_render_core::build_preview_outline(&seen, view, strength),
+                area,
+            )
         };
         // The outline has no artwork layers and no images: its triangles are overlay as they are.
         preview.outline_mesh.with(frame, build, |mesh| {

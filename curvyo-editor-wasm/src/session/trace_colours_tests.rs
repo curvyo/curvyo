@@ -1,6 +1,6 @@
 //! The Trace tool's multicolour side (`specs/0089-trace-quality-and-colour` slice M, criteria
-//! 25 and 29): Create paths writes one filled compound path per colour in one step; Isolate
-//! dims the preview only.
+//! 25 and 29): Create paths writes one filled compound path per colour in one step; the
+//! palette of the preview and of a deleted colour.
 
 use curvyo_document_core::{Length, NodeId, ObjectSnapshot};
 use curvyo_ui_core::{
@@ -81,7 +81,7 @@ fn written(session: &Session) -> Vec<(TraceRgb, usize)> {
 }
 
 /// Criterion 29: one group with one filled compound path per colour, largest first, in one
-/// undo step, each filled with its palette colour; Isolate changes nothing that is written.
+/// undo step, each filled with its palette colour.
 #[test]
 fn create_paths_writes_one_path_per_colour_with_its_palette_fill() {
     let (mut session, image) = traced_image();
@@ -91,13 +91,6 @@ fn create_paths_writes_one_path_per_colour_with_its_palette_fill() {
     assert_eq!(layers.len(), 2);
     assert!(session.set_trace_preview(image, &wire));
     assert!(session.set_trace_result(image, &wire));
-    let before = session.trace.preview.as_ref().unwrap().outlines.clone();
-    session.set_trace_isolated(Some(BLUE));
-    assert_eq!(
-        session.trace.preview.as_ref().unwrap().outlines,
-        before,
-        "Isolate traces nothing again"
-    );
     let steps = session.document.own_steps().len();
     let outcome = session.create_traced_paths();
     assert!(matches!(
@@ -183,59 +176,6 @@ fn all_colours_excluded_shows_the_palette_and_creates_nothing() {
     ));
     assert_eq!(session.document.own_steps().len(), steps);
     assert_eq!(session.document.object_ids(), [image]);
-}
-
-/// The alpha of every vertex the Trace outline draws.
-fn outline_alphas(session: &Session) -> Vec<u8> {
-    let mut list = curvyo_render_core::DrawList::default();
-    session.trace_draw_into(session.view(), &mut list);
-    list.triangles.iter().map(|v| v.color.a).collect()
-}
-
-/// UX notes §7: with a colour isolated, the outlines of the other colours are drawn at
-/// [`super::trace_colours::DIMMED`] of their alpha and the isolated colour's are not.
-#[test]
-fn isolate_dims_the_outlines_of_the_other_colours() {
-    let (mut session, image) = traced_image();
-    let source = session.trace_source(image, false).unwrap();
-    assert!(session.set_trace_preview(image, &colour_wire(source.map)));
-    let plain = outline_alphas(&session);
-    let full = *plain.iter().max().unwrap();
-    assert!(plain.iter().all(|&a| a > 0));
-    let dim = dimmed_alpha;
-    session.set_trace_isolated(Some(RED));
-    let isolated = outline_alphas(&session);
-    assert!(
-        isolated.contains(&full),
-        "the isolated colour keeps its alpha"
-    );
-    assert!(isolated.contains(&dim(full)), "the other colour is dimmed");
-    assert!(
-        isolated
-            .iter()
-            .all(|&a| a == full || plain.iter().any(|&p| dim(p) == a))
-    );
-    let blue = outline_alphas_isolating(&mut session, BLUE);
-    assert_eq!(isolated.len(), blue.len(), "only the strength differs");
-    session.set_trace_isolated(None);
-    assert_eq!(
-        outline_alphas(&session),
-        plain,
-        "no isolation draws all at full"
-    );
-}
-
-/// The outline alphas with `colour` isolated.
-fn outline_alphas_isolating(session: &mut Session, colour: TraceRgb) -> Vec<u8> {
-    session.set_trace_isolated(Some(colour));
-    outline_alphas(session)
-}
-
-/// `alpha` at the dimmed strength.
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn dimmed_alpha(alpha: u8) -> u8 {
-    // invariant: the product of an alpha byte and 0.35 is a byte.
-    (f64::from(alpha) * super::trace_colours::DIMMED).round() as u8
 }
 
 /// `ux-notes.md` §26: deleting a palette colour traces the other colours as fixed colours with
