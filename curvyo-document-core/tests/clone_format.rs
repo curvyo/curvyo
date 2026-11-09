@@ -622,7 +622,8 @@ fn ac38_a_clone_without_link_and_with_a_broken_outline_is_deleted() {
 }
 
 #[test]
-fn ac38_a_clone_of_a_group_or_a_primitive_is_an_orphan_not_damage() {
+// Amended by `specs/0100-bring-content-in` (ADR 0045 §1): a group and a primitive are origins.
+fn ac38_a_clone_of_a_group_or_a_primitive_opens_and_resolves() {
     let d = Document::new(1);
     let a = square(&d, 1, Point::new(0.0, 0.0));
     let b = square(&d, 2, Point::new(0.0, 0.0));
@@ -642,7 +643,7 @@ fn ac38_a_clone_of_a_group_or_a_primitive_is_an_orphan_not_damage() {
         );
     }
     let document = unpack(2, &file_from_loro(&loro)).unwrap();
-    assert_eq!(document.read_objects().orphans.len(), 2);
+    assert_eq!(document.read_objects().orphans.len(), 0);
 }
 
 #[test]

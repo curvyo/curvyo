@@ -178,6 +178,7 @@ pub const fn move_refusal_text(refusal: MoveRefusal) -> &'static str {
         MoveRefusal::LayerNotTopLevel => "Layers stay at the top level",
         MoveRefusal::TooDeep => "Groups can be nested 32 levels deep",
         MoveRefusal::IntoItself => "Cannot go into itself",
+        MoveRefusal::InsideOwnOriginal => "A clone cannot go inside its own original.",
         MoveRefusal::NotAContainer => "Only layers and groups hold objects",
         MoveRefusal::Nothing | MoveRefusal::NoSuchNode => "Nothing to move",
     }

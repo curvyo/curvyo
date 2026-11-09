@@ -378,9 +378,9 @@ fn ac32_a_skew_and_a_negative_scale_stay_an_image_with_exactly_mapped_corners() 
 // --- criterion 38: clones ----------------------------------------------------------------------
 
 #[test]
-fn ac38_a_group_holding_an_image_is_not_a_way_around_the_clone_refusal() {
-    // "Linked clone is not offered for a selection that contains an image": a selected group
-    // with an image inside contains one.
+// Amended by `specs/0100-bring-content-in` criterion 8 (ADR 0045 §1): a group holding an image
+// is an original like any group.
+fn ac38_a_group_holding_an_image_is_an_original() {
     let document = Document::new(1);
     let id = document
         .add_images(&[new_image(&picture("png_rgb_8.png"), "a.png")])
@@ -390,7 +390,7 @@ fn ac38_a_group_holding_an_image_is_not_a_way_around_the_clone_refusal() {
         Point::new(5.0, 5.0),
     ));
     let group = document.group_objects(&[id, rect]).unwrap();
-    assert!(document.linked_clone(&[group], &[]).is_err());
+    assert!(document.linked_clone(&[group], &[]).is_ok());
 }
 
 // --- criterion 44: format 25 and damaged containers --------------------------------------------

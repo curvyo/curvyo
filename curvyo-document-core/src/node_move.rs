@@ -70,6 +70,9 @@ pub enum MoveRefusal {
     /// The move would put more than [`MAX_GROUP_DEPTH`] groups on one chain.
     #[error("groups can be nested 32 levels deep")]
     TooDeep,
+    /// The move would put a clone inside what it draws (ADR 0045 §4).
+    #[error("A clone cannot go inside its own original.")]
+    InsideOwnOriginal,
 }
 
 /// The container a target puts the nodes into, and the sibling it is relative to.
@@ -160,6 +163,11 @@ fn checked(tree: &LoroTree, plan: &MovePlan) -> Result<(Vec<TreeID>, Option<Tree
     }
     if parent.is_some() && moved.iter().any(|&id| is_layer_node(tree, id)) {
         return Err(MoveRefusal::LayerNotTopLevel);
+    }
+    if let Some(p) = parent
+        && crate::clone_cycle::would_cycle_in(tree, moved.iter().copied(), p)
+    {
+        return Err(MoveRefusal::InsideOwnOriginal);
     }
     let above = parent.map_or(0, |p| groups_above(tree, p) + 1);
     if moved

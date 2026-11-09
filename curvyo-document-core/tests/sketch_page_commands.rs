@@ -354,7 +354,8 @@ fn read_golden() -> Vec<u8> {
 fn the_sketch_pages_golden_reads_back_every_page_sketch_clone_and_path_identical() {
     let expected = golden_document();
     let bytes = read_golden();
-    assert_eq!(CURRENT_FORMAT_VERSION, 37, "no format bump (criterion 19)");
+    // `0099` made no bump (criterion 19); `0100` bumps to 38 and the v37 golden still opens.
+    assert_eq!(CURRENT_FORMAT_VERSION, 38);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.pages(), expected.pages());
     let kinds: Vec<_> = opened.pages().iter().map(|p| p.kind.clone()).collect();

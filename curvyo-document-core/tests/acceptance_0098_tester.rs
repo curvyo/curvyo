@@ -822,10 +822,11 @@ fn adr0042_a_claim_of_a_sketch_on_a_drawing_page_reads_as_no_owner() {
 // ---- criteria 19, 20: goldens and format -------------------------------------------------------
 
 #[test]
-fn ac20_save_writes_format_37() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 37);
+// Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9).
+fn ac20_save_writes_format_38() {
+    assert_eq!(CURRENT_FORMAT_VERSION, 38);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 37);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 38);
 }
 
 #[test]
@@ -1157,10 +1158,11 @@ fn ac19b_the_new_clone_has_its_own_placement() {
 }
 
 #[test]
-fn ac19_the_converted_file_saves_as_37_and_does_not_convert_again() {
+fn ac19_the_converted_file_saves_as_the_current_format_and_does_not_convert_again() {
     let d = unpack(2, &format_36_file()).unwrap();
     let saved = pack(&d, "0.1.0").unwrap();
-    assert_eq!(manifest_version(&saved), 37);
+    // The current format since `specs/0100-bring-content-in` is 38.
+    assert_eq!(manifest_version(&saved), u64::from(CURRENT_FORMAT_VERSION));
     let again = unpack(3, &saved).unwrap();
     assert_eq!(again.own_step_count(), 0);
     assert_eq!(again.pages(), d.pages());

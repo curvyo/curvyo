@@ -404,7 +404,18 @@ impl DocumentVersion {
 /// number is provisional by the rule above. Goldens: `page_kinds_v37.curvyo`,
 /// `page_kind_damaged_v37.curvyo`, `page_kind_unknown_v37.curvyo`,
 /// `page_kinds_migration_v36.curvyo`.
-pub const CURRENT_FORMAT_VERSION: u32 = 37;
+///
+/// Bumped to 38 in `bring-content-in` (ADR 0045, `specs/0100-bring-content-in`): no register is
+/// added; the set of legal `clone_link` origins widens to primitives, texts, images and groups
+/// (a clone of a group draws the group's drawn subtree), and a placement may carry any matrix of
+/// its laser page. A build that stops at 37 would read every clone of a group, text, image or
+/// primitive as a wrong-kind orphan, and its repair after Open would delete them and save the
+/// deletion: silent loss. So it must refuse every file of this build as too new. Migration from 37
+/// is none: a format-37 file cannot hold a live clone of those kinds (its repair deleted any), so
+/// it opens unchanged and is not rewritten. Damage: none new; a clone inside what it draws is an
+/// orphan (ADR 0045 §4), repaired as before. The number is provisional by the rule above.
+/// Golden: `bring_content_in_v38.curvyo`; the version 37 goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 38;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -465,6 +476,9 @@ pub struct Document {
     pub(crate) clone_hold: std::cell::Cell<crate::clone_hold::CloneHold>,
     /// The next counter of the anchor ids the clone repair takes (`crate::clone_repair`).
     pub(crate) repair_ids: std::cell::Cell<u64>,
+    /// Whether a writer refused a placed page's move off its laser page since the session last
+    /// asked (`crate::placement_objects`); view state, never stored.
+    pub(crate) placement_refusal: std::cell::Cell<bool>,
     /// The clone named by the last refusal of the limit check (`crate::clone_write`); view state
     /// for its notice, never stored.
     pub(crate) clone_refusal: std::cell::Cell<Option<crate::path_model::NodeId>>,
@@ -542,6 +556,7 @@ impl Document {
             text_clones_unlinked: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
+            placement_refusal: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),
@@ -607,6 +622,7 @@ impl Document {
             text_clones_unlinked: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
+            placement_refusal: std::cell::Cell::default(),
             clone_refusal: std::cell::Cell::default(),
             object_index: std::cell::RefCell::default(),
             writable_cache: std::cell::RefCell::default(),

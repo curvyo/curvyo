@@ -115,12 +115,15 @@ pub(crate) fn leaf_style(tree: &LoroTree, id: NodeId, meta: &LoroMap) -> crate::
 /// (undo rule (a) of `0049` criterion 36).
 pub(crate) fn origin_is_live(tree: &LoroTree, origin: NodeId) -> bool {
     let origin = TreeID::new(origin.peer, origin.counter);
+    // A group is a legal origin, a layer is not (ADR 0045 §1).
+    if path_codec::node_exists(tree, origin) && crate::group_tree::is_group_node(tree, origin) {
+        return !crate::group_tree::is_layer_node(tree, origin);
+    }
     path_codec::leaf_exists(tree, origin)
         && tree.get_meta(origin).is_ok_and(|origin_meta| {
             !matches!(
                 crate::shape_codec::leaf_kind(&origin_meta),
-                crate::shape_codec::LeafKind::Primitive(_)
-                    | crate::shape_codec::LeafKind::Dimension
+                crate::shape_codec::LeafKind::Dimension
             )
         })
 }

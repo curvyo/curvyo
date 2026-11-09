@@ -22,13 +22,17 @@ mod affine;
 mod assets;
 mod clone_codec;
 mod clone_copy;
+mod clone_cycle;
 mod clone_hold;
 mod clone_model;
 mod clone_overrides;
+mod clone_picture;
+mod clone_place;
 mod clone_preview;
 mod clone_read;
 mod clone_repair;
 mod clone_transform;
+mod clone_unlink;
 mod clone_write;
 mod clones;
 mod container;
@@ -48,6 +52,8 @@ mod page_grid;
 mod page_kind;
 mod page_kind_migration;
 mod pages;
+mod placement_commands;
+mod placement_objects;
 mod workspace_disk_plan;
 mod workspace_list;
 mod workspace_list_view;
@@ -175,6 +181,8 @@ pub use clone_overrides::{
     CloneColours, FOLLOW_PLACEMENT_COMMIT_LABEL, ORIGINAL_STYLE_COMMIT_LABEL,
     OWN_PLACEMENT_COMMIT_LABEL, OWN_STYLE_COMMIT_LABEL, SPREAD_COLOURS_COMMIT_LABEL,
 };
+pub use clone_picture::map_leaf;
+pub use clone_place::{PLACE_LINKED_CLONES_COMMIT_LABEL, PLACE_ON_PAGE_COMMIT_LABEL};
 pub use clone_preview::clone_previews;
 pub use clone_read::ObjectRead;
 pub use clone_repair::CloneRepair;
@@ -262,6 +270,9 @@ pub use pattern_model::{
     PatternMode, PatternParam, PatternParamError, PatternSeed, splitmix64,
 };
 pub use pattern_schema::{MIN_LENGTH_MM, ParamKind, ParamSpec, spec_of, specs as pattern_params};
+pub use placement_commands::{
+    PLACE_PAGE_COMMIT_LABEL, PLACED_PAGE_MIN_OVERLAP_MM2, PlacedPage, overlaps_page,
+};
 pub use preset_units::{AuthoredSize, Orientation, PresetUnit};
 pub use primitive_model::{
     EllipseFrame, InnerRatio, ObjectSnapshot, PointCount, PrimitiveSnapshot, RectBounds, Shape,

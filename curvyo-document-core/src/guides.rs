@@ -142,6 +142,8 @@ pub(crate) fn effective_guide(
     own: impl Fn(NodeId) -> bool,
 ) -> bool {
     match object {
+        // A picture-root clone is never a guide: its flag is residue (`0100` adrs.md note 6).
+        crate::primitive_model::ObjectSnapshot::Clone(clone) if clone.is_picture() => false,
         crate::primitive_model::ObjectSnapshot::Clone(clone) => {
             own(clone.id()) || own(clone.chain.root)
         }

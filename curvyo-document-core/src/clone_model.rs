@@ -64,6 +64,12 @@ pub struct CloneChain {
     /// Invariant: [`CloneSnapshot::resolved`]'s anchors are this outline's under `composed`.
     #[serde(skip)]
     pub root_outline: std::sync::Arc<PathSnapshot>,
+    /// What a clone of a picture root (a group, a text or an image, ADR 0045 §1) draws: the
+    /// root's drawn leaves (paths, texts, images; ADR 0045 §2) already mapped by `composed`,
+    /// each with its opacity through the root baked into its paints. `None` for an outline root,
+    /// whose drawing is [`CloneSnapshot::resolved`]; with it, `resolved` has no anchors.
+    #[serde(skip)]
+    pub picture: Option<std::sync::Arc<[crate::primitive_model::ObjectSnapshot]>>,
 }
 
 impl CloneSnapshot {
@@ -72,7 +78,11 @@ impl CloneSnapshot {
     pub fn new(id: NodeId, chain: CloneChain) -> Self {
         #[cfg(test)]
         OUTLINE_TRANSFORMS.with(|count| count.set(count.get() + 1));
-        let mut resolved = chain.root_outline.mapped(chain.composed);
+        let mut resolved = if chain.picture.is_some() {
+            chain.root_outline.as_ref().clone()
+        } else {
+            chain.root_outline.mapped(chain.composed)
+        };
         resolved.id = id;
         resolved.rotation = Angle::from_radians(0.0);
         Self {
@@ -87,6 +97,24 @@ impl CloneSnapshot {
         self.resolved.id
     }
 
+    /// Whether its root is a group, a text or an image: it draws [`CloneChain::picture`]
+    /// (ADR 0045 §1).
+    #[must_use]
+    pub const fn is_picture(&self) -> bool {
+        self.chain.picture.is_some()
+    }
+
+    /// The leaves it draws: its picture's, or its resolved outline as one path.
+    #[must_use]
+    pub fn drawn_leaves(&self) -> Vec<crate::primitive_model::ObjectSnapshot> {
+        match &self.chain.picture {
+            Some(picture) => picture.to_vec(),
+            None => vec![crate::primitive_model::ObjectSnapshot::Path(
+                self.resolved.clone(),
+            )],
+        }
+    }
+
     /// This clone with its drawn outline mapped by `g` while nothing of its chain moves: the
     /// matrix becomes `g·M` (`0049` criterion 15). The live preview of a move or rotate draws it.
     #[must_use]
@@ -94,6 +122,12 @@ impl CloneSnapshot {
         let mut chain = (*self.chain).clone();
         chain.matrix = g.compose(chain.matrix);
         chain.composed = g.compose(chain.composed);
+        chain.picture = chain.picture.map(|leaves| {
+            leaves
+                .iter()
+                .map(|leaf| crate::clone_picture::map_leaf(leaf, g))
+                .collect()
+        });
         Self {
             resolved: self.resolved.mapped(g),
             chain: Box::new(chain),

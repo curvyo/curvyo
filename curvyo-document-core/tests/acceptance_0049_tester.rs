@@ -952,7 +952,9 @@ fn ac38_damaged_links_are_refused_without_a_crash() {
 }
 
 #[test]
-fn ac35_valid_origin_that_names_nothing_a_primitive_or_a_group_is_an_orphan_not_damage() {
+// Amended by `specs/0100-bring-content-in` (ADR 0045 §1): a primitive and a group are legal
+// origins now, so only the origin that names nothing is an orphan.
+fn ac35_valid_origin_that_names_nothing_is_an_orphan_and_a_primitive_or_group_origin_resolves() {
     let d = Document::new(1);
     let o = square(&d, 0.0, 0.0, 10.0);
     let keep = square(&d, 30.0, 0.0, 10.0);
@@ -983,16 +985,17 @@ fn ac35_valid_origin_that_names_nothing_a_primitive_or_a_group_is_an_orphan_not_
     )
     .unwrap();
     let read = doc.read_objects();
-    for c in [c_none, c_prim, c_group] {
-        assert!(read.orphans.contains(&c), "{c:?}");
-        assert!(
-            read.get(c).is_none(),
-            "an orphan is not drawn, hit or selected"
-        );
+    assert!(read.orphans.contains(&c_none), "{c_none:?}");
+    assert!(
+        read.get(c_none).is_none(),
+        "an orphan is not drawn, hit or selected"
+    );
+    for c in [c_prim, c_group, c_keep] {
+        assert!(!read.orphans.contains(&c), "{c:?}");
+        assert!(read.get(c).is_some());
     }
-    assert!(!read.orphans.contains(&c_keep));
     let removed = doc.remove_orphan_clones();
-    assert_eq!(removed, 3);
+    assert_eq!(removed, 1);
     assert_eq!(doc.remove_orphan_clones(), 0, "idempotent");
     assert!(doc.object(c_keep).is_some());
     assert_eq!(labels(&doc).last().unwrap(), "remove_orphan_clones");

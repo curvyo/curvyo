@@ -7,7 +7,7 @@
 
 use loro::{LoroTree, TreeID};
 
-use crate::clone_read::{RawLeaf, resolve};
+use crate::clone_read::{RawLeaf, resolve_in};
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::{children_of, is_group_node, is_layer_node, node_id};
 use crate::node_registers::{NodeRegisters, read_registers};
@@ -180,6 +180,7 @@ impl Document {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let mut walked: Vec<Walked> = Vec::new();
         let mut raws: Vec<RawLeaf> = Vec::new();
+        let mut structure = crate::clone_picture::Structure::default();
         let mut stack: Vec<(TreeID, Inherited)> = children_of(&tree, None)
             .into_iter()
             .rev()
@@ -198,7 +199,8 @@ impl Document {
             } else {
                 None
             };
-            if container.is_some() {
+            if let Some(kind) = &container {
+                structure.container(node, from.parent, &registers, *kind == NodeKind::Layer);
                 let opacity = from.opacity * registers.opacity.get();
                 let down = Inherited {
                     parent: Some(node),
@@ -228,6 +230,7 @@ impl Document {
                     .or_else(|| raw_leaf(&tree, id))
                     .map(|raw| {
                         raws.push(raw);
+                        structure.leaf(from.parent, &registers);
                         raws.len() - 1
                     })
             } else {
@@ -255,7 +258,7 @@ impl Document {
                 .map(|w| w.node)
                 .collect(),
         };
-        let mut leaves = resolve(raws).leaves;
+        let mut leaves = resolve_in(raws, Some(&structure)).leaves;
         walked
             .into_iter()
             .filter_map(|w| w.read(&mut leaves, &own))

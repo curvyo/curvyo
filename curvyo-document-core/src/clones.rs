@@ -12,7 +12,6 @@ use crate::clone_codec::{CloneLink, is_clone_meta, write_clone};
 use crate::clone_model::MAX_CLONE_DEPTH;
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::is_group_node;
-use crate::object_read::read_one_clone;
 use crate::path_codec::node_exists;
 use crate::path_model::{NewAnchor, NodeId};
 use crate::paths::tree_id_of;
@@ -33,8 +32,9 @@ pub enum CloneError {
     /// A source no longer exists.
     #[error("an object to clone no longer exists")]
     NoSuchObject,
-    /// A source is a group, or a clone whose original cannot be found (`0049` criterion 4).
-    #[error("only paths, compound paths, shapes and clones can be cloned")]
+    /// A source is a layer, a dimension, a node of a laser page, or a clone whose original
+    /// cannot be found (ADR 0045 §1).
+    #[error("only objects, groups and clones can be cloned")]
     NotClonable,
     /// The primitives among the sources and the given conversions are not the same set, or a
     /// conversion names an object that is not a primitive.
@@ -50,6 +50,12 @@ pub enum CloneError {
     /// different.
     #[error("the fresh anchor ids do not match the clone's anchors")]
     AnchorIds,
+    /// A placed clone's matrix would pass the ±1e7 limit (`0049` criterion 17).
+    #[error("the place is too far out")]
+    OutOfRange,
+    /// The command would put a clone inside what it draws (ADR 0045 §4).
+    #[error("A clone cannot go inside its own original.")]
+    InsideOwnOriginal,
 }
 
 /// What one source is, checked before any write.
@@ -148,6 +154,7 @@ impl Document {
     ) -> Result<usize, CloneError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let mut planned = Vec::with_capacity(unlinks.len());
+        let mut copies = Vec::new();
         let mut fresh = HashSet::new();
         for unlink in unlinks {
             let tree_id = tree_id_of(unlink.id);
@@ -160,7 +167,11 @@ impl Document {
             if !is_clone_meta(&meta) {
                 return Err(CloneError::NotAClone);
             }
-            let clone = read_one_clone(&tree, unlink.id).ok_or(CloneError::NotAClone)?;
+            let clone = self.read_clone(unlink.id).ok_or(CloneError::NotAClone)?;
+            if self.unlinks_as_copy(&clone) {
+                copies.push(clone);
+                continue;
+            }
             let opacity = crate::clone_write::source_opacity(&tree, &clone);
             let mut path = clone.resolved;
             if path.all_anchors().count() != unlink.anchor_ids.len()
@@ -183,8 +194,12 @@ impl Document {
         for (meta, shown) in &text_plan {
             crate::text_clone_codec::unlink_meta(meta, shown);
         }
+        // A clone of a group, text, image or primitive becomes a copy of its root (ADR 0045 §5).
+        for clone in &copies {
+            self.unlink_as_copy_uncommitted(clone)?;
+        }
         self.commit_with_label(UNLINK_CLONE_COMMIT_LABEL);
-        Ok(planned.len() + text_plan.len())
+        Ok(planned.len() + text_plan.len() + copies.len())
     }
 
     /// Repairs every orphan clone (`0049` criterion 35) in one commit labelled
@@ -222,6 +237,19 @@ impl Document {
         doomed.len()
     }
 
+    /// The clone depth of each of `sources` (0 for an original that is not a clone), checked as
+    /// Linked clone checks them.
+    pub(crate) fn clone_source_depths(&self, sources: &[NodeId]) -> Result<Vec<usize>, CloneError> {
+        Ok(self
+            .classify_sources(sources)?
+            .into_iter()
+            .map(|source| match source {
+                Source::Clone(depth) => depth,
+                Source::Path | Source::Primitive => 0,
+            })
+            .collect())
+    }
+
     fn classify_sources(&self, sources: &[NodeId]) -> Result<Vec<Source>, CloneError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         sources
@@ -231,21 +259,29 @@ impl Document {
                 if !node_exists(&tree, tree_id) {
                     return Err(CloneError::NoSuchObject);
                 }
-                if is_group_node(&tree, tree_id) {
+                // A group, a text and an image are originals; a layer, a dimension and the
+                // nodes of a manufacturing are not (ADR 0045 §1).
+                if crate::group_tree::is_layer_node(&tree, tree_id)
+                    || crate::manufacturing_codec::in_manufacturing_subtree(&tree, tree_id)
+                {
                     return Err(CloneError::NotClonable);
+                }
+                if is_group_node(&tree, tree_id) {
+                    return Ok(Source::Path);
                 }
                 let meta = tree
                     .get_meta(tree_id)
                     .map_err(|_| CloneError::NoSuchObject)?;
-                // An image is never an original (`specs/0058-bitmap-import` criterion 38).
-                if crate::text_codec::is_text_meta(&meta)
-                    || crate::image_codec::is_image_meta(&meta)
-                    || crate::dimension_codec::is_dimension_meta(&meta)
-                {
+                if crate::dimension_codec::is_dimension_meta(&meta) {
                     return Err(CloneError::NotClonable);
                 }
+                if crate::text_codec::is_text_meta(&meta)
+                    || crate::image_codec::is_image_meta(&meta)
+                {
+                    return Ok(Source::Path);
+                }
                 if is_clone_meta(&meta) {
-                    let clone = read_one_clone(&tree, id).ok_or(CloneError::NotClonable)?;
+                    let clone = self.read_clone(id).ok_or(CloneError::NotClonable)?;
                     Ok(Source::Clone(clone.chain.depth))
                 } else if read_shape_tag(&meta).as_deref() == Some("sketch") {
                     Ok(Source::Path)

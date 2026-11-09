@@ -226,6 +226,8 @@ impl Document {
             return self.read_cached_clone(id).map(ObjectSnapshot::Clone);
         }
         object_in(&self.loro().get_tree(OBJECTS_TREE), id)
+            // A placed page reads as its frame object (`specs/0100` criterion 17).
+            .or_else(|| self.placed_page_object(id))
     }
 
     /// Reads one primitive's full current data, or `None` if it no

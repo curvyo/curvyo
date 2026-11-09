@@ -193,6 +193,12 @@ pub enum ManufacturingError {
     /// The work area is not a valid page size.
     #[error(transparent)]
     Size(#[from] DocumentSizeError),
+    /// A placed page would have no overlap with its own laser page (`0100` criterion 18).
+    #[error("A placed page stays on its laser page.")]
+    OffPage,
+    /// A placement matrix would pass ±1e7 or is not finite.
+    #[error("the place is too far out")]
+    OutOfRange,
 }
 
 /// "`label` n" with the smallest n from 1 that no name of `taken` uses.
@@ -346,6 +352,35 @@ impl Document {
         // manufacturing sits at the root and holds no group, so this finds nothing of its own.
         crate::groups::remove_emptied_groups(&tree, &[None]);
         Ok(())
+    }
+
+    /// Deletes, uncommitted, every placement of the page `page` on every laser page: the page is
+    /// being deleted in the same step (criterion 24).
+    pub(crate) fn remove_placements_of(&self, page: &str) {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        let doomed: Vec<loro::TreeID> = manufacturing_nodes(&tree)
+            .into_iter()
+            .flat_map(|m| tree.children(TreeParentId::Node(m)).unwrap_or_default())
+            .filter(|&child| {
+                tree.get_meta(child)
+                    .ok()
+                    .and_then(|meta| read_placement_link(&meta))
+                    .is_some_and(|link| link.page == page)
+            })
+            .collect();
+        for node in doomed {
+            let _ = tree.delete(node);
+        }
+        crate::groups::remove_emptied_groups(&tree, &[None]);
+    }
+    /// Deletes the placements `ids`, uncommitted, inside the caller's step (Delete of placed pages
+    /// in the one selection, `specs/0100` criterion 19).
+    pub(crate) fn remove_placement_nodes(&self, ids: &[NodeId]) {
+        let tree = self.loro().get_tree(OBJECTS_TREE);
+        for &id in ids {
+            let _ = tree.delete(tree_id_of(id));
+        }
+        crate::groups::remove_emptied_groups(&tree, &[None]);
     }
 
     /// Removes the placement `id` (only the reference; the drawing page stays) in one history

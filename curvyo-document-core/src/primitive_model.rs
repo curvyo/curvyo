@@ -349,6 +349,16 @@ impl ObjectSnapshot {
         }
     }
 
+    /// The leaves a clone of a group, text or image draws (ADR 0045 §3); `None` for every other
+    /// object.
+    #[must_use]
+    pub fn picture(&self) -> Option<&[ObjectSnapshot]> {
+        match self {
+            Self::Clone(clone) => clone.chain.picture.as_deref(),
+            _ => None,
+        }
+    }
+
     /// The outline this object is drawn, hit and traced by when it has one of its own: a path's,
     /// a clone's resolved outline, a text's laid-out glyphs ([`TextSnapshot::outline`]); `None` for
     /// a primitive (drawn from its shape) and a text not laid out yet.
@@ -357,6 +367,8 @@ impl ObjectSnapshot {
         match self {
             Self::Path(path) => Some(path),
             Self::Sketch(snapshot) => Some(&snapshot.resolved),
+            // A clone of a group, text or image draws its picture's leaves, not one outline.
+            Self::Clone(clone) if clone.is_picture() => None,
             Self::Clone(clone) => Some(&clone.resolved),
             Self::Text(text) => text.outline.as_deref().map(|outline| &outline.glyphs),
             Self::Primitive(_) | Self::Image(_) | Self::Dimension(_) => None,

@@ -813,8 +813,9 @@ fn ac17_a_clone_made_by_a_peer_while_the_page_is_deleted_is_removed_as_an_orphan
 // ---- criterion 19: files ---------------------------------------------------------------------
 
 #[test]
-fn ac19_the_format_stays_37() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 37);
+// `0099` made no bump; `specs/0100-bring-content-in` bumps to 38 (ADR 0045 §9).
+fn ac19_the_format_stays_37_until_0100_bumps_it_to_38() {
+    assert_eq!(CURRENT_FORMAT_VERSION, 38);
 }
 
 fn criterion_19_project() -> (Document, Vec<NodeId>) {
