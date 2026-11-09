@@ -5,7 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
 use curvyo_document_core::{NodeId, unpack};
-use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, TraceViewMode};
+use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
 use curvyo_ui_core::{TRACE_WIRE_HEADER, trace_job};
 use image::ImageEncoder;
 
@@ -68,7 +68,6 @@ fn c51_the_one_view_is_the_overlay_with_the_picture_and_the_outline() {
     let (mut session, image) = traced(60, 60);
     let bare = session.draw_list();
     preview(&mut session, image);
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay, "default");
     let overlay = session.draw_list();
     assert_eq!(overlay.images.len(), 1, "Overlay keeps the dimmed picture");
     assert!(
@@ -80,7 +79,6 @@ fn c51_the_one_view_is_the_overlay_with_the_picture_and_the_outline() {
     // Leaving the tool and entering again starts on the Overlay again.
     session.set_tool(Tool::Select);
     session.set_tool(Tool::Trace);
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
     let after = unpack(9, &session.pack("t").unwrap()).unwrap();
     assert_eq!(
         after.object_ids().len(),

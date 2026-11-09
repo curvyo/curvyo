@@ -94,7 +94,7 @@ pub(crate) fn is_content(params: &TraceParams, score: u8, alpha: u8) -> bool {
 }
 
 /// The pixels `params` makes content, before Denoise and Upscale, row by row: what the tracer's
-/// mask starts from (the Mask view of slice E and the harness's reference read it).
+/// mask starts from (the harness's reference reads it).
 #[must_use]
 pub fn selected(raster: Raster<'_>, params: &TraceParams) -> Vec<bool> {
     if raster.checked_pixels().is_none() {

@@ -220,33 +220,6 @@ fn ac18_a_drag_past_the_limit_shows_the_last_valid_pattern() {
     assert!(!session.pattern_panel().alert);
 }
 
-/// Architecture review change 1 (ADR 0029 §6): a draw split in two parts (the Trace view's kept
-/// mesh between them) keeps the patterns of both parts; a second draw makes nothing again.
-#[test]
-fn ac19_a_draw_in_two_parts_keeps_both_parts_patterns() {
-    let (mut session, first) = patterned(30.0);
-    let second = session.document.create_rect(RectBounds {
-        origin: Point::new(40.0, 0.0),
-        width: Length::from_mm(30.0),
-        height: Length::from_mm(30.0),
-    });
-    select(&mut session, &[second]);
-    assert!(session.set_fill_kind("pattern"));
-    let objects = session.objects();
-    let at = objects.iter().position(|o| o.id() == second).unwrap();
-    assert!(at > 0 && objects[..at].iter().any(|o| o.id() == first));
-    let guides = std::sync::Arc::clone(&session.document_read().guides);
-    let view = session.view();
-    session.artwork_list(&objects, Some(at), &guides, view);
-    let made = session.patterns.borrow().made();
-    session.artwork_list(&objects, Some(at), &guides, view);
-    assert_eq!(
-        session.patterns.borrow().made(),
-        made,
-        "the second draw is a hit"
-    );
-}
-
 /// UI review 2026-11-02, item 4: the work refusal names no lever the generator may lack.
 #[test]
 fn ac18_too_detailed_names_no_lever() {

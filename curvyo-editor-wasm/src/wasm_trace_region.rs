@@ -1,31 +1,7 @@
 //! The mask region of a masked trace across the wasm boundary (`specs/0094-masked-composite-trace`
-//! slice 1): the Mask view white outside the region and the region-only automatic values, for
-//! the trace worker.
+//! slice 1): the region-only automatic values, for the trace worker.
 
 use wasm_bindgen::prelude::*;
-
-/// `mask` with the pixels outside the region of `settings` white (`specs/0094` criterion 10).
-pub(crate) fn in_region(
-    mut mask: crate::wasm_trace::TraceMaskJs,
-    width: u32,
-    map: [f64; 6],
-    settings: &str,
-) -> crate::wasm_trace::TraceMaskJs {
-    if let Some(region) = crate::trace_glue::trace_mask_region(settings) {
-        let pixels = mask.width as usize * mask.height as usize;
-        let channels = mask.bits.len().checked_div(pixels).unwrap_or(1);
-        curvyo_ui_core::trace_whiten_outside_region(
-            &mut mask.bits,
-            channels.max(1),
-            mask.width,
-            mask.height,
-            width,
-            map,
-            &region,
-        );
-    }
-    mask
-}
 
 /// The automatic Threshold, background and analysis of the pixels the mask region of `settings`
 /// keeps (`specs/0094` criterion 9), for the worker; the whole picture's without a region.

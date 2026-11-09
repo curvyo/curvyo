@@ -1,7 +1,6 @@
 //! Tester cases for `specs/0094-masked-composite-trace` slice 1 in the core (criteria 1 to 11,
 //! 15; ux-notes §2): the trace limited to a mask region with an exact stencil edge, Inside and
-//! Outside together equal to the unmasked trace, the region-only automatic values, the Mask view
-//! whitened outside the region, text and shapes decided by the region, determinism. Written from
+//! Outside together equal to the unmasked trace, the region-only automatic values, text and shapes decided by the region, determinism. Written from
 //! the specification on the tester's own synthetic fixtures (`support_0094`), before the
 //! implementation was read. The unmasked goldens in
 //! `tests/fixtures/acceptance_0094_tester_unmasked.json` were written by the base commit of the
@@ -32,8 +31,8 @@ use curvyo_geometry_core::{
 use curvyo_ui_core::{
     OcrLine, TraceColourParams, TraceMethod, TraceParams, TraceRegion, TraceRegionError, TraceRgb,
     read_trace_wire, trace_add_shapes, trace_analyse, trace_auto_threshold, trace_colour_job_in,
-    trace_colour_job_with, trace_job_in, trace_job_with, trace_mask_job, trace_region_defaults,
-    trace_suggest_background, trace_text_job_in, trace_text_job_with, trace_whiten_outside_region,
+    trace_colour_job_with, trace_job_in, trace_job_with, trace_region_defaults,
+    trace_suggest_background, trace_text_job_in, trace_text_job_with,
 };
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
@@ -913,62 +912,6 @@ fn c9_threshold_background_and_analysis_read_only_the_masks_pixels() {
         trace_analyse(&crop_l, w, h),
         "analysis of the left half"
     );
-}
-
-// ---------------------------------------------------------------------------------------------
-// Criterion 10: the Mask view is white outside the region.
-
-#[test]
-fn c10_mask_view_white_outside_the_region_unchanged_inside() {
-    let rgba = m1();
-    let mask = trace_mask_job(&rgba, N, N, map_100mm(N), &t50()).expect("a mask");
-    let (w, h) = (mask.width, mask.height);
-    let bits = mask.bits.clone();
-    let channels = bits.len() / (w * h) as usize;
-    assert_eq!(channels, 1, "a one-byte mask");
-    let at = |b: &[u8], px: u32, py: u32| {
-        // Pixel centres of M1 (1000 px frame) in the mask's grid.
-        let x = (f64::from(px) + 0.5) * f64::from(w) / 1000.0;
-        let y = (f64::from(py) + 0.5) * f64::from(h) / 1000.0;
-        b[(y as u32 * w + x as u32) as usize]
-    };
-    assert_eq!(
-        at(&bits, 100, 500),
-        255,
-        "the bar at (100, 500) is content unmasked"
-    );
-    assert_eq!(
-        at(&bits, 900, 500),
-        255,
-        "the bar at (900, 500) is content unmasked"
-    );
-    let mut outside = bits.clone();
-    trace_whiten_outside_region(&mut outside, 1, w, h, N, map_100mm(N), &region(r1(), true));
-    assert_eq!(at(&outside, 100, 500), 0, "R1 Outside: (100, 500) is white");
-    assert_eq!(
-        at(&outside, 900, 500),
-        255,
-        "R1 Outside: (900, 500) stays content"
-    );
-    let mut inside = bits.clone();
-    trace_whiten_outside_region(&mut inside, 1, w, h, N, map_100mm(N), &region(r1(), false));
-    assert_eq!(at(&inside, 900, 500), 0, "R1 Inside: (900, 500) is white");
-    assert_eq!(
-        at(&inside, 100, 500),
-        255,
-        "R1 Inside: (100, 500) stays content"
-    );
-    // Inside the region every pixel is the tracer's mask as before.
-    let changed_inside = (0..h)
-        .flat_map(|y| (0..w / 2 - 1).map(move |x| (x, y)))
-        .filter(|&(x, y)| inside[(y * w + x) as usize] != bits[(y * w + x) as usize])
-        .count();
-    assert_eq!(changed_inside, 0, "the region's pixels are untouched");
-    let content_right = (0..h)
-        .flat_map(|y| (w / 2 + 1..w).map(move |x| (x, y)))
-        .filter(|&(x, y)| inside[(y * w + x) as usize] != 0)
-        .count();
-    assert_eq!(content_right, 0, "nothing outside the region is content");
 }
 
 // ---------------------------------------------------------------------------------------------

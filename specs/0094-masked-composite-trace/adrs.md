@@ -132,8 +132,8 @@ the fix.
   - pixel centres are tested with the nonzero rule, crossings found row by row;
   - the result is a `Vec<bool>`, worked out in the worker per job;
   - a per-pixel point-in-polygon is ruled out: 4 Mpx times 500 edges is too slow.
-- **Mask view:** `trace_mask_job` (and the text and colour variants) whiten pixels outside the
-  raster, or inside it for Outside (criterion 10).
+- **Mask view:** retired with the views (`0089` `ux-notes.md` §24.1); `trace_mask_job` and
+  `trace_whiten_outside_region` are gone (criterion 10 has no view left to whiten).
 - **Analysis** (Remove background, Pick colours, Analyse, auto Threshold): the same functions over
   only the pixels in the raster (criterion 9). With no mask they read every pixel, as today.
 - **Overlay:** the preview outlines are already clipped, so the outline ends on the mask path

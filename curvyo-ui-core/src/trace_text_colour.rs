@@ -10,17 +10,16 @@ use std::ops::ControlFlow;
 
 use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{
-    ColourMask, ColourParams, ColourTrace, PaletteEntry, Progress, Raster, Rgb8, Selection,
-    TraceError, colour_mask, suggest_background, trace_colours,
+    ColourParams, ColourTrace, PaletteEntry, Progress, Raster, Rgb8, Selection, TraceError,
+    colour_palette, suggest_background, trace_colours,
 };
 
 use crate::trace_ocr::OcrLine;
 use crate::trace_region::TraceRegion;
 use crate::trace_text::{TextPass, text_pass};
-use crate::trace_text_wire::{LEFT_OUT_LEVEL, keep_lines_in, write_texts};
+use crate::trace_text_wire::{keep_lines_in, write_texts};
 use crate::trace_transfer::{
-    TraceStatus, colour_head, job_percent, status_only, trace_colour_job_in, trace_colour_mask_job,
-    write_colour_tail,
+    TraceStatus, colour_head, job_percent, status_only, trace_colour_job_in, write_colour_tail,
 };
 
 /// The share of a job's percent the palette of the unfilled picture takes (Proposal: it is the
@@ -110,53 +109,6 @@ pub fn trace_text_colour_job_in(
     }
 }
 
-/// The segmented palette the trace of the same arguments walks (`specs/0089` UX notes §4), the
-/// pixels the text pass leaves out in [`LEFT_OUT_LEVEL`] grey (UX notes §2); without lines
-/// exactly [`trace_colour_mask_job`].
-#[must_use]
-pub fn trace_text_colour_mask_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &ColourParams,
-    lines: &[OcrLine],
-) -> Option<ColourMask> {
-    if lines.is_empty() {
-        return trace_colour_mask_job(rgba, width, height, pixel_map, params);
-    }
-    let map = Affine::from_array(pixel_map);
-    let pass = text_pass(rgba, width, height, map, &params.trace, lines);
-    let raster = Raster {
-        width,
-        height,
-        rgba,
-    };
-    let palette = palette_of_picture(raster, map, params, &pass, &mut |_| {}).ok()?;
-    let own = with_palette(params, palette.as_deref());
-    let filled = Raster {
-        width,
-        height,
-        rgba: &pass.rgba,
-    };
-    let (mut mask, _) = colour_mask(filled, map, &own, &mut |_| ControlFlow::Continue(())).ok()?;
-    let (w, mw) = (width as usize, mask.width as usize);
-    let factor = (mw / w.max(1)).max(1);
-    let grey = [LEFT_OUT_LEVEL, LEFT_OUT_LEVEL, LEFT_OUT_LEVEL, 255];
-    for (i, _) in pass.left_out.iter().enumerate().filter(|(_, out)| **out) {
-        let (x, y) = (i % w, i / w);
-        for dy in 0..factor {
-            for dx in 0..factor {
-                let at = ((y * factor + dy) * mw + x * factor + dx) * 4;
-                if let Some(px) = mask.rgba.get_mut(at..at + 4) {
-                    px.copy_from_slice(&grey);
-                }
-            }
-        }
-    }
-    Some(mask)
-}
-
 /// The palette of `raster` as it is, for the trace of the filled picture: `None` when the text
 /// pass changed no pixel or Pick colours sets the palette (the filled picture's palette is then
 /// the same).
@@ -170,7 +122,7 @@ fn palette_of_picture(
     if pass.regions.is_empty() || matches!(params.trace.selection, Selection::PickColours { .. }) {
         return Ok(None);
     }
-    let (_, palette) = colour_mask(raster, map, params, &mut |p| {
+    let palette = colour_palette(raster, map, params, &mut |p| {
         progress(p);
         ControlFlow::Continue(())
     })?;
@@ -516,28 +468,6 @@ mod tests {
         assert_eq!(first, second);
         assert!(seen.windows(2).all(|w| w[0] < w[1]), "{seen:?}");
         assert_eq!(seen.last(), Some(&100));
-    }
-
-    /// UX notes §2 in Multicolour: the left-out pixels grey, the box around them red.
-    #[test]
-    fn the_colour_mask_shows_left_out_pixels_grey() {
-        let mask =
-            trace_text_colour_mask_job(&white_on_red(), W, H, MAP, &params(), &[line()]).unwrap();
-        let factor = (mask.width / W) as usize;
-        let at = |x: usize, y: usize| {
-            let i = ((y * factor) * mask.width as usize + x * factor) * 4;
-            [
-                mask.rgba[i],
-                mask.rgba[i + 1],
-                mask.rgba[i + 2],
-                mask.rgba[i + 3],
-            ]
-        };
-        assert_eq!(
-            at(20, 14),
-            [LEFT_OUT_LEVEL, LEFT_OUT_LEVEL, LEFT_OUT_LEVEL, 255]
-        );
-        assert_eq!(at(4, 4), [RED[0], RED[1], RED[2], 255]);
     }
 
     #[test]

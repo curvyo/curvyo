@@ -6,9 +6,8 @@ use std::ops::ControlFlow;
 
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
-    AnalysisReport, ColourMask as TraceColourMask, ColourParams as TraceColourParams, ColourTrace,
-    Mask as TraceMask, Phase, Progress, Raster, Rgb8 as TraceRgb, TraceError, TraceParams, trace,
-    trace_colours,
+    AnalysisReport, ColourParams as TraceColourParams, ColourTrace, Phase, Progress, Raster,
+    Rgb8 as TraceRgb, TraceError, TraceParams, trace, trace_colours,
 };
 use kurbo::{BezPath, PathEl, Point};
 
@@ -363,49 +362,6 @@ pub fn trace_sample_colour(
         x,
         y,
     )
-}
-
-/// The mask the trace of the same arguments walks, for the worker's Mask view (`specs/0089`
-/// criterion 21); `None` when the picture or the map cannot be traced.
-#[must_use]
-pub fn trace_mask_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &TraceParams,
-) -> Option<TraceMask> {
-    let raster = Raster {
-        width,
-        height,
-        rgba,
-    };
-    curvyo_vectorize_core::mask(raster, Affine::from_array(pixel_map), params, &mut |_| {
-        ControlFlow::Continue(())
-    })
-    .ok()
-}
-
-/// The segmented palette the multicolour trace of the same arguments walks, for the worker's
-/// Mask view (`specs/0089` UX notes §4); `None` when the picture or the map cannot be traced.
-#[must_use]
-pub fn trace_colour_mask_job(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &TraceColourParams,
-) -> Option<TraceColourMask> {
-    let raster = Raster {
-        width,
-        height,
-        rgba,
-    };
-    curvyo_vectorize_core::colour_mask(raster, Affine::from_array(pixel_map), params, &mut |_| {
-        ControlFlow::Continue(())
-    })
-    .ok()
-    .map(|(mask, _)| mask)
 }
 
 pub(crate) fn status_only(status: TraceStatus) -> Vec<f64> {

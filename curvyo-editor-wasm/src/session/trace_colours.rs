@@ -2,12 +2,10 @@
 //! 29 and UX notes §7): the palette of the shown preview for the strip, the maker's recolours
 //! (fills only, no refit) and Isolate (the other colours dimmed in every view).
 
-use curvyo_document_core::{Color, NodeId, Opacity, PathSnapshot};
-use curvyo_render_core::PreviewAnchor;
+use curvyo_document_core::Color;
 use curvyo_ui_core::{TraceColour, TraceLayerWire, TraceRgb};
 
 use super::Session;
-use super::trace_draw::filled_result;
 use super::trace_mesh::MeshCache;
 
 /// How strongly the colours Isolate does not pick are drawn (UX notes §7: 35 %).
@@ -120,34 +118,6 @@ pub(super) fn outline_layers(layers: &[TraceLayerWire], outlines: usize) -> Vec<
         .collect()
 }
 
-/// The preview of `image` filled as Create paths would write it (criterion 51 of 0025, slice M
-/// criterion 29): one black compound path, or one per layer in its fill, the colours Isolate
-/// leaves out at [`DIMMED`].
-pub(super) fn filled_layers(
-    image: NodeId,
-    outlines: &[Vec<PreviewAnchor>],
-    layers: &[TraceLayerWire],
-    view: &PaletteView,
-) -> Vec<PathSnapshot> {
-    if layers.is_empty() {
-        return vec![filled_result(image, outlines)];
-    }
-    let mut at = 0;
-    layers
-        .iter()
-        .map(|layer| {
-            let to = (at + layer.outlines).min(outlines.len());
-            let mut path = filled_result(image, &outlines[at..to]);
-            at = to;
-            path.style.fill.color = color(view.fill(layer.colour));
-            if view.dimmed(layer.colour) {
-                path.style.fill.opacity = Opacity::new(DIMMED).unwrap_or(Opacity::OPAQUE);
-            }
-            path
-        })
-        .collect()
-}
-
 /// The colours the shown result fills, for its colour count: its layers' colours, then the
 /// palette colours only its texts use (`specs/0091` slice 2), so the count and the strip agree.
 fn used_colours(preview: &super::trace::TracePreview) -> Vec<TraceRgb> {
@@ -204,15 +174,7 @@ impl Session {
         }
         self.trace.palette_view = view;
         if let Some(preview) = &mut self.trace.preview {
-            preview.fills = filled_layers(
-                preview.image,
-                &preview.outlines,
-                &preview.fill_layers,
-                &self.trace.palette_view,
-            );
-            preview.fill_mesh = MeshCache::default();
             preview.outline_mesh = MeshCache::default();
         }
-        self.refresh_trace_mask();
     }
 }

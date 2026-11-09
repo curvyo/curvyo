@@ -25,8 +25,7 @@ use common::quality::multi::{
 };
 use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
-    ColourParams, ColourTrace, Rgb8, Selection, TraceParams, colour_mask, suggest_background,
-    trace_colours,
+    ColourParams, ColourTrace, Rgb8, Selection, TraceParams, suggest_background, trace_colours,
 };
 
 /// Millimetres per pixel of the fixtures: Ignore below 0.5 mm is 5 px.
@@ -231,41 +230,6 @@ fn criterion_29_layers_exclude_and_merge() {
         .map(|l| l.pixels)
         .sum();
     assert_eq!(blue_layer.pixels, before);
-}
-
-/// The Mask view of a multicolour trace is the segmented palette: content pixels in their
-/// colour, the background transparent; an excluded colour is background there too.
-#[test]
-fn the_colour_mask_is_the_segmented_palette() {
-    let drawn = scene("adjacent-straight").draw();
-    let mut p = ColourParams::new(params_for(&drawn.picture));
-    let mut go = |_| ControlFlow::Continue(());
-    let (mask, palette) = colour_mask(
-        drawn.picture.raster(),
-        Affine::scale(MM_PER_PX, MM_PER_PX),
-        &p,
-        &mut go,
-    )
-    .unwrap();
-    assert_eq!((mask.width, mask.height), (600, 400));
-    let at = |x: usize, y: usize| &mask.rgba[(y * 600 + x) * 4..(y * 600 + x) * 4 + 4];
-    assert_eq!(at(5, 5)[3], 0);
-    let red = at(100, 100);
-    assert_eq!(red[3], 255);
-    assert!(
-        palette
-            .iter()
-            .any(|e| [e.colour.r, e.colour.g, e.colour.b] == red[..3])
-    );
-    p.excluded = vec![Rgb8::new(red[0], red[1], red[2])];
-    let (mask, _) = colour_mask(
-        drawn.picture.raster(),
-        Affine::scale(MM_PER_PX, MM_PER_PX),
-        &p,
-        &mut go,
-    )
-    .unwrap();
-    assert_eq!(mask.rgba[(100 * 600 + 100) * 4 + 3], 0);
 }
 
 /// Pick colours with Multicolour: the palette is exactly the picked colours (Frage 90 A).

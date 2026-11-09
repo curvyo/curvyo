@@ -49,7 +49,7 @@ impl Session {
             view,
             self.device_pixel_ratio,
         );
-        list.extend(self.artwork_list(&objects, None, &HashSet::new(), view));
+        list.extend(self.artwork_list(&objects, &HashSet::new(), view));
         (list, view)
     }
 }

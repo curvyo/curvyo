@@ -6,7 +6,7 @@ use curvyo_ui_core::trace_job;
 
 use super::{
     DoubleClickHint, EscapeStep, KeyInput, KeyOutcome, Session, Tool, TraceCreateOutcome,
-    TraceSelection, TraceViewMode,
+    TraceSelection,
 };
 
 const PNG: &[u8] =
@@ -295,22 +295,14 @@ fn each_trace_group_keeps_its_counts_for_the_layers_tooltip() {
 }
 
 /// `specs/0089` UX notes §24.1 (criterion 51 retired): the Trace tool has one view, the Overlay,
-/// from every entry; the image is washed under the outline and the document is untouched. (The
-/// Rust view state of the Mask, Trace and Image views is dead code the lead removes.)
+/// from every entry; the image is washed under the outline and the document is untouched.
 #[test]
 fn the_one_view_is_the_overlay_that_washes_the_image_under_the_outline() {
     let mut session = Session::new(1);
     let images = import_images(&mut session, 1);
     session.set_tool(Tool::Trace);
-    assert_eq!(session.trace_view_mode(), TraceViewMode::Overlay);
-    assert_eq!(session.shown_trace_view_mode(), TraceViewMode::Overlay);
     session.set_tool(Tool::Select);
     session.set_tool(Tool::Trace);
-    assert_eq!(
-        session.shown_trace_view_mode(),
-        TraceViewMode::Overlay,
-        "every entry starts on it"
-    );
     let source = session.trace_source(images[0], false).unwrap();
     assert!(session.set_trace_preview(images[0], &wire(source.map)));
     let objects = session.objects().to_vec();
