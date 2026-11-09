@@ -328,13 +328,15 @@ export class BackgroundWorkspace {
     this.session.free();
   }
 
-  /** Leave my devices here: its own removal goes out, then it stops (criterion 27). */
+  /** Leave my devices here: its own removal goes out, then it stops (criterion 27); the folder
+   * stays as a local workspace, so it never reconnects to the room it left. */
   async leave(): Promise<boolean> {
     if (!this.session.leave_synced_workspace()) {
       return false;
     }
     this.transport.drain();
     await this.chain;
+    await invoke("clear_workspace_marker_share", { workspace: this.id }).catch(() => undefined);
     this.stopped = true;
     running.delete(this.id);
     this.transport.attach(null);

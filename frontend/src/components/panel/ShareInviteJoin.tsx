@@ -5,30 +5,15 @@ import { Copy, FolderOpen, LogIn, UserPlus } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { APPLY, BUTTON, FIELD, MUTED, OUTLINE } from "@/components/panel/devicesUi";
-import { PanelRadioGroup } from "@/components/panel/PanelRadioGroup";
 import { SettingField } from "@/components/panel/ShareSettingField";
 import type { CollaborationApi } from "@/hooks/useCollaboration";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
-import { invite_link_kind, invite_sentence } from "@/wasm-bindings/curvyo_editor_wasm.js";
+import { invite_link_kind } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
-const VALIDITY: readonly (readonly ["3600" | "86400" | "604800", string])[] = [
-  ["3600", "1 hour"],
-  ["86400", "24 hours"],
-  ["604800", "7 days"],
-];
-
-export /** The Invite block (UX notes §2.3): validity, Create link, the sentence, the link and Copy. */
-function InviteBlock({
-  collab,
-  onReturnFocus,
-  sentence = invite_sentence(),
-}: {
-  collab: CollaborationApi;
-  onReturnFocus: () => void;
-  sentence?: string;
-}) {
+export /** The Invite block (UX notes §2.3): Invite writes a link valid for 24 hours at once (customer
+ * 2026-11-09); the expiry, the link and Copy. */
+function InviteBlock({ collab }: { collab: CollaborationApi }) {
   const [open, setOpen] = useState(false);
-  const [validity, setValidity] = useState<"3600" | "86400" | "604800">("86400");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("Copy");
   const inviteButton = useRef<HTMLButtonElement>(null);
@@ -40,7 +25,12 @@ function InviteBlock({
   };
   if (!open) {
     return (
-      <button ref={inviteButton} type="button" className={`${BUTTON} ${OUTLINE} w-[118px]`} onClick={() => setOpen(true)}>
+      <button ref={inviteButton} type="button" className={`${BUTTON} ${OUTLINE} w-[118px]`}
+        onClick={() => {
+          setError(collab.createInvite());
+          setOpen(true);
+        }}
+      >
         <UserPlus size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
         Invite
       </button>
@@ -60,9 +50,7 @@ function InviteBlock({
     >
       {invite ? (
         <>
-          <p className="text-xs text-[var(--toolbar-icon)]">
-            {sentence} {invite.expiry}
-          </p>
+          <p className={MUTED}>{invite.expiry}</p>
           <input
             ref={linkField}
             readOnly
@@ -98,26 +86,14 @@ function InviteBlock({
         </>
       ) : (
         <>
-              <PanelRadioGroup
-                legend="Valid for"
-                options={VALIDITY}
-                value={validity}
-                onChange={setValidity}
-                onReturnFocus={onReturnFocus}
-                stacked
-              />
-              <button
-                type="button"
-                className={`${BUTTON} ${APPLY} w-[118px]`}
-                onClick={() => setError(collab.createInvite(Number(validity)))}
-              >
-                Create link
-              </button>
-              {error ? (
-                <p role="alert" className="text-xs text-[var(--field-invalid)]">
-                  {error}
-                </p>
-              ) : null}
+          {error ? (
+            <p role="alert" className="text-xs text-[var(--field-invalid)]">
+              {error}
+            </p>
+          ) : null}
+          <button type="button" className={`${BUTTON} ${OUTLINE} w-[76px]`} onClick={close}>
+            Done
+          </button>
         </>
       )}
     </div>

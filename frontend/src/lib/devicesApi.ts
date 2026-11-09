@@ -41,7 +41,6 @@ export interface DevicesView {
   rows: DeviceRow[];
   count: string;
   workspaces: GroupWorkspace[];
-  one_device_warning: string;
   /** "Key renewal pending for 2 workspaces", or "" (criterion 27). */
   renewal?: string;
   /** Devices still in workspaces this device cannot remove them from (criterion 26). */
@@ -108,6 +107,10 @@ export interface DevicesApi {
   switchOn: () => void;
   /** Switches the open workspace off for every device; "" when started, else why not. */
   switchOff: () => string;
+  /** Turns a running switch back; a switch-on's Share stops and nothing is written. */
+  cancelSwitch: () => void;
+  /** Reconnects every link of the group and the synced workspaces at once (Try again). */
+  retryNow: () => void;
   /** The person leave of the open synced workspace (`specs/0097` criterion 16); "" when the
    * `left` mark went out, else why not. */
   leavePerson: () => string;
@@ -119,8 +122,8 @@ export interface DevicesApi {
   ownMembers: string[];
   /** "Uploading..." or "Stopping..." while a switch runs. */
   switching: "" | "on" | "off" | "leave";
-  /** The last switch-on failed: the switch row shows the alert. */
-  switchFailed: boolean;
+  /** Why the last switch failed, or empty: the switch row shows the alert with Try again. */
+  switchFailure: string;
   /** The other devices' names, for the switch-off confirm. */
   otherNames: string[];
   /** The workspaces offered after Pair (ux-notes 3.1); empty while none is being chosen. */

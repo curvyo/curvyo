@@ -117,12 +117,15 @@ export interface CollaborationApi {
   setName: (text: string) => string;
   reach: Reach;
   checkServer: () => void;
+  /** The open document's or workspace's link reconnects at once (Try again). */
+  reconnect: () => void;
   /** Shares the open document; "" when the share started, else the sentence why not. */
   share: () => Promise<string>;
   /** Leaves the room (Cancel while joining, or a share that could not reach the server). */
   leave: () => void;
   invite: InviteShown | null;
-  createInvite: (seconds: number) => string;
+  /** Writes an invite valid for 24 hours (Rust); "" when done, else why not. */
+  createInvite: () => string;
   clearInvite: () => void;
   /** Removes a participant with a key rotation; "" when done, else the sentence why not. */
   remove: (member: string) => string;
@@ -498,12 +501,12 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
   }, []);
 
   const createInvite = useCallback(
-    (seconds: number) => {
+    () => {
       const session = getSession();
       if (!session) {
         return "";
       }
-      const answer = JSON.parse(session.create_invite(seconds, Date.now())) as
+      const answer = JSON.parse(session.create_invite(Date.now())) as
         | { link: string; expires: number }
         | { error: string };
       carry(transportRef.current, session);
@@ -559,6 +562,7 @@ export function useCollaboration(editor: EditorSession, project: ProjectApi): Co
     setName,
     reach,
     checkServer,
+    reconnect: () => transportRef.current?.networkBack(),
     share: startShare,
     leave,
     invite,

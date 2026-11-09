@@ -13,6 +13,7 @@ import { type OfferedWorkspace, useSyncedWorkspaces } from "@/hooks/useSyncedWor
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import type { DevicesApi, DevicesView, PairingView, SyncedFolder } from "@/lib/devicesApi";
 import { openRoomNow, setGroupWorkspaces } from "@/lib/backgroundWorkspace";
+import { type StallWatch, lookAt, startWatch } from "@/lib/stallWatch";
 import { mintPeerId, wasmLoaded, wasmReady } from "@/lib/editorSession";
 import { SyncTransport, type SocketLike, type SyncSessionPort } from "@/lib/syncTransport";
 import { onStorageFull, workspaceNames } from "@/platform/browserWorkspaces";
@@ -140,8 +141,11 @@ export function useDevices(
   const [switching, setSwitching] = useState<"" | "on" | "off" | "leave">("");
   /** When the person leave's mark went out (0 when none runs): "Leaving..." until it ends. */
   const leavingRef = useRef(0);
-  /** The last switch-on failed (ux-notes 6.2: the alert under the switch). */
-  const [switchFailed, setSwitchFailed] = useState(false);
+  /** Why the last switch failed, or empty (ux-notes 6.2: the alert under the switch, with Try
+   * again). */
+  const [switchFailure, setSwitchFailure] = useState("");
+  /** What the running switch did last and when (`lib/stallWatch`). */
+  const switchWatchRef = useRef<StallWatch>(startWatch("", 0));
   const [removedShown, setRemovedShown] = useState(false);
   const [justPaired, setJustPaired] = useState("");
   const [loaded, setLoaded] = useState<{ label: string; rows: OfferedWorkspace[] }>({ label: "", rows: [] });
@@ -243,7 +247,6 @@ export function useDevices(
   const [deviceTab, setDeviceTab] = useState<"mine" | "other" | "pending">(() =>
     isTauri || !(navigator as Navigator & { locks?: LockManager }).locks ? "mine" : "pending",
   );
-  const [persisted, setPersisted] = useState(true);
   const [storageLine, setStorageLine] = useState("");
   useEffect(() => {
     if (isTauri) {
@@ -265,14 +268,13 @@ export function useDevices(
         release = resolve;
       });
     });
-    void navigator.storage?.persisted?.().then(setPersisted, () => undefined);
     return () => release?.();
   }, []);
 
   /** The browser asks to keep its data at pairing and shows the answer (ADR 0040 decision 9). */
   const askPersist = useCallback(() => {
     if (!isTauri) {
-      void navigator.storage?.persist?.().then(setPersisted, () => setPersisted(false));
+      void navigator.storage?.persist?.().catch(() => undefined);
     }
   }, []);
 
@@ -343,6 +345,12 @@ export function useDevices(
     };
   }, [attachGroup, deviceTab]);
 
+  /** Try again on the Server field and the switch row: every link reconnects at once. */
+  const retryNow = useCallback(() => {
+    groupTransport.current?.networkBack();
+    syncedRef.current.networkBack();
+  }, []);
+
   /** Reconciles the open workspace with the group, and finishes a pending switch. */
   const reconcileOpen = useCallback(() => {
     const group = groupRef.current;
@@ -356,12 +364,28 @@ export function useDevices(
       leavingRef.current = 0;
       setSwitching((now) => (now === "leave" ? "" : now));
     }
-    if (pendingSwitchRef.current === "on" && refs.current.workspaceSync.share.kind === "failed") {
+    const share = refs.current.workspaceSync.share;
+    if (pendingSwitchRef.current === "on" && share.kind === "failed") {
       // A failed Share ends the switch-on; the switch row says why.
       pendingSwitchRef.current = "";
       setSwitching("");
-      setSwitchFailed(true);
+      setSwitchFailure(share.text);
       return;
+    }
+    if (pendingSwitchRef.current !== "") {
+      // A switch that made no progress for `STALL_MS` fails with Try again, never "Uploading..."
+      // for good (customer feedback on PR #281).
+      const key = `${pendingSwitchRef.current}:${share.kind}:${share.kind === "uploading" ? share.done : ""}`;
+      const look = lookAt(switchWatchRef.current, key, Date.now());
+      switchWatchRef.current = look.watch;
+      if (look.stalled) {
+        const off = pendingSwitchRef.current === "off";
+        pendingSwitchRef.current = "";
+        setSwitching("");
+        refs.current.workspaceSync.cancelShare();
+        setSwitchFailure(devices_text(off ? "not-connected" : openWorkspaceId() === "" ? "share-stalled" : "sync-failed"));
+        return;
+      }
     }
     if (!group || !session || id === "" || !group.is_online()) {
       return;
@@ -491,16 +515,13 @@ export function useDevices(
         }
       }
     }, TICK_MS);
-    const onOnline = () => {
-      groupTransport.current?.networkBack();
-      syncedRef.current.networkBack();
-    };
+    const onOnline = () => retryNow();
     window.addEventListener("online", onOnline);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("online", onOnline);
     };
-  }, [attachGroup, getSession, persist, reconcileOpen, showNotice]);
+  }, [attachGroup, getSession, persist, reconcileOpen, retryNow, showNotice]);
 
   const setDeviceName = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -704,17 +725,29 @@ export function useDevices(
     if (!group) {
       return "";
     }
+    const last = group.is_last_device();
+    const openOn = group.is_switched_on(openWorkspaceId());
     const refusal = group.leave();
     groupTransport.current?.drain();
     if (refusal === "") {
-      // Criterion 27: its own removal in every synced workspace too; the files stay.
+      // Criterion 27: its own removal in every synced workspace too; the files stay, and the
+      // folder is a local workspace from now on, never reconnecting to the room it left.
       const session = getSession();
-      if (session && group.is_switched_on(openWorkspaceId()) && session.leave_synced_workspace()) {
+      const left = session ? openOn && session.leave_synced_workspace() : false;
+      if (session && left) {
         refs.current.collab.drive(session);
       }
-      void syncedRef.current.leaveAll();
+      if (left || (openOn && last)) {
+        void invoke("clear_workspace_marker_share").catch(() => undefined);
+      }
+      // The last device makes every synced workspace plain local files, also one not running;
+      // the host forgets the group only after, while it still knows where they are.
+      const synced = last ? Object.keys(recordRef.current.folders) : [];
       recordRef.current = { server: "", syncedFolder: "", folders: {} };
-      void invoke("remove_device_group").catch(() => undefined);
+      void syncedRef.current
+        .leaveAll(synced)
+        .then(() => invoke("remove_device_group"))
+        .catch(() => undefined);
       attachGroup(null);
     }
     return refusal;
@@ -771,8 +804,9 @@ export function useDevices(
 
   const switchOn = useCallback(() => {
     pendingSwitchRef.current = "on";
+    switchWatchRef.current = startWatch("", Date.now());
     setSwitching("on");
-    setSwitchFailed(false);
+    setSwitchFailure("");
     if (openWorkspaceId() === "") {
       // Not shared yet: Share as `0095` first (ADR 0040 decision 6); the switch finishes once
       // the workspace room is online.
@@ -786,10 +820,25 @@ export function useDevices(
       return devices_text("not-connected");
     }
     pendingSwitchRef.current = "off";
+    switchWatchRef.current = startWatch("", Date.now());
     setSwitching("off");
+    setSwitchFailure("");
     reconcileOpen();
     return "";
   }, [reconcileOpen]);
+
+  /** Turns a running switch back (customer feedback on PR #281): a switch-on stops its Share,
+   * which leaves a room it made, and the switch is off again; a switch-off that did not go out
+   * yet stays on. Nothing is asked: nothing was written to the devices list. */
+  const cancelSwitch = useCallback(() => {
+    if (pendingSwitchRef.current === "on") {
+      refs.current.workspaceSync.cancelShare();
+    }
+    pendingSwitchRef.current = "";
+    setSwitching((now) => (now === "leave" ? now : ""));
+    setSwitchFailure("");
+  }, []);
+
 
 
   // The workspaces offered right after Pair (ux-notes 3.1).
@@ -828,13 +877,8 @@ export function useDevices(
       : !isTauri && browserServer !== "" && !browserServer.startsWith("wss://")
         ? devices_browser_text("needs-tls")
         : "";
-  const browserLines = isTauri || !words
-    ? []
-    : [
-        devices_browser_text("own-row"),
-        ...(persisted ? [] : [devices_browser_text("not-persisted")]),
-        ...(storageLine ? [storageLine] : []),
-      ];
+  // Only the storage status: the browser's loss hints are gone (customer 2026-11-09).
+  const browserLines = isTauri || !words || !storageLine ? [] : [storageLine];
 
   const openId = collab.view.workspace && !collab.view.workspace.joining ? collab.view.workspace.id : "";
   const openSynced = view !== null && openId !== "" && view.workspaces.some((w) => w.id === openId && w.on);
@@ -842,7 +886,7 @@ export function useDevices(
   const shown = view && removedShown ? { ...view, removed: true } : view;
   return {
     view: removedShown && !view
-      ? { room: "", online: false, removed: true, rows: [], count: "", workspaces: [], one_device_warning: "" }
+      ? { room: "", online: false, removed: true, rows: [], count: "", workspaces: [] }
       : shown,
     pairing,
     deviceName,
@@ -862,12 +906,14 @@ export function useDevices(
     openSynced,
     switchOn,
     switchOff,
+    cancelSwitch,
+    retryNow,
     leavePerson,
     clearLeft,
     leftIds: view ? view.workspaces.filter((w) => w.left).map((w) => w.id) : [],
     ownMembers: view && !view.removed ? view.rows.map((row) => row.member).filter((m) => m !== "") : [],
     switching,
-    switchFailed,
+    switchFailure,
     otherNames,
     offered: loaded.label === justPaired && justPaired !== "" ? loaded.rows : [],
     syncChosen,
