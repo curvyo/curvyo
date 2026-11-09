@@ -37,7 +37,7 @@ pub struct TraceTarget {
 /// One colour of a multicolour result as Create paths writes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TraceColour {
-    /// The fill (the palette colour, or the maker's recolour of it).
+    /// The fill (the palette colour).
     pub fill: Color,
     /// How many of the target's outlines are this colour's.
     pub outlines: usize,

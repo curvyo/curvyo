@@ -464,23 +464,11 @@ impl WasmSession {
         self.session.trace_palette_json()
     }
 
-    /// The maker's palette view (`specs/0089` criterion 29): `recolours` a JSON list of `[from,
-    /// to]` `#RRGGBB` pairs (fills only, no trace), `isolated` a `#RRGGBB` or empty; the preview
-    /// and Create paths follow.
-    pub fn set_trace_palette_view(&mut self, recolours: &str, isolated: &str) {
-        let pairs: Vec<(curvyo_ui_core::TraceRgb, curvyo_ui_core::TraceRgb)> =
-            serde_json::from_str::<Vec<(String, String)>>(recolours)
-                .unwrap_or_default()
-                .iter()
-                .filter_map(|(from, to)| {
-                    Some((
-                        crate::trace_glue::parse_hex(from)?,
-                        crate::trace_glue::parse_hex(to)?,
-                    ))
-                })
-                .collect();
+    /// The isolated palette colour (`specs/0089` UX notes §26: Shift+hover on a swatch), a
+    /// `#RRGGBB` or empty for none: the preview dims the other colours; nothing is traced again.
+    pub fn set_trace_isolated(&mut self, isolated: &str) {
         self.session
-            .set_trace_palette_view(pairs, crate::trace_glue::parse_hex(isolated));
+            .set_trace_isolated(crate::trace_glue::parse_hex(isolated));
     }
 
     /// The view is moving (`true`) or has rested for 150 ms (`false`): while it moves, the Trace

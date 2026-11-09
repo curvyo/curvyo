@@ -7,7 +7,6 @@ import { TraceField } from "@/components/TraceField";
 import { TracePalette } from "@/components/TracePalette";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { TracePaletteApi } from "@/hooks/useTracePalette";
-import type { HsvTriple } from "@/hooks/useStylePanel";
 import { ANALYSE } from "@/lib/traceAnalysis";
 import {
   BRIGHTNESS,
@@ -23,9 +22,7 @@ import {
   type TraceValues,
   coloursText,
 } from "@/lib/traceText";
-import {
-  PICK_PALETTE_COLOUR,
-} from "@/lib/tracePaletteText";
+import { PICK_PALETTE_COLOUR } from "@/lib/tracePaletteText";
 
 /** The Output pill as a choice of the schema's shape (`specs/0089` criterion 25). */
 const OUTPUT_PARAM: TraceParam = {
@@ -156,15 +153,41 @@ function TraceToggle({ label, icon: Icon, pressed, onChange, onReturnFocus }: Tr
   );
 }
 
+/** The palette pipette of Brightness + Multicolour (UX notes §7): pressed while armed; a mouse
+ * press hands the keyboard back to the canvas. */
+function PalettePipette({ armed, onPipette, onReturnFocus }: { armed: boolean; onPipette: () => void; onReturnFocus: () => void }) {
+  return (
+    <span className="flex h-9 items-center">
+      <Tooltip side="bottom" content={PICK_TOOLTIP}>
+        <button
+          type="button"
+          aria-label={PICK_PALETTE_COLOUR}
+          aria-pressed={armed}
+          data-trace-pipette="palette"
+          onClick={(event) => {
+            onPipette();
+            if (event.detail > 0) {
+              onReturnFocus();
+            }
+          }}
+          className={`${ICON_BUTTON_CLASS} ${
+            armed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
+          }`}
+        >
+          <Pipette size={16} strokeWidth={1.5} aria-hidden />
+        </button>
+      </Tooltip>
+    </span>
+  );
+}
+
 interface TraceAdvancedProps {
   params: readonly TraceParam[];
   values: TraceValues;
   /** The Analyse button (`specs/0089` criteria 31, 33; UX notes §24.3). */
   onAnalyse: () => void;
-  /** The one colour strip (`ux-notes.md` §22.3) and the Recolour picker's conversions. */
+  /** The palette's swatch row beside Colours (`ux-notes.md` §26). */
   palette: TracePaletteApi;
-  hsvOf: (rgb: number) => HsvTriple;
-  rgbOf: (hue: number, saturation: number, value: number) => number;
   /** The palette belongs to an older result (a running or stopped trace): drawn at 50 %. */
   countsStale: boolean;
   setValue: <K extends keyof TraceValues>(name: K, value: TraceValues[K], dragging?: boolean) => void;
@@ -184,8 +207,9 @@ interface TraceAdvancedProps {
 
 /**
  * The Advanced block (`specs/0025-raster-trace` criteria 11, 41, 44, 71; UX notes 20.4, 20.5):
- * below the main rows inside the bar, after a divider: the Output row with the four icon toggles,
- * the colour strip, Denoise, Upscale and Corners, and last the Parts group and the Analyse button
+ * below the main rows inside the bar, after a divider: the Output row (with Multicolour the
+ * Colours field, the palette pipette and the palette's swatches) with the four icon toggles,
+ * Denoise, Upscale and Corners, and last the Parts group and the Analyse button
  * at the far right (`specs/0089` UX notes §24.3), wrapping by whole groups.
  */
 export function TraceAdvanced({
@@ -193,8 +217,6 @@ export function TraceAdvanced({
   values,
   onAnalyse,
   palette,
-  hsvOf,
-  rgbOf,
   countsStale,
   setValue,
   onEndDrag,
@@ -218,10 +240,10 @@ export function TraceAdvanced({
       <div data-trace-output-row="" className="flex flex-wrap items-center gap-x-1">
         <ChoicePill param={OUTPUT_PARAM} bare value={values.output} onValue={(v) => setValue("output", v)} onReturnFocus={onReturnFocus} />
         {values.output === MULTICOLOUR ? (
-          <div className="flex h-9 items-center gap-1">
+          <div data-trace-colours="palette" className="flex min-h-9 items-start gap-1">
             {values.method === PICK_COLOURS ? (
               // Pick colours: the palette is exactly the picked colours, the count fixed (Frage 90 A).
-              <div aria-disabled="true" data-trace-colours-fixed="" className="pointer-events-none opacity-50">
+              <div aria-disabled="true" data-trace-colours-fixed="" className="pointer-events-none flex h-9 items-center opacity-50">
                 <TraceField
                   param={COLOURS_PARAM}
                   value={Math.max(1, values.swatches.length)}
@@ -234,42 +256,29 @@ export function TraceAdvanced({
                 />
               </div>
             ) : (
-              <TraceField
-                param={COLOURS_PARAM}
-                value={values.colours ?? 1}
-                display={coloursText(values.colours, coloursFound)}
-                width={COLOURS_WIDTH}
-                onValue={(v, dragging) => setValue("colours", v <= 1 ? null : v, dragging)}
-                onEndDrag={onEndDrag}
-                onCreate={onCreate}
-                onReturnFocus={onReturnFocus}
-              />
+              <span className="flex h-9 items-center">
+                <TraceField
+                  param={COLOURS_PARAM}
+                  value={values.colours ?? 1}
+                  display={coloursText(values.colours, coloursFound)}
+                  width={COLOURS_WIDTH}
+                  onValue={(v, dragging) => setValue("colours", v <= 1 ? null : v, dragging)}
+                  onEndDrag={onEndDrag}
+                  onCreate={onCreate}
+                  onReturnFocus={onReturnFocus}
+                />
+              </span>
             )}
-            {values.method === BRIGHTNESS ? (
-              <Tooltip side="bottom" content={PICK_TOOLTIP}>
-                <button
-                  type="button"
-                  aria-label={PICK_PALETTE_COLOUR}
-                  aria-pressed={paletteArmed}
-                  data-trace-pipette="palette"
-                  onClick={(event) => {
-                    onPalettePipette();
-                    if (event.detail > 0) {
-                      onReturnFocus();
-                    }
-                  }}
-                  className={`${ICON_BUTTON_CLASS} ${
-                    paletteArmed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
-                  }`}
-                >
-                  <Pipette size={16} strokeWidth={1.5} aria-hidden />
-                </button>
-              </Tooltip>
-            ) : null}
+            <span className="flex min-h-9 items-start">
+              {values.method === BRIGHTNESS ? <PalettePipette armed={paletteArmed} onPipette={onPalettePipette} onReturnFocus={onReturnFocus} /> : null}
+              {/* The palette's swatches beside the pipette (`ux-notes.md` §26): the cells of the
+                  Pick colours row; Pick colours has its own row in the bar. */}
+              <TracePalette palette={palette} stale={countsStale} onReturnFocus={onReturnFocus} />
+            </span>
           </div>
         ) : null}
         {/* 1b. The four icon toggles share the Output row (`specs/0088` UX notes B2, lead 2026-11-03),
-            before the strip, Denoise, Upscale and Corners. */}
+            before Denoise, Upscale and Corners. */}
         <div className="flex h-9 items-center gap-1">
           {params
             .filter((p) => p.advanced && p.kind === "toggle")
@@ -304,13 +313,6 @@ export function TraceAdvanced({
           />
         </div>
       </div>
-      {/* 2. The colour strip with its edit actions: Multicolour with Colours Auto only; Pick colours
-          show their colours beside the pipette (`ux-notes.md` §25.4, Frage 142 A). */}
-      {palette.swatches.length > 0 ? (
-        <div className={`basis-full ${countsStale ? "opacity-50" : ""}`}>
-          <TracePalette palette={palette} hsvOf={hsvOf} rgbOf={rgbOf} />
-        </div>
-      ) : null}
       {denoise ? <ChoicePill param={denoise} value={values.denoise} onValue={(v) => setValue("denoise", v)} onReturnFocus={onReturnFocus} /> : null}
       {upscale ? <ChoicePill param={upscale} value={values.upscale} onValue={(v) => setValue("upscale", v)} onReturnFocus={onReturnFocus} /> : null}
       {corners ? (

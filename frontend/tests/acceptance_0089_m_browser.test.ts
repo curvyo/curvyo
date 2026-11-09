@@ -1,8 +1,8 @@
 // `specs/0089-trace-quality-and-colour` slice M in the real app (Chromium via DevTools; set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): Output in Advanced
-// (criterion 25), the palette with its count and actions (criteria 26, 29), the segmented Mask
-// view, Create paths as one group of one filled path per colour in one step, and the bar at
-// 800 x 600. Harness as in `acceptance_0089_e_browser.test.ts`.
+// (criterion 25), the palette's swatch row with its count, tooltip, Exclude, Isolate and delete
+// (criteria 26, 29, ux-notes §26), Create paths as one group of one filled path per colour in one
+// step, and the bar at 800 x 600. Harness as in `acceptance_0089_e_browser.test.ts`.
 
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -304,12 +304,51 @@ const THREE = rgbPng(240, 120, (x, y) => {
 });
 
 const swatches = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=listbox][aria-label=Palette] [role=option]')].map((o) => o.getAttribute('aria-label')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=group][aria-label=Palette] [data-trace-palette-swatch]')].map((o) => o.getAttribute('aria-label')))`)) as string) as string[];
+
+const swatchSel = (hex: string) => `${BAR} [data-trace-palette-swatch="${hex}"]`;
+
+/** The middle of `sel` on screen. */
+const centre = async (s: S, sel: string) =>
+  JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
+
+/** The pointer over `sel`, with Shift held when `shift` (CDP modifiers 8). */
+const hover = async (s: S, sel: string, shift = false) => {
+  const [x, y] = await centre(s, sel);
+  await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, modifiers: shift ? 8 : 0 });
+  await sleep(300);
+};
+
+/** The pointer away from the bar, over the canvas's lower part. */
+const away = async (s: S) => {
+  await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 400, y: 560, modifiers: 0 });
+  await sleep(300);
+};
+
+const shiftClick = async (s: S, sel: string) => {
+  const [x, y] = await centre(s, sel);
+  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers: 8 });
+  }
+  await sleep(300);
+};
+
+const holdShift = async (s: S) => {
+  await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
+  await sleep(300);
+};
+
+const releaseShift = async (s: S) => {
+  await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
+  await sleep(300);
+};
+
+const hiddenStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
 
 const coloursFieldText = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label=Colours]')?.textContent ?? ''`)) as string;
 
-test("0089 M in Chromium: Output, the palette and its actions, Isolate dims in the Overlay, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 M in Chromium: Output, the palette row with its tooltip, Shift+hover Isolate dims in the Overlay, a click excludes, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -364,40 +403,48 @@ test("0089 M in Chromium: Output, the palette and its actions, Isolate dims in t
     console.log("outline pixels around the red block before Isolate:", redBefore);
     assert.ok(redBefore > 20, "the outline is drawn around the red block");
 
-    // Isolate (view only): the hidden region says so, the other colours are dimmed in the Overlay.
-    await s.clickSel(`${BAR} [data-trace-palette-swatch="#234EB8"]`);
-    const detail = (await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-detail]')?.textContent ?? ''`)) as string;
-    assert.ok(detail.startsWith("#234EB8 · Blue"), detail);
-    const actions = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-action]')].map((b) => b.getAttribute('aria-label')))`)) as string) as string[];
-    assert.deepEqual(actions, ["Isolate", "Recolour", "Merge into", "Exclude"], "an automatic colour has no Remove");
-    await s.clickSel(`${BAR} [data-trace-palette-action="Isolate"]`);
-    await waitFor("Isolating", async () => ((await s.statusText()).includes("Isolating #234EB8") ? true : null), 10_000);
-    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-action="Isolate"]').getAttribute('aria-pressed')`), "true", "Isolate carries its state (aria-pressed)");
+    // ux-notes §26: no detail row and no action buttons; the tooltip is the code and name, and the
+    // short second line.
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-palette-detail], ${BAR} [data-trace-palette-action]').length`), 0, "no detail row, no actions");
+    await hover(s, swatchSel("#234EB8"));
+    const tip = await waitFor("the tooltip", async () => {
+      const t = (await s.evaluate(`[...document.querySelectorAll('[role=tooltip]')].map((e) => e.textContent).join('|')`)) as string;
+      return t.includes("#234EB8") ? t : null;
+    }, 5_000);
+    assert.ok(tip.includes("#234EB8 · Blue"), tip);
+    assert.ok(tip.includes("Click: exclude · Shift: isolate / delete"), tip);
+    assert.ok(!(await hiddenStatus(s)).includes("Isolating"), "a plain hover isolates nothing");
+
+    // Shift+hover isolates (view only): pressing Shift over the swatch; the hidden region says so,
+    // the other colours are dimmed; releasing Shift ends it.
+    await holdShift(s);
+    await waitFor("Isolating", async () => ((await hiddenStatus(s)).includes("Isolating #234EB8") ? true : null), 10_000);
     await waitFor("the dimmed red", async () => ((await strong(await shot(s), red, redOutline)) < redBefore * 0.5 ? true : null), 10_000);
-    await s.clickSel(`${BAR} [data-trace-palette-action="Isolate"]`);
+    await releaseShift(s);
+    await waitFor("Isolate ends with Shift", async () => (!(await hiddenStatus(s)).includes("Isolating") ? true : null), 10_000);
+    await waitFor("the red at full strength", async () => ((await strong(await shot(s), red, redOutline)) > redBefore * 0.8 ? true : null), 10_000);
+    // Pointing with Shift already held isolates too; it ends when the pointer leaves.
+    await away(s);
+    await hover(s, swatchSel("#234EB8"), true);
+    await waitFor("Isolating again", async () => ((await hiddenStatus(s)).includes("Isolating #234EB8") ? true : null), 10_000);
+    await away(s);
+    await releaseShift(s);
+    await waitFor("Isolate ends with the hover", async () => (!(await hiddenStatus(s)).includes("Isolating") ? true : null), 10_000);
 
-    // Recolour by its hex field (UX notes §7): the swatch is then named by its new colour and its
-    // old hex; Reset takes it back.
-    await s.clickSel(`${BAR} [data-trace-palette-action="Recolour"]`);
-    const hexField = `${BAR} [data-trace-palette-picker] input[aria-label="Recolour hex"]`;
-    await waitFor("the Recolour hex field", async () => ((await s.evaluate(`!!document.querySelector('${hexField}')`)) ? true : null), 10_000);
-    await s.evaluate(`(() => { const i = document.querySelector('${hexField}'); i.focus(); i.select(); })()`);
-    await s.send("Input.insertText", { text: "00a0ff" });
-    await s.key("Enter", 13);
-    await waitFor("the recoloured swatch name", async () => ((await swatches(s)).some((n) => n.startsWith("#00A0FF (was #234EB8) · ")) ? true : null), 10_000);
-    await s.evaluate(`[...document.querySelectorAll('${BAR} [data-trace-palette-picker] button')].find((b) => b.textContent === 'Reset').click()`);
-    await waitFor("the reset swatch name", async () => ((await swatches(s)).some((n) => n.startsWith("#234EB8 · Blue")) ? true : null), 10_000);
-    await s.clickSel(`${BAR} [data-trace-palette-action="Recolour"]`);
-
-    // Exclude: the colour becomes background; the swatch stays with its mark.
-    await s.clickSel(`${BAR} [data-trace-palette-action="Exclude"]`);
-    await waitFor("1 colour excluded", async () => ((await s.statusText()).includes("1 colour excluded") ? true : null), 20_000);
-    assert.ok((await swatches(s)).some((n) => n.startsWith("#234EB8") && n.includes("excluded")));
+    // A click excludes: the colour becomes background; the swatch stays with its mark; a second
+    // click brings it back, a third excludes again.
+    await s.clickSel(swatchSel("#234EB8"));
+    await waitFor("1 colour excluded", async () => ((await hiddenStatus(s)).includes("1 colour excluded") ? true : null), 20_000);
+    assert.ok((await swatches(s)).some((n) => n === "#234EB8 · Blue, excluded"), (await swatches(s)).join(" | "));
+    await s.clickSel(swatchSel("#234EB8"));
+    await waitFor("back in", async () => ((await swatches(s)).includes("#234EB8 · Blue") ? true : null), 20_000);
+    await s.clickSel(swatchSel("#234EB8"));
+    await waitFor("excluded again", async () => ((await swatches(s)).includes("#234EB8 · Blue, excluded") ? true : null), 20_000);
     // Sampled near the block's bottom edge: the grown bar's shadow falls on its top; Advanced is
     // closed first so the bar (one row taller with the analysis line) leaves the block visible.
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]').click()`);
     await sleep(500);
-    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]').textContent.includes('1 colour excluded')`), true, "the hidden region says it");
+    assert.equal((await hiddenStatus(s)).includes("1 colour excluded"), true, "the hidden region says it");
 
     // Criterion 29: Create paths writes one group with one filled path per traced colour, in one step.
     const before = (await s.layerRows()).length;
@@ -423,12 +470,25 @@ test("0089 M in Chromium: Output, the palette and its actions, Isolate dims in t
   }
 });
 
-test("0089 M in Chromium: Multicolour at 800 x 600 keeps the bar inside the window", { skip: !BROWSER, timeout: 400_000 }, async () => {
+/** Five colour blocks side by side on white: 300 x 80 px. */
+const FIVE_COLOURS: [number, number, number][] = [
+  [208, 34, 42],
+  [35, 78, 184],
+  [242, 194, 14],
+  [30, 150, 60],
+  [75, 57, 47],
+];
+const FIVE = rgbPng(300, 80, (x, y) => {
+  if (y < 10 || y >= 70 || x < 10 || x >= 290) return [255, 255, 255];
+  return FIVE_COLOURS[Math.min(4, Math.floor((x - 10) / 56))];
+});
+
+test("0089 M in Chromium (ux-notes §26): at 800 x 600 five Multicolour colours sit in one line beside Colours, the bar never leaves the window; Shift+click deletes and the rest are matched again", { skip: !BROWSER, timeout: 400_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
-  const file = path.join(SCRATCH, "three.png");
-  writeFileSync(file, THREE);
+  const file = path.join(SCRATCH, "five.png");
+  writeFileSync(file, FIVE);
   let closeAll: () => Promise<void> = async () => undefined;
   try {
     vite = spawn("npx", ["vite", "--port", String(PORT), "--strictPort"], { cwd: FRONTEND, stdio: "ignore" });
@@ -440,18 +500,59 @@ test("0089 M in Chromium: Multicolour at 800 x 600 keeps the bar inside the wind
     await s.evaluate(`document.querySelector('${BAR} [aria-label="More trace options"]').click()`);
     await sleep(400);
     await s.evaluate(`[...document.querySelectorAll('${BAR} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === 'Multicolour').click()`);
-    await waitFor("three swatches", async () => ((await swatches(s)).length === 3 ? true : null), 30_000);
-    await s.clickSel(`${BAR} [data-trace-palette-swatch="#D0222A"]`);
-    const sizes = JSON.parse((await s.evaluate(`JSON.stringify((() => { const bar = document.querySelector('${BAR}').getBoundingClientRect();
-      const out = [...document.querySelectorAll('${BAR} *')].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 0.5).length;
-      return { height: Math.round(bar.height), right: Math.round(bar.right), out }; })())`)) as string) as { height: number; right: number; out: number };
-    console.log(`800 x 600, Multicolour, palette and detail row, Advanced open: bar ${sizes.height} px`);
-    assert.equal(sizes.out, 0, "nothing past the window's edge");
-    assert.ok(sizes.right <= 800);
-    // Pick colours + Multicolour: the Colours field is greyed out (Frage 90 A).
+    const found = await waitFor("five swatches", async () => {
+      const list = await swatches(s);
+      return list.length === 5 ? list : null;
+    }, 30_000);
+    console.log("palette:", found.join(" | "));
+    const layout = async () =>
+      JSON.parse((await s.evaluate(`JSON.stringify((() => {
+        const field = document.querySelector('${BAR} [role=spinbutton][aria-label=Colours]').getBoundingClientRect();
+        const cells = [...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getBoundingClientRect());
+        const bar = document.querySelector('${BAR}').getBoundingClientRect();
+        const out = [...document.querySelectorAll('${BAR} *')].filter((e) => e.getBoundingClientRect().right > window.innerWidth + 0.5).length;
+        return { fieldMid: field.top + field.height / 2, mids: cells.map((c) => c.top + c.height / 2), tops: cells.map((c) => Math.round(c.top)),
+          widths: cells.map((c) => Math.round(c.width)), heights: cells.map((c) => Math.round(c.height)), lefts: cells.map((c) => Math.round(c.left)),
+          right: bar.right, out, scroll: document.documentElement.scrollWidth - window.innerWidth,
+          detail: document.querySelectorAll('${BAR} [data-trace-palette-detail], ${BAR} [data-trace-palette-action]').length };
+      })())`)) as string) as { fieldMid: number; mids: number[]; tops: number[]; widths: number[]; heights: number[]; lefts: number[]; right: number; out: number; scroll: number; detail: number };
+    const check = async (label: string) => {
+      const l = await layout();
+      console.log(`800 x 600, ${label}:`, JSON.stringify(l));
+      assert.equal(new Set(l.tops).size, 1, `${label}: the swatches share one line`);
+      assert.ok(Math.abs(l.mids[0] - l.fieldMid) < 1, `${label}: on the Colours field's line`);
+      assert.deepEqual([...new Set(l.widths), ...new Set(l.heights)], [24, 28], `${label}: cells of 24 x 28, the Pick colours row's`);
+      l.lefts.slice(1).forEach((x, i) => assert.equal(x - l.lefts[i], 24, `${label}: the cells touch`));
+      assert.equal(l.out, 0, `${label}: nothing past the window's edge`);
+      assert.ok(l.right <= 800 && l.scroll <= 0, `${label}: no horizontal scroll`);
+      assert.equal(l.detail, 0, `${label}: no detail row, no actions`);
+    };
+    await check("panel as opened");
+    // The other panel state too (the Properties panel toggles with its tab strip's shortcut-free button).
+    const panelToggled = (await s.evaluate(`(() => { const b = document.querySelector('[aria-label="Hide panel"], [aria-label="Show panel"]'); if (!b) return false; b.click(); return true; })()`)) as boolean;
+    if (panelToggled) {
+      await sleep(600);
+      await check("panel toggled");
+    }
+
+    // Shift+click deletes the brown: four swatches, exactly the others; the brown area is matched again.
+    const brown = "#4B392F";
+    assert.ok(found.some((n) => n.startsWith(brown)), found.join(" | "));
+    await shiftClick(s, swatchSel(brown));
+    const left = await waitFor("four swatches", async () => {
+      const list = (await swatches(s)).map((n) => n.slice(0, 7));
+      return list.length === 4 ? list : null;
+    }, 30_000);
+    assert.deepEqual([...left].sort(), found.map((n) => n.slice(0, 7)).filter((h) => h !== brown).sort());
+    await waitFor("Removed", async () => ((await hiddenStatus(s)).includes(`Removed ${brown}`) ? true : null), 10_000);
+    assert.ok(!(await hiddenStatus(s)).includes("excluded"), "nothing became background");
+    await check("after the delete");
+
+    // Pick colours + Multicolour: the Colours field is greyed out (Frage 90 A) and there is no palette row.
     await pickMethod(s, "Pick colours");
     await escape(s);
     assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-colours-fixed]')?.getAttribute('aria-disabled')`), "true");
+    assert.deepEqual(await swatches(s), [], "no palette row with Pick colours");
   } finally {
     await closeAll();
     vite?.kill();

@@ -1,7 +1,6 @@
 import type { TraceAnalysisState } from "@/lib/traceAnalysis";
 import type { TracePartInfo } from "@/lib/traceParts";
 
-import type { HsvTriple } from "./useStylePanel";
 import type { TracePaletteApi } from "./useTracePalette";
 import type {
   TraceChoice,
@@ -110,7 +109,4 @@ export interface TraceApi {
   traceBlocked: string;
   /** The palette of a multicolour trace (`specs/0089` slice M). */
   palette: TracePaletteApi;
-  /** The Recolour picker's conversions (Rust's rounding, as the Style section's). */
-  hsvOf: (rgb: number) => HsvTriple;
-  rgbOf: (hue: number, saturation: number, value: number) => number;
 }

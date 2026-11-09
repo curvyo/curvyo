@@ -14,7 +14,7 @@ use curvyo_ui_core::{
 };
 
 use super::select::DoubleClickHint;
-use super::trace_colours::{PaletteView, with_leftovers};
+use super::trace_colours::with_leftovers;
 use super::trace_draw::preview_anchors;
 use super::trace_mesh::MeshCache;
 use super::trace_text::leftovers_of;
@@ -62,8 +62,8 @@ pub(super) struct TraceState {
     pub(super) pick: super::trace_pick::TracePick,
     /// Pick mask paths (`trace_mask_pick.rs`, `specs/0094` slice 1b).
     pub(super) mask_pick: super::trace_mask_pick::MaskPick,
-    /// Recolours and Isolate of a multicolour preview (`trace_colours.rs`).
-    pub(super) palette_view: PaletteView,
+    /// The colour Isolate shows of a multicolour preview, the others dimmed (`trace_colours.rs`).
+    pub(super) isolated: Option<curvyo_ui_core::TraceRgb>,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).
@@ -385,7 +385,7 @@ impl Session {
 
     /// Create paths (criteria 13, 14, 46; `specs/0089` criterion 29): for every selected image
     /// with a full-size result, one group "Trace of" and the image name with one black compound
-    /// path (or one filled compound path per colour, recoloured) directly above it, all in one step
+    /// path (or one filled compound path per colour) directly above it, all in one step
     /// "Trace image"; the groups are selected and the Select tool is chosen. The images stay.
     pub fn create_traced_paths(&mut self) -> TraceCreateOutcome {
         self.recording(|this| -> TraceCreateOutcome {
@@ -417,7 +417,6 @@ impl Session {
                     &wire.outlines,
                     &wire.layers,
                     &leftovers_of(&fitted, image.id, wire),
-                    &this.trace.palette_view,
                 );
                 targets.push(TraceTarget {
                     image: image.id,
@@ -432,7 +431,6 @@ impl Session {
             if plan.items.is_empty() && !has_texts {
                 return TraceCreateOutcome::Ignored;
             }
-            let view = this.trace.palette_view.clone();
             let written =
                 this.document
                     .batch(curvyo_document_core::TRACE_IMAGE_COMMIT_LABEL, |document| {
@@ -456,7 +454,7 @@ impl Session {
                             })
                             .collect();
                         let texts =
-                            super::trace_text_write::write_texts(document, &fitted, &above, &view)?;
+                            super::trace_text_write::write_texts(document, &fitted, &above)?;
                         Some((groups, texts))
                     });
             let Some((groups, texts)) = written else {

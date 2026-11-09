@@ -81,8 +81,7 @@ async function barHtml(overrides: Record<string, unknown> = {}, values: Record<s
   const presets = text.TRACE_PRESETS_FALLBACK as { label: string }[];
   const choice = (text.firstChoice as (p: unknown) => { values: Record<string, unknown> })(presets);
   const palette = {
-    swatches: [], found: null, joined: 0, selected: null, select: noop, state: () => "normal", isolated: null, merging: null,
-    isolate: noop, recolour: noop, startMerge: noop, mergeInto: noop, cancelMerge: noop, toggleExclude: noop, remove: noop,
+    swatches: [], found: null, joined: 0, excluded: () => false, isolated: null, setIsolated: noop, toggleExclude: noop, remove: noop,
     pick: noop, note: "", sameNote: "", refresh: noop,
   };
   const trace = {
@@ -95,7 +94,7 @@ async function barHtml(overrides: Record<string, unknown> = {}, values: Record<s
     setValue: noop, pick: noop, setAdvancedOpen: noop, endDrag: noop, stop: noop, create: noop, keyDown: () => false,
     setMethod: noop, setColourTolerance: noop, setBackgroundAuto: noop, pickMode: "", setPicking: noop, removePicked: noop,
     suggestedBackground: null, analysis: { kind: "none" }, analyse: noop, announcement: "", traceBlocked: "",
-    palette, hsvOf: () => [0, 0, 0], rgbOf: () => 0,
+    palette,
     ...overrides,
   };
   const info = { available: true, active: false, shown: false, choose: noop, toggle: noop, dismiss: noop };

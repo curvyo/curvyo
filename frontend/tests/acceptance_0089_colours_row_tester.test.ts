@@ -658,9 +658,9 @@ test("0089 §25.4: removal: a click, Delete or Backspace removes; focus follows 
   });
 });
 
-// ------------------------------------------------------------------ §25.4: the strip only with Multicolour and Colours Auto
+// ------------------------------------------------------------------ §25.4, §26: the palette row only with Multicolour, never with Pick colours
 
-test("0089 §25.4: the palette strip with its detail row shows only for Multicolour with Colours Auto; Pick colours (Single or Multicolour) has none and uses the swatch row", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §25.4, §26: the palette's swatch row shows only for Multicolour without Pick colours, with no detail row and no actions; Pick colours (Single or Multicolour) uses its own row", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "stripes.png", STRIPE_PNG, true);
     const strip = async () => ({
@@ -672,13 +672,10 @@ test("0089 §25.4: the palette strip with its detail row shows only for Multicol
     await setOutput(s, "Single colour");
     assert.deepEqual(await strip(), { swatches: 0, actions: 0, detail: false }, "Single colour, Brightness: none");
     await setOutput(s, "Multicolour");
-    await waitFor("the palette strip", async () => (((await strip()).swatches >= 1) ? true : null), 60_000);
-    await s.evaluate(`document.querySelector('${ADV} [data-trace-palette-swatch]').click()`);
-    await sleep(500);
+    await waitFor("the palette row", async () => (((await strip()).swatches >= 1) ? true : null), 60_000);
     const auto = await strip();
-    assert.ok(auto.swatches >= 1 && auto.actions >= 1, `Multicolour, Colours Auto: the strip and its actions: ${JSON.stringify(auto)}`);
-    assert.equal(auto.detail, true, "the detail row of the selected swatch");
-    assert.equal(await s.evaluate(`[...document.querySelectorAll('${ADV} [data-trace-palette-action]')].map((e) => e.getAttribute('data-trace-palette-action')).includes('Isolate')`), true, "Isolate is there");
+    assert.deepEqual({ actions: auto.actions, detail: auto.detail }, { actions: 0, detail: false }, `Multicolour, Colours Auto: swatches only: ${JSON.stringify(auto)}`);
+    assert.equal(await s.evaluate(`document.querySelector('${ADV} [data-trace-pipette="palette"]').parentElement.nextElementSibling === document.querySelector('${ADV} [role=group][aria-label=Palette]')`), true, "the row right after the palette pipette");
     await pickMethod(s, "Pick colours");
     await pickStripe(s, 0, false);
     assert.deepEqual(await strip(), { swatches: 0, actions: 0, detail: false }, "Multicolour, Pick colours: none");

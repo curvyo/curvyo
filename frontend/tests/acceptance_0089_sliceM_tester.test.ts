@@ -202,6 +202,14 @@ async function launch(preload?: string) {
 const BAR = "[role=toolbar][aria-label=Trace]";
 type S = Awaited<ReturnType<typeof session>>;
 
+/** A Shift+click on the middle of `sel` (CDP modifiers 8 = Shift). */
+const shiftClick = async (s: S, sel: string) => {
+  const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
+  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+    await s.send("Input.dispatchMouseEvent", { type, x: c[0], y: c[1], button: "left", clickCount: 1, modifiers: 8 });
+  }
+  await sleep(300);
+};
 const press = async (s: S, k: string, vk: number, modifiers = 0) => {
   await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
   await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: k, windowsVirtualKeyCode: vk, modifiers });
@@ -274,9 +282,9 @@ const distance = (a: number[], b: number[]) => Math.hypot(a[0] - b[0], a[1] - b[
 
 const HINT = /\b(click|press|drag|tap|hold|try|use|tip|hint|you can|choose|select a|to (pick|add|remove|create))\b/i;
 const OUTPUT = `${BAR} [role=radiogroup][aria-label=Output]`;
-const PALETTE = `${BAR} [role=listbox][aria-label=Palette]`;
+const PALETTE = `${BAR} [role=group][aria-label=Palette]`;
 const swatchNames = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${PALETTE} [role=option]')].map((o) => o.getAttribute('aria-label')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${PALETTE} [data-trace-palette-swatch]')].map((o) => o.getAttribute('aria-label')))`)) as string) as string[];
 const openAdvanced = async (s: S) => {
   if (!(await s.evaluate(`!!document.querySelector('${BAR} [role=group][aria-label=Advanced]')`))) {
     await s.evaluate(`document.querySelector('${BAR} [aria-label="More trace options"]').click()`);
@@ -294,8 +302,7 @@ const sixColours = async (s: S) => {
   await typeInto(s, "Colours", "6");
   await waitFor("six swatches", async () => ((await swatchNames(s)).length === 6 ? true : null), 30_000);
 };
-const swatch = (h: string) => `${PALETTE} [role=option][aria-label^="${h}"]`;
-const action = (name: string) => `${BAR} [data-trace-palette-action="${name}"]`;
+const swatch = (h: string) => `${PALETTE} [data-trace-palette-swatch="${h}"]`;
 
 test("0089M tester c25, c26, c29: Output sits in Advanced, the palette is exactly what is in the picture (pale accent, near-greys), and every swatch is readable without colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
@@ -329,59 +336,54 @@ test("0089M tester c25, c26, c29: Output sits in Advanced, the palette is exactl
     for (const n of names) {
       assert.match(n, /^#[0-9A-F]{6} · [A-Za-z][A-Za-z ]+/, `hex and name in "${n}"`);
     }
-    // Roving tabindex: one Tab stop; the arrow keys move the focus and the selection.
-    const stops = (await s.evaluate(`[...document.querySelectorAll('${PALETTE} [role=option]')].filter((o) => o.tabIndex === 0).length`)) as number;
-    assert.equal(stops, 1, "one Tab stop in the strip");
-    await s.evaluate(`document.querySelector('${PALETTE} [role=option][tabindex="0"]').focus()`);
+    // Roving tabindex: one Tab stop; the arrow keys move the focus (ux-notes §26).
+    const stops = (await s.evaluate(`[...document.querySelectorAll('${PALETTE} [data-trace-palette-swatch]')].filter((o) => o.tabIndex === 0).length`)) as number;
+    assert.equal(stops, 1, "one Tab stop in the swatch row");
+    await s.evaluate(`document.querySelector('${PALETTE} [data-trace-palette-swatch][tabindex="0"]').focus()`);
     const first = (await s.evaluate(`document.activeElement.getAttribute('aria-label')`)) as string;
     await press(s, "ArrowRight", 39);
     const second = (await s.evaluate(`document.activeElement.getAttribute('aria-label')`)) as string;
     assert.notEqual(first, second, "ArrowRight moves to the next swatch");
     assert.equal(second, names[1]);
-    // Every state is a word: Exclude it from the keyboard-reachable detail row and read the name.
-    if (!(await s.evaluate(`!!document.querySelector('${BAR} [data-trace-palette-detail]')`))) {
-      await s.clickSel(swatch(hexes[1]));
-    }
-    assert.ok(((await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-detail]')?.textContent ?? ''`)) as string).startsWith(hexes[1]), "the arrow-selected swatch has the detail row");
-    await s.clickSel(action("Exclude"));
+    // Every state is a word (ux-notes §26): Enter on the focused swatch excludes it, the name says so; Enter again brings it back.
+    await press(s, "Enter", 13);
     const excluded = await waitFor("excluded in the name", async () => {
       const list = await swatchNames(s);
       return list.find((n) => n.startsWith(hexes[1]) && /excluded/i.test(n)) ?? null;
     }, 20_000);
     assert.ok(excluded);
-    const detail = (await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-detail]')?.textContent ?? ''`)) as string;
-    assert.match(detail, /Excluded/);
-    await s.clickSel(action("Exclude"));
+    await s.evaluate(`document.querySelector('${swatch(hexes[1])}').focus()`);
+    await press(s, "Enter", 13);
+    await waitFor("back in", async () => ((await swatchNames(s)).some((n) => n.startsWith(hexes[1]) && !/excluded/i.test(n)) ? true : null), 20_000);
 
     // Controls and status of the new UI carry no operating tips.
-    const texts = (await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=group][aria-label=Advanced] *, ${PALETTE} *, ${BAR} [data-trace-palette-detail] *')].flatMap((e) => [e.children.length === 0 ? e.textContent : '', e.getAttribute('title') ?? '', e.getAttribute('aria-label') ?? '']).filter((t) => t.trim() !== ''))`)) as string;
+    const texts = (await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=group][aria-label=Advanced] *, ${PALETTE} *')].flatMap((e) => [e.children.length === 0 ? e.textContent : '', e.getAttribute('title') ?? '', e.getAttribute('aria-label') ?? '']).filter((t) => t.trim() !== ''))`)) as string;
     const tips = (JSON.parse(texts) as string[]).concat(await s.statusText()).filter((t) => HINT.test(t));
     console.log("hint-like text:", JSON.stringify(tips));
     assert.deepEqual(tips, [], "no operating tips");
   });
 });
 
-test("0089M tester c29: Merge into reassigns, one Create paths is one group of the traced colours in one undo step", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089M tester c29 (ux-notes §26): Shift+click deletes a colour, the others are matched again, one Create paths is one group of them in one undo step", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "m-three.png", PICTURE);
     await pickMethod(s, "Remove background");
     await sixColours(s);
     const hexes = (await swatchNames(s)).map((n) => n.slice(0, 7));
     const near = (c: number[]) => hexes.find((h) => distance(fromHex(h), c) < 0.03)!;
-    const [red, green] = [near(RED), near(GREEN)];
-    // Merge red into green.
-    await s.clickSel(swatch(red));
-    await s.clickSel(action("Merge into"));
-    await waitFor("choosing mode", async () => (/Merging/.test(await s.statusText()) ? true : null), 10_000);
-    await s.clickSel(swatch(green));
-    const merged = await waitFor("the merged swatch", async () => (await swatchNames(s)).find((n) => n.startsWith(red) && /merged into/i.test(n)) ?? null, 20_000);
-    assert.match(merged, new RegExp(green), "the name says what it was merged into");
-    // Create paths: five colours remain (the merged one is traced with its target).
+    const red = near(RED);
+    // Delete red: the palette is the other five, exactly.
+    await shiftClick(s, swatch(red));
+    const left = await waitFor("five swatches", async () => {
+      const list = (await swatchNames(s)).map((n) => n.slice(0, 7));
+      return list.length === 5 ? list : null;
+    }, 30_000);
+    assert.deepEqual([...left].sort(), hexes.filter((h) => h !== red).sort(), "the palette is the others, unchanged");
+    await waitFor("Removed in the hidden region", async () => ((await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]').textContent`)) as string).includes(`Removed ${red}`) ? true : null, 10_000);
+    // Create paths: five colours, none of them red; the red area is traced in one of the others.
     const before = (await s.layerRows()).length;
     await s.clickSel(`${BAR} [data-trace-slot="none"]`);
-    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
     await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 30000);
-    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
     await s.tab("Layers");
     await sleep(500);
     await s.evaluate(`[...document.querySelectorAll('[role=row][aria-level]')].find((r) => r.getAttribute('aria-label').startsWith('Trace of'))?.querySelector('[aria-label=Expand]')?.click()`);
@@ -389,12 +391,9 @@ test("0089M tester c29: Merge into reassigns, one Create paths is one group of t
     const rows = (await s.layerRows()).filter(Boolean);
     console.log("rows:", rows.join(" | "));
     assert.equal(rows.filter((r) => r.startsWith("Trace of")).length, 1, "one group");
-    assert.ok(!rows.some((r) => r.includes(red)), "the merged colour has no path of its own");
-    assert.ok(rows.some((r) => r.includes(green)), "its target has");
+    assert.ok(!rows.some((r) => r.includes(red)), "the deleted colour has no path of its own");
     const hexRows = rows.filter((r) => /^#[0-9A-F]{6}/.test(r));
     assert.equal(hexRows.length, 5, `five paths named by hex: ${hexRows.join(", ")}`);
-    // The largest area is at the bottom: the layer panel lists the top first, so it is last.
-    assert.ok(hexRows[hexRows.length - 1].startsWith(green), `the merged green+red is the largest and lowest: ${hexRows.join(", ")}`);
     await s.key("z", 90, 2);
     await waitFor("one undo takes the whole trace back", async () => ((await s.layerRows()).length === before ? true : null), 10_000);
   });
@@ -420,46 +419,6 @@ test("0089M tester: Multicolour is remembered as an app setting, Single colour n
     console.log("stored:", stored);
     const checked = stored.includes('\\"output\\":1') ? "Multicolour" : "";
     assert.equal(checked, "Multicolour", "Output is remembered");
-  });
-});
-
-test("0089M tester c29: Recolour changes the fill of the written path and nothing else", { skip: !BROWSER, timeout: 400_000 }, async () => {
-  await withApp(async (s) => {
-    await openOn(s, "m-recolour.png", PICTURE);
-    await pickMethod(s, "Remove background");
-    await sixColours(s);
-    const hexes0 = (await swatchNames(s)).map((n) => n.slice(0, 7));
-    const blue = hexes0.find((h) => distance(fromHex(h), BLUE) < 0.03)!;
-    await s.clickSel(swatch(blue));
-    await s.clickSel(action("Recolour"));
-    await sleep(500);
-    // The picker (UX notes 7 speak of a hex field; the build offers the hex as text with an area
-    // and a hue slider): drive the hue slider from the keyboard.
-    await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-picker] [role=slider][aria-label="Recolour hue"]').focus()`);
-    for (let n = 0; n < 6; n++) {
-      await press(s, "ArrowLeft", 37);
-    }
-    const detail = await waitFor("the detail row names the new colour", async () => {
-      const t = (await s.evaluate(`document.querySelector('${BAR} [data-trace-palette-detail]')?.textContent ?? ''`)) as string;
-      return new RegExp(`was ${blue}`).test(t) ? t : null;
-    }, 20_000);
-    const newHex = detail.match(/#[0-9A-F]{6}/)![0];
-    assert.notEqual(newHex, blue);
-    console.log("recolour:", detail, "| swatch name:", (await swatchNames(s)).find((n) => n.startsWith(blue)));
-    const after = await swatchNames(s);
-    assert.equal(after.length, 6, "no refit: the palette keeps its six colours");
-    await s.clickSel(`${BAR} [data-trace-slot="none"]`);
-    // Decided by the customer (2026-10-31): no notice after creating paths; the new group being selected is the feedback.
-    await waitFor("the Trace bar closes", async () => (((await s.evaluate(`!document.querySelector('[role=toolbar][aria-label=Trace]')`)) as boolean) ? true : null), 30000);
-    assert.ok(!/Traced/.test(await s.statusText()), "no notice appears after creating paths");
-    await s.tab("Layers");
-    await sleep(500);
-    await s.evaluate(`[...document.querySelectorAll('[role=row][aria-level]')].find((r) => r.getAttribute('aria-label').startsWith('Trace of'))?.querySelector('[aria-label=Expand]')?.click()`);
-    await sleep(500);
-    const rows = (await s.layerRows()).filter(Boolean);
-    console.log("rows:", rows.join(" | "));
-    assert.ok(rows.some((r) => r.includes(newHex)), "the path is filled with the new colour");
-    assert.ok(!rows.some((r) => r.includes(blue)), "the old colour is gone from the result");
   });
 });
 

@@ -1,6 +1,6 @@
 //! The Trace tool's multicolour side (`specs/0089-trace-quality-and-colour` slice M, criteria
-//! 25 and 29): Create paths writes one filled compound path per colour in one step, a recolour
-//! changes fills only.
+//! 25 and 29): Create paths writes one filled compound path per colour in one step; Isolate
+//! dims the preview only.
 
 use curvyo_document_core::{Length, NodeId, ObjectSnapshot};
 use curvyo_ui_core::{
@@ -81,9 +81,9 @@ fn written(session: &Session) -> Vec<(TraceRgb, usize)> {
 }
 
 /// Criterion 29: one group with one filled compound path per colour, largest first, in one
-/// undo step; a recolour changes the fill only, the outlines stay those of the result.
+/// undo step, each filled with its palette colour; Isolate changes nothing that is written.
 #[test]
-fn create_paths_writes_one_path_per_colour_and_recolours_fills_only() {
+fn create_paths_writes_one_path_per_colour_with_its_palette_fill() {
     let (mut session, image) = traced_image();
     let source = session.trace_source(image, false).unwrap();
     let wire = colour_wire(source.map);
@@ -92,11 +92,11 @@ fn create_paths_writes_one_path_per_colour_and_recolours_fills_only() {
     assert!(session.set_trace_preview(image, &wire));
     assert!(session.set_trace_result(image, &wire));
     let before = session.trace.preview.as_ref().unwrap().outlines.clone();
-    session.set_trace_palette_view(vec![(RED, TraceRgb::new(0, 160, 0))], None);
+    session.set_trace_isolated(Some(BLUE));
     assert_eq!(
         session.trace.preview.as_ref().unwrap().outlines,
         before,
-        "a recolour traces nothing again"
+        "Isolate traces nothing again"
     );
     let steps = session.document.own_steps().len();
     let outcome = session.create_traced_paths();
@@ -112,7 +112,7 @@ fn create_paths_writes_one_path_per_colour_and_recolours_fills_only() {
     assert_eq!(session.document.own_steps().len(), steps + 1);
     let fills = written(&session);
     assert_eq!(fills.len(), 2);
-    assert!(fills.contains(&(TraceRgb::new(0, 160, 0), 1)), "{fills:?}");
+    assert!(fills.contains(&(RED, 1)), "{fills:?}");
     assert!(fills.contains(&(BLUE, 1)), "{fills:?}");
     let path = session.selection.ids()[0];
     let group = session.document.parent_group(path).unwrap();
@@ -203,7 +203,7 @@ fn isolate_dims_the_outlines_of_the_other_colours() {
     let full = *plain.iter().max().unwrap();
     assert!(plain.iter().all(|&a| a > 0));
     let dim = dimmed_alpha;
-    session.set_trace_palette_view(Vec::new(), Some(RED));
+    session.set_trace_isolated(Some(RED));
     let isolated = outline_alphas(&session);
     assert!(
         isolated.contains(&full),
@@ -217,7 +217,7 @@ fn isolate_dims_the_outlines_of_the_other_colours() {
     );
     let blue = outline_alphas_isolating(&mut session, BLUE);
     assert_eq!(isolated.len(), blue.len(), "only the strength differs");
-    session.set_trace_palette_view(Vec::new(), None);
+    session.set_trace_isolated(None);
     assert_eq!(
         outline_alphas(&session),
         plain,
@@ -227,7 +227,7 @@ fn isolate_dims_the_outlines_of_the_other_colours() {
 
 /// The outline alphas with `colour` isolated.
 fn outline_alphas_isolating(session: &mut Session, colour: TraceRgb) -> Vec<u8> {
-    session.set_trace_palette_view(Vec::new(), Some(colour));
+    session.set_trace_isolated(Some(colour));
     outline_alphas(session)
 }
 
@@ -236,4 +236,69 @@ fn outline_alphas_isolating(session: &mut Session, colour: TraceRgb) -> Vec<u8> 
 fn dimmed_alpha(alpha: u8) -> u8 {
     // invariant: the product of an alpha byte and 0.35 is a byte.
     (f64::from(alpha) * super::trace_colours::DIMMED).round() as u8
+}
+
+/// `ux-notes.md` §26: deleting a palette colour traces the other colours as fixed colours with
+/// their count (what the frontend sends as the kept palette): the palette is exactly them, nothing
+/// is found anew, and every pixel of the deleted colour goes to the colour nearest to it, so its
+/// area splits where its shades lean to different colours (not one merge into one colour).
+#[test]
+fn a_deleted_colour_is_matched_again_pixel_by_pixel_among_the_kept_colours() {
+    const A: TraceRgb = TraceRgb::new(200, 30, 30);
+    const B: TraceRgb = TraceRgb::new(30, 30, 200);
+    // One colour to the palette (5.7 bytes apart, under the 7.65 merge distance), its left half
+    // nearer A, its right half nearer B.
+    const X_A: TraceRgb = TraceRgb::new(117, 30, 113);
+    const X_B: TraceRgb = TraceRgb::new(113, 30, 117);
+    let rgba: Vec<u8> = (0..60 * 20)
+        .flat_map(|i| {
+            let (x, y) = (i % 60, i / 60);
+            let c = if !(4..56).contains(&x) || !(4..16).contains(&y) {
+                TraceRgb::new(255, 255, 255)
+            } else if x < 20 {
+                A
+            } else if x < 28 {
+                X_A
+            } else if x < 36 {
+                X_B
+            } else {
+                B
+            };
+            [c.r, c.g, c.b, 255]
+        })
+        .collect();
+    let mut params = TraceColourParams::new(TraceParams {
+        selection: TraceMethod::RemoveBackground {
+            background: Some(TraceRgb::new(255, 255, 255)),
+            tolerance: 40,
+        },
+        specks: Length::from_mm(0.0),
+        ..TraceParams::with_threshold(128)
+    });
+    let palette_of = |params: &TraceColourParams| {
+        let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let wire = trace_colour_job_with(&rgba, 60, 20, map, params, &mut |_| {});
+        read_trace_wire(&wire).unwrap().palette
+    };
+    let found = palette_of(&params);
+    assert_eq!(found.len(), 3, "A, B and the one middle colour: {found:?}");
+    let near = |c: TraceRgb| {
+        let d = |p: &TraceRgb| {
+            (i32::from(p.r) - i32::from(c.r)).pow(2)
+                + (i32::from(p.g) - i32::from(c.g)).pow(2)
+                + (i32::from(p.b) - i32::from(c.b)).pow(2)
+        };
+        found.iter().map(|e| e.colour).min_by_key(d).unwrap()
+    };
+    let (a, b) = (near(A), near(B));
+    // The delete: the kept palette as fixed colours and their count.
+    params.fixed = vec![a, b];
+    params.colours = Some(2);
+    let kept = palette_of(&params);
+    let colours: Vec<TraceRgb> = kept.iter().map(|e| e.colour).collect();
+    assert_eq!(colours.len(), 2, "nothing found anew: {kept:?}");
+    assert!(colours.contains(&a) && colours.contains(&b), "{kept:?}");
+    let pixels = |c: TraceRgb| kept.iter().find(|e| e.colour == c).unwrap().pixels;
+    // 16 + 8 columns of 12 rows each side.
+    assert_eq!((pixels(a), pixels(b)), (24 * 12, 28 * 12), "{kept:?}");
 }

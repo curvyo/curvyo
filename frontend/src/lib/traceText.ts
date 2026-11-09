@@ -246,7 +246,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",
   "Background: the colour Remove background leaves out; Auto takes it from the image border.",
-  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette.",
+  "Pick colours: pixels like the colours picked with the pipette; Shift+click adds a colour, up to 8. The picked colours sit beside the pipette; a click on one takes it out.",
   "Pipette: takes a colour from the image under a click; Esc ends it.",
   "Colour tolerance: how far a colour may be from the background or a picked colour and still count as it.",
   "Threshold: pixels darker than this brightness (0 to 100 %) become shapes.",
@@ -255,12 +255,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Ignore below: drops shapes and holes smaller than this size in mm.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
-  "Palette: the colours of a Multicolour trace, largest area first; picked colours carry a corner mark and come first.",
-  "Isolate: shows one colour and dims the others; Enter still creates every colour.",
-  "Recolour: gives a colour another fill without tracing again.",
-  "Merge into: traces a colour as another one, as one shape.",
-  "Exclude: makes a colour background; it is not traced.",
-  "Remove: takes a picked colour out of the palette.",
+  "Palette: the colours of a Multicolour trace beside Colours, largest area first. A click excludes a colour: it becomes background and is not traced; a second click brings it back. Shift while pointing at a colour isolates it: the others are dimmed in the preview. Shift+click deletes a colour: the others are matched again as if it had never been found.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",
@@ -268,6 +263,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Denoise: smooths out noise in the picture before tracing.",
   "Upscale: doubles small images before tracing; Auto does it below 1 Mpx.",
   "Corners: higher turns more bends into sharp corners.",
+  "Parts: pieces of the picture, each with its own mask and settings; Add part makes the next one, the trash removes the active one, and Create paths joins them into one group.",
   "Analyse: sets the method, its background and Colour tolerance, and the Threshold back to what the analysis found in the image; never the preset or other values.",
 ];
 
@@ -334,9 +330,12 @@ export interface TraceValues {
   colours: number | null;
   /** Palette colours picked with the pipette in Brightness + Multicolour (the session). */
   fixed: readonly string[];
-  /** Palette colours made background (Exclude) and traced as another (Merge into: from, into). */
+  /** Palette colours made background (Exclude, the session). */
   excluded: readonly string[];
-  merged: readonly (readonly [string, string])[];
+  /** The palette after a swatch was deleted (`ux-notes.md` §26, the session): exactly these
+   * colours are traced, every pixel matched again among them; `null` for the found palette. A new
+   * method, Colours count or image ends it. */
+  keptPalette: readonly string[] | null;
 }
 
 /** The values a preset sets (criterion 60). */
@@ -671,7 +670,7 @@ export function firstChoice(presets: readonly TracePreset[] = TRACE_PRESETS_FALL
     colours: null,
     fixed: [],
     excluded: [],
-    merged: [],
+    keptPalette: null,
   };
   return { preset: first.key, edited: false, values: base };
 }
@@ -685,7 +684,9 @@ export function pickPreset(choice: TraceChoice, preset: TracePreset): TraceChoic
  * (Threshold, the switches) do not. */
 export function editChoice<K extends keyof TraceValues>(choice: TraceChoice, name: K, value: TraceValues[K]): TraceChoice {
   const edited = choice.edited || (PRESET_FIELDS as readonly string[]).includes(name);
-  return { ...choice, edited, values: { ...choice.values, [name]: value } };
+  // A kept palette belongs to the method and the count it was deleted from (`ux-notes.md` §26).
+  const kept = name === "method" || name === "colours" ? { keptPalette: null } : {};
+  return { ...choice, edited, values: { ...choice.values, ...kept, [name]: value } };
 }
 
 /** The Preset button's text: the preset's name, or "Custom" after an edit (criterion 40). */
@@ -714,12 +715,14 @@ export function settingsJson(values: TraceValues, threshold: number, suggested?:
 function settingsOnly(values: TraceValues, threshold: number, suggested?: string): string {
   const background = values.method === PICK_COLOURS && suggested !== undefined ? suggested : values.background;
   const multi = values.output === MULTICOLOUR;
+  // A kept palette is traced as fixed colours and their count, so the tracer keeps exactly them
+  // and matches every pixel among them (`ux-notes.md` §26); Pick colours has its own palette.
+  const kept = multi && values.method !== PICK_COLOURS ? values.keptPalette : null;
   return JSON.stringify({
     output: values.output,
-    colours: values.colours,
-    fixed: multi && values.method === BRIGHTNESS ? values.fixed : [],
+    colours: kept ? kept.length : values.colours,
+    fixed: kept ?? (multi && values.method === BRIGHTNESS ? values.fixed : []),
     excluded: multi ? values.excluded : [],
-    merged: multi ? values.merged : [],
     method: values.method,
     colour_tolerance: colourTolerance(values),
     background: background === "" ? null : background,

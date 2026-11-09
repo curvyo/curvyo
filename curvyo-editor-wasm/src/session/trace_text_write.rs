@@ -4,7 +4,7 @@
 use curvyo_document_core::NodeId;
 
 use super::Session;
-use super::trace_colours::{PaletteView, color};
+use super::trace_colours::color;
 use super::trace_text::FittedImage;
 
 /// One text Create paths wrote: its node, string, guessed positions, size bits (for the guessed
@@ -13,13 +13,12 @@ pub(crate) type WrittenText = (NodeId, String, Vec<usize>, u64, bool);
 
 /// Writes the texts of `fitted` into `document`, each directly above its picture's entry of
 /// `above` (the "Trace of" group, or the picture when it has no paths), black or in its
-/// multicolour fill through the maker's recolours `view`, no stroke (decision 6, criteria 10 and
+/// multicolour fill, no stroke (decision 6, criteria 10 and
 /// 23). `None` when a write failed (the caller's step is then reverted).
 pub(super) fn write_texts(
     document: &curvyo_document_core::Document,
     fitted: &[FittedImage],
     above: &[(NodeId, NodeId)],
-    view: &PaletteView,
 ) -> Option<Vec<WrittenText>> {
     use curvyo_document_core::{
         Affine, Length, MAX_TEXT_SIZE, MIN_TEXT_SIZE, MoveTarget, TextChars, TextLayoutValues,
@@ -55,7 +54,7 @@ pub(super) fn write_texts(
                 .ok()?;
             let mut own = style.clone();
             if let Some(fill) = text.fill {
-                own.fill.color = color(view.fill(fill));
+                own.fill.color = color(fill);
             }
             // Criterion 27: a single-line text is drawn with the traced strokes' width, unfilled.
             if let Some(width) = text.stroke {

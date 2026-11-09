@@ -537,8 +537,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               values={trace.values}
               onAnalyse={trace.analyse}
               palette={trace.palette}
-              hsvOf={trace.hsvOf}
-              rgbOf={trace.rgbOf}
               countsStale={trace.countsStale}
               setValue={trace.setValue}
               onEndDrag={trace.endDrag}

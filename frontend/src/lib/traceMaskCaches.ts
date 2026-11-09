@@ -83,12 +83,12 @@ export async function readRegion(cache: Map<string, RegionRead>, id: string, mas
 
 /** The values the bar shows right after the view changed (`specs/0089` UX notes §25.2): a new
  * region of the same image keeps them until its analysis answers; a new image starts from its kept
- * Threshold (`known`, or none yet) and its suggested background. */
+ * Threshold (`known`, or none yet), its suggested background and the found palette (§26). */
 export function viewValues(values: TraceValues, sameImage: boolean, known: number | undefined, background: string | undefined): TraceValues {
   if (sameImage) {
     return values;
   }
-  return { ...values, threshold: known ?? null, background: values.backgroundAuto ? (background ?? null) : values.background };
+  return { ...values, keptPalette: null, threshold: known ?? null, background: values.backgroundAuto ? (background ?? null) : values.background };
 }
 
 /** The values once a new region's analysis answered (`specs/0089` UX notes §25.2): it applies

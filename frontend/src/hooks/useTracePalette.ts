@@ -1,8 +1,8 @@
 /**
  * The palette of a multicolour trace in the frontend (`specs/0089` slice M, criteria 26 and 29;
- * UX notes §7): the strip read from the session after each preview, the selected swatch, and the
- * five actions. Exclude, Merge into, Remove and a pipette pick change the trace's values (traced
- * again); Isolate and Recolour change only how the session draws and writes the result.
+ * UX notes §7, §26): the swatch row read from the session after each preview and what a swatch
+ * does. Exclude, delete and a pipette pick change the trace's values (traced again); Isolate
+ * changes only how the session draws the preview.
  */
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from "react";
 
@@ -10,17 +10,18 @@ import type { WasmSession } from "@/lib/editorSession";
 import {
   MULTICOLOUR,
   PICK_COLOURS,
+  removedPickedText,
   type TraceChoice,
   type TraceValues,
 } from "@/lib/traceText";
 import {
   type PaletteInfo,
   type PaletteSwatch,
+  deleteFromPalette,
   readPalette,
   stripOrder,
   excludedNote,
   isolatingNote,
-  mergingNote,
   sameAsNote,
   sameColour,
 } from "@/lib/tracePaletteText";
@@ -28,37 +29,29 @@ import {
 /** How long "Same as ..." stays, ms (`ux-notes.md` §22.2). */
 const SAME_NOTICE_MS = 3000;
 
+/** The most colours a palette holds (the Colours field's highest count). */
+const MAX_PALETTE = 16;
+
 const NO_SWATCHES: PaletteSwatch[] = [];
 
-/** What the palette shows of `hex`: excluded, merged into another, its fill. */
-export interface SwatchState {
-  excluded: boolean;
-  mergedInto: string | null;
-  fill: string;
-}
-
 export interface TracePaletteApi {
-  /** The strip in order; empty without a multicolour preview and with Pick colours, whose colours
-   * sit beside the pipette (`ux-notes.md` §25.4, Frage 142 A). */
+  /** The swatch row in order; empty without a multicolour preview and with Pick colours, whose
+   * colours sit beside the pipette (`ux-notes.md` §25.4). */
   swatches: PaletteSwatch[];
   /** The colours Auto found (the Colours field's muted count), `null` before a result. */
   found: number | null;
   joined: number;
-  selected: string | null;
-  select: (hex: string | null) => void;
-  state: (hex: string) => SwatchState;
+  excluded: (hex: string) => boolean;
   isolated: string | null;
-  merging: string | null;
-  isolate: (hex: string) => void;
-  recolour: (hex: string, fill: string | null) => void;
-  startMerge: (hex: string) => void;
-  mergeInto: (target: string) => void;
-  cancelMerge: () => void;
+  /** Shift+hover (`ux-notes.md` §26): `hex` isolated, or none; a view only. */
+  setIsolated: (hex: string | null) => void;
   toggleExclude: (hex: string) => void;
+  /** Shift+click, Shift+Enter, Delete: the palette without `hex`, matched again. */
   remove: (hex: string) => void;
   /** A pipette pick in Brightness + Multicolour: a new fixed colour, or the swatch it equals. */
   pick: (hex: string) => void;
-  /** The palette state for the hidden status region ("Isolating #FFF2A8", "2 colours excluded"), or empty. */
+  /** The palette state for the hidden status region ("Isolating #FFF2A8", "Removed #4B392F",
+   * "2 colours excluded"), or empty. */
   note: string;
   /** "Same as #3366CC" for 3 s after a pick that matched a colour, or empty: a bar notice. */
   sameNote: string;
@@ -78,37 +71,24 @@ interface PaletteContext {
 
 export function useTracePalette({ active, values, getSession, onChange, apply, choiceRef }: PaletteContext): TracePaletteApi {
   const [info, setInfo] = useState<PaletteInfo | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [merging, setMerging] = useState<string | null>(null);
-  const [recolours, setRecolours] = useState<Readonly<Record<string, string>>>({});
   const [isolated, setIsolated] = useState<string | null>(null);
   const [same, setSame] = useState<string | null>(null);
+  /** The colour last deleted and the kept palette it left: "Removed #..." is said until that changes. */
+  const [removed, setRemoved] = useState<{ hex: string; kept: string } | null>(null);
 
   const refresh = useCallback(() => {
     setInfo(readPalette(getSession()?.trace_palette() ?? ""));
   }, [getSession]);
 
-  // The session draws and writes with the recolours and the isolated colour.
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-    const pairs = Object.entries(recolours);
-    getSession()?.set_trace_palette_view(JSON.stringify(pairs), isolated ?? "");
-    onChange();
-  }, [active, recolours, isolated, getSession, onChange]);
-
-  // Leaving the tool forgets the palette's session state; so does Pick colours, which has no strip
-  // whose controls could undo an Isolate or a Recolour (`ux-notes.md` §25.4).
+  // Leaving the tool forgets the palette's session state; so does Pick colours, which has no
+  // palette row (`ux-notes.md` §25.4).
   const picking = values.method === PICK_COLOURS;
   useEffect(() => {
     if (!active || picking) {
       setInfo(null);
-      setSelected(null);
-      setMerging(null);
       setIsolated(null);
-      setRecolours({});
       setSame(null);
+      setRemoved(null);
     }
   }, [active, picking]);
 
@@ -121,50 +101,8 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
   );
 
   const swatches = useMemo(() => (info ? stripOrder(info.colours) : []), [info]);
-  const state = useCallback(
-    (hex: string): SwatchState => ({
-      excluded: values.excluded.includes(hex),
-      mergedInto: values.merged.find(([from]) => from === hex)?.[1] ?? null,
-      fill: recolours[hex] ?? hex,
-    }),
-    [values.excluded, values.merged, recolours],
-  );
+  const excluded = useCallback((hex: string) => values.excluded.includes(hex), [values.excluded]);
 
-  const isolate = useCallback((hex: string) => setIsolated((now) => (now === hex ? null : hex)), []);
-  const recolour = useCallback((hex: string, fill: string | null) => {
-    setRecolours((now) => {
-      const next = { ...now };
-      if (fill === null || fill === hex) {
-        delete next[hex];
-      } else {
-        next[hex] = fill;
-      }
-      return next;
-    });
-  }, []);
-  const startMerge = useCallback(
-    (hex: string) => {
-      if (values.merged.some(([from]) => from === hex)) {
-        // Pressing Merge into again on a merged swatch undoes it.
-        edit((v) => ({ merged: v.merged.filter(([from]) => from !== hex) }));
-        return;
-      }
-      setMerging((now) => (now === hex ? null : hex));
-    },
-    [values.merged, edit],
-  );
-  const mergeInto = useCallback(
-    (target: string) => {
-      const from = merging;
-      setMerging(null);
-      if (!from || from === target) {
-        return;
-      }
-      edit((v) => ({ merged: [...v.merged.filter(([f]) => f !== from), [from, target] as const] }));
-    },
-    [merging, edit],
-  );
-  const cancelMerge = useCallback(() => setMerging(null), []);
   const toggleExclude = useCallback(
     (hex: string) => {
       edit((v) => ({ excluded: v.excluded.includes(hex) ? v.excluded.filter((e) => e !== hex) : [...v.excluded, hex] }));
@@ -173,10 +111,19 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
   );
   const remove = useCallback(
     (hex: string) => {
-      setSelected(null);
-      edit((v) => ({ fixed: v.fixed.filter((f) => f !== hex) }));
+      const next = deleteFromPalette(
+        swatches.map((s) => s.hex),
+        choiceRef.current.values.excluded,
+        hex,
+      );
+      if (next === null) {
+        return;
+      }
+      setIsolated((now) => (now === hex ? null : now));
+      setRemoved({ hex, kept: next.keptPalette.join() });
+      edit(() => next);
     },
-    [edit],
+    [swatches, choiceRef, edit],
   );
   const pick = useCallback(
     (hex: string) => {
@@ -185,12 +132,16 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
         hex,
       );
       if (twin) {
-        setSelected(twin);
         setSame(twin);
         return;
       }
       setSame(null);
-      edit((v) => ({ fixed: v.fixed.includes(hex) ? v.fixed : [...v.fixed, hex] }));
+      // After a delete the palette is kept exactly, so a pick joins the kept colours.
+      edit((v) =>
+        v.keptPalette
+          ? { keptPalette: v.keptPalette.length >= MAX_PALETTE ? v.keptPalette : [...v.keptPalette, hex] }
+          : { fixed: v.fixed.includes(hex) ? v.fixed : [...v.fixed, hex] },
+      );
     },
     [swatches, edit],
   );
@@ -202,37 +153,34 @@ export function useTracePalette({ active, values, getSession, onChange, apply, c
     const timer = setTimeout(() => setSame(null), SAME_NOTICE_MS);
     return () => clearTimeout(timer);
   }, [same]);
-  const select = useCallback((hex: string | null) => {
-    setSame(null);
-    setSelected(hex);
-  }, []);
 
   const multi = values.output === MULTICOLOUR;
   const shown = multi && !picking ? swatches : NO_SWATCHES;
+  // A swatch that left the palette is isolated no more.
+  const isolatedShown = isolated !== null && shown.some((s) => s.hex === isolated) ? isolated : null;
+  // The session dims the colours the isolated one leaves out.
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    getSession()?.set_trace_isolated(isolatedShown ?? "");
+    onChange();
+  }, [active, isolatedShown, getSession, onChange]);
   const excludedCount = swatches.filter((s) => values.excluded.includes(s.hex)).length;
   const note = !multi
     ? ""
-    : merging
-      ? mergingNote(merging)
-      : isolated
-        ? isolatingNote(isolated)
-        : excludedCount > 0
-          ? excludedNote(excludedCount)
-          : "";
+    : isolatedShown
+      ? isolatingNote(isolatedShown)
+      : [removed !== null && removed.kept === (values.keptPalette ?? []).join() ? removedPickedText(removed.hex) : "", excludedCount > 0 ? excludedNote(excludedCount) : ""]
+          .filter((t) => t !== "")
+          .join(". ");
   return {
     swatches: shown,
     found: info ? info.colours.length : null,
     joined: info?.joined ?? 0,
-    selected: selected !== null && shown.some((s) => s.hex === selected) ? selected : null,
-    select,
-    state,
-    isolated,
-    merging,
-    isolate,
-    recolour,
-    startMerge,
-    mergeInto,
-    cancelMerge,
+    excluded,
+    isolated: isolatedShown,
+    setIsolated,
     toggleExclude,
     remove,
     pick,

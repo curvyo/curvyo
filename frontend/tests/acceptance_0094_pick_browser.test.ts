@@ -792,7 +792,7 @@ const pickedRow = async (s: S) =>
         group: r(g), pipette: r(g.querySelector('[data-trace-pipette]')), bar: r(document.querySelector('${BAR} [data-trace-row]')),
         cells: cells.map(r), swatches: cells.map((c) => r(c.firstElementChild)), names: cells.map((c) => c.getAttribute('aria-label')),
         stops: cells.map((c) => c.tabIndex), scroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-        strip: !!document.querySelector('${BAR} [role=listbox][aria-label=Palette]'), detail: !!document.querySelector('${BAR} [data-trace-palette-detail]'),
+        strip: !!document.querySelector('${BAR} [role=group][aria-label=Palette]'), detail: !!document.querySelector('${BAR} [data-trace-palette-detail]'),
         label: g.textContent.trim(), reason: document.querySelector('${BAR} [data-trace-reason]')?.textContent ?? '',
       };
     })())`)) as string,
