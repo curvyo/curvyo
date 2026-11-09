@@ -97,7 +97,10 @@ pub(super) fn proof(
             room: claimant.room,
         }));
     }
-    if log.keyring().was_removed(&claimant.member) {
+    // A removed identity that knows nothing of the room (`since_seq` 0) may offer a claim of a
+    // new invite and join again (customer 2026-11-09); anything else it sends is refused as
+    // removed, and so is a reconnect from a cursor at once.
+    if log.keyring().was_removed(&claimant.member) && claimant.since_seq != 0 {
         return Err(RefusalReason::Removed);
     }
     Ok(Some(proven))
@@ -115,8 +118,16 @@ pub(super) fn genesis_or_claim(
     connection: ConnectionId,
     out: &mut Vec<RelayOutput>,
 ) -> Verdict {
+    let removed = rooms
+        .get(&claimant.room)
+        .is_some_and(|log| log.keyring().was_removed(&claimant.member));
+    let not_member = if removed {
+        RefusalReason::Removed
+    } else {
+        RefusalReason::NotAMember
+    };
     let ClientFrame::Keyring { entry: bytes } = frame else {
-        return Err(RefusalReason::NotAMember);
+        return Err(not_member);
     };
     let entry = Entry::decode(bytes).map_err(|_| RefusalReason::Protocol)?;
     if entry.author != claimant.member {
@@ -141,7 +152,7 @@ pub(super) fn genesis_or_claim(
         proof,
     } = &entry.payload
     else {
-        return Err(RefusalReason::NotAMember);
+        return Err(not_member);
     };
     if identity.member != claimant.member {
         return Err(RefusalReason::NotAMember);
