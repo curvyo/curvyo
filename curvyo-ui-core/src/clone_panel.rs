@@ -11,7 +11,8 @@ use crate::style_scope::object_kind_name;
 
 /// How an object is named in the panel: its kind and the six characters of its id
 /// ("Path 3f9a1c"), and for a clone "Clone of " and the name of its direct original, so a
-/// clone of a clone is "Clone of Clone of Path 3f9a1c" (at most eight times "Clone of ").
+/// clone of a clone is "Clone of Clone of Path 3f9a1c" (at most eight times "Clone of "); a
+/// group original is "Group 3f9a1c".
 #[must_use]
 pub fn object_name(read: &ObjectRead, id: NodeId) -> String {
     let mut prefix = String::new();
@@ -33,6 +34,13 @@ pub fn object_name(read: &ObjectRead, id: NodeId) -> String {
                     object_kind_name(object),
                     current.short_id()
                 );
+            }
+            // A group is no leaf of the read: named by the picture clones that follow it.
+            None if read.objects.iter().any(|o| {
+                matches!(o, ObjectSnapshot::Clone(c) if c.is_picture() && c.chain.root == current)
+            }) =>
+            {
+                return format!("{prefix}Group {}", current.short_id());
             }
             None => return format!("{prefix}Object {}", current.short_id()),
         }
@@ -124,6 +132,9 @@ pub struct CloneBlock {
     pub texts: bool,
     /// The Style row (`0057` criterion 10).
     pub style: OverrideState,
+    /// Whether the Style row, the greyed rows and Spread colours are shown: only while every
+    /// selected clone has an outline root (`specs/0100` criterion 9).
+    pub style_row: bool,
     /// The effective style of the first selected clone, for the greyed Stroke, Fill and Markers
     /// headers of a selection with the original's style (`0057` UX notes).
     pub summary: curvyo_document_core::Style,
@@ -137,6 +148,7 @@ struct BlockClone<'a> {
     depth: usize,
     own_placement: Option<bool>,
     own_style: bool,
+    picture: bool,
     style: &'a curvyo_document_core::Style,
 }
 
@@ -149,6 +161,7 @@ fn block_clone(object: &ObjectSnapshot) -> Option<BlockClone<'_>> {
             depth: clone.chain.depth,
             own_placement: Some(clone.chain.own_placement),
             own_style: clone.chain.own_style,
+            picture: clone.is_picture(),
             style: &clone.resolved.style,
         }),
         ObjectSnapshot::Text(text) => text.source.map(|source| BlockClone {
@@ -158,6 +171,7 @@ fn block_clone(object: &ObjectSnapshot) -> Option<BlockClone<'_>> {
             depth: 1,
             own_placement: None,
             own_style: source.own_style,
+            picture: false,
             style: &text.style,
         }),
         _ => None,
@@ -186,6 +200,7 @@ pub fn clone_block(read: &ObjectRead, selected: &[NodeId]) -> Option<CloneBlock>
         placement_row: clones.iter().all(|clone| clone.own_placement.is_some()),
         texts: clones.iter().all(|clone| clone.own_placement.is_none()),
         style: OverrideState::of(clones.iter().map(|clone| clone.own_style)),
+        style_row: !clones.iter().any(|clone| clone.picture),
         summary: first.style.clone(),
     })
 }

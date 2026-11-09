@@ -17,7 +17,7 @@
     <path id="compound2" inkscape:label="overlap" d="M 60 100 L 80 100 L 80 120 L 60 120 Z M 50 90 L 70 90 L 70 110 L 50 110 Z" sodipodi:nodetypes="cccccccc" fill="#008080" stroke="none" fill-rule="nonzero"/>
     <path id="path3" inkscape:label="st1" d="M 100 100 L 140 100 L 150 120" sodipodi:nodetypes="ccc" fill="none" stroke="#000000" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" stroke-dasharray="2 1"/>
     <use id="use1" inkscape:label="clone_moved" xlink:href="#path1" transform="matrix(1 0 0 1 0 10.583333)"/>
-    <use id="use2" inkscape:label="clone_rot30" xlink:href="#path1" transform="matrix(0.8660254037844387 0.49999999999999994 -0.49999999999999994 0.8660254037844387 12.67949215786573 11.200325052673943)"/>
+    <use id="use2" inkscape:label="clone_rot30" xlink:href="#path1" transform="matrix(0.8660254037844387 0.5 -0.5 0.8660254037844387 12.67949215786573 11.200325052673943)"/>
     <use id="use3" inkscape:label="clone_flip" xlink:href="#path1" transform="matrix(-1 0 0 1 40 26.458333)"/>
     <path id="path4" inkscape:label="clone_scaled" d="M 0 34.395833 L 40 34.395833 L 40 74.395833 L 0 74.395833 Z" sodipodi:nodetypes="cccc" fill="#ff0000" stroke="none" fill-rule="nonzero"/>
     <rect id="rect4" inkscape:label="clone_of_rect" x="40" y="54.979167" width="30" height="20" fill="#00ff00" stroke="none" fill-rule="nonzero"/>

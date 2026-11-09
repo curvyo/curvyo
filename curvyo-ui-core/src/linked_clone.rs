@@ -16,11 +16,9 @@ pub const MAX_REFUSAL_OUTLINES: usize = 200;
 /// object and no group (criterion 4).
 #[must_use]
 pub fn linked_clone_shown(selection: &ObjectSelection, units: &Units) -> bool {
+    // A group is an original too (`specs/0100-bring-content-in` criterion 8).
+    let _ = units;
     !selection.ids().is_empty()
-        && !units
-            .selected(selection.ids())
-            .iter()
-            .any(|unit| unit.is_group)
 }
 
 /// What Linked clone on the selection does.
@@ -64,10 +62,28 @@ pub fn plan_linked_clone(
     if !too_deep.is_empty() {
         return Some(LinkedClonePlan::TooDeep(too_deep));
     }
-    let sources: Vec<NodeId> = held.iter().map(|object| object.id()).collect();
+    // One clone per selected unit: a group as one original, a loose object as itself; a
+    // dimension is no original (ADR 0045 §1).
+    let sources: Vec<NodeId> = units
+        .selected(selection.ids())
+        .iter()
+        .map(|unit| unit.id)
+        .filter(|&id| {
+            !held
+                .iter()
+                .any(|o| o.id() == id && matches!(o, ObjectSnapshot::Dimension(_)))
+        })
+        .collect();
+    if sources.is_empty() {
+        return None;
+    }
+    // A primitive selected directly is still converted first (`0049` criterion 2); one inside
+    // a group never is.
     let shapes: Vec<NodeId> = held
         .iter()
-        .filter(|object| matches!(object, ObjectSnapshot::Primitive(_)))
+        .filter(|object| {
+            matches!(object, ObjectSnapshot::Primitive(_)) && sources.contains(&object.id())
+        })
         .map(|object| object.id())
         .collect();
     let conversions = build_primitive_conversions(document, minter, &shapes);

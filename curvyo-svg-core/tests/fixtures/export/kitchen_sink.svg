@@ -19,7 +19,7 @@
   </defs>
   <g id="layer1" inkscape:groupmode="layer" inkscape:label="Cut">
     <g id="g1" opacity="0.5">
-      <use id="use1" xlink:href="#rect1" transform="matrix(0 1 -1 0 30 0.30000000000000004)"/>
+      <use id="use1" xlink:href="#rect1" transform="matrix(0 1 -1 0 30 0.3)"/>
       <path id="rect1" inkscape:label="Odd &amp; &lt;named&gt; &quot;x&quot;" d="M 0 0 L 10 0 C 11.5 0 13 1.2 14 2 Z M 0 0.3 L 10000000 -10000000" sodipodi:nodetypes="cccc" style="display:none" sodipodi:insensitive="true" fill="#12abef" fill-opacity="0.25" stroke="none" fill-rule="nonzero" opacity="0.3" curvyo:kind="rectangle" curvyo:frame="5 6 7 8 0" curvyo:radii="1 2 3 4" curvyo:stroke-width="0.30000000000000004" curvyo:dash="2 0.30000000000000004" curvyo:markers="start=none middle=arrow place=spaced count=3 end=dot"/>
     </g>
     <path id="path1" d="M 0 0 L 100 0" sodipodi:nodetypes="cc" fill="none" stroke="#000000" stroke-width="0.5" stroke-opacity="0.5" stroke-linecap="round" stroke-linejoin="bevel" stroke-dasharray="1 0 0.5" marker-start="url(#marker1)" marker-mid="url(#marker2)" marker-end="url(#marker3)"/>

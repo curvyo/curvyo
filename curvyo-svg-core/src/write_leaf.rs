@@ -4,6 +4,11 @@
 
 use kurbo::{BezPath, PathEl};
 
+/// The grid a written matrix entry within noise of it is snapped to: 1e-9.
+const MATRIX_GRID: f64 = 1e9;
+/// How far from a grid point a matrix entry is float noise.
+const MATRIX_NOISE: f64 = 1e-12;
+
 use crate::drawing::{Cap, Join};
 use crate::export::{
     ExportKind, ExportLeaf, ExportState, ExportStyle, MarkerShape, Shadow, ShadowMarkers,
@@ -216,14 +221,24 @@ impl Writer<'_> {
         self.out.push_str(")\"");
     }
 
-    /// `transform="matrix(a b c d e f)"`, exact numbers.
+    /// `transform="matrix(a b c d e f)"`, exact numbers, except that a number within float
+    /// noise (1e-12) of a 1e-9 grid point is written as that point, so a turn's noise
+    /// (`6.1e-17`, `320.00000000000006`) is not written while every other value stays exact
+    /// (`specs/0100-bring-content-in`, criterion 20; `0024` criterion 152 stability).
     pub(crate) fn matrix(&mut self, m: kurbo::Affine) {
         self.out.push_str(" transform=\"matrix(");
         for (i, v) in m.as_coeffs().iter().enumerate() {
             if i > 0 {
                 self.out.push(' ');
             }
-            exact(*v, &mut self.out);
+            let snapped = (*v * MATRIX_GRID).round() / MATRIX_GRID;
+            let shown = if (snapped - v).abs() < MATRIX_NOISE {
+                snapped
+            } else {
+                *v
+            };
+            // Adding 0 turns a -0 into 0.
+            exact(shown + 0.0, &mut self.out);
         }
         self.out.push_str(")\"");
     }

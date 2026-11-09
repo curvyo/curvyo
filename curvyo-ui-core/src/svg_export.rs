@@ -133,6 +133,11 @@ pub fn svg_export_of(
     let in_scope = tree.scope(scope.selection, options, active.as_ref(), &membership);
     let mut parts = Parts::new(&tree, document, fonts, options, t, &in_scope);
     let mut top = Vec::new();
+    // Placed pages first: the canvas draws them under the drawing (ADR 0045 §8).
+    if !options.selection_only {
+        let laser = active.as_ref().filter(|_| options.active_page_only);
+        parts.placed_pages(laid, &pages, &membership, laser, &mut top);
+    }
     for &root in &tree.roots {
         parts.node(root, &mut top);
     }
@@ -292,6 +297,10 @@ impl<'a> Tree<'a> {
         let Some(ObjectSnapshot::Clone(clone)) = self.object(i) else {
             return None;
         };
+        // A clone of a group, text or image is never a `<use>` (ADR 0045 §8).
+        if clone.is_picture() {
+            return None;
+        }
         let chain = &clone.chain;
         let origin = *self.index.get(&chain.origin)?;
         let m = Affine::new(chain.matrix.to_array());
