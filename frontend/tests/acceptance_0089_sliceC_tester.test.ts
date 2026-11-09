@@ -283,9 +283,9 @@ const pathsNow = async (s: S, n: number) =>
   });
 const slotKind = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-slot]')?.getAttribute('data-trace-slot') ?? 'gone'`)) as string;
 const pressed = async (s: S, sel: string) => (await s.evaluate(`document.querySelector('${BAR} ${sel}')?.getAttribute('aria-pressed') ?? 'none'`)) as string;
-// `ux-notes.md` §22.1/22.3 (2026-10-31): the picked colours are the one swatch strip of the Advanced block (open in this file).
+// `ux-notes.md` §25.4 (2026-11-09): the picked colours are the swatch row beside the pipette in the bar.
 const swatches = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=group][aria-label="Picked colours"] [data-trace-picked-swatch]')].map((e) => e.getAttribute('data-trace-picked-swatch')))`)) as string) as string[];
 const typeInto = async (s: S, name: string, text: string) => {
   await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label="${name}"]').focus()`);
   await press(s, "F2", 113);
@@ -698,9 +698,9 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
         return { overlaps, outside, clipped, texts, labels, height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom), vh: innerHeight, vw: innerWidth,
           slotRightGap: Math.round(box.right - slot.right), insideBar: lastBottom <= box.bottom + 0.5 }; })())`)) as string) as {
         overlaps: string[]; outside: string[]; clipped: string[]; texts: string[]; labels: string[]; height: number; top: number; bottom: number; vh: number; vw: number; slotRightGap: number; insideBar: boolean };
-    // The row counts of ux-notes.md §24.2 (2026-11-06; 150 px fields, 36 px rows, Advanced closed, no picks, the analysis row is
-    // in Advanced): Brightness 7 / 3 rows, Remove background 8 / 3, Pick colours 7 / 3 (panel open / closed).
-    const asBuilt: Record<string, [number, number]> = { Brightness: [252, 108], "Remove background": [288, 108], "Pick colours": [252, 108] };
+    // The row counts of ux-notes.md §25.1, §25.4 (2026-11-09; Ignore below 171 px joins the expander and Trace, the colours group
+    // reserves 220 px; Advanced closed, no picks): Brightness 6 / 3 rows, Remove background 7 / 3, Pick colours 7 / 3.
+    const asBuilt: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [252, 108] };
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]')?.click()`);
     await sleep(400);
     const all: string[] = [];
@@ -726,9 +726,8 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
         assert.ok(m.insideBar, `${tag}: every control inside the bar's box`);
         assert.ok(m.top >= 0 && m.bottom <= m.vh, `${tag}: the bar is inside the window`);
         assert.ok(Math.abs(m.slotRightGap - 8) <= 2, `${tag}: finish button at the right edge (gap ${m.slotRightGap})`);
-        // §24.5: Pick colours with nothing picked says why Trace is dimmed in the notice row (36 px of its own).
-        const notice = method === "Pick colours" ? 36 : 0;
-        const expected = asBuilt[method][open ? 0 : 1] + notice;
+        // §25.3: nothing picked adds no notice row; Trace's tooltip says why it is dimmed.
+        const expected = asBuilt[method][open ? 0 : 1];
         assert.ok(Math.abs(m.height - expected) <= 4, `${tag}: bar height ${m.height} px, notes say ${expected} px`);
         for (const t of [...m.texts, ...m.labels]) if (HINT.test(t)) hints.push(`${tag}: "${t}"`);
         await s.send("Page.captureScreenshot", { format: "png" }).then((r) => writeFileSync(path.join(SCRATCH, `tester-${method.replace(/ /g, "-")}-${open ? "open" : "closed"}.png`), Buffer.from(((r as { result?: { data?: string } }).result?.data) ?? "", "base64")));

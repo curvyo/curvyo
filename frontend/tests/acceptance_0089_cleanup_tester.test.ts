@@ -574,7 +574,7 @@ test("0089 §24.1, §24.6: the strings of the views, the status line and the ana
 
 // ------------------------------------------------------------------ 24.2, 24.7: order and widths
 
-test("0089 §24.2, §24.7: the value fields are 150 px wide, Ignore below 171 px (its value needs it, lead 2026-11-06) with its readout 215 px, Colours 120 px, the Denoise and Upscale cells at least 150 px", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 §24.2, §24.7: the value fields are 150 px wide, Ignore below 171 px (its value needs it, lead 2026-11-06; §25.1: no readout, so the item is the field alone), Colours 120 px, the Denoise and Upscale cells at least 150 px", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
@@ -584,11 +584,12 @@ test("0089 §24.2, §24.7: the value fields are 150 px wide, Ignore below 171 px
     }
     assert.equal(await w(field("Ignore below")), 171, "Ignore below is 171 px wide");
     assert.equal((await rectOf(s, field("Smooth")))!.h, 28, "hit height unchanged");
-    // Ignore below with its "< 1 px" readout: 171 + 8 + 36 = 215 px, the item's own box.
+    // §25.1: the pixel readout and its slot are gone: the item is the 171 px field alone.
     const ignore = (await rectOf(s, field("Ignore below")))!;
     const row = JSON.parse((await s.evaluate(`JSON.stringify((() => { const f = document.querySelector('${field("Ignore below")}'); let n = f; while (n && n.parentElement && n.parentElement.getAttribute('data-trace-row') === null) n = n.parentElement;
       const r = n.getBoundingClientRect(); return { w: r.width, x: r.x }; })())`)) as string) as { w: number; x: number };
-    assert.ok(Math.abs(row.w - 215) <= 1, `Ignore below with its readout is ${row.w} px`);
+    assert.ok(Math.abs(row.w - 171) <= 1, `Ignore below, no readout, is ${row.w} px`);
+    assert.deepEqual(JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} *')].filter((e) => e.children.length === 0 && !e.closest('.sr-only') && /^[~<] ?\\d+ px$/.test(e.textContent.trim())).map((e) => e.textContent))`)) as string), [], "no '~ 2 px' or '< 1 px' readout anywhere in the bar");
     assert.equal(Math.round(ignore.x - row.x), 0, "the field starts the item");
     // Denoise and Upscale cells in Advanced.
     for (const name of ["Denoise", "Upscale"]) {

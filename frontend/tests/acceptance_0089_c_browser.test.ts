@@ -279,9 +279,9 @@ const fieldNames = async (s: S) =>
 
 const pipettePressed = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-pipette]')?.getAttribute('aria-pressed') ?? 'none'`)) as string;
 
-// Adjusted for `ux-notes.md` §22.3 (2026-10-31): the picked colours are the one swatch strip of the Advanced block.
+// Adjusted for `ux-notes.md` §25.4 (2026-11-09): the picked colours are the swatch row beside the pipette (no Advanced strip).
 const swatches = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
+  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [role=group][aria-label="Picked colours"] [data-trace-picked-swatch]')].map((e) => e.getAttribute('data-trace-picked-swatch')))`)) as string) as string[];
 
 /** The counts of the Advanced block once a trace settled with `paths` paths. */
 const settled = async (s: S, paths: RegExp) =>
@@ -374,12 +374,11 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     await escape(s);
     assert.equal(await pipettePressed(s), "false", "Esc disarms");
     assert.equal(await s.evaluate(`!!document.querySelector('${BAR}')`), true, "the tool stays");
-    // Remove a swatch: select it, its Remove button.
-    // §22.3: the swatch and its Remove action are in the Advanced strip, not in the bar.
-    await s.clickSel(`${BAR} [data-trace-palette-swatch="#DCD6CF"]`);
-    await s.clickSel(`${BAR} [data-trace-palette-action="Remove"]`);
+    // Remove a swatch (§25.4): a click on it in the row beside the pipette; no Advanced strip, no Remove action.
+    assert.equal(await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-palette-swatch], ${BAR} [data-trace-palette-action]').length`), 0, "no strip, no actions for Pick colours");
+    await s.clickSel(`${BAR} [data-trace-picked-swatch="#DCD6CF"]`);
     await waitFor("no swatch", async () => ((await swatches(s)).length === 0 ? true : null));
-    await waitFor("no colour picked", async () => ((await s.statusText()).includes("0 paths: no colour picked.") ? true : null));
+    await waitFor("no colour picked (hidden region)", async () => ((await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string).includes("0 paths: no colour picked.") ? true : null);
 
     // Remove background: Auto pressed with the border colour; the three blocks are traced.
     await pickMethod(s, "Remove background");
@@ -404,7 +403,8 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
       if (window.__slots.at(-1)?.[0] !== k) window.__slots.push([k, performance.now()]); }).observe(document.querySelector('${BAR}'), { subtree: true, childList: true, attributes: true });`);
     const slotsDuring = async (delay: number) => {
       await s.evaluate(`window.__delay = ${delay}; window.__slots = [];`);
-      await pickMethod(s, "Pick colours");
+      // §25.3: Pick colours with nothing picked traces nothing, so the job to time is Remove background.
+      await pickMethod(s, "Remove background");
       await sleep(delay + 1200);
       await pickMethod(s, "Brightness");
       await sleep(delay + 1200);
@@ -418,7 +418,7 @@ test("0089 C in Chromium: Method, pipette, chip, Esc order, finish button", { sk
     assert.ok(shown.length > 0, `a job past 400 ms shows its progress: ${JSON.stringify(slow)}`);
     assert.ok(shown.every((ms) => ms >= 290), `held at least 300 ms: ${shown}`);
     const running = JSON.parse((await s.evaluate(`(async () => { window.__delay = 3000; document.querySelector('${BAR} button[aria-label=Method]').click(); await new Promise((r) => setTimeout(r, 200));
-      [...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes('Pick colours')).click();
+      [...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes('Remove background')).click();
       await new Promise((r) => setTimeout(r, 1200)); const e = document.querySelector('${BAR} [data-trace-slot=running]'); if (!e) return 'null'; const r = e.getBoundingClientRect();
       return JSON.stringify({ bg: getComputedStyle(e).backgroundColor, width: Math.round(r.width), height: Math.round(r.height), stop: !!e.querySelector('button[aria-label="Stop (Esc)"]'), text: e.textContent }); })()`)) as string) as { bg: string; width: number; height: number; stop: boolean; text: string } | null;
     assert.ok(running, "the running button");
