@@ -29,6 +29,7 @@ function vectorRail(ctx: WorkbenchContext) {
       selectionCount={ctx.editor.selectionCount}
       onSelect={ctx.editor.setTool}
       onReturnFocus={() => ctx.editor.containerRef.current?.focus()}
+      moveOnly={ctx.editor.getSession()?.selection_move_only() ?? false}
       commands={ctx.railCommands}
       grouping={ctx.editor.grouping.commands}
       paused={ctx.paused}

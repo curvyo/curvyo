@@ -22,6 +22,7 @@ import { LayersTab } from "@/components/panel/LayersTab";
 import { PanelStrip } from "@/components/panel/PanelStrip";
 import { GridSection } from "@/components/panel/GridSection";
 import { SnappingSection } from "@/components/panel/SnappingSection";
+import { CloneBlock } from "@/components/panel/CloneBlock";
 import { StyleSection } from "@/components/panel/StyleSection";
 import { TraceInfoPage } from "@/components/panel/TraceInfoPage";
 import { ShareTab } from "@/components/panel/ShareTab";
@@ -130,6 +131,10 @@ export function PropertiesPanel({
   const background = useBackgroundPanel(editor);
   const textLayout = useTextLayout(editor.getSession, editor.sync, editor.syncRevision);
   const { getSession } = editor;
+  // "On Drawing 2. Double-click to edit." while the selection is move-only (`specs/0106`).
+  // `syncRevision` re-renders the panel after every session change.
+  const outOfContext = getSession()?.out_of_context_line() ?? "";
+  const placedPage = getSession()?.placed_page_block() ?? "";
   const formats = useFormats(getSession, doc);
   const snapping = useSnapping({ getSession, syncRevision: editor.syncRevision, sync:editor.sync });
   const grid = useGrid({ getSession, syncRevision: editor.syncRevision, sync: editor.sync });
@@ -496,10 +501,30 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
               />
             ) : doc.view.content === "style" ? (
-              <>
-                <PlacedPageBlock text={getSession()?.placed_page_block() ?? ""} />
-                <StyleSection panel={panel} clones={editor.clones} onReturnFocus={returnFocus} />
-              </>
+              outOfContext !== "" ? (
+                // A move-only selection: the one muted line, every section hidden (`specs/0106`
+                // criterion 11, UX notes §3).
+                <div className="flex flex-col gap-4">
+                  <p
+                    role="note"
+                    title={outOfContext}
+                    className="mt-2 truncate text-xs text-[var(--panel-muted-fg)]"
+                  >
+                    {outOfContext}
+                  </p>
+                  {/* Linked clones out of context: the reduced block, select buttons only. */}
+                  <CloneBlock clones={editor.clones} moveOnly onReturnFocus={returnFocus} onPressedAt={() => {}} />
+                </div>
+              ) : (
+                <>
+                  <PlacedPageBlock text={placedPage} />
+                  {/* A placed page has no style of its own: no Stroke, no Fill (`specs/0106`
+                      criterion 12). */}
+                  {placedPage === "" ? (
+                    <StyleSection panel={panel} clones={editor.clones} onReturnFocus={returnFocus} />
+                  ) : null}
+                </>
+              )
             ) : doc.view.content === "layers" ? (
               <LayersTab
                 getSession={getSession}

@@ -23,6 +23,9 @@ import {
   idText,
   nextRow,
   reorderFor,
+  isPlainRow,
+  parseLayersView,
+  pressedId,
   rowKey,
   listWindow,
   toolbarStep,
@@ -167,6 +170,14 @@ export function LayersTab({
     setTotal(view.count);
   }
   const focused = Math.min(focusedRaw, Math.max(0, view.count - 1));
+  // A muted note row of a laser page's tree takes no focus: the arrows step over it.
+  const skipNote = (to: number | null, key: string): number | null => {
+    if (to === null || view.rows.find((row) => row.index === to)?.kind !== "note") {
+      return to;
+    }
+    const step = key === "ArrowUp" || key === "PageUp" || key === "End" ? -1 : 1;
+    return Math.max(0, Math.min(view.count - 1, to + step));
+  };
 
   const scrollToRow = useCallback(
     (index: number) => {
@@ -231,11 +242,24 @@ export function LayersTab({
   const press = (row: LayerRowData, how: "plain" | "toggle" | "range") => {
     setFocused(row.index);
     setCell("name");
-    reply(act((session) => session.press_layer_row(idText(row.id), how)));
+    // The root and the Fixtures row of a laser page's tree select nothing (`specs/0106` UX §5).
+    if (row.kind === "page-root" || row.kind === "fixtures" || row.kind === "note") {
+      return;
+    }
+    reply(act((session) => session.press_layer_row(idText(pressedId(row)), how)));
   };
 
-  const flag = (row: LayerRowData, which: "visible" | "locked") =>
+  const flag = (row: LayerRowData, which: "visible" | "locked") => {
+    // The Fixtures row's eye shows or hides the page's fixtures (`specs/0106` criterion 17).
+    if (row.kind === "fixtures") {
+      act((session) => {
+        session.set_layer_fixtures_shown(!row.visible);
+        return "";
+      });
+      return;
+    }
     reply(act((session) => session.toggle_layer_row_flag(idText(row.id), which)));
+  };
 
   const expand = (row: LayerRowData, expanded: boolean) => {
     getSession()?.set_layer_expanded(idText(row.id), expanded);
@@ -243,6 +267,9 @@ export function LayersTab({
   };
 
   const startRename = (row: LayerRowData) => {
+    if (isPlainRow(row)) {
+      return;
+    }
     const blocked = getSession()?.layers_pen_hint() ?? "";
     if (blocked !== "") {
       setHint(blocked);
@@ -286,6 +313,15 @@ export function LayersTab({
   };
 
   const deleteLayer = () => {
+    if (view.laserTree) {
+      // A laser page's tree has no layer: Delete removes the selected rows' objects, a placed
+      // page's reference included (`specs/0106` criterion 19), never the document's active layer.
+      act((session) => {
+        session.delete_selected();
+        return "";
+      });
+      return;
+    }
     reply(act((session) => session.delete_active_layer()));
   };
 
@@ -382,7 +418,7 @@ export function LayersTab({
       }
       return;
     }
-    const to = nextRow(event.key, focused, view.count, pageRows);
+    const to = skipNote(nextRow(event.key, focused, view.count, pageRows), event.key);
     if (to !== null) {
       event.preventDefault();
       moveFocus(to, cell);
@@ -568,7 +604,10 @@ export function LayersTab({
   const [toolFocus, setToolFocus] = useState(0);
   const toolRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const tools: { name: string; glyph: ToolGlyph; applies: boolean; press: () => void }[] = [
-    { name: "New layer", glyph: LayersPlus, applies: toolbar.newLayer, press: newLayer },
+    // Hidden on a laser page, whose tree has no layer to add (`specs/0106` UX notes §5).
+    ...(view.laserTree
+      ? []
+      : [{ name: "New layer", glyph: LayersPlus, applies: toolbar.newLayer, press: newLayer }]),
     {
       name: "Duplicate",
       glyph: Copy,
@@ -590,14 +629,28 @@ export function LayersTab({
       applies: toolbar.moveDown,
       press: () => reply(act((session) => session.step_layer_target("down"))),
     },
-    { name: "Delete layer", glyph: Trash2, applies: toolbar.deleteLayer, press: deleteLayer },
+    view.laserTree
+      ? {
+          name: "Delete",
+          glyph: Trash2,
+          applies: view.rows.some((row) => row.mark === "selected" && !row.readOnly),
+          press: deleteLayer,
+        }
+      : { name: "Delete layer", glyph: Trash2, applies: toolbar.deleteLayer, press: deleteLayer },
   ];
 
-  const rows = view.rows.map((row) => (
+  // The laser tree's root row is pinned: it is drawn at the top of the scrolled list whatever
+  // the window holds (`specs/0106` UX notes §5).
+  const pinnedRoot = view.laserTree
+    ? (parseLayersView(getSession()?.layers_view(0, 1) ?? "").rows[0] ?? null)
+    : null;
+  const listed = pinnedRoot ? [pinnedRoot, ...view.rows.filter((row) => row.index !== 0)] : view.rows;
+  const rows = listed.map((row) => (
     <LayerRow
       key={rowKey(row)}
       row={row}
-      top={row.index * rowHeight}
+      pinned={row === pinnedRoot}
+      top={row === pinnedRoot ? scrollTop : row.index * rowHeight}
       height={rowHeight}
       tabbable={row.index === focused}
       cell={row.index === focused ? cell : "name"}
@@ -627,7 +680,7 @@ export function LayersTab({
       }
       onRename={(name) => finishRename(row, name)}
       onStartRename={() => startRename(row)}
-      onDragStart={onDragStart(row)}
+      onDragStart={isPlainRow(row) ? () => {} : onDragStart(row)}
       onHover={(hovered) => getSession()?.set_layer_hover(hovered ? idText(row.id) : "")}
       onFocusCell={(focusCell) => {
         setFocused(row.index);

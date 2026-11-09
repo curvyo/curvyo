@@ -64,7 +64,7 @@ export function PageFrames({
               className="absolute bottom-full left-0 mb-1 flex max-w-full items-center gap-1.5 whitespace-nowrap text-xs"
               style={{ color: "var(--toolbar-icon)" }}
             >
-              <span className={`min-w-0 truncate ${page.active ? "font-semibold" : ""}`}>{page.name}</span>
+              <span className={`min-w-0 truncate ${page.active || page.home ? "font-semibold" : ""}`}>{page.name}</span>
               <KindChip
                 size={12}
                 kind={{

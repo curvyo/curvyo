@@ -4,6 +4,8 @@ import {
   Circle,
   Eye,
   EyeOff,
+  Frame,
+  Grid3x3,
   Group,
   Hexagon,
   Image,
@@ -18,6 +20,7 @@ import {
   Square,
   Star,
   Type,
+  Zap,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { useEffect, useRef } from "react";
@@ -59,6 +62,9 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   image: Image,
   // A dimension (`specs/0070-measure-and-dimension` UX notes §9).
   dimension: Ruler,
+  // A laser page's tree (`specs/0106` UX notes §5): its placed pages and the Fixtures row.
+  "placed-page": Frame,
+  fixtures: Grid3x3,
 };
 
 /** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */
@@ -88,6 +94,8 @@ export interface LayerRowProps {
   onDragStart: (event: React.PointerEvent) => void;
   onHover: (hovered: boolean) => void;
   onFocusCell: (cell: RowCell) => void;
+  /** The laser tree's root row stays at the top of the list while it scrolls (`specs/0106`). */
+  pinned?: boolean;
 }
 
 const ICON_BUTTON =
@@ -184,6 +192,7 @@ export function LayerRow({
   onDragStart,
   onHover,
   onFocusCell,
+  pinned = false,
 }: LayerRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const actionRef = useRef<HTMLButtonElement>(null);
@@ -224,17 +233,43 @@ export function LayerRow({
       {row.overridesLine ? (
         <span className="text-[var(--panel-muted-fg)]">{row.overridesLine}</span>
       ) : null}
+      {row.homeLine ? <span className="text-[var(--panel-muted-fg)]">{row.homeLine}</span> : null}
       {row.stateLine !== "" ? (
         <span className="text-[var(--panel-muted-fg)]">{row.stateLine}</span>
       ) : null}
     </span>
   );
   const showAction = row.rowAction !== "";
+  // A laser page's tree (`specs/0106` UX notes §5): the root has no glyph cell of its own but the
+  // Laser chip; a placed page and a row inside one have no eye and no lock; Fixtures the eye only.
+  const root = row.kind === "page-root";
+  const plain = root || row.kind === "placed-page" || row.readOnly === true;
+  const showEye = !plain;
+  const showLock = !plain && row.kind !== "fixtures";
   // A clone row selects its original, a group or layer row its contents (`0049`, `0050`).
   const actionLabel = row.rowAction === "select-original" ? "Select original" : "Select contents";
-  const nameClass = `min-w-0 flex-1 truncate ${active ? "font-semibold" : ""} ${
-    hidden ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"
+  const nameClass = `min-w-0 flex-1 truncate ${active || root ? "font-semibold" : ""} ${
+    hidden || row.readOnly ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"
   }`;
+  // "Empty" and "Nothing on this page yet." (`specs/0106` UX notes §5): muted, no glyph, not
+  // focusable, no cells.
+  if (row.kind === "note") {
+    return (
+      <div
+        role="row"
+        aria-level={row.level}
+        aria-rowindex={row.index + 1}
+        data-row-index={row.index}
+        className="absolute right-0 left-0 flex items-center text-sm text-[var(--panel-muted-fg)] select-none"
+        style={{ top, height }}
+      >
+        <span aria-hidden className="shrink-0" style={{ width: indentPx(row.level) + 24 }} />
+        <span role="gridcell" className="min-w-0 truncate">
+          {row.name}
+        </span>
+      </div>
+    );
+  }
   return (
     <div
       ref={rowRef}
@@ -247,6 +282,7 @@ export function LayerRow({
       aria-expanded={row.container ? row.expanded : undefined}
       aria-current={active || entered ? "true" : undefined}
       aria-label={row.label}
+      aria-readonly={row.readOnly ? "true" : undefined}
       tabIndex={tabbable && cell === "name" ? 0 : -1}
       data-row-index={row.index}
       onFocus={(event) => {
@@ -257,7 +293,7 @@ export function LayerRow({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       onClick={(event) => onPress(event)}
-      className={`group/row absolute right-0 left-0 flex items-center rounded-[4px] pr-1 text-sm outline-none select-none hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
+      className={`group/row absolute right-0 left-0 flex items-center rounded-[4px] pr-1 text-sm outline-none select-none ${pinned ? "z-10 bg-[var(--panel-bg)]" : ""} hover:bg-[var(--row-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
         selected ? "!bg-[var(--value-fill)]" : ""
       } ${entered || drop === "into" ? "ring-[1.5px] ring-inset ring-[var(--editor-accent)]" : ""}`}
       style={{ top, height }}
@@ -305,9 +341,13 @@ export function LayerRow({
           }}
           style={{ touchAction: "pan-y" }}
         >
-          <span className="flex shrink-0 text-[var(--toolbar-icon)]">
-            {Kind ? <Kind size={16} strokeWidth={1.5} aria-hidden /> : <CompoundGlyph />}
-          </span>
+          {root ? null : (
+            <span
+              className={`flex shrink-0 ${row.readOnly ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
+            >
+              {Kind ? <Kind size={16} strokeWidth={1.5} aria-hidden /> : <CompoundGlyph />}
+            </span>
+          )}
           {renaming ? (
             <input
               ref={inputRef}
@@ -336,6 +376,12 @@ export function LayerRow({
               <span className={nameClass} title={row.name}>{row.text ?? row.name}</span>
             </Tooltip>
           )}
+          {root ? (
+            <span className="flex shrink-0 items-center gap-1 text-[11px] text-[var(--panel-muted-fg)]">
+              <Zap size={12} strokeWidth={1.5} aria-hidden />
+              Laser
+            </span>
+          ) : null}
           {row.containsSelection ? (
             <Tooltip side="left" content="Contains the selection">
               <svg width={6} height={6} viewBox="0 0 6 6" aria-hidden className="shrink-0">
@@ -381,8 +427,8 @@ export function LayerRow({
           </Tooltip>
         </span>
       ) : null}
-      <span role="gridcell" className="flex shrink-0 items-center">
-        <FlagButton
+      <span role="gridcell" className={`flex shrink-0 items-center ${showEye ? "" : "w-6 pointer-coarse:w-9"}`}>
+        {showEye ? <FlagButton
           kind="visible"
           on={!row.visible}
           inherited={row.hiddenBy}
@@ -390,10 +436,10 @@ export function LayerRow({
           focused={tabbable && cell === "eye"}
           onPress={() => onFlag("visible")}
           onFocus={() => onFocusCell("eye")}
-        />
+        /> : null}
       </span>
-      <span role="gridcell" className="flex shrink-0 items-center">
-        <FlagButton
+      <span role="gridcell" className={`flex shrink-0 items-center ${showLock ? "" : "w-6 pointer-coarse:w-9"}`}>
+        {showLock ? <FlagButton
           kind="locked"
           on={row.locked}
           inherited={row.lockedBy}
@@ -401,7 +447,7 @@ export function LayerRow({
           focused={tabbable && cell === "lock"}
           onPress={() => onFlag("locked")}
           onFocus={() => onFocusCell("lock")}
-        />
+        /> : null}
       </span>
     </div>
   );

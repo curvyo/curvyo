@@ -9,6 +9,9 @@ import {
   edgeScroll,
   idText,
   indentPx,
+  isPlainRow,
+  pressedId,
+  rowKey,
   nextRow,
   parseLayerNotice,
   parseLayersView,
@@ -148,4 +151,17 @@ test("the window follows the scroll and the focused row comes on its own (0049 U
     merged.rows.map((r) => (r as { index: number }).index),
     [4090, 4091, 1],
   );
+});
+
+test("a laser page's tree: rows keyed apart, inner rows press their placed page (0106)", () => {
+  const base = parseLayersView('{"rows":[]}');
+  const row = (kind: string, extra: object = {}) =>
+    ({ index: 0, id: { peer: "1", counter: 5 }, kind, ...extra }) as unknown as (typeof base.rows)[number];
+  const via = { peer: "1", counter: 9 };
+  assert.notEqual(rowKey(row("page-root")), rowKey(row("fixtures")));
+  assert.notEqual(rowKey(row("rectangle")), rowKey(row("rectangle", { via })));
+  assert.deepEqual(pressedId(row("rectangle", { via, readOnly: true })), via);
+  assert.equal(isPlainRow(row("note")), true);
+  assert.equal(isPlainRow(row("placed-page")), true);
+  assert.equal(isPlainRow(row("rectangle")), false);
 });

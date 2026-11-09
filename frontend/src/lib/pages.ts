@@ -33,6 +33,8 @@ export interface PageRow {
   sketch: SketchRow | null;
   /** The page a page-row drag would drop onto now (its frame cue, UX notes §2). */
   dropTarget: boolean;
+  /** A move-only selection's object belongs here: the label is semibold (`specs/0106` UX §2). */
+  home?: boolean;
 }
 export function readPages(json: string): PageRow[] {
   return JSON.parse(json) as PageRow[];

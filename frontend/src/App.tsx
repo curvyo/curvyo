@@ -178,6 +178,7 @@ function Editor() {
           {editor.tool === "select" && editor.tiling.open ? <TilingBar tiling={editor.tiling} /> : null}
           {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open ? (
             <SelectToolbar
+              moveOnly={editor.getSession()?.selection_move_only() ?? false}
               scaleStrokeWidth={editor.scaleStrokeWidth}
               onSetScaleStrokeWidth={editor.setScaleStrokeWidth}
               scaleCornerRadius={editor.scaleCornerRadius}
@@ -418,6 +419,7 @@ function Editor() {
         kind={workbenches.list.page.id ? workbenches.list.page : null}
         zoomPercent={editor.zoomPercent}
         nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}
+        contextText={editor.getSession()?.out_of_context_status() ?? ""}
       />
       <ErrorDialog
         title={openError?.title ?? "Can't open project"}
