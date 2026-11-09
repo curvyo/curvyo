@@ -11,7 +11,7 @@ pub const OFF_PAGE_NOTICE: &str = "A placed page stays on its laser page.";
 pub const NOT_GROUPED_NOTICE: &str = "A placed page cannot be grouped.";
 
 impl Session {
-    /// The Style tab block of the selected placed page (criterion 17): "Placed page of <name>."
+    /// The Style tab block of the selected placed page (criterion 17): "Placed page of `name`."
     /// with the source page's name cut at 40 characters; empty when none is selected.
     #[must_use]
     pub fn placed_page_block(&self) -> String {

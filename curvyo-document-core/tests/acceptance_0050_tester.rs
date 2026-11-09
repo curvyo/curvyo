@@ -728,6 +728,9 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             || name.starts_with("page_kind")
             // `0099-sketch-pages` (format 37) is a later build: its golden holds named sketches.
             || name.starts_with("sketch_pages_v")
+            // `0100-bring-content-in` (format 38) is a later build: its golden holds a group
+            // and a manufacturing.
+            || name.starts_with("bring_content_in_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")
