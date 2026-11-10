@@ -14,7 +14,7 @@ mod manifest;
 mod notice;
 mod param;
 
-pub use drawing::{FixtureDrawing, LineSegment};
+pub use drawing::LineSegment;
 pub use manifest::{
     Block, Contribution, FixtureKind, Manifest, Tab, ToolboxCard, ToolboxCommand,
     WorkbenchContribution,

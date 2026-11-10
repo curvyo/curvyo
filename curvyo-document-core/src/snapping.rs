@@ -26,6 +26,9 @@ const KEY_NODES: &str = "snapping_nodes";
 const KEY_PAGE: &str = "snapping_page";
 /// The root register for the page grids (`specs/0090-grid` criterion 10). Absent means on.
 const KEY_GRID: &str = "snapping_grid";
+/// The root register for the laser fixtures (`specs/0102-laser-fixtures` criterion 24, ADR 0049
+/// §5). Absent means on.
+const KEY_FIXTURES: &str = "snapping_fixtures";
 /// The root register for the grid snap point (criterion 11). Absent means centre.
 const KEY_GRID_POINT: &str = "snapping_grid_point";
 const KEY_X: &str = "snapping_x";
@@ -92,6 +95,8 @@ pub struct DocumentSnapping {
     pub page: bool,
     /// Snap to shown page grids (`specs/0090-grid` criterion 10).
     pub grid: bool,
+    /// Snap to the Active fixtures of a laser page (`specs/0102-laser-fixtures` criterion 24).
+    pub fixtures: bool,
     /// Which part of a moved selection snaps to a grid.
     pub grid_point: GridSnapPoint,
     /// Allow correction of the horizontal coordinate.
@@ -120,6 +125,7 @@ impl DocumentSnapping {
         nodes: true,
         page: true,
         grid: true,
+        fixtures: true,
         grid_point: GridSnapPoint::Centre,
         x: true,
         y: true,
@@ -165,6 +171,9 @@ pub(crate) struct SnappingJson {
     /// without grid snapping registers is unchanged.
     #[serde(skip_serializing_if = "is_true")]
     grid: bool,
+    /// Left out at its default (on), as `grid`.
+    #[serde(skip_serializing_if = "is_true")]
+    fixtures: bool,
     #[serde(skip_serializing_if = "is_centre")]
     grid_point: GridSnapPoint,
     x: bool,
@@ -192,6 +201,7 @@ impl From<DocumentSnapping> for SnappingJson {
             nodes: snapping.nodes,
             page: snapping.page,
             grid: snapping.grid,
+            fixtures: snapping.fixtures,
             grid_point: snapping.grid_point,
             x: snapping.x,
             y: snapping.y,
@@ -255,6 +265,7 @@ pub(crate) fn snapping_of_root(root: &LoroMap) -> DocumentSnapping {
         nodes: boolean(KEY_NODES, true),
         page: boolean(KEY_PAGE, true),
         grid: boolean(KEY_GRID, true),
+        fixtures: boolean(KEY_FIXTURES, true),
         grid_point: plain(root, KEY_GRID_POINT)
             .ok()
             .flatten()
@@ -283,6 +294,7 @@ pub(crate) fn validate(loro: &LoroDoc) -> bool {
         && ok(KEY_NODES, |value| bool_of(value).is_some())
         && ok(KEY_PAGE, |value| bool_of(value).is_some())
         && ok(KEY_GRID, |value| bool_of(value).is_some())
+        && ok(KEY_FIXTURES, |value| bool_of(value).is_some())
         && ok(KEY_GRID_POINT, |value| grid_point_of(value).is_some())
         && ok(KEY_X, |value| bool_of(value).is_some())
         && ok(KEY_Y, |value| bool_of(value).is_some())
@@ -313,13 +325,13 @@ impl Document {
         let value = value.resolved();
         let root = self.loro().get_map(ROOT_MAP);
         let current = snapping_of_root(&root);
-        let mut changed = false;
+        let mut changed = 0_usize;
         let mut set = |key: &str, new: LoroValue| {
             // invariant: attached document root accepts primitive registers.
             if root.insert(key, new).is_err() {
                 return;
             }
-            changed = true;
+            changed += 1;
         };
         if value.enabled != current.enabled {
             set(KEY_ENABLED, LoroValue::Bool(value.enabled));
@@ -339,6 +351,9 @@ impl Document {
         if value.grid != current.grid {
             set(KEY_GRID, LoroValue::Bool(value.grid));
         }
+        if value.fixtures != current.fixtures {
+            set(KEY_FIXTURES, LoroValue::Bool(value.fixtures));
+        }
         if value.grid_point != current.grid_point {
             set(KEY_GRID_POINT, LoroValue::from(value.grid_point.as_str()));
         }
@@ -354,9 +369,17 @@ impl Document {
         if value.release_px != current.release_px {
             set(KEY_RELEASE_PX, LoroValue::Double(value.release_px));
         }
-        if changed {
+        // The Fixtures switch alone has its own two steps (`specs/0102` adrs.md §4).
+        let fixtures_only = changed == 1 && value.fixtures != current.fixtures;
+        if fixtures_only {
+            self.commit_with_label(if value.fixtures {
+                "set_fixtures_snap_on"
+            } else {
+                "set_fixtures_snap_off"
+            });
+        } else if changed > 0 {
             self.commit_with_label("set_document_snapping");
         }
-        changed
+        changed > 0
     }
 }

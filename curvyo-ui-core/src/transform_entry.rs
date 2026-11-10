@@ -28,12 +28,10 @@ use crate::transform_math::{
 const SIZE_EQUAL_EPSILON_MM: f64 = 1e-9;
 
 impl EntryField {
-    /// The single field of a parameter or skew entry.
-    pub(crate) fn for_param(
-        label: &'static str,
-        accessible_name: &'static str,
-        prefill: String,
-    ) -> Self {
+    /// The single field of a parameter or skew entry, and of a fixture's chips
+    /// (`specs/0102-laser-fixtures` adrs.md §6a.4).
+    #[must_use]
+    pub fn for_param(label: &'static str, accessible_name: &'static str, prefill: String) -> Self {
         Self {
             label,
             accessible_name,
@@ -173,7 +171,8 @@ pub fn format_degrees(degrees: f64) -> String {
 }
 
 /// The one decimal a size readout and a size field prefill show.
-pub(crate) fn format_mm(value: f64) -> String {
+#[must_use]
+pub fn format_mm(value: f64) -> String {
     format!("{value:.1}")
 }
 

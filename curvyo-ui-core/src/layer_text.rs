@@ -127,6 +127,21 @@ fn page_tree_name(row: &LayerRow) -> String {
             row.name.clone(),
             if row.own.visible { "shown" } else { "hidden" }.to_owned(),
         ],
+        RowKind::Fixture => {
+            let (word, active) = row
+                .fixture
+                .map_or(("Fixture", true), |line| (line.word, line.active));
+            vec![
+                row.name.clone(),
+                word.to_owned(),
+                if active {
+                    "on the bed"
+                } else {
+                    "not on the bed"
+                }
+                .to_owned(),
+            ]
+        }
         RowKind::PlacedPage => vec![
             row.name.clone(),
             objects_count_text(row.container.map_or(0, |c| c.children)),
@@ -146,7 +161,12 @@ fn page_tree_name(row: &LayerRow) -> String {
         )],
         _ => vec![row.name.clone(), "own item".to_owned()],
     };
-    if !row.read_only && !matches!(row.kind, RowKind::PlacedPage | RowKind::Fixtures) {
+    if !row.read_only
+        && !matches!(
+            row.kind,
+            RowKind::PlacedPage | RowKind::Fixtures | RowKind::Fixture
+        )
+    {
         parts.extend(state_words(row));
     }
     parts.join(", ")

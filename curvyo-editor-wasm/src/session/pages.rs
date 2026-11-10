@@ -56,8 +56,10 @@ impl Session {
         let page = pages.iter().find(|p| p.id == id).cloned()?;
         let changed = self.page_view.active(&pages).is_none_or(|p| p.id != id);
         if changed {
-            // A page switch cancels the open tiling bar (`0069` criterion 35).
+            // A page switch cancels the open tiling bar (`0069` criterion 35) and ends a fixture
+            // selection (`specs/0102` criterion 11).
             self.tiling = None;
+            self.clear_fixture_selection();
             self.note_active_drawing_page();
         }
         self.page_view.active = Some(id.to_owned());

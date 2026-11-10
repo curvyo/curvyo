@@ -86,6 +86,14 @@ impl MoveEntry {
         Self::over(objects.to_vec(), box_, (box_.min, box_.max))
     }
 
+    /// An entry over a box that is no object (a laser fixture, `specs/0102-laser-fixtures`
+    /// adrs.md §6a.4): its bounds are the box's; the caller resolves the typed values with
+    /// [`MoveEntry::resolve`] and writes the move itself, so [`MoveEntry::commit`] moves nothing.
+    #[must_use]
+    pub fn for_box(start_box: OrientedBox, bounds: (Point, Point)) -> Self {
+        Self::over(Vec::new(), start_box, bounds)
+    }
+
     fn over(start: Vec<ObjectSnapshot>, start_box: OrientedBox, bounds: (Point, Point)) -> Self {
         let field = |label, name| EntryField::for_param(label, name, "0".to_string());
         Self {

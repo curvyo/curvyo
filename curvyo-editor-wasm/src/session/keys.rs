@@ -380,6 +380,10 @@ impl Session {
         if let Some(outcome) = self.mode_key(&input) {
             return outcome;
         }
+        // A selected fixture takes the arrows, Delete and Escape (`specs/0102` criteria 13, 14).
+        if let Some(outcome) = self.fixture_key(&input) {
+            return outcome;
+        }
         match decide(&input, self.key_state()) {
             KeyAction::Ignore => KeyOutcome::Ignored,
             KeyAction::SetTool(tool) => {
@@ -464,6 +468,7 @@ impl Session {
     /// its step 2 and 3 are one, see [`Session::escape`].
     pub(super) fn cancel_drag_in_flight(&mut self) -> bool {
         self.end_snapping_drag();
+        self.end_fixture_fit();
         self.clone_drop_cancel();
         if self.page_drag.take().is_some() {
             return true;
@@ -510,6 +515,14 @@ impl Session {
             return self.sketch_escape();
         }
         if self.page_drag.take().is_some() {
+            return EscapeStep::ClearedState;
+        }
+        // A fixture's drag, then its selection (`specs/0102-laser-fixtures` UX notes §10).
+        if self.cancel_fixture_drag() {
+            return EscapeStep::CancelledDrag;
+        }
+        if self.selected_fixture().is_some() {
+            self.clear_fixture_selection();
             return EscapeStep::ClearedState;
         }
         // Picking a colour ends first (`0017` criterion 60).

@@ -1156,6 +1156,8 @@ fn ac12_0093_9_grid_lines_are_drawn_below_the_placed_drawing() {
     let plain = s.frame_draw_list().triangles.len();
     let red_plain = first_red(&s);
     s.add_fixture("engraved_grid").unwrap();
+    // `0102` criterion 2: a new fixture is selected; its box is drawn over everything.
+    s.escape();
     let extra = s.frame_draw_list().triangles.len() - plain;
     assert!(extra > 0, "the grid draws lines");
     assert!(

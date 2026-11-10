@@ -14,6 +14,10 @@ use curvyo_laser_core::{
 use super::super::Session;
 use super::commands::workbench_of;
 
+/// The notice of a pick or reset that removed fixtures (criterion 29, ADR 0050 section 6): it
+/// informs about a removal, so it is not a success notice.
+const FIXTURES_REMOVED_NOTICE: &str = "Fixtures removed (undo restores them).";
+
 /// One write the host must perform for the library or the last pick (ADR 0038 §1, §6).
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HostWrite {
@@ -146,6 +150,12 @@ impl Session {
         };
         let pages = self.document.pages();
         let contents = self.page_contents();
+        // The fixtures a pick or reset removes say so, with the undo that brings them back
+        // (criterion 29, ADR 0050 section 6). Nothing is posted when none went.
+        let before = match fixtures {
+            Some(_) => self.active_fixture_set(),
+            None => Vec::new(),
+        };
         let changed = self.recording_unguarded(|this| {
             match fixtures {
                 Some(set) => this.document.set_manufacturing_profile_and_fixtures(
@@ -160,11 +170,17 @@ impl Session {
         if let Some(output) = self.document.manufacturing(id).and_then(|m| m.page) {
             self.note_moved_pages(&pages, &output.id);
         }
+        if let Some(set) = fixtures
+            && changed
+            && before.iter().any(|fixture| !set.contains(fixture))
+        {
+            self.post_fixture_notice(FIXTURES_REMOVED_NOTICE);
+        }
         changed
     }
 
     /// The fixtures of the active page as a profile set (`specs/0102` criterion 28).
-    fn active_fixture_set(&self) -> Vec<FixtureRecord> {
+    pub(super) fn active_fixture_set(&self) -> Vec<FixtureRecord> {
         self.active_manufacturing()
             .map(|m| m.fixtures.iter().map(FixtureSnapshot::record).collect())
             .unwrap_or_default()

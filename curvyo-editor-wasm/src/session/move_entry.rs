@@ -29,6 +29,9 @@ pub struct MoveEntryView {
     /// Whether the Copy check opens on: Ctrl was held at the second press of
     /// the double-click (criterion 23).
     pub copy_preset: bool,
+    /// Whether the chip shows its Copy check: not for a laser fixture, which is not cloned
+    /// (`specs/0102-laser-fixtures` D21).
+    pub copy_allowed: bool,
 }
 
 impl Session {
@@ -45,6 +48,9 @@ impl Session {
     /// The move chip to show, or `None`.
     #[must_use]
     pub fn move_entry(&self) -> Option<MoveEntryView> {
+        if let Some(view) = self.fixture_move_view() {
+            return Some(view);
+        }
         let entry = self.open_move_entry()?;
         let box_ = entry.start_box();
         let relative = |index: usize| entry.fields()[index].prefill.clone();
@@ -58,6 +64,7 @@ impl Session {
             reference: entry.reference(),
             box_bottom: Point::new(f64::midpoint(min.x, max.x), max.y),
             copy_preset: entry.copy_preset(),
+            copy_allowed: true,
         })
     }
 
@@ -71,6 +78,9 @@ impl Session {
         second: &str,
         mode: MoveEntryMode,
     ) -> EntryOutcome {
+        if let Some(outcome) = self.commit_fixture_entry(&[first, second], mode.absolute) {
+            return outcome;
+        }
         self.recording_unguarded(|this| -> EntryOutcome {
             if this.open_move_entry().is_none() {
                 this.select.cancel_entry();

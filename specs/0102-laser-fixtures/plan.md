@@ -43,9 +43,60 @@ ADR 0049 but not yet written in code (task 2 below).
 - [x] 7. Profile record format 2 with `fixtures` (ADR 0050; AC 28 to 30) and its goldens; Pick and
   Reset replace the page's fixtures in one step (Generic laser removes them); Save as and Update
   store the page's fixtures.
-- [ ] 8. Later Part (session): `session/fixtures/`, the Fixtures block, hit, snap, fit, drawing
-  with major lines and tapes, `snapping_fixtures`, "Differs" over the set, a new page starting with
-  the profile's set.
+
+## Parts B and C (editor-wasm session, view JSON, budgets)
+
+Affected: `curvyo-editor-wasm/src/session/fixtures/` (new, one `FixtureState` field on
+`Session`), `session/manufacturing/` (fixture glue moves out), `session/snapping.rs` (fixture
+targets), `session/select.rs` (fit during a move), `session/row_drag.rs` (fit of a placed page
+from the page list), `keys.rs` (Delete, arrows, Escape on a fixture), `wasm_fixtures.rs` (new
+bridge); `curvyo-render-core` `fixture_look.rs` (draw code); `curvyo-document-core`
+`snapping.rs` (`snapping_fixtures`); `curvyo-ui-core` `snapping.rs` (`TargetKind::Fixture`).
+
+- [x] 8. `session/fixtures/`: state, typed read of the page's fixtures, selection transitions
+  (object selection, page switch, Escape clear it) (AC 8, 10, 11, 12).
+- [x] 9. Commands: four add buttons with the Proposal sizes centred, one grid per page, rename,
+  armed delete, Active, eye, grid/holder/clamp/stop parameters with clamping notices, slot add
+  (50 max) / remove / edit with the outside notice, typed X, Y and angle (AC 1 to 6, 13 to 15,
+  18 to 20, 22, 23).
+- [x] 10. Hit on the outline of an Active, shown fixture of the active laser page, slot outline
+  selects its holder, inside never; move and rotate drags (22.5 degree snap with Ctrl), arrow
+  nudges 1/10 mm, Delete arms then removes, Delete on a grid gives the notice (AC 8, 9, 11, 13, 14).
+- [x] 11. `snapping_fixtures` register and switch (one undo step); fixture snap targets (slot,
+  board, stop points; grid lines) built once at drag start (AC 24, 27).
+- [x] 12. Fit during a Select move and a page-row drag of a placed page: 0.1 mm, centre to centre,
+  turn by 90 degrees, one step "Move to slot", the fit cue in the drag answer (AC 25, 26).
+- [x] 13. "Differs from profile" over the set, "Fixtures in profile: N", a new laser page starts
+  with the profile's set (AC 28, 29).
+- [x] 14. Drawing (render-core `fixture_look`): grid minor and major lines with fade, tapes on
+  the chosen edges with ticks, holder board with slots (dashed outside), clamp hatch in ink, stop
+  bar, Active off and eye off not drawn, selection box with the rotate glyph, slot cue; tape
+  numbers and names as labels JSON at 1-2-5 steps (AC 5, 6, 7, 16 to 18, 20 to 23).
+- [x] 15. Delete of a laser page removes its fixtures; undo restores them (AC 4, 36).
+- [x] 16. View JSON: one serde type `FixturesView`, shared fixtures in
+  `tests/fixtures/fixtures_view/`, Rust contract test (AC 1, 32, 33; adrs §7).
+- [x] 17. wasm entry points in `wasm_fixtures.rs`.
+- [x] 18. Budgets in thread CPU time, `tests/fixtures_budget.rs`, in the CI performance job
+  (AC 35 a to d).
+
+Notes on Parts B and C (Proposal unless said otherwise, for the lead):
+
+- The grid's only outline is the work-area edge, where the page-edge drag of `0098` already takes
+  the press; the page drag wins, so the grid is selected by its row (criterion 10's routes).
+- The Layers tree's fixture child rows (criterion 12) are not built: `select_fixture` serves both
+  rows; the ui-core `LayerRows` change is left for Part D.
+- Grid snapping uses the grid's lines as line targets (an intersection when both axes capture)
+  instead of the laser-core `Lattice`; 2,002 lines at 1 mm stay within budget (35 a).
+- A fit needs only the Fixtures switch, not the master snapping switch; a holder turned by an
+  angle that is not a multiple of 90 degrees offers no fit; a page row dropped into a slot is one
+  step "Place page" (a creation), a Select move into a slot one step "Move to slot".
+- Arrow nudges of a fixture are one step each (no `0044` run coalescing).
+- `curvyo_ui_core::fixture_drawing` and laser-core `engraved_grid` are no longer called by the
+  session; their removal touches two crates' public API and is left to the lead.
+
+Validation: session tests in `session/fixtures/tests*.rs`; the contract test
+`tests/fixtures_view_contract.rs`; the budget test; fmt, clippy `-D warnings`, nextest for
+editor-wasm, render-core, ui-core, document-core; wasm32 build and clippy.
 
 ## Validation
 

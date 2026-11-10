@@ -94,6 +94,10 @@ impl Session {
         if self.move_mark_hover().is_some() {
             return "pointer".to_string();
         }
+        // A selected laser fixture's handles and box, as the rectangle's (`specs/0102`).
+        if let Some(hint) = self.fixture_cursor() {
+            return hint;
+        }
         let objects = self.objects();
         // The cursor arrows follow the box the maker sees: its direction is the
         // shown angle (`orientation()`), which is the `rotation` register for

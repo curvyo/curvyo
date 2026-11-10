@@ -184,6 +184,8 @@ impl Session {
     /// (criterion 20).
     pub(super) fn select_pointer_down(&mut self, point: Point, shift: bool) {
         self.limit_notice = None;
+        // An object press ends a fixture selection: the two never mix (`specs/0102` crit. 8).
+        self.clear_fixture_selection();
         self.sync_select_units();
         let objects = self.objects();
         let tolerance = self.object_tolerance();
@@ -210,6 +212,10 @@ impl Session {
         // If a move drag began, start snapping.
         if self.select.drag_in_flight() {
             self.begin_snapping_drag_for_selection();
+            // A move may drop into a fitting slot of the active laser page (`0102` crit. 25).
+            if self.select.move_in_flight() {
+                self.begin_fixture_fit(false);
+            }
         }
         // A move may end as a cloning drop on a laser page (`specs/0100`).
         self.clone_drop_begin();
@@ -242,6 +248,13 @@ impl Session {
             self.end_snapping_drag();
             return;
         }
+        // A move that fits a slot lands in it, turned when needed (`specs/0102` criterion 25).
+        if self.release_fixture_fit() {
+            self.clone_drop_cancel();
+            self.end_snapping_drag();
+            return;
+        }
+        self.end_fixture_fit();
         let target = self.clone_drop_target();
         // Ctrl with Alt over a laser page is a copy (criterion 4).
         let alt = self.held.alt && self.clone_drop_mode() != super::DropMode::Copy;
@@ -434,6 +447,10 @@ impl Session {
         let offset = live.map_or(curvyo_document_core::Vec2::ZERO, |live| live.offset);
         let grid_points = self.move_grid_points(min, max, offset);
         let result = self.resolve_snapping_grid(&probe, &grid_points, direction);
+        // A fit to a slot wins over every other snap (`specs/0102` criterion 25).
+        if let Some(fit) = self.fixture_fit(min, max) {
+            return Some(fit);
+        }
         if result.is_empty() {
             None
         } else {

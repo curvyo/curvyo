@@ -8,7 +8,6 @@
     allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)
 )]
 
-mod engraved_grid;
 mod fixture_fit;
 mod fixture_kind;
 mod fixture_slot;
@@ -42,7 +41,6 @@ pub mod operations {
     pub use crate::operation_summary::{Hidden, Leaf, LeafStatus, Summary, leaf_status, summarize};
 }
 
-pub use engraved_grid::{ENGRAVED_GRID, engraved_grid};
 pub use fixture_fit::{FitMatch, fit_slot};
 pub use fixture_kind::{
     FixtureKind, KIND_PREFIX, MAJOR_EVERY_RANGE, MmRange, ScrewPart, SlotShape, StopPart,
@@ -71,25 +69,10 @@ pub use machine_profile_file::{
 };
 pub use machine_profile_fixtures::{MAX_SET_FIXTURES, MAX_SET_SLOTS};
 pub use machine_profiles::{LibraryWrite, MAX_RECORDS, MachineProfiles};
-pub use manifest::{PROCESS_ID, manifest};
+pub use manifest::{ENGRAVED_GRID, PROCESS_ID, manifest};
 pub use overhang::{OVERHANG_NOTICE, OVERHANG_TOLERANCE, overhang_text};
 
-use curvyo_document_core::DocumentSize;
-use curvyo_extension_core::{FixtureDrawing, NoticeContext, StoredParams};
-
-/// The outline of a fixture of kind `kind` (the part after `curvyo.laser/`) with the stored
-/// values `params` over a work area; an unknown kind draws nothing.
-#[must_use]
-pub fn fixture_drawing(
-    kind: &str,
-    params: &StoredParams,
-    work_area: DocumentSize,
-) -> FixtureDrawing {
-    match kind {
-        ENGRAVED_GRID => engraved_grid(params, work_area),
-        _ => FixtureDrawing::empty(),
-    }
-}
+use curvyo_extension_core::NoticeContext;
 
 /// The text of the notice `id`, `None` while it does not apply or for an unknown id.
 #[must_use]

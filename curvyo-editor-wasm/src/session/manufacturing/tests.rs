@@ -214,8 +214,9 @@ fn ac9_ac10_an_engraved_grid_is_drawn_on_the_page_and_its_eye_hides_it() {
     let id = session
         .fixture_named(fixture["id"].as_str().unwrap())
         .unwrap();
+    // `0102` criterion 15: the spacing is 1 to 100 mm and the row is the Fixtures block's.
     assert!(session.set_fixture_length(id, "spacing", Length::from_mm(0.1)));
-    assert_eq!(view(&session)["fixtures"][0]["values"]["spacing"], 0.5);
+    assert_eq!(view(&session)["fixtures"][0]["grid"]["spacing_mm"], 1.0);
     assert!(session.set_fixture_visible(id, false));
     assert_eq!(triangles(&session), bare);
     assert!(session.delete_fixture(id));

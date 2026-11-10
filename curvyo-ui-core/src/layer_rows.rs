@@ -45,6 +45,8 @@ pub enum RowKind {
     PlacedPage,
     /// The Fixtures row of a laser page's tree (`specs/0106` criterion 17).
     Fixtures,
+    /// A fixture under the Fixtures row (`specs/0102` criterion 12).
+    Fixture,
     /// A muted line in a laser page's tree: "Empty", "Nothing on this page yet." (`specs/0106`
     /// UX notes §5); not focusable, no node.
     Note,
@@ -91,6 +93,7 @@ impl RowKind {
             Self::PageRoot => "Page",
             Self::PlacedPage => "Placed page",
             Self::Fixtures => "Fixtures",
+            Self::Fixture => "Fixture",
             Self::Note => "Note",
         }
     }
@@ -115,6 +118,7 @@ impl RowKind {
             Self::PageRoot => "page-root",
             Self::PlacedPage => "placed-page",
             Self::Fixtures => "fixtures",
+            Self::Fixture => "fixture",
             Self::Note => "note",
         }
     }
@@ -216,6 +220,17 @@ pub struct LayerRow {
     pub read_only: bool,
     /// A row of a laser page's own tree (`specs/0106` criteria 17 to 19): named as there.
     pub page_tree: bool,
+    /// A fixture row's kind word and Active state (`specs/0102` criterion 12); `None` elsewhere.
+    pub fixture: Option<FixtureLine>,
+}
+
+/// A fixture row's kind word and whether it lies on the bed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FixtureLine {
+    /// "Grid", "Holder", "Clamp", "Stop" or "Unknown fixture".
+    pub word: &'static str,
+    /// The Active check box: on the bed.
+    pub active: bool,
 }
 
 impl LayerRow {
@@ -232,7 +247,7 @@ impl LayerRow {
         self.via.is_none()
             && !matches!(
                 self.kind,
-                RowKind::PageRoot | RowKind::Fixtures | RowKind::Note
+                RowKind::PageRoot | RowKind::Fixtures | RowKind::Fixture | RowKind::Note
             )
     }
 
@@ -566,6 +581,7 @@ impl<'a> Tree<'a> {
             via: None,
             read_only: false,
             page_tree: false,
+            fixture: None,
         }
     }
 }

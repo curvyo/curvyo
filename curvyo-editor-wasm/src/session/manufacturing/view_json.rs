@@ -2,12 +2,12 @@
 //! across the wasm boundary): the kind list, each page's chip, the extension list, the
 //! manifests, and the values the Machine and Fixtures blocks show.
 
-use curvyo_document_core::{ManufacturingSnapshot, NodeId, PageKind};
-use curvyo_extension_core::{Block, NoticeContext, Param, ParamValue};
+use curvyo_document_core::{NodeId, PageKind};
+use curvyo_extension_core::{Block, NoticeContext};
 use serde_json::{Value, json};
 
 use super::super::{Session, Workbench};
-use super::commands::{fixture_kind_of, workbench_of};
+use super::commands::workbench_of;
 
 /// The id the front end names a workbench by.
 const fn workbench_name(workbench: Workbench) -> &'static str {
@@ -192,44 +192,9 @@ impl Session {
             ),
             "machine": machine,
             "notices": notices,
-            "fixtures": fixtures_json(&manufacturing, &contribution),
+            // The Fixtures block's rows, the one type of `fixtures/view_json.rs`.
+            "fixtures": self.fixtures_view().map(|v| v.rows).unwrap_or_default(),
         })
         .to_string()
-    }
-}
-
-/// Each fixture with its validated values in the manifest's units (mm for a length).
-fn fixtures_json(
-    manufacturing: &ManufacturingSnapshot,
-    contribution: &curvyo_extension_core::WorkbenchContribution,
-) -> Vec<Value> {
-    manufacturing
-        .fixtures
-        .iter()
-        .map(|fixture| {
-            let kind = fixture_kind_of(contribution, &manufacturing.process, &fixture.kind);
-            let values: serde_json::Map<String, Value> = kind
-                .map(|kind| {
-                    kind.params
-                        .iter()
-                        .map(|p| (p.key.to_owned(), value_json(p, &fixture.params)))
-                        .collect()
-                })
-                .unwrap_or_default();
-            json!({
-                "id": fixture.id.full_id(),
-                "name": fixture.name,
-                "kind": kind.map(|k| k.id),
-                "icon": kind.map(|k| k.icon),
-                "visible": fixture.visible,
-                "values": values,
-            })
-        })
-        .collect()
-}
-
-fn value_json(param: &Param, stored: &curvyo_extension_core::StoredParams) -> Value {
-    match param.read(stored) {
-        ParamValue::Length(length) => json!(length.as_mm()),
     }
 }

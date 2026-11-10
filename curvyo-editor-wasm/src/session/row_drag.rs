@@ -95,6 +95,10 @@ pub struct RowDragAnswer {
     pub target: Option<String>,
     /// Whether the ghost is drawn faint (over a sketch page).
     pub faint: bool,
+    /// The slot a drop fits, for its cue (`specs/0102` criteria 25 and 26); left out of the
+    /// JSON when there is none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fit: Option<super::FitCue>,
 }
 
 /// A row drag in flight: nothing is written before the drop.
@@ -147,6 +151,7 @@ impl Session {
                 badge: DropBadge::None,
                 target: None,
                 faint: false,
+                fit: None,
             },
         });
         true
@@ -155,11 +160,13 @@ impl Session {
     /// One pointer move of the row drag: `point` on the canvas in document space, `None` while
     /// the pointer is over the panels or the page list.
     pub fn row_drag_move(&mut self, point: Option<Point>) -> RowDragAnswer {
+        self.clear_fixture_fit_match();
         let Some(drag) = self.row_drag.clone() else {
             return RowDragAnswer {
                 badge: DropBadge::None,
                 target: None,
                 faint: false,
+                fit: None,
             };
         };
         let Some(point) = point else {
@@ -185,12 +192,13 @@ impl Session {
                 min.translated(delta),
                 max.translated(delta),
             ));
-            return self.set_row_drag(
-                Some(point.translated(snap.offset)),
-                target,
-                DropBadge::PlacedPage,
-                false,
-            );
+            let mut at = point.translated(snap.offset);
+            // A fitting slot of an Active holder takes the page centre to centre (`0102` c. 26).
+            let moved = centre.vector_to(at);
+            if let Some(fit) = self.fixture_fit(min.translated(moved), max.translated(moved)) {
+                at = at.translated(fit);
+            }
+            return self.set_row_drag(Some(at), target, DropBadge::PlacedPage, false);
         }
         let Some((object, centre)) = &drag.ghost else {
             return self.set_row_drag(None, None, DropBadge::NoSketch, false);
@@ -222,6 +230,7 @@ impl Session {
             badge,
             target,
             faint,
+            fit: self.fixture_fit_cue(),
         };
         if let Some(drag) = self.row_drag.as_mut() {
             drag.at = at;
@@ -238,6 +247,7 @@ impl Session {
             return false;
         };
         self.end_snapping_drag();
+        self.end_fixture_fit();
         if let RowDragSource::DrawingPage { page } = &drag.source {
             if drag.answer.badge != DropBadge::PlacedPage {
                 return false;
@@ -245,7 +255,8 @@ impl Session {
             let (Some(target), Some(at)) = (drag.answer.target.as_deref(), drag.at) else {
                 return false;
             };
-            return self.place_page_at(page, target, at);
+            let turned = drag.answer.fit.as_ref().is_some_and(|fit| fit.turned);
+            return self.place_page_at(page, target, at, turned);
         }
         let (RowDragSource::Sketch { sketch, .. }, Some((_, centre)), Some(at)) =
             (&drag.source, &drag.ghost, drag.at)
@@ -265,6 +276,7 @@ impl Session {
     pub fn row_drag_cancel(&mut self) {
         if self.row_drag.take().is_some() {
             self.end_snapping_drag();
+            self.end_fixture_fit();
         }
     }
 
@@ -317,6 +329,12 @@ impl Session {
             source.origin.y + source.size.height.as_mm() / 2.0,
         );
         self.begin_snapping_drag_for_shape();
+        // The Active fixtures of every laser page are snap and fit targets (`0102` c. 24, 26).
+        let fixtures = self.fixture_snap_targets(true);
+        if !fixtures.is_empty() {
+            self.snapping.set_fixture_targets(fixtures);
+        }
+        self.begin_fixture_fit(true);
         self.row_drag = Some(RowDrag {
             source: RowDragSource::DrawingPage {
                 page: page.to_owned(),
@@ -328,15 +346,23 @@ impl Session {
                 badge: DropBadge::None,
                 target: None,
                 faint: false,
+                fit: None,
             },
         });
         true
     }
 
-    /// Places drawing page `source` on laser page `laser` with its frame's centre at `at`, as
-    /// one step "Place page", activates the laser page and selects the placed page. Refused
-    /// (nothing written) when it would not overlap the laser page.
-    pub(super) fn place_page_at(&mut self, source: &str, laser: &str, at: Point) -> bool {
+    /// Places drawing page `source` on laser page `laser` with its frame's centre at `at`, turned
+    /// by 90 degrees about it when `turned` (a fit, `specs/0102` criterion 26), as one step
+    /// "Place page", activates the laser page and selects the placed page. Refused (nothing
+    /// written) when it would not overlap the laser page.
+    pub(super) fn place_page_at(
+        &mut self,
+        source: &str,
+        laser: &str,
+        at: Point,
+        turned: bool,
+    ) -> bool {
         let pages = self.document.pages();
         let (Some(src), Some(out)) = (
             pages.iter().find(|p| p.id == source),
@@ -344,10 +370,15 @@ impl Session {
         ) else {
             return false;
         };
-        let matrix = Affine::translation(Vec2::new(
+        let mut matrix = Affine::translation(Vec2::new(
             at.x - out.origin.x - src.size.width.as_mm() / 2.0,
             at.y - out.origin.y - src.size.height.as_mm() / 2.0,
         ));
+        if turned {
+            let pivot = Point::new(at.x - out.origin.x, at.y - out.origin.y);
+            let quarter = curvyo_document_core::Angle::from_radians(std::f64::consts::FRAC_PI_2);
+            matrix = Affine::rotation_about(pivot, quarter).compose(matrix);
+        }
         let placed =
             self.recording_unguarded(|this| this.document.place_page(laser, source, matrix).ok());
         let Some(id) = placed else {
@@ -370,7 +401,7 @@ impl Session {
             laser.origin.x + laser.size.width.as_mm() / 2.0,
             laser.origin.y + laser.size.height.as_mm() / 2.0,
         );
-        self.place_page_at(source, &laser.id, centre)
+        self.place_page_at(source, &laser.id, centre, false)
     }
 
     /// Places a linked clone of `sketch` moved by `translation` as one step, activates `target`

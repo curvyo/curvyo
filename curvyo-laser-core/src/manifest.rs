@@ -1,16 +1,40 @@
 //! The laser workbench's manifest: one Laser tab, a View card and the Engraved grid fixture
 //! (`specs/0093-laser-workbench-shell` UX notes §3, §4).
 
+use curvyo_document_core::Length;
 use curvyo_extension_core::{
-    Block, Contribution, FixtureKind, Manifest, Tab, ToolboxCard, ToolboxCommand,
-    WorkbenchContribution,
+    Block, Contribution, FixtureKind, Manifest, Param, ParamKind, ParamValue, Tab, ToolboxCard,
+    ToolboxCommand, WorkbenchContribution,
 };
 
-use crate::engraved_grid::{ENGRAVED_GRID, grid_params};
 use crate::overhang::OVERHANG_NOTICE;
 
 /// The process id of a laser manufacturing and the id of this extension (ADR 0033 §1).
 pub const PROCESS_ID: &str = "curvyo.laser";
+
+/// The kind id of the Engraved grid inside the laser process.
+pub const ENGRAVED_GRID: &str = "engraved_grid";
+
+/// The parameters of the Engraved grid, with their defaults and bounds (UX notes §4).
+#[must_use]
+pub(crate) fn grid_params() -> Vec<Param> {
+    let length = |key, label, min: f64, max: f64, default: f64| Param {
+        key,
+        label,
+        tooltip: label,
+        kind: ParamKind::Length {
+            min: Length::from_mm(min),
+            max: Length::from_mm(max),
+        },
+        default: ParamValue::Length(Length::from_mm(default)),
+    };
+    vec![
+        length("spacing", "Spacing", 0.5, 1000.0, 10.0),
+        length("line_width", "Line width", 0.01, 10.0, 0.1),
+        length("origin_x", "Origin X", -10_000.0, 10_000.0, 0.0),
+        length("origin_y", "Origin Y", -10_000.0, 10_000.0, 0.0),
+    ]
+}
 
 /// The laser workbench's manifest.
 #[must_use]

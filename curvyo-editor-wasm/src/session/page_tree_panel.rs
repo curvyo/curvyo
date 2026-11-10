@@ -5,11 +5,25 @@
 use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{NodeId, NodeKind, NodeRead};
+use curvyo_laser_core::FixtureKind;
 use curvyo_ui_core::{
-    Expansion, Home, LayerRows, PageTree, PlacedPageRow, Reach, RowFacts, object_bounds,
+    Expansion, FixtureTreeRow, Home, LayerRows, PageTree, PlacedPageRow, Reach, RowFacts,
+    object_bounds,
 };
 
 use super::Session;
+
+/// A fixture kind's word in the Layers tree (`specs/0102` criterion 12).
+const fn fixture_word(kind: FixtureKind) -> &'static str {
+    match kind {
+        FixtureKind::EngravedGrid => "Grid",
+        FixtureKind::Holder => "Holder",
+        FixtureKind::Clamp => "Clamp",
+        FixtureKind::Stop => "Stop",
+        FixtureKind::Screw => "Screw",
+        FixtureKind::Unknown => "Unknown fixture",
+    }
+}
 
 /// The top-level object (a child of a layer or of the root) each node lies in.
 fn top_level_units(nodes: &[NodeRead]) -> HashMap<NodeId, NodeId> {
@@ -94,6 +108,20 @@ impl Session {
         let fixtures_shown = self
             .active_manufacturing()
             .is_none_or(|m| m.fixtures.iter().all(|f| f.visible));
+        let page_fixtures = self.fixture_tree();
+        let fixture_rows: Vec<FixtureTreeRow<'_>> = page_fixtures
+            .iter()
+            .map(
+                |(id, name, kind, active, visible, selected)| FixtureTreeRow {
+                    id: *id,
+                    name,
+                    word: fixture_word(*kind),
+                    active: *active,
+                    visible: *visible,
+                    selected: *selected,
+                },
+            )
+            .collect();
         let Some(root) = page.kind.manufacturing() else {
             return LayerRows::build(nodes, expansion, facts);
         };
@@ -104,6 +132,7 @@ impl Session {
                 page_name: &page.name,
                 own: &own,
                 placed: &rows,
+                fixtures: &fixture_rows,
                 fixtures_shown,
             },
             expansion,

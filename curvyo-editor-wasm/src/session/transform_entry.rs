@@ -216,6 +216,10 @@ impl Session {
     /// `unified-object-editing`; 33, 34, 36 of `multi-object-transform`).
     #[must_use]
     pub fn transform_entry(&self) -> Option<EntryView> {
+        // A laser fixture's chip (`specs/0102-laser-fixtures` adrs.md §6a.4).
+        if let Some(view) = self.fixture_entry_view() {
+            return Some(view);
+        }
         if let Some(entry) = self.open_group_entry() {
             return self.group_entry_view(entry);
         }
@@ -299,6 +303,21 @@ impl Session {
         second: &str,
         last_edited: usize,
     ) -> EntryOutcome {
+        self.commit_transform_entry_fields(&[first, second], last_edited)
+    }
+
+    /// [`Session::commit_transform_entry`] with every field's text: a laser fixture's S chip of
+    /// a stop has three (`specs/0102-laser-fixtures` criterion 23).
+    pub fn commit_transform_entry_fields(
+        &mut self,
+        texts: &[&str],
+        last_edited: usize,
+    ) -> EntryOutcome {
+        if let Some(outcome) = self.commit_fixture_entry(texts, false) {
+            return outcome;
+        }
+        let first = texts.first().copied().unwrap_or("");
+        let second = texts.get(1).copied().unwrap_or("");
         self.recording_unguarded(|this| -> EntryOutcome {
             if this.open_entry().is_none()
                 && this.open_param_entry().is_none()
@@ -385,6 +404,7 @@ impl Session {
     /// Closes the entry without writing (criterion 20): Escape in the chip,
     /// a press elsewhere, a blur, a tool switch. Idempotent.
     pub fn cancel_transform_entry(&mut self) {
+        self.cancel_fixture_entry();
         self.select.cancel_entry();
     }
 }

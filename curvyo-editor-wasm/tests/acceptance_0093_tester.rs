@@ -109,16 +109,16 @@ fn ac9_a_new_setup_has_no_fixture_and_the_grid_is_added_with_its_defaults() {
     assert!(s.add_fixture("engraved_grid").is_some());
     assert_eq!(s.undo_len(), steps + 1);
     let f = &view(&s)["fixtures"][0];
-    // Named "<Kind> N" since `specs/0102-laser-fixtures` criterion 2.
+    // Named "<Kind> N" since `specs/0102-laser-fixtures` criterion 2; the row's grid fields are
+    // those of `0102` criterion 15 (the line width is no longer shown, criterion 16).
     assert_eq!(f["name"], "Grid 1");
     assert_eq!(f["visible"], true);
-    assert_eq!(f["values"]["spacing"], 10.0);
-    assert_eq!(f["values"]["line_width"], 0.1);
-    assert_eq!(f["values"]["origin_x"], 0.0);
-    assert_eq!(f["values"]["origin_y"], 0.0);
+    assert_eq!(f["grid"]["spacing_mm"], 10.0);
+    assert_eq!(f["grid"]["origin_x_mm"], 0.0);
+    assert_eq!(f["grid"]["origin_y_mm"], 0.0);
     assert!(s.add_fixture("pocket").is_none(), "only the declared kind");
-    s.add_fixture("engraved_grid").unwrap();
-    assert_eq!(view(&s)["fixtures"][1]["name"], "Grid 2");
+    // One grid per page since `0102` criterion 2.
+    assert!(s.add_fixture("engraved_grid").is_none());
 }
 
 #[test]
@@ -133,9 +133,10 @@ fn ac9_a_spacing_edit_redraws_and_is_one_step_and_clamped() {
     assert_eq!(s.undo_len(), steps + 1);
     assert!(s.frame_draw_list().triangles.len() < n10);
     assert!(s.set_fixture_length(id, "spacing", mm(0.0)));
+    // `0102` criterion 15: the spacing is 1 to 100 mm.
     assert_eq!(
-        view(&s)["fixtures"][0]["values"]["spacing"],
-        0.5,
+        view(&s)["fixtures"][0]["grid"]["spacing_mm"],
+        1.0,
         "clamped to its minimum"
     );
     assert!(!s.set_fixture_length(id, "nonsense", mm(3.0)));
@@ -148,6 +149,8 @@ fn ac10_fixtures_are_never_selectable_and_hide_is_view_state_of_one_step() {
     let o = s.active_page().origin;
     s.add_fixture("engraved_grid").unwrap();
     let id = s.fixture_named(&fixture_ids(&s)[0]).unwrap();
+    // `0102` criterion 2: a new fixture is selected; its box is not the grid's drawing.
+    s.escape();
     let shown = s.frame_draw_list().triangles.len();
 
     // Press on a grid line of the laser page, marquee over the page, Select All.
@@ -286,7 +289,8 @@ fn ac12_save_and_reopen_keep_the_laser_page_and_its_fixtures() {
     let mut s = one_page();
     let page = add_laser(&mut s);
     s.add_fixture("engraved_grid").unwrap();
-    s.add_fixture("engraved_grid").unwrap();
+    // One grid per page since `0102` criterion 2: the second fixture is a holder.
+    s.add_fixture("holder").unwrap();
     let hidden = s.fixture_named(&fixture_ids(&s)[1]).unwrap();
     assert!(s.set_fixture_visible(hidden, false));
     let before = opened(&s).manufacturings();

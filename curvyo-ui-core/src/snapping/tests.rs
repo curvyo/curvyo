@@ -947,3 +947,27 @@ fn axis_constraints_are_independent_of_direction_vector_scale() {
         assert!(r.is_empty());
     }
 }
+
+#[test]
+fn a_fixture_point_captures_both_axes_whatever_the_object_switches() {
+    // `specs/0102-laser-fixtures` criterion 27: the caller gathers fixture targets only while the
+    // Fixtures switch is on, so the kind itself is never switched off by the other flags.
+    let targets = SnapTargets::new(vec![SnapTarget::point(
+        Point::new(10.0, 10.0),
+        (Point::new(10.0, 10.0), Point::new(10.0, 10.0)),
+        TargetKind::Fixture,
+    )]);
+    let only_page = SnapSettings {
+        objects: false,
+        guides: false,
+        nodes: false,
+        ..settings(8.0, 14.0)
+    };
+    let result = resolve(
+        &only_page,
+        &targets,
+        &SnapProbe::point(Point::new(12.0, 9.0)),
+        &mut SnapState::default(),
+    );
+    assert_eq!(result.offset, Vec2::new(-2.0, 1.0));
+}

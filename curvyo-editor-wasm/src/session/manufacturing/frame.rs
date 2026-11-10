@@ -6,7 +6,7 @@ use std::sync::Arc;
 use curvyo_document_core::{
     Affine, ManufacturingSnapshot, NodeId, ObjectSnapshot, Page, Point, Vec2, ViewTransform,
 };
-use curvyo_render_core::{DrawList, GridStroke, RgbaColor, build_artwork};
+use curvyo_render_core::{DrawList, GridStroke, build_artwork};
 
 use super::super::Session;
 
@@ -32,39 +32,6 @@ struct PlacedEntry {
 }
 
 impl Session {
-    /// The visible fixtures of every output page, added to that page's entry of `grids` (one
-    /// entry per page of `pages`): they are painted with the page's grid, under everything
-    /// placed or drawn on it. Lines one device pixel wide in the grid ink.
-    pub(in crate::session) fn add_output_fixtures(
-        &self,
-        pages: &[Page],
-        grids: &mut Vec<DrawList>,
-    ) {
-        let view = self.view();
-        let ink = curvyo_render_core::grid_ink(self.shown_background());
-        for manufacturing in &self.document.manufacturings() {
-            let Some(page) = manufacturing.page.as_ref() else {
-                continue;
-            };
-            let Some(index) = pages.iter().position(|shown| shown.id == page.id) else {
-                continue;
-            };
-            let to_plane = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
-            for fixture in manufacturing.fixtures.iter().filter(|f| f.visible) {
-                let mut drawing =
-                    curvyo_ui_core::fixture_drawing(&fixture.kind, &fixture.params, page.size);
-                for line in &mut drawing.lines {
-                    line.start = to_plane.apply_point(line.start);
-                    line.end = to_plane.apply_point(line.end);
-                }
-                if grids.len() < pages.len() {
-                    grids.resize_with(pages.len(), DrawList::default);
-                }
-                grids[index].extend(fixture_lines(&drawing, ink, view, self.device_pixel_ratio));
-            }
-        }
-    }
-
     /// Each placement's drawing page on its output page, under the drawing (ADR 0042 §4,
     /// `adrs.md` decision 2), through one composed matrix: the drawing's resolved outlines
     /// reused, never copied. Artwork layers only, so the drawing after it keeps its layers and
@@ -306,25 +273,4 @@ fn origin_marker(
 fn linear_scale(map: Affine) -> f64 {
     let det = map.a.mul_add(map.d, -(map.b * map.c)).abs();
     if det > UNIFORM_EPS { det.sqrt() } else { 1.0 }
-}
-
-/// The lines of one fixture, each one device pixel wide in the page's grid ink: a reference on
-/// the bed, not artwork (its stored line width is the engraving's, used by later job slices).
-fn fixture_lines(
-    drawing: &curvyo_extension_core::FixtureDrawing,
-    ink: RgbaColor,
-    view: ViewTransform,
-    device_pixel_ratio: f64,
-) -> DrawList {
-    let strokes: Vec<GridStroke> = drawing
-        .lines
-        .iter()
-        .map(|line| GridStroke {
-            start: line.start,
-            end: line.end,
-            emphasis: 1.0,
-            alpha: 1.0,
-        })
-        .collect();
-    curvyo_render_core::build_grid_lines(&strokes, ink, view, device_pixel_ratio)
 }
