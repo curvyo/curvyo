@@ -1,0 +1,90 @@
+{
+  "clone_members": [
+    {
+      "clone": {
+        "counter": 39,
+        "peer": "1"
+      },
+      "clone_name": "Clone 1",
+      "member": {
+        "counter": 17,
+        "peer": "1"
+      },
+      "name": "Member 1",
+      "operations": [
+        {
+          "counter": 42,
+          "peer": "1"
+        }
+      ]
+    },
+    {
+      "clone": {
+        "counter": 39,
+        "peer": "1"
+      },
+      "clone_name": "Clone 1",
+      "member": {
+        "counter": 26,
+        "peer": "1"
+      },
+      "name": "Member 2",
+      "operations": []
+    }
+  ],
+  "cuts_last": true,
+  "items": {
+    "not_assigned": [
+      {
+        "counter": 17,
+        "peer": "1"
+      }
+    ],
+    "output_off": [],
+    "running": [
+      {
+        "counter": 39,
+        "peer": "1"
+      }
+    ],
+    "runs_while_hidden": []
+  },
+  "rows": [
+    {
+      "id": {
+        "counter": 48,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "unknown",
+      "margin_mm": 0.0,
+      "name": "Plasma 1",
+      "output": true,
+      "section": null,
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 42,
+        "peer": "1"
+      },
+      "items": 2,
+      "kind": "cut",
+      "margin_mm": 0.0,
+      "name": "Cut 1",
+      "output": true,
+      "section": "cutting",
+      "show": true,
+      "tick": "none"
+    }
+  ],
+  "summary": {
+    "not_assigned": 1,
+    "operations": 1,
+    "output_off": 0,
+    "running": 2,
+    "runs_while_hidden": 0
+  },
+  "view_mode": "operations"
+}

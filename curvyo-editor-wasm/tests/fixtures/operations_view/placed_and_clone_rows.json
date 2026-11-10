@@ -1,0 +1,75 @@
+{
+  "clone_members": [],
+  "cuts_last": true,
+  "items": {
+    "not_assigned": [],
+    "output_off": [],
+    "running": [
+      {
+        "counter": 29,
+        "peer": "1"
+      },
+      {
+        "counter": 26,
+        "peer": "1"
+      },
+      {
+        "counter": 17,
+        "peer": "1"
+      }
+    ],
+    "runs_while_hidden": []
+  },
+  "rows": [
+    {
+      "id": {
+        "counter": 43,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "engrave",
+      "margin_mm": 0.0,
+      "name": "Engrave 1",
+      "output": true,
+      "section": "marking",
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 48,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "score",
+      "margin_mm": 0.0,
+      "name": "Score 1",
+      "output": true,
+      "section": "marking",
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 38,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "cut",
+      "margin_mm": 0.0,
+      "name": "Cut 1",
+      "output": true,
+      "section": "cutting",
+      "show": true,
+      "tick": "none"
+    }
+  ],
+  "summary": {
+    "not_assigned": 0,
+    "operations": 3,
+    "output_off": 0,
+    "running": 3,
+    "runs_while_hidden": 0
+  },
+  "view_mode": "operations"
+}

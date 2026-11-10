@@ -1,0 +1,135 @@
+{
+  "clone_members": [],
+  "cuts_last": true,
+  "items": {
+    "not_assigned": [
+      {
+        "counter": 71,
+        "peer": "1"
+      }
+    ],
+    "output_off": [
+      {
+        "counter": 62,
+        "peer": "1"
+      }
+    ],
+    "running": [
+      {
+        "counter": 17,
+        "peer": "1"
+      },
+      {
+        "counter": 26,
+        "peer": "1"
+      },
+      {
+        "counter": 35,
+        "peer": "1"
+      },
+      {
+        "counter": 44,
+        "peer": "1"
+      },
+      {
+        "counter": 53,
+        "peer": "1"
+      }
+    ],
+    "runs_while_hidden": []
+  },
+  "rows": [
+    {
+      "id": {
+        "counter": 80,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "score",
+      "margin_mm": 0.0,
+      "name": "Score 1",
+      "output": true,
+      "section": "marking",
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 85,
+        "peer": "1"
+      },
+      "items": 2,
+      "kind": "engrave",
+      "margin_mm": 0.0,
+      "name": "Engrave 1",
+      "output": true,
+      "section": "marking",
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 91,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "engrave_outline",
+      "margin_mm": 0.0,
+      "name": "Engrave + Outline 1",
+      "output": true,
+      "section": "marking",
+      "show": false,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 96,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "cut",
+      "margin_mm": 0.0,
+      "name": "Cut 1",
+      "output": true,
+      "section": "cutting",
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 101,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "cut_out",
+      "margin_mm": 2.0,
+      "name": "Cut-out 1",
+      "output": true,
+      "section": "cutting",
+      "show": true,
+      "tick": "none"
+    },
+    {
+      "id": {
+        "counter": 108,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "cut",
+      "margin_mm": 0.0,
+      "name": "Cut 2",
+      "output": false,
+      "section": "cutting",
+      "show": true,
+      "tick": "none"
+    }
+  ],
+  "summary": {
+    "not_assigned": 1,
+    "operations": 5,
+    "output_off": 1,
+    "running": 5,
+    "runs_while_hidden": 0
+  },
+  "view_mode": "operations"
+}

@@ -106,11 +106,17 @@ fn ac8_the_tabs_follow_the_page_kind() {
     assert!(!drawing.contains(&"sketches") && !drawing.contains(&"parameters"));
     assert!(!drawing.contains(&"workbench"));
     add_laser(&mut session);
+    let laser = tab_names(&session);
     assert_eq!(
-        tab_names(&session),
+        laser
+            .iter()
+            .filter(|n| **n != "operations")
+            .copied()
+            .collect::<Vec<_>>(),
         drawing,
-        "a laser page has the drawing tabs"
+        "a laser page has the drawing tabs and the Operations tab"
     );
+    assert!(laser.contains(&"operations"), "{laser:?}");
     session.add_page_of_kind("sketch", None).unwrap();
     assert_eq!(session.workbench(), Workbench::Sketch);
     let sketch = tab_names(&session);

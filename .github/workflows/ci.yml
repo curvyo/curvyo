@@ -46,7 +46,7 @@
 #                        0049 (read, frame, commands, hostile sizes, the no-cycle property test),
 #                        Fracture, Flatten and Weld (0037, 0068), node editing of compound
 #                        paths (0055), tiling (0069), cooperative editing (0092) and the
-#                        workspace tree (0095).
+#                        workspace tree (0095), laser operations (0101, criterion 29).
 #   boolean-wasm-golden — the kernel's golden results and the tiling layout goldens (0069) in the
 #                        wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
@@ -520,6 +520,7 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test weld_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test tiling_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test move_versus_edit_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test operations_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture

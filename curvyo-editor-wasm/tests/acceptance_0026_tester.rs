@@ -509,6 +509,9 @@ fn ac4_library_writes_never_enter_the_document_or_its_history() {
 #[test]
 fn ac5_pick_takes_values_and_work_area_in_one_step_and_content_keeps_its_place() {
     let mut s = with_laser(&disk_of(&[k40(1)]));
+    // `0101` criterion 18: the unassigned content is in the Not assigned look under "View:
+    // Operations"; this test reads the drawing's own colour, which "View: Drawn" keeps.
+    s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
     let red = red_box(&s);
     let steps = s.undo_len();
     assert!(s.pick_machine_profile(&id(1)));

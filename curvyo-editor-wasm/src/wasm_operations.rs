@@ -1,0 +1,123 @@
+//! Thin host bridge of the laser operations of the active laser page (`specs/0101-laser-operations`):
+//! the commands of the Operations tab, the number keys and the notice. Ids are the JSON texts of
+//! node ids, as the other bridges take them.
+
+use curvyo_document_core::{NodeId, OperationSwitch};
+use wasm_bindgen::prelude::*;
+
+use crate::wasm_api::WasmSession;
+
+/// The node id a host sends back (its JSON text), `None` for anything else.
+fn node(text: &str) -> Option<NodeId> {
+    serde_json::from_str(text).ok()
+}
+
+#[wasm_bindgen]
+impl WasmSession {
+    /// Adds an operation of the stored kind (`cut`, `score`, `engrave`, `engrave_outline`,
+    /// `cut_out`) on the active laser page, with the selection assigned (criterion 8). The new
+    /// operation's id as JSON text, `None` when nothing was added.
+    pub fn press_operation_kind(&mut self, kind: &str) -> Option<String> {
+        let id = self.session.press_operation_kind(kind)?;
+        serde_json::to_string(&id).ok()
+    }
+
+    /// Renames operation `id` (criterion 3). Whether it changed.
+    pub fn rename_operation(&mut self, id: &str, name: &str) -> bool {
+        node(id).is_some_and(|id| self.session.rename_operation(id, name))
+    }
+
+    /// Deletes operation `id` with its memberships (criterion 4). Whether it was deleted.
+    pub fn delete_operation(&mut self, id: &str) -> bool {
+        node(id).is_some_and(|id| self.session.delete_operation(id))
+    }
+
+    /// Sets the Cut-out margin of operation `id` in mm (criterion 23). Whether it changed.
+    pub fn set_operation_margin(&mut self, id: &str, margin_mm: f64) -> bool {
+        node(id).is_some_and(|id| self.session.set_operation_margin(id, margin_mm))
+    }
+
+    /// Sets the Show switch of operation `id` (criterion 15). Whether it changed.
+    pub fn set_operation_show(&mut self, id: &str, on: bool) -> bool {
+        node(id).is_some_and(|id| {
+            self.session
+                .set_operation_switch(id, OperationSwitch::Show, on)
+        })
+    }
+
+    /// Sets the Output switch of operation `id` (criterion 16). Whether it changed.
+    pub fn set_operation_output(&mut self, id: &str, on: bool) -> bool {
+        node(id).is_some_and(|id| {
+            self.session
+                .set_operation_switch(id, OperationSwitch::Output, on)
+        })
+    }
+
+    /// Switches Cuts last on or off, the cutting operations moving below the marking ones when on
+    /// (criterion 6). Whether it changed.
+    pub fn set_cuts_last(&mut self, on: bool) -> bool {
+        self.session.set_cuts_last(on)
+    }
+
+    /// Moves operation `id` to position `to` of the run order shown (criteria 5, 6). Whether it
+    /// moved; a move across the section line is refused.
+    pub fn move_operation(&mut self, id: &str, to: u32) -> bool {
+        node(id).is_some_and(|id| self.session.move_operation(id, to as usize))
+    }
+
+    /// Ticks (`on` true) or unticks the selection's items in operation `id` (criterion 8).
+    pub fn set_selection_in_operation(&mut self, id: &str, on: bool) -> bool {
+        node(id).is_some_and(|id| self.session.set_selection_in_operation(id, on))
+    }
+
+    /// Assigns or removes the clone member `member` of clone `clone` in operation `id`, by its
+    /// path (Frage 167 B).
+    pub fn set_clone_member_in_operation(
+        &mut self,
+        id: &str,
+        clone: &str,
+        member: &str,
+        on: bool,
+    ) -> bool {
+        match (node(id), node(clone), node(member)) {
+            (Some(id), Some(clone), Some(member)) => self
+                .session
+                .set_clone_member_in_operation(id, clone, member, on),
+            _ => false,
+        }
+    }
+
+    /// The number keys 1 to 9: toggles the selection in operation `number` of the list
+    /// (criterion 8). Whether it changed.
+    pub fn toggle_selection_by_number(&mut self, number: u32) -> bool {
+        self.session.toggle_selection_by_number(number as usize)
+    }
+
+    /// Selects the items of the summary count `which` (`running`, `not_assigned`,
+    /// `runs_while_hidden`, `output_off`), criterion 17. Whether it selected.
+    pub fn select_operation_items(&mut self, which: &str) -> bool {
+        self.session.select_operation_items(which)
+    }
+
+    /// Draws the output page by its operations (`false`) or as drawn (`true`), criterion 18.
+    /// Whether it changed. Session state, no step.
+    pub fn set_operations_drawn(&mut self, drawn: bool) -> bool {
+        let mode = if drawn {
+            crate::session::OperationsViewMode::Drawn
+        } else {
+            crate::session::OperationsViewMode::Operations
+        };
+        self.session.set_operations_view_mode(mode)
+    }
+
+    /// The Operations tab as JSON (`specs/0101` criteria 1, 5, 17): rows in run order, ticks over the
+    /// selection and the summary; `null` on another page.
+    pub fn operations_view_json(&self) -> String {
+        self.session.operations_view_json()
+    }
+
+    /// The notice of the last operation command (criterion 10), `None` when there is none.
+    pub fn operations_notice(&self) -> Option<String> {
+        self.session.operations_notice()
+    }
+}

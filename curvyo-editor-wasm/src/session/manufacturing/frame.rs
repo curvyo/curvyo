@@ -78,6 +78,7 @@ impl Session {
         let view = self.view();
         let read = self.document_read();
         let live = self.placed_live();
+        let looks = self.operation_look_table();
         for manufacturing in &manufacturings {
             let Some(page) = manufacturing.page.as_ref() else {
                 continue;
@@ -88,6 +89,14 @@ impl Session {
                     .iter()
                     .map(|&index| read.drawn[index].clone())
                     .collect();
+                // The members of this placed page in their looks (`0101` criteria 11, 14, 15, 18).
+                let objects = match looks
+                    .as_ref()
+                    .filter(|t| t.manufacturing == manufacturing.id)
+                {
+                    Some(table) => self.looked_placed_members(table, id, &objects, view),
+                    None => objects,
+                };
                 // A placed page in a Select drag is drawn where a release puts it, a copy beside
                 // the original; off its laser page at 40 % (`specs/0100` UX notes §5).
                 let mut drawn = vec![(Affine::IDENTITY, false)];

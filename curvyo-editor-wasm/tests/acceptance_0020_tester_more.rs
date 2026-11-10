@@ -852,6 +852,11 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
         let explicit_steps = matches!(
             name,
             "sketch_plate_v28.curvyo"
+                | "operations_clone_member_v39.curvyo"
+                | "operations_v39.curvyo"
+                | "operations_unknown_kind_v39.curvyo"
+                | "operations_unreadable_v39.curvyo"
+                | "operations_dangling_v39.curvyo"
                 | "sketch_dangling_v28.curvyo"
                 | "sketch_slot_v28.curvyo"
                 | "sketch_converted_v28.curvyo"

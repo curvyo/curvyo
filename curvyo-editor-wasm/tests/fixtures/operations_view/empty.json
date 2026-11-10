@@ -1,0 +1,19 @@
+{
+  "clone_members": [],
+  "cuts_last": true,
+  "items": {
+    "not_assigned": [],
+    "output_off": [],
+    "running": [],
+    "runs_while_hidden": []
+  },
+  "rows": [],
+  "summary": {
+    "not_assigned": 0,
+    "operations": 0,
+    "output_off": 0,
+    "running": 0,
+    "runs_while_hidden": 0
+  },
+  "view_mode": "operations"
+}

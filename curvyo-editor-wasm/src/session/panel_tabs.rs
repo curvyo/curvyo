@@ -23,6 +23,12 @@ fn tab_of_kind(name: &str, sketch: bool) -> bool {
     }
 }
 
+/// Whether `tab` may show on the active page: the Operations tab only on a laser page with its
+/// extension on (`specs/0101-laser-operations` criterion 1, 28), the drawing tabs as `tab_of_kind`.
+fn tab_allowed(tab: PanelTab, sketch: bool, laser: bool) -> bool {
+    (tab != PanelTab::Operations || laser) && tab_of_kind(tab.name(), sketch)
+}
+
 /// The key a page kind's last tab is kept under (criterion 9): an output page by its process,
 /// every unknown kind as one.
 fn kind_key(kind: &PageKind) -> String {
@@ -89,12 +95,24 @@ impl Session {
             tabs.active()
         });
         let sketch = self.workbench() == super::Workbench::Sketch;
+        let mut tabs: Vec<PanelTabEntry> = tab_entries_for(active, self.style_blocker(non_empty))
+            .into_iter()
+            .filter(|tab| tab_of_kind(tab.name, sketch))
+            .collect();
+        if self.operations_available() {
+            // The Operations tab comes right after Document (`specs/0101` criterion 1).
+            let at = tabs
+                .iter()
+                .position(|tab| tab.name == PanelTab::Document.name())
+                .map_or(tabs.len(), |index| index + 1);
+            tabs.insert(
+                at,
+                PanelTab::Operations.entry_labelled("Operations", active == PanelTab::Operations),
+            );
+        }
         PanelView {
             content: panel_body(active, self.pen_path_unfinished(), non_empty),
-            tabs: tab_entries_for(active, self.style_blocker(non_empty))
-                .into_iter()
-                .filter(|tab| tab_of_kind(tab.name, sketch))
-                .collect(),
+            tabs,
         }
     }
 
@@ -112,14 +130,15 @@ impl Session {
         let current = self.panel_tabs.get().active();
         self.kind_tabs.insert(from, current);
         let sketch = to == super::Workbench::Sketch;
-        if tab_of_kind(current.name(), sketch) {
+        let laser = self.operations_available();
+        if tab_allowed(current, sketch, laser) {
             return;
         }
         let tab = self
             .kind_tabs
             .get(&kind)
             .copied()
-            .filter(|tab| tab_of_kind(tab.name(), sketch))
+            .filter(|tab| tab_allowed(*tab, sketch, laser))
             .unwrap_or(PanelTab::Document);
         if !self.press_panel_tab(tab.name()) {
             self.press_panel_tab(PanelTab::Document.name());
@@ -137,6 +156,9 @@ impl Session {
         let Some(tab) = PanelTab::from_name(name) else {
             return false;
         };
+        if tab == PanelTab::Operations && !self.operations_available() {
+            return false;
+        }
         let non_empty = self.panel_scope_non_empty();
         self.update_panel_tabs(|tabs| {
             tabs.observe(non_empty);
@@ -233,6 +255,7 @@ impl PanelTabsRecord {
             PanelContent::Parameters => "parameters",
             PanelContent::Share => "share",
             PanelContent::Workbench => "workbench",
+            PanelContent::Operations => "operations",
             PanelContent::Empty => "empty",
         };
         Self {
