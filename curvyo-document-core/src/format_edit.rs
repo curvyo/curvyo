@@ -30,9 +30,6 @@ pub enum FormatReason {
     /// A side is not a number from 1 to 100 000 mm.
     #[error("a side must be from 1 to 100000 mm")]
     BadSize,
-    /// The library already has a format of this size; carries its name.
-    #[error("the same size as {0}")]
-    SameSizeAs(String),
     /// The group already has a format of this name; carries the name.
     #[error("this group already has {0}")]
     NameInGroup(String),
@@ -148,12 +145,6 @@ impl FormatLibrary {
                 None
             }
         };
-        if let Some(alike) = self.effective.with_sides(short, long, editing) {
-            return Err(FormatError::new(
-                FormatField::Width,
-                FormatReason::SameSizeAs(alike.name.clone()),
-            ));
-        }
         let name = spec.name.trim();
         let taken = self.effective.presets().find(|(group, preset)| {
             Some(group.id.as_str()) == group_id

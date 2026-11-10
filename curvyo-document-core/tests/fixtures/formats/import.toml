@@ -16,6 +16,14 @@ default_orientation = "landscape"
   long_side = 50
   unit = "mm"
 
+  # Another id, but the group has this name and size: skipped (criterion 39).
+  [[group.preset]]
+  id = "u-ring-copy"
+  name = "key ring"
+  short_side = 3
+  long_side = 5
+  unit = "cm"
+
   [[group.preset]]
   id = "u-key-tag"
   name = "Key tag"
@@ -63,7 +71,7 @@ id = "paper"
   long_side = 11
   unit = "in"
 
-  # The size of A4: skipped.
+  # The size of A4 under another name: added (criterion 39).
   [[group.preset]]
   id = "u-a4-copy"
   name = "A4 copy"

@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::document_presets::{DocumentPreset, PresetError};
+use crate::document_presets::{DocumentPreset, PresetError, same_sides};
 use crate::format_library::FormatLibrary;
 use crate::format_library_file::{UserFile, UserGroup};
 
@@ -16,7 +16,7 @@ pub struct ImportReport {
     pub added: usize,
     /// Groups that received at least one added format.
     pub groups: usize,
-    /// Formats left out because the library had them, or one of their size.
+    /// Formats left out because the library had them.
     pub skipped: usize,
 }
 
@@ -103,7 +103,7 @@ impl FormatLibrary {
     }
 
     /// Merges one imported format: skipped when the library has it (same id
-    /// and content) or has a format of its size, otherwise added to the group
+    /// and content) or the group has one of its name and size, otherwise added to the group
     /// of its id or name (or a new group) under its own id, or a new one when
     /// that is taken.
     fn import_format(&mut self, group: &UserGroup, preset: &DocumentPreset) -> Merge {
@@ -112,11 +112,7 @@ impl FormatLibrary {
         {
             return Merge::Skipped(Some(known.id.clone()));
         }
-        if self
-            .list()
-            .with_sides(preset.short_side, preset.long_side, None)
-            .is_some()
-        {
+        if self.has_in_group(group, preset) {
             return Merge::Skipped(None);
         }
         let target = self.group_for_import(group);
@@ -133,13 +129,12 @@ impl FormatLibrary {
         Merge::Added(id, target)
     }
 
-    /// The group an imported group joins: the one with its id (a built-in id
-    /// appends to that built-in group), else the maker's group with its name
-    /// ignoring case, else a new group (criterion 27).
-    fn group_for_import(&mut self, group: &UserGroup) -> String {
+    /// The id of the group an imported group joins, if there is one: the one
+    /// with its id (a built-in id appends to that built-in group), else the
+    /// maker's group with its name ignoring case.
+    fn existing_group_for_import(&self, group: &UserGroup) -> Option<String> {
         let name = group.name.to_lowercase();
-        let existing = self
-            .list()
+        self.list()
             .groups
             .iter()
             .find(|g| g.id == group.id)
@@ -149,7 +144,28 @@ impl FormatLibrary {
                     .iter()
                     .find(|g| g.user && g.name.to_lowercase() == name)
             })
-            .map(|g| g.id.clone());
+            .map(|g| g.id.clone())
+    }
+
+    /// Whether the group the imported one joins already has a format of this
+    /// name (ignoring case) and size (criteria 27 and 39).
+    fn has_in_group(&self, group: &UserGroup, preset: &DocumentPreset) -> bool {
+        let Some(id) = self.existing_group_for_import(group) else {
+            return false;
+        };
+        let name = preset.name.to_lowercase();
+        let (short, long) = (preset.short_side.as_mm(), preset.long_side.as_mm());
+        self.list()
+            .groups
+            .iter()
+            .filter(|g| g.id == id)
+            .flat_map(|g| g.presets.iter())
+            .any(|known| known.name.to_lowercase() == name && same_sides(known, short, long))
+    }
+
+    /// The group an imported group joins, or a new one (criterion 27).
+    fn group_for_import(&mut self, group: &UserGroup) -> String {
+        let existing = self.existing_group_for_import(group);
         existing.unwrap_or_else(|| {
             let id = self.unique_group_id(&group.name);
             self.push_user_group(UserGroup {

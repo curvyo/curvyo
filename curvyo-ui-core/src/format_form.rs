@@ -6,8 +6,8 @@
 
 use curvyo_document_core::{
     DisplayUnit, DocumentPreset, DocumentSize, FormatError, FormatLibrary, FormatReason,
-    FormatSpec, GroupTarget, ImportReport, MAX_DOCUMENT_MM, MAX_USER_FORMATS, MIN_DOCUMENT_MM,
-    Orientation, PresetGroup, PresetUnit, checked_name,
+    FormatSpec, GroupTarget, MAX_DOCUMENT_MM, MAX_USER_FORMATS, MIN_DOCUMENT_MM, Orientation,
+    PresetGroup, PresetUnit, checked_name,
 };
 
 use crate::display_unit_text::{decimal_text, format_field_length, range_message};
@@ -129,8 +129,6 @@ pub struct FormDraft<'a> {
     pub group_id: &'a str,
     /// The new group's name (used with an empty `group_id`).
     pub new_group_name: &'a str,
-    /// The new group's "Opens as".
-    pub new_group_orientation: Orientation,
     /// "Add to quick selection".
     pub favourite: bool,
 }
@@ -167,7 +165,7 @@ pub fn check_format_form(
         }
         GroupTarget::New {
             name: draft.new_group_name.to_string(),
-            orientation: draft.new_group_orientation,
+            orientation: Orientation::Portrait,
         }
     } else {
         GroupTarget::Existing(draft.group_id.to_string())
@@ -216,7 +214,6 @@ fn size_message(unit: PresetUnit) -> String {
 #[must_use]
 pub fn field_error(error: &FormatError) -> FieldError {
     let message = match &error.reason {
-        FormatReason::SameSizeAs(name) => format!("Same size as {name}"),
         FormatReason::NameInGroup(name) => format!("This group already has {name}"),
         FormatReason::LimitFormats => format!("The list is full ({MAX_USER_FORMATS} formats)"),
         FormatReason::LimitGroups => "There are too many groups".to_string(),
@@ -233,48 +230,6 @@ pub fn field_error(error: &FormatError) -> FieldError {
         curvyo_document_core::FormatField::GroupName => FormField::GroupName,
     };
     FieldError { field, message }
-}
-
-/// The notice after a format was added (criterion 20).
-#[must_use]
-pub fn added_notice(name: &str) -> String {
-    format!("Added {}.", name.trim())
-}
-
-/// The notice after a format or group was saved (criteria 21 and 24).
-#[must_use]
-pub fn saved_notice(name: &str) -> String {
-    format!("Saved {}.", name.trim())
-}
-
-/// The notice after an import (criterion 27): "Imported 5 formats in 2 groups.
-/// Skipped 2 that were already there."
-#[must_use]
-pub fn import_notice(report: &ImportReport) -> String {
-    let plural =
-        |n: usize, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
-    let mut text = if report.added == 0 {
-        "Nothing new to import.".to_string()
-    } else {
-        format!(
-            "Imported {} in {}.",
-            plural(report.added, "format", "formats"),
-            plural(report.groups, "group", "groups")
-        )
-    };
-    if report.skipped > 0 {
-        let were = if report.skipped == 1 {
-            "that was"
-        } else {
-            "that were"
-        };
-        text.push_str(" Skipped ");
-        text.push_str(&report.skipped.to_string());
-        text.push(' ');
-        text.push_str(were);
-        text.push_str(" already there.");
-    }
-    text
 }
 
 /// The refusal of a file that could not be imported (criterion 25).
@@ -299,7 +254,6 @@ mod tests {
             unit: PresetUnit::Mm,
             group_id: "paper",
             new_group_name: "",
-            new_group_orientation: Orientation::Portrait,
             favourite: true,
         }
     }
@@ -459,10 +413,8 @@ mod tests {
             unit: PresetUnit::Cm,
             ..draft()
         };
-        assert_eq!(
-            messages(&same),
-            [(FormField::Width, "Same size as A4".to_string())]
-        );
+        // Criterion 39: the size of another format is not refused.
+        assert_eq!(messages(&same), []);
         let name_taken = FormDraft {
             name: "a5",
             ..draft()
@@ -500,7 +452,6 @@ mod tests {
         let ok = FormDraft {
             group_id: "",
             new_group_name: "Laser",
-            new_group_orientation: Orientation::Landscape,
             ..draft()
         };
         let spec = check_format_form(&library(), &ok, None).unwrap();
@@ -508,7 +459,8 @@ mod tests {
             spec.group,
             GroupTarget::New {
                 name: "Laser".into(),
-                orientation: Orientation::Landscape
+                // Criterion 42: a new group opens portrait; nothing asks.
+                orientation: Orientation::Portrait
             }
         );
     }
@@ -537,32 +489,10 @@ mod tests {
     }
 
     #[test]
-    fn the_import_notice_counts_what_happened() {
-        let report = |added, groups, skipped| {
-            import_notice(&ImportReport {
-                added,
-                groups,
-                skipped,
-            })
-        };
-        assert_eq!(
-            report(5, 2, 2),
-            "Imported 5 formats in 2 groups. Skipped 2 that were already there."
-        );
-        assert_eq!(report(1, 1, 0), "Imported 1 format in 1 group.");
-        assert_eq!(
-            report(0, 0, 1),
-            "Nothing new to import. Skipped 1 that was already there."
-        );
+    fn a_refused_import_names_the_file_and_the_reason() {
         assert_eq!(
             import_refusal("a.toml", "made by a newer version"),
             "Could not import a.toml: made by a newer version. Nothing was changed."
         );
-    }
-
-    #[test]
-    fn notices_name_the_format() {
-        assert_eq!(added_notice(" Key ring "), "Added Key ring.");
-        assert_eq!(saved_notice("Laser"), "Saved Laser.");
     }
 }

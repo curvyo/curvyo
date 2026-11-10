@@ -33,12 +33,12 @@ default_orientation = "landscape"
   long_side = 200
   unit = "mm"
 
-  # the size of A4 exists: skipped
+  # the group has this name and size (criterion 39): skipped
   [[group.preset]]
   id = "u-copy"
-  name = "Copy of A4"
-  short_side = 21
-  long_side = 29.7
+  name = "sign"
+  short_side = 6
+  long_side = 8
   unit = "cm"
 
 # another id, the name of an existing user group: joins that group

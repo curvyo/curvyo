@@ -1,0 +1,17 @@
+# Criterion 39: a format may have the size of another one. "My A4" has the
+# size of the built-in A4 and "Copy" has the size of "My A4".
+format = 1
+[[group]]
+id = "paper"
+[[group.preset]]
+id = "u-my-a4"
+name = "My A4"
+short_side = 21
+long_side = 29.7
+unit = "cm"
+[[group.preset]]
+id = "u-my-a4-copy"
+name = "Copy"
+short_side = 210
+long_side = 297
+unit = "mm"

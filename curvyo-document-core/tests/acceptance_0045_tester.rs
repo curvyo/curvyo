@@ -597,25 +597,18 @@ fn c5_name_is_trimmed_before_the_length_rule() {
 }
 
 #[test]
-fn c5_same_size_is_refused_anywhere_in_the_library_within_tolerance() {
-    // A4 is 210 x 297; the same size in another unit and a hair off.
+fn c5_same_size_is_accepted_anywhere_in_the_library_since_criterion_39() {
+    // Changed by design (2026-11-10): sizes may repeat, also those of A4 and
+    // of a group that is off.
     for (s, l, unit) in [
         ("210", "297", "mm"),
         ("21", "29.7", "cm"),
         ("210.005", "297.005", "mm"),
-        ("209.995", "296.995", "mm"),
         ("8.267716535433071", "11.69291338582677", "in"),
     ] {
         let body = p("u-x", "X", s, l, unit);
-        let r = reason_of(&group_with(&body));
-        assert!(
-            matches!(r, PresetReason::SameSizeAs(_)),
-            "{s} x {l} {unit}: {r:?}"
-        );
+        load(&group_with(&body)).unwrap_or_else(|e| panic!("{s} x {l} {unit}: {e:?}"));
     }
-    // Slides is off: still counts ("anywhere in the library").
-    let body = p("u-x", "X", "9", "16", "in");
-    let _ = body;
     let slide = builtin().groups[1].presets[0].clone();
     let body = p(
         "u-x",
@@ -624,10 +617,7 @@ fn c5_same_size_is_refused_anywhere_in_the_library_within_tolerance() {
         &slide.long_side.as_mm().to_string(),
         "mm",
     );
-    assert!(matches!(
-        reason_of(&group_with(&body)),
-        PresetReason::SameSizeAs(_)
-    ));
+    load(&group_with(&body)).unwrap();
 }
 
 #[test]
@@ -638,11 +628,12 @@ fn c5_a_size_clearly_different_is_accepted() {
 }
 
 #[test]
-fn c5_same_size_between_two_user_formats_is_refused() {
+fn c5_same_size_between_two_user_formats_is_accepted() {
     let t = user(
         "[[group]]\nid = \"u-g\"\nname = \"G\"\ndefault_orientation = \"portrait\"\n  [[group.preset]]\n  id = \"u-a\"\n  name = \"A\"\n  short_side = 12\n  long_side = 34\n  unit = \"mm\"\n  [[group.preset]]\n  id = \"u-b\"\n  name = \"B\"\n  short_side = 1.2\n  long_side = 3.4\n  unit = \"cm\"\n",
     );
-    assert!(matches!(reason_of(&t), PresetReason::SameSizeAs(_)));
+    let lib = load(&t).unwrap();
+    assert!(lib.list().find("u-a").is_some() && lib.list().find("u-b").is_some());
 }
 
 fn many_formats(n: usize, groups: usize) -> String {
@@ -939,17 +930,13 @@ fn c20_add_converts_units_exactly_and_keeps_the_authored_unit() {
     let (_, p) = lib.list().find(&id).unwrap();
     assert!((p.short_side.as_mm() - 75.0).abs() < 1e-9);
 
-    // 1 in is 25.4 mm: a one inch square collides with a 25.4 mm square.
+    // 1 in is 25.4 mm: a one inch square and a 25.4 mm square are both
+    // accepted (criterion 39).
     let mut l2 = fresh();
     l2.add_format(&spec("Inch", "paper", 1.0, 2.0, PresetUnit::In))
         .unwrap();
-    let e = l2
-        .add_format(&spec("Mm", "paper", 25.4, 50.8, PresetUnit::Mm))
-        .unwrap_err();
-    assert!(
-        matches!(e.reason, FormatReason::SameSizeAs(ref n) if n == "Inch"),
-        "{e:?}"
-    );
+    l2.add_format(&spec("Mm", "paper", 25.4, 50.8, PresetUnit::Mm))
+        .unwrap();
 
     // px is 1/96 in.
     let id = lib
@@ -961,6 +948,10 @@ fn c20_add_converts_units_exactly_and_keeps_the_authored_unit() {
 
 #[test]
 fn c20_validation_messages_carry_the_right_field() {
+    // Criterion 39: the size of A4 is not a validation failure.
+    fresh()
+        .add_format(&spec("X", "paper", 21.0, 29.7, PresetUnit::Cm))
+        .unwrap();
     let mut lib = fresh();
     let e = lib
         .add_format(&spec("", "paper", 20.0, 40.0, PresetUnit::Mm))
@@ -988,13 +979,6 @@ fn c20_validation_messages_carry_the_right_field() {
         let e = lib.add_format(&spec("X", "paper", 20.0, bad, PresetUnit::Mm));
         assert!(e.is_err(), "long = {bad}");
     }
-    let e = lib
-        .add_format(&spec("X", "paper", 21.0, 29.7, PresetUnit::Cm))
-        .unwrap_err();
-    assert!(
-        matches!(e.reason, FormatReason::SameSizeAs(ref n) if n == "A4"),
-        "{e:?}"
-    );
     let e = lib
         .add_format(&spec("X", "nowhere", 20.0, 40.0, PresetUnit::Mm))
         .unwrap_err();
@@ -1115,7 +1099,7 @@ impl Named for FormatSpec {
 }
 
 #[test]
-fn c21_edit_keeps_id_and_favourite_state_and_its_own_old_size_is_not_a_duplicate() {
+fn c21_edit_keeps_id_and_favourite_state_and_sizes_may_repeat() {
     let mut lib = fresh();
     let mut s = spec("Ring", "paper", 30.0, 50.0, PresetUnit::Mm);
     s.favourite = false;
@@ -1134,12 +1118,13 @@ fn c21_edit_keeps_id_and_favourite_state_and_its_own_old_size_is_not_a_duplicate
     let (_, p) = lib.list().find(&id).unwrap();
     assert_eq!((p.id.as_str(), p.name.as_str()), (id.as_str(), "Ring 2"));
     assert!((p.long_side.as_mm() - 55.0).abs() < 1e-9);
-    // Another format's size is a duplicate.
+    // Another format's size is fine (criterion 39); a failing edit changes nothing.
+    lib.edit_format(&id, &spec("Ring 2", "paper", 21.0, 29.7, PresetUnit::Cm))
+        .unwrap();
     let e = lib
-        .edit_format(&id, &spec("Ring 2", "paper", 21.0, 29.7, PresetUnit::Cm))
+        .edit_format(&id, &spec("", "paper", 21.0, 29.7, PresetUnit::Cm))
         .unwrap_err();
-    assert!(matches!(e.reason, FormatReason::SameSizeAs(ref n) if n == "A4"));
-    // Failing edit changes nothing.
+    assert_eq!(e.reason, FormatReason::BadName);
     let p = lib.list().find(&id).unwrap().1.clone();
     assert_eq!(p.name, "Ring 2");
 }
@@ -1514,8 +1499,8 @@ fn c27_import_merge_rules_via_the_golden_file() {
     assert_eq!(mine.len(), 1);
     assert_ne!(mine[0].2, "a4");
     assert!(mine[0].2.starts_with("u-"));
-    // A size that already exists (A4): skipped.
-    assert!(by_name("Copy of A4").is_empty());
+    // The group has this name and size (Sign, 6 x 8 cm): skipped.
+    assert_eq!(by_name("Sign").len(), 1);
     // Joined the existing Laser group by id and by name.
     assert_eq!(
         lib.list()
@@ -1600,7 +1585,7 @@ fn c27_importing_the_same_file_twice_skips_everything_the_second_time() {
 }
 
 #[test]
-fn c27_import_ids_are_never_duplicated_and_sizes_stay_distinct() {
+fn c27_import_ids_are_never_duplicated_and_names_stay_unique_in_a_group() {
     let mut lib = load(LASER).unwrap();
     lib.import(FIXTURE_IMPORT).unwrap();
     lib.import(FIXTURE_FULL).unwrap();
@@ -1613,10 +1598,10 @@ fn c27_import_ids_are_never_duplicated_and_sizes_stay_distinct() {
     for (i, a) in r.iter().enumerate() {
         for b in &r[i + 1..] {
             assert!(
-                (a.4 - b.4).abs() > 0.01 || (a.5 - b.5).abs() > 0.01,
-                "{} and {} share a size",
+                a.0 != b.0 || a.3.to_lowercase() != b.3.to_lowercase(),
+                "{} is twice in group {}",
                 a.3,
-                b.3
+                a.0
             );
         }
     }
@@ -1772,10 +1757,10 @@ fn model_random_edit_sequences_keep_the_library_valid_and_round_tripping() {
                 for b in &r[i + 1..] {
                     assert!(a.2 != b.2, "duplicate id {}", a.2);
                     assert!(
-                        (a.4 - b.4).abs() > 0.0099 || (a.5 - b.5).abs() > 0.0099,
-                        "seed {seed} step {step}: {} and {} share a size",
+                        a.0 != b.0 || a.3.to_lowercase() != b.3.to_lowercase(),
+                        "seed {seed} step {step}: {} is twice in group {}",
                         a.3,
-                        b.3
+                        a.0
                     );
                 }
             }

@@ -12,7 +12,7 @@ use crate::wasm_api::WasmSession;
 
 /// The list as parallel arrays: one entry per group, and one per format row
 /// with the group it belongs to. Flags are bit sets: a group has `1` on, `2`
-/// can toggle, `4` can edit; a row has `1` favourite, `2` can star, `4`
+/// can toggle, `4` can rename and delete; a row has `1` favourite, `2` can star, `4`
 /// selected, `8` can edit.
 #[wasm_bindgen]
 pub struct FormatListRecord {
@@ -44,18 +44,15 @@ pub struct FormatListRecord {
     /// "Fold group Paper".
     #[wasm_bindgen(getter_with_clone)]
     pub group_fold_names: Vec<String>,
-    /// "Edit group Laser".
-    #[wasm_bindgen(getter_with_clone)]
-    pub group_edit_names: Vec<String>,
     /// "Delete group Laser".
     #[wasm_bindgen(getter_with_clone)]
     pub group_delete_names: Vec<String>,
-    /// "Delete group Laser and its 2 formats?".
+    /// "Press again to delete group Laser. Its 2 formats go too.".
     #[wasm_bindgen(getter_with_clone)]
-    pub group_delete_prompts: Vec<String>,
-    /// "portrait" or "landscape".
+    pub group_armed_names: Vec<String>,
+    /// "Name of group Laser".
     #[wasm_bindgen(getter_with_clone)]
-    pub group_orientations: Vec<String>,
+    pub group_rename_names: Vec<String>,
     /// The group of each row: an index into the group arrays.
     #[wasm_bindgen(getter_with_clone)]
     pub row_group: Vec<u32>,
@@ -83,9 +80,12 @@ pub struct FormatListRecord {
     /// "Delete Key ring".
     #[wasm_bindgen(getter_with_clone)]
     pub row_delete_names: Vec<String>,
-    /// "Delete Key ring?".
+    /// "Press again to delete Key ring.".
     #[wasm_bindgen(getter_with_clone)]
-    pub row_delete_prompts: Vec<String>,
+    pub row_armed_names: Vec<String>,
+    /// "Name of Key ring".
+    #[wasm_bindgen(getter_with_clone)]
+    pub row_rename_names: Vec<String>,
 }
 
 impl FormatListRecord {
@@ -101,10 +101,9 @@ impl FormatListRecord {
             group_flags: Vec::new(),
             group_show_names: Vec::new(),
             group_fold_names: Vec::new(),
-            group_edit_names: Vec::new(),
             group_delete_names: Vec::new(),
-            group_delete_prompts: Vec::new(),
-            group_orientations: Vec::new(),
+            group_armed_names: Vec::new(),
+            group_rename_names: Vec::new(),
             row_group: Vec::new(),
             row_ids: Vec::new(),
             row_names: Vec::new(),
@@ -114,7 +113,8 @@ impl FormatListRecord {
             row_flags: Vec::new(),
             row_edit_names: Vec::new(),
             row_delete_names: Vec::new(),
-            row_delete_prompts: Vec::new(),
+            row_armed_names: Vec::new(),
+            row_rename_names: Vec::new(),
         };
         for (index, group) in view.groups.iter().enumerate() {
             record.group_ids.push(group.id.clone());
@@ -127,14 +127,9 @@ impl FormatListRecord {
             );
             record.group_show_names.push(group.show_name.clone());
             record.group_fold_names.push(group.fold_name.clone());
-            record.group_edit_names.push(group.edit_name.clone());
             record.group_delete_names.push(group.delete_name.clone());
-            record
-                .group_delete_prompts
-                .push(group.delete_prompt.clone());
-            record
-                .group_orientations
-                .push(group.orientation.to_string());
+            record.group_armed_names.push(group.armed_name.clone());
+            record.group_rename_names.push(group.rename_name.clone());
             for row in &group.rows {
                 record
                     .row_group
@@ -152,7 +147,8 @@ impl FormatListRecord {
                 );
                 record.row_edit_names.push(row.edit_name.clone());
                 record.row_delete_names.push(row.delete_name.clone());
-                record.row_delete_prompts.push(row.delete_prompt.clone());
+                record.row_armed_names.push(row.armed_name.clone());
+                record.row_rename_names.push(row.rename_name.clone());
             }
         }
         record
@@ -231,7 +227,7 @@ impl From<FormatEdit> for FormatEditRecord {
 }
 
 /// The form's typed text as `[name, width, height, unit, group id, new group
-/// name, orientation]`.
+/// name]`.
 fn form_texts(fields: &[String], favourite: bool) -> FormTexts {
     let at = |index: usize| fields.get(index).cloned().unwrap_or_default();
     FormTexts {
@@ -241,7 +237,6 @@ fn form_texts(fields: &[String], favourite: bool) -> FormTexts {
         unit: at(3),
         group_id: at(4),
         new_group_name: at(5),
-        orientation: at(6),
         favourite,
     }
 }
@@ -282,7 +277,7 @@ impl WasmSession {
     }
 
     /// Add in the form. `fields` is `[name, width, height, unit, group id, new
-    /// group name, orientation]`.
+    /// group name]`.
     #[allow(clippy::needless_pass_by_value)] // wasm-bindgen takes the array by value
     pub fn add_format(&mut self, fields: Vec<String>, favourite: bool) -> FormatEditRecord {
         self.session
@@ -308,15 +303,14 @@ impl WasmSession {
         self.session.delete_format(id).into()
     }
 
-    /// Save in the form of the user group `id`; `orientation` is `portrait` or
-    /// `landscape`.
-    pub fn save_format_group(
-        &mut self,
-        id: &str,
-        name: &str,
-        orientation: &str,
-    ) -> FormatEditRecord {
-        self.session.save_format_group(id, name, orientation).into()
+    /// Rename the user format `id`.
+    pub fn rename_format(&mut self, id: &str, name: &str) -> FormatEditRecord {
+        self.session.rename_format(id, name).into()
+    }
+
+    /// Rename the user group `id`.
+    pub fn rename_format_group(&mut self, id: &str, name: &str) -> FormatEditRecord {
+        self.session.rename_format_group(id, name).into()
     }
 
     /// Delete the user group `id` with its formats.

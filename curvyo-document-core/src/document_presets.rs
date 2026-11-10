@@ -256,8 +256,8 @@ impl PresetList {
 
     /// The first preset, in list order, of a group that is on that `size` has
     /// in either orientation: its shorter and longer side equal the preset's
-    /// within [`PRESET_MATCH_TOLERANCE`]. At most one matches, because no two
-    /// presets share a size.
+    /// within [`PRESET_MATCH_TOLERANCE`]. Several may share a size (user formats);
+    /// the first one is the current format (criterion 39).
     #[must_use]
     pub fn matching(&self, size: DocumentSize) -> Option<(&PresetGroup, &DocumentPreset)> {
         let (short, long) = sides_of(size);
@@ -269,22 +269,6 @@ impl PresetList {
     #[must_use]
     pub fn find(&self, id: &str) -> Option<(&PresetGroup, &DocumentPreset)> {
         self.presets().find(|(_, preset)| preset.id == id)
-    }
-
-    /// The preset of any group, on or off, that has the sides `short` and
-    /// `long` within [`PRESET_MATCH_TOLERANCE`], other than the one with id
-    /// `ignoring`.
-    #[must_use]
-    pub fn with_sides(
-        &self,
-        short: Length,
-        long: Length,
-        ignoring: Option<&str>,
-    ) -> Option<&DocumentPreset> {
-        let (short, long) = (short.as_mm(), long.as_mm());
-        self.presets()
-            .map(|(_, preset)| preset)
-            .find(|preset| Some(preset.id.as_str()) != ignoring && same_sides(preset, short, long))
     }
 
     fn check_presets_are_distinct(&self) -> Result<(), PresetError> {
