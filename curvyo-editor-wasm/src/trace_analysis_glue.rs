@@ -1,10 +1,7 @@
 //! The automatic analysis of a picture written as JSON for the Trace tool's page (`specs/0089`
 //! slice F). Host-independent, so ordinary `cargo test` covers it.
 
-use vectrace::{
-    AnalysisReport as TraceAnalysis, Capture as TraceCapture, ImageType as TraceImageType,
-    PropertyKind as TraceProperty, Reason as TraceReason, Selection as TraceMethod,
-};
+use vectrace::{AnalysisReport, Capture, ImageType, PropertyKind, Reason, Selection};
 
 use crate::trace_glue::hex;
 
@@ -15,9 +12,9 @@ use crate::trace_glue::hex;
 /// order to say them (`pale_colours`, `transparent_background`, `shadow_left_out`,
 /// `low_confidence`); `properties` each measured value by name.
 #[must_use]
-pub fn analysis_json(report: &TraceAnalysis) -> String {
+pub fn analysis_json(report: &AnalysisReport) -> String {
     let (background, tolerance) = match report.proposal.selection {
-        TraceMethod::RemoveBackground {
+        Selection::RemoveBackground {
             background,
             tolerance,
         } => (background.map(hex).unwrap_or_default(), Some(tolerance)),
@@ -48,58 +45,58 @@ pub fn analysis_json(report: &TraceAnalysis) -> String {
     .to_string()
 }
 
-fn type_name(kind: TraceImageType) -> &'static str {
+fn type_name(kind: ImageType) -> &'static str {
     match kind {
-        TraceImageType::Graphic => "graphic",
-        TraceImageType::Logo => "logo",
-        TraceImageType::LineDrawing => "line_drawing",
-        TraceImageType::Sketch => "sketch",
+        ImageType::Graphic => "graphic",
+        ImageType::Logo => "logo",
+        ImageType::LineDrawing => "line_drawing",
+        ImageType::Sketch => "sketch",
     }
 }
 
-fn capture_name(capture: TraceCapture) -> &'static str {
+fn capture_name(capture: Capture) -> &'static str {
     match capture {
-        TraceCapture::Digital => "digital",
-        TraceCapture::Scan => "scan",
-        TraceCapture::PaperPhoto => "paper_photo",
+        Capture::Digital => "digital",
+        Capture::Scan => "scan",
+        Capture::PaperPhoto => "paper_photo",
     }
 }
 
-fn reason_name(reason: TraceReason) -> &'static str {
+fn reason_name(reason: Reason) -> &'static str {
     match reason {
-        TraceReason::PaleColours => "pale_colours",
-        TraceReason::TransparentBackground => "transparent_background",
-        TraceReason::ShadowLeftOut => "shadow_left_out",
-        TraceReason::LowConfidence => "low_confidence",
+        Reason::PaleColours => "pale_colours",
+        Reason::TransparentBackground => "transparent_background",
+        Reason::ShadowLeftOut => "shadow_left_out",
+        Reason::LowConfidence => "low_confidence",
     }
 }
 
-fn property_name(kind: TraceProperty) -> &'static str {
+fn property_name(kind: PropertyKind) -> &'static str {
     match kind {
-        TraceProperty::Colours => "colours",
-        TraceProperty::Chroma => "chroma",
-        TraceProperty::BackgroundUniformity => "background_uniformity",
-        TraceProperty::BackgroundGrain => "background_grain",
-        TraceProperty::Transparency => "transparency",
-        TraceProperty::Noise => "noise",
-        TraceProperty::Gradient => "gradient",
-        TraceProperty::Midtones => "midtones",
-        TraceProperty::PaleContent => "pale_content",
-        TraceProperty::Ink => "ink",
-        TraceProperty::StraightEdges => "straight_edges",
-        TraceProperty::Components => "components",
-        TraceProperty::Holes => "holes",
-        TraceProperty::ComponentSize => "component_size",
-        TraceProperty::StrokeWidth => "stroke_width",
-        TraceProperty::TextRows => "text_rows",
-        TraceProperty::Shadow => "shadow",
+        PropertyKind::Colours => "colours",
+        PropertyKind::Chroma => "chroma",
+        PropertyKind::BackgroundUniformity => "background_uniformity",
+        PropertyKind::BackgroundGrain => "background_grain",
+        PropertyKind::Transparency => "transparency",
+        PropertyKind::Noise => "noise",
+        PropertyKind::Gradient => "gradient",
+        PropertyKind::Midtones => "midtones",
+        PropertyKind::PaleContent => "pale_content",
+        PropertyKind::Ink => "ink",
+        PropertyKind::StraightEdges => "straight_edges",
+        PropertyKind::Components => "components",
+        PropertyKind::Holes => "holes",
+        PropertyKind::ComponentSize => "component_size",
+        PropertyKind::StrokeWidth => "stroke_width",
+        PropertyKind::TextRows => "text_rows",
+        PropertyKind::Shadow => "shadow",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vectrace::{Raster as TraceRaster, analyse as trace_analyse};
+    use vectrace::{Raster, analyse};
 
     /// A pale yellow panel on white: Remove background with white, its reason and every
     /// property by name.
@@ -117,7 +114,7 @@ mod tests {
                 }
             })
             .collect();
-        let report = trace_analyse(TraceRaster {
+        let report = analyse(Raster {
             width: 100,
             height: 100,
             rgba: &rgba,

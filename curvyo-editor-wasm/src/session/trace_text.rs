@@ -368,7 +368,7 @@ impl Session {
                 "plausible": l.plausible,
                 "pixel": l.pixel,
                 "positions": l.positions,
-                "outlines": l.outlines.iter().map(crate::trace_fit_glue::path_svg).collect::<Vec<_>>(),
+                "outlines": l.outlines.iter().map(kurbo::BezPath::to_svg).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "listed": used,
         });

@@ -40,12 +40,6 @@ impl std::fmt::Debug for FitWorker {
     }
 }
 
-/// `path` as SVG path data (shortest round-trip numbers: exact).
-#[must_use]
-pub fn path_svg(path: &BezPath) -> String {
-    path.to_svg()
-}
-
 fn numbers(value: Option<&Value>) -> Vec<f64> {
     value
         .and_then(Value::as_array)
@@ -121,7 +115,7 @@ fn text_json(text: &curvyo_ui_core::FitText, hash: &str) -> Value {
         "letters": run.letters,
         "nearest": text.nearest,
         "stroke": text.stroke.map(Mm::get),
-        "glyphs": text.glyphs.iter().map(path_svg).collect::<Vec<_>>(),
+        "glyphs": text.glyphs.iter().map(BezPath::to_svg).collect::<Vec<_>>(),
     })
 }
 

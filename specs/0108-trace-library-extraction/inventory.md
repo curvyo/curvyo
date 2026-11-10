@@ -186,3 +186,15 @@ Out of scope here and listed for slice 5: the dev-dependencies `curvyo-image-cor
 decoding; replacing it with `image` may change pixels, so check against the reference tables
 first) and `curvyo-svg-core` (Inkscape baselines in `tests/quality.rs`), and the OCR record test
 path into `frontend/`.
+
+## Slice 4 result (glue shrink)
+
+Audit of editor-wasm `trace_*_glue`, `wasm_trace*`, `wasm_recognise`, `wasm_ocr_pool`,
+`ocr_pool_glue`, `session/trace_*` and ui-core `trace_*`, `text_recognise_*`: the earlier slices
+already left one adapter (`trace_adapter.rs`, vectrace result to document objects) and exports
+that forward bytes. No duplicated converter, no dead public item and no rename-only wrapper
+beyond the one removed below; the remaining aliases (`TraceRgb`, `TRACE_PARAMS`) disambiguate
+names in files that also import document types and stay. Removed: `trace_fit_glue::path_svg`
+(forwarded to `BezPath::to_svg`) and the import aliases of `trace_analysis_glue.rs`.
+Lines, editor-wasm trace glue (`trace_*_glue`, `ocr_pool_glue`, `wasm_trace*`, `wasm_recognise`,
+`wasm_ocr_pool`, `trace_glue`): 2,045 before, 2,036 after; ui-core `trace*.rs` unchanged.
