@@ -44,6 +44,8 @@ pub const MOVE_STEPS: &[&str] = &[
     "distribute_h_page",
     "distribute_v_page",
     "arrange_grid",
+    // `specs/0102-laser-fixtures` adrs.md section 4: the placed page or clone dropped into a slot.
+    "move_to_slot",
 ];
 
 /// The commands that are not about the selected objects: pages, manufacturing, profiles and
@@ -65,6 +67,20 @@ pub const FREE_STEPS: &[&str] = &[
     "delete_fixture",
     "set_fixture_visible",
     "set_fixture_params",
+    // `specs/0102-laser-fixtures` adrs.md section 4: fixture commands are free (they only write
+    // the manufacturing's fixture nodes, never the selected objects).
+    "add_grid",
+    "add_holder",
+    "add_clamp",
+    "add_stop",
+    "rename_fixture",
+    "set_fixture_active",
+    "set_fixture_inactive",
+    "move_fixture",
+    "rotate_fixture",
+    "add_slot",
+    "remove_slot",
+    "set_slot",
     // `specs/0101-laser-operations`: operations write only the manufacturing's operation nodes,
     // never the selected objects, so an assignment of a read-only inner object is allowed.
     "add_operation",

@@ -26,6 +26,20 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("delete_fixture", "Delete fixture"),
     ("set_fixture_visible", "Show or hide fixture"),
     ("set_fixture_params", "Change fixture"),
+    // `specs/0102-laser-fixtures` criteria 2 to 5, 14, 19 and 25 (adrs.md section 4).
+    ("add_grid", "Add grid"),
+    ("add_holder", "Add holder"),
+    ("add_clamp", "Add clamp"),
+    ("add_stop", "Add stop"),
+    ("rename_fixture", "Rename fixture"),
+    ("set_fixture_active", "Set fixture active"),
+    ("set_fixture_inactive", "Set fixture inactive"),
+    ("move_fixture", "Move fixture"),
+    ("rotate_fixture", "Rotate fixture"),
+    ("add_slot", "Add slot"),
+    ("remove_slot", "Remove slot"),
+    ("set_slot", "Change slot"),
+    ("move_to_slot", "Move to slot"),
     // `specs/0101-laser-operations` criteria 2 to 8, 15, 16, 23 and 27; the session names an
     // assignment after its operation ("Assign to Cut 1").
     ("add_operation", "Add operation"),

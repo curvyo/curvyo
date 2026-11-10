@@ -1,0 +1,50 @@
+# ADR 0049: Laser fixtures in the project file: five kinds, slots as child nodes, an active register, format 40
+
+**Status:** Proposed (architect, 2026-11-10; `needs-customer`: document model and file format). Drafted on Frage 171 to 175; answered by the customer 2026-11-10 (171, 172 A; 173 A with a 0.1 mm fit tolerance; 174 B and C; the grid's tapes are on all four edges by default). Revision 2 of the same day adds the fifth kind `screw` and the rigid matrix rule, after the customer's feedback on PR #313. Extends [ADR 0033](0033-manufacturing-data-in-the-project-file.md) §2 (fixture keys) and follows the child-node precedent of [ADR 0046](0046-laser-operations-record.md) §1 and §6. Spec: [`0102`](../../specs/0102-laser-fixtures/specification.md) criteria 1 to 5, 13, 14, 18, 19, 27, 31 to 34. Feature notes: [`0102` adrs.md](../../specs/0102-laser-fixtures/adrs.md). On acceptance, amendment notes go on ADR 0033 (§2, §7) and ADR 0032 (§8, the hit rule of criteria 8 to 11). The profile's fixture set is [ADR 0050](0050-laser-fixture-set-in-machine-profile.md).
+
+## Context
+
+`0093` stores one fixture kind as a node with `shape = "fixture"`, `fixture_kind = "curvyo.laser/engraved_grid"`, an atomic `fixture_params` map and the eye `visible`. `0102` needs five kinds (a grid, a holder with up to 50 slots, a clamp, a stop and a screw), a holder whose slots several peers can edit at once, an Active register, and move and turn for holders, clamps, stops and screws. The file must keep a build that lacks the extension intact (ADR 0033 §4).
+
+### Options considered: where the slots live
+
+- **A. Slots as an atomic list inside the holder's `fixture_params` (no bump).** Simple. Lost: two peers editing two different slots of one holder write the same value, and one edit is lost. The grid's spacing and origin accept that trade (ADR 0033 §2); slots are many and independent, so the trade does not fit.
+- **B. Slots as child nodes of the holder, `shape = "fixture_slot"`, each with its own atomic `slot_params` map (chosen).** Merges per slot (ADR 0009 §3). Undo and deletion are the tree's own (ADR 0014). Cost: a new node shape, so `format_version` 40 (ADR 0033 §7).
+- **C. Keys `slot.<id>.*` registers on the holder.** No node, but deletion, revive and "keep unknown" become bespoke code, the same reason ADR 0046 rejected its option C.
+
+### Options considered: where the position lives
+
+- **A. Inside `fixture_params` with the size.** A move would rewrite the size too; a size edit racing a move loses one.
+- **B. One `fixture_matrix` register beside `fixture_params` (chosen).** Six finite numbers, the same shape as `placement_link`'s matrix (ADR 0033 §2). A move and a size edit write different registers.
+
+## Decision
+
+1. **Kinds.** `fixture_kind` is `curvyo.laser/<kind>` with `<kind>` one of `engraved_grid` (the `0093` value, kept), `holder`, `clamp`, `stop`, `screw`. `curvyo-laser-core` reads the suffix into a typed kind; `curvyo-document-core` treats it as an opaque string (ADR 0033 §3). Any other suffix is an **Unknown fixture**: kept with all children, draws nothing, is no snap target, is never output.
+2. **Fixture node** (`shape = "fixture"`, child of the manufacturing node, creation order = child order):
+   - `name` (existing), `visible` (the eye, existing, unchanged), `active` (boolean, absent = true, new);
+   - `fixture_params` (existing atomic map, one per kind): grid `spacing_mm`, `major_every`, `tapes` (a list of edge names), `origin_x_mm`, `origin_y_mm`; holder `width_mm`, `height_mm`; clamp `width_mm`, `height_mm`; stop `leg_a_mm`, `leg_b_mm`, `thickness_mm`; screw `thread_diameter_mm`, `head_diameter_mm` (new, revision 2);
+   - `fixture_matrix` (new): six finite numbers, `[a, b, c, d, e, f]`, mapping the kind's local frame into the page. Absent = identity. The grid has none: it never moves, and its origin is in `origin_*_mm`. The matrix is **rigid** (§6, rule 6 below).
+   - The local frame, in mm, so the parts move with the fixture. A board and a clamp have their origin at the top-left corner of the unrotated box. A stop's origin is its outer corner: leg 1 is the band `y` from 0 to `thickness_mm` running to `x = leg_a_mm`, leg 2 the band `x` from 0 to `thickness_mm` running to `y = leg_b_mm`. A thickness change keeps the inner corner and moves the outer edges, so it moves the origin (`0102` criterion 23). A screw's origin is its **centre**: the head circle has diameter `head_diameter_mm` and the thread circle `thread_diameter_mm`, both concentric with the origin. Changing a screw's diameter never moves its origin.
+3. **Slot node** (`shape = "fixture_slot"`, child of a holder node): `name` (existing) and `slot_params`, an atomic map `{ shape: "rect" | "circle", cx_mm, cy_mm, w_mm, h_mm, d_mm }` with the centre in the board's local frame. One atomic map per slot, so a shape change and its size are written together. A holder holds up to 50 slots; the reader reads every child and the limit is an add refusal in the UI only (`0102` criterion 19).
+4. **The grid's origin corner** is not stored on the grid. Its tapes and the origin of its lines are the configurable origin corner of the 0090 grid (its `grid_origin` register) plus `origin_*_mm`. The profile copy's corner plays no part (Frage 174 B). The four tapes are on by default (Frage 174 C), each switched on or off in `tapes`.
+5. **Snap switch.** A root register `snapping_fixtures` (boolean, absent = on), written by the existing `set_document_snapping` (ADR 0060's settings pattern). Absent is on, so a file written before this slice snaps as on and nothing is written on open.
+6. **Reads and damage.** Read per field. A value of the wrong type, not finite, out of its range, or a slot without a valid shape or size reads as that field's default; a slot that cannot be read is skipped (not drawn, not a snap target). One notice per fixture counts the damaged values (`0102` criterion 33). Nothing is rewritten on read.
+   - **Matrix:** not six finite numbers, or not rigid, reads as identity and is counted the same way. Rigid means a rotation with translation: `a = d`, `c = −b` and `a² + b² = 1` within 1e-6. A matrix with scale, shear or a mirror is never drawn, handled or written.
+   - **Screw:** a `head_diameter_mm` below its `thread_diameter_mm` reads as the thread's value and counts as one damaged value.
+7. **`format_version` 40.** A `fixture_slot` node is a new node shape under the manufacturing. Build 39 would treat it as an unknown child, and ADR 0046 §6 records that such a build may drop unknown children on save. That is the case ADR 0033 §7 bumps for; ADR 0042, 0045 and 0046 bumped 37, 38 and 39 for the same reason. The `active` register alone would not need a bump: an older build would draw an inactive grid, which is a misreading but changes no output. The screw is a new kind value of the same node shape and needs no bump of its own. **Migration: none.** A format 39 file opens unchanged, and absent `active` reads as on.
+8. **Goldens** in `curvyo-document-core/tests/fixtures/` (the implementer writes or regenerates them):
+   - `fixtures_v40.curvyo`: the round trip of `0102` criterion 31 (**one of each of the five kinds, including one screw**, two holders with two slots each, one circle, an inactive grid, a hidden clamp, a holder moved and turned by 30 degrees);
+   - `fixtures_unknown_kind_v40.curvyo` (criterion 32);
+   - `fixtures_damaged_v40.curvyo` (criterion 33: text in a number, a NaN, a slot without a shape, a matrix with four entries, a matrix with scale, **a screw with text in `thread_diameter_mm`**);
+   - `fixtures_slot_orphan_v40.curvyo` (a `fixture_slot` child of a non-fixture node: kept, not drawn, saved back unchanged);
+   - `fixtures_grid_v39.curvyo` (a format 39 file with one grid, no `active`, no tapes: opens active, lines unchanged, nothing written on open; criterion 34).
+   - The existing v35, v36 and v39 goldens (`laser_workbench_v35`, `laser_workbench_v36`, `manufacturing_unknown_process_v35`, `machine_profile_v36`, `operations_*_v39`) must still open unchanged.
+9. **Commit labels** (each one in exactly one `step_scope` list, names in `history_names.rs`; the table is in the feature's `adrs.md` §4). Add labels are one per kind (`add_grid`, `add_holder`, `add_clamp`, `add_stop`, `add_screw`), because a history name is fixed per label and the spec names each kind's undo step. Size, leg, thickness and diameter changes, from any route, are `resize_fixture`. Each grid field has its own label (`set_grid_spacing`, `set_grid_major`, `set_tape_edge`, `set_grid_origin`), and the eye is one undo step per fixture, "Show or hide fixture", as `0102` criterion 6 says and `0093` shipped (`adrs.md` §4, §9).
+
+## Consequences
+
+- Holders, clamps, stops and screws are fixed-size shapes with a rigid matrix. Scaling and skew are out of scope (`0102` out of scope). A matrix that is not rigid is never inverted or sheared on read; it is read as identity and counted as damage.
+- Two peers editing two slots, or a slot and the holder's size, merge without loss. Two peers editing the same slot lose one edit, the same trade as ADR 0046's per-operation values. A holder whose origin moves (a resize from its N or W edge) writes its slots' centres in the same commit; two peers doing that at once merge per slot as the rest does.
+- Every consumer of the manufacturing subtree keeps the ADR 0032 skip predicate. A fixture is never a leaf of the output (ADR 0042 §4, `0101` criterion 10), so a missed walk would be a bug the orphan golden only partly guards.
+- Old files open with no migration. A build of format 39 refuses a file of format 40 (ADR 0033 §7); that is accepted for this development build (customer, 2026-10-29).
+- Rejected and why: slots as an atomic list (A above, loses edits); a position inside the size map (B above, couples two edits); slots as keyed registers (C above, bespoke undo and delete); a screw as a node with children for its two circles (rejected in revision 2: two numbers do not need a child node, and a child would be a second shape to keep in every walk).
