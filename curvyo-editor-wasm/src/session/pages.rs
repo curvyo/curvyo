@@ -292,29 +292,6 @@ impl Session {
             .map(ObjectSnapshot::id)
             .collect()
     }
-    /// Applies a global position field in the document display unit.
-    pub fn set_page_position(&mut self, id: &str, axis: &str, text: &str) -> bool {
-        let Ok(value) = text.trim().parse::<f64>() else {
-            return false;
-        };
-        if !value.is_finite() {
-            return false;
-        }
-        let Some(page) = self.document.pages().into_iter().find(|p| p.id == id) else {
-            return false;
-        };
-        let value = match self.display_unit() {
-            curvyo_document_core::DisplayUnit::Mm => value,
-            curvyo_document_core::DisplayUnit::Cm => value * 10.0,
-            curvyo_document_core::DisplayUnit::In => value * 25.4,
-        };
-        let origin = match axis {
-            "x" => Point::new(value, page.origin.y),
-            "y" => Point::new(page.origin.x, value),
-            _ => return false,
-        };
-        self.move_page_to(id, origin)
-    }
     /// Moves the frame to a global position, optionally carrying contained objects.
     pub fn move_page_to(&mut self, id: &str, origin: Point) -> bool {
         let Some(page) = self.document.pages().into_iter().find(|p| p.id == id) else {
@@ -415,7 +392,7 @@ impl Session {
             let (x,y)=self.view().document_to_screen(p.origin);
             let chip = self.kind_chip(&p.kind);
             let sketch = self.sketch_row_json(p);
-            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"xText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.x),self.display_unit()),"yText":curvyo_ui_core::format_field_length(curvyo_document_core::Length::from_mm(p.origin.y),self.display_unit()),"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str()),"home":homes.contains(&p.id)})
+            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str()),"home":homes.contains(&p.id)})
         }).collect();
         serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_owned())
     }
