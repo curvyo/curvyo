@@ -24,7 +24,7 @@
 #[path = "support_0094/mod.rs"]
 mod support;
 
-use curvyo_document_core::{Length, Point, Tolerance, Vec2};
+use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
@@ -294,7 +294,7 @@ fn colour_params() -> TraceColourParams {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     })
 }
@@ -1472,7 +1472,7 @@ fn far_left_half(outside: bool) -> TraceRegion {
 
 fn far_params() -> TraceParams {
     TraceParams {
-        specks: Length::from_mm(0.0),
+        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     }
 }

@@ -386,7 +386,7 @@ fn the_colour_count_includes_colours_only_texts_use() {
         positions: Vec::new(),
     };
     let mut params = colour_params();
-    params.trace.specks = curvyo_document_core::Length::from_mm(0.0);
+    params.trace.specks = curvyo_ui_core::TraceMm::from_mm(0.0);
     let wire = trace_text_colour_job_with(
         &rgba,
         w,

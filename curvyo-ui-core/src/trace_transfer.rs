@@ -4,10 +4,9 @@
 
 use std::ops::ControlFlow;
 
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
-    AnalysisReport, ColourParams as TraceColourParams, ColourTrace, Phase, Progress, Raster,
-    Rgb8 as TraceRgb, TraceError, TraceParams, trace, trace_colours,
+    AnalysisReport, ColourParams as TraceColourParams, ColourTrace, Mm, Phase, PixelMap, Progress,
+    Raster, Rgb8 as TraceRgb, TraceError, TraceParams, trace, trace_colours,
 };
 use kurbo::{BezPath, PathEl, Point};
 
@@ -121,7 +120,7 @@ pub fn trace_job(
     let params = TraceParams {
         threshold,
         smooth,
-        specks: Length::from_mm(specks_mm),
+        specks: Mm::from_mm(specks_mm),
         ..TraceParams::with_threshold(threshold)
     };
     trace_job_with(rgba, width, height, pixel_map, &params, &mut |_| {})
@@ -193,7 +192,7 @@ pub fn trace_job_in(
         }
         ControlFlow::Continue(())
     };
-    match trace(raster, Affine::from_array(pixel_map), params, &mut go) {
+    match trace(raster, PixelMap::new(pixel_map), params, &mut go) {
         Ok(mut result) => {
             let unclipped = region.map_or(0, |region| region.clip_trace(&mut result));
             #[allow(clippy::cast_precision_loss)] // counts far below 2^52
@@ -258,7 +257,7 @@ pub fn trace_colour_job_in(
         }
         ControlFlow::Continue(())
     };
-    match trace_colours(raster, Affine::from_array(pixel_map), params, &mut go) {
+    match trace_colours(raster, PixelMap::new(pixel_map), params, &mut go) {
         Ok(mut result) => {
             let unclipped = region.map_or(0, |region| region.clip_colours(&mut result));
             let mut wire = colour_head(&result);
@@ -641,7 +640,7 @@ mod tests {
                 background: Some(TraceRgb::new(255, 255, 255)),
                 tolerance: 40,
             },
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..TraceParams::with_threshold(128)
         });
         let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
