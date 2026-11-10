@@ -4,7 +4,8 @@
 2026-11-10 (`specs/0108-trace-library-extraction/plan.md`): the name `vectrace` in the directory
 `vectrace/` (Frage 1 B), OCR as a module of the same crate (Frage 2 A), and the licence
 MIT OR Apache-2.0, with the weights staying Apache-2.0 (Frage 3 A). This ADR becomes Accepted
-when slice 3 of 0108 is merged. Amends by dated notes: [ADR 0011](0011-workspace-and-crate-layout.md)
+when the PR of `story/trace-library-extraction` (slices 1 to 5) is merged. Amends by dated
+notes: [ADR 0011](0011-workspace-and-crate-layout.md)
 §2/§3/§6 (new crate, two crates removed), [ADR 0023](0023-raster-trace-crate-pipeline-and-worker.md)
 §1/§2/§5 (crate, `Affine` in the API, the worker job), [ADR 0028](0028-ocr-text-in-trace.md)
 §1/§4 (crate, the `rayon` exception) and [ADR 0006](0006-license.md) (one crate is not AGPL).
@@ -203,3 +204,32 @@ are in `vectrace::job`, `Mask` and `Clipped` in `vectrace::mask`, the shape type
 three items stay public with a reason: `node_count` (Curvyo recomputes `Output::nodes` after joining
 parts), `shapes::valid_ratio` (a Curvyo test pins its `InnerRatio` to it) and
 `shapes::add_shapes` (two CPU-time tests time the shape pass alone; the worker sets `Job::shapes`).
+
+## Note 2026-11-10 (architect review of slice 5, API against §5)
+
+Accepted deviations from §5, kept as they are:
+
+- `ocr::read_text` keeps `(model, rgba, width, height, on_percent)` instead of a `Raster` and a
+  `poll` (the worker and its pool call it so; one entry point, no second form).
+- `node_count`, `shapes::valid_ratio` and `shapes::add_shapes` stay public for the reasons in the
+  note above.
+- The pixel coordinates of `ocr::TextLine`, `LineCrop` (`f32`) and `OcrLine` (`f64`) stay plain
+  numbers, as in ADR 0028 §2; they are source pixels, not lengths.
+- The schema (`PARAMS`, `PRESETS`, `Selection::LABELS`, `Denoise::LABELS`, `Upscale::LABELS`)
+  keeps its English labels as data. §2 "every string the user sees stays in Curvyo" means
+  statuses, notices and reasons; the schema's labels are the exception §5 already lists.
+- Further `pub` items beyond the §5 listing are the types and limits its signatures reach
+  (`Counts`, `Diagnostics`, `Progress`, `Phase`, `Selection`, `Swatches`, `Denoise`, `Upscale`,
+  `ColourLayer`, the analysis report types, `wire::{Palette, Layer, Text, Texts}`, the `MAX_*` and
+  `DEFAULT_*` constants, the OCR model hashes and `LINE_HEIGHT`). They are part of the API.
+- `curvyo-document-core` is a dev-dependency of `vectrace` for the `PixelMap` bit test (§3 put
+  that test in Curvyo). It is extraction blocker 1 in `specs/0108-trace-library-extraction/
+  extraction.md` and goes with it.
+
+Required before the PR (review findings, `CLAUDE.md` §5 units): re-export `Diagnostics`
+(its fields are public on `TraceResult` and `ColourTrace`); make `wire::Text::pixel` and `positions`
+`Mm`, `Preset::tolerance_px`/`specks_mm` and `DEFAULT_TOLERANCE_PX`/`DEFAULT_SPECKS_MM`
+`PixelLength` and `Mm`, and `add_shapes` take a `PixelMap`.
+
+Status: this ADR becomes Accepted when the PR of `story/trace-library-extraction` is merged (it
+carries slices 1 to 5); the later move to an own repository only adds a note.
