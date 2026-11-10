@@ -2,7 +2,7 @@
 //! to the machine's work area, with live placements of drawing pages and installed fixtures as
 //! its children. This module holds their reads and the commands that write them.
 
-use loro::{LoroMap, TreeID, TreeParentId};
+use loro::{TreeID, TreeParentId};
 use serde::Serialize;
 
 use crate::affine::Affine;
@@ -10,12 +10,12 @@ use crate::document::{Document, OBJECTS_TREE, ROOT_MAP};
 use crate::document_size::{DocumentSizeError, validated_document_side};
 use crate::group_tree::node_id;
 use crate::manufacturing_codec::{
-    KEY_FIXTURE_KIND, KEY_MACHINE_NAME, KEY_MANUFACTURING, KEY_PAGE, KEY_PROCESS, KEY_PROFILE,
-    PAGE_OWNER_FIELD, PlacementLink, SHAPE_FIXTURE, SHAPE_PLACEMENT, is_manufacturing_node,
-    manufacturing_nodes, owner_text, read_fixture_params, read_placement_link, string,
-    write_fixture_params, write_placement_link, write_plain_map,
+    KEY_MACHINE_NAME, KEY_MANUFACTURING, KEY_PAGE, KEY_PROCESS, KEY_PROFILE, PAGE_OWNER_FIELD,
+    PlacementLink, SHAPE_PLACEMENT, is_manufacturing_node, manufacturing_nodes, owner_text,
+    read_placement_link, string, write_placement_link, write_plain_map,
 };
-use crate::node_registers::{KEY_NAME, KEY_VISIBLE, read_registers};
+use crate::manufacturing_fixtures::{FixtureRecord, FixtureSnapshot};
+use crate::node_registers::read_registers;
 use crate::page_frame::{Frame, write_frame};
 use crate::pages::{Page, owned_page, write};
 use crate::path_codec::node_exists;
@@ -29,14 +29,6 @@ use crate::{Point, Vec2};
 pub const ADD_OUTPUT_PAGE_COMMIT_LABEL: &str = "add_output_page";
 /// The label of the delete of a placement (criterion 12).
 pub const DELETE_PLACEMENT_COMMIT_LABEL: &str = "delete_placement";
-/// The label of Add fixture's commit.
-pub const ADD_FIXTURE_COMMIT_LABEL: &str = "add_fixture";
-/// The label of Delete fixture's commit.
-pub const DELETE_FIXTURE_COMMIT_LABEL: &str = "delete_fixture";
-/// The label of a fixture's hide or show.
-pub const SET_FIXTURE_VISIBLE_COMMIT_LABEL: &str = "set_fixture_visible";
-/// The label of a fixture parameter edit.
-pub const SET_FIXTURE_PARAMS_COMMIT_LABEL: &str = "set_fixture_params";
 /// The label of a machine profile pick (`specs/0026-machine-profile` criterion 5).
 pub const PICK_PROFILE_COMMIT_LABEL: &str = "pick_profile";
 /// The label of Reset from profile (criterion 7).
@@ -143,21 +135,6 @@ pub struct PlacementSnapshot {
     pub matrix: Affine,
 }
 
-/// An installed fixture (ADR 0032 §8).
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct FixtureSnapshot {
-    /// Its node.
-    pub id: NodeId,
-    /// Its name ("Engraved grid", "Engraved grid 2").
-    pub name: String,
-    /// `<process id>/<kind>`.
-    pub kind: String,
-    /// The stored parameter values.
-    pub params: FixtureParams,
-    /// Whether it is shown on the output page.
-    pub visible: bool,
-}
-
 /// What Add page with an output kind creates.
 #[derive(Debug, Clone, Copy)]
 pub struct NewOutputPage<'a> {
@@ -190,6 +167,12 @@ pub enum ManufacturingError {
     /// The id names no live fixture.
     #[error("no such fixture")]
     NoSuchFixture,
+    /// The id names no live slot of a fixture.
+    #[error("no such slot")]
+    NoSuchSlot,
+    /// The holder holds 50 slots already (`specs/0102-laser-fixtures` criterion 19).
+    #[error("a holder holds up to 50 slots")]
+    TooManySlots,
     /// The work area is not a valid page size.
     #[error(transparent)]
     Size(#[from] DocumentSizeError),
@@ -202,7 +185,7 @@ pub enum ManufacturingError {
 }
 
 /// "`label` n" with the smallest n from 1 that no name of `taken` uses.
-fn next_numbered(label: &str, taken: &[String], first_bare: bool) -> String {
+pub(crate) fn next_numbered(label: &str, taken: &[String], first_bare: bool) -> String {
     let free = |name: &String| !taken.contains(name);
     if first_bare && free(&label.to_owned()) {
         return label.to_owned();
@@ -259,23 +242,19 @@ impl Document {
         let meta = tree.get_meta(node).ok()?;
         let page_id = string(&meta, KEY_PAGE)?;
         let mut placements = Vec::new();
-        let mut fixtures = Vec::new();
-        for child in tree.children(TreeParentId::Node(node)).unwrap_or_default() {
+        let children = tree.children(TreeParentId::Node(node)).unwrap_or_default();
+        for &child in &children {
             let Ok(child_meta) = tree.get_meta(child) else {
                 continue;
             };
-            match string(&child_meta, KEY_SHAPE).as_deref() {
-                Some(SHAPE_PLACEMENT) => {
-                    if let Some(link) = read_placement_link(&child_meta) {
-                        placements.push(PlacementSnapshot {
-                            id: node_id(child),
-                            page: link.page,
-                            matrix: link.matrix,
-                        });
-                    }
-                }
-                Some(SHAPE_FIXTURE) => fixtures.push(read_fixture(child, &child_meta)),
-                _ => {}
+            if string(&child_meta, KEY_SHAPE).as_deref() == Some(SHAPE_PLACEMENT)
+                && let Some(link) = read_placement_link(&child_meta)
+            {
+                placements.push(PlacementSnapshot {
+                    id: node_id(child),
+                    page: link.page,
+                    matrix: link.matrix,
+                });
             }
         }
         Some(ManufacturingSnapshot {
@@ -286,7 +265,7 @@ impl Document {
             legacy_machine_name: string(&meta, KEY_MACHINE_NAME),
             page: owned_page(&self.loro().get_map(ROOT_MAP), &tree, &page_id),
             placements,
-            fixtures,
+            fixtures: crate::manufacturing_fixtures::read_fixtures(&tree, &children),
             process_values: crate::manufacturing_codec::process_values(&meta),
         })
     }
@@ -413,6 +392,8 @@ impl Document {
     /// beside the frame's moving edges move with them, carrying what `contents` says they own,
     /// in the same step (ADR 0051 §2, `specs/0109` criterion 32).
     /// `Ok(false)` and nothing written when the copy, the size and the old key are unchanged.
+    /// The page's fixtures are not written; [`Document::set_manufacturing_profile_and_fixtures`]
+    /// writes them too.
     ///
     /// # Errors
     /// [`ManufacturingError::NotFound`] for an unknown manufacturing or one without its page;
@@ -427,15 +408,73 @@ impl Document {
         change: ProfileChange,
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
+        self.write_profile(id, profile, work_area, anchor, change, None, contents)
+    }
+
+    /// As [`Document::set_manufacturing_profile`], and in the same step the page's fixtures are
+    /// replaced by one new node per record of the profile's set, with fresh ids (Pick profile and
+    /// Reset from profile, ADR 0050 §4); an empty set removes them (Generic laser, §6). The
+    /// fixtures are not written when they already equal the set.
+    ///
+    /// # Errors
+    /// As [`Document::set_manufacturing_profile`].
+    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, set and owned contents
+    pub fn set_manufacturing_profile_and_fixtures(
+        &self,
+        id: NodeId,
+        profile: &FixtureParams,
+        work_area: DocumentSize,
+        anchor: PageCorner,
+        change: ProfileChange,
+        fixtures: &[FixtureRecord],
+        contents: &crate::PageContents,
+    ) -> Result<bool, ManufacturingError> {
+        self.write_profile(
+            id,
+            profile,
+            work_area,
+            anchor,
+            change,
+            Some(fixtures),
+            contents,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, set and owned contents
+    fn write_profile(
+        &self,
+        id: NodeId,
+        profile: &FixtureParams,
+        work_area: DocumentSize,
+        anchor: PageCorner,
+        change: ProfileChange,
+        fixtures: Option<&[FixtureRecord]>,
+        contents: &crate::PageContents,
+    ) -> Result<bool, ManufacturingError> {
         let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
-        let page = manufacturing.page.ok_or(ManufacturingError::NotFound)?;
-        let width = validated_document_side(work_area.width)?;
-        let height = validated_document_side(work_area.height)?;
+        let page = manufacturing
+            .page
+            .clone()
+            .ok_or(ManufacturingError::NotFound)?;
+        let size = DocumentSize {
+            width: validated_document_side(work_area.width)?,
+            height: validated_document_side(work_area.height)?,
+        };
         #[allow(clippy::float_cmp)] // exact register equality avoids an empty step
-        let same_size =
-            page.size.width.as_mm() == width.as_mm() && page.size.height.as_mm() == height.as_mm();
+        let same_size = page.size.width.as_mm() == size.width.as_mm()
+            && page.size.height.as_mm() == size.height.as_mm();
         let same_profile = manufacturing.profile.as_ref() == Some(profile);
-        if same_size && same_profile && manufacturing.legacy_machine_name.is_none() {
+        let current: Vec<FixtureRecord> = manufacturing
+            .fixtures
+            .iter()
+            .map(FixtureSnapshot::record)
+            .collect();
+        let fixtures = fixtures.filter(|set| *set != current.as_slice());
+        if same_size
+            && same_profile
+            && fixtures.is_none()
+            && manufacturing.legacy_machine_name.is_none()
+        {
             return Ok(false);
         }
         let meta = self
@@ -445,19 +484,19 @@ impl Document {
             .map_err(|_| ManufacturingError::NotFound)?;
         let shift = Vec2::new(
             if anchor.right {
-                page.size.width.as_mm() - width.as_mm()
+                page.size.width.as_mm() - size.width.as_mm()
             } else {
                 0.0
             },
             if anchor.bottom {
-                page.size.height.as_mm() - height.as_mm()
+                page.size.height.as_mm() - size.height.as_mm()
             } else {
                 0.0
             },
         );
         let frame = Frame {
             origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
-            size: DocumentSize { width, height },
+            size,
         };
         let pages = self.pages();
         let layout = if same_size {
@@ -493,129 +532,11 @@ impl Document {
                     }
                 }
             }
+            if let Some(set) = fixtures {
+                doc.replace_fixtures(id, set)?;
+            }
             Ok(true)
         })
-    }
-
-    /// Installs a fixture of `kind` (`<process>/<kind>`) named `label`, numbered when the name is
-    /// taken ("Engraved grid 2"), with the stored `params`, at the end of the setup, in one
-    /// history step (criterion 9).
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NotFound`] for an unknown manufacturing.
-    ///
-    /// # Panics
-    /// Does not panic in practice: the meta map of a node just created exists.
-    pub fn add_fixture(
-        &self,
-        manufacturing: NodeId,
-        kind: &str,
-        label: &str,
-        params: &FixtureParams,
-    ) -> Result<NodeId, ManufacturingError> {
-        let snapshot = self
-            .manufacturing(manufacturing)
-            .ok_or(ManufacturingError::NotFound)?;
-        let taken: Vec<String> = snapshot.fixtures.into_iter().map(|f| f.name).collect();
-        let name = next_numbered(label, &taken, true);
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        tree.enable_fractional_index(0);
-        let fixture = tree
-            .create(TreeParentId::Node(tree_id_of(manufacturing)))
-            .map_err(|_| ManufacturingError::NotFound)?;
-        // invariant: the node was just created, so its meta map exists; plain values only.
-        #[allow(clippy::unwrap_used)]
-        {
-            let meta = tree.get_meta(fixture).unwrap();
-            meta.insert(KEY_SHAPE, SHAPE_FIXTURE).unwrap();
-            meta.insert(KEY_FIXTURE_KIND, kind).unwrap();
-            meta.insert(KEY_NAME, name.as_str()).unwrap();
-            write_fixture_params(&meta, params);
-        }
-        self.commit_with_label(ADD_FIXTURE_COMMIT_LABEL);
-        Ok(node_id(fixture))
-    }
-
-    /// Removes the fixture `id` in one history step.
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchFixture`] when `id` is not a live fixture.
-    pub fn delete_fixture(&self, id: NodeId) -> Result<(), ManufacturingError> {
-        self.fixture_meta(id)?;
-        self.loro()
-            .get_tree(OBJECTS_TREE)
-            .delete(tree_id_of(id))
-            .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        self.commit_with_label(DELETE_FIXTURE_COMMIT_LABEL);
-        Ok(())
-    }
-
-    /// Hides or shows the fixture `id` through the ordinary `visible` register, saved and
-    /// undoable (`adrs.md` decision 4). `Ok(false)` when it already is.
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchFixture`] when `id` is not a live fixture.
-    pub fn set_fixture_visible(
-        &self,
-        id: NodeId,
-        visible: bool,
-    ) -> Result<bool, ManufacturingError> {
-        let meta = self.fixture_meta(id)?;
-        if read_registers(&meta).visible == visible {
-            return Ok(false);
-        }
-        meta.insert(KEY_VISIBLE, visible)
-            .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        self.commit_with_label(SET_FIXTURE_VISIBLE_COMMIT_LABEL);
-        Ok(true)
-    }
-
-    /// Writes the fixture's parameter values whole, so a merge never pairs one peer's spacing with
-    /// another's origin (ADR 0033 §2). `Ok(false)` when they are unchanged.
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchFixture`] when `id` is not a live fixture.
-    pub fn set_fixture_params(
-        &self,
-        id: NodeId,
-        params: &FixtureParams,
-    ) -> Result<bool, ManufacturingError> {
-        let meta = self.fixture_meta(id)?;
-        if read_fixture_params(&meta).as_ref() == Some(params) {
-            return Ok(false);
-        }
-        write_fixture_params(&meta, params);
-        self.commit_with_label(SET_FIXTURE_PARAMS_COMMIT_LABEL);
-        Ok(true)
-    }
-
-    fn fixture_meta(&self, id: NodeId) -> Result<LoroMap, ManufacturingError> {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        let node = tree_id_of(id);
-        let parent = match tree.parent(node) {
-            Some(TreeParentId::Node(parent)) if node_exists(&tree, node) => parent,
-            _ => return Err(ManufacturingError::NoSuchFixture),
-        };
-        let meta = tree
-            .get_meta(node)
-            .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        if !is_manufacturing_node(&tree, parent)
-            || string(&meta, KEY_SHAPE).as_deref() != Some(SHAPE_FIXTURE)
-        {
-            return Err(ManufacturingError::NoSuchFixture);
-        }
-        Ok(meta)
-    }
-}
-
-fn read_fixture(node: TreeID, meta: &LoroMap) -> FixtureSnapshot {
-    let registers = read_registers(meta);
-    FixtureSnapshot {
-        id: node_id(node),
-        name: registers.name.unwrap_or_default(),
-        kind: string(meta, KEY_FIXTURE_KIND).unwrap_or_default(),
-        params: read_fixture_params(meta).unwrap_or_default(),
-        visible: registers.visible,
     }
 }
 

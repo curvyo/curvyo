@@ -312,7 +312,16 @@ fn ac9_ac10_fixtures_are_not_drawing_objects_and_hide_is_one_saved_step() {
     let id = add(&d);
     assert!(d.manufacturing(id).unwrap().fixtures.is_empty());
     let f = d
-        .add_fixture(id, GRID, "Engraved grid", &grid(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     assert!(d.is_in_manufacturing(f));
     assert_eq!(
@@ -347,10 +356,28 @@ fn ac13_delete_takes_page_and_fixtures_leaves_drawing_and_undo_restores_everythi
     let id = add(&d);
     let d = with_placement(&d, &second.id);
     let shown = d
-        .add_fixture(id, GRID, "Engraved grid", &grid(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     let hidden = d
-        .add_fixture(id, GRID, "Engraved grid", &grid(25.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(25.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     d.set_fixture_visible(hidden, false).unwrap();
     let full = d.manufacturing(id).unwrap();
@@ -492,10 +519,28 @@ fn ac12_save_and_reopen_of_a_fresh_project_is_identical() {
     let _ = rect(&d, 10.0, 10.0);
     let id = add(&d);
     let d = with_placement(&d, "first");
-    d.add_fixture(id, GRID, "Engraved grid", &grid(10.0))
-        .unwrap();
+    d.add_fixture(
+        id,
+        &curvyo_document_core::NewFixture {
+            add: curvyo_document_core::FixtureAdd::Grid,
+            kind: GRID,
+            label: "Engraved grid",
+            params: &grid(10.0),
+            matrix: None,
+        },
+    )
+    .unwrap();
     let hidden = d
-        .add_fixture(id, GRID, "Engraved grid", &grid(5.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(5.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     d.set_fixture_visible(hidden, false).unwrap();
     let back = unpack(3, &pack(&d, "0.1.0").unwrap()).unwrap();
@@ -526,8 +571,17 @@ fn unknown_process_file() -> Vec<u8> {
         "count": 3,
     }))
     .unwrap();
-    d.add_fixture(id, "acme.waterjet/vise", "Vise", &params)
-        .unwrap();
+    d.add_fixture(
+        id,
+        &curvyo_document_core::NewFixture {
+            add: curvyo_document_core::FixtureAdd::Grid,
+            kind: "acme.waterjet/vise",
+            label: "Vise",
+            params: &params,
+            matrix: None,
+        },
+    )
+    .unwrap();
     let loro = LoroDoc::new();
     loro.import(&d.export_loro_snapshot().unwrap()).unwrap();
     let tree = loro.get_tree("paths");

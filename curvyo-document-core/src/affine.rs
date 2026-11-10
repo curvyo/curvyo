@@ -156,6 +156,16 @@ impl Affine {
             .iter()
             .all(|v| v.is_finite() && v.abs() <= MATRIX_ENTRY_LIMIT)
     }
+
+    /// Whether the map is a rotation with a translation, within `tolerance`: `a = d`, `c = −b`
+    /// and `a² + b² = 1` (no scale, no shear, no mirror; ADR 0049 §6).
+    #[must_use]
+    pub fn is_rigid_within(self, tolerance: f64) -> bool {
+        self.is_finite()
+            && (self.a - self.d).abs() <= tolerance
+            && (self.c + self.b).abs() <= tolerance
+            && (self.a.mul_add(self.a, self.b * self.b) - 1.0).abs() <= tolerance
+    }
 }
 
 impl From<Affine> for [f64; 6] {

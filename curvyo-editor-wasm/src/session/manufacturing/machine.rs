@@ -2,7 +2,9 @@
 //! the last pick, the commands of the Machine block, and the outbox of writes the host performs.
 //! Library edits are no history step; edits of the manufacturing's copy are one step each.
 
-use curvyo_document_core::{DocumentSize, Length, PageCorner, ProfileChange};
+use curvyo_document_core::{
+    DocumentSize, FixtureRecord, FixtureSnapshot, Length, PageCorner, ProfileChange,
+};
 use curvyo_laser_core::{
     Connection, CopyRead, LibraryWrite, MachineProfile, MachineProfiles, OriginCorner, ProfileCopy,
     clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port, clamp_power, clamp_work_area,
@@ -126,13 +128,15 @@ impl Session {
         })
     }
 
-    /// Writes `copy` and the page size `page` as one step labelled `change`.
+    /// Writes `copy` and the page size `page` as one step labelled `change`; with `fixtures`
+    /// the page's fixtures are replaced by that set in the same step (ADR 0050 §4).
     fn write_active_copy(
         &mut self,
         id: curvyo_document_core::NodeId,
         copy: &ProfileCopy,
         page: DocumentSize,
         change: ProfileChange,
+        fixtures: Option<&[FixtureRecord]>,
     ) -> bool {
         let map = write_copy(copy);
         let origin = copy.values.origin;
@@ -143,9 +147,15 @@ impl Session {
         let pages = self.document.pages();
         let contents = self.page_contents();
         let changed = self.recording_unguarded(|this| {
-            this.document
-                .set_manufacturing_profile(id, &map, page, anchor, change, &contents)
-                .unwrap_or(false)
+            match fixtures {
+                Some(set) => this.document.set_manufacturing_profile_and_fixtures(
+                    id, &map, page, anchor, change, set, &contents,
+                ),
+                None => this
+                    .document
+                    .set_manufacturing_profile(id, &map, page, anchor, change, &contents),
+            }
+            .unwrap_or(false)
         });
         if let Some(output) = self.document.manufacturing(id).and_then(|m| m.page) {
             self.note_moved_pages(&pages, &output.id);
@@ -153,8 +163,16 @@ impl Session {
         changed
     }
 
-    /// Picks the library profile `id` (criterion 5): the copy takes its values and the output
-    /// page its work area in one step; remembered as this computer's last pick.
+    /// The fixtures of the active page as a profile set (`specs/0102` criterion 28).
+    fn active_fixture_set(&self) -> Vec<FixtureRecord> {
+        self.active_manufacturing()
+            .map(|m| m.fixtures.iter().map(FixtureSnapshot::record).collect())
+            .unwrap_or_default()
+    }
+
+    /// Picks the library profile `id` (criterion 5): the copy takes its values, the output page
+    /// its work area and the page's fixtures its set (Generic laser: none; `0102` criterion 29)
+    /// in one step; remembered as this computer's last pick.
     pub fn pick_machine_profile(&mut self, id: &str) -> bool {
         let Some(active) = self.active_copy() else {
             return false;
@@ -167,6 +185,7 @@ impl Session {
             &ProfileCopy::of(&profile),
             profile.work_area,
             ProfileChange::Pick,
+            Some(&profile.fixtures),
         );
         self.remember_machine_pick(&profile.id);
         changed
@@ -189,7 +208,7 @@ impl Session {
         let active = self.active_copy()?;
         let mut copy = active.read.copy;
         let notice = edit(&mut copy)?;
-        self.write_active_copy(active.id, &copy, active.page, change);
+        self.write_active_copy(active.id, &copy, active.page, change, None);
         notice
     }
 
@@ -265,8 +284,8 @@ impl Session {
         Some(area.notice)
     }
 
-    /// Reset from profile (criterion 7): the copy and the page take the library record's values
-    /// in one step.
+    /// Reset from profile (criterion 7): the copy, the page and the page's fixtures take the
+    /// library record's values and set in one step (`0102` criterion 28).
     pub fn reset_machine_profile(&mut self) -> bool {
         let Some(active) = self.active_copy() else {
             return false;
@@ -286,6 +305,7 @@ impl Session {
             &ProfileCopy::of(&record),
             record.work_area,
             ProfileChange::Reset,
+            Some(&record.fixtures),
         )
     }
 
@@ -316,6 +336,7 @@ impl Session {
             },
             work_area: area.value,
             connection: Connection::default(),
+            fixtures: self.active_fixture_set(),
         };
         let write = self.manufacturing.machine.profiles.add(profile.clone())?;
         self.manufacturing
@@ -327,20 +348,24 @@ impl Session {
             &ProfileCopy::of(&profile),
             active.page,
             ProfileChange::SaveAs,
+            None,
         );
         area.notice
     }
 
-    /// Update profile (criterion 7): the user record the copy came from takes the copy's values
-    /// and the page size (cut into the profile range); no history step. Returns the notice.
+    /// Update profile (criterion 7): the user record the copy came from takes the copy's values,
+    /// the page size (cut into the profile range) and the page's fixtures (`0102` criterion 28);
+    /// no history step. Returns the notice.
     pub fn update_machine_profile(&mut self, now_ms: i64) -> Option<String> {
         let active = self.active_copy()?;
         let id = active.read.copy.id?;
         let area = clamp_work_area(active.page);
-        let write = self.manufacturing.machine.profiles.update(
+        let fixtures = self.active_fixture_set();
+        let write = self.manufacturing.machine.profiles.update_with_fixtures(
             &id,
             active.read.copy.values,
             area.value,
+            fixtures,
             now_ms,
         )?;
         self.manufacturing

@@ -316,8 +316,17 @@ fn deleting_a_laser_page_keeps_its_own_items_and_undo_restores_the_machine_data(
     let generic = profile("generic-laser", "bottom_left");
     let page = d.add_output_page(laser(&generic, 400.0, 300.0)).unwrap();
     let id = page.kind.manufacturing().unwrap();
-    d.add_fixture(id, GRID, "Engraved grid", &grid(10.0))
-        .unwrap();
+    d.add_fixture(
+        id,
+        &curvyo_document_core::NewFixture {
+            add: curvyo_document_core::FixtureAdd::Grid,
+            kind: GRID,
+            label: "Engraved grid",
+            params: &grid(10.0),
+            matrix: None,
+        },
+    )
+    .unwrap();
     let own = rect(&d, page.origin.x + 5.0, page.origin.y + 5.0);
     let full = d.manufacturing(id).unwrap();
     let steps = d.own_step_count();
@@ -408,7 +417,16 @@ fn golden_document() -> Document {
     let other = d.add_output_page(laser(&k40, 300.0, 200.0)).unwrap();
     let id = other.kind.manufacturing().unwrap();
     let grid_id = d
-        .add_fixture(id, GRID, "Engraved grid", &grid(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     d.set_fixture_visible(grid_id, false).unwrap();
     d
@@ -449,7 +467,16 @@ fn migration_file() -> Vec<u8> {
     let page = d.add_output_page(laser(&generic, 600.0, 400.0)).unwrap();
     let id = page.kind.manufacturing().unwrap();
     let hidden = d
-        .add_fixture(id, GRID, "Engraved grid", &grid(25.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(25.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     d.set_fixture_visible(hidden, false).unwrap();
     let loro = raw(&d);
@@ -549,7 +576,17 @@ fn the_page_kinds_golden_reads_back_every_page_and_the_machine_data_identical() 
             "curvyo.laser"
         ]
     );
-    assert_eq!(d.manufacturings(), fresh.manufacturings());
+    // The v37 golden names its grid "Engraved grid"; since `0102` (criterion 2) a new fixture is
+    // numbered from 1, so the fresh build's name differs and only the name is left out here.
+    let unnamed = |d: &Document| {
+        let mut all = d.manufacturings();
+        for fixture in all.iter_mut().flat_map(|m| m.fixtures.iter_mut()) {
+            fixture.name.clear();
+        }
+        all
+    };
+    assert_eq!(unnamed(&d), unnamed(&fresh));
+    assert_eq!(d.manufacturings()[1].fixtures[0].name, "Engraved grid");
     assert!(!d.manufacturings()[1].fixtures[0].visible);
     let sketch_page = &d.pages()[2];
     let sketch = d.page_sketch(&sketch_page.id).unwrap();

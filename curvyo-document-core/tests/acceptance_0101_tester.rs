@@ -40,7 +40,7 @@ fn round_trip(bytes: &[u8]) -> Vec<u8> {
 
 #[test]
 fn c25_the_format_number_is_39_for_this_slice() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 39);
+    assert_eq!(CURRENT_FORMAT_VERSION, 40);
 }
 
 #[test]

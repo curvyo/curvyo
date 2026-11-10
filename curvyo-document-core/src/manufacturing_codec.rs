@@ -32,6 +32,14 @@ pub(crate) const KEY_PLACEMENT_LINK: &str = "placement_link";
 pub(crate) const KEY_FIXTURE_KIND: &str = "fixture_kind";
 /// The atomic map of a fixture's parameter values.
 pub(crate) const KEY_FIXTURE_PARAMS: &str = "fixture_params";
+/// A fixture's Active register (absent reads as on, ADR 0049 §2).
+pub(crate) const KEY_FIXTURE_ACTIVE: &str = "active";
+/// A fixture's six-number matrix from its local frame into the page (absent is identity).
+pub(crate) const KEY_FIXTURE_MATRIX: &str = "fixture_matrix";
+/// The `shape` tag of a holder's slot node (ADR 0049 §3).
+pub(crate) const SHAPE_FIXTURE_SLOT: &str = "fixture_slot";
+/// The atomic map of a slot's values.
+pub(crate) const KEY_SLOT_PARAMS: &str = "slot_params";
 /// The page record field naming its owning manufacturing (`page.<id>.owner`).
 pub(crate) const PAGE_OWNER_FIELD: &str = "owner";
 
@@ -53,11 +61,18 @@ pub(crate) fn is_manufacturing_node(tree: &LoroTree, id: TreeID) -> bool {
         .is_ok_and(|meta| meta_is_manufacturing(&meta))
 }
 
-/// Whether `id` is a manufacturing or one of its placements, fixtures or operations (its direct
-/// children): no drawing command reads or writes such a node.
+/// Whether `id` is a manufacturing, one of its placements, fixtures or operations (its direct
+/// children) or a slot of one of its fixtures: no drawing command reads or writes such a node.
 pub(crate) fn in_manufacturing_subtree(tree: &LoroTree, id: TreeID) -> bool {
+    let parent = |node: TreeID| match tree.parent(node) {
+        Some(loro::TreeParentId::Node(parent)) => Some(parent),
+        _ => None,
+    };
     is_manufacturing_node(tree, id)
-        || matches!(tree.parent(id), Some(loro::TreeParentId::Node(parent)) if is_manufacturing_node(tree, parent))
+        || parent(id).is_some_and(|up| {
+            is_manufacturing_node(tree, up)
+                || parent(up).is_some_and(|top| is_manufacturing_node(tree, top))
+        })
 }
 
 /// The live manufacturing nodes at the root of the tree, in creation (tree) order.
@@ -124,33 +139,6 @@ pub(crate) fn read_placement_link(meta: &LoroMap) -> Option<PlacementLink> {
         page: page.to_string(),
         matrix: Affine::from_array(matrix),
     })
-}
-
-/// The fixture's parameter map as plain JSON values, `None` when it is not a map of plain values.
-pub(crate) fn read_fixture_params(
-    meta: &LoroMap,
-) -> Option<serde_json::Map<String, serde_json::Value>> {
-    read_plain_map(meta, KEY_FIXTURE_PARAMS)
-}
-
-pub(crate) fn write_fixture_params(
-    meta: &LoroMap,
-    params: &serde_json::Map<String, serde_json::Value>,
-) {
-    write_plain_map(meta, KEY_FIXTURE_PARAMS, params);
-}
-
-/// The register `key` as a map of plain JSON values, `None` when absent or not such a map.
-pub(crate) fn read_plain_map(
-    meta: &LoroMap,
-    key: &str,
-) -> Option<serde_json::Map<String, serde_json::Value>> {
-    let Some(ValueOrContainer::Value(LoroValue::Map(map))) = meta.get(key) else {
-        return None;
-    };
-    map.iter()
-        .map(|(key, value)| Some((key.clone(), json_of(value)?)))
-        .collect()
 }
 
 /// The machine profile copy `mfg_profile` as plain JSON values, `None` when absent or not a map of
@@ -251,8 +239,9 @@ pub(crate) fn owner_text(id: TreeID) -> String {
 }
 
 /// The open-file check of ADR 0033 §7: every manufacturing names a process and a page, holds only
-/// placement, fixture and operation leaves with readable node registers, and every page owner of a live page
-/// names a live manufacturing (or a removed node, whose page is not shown).
+/// placement, fixture, operation and orphan slot nodes with readable node registers, a fixture
+/// holds only slot leaves (ADR 0049 §3), and every page owner of a live page names a live
+/// manufacturing (or a removed node, whose page is not shown).
 pub(crate) fn validate(loro: &LoroDoc) -> bool {
     let tree = loro.get_tree(OBJECTS_TREE);
     let root = loro.get_map(ROOT_MAP);
@@ -298,21 +287,35 @@ fn child_is_valid(tree: &LoroTree, id: TreeID) -> bool {
     let Ok(meta) = tree.get_meta(id) else {
         return false;
     };
-    if tree.children_num(id).unwrap_or(0) != 0
-        || !crate::node_registers::registers_are_valid(&meta, false)
-    {
+    if !crate::node_registers::registers_are_valid(&meta, false) {
         return false;
     }
+    let children = tree
+        .children(loro::TreeParentId::Node(id))
+        .unwrap_or_default();
     match string(&meta, KEY_SHAPE).as_deref() {
-        Some(SHAPE_PLACEMENT) => read_placement_link(&meta).is_some(),
+        Some(SHAPE_PLACEMENT) => children.is_empty() && read_placement_link(&meta).is_some(),
+        // A fixture's values read per field (ADR 0049 §6); only its kind and its children decide.
         Some(SHAPE_FIXTURE) => {
-            string(&meta, KEY_FIXTURE_KIND).is_some() && read_fixture_params(&meta).is_some()
+            string(&meta, KEY_FIXTURE_KIND).is_some()
+                && children.into_iter().all(|slot| slot_is_valid(tree, slot))
         }
         // An operation is kept whatever its registers hold: an unreadable one reads as Unknown
-        // and saves back unchanged (ADR 0046 §1, R-MFG-010).
-        Some(crate::operation_codec::SHAPE_OPERATION) => true,
+        // and saves back unchanged (ADR 0046 §1, R-MFG-010). A slot outside a holder is an
+        // orphan: kept, never read (ADR 0049 §8).
+        Some(crate::operation_codec::SHAPE_OPERATION | SHAPE_FIXTURE_SLOT) => children.is_empty(),
         _ => false,
     }
+}
+
+/// A child of a fixture: a slot node with readable node registers and no children; its values
+/// read per field.
+fn slot_is_valid(tree: &LoroTree, id: TreeID) -> bool {
+    tree.children_num(id).unwrap_or(0) == 0
+        && tree.get_meta(id).is_ok_and(|meta| {
+            crate::node_registers::registers_are_valid(&meta, false)
+                && string(&meta, KEY_SHAPE).as_deref() == Some(SHAPE_FIXTURE_SLOT)
+        })
 }
 
 fn owners_are_valid(tree: &LoroTree, root: &LoroMap) -> bool {

@@ -13,10 +13,12 @@ mod fixture_fit;
 mod fixture_kind;
 mod fixture_slot;
 mod fixture_snap;
+mod fixture_stored;
 mod grid_layout;
 mod machine_profile;
 mod machine_profile_copy;
 mod machine_profile_file;
+mod machine_profile_fixtures;
 mod machine_profiles;
 mod manifest;
 mod operation_cut_out;
@@ -43,11 +45,13 @@ pub mod operations {
 pub use engraved_grid::{ENGRAVED_GRID, engraved_grid};
 pub use fixture_fit::{FitMatch, fit_slot};
 pub use fixture_kind::{
-    FixtureKind, KIND_PREFIX, MAJOR_EVERY_RANGE, MmRange, SlotShape, board_side_range,
-    grid_spacing_range, origin_offset_range, slot_size_range, stop_leg_range, stop_thickness_range,
+    FixtureKind, KIND_PREFIX, MAJOR_EVERY_RANGE, MmRange, ScrewPart, SlotShape, StopPart,
+    board_side_range, grid_spacing_range, origin_offset_range, screw_diameters, screw_head_range,
+    screw_thread_range, slot_size_range, stop_leg_range, stop_legs, stop_thickness_range,
 };
 pub use fixture_slot::Slot;
 pub use fixture_snap::{Placement, board_points, stop_points};
+pub use fixture_stored::{SLOT_CIRCLE, SLOT_RECT, grid_spec, params_damage, read_slot, screw_spec};
 pub use grid_layout::{
     GridLayout, GridSpec, Lattice, Number, Tape, TapeEdge, TapeEdges, Tick, layout,
 };
@@ -65,6 +69,7 @@ pub use machine_profile_file::{
     MAX_RECORD_BYTES, RECORD_SUFFIX, RecordError, read_choice, read_record, record_file_name,
     record_id, write_choice, write_record,
 };
+pub use machine_profile_fixtures::{MAX_SET_FIXTURES, MAX_SET_SLOTS};
 pub use machine_profiles::{LibraryWrite, MAX_RECORDS, MachineProfiles};
 pub use manifest::{PROCESS_ID, manifest};
 pub use overhang::{OVERHANG_NOTICE, OVERHANG_TOLERANCE, overhang_text};

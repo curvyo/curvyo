@@ -109,9 +109,13 @@ fn project(drawing_clone: bool) -> Vec<u8> {
     .unwrap();
     d.add_fixture(
         manufacturing,
-        curvyo_laser_core::ENGRAVED_GRID,
-        "Engraved grid",
-        &params,
+        &curvyo_document_core::NewFixture {
+            add: curvyo_document_core::FixtureAdd::Grid,
+            kind: curvyo_laser_core::ENGRAVED_GRID,
+            label: "Engraved grid",
+            params: &params,
+            matrix: None,
+        },
     )
     .unwrap();
     if drawing_clone {

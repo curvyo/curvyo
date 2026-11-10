@@ -1,0 +1,649 @@
+{
+  "format_version": 2,
+  "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+  "kind": "laser",
+  "modified": 1762171200000,
+  "name": "K40 in the garage",
+  "work_area_mm": {
+    "width": 600.0,
+    "height": 400.0
+  },
+  "origin": "top_left",
+  "max_feed_mm_per_min": 12000,
+  "max_power": 255,
+  "laser_mode": false,
+  "connection": {
+    "connector_address": "192.168.1.40:8080",
+    "controller_port": "/dev/ttyUSB0",
+    "baud_rate": 115200
+  },
+  "fixtures": [
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": []
+    }
+  ]
+}

@@ -725,8 +725,17 @@ fn ac16_deleting_a_laser_page_takes_its_machine_data_keeps_own_items_and_undo_re
     let d = Document::new(1);
     let l = add_laser(&d, &copy("generic-laser", "bottom_left"), 400.0, 300.0);
     let id = l.kind.manufacturing().unwrap();
-    d.add_fixture(id, GRID, "Engraved grid", &grid(10.0))
-        .unwrap();
+    d.add_fixture(
+        id,
+        &curvyo_document_core::NewFixture {
+            add: curvyo_document_core::FixtureAdd::Grid,
+            kind: GRID,
+            label: "Engraved grid",
+            params: &grid(10.0),
+            matrix: None,
+        },
+    )
+    .unwrap();
     let own = rect(&d, l.origin.x + 20.0, l.origin.y + 20.0);
     let own_before = d.object(own).unwrap();
     let first_before = page(&d, "first");
@@ -889,11 +898,11 @@ fn adr0042_a_claim_of_a_sketch_on_a_drawing_page_reads_as_no_owner() {
 
 #[test]
 // Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9), to 39 by
-// `specs/0101-laser-operations` (ADR 0046 §4).
+// `specs/0101-laser-operations` (ADR 0046 §4), to 40 by `specs/0102-laser-fixtures` (ADR 0049).
 fn ac20_save_writes_format_38() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 39);
+    assert_eq!(CURRENT_FORMAT_VERSION, 40);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 39);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 40);
 }
 
 #[test]
@@ -966,9 +975,13 @@ fn ac20_a_project_built_through_the_commands_round_trips() {
     let f = d
         .add_fixture(
             b.kind.manufacturing().unwrap(),
-            GRID,
-            "Engraved grid",
-            &grid(25.0),
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(25.0),
+                matrix: None,
+            },
         )
         .unwrap();
     d.set_fixture_visible(f, false).unwrap();
@@ -1046,9 +1059,13 @@ fn format_36_file() -> Vec<u8> {
     let fa = d
         .add_fixture(
             a.kind.manufacturing().unwrap(),
-            GRID,
-            "Engraved grid",
-            &grid(10.0),
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid(10.0),
+                matrix: None,
+            },
         )
         .unwrap();
     d.set_fixture_visible(fa, false).unwrap();
