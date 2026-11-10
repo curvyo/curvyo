@@ -35,10 +35,7 @@ Marks: **move** (to `vectrace` as is), **split** (pure part moves, adapter part 
    `curvyo-image-core` and `curvyo-svg-core`, and `ocr-core` uses `curvyo-image-core`. The OCR
    record test reads `frontend/public/models/`. 16 `vectorize-core` test files import
    `document-core`. Slice 1 fixes the imports. The dev-dependencies stay until slice 5 (§6).
-8. **The slice 4 target "`trace_*` in `ui-core` below 1,500 lines" cannot be reached.** About
-   3,100 lines stay for good reasons (points 2 to 5). Reaching 1,500 would need a boolean kernel
-   inside vectrace or font matching inside vectrace; both go against the plan. Recommendation:
-   drop the target and report the number (it is the plan's own target, not the customer's).
+8. **No line target for ui-core `trace_*` (customer, 2026-11-10).** About 3,100 lines stay for good reasons (points 2 to 5). Soft goal: as lean as reasonable, everything keeps working; report the number.
 9. **Crate name without a suffix.** `vectrace` breaks the `CLAUDE.md` §6 suffix list. ADR 0048
    §1 treats it as a core crate in every rule. The lead amends `CLAUDE.md` §6 and the §7 gate list.
 
