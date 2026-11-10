@@ -30,7 +30,7 @@
 #                        go stale, and `--workspace` is not more expensive
 #                        here than the split would have been.
 #   core-wasm32       — one job per workspace member whose name ends in
-#                        `-core`, plus `curvyo-editor-wasm` (see its own
+#                        `-core`, plus `curvyo-editor-wasm` and `vectrace` (see its own
 #                        comment) — discovered via `cargo metadata`, not
 #                        hardcoded, so a new `*-core` crate is picked up with
 #                        no workflow edit at all. Builds for
@@ -347,7 +347,7 @@ jobs:
 
   # Discovers the crates core-wasm32 below runs against, instead of a
   # hand-maintained list that silently misses a new crate: every workspace
-  # member whose name ends in `-core`, plus `curvyo-editor-wasm` (see that
+  # member whose name ends in `-core`, plus `curvyo-editor-wasm` and `vectrace` (see that
   # job's comment for why it's included by name rather than by suffix).
   discover-core-crates:
     name: discover core crates
@@ -362,7 +362,7 @@ jobs:
         run: |
           set -euo pipefail
           crates=$(cargo metadata --no-deps --format-version=1 \
-            | jq -c '[.packages[].name | select(endswith("-core") or . == "curvyo-editor-wasm")]')
+            | jq -c '[.packages[].name | select(endswith("-core") or . == "curvyo-editor-wasm" or . == "vectrace")]')
           echo "Discovered: $crates"
           echo "crates=$crates" >> "$GITHUB_OUTPUT"
 
@@ -565,15 +565,15 @@ jobs:
 
       - name: Run the quality harness, the budget and the memory test in release
         run: |
-          cargo test --release -p curvyo-vectorize-core --test quality -- --ignored --nocapture --test-threads=1
-          cargo test --release -p curvyo-vectorize-core --test memory -- --ignored --nocapture
+          cargo test --release -p vectrace --test quality -- --ignored --nocapture --test-threads=1
+          cargo test --release -p vectrace --test memory -- --ignored --nocapture
 
       # specs/0089-trace-quality-and-colour slice A: the reference set at three resolutions with all
       # four presets (about 5 minutes on the build host), guarded at +5 % like the harness above.
       - name: Run the reference set in release
         timeout-minutes: 30
         run: |
-          cargo test --release -p curvyo-vectorize-core --test reference -- --ignored --nocapture --test-threads=1 reference_table
+          cargo test --release -p vectrace --test reference -- --ignored --nocapture --test-threads=1 reference_table
 
   # Criterion 43 of specs/0016-boolean-operations: the golden results of the boolean kernel are
   # compared in the build that ships to the browser, run in Node by wasm-bindgen-test-runner
