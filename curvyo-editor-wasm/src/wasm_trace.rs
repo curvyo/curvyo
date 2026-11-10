@@ -66,7 +66,7 @@ pub fn trace_job(
             height,
             map,
             &colour,
-            region.as_ref(),
+            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
             &mut report,
         ),
         None => curvyo_ui_core::trace_job_in(
@@ -75,7 +75,7 @@ pub fn trace_job(
             height,
             map,
             &crate::trace_glue::trace_settings(settings),
-            region.as_ref(),
+            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
             &mut report,
         ),
     };
@@ -207,7 +207,7 @@ pub fn trace_text_job(
             map,
             &colour,
             &crate::trace_glue::read_ocr_lines(lines, width),
-            region.as_ref(),
+            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
             &mut report,
         )
     } else {
@@ -218,7 +218,7 @@ pub fn trace_text_job(
             map,
             &crate::trace_glue::trace_settings(settings),
             &crate::trace_glue::read_ocr_lines(lines, width),
-            region.as_ref(),
+            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
             &mut report,
         )
     };
@@ -246,7 +246,9 @@ pub fn trace_text_regions_job(
         map,
         &crate::trace_glue::trace_settings(settings),
         &crate::trace_glue::read_ocr_lines(lines, width),
-        crate::trace_glue::trace_mask_region(settings).as_ref(),
+        crate::trace_glue::trace_mask_region(settings)
+            .as_ref()
+            .map(|r| r as &dyn curvyo_ui_core::Mask),
     )
 }
 

@@ -8,7 +8,7 @@
 mod cpu_time;
 
 use curvyo_document_core::{Point, Vec2};
-use curvyo_ui_core::{TraceParams, TraceRegion, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{Mask, TraceParams, TraceRegion, read_trace_wire, trace_job_in};
 
 /// A 2000 x 2000 px picture of 400 discs on a grid, 20 x 20 of them, placed 200 mm wide.
 fn picture() -> Vec<u8> {
@@ -58,15 +58,15 @@ fn c16_the_stencil_clip_of_a_2000_px_trace_with_a_500_node_mask() {
         })
         .collect();
     let region = TraceRegion::of_operands(&[vec![(circle, true)]], false).unwrap();
-    let (clipped, clip) = cpu_time::cpu_time_of(|| region.clip(&outlines));
+    let (clipped, clip) = cpu_time::cpu_time_of(|| Mask::clip(&region, &outlines));
     println!(
         "criterion 16: trace {:.3} s, clip {:.3} s ({} outlines, {} kept)",
         trace.as_secs_f64(),
         clip.as_secs_f64(),
         outlines.len(),
-        clipped.0.len()
+        clipped.outlines.len()
     );
-    assert_ne!(clipped.0.len(), 0);
+    assert_ne!(clipped.outlines.len(), 0);
 }
 
 /// `rgba` (`side` px square) cut to `x0..x1` by `y0..y1` px, and `map` moved with the cut (the
@@ -158,7 +158,7 @@ fn c31_four_quarter_parts_against_one_whole_trace() {
                     cut.3 - cut.1,
                     moved,
                     &params,
-                    clip.region(),
+                    clip.region().map(|r| r as &dyn Mask),
                     &mut |_| {},
                 ))
                 .unwrap()

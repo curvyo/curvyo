@@ -14,8 +14,8 @@ use curvyo_vectorize_core::{
     TraceError, colour_palette, suggest_background, trace_colours,
 };
 
+use crate::trace_mask::{Mask, clip_colours, write_unclipped};
 use crate::trace_ocr::OcrLine;
-use crate::trace_region::TraceRegion;
 use crate::trace_text::{TextPass, text_pass};
 use crate::trace_text_wire::{keep_lines_in, write_texts};
 use crate::trace_transfer::{
@@ -41,7 +41,7 @@ pub fn trace_text_colour_job_in(
     pixel_map: [f64; 6],
     params: &ColourParams,
     lines: &[OcrLine],
-    region: Option<&TraceRegion>,
+    region: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
     if lines.is_empty() {
@@ -78,11 +78,11 @@ pub fn trace_text_colour_job_in(
     });
     match traced {
         Ok(mut result) => {
-            let unclipped = region.map_or(0, |region| region.clip_colours(&mut result));
+            let unclipped = region.map_or(0, |mask| clip_colours(mask, &mut result));
             report(100);
             let fills = line_fills(&pass, &result.palette, raster, params);
             let mut wire = colour_head(&result);
-            crate::trace_region::write_unclipped(&mut wire, unclipped);
+            write_unclipped(&mut wire, unclipped);
             write_texts(&mut wire, &pass, &fills);
             write_colour_tail(&mut wire, &result);
             wire

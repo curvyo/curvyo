@@ -2,7 +2,7 @@
 //! criteria 18, 19, 24, 27 to 29 and 42).
 
 use curvyo_document_core::{Affine, Length, NodeId, ObjectSnapshot, Point, RectBounds};
-use curvyo_ui_core::{TraceParams, TracePartClip, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{Mask, TraceParams, TracePartClip, read_trace_wire, trace_job_in};
 
 use super::trace_parts::TRACE_PARTS_MAX;
 use super::{Session, Tool, TraceCreateOutcome};
@@ -305,7 +305,7 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
                 16,
                 map,
                 &params,
-                clip.region(),
+                clip.region().map(|r| r as &dyn Mask),
                 &mut |_| {},
             )
         })

@@ -198,6 +198,7 @@ mod trace_fit;
 mod trace_fit_guess;
 mod trace_fit_turn;
 mod trace_inpaint;
+mod trace_mask;
 mod trace_ocr;
 mod trace_parts;
 mod trace_plan;
@@ -555,6 +556,7 @@ pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
 };
+pub use trace_mask::{Clipped, Mask};
 pub use trace_ocr::{
     LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
     OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,

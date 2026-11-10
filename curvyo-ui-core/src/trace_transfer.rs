@@ -10,7 +10,7 @@ use curvyo_vectorize_core::{
 };
 use kurbo::{BezPath, PathEl, Point};
 
-use crate::trace_region::TraceRegion;
+use crate::trace_mask::{Mask, UNCLIPPED_MARK, clip_colours, clip_trace, write_unclipped};
 
 /// How a trace job ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,7 +141,7 @@ pub fn trace_job_in(
     height: u32,
     pixel_map: [f64; 6],
     params: &TraceParams,
-    region: Option<&TraceRegion>,
+    region: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
     let raster = Raster {
@@ -160,7 +160,7 @@ pub fn trace_job_in(
     };
     match trace(raster, PixelMap::new(pixel_map), params, &mut go) {
         Ok(mut result) => {
-            let unclipped = region.map_or(0, |region| region.clip_trace(&mut result));
+            let unclipped = region.map_or(0, |mask| clip_trace(mask, &mut result));
             #[allow(clippy::cast_precision_loss)] // counts far below 2^52
             let mut wire = vec![
                 TraceStatus::Traced.code(),
@@ -174,7 +174,7 @@ pub fn trace_job_in(
             for outline in &result.outlines {
                 write_outline(&mut wire, outline);
             }
-            crate::trace_region::write_unclipped(&mut wire, unclipped);
+            write_unclipped(&mut wire, unclipped);
             wire
         }
         Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
@@ -193,7 +193,7 @@ pub fn trace_colour_job_in(
     height: u32,
     pixel_map: [f64; 6],
     params: &TraceColourParams,
-    region: Option<&TraceRegion>,
+    region: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
     let raster = Raster {
@@ -212,9 +212,9 @@ pub fn trace_colour_job_in(
     };
     match trace_colours(raster, PixelMap::new(pixel_map), params, &mut go) {
         Ok(mut result) => {
-            let unclipped = region.map_or(0, |region| region.clip_colours(&mut result));
+            let unclipped = region.map_or(0, |mask| clip_colours(mask, &mut result));
             let mut wire = colour_head(&result);
-            crate::trace_region::write_unclipped(&mut wire, unclipped);
+            write_unclipped(&mut wire, unclipped);
             write_colour_tail(&mut wire, &result);
             wire
         }
@@ -381,7 +381,7 @@ pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
     let outline_count = count(header[6])?;
     let outlines = read_outlines(wire, &mut at, outline_count)?;
     // `specs/0094`: the unclipped count, when a kernel refusal kept outlines whole.
-    let unclipped = if wire.get(at) == Some(&crate::trace_region::UNCLIPPED_MARK) {
+    let unclipped = if wire.get(at) == Some(&UNCLIPPED_MARK) {
         at += 2;
         count(*wire.get(at - 1)?)?
     } else {
@@ -508,6 +508,7 @@ fn read_colour_tail(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trace_mask::test_double::BoxMask;
     use curvyo_vectorize_core::Mm;
 
     fn square_picture() -> Vec<u8> {
@@ -541,6 +542,93 @@ mod tests {
             ..TraceParams::with_threshold(threshold)
         };
         trace_job_in(rgba, width, height, pixel_map, &params, None, &mut |_| {})
+    }
+
+    const SQUARE_MAP: [f64; 6] = [0.5, 0.0, 0.0, 0.5, 1.0, 2.0];
+
+    fn job_with(mask: Option<&dyn Mask>) -> TraceWire {
+        let params = TraceParams::with_threshold(128);
+        let wire = trace_job_in(
+            &square_picture(),
+            16,
+            16,
+            SQUARE_MAP,
+            &params,
+            mask,
+            &mut |_| {},
+        );
+        read_wire(&wire).unwrap()
+    }
+
+    /// The square outline spans x 3..7, y 4..8 mm.
+    #[test]
+    fn a_mask_that_keeps_everything_leaves_the_job_as_it_is() {
+        let all = BoxMask {
+            min: Point::new(0.0, 0.0),
+            max: Point::new(100.0, 100.0),
+        };
+        assert_eq!(job_with(Some(&all)), job_with(None));
+    }
+
+    #[test]
+    fn a_mask_that_drops_the_outline_leaves_none_and_recounts() {
+        let away = BoxMask {
+            min: Point::new(50.0, 50.0),
+            max: Point::new(60.0, 60.0),
+        };
+        let read = job_with(Some(&away));
+        assert_eq!(read.status, TraceStatus::Traced);
+        assert_eq!((read.paths, read.nodes, read.outlines.len()), (0, 0, 0));
+        assert!(!read.covers_whole_image);
+        assert_eq!(read.unclipped, 0);
+    }
+
+    /// An outline the mask could not cut stays whole and its count travels on the wire.
+    #[test]
+    fn the_masks_whole_kept_outlines_are_counted_on_the_wire() {
+        let edge = BoxMask {
+            min: Point::new(0.0, 0.0),
+            max: Point::new(5.0, 100.0),
+        };
+        let read = job_with(Some(&edge));
+        assert_eq!((read.paths, read.nodes), (1, 4));
+        assert_eq!(read.unclipped, 1);
+    }
+
+    /// A multicolour layer left empty by the mask is dropped and the counts follow.
+    #[test]
+    fn a_mask_drops_the_layers_it_empties() {
+        let picture: Vec<u8> = (0..40 * 20)
+            .flat_map(|i| {
+                let (x, y) = (i % 40, i / 40);
+                if !(4..36).contains(&x) || !(4..16).contains(&y) {
+                    [255, 255, 255, 255]
+                } else if x < 20 {
+                    [208, 34, 42, 255]
+                } else {
+                    [35, 78, 184, 255]
+                }
+            })
+            .collect();
+        let params = TraceColourParams::new(TraceParams {
+            selection: curvyo_vectorize_core::Selection::RemoveBackground {
+                background: Some(TraceRgb::new(255, 255, 255)),
+                tolerance: 40,
+            },
+            specks: Mm::from_mm(0.0),
+            ..TraceParams::with_threshold(128)
+        });
+        let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let left = BoxMask {
+            min: Point::new(0.0, 0.0),
+            max: Point::new(19.0, 20.0),
+        };
+        let wire = trace_colour_job_in(&picture, 40, 20, map, &params, Some(&left), &mut |_| {});
+        let read = read_wire(&wire).unwrap();
+        assert_eq!(read.layers.len(), 1);
+        assert_eq!(read.layers[0].colour, TraceRgb::new(208, 34, 42));
+        assert_eq!(read.outlines.len(), read.paths);
+        assert_eq!(read.layers[0].outlines, read.outlines.len());
     }
 
     #[test]

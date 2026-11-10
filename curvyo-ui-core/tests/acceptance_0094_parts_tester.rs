@@ -28,7 +28,7 @@ use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
 use curvyo_ui_core::{
-    OcrLine, TraceColourParams, TraceMethod, TraceParams, TracePartArea, TracePartClip,
+    Mask, OcrLine, TraceColourParams, TraceMethod, TraceParams, TracePartArea, TracePartClip,
     TraceRegion, TraceRgb, TraceStatus, TraceWire, join_trace_parts, read_trace_wire,
     trace_colour_job_in, trace_job_in, trace_part_clips, trace_text_job_in,
 };
@@ -180,6 +180,7 @@ struct Picture {
 
 fn job(pic: &Picture, job: &Job, region: Option<&TraceRegion>) -> Vec<f64> {
     let map = map_100mm(pic.n);
+    let region = region.map(|r| r as &dyn Mask);
     match job {
         Job::Mono(p) => trace_job_in(&pic.rgba, pic.n, pic.n, map, p, region, &mut |_| {}),
         Job::Colour(p) => trace_colour_job_in(&pic.rgba, pic.n, pic.n, map, p, region, &mut |_| {}),
