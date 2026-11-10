@@ -34,6 +34,9 @@ pub enum PanelTab {
     /// The active manufacturing workbench's tab, drawn from its extension's manifest
     /// (`specs/0093-laser-workbench-shell`, ADR 0032 §2); its label comes from the manifest.
     Workbench,
+    /// The laser operations of a laser page (`specs/0101-laser-operations` criterion 1): after
+    /// Document, on a laser page with its extension on only; never active by itself.
+    Operations,
 }
 
 impl PanelTab {
@@ -53,6 +56,7 @@ impl PanelTab {
             Self::Parameters => "parameters",
             Self::Share => "share",
             Self::Workbench => "workbench",
+            Self::Operations => "operations",
         }
     }
 
@@ -61,7 +65,7 @@ impl PanelTab {
     pub fn from_name(name: &str) -> Option<Self> {
         TABS.iter()
             .copied()
-            .chain([Self::Workbench])
+            .chain([Self::Workbench, Self::Operations])
             .find(|tab| tab.name() == name)
     }
 
@@ -94,6 +98,7 @@ impl PanelTab {
             Self::Parameters => "Parameters",
             Self::Share => "Share",
             Self::Workbench => "Workbench",
+            Self::Operations => "Operations",
         }
     }
 
@@ -114,6 +119,7 @@ impl PanelTab {
             (Self::Parameters, _) => "Parameters",
             (Self::Share, _) => "Share",
             (Self::Workbench, _) => "Workbench",
+            (Self::Operations, _) => "Operations",
         }
     }
 }
@@ -484,6 +490,10 @@ mod tests {
         assert_eq!(PanelTab::from_name("document"), Some(Document));
         assert_eq!(PanelTab::from_name("history"), Some(PanelTab::History));
         assert_eq!(PanelTab::from_name("file"), Some(PanelTab::File));
+        assert_eq!(
+            PanelTab::from_name("operations"),
+            Some(PanelTab::Operations)
+        );
         assert_eq!(PanelTab::from_name("unknown"), None);
     }
 }
