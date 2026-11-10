@@ -22,9 +22,9 @@
     clippy::needless_pass_by_value
 )]
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     ADVANCED_PARAMS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD, DEFAULT_TOLERANCE_PX,
     PARAMS, PRESETS, ParamKind, ParamUnit, Phase, PixelLength, Raster, TraceError, TraceParams,
@@ -79,20 +79,20 @@ fn aa(w: u32, h: u32, inside: impl Fn(f64, f64) -> bool) -> Pic {
     })
 }
 
-fn px_map() -> Affine {
-    Affine::new(MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0)
+fn px_map() -> PixelMap {
+    PixelMap::new([MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0])
 }
 
 fn params(threshold: u8, smooth: u8, specks_mm: f64) -> TraceParams {
     TraceParams {
         threshold,
         smooth,
-        specks: Length::from_mm(specks_mm),
+        specks: Mm::from_mm(specks_mm),
         ..TraceParams::with_threshold(threshold)
     }
 }
 
-fn run(pic: &Pic, map: Affine, p: &TraceParams) -> TraceResult {
+fn run(pic: &Pic, map: PixelMap, p: &TraceParams) -> TraceResult {
     trace(pic.raster(), map, p, &mut |_| ControlFlow::Continue(())).unwrap()
 }
 
@@ -330,7 +330,7 @@ fn c14_rotated_flipped_map_lands_on_hand_computed_corners() {
     // 40 x 20 mm frame, flipped horizontally (u = 40 - 10 x), rotated 90 degrees about the frame
     // centre (20, 10): X = 30 - v, Y = 10 + (u - 20) = 30 - u - ... computed by hand below.
     // v = 10 y, u = 40 - 10 x; X = 20 - (v - 10) = 30 - 10 y; Y = 10 + (u - 20) = 30 - 10 x.
-    let map = Affine::new(0.0, -10.0, -10.0, 0.0, 30.0, 30.0);
+    let map = PixelMap::new([0.0, -10.0, -10.0, 0.0, 30.0, 30.0]);
     let by_hand = |x: f64, y: f64| Point::new(30.0 - 10.0 * y, 30.0 - 10.0 * x);
     let m = map.to_array();
     let svg = |x: f64, y: f64| Point::new(m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]);
@@ -642,7 +642,7 @@ fn disc_deviation(smooth: u8) -> (usize, usize, f64, f64) {
     });
     let r = run(
         &pic,
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &params(128, smooth, 0.5 / MM_PER_PX),
     );
     let pts = flat_points(&r.outlines[0], 0.01);
@@ -697,7 +697,7 @@ fn ring_with_dot() -> Pic {
 fn c22_ring_with_dot_three_outlines_directions_and_area() {
     let pic = ring_with_dot();
     // the dot is inside the hole: ring 90..130, hole 40..90, dot r < 40.
-    let r = run(&pic, Affine::IDENTITY, &params(128, 80, 0.0));
+    let r = run(&pic, PixelMap::IDENTITY, &params(128, 80, 0.0));
     assert_eq!(r.outlines.len(), 3, "ring outer, hole, dot");
     let mut areas: Vec<(f64, usize)> = r
         .outlines
@@ -930,7 +930,7 @@ fn c25_reduced_copy_preview_timing_is_reported() {
 
 #[test]
 fn degenerate_inputs_do_not_panic() {
-    let ok = |w: u32, h: u32, rgba: &[u8], map: Affine| {
+    let ok = |w: u32, h: u32, rgba: &[u8], map: PixelMap| {
         trace(
             Raster {
                 width: w,
@@ -955,7 +955,7 @@ fn degenerate_inputs_do_not_panic() {
             1,
             1,
             &[0, 0, 0, 255],
-            Affine::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            PixelMap::new([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         ),
         Err(TraceError::Invalid(_))
     ));
@@ -964,7 +964,7 @@ fn degenerate_inputs_do_not_panic() {
             1,
             1,
             &[0, 0, 0, 255],
-            Affine::new(f64::NAN, 0.0, 0.0, 1.0, 0.0, 0.0)
+            PixelMap::new([f64::NAN, 0.0, 0.0, 1.0, 0.0, 0.0])
         ),
         Err(TraceError::Invalid(_))
     ));
@@ -986,14 +986,14 @@ fn degenerate_inputs_do_not_panic() {
         &TraceParams {
             threshold: 128,
             smooth: 80,
-            specks: Length::from_mm(f64::NAN),
+            specks: Mm::from_mm(f64::NAN),
             ..TraceParams::with_threshold(128)
         },
         &mut |_| ControlFlow::Continue(()),
     );
     assert!(r.is_ok());
     // a mirrored map (negative determinant) still traces
-    let mirrored = Affine::new(-MM_PER_PX, 0.0, 0.0, MM_PER_PX, 10.0, 0.0);
+    let mirrored = PixelMap::new([-MM_PER_PX, 0.0, 0.0, MM_PER_PX, 10.0, 0.0]);
     let pic = aa(60, 60, |x, y| {
         (10.0..40.0).contains(&x) && (10.0..40.0).contains(&y)
     });

@@ -43,6 +43,7 @@ mod select;
 mod shared_fit;
 mod smooth;
 mod trace;
+mod units;
 
 // The integration tests' helpers (the quality set and its metrics) for the one unit test that
 // needs the trace before the node reduction (`trace::tests`).
@@ -75,3 +76,4 @@ pub use schema::{
 };
 pub use select::{DEFAULT_BACKGROUND_TOLERANCE, DEFAULT_PICK_TOLERANCE, selected};
 pub use trace::{Counts, Diagnostics, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};
+pub use units::{Angle, Mm, PixelMap};

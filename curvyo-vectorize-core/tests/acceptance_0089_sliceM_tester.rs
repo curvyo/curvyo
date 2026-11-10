@@ -28,9 +28,9 @@
 
 mod common;
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     ColourParams, ColourTrace, DEFAULT_BACKGROUND_TOLERANCE, PixelLength, Raster, Rgb8, Selection,
     Swatches, TraceParams, trace_colours,
@@ -140,7 +140,7 @@ fn disc_scene() -> Scene {
 fn tp(selection: Selection) -> TraceParams {
     TraceParams {
         selection,
-        specks: Length::from_mm(0.0),
+        specks: Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     }
 }
@@ -163,7 +163,7 @@ fn run(p: &Pic, params: &ColourParams) -> ColourTrace {
 fn run_scaled(p: &Pic, params: &ColourParams, mm_per_px: f64) -> ColourTrace {
     trace_colours(
         p.raster(),
-        Affine::scale(mm_per_px, mm_per_px),
+        PixelMap::scale(mm_per_px, mm_per_px),
         params,
         &mut |_| ControlFlow::Continue(()),
     )
@@ -608,7 +608,7 @@ fn c27_small_region_joins_the_neighbour_with_the_longest_shared_border() {
     });
     let p = render(160, 160, 0, &scene);
     let mut cp = params(WHITE);
-    cp.trace.specks = Length::from_mm(1.0);
+    cp.trace.specks = Mm::from_mm(1.0);
     let t = run(&p, &cp);
     assert_eq!(
         t.layers.len(),

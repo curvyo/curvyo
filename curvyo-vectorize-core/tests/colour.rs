@@ -18,12 +18,12 @@
 
 mod common;
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 
 use common::quality::multi::{
     BLUE, GREEN, Inside, MultiScene, RED, WHITE, YELLOW, common_nodes, measure, multi_set,
 };
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     ColourParams, ColourTrace, Rgb8, Selection, TraceParams, suggest_background, trace_colours,
 };
@@ -50,7 +50,7 @@ fn run(picture: &common::Picture, params: &ColourParams) -> ColourTrace {
     let mut go = |_| ControlFlow::Continue(());
     trace_colours(
         picture.raster(),
-        Affine::scale(MM_PER_PX, MM_PER_PX),
+        PixelMap::scale(MM_PER_PX, MM_PER_PX),
         params,
         &mut go,
     )
@@ -290,12 +290,12 @@ fn eight_colours_2000() -> common::Picture {
 fn criterion_30_eight_colours_2000_budget() {
     let picture = eight_colours_2000();
     let mut p = ColourParams::new(params_for(&picture));
-    p.trace.specks = Length::from_mm(0.0);
+    p.trace.specks = Mm::from_mm(0.0);
     let start = common::thread_cpu_seconds();
     let mut go = |_| ControlFlow::Continue(());
     let result = trace_colours(
         picture.raster(),
-        Affine::scale(25.4 / 300.0, 25.4 / 300.0),
+        PixelMap::scale(25.4 / 300.0, 25.4 / 300.0),
         &p,
         &mut go,
     )

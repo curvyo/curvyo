@@ -10,7 +10,6 @@ description = "The Curvyo raster tracer: an RGBA8 raster and trace settings in, 
 workspace = true
 
 [dependencies]
-curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 kurbo.workspace = true
 thiserror.workspace = true
 
@@ -19,6 +18,8 @@ thiserror.workspace = true
 rustix = { version = "1.1", features = ["time"] }
 
 [dev-dependencies]
+# The bit-for-bit test of `units.rs` against `Affine` (ADR 0048 §3), dev only.
+curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 # The golden files of `tests/fixtures/trace/` (criterion 18).
 serde_json.workspace = true
 # The reference set's CC0 and local images are PNG and JPEG (`specs/0089` adrs.md §11, dev only).

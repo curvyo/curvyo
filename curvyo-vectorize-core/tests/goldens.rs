@@ -19,10 +19,10 @@
 
 mod common;
 
+use curvyo_vectorize_core::PixelMap;
 use std::ops::ControlFlow;
 
 use common::{MM_PER_PX_96, Picture, area, at_96_dpi, params, read_picture, render, run};
-use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{MAX_HOLES_PER_REGION, TraceError, TraceParams, trace};
 use kurbo::{BezPath, PathEl, Shape};
 use serde_json::{Value, json};
@@ -286,7 +286,7 @@ fn the_rectangle_is_four_sharp_corners() {
 fn the_disc_is_round_and_light() {
     let result = run(
         &read_picture("disc.pgm"),
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &params(128, 80, 0.5),
     );
     assert_eq!(result.counts.paths, 1);
@@ -319,7 +319,7 @@ fn winding(outlines: &[BezPath], p: kurbo::Point) -> i32 {
 #[test]
 fn the_ring_with_a_dot_has_three_outlines() {
     let picture = read_picture("ring-with-dot.pgm");
-    let result = run(&picture, Affine::IDENTITY, &params(128, 80, 0.5));
+    let result = run(&picture, PixelMap::IDENTITY, &params(128, 80, 0.5));
     assert_eq!(result.counts.paths, 3);
     let areas: Vec<f64> = result.outlines.iter().map(area).collect();
     // Order: the ring, its hole, then the dot (first scan positions).
@@ -438,7 +438,7 @@ fn outlines_follow_a_rotated_flipped_pixel_map() {
     // 4 x 2 px, the left 2 x 2 black; framed 40 x 20 mm, rotated 90 degrees, flipped
     // horizontally: pixel (x, y) to mm (10 y, 10 x) + (5, 7), so the frame is 20 x 40 mm.
     let picture = Picture::grey(4, 2, &[0, 0, 255, 255, 0, 0, 255, 255]);
-    let map = Affine::new(0.0, 10.0, 10.0, 0.0, 5.0, 7.0);
+    let map = PixelMap::new([0.0, 10.0, 10.0, 0.0, 5.0, 7.0]);
     let result = run(&picture, map, &params(128, 80, 0.0));
     assert_eq!(result.counts.paths, 1);
     let mut corners: Vec<(f64, f64)> = result.outlines[0]
@@ -542,7 +542,7 @@ fn a_stop_cancels_and_bad_input_is_invalid() {
         trace(short, at_96_dpi(), &params(128, 80, 0.5), &mut go),
         Err(TraceError::Invalid(_))
     ));
-    let flat = Affine::new(1.0, 0.0, 1.0, 0.0, 0.0, 0.0);
+    let flat = PixelMap::new([1.0, 0.0, 1.0, 0.0, 0.0, 0.0]);
     assert!(matches!(
         trace(picture.raster(), flat, &params(128, 80, 0.5), &mut go),
         Err(TraceError::Invalid(_))

@@ -37,6 +37,7 @@
 
 mod common;
 
+use curvyo_vectorize_core::PixelMap;
 use std::alloc::System;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -55,7 +56,6 @@ use common::quality::report::{
 use common::quality::run::{Case, Truth, case_params, measure, params_for};
 use common::quality::shape::{corner_errors, measure_edge, self_intersections};
 use common::quality::{reference_set, selection_set};
-use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{PRESETS, Preset, Selection};
 use kurbo::{BezPath, Point};
 use serde_json::{Value, json};
@@ -237,7 +237,7 @@ fn peak_memory_child() {
     };
     let p = params_for(preset, &picture);
     let before = ALLOCATOR.allocated();
-    let result = common::run(&picture, Affine::scale(mm, mm), &p);
+    let result = common::run(&picture, PixelMap::scale(mm, mm), &p);
     let peak = ALLOCATOR.max_allocated().saturating_sub(before);
     drop(result);
     println!(

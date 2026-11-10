@@ -21,11 +21,11 @@
 
 mod common;
 
+use curvyo_vectorize_core::PixelMap;
 use std::alloc::System;
 
 use cap::Cap;
 use common::{params, run};
-use curvyo_document_core::Affine;
 
 #[global_allocator]
 static ALLOCATOR: Cap<System> = Cap::new(System, usize::MAX);
@@ -83,7 +83,7 @@ fn a_16_mpx_trace_stays_within_16_bytes_per_pixel() {
     let peak_before = ALLOCATOR.max_allocated();
     let result = run(
         &picture,
-        Affine::scale(25.4 / 300.0, 25.4 / 300.0),
+        PixelMap::scale(25.4 / 300.0, 25.4 / 300.0),
         &params(128, 80, 0.5),
     );
     let peak = ALLOCATOR.max_allocated();

@@ -1,7 +1,7 @@
 //! Traces one reference case with one preset, measuring it (`specs/0089-trace-quality-and-colour`
 //! criterion 3: everything but peak memory or the wasm time, which need their own process).
 
-use curvyo_document_core::Affine;
+use curvyo_vectorize_core::PixelMap;
 use curvyo_vectorize_core::{Preset, Selection, TraceParams, auto_threshold, selected};
 use kurbo::{BezPath, Point};
 
@@ -59,7 +59,7 @@ pub fn measure_with(case: &Case, p: &TraceParams, specks_mm: f64) -> Row {
     let p = *p;
     let mm = case.mm_per_px;
     let t0 = super::super::thread_cpu_seconds();
-    let result = super::super::run(&case.picture, Affine::scale(mm, mm), &p);
+    let result = super::super::run(&case.picture, PixelMap::scale(mm, mm), &p);
     let cpu = super::super::thread_cpu_seconds() - t0;
     let outlines: Vec<BezPath> = result
         .outlines
