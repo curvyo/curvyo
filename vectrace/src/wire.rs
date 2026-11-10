@@ -282,6 +282,7 @@ pub(crate) fn write_outline(wire: &mut Vec<f64>, outline: &BezPath) {
 }
 
 /// A count read from the wire: a whole, non-negative, finite number.
+#[must_use]
 pub fn count(value: f64) -> Option<usize> {
     // invariant: checked whole and in range before the cast.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -289,7 +290,7 @@ pub fn count(value: f64) -> Option<usize> {
         .then_some(value as usize)
 }
 
-/// Reads the numbers of [`trace_job_in`] back as they are; `None` when they are not a
+/// Reads the numbers of [`crate::job::run`] back as they are; `None` when they are not a
 /// well-formed result.
 #[must_use]
 pub fn read_wire(wire: &[f64]) -> Option<TraceWire> {

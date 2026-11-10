@@ -89,6 +89,7 @@ pub enum Primitive {
 pub const POINTS: RangeInclusive<u32> = 3..=1024;
 
 /// The inner ratio of a star when it lies in the open interval (0, 1).
+#[must_use]
 pub fn valid_ratio(ratio: f64) -> Option<f64> {
     (ratio.is_finite() && ratio > 0.0 && ratio < 1.0).then_some(ratio)
 }
