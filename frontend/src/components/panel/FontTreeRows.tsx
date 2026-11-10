@@ -78,7 +78,7 @@ interface TrashProps {
 }
 
 /** The family row's Remove trash: 24 x 28, not a Tab stop, the focus stays on a press. */
-function RowTrash({ target, armed, label, tip, onPress }: TrashProps) {
+export function RowTrash({ target, armed, label, tip, onPress }: TrashProps) {
   return (
     <Tooltip side="left" content={tip}>
       <button

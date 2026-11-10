@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormatListRecord, WasmSession } from "@/lib/editorSession";
 import { pickFormatsFile, saveFormatsFile, setFormatsAside, storeFormats } from "@/lib/formatsFile";
 import type { DocumentPanelApi } from "@/hooks/useDocumentPanel";
+import { type DeleteArm, useDeleteArm } from "@/hooks/useDeleteArm";
 
 export interface FormatRow {
   id: string;
@@ -16,7 +17,10 @@ export interface FormatRow {
   canEdit: boolean;
   editName: string;
   deleteName: string;
-  deletePrompt: string;
+  /** The trash's name while it is armed: "Press again to delete Key ring." */
+  armedName: string;
+  /** The rename field's name: "Name of Key ring". */
+  renameName: string;
 }
 
 export interface FormatGroup {
@@ -28,10 +32,9 @@ export interface FormatGroup {
   canEdit: boolean;
   showName: string;
   foldName: string;
-  editName: string;
   deleteName: string;
-  deletePrompt: string;
-  orientation: "portrait" | "landscape";
+  armedName: string;
+  renameName: string;
   rows: FormatRow[];
 }
 
@@ -64,10 +67,9 @@ function readList(session: WasmSession | null): FormatListView {
     canEdit: (groupFlags[index] & 4) !== 0,
     showName: raw.group_show_names[index],
     foldName: raw.group_fold_names[index],
-    editName: raw.group_edit_names[index],
     deleteName: raw.group_delete_names[index],
-    deletePrompt: raw.group_delete_prompts[index],
-    orientation: raw.group_orientations[index] as "portrait" | "landscape",
+    armedName: raw.group_armed_names[index],
+    renameName: raw.group_rename_names[index],
     rows: [],
   }));
   raw.row_ids.forEach((id, index) => {
@@ -83,7 +85,8 @@ function readList(session: WasmSession | null): FormatListView {
       canEdit: (rowFlags[index] & 8) !== 0,
       editName: raw.row_edit_names[index],
       deleteName: raw.row_delete_names[index],
-      deletePrompt: raw.row_delete_prompts[index],
+      armedName: raw.row_armed_names[index],
+      renameName: raw.row_rename_names[index],
     });
   });
   const view: FormatListView = {
@@ -109,7 +112,6 @@ export interface FormValues {
   /** The chosen group's id; empty for "New group...". */
   groupId: string;
   newGroupName: string;
-  orientation: "portrait" | "landscape";
   favourite: boolean;
 }
 
@@ -125,23 +127,26 @@ export interface OpenForm {
   focusRequest: { field: FormField; n: number } | null;
 }
 
-export interface GroupForm {
+/** The inline rename of a user format or group (`0045` criterion 43). */
+export interface RenameState {
+  kind: "format" | "group";
   id: string;
-  name: string;
-  orientation: "portrait" | "landscape";
+  /** The name when the field opened. */
+  original: string;
+  /** The typed text. */
+  text: string;
+  /** The chip text of a refused name; empty while none is shown. */
   error: string;
 }
 
-/** A notice 4 px under the button that was pressed. */
+/** A failure notice 4 px under the button that was pressed. Never a success: the customer rule is
+ * no notice after a successful operation; the screen reader hears the polite status instead. */
 export interface FormatNotice {
   id: number;
   anchor: "add" | "import" | "export" | "broken";
-  kind: "success" | "refusal";
   text: string;
 }
 
-const SUCCESS_MS = 3000;
-const IMPORT_MS = 5000;
 const REFUSAL_MS = 8000;
 
 export interface FormatsApi {
@@ -162,16 +167,17 @@ export interface FormatsApi {
   /** `keyboard` is true when Escape or a key press closed it: the keyboard
    * goes to a sensible control instead of the canvas. */
   cancelForm: (keyboard: boolean) => void;
-  groupForm: GroupForm | null;
-  openGroupEdit: (id: string) => void;
-  changeGroupForm: (change: Partial<GroupForm>) => void;
-  saveGroupForm: () => void;
-  cancelGroupForm: (keyboard: boolean) => void;
-  /** The format or group whose delete is being confirmed. */
-  confirm: { kind: "format" | "group"; id: string } | null;
-  askDelete: (kind: "format" | "group", id: string) => void;
-  cancelDelete: (keyboard: boolean) => void;
-  doDelete: (keyboard: boolean) => void;
+  /** The one armed trash and the polite status text (`0081` pattern). */
+  arm: DeleteArm;
+  /** A press on the trash of a user format or group: arms it, or deletes on the second press.
+   * `next` is where the keyboard goes after a keyboard delete (`"disclosure"` or a row control). */
+  pressDelete: (kind: "format" | "group", id: string, next: string | null) => void;
+  renaming: RenameState | null;
+  startRename: (kind: "format" | "group", id: string) => void;
+  changeRename: (text: string) => void;
+  /** Enter (`"enter"`) or blur (`"blur"`) in the rename field. */
+  commitRename: (source: "enter" | "blur") => void;
+  cancelRename: () => void;
   importFile: () => void;
   exportFile: () => void;
   setAside: (keyboard: boolean) => void;
@@ -207,10 +213,15 @@ export function useFormats(
   const [expanded, setExpanded] = useState(false);
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const [form, setForm] = useState<OpenForm | null>(null);
-  const [groupForm, setGroupForm] = useState<GroupForm | null>(null);
-  const [confirm, setConfirm] = useState<FormatsApi["confirm"]>(null);
+  const arm = useDeleteArm();
+  const { press: armPress, disarm } = arm;
+  const [renaming, setRenaming] = useState<RenameState | null>(null);
+  const renameRef = useRef<RenameState | null>(null);
   const [notice, setNotice] = useState<FormatNotice | null>(null);
   const [focusReturn, setFocusReturn] = useState<FormatsApi["focusReturn"]>(null);
+  useEffect(() => {
+    renameRef.current = renaming;
+  }, [renaming]);
   const lastGroup = useRef("");
   const counter = useRef(0);
 
@@ -219,8 +230,8 @@ export function useFormats(
   if (seen !== session) {
     setSeen(session);
     setForm(null);
-    setGroupForm(null);
-    setConfirm(null);
+    setRenaming(null);
+    disarm();
     setNotice(null);
   }
 
@@ -228,18 +239,17 @@ export function useFormats(
     if (!notice) {
       return;
     }
-    const ms = notice.kind === "refusal" ? REFUSAL_MS : notice.anchor === "import" ? IMPORT_MS : SUCCESS_MS;
-    const handle = window.setTimeout(() => setNotice(null), ms);
+    const handle = window.setTimeout(() => setNotice(null), REFUSAL_MS);
     return () => window.clearTimeout(handle);
   }, [notice]);
 
   const say = useCallback(
-    (anchor: FormatNotice["anchor"], kind: FormatNotice["kind"], text: string) => {
+    (anchor: FormatNotice["anchor"], text: string) => {
       if (text === "") {
         return;
       }
       counter.current += 1;
-      setNotice({ id: counter.current, anchor, kind, text });
+      setNotice({ id: counter.current, anchor, text });
     },
     [],
   );
@@ -249,23 +259,28 @@ export function useFormats(
     async (fileText: string, anchor: FormatNotice["anchor"]) => {
       const failure = await storeFormats(fileText);
       if (failure !== null) {
-        say(anchor, "refusal", `Could not save your formats: ${failure}.`);
+        say(anchor, `Could not save your formats: ${failure}.`);
       }
     },
     [say],
   );
 
-  const toggleExpanded = useCallback(() => setExpanded((open) => !open), []);
+  const toggleExpanded = useCallback(() => {
+    disarm();
+    setExpanded((open) => !open);
+  }, [disarm]);
   const toggleFold = useCallback(
-    (groupId: string) =>
+    (groupId: string) => {
+      disarm();
       setFolded((now) => {
         const next = new Set(now);
         if (!next.delete(groupId)) {
           next.add(groupId);
         }
         return next;
-      }),
-    [],
+      });
+    },
+    [disarm],
   );
 
   const pick = useCallback((id: string) => doc.pickPreset(id), [doc]);
@@ -283,13 +298,14 @@ export function useFormats(
 
   const setGroupEnabled = useCallback(
     (id: string, on: boolean) => {
+      disarm();
       const edit = getSession()?.set_format_group_enabled(id, on);
       if (edit?.ok) {
         void write(edit.file_text, "add");
       }
       refresh();
     },
-    [getSession, refresh, write],
+    [disarm, getSession, refresh, write],
   );
 
   const openWith = useCallback(
@@ -298,8 +314,7 @@ export function useFormats(
       if (!prefill) {
         return;
       }
-      setConfirm(null);
-      setGroupForm(null);
+      disarm();
       setForm({
         editing,
         values: {
@@ -309,7 +324,6 @@ export function useFormats(
           unit: prefill.unit as FormUnit,
           groupId: prefill.group_id,
           newGroupName: "",
-          orientation: "portrait",
           favourite: prefill.favourite,
         },
         errors: {},
@@ -317,8 +331,17 @@ export function useFormats(
         focusRequest: { field: "name", n: ++counter.current },
       });
     },
-    [getSession],
+    [disarm, getSession],
   );
+
+  // Add while its form is open only moves the keyboard to Name (one form at a time).
+  const openAdd = useCallback(() => {
+    if (form && form.editing === null) {
+      setForm({ ...form, focusRequest: { field: "name", n: ++counter.current } });
+    } else {
+      openWith(null);
+    }
+  }, [form, openWith]);
 
   const changeForm = useCallback((change: Partial<FormValues>) => {
     setForm((now) => {
@@ -353,7 +376,6 @@ export function useFormats(
       values.unit,
       values.groupId,
       values.newGroupName,
-      values.orientation,
     ];
     const edit =
       current.editing === null
@@ -380,9 +402,8 @@ export function useFormats(
       n: ++counter.current,
     });
     void write(edit.file_text, "add");
-    say("add", "success", edit.notice);
     refresh();
-  }, [form, getSession, refresh, say, write]);
+  }, [form, getSession, refresh, write]);
 
   const returnKeyboardTo = useCallback((target: string) => {
     setFocusReturn({ target, n: ++counter.current });
@@ -398,88 +419,109 @@ export function useFormats(
     [form, returnKeyboardTo],
   );
 
-  const openGroupEdit = useCallback(
-    (id: string) => {
-      const group = list.groups.find((g) => g.id === id);
-      if (!group) {
+  const pressDelete = useCallback(
+    (kind: "format" | "group", id: string, next: string | null) => {
+      const active = getSession();
+      if (!active) {
         return;
       }
-      setForm(null);
-      setConfirm(null);
-      setGroupForm({ id, name: group.name, orientation: group.orientation, error: "" });
-    },
-    [list],
-  );
-
-  const changeGroupForm = useCallback(
-    (change: Partial<GroupForm>) =>
-      setGroupForm((now) => (now ? { ...now, ...change, error: "" } : now)),
-    [],
-  );
-
-  const saveGroupForm = useCallback(() => {
-    const active = getSession();
-    if (!groupForm || !active) {
-      return;
-    }
-    const edit = active.save_format_group(groupForm.id, groupForm.name, groupForm.orientation);
-    if (!edit.ok) {
-      setGroupForm({ ...groupForm, error: edit.error_messages[0] ?? "" });
-      return;
-    }
-    setGroupForm(null);
-    void write(edit.file_text, "add");
-    refresh();
-  }, [groupForm, getSession, refresh, write]);
-
-  const cancelGroupForm = useCallback(
-    (keyboard: boolean) => {
-      if (keyboard && groupForm) {
-        returnKeyboardTo(`grp:${groupForm.id}:edit`);
+      const group = kind === "group" ? list.groups.find((g) => g.id === id) : undefined;
+      const row =
+        kind === "format" ? list.groups.flatMap((g) => g.rows).find((r) => r.id === id) : undefined;
+      const armedName = group?.armedName ?? row?.armedName;
+      if (armedName === undefined) {
+        return;
       }
-      setGroupForm(null);
+      const name = group?.name ?? row?.name ?? "";
+      armPress(`${kind === "format" ? "fmt" : "grp"}:${id}`, armedName, () => {
+        const edit = kind === "format" ? active.delete_format(id) : active.delete_format_group(id);
+        if (edit.ok) {
+          void write(edit.file_text, "add");
+        }
+        if (next !== null) {
+          setFocusReturn({ target: next, n: ++counter.current });
+        }
+        refresh();
+        return kind === "format" ? `${name} deleted.` : `Group ${name} deleted.`;
+      });
     },
-    [groupForm, returnKeyboardTo],
+    [armPress, getSession, list, refresh, write],
   );
 
-  const askDelete = useCallback((kind: "format" | "group", id: string) => {
-    setForm(null);
-    setGroupForm(null);
-    setConfirm({ kind, id });
+  const startRename = useCallback(
+    (kind: "format" | "group", id: string) => {
+      const found =
+        kind === "group"
+          ? list.groups.find((g) => g.id === id && g.canEdit)
+          : list.groups.flatMap((g) => g.rows).find((r) => r.id === id && r.canEdit);
+      if (!found) {
+        return;
+      }
+      disarm();
+      const next: RenameState = { kind, id, original: found.name, text: found.name, error: "" };
+      renameRef.current = next;
+      setRenaming(next);
+    },
+    [disarm, list],
+  );
+
+  const changeRename = useCallback((text: string) => {
+    setRenaming((now) => {
+      const next = now ? { ...now, text, error: "" } : now;
+      renameRef.current = next;
+      return next;
+    });
   }, []);
-  const cancelDelete = useCallback(
-    (keyboard: boolean) => {
-      if (keyboard && confirm) {
-        returnKeyboardTo(
-          `${confirm.kind === "format" ? "fmt" : "grp"}:${confirm.id}:delete`,
-        );
-      }
-      setConfirm(null);
-    },
-    [confirm, returnKeyboardTo],
-  );
 
-  const doDelete = useCallback(
-    (keyboard: boolean) => {
-    const active = getSession();
-    if (!confirm || !active) {
-      return;
+  const closeRename = useCallback((keyboardTarget: string | null) => {
+    renameRef.current = null;
+    setRenaming(null);
+    if (keyboardTarget !== null) {
+      setFocusReturn({ target: keyboardTarget, n: ++counter.current });
     }
-    const edit =
-      confirm.kind === "format"
-        ? active.delete_format(confirm.id)
-        : active.delete_format_group(confirm.id);
-    setConfirm(null);
-    if (edit.ok) {
-      void write(edit.file_text, "add");
+  }, []);
+
+  const cancelRename = useCallback(() => {
+    const now = renameRef.current;
+    if (now) {
+      closeRename(`${now.kind === "format" ? "fmt" : "grp"}:${now.id}:${now.kind === "format" ? "apply" : "fold"}`);
     }
-    // The row is gone: the keyboard goes back to the disclosure.
-    if (keyboard) {
-      returnKeyboardTo("disclosure");
-    }
-    refresh();
+  }, [closeRename]);
+
+  const commitRename = useCallback(
+    (source: "enter" | "blur") => {
+      const now = renameRef.current;
+      const active = getSession();
+      if (!now || !active) {
+        return;
+      }
+      const back =
+        source === "enter"
+          ? `${now.kind === "format" ? "fmt" : "grp"}:${now.id}:${now.kind === "format" ? "apply" : "fold"}`
+          : null;
+      if (now.text.trim() === now.original) {
+        closeRename(back);
+        return;
+      }
+      const edit =
+        now.kind === "format"
+          ? active.rename_format(now.id, now.text)
+          : active.rename_format_group(now.id, now.text);
+      if (edit.ok) {
+        void write(edit.file_text, "add");
+        closeRename(back);
+        refresh();
+      } else if (source === "enter") {
+        const error = edit.error_messages[0] ?? "";
+        const next = { ...now, error };
+        renameRef.current = next;
+        setRenaming(next);
+      } else {
+        // Blur with an invalid name reverts without a notice.
+        closeRename(null);
+      }
     },
-    [confirm, getSession, refresh, returnKeyboardTo, write],
+    [closeRename, getSession, refresh, write],
   );
 
   const importFile = useCallback(() => {
@@ -488,7 +530,7 @@ export function useFormats(
       try {
         picked = await pickFormatsFile();
       } catch (error) {
-        say("import", "refusal", `Could not import: ${error instanceof Error ? error.message : String(error)}.`);
+        say("import", `Could not import: ${error instanceof Error ? error.message : String(error)}.`);
         return;
       }
       const active = getSession();
@@ -499,7 +541,9 @@ export function useFormats(
       if (edit.ok) {
         await write(edit.file_text, "import");
       }
-      say("import", edit.ok ? "success" : "refusal", edit.notice);
+      if (!edit.ok) {
+        say("import", edit.notice);
+      }
       refresh();
     })();
   }, [getSession, refresh, say, write]);
@@ -513,7 +557,7 @@ export function useFormats(
       try {
         await saveFormatsFile(text);
       } catch (error) {
-        say("export", "refusal", `Could not export: ${error instanceof Error ? error.message : String(error)}.`);
+        say("export", `Could not export: ${error instanceof Error ? error.message : String(error)}.`);
       }
     })();
   }, [getSession, say]);
@@ -523,14 +567,13 @@ export function useFormats(
     void (async () => {
       const failure = await setFormatsAside();
       if (failure !== null) {
-        say("broken", "refusal", `Could not move the file: ${failure}.`);
+        say("broken", `Could not move the file: ${failure}.`);
         return;
       }
       getSession()?.formats_file_set_aside();
       if (keyboard) {
         returnKeyboardTo("disclosure");
       }
-      say("broken", "success", "Moved to document-formats.toml.broken.");
       refresh();
     })();
     },
@@ -551,21 +594,19 @@ export function useFormats(
     setFavourite,
     setGroupEnabled,
     form,
-    openAdd: () => openWith(null),
+    openAdd,
     openEdit: openWith,
     changeForm,
     focusFormField,
     submitForm,
     cancelForm,
-    groupForm,
-    openGroupEdit,
-    changeGroupForm,
-    saveGroupForm,
-    cancelGroupForm,
-    confirm,
-    askDelete,
-    cancelDelete,
-    doDelete,
+    arm,
+    pressDelete,
+    renaming,
+    startRename,
+    changeRename,
+    commitRename,
+    cancelRename,
     importFile,
     exportFile,
     setAside,
