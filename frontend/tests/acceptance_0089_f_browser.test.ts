@@ -305,3 +305,46 @@ test("0089 F in Chromium: the analysis applies to a new image, Custom after an e
     removeProfile(profile);
   }
 });
+
+/** Workers made while `window.__poison` is true start, then answer every job with an error, as a
+ * worker whose wasm trapped does (`ux-notes.md` §27.11). It starts true. */
+const POISONED_WORKERS = `(() => {
+  const Real = window.Worker;
+  window.__poison = true;
+  const source = "onmessage = (e) => { const r = e.data; postMessage(r.type === 'init' ? { id: 0, kind: 'ready', error: '' } : { id: r.id, kind: 'error', message: 'RuntimeError: unreachable' }); };";
+  window.Worker = class extends Real {
+    constructor(url, options) {
+      super(window.__poison ? URL.createObjectURL(new Blob([source], { type: 'text/javascript' })) : url, options);
+    }
+  };
+})();`;
+
+test("0089 §27.11 in Chromium: after a worker that errored, Analyse answers on a fresh worker and the trace recovers", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  let vite: ChildProcess | null = null;
+  mkdirSync(SCRATCH, { recursive: true });
+  const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
+  const blocks = path.join(SCRATCH, "blocks.png");
+  writeFileSync(blocks, BLOCKS);
+  let closeAll: () => Promise<void> = async () => undefined;
+  try {
+    vite = startVite(PORT, FRONTEND);
+    await waitFor("vite", async () => ((await fetch(ORIGIN)).ok ? true : null));
+    const s = await session(profile);
+    closeAll = s.close;
+    await s.send("Page.addScriptToEvaluateOnNewDocument", { source: POISONED_WORKERS });
+    await openTrace(s, blocks, 1280, 800);
+    await s.clickSel(`${BAR} button[aria-label="More trace options"]`);
+    // Every job of the broken worker errors: the analysis fails, and so does the trace.
+    await waitFor("the analysis failed", async () => ((await rowState(s)) === "failed" ? true : null), 60_000);
+    await waitFor("Failed", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=failed]')`)) ? true : null), 60_000);
+    // The next workers are sound: Analyse must not ask the broken one again.
+    await s.evaluate(`window.__poison = false`);
+    await s.clickSel(`${BAR} [data-trace-analyse]`);
+    await waitFor("the analysis answers", async () => ((await rowState(s)) === "auto" ? true : null), 60_000);
+    await waitFor("a result", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-slot=none]')`)) ? true : null), 60_000);
+  } finally {
+    await closeAll();
+    await stopVite(vite, PORT);
+    removeProfile(profile);
+  }
+});

@@ -439,15 +439,20 @@ export function useTrace(
           return false;
         }
         let read: { threshold: number; background: string; analysis: string };
+        let answered = true;
         try {
           read = await runner().defaults(pixels, part.mask);
         } catch (error) {
           if (error instanceof TraceCancelled) {
             throw error;
           }
+          answered = false;
           read = { threshold: trace_auto_threshold(pixels.rgba, pixels.width, pixels.height), background: trace_suggest_background(pixels.rgba, pixels.width, pixels.height), analysis: "" };
         }
-        partAuto.current.set(part.id, { region: part.mask, background: read.background });
+        // A failed read is not kept: the next preview (Analyse, Retry) asks the worker again.
+        if (answered) {
+          partAuto.current.set(part.id, { region: part.mask, background: read.background });
+        }
         const analysis = readAnalysis(read.analysis);
         const maker = partsRef.current.makerOf(part.id);
         const choice = partsRef.current.choiceOf(part);
