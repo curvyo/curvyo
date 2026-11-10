@@ -8,7 +8,7 @@
     clippy::cast_sign_loss
 )]
 
-use curvyo_document_core::Shape;
+use curvyo_ui_core::TracePrimitive;
 use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_in};
 use kurbo::{BezPath, Join, Shape as _, Stroke, StrokeOpts};
 
@@ -93,16 +93,17 @@ fn c16_the_customers_8_star_is_a_stroked_star_with_the_traced_area() {
     assert_eq!(bands.len(), 1, "exactly one stroked band on the page");
     let region = bands[0];
     let band = region.band.unwrap();
-    let Shape::Star {
-        frame,
-        point_count,
+    let TracePrimitive::Star {
+        centre,
+        radius,
+        angle,
+        points,
         inner_ratio,
-        ..
-    } = band.shape
+    } = band.primitive
     else {
         panic!("not a star: {band:?}");
     };
-    assert_eq!(point_count.get(), 8);
+    assert_eq!(points, 8);
     assert_eq!(region.primitives(), 1, "one object for the band");
     assert!(band.width.as_mm() > 0.0);
     let traced: f64 = region
@@ -112,10 +113,10 @@ fn c16_the_customers_8_star_is_a_stroked_star_with_the_traced_area() {
         .sum::<f64>()
         .abs();
     let centre_line = star_outline(
-        (frame.center.x, frame.center.y),
-        frame.radius.as_mm(),
-        frame.angle.as_radians(),
-        inner_ratio.get(),
+        (centre.x, centre.y),
+        radius.as_mm(),
+        angle.as_radians(),
+        inner_ratio,
         8,
         band.rotation.as_radians(),
     );

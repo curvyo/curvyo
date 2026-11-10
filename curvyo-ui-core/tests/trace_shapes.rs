@@ -8,11 +8,12 @@
     clippy::similar_names
 )]
 
-use curvyo_document_core::{Angle, LineJoin, Shape};
 use curvyo_ui_core::{
-    TraceColourParams, TraceMethod, TraceParams, TraceRgb, TraceShapeRegion, TraceWire,
-    read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
+    TraceColourParams, TraceJoin, TraceMethod, TraceParams, TracePrimitive, TraceRgb,
+    TraceShapeRegion, TraceWire, read_trace_wire, trace_add_shapes, trace_colour_job_in,
+    trace_job_in,
 };
+use curvyo_vectorize_core::Angle;
 
 /// 10 px/mm.
 const MAP: [f64; 6] = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];
@@ -66,7 +67,7 @@ fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, TraceWire) {
 }
 
 /// The one region of a result and its outer primitive.
-fn only(read: &TraceWire) -> (&TraceShapeRegion, &(Shape, Angle)) {
+fn only(read: &TraceWire) -> (&TraceShapeRegion, &(TracePrimitive, Angle)) {
     assert_eq!(read.shapes.len(), 1, "{:?}", read.shapes);
     let region = &read.shapes[0];
     (region, region.shapes[0].as_ref().unwrap())
@@ -97,18 +98,20 @@ fn c1_a_rounded_rectangle_is_a_rectangle_with_its_corners() {
     let (_, read) = traced(&rgba, 2200, 1200, true);
     let (region, (shape, turn)) = only(&read);
     assert_eq!(region.outlines.len(), 1);
-    let Shape::Rect {
-        bounds,
-        corner_radii,
-    } = shape
+    let TracePrimitive::Rect {
+        origin,
+        width,
+        height,
+        corner_radius,
+    } = *shape
     else {
         panic!("{shape:?}");
     };
-    eprintln!("{bounds:?} {corner_radii:?} {turn:?}");
-    assert!(near(bounds.width.as_mm(), 200.0, 0.2), "{bounds:?}");
-    assert!(near(bounds.height.as_mm(), 100.0, 0.2), "{bounds:?}");
-    assert!(near(corner_radii.tl.as_mm(), 10.0, 0.2), "{corner_radii:?}");
-    assert!(near(bounds.origin.x, 10.0, 0.2) && near(bounds.origin.y, 10.0, 0.2));
+    eprintln!("{width:?} {height:?} {corner_radius:?} {turn:?}");
+    assert!(near(width.as_mm(), 200.0, 0.2), "{width:?} {height:?}");
+    assert!(near(height.as_mm(), 100.0, 0.2), "{width:?} {height:?}");
+    assert!(near(corner_radius.as_mm(), 10.0, 0.2), "{corner_radius:?}");
+    assert!(near(origin.x, 10.0, 0.2) && near(origin.y, 10.0, 0.2));
     assert!(turn.as_radians().abs().to_degrees() < 0.5);
 }
 
@@ -120,15 +123,17 @@ fn c7_a_square_cornered_rectangle_has_no_corner_radius() {
     });
     let (_, read) = traced(&rgba, 800, 600, true);
     let (_, (shape, _)) = only(&read);
-    let Shape::Rect {
-        bounds,
-        corner_radii,
-    } = shape
+    let TracePrimitive::Rect {
+        width,
+        height,
+        corner_radius,
+        ..
+    } = *shape
     else {
         panic!("{shape:?}");
     };
-    assert_eq!(corner_radii.tl.as_mm(), 0.0);
-    assert!(near(bounds.width.as_mm(), 60.0, 0.2) && near(bounds.height.as_mm(), 40.0, 0.2));
+    assert_eq!(corner_radius.as_mm(), 0.0);
+    assert!(near(width.as_mm(), 60.0, 0.2) && near(height.as_mm(), 40.0, 0.2));
 }
 
 /// Criteria 2 and 7: a 50 mm circle is a circle (not an ellipse).
@@ -137,13 +142,13 @@ fn c2_a_circle_is_a_circle() {
     let rgba = picture(600, 600, |x, y| (x - 30.0).hypot(y - 30.0) <= 25.0);
     let (_, read) = traced(&rgba, 600, 600, true);
     let (_, (shape, _)) = only(&read);
-    let Shape::Ellipse { frame, .. } = shape else {
+    let TracePrimitive::Ellipse { centre, rx, ry } = *shape else {
         panic!("{shape:?}");
     };
-    eprintln!("{frame:?}");
-    assert_eq!(frame.rx, frame.ry, "a circle");
-    assert!(near(frame.rx.as_mm() * 2.0, 50.0, 0.2));
-    assert!(near(frame.center.x, 30.0, 0.2) && near(frame.center.y, 30.0, 0.2));
+    eprintln!("{centre:?} {rx:?} {ry:?}");
+    assert_eq!(rx, ry, "a circle");
+    assert!(near(rx.as_mm() * 2.0, 50.0, 0.2));
+    assert!(near(centre.x, 30.0, 0.2) && near(centre.y, 30.0, 0.2));
 }
 
 /// Criterion 2: a 60 x 40 mm ellipse turned by 25 degrees keeps its radii and turn.
@@ -157,11 +162,14 @@ fn c2_a_turned_ellipse_has_its_radii_and_turn() {
     });
     let (_, read) = traced(&rgba, 800, 800, true);
     let (_, (shape, turn)) = only(&read);
-    let Shape::Ellipse { frame, .. } = shape else {
+    let TracePrimitive::Ellipse { centre, rx, ry } = *shape else {
         panic!("{shape:?}");
     };
-    eprintln!("{frame:?} {}", turn.as_radians().to_degrees());
-    assert!(near(frame.rx.as_mm(), 30.0, 0.2) && near(frame.ry.as_mm(), 20.0, 0.2));
+    eprintln!(
+        "{centre:?} {rx:?} {ry:?} {}",
+        turn.as_radians().to_degrees()
+    );
+    assert!(near(rx.as_mm(), 30.0, 0.2) && near(ry.as_mm(), 20.0, 0.2));
     assert!(degrees_off(turn.as_radians(), 25_f64.to_radians(), std::f64::consts::PI) < 0.5);
 }
 
@@ -193,15 +201,18 @@ fn c4_a_hexagon_is_a_polygon_of_six() {
     let rgba = picture(800, 800, |x, y| regular(x, y, 6, 30.0, None, 0.3));
     let (_, read) = traced(&rgba, 800, 800, true);
     let (_, (shape, _)) = only(&read);
-    let Shape::Polygon {
-        frame, point_count, ..
-    } = shape
+    let TracePrimitive::Polygon {
+        centre,
+        radius,
+        angle,
+        points,
+    } = *shape
     else {
         panic!("{shape:?}");
     };
-    eprintln!("{frame:?}");
-    assert_eq!(point_count.get(), 6);
-    assert!(near(frame.radius.as_mm(), 30.0, 0.2));
+    eprintln!("{centre:?} {radius:?} {angle:?}");
+    assert_eq!(points, 6);
+    assert!(near(radius.as_mm(), 30.0, 0.2));
 }
 
 /// Criteria 3 and 7: a five-point star, outer 40 mm, ratio 0.5, is a star with its radii and
@@ -212,21 +223,22 @@ fn c3_a_five_point_star_has_its_radii_and_turn() {
     let rgba = picture(800, 800, |x, y| regular(x, y, 5, 40.0, Some(20.0), turn));
     let (_, read) = traced(&rgba, 800, 800, true);
     let (_, (shape, _)) = only(&read);
-    let Shape::Star {
-        frame,
-        point_count,
+    let TracePrimitive::Star {
+        centre,
+        radius,
+        angle,
+        points,
         inner_ratio,
-        ..
-    } = shape
+    } = *shape
     else {
         panic!("{shape:?}");
     };
-    eprintln!("{frame:?} {}", inner_ratio.get());
-    assert_eq!(point_count.get(), 5);
-    assert!(near(frame.radius.as_mm(), 40.0, 0.2));
-    assert!(near(frame.radius.as_mm() * inner_ratio.get(), 20.0, 0.2));
+    eprintln!("{centre:?} {radius:?} {angle:?} {inner_ratio}");
+    assert_eq!(points, 5);
+    assert!(near(radius.as_mm(), 40.0, 0.2));
+    assert!(near(radius.as_mm() * inner_ratio, 20.0, 0.2));
     let period = std::f64::consts::TAU / 5.0;
-    assert!(degrees_off(frame.angle.as_radians(), turn, period) < 0.5);
+    assert!(degrees_off(angle.as_radians(), turn, period) < 0.5);
 }
 
 /// Criterion 5: a hand-drawn wobbly circle (radius 25 mm varying by about ±3 %, not regularly)
@@ -260,7 +272,7 @@ fn c8_holes_are_kept() {
         .shapes
         .iter()
         .map(|s| match s {
-            Some((Shape::Ellipse { frame, .. }, _)) if frame.rx == frame.ry => frame.rx.as_mm(),
+            Some((TracePrimitive::Ellipse { centre, rx, ry }, _)) if rx == ry => rx.as_mm(),
             other => panic!("{other:?}"),
         })
         .collect();
@@ -270,13 +282,10 @@ fn c8_holes_are_kept() {
     );
     // Criterion 16 (Frage 119 A): the ring is a band, a circle at its centre line with a stroke.
     let band = region.band.unwrap();
-    let Shape::Ellipse { frame, .. } = band.shape else {
+    let TracePrimitive::Ellipse { rx, ry, .. } = band.primitive else {
         panic!("{band:?}");
     };
-    assert!(
-        frame.rx == frame.ry && near(frame.rx.as_mm(), 22.5, 0.2),
-        "{band:?}"
-    );
+    assert!(rx == ry && near(rx.as_mm(), 22.5, 0.2), "{band:?}");
     assert!(near(band.width.as_mm(), 15.0, 0.2), "{band:?}");
     let frame = picture(1400, 1000, |x, y| {
         let outer = (10.0..130.0).contains(&x) && (10.0..90.0).contains(&y);
@@ -289,7 +298,9 @@ fn c8_holes_are_kept() {
         .shapes
         .iter()
         .map(|s| match s {
-            Some((Shape::Rect { bounds, .. }, _)) => (bounds.width.as_mm(), bounds.height.as_mm()),
+            Some((TracePrimitive::Rect { width, height, .. }, _)) => {
+                (width.as_mm(), height.as_mm())
+            }
             other => panic!("{other:?}"),
         })
         .collect();
@@ -300,15 +311,17 @@ fn c8_holes_are_kept() {
     );
     // Criterion 16: a square-cornered rectangle at the centre line, a 20 mm stroke.
     let band = region.band.unwrap();
-    let Shape::Rect {
-        bounds,
-        corner_radii,
-    } = band.shape
+    let TracePrimitive::Rect {
+        width,
+        height,
+        corner_radius,
+        ..
+    } = band.primitive
     else {
         panic!("{band:?}");
     };
-    assert!(near(bounds.width.as_mm(), 100.0, 0.2) && near(bounds.height.as_mm(), 60.0, 0.2));
-    assert_eq!(corner_radii.tl.as_mm(), 0.0);
+    assert!(near(width.as_mm(), 100.0, 0.2) && near(height.as_mm(), 60.0, 0.2));
+    assert_eq!(corner_radius.as_mm(), 0.0);
     assert!(near(band.width.as_mm(), 20.0, 0.2), "{band:?}");
 }
 
@@ -325,15 +338,12 @@ fn c16_bands_of_constant_width_are_stroked_primitives() {
     let (_, read) = traced(&hexagons, 800, 800, true);
     let (region, _) = only(&read);
     let band = region.band.unwrap();
-    let Shape::Polygon {
-        frame, point_count, ..
-    } = band.shape
-    else {
+    let TracePrimitive::Polygon { radius, points, .. } = band.primitive else {
         panic!("{band:?}");
     };
-    assert_eq!(point_count.get(), 6);
+    assert_eq!(points, 6);
     let mid = (apothem - 1.5) / (std::f64::consts::PI / 6.0).cos();
-    assert!(near(frame.radius.as_mm(), mid, 0.2), "{band:?}");
+    assert!(near(radius.as_mm(), mid, 0.2), "{band:?}");
     assert!(near(band.width.as_mm(), 3.0, 0.2), "{band:?}");
     assert_eq!(region.primitives(), 1);
     let off_centre = picture(700, 700, |x, y| {
@@ -400,7 +410,7 @@ fn c9_the_0025_ring_and_dot_grid() {
         assert_eq!(read.shapes.len(), 10_000);
         assert!(read.shapes.iter().all(|r| {
             r.outlines.len() == 1
-                && matches!(&r.shapes[0], Some((Shape::Ellipse { frame, .. }, _)) if frame.rx == frame.ry)
+                && matches!(&r.shapes[0], Some((TracePrimitive::Ellipse { centre, rx, ry }, _)) if rx == ry)
         }));
     }
 }
@@ -445,8 +455,8 @@ fn c10_multicolour_keeps_each_colour() {
         .iter()
         .map(|r| {
             let kind = match &r.shapes[0] {
-                Some((Shape::Ellipse { .. }, _)) => "circle",
-                Some((Shape::Rect { .. }, _)) => "rect",
+                Some((TracePrimitive::Ellipse { .. }, _)) => "circle",
+                Some((TracePrimitive::Rect { .. }, _)) => "rect",
                 other => panic!("{other:?}"),
             };
             (layer_of(r.outlines[0]), kind)
@@ -552,36 +562,27 @@ fn c16_touching_outline_stars_are_one_stroked_star_each() {
     };
     let truth = drawn(t) - drawn(-t);
     for (band, c) in region.bands.iter().zip(centres) {
-        let Shape::Star {
-            frame,
-            point_count,
+        let TracePrimitive::Star {
+            centre,
+            radius,
+            points,
             inner_ratio,
             ..
-        } = band.shape
+        } = band.primitive
         else {
             panic!("{band:?}");
         };
         eprintln!("{band:?}");
-        assert_eq!(point_count.get(), 8);
-        assert_eq!(band.join, LineJoin::Miter);
+        assert_eq!(points, 8);
+        assert_eq!(band.join, TraceJoin::Miter);
         assert!(
-            near(frame.center.x, c.0, 0.2) && near(frame.center.y, c.1, 0.2),
+            near(centre.x, c.0, 0.2) && near(centre.y, c.1, 0.2),
             "{band:?}"
         );
-        assert!(near(frame.radius.as_mm(), r, 0.3), "{band:?}");
-        assert!(near(inner_ratio.get(), q, 0.02), "{band:?}");
-        let (a, b) = offset_radii(
-            n,
-            frame.radius.as_mm(),
-            inner_ratio.get(),
-            band.width.as_mm() / 2.0,
-        );
-        let (c2, d) = offset_radii(
-            n,
-            frame.radius.as_mm(),
-            inner_ratio.get(),
-            -band.width.as_mm() / 2.0,
-        );
+        assert!(near(radius.as_mm(), r, 0.3), "{band:?}");
+        assert!(near(inner_ratio, q, 0.02), "{band:?}");
+        let (a, b) = offset_radii(n, radius.as_mm(), inner_ratio, band.width.as_mm() / 2.0);
+        let (c2, d) = offset_radii(n, radius.as_mm(), inner_ratio, -band.width.as_mm() / 2.0);
         let sin = (std::f64::consts::PI / 8.0).sin();
         let stroked = 8.0 * sin * (a * b - c2 * d);
         assert!(

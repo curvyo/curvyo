@@ -14,7 +14,7 @@ use curvyo_vectorize_core::{Rgb8 as TraceRgb, node_count};
 use kurbo::{BezPath, Shape};
 
 use crate::trace_region::{TRACE_REGION_TOLERANCE, TraceRegion, outer_sign, wound_polylines};
-use crate::trace_shapes::TraceShapeRegion;
+use crate::trace_shapes::ShapeRegion;
 use crate::trace_text_wire::TraceTexts;
 use crate::trace_transfer::{TraceLayerWire, TraceStatus, TraceWire};
 
@@ -325,10 +325,10 @@ fn sort_into_colours(
 /// A shape region of part `part` with its outlines at their joined places; `None` when one of
 /// them went into a seam union.
 fn moved_region(
-    region: &TraceShapeRegion,
+    region: &ShapeRegion,
     part: usize,
     moved: &[((usize, usize), usize)],
-) -> Option<TraceShapeRegion> {
+) -> Option<ShapeRegion> {
     let outlines = region
         .outlines
         .iter()
@@ -339,7 +339,7 @@ fn moved_region(
                 .map(|(_, new)| *new)
         })
         .collect::<Option<Vec<usize>>>()?;
-    Some(TraceShapeRegion {
+    Some(ShapeRegion {
         outlines,
         ..region.clone()
     })

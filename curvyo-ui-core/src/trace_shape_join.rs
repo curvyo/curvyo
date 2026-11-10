@@ -6,11 +6,12 @@
 
 use std::f64::consts::{PI, TAU};
 
-use curvyo_document_core::{InnerRatio, Length, LineJoin, Shape};
+use curvyo_vectorize_core::Mm;
 
 use crate::trace_shape_band::side_line;
 use crate::trace_shape_math::{atan2, sin_cos};
 use crate::trace_shape_sample::length;
+use crate::trace_shapes::{Join, Primitive, valid_ratio};
 
 /// The pieces of a round join's arc.
 const ARC_STEPS: u32 = 8;
@@ -20,21 +21,25 @@ pub(crate) const MITER_LIMIT: f64 = 4.0;
 
 /// The corners of a star or regular polygon in document millimetres, turning counter-clockwise
 /// (positive area); `None` for any other kind.
-pub(crate) fn corners(shape: &Shape) -> Option<Vec<[f64; 2]>> {
-    let (frame, n, ratio) = match shape {
-        Shape::Star {
-            frame,
-            point_count,
+pub(crate) fn corners(shape: &Primitive) -> Option<Vec<[f64; 2]>> {
+    let (centre, radius, angle, n, ratio) = match *shape {
+        Primitive::Star {
+            centre,
+            radius,
+            angle,
+            points,
             inner_ratio,
-            ..
-        } => (frame, point_count.get(), Some(inner_ratio.get())),
-        Shape::Polygon {
-            frame, point_count, ..
-        } => (frame, point_count.get(), None),
+        } => (centre, radius, angle, points, Some(inner_ratio)),
+        Primitive::Polygon {
+            centre,
+            radius,
+            angle,
+            points,
+        } => (centre, radius, angle, points, None),
         _ => return None,
     };
     let m = if ratio.is_some() { 2 * n } else { n };
-    let r = frame.radius.as_mm();
+    let r = radius.as_mm();
     let step = TAU / f64::from(m);
     Some(
         (0..m)
@@ -43,8 +48,8 @@ pub(crate) fn corners(shape: &Shape) -> Option<Vec<[f64; 2]>> {
                     Some(q) if j % 2 == 1 => r * q,
                     _ => r,
                 };
-                let (s, c) = sin_cos(frame.angle.as_radians() + step * f64::from(j));
-                [frame.center.x + radius * c, frame.center.y + radius * s]
+                let (s, c) = sin_cos(angle.as_radians() + step * f64::from(j));
+                [centre.x + radius * c, centre.y + radius * s]
             })
             .collect(),
     )
@@ -53,18 +58,18 @@ pub(crate) fn corners(shape: &Shape) -> Option<Vec<[f64; 2]>> {
 /// The star or polygon whose sides are those of `shape` moved outwards by `t` (inwards for a
 /// negative `t`): the same corner angles, so the centre line of a stroke whose inner outline is
 /// `shape` and whose half width is `t`.
-pub(crate) fn widened(shape: &Shape, t: f64) -> Option<Shape> {
+pub(crate) fn widened(shape: &Primitive, t: f64) -> Option<Primitive> {
     let mut out = *shape;
     match &mut out {
-        Shape::Star {
-            frame,
-            point_count,
+        Primitive::Star {
+            radius,
+            points,
             inner_ratio,
             ..
         } => {
-            let n = point_count.get();
-            let r = frame.radius.as_mm();
-            let (normal, p) = side_line(r, r * inner_ratio.get(), n)?;
+            let n = *points;
+            let r = radius.as_mm();
+            let (normal, p) = side_line(r, r * *inner_ratio, n)?;
             let (us, uc) = sin_cos(PI / f64::from(n));
             let p = p + t;
             let tip = p / normal[0];
@@ -72,18 +77,16 @@ pub(crate) fn widened(shape: &Shape, t: f64) -> Option<Shape> {
             if !(tip > 0.0 && valley > 0.0) {
                 return None;
             }
-            frame.radius = Length::from_mm(tip);
-            *inner_ratio = InnerRatio::new(valley / tip).ok()?;
+            *radius = Mm::from_mm(tip);
+            *inner_ratio = valid_ratio(valley / tip)?;
         }
-        Shape::Polygon {
-            frame, point_count, ..
-        } => {
-            let (_, c) = sin_cos(PI / f64::from(point_count.get()));
-            let apothem = frame.radius.as_mm() * c + t;
+        Primitive::Polygon { radius, points, .. } => {
+            let (_, c) = sin_cos(PI / f64::from(*points));
+            let apothem = radius.as_mm() * c + t;
             if apothem <= 0.0 {
                 return None;
             }
-            frame.radius = Length::from_mm(apothem / c);
+            *radius = Mm::from_mm(apothem / c);
         }
         _ => return None,
     }
@@ -102,17 +105,17 @@ fn normal(corners: &[[f64; 2]], i: usize) -> [f64; 2] {
 /// `corners` with every side moved out by `s` (in for a negative `s`); a corner the stroke turns
 /// round on this side gets `join` (a bevel is two points, a round join an arc), the others the
 /// sides' meeting point.
-pub(crate) fn offset(corners: &[[f64; 2]], s: f64, join: LineJoin) -> Vec<[f64; 2]> {
+pub(crate) fn offset(corners: &[[f64; 2]], s: f64, join: Join) -> Vec<[f64; 2]> {
     let m = corners.len();
     let mut out = Vec::with_capacity(2 * m);
     for i in 0..m {
         let (na, nb) = (normal(corners, (i + m - 1) % m), normal(corners, i));
         let v = corners[i];
         let convex = na[0] * nb[1] - na[1] * nb[0] > 0.0;
-        if join == LineJoin::Bevel && convex == (s > 0.0) {
+        if join == Join::Bevel && convex == (s > 0.0) {
             out.push([v[0] + s * na[0], v[1] + s * na[1]]);
             out.push([v[0] + s * nb[0], v[1] + s * nb[1]]);
-        } else if join == LineJoin::Round && convex == (s > 0.0) {
+        } else if join == Join::Round && convex == (s > 0.0) {
             // The arc about the corner from one side's end to the next one's.
             let turn = atan2(na[0] * nb[1] - na[1] * nb[0], na[0] * nb[0] + na[1] * nb[1]);
             for k in 0..=ARC_STEPS {
@@ -151,7 +154,7 @@ pub(crate) fn area(points: &[[f64; 2]]) -> f64 {
 }
 
 /// The area a stroke of `width` along `corners` covers with `join`.
-pub(crate) fn stroke_area(corners: &[[f64; 2]], width: f64, join: LineJoin) -> f64 {
+pub(crate) fn stroke_area(corners: &[[f64; 2]], width: f64, join: Join) -> f64 {
     let t = width / 2.0;
     area(&offset(corners, t, join)) - area(&offset(corners, -t, join))
 }
@@ -190,7 +193,8 @@ pub(crate) fn inside(p: [f64; 2], points: &[[f64; 2]]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_document_core::{Angle, Curve, Point, PointCount, StarFrame};
+    use curvyo_vectorize_core::Angle;
+    use kurbo::Point;
 
     fn square() -> Vec<[f64; 2]> {
         vec![[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]]
@@ -200,13 +204,13 @@ mod tests {
     /// triangles of (w/2)² / 2 each.
     #[test]
     fn a_square_stroke_covers_its_offsets() {
-        let mitred = stroke_area(&square(), 2.0, LineJoin::Miter);
+        let mitred = stroke_area(&square(), 2.0, Join::Miter);
         assert!((mitred - (144.0 - 64.0)).abs() < 1e-9);
-        let bevelled = stroke_area(&square(), 2.0, LineJoin::Bevel);
+        let bevelled = stroke_area(&square(), 2.0, Join::Bevel);
         assert!((bevelled - (80.0 - 2.0)).abs() < 1e-9);
         // A round corner of radius 1 instead of the square one: π − 4 less each, to the arc's
         // pieces.
-        let round = stroke_area(&square(), 2.0, LineJoin::Round);
+        let round = stroke_area(&square(), 2.0, Join::Round);
         assert!(
             (round - (80.0 - (4.0 - std::f64::consts::PI))).abs() < 0.03,
             "{round}"
@@ -219,18 +223,15 @@ mod tests {
     /// star's own.
     #[test]
     fn a_widened_star_has_the_star_as_its_mitred_inner_offset() {
-        let star = Shape::Star {
-            frame: StarFrame {
-                center: Point::new(5.0, 7.0),
-                radius: Length::from_mm(30.0),
-                angle: Angle::from_radians(0.2),
-            },
-            point_count: PointCount::new(8).unwrap(),
-            inner_ratio: InnerRatio::new(0.55).unwrap(),
-            curve: Curve::POLYGON_DEFAULT,
+        let star = Primitive::Star {
+            centre: Point::new(5.0, 7.0),
+            radius: Mm::from_mm(30.0),
+            angle: Angle::from_radians(0.2),
+            points: 8,
+            inner_ratio: 0.55,
         };
         let wide = corners(&widened(&star, 1.5).unwrap()).unwrap();
-        let back = offset(&wide, -1.5, LineJoin::Miter);
+        let back = offset(&wide, -1.5, Join::Miter);
         for (a, b) in back.iter().zip(corners(&star).unwrap()) {
             assert!(length(a[0] - b[0], a[1] - b[1]) < 1e-9, "{a:?} {b:?}");
         }

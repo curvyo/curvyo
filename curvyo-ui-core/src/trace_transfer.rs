@@ -1,6 +1,6 @@
 //! One trace job of the Trace tool's worker and its result as a flat list of numbers
 //! (`specs/0025-raster-trace` criteria 11, 15, 16 and 17; ADR 0023 §5): the worker runs
-//! [`trace_job_in`], posts the numbers, and the session reads them back with [`read_trace_wire`].
+//! [`trace_job_in`], posts the numbers, and the session reads them back with [`read_wire`].
 
 use std::ops::ControlFlow;
 
@@ -70,7 +70,7 @@ pub struct TraceWire {
     pub texts: crate::trace_text_wire::TraceTexts,
     /// The recognised shapes (`specs/0088` Part B); empty with Recognise shapes off. Each
     /// recognised outline in `outlines` is already its primitive's outline.
-    pub shapes: Vec<crate::trace_shapes::TraceShapeRegion>,
+    pub shapes: Vec<crate::trace_shapes::ShapeRegion>,
     /// Outlines kept whole across the mask edge after a kernel refusal (`specs/0094`).
     pub unclipped: usize,
 }
@@ -360,13 +360,14 @@ pub(crate) fn count(value: f64) -> Option<usize> {
         .then_some(value as usize)
 }
 
-/// Reads the numbers of [`trace_job_in`] back; `None` when they are not a well-formed result.
+/// Reads the numbers of [`trace_job_in`] back as they are; `None` when they are not a
+/// well-formed result.
 #[must_use]
-pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
+pub(crate) fn read_wire(wire: &[f64]) -> Option<TraceWire> {
     read_trace_body(wire).map(|(read, _)| read)
 }
 
-/// As [`read_trace_wire`], with where the shape section starts (or would start: after the text
+/// As [`read_wire`], with where the shape section starts (or would start: after the text
 /// section).
 pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
     let header = wire.get(..TRACE_WIRE_HEADER)?;
@@ -403,7 +404,6 @@ pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
     } else {
         Vec::new()
     };
-    let (outlines, shapes) = crate::trace_shapes::with_primitives(outlines, shapes);
     let (palette, layers, joined) = if at == wire.len() {
         (Vec::new(), Vec::new(), 0)
     } else {
@@ -556,7 +556,7 @@ mod tests {
             None,
             &mut |percent| seen.push(percent),
         );
-        assert_eq!(read_trace_wire(&wire).unwrap().status, TraceStatus::Traced);
+        assert_eq!(read_wire(&wire).unwrap().status, TraceStatus::Traced);
         assert_ne!(seen.len(), 0);
         assert!(seen.windows(2).all(|w| w[0] < w[1]), "{seen:?}");
         assert_eq!(seen.last(), Some(&100));
@@ -584,7 +584,7 @@ mod tests {
             80,
             0.0,
         );
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(read.status, TraceStatus::Traced);
         assert_eq!((read.paths, read.nodes, read.specks_removed), (1, 4, 0));
         assert_eq!(read.foreground_pixels, 64);
@@ -619,7 +619,7 @@ mod tests {
         });
         let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
         let wire = trace_colour_job_in(&picture, 40, 20, map, &params, None, &mut |_| {});
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(read.status, TraceStatus::Traced);
         assert_eq!(read.palette.len(), 2);
         assert_eq!(read.layers.len(), 2);
@@ -636,10 +636,10 @@ mod tests {
         // One more outline claimed by the last layer than there are.
         let last = bad.len() - 2;
         bad[last] += 1.0;
-        assert_eq!(read_trace_wire(&bad), None);
+        assert_eq!(read_wire(&bad), None);
         // A single-colour wire has no tail.
         let single = trace_job(&picture, 40, 20, map, 200, 80, 0.0);
-        assert_eq!(read_trace_wire(&single).unwrap().layers, []);
+        assert_eq!(read_wire(&single).unwrap().layers, []);
     }
 
     /// The worker's analysis (`specs/0089` slice F): a report for a valid picture, none for
@@ -665,8 +665,8 @@ mod tests {
             80,
             0.0,
         );
-        assert_eq!(read_trace_wire(&wire).unwrap().status, TraceStatus::Invalid);
-        assert_eq!(read_trace_wire(&[0.0; 3]), None);
+        assert_eq!(read_wire(&wire).unwrap().status, TraceStatus::Invalid);
+        assert_eq!(read_wire(&[0.0; 3]), None);
         let mut good = trace_job(
             &square_picture(),
             16,
@@ -677,12 +677,12 @@ mod tests {
             0.0,
         );
         good.push(1.0);
-        assert_eq!(read_trace_wire(&good), None);
+        assert_eq!(read_wire(&good), None);
         good.pop();
         good[TRACE_WIRE_HEADER + 1] = 9.0;
-        assert_eq!(read_trace_wire(&good), None);
+        assert_eq!(read_wire(&good), None);
         good[TRACE_WIRE_HEADER + 1] = MOVE;
         good[TRACE_WIRE_HEADER + 2] = f64::NAN;
-        assert_eq!(read_trace_wire(&good), None);
+        assert_eq!(read_wire(&good), None);
     }
 }
