@@ -190,3 +190,16 @@ added until a second user asks for one (`CLAUDE.md` §5).
   test's path into `frontend/public/models/`.
 - Not solved: a standalone wasm package with its own JSON settings (it needs serde, or the
   settings as numbers). That is decided when the package is built.
+
+## Note 2026-11-10 (slice 3b, names in the code)
+
+The §5 listing leaves the module paths open. In the code: `Job`, `Mode`, `run` and `text_regions`
+are in `vectrace::job`, `Mask` and `Clipped` in `vectrace::mask`, the shape types and `POINTS` in
+`vectrace::shapes`, `Output` at the crate root, and `Status`, `Palette`, `Layer`, `Text`, `Texts`,
+`HEADER` and `read` in `vectrace::wire`. In `vectrace::ocr`, `read_text`, `crop_text` and
+`read_crop_text` take `OcrLine` (the accepted line, `f64`); `read_lines`, `crop_lines` and
+`read_crop` keep their `f32` `TextLine` form because the reader's own tests use it, and
+`read_text` keeps today's `(model, rgba, width, height, on_percent)` arguments. Beyond the list,
+three items stay public with a reason: `node_count` (Curvyo recomputes `Output::nodes` after joining
+parts), `shapes::valid_ratio` (a Curvyo test pins its `InnerRatio` to it) and
+`shapes::add_shapes` (two CPU-time tests time the shape pass alone; the worker sets `Job::shapes`).

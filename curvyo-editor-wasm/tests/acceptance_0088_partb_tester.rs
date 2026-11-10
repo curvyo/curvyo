@@ -39,7 +39,6 @@ use curvyo_ui_core::read_trace_wire;
 use kurbo::{Affine, BezPath, PathEl, Point};
 use proptest::prelude::*;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
-use vectrace::shapes::trace_add_shapes;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const OFF: &str = r#"{"threshold":128}"#;
@@ -387,7 +386,7 @@ impl Host {
     }
 
     fn wire(&self, settings: &str) -> Vec<f64> {
-        let mut wire = if settings.contains("\"output\":1") {
+        if settings.contains("\"output\":1") {
             run_trace_job(
                 &TraceJob {
                     raster: TraceRaster {
@@ -401,7 +400,7 @@ impl Host {
                     ),
                     lines: &[],
                     mask: None,
-                    shapes: false,
+                    shapes: trace_recognise_shapes(settings),
                 },
                 &mut |_| {},
             )
@@ -417,16 +416,11 @@ impl Host {
                     mode: TraceMode::Mono(&trace_settings(settings)),
                     lines: &[],
                     mask: None,
-                    shapes: false,
+                    shapes: trace_recognise_shapes(settings),
                 },
                 &mut |_| {},
             )
-        };
-        // The worker's glue (`wasm_trace.rs` `with_shapes`).
-        if trace_recognise_shapes(settings) {
-            trace_add_shapes(&mut wire, self.map);
         }
-        wire
     }
 
     /// Preview and result from one trace, then Create paths (one step).

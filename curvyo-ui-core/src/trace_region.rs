@@ -165,10 +165,10 @@ impl TraceRegion {
             at += 1;
             Some(value)
         };
-        let polygons = vectrace::wire::count(next()?)?;
+        let polygons = count(next()?)?;
         let mut read = Vec::with_capacity(polygons.min(numbers.len()));
         for _ in 0..polygons {
-            let n = vectrace::wire::count(next()?)?;
+            let n = count(next()?)?;
             let mut polygon = Vec::with_capacity(n.min(numbers.len()));
             for _ in 0..n {
                 polygon.push(Point::new(next()?, next()?));
@@ -344,6 +344,14 @@ pub fn unclipped_notice(count: usize) -> String {
 }
 
 /// The z component of `(b - a) x (p - a)`.
+/// A count read from the region's numbers: a whole, non-negative, finite number.
+fn count(value: f64) -> Option<usize> {
+    // invariant: checked whole and in range before the cast.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    (value.is_finite() && value >= 0.0 && value.fract() == 0.0 && value < 9.0e15)
+        .then_some(value as usize)
+}
+
 fn cross(a: Point, b: Point, p: Point) -> f64 {
     (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y)
 }

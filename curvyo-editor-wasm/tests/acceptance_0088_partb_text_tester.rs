@@ -25,7 +25,6 @@ use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
 use vectrace::ocr::{OcrModel, read_text};
-use vectrace::shapes::trace_add_shapes;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const TOLERANCE_MM: f64 = 0.3;
@@ -174,7 +173,7 @@ fn run(model: &OcrModel, settings: &str) -> Out {
         assert!(s.set_trace_fit(&request, &reply));
     }
     let (decided, _) = s.trace_lines_to_trace(image).expect("kept lines");
-    let mut wire = run_trace_job(
+    let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: src.width,
@@ -185,13 +184,10 @@ fn run(model: &OcrModel, settings: &str) -> Out {
             mode: TraceMode::Mono(&params),
             lines: &decided,
             mask: None,
-            shapes: false,
+            shapes: trace_recognise_shapes(settings),
         },
         &mut |_| {},
     );
-    if trace_recognise_shapes(settings) {
-        trace_add_shapes(&mut wire, src.map);
-    }
     assert!(s.set_trace_preview(image, &wire));
     assert!(s.set_trace_result(image, &wire));
     load_fonts(&mut s);

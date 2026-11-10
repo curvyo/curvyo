@@ -5,7 +5,7 @@
 //! implementation was read. The unmasked goldens in
 //! `tests/fixtures/acceptance_0094_tester_unmasked.json` were written by the base commit of the
 //! story (d1275c72, before `trace_job_in` existed) with `trace_job_in`,
-//! `trace_colour_job_in`, `trace_text_job_in` and `trace_add_shapes`.
+//! `trace_colour_job_in`, `trace_text_job_in` and `add_shapes`.
 //!
 //! M1 and M2 are drawn at their own 1000 x 1000 px over 100 x 100 mm; the variants for text,
 //! shapes, Multicolour and the property test use 160 to 400 px to stay fast in debug.
@@ -35,7 +35,6 @@ use support::{COLOUR, M1, M2, draw, map_100mm, text_quads, text_sheet};
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::mask::Mask;
 use vectrace::ocr::OcrLine;
-use vectrace::shapes::trace_add_shapes;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams, analyse as trace_analyse,
@@ -368,8 +367,21 @@ fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
         golden("m1_250_t50"),
         "trace_job_in"
     );
-    let mut shapes = no_mask.clone();
-    trace_add_shapes(&mut shapes, map_100mm(n));
+    let shapes = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &m1,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: None,
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     assert_eq!(shapes, golden("m1_250_t50_shapes"), "Recognise shapes");
     assert_eq!(
         run_trace_job(
@@ -1214,7 +1226,7 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
     let n = 200;
     let sheet = shapes_sheet(n);
     let p = TraceParams::with_threshold(128);
-    let mut whole = run_trace_job(
+    let whole = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: n,
@@ -1225,11 +1237,10 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
             mode: TraceMode::Mono(&p),
             lines: &[],
             mask: None,
-            shapes: false,
+            shapes: true,
         },
         &mut |_| {},
     );
-    trace_add_shapes(&mut whole, map_100mm(n));
     let whole = read_trace_wire(&whole).unwrap();
     let recognised = |w: &vectrace::Output| {
         w.shapes
@@ -1238,7 +1249,7 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
             .count()
     };
     assert_eq!(recognised(&whole), 3, "three shapes without a mask");
-    let mut masked = run_trace_job(
+    let masked = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: n,
@@ -1249,11 +1260,10 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
             mode: TraceMode::Mono(&p),
             lines: &[],
             mask: Some(&region(r1(), false)),
-            shapes: false,
+            shapes: true,
         },
         &mut |_| {},
     );
-    trace_add_shapes(&mut masked, map_100mm(n));
     let masked = read_trace_wire(&masked).unwrap();
     for q in nodes(&masked.outlines) {
         assert!(q.x <= 50.0 + EDGE_MM, "shape node {q:?} outside R1");
@@ -1890,7 +1900,7 @@ fn item3_a_refused_clip_with_text_lines_and_shapes_keeps_every_section() {
             },
             map: TracePixelMap::new(far_map()),
             mode: TraceMode::Mono(&far_params()),
-            lines: &[line],
+            lines: std::slice::from_ref(&line),
             mask: Some(&far_left_half(false)),
             shapes: false,
         },
@@ -1899,7 +1909,21 @@ fn item3_a_refused_clip_with_text_lines_and_shapes_keeps_every_section() {
     let read = read_trace_wire(&wire).expect("a readable text wire");
     assert_eq!(read.unclipped, 3);
     assert_eq!(read.texts.lines.len(), 1, "the line in the region is text");
-    trace_add_shapes(&mut wire, far_map());
+    wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 32,
+                height: 32,
+                rgba: &far_picture(),
+            },
+            map: TracePixelMap::new(far_map()),
+            mode: TraceMode::Mono(&far_params()),
+            lines: &[line],
+            mask: Some(&far_left_half(false)),
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     let read = read_trace_wire(&wire).expect("readable with the shape section");
     assert_eq!(read.unclipped, 3, "the count survives the shape section");
     assert_eq!(read.texts.lines.len(), 1);

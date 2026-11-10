@@ -11,7 +11,7 @@ use self::text::{text_mono_wire, text_regions_wire};
 use self::text_colour::text_colour_wire;
 use crate::mask::Mask;
 use crate::ocr::OcrLine;
-use crate::shapes::trace_add_shapes;
+use crate::shapes::add_shapes;
 
 /// The settings of a job: one black result or one per colour.
 #[derive(Debug, Clone, Copy)]
@@ -54,7 +54,7 @@ pub fn run(job: &Job<'_>, on_percent: &mut dyn FnMut(u8)) -> Vec<f64> {
         }
     };
     if job.shapes {
-        trace_add_shapes(&mut wire, job.map.to_array());
+        add_shapes(&mut wire, job.map.to_array());
     }
     wire
 }
