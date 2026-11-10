@@ -186,7 +186,16 @@ fn layers_rows_do_not_list_the_manufacturing() {
 fn the_drawing_read_for_hit_test_marquee_select_all_and_page_membership_skips_it() {
     let (document, object, id) = with_laser();
     let fixture = document
-        .add_fixture(id, GRID, "Engraved grid", &grid_params(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid_params(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     let read = document.read_objects();
     let ids: Vec<NodeId> = read
@@ -205,7 +214,16 @@ fn the_drawing_read_for_hit_test_marquee_select_all_and_page_membership_skips_it
 fn the_drawing_export_lists_no_manufacturing_object() {
     let (document, _, id) = with_laser();
     document
-        .add_fixture(id, GRID, "Engraved grid", &grid_params(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid_params(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     let json = json(&document);
     assert_eq!(json["objects"].as_array().unwrap().len(), 1);
@@ -230,10 +248,28 @@ fn fixtures_are_added_hidden_edited_and_removed_one_step_each() {
     let (document, _, id) = with_laser();
     let steps = document.own_step_count();
     let first = document
-        .add_fixture(id, GRID, "Engraved grid", &grid_params(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid_params(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     let second = document
-        .add_fixture(id, GRID, "Engraved grid", &grid_params(10.0))
+        .add_fixture(
+            id,
+            &curvyo_document_core::NewFixture {
+                add: curvyo_document_core::FixtureAdd::Grid,
+                kind: GRID,
+                label: "Engraved grid",
+                params: &grid_params(10.0),
+                matrix: None,
+            },
+        )
         .unwrap();
     let names: Vec<String> = document
         .manufacturing(id)
@@ -242,7 +278,7 @@ fn fixtures_are_added_hidden_edited_and_removed_one_step_each() {
         .into_iter()
         .map(|f| f.name)
         .collect();
-    assert_eq!(names, vec!["Engraved grid", "Engraved grid 2"]);
+    assert_eq!(names, vec!["Engraved grid 1", "Engraved grid 2"]);
     assert!(document.set_fixture_visible(second, false).unwrap());
     assert!(!document.set_fixture_visible(second, false).unwrap());
     assert!(
@@ -498,11 +534,6 @@ fn damaged_manufacturing_registers_are_refused_as_damaged() {
                 .unwrap();
         }),
         damaged(|loro| {
-            first_child(loro, "fixture")
-                .insert("fixture_params", LoroValue::from("dense"))
-                .unwrap();
-        }),
-        damaged(|loro| {
             let tree = loro.get_tree("paths");
             let drawing = tree
                 .children(loro::TreeParentId::Root)
@@ -523,4 +554,15 @@ fn damaged_manufacturing_registers_are_refused_as_damaged() {
         );
     }
     assert!(unpack(2, &damaged(|_| {})).is_ok(), "the undamaged control");
+    // Since format 40 a fixture's values read per field (ADR 0049 §6): parameters that are not a
+    // map read empty and count one damaged value; the file opens.
+    let per_field = damaged(|loro| {
+        first_child(loro, "fixture")
+            .insert("fixture_params", LoroValue::from("dense"))
+            .unwrap();
+    });
+    let opened = unpack(2, &per_field).unwrap();
+    let fixture = &opened.manufacturings()[0].fixtures[0];
+    assert!(fixture.params.is_empty());
+    assert_eq!(fixture.damaged, 1);
 }

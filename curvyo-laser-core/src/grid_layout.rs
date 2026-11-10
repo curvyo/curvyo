@@ -1,11 +1,11 @@
 //! The engraved grid's lines, major lines and tapes over the work area, counted from the origin
-//! corner of the page's profile copy plus the grid's offset (`specs/0102-laser-fixtures` criteria
-//! 15 to 17 and 27 a; Frage 174 A). Page coordinates have y growing downwards, as on the canvas.
+//! corner of the page's 0090 grid plus the grid's offset (`specs/0102-laser-fixtures` criteria
+//! 15 to 17 and 27 a; Frage 174 B). Page coordinates have y growing downwards, as on the canvas.
 
 use curvyo_document_core::{DocumentSize, Length, Point};
 use curvyo_extension_core::LineSegment;
 
-use crate::machine_profile::OriginCorner;
+use curvyo_document_core::OriginCorner;
 
 /// The width of a tape's band along its edge, in mm (criterion 17).
 pub const TAPE_BAND_MM: f64 = 5.0;
@@ -82,7 +82,7 @@ pub struct GridSpec {
     pub major_every: u32,
     /// The tapes that are on.
     pub tapes: TapeEdges,
-    /// The origin corner of the page's profile copy.
+    /// The origin corner of the page's 0090 grid (its `grid_origin` register, Frage 174 B).
     pub corner: OriginCorner,
     /// The grid's origin offset from the corner, along X.
     pub origin_x: Length,

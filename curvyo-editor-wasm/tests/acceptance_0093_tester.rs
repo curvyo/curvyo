@@ -109,7 +109,8 @@ fn ac9_a_new_setup_has_no_fixture_and_the_grid_is_added_with_its_defaults() {
     assert!(s.add_fixture("engraved_grid").is_some());
     assert_eq!(s.undo_len(), steps + 1);
     let f = &view(&s)["fixtures"][0];
-    assert_eq!(f["name"], "Engraved grid");
+    // Named "<Kind> N" since `specs/0102-laser-fixtures` criterion 2.
+    assert_eq!(f["name"], "Grid 1");
     assert_eq!(f["visible"], true);
     assert_eq!(f["values"]["spacing"], 10.0);
     assert_eq!(f["values"]["line_width"], 0.1);
@@ -117,7 +118,7 @@ fn ac9_a_new_setup_has_no_fixture_and_the_grid_is_added_with_its_defaults() {
     assert_eq!(f["values"]["origin_y"], 0.0);
     assert!(s.add_fixture("pocket").is_none(), "only the declared kind");
     s.add_fixture("engraved_grid").unwrap();
-    assert_eq!(view(&s)["fixtures"][1]["name"], "Engraved grid 2");
+    assert_eq!(view(&s)["fixtures"][1]["name"], "Grid 2");
 }
 
 #[test]
@@ -333,8 +334,17 @@ fn ac12_an_unknown_process_opens_with_vector_tools_and_saves_back_unchanged() {
         .unwrap();
     let id = page.kind.manufacturing().unwrap();
     let params = serde_json::from_value(serde_json::json!({"depth": {"mm": 3.0}})).unwrap();
-    d.add_fixture(id, "acme.cnc/clamp", "Clamp", &params)
-        .unwrap();
+    d.add_fixture(
+        id,
+        &curvyo_document_core::NewFixture {
+            add: curvyo_document_core::FixtureAdd::Grid,
+            kind: "acme.cnc/clamp",
+            label: "Clamp",
+            params: &params,
+            matrix: None,
+        },
+    )
+    .unwrap();
     let bytes = pack(&d, "0.1.0").unwrap();
 
     let mut s = Session::open(9206, &bytes).unwrap();

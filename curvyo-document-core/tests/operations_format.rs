@@ -300,7 +300,7 @@ fn the_golden_reads_back_every_operation_switch_membership_and_cuts_last() {
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 39);
-    assert_eq!(CURRENT_FORMAT_VERSION, 39);
+    assert_eq!(CURRENT_FORMAT_VERSION, 40);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let lists = all_operations(&opened);

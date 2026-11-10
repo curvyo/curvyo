@@ -1,7 +1,7 @@
 //! The commands of a laser page (`0093` criteria 9, 10; `0098` criteria 4, 12): each is one
 //! history step recorded like every other command; values are clamped by the extension's schema.
 
-use curvyo_document_core::{Length, NewOutputPage, NodeId};
+use curvyo_document_core::{FixtureAdd, Length, NewFixture, NewOutputPage, NodeId};
 use curvyo_extension_core::{FixtureKind, Param, ParamValue, WorkbenchContribution};
 use curvyo_laser_core::{ProfileCopy, write_copy};
 
@@ -63,17 +63,33 @@ impl Session {
         deleted
     }
 
-    /// Installs a fixture of `kind` with its defaults at the end of the active setup (criterion
-    /// 9). `None` for a kind the manifest does not declare.
+    /// Installs a fixture of `kind` with its defaults at the end of the active setup, named
+    /// "<Kind> N" (`0102` criterion 2). `None` for a kind the manifest does not declare.
     pub fn add_fixture(&mut self, kind: &str) -> Option<NodeId> {
         let manufacturing = self.active_manufacturing()?;
         let contribution = workbench_of(&manufacturing.process)?;
         let fixture = contribution.fixture_kind(kind)?;
         let stored = format!("{}/{}", manufacturing.process, fixture.id);
+        let typed = curvyo_laser_core::FixtureKind::from_stored(&stored);
+        let add = match typed {
+            curvyo_laser_core::FixtureKind::Holder => FixtureAdd::Holder,
+            curvyo_laser_core::FixtureKind::Clamp => FixtureAdd::Clamp,
+            curvyo_laser_core::FixtureKind::Stop => FixtureAdd::Stop,
+            _ => FixtureAdd::Grid,
+        };
         let params = Param::defaults(&fixture.params);
         self.recording_unguarded(|this| {
             this.document
-                .add_fixture(manufacturing.id, &stored, fixture.label, &params)
+                .add_fixture(
+                    manufacturing.id,
+                    &NewFixture {
+                        add,
+                        kind: &stored,
+                        label: typed.word(),
+                        params: &params,
+                        matrix: None,
+                    },
+                )
                 .ok()
         })
     }

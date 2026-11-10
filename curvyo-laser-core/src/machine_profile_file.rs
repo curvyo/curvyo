@@ -8,11 +8,17 @@ use crate::machine_profile::{
     BaudRate, Connection, FeedRate, MAX_CONNECTION_CHARS, MachineProfile, OriginCorner, PowerValue,
     ProfileValues, is_profile_id, is_valid_name, is_valid_work_side,
 };
+use crate::machine_profile_fixtures::{FixtureJson, read_set, write_set};
 
-/// The record format this build writes and the newest it reads.
-pub const RECORD_FORMAT_VERSION: u64 = 1;
-/// The largest record text that is read; a longer one is damage.
-pub const MAX_RECORD_BYTES: usize = 16 * 1024;
+/// The record format this build writes and the newest it reads: 2 adds the fixture set
+/// (ADR 0050 §1).
+pub const RECORD_FORMAT_VERSION: u64 = 2;
+/// The record format without a fixture set, still read (ADR 0050 §2).
+const RECORD_FORMAT_NO_FIXTURES: u64 = 1;
+/// The format of `machine-choice.json`, unchanged by the record's format 2.
+const CHOICE_FORMAT_VERSION: u64 = 1;
+/// The largest record text that is read; a longer one is damage (64 KiB since format 2).
+pub const MAX_RECORD_BYTES: usize = 64 * 1024;
 /// The file name suffix of a record.
 pub const RECORD_SUFFIX: &str = ".json";
 /// The only machine family this build stores.
@@ -52,6 +58,8 @@ struct RecordJson {
     max_power: PowerValue,
     laser_mode: bool,
     connection: ConnectionJson,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fixtures: Option<Vec<FixtureJson>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -93,20 +101,27 @@ pub fn record_file_name(id: &str) -> String {
 /// The profile the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordError::Newer`] for a `format_version` above 1; [`RecordError::Damaged`] for a text over
-/// 16 KiB, a JSON or type error, an unknown key, a value out of its range, a kind other than
-/// `laser` or an id that differs from the file name.
+/// [`RecordError::Newer`] for a `format_version` above 2; [`RecordError::Damaged`] for a text over
+/// 64 KiB, a JSON or type error, an unknown key (`fixtures` in a format 1 record), a value out of
+/// its range, a kind other than `laser`, an id that differs from the file name, or a format 2
+/// record whose fixture set is missing or damaged (ADR 0050 §2). A format 1 record reads with an
+/// empty set.
 pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, RecordError> {
     if text.len() > MAX_RECORD_BYTES {
         return Err(RecordError::Damaged);
     }
     let value: Value = serde_json::from_str(text).map_err(|_| RecordError::Damaged)?;
-    match value.get("format_version").and_then(Value::as_u64) {
-        Some(RECORD_FORMAT_VERSION) => {}
+    let version = match value.get("format_version").and_then(Value::as_u64) {
+        Some(version @ (RECORD_FORMAT_NO_FIXTURES | RECORD_FORMAT_VERSION)) => version,
         Some(version) if version > RECORD_FORMAT_VERSION => return Err(RecordError::Newer),
         _ => return Err(RecordError::Damaged),
-    }
+    };
     let record: RecordJson = serde_json::from_value(value).map_err(|_| RecordError::Damaged)?;
+    let fixtures = match (version, record.fixtures) {
+        (RECORD_FORMAT_NO_FIXTURES, None) => Vec::new(),
+        (RECORD_FORMAT_VERSION, Some(set)) => read_set(set).ok_or(RecordError::Damaged)?,
+        _ => return Err(RecordError::Damaged),
+    };
     let valid = record_id(file_name) == Some(record.id.as_str())
         && record.kind == KIND_LASER
         && is_valid_name(&record.name)
@@ -133,11 +148,12 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
             controller_port: record.connection.controller_port,
             baud_rate: record.connection.baud_rate,
         },
+        fixtures,
     })
 }
 
-/// The canonical text of a record: fixed key order, two-space indent, trailing newline, so read,
-/// write, read is the identity.
+/// The canonical text of a record, always format 2 with its `fixtures` (ADR 0050 §3): fixed key
+/// order, two-space indent, trailing newline, so read, write, read is the identity.
 #[must_use]
 pub fn write_record(profile: &MachineProfile) -> String {
     let record = RecordJson {
@@ -159,6 +175,7 @@ pub fn write_record(profile: &MachineProfile) -> String {
             controller_port: profile.connection.controller_port.clone(),
             baud_rate: profile.connection.baud_rate,
         },
+        fixtures: Some(write_set(&profile.fixtures)),
     };
     pretty(&record)
 }
@@ -169,7 +186,7 @@ pub fn write_record(profile: &MachineProfile) -> String {
 pub fn read_choice(text: &str) -> Option<String> {
     serde_json::from_str::<ChoiceJson>(text)
         .ok()
-        .filter(|choice| choice.format_version == RECORD_FORMAT_VERSION)
+        .filter(|choice| choice.format_version == CHOICE_FORMAT_VERSION)
         .map(|choice| choice.last_picked)
 }
 
@@ -177,7 +194,7 @@ pub fn read_choice(text: &str) -> Option<String> {
 #[must_use]
 pub fn write_choice(id: &str) -> String {
     pretty(&ChoiceJson {
-        format_version: RECORD_FORMAT_VERSION,
+        format_version: CHOICE_FORMAT_VERSION,
         last_picked: id.to_owned(),
     })
 }
@@ -207,7 +224,13 @@ mod tests {
             };
         }
         files!(
-            "full_record.json",
+            "format1_full_record.json",
+            "format2_fixtures.json",
+            "format2_damaged_fixture.json",
+            "format2_damaged_screw.json",
+            "format2_damaged_matrix.json",
+            "format2_unknown_kind.json",
+            "format2_over_limit.json",
             "generic_laser_copy.json",
             "damaged_not_json.json",
             "damaged_wrong_type.json",
@@ -221,12 +244,82 @@ mod tests {
     }
 
     #[test]
-    fn the_full_record_reads_and_writes_back_byte_identical() {
-        let text = fixture("full_record.json");
+    fn a_format_1_record_reads_with_an_empty_set_and_any_write_is_format_2() {
+        let text = fixture("format1_full_record.json");
         let profile = read_record(&record_file_name(ID), &text).unwrap();
         assert_eq!(profile.values.name, "K40 in the garage");
         assert_eq!(profile.connection.controller_port, "/dev/ttyUSB0");
+        assert_eq!(profile.fixtures, Vec::new());
+        let written = write_record(&profile);
+        assert!(written.starts_with("{\n  \"format_version\": 2,"));
+        assert!(written.ends_with("  },\n  \"fixtures\": []\n}\n"));
+        assert_eq!(
+            read_record(&record_file_name(ID), &written).unwrap(),
+            profile
+        );
+    }
+
+    #[test]
+    fn a_format_2_set_reads_and_writes_back_byte_identical() {
+        let text = fixture("format2_fixtures.json");
+        let profile = read_record(&record_file_name(ID), &text).unwrap();
+        let kinds: Vec<&str> = profile.fixtures.iter().map(|f| f.kind.as_str()).collect();
+        assert_eq!(
+            kinds,
+            [
+                "curvyo.laser/engraved_grid",
+                "curvyo.laser/holder",
+                "curvyo.laser/stop",
+                "curvyo.laser/screw"
+            ]
+        );
+        assert_eq!(profile.fixtures[3].params["thread_diameter_mm"], 6.0);
+        assert!(profile.fixtures[3].slots.is_empty(), "a screw has no slots");
+        assert_eq!(profile.fixtures[0].matrix, None, "the grid has no matrix");
+        assert_eq!(profile.fixtures[1].slots.len(), 2);
+        assert_eq!(profile.fixtures[1].slots[0].params["shape"], "circle");
+        assert!(!profile.fixtures[2].active);
         assert_eq!(write_record(&profile), text);
+    }
+
+    #[test]
+    fn a_damaged_set_damages_the_whole_record() {
+        for case in [
+            "format2_damaged_fixture.json",
+            "format2_damaged_screw.json",
+            "format2_damaged_matrix.json",
+            "format2_unknown_kind.json",
+            "format2_over_limit.json",
+        ] {
+            assert_eq!(
+                read_record(&record_file_name(ID), &fixture(case)),
+                Err(RecordError::Damaged),
+                "{case}"
+            );
+        }
+        let text_thread = fixture("format2_fixtures.json").replace(
+            "\"thread_diameter_mm\": 6.0",
+            "\"thread_diameter_mm\": \"M6\"",
+        );
+        assert_eq!(
+            read_record(&record_file_name(ID), &text_thread),
+            Err(RecordError::Damaged),
+            "a text diameter damages the record"
+        );
+        let without_set = fixture("format1_full_record.json")
+            .replace("\"format_version\": 1", "\"format_version\": 2");
+        assert_eq!(
+            read_record(&record_file_name(ID), &without_set),
+            Err(RecordError::Damaged),
+            "a format 2 record has its set"
+        );
+        let set_in_format_1 = fixture("format2_fixtures.json")
+            .replace("\"format_version\": 2", "\"format_version\": 1");
+        assert_eq!(
+            read_record(&record_file_name(ID), &set_in_format_1),
+            Err(RecordError::Damaged),
+            "a format 1 record has no set"
+        );
     }
 
     #[test]
@@ -236,7 +329,7 @@ mod tests {
         let profile = read_record(name, &text).unwrap();
         assert_eq!(profile.values.name, "Generic laser copy");
         assert!(!profile.is_builtin());
-        assert_eq!(write_record(&profile), text);
+        assert_eq!(read_record(name, &write_record(&profile)).unwrap(), profile);
     }
 
     #[test]
@@ -258,7 +351,7 @@ mod tests {
         }
         let big = format!(
             "{}{}",
-            fixture("full_record.json"),
+            fixture("format1_full_record.json"),
             " ".repeat(MAX_RECORD_BYTES)
         );
         assert_eq!(read_record(&name, &big), Err(RecordError::Damaged));

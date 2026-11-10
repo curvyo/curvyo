@@ -1,5 +1,5 @@
 //! The kinds of laser fixtures and the limits of their parameters (`specs/0102-laser-fixtures`
-//! criteria 2, 15, 19, 20, 22, 23 and 32; ADR 0049 §1 and §2).
+//! criteria 2, 15, 19, 20, 22, 23, 32 and 37; ADR 0049 §1 and §2).
 
 use curvyo_document_core::Length;
 
@@ -17,12 +17,14 @@ pub enum FixtureKind {
     Clamp,
     /// An L-shaped fence.
     Stop,
+    /// A round screw or bolt: a thread circle inside a head circle, on one centre.
+    Screw,
     /// A kind this build does not know: kept with its values, drawn never.
     Unknown,
 }
 
 impl FixtureKind {
-    /// Reads a stored kind; every value that is not one of the four known kinds is unknown.
+    /// Reads a stored kind; every value that is not one of the five known kinds is unknown.
     #[must_use]
     pub fn from_stored(stored: &str) -> Self {
         match stored.strip_prefix(KIND_PREFIX) {
@@ -30,6 +32,7 @@ impl FixtureKind {
             Some("holder") => Self::Holder,
             Some("clamp") => Self::Clamp,
             Some("stop") => Self::Stop,
+            Some("screw") => Self::Screw,
             _ => Self::Unknown,
         }
     }
@@ -43,6 +46,7 @@ impl FixtureKind {
             Self::Holder => Some("curvyo.laser/holder"),
             Self::Clamp => Some("curvyo.laser/clamp"),
             Self::Stop => Some("curvyo.laser/stop"),
+            Self::Screw => Some("curvyo.laser/screw"),
             Self::Unknown => None,
         }
     }
@@ -55,6 +59,7 @@ impl FixtureKind {
             Self::Holder => "Holder",
             Self::Clamp => "Clamp",
             Self::Stop => "Stop",
+            Self::Screw => "Screw",
             Self::Unknown => "Unknown fixture",
         }
     }
@@ -143,6 +148,104 @@ pub fn stop_thickness_range() -> MmRange {
     MmRange::new(0.5, 50.0, 5.0)
 }
 
+/// Which of a stop's three sizes was typed or dragged: the one that gives way (D24).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StopPart {
+    /// Leg 1, along the stop's width.
+    LegA,
+    /// Leg 2, along the stop's height.
+    LegB,
+    /// The thickness of both legs.
+    Thickness,
+}
+
+/// A stop's legs and thickness `[leg 1, leg 2, thickness]` with `value` set for `part` and the
+/// others kept: a leg is never shorter than the thickness, the thickness never above the shorter
+/// leg or 50 mm (criterion 23, D24). Returns the three sizes and whether `value` had to move.
+#[must_use]
+pub fn stop_legs(part: StopPart, value: Length, sizes: [Length; 3]) -> ([Length; 3], bool) {
+    let [leg_a, leg_b, thickness] = sizes;
+    match part {
+        StopPart::LegA | StopPart::LegB => {
+            let (leg, mut moved) = stop_leg_range().clamp(value);
+            let leg = if leg.as_mm() < thickness.as_mm() {
+                moved = true;
+                thickness
+            } else {
+                leg
+            };
+            if part == StopPart::LegA {
+                ([leg, leg_b, thickness], moved)
+            } else {
+                ([leg_a, leg, thickness], moved)
+            }
+        }
+        StopPart::Thickness => {
+            let (t, mut moved) = stop_thickness_range().clamp(value);
+            let shorter = leg_a.as_mm().min(leg_b.as_mm());
+            let t = if t.as_mm() > shorter {
+                moved = true;
+                Length::from_mm(shorter)
+            } else {
+                t
+            };
+            ([leg_a, leg_b, t], moved)
+        }
+    }
+}
+
+/// A screw's thread diameter: 0.5 to 1,000 mm, 6 mm by default (criterion 37, an M6 screw). The
+/// thread is never larger than the head (see [`screw_diameters`]).
+#[must_use]
+pub fn screw_thread_range() -> MmRange {
+    MmRange::new(0.5, 1000.0, 6.0)
+}
+
+/// A screw's head diameter: 0.5 to 1,000 mm, 10 mm by default (criterion 37).
+#[must_use]
+pub fn screw_head_range() -> MmRange {
+    MmRange::new(0.5, 1000.0, 10.0)
+}
+
+/// Which of a screw's two diameters was typed or dragged: the one that gives way (D24, D26).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrewPart {
+    /// The thread circle.
+    Thread,
+    /// The head circle.
+    Head,
+}
+
+/// A screw's diameters with `value` set for `part` and the other one kept: `value` is clamped to
+/// its range and then to the other circle (the thread never above the head). Returns the thread,
+/// the head and whether `value` had to move.
+#[must_use]
+pub fn screw_diameters(
+    part: ScrewPart,
+    value: Length,
+    thread: Length,
+    head: Length,
+) -> (Length, Length, bool) {
+    match part {
+        ScrewPart::Thread => {
+            let (value, moved) = screw_thread_range().clamp(value);
+            if value.as_mm() > head.as_mm() {
+                (head, head, true)
+            } else {
+                (value, head, moved)
+            }
+        }
+        ScrewPart::Head => {
+            let (value, moved) = screw_head_range().clamp(value);
+            if value.as_mm() < thread.as_mm() {
+                (thread, thread, true)
+            } else {
+                (thread, value, moved)
+            }
+        }
+    }
+}
+
 /// A slot's width, height or diameter: 0.5 to 1,000 mm, 20 mm by default (criteria 19 and 20).
 #[must_use]
 pub fn slot_size_range() -> MmRange {
@@ -154,7 +257,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_four_stored_kinds_read_and_anything_else_is_unknown() {
+    fn the_five_stored_kinds_read_and_anything_else_is_unknown() {
+        assert_eq!(
+            FixtureKind::from_stored("curvyo.laser/screw"),
+            FixtureKind::Screw
+        );
         assert_eq!(
             FixtureKind::from_stored("curvyo.laser/engraved_grid"),
             FixtureKind::EngravedGrid
@@ -222,5 +329,54 @@ mod tests {
         assert_eq!(slot_size_range().default, Length::from_mm(20.0));
         assert_eq!(stop_thickness_range().default, Length::from_mm(5.0));
         assert_eq!(MAJOR_EVERY_RANGE.2, 5);
+        assert_eq!(screw_thread_range().default, Length::from_mm(6.0));
+        assert_eq!(screw_head_range().default, Length::from_mm(10.0));
+        assert_eq!(screw_head_range().min, Length::from_mm(0.5));
+        assert_eq!(screw_thread_range().max, Length::from_mm(1000.0));
+    }
+
+    #[test]
+    fn a_stop_leg_never_falls_below_its_thickness_nor_the_thickness_above_the_shorter_leg() {
+        let mm = Length::from_mm;
+        let sizes = [mm(60.0), mm(20.0), mm(5.0)];
+        assert_eq!(
+            stop_legs(StopPart::LegA, mm(3.0), sizes),
+            ([mm(5.0), mm(20.0), mm(5.0)], true)
+        );
+        assert_eq!(
+            stop_legs(StopPart::Thickness, mm(30.0), sizes),
+            ([mm(60.0), mm(20.0), mm(20.0)], true)
+        );
+        assert_eq!(
+            stop_legs(StopPart::Thickness, mm(80.0), [mm(60.0), mm(60.0), mm(5.0)]),
+            ([mm(60.0), mm(60.0), mm(50.0)], true)
+        );
+        assert_eq!(
+            stop_legs(StopPart::LegB, mm(40.0), sizes),
+            ([mm(60.0), mm(40.0), mm(5.0)], false)
+        );
+    }
+
+    #[test]
+    fn a_screw_thread_never_passes_its_head_and_the_typed_value_gives_way() {
+        let mm = Length::from_mm;
+        assert_eq!(
+            screw_diameters(ScrewPart::Thread, mm(12.0), mm(6.0), mm(10.0)),
+            (mm(10.0), mm(10.0), true)
+        );
+        assert_eq!(
+            screw_diameters(ScrewPart::Head, mm(4.0), mm(6.0), mm(10.0)),
+            (mm(6.0), mm(6.0), true)
+        );
+        assert_eq!(
+            screw_diameters(ScrewPart::Head, mm(14.0), mm(6.0), mm(10.0)),
+            (mm(6.0), mm(14.0), false)
+        );
+        assert_eq!(
+            screw_diameters(ScrewPart::Thread, mm(0.1), mm(6.0), mm(10.0)),
+            (mm(0.5), mm(10.0), true)
+        );
+        assert_eq!(FixtureKind::Screw.word(), "Screw");
+        assert_eq!(FixtureKind::Screw.stored(), Some("curvyo.laser/screw"));
     }
 }

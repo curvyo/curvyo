@@ -209,7 +209,8 @@ fn ac9_ac10_an_engraved_grid_is_drawn_on_the_page_and_its_eye_hides_it() {
     let with_grid = triangles(&session);
     assert!(with_grid > bare);
     let fixture = view(&session)["fixtures"][0].clone();
-    assert_eq!(fixture["name"], "Engraved grid");
+    // "<Kind> N" since `0102` criterion 2.
+    assert_eq!(fixture["name"], "Grid 1");
     let id = session
         .fixture_named(fixture["id"].as_str().unwrap())
         .unwrap();
@@ -344,4 +345,17 @@ fn ac14_ac15_a_profile_work_area_edit_writes_the_library_and_reset_resizes_about
         session.active_page().size,
         curvyo_document_core::DocumentSize::from_mm(700.0, 500.0)
     );
+}
+
+#[test]
+fn picking_generic_laser_removes_the_fixtures_and_undo_restores_them() {
+    // `specs/0102-laser-fixtures` criterion 29, ADR 0050 §4 and §6: the pick replaces the
+    // page's fixtures by the profile's set, empty for the built-in, in the pick's one step.
+    let mut session = session_with_drawing();
+    add_laser(&mut session);
+    session.add_fixture("engraved_grid").unwrap();
+    assert!(session.pick_machine_profile(curvyo_laser_core::GENERIC_LASER_ID));
+    assert!(view(&session)["fixtures"].as_array().unwrap().is_empty());
+    session.undo();
+    assert_eq!(view(&session)["fixtures"].as_array().unwrap().len(), 1);
 }

@@ -298,8 +298,9 @@ fn c19_a_clone_and_its_original_on_pages_that_move_apart_each_follow_their_own_p
 }
 
 #[test]
-fn c28_the_format_stays_39() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 39);
+fn c28_the_format_has_no_bump_of_its_own() {
+    // The auto-layout bumps nothing; 40 is the bump of `0102` laser-fixtures (ADR 0049).
+    assert_eq!(CURRENT_FORMAT_VERSION, 40);
 }
 
 #[test]

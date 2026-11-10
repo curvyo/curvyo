@@ -731,6 +731,9 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             // `0100-bring-content-in` (format 38) is a later build: its golden holds a group
             // and a manufacturing.
             || name.starts_with("bring_content_in_")
+            // `0102-laser-fixtures` (format 40) is a later build: its goldens hold fixtures
+            // with their eye and names.
+            || name.starts_with("fixtures_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

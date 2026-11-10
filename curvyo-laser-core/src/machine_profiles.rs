@@ -178,6 +178,7 @@ impl MachineProfiles {
             },
             work_area: source.work_area,
             connection: source.connection,
+            fixtures: source.fixtures,
         };
         self.add(profile)
     }
@@ -208,6 +209,20 @@ impl MachineProfiles {
         profile.work_area = work_area;
         profile.modified = modified;
         Some(write_of(profile))
+    }
+
+    /// Update profile with the page's fixtures (`specs/0102-laser-fixtures` criterion 28): as
+    /// [`MachineProfiles::update`], and the set becomes `fixtures`.
+    pub fn update_with_fixtures(
+        &mut self,
+        id: &str,
+        values: ProfileValues,
+        work_area: curvyo_document_core::DocumentSize,
+        fixtures: Vec<curvyo_document_core::FixtureRecord>,
+        modified: i64,
+    ) -> Option<LibraryWrite> {
+        self.user_mut(id)?.fixtures = fixtures;
+        self.update(id, values, work_area, modified)
     }
 
     /// Sets the connection of the user profile `id` (criterion 9). `None` for the built-in, an
@@ -266,7 +281,7 @@ mod tests {
         let (name, text) = record(4, "newer");
         entries.push((
             name,
-            text.replace("\"format_version\": 1", "\"format_version\": 7"),
+            text.replace("\"format_version\": 2", "\"format_version\": 7"),
         ));
         entries.push(("notes.txt".to_owned(), "{".to_owned()));
         let library = MachineProfiles::load(&entries);

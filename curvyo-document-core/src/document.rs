@@ -427,7 +427,21 @@ impl DocumentVersion {
 /// number is provisional by the rule above. Goldens: `operations_v39.curvyo`,
 /// `operations_unknown_kind_v39.curvyo`, `operations_unreadable_v39.curvyo`; the version 38
 /// golden stays.
-pub const CURRENT_FORMAT_VERSION: u32 = 39;
+///
+/// Bumped to 40 in `laser-fixtures` (ADR 0049, `specs/0102-laser-fixtures`): a fixture node
+/// (`shape = "fixture"`) may carry `active` (absent reads as on) and `fixture_matrix` (six
+/// numbers, absent is identity), its kind is `curvyo.laser/<kind>` for the grid, holder, clamp
+/// and stop, and it may hold slot child nodes (`shape = "fixture_slot"`, `name`, the atomic map
+/// `slot_params`). A build that stops at 39 refuses any child of a fixture as damage, so it must
+/// refuse every file of this build as too new. Migration from 39 is none: a format-39 file has
+/// no slot, opens unchanged and is not rewritten. Damage is read per field
+/// (`crate::manufacturing_fixtures`): a fixture value, a matrix or an `active` that does not read
+/// is counted and reads as its default, a slot whose `slot_params` is not a map is skipped, a
+/// slot outside a fixture is kept and never read; only a fixture without a kind or with a child
+/// that is not a slot is refused. The number is provisional by the rule above. Goldens:
+/// `fixtures_v40.curvyo`, `fixtures_unknown_kind_v40.curvyo`, `fixtures_damaged_v40.curvyo`,
+/// `fixtures_slot_orphan_v40.curvyo`, `fixtures_grid_v39.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 40;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
