@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use curvyo_document_core::{Affine, Document, NewImage, NodeId, Point, pack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
-use curvyo_ui_core::trace_job;
 
 fn session_with_two_images() -> (Session, Vec<NodeId>) {
     let png = std::fs::read(
@@ -88,4 +87,23 @@ fn c68a_the_group_knows_its_counts_for_the_tooltip_and_undo_redo_keep_them_coher
         "counts after redo: {:?}",
         again.and_then(|g| session.traced_counts(g))
     );
+}
+
+/// One trace with the three bar values and every other setting at its first-use value.
+fn trace_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    threshold: u8,
+    smooth: u8,
+    specks_mm: f64,
+) -> Vec<f64> {
+    let params = curvyo_ui_core::TraceParams {
+        threshold,
+        smooth,
+        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
+        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+    };
+    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
 }

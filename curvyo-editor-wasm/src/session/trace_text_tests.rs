@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use super::{Session, Tool, TraceCreateOutcome};
 use curvyo_document_core::{NodeId, ObjectSnapshot, TextSnapshot};
-use curvyo_ui_core::{OcrModel, TraceParams, trace_read_text, trace_text_job_with};
+use curvyo_ui_core::{OcrModel, TraceParams, trace_read_text, trace_text_job_in};
 
 /// The thread's CPU time in seconds (`CLAUDE.md` §5: timings are thread CPU time).
 #[allow(clippy::cast_precision_loss)] // seconds and nanoseconds of a test run
@@ -160,13 +160,14 @@ pub(super) fn run(model: &OcrModel, file: &str) -> Run {
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let threshold = curvyo_ui_core::trace_auto_threshold(&source.rgba, source.width, source.height);
     let started = cpu_seconds();
-    let wire = trace_text_job_with(
+    let wire = trace_text_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &TraceParams::with_threshold(threshold),
         &lines,
+        None,
         &mut |_| {},
     );
     let pass_seconds = cpu_seconds() - started;
@@ -334,13 +335,14 @@ fn a_ring_read_as_o_is_decided_before_the_one_trace() {
     );
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let params = TraceParams::with_threshold(128);
-    let regions = curvyo_ui_core::trace_text_regions_with(
+    let regions = curvyo_ui_core::trace_text_regions_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
         &lines,
+        None,
     );
     let request = session
         .trace_fit_request_for(image, &regions, 0.3, &[])
@@ -349,21 +351,23 @@ fn a_ring_read_as_o_is_decided_before_the_one_trace() {
     assert_eq!(session.trace_fit_dropped(), 1);
     let (decided, _) = session.trace_lines_to_trace(image).unwrap();
     assert!(decided.iter().all(|l| !l.accepted()));
-    let wire = trace_text_job_with(
+    let wire = trace_text_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
         &decided,
+        None,
         &mut |_| {},
     );
-    let plain = curvyo_ui_core::trace_job_with(
+    let plain = curvyo_ui_core::trace_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
+        None,
         &mut |_| {},
     );
     let (on, off) = (
@@ -401,24 +405,26 @@ fn a_trace_with_other_lines_drops_the_fit() {
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let params = TraceParams::with_threshold(128);
-    let regions = curvyo_ui_core::trace_text_regions_with(
+    let regions = curvyo_ui_core::trace_text_regions_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
         &lines,
+        None,
     );
     let request = session
         .trace_fit_request_for(image, &regions, 0.3, &[])
         .unwrap();
     assert!(session.set_trace_fit(&request, &fit(&request)));
-    let plain = curvyo_ui_core::trace_job_with(
+    let plain = curvyo_ui_core::trace_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
+        None,
         &mut |_| {},
     );
     assert!(session.set_trace_result(image, &plain));

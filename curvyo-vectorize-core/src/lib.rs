@@ -62,13 +62,14 @@ pub use background::{sample_colour, suggest_background};
 pub use colour_trace::{
     ColourLayer, ColourParams, ColourTrace, PaletteEntry, colour_palette, trace_colours,
 };
+pub use outline::node_count;
 pub use palette::{DEFAULT_COLOURS, MAX_COLOURS, MIN_COLOURS};
 pub use params::{
     Denoise, MAX_SWATCHES, PRESETS, PixelLength, Preset, Rgb8, Selection, Swatches, TraceParams,
     UPSCALE_AUTO_BELOW_PX, Upscale,
 };
 pub use progress::{Phase, Progress};
-pub use raster::{Raster, auto_threshold};
+pub use raster::{Raster, auto_threshold, luma};
 pub use schema::{
     ADVANCED_PARAMS, DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD,
     DEFAULT_TOLERANCE_PX, MAX_SPECKS_MM, MAX_TOLERANCE_PX, METHOD_PARAMS, MIN_TOLERANCE_PX, PARAMS,

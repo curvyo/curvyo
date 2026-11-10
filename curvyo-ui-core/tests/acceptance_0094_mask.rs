@@ -7,13 +7,12 @@
 
 use std::sync::OnceLock;
 
-use curvyo_document_core::{Affine, Angle, Point, Vec2};
+use curvyo_document_core::{Affine, Angle, Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    OcrLine, TRACE_REGION_TOLERANCE, TraceColourParams, TraceParams, TraceRegion, TraceRegionError,
-    TraceRgb, TraceWire, read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
-    trace_job_with, trace_region_defaults, trace_suggest_background, trace_text_job_in,
-    trace_text_regions_in, unclipped_notice,
+    OcrLine, TraceColourParams, TraceParams, TraceRegion, TraceRegionError, TraceRgb, TraceWire,
+    read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in, trace_region_defaults,
+    trace_suggest_background, trace_text_job_in, trace_text_regions_in, unclipped_notice,
 };
 use kurbo::{BezPath, PathEl, Shape};
 
@@ -21,6 +20,8 @@ const SIDE: u32 = 1000;
 /// 1000 px placed 100 mm wide: 10 px per mm.
 const MAP: [f64; 6] = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];
 const TOLERANCE_MM: f64 = 0.01;
+/// The kernel tolerance of the mask region, as `TraceRegion` clips with it.
+const REGION_TOLERANCE: Tolerance = Tolerance::from_mm(0.005);
 
 /// M1 (spec, "Reference fixtures"); with `paper_right` the right half's white is #D8D8D8 (M2).
 fn picture(paper_right: bool) -> Vec<u8> {
@@ -155,7 +156,7 @@ fn area_of(op: BooleanOp, sets: &[&[BezPath]]) -> f64 {
         .map(|s| s.iter().map(|a| Outline::new(a, true)).collect())
         .collect();
     let refs: Vec<&[Outline<'_>]> = operands.iter().map(Vec::as_slice).collect();
-    boolean(op, &refs, TRACE_REGION_TOLERANCE).map_or(0.0, |r| {
+    boolean(op, &refs, REGION_TOLERANCE).map_or(0.0, |r| {
         r.outlines().iter().map(|o| signed_area_mm2(o)).sum()
     })
 }
@@ -269,7 +270,7 @@ fn c1_without_a_region_the_numbers_are_the_unmasked_jobs() {
     let map = [0.5, 0.0, 0.0, 0.5, 3.0, 4.0];
     assert_eq!(
         trace_job_in(&small, 64, 64, map, &params(), None, &mut |_| {}),
-        trace_job_with(&small, 64, 64, map, &params(), &mut |_| {})
+        trace_job_in(&small, 64, 64, map, &params(), None, &mut |_| {})
     );
 }
 

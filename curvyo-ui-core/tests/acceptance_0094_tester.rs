@@ -4,8 +4,8 @@
 //! the specification on the tester's own synthetic fixtures (`support_0094`), before the
 //! implementation was read. The unmasked goldens in
 //! `tests/fixtures/acceptance_0094_tester_unmasked.json` were written by the base commit of the
-//! story (d1275c72, before `trace_job_in` existed) with `trace_job_with`,
-//! `trace_colour_job_with`, `trace_text_job_with` and `trace_add_shapes`.
+//! story (d1275c72, before `trace_job_in` existed) with `trace_job_in`,
+//! `trace_colour_job_in`, `trace_text_job_in` and `trace_add_shapes`.
 //!
 //! M1 and M2 are drawn at their own 1000 x 1000 px over 100 x 100 mm; the variants for text,
 //! shapes, Multicolour and the property test use 160 to 400 px to stay fast in debug.
@@ -31,8 +31,7 @@ use curvyo_geometry_core::{
 use curvyo_ui_core::{
     OcrLine, TraceColourParams, TraceMethod, TraceParams, TraceRegion, TraceRegionError, TraceRgb,
     read_trace_wire, trace_add_shapes, trace_analyse, trace_auto_threshold, trace_colour_job_in,
-    trace_colour_job_with, trace_job_in, trace_job_with, trace_region_defaults,
-    trace_suggest_background, trace_text_job_in, trace_text_job_with,
+    trace_job_in, trace_region_defaults, trace_suggest_background, trace_text_job_in,
 };
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
@@ -306,9 +305,9 @@ fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
     let no_mask = trace_job_in(&m1, n, n, map_100mm(n), &t50(), None, &mut |_| {});
     assert_eq!(no_mask, golden("m1_250_t50"), "trace_job_in(None)");
     assert_eq!(
-        trace_job_with(&m1, n, n, map_100mm(n), &t50(), &mut |_| {}),
+        trace_job_in(&m1, n, n, map_100mm(n), &t50(), None, &mut |_| {}),
         golden("m1_250_t50"),
-        "trace_job_with"
+        "trace_job_in"
     );
     let mut shapes = no_mask.clone();
     trace_add_shapes(&mut shapes, map_100mm(n));
@@ -327,7 +326,7 @@ fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
         "Multicolour"
     );
     assert_eq!(
-        trace_colour_job_with(&col, c, c, map_100mm(c), &colour, &mut |_| {}),
+        trace_colour_job_in(&col, c, c, map_100mm(c), &colour, None, &mut |_| {}),
         golden("colour_200")
     );
     let t = text_sheet(c);
@@ -338,7 +337,7 @@ fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
         "Recognise text"
     );
     assert_eq!(
-        trace_text_job_with(&t, c, c, map_100mm(c), &p, &ocr_lines(c), &mut |_| {}),
+        trace_text_job_in(&t, c, c, map_100mm(c), &p, &ocr_lines(c), None, &mut |_| {}),
         golden("text_200")
     );
 }

@@ -35,8 +35,8 @@ use curvyo_editor_wasm::{
     ocr_lines_json, read_ocr_lines, trace_settings,
 };
 use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, TraceWire, read_trace_wire, trace_job_with, trace_read_text,
-    trace_text_job_with, trace_text_regions_with,
+    FontBlock, OcrLine, OcrModel, TraceWire, read_trace_wire, trace_job_in, trace_read_text,
+    trace_text_job_in, trace_text_regions_in,
 };
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
@@ -204,24 +204,26 @@ impl Host {
     }
 
     fn wire(&self, settings: &str, lines: &[OcrLine]) -> Vec<f64> {
-        trace_text_job_with(
+        trace_text_job_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &trace_settings(settings),
             lines,
+            None,
             &mut |_| {},
         )
     }
 
     fn plain_wire(&self, settings: &str) -> Vec<f64> {
-        trace_job_with(
+        trace_job_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &trace_settings(settings),
+            None,
             &mut |_| {},
         )
     }
@@ -249,13 +251,14 @@ impl Host {
             self.s
                 .set_trace_ocr_lines(self.image, lines.to_vec(), (self.width, self.height))
         );
-        let regions = trace_text_regions_with(
+        let regions = trace_text_regions_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &trace_settings(settings),
             lines,
+            None,
         );
         let (request, reply) =
             match self
@@ -1605,13 +1608,14 @@ fn timings_of_the_customer_screenshot_fit() {
             .set_trace_ocr_lines(host.image, lines.clone(), (host.width, host.height))
     );
     let (regions, pass) = cpu_time::cpu_time_of(|| {
-        trace_text_regions_with(
+        trace_text_regions_in(
             &host.rgba,
             host.width,
             host.height,
             host.map,
             &trace_settings(SETTINGS),
             &lines,
+            None,
         )
     });
     let request = host

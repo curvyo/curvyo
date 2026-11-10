@@ -9,7 +9,7 @@
 /// Fills every pixel of `rgba` (`width` x `height`, four bytes each) whose `mask` entry is set
 /// from its component's ring; a component without a ring (the whole picture) becomes white.
 /// Does nothing when the sizes do not match.
-pub fn inpaint(rgba: &mut [u8], width: usize, height: usize, mask: &[bool]) {
+pub(crate) fn inpaint(rgba: &mut [u8], width: usize, height: usize, mask: &[bool]) {
     let n = width * height;
     if mask.len() != n || rgba.len() != n * 4 {
         return;

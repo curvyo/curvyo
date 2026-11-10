@@ -897,7 +897,8 @@ pub(crate) fn to_path(segments: &[Seg]) -> BezPath {
 }
 
 /// The anchors of a closed outline: one per segment, the closing one not counted twice.
-pub(crate) fn node_count(path: &BezPath) -> usize {
+#[must_use]
+pub fn node_count(path: &BezPath) -> usize {
     use kurbo::PathEl;
     let mut start = None;
     let mut last = None;

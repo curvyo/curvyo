@@ -11,7 +11,7 @@
 use curvyo_document_core::{Angle, LineJoin, Shape};
 use curvyo_ui_core::{
     TraceColourParams, TraceMethod, TraceParams, TraceRgb, TraceShapeRegion, TraceWire,
-    read_trace_wire, trace_add_shapes, trace_colour_job_with, trace_job_with,
+    read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
 };
 
 /// 10 px/mm.
@@ -49,12 +49,13 @@ fn picture_rgb(w: u32, h: u32, paint: impl Fn(f64, f64) -> Option<[u8; 3]>) -> V
 }
 
 fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, TraceWire) {
-    let mut wire = trace_job_with(
+    let mut wire = trace_job_in(
         rgba,
         w,
         h,
         MAP,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     if shapes {
@@ -377,12 +378,13 @@ fn c9_the_0025_ring_and_dot_grid() {
     });
     for map in [[0.264_583_333, 0.0, 0.0, 0.264_583_333, 0.0, 0.0], MAP] {
         let shape_wire = |rgba: &[u8], side: u32| {
-            let mut wire = trace_job_with(
+            let mut wire = trace_job_in(
                 rgba,
                 side,
                 side,
                 map,
                 &TraceParams::with_threshold(128),
+                None,
                 &mut |_| {},
             );
             trace_add_shapes(&mut wire, map);
@@ -423,7 +425,7 @@ fn c10_multicolour_keeps_each_colour() {
         },
         ..TraceParams::with_threshold(128)
     });
-    let mut wire = trace_colour_job_with(&rgba, 1000, 600, MAP, &params, &mut |_| {});
+    let mut wire = trace_colour_job_in(&rgba, 1000, 600, MAP, &params, None, &mut |_| {});
     trace_add_shapes(&mut wire, MAP);
     let read = read_trace_wire(&wire).unwrap();
     assert_eq!(read.layers.len(), 2);
@@ -466,12 +468,13 @@ fn c10_multicolour_keeps_each_colour() {
 #[test]
 fn c11_c13_off_is_today_and_runs_repeat() {
     let rgba = picture(800, 800, |x, y| regular(x, y, 5, 30.0, Some(14.0), 0.7));
-    let plain = trace_job_with(
+    let plain = trace_job_in(
         &rgba,
         800,
         800,
         MAP,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     let (off, _) = traced(&rgba, 800, 800, false);

@@ -33,8 +33,8 @@ use curvyo_editor_wasm::{
     trace_colour_settings, trace_settings,
 };
 use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, TraceRgb, TraceWire, read_trace_wire, text_pass,
-    trace_colour_job_with, trace_read_text, trace_text_colour_job_with, trace_text_regions_with,
+    FontBlock, OcrLine, OcrModel, TraceRgb, TraceWire, read_trace_wire, trace_colour_job_in,
+    trace_read_text, trace_text_colour_job_in, trace_text_regions_in,
 };
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
@@ -226,13 +226,14 @@ impl Host {
     /// The multicolour job with `lines` (`trace_text_job` of the wasm with Multicolour settings).
     fn wire(&self, settings: &str, lines: &[OcrLine]) -> Vec<f64> {
         let colour = trace_colour_settings(settings).expect("multicolour settings");
-        trace_text_colour_job_with(
+        trace_text_colour_job_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &colour,
             lines,
+            None,
             &mut |_| {},
         )
     }
@@ -240,12 +241,13 @@ impl Host {
     /// The plain multicolour trace (Recognise text off: the host calls `trace_job`).
     fn plain_wire(&self, settings: &str) -> Vec<f64> {
         let colour = trace_colour_settings(settings).expect("multicolour settings");
-        trace_colour_job_with(
+        trace_colour_job_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &colour,
+            None,
             &mut |_| {},
         )
     }
@@ -257,13 +259,14 @@ impl Host {
             self.s
                 .set_trace_ocr_lines(self.image, lines.to_vec(), (self.width, self.height))
         );
-        let regions = trace_text_regions_with(
+        let regions = trace_text_regions_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &trace_settings(settings),
             lines,
+            None,
         );
         let (request, reply) =
             match self
@@ -342,8 +345,6 @@ impl Host {
 struct Run {
     host: Host,
     lines: Vec<OcrLine>,
-    /// The lines the fit decided, handed to the one multicolour trace.
-    decided: Vec<OcrLine>,
     wire: Vec<f64>,
     reply: String,
     before: Vec<String>,
@@ -354,7 +355,7 @@ fn run_with(model: &OcrModel, file: &str, settings: &str) -> Run {
     let mut host = Host::new(file);
     let lines = host.read(model);
     let (_, reply, wire) = host.trace_and_fit(settings, &lines);
-    let (decided, _) = host.s.trace_lines_to_trace(host.image).expect("kept lines");
+    host.s.trace_lines_to_trace(host.image).expect("kept lines");
     load_fonts(&mut host.s);
     let before = host.fingerprint();
     let outcome = host.create();
@@ -367,7 +368,6 @@ fn run_with(model: &OcrModel, file: &str, settings: &str) -> Run {
     Run {
         host,
         lines,
-        decided,
         wire,
         reply,
         before,
@@ -636,26 +636,6 @@ fn s2_c23_a_colour_only_the_text_has() {
         dist2(rgb(text.style.fill.color), green) < 40 * 40,
         "the text is green"
     );
-    // The alternative of Proposal (a): the palette of the filled picture.
-    let pass = text_pass(
-        &r.host.rgba,
-        r.host.width,
-        r.host.height,
-        curvyo_document_core::Affine::from_array(r.host.map),
-        &trace_settings(MULTI),
-        &r.decided,
-    );
-    let filled = traced(&trace_colour_job_with(
-        &pass.rgba,
-        r.host.width,
-        r.host.height,
-        r.host.map,
-        &trace_colour_settings(MULTI).unwrap(),
-        &mut |_| {},
-    ));
-    eprintln!("palette of the filled picture alone: {}", describe(&filled));
-    let alt = nearest(&candidates(&filled, false), green);
-    eprintln!("with that palette the green text would be {alt:?}");
     // No empty path in the document, no layer without outlines.
     for (c, o) in layer_outlines(&w) {
         assert!(!o.is_empty(), "layer {c:?} has outlines");

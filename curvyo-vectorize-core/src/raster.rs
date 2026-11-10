@@ -24,7 +24,7 @@ impl Raster<'_> {
 /// The luma of a pixel's stored RGB: `0.2126 R + 0.7152 G + 0.0722 B` in integers, rounded
 /// (`0058` D10, no colour management); the alpha is not part of it (`specs/0089` criterion 15).
 #[must_use]
-pub(crate) fn luma(r: u8, g: u8, b: u8) -> u8 {
+pub fn luma(r: u8, g: u8, b: u8) -> u8 {
     let weighted = 2126 * u32::from(r) + 7152 * u32::from(g) + 722 * u32::from(b);
     // invariant: the weights sum to 10 000, so the quotient is at most 255.
     u8::try_from((weighted + 5000) / 10_000).unwrap_or(u8::MAX)

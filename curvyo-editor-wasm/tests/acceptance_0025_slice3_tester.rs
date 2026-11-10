@@ -6,7 +6,7 @@
 
 use curvyo_document_core::{NodeId, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
-use curvyo_ui_core::{TRACE_WIRE_HEADER, trace_job};
+use curvyo_ui_core::TRACE_WIRE_HEADER;
 use image::ImageEncoder;
 
 mod cpu_time;
@@ -197,4 +197,23 @@ fn c55_a_100000_node_result_still_creates_paths() {
         panic!("Create paths over 100,000 nodes");
     };
     assert_eq!(nodes, 100_000);
+}
+
+/// One trace with the three bar values and every other setting at its first-use value.
+fn trace_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    threshold: u8,
+    smooth: u8,
+    specks_mm: f64,
+) -> Vec<f64> {
+    let params = curvyo_ui_core::TraceParams {
+        threshold,
+        smooth,
+        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
+        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+    };
+    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
 }

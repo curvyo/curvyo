@@ -1,7 +1,7 @@
 //! Tester cases for `specs/0089-trace-quality-and-colour` slice M at the session (criterion 29):
 //! one group with one filled compound path per colour named by its hex, the largest at the
 //! bottom, one undo step, every colour written opaque. Written from the
-//! specification; the results come from `trace_colour_job_with` over the pixels the session
+//! specification; the results come from `trace_colour_job_in` over the pixels the session
 //! itself decoded.
 
 #![allow(
@@ -14,8 +14,7 @@
 use curvyo_document_core::{NodeId, ObjectSnapshot, PathSnapshot, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
 use curvyo_ui_core::{
-    TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_with,
-    trace_job,
+    TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_in,
 };
 use image::ImageEncoder;
 
@@ -65,12 +64,13 @@ fn traced() -> (Session, NodeId, Vec<f64>) {
         specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
-    let wire = trace_colour_job_with(
+    let wire = trace_colour_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
+        None,
         &mut |_| {},
     );
     assert!(session.set_trace_preview(image, &wire));
@@ -269,4 +269,23 @@ fn c29_a_single_colour_result_still_writes_one_black_path_without_a_colour_group
     };
     assert_eq!(colours, 0);
     assert_eq!(session.trace_palette_json(), "");
+}
+
+/// One trace with the three bar values and every other setting at its first-use value.
+fn trace_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    threshold: u8,
+    smooth: u8,
+    specks_mm: f64,
+) -> Vec<f64> {
+    let params = curvyo_ui_core::TraceParams {
+        threshold,
+        smooth,
+        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
+        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+    };
+    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
 }
