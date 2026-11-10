@@ -218,11 +218,6 @@ fn every_rule_has_a_failing_fixture() {
             R::DuplicatePresetId,
         ),
         (
-            "fail_same_size.toml",
-            Preset("u-my-a4".into()),
-            R::SameSizeAs("a4".into()),
-        ),
-        (
             "fail_favourite_in_block.toml",
             File,
             R::Syntax(String::new()),
@@ -281,11 +276,9 @@ fn the_limits_of_200_formats_20_groups_and_256_kib() {
 
 #[test]
 fn errors_are_described_with_the_id_and_the_reason() {
-    let error = FormatLibrary::load(builtin(), &fixture("fail_same_size.toml")).unwrap_err();
-    assert_eq!(
-        describe_error(&error),
-        "format \"u-my-a4\": same size as \"a4\""
-    );
+    let error =
+        FormatLibrary::load(builtin(), &fixture("fail_duplicate_preset_id.toml")).unwrap_err();
+    assert_eq!(describe_error(&error), "format \"u-b5\": id is used twice");
     let newer = FormatLibrary::load(builtin(), "format = 3\n").unwrap_err();
     assert_eq!(describe_error(&newer), "made by a newer version");
 }
@@ -388,14 +381,6 @@ fn a_refused_format_changes_nothing() {
         spec("Nan", "paper", f64::NAN, 50.0, PresetUnit::Mm),
     );
     assert_eq!(e.reason, FormatReason::BadSize);
-    let e = refused(&mut lib, spec("My A4", "paper", 21.0, 29.7, PresetUnit::Cm));
-    assert_eq!(e.reason, FormatReason::SameSizeAs("A4".into()));
-    // Slides is off but its sizes are still taken (criterion 5).
-    let e = refused(
-        &mut lib,
-        spec("Wide", "paper", 1080.0, 1920.0, PresetUnit::Px),
-    );
-    assert_eq!(e.reason, FormatReason::SameSizeAs("16:9".into()));
     let e = refused(&mut lib, spec("b5", "paper", 100.0, 150.0, PresetUnit::Mm));
     assert_eq!(e.reason, FormatReason::NameInGroup("B5".into()));
     let e = refused(&mut lib, spec("X", "nowhere", 100.0, 150.0, PresetUnit::Mm));
@@ -485,13 +470,17 @@ fn editing_keeps_the_id_and_the_favourite_state() {
         &spec("Key ring", "u-laser", 30.0, 55.0, PresetUnit::Mm),
     )
     .unwrap();
-    let e = lib
-        .edit_format(
-            "u-keyring",
-            &spec("Key ring", "u-laser", 9.0, 9.0, PresetUnit::Cm),
-        )
-        .unwrap_err();
-    assert_eq!(e.reason, FormatReason::SameSizeAs("Coaster".into()));
+    // The size of another format is fine too (criterion 39).
+    lib.edit_format(
+        "u-keyring",
+        &spec("Key ring", "u-laser", 9.0, 9.0, PresetUnit::Cm),
+    )
+    .unwrap();
+    lib.edit_format(
+        "u-keyring",
+        &spec("Key ring", "u-laser", 30.0, 55.0, PresetUnit::Mm),
+    )
+    .unwrap();
     // Moving it to another group keeps the id.
     lib.edit_format(
         "u-keyring",
@@ -601,6 +590,40 @@ fn matching_ignores_groups_that_are_off() {
     assert_eq!(lib.list().matching(slide).unwrap().1.name, "16:9");
 }
 
+/// Criterion 39: a user file and the edits accept formats of one size, the
+/// first in list order is the current format, and they survive a reload.
+#[test]
+fn formats_of_one_size_are_allowed_and_survive_a_reload() {
+    let lib = library(&fixture("valid_same_size.toml"));
+    assert_eq!(ids(&lib, "paper").len(), 9);
+    let mut lib = FormatLibrary::from_builtin(builtin());
+    lib.add_format(&spec("Key ring", "paper", 90.0, 90.0, PresetUnit::Mm))
+        .unwrap();
+    lib.add_format(&spec("Coaster", "paper", 9.0, 9.0, PresetUnit::Cm))
+        .unwrap();
+    lib.add_format(&spec("My A4", "paper", 21.0, 29.7, PresetUnit::Cm))
+        .unwrap();
+    let text = lib.user_text().unwrap();
+    let again = library(&text);
+    assert_eq!(again.user_text().unwrap(), text);
+    let names = |l: &FormatLibrary| -> Vec<String> {
+        l.list()
+            .presets()
+            .filter(|(_, p)| p.user)
+            .map(|(_, p)| p.name.clone())
+            .collect()
+    };
+    assert_eq!(names(&again), ["Key ring", "Coaster", "My A4"]);
+    // The first match in list order is the current format.
+    let size = DocumentSize::from_mm(90.0, 90.0);
+    assert_eq!(again.list().matching(size).unwrap().1.name, "Key ring");
+    // A name still has to be unique within its group.
+    let e = lib
+        .add_format(&spec("coaster", "paper", 50.0, 50.0, PresetUnit::Mm))
+        .unwrap_err();
+    assert_eq!(e.reason, FormatReason::NameInGroup("Coaster".into()));
+}
+
 // ---- Part E: share the list
 
 /// Criterion 26: the export holds the maker's groups and formats and their
@@ -628,15 +651,13 @@ fn the_export_is_the_user_groups_and_their_favourites() {
 fn an_import_merges_by_id_size_and_group() {
     let mut lib = library(&fixture("valid.toml"));
     let report = lib.import(&fixture("import.toml")).unwrap();
-    assert_eq!((report.added, report.groups, report.skipped), (5, 3, 3));
+    assert_eq!((report.added, report.groups, report.skipped), (7, 3, 2));
     assert_eq!(lib.user_text().unwrap(), fixture("import.expected.toml"));
     // Built-in groups and the enabled choices are not changed.
     assert!(lib.list().groups[1].enabled);
-    // The formats keep their groups: the Letter joined Paper under a new id.
-    assert_eq!(
-        ids(&lib, "paper").last().map(String::as_str),
-        Some("u-letter")
-    );
+    // The formats keep their groups: the Letter joined Paper under a new id,
+    // and so did the A4 copy, which has a size but not the name of A4.
+    assert!(ids(&lib, "paper").ends_with(&["u-letter".to_string(), "u-a4-copy".to_string()]));
     // The same import again adds nothing.
     let again = lib.import(&fixture("import.toml")).unwrap();
     assert_eq!((again.added, again.groups), (0, 0));

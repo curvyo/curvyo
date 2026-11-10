@@ -6,12 +6,11 @@
 //! on the built-in formats and refuses every edit (criterion 6).
 
 use curvyo_document_core::{
-    FormatLibrary, FormatSpec, Orientation, PresetList, PresetUnit, describe_error,
+    FormatField, FormatLibrary, FormatSpec, GroupTarget, PresetList, PresetUnit, describe_error,
 };
 use curvyo_ui_core::{
-    FieldError, FormDraft, FormPrefill, FormatListView, add_prefill, added_notice,
-    check_format_form, edit_prefill, field_error, format_list_view, import_notice, import_refusal,
-    saved_notice,
+    FieldError, FormDraft, FormPrefill, FormatListView, add_prefill, check_format_form,
+    edit_prefill, field_error, format_list_view, import_refusal,
 };
 
 use super::Session;
@@ -23,7 +22,8 @@ pub struct FormatEdit {
     pub ok: bool,
     /// After a successful edit: the text of the user file to write.
     pub file_text: String,
-    /// The notice to show under the button that was pressed.
+    /// The notice to show under the button that was pressed: only a failure
+    /// (a file that could not be imported or written), never a success.
     pub notice: String,
     /// Why the edit was refused, field by field, in form order.
     pub errors: Vec<FieldError>,
@@ -44,18 +44,8 @@ pub struct FormTexts {
     pub group_id: String,
     /// The new group's name.
     pub new_group_name: String,
-    /// `portrait` or `landscape`.
-    pub orientation: String,
     /// "Add to quick selection".
     pub favourite: bool,
-}
-
-fn orientation_of(word: &str) -> Orientation {
-    if word == "landscape" {
-        Orientation::Landscape
-    } else {
-        Orientation::Portrait
-    }
 }
 
 impl Session {
@@ -150,12 +140,12 @@ impl Session {
         self.formats_broken.as_ref().map(|_| FormatEdit::default())
     }
 
-    fn applied(&self, notice: String) -> FormatEdit {
+    fn applied(&self) -> FormatEdit {
         match self.formats.user_text() {
             Ok(file_text) => FormatEdit {
                 ok: true,
                 file_text,
-                notice,
+                notice: String::new(),
                 errors: Vec::new(),
             },
             Err(error) => FormatEdit {
@@ -185,7 +175,6 @@ impl Session {
             unit,
             group_id: &texts.group_id,
             new_group_name: &texts.new_group_name,
-            new_group_orientation: orientation_of(&texts.orientation),
             favourite: texts.favourite,
         };
         check_format_form(&self.formats, &draft, editing).map_err(|errors| FormatEdit {
@@ -204,7 +193,7 @@ impl Session {
             Err(edit) => return edit,
         };
         match self.formats.add_format(&spec) {
-            Ok(_) => self.applied(added_notice(&spec.name)),
+            Ok(_) => self.applied(),
             Err(error) => Self::refused(&error),
         }
     }
@@ -219,7 +208,7 @@ impl Session {
             Err(edit) => return edit,
         };
         match self.formats.edit_format(id, &spec) {
-            Ok(()) => self.applied(saved_notice(&spec.name)),
+            Ok(()) => self.applied(),
             Err(error) => Self::refused(&error),
         }
     }
@@ -230,24 +219,55 @@ impl Session {
             return refusal;
         }
         match self.formats.delete_format(id) {
-            Ok(()) => self.applied(String::new()),
+            Ok(()) => self.applied(),
             Err(error) => Self::refused(&error),
         }
     }
 
-    /// A press on Save in the form of the user group `id` (criterion 24).
-    pub fn save_format_group(&mut self, id: &str, name: &str, orientation: &str) -> FormatEdit {
+    /// Enter in the rename field of the user format `id` (criterion 43): the
+    /// name changes, the id, the size, the group and the star stay.
+    pub fn rename_format(&mut self, id: &str, name: &str) -> FormatEdit {
         if let Some(refusal) = self.refuse_while_broken() {
             return refusal;
         }
-        match self
+        let Some((group, preset)) = self.formats.list().find(id) else {
+            return FormatEdit::default();
+        };
+        let spec = FormatSpec {
+            name: name.to_string(),
+            group: GroupTarget::Existing(group.id.clone()),
+            short: preset.authored.short,
+            long: preset.authored.long,
+            unit: preset.authored.unit,
+            favourite: preset.favourite,
+        };
+        match self.formats.edit_format(id, &spec) {
+            Ok(()) => self.applied(),
+            Err(error) => Self::refused(&error),
+        }
+    }
+
+    /// Enter in the rename field of the user group `id` (criterion 43): the
+    /// name changes, the opening orientation stays.
+    pub fn rename_format_group(&mut self, id: &str, name: &str) -> FormatEdit {
+        if let Some(refusal) = self.refuse_while_broken() {
+            return refusal;
+        }
+        let Some(orientation) = self
             .formats
-            .edit_group(id, name, orientation_of(orientation))
-        {
-            Ok(()) => self.applied(saved_notice(name)),
+            .list()
+            .groups
+            .iter()
+            .find(|group| group.id == id)
+            .map(|group| group.default_orientation)
+        else {
+            return FormatEdit::default();
+        };
+        match self.formats.edit_group(id, name, orientation) {
+            Ok(()) => self.applied(),
             Err(mut error) => {
-                // The group form has one field.
-                error.field = curvyo_document_core::FormatField::GroupName;
+                // The rename field is the group's name.
+                error.field = FormatField::GroupName;
                 Self::refused(&error)
             }
         }
@@ -259,7 +279,7 @@ impl Session {
             return refusal;
         }
         match self.formats.delete_group(id) {
-            Ok(()) => self.applied(String::new()),
+            Ok(()) => self.applied(),
             Err(error) => Self::refused(&error),
         }
     }
@@ -270,7 +290,7 @@ impl Session {
             return refusal;
         }
         match self.formats.set_favourite(id, on) {
-            Ok(()) => self.applied(String::new()),
+            Ok(()) => self.applied(),
             Err(error) => Self::refused(&error),
         }
     }
@@ -281,7 +301,7 @@ impl Session {
             return refusal;
         }
         match self.formats.set_group_enabled(id, on) {
-            Ok(()) => self.applied(String::new()),
+            Ok(()) => self.applied(),
             Err(error) => Self::refused(&error),
         }
     }
@@ -293,7 +313,7 @@ impl Session {
             return refusal;
         }
         match self.formats.import(text) {
-            Ok(report) => self.applied(import_notice(&report)),
+            Ok(_) => self.applied(),
             Err(error) => FormatEdit {
                 notice: import_refusal(file_name, &describe_error(&error)),
                 ..FormatEdit::default()

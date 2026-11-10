@@ -38,6 +38,13 @@ short_side = 10.0
 long_side = 10.0
 unit = "cm"
 
+[[group.preset]]
+id = "u-tag-again"
+name = "Tag"
+short_side = 20.0
+long_side = 60.0
+unit = "mm"
+
 [[group]]
 id = "paper"
 
@@ -54,6 +61,13 @@ name = "Letter"
 short_side = 8.5
 long_side = 11.0
 unit = "in"
+
+[[group.preset]]
+id = "u-a4-copy"
+name = "A4 copy"
+short_side = 210.0
+long_side = 297.0
+unit = "mm"
 
 [[group]]
 id = "u-embroidery"

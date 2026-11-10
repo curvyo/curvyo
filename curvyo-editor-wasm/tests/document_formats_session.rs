@@ -6,7 +6,6 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
-use curvyo_document_core::Orientation;
 use curvyo_editor_wasm::{DocumentSide, FormTexts, FormatEdit, Session, SizeOutcome};
 
 fn texts(name: &str, width: &str, height: &str, group: &str) -> FormTexts {
@@ -17,15 +16,13 @@ fn texts(name: &str, width: &str, height: &str, group: &str) -> FormTexts {
         unit: "mm".to_string(),
         group_id: group.to_string(),
         new_group_name: String::new(),
-        orientation: "portrait".to_string(),
         favourite: true,
     }
 }
 
-fn new_group(name: &str, orientation: &str, width: &str, height: &str, label: &str) -> FormTexts {
+fn new_group(name: &str, width: &str, height: &str, label: &str) -> FormTexts {
     FormTexts {
         new_group_name: name.to_string(),
-        orientation: orientation.to_string(),
         ..texts(label, width, height, "")
     }
 }
@@ -62,11 +59,31 @@ fn groups(session: &Session) -> Vec<String> {
         .collect()
 }
 
+/// A file with a landscape "Laser" group: the form makes portrait groups only
+/// (criterion 42), a landscape one comes from a file.
+const LASER_FILE: &str = "format = 1\n[[group]]\nid = \"u-laser\"\nname = \"Laser\"\n\
+    default_orientation = \"landscape\"\n[[group.preset]]\nid = \"u-key-ring\"\n\
+    name = \"Key ring\"\nshort_side = 30\nlong_side = 50\nunit = \"mm\"\n";
+
 fn with_laser() -> (Session, FormatEdit) {
     let mut session = Session::new(1);
-    let edit = session.add_format(&new_group("Laser", "landscape", "30", "50", "Key ring"));
+    session.load_formats(LASER_FILE).unwrap();
+    let edit = session.set_format_favourite("u-key-ring", true);
     assert!(edit.ok, "{edit:?}");
     (session, edit)
+}
+
+/// Criterion 42: a group made from the form opens portrait and its add
+/// writes no notice.
+#[test]
+fn a_new_group_from_the_form_is_portrait_and_a_success_has_no_notice() {
+    let mut session = Session::new(1);
+    let edit = session.add_format(&new_group("Hoops", "130", "130", "Hoop"));
+    assert!(edit.ok && edit.notice.is_empty(), "{edit:?}");
+    assert!(
+        edit.file_text
+            .contains("default_orientation = \"portrait\"")
+    );
 }
 
 /// Criteria 8 and 11: the defaults show the Paper strip only, and a slide size
@@ -118,7 +135,6 @@ fn stars_and_switches_change_the_quick_selection_and_write_the_file() {
 #[test]
 fn an_added_format_is_a_strip_and_a_press_resizes_the_document() {
     let (mut session, edit) = with_laser();
-    assert_eq!(edit.notice, "Added Key ring.");
     assert!(edit.file_text.contains("u-key-ring"), "{}", edit.file_text);
     assert_eq!(size_mm(&session), (210.0, 297.0), "an add never resizes");
     assert_eq!(groups(&session), ["Paper", "Laser"]);
@@ -142,9 +158,10 @@ fn a_refused_add_changes_nothing_and_names_the_fields() {
     assert!(!bad.ok && bad.file_text.is_empty());
     let fields: Vec<_> = bad.errors.iter().map(|e| e.field.name()).collect();
     assert_eq!(fields, ["name", "width"]);
-    let same = session.add_format(&texts("My A4", "210", "297", "paper"));
-    assert_eq!(same.errors[0].message, "Same size as A4");
     assert_eq!(session.format_list(), before);
+    // Criterion 39: the size of A4 is not a reason to refuse.
+    let same = session.add_format(&texts("My A4", "210", "297", "paper"));
+    assert!(same.ok, "{same:?}");
 }
 
 /// Criteria 21, 22 and 24: edit, delete and the group forms.
@@ -153,7 +170,7 @@ fn edit_delete_and_rename() {
     let (mut session, _) = with_laser();
     let saved = session.save_format("u-key-ring", &texts("Key ring", "30", "55", "u-laser"));
     assert!(saved.ok, "{saved:?}");
-    assert_eq!(saved.notice, "Saved Key ring.");
+    assert_eq!(saved.notice, "");
     assert_eq!(
         session.apply_document_preset("u-key-ring"),
         SizeOutcome::Committed
@@ -164,10 +181,10 @@ fn edit_delete_and_rename() {
         (prefill.width.as_str(), prefill.height.as_str()),
         ("55", "30")
     );
-    let renamed = session.save_format_group("u-laser", "Laser cut", "portrait");
+    let renamed = session.rename_format_group("u-laser", "Laser cut");
     assert!(renamed.ok);
     assert_eq!(groups(&session), ["Paper", "Laser cut"]);
-    let clash = session.save_format_group("u-laser", "paper", "portrait");
+    let clash = session.rename_format_group("u-laser", "paper");
     assert_eq!(clash.errors[0].field.name(), "group-name");
     // Editing never changes the document, even when it has that size.
     assert_eq!(size_mm(&session), (55.0, 30.0));
@@ -230,13 +247,11 @@ fn export_and_import_round_trip() {
     let mut other = Session::new(2);
     let imported = other.import_formats(&exported, "curvyo-formats.toml");
     assert!(imported.ok);
-    assert_eq!(imported.notice, "Imported 1 format in 1 group.");
+    assert_eq!(imported.notice, "", "no notice after a success");
     assert_eq!(groups(&other), ["Paper", "Laser"]);
     let again = other.import_formats(&exported, "curvyo-formats.toml");
-    assert_eq!(
-        again.notice,
-        "Nothing new to import. Skipped 1 that was already there."
-    );
+    assert!(again.ok && again.notice.is_empty());
+    assert_eq!(other.export_formats().as_deref(), Some(exported.as_str()));
     let bad = other.import_formats("format = 7\n", "new.toml");
     assert!(!bad.ok);
     assert_eq!(
@@ -253,9 +268,19 @@ fn the_text_the_host_stores_loads_into_a_new_session() {
     let mut fresh = Session::new(3);
     fresh.load_formats(&edit.file_text).unwrap();
     assert_eq!(groups(&fresh), ["Paper", "Laser"]);
-    let orientation = fresh.format_list().groups[1].orientation;
-    assert_eq!(orientation, "landscape");
-    let _ = Orientation::Landscape;
+    assert_eq!(
+        size_after_pick(&mut fresh),
+        (50.0, 30.0),
+        "Laser opens landscape"
+    );
+}
+
+fn size_after_pick(session: &mut Session) -> (f64, f64) {
+    assert_eq!(
+        session.apply_document_preset("u-key-ring"),
+        SizeOutcome::Committed
+    );
+    size_mm(session)
 }
 
 /// An empty or blank file means no formats of the maker's, not a broken file.

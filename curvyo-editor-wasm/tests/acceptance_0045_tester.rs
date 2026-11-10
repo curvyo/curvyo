@@ -109,15 +109,13 @@ fn form(name: &str, w: &str, h: &str, unit: &str, group_id: &str) -> FormTexts {
         unit: unit.to_string(),
         group_id: group_id.to_string(),
         new_group_name: String::new(),
-        orientation: "portrait".to_string(),
         favourite: true,
     }
 }
 
-fn form_new_group(name: &str, w: &str, h: &str, group: &str, orientation: &str) -> FormTexts {
+fn form_new_group(name: &str, w: &str, h: &str, group: &str) -> FormTexts {
     FormTexts {
         new_group_name: group.to_string(),
-        orientation: orientation.to_string(),
         ..form(name, w, h, "mm", "")
     }
 }
@@ -274,15 +272,10 @@ fn c10_a_pick_and_the_typed_size_end_in_the_same_state() {
 
 #[test]
 fn c10_c14_a_pick_of_a_user_format_follows_the_group_orientation_rule() {
+    // A landscape group can only come from a file now (criterion 42).
     let mut s = Session::new(1);
-    let e = s.add_format(&form_new_group(
-        "Key ring",
-        "30",
-        "50",
-        "Laser",
-        "landscape",
-    ));
-    assert!(e.ok, "{e:?}");
+    s.load_formats(LANDSCAPE_LASER).unwrap();
+    assert!(s.set_format_favourite("u-key-ring", true).ok);
     let id = list(&s)
         .groups
         .iter()
@@ -422,7 +415,7 @@ fn c18_the_add_form_opens_prefilled_with_the_document_size_in_the_display_unit()
     assert_eq!(s.display_unit(), DisplayUnit::Mm);
 
     let mut s = Session::new(1);
-    s.add_format(&form_new_group("Ring", "30", "50", "Laser", "landscape"));
+    s.add_format(&form_new_group("Ring", "30", "50", "Laser"));
     let p = s.format_prefill("", "");
     assert_eq!(p.group_id, "u-laser", "else the first user group");
     let p = s.format_prefill("", "paper");
@@ -451,7 +444,7 @@ fn c20_a_valid_form_creates_the_format_writes_text_and_leaves_the_document_alone
     let before_size = size(&s);
     let e = s.add_format(&form("Key ring", "30", "50", "mm", "paper"));
     assert!(e.ok, "{e:?}");
-    assert_eq!(e.notice, "Added Key ring.");
+    assert_eq!(e.notice, "", "no notice after a success");
     assert!(e.errors.is_empty());
     assert!(!e.file_text.is_empty());
     assert_eq!(changes(&s), before_changes, "the document is not changed");
@@ -461,7 +454,8 @@ fn c20_a_valid_form_creates_the_format_writes_text_and_leaves_the_document_alone
     assert!(r.can_edit && r.favourite);
     assert_eq!(r.edit_name, "Edit Key ring");
     assert_eq!(r.delete_name, "Delete Key ring");
-    assert_eq!(r.delete_prompt, "Delete Key ring?");
+    assert_eq!(r.armed_name, "Press again to delete Key ring.");
+    assert_eq!(r.rename_name, "Name of Key ring");
     assert!(list(&s).can_export);
     // In the quick selection because the star was on.
     assert!(entries(&s, "Paper").iter().any(|e| e.0 == "Key ring"));
@@ -525,9 +519,11 @@ fn c20_every_message_of_the_spec() {
         inch[0].1.ends_with(" in") && !inch[0].1.contains("100000"),
         "{inch:?}"
     );
-    assert_eq!(
-        msgs(&mut s, form("X", "21", "29.7", "cm", "paper"))[0].1,
-        "Same size as A4"
+    // Criterion 39: the size of A4 is not refused.
+    assert!(
+        Session::new(1)
+            .add_format(&form("X", "21", "29.7", "cm", "paper"))
+            .ok
     );
     // All invalid fields are reported in form order.
     let all = msgs(&mut s, form("", "x", "y", "mm", "paper"));
@@ -543,11 +539,11 @@ fn c20_every_message_of_the_spec() {
         (FormField::Name, "This group already has Ring".to_string())
     );
     // New group: the name is required and unique.
-    let e = s.add_format(&form_new_group("X", "40", "60", "", "portrait"));
+    let e = s.add_format(&form_new_group("X", "40", "60", ""));
     assert!(!e.ok);
     assert_eq!(e.errors[0].field, FormField::GroupName);
     assert_eq!(e.errors[0].message, "Enter a name of 1 to 24 characters");
-    let e = s.add_format(&form_new_group("X", "40", "60", "PAPER", "portrait"));
+    let e = s.add_format(&form_new_group("X", "40", "60", "PAPER"));
     assert!(!e.ok);
     assert_eq!(e.errors[0].field, FormField::GroupName);
 }
@@ -650,11 +646,7 @@ fn c21_edit_keeps_id_and_star_and_never_touches_the_document() {
     s.set_format_favourite("u-ring", false);
     let e = s.save_format("u-ring", &form("Ring 2", "35", "55", "mm", "paper"));
     assert!(e.ok, "{e:?}");
-    assert!(
-        e.notice == "Saved Ring 2." || e.notice.contains("Ring 2"),
-        "{}",
-        e.notice
-    );
+    assert_eq!(e.notice, "", "no notice after a success");
     assert!(!row(&list(&s), "u-ring").favourite, "star kept");
     assert_eq!(row(&list(&s), "u-ring").name, "Ring 2");
     assert_eq!(changes(&s), doc_changes, "the document is untouched");
@@ -666,10 +658,9 @@ fn c21_edit_keeps_id_and_star_and_never_touches_the_document() {
     // The old size is not a duplicate of itself.
     let e = s.save_format("u-ring", &form("Ring 2", "35", "55", "mm", "paper"));
     assert!(e.ok, "{e:?}");
-    // But another format's size is.
+    // Another format's size is fine (criterion 39).
     let e = s.save_format("u-ring", &form("Ring 2", "210", "297", "mm", "paper"));
-    assert!(!e.ok);
-    assert_eq!(e.errors[0].message, "Same size as A4");
+    assert!(e.ok, "{e:?}");
     assert!(
         !s.save_format("a4", &form("A4", "211", "297", "mm", "paper"))
             .ok
@@ -695,14 +686,16 @@ fn c22_delete_removes_the_format_and_leaves_the_document_alone() {
 #[test]
 fn c22_delete_group_prompt_counts_the_formats_and_removes_them() {
     let mut s = Session::new(1);
-    s.add_format(&form_new_group("Ring", "30", "50", "Laser", "landscape"));
+    s.add_format(&form_new_group("Ring", "30", "50", "Laser"));
     s.add_format(&form("Plate", "31", "51", "mm", "u-laser"));
     let g = group(&list(&s), "u-laser").clone();
     assert!(g.can_edit);
-    assert_eq!(g.delete_prompt, "Delete group Laser and its 2 formats?");
-    assert_eq!(g.edit_name, "Edit group Laser");
+    assert_eq!(
+        g.armed_name,
+        "Press again to delete group Laser. Its 2 formats go too."
+    );
+    assert_eq!(g.rename_name, "Name of group Laser");
     assert_eq!(g.show_name, "Show group Laser");
-    assert_eq!(g.orientation, "landscape");
     let e = s.delete_format_group("u-laser");
     assert!(e.ok, "{e:?}");
     assert!(list(&s).groups.iter().all(|g| g.id != "u-laser"));
@@ -711,31 +704,73 @@ fn c22_delete_group_prompt_counts_the_formats_and_removes_them() {
 }
 
 #[test]
-fn c24_group_edit_renames_and_sets_orientation_with_validation() {
+fn c24_c43_group_rename_keeps_the_orientation_and_validates() {
     let mut s = Session::new(1);
-    s.add_format(&form_new_group("Ring", "30", "50", "Laser", "landscape"));
-    s.add_format(&form_new_group(
-        "Hoop",
-        "130",
-        "131",
-        "Embroidery",
-        "portrait",
-    ));
-    let e = s.save_format_group("u-laser", "Laser cut", "portrait");
+    s.load_formats(LANDSCAPE_LASER).unwrap();
+    s.add_format(&form_new_group("Hoop", "130", "131", "Embroidery"));
+    let e = s.rename_format_group("u-laser", "Laser cut");
     assert!(e.ok, "{e:?}");
-    let v = list(&s);
-    let g = group(&v, "u-laser");
-    assert_eq!((g.name.as_str(), g.orientation), ("Laser cut", "portrait"));
-    let e = s.save_format_group("u-laser", "embroidery", "portrait");
+    assert_eq!(e.notice, "", "no notice after a success");
+    assert!(e.file_text.contains("default_orientation = \"landscape\""));
+    assert_eq!(group(&list(&s), "u-laser").name, "Laser cut");
+    // A group made from the form opens portrait (criterion 42).
+    assert!(
+        e.file_text
+            .contains("name = \"Embroidery\"\ndefault_orientation = \"portrait\"")
+    );
+    let e = s.rename_format_group("u-laser", "embroidery");
     assert!(!e.ok);
     assert_eq!(e.errors[0].field, FormField::GroupName);
-    let e = s.save_format_group("u-laser", "", "portrait");
+    let e = s.rename_format_group("u-laser", "");
     assert!(!e.ok);
     assert_eq!(e.errors[0].message, "Enter a name of 1 to 24 characters");
-    assert!(!s.save_format_group("paper", "Papier", "portrait").ok);
+    assert!(!s.rename_format_group("paper", "Papier").ok);
+}
+
+#[test]
+fn c43_format_rename_keeps_id_star_size_and_group_and_validates() {
+    let mut s = Session::new(1);
+    s.load_formats(LANDSCAPE_LASER).unwrap();
+    s.add_format(&form("Tag", "20", "60", "mm", "u-laser"));
+    s.set_format_favourite("u-key-ring", false);
+    let e = s.rename_format("u-key-ring", "Keyring");
+    assert!(e.ok, "{e:?}");
+    assert_eq!(e.notice, "");
+    let v = list(&s);
+    let r = row(&v, "u-key-ring");
+    assert_eq!(
+        (r.name.as_str(), r.size_text.as_str()),
+        ("Keyring", "50 \u{d7} 30 mm")
+    );
+    assert!(!r.favourite, "the star is kept");
+    assert!(e.file_text.contains("name = \"Keyring\""));
+    // A name the group has is refused with its chip; nothing is written.
+    let e = s.rename_format("u-key-ring", "tag");
+    assert!(!e.ok && e.file_text.is_empty());
+    assert_eq!(
+        (e.errors[0].field, e.errors[0].message.as_str()),
+        (FormField::Name, "This group already has Tag")
+    );
+    let e = s.rename_format("u-key-ring", "");
+    assert_eq!(e.errors[0].message, "Enter a name of 1 to 24 characters");
+    assert!(!s.rename_format("a4", "A 4").ok, "built-ins do not rename");
 }
 
 // ---------------------------------------------------------------- Part E: import / export
+
+const LANDSCAPE_LASER: &str = r#"
+format = 1
+[[group]]
+id = "u-laser"
+name = "Laser"
+default_orientation = "landscape"
+  [[group.preset]]
+  id = "u-key-ring"
+  name = "Key ring"
+  short_side = 30
+  long_side = 50
+  unit = "mm"
+"#;
 
 const SHARE: &str = r#"
 format = 1
@@ -777,26 +812,21 @@ default_orientation = "landscape"
 "#;
 
 #[test]
-fn c25_c27_import_notices_the_spec_wording() {
+fn c25_c27_a_successful_import_has_no_notice_and_skips_what_the_group_has() {
     let mut s = Session::new(1);
     let e = s.import_formats(SHARE, "share.toml");
     assert!(e.ok, "{e:?}");
-    assert_eq!(
-        e.notice,
-        "Imported 3 formats in 2 groups. Skipped 1 that was already there."
-    );
+    assert_eq!(e.notice, "", "no notice after a success");
     assert!(!e.file_text.is_empty());
     let v = list(&s);
     assert!(v.can_export);
     assert!(row(&v, "u-a").favourite && row(&v, "u-c").favourite);
-    // Importing again: nothing new.
+    // Criterion 39: Ddd has the size of A4 and is added all the same.
+    assert_eq!(row(&v, "u-d").name, "Ddd");
+    // Importing again adds nothing.
     let e = s.import_formats(SHARE, "share.toml");
     assert!(e.ok);
-    assert!(
-        e.notice.starts_with("Nothing new to import."),
-        "{}",
-        e.notice
-    );
+    assert_eq!(list(&s), v);
 }
 
 #[test]
@@ -835,8 +865,9 @@ fn c26_export_is_none_without_user_formats_and_round_trips() {
     let e = t.import_formats(&out, "curvyo-formats.toml");
     assert!(e.ok, "{e:?}");
     assert_eq!(
-        e.notice, "Imported 3 formats in 2 groups.",
-        "same content, nothing skipped"
+        t.export_formats(),
+        Some(out),
+        "the same content came across"
     );
 }
 
@@ -871,7 +902,7 @@ fn c6_a_broken_file_keeps_built_ins_refuses_every_edit_and_hides_every_write_con
     assert!(!s.delete_format("a4").ok);
     assert!(!s.set_format_favourite("a4", false).ok);
     assert!(!s.set_format_group_enabled("slides", true).ok);
-    assert!(!s.save_format_group("paper", "X", "portrait").ok);
+    assert!(!s.rename_format_group("paper", "X").ok);
     assert!(!s.delete_format_group("paper").ok);
     assert!(!s.import_formats(SHARE, "share.toml").ok);
     for e in [
@@ -1070,8 +1101,6 @@ fn model_random_form_input_never_panics_and_refusals_change_nothing() {
                     gids[rng.below(gids.len() as u64) as usize].clone()
                 },
                 new_group_name: scrap(&mut rng),
-                orientation: ["portrait", "landscape", "diagonal", ""][rng.below(4) as usize]
-                    .to_string(),
                 favourite: rng.below(2) == 0,
             };
             let edit: FormatEdit = match rng.below(9) {
@@ -1086,10 +1115,9 @@ fn model_random_form_input_never_panics_and_refusals_change_nothing() {
                     &gids[rng.below(gids.len() as u64) as usize],
                     rng.below(2) == 0,
                 ),
-                7 => s.save_format_group(
+                7 => s.rename_format_group(
                     &gids[rng.below(gids.len() as u64) as usize],
                     &scrap(&mut rng),
-                    "portrait",
                 ),
                 _ => s.delete_format_group(&gids[rng.below(gids.len() as u64) as usize]),
             };

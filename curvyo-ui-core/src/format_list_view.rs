@@ -1,5 +1,5 @@
 //! The "All formats" list of the Document tab (`specs/0045-document-formats-
-//! library/` criteria 13 and 17): every group of the library with its formats,
+//! library/` criteria 13, 17 and 35 to 37): every group of the library with its formats,
 //! the counts, which buttons exist and the accessible names. A pure function of
 //! the library and the document, so the DOM holds no format and no rule.
 
@@ -34,14 +34,17 @@ pub struct FormatRowView {
     pub can_star: bool,
     /// The document has this format's size: the selected row look.
     pub selected: bool,
-    /// Edit and Delete exist: a format of the maker's, with a writable library.
+    /// Edit, the armed trash and the rename exist: a format of the maker's,
+    /// with a writable library.
     pub can_edit: bool,
     /// "Edit Key ring".
     pub edit_name: String,
     /// "Delete Key ring".
     pub delete_name: String,
-    /// "Delete Key ring?".
-    pub delete_prompt: String,
+    /// "Press again to delete Key ring.": the trash's name while it is armed.
+    pub armed_name: String,
+    /// "Name of Key ring": the rename field's name.
+    pub rename_name: String,
 }
 
 /// One group with its header.
@@ -62,16 +65,16 @@ pub struct FormatGroupView {
     pub show_name: String,
     /// The fold button's name: "Fold group Paper".
     pub fold_name: String,
-    /// Edit and Delete exist: a group of the maker's, with a writable library.
+    /// The armed trash and the rename exist: a group of the maker's, with a
+    /// writable library.
     pub can_edit: bool,
-    /// "Edit group Laser".
-    pub edit_name: String,
     /// "Delete group Laser".
     pub delete_name: String,
-    /// "Delete group Laser and its 2 formats?".
-    pub delete_prompt: String,
-    /// "portrait" or "landscape": the group's `Opens as`, for its edit form.
-    pub orientation: &'static str,
+    /// "Press again to delete group Laser. Its 2 formats go too.": the
+    /// trash's name while it is armed.
+    pub armed_name: String,
+    /// "Name of group Laser": the rename field's name.
+    pub rename_name: String,
     /// The formats; none for a group that is off.
     pub rows: Vec<FormatRowView>,
 }
@@ -142,17 +145,19 @@ fn group_view(
         show_name: format!("Show group {}", group.name),
         fold_name: format!("Fold group {}", group.name),
         can_edit: writable && group.user,
-        edit_name: format!("Edit group {}", group.name),
         delete_name: format!("Delete group {}", group.name),
-        delete_prompt: format!(
-            "Delete group {} and its {count} {}?",
-            group.name,
-            if count == 1 { "format" } else { "formats" }
-        ),
-        orientation: match group.default_orientation {
-            Orientation::Portrait => "portrait",
-            Orientation::Landscape => "landscape",
+        armed_name: match count {
+            0 => format!("Press again to delete group {}.", group.name),
+            1 => format!(
+                "Press again to delete group {}. Its 1 format goes too.",
+                group.name
+            ),
+            _ => format!(
+                "Press again to delete group {}. Its {count} formats go too.",
+                group.name
+            ),
         },
+        rename_name: format!("Name of group {}", group.name),
         rows: if group.enabled {
             group
                 .presets
@@ -193,7 +198,8 @@ fn row_view(
         can_edit: writable && preset.user,
         edit_name: format!("Edit {}", preset.name),
         delete_name: format!("Delete {}", preset.name),
-        delete_prompt: format!("Delete {}?", preset.name),
+        armed_name: format!("Press again to delete {}.", preset.name),
+        rename_name: format!("Name of {}", preset.name),
         size_text,
     }
 }
@@ -295,13 +301,81 @@ mod tests {
         let view = format_list_view(library.list(), mm(210.0, 297.0), DisplayUnit::Mm, true);
         let laser = &view.groups[2];
         assert!(laser.can_edit && view.can_export && view.can_add);
-        assert_eq!(laser.delete_prompt, "Delete group Laser and its 1 format?");
-        assert_eq!(laser.rows[0].delete_prompt, "Delete Key ring?");
+        assert_eq!(
+            laser.armed_name,
+            "Press again to delete group Laser. Its 1 format goes too."
+        );
+        assert_eq!(laser.rename_name, "Name of group Laser");
+        assert_eq!(laser.rows[0].delete_name, "Delete Key ring");
+        assert_eq!(laser.rows[0].armed_name, "Press again to delete Key ring.");
+        assert_eq!(laser.rows[0].rename_name, "Name of Key ring");
         assert_eq!(laser.rows[0].size_text, "50 \u{d7} 30 mm");
         assert!(laser.rows[0].can_edit);
         let broken = format_list_view(library.list(), mm(210.0, 297.0), DisplayUnit::Mm, false);
         let laser = &broken.groups[2];
         assert!(!laser.can_edit && !laser.can_toggle && !laser.rows[0].can_edit);
         assert!(!laser.rows[0].can_star && !broken.can_add && !broken.can_export);
+    }
+
+    /// Criterion 39: with two formats of the size of the document only the
+    /// first in list order has the selected look.
+    #[test]
+    fn only_the_first_of_two_formats_of_one_size_is_selected() {
+        let mut library = shipped();
+        let spec = |name: &str| FormatSpec {
+            name: name.into(),
+            group: GroupTarget::Existing("paper".into()),
+            short: 21.0,
+            long: 29.7,
+            unit: PresetUnit::Cm,
+            favourite: false,
+        };
+        library.add_format(&spec("My A4")).unwrap();
+        let view = format_list_view(library.list(), mm(210.0, 297.0), DisplayUnit::Mm, true);
+        let selected: Vec<_> = view.groups[0]
+            .rows
+            .iter()
+            .filter(|row| row.selected)
+            .map(|row| row.name.as_str())
+            .collect();
+        assert_eq!(selected, ["A4"]);
+    }
+
+    /// Criterion 37: the armed name of a group counts its formats.
+    #[test]
+    fn the_armed_name_of_a_group_counts_its_formats() {
+        let mut library = shipped();
+        for (name, group) in [("One", "Laser"), ("Two", "Laser"), ("Three", "Laser")] {
+            library
+                .add_format(&FormatSpec {
+                    name: name.into(),
+                    group: if name == "One" {
+                        GroupTarget::New {
+                            name: group.into(),
+                            orientation: Orientation::Portrait,
+                        }
+                    } else {
+                        GroupTarget::Existing("u-laser".into())
+                    },
+                    short: 10.0 + f64::from(u8::try_from(name.len()).unwrap()),
+                    long: 90.0,
+                    unit: PresetUnit::Mm,
+                    favourite: false,
+                })
+                .unwrap();
+        }
+        let view = format_list_view(library.list(), mm(210.0, 297.0), DisplayUnit::Mm, true);
+        assert_eq!(
+            view.groups[2].armed_name,
+            "Press again to delete group Laser. Its 3 formats go too."
+        );
+        library.delete_format("u-one").unwrap();
+        library.delete_format("u-two").unwrap();
+        library.delete_format("u-three").unwrap();
+        let view = format_list_view(library.list(), mm(210.0, 297.0), DisplayUnit::Mm, true);
+        assert_eq!(
+            view.groups[2].armed_name,
+            "Press again to delete group Laser."
+        );
     }
 }

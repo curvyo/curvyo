@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::document_presets::{
     DocumentPreset, PresetError, PresetGroup, PresetList, PresetReason, PresetSubject, RawPreset,
-    checked_name, id_is_valid, same_sides, validate_preset,
+    checked_name, id_is_valid, validate_preset,
 };
 use crate::preset_units::{AuthoredSize, Orientation, PresetUnit};
 use crate::units::Length;
@@ -318,18 +318,14 @@ fn orientation_of(value: &str, subject: &PresetSubject) -> Result<Orientation, P
     }
 }
 
-/// Criterion 4c and 5: the group's formats have ids and sizes that no earlier
-/// format of the library has, and none of them twice.
+/// Criterion 4c and 39: the group's formats have ids that no earlier format of
+/// the library has, and none of them twice. Sizes may repeat.
 fn check_group_formats(group: &UserGroup, known: &[DocumentPreset]) -> Result<(), PresetError> {
     let mut seen: Vec<&DocumentPreset> = known.iter().collect();
     for preset in &group.presets {
         let subject = PresetSubject::Preset(preset.id.clone());
         if seen.iter().any(|other| other.id == preset.id) {
             return Err(fail(subject, PresetReason::DuplicatePresetId));
-        }
-        let (short, long) = (preset.short_side.as_mm(), preset.long_side.as_mm());
-        if let Some(alike) = seen.iter().find(|other| same_sides(other, short, long)) {
-            return Err(fail(subject, PresetReason::SameSizeAs(alike.id.clone())));
         }
         seen.push(preset);
     }
