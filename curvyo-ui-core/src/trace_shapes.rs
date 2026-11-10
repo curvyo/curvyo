@@ -2,13 +2,11 @@
 //! primitives within the picture-relative tolerance, written as a section of the worker's numbers
 //! after the text section and read back.
 
-use curvyo_document_core::{
-    Angle, CornerRadii, Curve, EllipseFrame, InnerRatio, Length, LineJoin, Point, PointCount,
-    RectBounds, Shape, StarFrame, drawing_outline_of_rotated,
-};
-use kurbo::BezPath;
+use std::ops::RangeInclusive;
 
-use crate::svg_import_match::outline_path;
+use curvyo_vectorize_core::{Angle, Mm};
+use kurbo::{BezPath, Point};
+
 use crate::trace_shape_band::{band_of, stroked_area};
 use crate::trace_shape_fit::{Fitted, fit_outline};
 use crate::trace_shape_hole_band::{BAND_AREA_SHARE, band_from_hole, touching_bands};
@@ -30,38 +28,106 @@ pub(crate) const SHAPE_TOLERANCE_SHARE: f64 = 0.01;
 /// Numbers per outline in the section: the kind and six parameters.
 const SHAPE_NUMBERS: usize = 7;
 
+/// A primitive the shape pass recognised, as the wire carries it: plain numbers in millimetres.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Primitive {
+    /// A rectangle with one corner radius, before its rotation.
+    Rect {
+        /// Its top-left corner before the rotation.
+        origin: Point,
+        /// Its width.
+        width: Mm,
+        /// Its height.
+        height: Mm,
+        /// The radius of all four corners.
+        corner_radius: Mm,
+    },
+    /// An ellipse (a circle when the radii are equal), before its rotation.
+    Ellipse {
+        /// Its centre.
+        centre: Point,
+        /// The radius along its x axis.
+        rx: Mm,
+        /// The radius along its y axis.
+        ry: Mm,
+    },
+    /// A regular polygon.
+    Polygon {
+        /// Its centre.
+        centre: Point,
+        /// The distance of a corner from the centre.
+        radius: Mm,
+        /// Where the first corner points, from the x axis.
+        angle: Angle,
+        /// The corners, in [`POINTS`].
+        points: u32,
+    },
+    /// A star.
+    Star {
+        /// Its centre.
+        centre: Point,
+        /// The distance of a tip from the centre.
+        radius: Mm,
+        /// Where the first tip points, from the x axis.
+        angle: Angle,
+        /// The tips, in [`POINTS`].
+        points: u32,
+        /// The valley radius over the tip radius, in the open interval (0, 1).
+        inner_ratio: f64,
+    },
+}
+
+/// The corners of a polygon and the tips of a star (the document's `PointCount`, tested).
+pub const POINTS: RangeInclusive<u32> = 3..=1024;
+
+/// The inner ratio of a star when it lies in the open interval (0, 1).
+pub(crate) fn valid_ratio(ratio: f64) -> Option<f64> {
+    (ratio.is_finite() && ratio > 0.0 && ratio < 1.0).then_some(ratio)
+}
+
+/// How the corners of a stroke are joined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Join {
+    /// Pointed to the miter limit.
+    Miter,
+    /// Rounded.
+    Round,
+    /// Cut off.
+    Bevel,
+}
+
 /// One recognised region of a trace result: its outer outline and its holes (indices into the
 /// result's outlines, outer first) and each one's primitive, `None` for a hole that stays a path.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TraceShapeRegion {
+pub struct ShapeRegion {
     /// The outer outline, then its holes, as indices into the outlines.
     pub outlines: Vec<usize>,
     /// The primitive of each, with its rotation; the outer's is there unless the region is
     /// bands (a bevelled stroke's or touching strokes' outer outline is no primitive).
-    pub shapes: Vec<Option<(Shape, Angle)>>,
+    pub shapes: Vec<Option<(Primitive, Angle)>>,
     /// A band of constant width (one hole, outer and hole parallel offsets of one primitive,
     /// `specs/0088` Part B criterion 16): the centre-line primitive and the stroke width it is
     /// written as; `None` for a filled region.
-    pub band: Option<TraceBand>,
+    pub band: Option<Band>,
     /// Touching bands whose outer outlines the trace merged into the region's one (`adrs.md`
     /// decision 22): one stroked primitive per hole; empty otherwise.
-    pub bands: Vec<TraceBand>,
+    pub bands: Vec<Band>,
 }
 
 /// The centre-line primitive of a band and its stroke width.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct TraceBand {
+pub struct Band {
     /// The primitive at the band's centre line.
-    pub shape: Shape,
+    pub primitive: Primitive,
     /// Its rotation about its frame's centre.
     pub rotation: Angle,
     /// The band's width: the stroke width.
-    pub width: Length,
+    pub width: Mm,
     /// The join the traced corners show (`adrs.md` decision 22): mitred or bevelled.
-    pub join: LineJoin,
+    pub join: Join,
 }
 
-impl TraceShapeRegion {
+impl ShapeRegion {
     /// How many primitives it is written as: one per band, else one per recognised outline.
     #[must_use]
     pub fn primitives(&self) -> usize {
@@ -85,11 +151,7 @@ pub(crate) fn tolerance(area: f64, pixel_mm: f64) -> f64 {
 /// A region is an outer outline and the holes inside it; the outer decides: one that matches no
 /// primitive leaves its region as paths (`adrs.md` Part B, the hole rule).
 #[must_use]
-pub fn recognise_shapes(
-    outlines: &[BezPath],
-    layers: &[usize],
-    pixel_mm: f64,
-) -> Vec<TraceShapeRegion> {
+pub fn recognise_shapes(outlines: &[BezPath], layers: &[usize], pixel_mm: f64) -> Vec<ShapeRegion> {
     let all = [outlines.len()];
     let layers = if layers.is_empty() { &all[..] } else { layers };
     let mut regions = Vec::new();
@@ -107,7 +169,7 @@ fn recognise_layer(
     outlines: &[BezPath],
     first: usize,
     pixel_mm: f64,
-    regions: &mut Vec<TraceShapeRegion>,
+    regions: &mut Vec<ShapeRegion>,
 ) {
     let sampled: Vec<Option<Sampled>> = outlines
         .iter()
@@ -145,7 +207,7 @@ fn recognise_layer(
         if shape.is_none() && holes.is_empty() {
             continue;
         }
-        let mut region = TraceShapeRegion {
+        let mut region = ShapeRegion {
             outlines: vec![first + k],
             shapes: vec![shape],
             band: None,
@@ -185,15 +247,15 @@ fn recognise_layer(
 /// The band between the traced `outer` and its one `hole`, recognised as `o` and `i`: their
 /// centre-line primitive when they are parallel offsets of one, and the stroked area it covers is
 /// the traced band's within [`BAND_AREA_SHARE`] (the area guard of decision 16 for the stroke).
-fn band(outer: &Sampled, hole: &Sampled, o: &Fitted, i: &Fitted, tol: f64) -> Option<TraceBand> {
+fn band(outer: &Sampled, hole: &Sampled, o: &Fitted, i: &Fitted, tol: f64) -> Option<Band> {
     let traced = outer.area() - hole.area();
-    let ((shape, rotation), width) = band_of(o, i, traced, tol)?;
-    let stroked = stroked_area(&shape, width);
-    ((stroked - traced).abs() <= BAND_AREA_SHARE * traced).then_some(TraceBand {
-        shape,
+    let ((primitive, rotation), width) = band_of(o, i, traced, tol)?;
+    let stroked = stroked_area(&primitive, width);
+    ((stroked - traced).abs() <= BAND_AREA_SHARE * traced).then_some(Band {
+        primitive,
         rotation,
-        width: Length::from_mm(width),
-        join: LineJoin::Miter,
+        width: Mm::from_mm(width),
+        join: Join::Miter,
     })
 }
 
@@ -226,71 +288,8 @@ fn parent_of(
     best.map(|(k, _)| k)
 }
 
-/// The outline a primitive draws, as a path.
-#[must_use]
-pub(crate) fn primitive_path(shape: &Shape, rotation: Angle) -> BezPath {
-    outline_path(&drawing_outline_of_rotated(shape, rotation))
-}
-
-/// [`primitive_path`] wound as `traced` is, so a hole stays a hole under the nonzero fill of a
-/// compound path (`specs/0088` Part B: a primitive's outline always winds one way).
-#[must_use]
-pub(crate) fn primitive_path_like(shape: &Shape, rotation: Angle, traced: &BezPath) -> BezPath {
-    let path = primitive_path(shape, rotation);
-    if kurbo::Shape::area(&path) * kurbo::Shape::area(traced) < 0.0 {
-        path.reverse_subpaths()
-    } else {
-        path
-    }
-}
-
-/// `outlines` with each recognised outline of `regions` replaced by its primitive's, wound as the
-/// traced one, and the regions kept. A region whose fill would change by more than its outlines'
-/// own accepted area changes (a hole that no longer cuts, for any reason) keeps its traced paths
-/// and is dropped: a hole is never lost.
-pub(crate) fn with_primitives(
-    mut outlines: Vec<BezPath>,
-    regions: Vec<TraceShapeRegion>,
-) -> (Vec<BezPath>, Vec<TraceShapeRegion>) {
-    let mut kept = Vec::with_capacity(regions.len());
-    for region in regions {
-        let traced: Vec<&BezPath> = region.outlines.iter().map(|&i| &outlines[i]).collect();
-        let drawn: Vec<BezPath> = region
-            .outlines
-            .iter()
-            .zip(&region.shapes)
-            .map(|(&i, shape)| match shape {
-                Some((shape, rotation)) => primitive_path_like(shape, *rotation, &outlines[i]),
-                None => outlines[i].clone(),
-            })
-            .collect();
-        if !keeps_fill(&traced, &drawn) {
-            continue;
-        }
-        for (&i, path) in region.outlines.iter().zip(drawn) {
-            outlines[i] = path;
-        }
-        kept.push(region);
-    }
-    (outlines, kept)
-}
-
-/// Whether `drawn` fills what `traced` fills (outline for outline, nonzero): the net signed area
-/// changes by no more than the outlines' own area changes add up to.
-pub(crate) fn keeps_fill(traced: &[&BezPath], drawn: &[BezPath]) -> bool {
-    let area = |p: &BezPath| kurbo::Shape::area(p);
-    let before: f64 = traced.iter().map(|p| area(p)).sum();
-    let after: f64 = drawn.iter().map(area).sum();
-    let own: f64 = traced
-        .iter()
-        .zip(drawn)
-        .map(|(t, d)| (area(t).abs() - area(d).abs()).abs())
-        .sum();
-    (after - before).abs() <= own + 1e-9 * before.abs().max(1.0)
-}
-
 /// The section of `regions` for the wire.
-pub(crate) fn write_shapes(wire: &mut Vec<f64>, regions: &[TraceShapeRegion]) {
+pub(crate) fn write_shapes(wire: &mut Vec<f64>, regions: &[ShapeRegion]) {
     #[allow(clippy::cast_precision_loss)] // counts far below 2^52
     {
         wire.extend([SHAPE_MARK, regions.len() as f64]);
@@ -317,19 +316,19 @@ pub(crate) fn write_shapes(wire: &mut Vec<f64>, regions: &[TraceShapeRegion]) {
 }
 
 /// The join's number on the wire.
-fn join_number(join: LineJoin) -> f64 {
+fn join_number(join: Join) -> f64 {
     match join {
-        LineJoin::Miter => 0.0,
-        LineJoin::Bevel => 1.0,
-        LineJoin::Round => 2.0,
+        Join::Miter => 0.0,
+        Join::Bevel => 1.0,
+        Join::Round => 2.0,
     }
 }
 
 /// One band's width, join and centre-line primitive.
-fn write_band(wire: &mut Vec<f64>, band: &TraceBand) {
+fn write_band(wire: &mut Vec<f64>, band: &Band) {
     wire.push(band.width.as_mm());
     wire.push(join_number(band.join));
-    wire.extend(shape_numbers(Some(&(band.shape, band.rotation))));
+    wire.extend(shape_numbers(Some(&(band.primitive, band.rotation))));
 }
 
 /// The kind and six parameters of one outline's primitive (kind 0: none).
@@ -339,54 +338,54 @@ fn shape_numbers(shape: Option<&Fitted>) -> [f64; SHAPE_NUMBERS] {
     };
     let turn = rotation.as_radians();
     match shape {
-        Shape::Rect {
-            bounds,
-            corner_radii,
+        Primitive::Rect {
+            origin,
+            width,
+            height,
+            corner_radius,
         } => {
-            let (w, h) = (bounds.width.as_mm(), bounds.height.as_mm());
+            let (w, h) = (width.as_mm(), height.as_mm());
             [
                 1.0,
-                bounds.origin.x + w / 2.0,
-                bounds.origin.y + h / 2.0,
+                origin.x + w / 2.0,
+                origin.y + h / 2.0,
                 w,
                 h,
-                corner_radii.tl.as_mm(),
+                corner_radius.as_mm(),
                 turn,
             ]
         }
-        Shape::Ellipse { frame, .. } => [
-            2.0,
-            frame.center.x,
-            frame.center.y,
-            frame.rx.as_mm(),
-            frame.ry.as_mm(),
-            turn,
-            0.0,
-        ],
-        Shape::Polygon {
-            frame, point_count, ..
+        Primitive::Ellipse { centre, rx, ry } => {
+            [2.0, centre.x, centre.y, rx.as_mm(), ry.as_mm(), turn, 0.0]
+        }
+        Primitive::Polygon {
+            centre,
+            radius,
+            angle,
+            points,
         } => [
             3.0,
-            frame.center.x,
-            frame.center.y,
-            frame.radius.as_mm(),
-            frame.angle.as_radians(),
-            f64::from(point_count.get()),
+            centre.x,
+            centre.y,
+            radius.as_mm(),
+            angle.as_radians(),
+            f64::from(*points),
             0.0,
         ],
-        Shape::Star {
-            frame,
-            point_count,
+        Primitive::Star {
+            centre,
+            radius,
+            angle,
+            points,
             inner_ratio,
-            ..
         } => [
             4.0,
-            frame.center.x,
-            frame.center.y,
-            frame.radius.as_mm(),
-            frame.angle.as_radians(),
-            f64::from(point_count.get()),
-            inner_ratio.get(),
+            centre.x,
+            centre.y,
+            radius.as_mm(),
+            angle.as_radians(),
+            f64::from(*points),
+            *inner_ratio,
         ],
     }
 }
@@ -395,56 +394,51 @@ fn shape_numbers(shape: Option<&Fitted>) -> [f64; SHAPE_NUMBERS] {
 struct Malformed;
 
 /// The primitive of one outline's numbers (`None` for kind 0).
-fn shape_of(n: &[f64]) -> Result<Option<Fitted>, Malformed> {
+fn primitive_of(n: &[f64]) -> Result<Option<Fitted>, Malformed> {
     if n.iter().any(|v| !v.is_finite()) {
         return Err(Malformed);
     }
     let zero = Angle::from_radians(0.0);
-    let star_frame = || StarFrame {
-        center: Point::new(n[1], n[2]),
-        radius: Length::from_mm(n[3]),
-        angle: Angle::from_radians(n[4]),
+    let points = || {
+        u32::try_from(count(n[5])?)
+            .ok()
+            .filter(|p| POINTS.contains(p))
     };
-    let points = || PointCount::new(u32::try_from(count(n[5])?).ok()?).ok();
     let shape = match count(n[0]).ok_or(Malformed)? {
         0 => return Ok(None),
         1 => (
-            Shape::Rect {
-                bounds: RectBounds {
-                    origin: Point::new(n[1] - n[3] / 2.0, n[2] - n[4] / 2.0),
-                    width: Length::from_mm(n[3]),
-                    height: Length::from_mm(n[4]),
-                },
-                corner_radii: CornerRadii::uniform(Length::from_mm(n[5])),
+            Primitive::Rect {
+                origin: Point::new(n[1] - n[3] / 2.0, n[2] - n[4] / 2.0),
+                width: Mm::from_mm(n[3]),
+                height: Mm::from_mm(n[4]),
+                corner_radius: Mm::from_mm(n[5]),
             },
             Angle::from_radians(n[6]),
         ),
         2 => (
-            Shape::Ellipse {
-                frame: EllipseFrame {
-                    center: Point::new(n[1], n[2]),
-                    rx: Length::from_mm(n[3]),
-                    ry: Length::from_mm(n[4]),
-                },
-                arc: None,
-                curve: Curve::ELLIPSE_DEFAULT,
+            Primitive::Ellipse {
+                centre: Point::new(n[1], n[2]),
+                rx: Mm::from_mm(n[3]),
+                ry: Mm::from_mm(n[4]),
             },
             Angle::from_radians(n[5]),
         ),
         3 => (
-            Shape::Polygon {
-                frame: star_frame(),
-                point_count: points().ok_or(Malformed)?,
-                curve: Curve::POLYGON_DEFAULT,
+            Primitive::Polygon {
+                centre: Point::new(n[1], n[2]),
+                radius: Mm::from_mm(n[3]),
+                angle: Angle::from_radians(n[4]),
+                points: points().ok_or(Malformed)?,
             },
             zero,
         ),
         4 => (
-            Shape::Star {
-                frame: star_frame(),
-                point_count: points().ok_or(Malformed)?,
-                inner_ratio: InnerRatio::new(n[6]).map_err(|_| Malformed)?,
-                curve: Curve::POLYGON_DEFAULT,
+            Primitive::Star {
+                centre: Point::new(n[1], n[2]),
+                radius: Mm::from_mm(n[3]),
+                angle: Angle::from_radians(n[4]),
+                points: points().ok_or(Malformed)?,
+                inner_ratio: valid_ratio(n[6]).ok_or(Malformed)?,
             },
             zero,
         ),
@@ -455,7 +449,7 @@ fn shape_of(n: &[f64]) -> Result<Option<Fitted>, Malformed> {
 
 /// The shape section at the start of `tail` (it starts with [`SHAPE_MARK`]) for a result of
 /// `outlines` outlines and the numbers it took; `None` unless it is well formed.
-pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceShapeRegion>, usize)> {
+pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<ShapeRegion>, usize)> {
     let mut at = 1;
     let mut next = || -> Option<f64> {
         let value = *tail.get(at)?;
@@ -475,7 +469,7 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
         let mut shapes = Vec::with_capacity(k);
         for _ in 0..k {
             let numbers: Vec<f64> = (0..SHAPE_NUMBERS).map(|_| next()).collect::<Option<_>>()?;
-            shapes.push(shape_of(&numbers).ok()?);
+            shapes.push(primitive_of(&numbers).ok()?);
         }
         let width = next()?;
         let (band, bands) = if width == 0.0 {
@@ -506,7 +500,7 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
         {
             return None;
         }
-        out.push(TraceShapeRegion {
+        out.push(ShapeRegion {
             outlines: indices,
             shapes,
             band,
@@ -517,19 +511,19 @@ pub(crate) fn read_shapes(tail: &[f64], outlines: usize) -> Option<(Vec<TraceSha
 }
 
 /// One band after its width: its join and centre-line primitive.
-fn read_band(next: &mut impl FnMut() -> Option<f64>, width: f64) -> Option<TraceBand> {
+fn read_band(next: &mut impl FnMut() -> Option<f64>, width: f64) -> Option<Band> {
     let join = match count(next()?)? {
-        0 => LineJoin::Miter,
-        1 => LineJoin::Bevel,
-        2 => LineJoin::Round,
+        0 => Join::Miter,
+        1 => Join::Bevel,
+        2 => Join::Round,
         _ => return None,
     };
     let numbers: Vec<f64> = (0..SHAPE_NUMBERS).map(|_| next()).collect::<Option<_>>()?;
-    let (shape, rotation) = shape_of(&numbers).ok()??;
-    (width > 0.0 && width.is_finite()).then_some(TraceBand {
-        shape,
+    let (primitive, rotation) = primitive_of(&numbers).ok()??;
+    (width > 0.0 && width.is_finite()).then_some(Band {
+        primitive,
         rotation,
-        width: Length::from_mm(width),
+        width: Mm::from_mm(width),
         join,
     })
 }
@@ -554,41 +548,4 @@ pub fn trace_add_shapes(wire: &mut Vec<f64>, pixel_map: [f64; 6]) {
     let mut section = Vec::new();
     write_shapes(&mut section, &regions);
     wire.splice(at..at, section);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn square(x: f64, side: f64, clockwise: bool) -> BezPath {
-        let mut p = BezPath::new();
-        let c = [(x, x), (x + side, x), (x + side, x + side), (x, x + side)];
-        let order: Vec<_> = if clockwise {
-            c.to_vec()
-        } else {
-            c.iter().rev().copied().collect()
-        };
-        p.move_to(order[0]);
-        for q in &order[1..] {
-            p.line_to(*q);
-        }
-        p.close_path();
-        p
-    }
-
-    /// A hole drawn the outer's way round would fill the frame: that is not the same fill.
-    #[test]
-    fn a_hole_that_no_longer_cuts_is_not_the_same_fill() {
-        let (outer, hole) = (square(0.0, 10.0, true), square(2.0, 6.0, false));
-        let traced = [&outer, &hole];
-        assert!(keeps_fill(&traced, &[outer.clone(), hole.clone()]));
-        assert!(keeps_fill(
-            &traced,
-            &[square(0.0, 10.01, true), square(2.0, 5.99, false)]
-        ));
-        assert!(!keeps_fill(
-            &traced,
-            &[outer.clone(), square(2.0, 6.0, true)]
-        ));
-    }
 }

@@ -8,11 +8,12 @@
 
 use std::f64::consts::{PI, TAU};
 
-use curvyo_document_core::{Angle, Curve, InnerRatio, Length, PointCount, Shape, StarFrame};
+use curvyo_vectorize_core::{Angle, Mm};
 
 use crate::trace_shape_fit::{Fitted, at, half_angle, within};
 use crate::trace_shape_math::{atan2, sin_cos};
 use crate::trace_shape_sample::{Sampled, length};
+use crate::trace_shapes::{POINTS, Primitive, valid_ratio};
 
 /// The most sides of a polygon and points of a star looked for (Proposal; more sides read as a
 /// circle within the tolerance).
@@ -310,25 +311,25 @@ fn figure_shape(
     turn: f64,
     outer: f64,
     inner: f64,
-) -> Option<Shape> {
-    let frame = StarFrame {
-        center: at(outline, [0.0, 0.0]),
-        radius: Length::from_mm(outer),
-        angle: Angle::from_radians(turn),
-    };
-    let point_count = PointCount::new(n).ok()?;
+) -> Option<Primitive> {
+    let centre = at(outline, [0.0, 0.0]);
+    let radius = Mm::from_mm(outer);
+    let angle = Angle::from_radians(turn);
+    let points = POINTS.contains(&n).then_some(n)?;
     Some(if star {
-        Shape::Star {
-            frame,
-            point_count,
-            inner_ratio: InnerRatio::new(inner / outer).ok()?,
-            curve: Curve::POLYGON_DEFAULT,
+        Primitive::Star {
+            centre,
+            radius,
+            angle,
+            points,
+            inner_ratio: valid_ratio(inner / outer)?,
         }
     } else {
-        Shape::Polygon {
-            frame,
-            point_count,
-            curve: Curve::POLYGON_DEFAULT,
+        Primitive::Polygon {
+            centre,
+            radius,
+            angle,
+            points,
         }
     })
 }
@@ -364,36 +365,40 @@ mod tests {
     fn a_hexagon_is_a_polygon_of_six() {
         let s = sample_closed(&figure(6, 30.0, None, 0.2), 0.1).unwrap();
         let (shape, _) = polygon_or_star(&s, 0.2).unwrap();
-        let Shape::Polygon {
-            frame, point_count, ..
+        let Primitive::Polygon {
+            radius,
+            angle,
+            points,
+            ..
         } = shape
         else {
             panic!("{shape:?}");
         };
-        assert_eq!(point_count.get(), 6);
-        assert!((frame.radius.as_mm() - 30.0).abs() < 1e-6);
-        let off = (frame.angle.as_radians() - 0.2).rem_euclid(TAU / 6.0);
-        assert!(off.min(TAU / 6.0 - off) < 1e-7, "{frame:?}");
+        assert_eq!(points, 6);
+        assert!((radius.as_mm() - 30.0).abs() < 1e-6);
+        let off = (angle.as_radians() - 0.2).rem_euclid(TAU / 6.0);
+        assert!(off.min(TAU / 6.0 - off) < 1e-7, "{angle:?}");
     }
 
     #[test]
     fn a_five_point_star_has_its_radii_and_turn() {
         let s = sample_closed(&figure(5, 40.0, Some(20.0), -0.5), 0.1).unwrap();
         let (shape, _) = polygon_or_star(&s, 0.2).unwrap();
-        let Shape::Star {
-            frame,
-            point_count,
+        let Primitive::Star {
+            centre,
+            radius,
+            angle,
+            points,
             inner_ratio,
-            ..
         } = shape
         else {
             panic!("{shape:?}");
         };
-        assert_eq!(point_count.get(), 5);
-        assert!((frame.radius.as_mm() - 40.0).abs() < 1e-6);
-        assert!((inner_ratio.get() - 0.5).abs() < 1e-6);
-        assert!((frame.center.x - 50.0).abs() < 1e-6 && (frame.center.y - 60.0).abs() < 1e-6);
-        let off = (frame.angle.as_radians() + 0.5).rem_euclid(TAU / 5.0);
-        assert!(off.min(TAU / 5.0 - off) < 1e-7, "{frame:?}");
+        assert_eq!(points, 5);
+        assert!((radius.as_mm() - 40.0).abs() < 1e-6);
+        assert!((inner_ratio - 0.5).abs() < 1e-6);
+        assert!((centre.x - 50.0).abs() < 1e-6 && (centre.y - 60.0).abs() < 1e-6);
+        let off = (angle.as_radians() + 0.5).rem_euclid(TAU / 5.0);
+        assert!(off.min(TAU / 5.0 - off) < 1e-7, "{angle:?}");
     }
 }

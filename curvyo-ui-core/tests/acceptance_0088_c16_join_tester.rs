@@ -11,7 +11,7 @@
     clippy::too_many_lines
 )]
 
-use curvyo_document_core::{LineJoin, Shape};
+use curvyo_ui_core::{TraceJoin, TracePrimitive};
 use curvyo_ui_core::{
     TraceParams, TraceShapeRegion, TraceWire, read_trace_wire, trace_add_shapes, trace_job_in,
 };
@@ -129,18 +129,19 @@ fn region_area(wire: &TraceWire, r: &TraceShapeRegion) -> f64 {
 }
 
 fn centre_line(b: &curvyo_ui_core::TraceBand) -> BezPath {
-    match b.shape {
-        Shape::Star {
-            frame,
-            point_count,
+    match b.primitive {
+        TracePrimitive::Star {
+            centre,
+            radius,
+            angle,
+            points,
             inner_ratio,
-            ..
         } => star_outline(
-            (frame.center.x, frame.center.y),
-            frame.radius.as_mm(),
-            inner_ratio.get(),
-            point_count.get(),
-            frame.angle.as_radians() + b.rotation.as_radians(),
+            (centre.x, centre.y),
+            radius.as_mm(),
+            inner_ratio,
+            points,
+            angle.as_radians() + b.rotation.as_radians(),
         ),
         other => panic!("not a star: {other:?}"),
     }
@@ -148,9 +149,9 @@ fn centre_line(b: &curvyo_ui_core::TraceBand) -> BezPath {
 
 fn join_of(b: &curvyo_ui_core::TraceBand) -> Join {
     match b.join {
-        LineJoin::Bevel => Join::Bevel,
-        LineJoin::Miter => Join::Miter,
-        LineJoin::Round => Join::Round,
+        TraceJoin::Bevel => Join::Bevel,
+        TraceJoin::Miter => Join::Miter,
+        TraceJoin::Round => Join::Round,
     }
 }
 
@@ -188,8 +189,8 @@ fn join_a_mitred_stroked_star_is_a_mitred_star_with_the_offset_width() {
     let bands = band_regions(&on);
     assert_eq!(bands.len(), 1, "{:?}", on.shapes);
     let b = bands[0].band.unwrap();
-    assert_eq!(b.join, LineJoin::Miter);
-    assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 5));
+    assert_eq!(b.join, TraceJoin::Miter);
+    assert!(matches!(b.primitive, TracePrimitive::Star { points, .. } if points == 5));
     let d = median_offset_distance(&on, bands[0]);
     assert!(
         (b.width.as_mm() - 2.4).abs() <= 0.2,
@@ -210,8 +211,8 @@ fn join_a_bevelled_stroked_star_is_a_bevelled_star() {
     let bands = band_regions(&on);
     assert_eq!(bands.len(), 1, "{:?}", on.shapes);
     let b = bands[0].band.unwrap();
-    assert_eq!(b.join, LineJoin::Bevel);
-    assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 5));
+    assert_eq!(b.join, TraceJoin::Bevel);
+    assert!(matches!(b.primitive, TracePrimitive::Star { points, .. } if points == 5));
     assert!((b.width.as_mm() - 3.0).abs() <= 0.25, "{}", b.width.as_mm());
     let traced = region_area(&on, bands[0]);
     let stroked = area_of(
@@ -241,29 +242,37 @@ fn join_a_bevelled_stroked_hexagon_or_square_never_becomes_a_wrong_primitive() {
         let r = &on.shapes[0];
         if let Some(b) = r.band {
             // A stroked primitive: its stroke must cover the traced area within 2 %.
-            let outline = match b.shape {
-                Shape::Rect { bounds, .. } => rect_outline(
+            let outline = match b.primitive {
+                TracePrimitive::Rect {
+                    origin,
+                    width,
+                    height,
+                    ..
+                } => rect_outline(
                     (
-                        bounds.origin.x + bounds.width.as_mm() / 2.0,
-                        bounds.origin.y + bounds.height.as_mm() / 2.0,
+                        origin.x + width.as_mm() / 2.0,
+                        origin.y + height.as_mm() / 2.0,
                     ),
-                    bounds.width.as_mm(),
-                    bounds.height.as_mm(),
+                    width.as_mm(),
+                    height.as_mm(),
                 ),
-                Shape::Star { .. } => centre_line(&b),
-                Shape::Polygon {
-                    frame, point_count, ..
+                TracePrimitive::Star { .. } => centre_line(&b),
+                TracePrimitive::Polygon {
+                    centre,
+                    radius,
+                    angle,
+                    points,
                 } => star_outline(
-                    (frame.center.x, frame.center.y),
-                    frame.radius.as_mm(),
+                    (centre.x, centre.y),
+                    radius.as_mm(),
                     1.0,
-                    point_count.get() / 2,
-                    frame.angle.as_radians() + b.rotation.as_radians(),
+                    points / 2,
+                    angle.as_radians() + b.rotation.as_radians(),
                 ),
-                other @ Shape::Ellipse { .. } => panic!("{name}: unexpected {other:?}"),
+                other @ TracePrimitive::Ellipse { .. } => panic!("{name}: unexpected {other:?}"),
             };
             let stroked = area_of(&[stroke_of(&outline, b.width.as_mm(), join_of(&b))], 0.05);
-            eprintln!("{name}: band {:?} join {:?}", b.shape, b.join);
+            eprintln!("{name}: band {:?} join {:?}", b.primitive, b.join);
             assert!(
                 (stroked - traced_truth).abs() <= 0.03 * traced_truth,
                 "{name}: stroked {stroked} vs {traced_truth}"
@@ -306,9 +315,9 @@ fn touching_three_stars_are_three_stroked_stars() {
     assert!(r.band.is_none());
     assert_eq!(r.primitives(), 3);
     for b in &r.bands {
-        assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 8));
+        assert!(matches!(b.primitive, TracePrimitive::Star { points, .. } if points == 8));
         assert!((b.width.as_mm() - 2.5).abs() <= 0.25, "{}", b.width.as_mm());
-        assert_eq!(b.join, LineJoin::Miter);
+        assert_eq!(b.join, TraceJoin::Miter);
     }
     let union_of_bands = area_of(
         &r.bands
@@ -412,16 +421,16 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_round() {
     let bands = band_regions(&on);
     let miter: Vec<_> = bands
         .iter()
-        .filter(|r| r.band.unwrap().join == LineJoin::Miter)
+        .filter(|r| r.band.unwrap().join == TraceJoin::Miter)
         .collect();
     let bevel: Vec<_> = bands
         .iter()
-        .filter(|r| r.band.unwrap().join == LineJoin::Bevel)
+        .filter(|r| r.band.unwrap().join == TraceJoin::Bevel)
         .collect();
     eprintln!("regions {} bands {}", on.shapes.len(), bands.len());
     let round: Vec<_> = bands
         .iter()
-        .filter(|r| r.band.unwrap().join == LineJoin::Round)
+        .filter(|r| r.band.unwrap().join == TraceJoin::Round)
         .collect();
     assert_eq!(miter.len(), 8, "eight mitred");
     assert_eq!(bevel.len(), 1, "one bevelled");
@@ -433,7 +442,7 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_round() {
     assert_eq!(in_bands, 20, "no star stays paths");
     for r in &bands {
         let b = r.band.unwrap();
-        assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 8));
+        assert!(matches!(b.primitive, TracePrimitive::Star { points, .. } if points == 8));
         let traced = region_area(&off, r);
         // A 0.2 mm raster keeps the test fast in debug; against a 0.05 mm raster it was at most
         // 0.32 % off on these stars, so 0.5 % of the 3 % rule is kept as the margin.
@@ -467,8 +476,8 @@ fn join_a_rounded_tip_star_is_a_round_join() {
     let bands = band_regions(&on);
     assert_eq!(bands.len(), 1, "{:?}", on.shapes);
     let b = bands[0].band.unwrap();
-    assert_eq!(b.join, LineJoin::Round);
-    assert!(matches!(b.shape, Shape::Star { point_count, .. } if point_count.get() == 5));
+    assert_eq!(b.join, TraceJoin::Round);
+    assert!(matches!(b.primitive, TracePrimitive::Star { points, .. } if points == 5));
     assert!((b.width.as_mm() - 3.0).abs() <= 0.25, "{}", b.width.as_mm());
     let traced = region_area(&on, bands[0]);
     let stroked = area_of(

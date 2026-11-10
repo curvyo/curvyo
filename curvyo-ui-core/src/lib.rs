@@ -193,6 +193,7 @@ mod text_path_edit;
 mod text_recognise_job;
 mod text_recognise_plan;
 pub mod tiling;
+mod trace_adapter;
 mod trace_fit;
 mod trace_fit_guess;
 mod trace_fit_turn;
@@ -549,6 +550,7 @@ pub use text_recognise_plan::{
     RecogniseSubjects, RecogniseWrite, RecognisedText, plan_recognise_write, recognise_available,
     recognise_subjects,
 };
+pub use trace_adapter::read_trace_wire;
 pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
@@ -566,13 +568,17 @@ pub use trace_region::{
     RegionOperand, TraceRegion, TraceRegionError, mask_operand, unclipped_notice,
 };
 pub use trace_region_raster::{TraceRegionDefaults, trace_region_defaults};
-pub use trace_shapes::{TraceBand, TraceShapeRegion, recognise_shapes, trace_add_shapes};
+pub use trace_shapes::{
+    Band as TraceBand, Join as TraceJoin, POINTS as TRACE_SHAPE_POINTS,
+    Primitive as TracePrimitive, ShapeRegion as TraceShapeRegion, recognise_shapes,
+    trace_add_shapes,
+};
 pub use trace_text_colour::trace_text_colour_job_in;
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
 pub use trace_text_wire::{TraceTextWire, TraceTexts, trace_text_job_in, trace_text_regions_in};
 pub use trace_transfer::{
-    TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,
-    trace_analyse, trace_auto_threshold, trace_colour_job_in, trace_job_in, trace_sample_colour,
+    TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, trace_analyse,
+    trace_auto_threshold, trace_colour_job_in, trace_job_in, trace_sample_colour,
     trace_suggest_background,
 };
 pub use transform_drag::{

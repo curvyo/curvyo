@@ -5,14 +5,15 @@
 //! `Document::insert_drawing_above`.
 
 use curvyo_document_core::{
-    AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, NodeId,
-    Opacity, Stroke, Style, clean_name,
+    AnchorId, Color, DrawingAnchor, DrawingNode, DrawingOutline, DrawingRegisters, Fill, Length,
+    NodeId, Opacity, Stroke, Style, clean_name,
 };
 use kurbo::BezPath;
 
 use crate::AnchorIdMinter;
 use crate::svg_import_shapes::{kind_from_handles, outlines};
-use crate::trace_shapes::{TraceBand, TraceShapeRegion};
+use crate::trace_adapter::{line_join, shape_of};
+use crate::trace_shapes::{Band, ShapeRegion};
 
 /// The name of an image that has none (the Layers panel's default).
 const IMAGE_DEFAULT_NAME: &str = "Image";
@@ -31,7 +32,7 @@ pub struct TraceTarget {
     pub colours: Vec<TraceColour>,
     /// The recognised shapes (`specs/0088` Part B), their indices into `outlines`; each
     /// recognised outline in `outlines` is already its primitive's outline.
-    pub shapes: Vec<TraceShapeRegion>,
+    pub shapes: Vec<ShapeRegion>,
 }
 
 /// One colour of a multicolour result as Create paths writes it.
@@ -147,12 +148,12 @@ fn push_path(
 
 /// The style of `band` in a colour whose filled style is `filled`: no fill, a stroke of its width
 /// and join in the fill's colour (butt, solid: the stroke's defaults).
-fn band_style(filled: &Style, band: &TraceBand) -> Style {
+fn band_style(filled: &Style, band: &Band) -> Style {
     Style {
         stroke: Stroke {
             enabled: true,
-            width: band.width,
-            join: band.join,
+            width: Length::from_mm(band.width.as_mm()),
+            join: line_join(band.join),
             color: filled.fill.color,
             opacity: Opacity::OPAQUE,
             ..Stroke::default()
@@ -197,19 +198,21 @@ fn plan_colour(
             // `specs/0088` Part B criterion 16: a band is its centre line, stroked in the fill
             // with the join the trace shows (decision 22); touching bands one each.
             for band in bands {
+                let (shape, rotation) = shape_of(&band.primitive, band.rotation);
                 children.push(DrawingNode::Primitive {
                     registers: DrawingRegisters::default(),
-                    shape: band.shape,
-                    rotation: band.rotation,
+                    shape,
+                    rotation,
                     style: band_style(&style, band),
                 });
             }
         } else if let ([Some((shape, rotation))], [_]) = (&region.shapes[..], &region.outlines[..])
         {
+            let (shape, rotation) = shape_of(shape, *rotation);
             children.push(DrawingNode::Primitive {
                 registers: DrawingRegisters::default(),
-                shape: *shape,
-                rotation: *rotation,
+                shape,
+                rotation,
                 style: style.clone(),
             });
         } else {
@@ -434,7 +437,9 @@ mod tests {
     /// compound path; the rest stays in the colour's path.
     #[test]
     fn recognised_shapes_are_primitives_and_compounds_in_their_colour() {
-        use curvyo_document_core::{Angle, CornerRadii, Length, Point, RectBounds, Shape};
+        use crate::trace_shapes::Primitive;
+        use curvyo_document_core::{Point, RectBounds};
+        use curvyo_vectorize_core::{Angle, Mm};
         let mut minter = AnchorIdMinter::new(3);
         let doc = curvyo_document_core::Document::new(1);
         let image = doc.create_rect(RectBounds {
@@ -442,13 +447,11 @@ mod tests {
             width: Length::from_mm(1.0),
             height: Length::from_mm(1.0),
         });
-        let rect = |x: f64| Shape::Rect {
-            bounds: RectBounds {
-                origin: Point::new(x, 0.0),
-                width: Length::from_mm(4.0),
-                height: Length::from_mm(4.0),
-            },
-            corner_radii: CornerRadii::uniform(Length::from_mm(0.0)),
+        let rect = |x: f64| Primitive::Rect {
+            origin: kurbo::Point::new(x, 0.0),
+            width: Mm::from_mm(4.0),
+            height: Mm::from_mm(4.0),
+            corner_radius: Mm::from_mm(0.0),
         };
         let turn = Angle::from_radians(0.0);
         let red = Color { r: 200, g: 0, b: 0 };
@@ -469,13 +472,13 @@ mod tests {
                 },
             ],
             shapes: vec![
-                TraceShapeRegion {
+                ShapeRegion {
                     outlines: vec![1],
                     shapes: vec![Some((rect(10.0), turn))],
                     band: None,
                     bands: Vec::new(),
                 },
-                TraceShapeRegion {
+                ShapeRegion {
                     outlines: vec![2, 3],
                     shapes: vec![Some((rect(20.0), turn)), None],
                     band: None,
@@ -494,7 +497,7 @@ mod tests {
                     outlines, style, ..
                 } => ("path", style.fill.color, outlines.len()),
                 DrawingNode::Primitive { shape, style, .. } => {
-                    assert_eq!(*shape, rect(10.0));
+                    assert_eq!(*shape, shape_of(&rect(10.0), turn).0);
                     ("primitive", style.fill.color, 1)
                 }
                 _ => panic!("{c:?}"),

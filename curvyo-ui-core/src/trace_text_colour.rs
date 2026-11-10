@@ -222,7 +222,7 @@ fn nearest(colour: Rgb8, candidates: &[Rgb8]) -> Option<Rgb8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::{read_trace_wire, trace_colour_job_in};
+    use crate::trace_transfer::{read_wire, trace_colour_job_in};
     use curvyo_vectorize_core::Mm;
     use curvyo_vectorize_core::TraceParams;
 
@@ -306,7 +306,7 @@ mod tests {
             None,
             &mut |_| {},
         );
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(read.texts.lines.len(), 1);
         assert_eq!(read.texts.lines[0].fill, Some(Rgb8::new(255, 255, 255)));
         assert_eq!(read.layers.len(), 1);
@@ -330,9 +330,9 @@ mod tests {
         let rgba = red_on_white();
         let wire =
             trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(read.texts.lines[0].fill, Some(rgb(RED)));
-        let off = read_trace_wire(&trace_colour_job_in(
+        let off = read_wire(&trace_colour_job_in(
             &rgba,
             W,
             H,
@@ -368,7 +368,7 @@ mod tests {
         // Remove background keeps the grey as a palette colour.
         let wire =
             trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
             Some(rgb(GREY)),
@@ -383,7 +383,7 @@ mod tests {
         });
         let wire =
             trace_text_colour_job_in(&rgba, W, H, MAP, &brightness, &[line()], None, &mut |_| {});
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
             Some(rgb(BLUE)),
@@ -407,7 +407,7 @@ mod tests {
             None,
             &mut |_| {},
         );
-        assert!(read_trace_wire(&wire).unwrap().texts.lines[0].excluded);
+        assert!(read_wire(&wire).unwrap().texts.lines[0].excluded);
         let kept = trace_text_colour_job_in(
             &red_on_white(),
             W,
@@ -418,7 +418,7 @@ mod tests {
             None,
             &mut |_| {},
         );
-        assert!(!read_trace_wire(&kept).unwrap().texts.lines[0].excluded);
+        assert!(!read_wire(&kept).unwrap().texts.lines[0].excluded);
     }
 
     /// Criteria 24/12 and 24/13: no lines, the plain colour job; the same input twice, the same

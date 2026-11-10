@@ -5,17 +5,17 @@
 // The formulas' own names (h, k, o, p, t, ...) read better than long ones here.
 #![allow(clippy::many_single_char_names)]
 
-use curvyo_document_core::{Angle, Length, LineJoin, Shape};
+use curvyo_vectorize_core::{Angle, Mm};
 
 use crate::trace_shape_fit::Fitted;
 use crate::trace_shape_join::{
     corners, distance, inside, offset, stroke_area, widened, within_miter_limit,
 };
 use crate::trace_shape_sample::Sampled;
-use crate::trace_shapes::TraceBand;
+use crate::trace_shapes::{Band, Join, Primitive};
 
 /// The joins looked for; on a tie the earlier one wins.
-const JOINS: [LineJoin; 3] = [LineJoin::Miter, LineJoin::Bevel, LineJoin::Round];
+const JOINS: [Join; 3] = [Join::Miter, Join::Bevel, Join::Round];
 
 /// The radius about each corner of the centre line, in band widths, whose traced points only
 /// choose the join and are left out of the deviation check (customer 2026-11-04: the tracer
@@ -33,14 +33,14 @@ const FEWEST_POINTS: usize = 8;
 
 /// A stroke along a star or polygon: its centre line, half width and join.
 struct Stroke {
-    centre: Shape,
+    centre: Primitive,
     half: f64,
-    join: LineJoin,
+    join: Join,
 }
 
 impl Stroke {
     /// The stroke whose inner outline has the sides of `inner`, `half` wide on each side.
-    fn of(inner: &Shape, half: f64, join: LineJoin) -> Option<Self> {
+    fn of(inner: &Primitive, half: f64, join: Join) -> Option<Self> {
         let centre = widened(inner, half)?;
         Some(Self { centre, half, join })
     }
@@ -56,15 +56,14 @@ impl Stroke {
 
     /// Whether the renderer draws it as it is (a miter longer than the limit is bevelled).
     fn drawable(&self) -> bool {
-        self.join != LineJoin::Miter
-            || corners(&self.centre).is_some_and(|c| within_miter_limit(&c))
+        self.join != Join::Miter || corners(&self.centre).is_some_and(|c| within_miter_limit(&c))
     }
 
-    fn band(&self) -> TraceBand {
-        TraceBand {
-            shape: self.centre,
+    fn band(&self) -> Band {
+        Band {
+            primitive: self.centre,
             rotation: Angle::from_radians(0.0),
-            width: Length::from_mm(2.0 * self.half),
+            width: Mm::from_mm(2.0 * self.half),
             join: self.join,
         }
     }
@@ -159,7 +158,7 @@ pub(crate) fn band_from_hole(
     hole: &Sampled,
     inner: &Fitted,
     tolerance: f64,
-) -> Option<TraceBand> {
+) -> Option<Band> {
     corners(&inner.0)?;
     let traced = outer.area() - hole.area();
     let (o, h) = (absolute(outer), absolute(hole));
@@ -195,7 +194,7 @@ fn median(mut values: Vec<f64>) -> f64 {
 /// The stroke along hole `inner` that `points` (the outer points nearest to it) lie on: for each
 /// join the half width where as many of them lie outside its outer outline as inside, the join
 /// whose outline they lie closer to.
-fn stroke_through(points: &[[f64; 2]], inner: &Shape) -> Option<Stroke> {
+fn stroke_through(points: &[[f64; 2]], inner: &Primitive) -> Option<Stroke> {
     let outline = corners(inner)?;
     let hi = median(points.iter().map(|&p| distance(p, &outline)).collect());
     let mut best: Option<(f64, Stroke)> = None;
@@ -234,7 +233,7 @@ pub(crate) fn touching_bands(
     holes: &[&Sampled],
     inners: &[&Fitted],
     tolerance: f64,
-) -> Option<Vec<TraceBand>> {
+) -> Option<Vec<Band>> {
     let insides: Vec<Vec<[f64; 2]>> = inners
         .iter()
         .map(|i| corners(&i.0))

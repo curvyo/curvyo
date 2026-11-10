@@ -259,7 +259,7 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::{read_trace_wire, trace_job_in};
+    use crate::trace_transfer::{read_wire, trace_job_in};
 
     /// A 40 x 20 picture with a black bar (the "text") on white.
     fn picture() -> Vec<u8> {
@@ -297,7 +297,7 @@ mod tests {
             None,
             &mut |_| {},
         );
-        let read = read_trace_wire(&wire).unwrap();
+        let read = read_wire(&wire).unwrap();
         assert_eq!(read.outlines.len(), 0);
         assert_eq!(read.texts.found, 1);
         assert_eq!(read.texts.lines[0].text, "Grüße");
@@ -312,7 +312,7 @@ mod tests {
     fn the_regions_are_the_text_section_of_the_job() {
         let params = TraceParams::with_threshold(128);
         let lines = [line("Grüße")];
-        let full = read_trace_wire(&trace_text_job_in(
+        let full = read_wire(&trace_text_job_in(
             &picture(),
             40,
             20,
@@ -323,7 +323,7 @@ mod tests {
             &mut |_| {},
         ))
         .unwrap();
-        let regions = read_trace_wire(&trace_text_regions_in(
+        let regions = read_wire(&trace_text_regions_in(
             &picture(),
             40,
             20,
@@ -346,7 +346,7 @@ mod tests {
             trace_text_job_in(&picture(), 40, 20, MAP, &params, &[], None, &mut |_| {}),
             plain
         );
-        let read = read_trace_wire(&plain).unwrap();
+        let read = read_wire(&plain).unwrap();
         assert_eq!(read.texts, TraceTexts::default());
     }
 }

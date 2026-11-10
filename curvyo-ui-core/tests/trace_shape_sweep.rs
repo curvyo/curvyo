@@ -10,7 +10,7 @@
 
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use curvyo_document_core::{LineJoin, Shape};
+use curvyo_ui_core::{TraceJoin, TracePrimitive};
 use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_in};
 
 /// 10 px/mm.
@@ -83,36 +83,40 @@ fn recognised_at(rgba: &[u8], side: u32) -> Option<(&'static str, u32, f64, Opti
     trace_add_shapes(&mut wire, MAP);
     let read = read_trace_wire(&wire).unwrap();
     let region = read.shapes.first()?;
-    Some(match region.shapes[0].as_ref()? {
+    Some(match *region.shapes[0].as_ref()? {
         (
-            Shape::Star {
-                frame,
-                point_count,
+            TracePrimitive::Star {
+                radius,
+                angle,
+                points,
                 inner_ratio,
                 ..
             },
             _,
         ) => (
             "star",
-            point_count.get(),
-            frame.radius.as_mm() * 10.0,
-            Some(inner_ratio.get()),
-            frame.angle.as_radians(),
+            points,
+            radius.as_mm() * 10.0,
+            Some(inner_ratio),
+            angle.as_radians(),
         ),
         (
-            Shape::Polygon {
-                frame, point_count, ..
+            TracePrimitive::Polygon {
+                radius,
+                angle,
+                points,
+                ..
             },
             _,
         ) => (
             "polygon",
-            point_count.get(),
-            frame.radius.as_mm() * 10.0,
+            points,
+            radius.as_mm() * 10.0,
             None,
-            frame.angle.as_radians(),
+            angle.as_radians(),
         ),
-        (Shape::Ellipse { frame, .. }, _) => ("ellipse", 0, frame.rx.as_mm() * 10.0, None, 0.0),
-        (Shape::Rect { .. }, _) => ("rect", 4, 0.0, None, 0.0),
+        (TracePrimitive::Ellipse { rx, .. }, _) => ("ellipse", 0, rx.as_mm() * 10.0, None, 0.0),
+        (TracePrimitive::Rect { .. }, _) => ("rect", 4, 0.0, None, 0.0),
     })
 }
 
@@ -255,8 +259,8 @@ fn the_customers_stars_are_stars() {
     let mut stars: Vec<u32> = read
         .shapes
         .iter()
-        .filter_map(|r| match r.shapes[0].as_ref()? {
-            (Shape::Star { point_count, .. }, _) => Some(point_count.get()),
+        .filter_map(|r| match *r.shapes[0].as_ref()? {
+            (TracePrimitive::Star { points, .. }, _) => Some(points),
             _ => None,
         })
         .collect();
@@ -325,10 +329,10 @@ fn the_customers_page_keeps_every_hole() {
         );
         kinds.push((
             match region.shapes[0].as_ref().unwrap().0 {
-                Shape::Star { point_count, .. } => format!("star{}", point_count.get()),
-                Shape::Polygon { point_count, .. } => format!("polygon{}", point_count.get()),
-                Shape::Ellipse { .. } => "ellipse".to_owned(),
-                Shape::Rect { .. } => "rect".to_owned(),
+                TracePrimitive::Star { points, .. } => format!("star{points}"),
+                TracePrimitive::Polygon { points, .. } => format!("polygon{points}"),
+                TracePrimitive::Ellipse { .. } => "ellipse".to_owned(),
+                TracePrimitive::Rect { .. } => "rect".to_owned(),
             },
             region.outlines.len(),
             region.primitives(),
@@ -345,17 +349,17 @@ fn the_customers_page_keeps_every_hole() {
     // what the traced band covers within 2 %.
     let region = on.shapes.iter().find(|r| r.outlines.len() == 2).unwrap();
     let band = region.band.expect("a stroked star");
-    let Shape::Star { point_count, .. } = band.shape else {
+    let TracePrimitive::Star { points, .. } = band.primitive else {
         panic!("{band:?}");
     };
-    assert_eq!(point_count.get(), 8);
+    assert_eq!(points, 8);
     let traced: f64 = region
         .outlines
         .iter()
         .map(|&i| kurbo::Shape::area(&off.outlines[i]))
         .sum::<f64>()
         .abs();
-    let stroked = stroked_star_area(&band.shape, band.width.as_mm());
+    let stroked = stroked_star_area(&band.primitive, band.width.as_mm());
     eprintln!(
         "outline star: width {:.3} mm, stroked {stroked:.1} mm², traced {traced:.1} mm²",
         band.width.as_mm()
@@ -368,18 +372,18 @@ fn the_customers_page_keeps_every_hole() {
 
 /// The area a mitred stroke of `width` along a star covers, from its two offset stars (each side
 /// moved by half the width along its normal), by the area of a star from its radii.
-fn stroked_star_area(shape: &Shape, width: f64) -> f64 {
-    let Shape::Star {
-        frame,
-        point_count,
+fn stroked_star_area(shape: &TracePrimitive, width: f64) -> f64 {
+    let TracePrimitive::Star {
+        radius,
+        points,
         inner_ratio,
         ..
-    } = shape
+    } = *shape
     else {
         return 0.0;
     };
-    let n = f64::from(point_count.get());
-    let (r, q) = (frame.radius.as_mm(), inner_ratio.get());
+    let n = f64::from(points);
+    let (r, q) = (radius.as_mm(), inner_ratio);
     let h = PI / n;
     let (tip, valley) = ((r, 0.0), (r * q * h.cos(), r * q * h.sin()));
     let (ex, ey) = (valley.0 - tip.0, valley.1 - tip.1);
@@ -447,10 +451,10 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
             failures.push(format!("{:?}: no band", region.outlines));
             continue;
         };
-        let Shape::Star { point_count, .. } = band.shape else {
+        let TracePrimitive::Star { points, .. } = band.primitive else {
             panic!("{band:?}");
         };
-        let stroked = stroke_cover(&band.shape, band.width.as_mm(), band.join);
+        let stroked = stroke_cover(&band.primitive, band.width.as_mm(), band.join);
         let off_by = 100.0 * (stroked - traced) / traced;
         eprintln!(
             "{:?}: width {:.3} mm, {:?}, stroked {stroked:.1} mm², traced {traced:.1} mm² ({off_by:+.1} %)",
@@ -458,12 +462,11 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
             band.width.as_mm(),
             band.join
         );
-        bevelled += usize::from(band.join == LineJoin::Bevel);
-        if point_count.get() != 8 || off_by.abs() > 2.0 {
+        bevelled += usize::from(band.join == TraceJoin::Bevel);
+        if points != 8 || off_by.abs() > 2.0 {
             failures.push(format!(
                 "{:?}: n {}, {off_by:+.1} %",
-                region.outlines,
-                point_count.get()
+                region.outlines, points
             ));
         }
     }
@@ -479,22 +482,23 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
     clippy::cast_sign_loss,
     clippy::cast_precision_loss
 )]
-fn stroke_cover(shape: &Shape, width: f64, join: LineJoin) -> f64 {
-    let Shape::Star {
-        frame,
-        point_count,
+fn stroke_cover(shape: &TracePrimitive, width: f64, join: TraceJoin) -> f64 {
+    let TracePrimitive::Star {
+        centre,
+        radius,
+        angle,
+        points,
         inner_ratio,
-        ..
-    } = shape
+    } = *shape
     else {
         return 0.0;
     };
-    let m = 2 * point_count.get();
+    let m = 2 * points;
     let mut path = kurbo::BezPath::new();
     for j in 0..m {
-        let r = frame.radius.as_mm() * if j % 2 == 1 { inner_ratio.get() } else { 1.0 };
-        let a = frame.angle.as_radians() + TAU * f64::from(j) / f64::from(m);
-        let p = (frame.center.x + r * a.cos(), frame.center.y + r * a.sin());
+        let r = radius.as_mm() * if j % 2 == 1 { inner_ratio } else { 1.0 };
+        let a = angle.as_radians() + TAU * f64::from(j) / f64::from(m);
+        let p = (centre.x + r * a.cos(), centre.y + r * a.sin());
         if j == 0 {
             path.move_to(p);
         } else {
@@ -504,9 +508,9 @@ fn stroke_cover(shape: &Shape, width: f64, join: LineJoin) -> f64 {
     path.close_path();
     let style = kurbo::Stroke::new(width)
         .with_join(match join {
-            LineJoin::Bevel => kurbo::Join::Bevel,
-            LineJoin::Round => kurbo::Join::Round,
-            LineJoin::Miter => kurbo::Join::Miter,
+            TraceJoin::Bevel => kurbo::Join::Bevel,
+            TraceJoin::Round => kurbo::Join::Round,
+            TraceJoin::Miter => kurbo::Join::Miter,
         })
         .with_miter_limit(4.0);
     let outline = kurbo::stroke(path.iter(), &style, &kurbo::StrokeOpts::default(), 0.01);

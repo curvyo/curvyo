@@ -6,19 +6,19 @@
 // The formulas' own names (x, y, u, v, a, b, r, ...) read better than long ones here.
 #![allow(clippy::many_single_char_names, clippy::similar_names)]
 
-use curvyo_document_core::{
-    Angle, CornerRadii, Curve, EllipseFrame, Length, Point, RectBounds, Shape,
-};
+use curvyo_vectorize_core::{Angle, Mm};
+use kurbo::Point;
 
 use crate::trace_shape_math::atan2;
 use crate::trace_shape_sample::{Sampled, length};
+use crate::trace_shapes::Primitive;
 
 /// How far from an axis a piece of outline may turn and still count as a rectangle's side
 /// (cosine of 10 degrees).
 const SIDE_COSINE: f64 = 0.984_807_753_012_208;
 
 /// A primitive with its rotation about its frame's centre, in document millimetres.
-pub(crate) type Fitted = (Shape, Angle);
+pub(crate) type Fitted = (Primitive, Angle);
 
 /// The simplest primitive every point of `outline` is within `tolerance` of, if any.
 pub(crate) fn fit_outline(outline: &Sampled, tolerance: f64) -> Option<Fitted> {
@@ -50,15 +50,11 @@ pub(crate) fn at(outline: &Sampled, p: [f64; 2]) -> Point {
     Point::new(outline.centre[0] + p[0], outline.centre[1] + p[1])
 }
 
-fn ellipse_shape(centre: Point, rx: f64, ry: f64) -> Shape {
-    Shape::Ellipse {
-        frame: EllipseFrame {
-            center: centre,
-            rx: Length::from_mm(rx),
-            ry: Length::from_mm(ry),
-        },
-        arc: None,
-        curve: Curve::ELLIPSE_DEFAULT,
+fn ellipse_shape(centre: Point, rx: f64, ry: f64) -> Primitive {
+    Primitive::Ellipse {
+        centre,
+        rx: Mm::from_mm(rx),
+        ry: Mm::from_mm(ry),
     }
 }
 
@@ -141,13 +137,11 @@ fn rectangle(outline: &Sampled, tolerance: f64) -> Option<Fitted> {
     let shape = |r: f64| {
         let centre = at(outline, centre);
         (
-            Shape::Rect {
-                bounds: RectBounds {
-                    origin: Point::new(centre.x - w / 2.0, centre.y - h / 2.0),
-                    width: Length::from_mm(w),
-                    height: Length::from_mm(h),
-                },
-                corner_radii: CornerRadii::uniform(Length::from_mm(r)),
+            Primitive::Rect {
+                origin: Point::new(centre.x - w / 2.0, centre.y - h / 2.0),
+                width: Mm::from_mm(w),
+                height: Mm::from_mm(h),
+                corner_radius: Mm::from_mm(r),
             },
             Angle::from_radians(atan2(s, c)),
         )
@@ -259,12 +253,12 @@ mod tests {
     fn a_circle_is_a_circle_not_an_ellipse() {
         let path = kurbo::Circle::new((40.0, 30.0), 25.0).to_path(1e-4);
         let (shape, _) = fit_outline(&sampled(&path), 0.2).unwrap();
-        let Shape::Ellipse { frame, .. } = shape else {
+        let Primitive::Ellipse { centre, rx, ry } = shape else {
             panic!("{shape:?}");
         };
-        assert!((frame.rx.as_mm() - 25.0).abs() < 1e-3);
-        assert_eq!(frame.rx, frame.ry);
-        assert!((frame.center.x - 40.0).abs() < 1e-6 && (frame.center.y - 30.0).abs() < 1e-6);
+        assert!((rx.as_mm() - 25.0).abs() < 1e-3);
+        assert_eq!(rx, ry);
+        assert!((centre.x - 40.0).abs() < 1e-6 && (centre.y - 30.0).abs() < 1e-6);
     }
 
     #[test]
@@ -272,11 +266,11 @@ mod tests {
         let mut path = kurbo::Ellipse::new((0.0, 0.0), (30.0, 20.0), 0.4).to_path(1e-4);
         path.close_path();
         let (shape, turn) = fit_outline(&sampled(&path), 0.2).unwrap();
-        let Shape::Ellipse { frame, .. } = shape else {
+        let Primitive::Ellipse { rx, ry, .. } = shape else {
             panic!("{shape:?}");
         };
-        assert!((frame.rx.as_mm() - 30.0).abs() < 1e-2, "{frame:?}");
-        assert!((frame.ry.as_mm() - 20.0).abs() < 1e-2, "{frame:?}");
+        assert!((rx.as_mm() - 30.0).abs() < 1e-2, "{rx:?}");
+        assert!((ry.as_mm() - 20.0).abs() < 1e-2, "{ry:?}");
         assert!((turn.as_radians() - 0.4).abs() < 1e-4);
     }
 
@@ -284,16 +278,18 @@ mod tests {
     fn a_square_cornered_rectangle_is_not_a_rounded_one() {
         let path = polygon(&[(0.0, 0.0), (200.0, 0.0), (200.0, 100.0), (0.0, 100.0)]);
         let (shape, turn) = fit_outline(&sampled(&path), 0.2).unwrap();
-        let Shape::Rect {
-            bounds,
-            corner_radii,
+        let Primitive::Rect {
+            width,
+            height,
+            corner_radius,
+            ..
         } = shape
         else {
             panic!("{shape:?}");
         };
-        assert!((bounds.width.as_mm() - 200.0).abs() < 1e-6);
-        assert!((bounds.height.as_mm() - 100.0).abs() < 1e-6);
-        assert_eq!(corner_radii, CornerRadii::uniform(Length::from_mm(0.0)));
+        assert!((width.as_mm() - 200.0).abs() < 1e-6);
+        assert!((height.as_mm() - 100.0).abs() < 1e-6);
+        assert_eq!(corner_radius, Mm::from_mm(0.0));
         assert!(turn.as_radians().abs() < 1e-9);
     }
 
@@ -302,18 +298,20 @@ mod tests {
         let rect = kurbo::RoundedRect::new(0.0, 0.0, 200.0, 100.0, 10.0);
         let path = kurbo::Affine::rotate(0.3) * rect.to_path(1e-4);
         let (shape, turn) = fit_outline(&sampled(&path), 0.2).unwrap();
-        let Shape::Rect {
-            bounds,
-            corner_radii,
+        let Primitive::Rect {
+            width,
+            height,
+            corner_radius,
+            ..
         } = shape
         else {
             panic!("{shape:?}");
         };
-        assert!((bounds.width.as_mm() - 200.0).abs() < 1e-3);
-        assert!((bounds.height.as_mm() - 100.0).abs() < 1e-3);
+        assert!((width.as_mm() - 200.0).abs() < 1e-3);
+        assert!((height.as_mm() - 100.0).abs() < 1e-3);
         assert!(
-            (corner_radii.tl.as_mm() - 10.0).abs() < 0.05,
-            "{corner_radii:?}"
+            (corner_radius.as_mm() - 10.0).abs() < 0.05,
+            "{corner_radius:?}"
         );
         assert!((turn.as_radians() - 0.3).abs() < 1e-6);
     }
