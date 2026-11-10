@@ -38,7 +38,7 @@ pub struct OcrLine {
 }
 
 impl OcrLine {
-    /// Whether Trace sets the line as text: mean confidence at least [`MIN_LINE_CONFIDENCE`] and a
+    /// Whether Trace sets the line as text: mean confidence at least `MIN_LINE_CONFIDENCE` and a
     /// letter or digit in it.
     #[must_use]
     pub fn accepted(&self) -> bool {
@@ -53,7 +53,7 @@ impl OcrLine {
 
     /// Whether the line becomes text even when no face gives it a sure letter (Frage 115 B /
     /// 117 B, the garbage filter): at least 2 characters besides spaces, more than half of them
-    /// letters or digits, a mean confidence of at least [`MIN_GUESSED_LINE_CONFIDENCE`], and not
+    /// letters or digits, a mean confidence of at least `MIN_GUESSED_LINE_CONFIDENCE`, and not
     /// one short unit repeated.
     #[must_use]
     pub fn plausible(&self) -> bool {

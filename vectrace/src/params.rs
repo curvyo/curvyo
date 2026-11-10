@@ -53,7 +53,7 @@ impl Denoise {
 /// The 2x copy before tracing (criterion 41).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Upscale {
-    /// Pictures under [`UPSCALE_AUTO_BELOW_PX`] are traced from a 2x copy.
+    /// Pictures under `UPSCALE_AUTO_BELOW_PX` are traced from a 2x copy.
     Auto,
     /// Never.
     #[default]
