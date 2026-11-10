@@ -138,7 +138,7 @@ pub struct AnalysisReport {
     pub image_type: ImageType,
     /// The capture condition.
     pub capture: Capture,
-    /// How sure the type is, 0 to 1; below [`LOW_CONFIDENCE`] the proposal is the fallback.
+    /// How sure the type is, 0 to 1; below `LOW_CONFIDENCE` the proposal is the fallback.
     pub confidence: f64,
     /// The proposed values.
     pub proposal: Proposal,
