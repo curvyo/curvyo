@@ -58,6 +58,8 @@ No new dialog, operating hints, decorative effects, theme or shortcut category.
   object selection remain. **(Proposal)** deleting the active page activates the
   next surviving row, or the preceding row at the end. Keyboard focus follows
   that row. Undo restores the frame; it does not replay a view-navigation step.
+  Note 2026-11-10 (customer, Frage 151 B of `specs/0109-page-autolayout`): the pages behind the
+  deleted page close the hole in the same step (`0109` ux-notes §3a); objects still remain.
 - **(Proposal)** Width, Height, format and orientation change only the active
   frame, anchored at its top-left. Preserve the existing single-page resize
   behaviour. In a multi-page document, translate only wholly contained objects
@@ -108,6 +110,10 @@ No new dialog, operating hints, decorative effects, theme or shortcut category.
   press. Move the frame and that set by the same preview delta. Partial overlaps
   and pasteboard objects stay. Determine inclusion from rectangle bounds. Shared layers remain shared; do not reparent objects. Domain
   handling of groups, locks and clone transforms belongs in the ADR.
+  Note 2026-11-10 (customer, Fragen 148 A and 149 B of `specs/0109-page-autolayout`): the set
+  frozen at press is now the objects whose centre the page owns (ADR 0051 §4), not the wholly
+  contained ones; on release the dropped page pushes the pages it lands on away (`0109`
+  ux-notes §3).
 - **(Proposal)** `Move frame only` is per-page session state, reset on New/Open,
   not a document edit or undo step. Read it at drag start. On, only the frame
   moves; off, the contained set moves too. Its accessible checked state and tooltip

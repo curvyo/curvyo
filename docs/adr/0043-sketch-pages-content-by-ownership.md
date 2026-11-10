@@ -9,6 +9,7 @@ content); [ADR 0024](0024-spatial-pages.md) §1, §5 (membership and frame move 
 page); [ADR 0026](0026-parametric-sketch-nodes-and-workbench.md) "Page ownership revision" (page
 deletion deletes the owned sketch) and "Original transforms" (the original is never transformed
 as a whole). Spec: `specs/0099-sketch-pages`.
+Note 2026-11-10: §1 amended by [ADR 0051](0051-page-auto-layout-and-ownership-by-centre.md) (proposed): the membership read gains `owner_by_centre`, one owner per top-level object for the auto-layout move and for what a frame drag carries; sketch frames still do not exist for other objects.
 
 ## Context
 
