@@ -679,3 +679,45 @@ test("0089 §27.8: with Multicolour a new part has no palette until it has paths
     await waitFor("part 1 adds nothing, no palette", async () => ((await hexes()).length === 0 ? true : null), 60_000);
   });
 });
+
+test("0089 §27.11: in a part without paths the palette pipette adds the part's own colour, shown with its x, which removes it; Pick colours too", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    const at = await pickSetup(s);
+    await setAdvanced(s, true);
+    await s.evaluate(`[...document.querySelectorAll('${ADV} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === 'Multicolour').click()`);
+    await sleep(1500);
+    const hexes = async () =>
+      JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
+    await s.clickSel(PICK);
+    await s.click(at.a[0], at.a[1]);
+    await waitFor("part 1 with A", async () => ((await chipNames(s))[0] === "Part 1 of 1, inside, 1 path, active" ? true : null), 10_000);
+    await waitFor("part 1 palette", async () => ((await hexes()).length >= 1 ? true : null), 30_000);
+    await s.clickSel(ADD);
+    await waitFor("chip 2", async () => ((await chipNames(s)).length === 2 ? true : null), 10_000);
+    await waitFor("no palette for the part without paths", async () => ((await hexes()).length === 0 ? true : null), 15_000);
+    // The palette pipette in the part without paths: its own colour, with its x.
+    await s.clickSel(`${BAR} [data-trace-pipette][aria-label="Pick palette colour from the image"]`);
+    await s.click(at.image[0], at.image[1]);
+    await waitFor("the part's own colour", async () => (JSON.stringify(await hexes()) === '["#000000"]' ? true : null), 15_000);
+    await s.clickSel(`${BAR} [data-trace-palette-swatch="#000000"]`);
+    await waitFor("removed by its x", async () => ((await hexes()).length === 0 ? true : null), 15_000);
+    // Pick colours in the part without paths: the picked colour beside its pipette.
+    await press(s, "Escape", 27);
+    await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
+    await sleep(300);
+    await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes('Pick colours')).click()`);
+    await sleep(800);
+    // Entering Pick colours with no colour arms its pipette.
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-pipette][aria-label="Pick colour from the image"]').getAttribute('aria-pressed')`), "true");
+    await s.click(at.image[0], at.image[1]);
+    await waitFor("the picked colour", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-picked-swatch="#000000"]')`)) ? true : null), 15_000);
+    // Add part from Pick colours with a colour picked: the new part has none, the pipette stays armed,
+    // and a press on the image picks into the new part.
+    await s.clickSel(ADD);
+    await waitFor("chip 3", async () => ((await chipNames(s)).length === 3 ? true : null), 10_000);
+    await waitFor("no picked colour in part 3", async () => ((await s.evaluate(`document.querySelectorAll('${BAR} [data-trace-picked-swatch]').length`)) === 0 ? true : null), 10_000);
+    assert.equal(await s.evaluate(`document.querySelector('${BAR} [data-trace-pipette][aria-label="Pick colour from the image"]').getAttribute('aria-pressed')`), "true");
+    await s.click(at.image[0], at.image[1]);
+    await waitFor("part 3's picked colour", async () => ((await s.evaluate(`!!document.querySelector('${BAR} [data-trace-picked-swatch="#000000"]')`)) ? true : null), 15_000);
+  });
+});

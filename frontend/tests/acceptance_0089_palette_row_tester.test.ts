@@ -652,6 +652,14 @@ test("0089 §27.3 tester: hovering a swatch shows the x; with Ctrl held it shows
     // The release event may never arrive (the desktop webview drops it): the next pointer move without Ctrl brings the x back.
     await moveTo(s, swatch(hex), 0);
     assert.equal(await shown(), '["x"]', "no Ctrl on the next pointer move: the x again, without a key release");
+    // §27.12, as WebKitGTK sends it: the Control key's own events report Ctrl as before the key changed
+    // (key-down without, key-up with the flag), and the pointer rests: the glyph follows the key.
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 0 });
+    await sleep(300);
+    assert.equal(await shown(), '["ban"]', "a Control key-down with a stale flag: the Exclude glyph");
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 2 });
+    await sleep(300);
+    assert.equal(await shown(), '["x"]', "a Control key-up with a stale flag: the x again, the pointer at rest");
     await away(s);
   });
 });
