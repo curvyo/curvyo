@@ -9,6 +9,10 @@ test("arrows move in the 2 x 2 corner grid and stop at its edge", () => {
   assert.equal(cornerKey("ArrowUp", "bottom_left"), "top_left");
   assert.equal(cornerKey("ArrowLeft", "top_left"), "top_left");
   assert.equal(cornerKey("Home", "bottom_right"), "top_left");
+  // `0045` criterion 41: no wrap; Up from Bottom right is Top right, Right stays.
+  assert.equal(cornerKey("ArrowUp", "bottom_right"), "top_right");
+  assert.equal(cornerKey("ArrowRight", "bottom_right"), "bottom_right");
+  assert.equal(cornerKey("End", "top_left"), "bottom_right");
   assert.equal(cornerKey("End", "top_left"), "bottom_right");
   assert.equal(cornerKey("a", "top_left"), null);
 });

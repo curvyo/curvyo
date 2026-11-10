@@ -1,7 +1,6 @@
 import { CircleAlert } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 
-import { PageGlyph } from "@/components/panel/DocumentPresets";
 import { PresetStrip } from "@/components/panel/PresetStrip";
 import { scrollBodyTo } from "@/lib/panelScroll";
 import { PanelSwitch } from "@/components/ui/switch";
@@ -23,31 +22,6 @@ const UNIT_OPTIONS: readonly ToggleOption<FormUnit>[] = (
   tooltip: label.split(", ")[1],
   icon: <span className="text-sm">{value}</span>,
 }));
-
-const ORIENTATION_OPTIONS: readonly ToggleOption<"portrait" | "landscape">[] = [
-  {
-    value: "portrait",
-    label: "Opens as Portrait",
-    tooltip: "A pick from this group starts taller than wide.",
-    icon: (
-      <span className="flex items-center gap-1 text-xs">
-        <PageGlyph landscape={false} size={14} />
-        Portrait
-      </span>
-    ),
-  },
-  {
-    value: "landscape",
-    label: "Opens as Landscape",
-    tooltip: "A pick from this group starts wider than tall.",
-    icon: (
-      <span className="flex items-center gap-1 text-xs">
-        <PageGlyph landscape size={14} />
-        Landscape
-      </span>
-    ),
-  },
-];
 
 const FIELD_CLASS =
   "style-field h-7 w-full rounded-[5px] border bg-white px-1.5 text-sm outline-none";
@@ -261,26 +235,13 @@ export function FormatForm({ formats, onReturnFocus }: FormatFormProps) {
         />
       </div>
       {newGroup && (
-        <>
-          <TextField
-            {...common("group-name")}
-            label="Group name"
-            rowLabel="Group name"
-            value={values.newGroupName}
-            onChange={(newGroupName) => formats.changeForm({ newGroupName })}
-          />
-          <div className="flex items-center gap-2">
-            <span className="w-[60px] shrink-0 text-sm text-[var(--toolbar-icon)]">Opens as</span>
-            <ToggleGroup
-              label="Opens as"
-              options={ORIENTATION_OPTIONS}
-              value={values.orientation}
-              onChange={(orientation) => formats.changeForm({ orientation })}
-              itemWidth={78}
-              onReturnFocus={onReturnFocus}
-            />
-          </div>
-        </>
+        <TextField
+          {...common("group-name")}
+          label="Group name"
+          rowLabel="Group name"
+          value={values.newGroupName}
+          onChange={(newGroupName) => formats.changeForm({ newGroupName })}
+        />
       )}
       {!editing && (
         <PanelSwitch

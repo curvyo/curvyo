@@ -139,8 +139,8 @@ test("the checked mode and the chosen corner are the one Tab stop of their group
   assert.match(html, /aria-checked="false" tabindex="-1"[^>]*>Fixed</);
   const moved = await pane({ ...VIEW, origin: "bottom_left", mode: "fixed" });
   assert.match(moved, /aria-checked="true" tabindex="0"[^>]*>Fixed</);
-  assert.match(moved, /aria-label="Bottom left" aria-checked="true" tabindex="0"/);
-  assert.match(moved, /aria-label="Top left" aria-checked="false" tabindex="-1"/);
+  assert.match(moved, /aria-checked="true" aria-label="Bottom left" data-corner="bottom_left" tabindex="0"/);
+  assert.match(moved, /aria-checked="false" aria-label="Top left" data-corner="top_left" tabindex="-1"/);
 });
 
 test("the origin corner is a radio group of four corners under the page name", async () => {
@@ -148,11 +148,20 @@ test("the origin corner is a radio group of four corners under the page name", a
   const group = html.indexOf('role="radiogroup" aria-label="Origin corner"');
   assert.ok(group > html.indexOf("Coasters"), "under the page name");
   assert.ok(group < html.indexOf('role="switch"'), "before the Grid switch");
+  // The control of the laser Machine block (`0045` criterion 41): four 28 px radios in a 2 x 2 grid,
+  // no page pictogram.
+  assert.match(html, /role="radiogroup" aria-label="Origin corner" class="grid grid-cols-2 gap-1"/);
   for (const corner of ["Top left", "Top right", "Bottom left", "Bottom right"]) {
-    assert.match(html, new RegExp(`role="radio" aria-label="${corner}"`));
+    assert.match(html, new RegExp(`role="radio" aria-checked="(true|false)" aria-label="${corner}"`));
   }
-  assert.match(html, /aria-label="Top left" aria-checked="true" tabindex="0"/);
+  assert.equal(html.match(/role="radio"[^>]*aria-label="(Top|Bottom) (left|right)"/g)?.length, 4);
+  assert.match(html, /aria-checked="true" aria-label="Top left" data-corner="top_left" tabindex="0"/);
+  assert.doesNotMatch(html, /h-\[72px\]/);
 });
+
+// The keys and tooltips of the four radios: `machineBlockKeys.test.ts` (arrows within a row or
+// column without wrap, Home, End) and `acceptance_0045_formats_panel_browser.test.ts` (tooltips,
+// focus, a pointer press in the real page).
 
 test("the notices are at most 70 characters", async () => {
   const hook = await server.ssrLoadModule("/src/hooks/useGrid.ts");

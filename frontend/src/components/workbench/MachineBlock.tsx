@@ -8,13 +8,14 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
+import { CornerControl } from "@/components/CornerControl";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MachineProfileList } from "@/components/workbench/MachineProfileList";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { MachineView, WorkbenchesApi } from "@/hooks/useWorkbenches";
-import { CORNER_NAMES, CORNERS, type Corner, cornerKey, typedNumber } from "@/lib/machineBlockKeys";
+import { typedNumber } from "@/lib/machineBlockKeys";
 import { setMachineWriteFailureHandler } from "@/lib/machineProfilesFile";
 import { formatWorkArea } from "@/lib/workAreaText";
 
@@ -218,7 +219,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm" }: Machi
             {formatWorkArea(copy.width, copy.height, unit)}
           </span>
         </div>
-        <CornerControl corner={copy.origin} onChange={(corner) => api.setOrigin(corner)} />
+        <CornerControl label="Origin corner" corner={copy.origin} onChange={(corner) => api.setOrigin(corner)} />
         <NumberField
           label="Max feed"
           unit="mm/min"
@@ -400,57 +401,6 @@ function NumberField({
       </Tooltip>
       {notice}
     </div>
-  );
-}
-
-/** The 2 x 2 origin corner radiogroup (UX notes §6): one Tab stop, arrows move and select. */
-function CornerControl({ corner, onChange }: { corner: Corner; onChange: (corner: Corner) => void }) {
-  const group = useRef<HTMLDivElement>(null);
-  const select = (next: Corner) => {
-    onChange(next);
-    group.current?.querySelector<HTMLElement>(`[data-corner="${next}"]`)?.focus();
-  };
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-[var(--toolbar-icon)]">Origin corner</span>
-      <div ref={group} role="radiogroup" aria-label="Origin corner" className="grid grid-cols-2 gap-1">
-        {CORNERS.map((name) => (
-          <Tooltip key={name} side="left" content={CORNER_NAMES[name]}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={name === corner}
-              aria-label={CORNER_NAMES[name]}
-              data-corner={name}
-              tabIndex={name === corner ? 0 : -1}
-              onClick={() => onChange(name)}
-              onKeyDown={(event) => {
-                const next = cornerKey(event.key, corner);
-                if (next !== null) {
-                  event.preventDefault();
-                  select(next);
-                }
-              }}
-              className={`${ICON_BUTTON} ${name === corner ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)] hover:bg-[var(--toolbar-icon-active-bg)]" : ""} focus-visible:ring-inset`}
-            >
-              <CornerGlyph corner={name} />
-            </button>
-          </Tooltip>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** A 12px square outline with a 5px filled square in the named corner. */
-function CornerGlyph({ corner }: { corner: Corner }) {
-  const x = corner.endsWith("right") ? 9.25 : 2.75;
-  const y = corner.startsWith("bottom") ? 9.25 : 2.75;
-  return (
-    <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden>
-      <rect x={2} y={2} width={12} height={12} fill="none" stroke="currentColor" strokeWidth={1.5} />
-      <rect x={x} y={y} width={4} height={4} fill="currentColor" />
-    </svg>
   );
 }
 
