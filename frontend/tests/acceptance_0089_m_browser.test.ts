@@ -1,7 +1,7 @@
 // `specs/0089-trace-quality-and-colour` slice M in the real app (Chromium via DevTools; set
 // CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built): Output in Advanced
 // (criterion 25), the palette's swatch row with its count, tooltip and Exclude (criteria 26, 29,
-// ux-notes §26, §27: no Isolate, Shift+click excludes), Create paths as one group of one filled path per colour in one
+// ux-notes §26, §27: no Isolate, Ctrl+click excludes), Create paths as one group of one filled path per colour in one
 // step, and the bar at 800 x 600. Harness as in `acceptance_0089_e_browser.test.ts`.
 
 import assert from "node:assert/strict";
@@ -325,7 +325,7 @@ const away = async (s: S) => {
   await sleep(300);
 };
 
-const shiftClick = (s: S, sel: string) => clickCentre(s, sel, 8);
+const shiftClick = (s: S, sel: string) => clickCentre(s, sel, 2);
 
 /** A press in the middle of `sel`: on a palette swatch that is its x, which deletes (§27). */
 const clickCentre = async (s: S, sel: string, modifiers = 0) => {
@@ -341,7 +341,7 @@ const hiddenStatus = async (s: S) => (await s.evaluate(`document.querySelector('
 const coloursFieldText = async (s: S) =>
   (await s.evaluate(`document.querySelector('${BAR} [role=spinbutton][aria-label=Colours]')?.textContent ?? ''`)) as string;
 
-test("0089 M in Chromium: Output, the palette row with its tooltip, a Shift+click excludes, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 M in Chromium: Output, the palette row with its tooltip, a Ctrl+click excludes, Create paths per colour", { skip: !BROWSER, timeout: 400_000 }, async () => {
   let vite: ChildProcess | null = null;
   mkdirSync(SCRATCH, { recursive: true });
   const profile = mkdtempSync(path.join(SCRATCH, "profile-"));
@@ -394,9 +394,9 @@ test("0089 M in Chromium: Output, the palette row with its tooltip, a Shift+clic
       return t.includes("#234EB8") ? t : null;
     }, 5_000);
     assert.ok(tip.includes("#234EB8 · Blue"), tip);
-    assert.ok(tip.includes("Shift+click: exclude"), tip);
+    assert.ok(tip.includes("Ctrl+click: exclude"), tip);
 
-    // A Shift+click excludes (§27): the colour becomes background; the swatch stays with its mark;
+    // A Ctrl+click excludes (§27): the colour becomes background; the swatch stays with its mark;
     // a second one brings it back, a third excludes again.
     await shiftClick(s, swatchSel("#234EB8"));
     await waitFor("1 colour excluded", async () => ((await hiddenStatus(s)).includes("1 colour excluded") ? true : null), 20_000);

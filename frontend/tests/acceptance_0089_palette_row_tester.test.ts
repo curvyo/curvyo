@@ -2,7 +2,7 @@
 // from §26 before the code was read: one row beside the palette pipette, no detail row / Recolour / Merge into, tooltip,
 // keys, one line at 800 x 600, the right press, About Trace and the user page. Changed by design with §27 (customer
 // 2026-11-09): no Isolate; the x deletes (the result equals a trace with the smaller palette, compared as wires on an own
-// wasm instance) down to no colour; Shift+click excludes; a plain click elsewhere does nothing; the palette pipette stays
+// wasm instance) down to no colour; Ctrl+click excludes; a plain click elsewhere does nothing; the palette pipette stays
 // with Remove background. Real app in Chromium (CURVYO_E2E_BROWSER). Harness as in `acceptance_0089_sliceM_tester.test.ts`.
 
 import assert from "node:assert/strict";
@@ -202,7 +202,7 @@ async function launch(preload?: string) {
 const BAR = "[role=toolbar][aria-label=Trace]";
 type S = Awaited<ReturnType<typeof session>>;
 
-/** A click on `sel` at (`dx`, `dy`) from its middle (CDP modifiers 8 = Shift). */
+/** A click on `sel` at (`dx`, `dy`) from its middle (CDP modifiers 2 = Ctrl). */
 const clickOn = async (s: S, sel: string, modifiers = 0, dx = 0, dy = 0) => {
   const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
@@ -210,8 +210,8 @@ const clickOn = async (s: S, sel: string, modifiers = 0, dx = 0, dy = 0) => {
   }
   await sleep(300);
 };
-/** A Shift+click on the middle of `sel`: Exclude on or off (§27). */
-const shiftClick = (s: S, sel: string) => clickOn(s, sel, 8);
+/** A Ctrl+click on the middle of `sel`: Exclude on or off (§27). */
+const shiftClick = (s: S, sel: string) => clickOn(s, sel, 2);
 /** A click on the swatch's x, in its middle (shown on hover): delete (§27). */
 const clickX = (s: S, sel: string) => clickOn(s, sel);
 const press = async (s: S, k: string, vk: number, modifiers = 0) => {
@@ -426,14 +426,14 @@ test("0089 §26 tester: tooltip is '#RRGGBB · Name' plus the shortcut line; a p
     const lines = tip.split("\n").map((l) => l.trim()).filter(Boolean);
     assert.equal(lines.length, 2, `two lines: ${JSON.stringify(lines)}`);
     assert.equal(lines[0], first, "line 1 is hex · name");
-    assert.equal(lines[1], "Shift+click: exclude");
+    assert.equal(lines[1], "Ctrl+click: exclude");
     assert.ok(!/excluded|Removed/.test(await hiddenStatus(s)), `hover alone excludes and removes nothing: ${await hiddenStatus(s)}`);
     assert.equal((await swatchNames(s)).length, 6);
     await away(s);
   });
 });
 
-test("0089 §27 tester: Shift+click excludes and a second Shift+click brings the colour back; a plain click beside the x does nothing; there is no Isolate", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §27 tester: Ctrl+click excludes and a second Ctrl+click brings the colour back; a plain click beside the x does nothing; there is no Isolate", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "click.png", PICTURE);
     await pickMethod(s, "Remove background");
@@ -460,12 +460,12 @@ test("0089 §27 tester: Shift+click excludes and a second Shift+click brings the
     assert.equal((await swatchNames(s)).length, 6, "nothing deleted");
     assert.ok(!(await swatchNames(s))[2].endsWith(", excluded"), "nothing excluded");
     assert.equal((await lastRequest(s))!.n, before, "nothing traced again");
-    // Shift held while pointing changes nothing either (Isolate is gone).
-    await moveTo(s, swatch(hexes[2]), 8);
-    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
+    // Ctrl held while pointing changes nothing either (Isolate is gone).
+    await moveTo(s, swatch(hexes[2]), 2);
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 2 });
     await sleep(800);
     assert.ok(!(await hiddenStatus(s)).includes("Isolating"), await hiddenStatus(s));
-    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 0 });
     await away(s);
   }, RECORD);
 });
@@ -633,10 +633,10 @@ test("0089 §26.6 tester: About Trace has one Palette entry, a Parts entry befor
   assert.ok(!/recolou?r|merge into|\bView pill\b|"View"/i.test(page), "the user page has no Recolour, Merge into or View pill");
   assert.ok(page.includes("## Parts"), "the user page has the Parts section");
   const design = readFileSync(path.resolve(FRONTEND, "..", "docs", "design-system.md"), "utf8");
-  assert.ok(design.includes('"Shift+click: exclude"'), "the design system names the tooltip line (§27)");
+  assert.ok(design.includes('"Ctrl+click: exclude"'), "the design system names the tooltip line (§27)");
 });
 
-test("0089 §27.3 tester: hovering a swatch shows the x; with Shift held it shows the Exclude glyph instead", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §27.3 tester: hovering a swatch shows the x; with Ctrl held it shows the Exclude glyph instead", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "shiftglyph.png", PICTURE);
     await pickMethod(s, "Remove background");
@@ -646,12 +646,12 @@ test("0089 §27.3 tester: hovering a swatch shows the x; with Shift held it show
       (await s.evaluate(`JSON.stringify([...document.querySelectorAll(${JSON.stringify(swatch(hex))} + ' svg')].filter((v) => getComputedStyle(v.parentElement).display !== 'none').map((v) => v.getAttribute('class').includes('lucide-x') ? 'x' : v.getAttribute('class').includes('lucide-ban') ? 'ban' : '?').filter((v, i, a) => a.indexOf(v) === i))`)) as string;
     await moveTo(s, swatch(hex));
     assert.equal(await shown(), '["x"]', "plain hover: the x");
-    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 2 });
     await sleep(300);
-    assert.equal(await shown(), '["ban"]', "Shift held: the Exclude glyph");
-    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
-    await sleep(300);
-    assert.equal(await shown(), '["x"]', "Shift released: the x again");
+    assert.equal(await shown(), '["ban"]', "Ctrl held: the Exclude glyph");
+    // The release event may never arrive (the desktop webview drops it): the next pointer move without Ctrl brings the x back.
+    await moveTo(s, swatch(hex), 0);
+    assert.equal(await shown(), '["x"]', "no Ctrl on the next pointer move: the x again, without a key release");
     await away(s);
   });
 });

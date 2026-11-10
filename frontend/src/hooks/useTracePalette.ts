@@ -40,7 +40,7 @@ export interface TracePaletteApi {
   found: number | null;
   joined: number;
   excluded: (hex: string) => boolean;
-  /** Shift+click, Enter, Space (`ux-notes.md` §27): Exclude on or off. */
+  /** Ctrl+click, Enter, Space (`ux-notes.md` §27): Exclude on or off. */
   toggleExclude: (hex: string) => void;
   /** The x, Shift+Enter, Delete: the palette without `hex`, matched again, down to no colour. */
   remove: (hex: string) => void;

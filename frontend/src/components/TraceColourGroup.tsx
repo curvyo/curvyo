@@ -102,41 +102,44 @@ function CasedGlyph({ icon: Icon, className }: { icon: LucideIcon; className: st
   );
 }
 
-/** Whether Shift is held, window-wide: a Shift+click excludes, so the hovered swatch shows the
- * Exclude glyph instead of the x (customer 2026-11-10). */
-let shiftHeld = false;
-const shiftListeners = new Set<() => void>();
-function setShift(down: boolean) {
-  if (shiftHeld !== down) {
-    shiftHeld = down;
-    shiftListeners.forEach((listen) => listen());
+/** Whether Ctrl (Cmd on a Mac) is held, window-wide: a Ctrl+click excludes, so the hovered swatch
+ * shows the Exclude glyph instead of the x (customer 2026-11-10). Every key and pointer event
+ * brings the state up to date, so a missed key release cannot leave it stuck. */
+let ctrlHeld = false;
+const ctrlListeners = new Set<() => void>();
+function setCtrl(down: boolean) {
+  if (ctrlHeld !== down) {
+    ctrlHeld = down;
+    ctrlListeners.forEach((listen) => listen());
   }
 }
-function subscribeShift(listen: () => void): () => void {
-  if (shiftListeners.size === 0) {
-    window.addEventListener("keydown", onShiftKey, true);
-    window.addEventListener("keyup", onShiftKey, true);
-    window.addEventListener("blur", onShiftBlur);
+function subscribeCtrl(listen: () => void): () => void {
+  if (ctrlListeners.size === 0) {
+    window.addEventListener("keydown", onCtrlKey, true);
+    window.addEventListener("keyup", onCtrlKey, true);
+    window.addEventListener("pointermove", onCtrlKey, true);
+    window.addEventListener("blur", onCtrlBlur);
   }
-  shiftListeners.add(listen);
+  ctrlListeners.add(listen);
   return () => {
-    shiftListeners.delete(listen);
-    if (shiftListeners.size === 0) {
-      window.removeEventListener("keydown", onShiftKey, true);
-      window.removeEventListener("keyup", onShiftKey, true);
-      window.removeEventListener("blur", onShiftBlur);
-      shiftHeld = false;
+    ctrlListeners.delete(listen);
+    if (ctrlListeners.size === 0) {
+      window.removeEventListener("keydown", onCtrlKey, true);
+      window.removeEventListener("keyup", onCtrlKey, true);
+      window.removeEventListener("pointermove", onCtrlKey, true);
+      window.removeEventListener("blur", onCtrlBlur);
+      ctrlHeld = false;
     }
   };
 }
-function onShiftKey(event: globalThis.KeyboardEvent) {
-  setShift(event.shiftKey);
+function onCtrlKey(event: globalThis.KeyboardEvent | PointerEvent) {
+  setCtrl(event.ctrlKey || event.metaKey);
 }
-function onShiftBlur() {
-  setShift(false);
+function onCtrlBlur() {
+  setCtrl(false);
 }
-function useShiftHeld(): boolean {
-  return useSyncExternalStore(subscribeShift, () => shiftHeld, () => false);
+function useCtrlHeld(): boolean {
+  return useSyncExternalStore(subscribeCtrl, () => ctrlHeld, () => false);
 }
 
 interface SwatchCellProps {
@@ -156,7 +159,7 @@ interface SwatchCellProps {
 /** One colour of a swatch row (`ux-notes.md` §25.4, §26, §27): a 24 x 28 button around the 20 px
  * swatch; the cells touch, so the swatches are 4 px apart. Hover and focus fade it and show the x. */
 export function SwatchCell({ hex, kind, stop, label, tooltip, excluded = false, onClick, onKeyDown }: SwatchCellProps) {
-  const shift = useShiftHeld() && kind === "palette";
+  const ctrl = useCtrlHeld() && kind === "palette";
   const fade = excluded ? "opacity-40" : "group-hover:opacity-40 group-focus-visible:opacity-40";
   return (
     <AppTooltip side="bottom" content={tooltip}>
@@ -172,7 +175,7 @@ export function SwatchCell({ hex, kind, stop, label, tooltip, excluded = false, 
       >
         <span aria-hidden className={`block size-5 rounded-[4px] border border-[var(--swatch-border)] ${fade}`} style={{ background: hex }} />
         <span aria-hidden className="pointer-events-none absolute size-5 rounded-[4px] group-focus-visible:ring-2 group-focus-visible:ring-[var(--editor-accent)]" />
-        {shift ? (
+        {ctrl ? (
           <CasedGlyph icon={Ban} className={excluded ? "block" : "hidden group-hover:block group-focus-visible:block"} />
         ) : (
           <>

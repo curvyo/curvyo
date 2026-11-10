@@ -111,7 +111,7 @@ test("ux-notes §26, §27: deleting a colour keeps exactly the others and un-exc
 
 test("ux-notes §26: the swatch tooltip, name and keys", () => {
   assert.equal(paletteTooltip("#4B392F"), "#4B392F · Brown");
-  assert.equal(PALETTE_HINT, "Shift+click: exclude");
+  assert.equal(PALETTE_HINT, "Ctrl+click: exclude");
   assert.equal(paletteSwatchLabel("#4B392F", false), "#4B392F · Brown");
   assert.equal(paletteSwatchLabel("#4B392F", true), "#4B392F · Brown, excluded");
   assert.deepEqual(paletteKey("ArrowRight", false, 1, 3), { move: 2 });

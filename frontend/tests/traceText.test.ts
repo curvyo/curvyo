@@ -165,7 +165,7 @@ test("criterion 70: the info page's exact text", () => {
   "Ignore below: drops shapes and holes smaller than this size in mm.",
   "Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.",
   "Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.",
-  "Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Shift+click excludes a colour: it becomes background and is not traced; a second Shift+click brings it back.",
+  "Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Ctrl+click excludes a colour: it becomes background and is not traced; a second Ctrl+click brings it back.",
   "Invert: traces what the method leaves out; transparent pixels never become shapes.",
   "Drop border shapes: drops shapes that touch the image border.",
   "Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.",

@@ -201,7 +201,7 @@ async function launch(preload?: string) {
 const BAR = "[role=toolbar][aria-label=Trace]";
 type S = Awaited<ReturnType<typeof session>>;
 
-/** A click on `sel` at (`dx`, `dy`) from its middle (CDP modifiers 8 = Shift). */
+/** A click on `sel` at (`dx`, `dy`) from its middle (CDP modifiers 2 = Ctrl). */
 const clickOn = async (s: S, sel: string, modifiers = 0, dx = 0, dy = 0) => {
   const c = JSON.parse((await s.evaluate(`JSON.stringify((() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; })())`)) as string) as [number, number];
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
@@ -545,7 +545,7 @@ test("0089 §27.1 tester: Pick colours with nothing picked: Trace is aria-disabl
 
 // ------------------------------------------------------------------ 27.2: Isolate is gone
 
-test("0089 §27.2 tester: no word Isolate anywhere; Shift+hover over a swatch changes nothing on the canvas and in the tooltip", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §27.2 tester: no word Isolate anywhere; Ctrl+hover over a swatch changes nothing on the canvas and in the tooltip", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "iso.png", PICTURE);
     await pickMethod(s, "Remove background");
@@ -558,8 +558,8 @@ test("0089 §27.2 tester: no word Isolate anywhere; Shift+hover over a swatch ch
     const hex = (await hexesOf(s))[2];
     await away(s);
     const before = await shot(s);
-    await moveTo(s, swatch(hex), 8);
-    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
+    await moveTo(s, swatch(hex), 2);
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 2 });
     await sleep(1500);
     const tip = (await s.evaluate(`[...document.querySelectorAll('[role=tooltip]')].map((e) => e.innerText).join('|')`)) as string;
     assert.ok(!/isolat/i.test(tip), tip);
@@ -572,8 +572,8 @@ test("0089 §27.2 tester: no word Isolate anywhere; Shift+hover over a swatch ch
         if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) > 6) diff++;
       }
     }
-    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
-    assert.ok(diff < 20, `no dimming of other colours under Shift+hover: ${diff} changed samples`);
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17, modifiers: 0 });
+    assert.ok(diff < 20, `no dimming of other colours under Ctrl+hover: ${diff} changed samples`);
     await away(s);
   }, RECORD);
 });
@@ -711,7 +711,7 @@ test("0089 §27 tester: at 800 x 600 the bar does not wrap beyond the rows of §
 
 // ------------------------------------------------------------------ 27.3: pointer
 
-test("0089 §27.3 tester: a plain click on the swatch body does nothing, Shift+click excludes and again brings it back, the x deletes; the Trace button is never asked", { skip: !BROWSER, timeout: 500_000 }, async () => {
+test("0089 §27.3 tester: a plain click on the swatch body does nothing, Ctrl+click excludes and again brings it back, the x deletes; the Trace button is never asked", { skip: !BROWSER, timeout: 500_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "ptr.png", PICTURE);
     await pickMethod(s, "Remove background");
@@ -725,11 +725,11 @@ test("0089 §27.3 tester: a plain click on the swatch body does nothing, Shift+c
     assert.equal((await swatchNames(s)).length, 6);
     assert.ok(!(await swatchNames(s))[0].endsWith(", excluded"));
     assert.equal((await lastRequest(s))!.n, n0, "nothing traced");
-    // Shift+click anywhere on the cell, also on the x spot: Exclude, not delete.
-    await clickOn(s, swatch(hexes[0]), 8);
+    // Ctrl+click anywhere on the cell, also on the x spot: Exclude, not delete.
+    await clickOn(s, swatch(hexes[0]), 2);
     await waitFor("excluded", async () => ((await swatchNames(s))[0].endsWith(", excluded") ? true : null), 20_000);
-    assert.equal((await swatchNames(s)).length, 6, "a Shift+click on the x spot excludes, it does not delete");
-    await clickOn(s, swatch(hexes[0]), 8, -9, -11);
+    assert.equal((await swatchNames(s)).length, 6, "a Ctrl+click on the x spot excludes, it does not delete");
+    await clickOn(s, swatch(hexes[0]), 2, -9, -11);
     await waitFor("back", async () => (!(await swatchNames(s))[0].endsWith(", excluded") ? true : null), 20_000);
     // The x: delete, the others stay in order; the keyboard goes back to the canvas.
     await clickOn(s, swatch(hexes[3]));
