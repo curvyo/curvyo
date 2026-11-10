@@ -3,8 +3,8 @@ name = "vectrace"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
-description = "The Curvyo raster tracer: an RGBA8 raster and trace settings in, closed outlines in document millimetres out (pure, wasm-compatible)."
+license = "MIT OR Apache-2.0"
+description = "The Curvyo raster tracer and text reader: an RGBA8 raster and trace settings in, closed outlines in document millimetres out (pure, wasm-compatible)."
 
 [lints]
 workspace = true

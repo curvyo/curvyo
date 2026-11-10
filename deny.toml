@@ -60,10 +60,6 @@ name = "curvyo-svg-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-image-core"
 
-[[licenses.exceptions]]
-allow = ["AGPL-3.0-or-later"]
-name = "curvyo-vectorize-core"
-
 # The first-party sketch solver adapter follows ADR 0006, like the other core crates.
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
@@ -78,10 +74,6 @@ name = "curvyo-extension-core"
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-laser-core"
-
-[[licenses.exceptions]]
-allow = ["AGPL-3.0-or-later"]
-name = "curvyo-ocr-core"
 
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
