@@ -1,6 +1,9 @@
 # 0108 Trace library extraction: plan
 
-Status: **Proposed, waiting for the customer's approval.** No code moves before that.
+Status: **Approved by the customer, 2026-11-10**, with these answers: Frage 1 = B, the crate is
+named `vectrace` (directory `vectrace/`, no Curvyo name); Frage 2 = A, OCR is a module of the same
+crate; Frage 3 = A, licence MIT OR Apache-2.0 (weights stay Apache-2.0). Branch
+`story/trace-library-extraction`.
 
 ## Goal
 All tracing algorithms live in one crate that can be moved to its own repository (own CI, own
@@ -19,7 +22,7 @@ app and a SaaS will use the same crate. Glue between the crate and Curvyo is as 
 
 ## Target shape
 ```text
-curvyo-trace-core            (new; later its own repo; name: Frage 1)
+vectrace                     (new; later its own repo)
   raster, pipeline, colour, analysis      <- vectorize-core
   ocr                                     <- ocr-core (module, weights still passed in as bytes)
   fit, shapes, words, inpaint, regions    <- ui-core trace_* (pure parts)
@@ -60,7 +63,7 @@ whole move is testable (CLAUDE.md §4): the trace in the demo behaves exactly as
 2. **Make `ui-core` trace modules pure.** Split each `doc:`-coupled file (`trace_plan`,
    `trace_text`, `trace_transfer`, `trace_shapes`) into a pure part (moves) and an adapter part
    (stays). Goldens and `ui-core` tests unchanged.
-3. **Create `curvyo-trace-core`.** `git mv` vectorize-core, ocr-core and the pure `trace_*`
+3. **Create `vectrace`.** `git mv` vectorize-core, ocr-core and the pure `trace_*`
    files; history stays with `git log --follow`. Re-export nothing from the old crates; fix the
    callers. Remove the two empty old crates. ADR (new) amends 0011, 0023, 0028 by note.
 4. **Shrink the glue.** One adapter module in `ui-core`, one thin forwarding layer in
@@ -94,21 +97,7 @@ target. Implementer (Sonnet): the adapter split of slice 2. Tester: as above.
   Slice 0 measures this first; if it exceeds 3 days the lead brings it back before slice 2.
 
 ## Questions for the customer
-**Frage 1 (TRACE-NAME): Name of the crate and the future repository**
-A: `curvyo-trace-core` now, renamed when the repo exists. B: a neutral name from the start
-(for example `vectrace`), so the standalone app and the SaaS carry no Curvyo name.
-Recommendation: B, a rename later touches every import. Default if unanswered: A.
-
-**Frage 2 (TRACE-OCR): OCR in the same crate or its own?**
-A: one crate, OCR a module (fewer moving parts, one release). B: two crates in the new repo
-(tracer without `rten` for a server that never reads text). Recommendation: A; B is a flag or
-split later when the SaaS needs it. Default: A.
-
-**Frage 3 (TRACE-LIC): Licence of the new repo**
-The crate is yours alone today; the weights are Apache-2.0 (ADR 0028). A: MIT OR Apache-2.0 like
-the Rust ecosystem. B: proprietary or source-available, because of the SaaS.
-Recommendation: decide before the rehearsal (slice 5); no effect on slices 0 to 4.
-Default: keep the workspace licence.
+Answered 2026-11-10, see Status. The licence goes into the new crate's `Cargo.toml` and a `LICENSE-*` pair at the extraction (slice 5).
 
 **Not asked (decided, vetoable at the demo) (Proposal):** font matching stays in Curvyo; shapes
 are returned as plain data; no behaviour change in the demo; no hard size limits.
