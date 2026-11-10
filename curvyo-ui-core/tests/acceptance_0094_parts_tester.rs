@@ -28,9 +28,9 @@ use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceMethod, TraceParams, TracePartArea, TracePartClip,
-    TraceRegion, TraceRgb, TraceStatus, TraceWire, join_trace_parts, read_trace_wire,
-    trace_colour_job_in, trace_job_in, trace_part_clips, trace_text_job_in,
+    Mask, OcrLine, TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePartArea,
+    TracePartClip, TracePixelMap, TraceRaster, TraceRegion, TraceRgb, TraceStatus, TraceWire,
+    join_trace_parts, read_trace_wire, run_trace_job, trace_part_clips,
 };
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
@@ -182,11 +182,51 @@ fn job(pic: &Picture, job: &Job, region: Option<&TraceRegion>) -> Vec<f64> {
     let map = map_100mm(pic.n);
     let region = region.map(|r| r as &dyn Mask);
     match job {
-        Job::Mono(p) => trace_job_in(&pic.rgba, pic.n, pic.n, map, p, region, &mut |_| {}),
-        Job::Colour(p) => trace_colour_job_in(&pic.rgba, pic.n, pic.n, map, p, region, &mut |_| {}),
-        Job::Text(p, lines) => {
-            trace_text_job_in(&pic.rgba, pic.n, pic.n, map, p, lines, region, &mut |_| {})
-        }
+        Job::Mono(p) => run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: pic.n,
+                    height: pic.n,
+                    rgba: &pic.rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(p),
+                lines: &[],
+                mask: region,
+                shapes: false,
+            },
+            &mut |_| {},
+        ),
+        Job::Colour(p) => run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: pic.n,
+                    height: pic.n,
+                    rgba: &pic.rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Colours(p),
+                lines: &[],
+                mask: region,
+                shapes: false,
+            },
+            &mut |_| {},
+        ),
+        Job::Text(p, lines) => run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: pic.n,
+                    height: pic.n,
+                    rgba: &pic.rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(p),
+                lines,
+                mask: region,
+                shapes: false,
+            },
+            &mut |_| {},
+        ),
     }
 }
 

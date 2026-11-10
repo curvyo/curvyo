@@ -8,7 +8,6 @@
 
 use std::ops::ControlFlow;
 
-use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{
     ColourParams, ColourTrace, PaletteEntry, PixelMap, Progress, Raster, Rgb8, Selection,
     TraceError, colour_palette, suggest_background, trace_colours,
@@ -19,7 +18,7 @@ use crate::trace_ocr::OcrLine;
 use crate::trace_text::{TextPass, text_pass};
 use crate::trace_text_wire::{keep_lines_in, write_texts};
 use crate::trace_transfer::{
-    TraceStatus, colour_head, job_percent, status_only, trace_colour_job_in, write_colour_tail,
+    TraceStatus, colour_head, colour_wire, job_percent, status_only, write_colour_tail,
 };
 
 /// The share of a job's percent the palette of the unfilled picture takes (Proposal: it is the
@@ -28,33 +27,23 @@ const PALETTE_PERCENT: u32 = 25;
 
 /// One multicolour trace with the OCR `lines` (in this picture's pixels): the text pass, the
 /// palette of the picture as it is, the trace of the filled picture with that palette, then the
-/// numbers of [`trace_colour_job_in`] with the text section (each line's fill) between the
-/// outlines and the palette. With a mask `region` (`specs/0094` criterion 11) only the lines
-/// whose box centre the region keeps stay as text, and each layer is clipped. Without lines the
-/// numbers are exactly those of [`trace_colour_job_in`] (criteria 12 and 24).
-#[must_use]
-#[allow(clippy::too_many_arguments)] // the job's inputs, as the worker passes them
-pub fn trace_text_colour_job_in(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
+/// numbers of [`colour_wire`] with the text section (each line's fill) between the outlines and
+/// the palette. With a `mask` (`specs/0094` criterion 11) only the lines whose box centre the
+/// mask keeps stay as text, and each layer is clipped. Without lines the numbers are exactly
+/// those of [`colour_wire`] (criteria 12 and 24).
+pub(crate) fn text_colour_wire(
+    raster: Raster<'_>,
+    map: PixelMap,
     params: &ColourParams,
     lines: &[OcrLine],
-    region: Option<&dyn Mask>,
+    mask: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
     if lines.is_empty() {
-        return trace_colour_job_in(rgba, width, height, pixel_map, params, region, on_percent);
+        return colour_wire(raster, map, params, mask, on_percent);
     }
-    let map = Affine::from_array(pixel_map);
-    let mut pass = text_pass(rgba, width, height, map, &params.trace, lines);
-    keep_lines_in(&mut pass, region);
-    let raster = Raster {
-        width,
-        height,
-        rgba,
-    };
+    let mut pass = text_pass(raster, map, &params.trace, lines);
+    keep_lines_in(&mut pass, mask);
     let mut reported: Option<u8> = None;
     let mut report = |percent: u32| {
         let percent = u8::try_from(percent.min(100)).unwrap_or(100);
@@ -68,9 +57,8 @@ pub fn trace_text_colour_job_in(
     })
     .and_then(|palette| {
         let filled = Raster {
-            width,
-            height,
             rgba: &pass.rgba,
+            ..raster
         };
         trace_with_palette(filled, map, params, palette.as_deref(), &mut |p| {
             report(PALETTE_PERCENT + u32::from(job_percent(p)) * (100 - PALETTE_PERCENT) / 100);
@@ -78,7 +66,7 @@ pub fn trace_text_colour_job_in(
     });
     match traced {
         Ok(mut result) => {
-            let unclipped = region.map_or(0, |mask| clip_colours(mask, &mut result));
+            let unclipped = mask.map_or(0, |mask| clip_colours(mask, &mut result));
             report(100);
             let fills = line_fills(&pass, &result.palette, raster, params);
             let mut wire = colour_head(&result);
@@ -97,7 +85,7 @@ pub fn trace_text_colour_job_in(
 /// the same).
 fn palette_of_picture(
     raster: Raster<'_>,
-    map: Affine,
+    map: PixelMap,
     params: &ColourParams,
     pass: &TextPass,
     progress: &mut dyn FnMut(Progress),
@@ -105,7 +93,7 @@ fn palette_of_picture(
     if pass.regions.is_empty() || matches!(params.trace.selection, Selection::PickColours { .. }) {
         return Ok(None);
     }
-    let palette = colour_palette(raster, PixelMap::new(map.to_array()), params, &mut |p| {
+    let palette = colour_palette(raster, map, params, &mut |p| {
         progress(p);
         ControlFlow::Continue(())
     })?;
@@ -129,13 +117,13 @@ fn with_palette(params: &ColourParams, palette: Option<&[PaletteEntry]>) -> Colo
 /// reported is `palette` with its marks and pixels, as Recognise text off reports it.
 fn trace_with_palette(
     filled: Raster<'_>,
-    map: Affine,
+    map: PixelMap,
     params: &ColourParams,
     palette: Option<&[PaletteEntry]>,
     progress: &mut dyn FnMut(Progress),
 ) -> Result<ColourTrace, TraceError> {
     let own = with_palette(params, palette);
-    let mut result = trace_colours(filled, PixelMap::new(map.to_array()), &own, &mut |p| {
+    let mut result = trace_colours(filled, map, &own, &mut |p| {
         progress(p);
         ControlFlow::Continue(())
     })?;
@@ -222,7 +210,8 @@ fn nearest(colour: Rgb8, candidates: &[Rgb8]) -> Option<Rgb8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::{read_wire, trace_colour_job_in};
+    use crate::trace_job::{Job, Mode, run};
+    use crate::trace_transfer::read_wire;
     use curvyo_vectorize_core::Mm;
     use curvyo_vectorize_core::TraceParams;
 
@@ -296,14 +285,19 @@ mod tests {
     /// outline with no letter hole.
     #[test]
     fn white_text_on_a_box_is_white_above_the_whole_box() {
-        let wire = trace_text_colour_job_in(
-            &white_on_red(),
-            W,
-            H,
-            MAP,
-            &params(),
-            &[line()],
-            None,
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &white_on_red(),
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         );
         let read = read_wire(&wire).unwrap();
@@ -328,17 +322,36 @@ mod tests {
     #[test]
     fn red_text_on_white_keeps_its_red() {
         let rgba = red_on_white();
-        let wire =
-            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &rgba,
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         let read = read_wire(&wire).unwrap();
         assert_eq!(read.texts.lines[0].fill, Some(rgb(RED)));
-        let off = read_wire(&trace_colour_job_in(
-            &rgba,
-            W,
-            H,
-            MAP,
-            &params(),
-            None,
+        let off = read_wire(&run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &rgba,
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap();
@@ -366,8 +379,21 @@ mod tests {
             }
         });
         // Remove background keeps the grey as a palette colour.
-        let wire =
-            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &rgba,
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         let read = read_wire(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
@@ -381,8 +407,21 @@ mod tests {
             specks: Mm::from_mm(0.0),
             ..TraceParams::with_threshold(128)
         });
-        let wire =
-            trace_text_colour_job_in(&rgba, W, H, MAP, &brightness, &[line()], None, &mut |_| {});
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &rgba,
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&brightness),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         let read = read_wire(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
@@ -397,25 +436,35 @@ mod tests {
     fn a_text_in_an_excluded_colour_is_left_out() {
         let mut excluded = params();
         excluded.excluded = vec![rgb(RED)];
-        let wire = trace_text_colour_job_in(
-            &red_on_white(),
-            W,
-            H,
-            MAP,
-            &excluded,
-            &[line()],
-            None,
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &red_on_white(),
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&excluded),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         );
         assert!(read_wire(&wire).unwrap().texts.lines[0].excluded);
-        let kept = trace_text_colour_job_in(
-            &red_on_white(),
-            W,
-            H,
-            MAP,
-            &params(),
-            &[line()],
-            None,
+        let kept = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &red_on_white(),
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         );
         assert!(!read_wire(&kept).unwrap().texts.lines[0].excluded);
@@ -427,16 +476,70 @@ mod tests {
     fn without_lines_it_is_the_colour_job_and_it_repeats() {
         let rgba = white_on_red();
         assert_eq!(
-            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[], None, &mut |_| {}),
-            trace_colour_job_in(&rgba, W, H, MAP, &params(), None, &mut |_| {})
+            run(
+                &Job {
+                    raster: Raster {
+                        width: W,
+                        height: H,
+                        rgba: &rgba
+                    },
+                    map: PixelMap::new(MAP),
+                    mode: Mode::Colours(&params()),
+                    lines: &[],
+                    mask: None,
+                    shapes: false
+                },
+                &mut |_| {}
+            ),
+            run(
+                &Job {
+                    raster: Raster {
+                        width: W,
+                        height: H,
+                        rgba: &rgba
+                    },
+                    map: PixelMap::new(MAP),
+                    mode: Mode::Colours(&params()),
+                    lines: &[],
+                    mask: None,
+                    shapes: false
+                },
+                &mut |_| {}
+            )
         );
         let mut seen = Vec::new();
-        let first =
-            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |p| {
+        let first = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &rgba,
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
+            &mut |p| {
                 seen.push(p);
-            });
-        let second =
-            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
+            },
+        );
+        let second = run(
+            &Job {
+                raster: Raster {
+                    width: W,
+                    height: H,
+                    rgba: &rgba,
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Colours(&params()),
+                lines: &[line()],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         assert_eq!(first, second);
         assert!(seen.windows(2).all(|w| w[0] < w[1]), "{seen:?}");
         assert_eq!(seen.last(), Some(&100));

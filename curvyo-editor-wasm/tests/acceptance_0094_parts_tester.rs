@@ -23,7 +23,10 @@ mod cpu_time;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
-use curvyo_ui_core::{Mask, TraceRegion, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{
+    Mask, TraceJob, TraceMode, TracePixelMap, TraceRaster, TraceRegion, read_trace_wire,
+    run_trace_job,
+};
 use image::ImageEncoder;
 use kurbo::{BezPath, PathEl};
 use support::{M1, base64, draw};
@@ -165,27 +168,39 @@ fn part_wire(s: &mut Session, image: NodeId, index: usize, settings: &str, cut: 
     }
     .expect("pixels");
     if let Some(colour) = curvyo_editor_wasm::trace_colour_settings(&settings) {
-        return curvyo_ui_core::trace_colour_job_in(
-            &source.rgba,
-            source.width,
-            source.height,
-            source.map,
-            &colour,
-            trace_mask_region(&settings)
-                .as_ref()
-                .map(|r| r as &dyn Mask),
+        return run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: source.width,
+                    height: source.height,
+                    rgba: &source.rgba,
+                },
+                map: TracePixelMap::new(source.map),
+                mode: TraceMode::Colours(&colour),
+                lines: &[],
+                mask: trace_mask_region(&settings)
+                    .as_ref()
+                    .map(|r| r as &dyn Mask),
+                shapes: false,
+            },
             &mut |_| {},
         );
     }
-    trace_job_in(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &params,
-        trace_mask_region(&settings)
-            .as_ref()
-            .map(|r| r as &dyn Mask),
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
+            map: TracePixelMap::new(source.map),
+            mode: TraceMode::Mono(&params),
+            lines: &[],
+            mask: trace_mask_region(&settings)
+                .as_ref()
+                .map(|r| r as &dyn Mask),
+            shapes: false,
+        },
         &mut |_| {},
     )
 }
@@ -563,15 +578,21 @@ fn c21_c33_session_join_matches_the_clip_rules_and_one_part_is_slice_1() {
     let slice1 = {
         let settings = format!(r#"{{"threshold":50,"mask":{mask}}}"#);
         let src = s.trace_source(image, false).unwrap();
-        trace_job_in(
-            &src.rgba,
-            src.width,
-            src.height,
-            src.map,
-            &trace_settings(&settings),
-            trace_mask_region(&settings)
-                .as_ref()
-                .map(|r| r as &dyn Mask),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: src.width,
+                    height: src.height,
+                    rgba: &src.rgba,
+                },
+                map: TracePixelMap::new(src.map),
+                mode: TraceMode::Mono(&trace_settings(&settings)),
+                lines: &[],
+                mask: trace_mask_region(&settings)
+                    .as_ref()
+                    .map(|r| r as &dyn Mask),
+                shapes: false,
+            },
             &mut |_| {},
         )
     };
@@ -880,13 +901,19 @@ fn c31_four_quarter_parts_cost_at_most_1_3_whole_traces_in_thread_cpu() {
     let settings = r#"{"threshold":128}"#;
     let src = s.trace_source(image, false).unwrap();
     let (_, whole) = cpu_time::cpu_time_of(|| {
-        trace_job_in(
-            &src.rgba,
-            src.width,
-            src.height,
-            src.map,
-            &trace_settings(settings),
-            None,
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: src.width,
+                    height: src.height,
+                    rgba: &src.rgba,
+                },
+                map: TracePixelMap::new(src.map),
+                mode: TraceMode::Mono(&trace_settings(settings)),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         )
     });
@@ -1041,13 +1068,19 @@ fn a_cut_out_part_with_upscale_auto_traces_as_the_whole_picture() {
     ));
     let params = trace_settings(settings);
     let run = |src: &curvyo_editor_wasm::TraceSource, region: Option<&TraceRegion>| {
-        read_trace_wire(&trace_job_in(
-            &src.rgba,
-            src.width,
-            src.height,
-            src.map,
-            &params,
-            region.map(|r| r as &dyn Mask),
+        read_trace_wire(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: src.width,
+                    height: src.height,
+                    rgba: &src.rgba,
+                },
+                map: TracePixelMap::new(src.map),
+                mode: TraceMode::Mono(&params),
+                lines: &[],
+                mask: region.map(|r| r as &dyn Mask),
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap()
@@ -1152,13 +1185,19 @@ fn a_whole_picture_with_upscale_auto_away_from_the_origin_lands_on_the_picture()
     let src = s.trace_source(image, false).unwrap();
     assert!(curvyo_ui_core::TraceUpscale::Auto.applies(src.width, src.height));
     let trace = |settings: &str| {
-        read_trace_wire(&trace_job_in(
-            &src.rgba,
-            src.width,
-            src.height,
-            src.map,
-            &trace_settings(settings),
-            None,
+        read_trace_wire(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: src.width,
+                    height: src.height,
+                    rgba: &src.rgba,
+                },
+                map: TracePixelMap::new(src.map),
+                mode: TraceMode::Mono(&trace_settings(settings)),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap()

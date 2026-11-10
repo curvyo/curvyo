@@ -8,11 +8,11 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
+use curvyo_ui_core::{TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job};
 use std::path::PathBuf;
 
 use curvyo_document_core::{ObjectSnapshot, unpack};
 use curvyo_editor_wasm::{Session, Tool, trace_colour_settings};
-use curvyo_ui_core::trace_colour_job_in;
 use serde_json::Value;
 
 /// The frontend's first-use Multicolour settings (`settingsJson`): Brightness, automatic count.
@@ -48,13 +48,19 @@ fn off(file: &str, settings: &str) -> Value {
     s.set_tool(Tool::Trace);
     let image = s.trace_view().shown.expect("the image is shown");
     let source = s.trace_source(image, false).unwrap();
-    let wire = trace_colour_job_in(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &trace_colour_settings(settings).unwrap(),
-        None,
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
+            map: TracePixelMap::new(source.map),
+            mode: TraceMode::Colours(&trace_colour_settings(settings).unwrap()),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     );
     assert!(s.set_trace_preview(image, &wire));

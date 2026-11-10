@@ -33,8 +33,8 @@ use curvyo_editor_wasm::{
     trace_colour_settings, trace_settings,
 };
 use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, TraceRgb, TraceWire, read_trace_wire, trace_colour_job_in,
-    trace_read_text, trace_text_colour_job_in, trace_text_regions_in,
+    FontBlock, OcrLine, OcrModel, TraceJob, TraceMode, TracePixelMap, TraceRaster, TraceRgb,
+    TraceWire, read_trace_wire, run_trace_job, trace_read_text, trace_text_regions,
 };
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
@@ -226,14 +226,19 @@ impl Host {
     /// The multicolour job with `lines` (`trace_text_job` of the wasm with Multicolour settings).
     fn wire(&self, settings: &str, lines: &[OcrLine]) -> Vec<f64> {
         let colour = trace_colour_settings(settings).expect("multicolour settings");
-        trace_text_colour_job_in(
-            &self.rgba,
-            self.width,
-            self.height,
-            self.map,
-            &colour,
-            lines,
-            None,
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: self.width,
+                    height: self.height,
+                    rgba: &self.rgba,
+                },
+                map: TracePixelMap::new(self.map),
+                mode: TraceMode::Colours(&colour),
+                lines,
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         )
     }
@@ -241,13 +246,19 @@ impl Host {
     /// The plain multicolour trace (Recognise text off: the host calls `trace_job`).
     fn plain_wire(&self, settings: &str) -> Vec<f64> {
         let colour = trace_colour_settings(settings).expect("multicolour settings");
-        trace_colour_job_in(
-            &self.rgba,
-            self.width,
-            self.height,
-            self.map,
-            &colour,
-            None,
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: self.width,
+                    height: self.height,
+                    rgba: &self.rgba,
+                },
+                map: TracePixelMap::new(self.map),
+                mode: TraceMode::Colours(&colour),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         )
     }
@@ -259,15 +270,18 @@ impl Host {
             self.s
                 .set_trace_ocr_lines(self.image, lines.to_vec(), (self.width, self.height))
         );
-        let regions = trace_text_regions_in(
-            &self.rgba,
-            self.width,
-            self.height,
-            self.map,
-            &trace_settings(settings),
+        let regions = trace_text_regions(&TraceJob {
+            raster: TraceRaster {
+                width: self.width,
+                height: self.height,
+                rgba: &self.rgba,
+            },
+            map: TracePixelMap::new(self.map),
+            mode: TraceMode::Mono(&trace_settings(settings)),
             lines,
-            None,
-        );
+            mask: None,
+            shapes: false,
+        });
         let (request, reply) =
             match self
                 .s

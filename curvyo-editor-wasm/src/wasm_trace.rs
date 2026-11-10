@@ -41,7 +41,7 @@ pub fn trace_text_failed_notice() -> String {
 /// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `tolerance`,
 /// `specks` in mm, `corners`, `upscale` and `denoise` as choice indices, `invert`,
 /// `ignore_background`, `method`, `background`, `swatches`, `colour_tolerance`); the
-/// result as the flat numbers of `curvyo_ui_core::trace_job_in`. `progress` hears each higher
+/// result as the flat numbers of `curvyo_ui_core::run_trace_job`. `progress` hears each higher
 /// whole percent (criterion 10). Never throws: bad input reads as the status
 /// "invalid".
 #[wasm_bindgen]
@@ -54,41 +54,42 @@ pub fn trace_job(
     settings: &str,
     progress: &TraceProgressSink,
 ) -> Vec<f64> {
-    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    let mut report = |percent| progress.report(percent);
-    // `specs/0094`: the outlines clipped to the mask region of the settings, if any.
-    let region = crate::trace_glue::trace_mask_region(settings);
-    // Multicolour (`specs/0089` slice M): the outlines layer by layer, the palette after them.
-    let mut wire = match crate::trace_glue::trace_colour_settings(settings) {
-        Some(colour) => curvyo_ui_core::trace_colour_job_in(
-            rgba,
-            width,
-            height,
-            map,
-            &colour,
-            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
-            &mut report,
-        ),
-        None => curvyo_ui_core::trace_job_in(
-            rgba,
-            width,
-            height,
-            map,
-            &crate::trace_glue::trace_settings(settings),
-            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
-            &mut report,
-        ),
-    };
-    with_shapes(&mut wire, map, settings);
-    wire
+    job_wire(rgba, width, height, map, settings, &[], progress)
 }
 
-/// The shape section of Recognise shapes (`specs/0088` Part B) added to `wire` when `settings`
-/// turn it on, in the same job.
-fn with_shapes(wire: &mut Vec<f64>, map: [f64; 6], settings: &str) {
-    if crate::trace_glue::recognise_shapes(settings) {
-        curvyo_ui_core::trace_add_shapes(wire, map);
-    }
+/// The job of `settings` over the picture `rgba`: multicolour (`specs/0089` slice M) or black,
+/// the OCR `lines` (`specs/0091`), the outlines clipped to the mask region of the settings
+/// (`specs/0094`) and the shape section when the settings turn Recognise shapes on
+/// (`specs/0088` Part B).
+fn job_wire(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: &[f64],
+    settings: &str,
+    lines: &[curvyo_ui_core::OcrLine],
+    progress: &TraceProgressSink,
+) -> Vec<f64> {
+    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
+    let region = crate::trace_glue::trace_mask_region(settings);
+    let colour = crate::trace_glue::trace_colour_settings(settings);
+    let mono = crate::trace_glue::trace_settings(settings);
+    let job = curvyo_ui_core::TraceJob {
+        raster: curvyo_ui_core::TraceRaster {
+            width,
+            height,
+            rgba,
+        },
+        map: curvyo_ui_core::TracePixelMap::new(map),
+        mode: colour.as_ref().map_or(
+            curvyo_ui_core::TraceMode::Mono(&mono),
+            curvyo_ui_core::TraceMode::Colours,
+        ),
+        lines,
+        mask: region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
+        shapes: crate::trace_glue::recognise_shapes(settings),
+    };
+    curvyo_ui_core::run_trace_job(&job, &mut |percent| progress.report(percent))
 }
 
 thread_local! {
@@ -196,34 +197,8 @@ pub fn trace_text_job(
     lines: &str,
     progress: &TraceProgressSink,
 ) -> Vec<f64> {
-    let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    let mut report = |percent| progress.report(percent);
-    let region = crate::trace_glue::trace_mask_region(settings);
-    let mut wire = if let Some(colour) = crate::trace_glue::trace_colour_settings(settings) {
-        curvyo_ui_core::trace_text_colour_job_in(
-            rgba,
-            width,
-            height,
-            map,
-            &colour,
-            &crate::trace_glue::read_ocr_lines(lines, width),
-            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
-            &mut report,
-        )
-    } else {
-        curvyo_ui_core::trace_text_job_in(
-            rgba,
-            width,
-            height,
-            map,
-            &crate::trace_glue::trace_settings(settings),
-            &crate::trace_glue::read_ocr_lines(lines, width),
-            region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
-            &mut report,
-        )
-    };
-    with_shapes(&mut wire, map, settings);
-    wire
+    let lines = crate::trace_glue::read_ocr_lines(lines, width);
+    job_wire(rgba, width, height, map, settings, &lines, progress)
 }
 
 /// The text pass alone with the OCR `lines` (`specs/0091` criterion 25): a result without
@@ -239,17 +214,21 @@ pub fn trace_text_regions_job(
     lines: &str,
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
-    curvyo_ui_core::trace_text_regions_in(
-        rgba,
-        width,
-        height,
-        map,
-        &crate::trace_glue::trace_settings(settings),
-        &crate::trace_glue::read_ocr_lines(lines, width),
-        crate::trace_glue::trace_mask_region(settings)
-            .as_ref()
-            .map(|r| r as &dyn curvyo_ui_core::Mask),
-    )
+    let region = crate::trace_glue::trace_mask_region(settings);
+    let mono = crate::trace_glue::trace_settings(settings);
+    let lines = crate::trace_glue::read_ocr_lines(lines, width);
+    curvyo_ui_core::trace_text_regions(&curvyo_ui_core::TraceJob {
+        raster: curvyo_ui_core::TraceRaster {
+            width,
+            height,
+            rgba,
+        },
+        map: curvyo_ui_core::TracePixelMap::new(map),
+        mode: curvyo_ui_core::TraceMode::Mono(&mono),
+        lines: &lines,
+        mask: region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
+        shapes: false,
+    })
 }
 
 /// The presets as JSON (criteria 59 and 60), in menu order: a list of `{key, label, detail,

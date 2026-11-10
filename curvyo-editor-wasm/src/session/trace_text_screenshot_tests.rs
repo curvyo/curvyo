@@ -6,7 +6,10 @@
 //! cargo test --release -p curvyo-editor-wasm --lib trace_text_screenshot -- --ignored --nocapture
 //! ```
 
-use curvyo_ui_core::{OcrModel, TraceParams, trace_read_text, trace_text_job_in};
+use curvyo_ui_core::{
+    OcrModel, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, run_trace_job,
+    trace_read_text, trace_text_regions,
+};
 
 use super::trace_text_tests::{fit, fonts, model, session_with};
 
@@ -29,14 +32,19 @@ fn fitted_lines(model: &OcrModel, file: &str) -> Vec<LineReport> {
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let threshold = curvyo_ui_core::trace_auto_threshold(&source.rgba, source.width, source.height);
-    let wire = trace_text_job_in(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &TraceParams::with_threshold(threshold),
-        &lines,
-        None,
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
+            map: TracePixelMap::new(source.map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(threshold)),
+            lines: &lines,
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     );
     assert!(session.set_trace_result(image, &wire));
@@ -187,15 +195,18 @@ fn the_fit_profile() {
             source.height,
         ));
         let t = cpu_seconds();
-        let regions = curvyo_ui_core::trace_text_regions_in(
-            &source.rgba,
-            source.width,
-            source.height,
-            source.map,
-            &params,
-            &lines,
-            None,
-        );
+        let regions = trace_text_regions(&TraceJob {
+            raster: TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
+            map: TracePixelMap::new(source.map),
+            mode: TraceMode::Mono(&params),
+            lines: &lines,
+            mask: None,
+            shapes: false,
+        });
         let pass = cpu_seconds() - t;
         let t = cpu_seconds();
         let request = session
@@ -205,7 +216,6 @@ fn the_fit_profile() {
         let t = cpu_seconds();
         let reply = fit(&request);
         let fitted = cpu_seconds() - t;
-        let _ = trace_text_job_in;
         println!(
             "{file}: {} lines; text pass {pass:.2} s, request {req:.2} s, fit {fitted:.2} s ({} bytes)",
             lines.len(),
@@ -276,15 +286,18 @@ fn fit_request(model: &OcrModel, file: &str) -> String {
     )
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let regions = curvyo_ui_core::trace_text_regions_in(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &TraceParams::with_threshold(128),
-        &lines,
-        None,
-    );
+    let regions = trace_text_regions(&TraceJob {
+        raster: TraceRaster {
+            width: source.width,
+            height: source.height,
+            rgba: &source.rgba,
+        },
+        map: TracePixelMap::new(source.map),
+        mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+        lines: &lines,
+        mask: None,
+        shapes: false,
+    });
     session
         .trace_fit_request_for(image, &regions, 0.3, &[])
         .unwrap()

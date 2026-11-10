@@ -198,6 +198,7 @@ mod trace_fit;
 mod trace_fit_guess;
 mod trace_fit_turn;
 mod trace_inpaint;
+mod trace_job;
 mod trace_mask;
 mod trace_ocr;
 mod trace_parts;
@@ -282,9 +283,9 @@ pub use curvyo_vectorize_core::{
     ImageType as TraceImageType, MAX_COLOURS as TRACE_MAX_COLOURS,
     METHOD_PARAMS as TRACE_METHOD_PARAMS, Mm as TraceMm, PARAMS as TRACE_PARAMS,
     PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
-    PixelLength as TracePixelLength, PropertyKind as TraceProperty, Reason as TraceReason,
-    Rgb8 as TraceRgb, Selection as TraceMethod, Swatches as TraceSwatches, TraceParams,
-    Upscale as TraceUpscale,
+    PixelLength as TracePixelLength, PixelMap as TracePixelMap, PropertyKind as TraceProperty,
+    Raster as TraceRaster, Reason as TraceReason, Rgb8 as TraceRgb, Selection as TraceMethod,
+    Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale,
 };
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
@@ -556,6 +557,9 @@ pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
 };
+pub use trace_job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
 pub use trace_mask::{Clipped, Mask};
 pub use trace_ocr::{
     LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
@@ -575,13 +579,11 @@ pub use trace_shapes::{
     Primitive as TracePrimitive, ShapeRegion as TraceShapeRegion, recognise_shapes,
     trace_add_shapes,
 };
-pub use trace_text_colour::trace_text_colour_job_in;
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
-pub use trace_text_wire::{TraceTextWire, TraceTexts, trace_text_job_in, trace_text_regions_in};
+pub use trace_text_wire::{TraceTextWire, TraceTexts};
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, trace_analyse,
-    trace_auto_threshold, trace_colour_job_in, trace_job_in, trace_sample_colour,
-    trace_suggest_background,
+    trace_auto_threshold, trace_sample_colour, trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

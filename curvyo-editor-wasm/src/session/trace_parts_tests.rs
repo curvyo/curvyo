@@ -2,7 +2,10 @@
 //! criteria 18, 19, 24, 27 to 29 and 42).
 
 use curvyo_document_core::{Affine, Length, NodeId, ObjectSnapshot, Point, RectBounds};
-use curvyo_ui_core::{Mask, TraceParams, TracePartClip, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{
+    Mask, TraceJob, TraceMode, TraceParams, TracePartClip, TracePixelMap, TraceRaster,
+    read_trace_wire, run_trace_job,
+};
 
 use super::trace_parts::TRACE_PARTS_MAX;
 use super::{Session, Tool, TraceCreateOutcome};
@@ -299,13 +302,19 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
     let wires: Vec<Vec<f64>> = clips
         .iter()
         .map(|clip| {
-            trace_job_in(
-                &square_picture(),
-                16,
-                16,
-                map,
-                &params,
-                clip.region().map(|r| r as &dyn Mask),
+            run_trace_job(
+                &TraceJob {
+                    raster: TraceRaster {
+                        width: 16,
+                        height: 16,
+                        rgba: &square_picture(),
+                    },
+                    map: TracePixelMap::new(map),
+                    mode: TraceMode::Mono(&params),
+                    lines: &[],
+                    mask: clip.region().map(|r| r as &dyn Mask),
+                    shapes: false,
+                },
                 &mut |_| {},
             )
         })
@@ -314,13 +323,19 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
     let header = session.set_trace_joined(image, &refs, true).unwrap();
     assert_eq!(header[0], 0.0, "traced");
     assert_eq!(header[1], 1.0, "the square's halves are one path");
-    let whole = read_trace_wire(&trace_job_in(
-        &square_picture(),
-        16,
-        16,
-        map,
-        &params,
-        None,
+    let whole = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 16,
+                height: 16,
+                rgba: &square_picture(),
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
@@ -462,13 +477,19 @@ fn c31_a_cropped_part_traces_as_the_whole_picture_does() {
     let cut = super::trace_parts::crop_to(source, region.polygons(), margin);
     assert!(cut.width < 1000, "the part is cut: {}", cut.width);
     let read = |rgba: &[u8], w: u32, h: u32, map: [f64; 6]| {
-        read_trace_wire(&trace_job_in(
-            rgba,
-            w,
-            h,
-            map,
-            &params,
-            Some(&region),
+        read_trace_wire(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: w,
+                    height: h,
+                    rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&params),
+                lines: &[],
+                mask: Some(&region),
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap()

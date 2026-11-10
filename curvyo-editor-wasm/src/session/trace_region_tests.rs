@@ -4,7 +4,9 @@
 #![allow(clippy::many_single_char_names)]
 
 use curvyo_document_core::{Length, NodeId, ObjectSnapshot, Point, RectBounds};
-use curvyo_ui_core::{TraceParams, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{
+    TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
+};
 
 use super::{Session, Tool, TraceCreateOutcome, TraceSelection};
 
@@ -182,17 +184,25 @@ fn c12_create_paths_leaves_the_mask_paths_and_undoes_in_one_step() {
             f64::from(source.height) / 16.0,
         ))
         .to_array();
-    let wire = trace_job_in(
-        &picture,
-        16,
-        16,
-        map,
-        // The image is under a millimetre wide: no speck is ignored.
-        &TraceParams {
-            specks: curvyo_ui_core::TraceMm::from_mm(0.0),
-            ..TraceParams::with_threshold(128)
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 16,
+                height: 16,
+                rgba: &picture,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(
+                // The image is under a millimetre wide: no speck is ignored.
+                &TraceParams {
+                    specks: curvyo_ui_core::TraceMm::from_mm(0.0),
+                    ..TraceParams::with_threshold(128)
+                },
+            ),
+            lines: &[],
+            mask: Some(&region),
+            shapes: false,
         },
-        Some(&region),
         &mut |_| {},
     );
     let read = read_trace_wire(&wire).unwrap();

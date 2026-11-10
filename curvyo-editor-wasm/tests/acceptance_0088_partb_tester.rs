@@ -35,7 +35,10 @@ use curvyo_editor_wasm::{
     Session, Tool, TraceCreateOutcome, trace_colour_settings, trace_recognise_shapes,
     trace_settings,
 };
-use curvyo_ui_core::{read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in};
+use curvyo_ui_core::{
+    TraceJob, TraceMode, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
+    trace_add_shapes,
+};
 use kurbo::{Affine, BezPath, PathEl, Point};
 use proptest::prelude::*;
 
@@ -385,23 +388,37 @@ impl Host {
 
     fn wire(&self, settings: &str) -> Vec<f64> {
         let mut wire = if settings.contains("\"output\":1") {
-            trace_colour_job_in(
-                &self.rgba,
-                self.width,
-                self.height,
-                self.map,
-                &trace_colour_settings(settings).expect("multicolour settings"),
-                None,
+            run_trace_job(
+                &TraceJob {
+                    raster: TraceRaster {
+                        width: self.width,
+                        height: self.height,
+                        rgba: &self.rgba,
+                    },
+                    map: TracePixelMap::new(self.map),
+                    mode: TraceMode::Colours(
+                        &trace_colour_settings(settings).expect("multicolour settings"),
+                    ),
+                    lines: &[],
+                    mask: None,
+                    shapes: false,
+                },
                 &mut |_| {},
             )
         } else {
-            trace_job_in(
-                &self.rgba,
-                self.width,
-                self.height,
-                self.map,
-                &trace_settings(settings),
-                None,
+            run_trace_job(
+                &TraceJob {
+                    raster: TraceRaster {
+                        width: self.width,
+                        height: self.height,
+                        rgba: &self.rgba,
+                    },
+                    map: TracePixelMap::new(self.map),
+                    mode: TraceMode::Mono(&trace_settings(settings)),
+                    lines: &[],
+                    mask: None,
+                    shapes: false,
+                },
                 &mut |_| {},
             )
         };
