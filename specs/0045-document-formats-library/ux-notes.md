@@ -154,7 +154,7 @@ All edited in `docs/design-system.md` on 2026-11-10:
 | `curvyo-ui-core/src/format_form.rs` (line 464 and the `SameSizeAs` message) | The message "Same size as <name>" is removed with the reason. |
 | `curvyo-editor-wasm/tests/document_formats_session.rs` (line 146) and `acceptance_0045_tester.rs` (lines 530, 672) | Duplicate sizes are accepted; the current format is the first in list order; a second row is not selected. |
 | `curvyo-editor-wasm/tests/acceptance_0045_tester.rs` c24 (line 714) | Group edit no longer sets the orientation; rename of a user group stays (by the inline path). |
-| Import fixtures (`import.toml`, `tester_import_in.toml`, `import.expected.toml`) | Skip rule: a format is skipped when its group, name and size match one already there; a same-size format with another name is added. |
+| Import fixtures (`import.toml`, `tester_import_in.toml`, `import.expected.toml`) | Skip rule: a format is skipped when its group already has its name (size irrelevant); a same-size format with another name is added. |
 | `frontend/tests/grid.test.ts` | The pictogram assertions go; new: 2 x 2 radiogroup "Origin corner", four radios with their names, tooltips, 2D arrow keys without wrap, Home and End. |
 | New view tests (`ui-core`) | Rows have no pencil and trash in the roving set; the header row lists Add, Import, Export (Export only with a user format); no Add / Import / Export block under the list; the armed names; rename validation. |
 | Frontend / browser check | Armed delete by mouse and by `Delete`; the add form opens under the header row; double-click and F2 rename; Pages block without X and Y at 800 x 600. |

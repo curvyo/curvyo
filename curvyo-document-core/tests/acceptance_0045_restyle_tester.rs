@@ -138,7 +138,6 @@ fn c39_the_renamed_fixture_is_valid_and_keeps_both_formats_through_a_round_trip(
 }
 
 #[test]
-#[ignore = "spec gap reported to the lead: criterion 39 says the name rules stay for a user file, criterion 5 never listed a unique name in the loader; since the same-size rule went, a user file with two identical formats loads"]
 fn c5_name_rule_still_refuses_two_formats_of_one_name_in_one_group_in_the_file() {
     // The same-size rule went; the "unique name in its group" rule stays.
     let user = KEYRING_AND_COASTER.replace("name = \"Coaster\"", "name = \"Key ring\"");
@@ -367,8 +366,8 @@ fn c27_same_name_and_size_in_another_group_is_not_skipped() {
 
 #[test]
 fn c27_same_group_and_name_with_another_size_leaves_a_valid_library() {
-    // Not skipped (the size differs); whatever the merge does, the result must
-    // stay a library that loads again (unique names within a group).
+    // Skipped by name (the size is irrelevant); the result stays a library
+    // that loads again (unique names within a group).
     let mut lib = lib_from(KEYRING_AND_COASTER);
     let other = KEYRING_AND_COASTER
         .replace("u-key-ring", "u-key-ring-big")
@@ -378,13 +377,12 @@ fn c27_same_group_and_name_with_another_size_leaves_a_valid_library() {
         );
     assert_ne!(other, KEYRING_AND_COASTER);
     let rep = lib.import(&other).unwrap();
-    assert_eq!(rep.skipped, 1, "the Coaster 90 x 90 is skipped");
-    assert_eq!(rep.added, 1, "the Key ring 95 x 95 is not skipped");
+    assert_eq!(rep.skipped, 2, "Coaster and Key ring are skipped by name");
+    assert_eq!(rep.added, 0);
     lib_from(&lib.user_text().unwrap());
 }
 
 #[test]
-#[ignore = "FAIL reported to the lead: import adds a format whose name its group already has (format_library_import.rs:109); remove this ignore with the fix"]
 fn c39_c27_an_import_keeps_names_unique_within_a_group() {
     // Criterion 39: "The name rules stay (1 to 24 characters, unique within
     // its group)" for the form, a user file and an import.

@@ -66,7 +66,7 @@ FMT-NOTICES decided otherwise than the default: no success notice at all (custom
   `hooks/useFormats.ts` (uses `useDeleteArm`).
 
 ### Tasks
-- [x] 1. Core: duplicate sizes allowed in add, edit, user file and import; import skips by group, name and size; built-in file keeps the rule (AC 39). Rust tests first: `formats_of_one_size_are_allowed_and_survive_a_reload`, import golden files, tester tests changed by design.
+- [x] 1. Core: duplicate sizes allowed in add, edit, user file and import; import skips by group and name; the user-file loader refuses a repeated name in a group; built-in file keeps the rule (AC 39). Rust tests first: `formats_of_one_size_are_allowed_and_survive_a_reload`, import golden files, tester tests changed by design.
 - [x] 2. `ui-core` list view: armed names, rename names, no group edit, no orientation, no success notices (AC 35 to 37, 42, 43); only the first of two formats of one size is selected (AC 39).
 - [x] 3. Session glue and wasm: `rename_format`, `rename_format_group`; new groups are portrait; success returns no notice (AC 42, 43).
 - [x] 4. Pages block without X and Y; `set_page_position` removed (AC 44).

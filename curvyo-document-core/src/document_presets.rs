@@ -113,6 +113,8 @@ pub enum PresetReason {
     BadId,
     /// A name is empty or longer than 24 characters after trimming.
     BadName,
+    /// Two formats of one group share a name (ignoring case).
+    DuplicateName,
     /// A note is longer than 60 characters.
     NoteTooLong,
     /// The preset has the same size as the preset with this id.
