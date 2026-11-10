@@ -12,11 +12,11 @@ use curvyo_ui_core::{
     TracePartArea, TracePartClip, TraceRegion, join_trace_parts, read_trace_wire, trace_part_clips,
 };
 use kurbo::{BezPath, PathEl, Shape};
+use vectrace::Output;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::mask::Mask;
-use vectrace::ocr::accept::OcrLine;
+use vectrace::ocr::OcrLine;
 use vectrace::shapes::trace_add_shapes;
-use vectrace::wire::TraceWire;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, TraceParams,
@@ -100,7 +100,7 @@ fn params(threshold: u8, smooth: u8) -> TraceParams {
     }
 }
 
-fn trace(picture: &[u8], p: &TraceParams, clip: &TracePartClip) -> TraceWire {
+fn trace(picture: &[u8], p: &TraceParams, clip: &TracePartClip) -> Output {
     read_trace_wire(&run_trace_job(
         &TraceJob {
             raster: TraceRaster {
@@ -120,15 +120,15 @@ fn trace(picture: &[u8], p: &TraceParams, clip: &TracePartClip) -> TraceWire {
 }
 
 /// Every part traced with its own parameters through its clip, then joined.
-fn join(picture: &[u8], parts: &[(TracePartArea, TraceParams)]) -> (TraceWire, Vec<TraceWire>) {
+fn join(picture: &[u8], parts: &[(TracePartArea, TraceParams)]) -> (Output, Vec<Output>) {
     let areas: Vec<TracePartArea> = parts.iter().map(|(a, _)| a.clone()).collect();
     let clips = trace_part_clips(&areas, &QUAD);
-    let wires: Vec<TraceWire> = parts
+    let wires: Vec<Output> = parts
         .iter()
         .zip(&clips)
         .map(|((_, p), clip)| trace(picture, p, clip))
         .collect();
-    let pairs: Vec<(&TraceWire, &TracePartClip)> = wires.iter().zip(&clips).collect();
+    let pairs: Vec<(&Output, &TracePartClip)> = wires.iter().zip(&clips).collect();
     (join_trace_parts(&pairs, 0), wires)
 }
 
@@ -422,7 +422,7 @@ fn c23_multicolour_parts_merge_by_colour() {
         },
         ..TraceParams::with_threshold(128)
     });
-    let wires: Vec<TraceWire> = clips
+    let wires: Vec<Output> = clips
         .iter()
         .map(|clip| {
             read_trace_wire(&run_trace_job(
@@ -443,7 +443,7 @@ fn c23_multicolour_parts_merge_by_colour() {
             .unwrap()
         })
         .collect();
-    let pairs: Vec<(&TraceWire, &TracePartClip)> = wires.iter().zip(&clips).collect();
+    let pairs: Vec<(&Output, &TracePartClip)> = wires.iter().zip(&clips).collect();
     let joined = join_trace_parts(&pairs, 1);
     let mut colours: Vec<TraceRgb> = wires
         .iter()

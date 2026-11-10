@@ -6,10 +6,10 @@
 use curvyo_document_core::{AssetHash, FontKind, FontRef, NodeId};
 use curvyo_text_core::RecognisedRun;
 use kurbo::BezPath;
+use vectrace::Output;
 use vectrace::Rgb8 as TraceRgb;
-use vectrace::job_text::TraceTextWire;
-use vectrace::ocr::accept::OcrLine;
-use vectrace::wire::TraceWire;
+use vectrace::ocr::OcrLine;
+use vectrace::wire::Text;
 
 use super::Session;
 use super::trace_text_write::TracedText;
@@ -67,7 +67,7 @@ pub(crate) struct FittedImage {
 pub(super) fn leftovers_of(
     fitted: &[FittedImage],
     image: NodeId,
-    wire: &TraceWire,
+    wire: &Output,
 ) -> Vec<(BezPath, TraceRgb)> {
     let black = TraceRgb::new(0, 0, 0);
     match fitted.iter().find(|f| f.image == image) {
@@ -98,7 +98,7 @@ pub(crate) struct TraceTextState {
     /// size; never in the document.
     ocr: Vec<(AssetHash, Vec<OcrLine>, (u32, u32))>,
     /// The lines of the last fit request: their picture and line, in request order.
-    requested: Vec<(NodeId, TraceTextWire)>,
+    requested: Vec<(NodeId, Text)>,
     /// The finished fit, for Create paths.
     pub(crate) fitted: Option<Vec<FittedImage>>,
     /// The texts the last Create paths wrote.
@@ -111,7 +111,7 @@ pub(crate) struct TraceTextState {
     last_dropped: usize,
     /// Those lines with their picture: once a trace of that picture traced them as shapes, their
     /// outlines leave the fit's leftovers (criterion 25).
-    dropped_lines: Vec<(NodeId, TraceTextWire)>,
+    dropped_lines: Vec<(NodeId, Text)>,
 }
 
 impl Session {
@@ -197,10 +197,10 @@ impl Session {
     /// fit decided runs once): when its text lines are the fit's lines of `image` it set text
     /// for, the fit stays, the lines it set none for (traced as shapes now) leave its leftovers,
     /// and the preview shows the texts; otherwise the fit is dropped.
-    pub(super) fn keep_trace_fit(&mut self, image: NodeId, read: &TraceWire) {
+    pub(super) fn keep_trace_fit(&mut self, image: NodeId, read: &Output) {
         let state = &self.trace_text;
         // The requested lines of `image` it set text for, by their place in the request.
-        let kept: Vec<(usize, &TraceTextWire)> = state
+        let kept: Vec<(usize, &Text)> = state
             .requested
             .iter()
             .enumerate()
@@ -264,10 +264,10 @@ impl Session {
     /// line, so Create paths can run at once.
     pub fn trace_fit_request(&mut self, tolerance: f64, favourites: &[String]) -> Option<String> {
         let (_, images) = self.trace_images();
-        let lines: Vec<(NodeId, TraceTextWire)> = images
+        let lines: Vec<(NodeId, Text)> = images
             .iter()
             .filter_map(|image| self.trace.results.iter().find(|(id, _)| *id == image.id))
-            .flat_map(|(id, wire): &(NodeId, TraceWire)| {
+            .flat_map(|(id, wire): &(NodeId, Output)| {
                 wire.texts.lines.iter().map(|l| (*id, l.clone()))
             })
             .collect();
@@ -292,7 +292,7 @@ impl Session {
 
     fn fit_request_of(
         &mut self,
-        lines: Vec<(NodeId, TraceTextWire)>,
+        lines: Vec<(NodeId, Text)>,
         tolerance: f64,
         favourites: &[String],
     ) -> Option<String> {
@@ -399,7 +399,7 @@ impl Session {
         let faces = self.fonts.faces();
         let mut out: Vec<FittedImage> = Vec::new();
         let mut dropped: Vec<(AssetHash, String)> = Vec::new();
-        let mut dropped_lines: Vec<(NodeId, TraceTextWire)> = Vec::new();
+        let mut dropped_lines: Vec<(NodeId, Text)> = Vec::new();
         for (k, ((texts, leftovers), (image, line))) in lines
             .into_iter()
             .zip(&self.trace_text.requested)

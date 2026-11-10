@@ -13,12 +13,12 @@ use crate::{
     TraceError, colour_palette, suggest_background, trace_colours,
 };
 
-use crate::job_text::{keep_lines_in, write_texts};
+use super::text::keep_lines_in;
 use crate::mask::{Mask, clip_colours, write_unclipped};
-use crate::ocr::accept::OcrLine;
+use crate::ocr::OcrLine;
 use crate::text_pass::{TextPass, text_pass};
 use crate::wire::{
-    TraceStatus, colour_head, colour_wire, job_percent, status_only, write_colour_tail,
+    Status, colour_head, colour_wire, job_percent, status_only, write_colour_tail, write_texts,
 };
 
 /// The share of a job's percent the palette of the unfilled picture takes (Proposal: it is the
@@ -75,8 +75,8 @@ pub(crate) fn text_colour_wire(
             write_colour_tail(&mut wire, &result);
             wire
         }
-        Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
-        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(TraceStatus::Invalid),
+        Err(TraceError::TooDetailed) => status_only(Status::TooDetailed),
+        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(Status::Invalid),
     }
 }
 
@@ -213,7 +213,7 @@ mod tests {
     use crate::Mm;
     use crate::TraceParams;
     use crate::job::{Job, Mode, run};
-    use crate::wire::read_wire;
+    use crate::wire::read;
 
     const RED: [u8; 3] = [208, 34, 42];
     const BLUE: [u8; 3] = [35, 78, 184];
@@ -300,7 +300,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        let read = read_wire(&wire).unwrap();
+        let read = read(&wire).unwrap();
         assert_eq!(read.texts.lines.len(), 1);
         assert_eq!(read.texts.lines[0].fill, Some(Rgb8::new(255, 255, 255)));
         assert_eq!(read.layers.len(), 1);
@@ -337,9 +337,9 @@ mod tests {
             },
             &mut |_| {},
         );
-        let read = read_wire(&wire).unwrap();
+        let read = read(&wire).unwrap();
         assert_eq!(read.texts.lines[0].fill, Some(rgb(RED)));
-        let off = read_wire(&run(
+        let off = crate::wire::read(&run(
             &Job {
                 raster: Raster {
                     width: W,
@@ -394,7 +394,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        let read = read_wire(&wire).unwrap();
+        let read = read(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
             Some(rgb(GREY)),
@@ -422,7 +422,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        let read = read_wire(&wire).unwrap();
+        let read = crate::wire::read(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
             Some(rgb(BLUE)),
@@ -451,7 +451,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        assert!(read_wire(&wire).unwrap().texts.lines[0].excluded);
+        assert!(read(&wire).unwrap().texts.lines[0].excluded);
         let kept = run(
             &Job {
                 raster: Raster {
@@ -467,7 +467,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        assert!(!read_wire(&kept).unwrap().texts.lines[0].excluded);
+        assert!(!read(&kept).unwrap().texts.lines[0].excluded);
     }
 
     /// Criteria 24/12 and 24/13: no lines, the plain colour job; the same input twice, the same

@@ -5,7 +5,7 @@
 use curvyo_document_core::{Color, ObjectSnapshot, Shape};
 use curvyo_ui_core::read_trace_wire;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
-use vectrace::ocr::accept::trace_read_text;
+use vectrace::ocr::read_text;
 use vectrace::shapes::trace_add_shapes;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
@@ -209,7 +209,7 @@ fn c12_letters_never_become_shapes() {
     let model = model();
     let (mut session, image) = session_with("poster.png");
     let source = session.trace_source(image, false).unwrap();
-    let lines = trace_read_text(
+    let lines = read_text(
         &model,
         &source.rgba,
         source.width,

@@ -5,7 +5,7 @@
 use curvyo_document_core::Color;
 use curvyo_ui_core::TraceColour;
 use vectrace::Rgb8 as TraceRgb;
-use vectrace::wire::TraceLayerWire;
+use vectrace::wire::Layer;
 
 use super::Session;
 
@@ -20,8 +20,8 @@ pub(super) fn color(c: TraceRgb) -> Color {
 
 /// The fill layer of `outlines` paths of a text or text line of a multicolour result
 /// (`specs/0091` slice 2): its fill, black without one.
-pub(super) fn text_layer(fill: Option<TraceRgb>, outlines: usize) -> TraceLayerWire {
-    TraceLayerWire {
+pub(super) fn text_layer(fill: Option<TraceRgb>, outlines: usize) -> Layer {
+    Layer {
         colour: fill.unwrap_or(TraceRgb::new(0, 0, 0)),
         outlines,
     }
@@ -34,7 +34,7 @@ pub(super) fn text_layer(fill: Option<TraceRgb>, outlines: usize) -> TraceLayerW
 /// went (`specs/0088` Part B: the recognised shapes follow their outlines).
 pub(super) fn with_leftovers(
     outlines: &[kurbo::BezPath],
-    layers: &[TraceLayerWire],
+    layers: &[Layer],
     leftovers: &[(kurbo::BezPath, TraceRgb)],
 ) -> (Vec<kurbo::BezPath>, Vec<TraceColour>, Vec<usize>) {
     if layers.is_empty() {

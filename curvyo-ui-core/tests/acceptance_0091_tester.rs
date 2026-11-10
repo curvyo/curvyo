@@ -4,7 +4,7 @@
 //! the threshold (0.8, adrs.md), and not one short pattern repeated. Each case sits on one side of
 //! one boundary; the other conditions hold. Written from the specification.
 
-use vectrace::ocr::accept::OcrLine;
+use vectrace::ocr::OcrLine;
 
 fn line(text: &str, confidence: f64) -> OcrLine {
     OcrLine {

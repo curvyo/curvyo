@@ -9,8 +9,9 @@ use curvyo_document_core::{AssetHash, DrawingNode, ImageSnapshot, NodeId, Object
 use curvyo_image_core::WorkingImage;
 use curvyo_render_core::PreviewAnchor;
 use curvyo_ui_core::{TraceTarget, hit_test_objects, plan_trace, read_trace_wire};
-use vectrace::shapes::ShapeRegion as TraceShapeRegion;
-use vectrace::wire::{TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire};
+use vectrace::Output;
+use vectrace::shapes::ShapeRegion;
+use vectrace::wire::{Layer, Palette, Status};
 
 use super::select::DoubleClickHint;
 use super::trace_colours::with_leftovers;
@@ -29,11 +30,11 @@ pub(super) struct TracePreview {
     /// A stopped job left it out of date: drawn at half strength.
     pub(super) stale: bool,
     /// A multicolour result's layers and palette (`specs/0089` slice M); empty for one colour.
-    pub(super) layers: Vec<TraceLayerWire>,
-    pub(super) palette: Vec<TracePaletteWire>,
+    pub(super) layers: Vec<Layer>,
+    pub(super) palette: Vec<Palette>,
     /// The layers the drawn paths fill in order: a multicolour result's layers, then one per
     /// text line or text in its fill (`specs/0091` slice 2); empty for one colour.
-    pub(super) fill_layers: Vec<TraceLayerWire>,
+    pub(super) fill_layers: Vec<Layer>,
     /// Colour regions joined to a neighbour.
     pub(super) joined: usize,
     /// Text lines set and found (`specs/0091` UX notes §4).
@@ -53,7 +54,7 @@ pub(super) struct TraceState {
     last_clicked: Option<NodeId>,
     pub(super) preview: Option<TracePreview>,
     /// The full-size results Create paths writes, per image.
-    pub(super) results: Vec<(NodeId, TraceWire)>,
+    pub(super) results: Vec<(NodeId, Output)>,
     /// The view is moving (a pan or zoom has not rested yet): the kept meshes are drawn as they
     /// are, whatever the zoom (criterion 56).
     pub(super) moving: bool,
@@ -267,7 +268,7 @@ impl Session {
     }
 
     /// Shows the result `read` as the preview of `image`.
-    pub(super) fn show_trace_read(&mut self, image: NodeId, read: TraceWire) {
+    pub(super) fn show_trace_read(&mut self, image: NodeId, read: Output) {
         // `specs/0091`: until the lines are fitted, their own outlines stand where their texts
         // will be, in the texts' fills.
         // A line whose fill the maker excluded is left out (slice 2).
@@ -278,7 +279,7 @@ impl Session {
             .chain(shown().flat_map(|l| &l.outlines))
             .cloned()
             .collect();
-        let extra: Vec<TraceLayerWire> = shown()
+        let extra: Vec<Layer> = shown()
             .map(|l| super::trace_colours::text_layer(l.fill, l.outlines.len()))
             .collect();
         self.show_trace_preview(image, read, &paths, &extra, false);
@@ -290,9 +291,9 @@ impl Session {
     pub(super) fn show_trace_preview(
         &mut self,
         image: NodeId,
-        read: TraceWire,
+        read: Output,
         paths: &[kurbo::BezPath],
-        extra: &[TraceLayerWire],
+        extra: &[Layer],
         stale: bool,
     ) {
         let mut outlines = Vec::with_capacity(paths.len());
@@ -302,7 +303,7 @@ impl Session {
             boxes.push((Point::new(b.x0, b.y0), Point::new(b.x1, b.y1)));
             outlines.push(preview_anchors(path));
         }
-        let fill_layers: Vec<TraceLayerWire> = if read.layers.is_empty() {
+        let fill_layers: Vec<Layer> = if read.layers.is_empty() {
             Vec::new()
         } else {
             read.layers.iter().chain(extra).copied().collect()
@@ -317,7 +318,7 @@ impl Session {
             fill_layers,
             joined: read.joined,
             text_counts: (read.texts.lines.len(), read.texts.found),
-            shape_count: read.shapes.iter().map(TraceShapeRegion::primitives).sum(),
+            shape_count: read.shapes.iter().map(ShapeRegion::primitives).sum(),
             unclipped: read.unclipped,
             outline_mesh: MeshCache::default(),
         });
@@ -341,7 +342,7 @@ impl Session {
     }
 
     /// Keeps the full-size result `read` of `image` for Create paths.
-    pub(super) fn keep_trace_result(&mut self, image: NodeId, read: &TraceWire) {
+    pub(super) fn keep_trace_result(&mut self, image: NodeId, read: &Output) {
         self.trace.results.retain(|(id, _)| *id != image);
         self.trace.results.push((image, read.clone()));
         self.keep_trace_fit(image, read);
@@ -402,7 +403,7 @@ impl Session {
                 else {
                     return TraceCreateOutcome::Ignored;
                 };
-                if wire.status != TraceStatus::Traced {
+                if wire.status != Status::Traced {
                     return TraceCreateOutcome::Ignored;
                 }
                 let name = names
@@ -561,10 +562,10 @@ impl Session {
 }
 
 /// The recognised shapes of a result (`specs/0088` Part B) at their outlines' new `places`.
-fn shapes_at(shapes: &[TraceShapeRegion], places: &[usize]) -> Vec<TraceShapeRegion> {
+fn shapes_at(shapes: &[ShapeRegion], places: &[usize]) -> Vec<ShapeRegion> {
     shapes
         .iter()
-        .map(|region| TraceShapeRegion {
+        .map(|region| ShapeRegion {
             outlines: region.outlines.iter().map(|&i| places[i]).collect(),
             shapes: region.shapes.clone(),
             band: region.band,

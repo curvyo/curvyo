@@ -9,7 +9,7 @@
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::ocr::{OcrModel, read_text};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 use super::trace_text_tests::{fit, fonts, model, session_with};
@@ -23,7 +23,7 @@ type LineReport = (String, f64, bool, Option<(String, usize, usize, bool)>);
 fn fitted_lines(model: &OcrModel, file: &str) -> Vec<LineReport> {
     let (mut session, image) = session_with(file);
     let source = session.trace_source(image, false).unwrap();
-    let lines = trace_read_text(
+    let lines = read_text(
         model,
         &source.rgba,
         source.width,
@@ -185,7 +185,7 @@ fn the_fit_profile() {
     for file in ["customer/font-manager-screenshot.png", "tester/poster.png"] {
         let (mut session, image) = session_with(file);
         let source = session.trace_source(image, false).unwrap();
-        let lines = trace_read_text(
+        let lines = read_text(
             &model,
             &source.rgba,
             source.width,
@@ -282,7 +282,7 @@ fn fit_in_shares(request: &str, shares: usize) -> String {
 fn fit_request(model: &OcrModel, file: &str) -> String {
     let (mut session, image) = session_with(file);
     let source = session.trace_source(image, false).unwrap();
-    let lines = trace_read_text(
+    let lines = read_text(
         model,
         &source.rgba,
         source.width,

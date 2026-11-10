@@ -35,11 +35,11 @@ use curvyo_editor_wasm::{
 use curvyo_ui_core::{FontBlock, read_trace_wire};
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
+use vectrace::Output;
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrLine, OcrModel, trace_read_text};
-use vectrace::wire::TraceWire;
+use vectrace::ocr::{OcrLine, OcrModel, read_text};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, Rgb8 as TraceRgb};
 
 const TOLERANCE_MM: f64 = 0.3;
@@ -172,7 +172,7 @@ fn fit(request: &str) -> String {
     panic!("the fit never finished");
 }
 
-fn traced(wire: &[f64]) -> TraceWire {
+fn traced(wire: &[f64]) -> Output {
     read_trace_wire(wire).expect("a readable wire")
 }
 
@@ -218,7 +218,7 @@ impl Host {
     }
 
     fn read(&self, model: &OcrModel) -> Vec<OcrLine> {
-        trace_read_text(model, &self.rgba, self.width, self.height, &mut |_| {
+        read_text(model, &self.rgba, self.width, self.height, &mut |_| {
             std::ops::ControlFlow::Continue(())
         })
         .unwrap()
@@ -463,7 +463,7 @@ fn subpath_boxes(path: &BezPath) -> Vec<Rect> {
 }
 
 /// The outlines of each layer of a multicolour wire, with the layer's colour.
-fn layer_outlines(w: &TraceWire) -> Vec<(TraceRgb, Vec<BezPath>)> {
+fn layer_outlines(w: &Output) -> Vec<(TraceRgb, Vec<BezPath>)> {
     let mut at = 0;
     w.layers
         .iter()
@@ -478,7 +478,7 @@ fn layer_outlines(w: &TraceWire) -> Vec<(TraceRgb, Vec<BezPath>)> {
 /// The candidates of "nearest" per criterion 23 and adrs.md decision 6 (as amended by the lead
 /// 2026-11-02): the palette, and the trace's background (here the white paper) only for a text
 /// that lies on a traced shape.
-fn candidates(w: &TraceWire, on_shape: bool) -> Vec<TraceRgb> {
+fn candidates(w: &Output, on_shape: bool) -> Vec<TraceRgb> {
     let mut c: Vec<TraceRgb> = w.palette.iter().map(|p| p.colour).collect();
     if on_shape {
         c.push(WHITE);
@@ -493,7 +493,7 @@ fn nearest(cands: &[TraceRgb], c: TraceRgb) -> TraceRgb {
     *cands.iter().min_by_key(|p| dist2(**p, c)).unwrap()
 }
 
-fn describe(w: &TraceWire) -> String {
+fn describe(w: &Output) -> String {
     format!(
         "palette {:?}; layers {:?}",
         w.palette

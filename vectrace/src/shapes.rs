@@ -544,7 +544,7 @@ pub fn trace_add_shapes(wire: &mut Vec<f64>, pixel_map: [f64; 6]) {
     let Some((read, at)) = crate::wire::read_trace_body(wire) else {
         return;
     };
-    if read.status != crate::wire::TraceStatus::Traced || wire.get(at) == Some(&SHAPE_MARK) {
+    if read.status != crate::wire::Status::Traced || wire.get(at) == Some(&SHAPE_MARK) {
         return;
     }
     let [a, b, c, d, _, _] = pixel_map;

@@ -2,12 +2,15 @@
 //! picture, the settings, the OCR lines, the mask and whether to recognise shapes; [`run`] gives
 //! the result as the flat numbers the session reads back, [`text_regions`] the text section only.
 
+mod text;
+mod text_colour;
+
 use crate::{ColourParams, PixelMap, Raster, TraceParams};
 
-use crate::job_text::{text_mono_wire, text_regions_wire};
-use crate::job_text_colour::text_colour_wire;
+use self::text::{text_mono_wire, text_regions_wire};
+use self::text_colour::text_colour_wire;
 use crate::mask::Mask;
-use crate::ocr::accept::OcrLine;
+use crate::ocr::OcrLine;
 use crate::shapes::trace_add_shapes;
 
 /// The settings of a job: one black result or one per colour.

@@ -13,7 +13,7 @@ use crate::{Mm, PixelMap, Raster, Rgb8, Selection, TraceParams, auto_threshold, 
 use kurbo::{BezPath, Point, Vec2};
 
 use crate::inpaint::{inpaint, median};
-use crate::ocr::accept::OcrLine;
+use crate::ocr::OcrLine;
 
 /// The box of a quad grows by this many pixels on each side (decision 2).
 const BOX_MARGIN: f64 = 2.0;

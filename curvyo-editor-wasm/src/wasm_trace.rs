@@ -67,7 +67,7 @@ fn job_wire(
     height: u32,
     map: &[f64],
     settings: &str,
-    lines: &[vectrace::ocr::accept::OcrLine],
+    lines: &[vectrace::ocr::OcrLine],
     progress: &TraceProgressSink,
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
@@ -94,7 +94,7 @@ fn job_wire(
 
 thread_local! {
     /// The text reader of this worker, loaded once (`specs/0091`, ADR 0028 §5).
-    pub(crate) static OCR_MODEL: std::cell::RefCell<Option<vectrace::ocr::accept::OcrModel>> =
+    pub(crate) static OCR_MODEL: std::cell::RefCell<Option<vectrace::ocr::OcrModel>> =
         const { std::cell::RefCell::new(None) };
 }
 
@@ -106,12 +106,12 @@ pub fn ocr_load(detector: &[u8], recogniser: &[u8], alphabet: &str) -> String {
     if OCR_MODEL.with(|m| m.borrow().is_some()) {
         return String::new();
     }
-    match vectrace::ocr::accept::OcrModel::load(detector, recogniser, alphabet) {
+    match vectrace::ocr::OcrModel::load(detector, recogniser, alphabet) {
         Ok(model) => {
             OCR_MODEL.with(|m| *m.borrow_mut() = Some(model));
             String::new()
         }
-        Err(vectrace::ocr::accept::OcrError::WrongModel) => "wrong_model".to_string(),
+        Err(vectrace::ocr::OcrError::WrongModel) => "wrong_model".to_string(),
         Err(error) => error.to_string(),
     }
 }
@@ -138,7 +138,7 @@ pub fn ocr_job(rgba: &[u8], width: u32, height: u32, progress: &TraceProgressSin
             progress.report(percent);
             std::ops::ControlFlow::Continue(())
         };
-        vectrace::ocr::accept::trace_read_text(model, rgba, width, height, &mut report)
+        vectrace::ocr::read_text(model, rgba, width, height, &mut report)
             .map(|lines| crate::trace_glue::ocr_lines_json(width, height, &lines))
             .unwrap_or_default()
     })

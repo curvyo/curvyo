@@ -26,17 +26,17 @@ use cpu_time::cpu_time_of;
 use curvyo_document_core::NodeId;
 use curvyo_editor_wasm::{Session, Tool};
 use image::ImageEncoder;
-use vectrace::wire::TRACE_WIRE_HEADER;
+use vectrace::wire::HEADER;
 
 const FRAME: Duration = Duration::from_millis(16);
 const HANDLER: Duration = Duration::from_millis(50);
 
 /// `count` squares of 4 nodes on a grid of 250 columns, 0.4 mm apart, as the worker's numbers.
 fn squares(count: usize) -> Vec<f64> {
-    let mut wire = vec![0.0; TRACE_WIRE_HEADER];
+    let mut wire = vec![0.0; HEADER];
     wire[1] = count as f64;
     wire[2] = (count * 4) as f64;
-    wire[TRACE_WIRE_HEADER - 1] = count as f64;
+    wire[HEADER - 1] = count as f64;
     for i in 0..count {
         let (x, y) = ((i % 250) as f64 * 0.4, (i / 250) as f64 * 0.4);
         wire.extend([6.0, 0.0, x, y, 1.0, x + 0.2, y, 1.0, x + 0.2, y + 0.2]);

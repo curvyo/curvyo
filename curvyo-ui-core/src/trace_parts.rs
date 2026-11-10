@@ -14,9 +14,10 @@ use kurbo::{BezPath, Shape};
 use vectrace::{Rgb8 as TraceRgb, node_count};
 
 use crate::trace_region::{TRACE_REGION_TOLERANCE, TraceRegion, outer_sign, wound_polylines};
-use vectrace::job_text::TraceTexts;
+use vectrace::Output;
 use vectrace::shapes::ShapeRegion;
-use vectrace::wire::{TraceLayerWire, TraceStatus, TraceWire};
+use vectrace::wire::Texts;
+use vectrace::wire::{Layer, Status};
 
 /// How far the box that stands for "everything" reaches past the picture, mm: far enough that
 /// no traced outline (which never leaves the picture) touches its edge (`adrs.md` decision 1).
@@ -125,8 +126,8 @@ pub fn trace_part_clips(areas: &[TracePartArea], quad: &[Point; 4]) -> Vec<Trace
 /// the bar shows). One part that adds anything is returned as it is; a part that did not trace
 /// (too detailed, invalid) makes the join say so.
 #[must_use]
-pub fn join_trace_parts(parts: &[(&TraceWire, &TracePartClip)], palette_of: usize) -> TraceWire {
-    let live: Vec<(usize, &TraceWire, &TracePartClip)> = parts
+pub fn join_trace_parts(parts: &[(&Output, &TracePartClip)], palette_of: usize) -> Output {
+    let live: Vec<(usize, &Output, &TracePartClip)> = parts
         .iter()
         .enumerate()
         .filter(|(_, (_, clip))| clip.contributes())
@@ -135,10 +136,7 @@ pub fn join_trace_parts(parts: &[(&TraceWire, &TracePartClip)], palette_of: usiz
     if let [(_, wire, _)] = live.as_slice() {
         return (*wire).clone();
     }
-    if let Some((_, failed, _)) = live
-        .iter()
-        .find(|(_, w, _)| w.status != TraceStatus::Traced)
-    {
+    if let Some((_, failed, _)) = live.iter().find(|(_, w, _)| w.status != Status::Traced) {
         return empty(failed.status);
     }
     let multicolour = live.iter().any(|(_, w, _)| !w.layers.is_empty());
@@ -149,7 +147,7 @@ pub fn join_trace_parts(parts: &[(&TraceWire, &TracePartClip)], palette_of: usiz
             .collect::<Vec<_>>(),
     );
     let buckets = sort_into_colours(&live, multicolour);
-    let mut joined = empty(TraceStatus::Traced);
+    let mut joined = empty(Status::Traced);
     // Where each part's kept outline went: (part, old index) to new index.
     let mut moved: Vec<((usize, usize), usize)> = Vec::new();
     for bucket in buckets {
@@ -165,7 +163,7 @@ pub fn join_trace_parts(parts: &[(&TraceWire, &TracePartClip)], palette_of: usiz
             joined.outlines.push(outline);
         }
         if multicolour {
-            joined.layers.push(TraceLayerWire {
+            joined.layers.push(Layer {
                 colour: bucket.colour,
                 outlines: joined.outlines.len() - start,
             });
@@ -260,18 +258,15 @@ impl Seam {
 
 /// The live parts' outlines sorted into one bucket per fill colour (black for a single-colour
 /// part), largest painted area first; ties keep the order in which the colours appear.
-fn sort_into_colours(
-    live: &[(usize, &TraceWire, &TracePartClip)],
-    multicolour: bool,
-) -> Vec<Bucket> {
+fn sort_into_colours(live: &[(usize, &Output, &TracePartClip)], multicolour: bool) -> Vec<Bucket> {
     let black = TraceRgb::new(0, 0, 0);
     let mut buckets: Vec<Bucket> = Vec::new();
     for (k, wire, clip) in live {
-        let single = [TraceLayerWire {
+        let single = [Layer {
             colour: black,
             outlines: wire.outlines.len(),
         }];
-        let layers: &[TraceLayerWire] = if wire.layers.is_empty() {
+        let layers: &[Layer] = if wire.layers.is_empty() {
             &single
         } else {
             &wire.layers
@@ -346,8 +341,8 @@ fn moved_region(
 }
 
 /// A result with `status` and nothing in it.
-fn empty(status: TraceStatus) -> TraceWire {
-    TraceWire {
+fn empty(status: Status) -> Output {
+    Output {
         status,
         paths: 0,
         nodes: 0,
@@ -358,7 +353,7 @@ fn empty(status: TraceStatus) -> TraceWire {
         palette: Vec::new(),
         layers: Vec::new(),
         joined: 0,
-        texts: TraceTexts::default(),
+        texts: Texts::default(),
         shapes: Vec::new(),
         unclipped: 0,
     }

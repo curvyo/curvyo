@@ -13,7 +13,7 @@ use crate::ocr::OcrError;
 use crate::ocr::resize::{Grid, Rgb, sample};
 
 /// The longest side the detector sees, px.
-pub const DETECTION_SIDE: usize = 960;
+pub(super) const DETECTION_SIDE: usize = 960;
 /// The probability above which a detector pixel is text.
 const PROBABILITY_CUT: f32 = 0.3;
 /// Components of this many detector pixels or fewer are noise.

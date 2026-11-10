@@ -8,7 +8,7 @@ use curvyo_document_core::{NodeId, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
 use image::ImageEncoder;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
-use vectrace::wire::TRACE_WIRE_HEADER;
+use vectrace::wire::HEADER;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 mod cpu_time;
@@ -128,10 +128,10 @@ fn c52_a_small_image_is_not_reduced() {
 
 /// `count` squares of 4 nodes, as the worker's wire (see `trace_view_budget.rs`).
 fn squares(count: usize, map: [f64; 6]) -> Vec<f64> {
-    let mut wire = vec![0.0; TRACE_WIRE_HEADER];
+    let mut wire = vec![0.0; HEADER];
     wire[1] = count as f64;
     wire[2] = (count * 4) as f64;
-    wire[TRACE_WIRE_HEADER - 1] = count as f64;
+    wire[HEADER - 1] = count as f64;
     for i in 0..count {
         let (x, y) = ((i % 250) as f64 * 0.4, (i / 250) as f64 * 0.4);
         wire.extend([6.0, 0.0, x, y, 1.0, x + 0.2, y, 1.0, x + 0.2, y + 0.2]);

@@ -1087,7 +1087,7 @@ fn a_cut_out_part_with_upscale_auto_traces_as_the_whole_picture() {
     };
     // Unclipped, the cut-out's outlines must lie where the whole picture's do (D's box plus the
     // margin, 8..46 mm from the picture's left edge).
-    let left_of = |w: &vectrace::wire::TraceWire| {
+    let left_of = |w: &vectrace::Output| {
         use kurbo::Shape;
         w.outlines
             .iter()
@@ -1204,7 +1204,7 @@ fn a_whole_picture_with_upscale_auto_away_from_the_origin_lands_on_the_picture()
     };
     let auto = trace(r#"{"threshold":100,"upscale":0}"#);
     let off = trace(r#"{"threshold":100,"upscale":1}"#);
-    let bbox = |w: &vectrace::wire::TraceWire| {
+    let bbox = |w: &vectrace::Output| {
         w.outlines
             .iter()
             .map(Shape::bounding_box)

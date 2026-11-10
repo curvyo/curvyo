@@ -13,13 +13,13 @@ use curvyo_ui_core::{
     TraceRegion, TraceRegionError, read_trace_wire, trace_region_defaults, unclipped_notice,
 };
 use kurbo::{BezPath, PathEl, Shape};
+use vectrace::Output;
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
 use vectrace::mask::Mask;
-use vectrace::ocr::accept::OcrLine;
+use vectrace::ocr::OcrLine;
 use vectrace::shapes::trace_add_shapes;
-use vectrace::wire::TraceWire;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, TraceParams, suggest_background as trace_suggest_background,
@@ -82,7 +82,7 @@ fn params() -> TraceParams {
     TraceParams::with_threshold(50)
 }
 
-fn trace(map: [f64; 6], region: Option<&TraceRegion>) -> TraceWire {
+fn trace(map: [f64; 6], region: Option<&TraceRegion>) -> Output {
     read_trace_wire(&run_trace_job(
         &TraceJob {
             raster: TraceRaster {
@@ -102,8 +102,8 @@ fn trace(map: [f64; 6], region: Option<&TraceRegion>) -> TraceWire {
 }
 
 /// The three traces of M1 at Threshold 50: unmasked, R1 Inside, R1 Outside.
-fn traces() -> &'static [TraceWire; 3] {
-    static TRACES: OnceLock<[TraceWire; 3]> = OnceLock::new();
+fn traces() -> &'static [Output; 3] {
+    static TRACES: OnceLock<[Output; 3]> = OnceLock::new();
     TRACES.get_or_init(|| {
         [
             trace(MAP, None),

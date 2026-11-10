@@ -33,7 +33,7 @@ use serde_json::Value;
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrLine, OcrModel, trace_read_text};
+use vectrace::ocr::{OcrLine, OcrModel, read_text};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const TOLERANCE_MM: f64 = 0.3;
@@ -165,7 +165,7 @@ impl Host {
     }
 
     fn read(&self, model: &OcrModel) -> Vec<OcrLine> {
-        trace_read_text(model, &self.rgba, self.width, self.height, &mut |_| {
+        read_text(model, &self.rgba, self.width, self.height, &mut |_| {
             std::ops::ControlFlow::Continue(())
         })
         .unwrap()

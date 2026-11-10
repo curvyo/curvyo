@@ -24,7 +24,7 @@ use serde_json::Value;
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::ocr::{OcrModel, read_text};
 use vectrace::shapes::trace_add_shapes;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
@@ -151,7 +151,7 @@ fn run(model: &OcrModel, settings: &str) -> Out {
     s.set_tool(Tool::Trace);
     let image = s.trace_view().shown.expect("the image is shown");
     let src = s.trace_source(image, false).unwrap();
-    let lines = trace_read_text(model, &src.rgba, src.width, src.height, &mut |_| {
+    let lines = read_text(model, &src.rgba, src.width, src.height, &mut |_| {
         std::ops::ControlFlow::Continue(())
     })
     .unwrap();

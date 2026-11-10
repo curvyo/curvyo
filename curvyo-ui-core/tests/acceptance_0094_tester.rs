@@ -34,7 +34,7 @@ use proptest::prelude::*;
 use support::{COLOUR, M1, M2, draw, map_100mm, text_quads, text_sheet};
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::mask::Mask;
-use vectrace::ocr::accept::OcrLine;
+use vectrace::ocr::OcrLine;
 use vectrace::shapes::trace_add_shapes;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
@@ -1231,7 +1231,7 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
     );
     trace_add_shapes(&mut whole, map_100mm(n));
     let whole = read_trace_wire(&whole).unwrap();
-    let recognised = |w: &vectrace::wire::TraceWire| {
+    let recognised = |w: &vectrace::Output| {
         w.shapes
             .iter()
             .filter(|s| s.shapes.first().is_some_and(Option::is_some))
@@ -1302,7 +1302,7 @@ fn multicolour_every_layer_is_clipped_and_inside_plus_outside_is_the_unmasked_la
     let whole = job(None);
     let inside = job(Some(&region(r1(), false)));
     let outside = job(Some(&region(r1(), true)));
-    let per_layer = |w: &vectrace::wire::TraceWire| {
+    let per_layer = |w: &vectrace::Output| {
         let mut at = 0;
         let mut out = Vec::new();
         for l in &w.layers {

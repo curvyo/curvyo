@@ -3,17 +3,18 @@
 
 use std::ops::ControlFlow;
 
-pub use crate::ocr::{LINE_HEIGHT, LineCrop, OcrError, OcrModel};
-use crate::ocr::{OcrProgress, TextLine, crop_lines, read_crop, read_lines};
+use crate::ocr::{
+    LineCrop, OcrError, OcrModel, OcrProgress, TextLine, crop_lines, read_crop, read_lines,
+};
 
 /// The least mean character confidence of a line Trace sets as text (Proposal, `adrs.md`
 /// decision 2).
-pub const MIN_LINE_CONFIDENCE: f64 = 0.6;
+const MIN_LINE_CONFIDENCE: f64 = 0.6;
 
 /// The least mean character confidence of a line set as text without a sure letter (Frage 115 B
 /// / 117 B garbage filter; Proposal, calibrated on the customer's screenshot and the posters:
 /// UI chrome read as "88+" is 0.74, "ye" 0.34, real labels 0.89 and up).
-pub const MIN_GUESSED_LINE_CONFIDENCE: f64 = 0.8;
+const MIN_GUESSED_LINE_CONFIDENCE: f64 = 0.8;
 
 /// A line whose letters repeat a unit of at most this many characters is a pattern, not text
 /// (the `0025` dot grid read as "TOTOTO").
@@ -85,7 +86,7 @@ impl OcrLine {
 ///
 /// # Errors
 /// As [`crate::ocr::read_lines`]: a cancel, an unreadable raster or a failed inference.
-pub fn trace_read_text(
+pub fn read_text(
     model: &OcrModel,
     rgba: &[u8],
     width: u32,
@@ -121,12 +122,12 @@ fn kept(line: TextLine) -> OcrLine {
     }
 }
 
-/// The detection half of [`trace_read_text`]: the lines of `rgba` sampled for the recogniser, top
+/// The detection half of [`read_text`]: the lines of `rgba` sampled for the recogniser, top
 /// to bottom, so a pool of workers can read them apart (`specs/0091` round 2).
 ///
 /// # Errors
 /// As [`crate::ocr::crop_lines`].
-pub fn trace_crop_text(
+pub fn crop_text(
     model: &OcrModel,
     rgba: &[u8],
     width: u32,
@@ -137,12 +138,12 @@ pub fn trace_crop_text(
     })
 }
 
-/// The reading half of [`trace_read_text`] for one crop: the line, or `None` when nothing was
+/// The reading half of [`read_text`] for one crop: the line, or `None` when nothing was
 /// read. The same crop gives the same line in any worker.
 ///
 /// # Errors
 /// As [`crate::ocr::read_crop`].
-pub fn trace_read_crop(model: &OcrModel, crop: &LineCrop) -> Result<Option<OcrLine>, OcrError> {
+pub fn read_crop_text(model: &OcrModel, crop: &LineCrop) -> Result<Option<OcrLine>, OcrError> {
     Ok(read_crop(model, crop)?.map(kept))
 }
 
