@@ -9,6 +9,11 @@
 )]
 
 mod engraved_grid;
+mod fixture_fit;
+mod fixture_kind;
+mod fixture_slot;
+mod fixture_snap;
+mod grid_layout;
 mod machine_profile;
 mod machine_profile_copy;
 mod machine_profile_file;
@@ -36,6 +41,16 @@ pub mod operations {
 }
 
 pub use engraved_grid::{ENGRAVED_GRID, engraved_grid};
+pub use fixture_fit::{FitMatch, fit_slot};
+pub use fixture_kind::{
+    FixtureKind, KIND_PREFIX, MAJOR_EVERY_RANGE, MmRange, SlotShape, board_side_range,
+    grid_spacing_range, origin_offset_range, slot_size_range, stop_leg_range, stop_thickness_range,
+};
+pub use fixture_slot::Slot;
+pub use fixture_snap::{Placement, board_points, stop_points};
+pub use grid_layout::{
+    GridLayout, GridSpec, Lattice, Number, Tape, TapeEdge, TapeEdges, Tick, layout,
+};
 pub use machine_profile::{
     BaudRate, Connection, FeedRate, GENERIC_LASER_ID, GENERIC_LASER_NAME, Limited,
     MAX_CONNECTION_CHARS, MAX_NAME_CHARS, MAX_WORK_MM, MIN_WORK_MM, MachineProfile, OriginCorner,
