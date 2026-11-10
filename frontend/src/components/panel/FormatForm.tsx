@@ -113,7 +113,7 @@ interface FormatFormProps {
 /**
  * The inline form that adds or edits a format (`specs/0045-document-formats-
  * library/` criteria 18, 19 and 21): Name, Width, Height, Unit, Group, a new
- * group's name and "Opens as", "Add to quick selection", and the buttons. It
+ * group's name, "Add to quick selection", and the buttons. It
  * holds typed text only; Rust checks it and names each refused field. Enter in a
  * field presses Add (or Save), Escape closes the form and drops the draft.
  */

@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::document_presets::{DocumentPreset, PresetError, same_sides};
+use crate::document_presets::{DocumentPreset, PresetError};
 use crate::format_library::FormatLibrary;
 use crate::format_library_file::{UserFile, UserGroup};
 
@@ -103,7 +103,7 @@ impl FormatLibrary {
     }
 
     /// Merges one imported format: skipped when the library has it (same id
-    /// and content) or the group has one of its name and size, otherwise added to the group
+    /// and content) or the group has one of its name, otherwise added to the group
     /// of its id or name (or a new group) under its own id, or a new one when
     /// that is taken.
     fn import_format(&mut self, group: &UserGroup, preset: &DocumentPreset) -> Merge {
@@ -148,19 +148,18 @@ impl FormatLibrary {
     }
 
     /// Whether the group the imported one joins already has a format of this
-    /// name (ignoring case) and size (criteria 27 and 39).
+    /// name (ignoring case), whatever its size (criteria 27 and 39).
     fn has_in_group(&self, group: &UserGroup, preset: &DocumentPreset) -> bool {
         let Some(id) = self.existing_group_for_import(group) else {
             return false;
         };
         let name = preset.name.to_lowercase();
-        let (short, long) = (preset.short_side.as_mm(), preset.long_side.as_mm());
         self.list()
             .groups
             .iter()
             .filter(|g| g.id == id)
             .flat_map(|g| g.presets.iter())
-            .any(|known| known.name.to_lowercase() == name && same_sides(known, short, long))
+            .any(|known| known.name.to_lowercase() == name)
     }
 
     /// The group an imported group joins, or a new one (criterion 27).

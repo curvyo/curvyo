@@ -16,7 +16,7 @@ default_orientation = "landscape"
   long_side = 50
   unit = "mm"
 
-  # Another id, but the group has this name and size: skipped (criterion 39).
+  # Another id, but the group has this name: skipped (criterion 39).
   [[group.preset]]
   id = "u-ring-copy"
   name = "key ring"

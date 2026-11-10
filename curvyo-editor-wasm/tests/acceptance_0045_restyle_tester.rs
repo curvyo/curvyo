@@ -403,11 +403,9 @@ fn c43_c6_rename_is_refused_while_the_file_is_broken() {
 }
 
 #[test]
-#[ignore = "FAIL reported to the lead: after such an import, Save and rename of either twin is refused with This group already has <name>; remove this ignore with the fix"]
 fn c39_c21_after_an_import_with_a_name_the_group_has_both_formats_stay_editable() {
-    // Same group and name, other size: the import adds it (criterion 27); the
-    // name rule of criterion 39 must not leave two formats that block each
-    // other's Save.
+    // Same group and name, other size: the import skips both (criteria 27, 39),
+    // so no two formats of one name exist and Save on each still works.
     let mut s = laser();
     let other = LASER
         .replace("u-key-ring", "u-key-ring-big")
@@ -422,6 +420,7 @@ fn c39_c21_after_an_import_with_a_name_the_group_has_both_formats_stay_editable(
         .iter()
         .map(|r| r.id.clone())
         .collect();
+    assert_eq!(ids.len(), 2, "the import adds nothing: {ids:?}");
     for id in &ids {
         let r = row(&s.format_list(), id).clone();
         let (w, h) = if r.size_text.starts_with("95") {

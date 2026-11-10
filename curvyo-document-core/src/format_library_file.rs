@@ -157,7 +157,7 @@ impl UserFile {
         for (position, group) in raw.group.into_iter().enumerate() {
             let group = read_group(position, group, builtin, &file.groups)?;
             if collisions {
-                check_group_formats(&group, &known)?;
+                check_group_formats(&group, &known, builtin)?;
             }
             known.extend(group.presets.iter().cloned());
             file.groups.push(group);
@@ -319,14 +319,32 @@ fn orientation_of(value: &str, subject: &PresetSubject) -> Result<Orientation, P
 }
 
 /// Criterion 4c and 39: the group's formats have ids that no earlier format of
-/// the library has, and none of them twice. Sizes may repeat.
-fn check_group_formats(group: &UserGroup, known: &[DocumentPreset]) -> Result<(), PresetError> {
+/// the library has, and none of them twice; no two formats of the group share
+/// a name (ignoring case, built-in formats of the group included). Sizes may
+/// repeat.
+fn check_group_formats(
+    group: &UserGroup,
+    known: &[DocumentPreset],
+    builtin: &PresetList,
+) -> Result<(), PresetError> {
     let mut seen: Vec<&DocumentPreset> = known.iter().collect();
+    let mut names: Vec<String> = builtin
+        .groups
+        .iter()
+        .filter(|g| g.id == group.id)
+        .flat_map(|g| g.presets.iter())
+        .map(|p| p.name.to_lowercase())
+        .collect();
     for preset in &group.presets {
         let subject = PresetSubject::Preset(preset.id.clone());
         if seen.iter().any(|other| other.id == preset.id) {
             return Err(fail(subject, PresetReason::DuplicatePresetId));
         }
+        let name = preset.name.to_lowercase();
+        if names.contains(&name) {
+            return Err(fail(subject, PresetReason::DuplicateName));
+        }
+        names.push(name);
         seen.push(preset);
     }
     Ok(())
@@ -448,6 +466,7 @@ pub fn describe_error(error: &PresetError) -> String {
         PresetReason::DuplicateGroupId | PresetReason::DuplicatePresetId => {
             "id is used twice".to_string()
         }
+        PresetReason::DuplicateName => "name is used twice in its group".to_string(),
         PresetReason::UnknownUnit(unit) => format!("unit \"{unit}\" is not mm, cm, in or px"),
         PresetReason::SideNotPositive => "a side is not a number above zero".to_string(),
         PresetReason::ShortSideLonger => "short_side is longer than long_side".to_string(),
