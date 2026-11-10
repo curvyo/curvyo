@@ -398,7 +398,7 @@ fn colour(tolerance: u8) -> Job {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance,
         },
-        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     }))
 }
@@ -516,7 +516,7 @@ fn c23_a_different_rgb_in_a_part_stays_a_layer_of_its_own() {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         invert: false,
         ..TraceParams::with_threshold(128)
     }));

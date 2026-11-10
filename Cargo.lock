@@ -992,19 +992,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "curvyo-ocr-core"
-version = "0.1.0"
-dependencies = [
- "curvyo-image-core",
- "rten",
- "rten-tensor",
- "serde",
- "sha2 0.10.9",
- "thiserror 2.0.21",
- "toml 1.1.6+spec-1.1.0",
-]
-
-[[package]]
 name = "curvyo-render-core"
 version = "0.1.0"
 dependencies = [
@@ -1111,11 +1098,9 @@ dependencies = [
  "curvyo-geometry-core",
  "curvyo-image-core",
  "curvyo-laser-core",
- "curvyo-ocr-core",
  "curvyo-sketch-core",
  "curvyo-svg-core",
  "curvyo-text-core",
- "curvyo-vectorize-core",
  "image",
  "kurbo",
  "proptest",
@@ -1123,21 +1108,8 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "toml 1.1.6+spec-1.1.0",
+ "vectrace",
  "wasm-bindgen-test",
-]
-
-[[package]]
-name = "curvyo-vectorize-core"
-version = "0.1.0"
-dependencies = [
- "cap",
- "curvyo-document-core",
- "curvyo-image-core",
- "curvyo-svg-core",
- "kurbo",
- "rustix",
- "serde_json",
- "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -6290,6 +6262,25 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
+
+[[package]]
+name = "vectrace"
+version = "0.1.0"
+dependencies = [
+ "cap",
+ "curvyo-document-core",
+ "curvyo-image-core",
+ "curvyo-svg-core",
+ "kurbo",
+ "rten",
+ "rten-tensor",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.21",
+ "toml 1.1.6+spec-1.1.0",
+]
 
 [[package]]
 name = "version-compare"

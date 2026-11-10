@@ -197,27 +197,11 @@ mod trace_adapter;
 mod trace_fit;
 mod trace_fit_guess;
 mod trace_fit_turn;
-mod trace_inpaint;
-mod trace_job;
-mod trace_mask;
-mod trace_ocr;
 mod trace_parts;
 mod trace_plan;
 mod trace_region;
 mod trace_region_raster;
-mod trace_shape_band;
-mod trace_shape_fit;
-mod trace_shape_hole_band;
-mod trace_shape_join;
-mod trace_shape_math;
-mod trace_shape_sample;
-mod trace_shape_star;
-mod trace_shapes;
-mod trace_text;
-mod trace_text_colour;
 mod trace_text_notice;
-mod trace_text_wire;
-mod trace_transfer;
 mod trace_words;
 mod transform_commit;
 mod transform_drag;
@@ -274,21 +258,6 @@ pub use combine::{
 pub use conversion::{build_primitive_conversions, primitive_as_path};
 pub use curvyo_geometry_core::{PATTERN_MAX_PIECES, PATTERN_NOTE_PIECES, PatternError};
 pub use curvyo_svg_core::SvgDrawing;
-/// The Trace tool's settings schema (criterion 6), passed through for the host.
-pub use curvyo_vectorize_core::{
-    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, AnalysisReport as TraceAnalysis,
-    Capture as TraceCapture, ColourParams as TraceColourParams,
-    DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
-    DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
-    ImageType as TraceImageType, MAX_COLOURS as TRACE_MAX_COLOURS,
-    METHOD_PARAMS as TRACE_METHOD_PARAMS, Mm as TraceMm, PARAMS as TRACE_PARAMS,
-    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
-    PixelLength as TracePixelLength, PixelMap as TracePixelMap, PropertyKind as TraceProperty,
-    Raster as TraceRaster, Reason as TraceReason, Rgb8 as TraceRgb, Selection as TraceMethod,
-    Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale, analyse as trace_analyse,
-    auto_threshold as trace_auto_threshold, sample_colour as trace_sample_colour,
-    suggest_background as trace_suggest_background,
-};
 pub use cut::{CUT_COMMIT_LABEL, CutPlan, CutRefusal, MAX_CUT_PIECES, plan_cut};
 pub use cuttable::{
     CUTTABLE_CHECK_VERSION, CUTTABLE_SIZE_MM, CUTTABLE_WORD, FontChecks, cuttable_pieces,
@@ -559,14 +528,6 @@ pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
 };
-pub use trace_job::{
-    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
-};
-pub use trace_mask::{Clipped, Mask};
-pub use trace_ocr::{
-    LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
-    OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,
-};
 pub use trace_parts::{TracePartArea, TracePartClip, join_trace_parts, trace_part_clips};
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
@@ -576,16 +537,7 @@ pub use trace_region::{
     RegionOperand, TraceRegion, TraceRegionError, mask_operand, unclipped_notice,
 };
 pub use trace_region_raster::{TraceRegionDefaults, trace_region_defaults};
-pub use trace_shapes::{
-    Band as TraceBand, Join as TraceJoin, POINTS as TRACE_SHAPE_POINTS,
-    Primitive as TracePrimitive, ShapeRegion as TraceShapeRegion, recognise_shapes,
-    trace_add_shapes,
-};
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
-pub use trace_text_wire::{TraceTextWire, TraceTexts};
-pub use trace_transfer::{
-    TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire,
-};
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };
@@ -607,6 +559,38 @@ pub use transform_math::{
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};
 pub use units::{SelectedUnit, Units};
 pub use value_scale::{FieldShown, Grid, ValueField, ValueScale};
+pub use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+pub use vectrace::job_text::{TraceTextWire, TraceTexts};
+pub use vectrace::mask::{Clipped, Mask};
+pub use vectrace::ocr::accept::{
+    LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
+    OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,
+};
+pub use vectrace::shapes::{
+    Band as TraceBand, Join as TraceJoin, POINTS as TRACE_SHAPE_POINTS,
+    Primitive as TracePrimitive, ShapeRegion as TraceShapeRegion, recognise_shapes,
+    trace_add_shapes,
+};
+pub use vectrace::wire::{
+    TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire,
+};
+/// The Trace tool's settings schema (criterion 6), passed through for the host.
+pub use vectrace::{
+    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, AnalysisReport as TraceAnalysis,
+    Capture as TraceCapture, ColourParams as TraceColourParams,
+    DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
+    DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
+    ImageType as TraceImageType, MAX_COLOURS as TRACE_MAX_COLOURS,
+    METHOD_PARAMS as TRACE_METHOD_PARAMS, Mm as TraceMm, PARAMS as TRACE_PARAMS,
+    PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind, ParamUnit as TraceParamUnit,
+    PixelLength as TracePixelLength, PixelMap as TracePixelMap, PropertyKind as TraceProperty,
+    Raster as TraceRaster, Reason as TraceReason, Rgb8 as TraceRgb, Selection as TraceMethod,
+    Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale, analyse as trace_analyse,
+    auto_threshold as trace_auto_threshold, sample_colour as trace_sample_colour,
+    suggest_background as trace_suggest_background,
+};
 pub use viewport::{DOCUMENT_INSET_PX, PX_PER_MM_AT_100, SavedView, Viewport, Zoom};
 pub use weld_plan::{
     WELD_COMMIT_LABEL, WeldAvailability, WeldPlan, WeldRefusal, plan_weld, weld_availability,

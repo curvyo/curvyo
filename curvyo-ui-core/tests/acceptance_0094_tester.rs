@@ -320,7 +320,7 @@ fn colour_params() -> TraceColourParams {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     })
 }
@@ -1764,7 +1764,7 @@ fn far_left_half(outside: bool) -> TraceRegion {
 
 fn far_params() -> TraceParams {
     TraceParams {
-        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     }
 }

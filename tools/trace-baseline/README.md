@@ -3,12 +3,12 @@
 The quality harness of `curvyo-vectorize-core` (`specs/0025-raster-trace` criteria 27 to 29,
 ADR 0023 §7) compares our trace with Inkscape's Trace Bitmap. Inkscape (GPL) never runs in CI and
 none of its output is committed: it runs here, by hand, and only its numbers go into
-`curvyo-vectorize-core/tests/fixtures/trace/baseline.json`.
+`vectrace/tests/fixtures/trace/baseline.json`.
 
 1. Write the synthetic black and white set (PGM, one per image of `research.md` section 5):
 
    ```text
-   cargo test --release -p curvyo-vectorize-core --test quality write_quality_set -- --ignored --nocapture
+   cargo test --release -p vectrace --test quality write_quality_set -- --ignored --nocapture
    ```
 
    The pictures land in `target/trace-quality/` with their resolution printed beside them.
@@ -24,7 +24,7 @@ none of its output is committed: it runs here, by hand, and only its numbers go 
    into outlines and measures them like ours):
 
    ```text
-   TRACE_BASELINE_DIR=target/trace-baseline cargo test --release -p curvyo-vectorize-core \
+   TRACE_BASELINE_DIR=target/trace-baseline cargo test --release -p vectrace \
      --test quality quality_table -- --ignored --nocapture
    ```
 
