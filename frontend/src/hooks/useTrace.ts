@@ -885,7 +885,7 @@ export function useTrace(
     [getSession, schedule],
   );
 
-  const palette = useTracePalette({ active, values, getSession, apply, choiceRef });
+  const palette = useTracePalette({ active, partId: partsApi.parts.find((part) => part.active)?.id ?? 0, values, getSession, apply, choiceRef });
   useEffect(() => {
     paletteRefresh.current = palette.refresh;
   }, [palette.refresh]);
