@@ -110,6 +110,9 @@ mod offset;
 mod offset_chip;
 mod offset_view;
 mod open_error;
+mod operations;
+#[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
+pub use operations::OperationsViewMode;
 mod page_drag;
 mod page_tree_panel;
 mod pages;
@@ -637,6 +640,8 @@ pub struct Session {
     /// The manufacturing workbenches' views, tabs, notice and extension switches
     /// (`manufacturing/`).
     manufacturing: manufacturing::ManufacturingState,
+    /// The laser operations of the active laser page (`operations/`).
+    operations: operations::OperationsState,
 }
 
 impl Session {
@@ -742,6 +747,7 @@ impl Session {
             trace_text: trace_text::TraceTextState::default(),
             tiling: None,
             manufacturing: manufacturing::ManufacturingState::default(),
+            operations: operations::OperationsState::default(),
         }
     }
 
@@ -842,6 +848,7 @@ impl Session {
             trace_text: trace_text::TraceTextState::default(),
             tiling: None,
             manufacturing: manufacturing::ManufacturingState::default(),
+            operations: operations::OperationsState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();

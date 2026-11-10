@@ -134,7 +134,16 @@ impl Session {
         }
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);
-        let mut list = self.artwork_list(&artwork_objects, &guides, view);
+        // "View: Operations" draws the output page's own items by their operations' looks
+        // (`0101` criterion 18); "View: Drawn" leaves the artwork as it is.
+        let mut list = match self.operation_looked_artwork(&artwork_objects, view) {
+            Some((looked, overlay)) => {
+                let mut artwork = self.artwork_list(&looked, &guides, view);
+                artwork.extend(overlay);
+                artwork
+            }
+            None => self.artwork_list(&artwork_objects, &guides, view),
+        };
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));
         list.extend(self.kept_point_list());
