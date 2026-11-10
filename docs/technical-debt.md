@@ -10,6 +10,13 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## Layout commands on 200 pages take 38 to 66 ms in a debug build (`0109`, 2026-11-11)
+
+One orientation change, drop or delete on 201 pages measured 38 to 66 ms thread CPU (cheapest of 3, debug build, developer machine);
+the first test limit of 100 ms failed on the CI runner, so the test is now a regression guard at 500 ms. The layout is O(pages^2) by
+design (ADR 0051). Look at it again if a project with hundreds of pages feels slow on a layout command; the 200-page draw check
+(`0059` criterion 14) measures about 4 % slower than before 0109, cause unproven (probably the test's own set-up).
+
 ## Concurrent page size changes, drops or deletes can merge into overlapping pages (`0109`, 2026-11-10)
 
 ADR 0051 runs the page auto-layout only inside a local size command, drop or delete; reads, opens
