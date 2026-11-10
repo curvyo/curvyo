@@ -268,6 +268,7 @@ Spec criteria 16 to 19; overrides §1 and §2 where they differ.
   name `Origin corner`; radios named `Top left`, `Top right`, `Bottom left`, `Bottom right`. One
   Tab stop on the chosen corner, arrow keys move and choose in reading order, pointer use returns
   focus to the canvas. Works with the grid hidden. One history step per change ("Change grid").
+- **Superseded 2026-11-10 (customer notes of 2026-11-06, item 5):** the pictogram above is replaced by the laser Machine block's 2 x 2 corner control (28 px radios, tooltips, arrows without wrap, Home/End); label `Origin`, group name `Origin corner` and the focus-return rule stay. See `specs/0045-document-formats-library/ux-notes.md`, section 4. `frontend/tests/grid.test.ts` changes with it.
 - **Removed**: rows 8 and 9 of §2 (`Origin X`, `Origin Y`, `Reset to page corner`) and their
   notice row; the `Angle, origin` notice applies to the angle only.
 - **Rulers** count from the active page's corner, positive into the page (customer, ORIGIN-AXES A):
