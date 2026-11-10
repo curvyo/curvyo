@@ -11,8 +11,9 @@
 use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::signed_area_mm2;
 use curvyo_geometry_core::{BooleanError, BooleanOp, Outline, OutlineTriple, boolean};
-use curvyo_vectorize_core::{ColourTrace, TraceResult, node_count};
 use kurbo::{BezPath, PathEl, Shape};
+
+use crate::trace_mask::{Clipped, Mask};
 
 /// The kernel tolerance of the region and of the clip (`adrs.md` decision 1): the grid keeps
 /// 0.002 mm, curves are flattened at 0.003 mm, half of criterion 2's 0.01 mm is left.
@@ -247,43 +248,6 @@ impl TraceRegion {
         })
     }
 
-    /// `outlines` (closed, document millimetres, holes wound against their outer outline)
-    /// clipped to the kept area, and whether anything changed. The outlines that stay whole keep
-    /// their order and curves; the clipped ones come back as polylines in the place of the first
-    /// outline that crossed, wound as the trace winds its outlines.
-    #[must_use]
-    pub fn clip(&self, outlines: &[BezPath]) -> (Vec<BezPath>, bool) {
-        let (kept, changed, _) = self.clip_counting(outlines);
-        (kept, changed)
-    }
-
-    /// As [`Self::clip`], with how many crossing outlines the kernel refused to clip and that were
-    /// kept whole ("1 shape crosses the mask edge unclipped.").
-    fn clip_counting(&self, outlines: &[BezPath]) -> (Vec<BezPath>, bool, usize) {
-        let mut kept = Vec::with_capacity(outlines.len());
-        let mut crossing: Vec<&BezPath> = Vec::new();
-        let mut crossing_at = None;
-        for outline in outlines {
-            let b = outline.control_box();
-            let (min, max) = (Point::new(b.x0, b.y0), Point::new(b.x1, b.y1));
-            if self.edge_meets(min, max) {
-                crossing_at.get_or_insert(kept.len());
-                crossing.push(outline);
-                continue;
-            }
-            if first_point(outline).is_some_and(|p| self.keeps(p)) {
-                kept.push(outline.clone());
-            }
-        }
-        let Some(at) = crossing_at else {
-            let changed = kept.len() != outlines.len();
-            return (kept, changed, 0);
-        };
-        let (pieces, unclipped) = self.clip_crossing(&crossing, outer_sign(outlines));
-        kept.splice(at..at, pieces);
-        (kept, true, unclipped)
-    }
-
     /// The crossing `outlines` as one operand clipped by the kernel, as polylines whose outer
     /// outlines have the kurbo area sign `sign`, and how many were kept whole unclipped after a
     /// kernel refusal.
@@ -323,46 +287,50 @@ impl TraceRegion {
         };
         (wound_polylines(result.outlines(), sign), 0)
     }
-
-    /// A traced result clipped in place (counts after the clip, `adrs.md` decision 1); the
-    /// outlines kept whole after a kernel refusal.
-    pub(crate) fn clip_trace(&self, result: &mut TraceResult) -> usize {
-        let (outlines, changed, unclipped) = self.clip_counting(&result.outlines);
-        if changed {
-            result.counts.paths = outlines.len();
-            result.counts.nodes = outlines.iter().map(node_count).sum();
-            result.covers_whole_image = false;
-            result.outlines = outlines;
-        }
-        unclipped
-    }
-
-    /// A multicolour result clipped in place, layer by layer; a layer left without outlines is
-    /// dropped. The outlines kept whole after a kernel refusal.
-    pub(crate) fn clip_colours(&self, result: &mut ColourTrace) -> usize {
-        let mut changed = false;
-        let mut unclipped = 0;
-        for layer in &mut result.layers {
-            let (outlines, layer_changed, kept_whole) = self.clip_counting(&layer.outlines);
-            unclipped += kept_whole;
-            if layer_changed {
-                layer.outlines = outlines;
-                changed = true;
-            }
-        }
-        if changed {
-            result.layers.retain(|layer| !layer.outlines.is_empty());
-            let all = || result.layers.iter().flat_map(|l| &l.outlines);
-            result.counts.paths = all().count();
-            result.counts.nodes = all().map(node_count).sum();
-        }
-        unclipped
-    }
 }
 
-/// The number that opens the unclipped count after a result's outlines (`specs/0094`): present
-/// only when a kernel refusal kept crossing outlines whole.
-pub(crate) const UNCLIPPED_MARK: f64 = -5.0;
+/// `outlines` (closed, document millimetres, holes wound against their outer outline) clipped to
+/// the kept area. The outlines that stay whole keep their order and curves; the clipped ones come
+/// back as polylines in the place of the first outline that crossed, wound as the trace winds its
+/// outlines.
+impl Mask for TraceRegion {
+    fn keeps(&self, p: kurbo::Point) -> bool {
+        Self::keeps(self, Point::new(p.x, p.y))
+    }
+
+    fn clip(&self, outlines: &[BezPath]) -> Clipped {
+        let mut kept = Vec::with_capacity(outlines.len());
+        let mut crossing: Vec<&BezPath> = Vec::new();
+        let mut crossing_at = None;
+        for outline in outlines {
+            let b = outline.control_box();
+            let (min, max) = (Point::new(b.x0, b.y0), Point::new(b.x1, b.y1));
+            if self.edge_meets(min, max) {
+                crossing_at.get_or_insert(kept.len());
+                crossing.push(outline);
+                continue;
+            }
+            if first_point(outline).is_some_and(|p| Self::keeps(self, p)) {
+                kept.push(outline.clone());
+            }
+        }
+        let Some(at) = crossing_at else {
+            let changed = kept.len() != outlines.len();
+            return Clipped {
+                outlines: kept,
+                changed,
+                kept_whole: 0,
+            };
+        };
+        let (pieces, kept_whole) = self.clip_crossing(&crossing, outer_sign(outlines));
+        kept.splice(at..at, pieces);
+        Clipped {
+            outlines: kept,
+            changed: true,
+            kept_whole,
+        }
+    }
+}
 
 /// The muted notice of outlines kept whole across the stencil edge (`specs/0094`, tester
 /// 2026-11-04).
@@ -372,14 +340,6 @@ pub fn unclipped_notice(count: usize) -> String {
         0 => String::new(),
         1 => "1 shape crosses the mask edge unclipped.".to_owned(),
         n => format!("{n} shapes cross the mask edge unclipped."),
-    }
-}
-
-/// Appends the unclipped count to a result's numbers when there is one.
-pub(crate) fn write_unclipped(wire: &mut Vec<f64>, count: usize) {
-    if count > 0 {
-        #[allow(clippy::cast_precision_loss)] // counts far below 2^52
-        wire.extend([UNCLIPPED_MARK, count as f64]);
     }
 }
 
@@ -497,6 +457,13 @@ pub(crate) fn triples_of(path: &BezPath) -> Vec<Vec<OutlineTriple>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use curvyo_vectorize_core::node_count;
+
+    /// The mask's clip as the outlines and whether anything changed.
+    fn clip(region: &TraceRegion, outlines: &[BezPath]) -> (Vec<BezPath>, bool) {
+        let clipped = Mask::clip(region, outlines);
+        (clipped.outlines, clipped.changed)
+    }
 
     fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<OutlineTriple> {
         [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
@@ -539,17 +506,17 @@ mod tests {
         let inside = square_path(1.0, 1.0, 2.0, 2.0);
         let outside = square_path(20.0, 1.0, 22.0, 2.0);
         let crossing = square_path(8.0, 1.0, 12.0, 3.0);
-        let (clipped, changed) = region.clip(&[inside.clone(), outside.clone()]);
+        let (clipped, changed) = clip(&region, &[inside.clone(), outside.clone()]);
         assert!(changed);
         assert_eq!(clipped, std::slice::from_ref(&inside));
-        let (clipped, _) = region.clip(&[inside.clone(), crossing.clone()]);
+        let (clipped, _) = clip(&region, &[inside.clone(), crossing.clone()]);
         assert_eq!(clipped.len(), 2);
         assert_eq!(clipped[0], inside);
         assert!((clipped[1].area().abs() - 4.0).abs() < 1e-6);
         // The trace's outer winding is kept.
         assert!(clipped[1].area() * inside.area() > 0.0);
         let outside_region = region.with_outside(true);
-        let (clipped, _) = outside_region.clip(&[inside, outside.clone(), crossing]);
+        let (clipped, _) = clip(&outside_region, &[inside, outside.clone(), crossing]);
         assert_eq!(clipped[0], outside);
         assert!((clipped[1].area().abs() - 4.0).abs() < 1e-6);
     }
@@ -562,10 +529,10 @@ mod tests {
             TraceRegion::of_operands(&[vec![(rect(0.0, 0.0, 10.0, 10.0), true)]], false).unwrap();
         // Beyond the kernel's 10^7 mm: refused as out of range.
         let far = square_path(5.0, 1.0, 2.0e7, 3.0);
-        let (clipped, changed) = region.clip(std::slice::from_ref(&far));
+        let (clipped, changed) = clip(&region, std::slice::from_ref(&far));
         assert!(changed);
         assert_eq!(clipped, std::slice::from_ref(&far));
-        let (clipped, _) = region.with_outside(true).clip(&[far]);
+        let (clipped, _) = clip(&region.with_outside(true), &[far]);
         assert_eq!(clipped, []);
     }
 

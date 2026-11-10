@@ -29,9 +29,10 @@ use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
 use curvyo_ui_core::{
-    OcrLine, TraceColourParams, TraceMethod, TraceParams, TraceRegion, TraceRegionError, TraceRgb,
-    read_trace_wire, trace_add_shapes, trace_analyse, trace_auto_threshold, trace_colour_job_in,
-    trace_job_in, trace_region_defaults, trace_suggest_background, trace_text_job_in,
+    Mask, OcrLine, TraceColourParams, TraceMethod, TraceParams, TraceRegion, TraceRegionError,
+    TraceRgb, read_trace_wire, trace_add_shapes, trace_analyse, trace_auto_threshold,
+    trace_colour_job_in, trace_job_in, trace_region_defaults, trace_suggest_background,
+    trace_text_job_in,
 };
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
@@ -726,7 +727,7 @@ fn c8_case(map: [f64; 6]) {
         apply(map, 0.0, n),
     ];
     let job =
-        |r: Option<&TraceRegion>| outlines(&trace_job_in(&m1(), N, N, map, &t50(), r, &mut |_| {}));
+        |r: Option<&dyn Mask>| outlines(&trace_job_in(&m1(), N, N, map, &t50(), r, &mut |_| {}));
     let whole = job(None);
     for p in nodes(&whole) {
         assert!(
@@ -1038,7 +1039,7 @@ fn multicolour_every_layer_is_clipped_and_inside_plus_outside_is_the_unmasked_la
     let n = 250;
     let col = draw(COLOUR, n);
     let params = colour_params();
-    let job = |r: Option<&TraceRegion>| {
+    let job = |r: Option<&dyn Mask>| {
         read_trace_wire(&trace_colour_job_in(
             &col,
             n,
@@ -1328,7 +1329,7 @@ proptest! {
             Point::new(x0 + w, y0 + h + skew),
             Point::new(x0, y0 + h),
         ];
-        let job = |r: Option<&TraceRegion>| outlines(&trace_job_in(&rgba, n, n, map, &t50(), r, &mut |_| {}));
+        let job = |r: Option<&dyn Mask>| outlines(&trace_job_in(&rgba, n, n, map, &t50(), r, &mut |_| {}));
         let whole = job(None);
         let a = job(Some(&region(poly.clone(), false)));
         let b = job(Some(&region(poly.clone(), true)));

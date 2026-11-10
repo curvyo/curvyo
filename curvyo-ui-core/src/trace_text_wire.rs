@@ -6,8 +6,8 @@ use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{Rgb8, TraceParams};
 use kurbo::{BezPath, Vec2};
 
+use crate::trace_mask::Mask;
 use crate::trace_ocr::OcrLine;
-use crate::trace_region::TraceRegion;
 use crate::trace_text::TextPass;
 use crate::trace_text::text_pass;
 use crate::trace_transfer::{
@@ -92,7 +92,7 @@ pub fn trace_text_job_in(
     pixel_map: [f64; 6],
     params: &TraceParams,
     lines: &[OcrLine],
-    region: Option<&TraceRegion>,
+    region: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
     if lines.is_empty() {
@@ -119,7 +119,7 @@ pub fn trace_text_job_in(
 
 /// Drops the lines of `pass` whose box centre `region` does not keep (`specs/0094` criterion 11);
 /// their pixels stay left out of the main trace, so they are neither text nor traced.
-pub(crate) fn keep_lines_in(pass: &mut TextPass, region: Option<&TraceRegion>) {
+pub(crate) fn keep_lines_in(pass: &mut TextPass, region: Option<&dyn Mask>) {
     if let Some(region) = region {
         pass.regions.retain(|line| region.keeps(line.centre));
     }
@@ -178,7 +178,7 @@ pub fn trace_text_regions_in(
     pixel_map: [f64; 6],
     params: &TraceParams,
     lines: &[OcrLine],
-    region: Option<&TraceRegion>,
+    region: Option<&dyn Mask>,
 ) -> Vec<f64> {
     let mut pass = text_pass(
         rgba,
@@ -335,6 +335,57 @@ mod tests {
         .unwrap();
         assert_eq!(regions.texts, full.texts);
         assert_eq!(regions.outlines.len(), 0);
+    }
+
+    /// `specs/0094` criterion 11: a line whose box centre the mask does not keep is left out of
+    /// the main trace and is no text; with the mask keeping it, it is text.
+    #[test]
+    fn a_mask_keeps_the_lines_by_their_box_centre() {
+        use crate::trace_mask::test_double::BoxMask;
+        let params = TraceParams::with_threshold(128);
+        let lines = [line("Grüße")];
+        // The line's box centre is at pixel (20, 10): 2 mm, 1 mm.
+        let run = |mask: &BoxMask| {
+            read_wire(&trace_text_job_in(
+                &picture(),
+                40,
+                20,
+                MAP,
+                &params,
+                &lines,
+                Some(mask),
+                &mut |_| {},
+            ))
+            .unwrap()
+        };
+        let keeps = BoxMask {
+            min: kurbo::Point::new(1.0, 0.5),
+            max: kurbo::Point::new(3.0, 1.5),
+        };
+        let drops = BoxMask {
+            min: kurbo::Point::new(3.0, 0.5),
+            max: kurbo::Point::new(4.0, 1.5),
+        };
+        let kept = run(&keeps);
+        assert_eq!((kept.texts.found, kept.texts.lines.len()), (1, 1));
+        let left = run(&drops);
+        assert_eq!((left.texts.found, left.texts.lines.len()), (1, 0));
+        assert_eq!(
+            left.outlines.len(),
+            0,
+            "its pixels stay out of the main trace"
+        );
+        let only_text = read_wire(&trace_text_regions_in(
+            &picture(),
+            40,
+            20,
+            MAP,
+            &params,
+            &lines,
+            Some(&drops),
+        ))
+        .unwrap();
+        assert_eq!(only_text.texts.lines.len(), 0);
     }
 
     /// Criteria 12 and 18: no lines, the same numbers as before.

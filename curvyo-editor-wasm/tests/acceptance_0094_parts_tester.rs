@@ -23,7 +23,7 @@ mod cpu_time;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
-use curvyo_ui_core::{read_trace_wire, trace_job_in};
+use curvyo_ui_core::{Mask, TraceRegion, read_trace_wire, trace_job_in};
 use image::ImageEncoder;
 use kurbo::{BezPath, PathEl};
 use support::{M1, base64, draw};
@@ -171,7 +171,9 @@ fn part_wire(s: &mut Session, image: NodeId, index: usize, settings: &str, cut: 
             source.height,
             source.map,
             &colour,
-            trace_mask_region(&settings).as_ref(),
+            trace_mask_region(&settings)
+                .as_ref()
+                .map(|r| r as &dyn Mask),
             &mut |_| {},
         );
     }
@@ -181,7 +183,9 @@ fn part_wire(s: &mut Session, image: NodeId, index: usize, settings: &str, cut: 
         source.height,
         source.map,
         &params,
-        trace_mask_region(&settings).as_ref(),
+        trace_mask_region(&settings)
+            .as_ref()
+            .map(|r| r as &dyn Mask),
         &mut |_| {},
     )
 }
@@ -565,7 +569,9 @@ fn c21_c33_session_join_matches_the_clip_rules_and_one_part_is_slice_1() {
             src.height,
             src.map,
             &trace_settings(&settings),
-            trace_mask_region(&settings).as_ref(),
+            trace_mask_region(&settings)
+                .as_ref()
+                .map(|r| r as &dyn Mask),
             &mut |_| {},
         )
     };
@@ -1034,14 +1040,14 @@ fn a_cut_out_part_with_upscale_auto_traces_as_the_whole_picture() {
         s.trace_part_mask_json(0)
     ));
     let params = trace_settings(settings);
-    let run = |src: &curvyo_editor_wasm::TraceSource, region| {
+    let run = |src: &curvyo_editor_wasm::TraceSource, region: Option<&TraceRegion>| {
         read_trace_wire(&trace_job_in(
             &src.rgba,
             src.width,
             src.height,
             src.map,
             &params,
-            region,
+            region.map(|r| r as &dyn Mask),
             &mut |_| {},
         ))
         .unwrap()

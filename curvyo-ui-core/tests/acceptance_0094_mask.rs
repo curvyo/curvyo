@@ -10,9 +10,10 @@ use std::sync::OnceLock;
 use curvyo_document_core::{Affine, Angle, Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    OcrLine, TraceColourParams, TraceParams, TraceRegion, TraceRegionError, TraceRgb, TraceWire,
-    read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in, trace_region_defaults,
-    trace_suggest_background, trace_text_job_in, trace_text_regions_in, unclipped_notice,
+    Mask, OcrLine, TraceColourParams, TraceParams, TraceRegion, TraceRegionError, TraceRgb,
+    TraceWire, read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
+    trace_region_defaults, trace_suggest_background, trace_text_job_in, trace_text_regions_in,
+    unclipped_notice,
 };
 use kurbo::{BezPath, PathEl, Shape};
 
@@ -80,7 +81,7 @@ fn trace(map: [f64; 6], region: Option<&TraceRegion>) -> TraceWire {
         SIDE,
         map,
         &params(),
-        region,
+        region.map(|r| r as &dyn Mask),
         &mut |_| {},
     ))
     .unwrap()
@@ -616,7 +617,7 @@ fn c4_a_ring_across_the_stencil_edge_keeps_its_hole_on_both_sides() {
             SIDE,
             MAP,
             &params(),
-            region,
+            region.map(|r| r as &dyn Mask),
             &mut |_| {},
         ))
         .unwrap()

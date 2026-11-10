@@ -18,7 +18,7 @@ mod support;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
-use curvyo_ui_core::{read_trace_wire, trace_job_in};
+use curvyo_ui_core::{Mask, read_trace_wire, trace_job_in};
 use image::ImageEncoder;
 use kurbo::PathEl;
 use support::{M1, base64, draw};
@@ -100,7 +100,7 @@ fn traced(s: &mut Session, image: NodeId, threshold: u8) -> Vec<f64> {
         source.height,
         source.map,
         &trace_settings(&settings),
-        region.as_ref(),
+        region.as_ref().map(|r| r as &dyn Mask),
         &mut |_| {},
     )
 }
@@ -572,7 +572,7 @@ fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
             n,
             map,
             &colour,
-            region.as_ref(),
+            region.as_ref().map(|r| r as &dyn Mask),
             &mut |_| {},
         ),
         None => trace_job_in(
@@ -581,7 +581,7 @@ fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
             n,
             map,
             &trace_settings(settings),
-            region.as_ref(),
+            region.as_ref().map(|r| r as &dyn Mask),
             &mut |_| {},
         ),
     };

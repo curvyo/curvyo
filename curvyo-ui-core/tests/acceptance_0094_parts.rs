@@ -9,8 +9,8 @@ use std::sync::OnceLock;
 use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    OcrLine, TraceColourParams, TraceParams, TracePartArea, TracePartClip, TraceRegion, TraceRgb,
-    TraceWire, join_trace_parts, read_trace_wire, trace_add_shapes, trace_colour_job_in,
+    Mask, OcrLine, TraceColourParams, TraceParams, TracePartArea, TracePartClip, TraceRegion,
+    TraceRgb, TraceWire, join_trace_parts, read_trace_wire, trace_add_shapes, trace_colour_job_in,
     trace_job_in, trace_part_clips, trace_text_job_in,
 };
 use kurbo::{BezPath, PathEl, Shape};
@@ -100,7 +100,7 @@ fn trace(picture: &[u8], p: &TraceParams, clip: &TracePartClip) -> TraceWire {
         SIDE,
         MAP,
         p,
-        clip.region(),
+        clip.region().map(|r| r as &dyn Mask),
         &mut |_| {},
     ))
     .unwrap()
@@ -418,7 +418,7 @@ fn c23_multicolour_parts_merge_by_colour() {
                 SIDE,
                 MAP,
                 &p,
-                clip.region(),
+                clip.region().map(|r| r as &dyn Mask),
                 &mut |_| {},
             ))
             .unwrap()
@@ -558,7 +558,7 @@ fn c30_text_and_shapes_follow_the_part_their_centre_lies_in() {
         map,
         &p,
         &lines,
-        clips[0].region(),
+        clips[0].region().map(|r| r as &dyn Mask),
         &mut |_| {},
     );
     trace_add_shapes(&mut first, map);
@@ -569,7 +569,7 @@ fn c30_text_and_shapes_follow_the_part_their_centre_lies_in() {
         200,
         map,
         &p,
-        clips[1].region(),
+        clips[1].region().map(|r| r as &dyn Mask),
         &mut |_| {},
     ))
     .unwrap();
