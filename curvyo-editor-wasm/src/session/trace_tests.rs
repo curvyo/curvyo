@@ -394,8 +394,15 @@ fn the_trace_pipette_takes_the_colour_under_a_press() {
         f64::midpoint(corners[0].x, corners[2].x),
         f64::midpoint(corners[0].y, corners[2].y),
     );
-    let expected =
-        curvyo_ui_core::trace_sample_colour(&source.rgba, source.width, source.height, 1, 0);
+    let expected = curvyo_ui_core::trace_sample_colour(
+        curvyo_ui_core::TraceRaster {
+            width: source.width,
+            height: source.height,
+            rgba: &source.rgba,
+        },
+        1,
+        0,
+    );
     assert!(session.trace_pick_hover().is_none(), "disarmed");
     session.set_trace_pick(Some(TracePickMode::Colours));
     assert_eq!(session.cursor_hint(), "eyedropper");

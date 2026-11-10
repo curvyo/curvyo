@@ -161,7 +161,11 @@ pub(super) fn run(model: &OcrModel, file: &str) -> Run {
     .unwrap();
     let ocr_seconds = cpu_seconds() - started;
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let threshold = curvyo_ui_core::trace_auto_threshold(&source.rgba, source.width, source.height);
+    let threshold = curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+        width: source.width,
+        height: source.height,
+        rgba: &source.rgba,
+    });
     let started = cpu_seconds();
     let wire = run_trace_job(
         &TraceJob {

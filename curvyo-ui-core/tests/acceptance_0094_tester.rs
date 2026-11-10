@@ -1002,7 +1002,11 @@ fn c9_remove_background_on_the_right_half_uses_the_paper_grey_and_traces_the_gre
         "the paper adds no area: {traced} vs {expected}"
     );
     // Without a mask Remove background's Auto stays the whole picture's suggestion.
-    let whole = trace_suggest_background(&m2, N, N);
+    let whole = trace_suggest_background(TraceRaster {
+        width: N,
+        height: N,
+        rgba: &m2,
+    });
     let (bx, by, bz) = whole.map_or((0, 0, 0), |c| (c.r, c.g, c.b));
     assert_eq!(
         trace_region_defaults(
@@ -1060,12 +1064,20 @@ fn c9_threshold_background_and_analysis_read_only_the_masks_pixels() {
     let dl = trace_region_defaults(&rgba, n, n, map_100mm(n), &left);
     assert_eq!(
         dr.threshold,
-        trace_auto_threshold(&crop_r, w, h),
+        trace_auto_threshold(TraceRaster {
+            width: w,
+            height: h,
+            rgba: &crop_r
+        }),
         "Threshold of the right half"
     );
     assert_eq!(
         dl.threshold,
-        trace_auto_threshold(&crop_l, w, h),
+        trace_auto_threshold(TraceRaster {
+            width: w,
+            height: h,
+            rgba: &crop_l
+        }),
         "Threshold of the left half"
     );
     assert_ne!(
@@ -1074,7 +1086,12 @@ fn c9_threshold_background_and_analysis_read_only_the_masks_pixels() {
     );
     assert_eq!(
         dr.background.map(|c| (c.r, c.g, c.b)),
-        trace_suggest_background(&crop_r, w, h).map(|c| (c.r, c.g, c.b)),
+        trace_suggest_background(TraceRaster {
+            width: w,
+            height: h,
+            rgba: &crop_r
+        })
+        .map(|c| (c.r, c.g, c.b)),
         "background of the right half"
     );
     assert_eq!(dr.background.map(|c| c.r), Some(200));
@@ -1085,12 +1102,22 @@ fn c9_threshold_background_and_analysis_read_only_the_masks_pixels() {
     );
     assert_eq!(
         dr.analysis,
-        trace_analyse(&crop_r, w, h),
+        trace_analyse(TraceRaster {
+            width: w,
+            height: h,
+            rgba: &crop_r
+        })
+        .ok(),
         "analysis of the right half"
     );
     assert_eq!(
         dl.analysis,
-        trace_analyse(&crop_l, w, h),
+        trace_analyse(TraceRaster {
+            width: w,
+            height: h,
+            rgba: &crop_l
+        })
+        .ok(),
         "analysis of the left half"
     );
 }

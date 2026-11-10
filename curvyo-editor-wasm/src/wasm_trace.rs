@@ -243,7 +243,11 @@ pub fn trace_presets() -> String {
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
-    curvyo_ui_core::trace_auto_threshold(rgba, width, height)
+    curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+        width,
+        height,
+        rgba,
+    })
 }
 
 /// The automatic analysis of a picture (`specs/0089` slice F), for the worker: the JSON of
@@ -251,9 +255,13 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> String {
-    curvyo_ui_core::trace_analyse(rgba, width, height)
-        .map(|report| crate::trace_analysis_glue::analysis_json(&report))
-        .unwrap_or_default()
+    curvyo_ui_core::trace_analyse(curvyo_ui_core::TraceRaster {
+        width,
+        height,
+        rgba,
+    })
+    .map(|report| crate::trace_analysis_glue::analysis_json(&report))
+    .unwrap_or_default()
 }
 
 /// The background colour Remove background's Auto suggests for a picture (`specs/0089`
@@ -261,9 +269,13 @@ pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> String {
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_suggest_background(rgba: &[u8], width: u32, height: u32) -> String {
-    curvyo_ui_core::trace_suggest_background(rgba, width, height)
-        .map(crate::trace_glue::hex)
-        .unwrap_or_default()
+    curvyo_ui_core::trace_suggest_background(curvyo_ui_core::TraceRaster {
+        width,
+        height,
+        rgba,
+    })
+    .map(crate::trace_glue::hex)
+    .unwrap_or_default()
 }
 
 /// The settings schema as JSON (criteria 6 and 45): a list of `{name, label, kind, unit, min,
