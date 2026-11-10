@@ -37,11 +37,11 @@ use curvyo_editor_wasm::{
 use curvyo_ui_core::{FontBlock, read_trace_wire};
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
+use vectrace::Output;
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrLine, OcrModel, trace_read_text};
-use vectrace::wire::TraceWire;
+use vectrace::ocr::{OcrLine, OcrModel, read_text};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const TOLERANCE_MM: f64 = 0.3;
@@ -198,7 +198,7 @@ impl Host {
     }
 
     fn read(&self, model: &OcrModel) -> Vec<OcrLine> {
-        trace_read_text(model, &self.rgba, self.width, self.height, &mut |_| {
+        read_text(model, &self.rgba, self.width, self.height, &mut |_| {
             std::ops::ControlFlow::Continue(())
         })
         .unwrap()
@@ -401,7 +401,7 @@ fn run(model: &OcrModel, file: &str) -> Run {
     run_with(model, file, SETTINGS)
 }
 
-fn traced(wire: &[f64]) -> TraceWire {
+fn traced(wire: &[f64]) -> Output {
     read_trace_wire(wire).expect("a readable wire")
 }
 

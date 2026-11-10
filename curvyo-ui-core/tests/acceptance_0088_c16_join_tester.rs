@@ -13,11 +13,11 @@
 
 use curvyo_ui_core::read_trace_wire;
 use kurbo::{BezPath, Join, ParamCurveNearest, Shape as _, Stroke, StrokeOpts};
+use vectrace::Output;
 use vectrace::TraceParams;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::shapes::{Join as TraceJoin, Primitive as TracePrimitive};
-use vectrace::shapes::{ShapeRegion as TraceShapeRegion, trace_add_shapes};
-use vectrace::wire::TraceWire;
+use vectrace::shapes::{ShapeRegion, trace_add_shapes};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const MM_PER_PX: f64 = 0.1;
@@ -78,7 +78,7 @@ fn area_of(outlines: &[BezPath], step: f64) -> f64 {
 }
 
 /// Trace `ink` (mm coordinates, picture of `w_mm` x `h_mm` at 10 px/mm), shapes on.
-fn trace(w_mm: f64, h_mm: f64, ink: impl Fn(f64, f64) -> bool) -> (TraceWire, TraceWire) {
+fn trace(w_mm: f64, h_mm: f64, ink: impl Fn(f64, f64) -> bool) -> (Output, Output) {
     let (w, h) = ((w_mm * 10.0) as u32, (h_mm * 10.0) as u32);
     let mut rgba = Vec::with_capacity((w * h * 4) as usize);
     for y in 0..h {
@@ -94,7 +94,7 @@ fn trace(w_mm: f64, h_mm: f64, ink: impl Fn(f64, f64) -> bool) -> (TraceWire, Tr
     run(&rgba, w, h)
 }
 
-fn run(rgba: &[u8], w: u32, h: u32) -> (TraceWire, TraceWire) {
+fn run(rgba: &[u8], w: u32, h: u32) -> (Output, Output) {
     let map = [MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0];
     let off = run_trace_job(
         &TraceJob {
@@ -126,7 +126,7 @@ fn ink_of(outlines: Vec<BezPath>) -> impl Fn(f64, f64) -> bool {
     }
 }
 
-fn region_area(wire: &TraceWire, r: &TraceShapeRegion) -> f64 {
+fn region_area(wire: &Output, r: &ShapeRegion) -> f64 {
     r.outlines
         .iter()
         .enumerate()
@@ -164,7 +164,7 @@ fn join_of(b: &vectrace::shapes::Band) -> Join {
     }
 }
 
-fn band_regions(on: &TraceWire) -> Vec<&TraceShapeRegion> {
+fn band_regions(on: &Output) -> Vec<&ShapeRegion> {
     on.shapes.iter().filter(|r| r.band.is_some()).collect()
 }
 
@@ -175,7 +175,7 @@ fn dist_to(path: &BezPath, p: kurbo::Point) -> f64 {
 }
 
 /// Median distance of the outer outline's points to the hole outline (the offsets' distance).
-fn median_offset_distance(wire: &TraceWire, r: &TraceShapeRegion) -> f64 {
+fn median_offset_distance(wire: &Output, r: &ShapeRegion) -> f64 {
     let outer = &wire.outlines[r.outlines[0]];
     let inner = &wire.outlines[r.outlines[1]];
     let mut d: Vec<f64> = Vec::new();
@@ -359,7 +359,7 @@ fn touching_two_touching_and_one_loose() {
     assert_eq!(touching.len(), 1);
     assert_eq!(touching[0].bands.len(), 2);
     assert_eq!(band_regions(&on).len(), 1, "the loose one is a single band");
-    let total: usize = on.shapes.iter().map(TraceShapeRegion::primitives).sum();
+    let total: usize = on.shapes.iter().map(ShapeRegion::primitives).sum();
     assert_eq!(total, 3);
 }
 

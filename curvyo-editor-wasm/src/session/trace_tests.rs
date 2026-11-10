@@ -327,12 +327,12 @@ fn outline_triangles(session: &Session) -> usize {
 
 /// Squares of 4 nodes, `count` of them, as the worker's numbers.
 fn many_squares(count: usize) -> Vec<f64> {
-    let mut wire = vec![0.0; vectrace::wire::TRACE_WIRE_HEADER];
+    let mut wire = vec![0.0; vectrace::wire::HEADER];
     #[allow(clippy::cast_precision_loss)]
     {
         wire[1] = count as f64;
         wire[2] = (count * 4) as f64;
-        wire[vectrace::wire::TRACE_WIRE_HEADER - 1] = count as f64;
+        wire[vectrace::wire::HEADER - 1] = count as f64;
     }
     for i in 0..count {
         #[allow(clippy::cast_precision_loss)]

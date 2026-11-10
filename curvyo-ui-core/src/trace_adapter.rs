@@ -10,8 +10,9 @@ use kurbo::BezPath;
 use vectrace::Angle;
 
 use crate::svg_import_match::outline_path;
+use vectrace::Output;
 use vectrace::shapes::{Join, Primitive, ShapeRegion};
-use vectrace::wire::{TraceWire, read_wire};
+use vectrace::wire;
 
 /// The document `Shape` of `primitive` and the rotation as the document's angle.
 ///
@@ -80,8 +81,8 @@ pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAng
 /// The numbers of a trace job read back (`None` when they are not a well-formed result), each
 /// recognised outline replaced by its primitive's, as the session keeps the result.
 #[must_use]
-pub fn read_trace_wire(wire: &[f64]) -> Option<TraceWire> {
-    let mut read = read_wire(wire)?;
+pub fn read_trace_wire(wire: &[f64]) -> Option<Output> {
+    let mut read = wire::read(wire)?;
     let (outlines, shapes) = with_primitives(read.outlines, read.shapes);
     read.outlines = outlines;
     read.shapes = shapes;

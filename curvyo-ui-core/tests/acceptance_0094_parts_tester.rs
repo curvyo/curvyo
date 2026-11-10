@@ -33,10 +33,11 @@ use curvyo_ui_core::{
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
 use support::{COLOUR, M1, draw, map_100mm, text_sheet};
+use vectrace::Output;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::mask::Mask;
-use vectrace::ocr::accept::OcrLine;
-use vectrace::wire::{TraceStatus, TraceWire};
+use vectrace::ocr::OcrLine;
+use vectrace::wire::Status;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
@@ -237,11 +238,11 @@ fn job(pic: &Picture, job: &Job, region: Option<&TraceRegion>) -> Vec<f64> {
 }
 
 /// The joined result of `parts` (stacking order, bottom first); the active part is the last.
-fn joined(pic: &Picture, parts: &[(TracePartArea, Job)]) -> (TraceWire, Vec<TracePartClip>) {
+fn joined(pic: &Picture, parts: &[(TracePartArea, Job)]) -> (Output, Vec<TracePartClip>) {
     let areas: Vec<TracePartArea> = parts.iter().map(|(a, _)| a.clone()).collect();
     let clips = trace_part_clips(&areas, &quad());
     assert_eq!(clips.len(), parts.len(), "one clip per part");
-    let wires: Vec<(TraceWire, TracePartClip)> = parts
+    let wires: Vec<(Output, TracePartClip)> = parts
         .iter()
         .zip(&clips)
         .filter(|(_, clip)| clip.contributes())
@@ -253,12 +254,12 @@ fn joined(pic: &Picture, parts: &[(TracePartArea, Job)]) -> (TraceWire, Vec<Trac
             )
         })
         .collect();
-    let refs: Vec<(&TraceWire, &TracePartClip)> = wires.iter().map(|(w, c)| (w, c)).collect();
+    let refs: Vec<(&Output, &TracePartClip)> = wires.iter().map(|(w, c)| (w, c)).collect();
     let palette_of = refs.len().saturating_sub(1);
     (join_trace_parts(&refs, palette_of), clips)
 }
 
-fn read(wire: &[f64]) -> TraceWire {
+fn read(wire: &[f64]) -> Output {
     read_trace_wire(wire).expect("a readable wire")
 }
 
@@ -282,7 +283,7 @@ const GREY: (f64, f64) = (90.0, 10.0);
 // ---------------------------------------------------------------------------------------------
 // Criterion 20: part 1 whole at Threshold 40, part 2 R1 Inside at Threshold 70.
 
-fn c20_case(pic: &Picture, t1: u8, t2: u8, r: Vec<Point>) -> (f64, f64, TraceWire) {
+fn c20_case(pic: &Picture, t1: u8, t2: u8, r: Vec<Point>) -> (f64, f64, Output) {
     let (join, clips) = joined(
         pic,
         &[
@@ -294,7 +295,7 @@ fn c20_case(pic: &Picture, t1: u8, t2: u8, r: Vec<Point>) -> (f64, f64, TraceWir
         clips.iter().all(TracePartClip::contributes),
         "both parts add something: {clips:?}"
     );
-    assert_eq!(join.status, TraceStatus::Traced);
+    assert_eq!(join.status, Status::Traced);
     let got = polygons(&join.outlines);
     let rp = vec![triples(&r)];
     let ref_in = polygons(&read(&job(pic, &mono(t2, 50), Some(&inside(r.clone())))).outlines);
@@ -386,7 +387,7 @@ fn c21_in_the_overlap_only_the_later_part_and_the_earlier_is_cut_at_its_edge() {
 }
 
 /// The outlines of each layer of a multicolour result, with its colour.
-fn layers(w: &TraceWire) -> Vec<(TraceRgb, Vec<BezPath>)> {
+fn layers(w: &Output) -> Vec<(TraceRgb, Vec<BezPath>)> {
     let mut at = 0;
     w.layers
         .iter()
@@ -429,7 +430,7 @@ fn c21_c23_multicolour_overlap_different_colours_overlap_at_most_0_01_mm2_and_on
             (TracePartArea::Mask(inside(b)), colour(50)),
         ],
     );
-    assert_eq!(join.status, TraceStatus::Traced);
+    assert_eq!(join.status, Status::Traced);
     let ls = layers(&join);
     assert!(
         ls.len() >= 3,
@@ -595,7 +596,7 @@ fn c22_the_bar_across_the_seam_is_one_closed_outline_and_no_stencil_edge_remains
             ),
         ],
     );
-    assert_eq!(join.status, TraceStatus::Traced);
+    assert_eq!(join.status, Status::Traced);
     assert_eq!(
         join.outlines.len(),
         1,
@@ -876,7 +877,7 @@ fn c26_a_part_that_did_not_trace_makes_the_join_say_so() {
     let clips = trace_part_clips(&areas, &quad());
     let good = read(&job(&pic, &mono(50, 50), clips[0].region()));
     let mut failed = read(&job(&pic, &mono(50, 50), clips[1].region()));
-    for status in [TraceStatus::TooDetailed, TraceStatus::Invalid] {
+    for status in [Status::TooDetailed, Status::Invalid] {
         failed.status = status;
         let join = join_trace_parts(&[(&good, &clips[0]), (&failed, &clips[1])], 1);
         assert_eq!(join.status, status, "the join reports the part's failure");
@@ -897,7 +898,7 @@ fn single_colour_next_to_multicolour_parts_overlap_nowhere() {
             ),
         ],
     );
-    assert_eq!(join.status, TraceStatus::Traced);
+    assert_eq!(join.status, Status::Traced);
     let ls = layers(&join);
     assert!(!ls.is_empty(), "a multicolour result");
     let mut seen = Vec::new();

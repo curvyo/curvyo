@@ -1,6 +1,6 @@
 //! One trace job of the Trace tool's worker and its result as a flat list of numbers
 //! (`specs/0025-raster-trace` criteria 11, 15, 16 and 17; ADR 0023 §5): the worker runs
-//! `trace_job::run`, posts the numbers, and the session reads them back with [`read_wire`].
+//! [`crate::job::run`], posts the numbers, and the session reads them back with [`read`].
 
 use std::ops::ControlFlow;
 
@@ -12,9 +12,13 @@ use kurbo::{BezPath, PathEl, Point};
 
 use crate::mask::{Mask, UNCLIPPED_MARK, clip_colours, clip_trace, write_unclipped};
 
+mod text;
+pub(crate) use text::{TEXT_MARK, read_texts, write_texts};
+pub use text::{Text, Texts};
+
 /// How a trace job ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TraceStatus {
+pub enum Status {
     /// Outlines were made (possibly none).
     Traced,
     /// A region has 65 000 holes or more: "Too much detail: raise Ignore below." (criterion 16).
@@ -23,7 +27,7 @@ pub enum TraceStatus {
     Invalid,
 }
 
-impl TraceStatus {
+impl Status {
     pub(crate) fn code(self) -> f64 {
         match self {
             Self::Traced => 0.0,
@@ -45,9 +49,9 @@ impl TraceStatus {
 
 /// A trace result as the session keeps it.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TraceWire {
+pub struct Output {
     /// How the job ended.
-    pub status: TraceStatus,
+    pub status: Status,
     /// Outlines.
     pub paths: usize,
     /// Anchor points of all outlines.
@@ -61,13 +65,13 @@ pub struct TraceWire {
     /// The outlines in document millimetres (a multicolour result: layer by layer).
     pub outlines: Vec<BezPath>,
     /// The palette of a multicolour result (`specs/0089` slice M); empty for one colour.
-    pub palette: Vec<TracePaletteWire>,
+    pub palette: Vec<Palette>,
     /// The layers of a multicolour result in order, largest area first; empty for one colour.
-    pub layers: Vec<TraceLayerWire>,
+    pub layers: Vec<Layer>,
     /// Colour regions below Ignore below joined to a neighbour (multicolour).
     pub joined: usize,
     /// The text pass's lines (`specs/0091`); empty without OCR lines.
-    pub texts: crate::job_text::TraceTexts,
+    pub texts: Texts,
     /// The recognised shapes (`specs/0088` Part B); empty with Recognise shapes off. Each
     /// recognised outline in `outlines` is already its primitive's outline.
     pub shapes: Vec<crate::shapes::ShapeRegion>,
@@ -77,7 +81,7 @@ pub struct TraceWire {
 
 /// One palette colour of a multicolour result, as the strip shows it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TracePaletteWire {
+pub struct Palette {
     /// Its colour.
     pub colour: TraceRgb,
     /// The maker picked it.
@@ -89,7 +93,7 @@ pub struct TracePaletteWire {
 /// One layer of a multicolour result: its colour and how many of the outlines are its (they
 /// follow each other in layer order).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TraceLayerWire {
+pub struct Layer {
     /// Its colour.
     pub colour: TraceRgb,
     /// Outlines of the layer.
@@ -98,7 +102,7 @@ pub struct TraceLayerWire {
 
 /// The numbers before the outlines: status, paths, nodes, specks, foreground pixels, whole
 /// picture, outline count.
-pub const TRACE_WIRE_HEADER: usize = 7;
+pub const HEADER: usize = 7;
 
 const MOVE: f64 = 0.0;
 const LINE: f64 = 1.0;
@@ -154,7 +158,7 @@ pub(crate) fn mono_wire(
             let unclipped = mask.map_or(0, |mask| clip_trace(mask, &mut result));
             #[allow(clippy::cast_precision_loss)] // counts far below 2^52
             let mut wire = vec![
-                TraceStatus::Traced.code(),
+                Status::Traced.code(),
                 result.counts.paths as f64,
                 result.counts.nodes as f64,
                 result.counts.specks_removed as f64,
@@ -168,8 +172,8 @@ pub(crate) fn mono_wire(
             write_unclipped(&mut wire, unclipped);
             wire
         }
-        Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
-        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(TraceStatus::Invalid),
+        Err(TraceError::TooDetailed) => status_only(Status::TooDetailed),
+        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(Status::Invalid),
     }
 }
 
@@ -200,8 +204,8 @@ pub(crate) fn colour_wire(
             write_colour_tail(&mut wire, &result);
             wire
         }
-        Err(TraceError::TooDetailed) => status_only(TraceStatus::TooDetailed),
-        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(TraceStatus::Invalid),
+        Err(TraceError::TooDetailed) => status_only(Status::TooDetailed),
+        Err(TraceError::Invalid(_) | TraceError::Cancelled) => status_only(Status::Invalid),
     }
 }
 
@@ -211,7 +215,7 @@ pub(crate) fn colour_head(result: &ColourTrace) -> Vec<f64> {
     let outlines: usize = result.layers.iter().map(|l| l.outlines.len()).sum();
     #[allow(clippy::cast_precision_loss)] // counts far below 2^52
     let mut wire = vec![
-        TraceStatus::Traced.code(),
+        Status::Traced.code(),
         result.counts.paths as f64,
         result.counts.nodes as f64,
         result.counts.specks_removed as f64,
@@ -245,8 +249,8 @@ pub(crate) fn write_colour_tail(wire: &mut Vec<f64>, result: &ColourTrace) {
     }
 }
 
-pub(crate) fn status_only(status: TraceStatus) -> Vec<f64> {
-    let mut wire = vec![0.0; TRACE_WIRE_HEADER];
+pub(crate) fn status_only(status: Status) -> Vec<f64> {
+    let mut wire = vec![0.0; HEADER];
     wire[0] = status.code();
     wire
 }
@@ -293,21 +297,21 @@ pub fn count(value: f64) -> Option<usize> {
 /// Reads the numbers of [`crate::job::run`] back as they are; `None` when they are not a
 /// well-formed result.
 #[must_use]
-pub fn read_wire(wire: &[f64]) -> Option<TraceWire> {
+pub fn read(wire: &[f64]) -> Option<Output> {
     read_trace_body(wire).map(|(read, _)| read)
 }
 
-/// As [`read_wire`], with where the shape section starts (or would start: after the text
+/// As [`read`], with where the shape section starts (or would start: after the text
 /// section).
-pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
-    let header = wire.get(..TRACE_WIRE_HEADER)?;
+pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(Output, usize)> {
+    let header = wire.get(..HEADER)?;
     let status = match count(header[0])? {
-        0 => TraceStatus::Traced,
-        1 => TraceStatus::TooDetailed,
-        2 => TraceStatus::Invalid,
+        0 => Status::Traced,
+        1 => Status::TooDetailed,
+        2 => Status::Invalid,
         _ => return None,
     };
-    let mut at = TRACE_WIRE_HEADER;
+    let mut at = HEADER;
     let outline_count = count(header[6])?;
     let outlines = read_outlines(wire, &mut at, outline_count)?;
     // `specs/0094`: the unclipped count, when a kernel refusal kept outlines whole.
@@ -318,12 +322,12 @@ pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
         0
     };
     // `specs/0091`: the text section, when the job had OCR lines.
-    let texts = if wire.get(at) == Some(&crate::job_text::TEXT_MARK) {
-        let (texts, used) = crate::job_text::read_texts(&wire[at..])?;
+    let texts = if wire.get(at) == Some(&TEXT_MARK) {
+        let (texts, used) = read_texts(&wire[at..])?;
         at += used;
         texts
     } else {
-        crate::job_text::TraceTexts::default()
+        Texts::default()
     };
     // `specs/0088` Part B: the shape section, when Recognise shapes was on.
     let shapes_at = at;
@@ -339,7 +343,7 @@ pub(crate) fn read_trace_body(wire: &[f64]) -> Option<(TraceWire, usize)> {
     } else {
         read_colour_tail(&wire[at..], outline_count)?
     };
-    let read = TraceWire {
+    let read = Output {
         status,
         paths: count(header[1])?,
         nodes: count(header[2])?,
@@ -391,10 +395,7 @@ pub(crate) fn read_outlines(wire: &[f64], at: &mut usize, n: usize) -> Option<Ve
 
 /// The palette, layers and joined regions after a multicolour result's outlines; `None` unless
 /// they are well formed and the layers hold exactly the `outlines`.
-fn read_colour_tail(
-    tail: &[f64],
-    outlines: usize,
-) -> Option<(Vec<TracePaletteWire>, Vec<TraceLayerWire>, usize)> {
+fn read_colour_tail(tail: &[f64], outlines: usize) -> Option<(Vec<Palette>, Vec<Layer>, usize)> {
     let mut at = 0;
     let mut next = || -> Option<f64> {
         let value = *tail.get(at)?;
@@ -415,7 +416,7 @@ fn read_colour_tail(
         let c = colour(&mut next)?;
         let fixed = next()? != 0.0;
         let pixels = u64::try_from(count(next()?)?).ok()?;
-        palette.push(TracePaletteWire {
+        palette.push(Palette {
             colour: c,
             fixed,
             pixels,
@@ -425,7 +426,7 @@ fn read_colour_tail(
     let mut layers = Vec::with_capacity(count_layers.min(tail.len()));
     for _ in 0..count_layers {
         let c = colour(&mut next)?;
-        layers.push(TraceLayerWire {
+        layers.push(Layer {
             colour: c,
             outlines: count(next()?)?,
         });
@@ -491,7 +492,7 @@ mod tests {
 
     const SQUARE_MAP: [f64; 6] = [0.5, 0.0, 0.0, 0.5, 1.0, 2.0];
 
-    fn job_with(mask: Option<&dyn Mask>) -> TraceWire {
+    fn job_with(mask: Option<&dyn Mask>) -> Output {
         let params = TraceParams::with_threshold(128);
         let wire = run(
             &Job {
@@ -508,7 +509,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        read_wire(&wire).unwrap()
+        read(&wire).unwrap()
     }
 
     /// The square outline spans x 3..7, y 4..8 mm.
@@ -528,7 +529,7 @@ mod tests {
             max: Point::new(60.0, 60.0),
         };
         let read = job_with(Some(&away));
-        assert_eq!(read.status, TraceStatus::Traced);
+        assert_eq!(read.status, Status::Traced);
         assert_eq!((read.paths, read.nodes, read.outlines.len()), (0, 0, 0));
         assert!(!read.covers_whole_image);
         assert_eq!(read.unclipped, 0);
@@ -589,7 +590,7 @@ mod tests {
             },
             &mut |_| {},
         );
-        let read = read_wire(&wire).unwrap();
+        let read = read(&wire).unwrap();
         assert_eq!(read.layers.len(), 1);
         assert_eq!(read.layers[0].colour, TraceRgb::new(208, 34, 42));
         assert_eq!(read.outlines.len(), read.paths);
@@ -615,7 +616,7 @@ mod tests {
             },
             &mut |percent| seen.push(percent),
         );
-        assert_eq!(read_wire(&wire).unwrap().status, TraceStatus::Traced);
+        assert_eq!(read(&wire).unwrap().status, Status::Traced);
         assert_ne!(seen.len(), 0);
         assert!(seen.windows(2).all(|w| w[0] < w[1]), "{seen:?}");
         assert_eq!(seen.last(), Some(&100));
@@ -643,8 +644,8 @@ mod tests {
             80,
             0.0,
         );
-        let read = read_wire(&wire).unwrap();
-        assert_eq!(read.status, TraceStatus::Traced);
+        let read = read(&wire).unwrap();
+        assert_eq!(read.status, Status::Traced);
         assert_eq!((read.paths, read.nodes, read.specks_removed), (1, 4, 0));
         assert_eq!(read.foreground_pixels, 64);
         assert!(!read.covers_whole_image);
@@ -692,8 +693,8 @@ mod tests {
             },
             &mut |_| {},
         );
-        let read = read_wire(&wire).unwrap();
-        assert_eq!(read.status, TraceStatus::Traced);
+        let read = read(&wire).unwrap();
+        assert_eq!(read.status, Status::Traced);
         assert_eq!(read.palette.len(), 2);
         assert_eq!(read.layers.len(), 2);
         assert_eq!(
@@ -709,10 +710,10 @@ mod tests {
         // One more outline claimed by the last layer than there are.
         let last = bad.len() - 2;
         bad[last] += 1.0;
-        assert_eq!(read_wire(&bad), None);
+        assert_eq!(super::read(&bad), None);
         // A single-colour wire has no tail.
         let single = trace_job(&picture, 40, 20, map, 200, 80, 0.0);
-        assert_eq!(read_wire(&single).unwrap().layers, []);
+        assert_eq!(super::read(&single).unwrap().layers, []);
     }
 
     /// The worker's analysis (`specs/0089` slice F): a report for a valid picture, none for
@@ -742,8 +743,8 @@ mod tests {
             80,
             0.0,
         );
-        assert_eq!(read_wire(&wire).unwrap().status, TraceStatus::Invalid);
-        assert_eq!(read_wire(&[0.0; 3]), None);
+        assert_eq!(read(&wire).unwrap().status, Status::Invalid);
+        assert_eq!(read(&[0.0; 3]), None);
         let mut good = trace_job(
             &square_picture(),
             16,
@@ -754,12 +755,12 @@ mod tests {
             0.0,
         );
         good.push(1.0);
-        assert_eq!(read_wire(&good), None);
+        assert_eq!(read(&good), None);
         good.pop();
-        good[TRACE_WIRE_HEADER + 1] = 9.0;
-        assert_eq!(read_wire(&good), None);
-        good[TRACE_WIRE_HEADER + 1] = MOVE;
-        good[TRACE_WIRE_HEADER + 2] = f64::NAN;
-        assert_eq!(read_wire(&good), None);
+        good[HEADER + 1] = 9.0;
+        assert_eq!(read(&good), None);
+        good[HEADER + 1] = MOVE;
+        good[HEADER + 2] = f64::NAN;
+        assert_eq!(read(&good), None);
     }
 }

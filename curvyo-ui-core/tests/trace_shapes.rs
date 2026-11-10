@@ -10,12 +10,11 @@
 
 use curvyo_ui_core::read_trace_wire;
 use vectrace::Angle;
+use vectrace::Output;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::shapes::{
-    Join as TraceJoin, Primitive as TracePrimitive, ShapeRegion as TraceShapeRegion,
-    trace_add_shapes,
+    Join as TraceJoin, Primitive as TracePrimitive, ShapeRegion, trace_add_shapes,
 };
-use vectrace::wire::TraceWire;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
@@ -55,7 +54,7 @@ fn picture_rgb(w: u32, h: u32, paint: impl Fn(f64, f64) -> Option<[u8; 3]>) -> V
     out
 }
 
-fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, TraceWire) {
+fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, Output) {
     let mut wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
@@ -79,7 +78,7 @@ fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, TraceWire) {
 }
 
 /// The one region of a result and its outer primitive.
-fn only(read: &TraceWire) -> (&TraceShapeRegion, &(TracePrimitive, Angle)) {
+fn only(read: &Output) -> (&ShapeRegion, &(TracePrimitive, Angle)) {
     assert_eq!(read.shapes.len(), 1, "{:?}", read.shapes);
     let region = &read.shapes[0];
     (region, region.shapes[0].as_ref().unwrap())

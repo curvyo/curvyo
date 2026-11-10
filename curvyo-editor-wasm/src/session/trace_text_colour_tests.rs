@@ -12,7 +12,7 @@ use curvyo_document_core::{Color, NodeId, ObjectSnapshot};
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::ocr::{OcrModel, read_text};
 use vectrace::{
     ColourParams as TraceColourParams,
     DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE, PixelMap as TracePixelMap,
@@ -66,7 +66,7 @@ pub(super) fn run(model: &OcrModel, file: &str, params: &TraceColourParams) -> (
     let source = session.trace_source(image, false).unwrap();
     let mut times = Times::default();
     let started = cpu_seconds();
-    let lines = trace_read_text(
+    let lines = read_text(
         model,
         &source.rgba,
         source.width,
@@ -328,7 +328,7 @@ fn native_record_of_the_small_colour_poster_matches_the_golden_file() {
     let ocr = if let Some(k) = &kept {
         k["ocr"].as_str().unwrap().to_owned()
     } else {
-        let lines = trace_read_text(
+        let lines = read_text(
             &model(),
             &source.rgba,
             source.width,
@@ -407,7 +407,7 @@ fn the_colour_count_includes_colours_only_texts_use() {
             }
         })
         .collect();
-    let line = vectrace::ocr::accept::OcrLine {
+    let line = vectrace::ocr::OcrLine {
         quad: [[8.0, 10.0], [52.0, 10.0], [52.0, 20.0], [8.0, 20.0]],
         text: "Il".to_owned(),
         confidence: vec![0.9, 0.9],

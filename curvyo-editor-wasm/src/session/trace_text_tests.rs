@@ -15,7 +15,7 @@ use curvyo_document_core::{NodeId, ObjectSnapshot, TextSnapshot};
 use vectrace::job::{
     Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
-use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::ocr::{OcrModel, read_text};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 /// The thread's CPU time in seconds (`CLAUDE.md` §5: timings are thread CPU time).
@@ -152,7 +152,7 @@ pub(super) fn run(model: &OcrModel, file: &str) -> Run {
     let (mut session, image) = session_with(file);
     let source = session.trace_source(image, false).unwrap();
     let started = cpu_seconds();
-    let lines = trace_read_text(
+    let lines = read_text(
         model,
         &source.rgba,
         source.width,
@@ -334,7 +334,7 @@ fn a_ring_read_as_o_is_decided_before_the_one_trace() {
         .unwrap();
     let (mut session, image) = session_with_bytes(&png, "ring.png");
     let source = session.trace_source(image, false).unwrap();
-    let lines = trace_read_text(
+    let lines = read_text(
         &model,
         &source.rgba,
         source.width,
@@ -343,7 +343,7 @@ fn a_ring_read_as_o_is_decided_before_the_one_trace() {
     )
     .unwrap();
     assert!(
-        lines.iter().any(vectrace::ocr::accept::OcrLine::accepted),
+        lines.iter().any(vectrace::ocr::OcrLine::accepted),
         "{lines:?}"
     );
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
@@ -422,7 +422,7 @@ fn a_trace_with_other_lines_drops_the_fit() {
     let model = model();
     let (mut session, image) = session_with("rotated.png");
     let source = session.trace_source(image, false).unwrap();
-    let lines = trace_read_text(
+    let lines = read_text(
         &model,
         &source.rgba,
         source.width,

@@ -554,7 +554,7 @@ fn ellipse_of(p: &PrimitiveSnapshot) -> (f64, f64, (f64, f64), f64) {
     }
 }
 
-fn traced_with(host: &Host, settings: &str) -> vectrace::wire::TraceWire {
+fn traced_with(host: &Host, settings: &str) -> vectrace::Output {
     read_trace_wire(&host.wire(settings)).expect("a readable wire")
 }
 

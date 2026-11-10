@@ -192,8 +192,7 @@ fn c31_four_quarter_parts_against_one_whole_trace() {
                 .unwrap()
             })
             .collect();
-        let pairs: Vec<(&vectrace::wire::TraceWire, &TracePartClip)> =
-            wires.iter().zip(&clips).collect();
+        let pairs: Vec<(&vectrace::Output, &TracePartClip)> = wires.iter().zip(&clips).collect();
         join_trace_parts(&pairs, 0)
     });
     println!(

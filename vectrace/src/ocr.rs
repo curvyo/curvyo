@@ -1,7 +1,7 @@
 //! Reads text lines from an RGBA raster with model weights handed in as bytes (ADR 0028).
 //!
 //! The pipeline is ours (ADR 0028 §3): the `PaddleOCR` detector (DB) finds word boxes on a copy at
-//! most [`DETECTION_SIDE`] px long, the boxes are grouped into lines with one quad each (rotated
+//! most `DETECTION_SIDE` px long, the boxes are grouped into lines with one quad each (rotated
 //! text allowed), and the Latin recogniser reads each line along its quad with greedy CTC. Only
 //! the inference runs in `rten`; it brings `rayon` (ADR 0028 §4: in wasm everything runs on the
 //! calling thread, natively only the tests run it), this crate spawns nothing, keeps no global
@@ -14,7 +14,7 @@
 #![allow(clippy::cast_precision_loss)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-pub mod accept;
+mod accept;
 mod detect;
 mod lines;
 mod model;
@@ -23,7 +23,7 @@ mod resize;
 
 use std::ops::ControlFlow;
 
-pub use detect::DETECTION_SIDE;
+pub use accept::{OcrLine, crop_text, read_crop_text, read_text};
 pub use model::{ALPHABET_SHA256, DETECTOR_SHA256, OcrModel, RECOGNISER_SHA256};
 pub use read::{LINE_HEIGHT, LineCrop, read_crop};
 

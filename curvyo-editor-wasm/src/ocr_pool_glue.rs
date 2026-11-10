@@ -7,7 +7,7 @@
 //! A read: a JSON array with one entry per crop, the line as `ocr_lines_json` writes it or `null`.
 
 use serde_json::{Value, json};
-use vectrace::ocr::accept::{LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, OcrModel, trace_read_crop};
+use vectrace::ocr::{LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, OcrModel, read_crop_text};
 
 /// The crops as the JSON of their quads and widths and their samples in one array.
 #[must_use]
@@ -69,7 +69,7 @@ pub fn read_crops(
 ) -> Option<String> {
     let mut out = Vec::with_capacity(crops.len());
     for (i, crop) in crops.iter().enumerate() {
-        let line = trace_read_crop(model, crop).ok()?;
+        let line = read_crop_text(model, crop).ok()?;
         out.push(line.map_or(
             Value::Null,
             |l| json!({ "quad": l.quad, "text": l.text, "confidence": l.confidence, "positions": l.positions }),
@@ -83,7 +83,7 @@ pub fn read_crops(
 mod tests {
     use std::path::Path;
 
-    use vectrace::ocr::accept::{trace_crop_text, trace_read_text};
+    use vectrace::ocr::{crop_text, read_text};
 
     use super::*;
 
@@ -105,7 +105,7 @@ mod tests {
         )
         .unwrap();
         let image = curvyo_image_core::decode_working(&bytes).unwrap();
-        let whole = trace_read_text(
+        let whole = read_text(
             &model,
             &image.pixels,
             image.width,
@@ -113,7 +113,7 @@ mod tests {
             &mut |_| std::ops::ControlFlow::Continue(()),
         )
         .unwrap();
-        let crops = trace_crop_text(&model, &image.pixels, image.width, image.height).unwrap();
+        let crops = crop_text(&model, &image.pixels, image.width, image.height).unwrap();
         let (json, samples) = crops_wire(&crops);
         let back = read_crops_wire(&json, &samples).unwrap();
         assert_eq!(back, crops);

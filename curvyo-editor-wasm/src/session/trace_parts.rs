@@ -10,7 +10,7 @@ use curvyo_ui_core::{
     RegionOperand, TracePartArea, TracePartClip, join_trace_parts, mask_operand, read_trace_wire,
     trace_part_clips,
 };
-use vectrace::wire::TraceWire;
+use vectrace::Output;
 
 use super::trace_region::{RegionCache, is_mask_path};
 use super::{Session, Tool, TraceSource};
@@ -328,8 +328,8 @@ impl Session {
         full: bool,
     ) -> Option<Vec<f64>> {
         let clips = self.trace_part_clip_list();
-        let empty = TraceWire {
-            status: vectrace::wire::TraceStatus::Traced,
+        let empty = Output {
+            status: vectrace::wire::Status::Traced,
             paths: 0,
             nodes: 0,
             specks_removed: 0,
@@ -339,11 +339,11 @@ impl Session {
             palette: Vec::new(),
             layers: Vec::new(),
             joined: 0,
-            texts: vectrace::job_text::TraceTexts::default(),
+            texts: vectrace::wire::Texts::default(),
             shapes: Vec::new(),
             unclipped: 0,
         };
-        let mut read: Vec<(TraceWire, TracePartClip)> = Vec::with_capacity(wires.len());
+        let mut read: Vec<(Output, TracePartClip)> = Vec::with_capacity(wires.len());
         for (index, wire) in wires.iter().enumerate() {
             let clip = clips.get(index).cloned().unwrap_or(TracePartClip::Nothing);
             match wire {
@@ -351,14 +351,14 @@ impl Session {
                 _ => read.push((empty.clone(), TracePartClip::Nothing)),
             }
         }
-        let pairs: Vec<(&TraceWire, &TracePartClip)> = read.iter().map(|(w, c)| (w, c)).collect();
+        let pairs: Vec<(&Output, &TracePartClip)> = read.iter().map(|(w, c)| (w, c)).collect();
         let joined = join_trace_parts(&pairs, self.trace.parts.active);
         #[allow(clippy::cast_precision_loss)] // counts far below 2^52
         let header = vec![
             match joined.status {
-                vectrace::wire::TraceStatus::Traced => 0.0,
-                vectrace::wire::TraceStatus::TooDetailed => 1.0,
-                vectrace::wire::TraceStatus::Invalid => 2.0,
+                vectrace::wire::Status::Traced => 0.0,
+                vectrace::wire::Status::TooDetailed => 1.0,
+                vectrace::wire::Status::Invalid => 2.0,
             },
             joined.paths as f64,
             joined.nodes as f64,

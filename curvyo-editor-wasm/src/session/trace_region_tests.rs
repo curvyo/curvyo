@@ -347,7 +347,7 @@ fn a_grouped_mask_path_counts_as_its_paths() {
 fn a_refused_clip_shows_its_muted_notice() {
     let (mut session, image, _) = masked();
     session.set_tool(Tool::Trace);
-    let mut wire = vec![0.0; vectrace::wire::TRACE_WIRE_HEADER];
+    let mut wire = vec![0.0; vectrace::wire::HEADER];
     assert!(session.set_trace_preview(image, &wire));
     assert_eq!(session.trace_unclipped_notice(), "");
     wire.extend([-5.0, 2.0]);
