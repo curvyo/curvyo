@@ -24,6 +24,8 @@ interface PointerFlags {
   altKey: boolean;
 }
 
+/** An options object, not `true`: Node 22's `removeEventListener` reads only `options.capture`, so a boolean would leave the listener attached. */
+const CAPTURE = { capture: true };
 const KEY_EVENTS = ["keydown", "keyup"] as const;
 const POINTER_EVENTS = ["pointermove", "pointerdown", "pointerup"] as const;
 
@@ -52,8 +54,8 @@ export function heldCtrlStore(sources: () => ModifierEventSources) {
   };
   const attach = () => {
     const on = sources();
-    KEY_EVENTS.forEach((type) => on.window.addEventListener(type, onKey, true));
-    POINTER_EVENTS.forEach((type) => on.window.addEventListener(type, onPointer, true));
+    KEY_EVENTS.forEach((type) => on.window.addEventListener(type, onKey, CAPTURE));
+    POINTER_EVENTS.forEach((type) => on.window.addEventListener(type, onPointer, CAPTURE));
     on.window.addEventListener("blur", onBlur);
     on.document.addEventListener("visibilitychange", onVisibility);
     attached = on;
@@ -63,8 +65,8 @@ export function heldCtrlStore(sources: () => ModifierEventSources) {
     if (!on) {
       return;
     }
-    KEY_EVENTS.forEach((type) => on.window.removeEventListener(type, onKey, true));
-    POINTER_EVENTS.forEach((type) => on.window.removeEventListener(type, onPointer, true));
+    KEY_EVENTS.forEach((type) => on.window.removeEventListener(type, onKey, CAPTURE));
+    POINTER_EVENTS.forEach((type) => on.window.removeEventListener(type, onPointer, CAPTURE));
     on.window.removeEventListener("blur", onBlur);
     on.document.removeEventListener("visibilitychange", onVisibility);
     attached = null;
