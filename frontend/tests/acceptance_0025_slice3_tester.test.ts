@@ -539,7 +539,8 @@ test("0025s3 c54 in Chromium: Failed in the slot, Retry, values and document sta
     assert.equal(info.word, "Failed");
     assert.equal(info.glyph, true, "red is not the only cue: a glyph");
     assert.equal(info.focusInside, false, "the slot does not take focus");
-    assert.ok(String(info.border + String(info.shadow)).includes(String(info.invalid)), `a ring in --field-invalid: ${info.border} / ${info.shadow} vs ${info.invalid}`);
+    // Customer 2026-11-10: Failed is a plain state of the button, as Stopped, with no red ring.
+    assert.ok(!String(info.border + String(info.shadow)).includes(String(info.invalid)), `no ring in --field-invalid: ${info.border} / ${info.shadow} vs ${info.invalid}`);
     const failed = await slotInfo(s);
     assert.equal(failed?.kind, "failed");
     assert.ok(failed?.afterSpecks && failed?.afterExpander, "Failed sits in the finish button, after the expander");

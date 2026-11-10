@@ -1,7 +1,8 @@
 /**
  * The page's side of the trace worker (`specs/0025-raster-trace` criteria 10, 17 and 58, ADR 0023
  * §5): one worker at a time, fed the compiled wasm module once; a job is a promise; cancelling
- * terminates the worker and the next job starts a fresh one from the cached module.
+ * terminates the worker and the next job starts a fresh one from the cached module, as does a
+ * worker that failed (customer 2026-11-10).
  */
 
 import { mergeReads, poolPercent, poolSize, readingCost, shareLines } from "./ocrPool.ts";
@@ -122,6 +123,8 @@ export class TraceCancelled extends Error {
 export interface TraceWorkerLike {
   onmessage: ((event: MessageEvent<TraceResponse>) => void) | null;
   onerror: ((event: ErrorEvent) => void) | null;
+  /** A reply the page could not read; the worker is ended like after an error. */
+  onmessageerror?: ((event: MessageEvent) => void) | null;
   postMessage(message: TraceRequest, transfer?: Transferable[]): void;
   terminate(): void;
 }
@@ -130,15 +133,25 @@ type Pending = {
   resolve: (response: TraceResponse) => void;
   reject: (error: Error) => void;
   onProgress?: (percent: number) => void;
+  /** The request again for a fresh worker: only a job that hands nothing over can be asked twice. */
+  again?: () => TraceRequest;
+  /** Its answer timer (the analysis, `ANALYSIS_ANSWER_MS`). */
+  timer?: ReturnType<typeof setTimeout>;
 };
 
 /** How long a new worker may take to answer `init`, and the module to compile, before the jobs
- * waiting for it fail (Proposal, customer 2026-10-31: a webview whose worker never starts showed
- * "Analysing..." for good). A 15 MB module compiles in well under a second. */
+ * waiting for it go to a second fresh worker, and fail when that one does not answer either
+ * (Proposal, customer 2026-10-31: a webview whose worker never starts showed "Analysing..." for
+ * good). A 15 MB module compiles in well under a second. */
 export const WORKER_START_MS = 20_000;
 
+/** How long the worker may take to answer an analysis (the automatic values of an image or a
+ * region) before it is ended and the analysis asked of a fresh worker, once (customer
+ * 2026-11-10: Analyse must always answer). A 12 Mpx photo takes about half a second. */
+export const ANALYSIS_ANSWER_MS = 30_000;
+
 /** Thrown into the jobs of a worker that did not start: it did not answer `init` in time, or its
- * module could not be instantiated. */
+ * module could not be instantiated; or into an analysis no worker answered in time. */
 export class TraceWorkerFailed extends Error {
   constructor(reason: string) {
     super(`the trace worker did not start: ${reason}`);
@@ -146,9 +159,21 @@ export class TraceWorkerFailed extends Error {
   }
 }
 
-/** Runs trace jobs in a worker; `cancel` ends every running job by terminating it. */
+/** Runs trace jobs in a worker; `cancel` ends every running job by terminating it. A worker that
+ * answered an error, raised one or could not be read is never asked again (its wasm may have
+ * trapped): its jobs fail and the next job starts a fresh worker. */
 export class TraceRunner {
   private worker: TraceWorkerLike | null = null;
+  /** The worker answered `init`: jobs go to it at once, else they wait in `waiting`. */
+  private started = false;
+  /** The jobs posted before the worker started, in order; `posted` hears when each goes out. */
+  private waiting: { message: TraceRequest; transfer: Transferable[]; posted?: () => void }[] = [];
+  /** The current worker replaces one that did not start in time (it is the last try). */
+  private secondStart = false;
+  /** The compiled module, once known, so a worker can be replaced at once. */
+  private compiledModule: WebAssembly.Module | null = null;
+  /** Counts `cancel` calls: a job stopped while its worker was made is never posted. */
+  private epoch = 0;
   /** The weights went to this worker (a pool worker loads them once, `specs/0091` round 2). */
   private weightsSent = false;
   /** The workers that read text lines next to this one, made on the first read. */
@@ -161,12 +186,20 @@ export class TraceRunner {
   private readonly makeWorker: () => TraceWorkerLike;
   private readonly module: () => Promise<WebAssembly.Module>;
   private readonly startMs: number;
+  private readonly analysisMs: number;
 
-  constructor(makeWorker: () => TraceWorkerLike, module: () => Promise<WebAssembly.Module>, startMs = WORKER_START_MS, poolWorkers = 1) {
+  constructor(
+    makeWorker: () => TraceWorkerLike,
+    module: () => Promise<WebAssembly.Module>,
+    startMs = WORKER_START_MS,
+    poolWorkers = 1,
+    analysisMs = ANALYSIS_ANSWER_MS,
+  ) {
     this.makeWorker = makeWorker;
     this.module = module;
     this.startMs = startMs;
     this.poolWorkers = poolWorkers;
+    this.analysisMs = analysisMs;
   }
 
   /** Whether a job is running. */
@@ -178,17 +211,32 @@ export class TraceRunner {
     if (this.worker) {
       return this.worker;
     }
-    const module = await this.module();
+    this.compiledModule = await this.module();
     if (this.worker) {
       return this.worker;
     }
+    this.secondStart = false;
+    return this.spawn(this.compiledModule);
+  }
+
+  /** A fresh worker fed `module`; its jobs wait until it answers `init`. */
+  private spawn(module: WebAssembly.Module): TraceWorkerLike {
     const worker = this.makeWorker();
     worker.onmessage = (event) => {
+      if (this.worker !== worker) {
+        return;
+      }
       const response = event.data;
       if (response.kind === "ready") {
         this.clearStartTimer();
         if (response.error !== "") {
           this.fail(worker, new TraceWorkerFailed(response.error));
+          return;
+        }
+        this.started = true;
+        for (const job of this.waiting.splice(0)) {
+          worker.postMessage(job.message, job.transfer);
+          job.posted?.();
         }
         return;
       }
@@ -197,16 +245,41 @@ export class TraceRunner {
         pending.onProgress?.(response.percent);
       } else if (pending) {
         this.pending.delete(response.id);
+        clearTimeout(pending.timer);
         pending.resolve(response);
+        if (response.kind === "error") {
+          // The wasm of this worker may have trapped: it is not asked again.
+          this.fail(worker, new Error(response.message));
+        }
       }
     };
     worker.onerror = (event) => this.fail(worker, new Error(event.message || "trace worker failed"));
+    worker.onmessageerror = () => this.fail(worker, new Error("trace worker reply unreadable"));
     worker.postMessage({ type: "init", module });
     this.worker = worker;
+    this.started = false;
     this.weightsSent = false;
     this.clearStartTimer();
-    this.startTimer = setTimeout(() => this.fail(worker, new TraceWorkerFailed(`no answer in ${this.startMs} ms`)), this.startMs);
+    this.startTimer = setTimeout(() => this.lateStart(worker, module), this.startMs);
     return worker;
+  }
+
+  /** `worker` did not answer `init` in time: its jobs (still unposted, their pixels whole) go to a
+   * second fresh worker; when that one is late too, they fail. */
+  private lateStart(worker: TraceWorkerLike, module: WebAssembly.Module): void {
+    if (this.worker !== worker) {
+      return;
+    }
+    const failure = new TraceWorkerFailed(`no answer in ${this.startMs} ms`);
+    if (this.secondStart) {
+      this.fail(worker, failure);
+      return;
+    }
+    this.startTimer = null;
+    worker.terminate();
+    this.worker = null;
+    this.secondStart = true;
+    this.spawn(module);
   }
 
   private clearStartTimer(): void {
@@ -222,24 +295,77 @@ export class TraceRunner {
       return;
     }
     this.clearStartTimer();
-    for (const pending of this.pending.values()) {
-      pending.reject(failure);
-    }
-    this.pending.clear();
     worker.terminate();
     this.worker = null;
+    this.waiting = [];
+    const jobs = [...this.pending.values()];
+    this.pending.clear();
+    for (const pending of jobs) {
+      clearTimeout(pending.timer);
+      pending.reject(failure);
+    }
+  }
+
+  /** Posts `message` to `worker` now, or once it started; `posted` hears when it goes out. */
+  private post(worker: TraceWorkerLike, message: TraceRequest, transfer: Transferable[], posted?: () => void): void {
+    if (this.started && this.worker === worker) {
+      worker.postMessage(message, transfer);
+      posted?.();
+    } else {
+      this.waiting.push({ message, transfer, posted });
+    }
   }
 
   private async send(
     make: (id: number) => TraceRequest,
     transfer: Transferable[],
     onProgress?: (percent: number) => void,
+    answerMs?: number,
   ): Promise<TraceResponse> {
+    const epoch = this.epoch;
     const worker = await this.ready();
+    if (epoch !== this.epoch) {
+      // Stopped while the worker was made: never posted, so nothing waits behind it.
+      throw new TraceCancelled();
+    }
     const id = this.nextId++;
     return new Promise<TraceResponse>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject, onProgress });
-      worker.postMessage(make(id), transfer);
+      const pending: Pending = { resolve, reject, onProgress };
+      this.pending.set(id, pending);
+      // The answer time counts from when the worker has the job, not from its start.
+      const posted =
+        answerMs === undefined
+          ? undefined
+          : () => {
+              pending.timer = setTimeout(() => this.unanswered(id, answerMs, true), answerMs);
+            };
+      if (answerMs !== undefined) {
+        pending.again = () => make(id);
+      }
+      this.post(worker, make(id), transfer, posted);
+    });
+  }
+
+  /** Job `id` got no answer in `ms`: its worker is ended; with `again` the job is asked of a fresh
+   * worker once, else it fails. */
+  private unanswered(id: number, ms: number, again: boolean): void {
+    const pending = this.pending.get(id);
+    const worker = this.worker;
+    if (!pending || !worker) {
+      return;
+    }
+    const failure = new TraceWorkerFailed(`no answer in ${ms} ms`);
+    if (!again || !pending.again || this.compiledModule === null) {
+      this.fail(worker, failure);
+      return;
+    }
+    // Every other job of the ended worker fails; this one is asked again.
+    this.pending.delete(id);
+    this.fail(worker, failure);
+    this.pending.set(id, pending);
+    const fresh = this.spawn(this.compiledModule);
+    this.post(fresh, pending.again(), [], () => {
+      pending.timer = setTimeout(() => this.unanswered(id, ms, false), ms);
     });
   }
 
@@ -253,9 +379,12 @@ export class TraceRunner {
    * analysis JSON (`specs/0089` slice F; empty when it failed); with a `mask` (the region JSON of
    * the session) of the region's pixels only (`specs/0094` criterion 9). */
   async defaults(pixels: TracePixels, mask = ""): Promise<{ threshold: number; background: string; analysis: string }> {
+    // The pixels are copied, not handed over, so an unanswered analysis can be asked again.
     const response = await this.send(
       (id) => ({ type: "threshold", id, rgba: pixels.rgba, width: pixels.width, height: pixels.height, ...(mask === "" ? {} : { map: pixels.map, mask }) }),
       [],
+      undefined,
+      this.analysisMs,
     );
     if (response.kind !== "threshold") {
       throw new Error(response.kind === "error" ? response.message : "unexpected reply");
@@ -475,8 +604,10 @@ export class TraceRunner {
   }
 
   /** Ends every running job: the worker is terminated and their promises reject with
-   * [`TraceCancelled`]; the next job starts a fresh worker. */
+   * [`TraceCancelled`]; a job still waiting for its worker is never posted; the next job starts a
+   * fresh worker. */
   cancel(): void {
+    this.epoch += 1;
     for (const runner of this.pool) {
       runner.cancel();
     }
@@ -486,10 +617,13 @@ export class TraceRunner {
     this.clearStartTimer();
     this.worker?.terminate();
     this.worker = null;
-    for (const pending of this.pending.values()) {
+    this.waiting = [];
+    const jobs = [...this.pending.values()];
+    this.pending.clear();
+    for (const pending of jobs) {
+      clearTimeout(pending.timer);
       pending.reject(new TraceCancelled());
     }
-    this.pending.clear();
   }
 
   /** Ends the worker for good (the editor unmounts). */

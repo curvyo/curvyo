@@ -128,7 +128,6 @@ function FinishSlot({ slot, onRun, onStop }: { slot: RecogniseSlot; onRun: () =>
       <span
         title={failed ? slot.text : undefined}
         className={`flex h-7 items-center gap-1 rounded-md text-xs ${failed ? "" : "opacity-90"}`}
-        style={failed ? { boxShadow: "inset 0 0 0 1px var(--field-invalid)" } : undefined}
       >
         {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" /> : null}
         {failed ? FAILED : STOPPED}

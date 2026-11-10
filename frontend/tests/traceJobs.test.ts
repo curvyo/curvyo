@@ -1,22 +1,27 @@
-// The trace worker runner (`frontend/src/lib/traceJobs.ts`, customer 2026-10-31): a worker that
-// never starts or fails to instantiate the module fails its jobs instead of leaving them waiting
-// ("Analysing..." for good); a worker that starts answers as before.
+// The trace worker runner (`frontend/src/lib/traceJobs.ts`, customer 2026-10-31 and 2026-11-10): a
+// worker that never starts or fails to instantiate the module fails its jobs instead of leaving them
+// waiting ("Analysing..." for good); a worker that starts answers as before; a worker that errored is
+// never asked again, a slow start and an unanswered analysis are tried once more on a fresh worker,
+// and a job stopped before its worker started is never posted.
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
-import { TraceRunner, TraceWorkerFailed, type TraceRequest, type TraceResponse, type TraceWorkerLike } from "../src/lib/traceJobs.ts";
+import { TraceCancelled, TraceRunner, TraceWorkerFailed, type TraceRequest, type TraceResponse, type TraceWorkerLike } from "../src/lib/traceJobs.ts";
 
-/** A fake worker: `answer` maps each request to the replies it posts (none: it stays silent). */
-function fakeWorker(answer: (request: TraceRequest) => TraceResponse[]) {
-  const made: { terminated: boolean }[] = [];
+/** A fake worker: `answer` maps each request (and the number of the worker, from 0) to the replies
+ * it posts (none: it stays silent). */
+function fakeWorker(answer: (request: TraceRequest, worker: number) => TraceResponse[]) {
+  const made: { terminated: boolean; got: string[] }[] = [];
   const make = (): TraceWorkerLike => {
-    const state = { terminated: false };
+    const state = { terminated: false, got: [] as string[] };
+    const index = made.length;
     made.push(state);
     const worker: TraceWorkerLike = {
       onmessage: null,
       onerror: null,
       postMessage(message: TraceRequest) {
-        for (const reply of answer(message)) {
+        state.got.push(message.type);
+        for (const reply of answer(message, index)) {
           setTimeout(() => {
             if (!state.terminated) {
               worker.onmessage?.({ data: reply } as MessageEvent<TraceResponse>);
@@ -36,11 +41,13 @@ function fakeWorker(answer: (request: TraceRequest) => TraceResponse[]) {
 const module = async () => ({}) as WebAssembly.Module;
 const pixels = () => ({ width: 1, height: 1, rgba: new Uint8Array(4), map: [1, 0, 0, 1, 0, 0] });
 
-test("a worker that never answers init fails its job after the start time, and is ended", async () => {
+test("a worker that never answers init is replaced once; the second that does not either fails the job, and both are ended", async () => {
   const fake = fakeWorker(() => []);
   const runner = new TraceRunner(fake.make, module, 30);
   await assert.rejects(runner.defaults(pixels()), (e: unknown) => e instanceof TraceWorkerFailed && /no answer in 30 ms/.test(e.message));
-  assert.equal(fake.made[0].terminated, true);
+  assert.equal(fake.made.length, 2);
+  assert.ok(fake.made.every((w) => w.terminated));
+  assert.deepEqual(fake.made.map((w) => w.got), [["init"], ["init"]], "a job waits for its worker's start");
   assert.equal(runner.busy, false);
 });
 
@@ -63,12 +70,102 @@ test("a worker that starts answers its jobs, and the next job after a failed sta
   await assert.rejects(runner.defaults(pixels()), TraceWorkerFailed);
   silent = false;
   assert.deepEqual(await runner.defaults(pixels()), { threshold: 120, background: "", analysis: "{}" });
-  assert.equal(fake.made.length, 2, "a fresh worker");
+  assert.equal(fake.made.length, 3, "a fresh worker");
   // After the start time nothing fails: the ready answer ended the timer.
   await new Promise((r) => setTimeout(r, 60));
-  assert.equal(fake.made[1].terminated, false);
+  assert.equal(fake.made[2].terminated, false);
   assert.deepEqual(await runner.defaults(pixels()), { threshold: 120, background: "", analysis: "{}" });
+  assert.equal(fake.made.length, 3);
+  runner.dispose();
+});
+
+// Customer 2026-11-10 ("Analysis failed", Failed and Retry, Analyse doing nothing): the worker is
+// recovered instead of asked again.
+const ready: TraceResponse = { id: 0, kind: "ready", error: "" };
+const answered = (r: TraceRequest): TraceResponse[] =>
+  r.type === "threshold" ? [{ id: r.id, kind: "threshold", threshold: 99, background: "", analysis: "{}", ms: 1 }] : r.type === "trace" ? [{ id: r.id, kind: "trace", wire: new Float64Array(7), ms: 1 }] : [];
+
+test("a slow start is tried once more: the waiting job runs on the second worker, and nothing but init went to the first", async () => {
+  const fake = fakeWorker((r, w) => (r.type === "init" ? (w === 0 ? [] : [ready]) : answered(r)));
+  const runner = new TraceRunner(fake.make, module, 30);
+  const out = await runner.trace(pixels(), "{}");
+  assert.equal(out.wire.length, 7);
+  assert.deepEqual(fake.made.map((w) => [w.terminated, w.got]), [[true, ["init"]], [false, ["init", "trace"]]]);
+  runner.dispose();
+});
+
+test("a worker that answered with an error is ended: the next job (Retry, Analyse) runs on a fresh one", async () => {
+  const fake = fakeWorker((r, w) => (r.type === "init" ? [ready] : w === 0 ? [{ id: (r as { id: number }).id, kind: "error", message: "RuntimeError: unreachable" }] : answered(r)));
+  const runner = new TraceRunner(fake.make, module, 5_000);
+  await assert.rejects(runner.trace(pixels(), "{}"), /unreachable/);
+  assert.equal(fake.made[0].terminated, true, "the worker that trapped is not asked again");
+  assert.deepEqual(await runner.defaults(pixels()), { threshold: 99, background: "", analysis: "{}" });
   assert.equal(fake.made.length, 2);
+  runner.dispose();
+});
+
+test("a worker error event ends the worker and fails its job; the next job gets a fresh worker", async () => {
+  const fake = fakeWorker((r) => (r.type === "init" ? [ready] : answered(r)));
+  const made: TraceWorkerLike[] = [];
+  const runner = new TraceRunner(() => {
+    const w = fake.make();
+    made.push(w);
+    return w;
+  }, module, 5_000);
+  await runner.defaults(pixels());
+  const job = runner.defaults(pixels());
+  await new Promise((r) => setTimeout(r, 0));
+  made[0].onerror?.({ message: "out of memory" } as ErrorEvent);
+  await assert.rejects(job, /out of memory/);
+  assert.equal(fake.made[0].terminated, true);
+  assert.deepEqual(await runner.defaults(pixels()), { threshold: 99, background: "", analysis: "{}" });
+  assert.equal(fake.made.length, 2);
+  runner.dispose();
+});
+
+test("a job stopped while its worker starts is never posted, so the next job does not queue behind it", async () => {
+  let compiled: () => void = () => undefined;
+  // One compile for every job, as `editorModule` caches it.
+  const compiling = new Promise<WebAssembly.Module>((resolve) => (compiled = () => resolve({} as WebAssembly.Module)));
+  const slowModule = () => compiling;
+  const fake = fakeWorker((r) => (r.type === "init" ? [ready] : answered(r)));
+  const runner = new TraceRunner(fake.make, slowModule, 5_000);
+  const stale = runner.trace(pixels(), "{}");
+  runner.cancel();
+  const next = runner.defaults(pixels());
+  compiled();
+  await assert.rejects(stale, TraceCancelled);
+  assert.deepEqual(await next, { threshold: 99, background: "", analysis: "{}" });
+  assert.deepEqual(fake.made.map((w) => w.got), [["init", "threshold"]]);
+  runner.dispose();
+});
+
+test("an analysis the worker does not answer in time is asked again of a fresh worker, once", async () => {
+  const fake = fakeWorker((r, w) => (r.type === "init" ? [ready] : w === 0 ? [] : answered(r)));
+  const runner = new TraceRunner(fake.make, module, 5_000, 1, 30);
+  assert.deepEqual(await runner.defaults(pixels()), { threshold: 99, background: "", analysis: "{}" });
+  assert.deepEqual(fake.made.map((w) => [w.terminated, w.got]), [[true, ["init", "threshold"]], [false, ["init", "threshold"]]]);
+  // Two silent workers: the analysis fails, it does not wait for good.
+  const silent = fakeWorker((r) => (r.type === "init" ? [ready] : []));
+  const stuck = new TraceRunner(silent.make, module, 5_000, 1, 30);
+  await assert.rejects(stuck.defaults(pixels()), (e: unknown) => e instanceof TraceWorkerFailed && /no answer in 30 ms/.test(e.message));
+  assert.equal(silent.made.length, 2);
+  assert.equal(stuck.busy, false);
+  runner.dispose();
+});
+
+test("the analysis's answer time counts from when the worker has it, not from the worker's start", async () => {
+  const made: TraceWorkerLike[] = [];
+  const fake = fakeWorker((r) => (r.type === "threshold" ? answered(r) : []));
+  const runner = new TraceRunner(() => {
+    const w = fake.make();
+    made.push(w);
+    // The start takes longer than the answer time.
+    setTimeout(() => w.onmessage?.({ data: ready } as MessageEvent<TraceResponse>), 60);
+    return w;
+  }, module, 5_000, 1, 30);
+  assert.deepEqual(await runner.defaults(pixels()), { threshold: 99, background: "", analysis: "{}" });
+  assert.equal(fake.made.length, 1, "no second worker");
   runner.dispose();
 });
 

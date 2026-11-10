@@ -304,10 +304,8 @@ function ProgressSlot({
   return (
     <div data-trace-slot={slot.kind} className={`${FINISH_CLASS} gap-1 pl-2`}>
       <AppTooltip side="bottom" content={failed ? slot.text : PREVIEW_OUT_OF_DATE}>
-        <span
-          className={`flex h-7 items-center gap-1 rounded-md text-xs ${failed ? "" : "opacity-90"}`}
-          style={failed ? { boxShadow: "inset 0 0 0 1px var(--field-invalid)" } : undefined}
-        >
+        {/* A plain state of the button, as Stopped: no ring (customer 2026-11-10). */}
+        <span className={`flex h-7 items-center gap-1 rounded-md text-xs ${failed ? "" : "opacity-90"}`}>
           {failed ? <CircleAlert size={12} aria-hidden className="shrink-0" /> : null}
           {failed ? FAILED : STOPPED}
         </span>
