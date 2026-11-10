@@ -192,7 +192,8 @@ export function MoveEntryChip({
       return false;
     }
     event.preventDefault();
-    const target = first ? copyRef.current : inputRefs.current[0];
+    // Without its Copy check (a laser fixture) the mode switch closes the loop.
+    const target = first ? (copyRef.current ?? switchRef.current) : inputRefs.current[0];
     target?.focus();
     if (target instanceof HTMLInputElement && target.type === "text") {
       target.select();
@@ -401,6 +402,7 @@ export function MoveEntryChip({
               </span>
             </div>
           )}
+          {entry.copyAllowed ? (
           <label className="mt-1.5 flex h-6 cursor-pointer items-center gap-1.5 px-1 text-xs">
             <input
               ref={copyRef}
@@ -418,6 +420,7 @@ export function MoveEntryChip({
             />
             <span aria-hidden>Copy</span>
           </label>
+          ) : null}
         </div>
         {/* Always mounted so the polite live region announces a change; empty it
             has no height. The message sits outside the body (the chip is placed

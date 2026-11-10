@@ -164,4 +164,7 @@ test("a laser page's tree: rows keyed apart, inner rows press their placed page 
   assert.equal(isPlainRow(row("note")), true);
   assert.equal(isPlainRow(row("placed-page")), true);
   assert.equal(isPlainRow(row("rectangle")), false);
+  // A fixture row under the Fixtures row has an eye but is not renamed, dragged or locked
+  // (`specs/0102` criterion 12, UX notes section 8).
+  assert.equal(isPlainRow(row("fixture")), true);
 });

@@ -1,6 +1,7 @@
 import { Frame, TriangleAlert } from "lucide-react";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { OperationsSection } from "@/components/panel/OperationsSection";
+import type { FixturesApi } from "@/hooks/useFixtures";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
@@ -76,6 +77,8 @@ interface PropertiesPanelProps {
   membership: MembershipApi;
   /** The laser operations of the active laser page (`specs/0101-laser-operations`). */
   operations: OperationsApi;
+  /** The laser fixtures of the active laser page (`specs/0102-laser-fixtures`). */
+  fixtures: FixturesApi;
 }
 
 /**
@@ -107,6 +110,7 @@ export function PropertiesPanel({
   collab,
   membership,
   operations,
+  fixtures,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
@@ -487,7 +491,7 @@ export function PropertiesPanel({
             ) : doc.view.content === "sketches" ? (
               <SketchesPanel key={`${sketch.view.page}:${sketch.view.active}`} sketch={sketch} pages={doc.view.pages} />
             ) : doc.view.content === "snapping" ? (
-              <SnappingSection snapping={snapping} onReturnFocus={returnFocus}/>
+              <SnappingSection snapping={snapping} fixtures={fixtures} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "grid" ? (
               <GridSection grid={grid} disabled={snapping.view.hasDrag} onReturnFocus={returnFocus}/>
             ) : doc.view.content === "document" ? (
@@ -504,6 +508,7 @@ export function PropertiesPanel({
                       view={manufacturing}
                       workbenches={workbenches}
                       unit={doc.view.unit}
+                      fixtures={fixtures}
                       onReturnFocus={returnFocus}
                     />
                   ) : page.off ? (

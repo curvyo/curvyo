@@ -54,6 +54,8 @@ export interface MachineView {
   builtin: boolean;
   state: "differs" | "missing" | null;
   can_update: boolean;
+  /** The profile's fixture count, "Fixtures in profile: N" (`specs/0102` 9.1). */
+  fixtures_in_profile: number;
   name_notice: string | null;
   connection: { connector_address: string; controller_port: string; baud_rate: number } | null;
   library_notices: string[];
@@ -132,12 +134,6 @@ export function useWorkbenches(editor: EditorSession) {
       setConnection: (address: string, port: string, baud: number) =>
         run((session) => session.set_machine_connection(address, port, baud, Date.now())) ?? "",
     },
-    addFixture: (kind: string) => run((session) => session.add_fixture(kind)),
-    deleteFixture: (id: string) => run((session) => session.delete_fixture(id)),
-    setFixtureVisible: (id: string, visible: boolean) =>
-      run((session) => session.set_fixture_visible(id, visible)),
-    setFixtureLength: (id: string, key: string, mm: number) =>
-      run((session) => session.set_fixture_length(id, key, mm)),
     setExtensionEnabled: (id: string, enabled: boolean) => {
       const text = run((session) => session.set_extension_enabled(id, enabled));
       if (text !== undefined) {

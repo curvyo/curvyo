@@ -1,3 +1,5 @@
+import type { FixtureKind } from "@/lib/fixturesView";
+import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
 import {
   ChevronDown,
   ChevronRight,
@@ -65,7 +67,17 @@ const KIND_GLYPHS: Record<string, Glyph> = {
   // A laser page's tree (`specs/0106` UX notes §5): its placed pages and the Fixtures row.
   "placed-page": Frame,
   fixtures: Grid3x3,
+  // A fixture under the Fixtures row (`specs/0102` criterion 12).
+  fixture: Grid3x3,
 };
+
+/** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */
+function fixtureKindOf(word: string): FixtureKind {
+  const kind = word.toLowerCase();
+  return kind === "grid" || kind === "holder" || kind === "clamp" || kind === "stop" || kind === "screw"
+    ? kind
+    : "unknown";
+}
 
 /** The four cells of a row, in order (criterion 38, customer feedback 2026-10-14). */
 export type RowCell = "name" | "action" | "eye" | "lock";
@@ -245,7 +257,7 @@ export function LayerRow({
   const root = row.kind === "page-root";
   const plain = root || row.kind === "placed-page" || row.readOnly === true;
   const showEye = !plain;
-  const showLock = !plain && row.kind !== "fixtures";
+  const showLock = !plain && row.kind !== "fixtures" && row.kind !== "fixture";
   // A clone row selects its original, a group or layer row its contents (`0049`, `0050`).
   const actionLabel = row.rowAction === "select-original" ? "Select original" : "Select contents";
   const nameClass = `min-w-0 flex-1 truncate ${active || root ? "font-semibold" : ""} ${
@@ -345,7 +357,13 @@ export function LayerRow({
             <span
               className={`flex shrink-0 ${row.readOnly ? "text-[var(--panel-muted-fg)]" : "text-[var(--toolbar-icon)]"}`}
             >
-              {Kind ? <Kind size={16} strokeWidth={1.5} aria-hidden /> : <CompoundGlyph />}
+              {row.kind === "fixture" && row.fixture ? (
+                <FixtureGlyph kind={fixtureKindOf(row.fixture.kind)} />
+              ) : Kind ? (
+                <Kind size={16} strokeWidth={1.5} aria-hidden />
+              ) : (
+                <CompoundGlyph />
+              )}
             </span>
           )}
           {renaming ? (

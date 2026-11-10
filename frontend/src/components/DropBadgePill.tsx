@@ -1,10 +1,11 @@
-import { Ban, Copy, Frame, Link2, Move, Tag } from "lucide-react";
+import { Ban, Copy, Frame, Link2, Magnet, Move, Tag } from "lucide-react";
 import type { DropBadgeKind } from "@/lib/dragAnswer";
 
 /** The drop badge beside the pointer (UX notes §2 "Drop badge"). */
 export interface DropBadge {
-  /** `assign`: a canvas drag over an operation row (`specs/0101` UX notes 6.3); its word is given. */
-  kind: DropBadgeKind | "assign";
+  /** `assign`: a canvas drag over an operation row (`specs/0101` UX notes 6.3); its word is given.
+   * `fit`: a move over a fixture slot it fits (`specs/0102` UX notes 7.2), glyph Magnet. */
+  kind: DropBadgeKind | "assign" | "fit";
   word: string;
   refused: boolean;
   x: number;
@@ -30,7 +31,7 @@ export function DropBadgePill({
   badge: DropBadge;
   position?: "fixed" | "absolute";
 }) {
-  const Glyph = badge.kind === "assign" ? Tag : (GLYPHS[badge.kind] ?? Ban);
+  const Glyph = badge.kind === "assign" ? Tag : badge.kind === "fit" ? Magnet : (GLYPHS[badge.kind] ?? Ban);
   return (
     <div
       aria-hidden

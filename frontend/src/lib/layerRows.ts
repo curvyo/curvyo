@@ -74,6 +74,9 @@ export interface LayerRowData {
   readOnly?: boolean;
   /** "On Laser 1": the tooltip's muted line of a row whose object lies on another page. */
   homeLine?: string;
+  /** A fixture row under the Fixtures row (`specs/0102` criterion 12): its full id as the
+   * fixture calls take it, its kind word and Active state; null elsewhere. */
+  fixture?: { id: string; kind: string; active: boolean } | null;
 }
 
 /** The Opacity field at the bottom of the tab (criterion 26). */
@@ -203,6 +206,7 @@ export function isPlainRow(row: LayerRowData): boolean {
   return (
     row.kind === "page-root" ||
     row.kind === "fixtures" ||
+    row.kind === "fixture" ||
     row.kind === "placed-page" ||
     row.kind === "note" ||
     row.readOnly === true

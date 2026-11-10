@@ -242,6 +242,15 @@ export function LayersTab({
   const press = (row: LayerRowData, how: "plain" | "toggle" | "range") => {
     setFocused(row.index);
     setCell("name");
+    // A fixture row selects its fixture on the canvas (`specs/0102` criterion 12).
+    if (row.kind === "fixture" && row.fixture) {
+      const id = row.fixture.id;
+      act((session) => {
+        session.select_fixture(id);
+        return "";
+      });
+      return;
+    }
     // The root and the Fixtures row of a laser page's tree select nothing (`specs/0106` UX §5).
     if (row.kind === "page-root" || row.kind === "fixtures" || row.kind === "note") {
       return;
@@ -254,6 +263,16 @@ export function LayersTab({
     if (row.kind === "fixtures") {
       act((session) => {
         session.set_layer_fixtures_shown(!row.visible);
+        return "";
+      });
+      return;
+    }
+    // A fixture row's eye shows or hides that fixture (`specs/0102` criterion 12).
+    if (row.kind === "fixture" && row.fixture) {
+      const id = row.fixture.id;
+      const shown = !row.visible;
+      act((session) => {
+        session.set_fixture_visible(id, shown);
         return "";
       });
       return;

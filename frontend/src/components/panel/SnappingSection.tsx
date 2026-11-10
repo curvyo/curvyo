@@ -2,6 +2,7 @@ import { EntryField } from "@/components/panel/EntryField";
 import { PanelRadioGroup } from "@/components/panel/PanelRadioGroup";
 import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
+import type { FixturesApi } from "@/hooks/useFixtures";
 import type { SnappingApi } from "@/hooks/useSnapping";
 
 const TARGETS = [
@@ -15,8 +16,10 @@ const GRID_POINTS = [["centre", "Centre"], ["box", "Box corners and edges"], ["n
 const TOGGLE_CLASS = "h-7 rounded border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] text-sm hover:bg-[var(--editor-accent-hover)] aria-pressed:bg-[var(--toolbar-icon-active-bg)] aria-pressed:text-[var(--toolbar-icon-active-fg)] focus-visible:outline-2 focus-visible:outline-[var(--editor-accent)]";
 
 /** Document-owned snapping controls in their own Properties pane. */
-export function SnappingSection({ snapping, onReturnFocus }: {
+export function SnappingSection({ snapping, fixtures, onReturnFocus }: {
   snapping: SnappingApi;
+  /** The Fixtures switch shows only on a laser page with the extension on (`specs/0102` 9.2). */
+  fixtures?: FixturesApi;
   onReturnFocus: () => void;
 }) {
   const { view } = snapping;
@@ -40,6 +43,10 @@ export function SnappingSection({ snapping, onReturnFocus }: {
           }}>Grid</button>
       </div>
     </fieldset>
+    {fixtures?.view ? (
+      // One undo step per switch (`specs/0102` 9.2, "Snap to fixtures on" or "off").
+      <PanelSwitch label="Fixtures" checked={fixtures.view.snappingFixtures} onCheckedChange={() => fixtures.setSnapping(!fixtures.view?.snappingFixtures)} onReturnFocus={onReturnFocus} />
+    ) : null}
     <PanelRadioGroup legend="Grid snaps with" options={GRID_POINTS} value={view.gridPoint} stacked
       onChange={(point) => snapping.setGridPoint(point)} onReturnFocus={onReturnFocus} />
     <fieldset className="min-w-0">
