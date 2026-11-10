@@ -305,7 +305,8 @@ fn ac15_the_extension_crates_have_no_io_network_or_gcode() {
                     "curvyo-document-core",
                     "curvyo-geometry-core",
                     "serde",
-                    "serde_json"
+                    "serde_json",
+                    "thiserror"
                 ]
                 .contains(&name),
                 "{krate} depends on {name}"

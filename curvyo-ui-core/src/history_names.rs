@@ -26,6 +26,20 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("delete_fixture", "Delete fixture"),
     ("set_fixture_visible", "Show or hide fixture"),
     ("set_fixture_params", "Change fixture"),
+    // `specs/0101-laser-operations` criteria 2 to 8, 15, 16, 23 and 27; the session names an
+    // assignment after its operation ("Assign to Cut 1").
+    ("add_operation", "Add operation"),
+    ("assign_to_operation", "Assign to operation"),
+    ("remove_from_operation", "Remove from operation"),
+    ("rename_operation", "Rename operation"),
+    ("set_operation_show", "Show or hide operation"),
+    ("set_operation_output", "Output on or off"),
+    ("set_operation_margin", "Set margin"),
+    ("delete_operation", "Delete operation"),
+    ("move_operation", "Move operation"),
+    ("cuts_last_on", "Cuts last on"),
+    ("cuts_last_off", "Cuts last off"),
+    ("remove_missing_items", "Remove missing items"),
     // `specs/0026-machine-profile` criteria 3, 5 and 7 (UX notes §2).
     ("pick_profile", "Pick profile"),
     ("reset_profile", "Reset from profile"),

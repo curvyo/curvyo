@@ -8,6 +8,8 @@ use crate::panel_tabs::PanelTab;
 /// The panel's content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PanelContent {
+    /// The Operations tab of a laser page (`specs/0101-laser-operations`).
+    Operations,
     /// The File tab: the project and the file commands (`specs/0051-sidebar-and-no-menu`).
     File,
     /// The Document section: the Document tab is active and the Pen has no
@@ -68,6 +70,7 @@ pub fn panel_body(
         PanelTab::Parameters => PanelContent::Parameters,
         PanelTab::Share => PanelContent::Share,
         PanelTab::Workbench => PanelContent::Workbench,
+        PanelTab::Operations => PanelContent::Operations,
     }
 }
 
