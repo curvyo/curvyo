@@ -33,6 +33,7 @@
 
 mod common;
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::collections::BTreeMap;
 use std::ops::ControlFlow;
 
@@ -41,7 +42,6 @@ use common::quality::{
     quality_set,
 };
 use common::{params, run};
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, PRESETS, Preset, TraceParams, auto_threshold, trace,
 };
@@ -53,7 +53,7 @@ fn defaults(image: &QualityImage) -> TraceParams {
     TraceParams {
         threshold: auto_threshold(image.picture.raster()),
         smooth: DEFAULT_SMOOTH,
-        specks: Length::from_mm(DEFAULT_SPECKS_MM),
+        specks: Mm::from_mm(DEFAULT_SPECKS_MM),
         ..TraceParams::with_threshold(0)
     }
 }
@@ -88,7 +88,7 @@ fn mask_of(image: &QualityImage, threshold: u8) -> Vec<bool> {
 fn candidate(image: &QualityImage) -> Metrics {
     let p = defaults(image);
     let scale = mm_per_px(image);
-    let result = run(&image.picture, Affine::scale(scale, scale), &p);
+    let result = run(&image.picture, PixelMap::scale(scale, scale), &p);
     let in_px: Vec<BezPath> = result
         .outlines
         .iter()
@@ -133,7 +133,7 @@ fn preset_run(preset: &Preset, image: &QualityImage) -> PresetRun {
     let threshold = auto_threshold(image.picture.raster());
     let p = preset.apply(TraceParams::with_threshold(threshold));
     let scale = mm_per_px(image);
-    let result = run(&image.picture, Affine::scale(scale, scale), &p);
+    let result = run(&image.picture, PixelMap::scale(scale, scale), &p);
     let in_px: Vec<BezPath> = result
         .outlines
         .iter()
@@ -790,7 +790,7 @@ fn relation_key(miss: &str) -> String {
 fn smooth_scan_for_the_default() {
     let disc = common::read_picture("disc.pgm");
     for smooth in (0..=100).step_by(10) {
-        let result = run(&disc, Affine::IDENTITY, &params(128, smooth, 0.5));
+        let result = run(&disc, PixelMap::IDENTITY, &params(128, smooth, 0.5));
         let (mut max, mut sum, mut n) = (0.0_f64, 0.0, 0.0);
         for seg in result.outlines[0].segments() {
             for i in 0..100 {
@@ -875,7 +875,7 @@ fn line_art_2000() -> common::Picture {
 #[ignore = "budget: run in release"]
 fn line_art_2000_budget() {
     let picture = line_art_2000();
-    let map = Affine::scale(25.4 / 300.0, 25.4 / 300.0);
+    let map = PixelMap::scale(25.4 / 300.0, 25.4 / 300.0);
     let p = params(128, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM);
     let mut last = common::thread_cpu_seconds();
     let mut longest = 0.0_f64;
@@ -898,7 +898,7 @@ fn line_art_2000_budget() {
         levels[(y as usize * 2) * 2000 + x as usize * 2] < 128
     });
     let t0 = common::thread_cpu_seconds();
-    let small = run(&reduced, Affine::scale(25.4 / 150.0, 25.4 / 150.0), &p);
+    let small = run(&reduced, PixelMap::scale(25.4 / 150.0, 25.4 / 150.0), &p);
     println!(
         "reduced copy 1000 x 1000 px: {:.3} s thread CPU, {} paths",
         common::thread_cpu_seconds() - t0,

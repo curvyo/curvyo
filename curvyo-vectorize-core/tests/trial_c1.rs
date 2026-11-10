@@ -34,7 +34,7 @@ use common::quality::scenes_colour::{
     FRINGE_RED, PALE_YELLOW, PICK_RED, PICK_YELLOW, logo_fringe, logo_pale_picked, logo_picked,
 };
 use common::quality::shape::{deviation, samples_along, truth_segments};
-use curvyo_document_core::Affine;
+use curvyo_vectorize_core::PixelMap;
 use curvyo_vectorize_core::TraceParams;
 use kurbo::BezPath;
 
@@ -198,7 +198,7 @@ fn trace_mask(content: &[bool], w: u32, h: u32) -> Vec<BezPath> {
     let picture = Picture::grey(w, h, &levels);
     let result = common::run(
         &picture,
-        Affine::scale(MM, MM),
+        PixelMap::scale(MM, MM),
         &TraceParams::with_threshold(128),
     );
     result

@@ -4,7 +4,7 @@
 
 use std::ops::ControlFlow;
 
-use curvyo_document_core::Affine;
+use crate::units::PixelMap;
 use kurbo::BezPath;
 
 use crate::colour_map::{ColourMap, colour_map};
@@ -15,7 +15,7 @@ use crate::params::{Rgb8, TraceParams, geometry};
 use crate::progress::{Poller, Progress};
 use crate::raster::Raster;
 use crate::shared_fit::{loop_segs, shared_fit};
-use crate::trace::{Counts, Diagnostics, TraceError, check, to_kurbo};
+use crate::trace::{Counts, Diagnostics, TraceError, check};
 
 /// The values of a multicolour trace: the single-colour values (the selection method decides
 /// what is content, the geometry how it is fitted) and the palette's.
@@ -94,7 +94,7 @@ pub struct ColourTrace {
 /// for bytes that do not match the size or a singular map.
 pub fn trace_colours(
     raster: Raster<'_>,
-    pixel_map: Affine,
+    pixel_map: PixelMap,
     params: &ColourParams,
     poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
 ) -> Result<ColourTrace, TraceError> {
@@ -130,7 +130,7 @@ pub fn trace_colours(
 /// One layer per palette colour of `cm` that has a loop, its outlines from the fitted
 /// `edge_segs` in millimetres, largest area first, ties by colour value.
 fn layers(cm: &ColourMap, loops: &[Loop], edge_segs: &[Vec<Seg>]) -> Vec<ColourLayer> {
-    let map = to_kurbo(cm.map);
+    let map = cm.map.to_kurbo();
     let mut pixels = vec![0_u64; cm.palette.len() + 1];
     for &l in &cm.labels {
         pixels[l as usize] += 1;
@@ -184,7 +184,7 @@ fn palette_of(cm: &ColourMap) -> Vec<PaletteEntry> {
 /// As [`trace_colours`].
 pub fn colour_palette(
     raster: Raster<'_>,
-    pixel_map: Affine,
+    pixel_map: PixelMap,
     params: &ColourParams,
     poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
 ) -> Result<Vec<PaletteEntry>, TraceError> {

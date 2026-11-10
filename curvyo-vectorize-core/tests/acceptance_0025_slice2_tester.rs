@@ -22,9 +22,9 @@
 
 mod common;
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     ADVANCED_PARAMS, DEFAULT_THRESHOLD, Denoise, PARAMS, PRESETS, ParamKind, Raster, TraceParams,
     TraceResult, Upscale, auto_threshold, trace,
@@ -77,15 +77,15 @@ fn aa(w: u32, h: u32, inside: impl Fn(f64, f64) -> bool) -> Pic {
     })
 }
 
-fn px_map() -> Affine {
-    Affine::new(MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0)
+fn px_map() -> PixelMap {
+    PixelMap::new([MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0])
 }
 
 fn base(threshold: u8) -> TraceParams {
     TraceParams::with_threshold(threshold)
 }
 
-fn run(pic: &Pic, map: Affine, p: &TraceParams) -> TraceResult {
+fn run(pic: &Pic, map: PixelMap, p: &TraceParams) -> TraceResult {
     trace(pic.raster(), map, p, &mut |_| ControlFlow::Continue(())).unwrap()
 }
 
@@ -214,7 +214,7 @@ fn c60_c65_logo_is_exactly_the_slice_1_default() {
         px_map(),
         &TraceParams {
             smooth: 80,
-            specks: Length::from_mm(0.5),
+            specks: Mm::from_mm(0.5),
             corners: 70,
             ..base(128)
         },
@@ -296,10 +296,10 @@ fn c42_denoise_low_keeps_ringing_out_and_the_logo_within_one_pixel() {
     let pic = noisy_logo(255, 20);
     let p = TraceParams {
         denoise: Denoise::Low,
-        specks: Length::from_mm(0.0),
+        specks: Mm::from_mm(0.0),
         ..base(128)
     };
-    let r = run(&pic, Affine::IDENTITY, &p);
+    let r = run(&pic, PixelMap::IDENTITY, &p);
     assert_eq!(r.outlines.len(), 1, "one outline, none outside the logo");
     let worst = flat(&r.outlines[0], 0.01)
         .iter()
@@ -315,10 +315,10 @@ fn c42_denoise_removes_threshold_crossing_noise_and_high_at_least_as_much() {
     let n = |d: Denoise| {
         let p = TraceParams {
             denoise: d,
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(128)
         };
-        run(&pic, Affine::IDENTITY, &p).counts.paths
+        run(&pic, PixelMap::IDENTITY, &p).counts.paths
     };
     let (off, low, high) = (n(Denoise::Off), n(Denoise::Low), n(Denoise::High));
     println!("c42 outlines: Off {off}, Low {low}, High {high}");
@@ -431,7 +431,7 @@ fn c42_upscale_auto_is_not_worse_than_off_against_the_true_shape() {
     let run_with = |u: Upscale| {
         let p = TraceParams {
             upscale: u,
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(t)
         };
         run(&pic, px_map(), &p)
@@ -484,7 +484,7 @@ fn c44_invert_is_the_exact_complement_of_the_mask() {
             &pic,
             px_map(),
             &TraceParams {
-                specks: Length::from_mm(0.0),
+                specks: Mm::from_mm(0.0),
                 ..base(t)
             },
         );
@@ -493,7 +493,7 @@ fn c44_invert_is_the_exact_complement_of_the_mask() {
             px_map(),
             &TraceParams {
                 invert: true,
-                specks: Length::from_mm(0.0),
+                specks: Mm::from_mm(0.0),
                 ..base(t)
             },
         );
@@ -515,7 +515,7 @@ fn c44_invert_is_the_exact_complement_of_the_mask() {
             px_map(),
             &TraceParams {
                 invert: inv,
-                specks: Length::from_mm(0.0),
+                specks: Mm::from_mm(0.0),
                 ..base(100)
             },
         )
@@ -531,10 +531,10 @@ fn c44_a_black_logo_inverted_is_the_page_shape_with_the_logo_as_a_hole() {
     });
     let r = run(
         &pic,
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &TraceParams {
             invert: true,
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(128)
         },
     );
@@ -566,18 +566,18 @@ fn c44_ignore_background_drops_the_regions_touching_the_border() {
     });
     let off = run(
         &pic,
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &TraceParams {
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(128)
         },
     );
     let on = run(
         &pic,
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &TraceParams {
             ignore_background: true,
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(128)
         },
     );
@@ -594,11 +594,11 @@ fn c44_ignore_background_drops_the_regions_touching_the_border() {
     // the same with Invert: the white page touches the border and goes, inner white regions stay
     let both = run(
         &pic,
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &TraceParams {
             invert: true,
             ignore_background: true,
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(128)
         },
     );
@@ -613,11 +613,11 @@ fn c44_ignore_background_drops_the_regions_touching_the_border() {
     });
     let kept = run(
         &open,
-        Affine::IDENTITY,
+        PixelMap::IDENTITY,
         &TraceParams {
             invert: true,
             ignore_background: true,
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..base(128)
         },
     );
@@ -709,7 +709,7 @@ fn c63_densities() -> Vec<(String, f64, f64)> {
     let mut out = Vec::new();
     for reference in reference_set() {
         let v = reference.variant(0);
-        let map = Affine::scale(v.mm_per_px, v.mm_per_px);
+        let map = PixelMap::scale(v.mm_per_px, v.mm_per_px);
         let at = |key: &str| {
             let params = params_for(preset(key), &v.picture);
             let raster = Raster {
@@ -879,7 +879,7 @@ fn c62_engraving_has_at_most_4x_the_node_density_of_logo_and_2_5x_as_geometric_m
         let pic = &image.picture;
         let t = auto_threshold(pic.raster());
         let mm = 25.4 / image.dpi;
-        let map = Affine::new(mm, 0.0, 0.0, mm, 0.0, 0.0);
+        let map = PixelMap::new([mm, 0.0, 0.0, mm, 0.0, 0.0]);
         let traced = |key: &str| {
             trace(pic.raster(), map, &with_preset(key, t), &mut |_| {
                 ControlFlow::Continue(())

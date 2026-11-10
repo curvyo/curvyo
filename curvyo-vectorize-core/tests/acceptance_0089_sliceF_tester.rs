@@ -26,9 +26,9 @@
 
 mod common;
 
+use curvyo_vectorize_core::PixelMap;
 use std::ops::ControlFlow;
 
-use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{
     AnalysisReport, Capture, ImageType, PropertyKind, Raster, Reason, Selection, TraceParams,
     analyse, auto_threshold, trace,
@@ -232,7 +232,7 @@ fn traced_pixels(pic: &Pic, r: &AnalysisReport) -> f64 {
         ..TraceParams::with_threshold(r.proposal.threshold)
     };
     let mut go = |_| ControlFlow::Continue(());
-    trace(pic.raster(), Affine::scale(0.1, 0.1), &params, &mut go)
+    trace(pic.raster(), PixelMap::scale(0.1, 0.1), &params, &mut go)
         .unwrap()
         .foreground_pixels as f64
 }

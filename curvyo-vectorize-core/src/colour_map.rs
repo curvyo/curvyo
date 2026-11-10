@@ -2,7 +2,7 @@
 //! 29) from the cleaned mask of the single-colour path: the palette, every content pixel's
 //! colour, the maker's exclusions, small colour regions joined.
 
-use curvyo_document_core::Affine;
+use crate::units::PixelMap;
 
 use crate::background::suggest_background;
 use crate::colour_trace::ColourParams;
@@ -24,7 +24,7 @@ pub(crate) struct ColourMap {
     pub width: usize,
     pub height: usize,
     /// Traced pixels to millimetres.
-    pub map: Affine,
+    pub map: PixelMap,
     /// Traced pixels per source pixel (2 after Upscale).
     pub unit: usize,
     pub palette: Vec<Entry>,
@@ -63,7 +63,7 @@ impl Source<'_> {
 /// The label map [`crate::trace_colours`] walks for `params`.
 pub(crate) fn colour_map(
     raster: Raster<'_>,
-    pixel_map: Affine,
+    pixel_map: PixelMap,
     params: &ColourParams,
     poller: &mut Poller<'_>,
 ) -> Result<ColourMap, TraceError> {

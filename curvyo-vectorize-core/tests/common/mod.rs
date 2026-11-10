@@ -6,10 +6,10 @@
 
 pub mod quality;
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 use std::path::PathBuf;
 
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{Raster, TraceParams, TraceResult, trace};
 
 /// Millimetres per pixel at 96 dpi.
@@ -156,20 +156,20 @@ pub fn params(threshold: u8, smooth: u8, specks_mm: f64) -> TraceParams {
     TraceParams {
         threshold,
         smooth,
-        specks: Length::from_mm(specks_mm),
+        specks: Mm::from_mm(specks_mm),
         ..TraceParams::with_threshold(threshold)
     }
 }
 
 /// Traces without stopping.
-pub fn run(picture: &Picture, map: Affine, params: &TraceParams) -> TraceResult {
+pub fn run(picture: &Picture, map: PixelMap, params: &TraceParams) -> TraceResult {
     let mut go = |_| ControlFlow::Continue(());
     trace(picture.raster(), map, params, &mut go).unwrap()
 }
 
 /// The map of a picture placed at 96 dpi at the origin.
-pub fn at_96_dpi() -> Affine {
-    Affine::scale(MM_PER_PX_96, MM_PER_PX_96)
+pub fn at_96_dpi() -> PixelMap {
+    PixelMap::scale(MM_PER_PX_96, MM_PER_PX_96)
 }
 
 /// The signed area of a closed path (kurbo's sign: positive is counter-clockwise in y-up, which

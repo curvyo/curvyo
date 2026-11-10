@@ -4,7 +4,7 @@
 
 use std::ops::ControlFlow;
 
-use curvyo_document_core::Affine;
+use crate::units::PixelMap;
 use kurbo::{BezPath, Point, Shape};
 
 use crate::boundary::chains;
@@ -86,7 +86,7 @@ pub enum TraceError {
 /// region with [`MAX_HOLES_PER_REGION`] holes or more.
 pub fn trace(
     raster: Raster<'_>,
-    pixel_map: Affine,
+    pixel_map: PixelMap,
     params: &TraceParams,
     poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
 ) -> Result<TraceResult, TraceError> {
@@ -99,7 +99,7 @@ pub fn trace(
 }
 
 /// Refuses bytes that do not match the size and a map that is not finite or not invertible.
-pub(crate) fn check(raster: Raster<'_>, pixel_map: Affine) -> Result<(), TraceError> {
+pub(crate) fn check(raster: Raster<'_>, pixel_map: PixelMap) -> Result<(), TraceError> {
     if raster.checked_pixels().is_none() {
         return Err(TraceError::Invalid("the pixel bytes do not match the size"));
     }
@@ -113,7 +113,7 @@ pub(crate) fn check(raster: Raster<'_>, pixel_map: Affine) -> Result<(), TraceEr
 pub(crate) struct Masked {
     pub(crate) labels: Labels,
     /// Traced pixels to millimetres.
-    pub(crate) map: Affine,
+    pub(crate) map: PixelMap,
     /// Traced pixels per source pixel (2 after Upscale).
     pub(crate) unit: usize,
     pub(crate) min_area_mm2: f64,
@@ -125,7 +125,7 @@ pub(crate) struct Masked {
 /// (for the tests of the contour before simplification).
 pub(crate) fn trace_with(
     raster: Raster<'_>,
-    pixel_map: Affine,
+    pixel_map: PixelMap,
     params: &TraceParams,
     geometry: &Geometry,
     poll: &mut dyn FnMut(Progress) -> ControlFlow<()>,
@@ -174,7 +174,7 @@ pub(crate) fn trace_with(
         .into_iter()
         .flat_map(|(outer, holes)| std::iter::once(outer).chain(holes))
         .map(|mut path| {
-            path.apply_affine(to_kurbo(masked.map));
+            path.apply_affine(masked.map.to_kurbo());
             path
         })
         .collect();
@@ -253,7 +253,7 @@ fn room(
 /// border shapes and specks: the labelled mask the outlines are walked on.
 pub(crate) fn masked(
     raster: Raster<'_>,
-    pixel_map: Affine,
+    pixel_map: PixelMap,
     params: &TraceParams,
     poller: &mut Poller<'_>,
 ) -> Result<Masked, TraceError> {
@@ -286,7 +286,7 @@ pub(crate) fn masked(
             alpha = Some(upscale_2x(a, width, height, poller)?);
         }
         (width, height) = (width * 2, height * 2);
-        map = pixel_map.compose(Affine::scale(0.5, 0.5));
+        map = pixel_map.compose(PixelMap::scale(0.5, 0.5));
         unit = 2;
     }
     let mut mask = content(&score, &alpha);
@@ -337,7 +337,7 @@ type Traced = (BezPath, Vec<BezPath>);
 
 /// Drops the outer outlines (with their holes) and the holes whose area in mm² is below
 /// `min_area_mm2`; returns how many outlines were dropped.
-fn drop_small_outlines(traced: &mut Vec<Traced>, pixel_map: Affine, min_area_mm2: f64) -> u64 {
+fn drop_small_outlines(traced: &mut Vec<Traced>, pixel_map: PixelMap, min_area_mm2: f64) -> u64 {
     let scale = pixel_map.determinant().abs();
     let small = |path: &BezPath| path.area().abs() * scale < min_area_mm2;
     let mut dropped = 0;
@@ -352,9 +352,4 @@ fn drop_small_outlines(traced: &mut Vec<Traced>, pixel_map: Affine, min_area_mm2
         true
     });
     dropped
-}
-
-/// The document map as a `kurbo` map (both in SVG order).
-pub(crate) fn to_kurbo(map: Affine) -> kurbo::Affine {
-    kurbo::Affine::new(map.to_array())
 }

@@ -9,9 +9,9 @@
     clippy::cast_sign_loss
 )]
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 
-use curvyo_document_core::{Affine, Length};
 use curvyo_vectorize_core::{
     ColourParams, ColourTrace, DEFAULT_BACKGROUND_TOLERANCE, Raster, Rgb8, Selection, TraceParams,
     trace_colours,
@@ -44,7 +44,7 @@ fn run(colours: Option<u8>, fixed: &[Rgb8]) -> ColourTrace {
             background: Some(Rgb8::new(255, 255, 255)),
             tolerance: DEFAULT_BACKGROUND_TOLERANCE,
         },
-        specks: Length::from_mm(0.0),
+        specks: Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     };
     let mut cp = ColourParams::new(tp);
@@ -56,7 +56,7 @@ fn run(colours: Option<u8>, fixed: &[Rgb8]) -> ColourTrace {
             height: h,
             rgba: &rgba,
         },
-        Affine::scale(0.1, 0.1),
+        PixelMap::scale(0.1, 0.1),
         &cp,
         &mut |_| ControlFlow::Continue(()),
     )

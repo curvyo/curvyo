@@ -32,7 +32,7 @@ use common::quality::scenes_colour::{
 };
 use common::quality::shape::{deviation, samples_along, samples_of, truth_segments};
 use common::quality::{rasterise_4x, render::Scene};
-use curvyo_document_core::Affine;
+use curvyo_vectorize_core::PixelMap;
 use curvyo_vectorize_core::{
     DEFAULT_BACKGROUND_TOLERANCE, DEFAULT_PICK_TOLERANCE, Rgb8, Selection, Swatches, TraceParams,
     selected, suggest_background,
@@ -89,7 +89,7 @@ fn pick_at(picture: &Picture, colours: &[[u8; 4]], tolerance: u8) -> TraceParams
 
 /// The outlines in pixels.
 fn trace_px(picture: &Picture, params: &TraceParams) -> Vec<BezPath> {
-    common::run(picture, Affine::scale(MM, MM), params)
+    common::run(picture, PixelMap::scale(MM, MM), params)
         .outlines
         .iter()
         .map(|o| kurbo::Affine::scale(1.0 / MM) * o.clone())

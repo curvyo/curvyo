@@ -1,7 +1,7 @@
 //! The trace values (`specs/0025-raster-trace` criteria 41, 59, 60; `specs/0089` adrs.md §7):
 //! the choices, the presets, the values one trace takes and the geometry they map to.
 
-use curvyo_document_core::Length;
+use crate::units::Mm;
 
 use crate::schema::{
     DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_TOLERANCE_PX, MAX_SPECKS_MM,
@@ -121,7 +121,7 @@ impl Preset {
         TraceParams {
             smooth: self.smooth,
             tolerance: PixelLength::from_px(self.tolerance_px),
-            specks: Length::from_mm(self.specks_mm),
+            specks: Mm::from_mm(self.specks_mm),
             corners: self.corners,
             upscale: self.upscale,
             denoise: self.denoise,
@@ -211,7 +211,7 @@ pub struct TraceParams {
     /// The largest distance of an outline from the calmed pixel border, source px.
     pub tolerance: PixelLength,
     /// Regions and holes whose area is below the square of this side are removed.
-    pub specks: Length,
+    pub specks: Mm,
     /// 0 to 100; higher means a bend becomes a sharp corner more readily.
     pub corners: u8,
     /// The 2x copy before tracing.
@@ -234,7 +234,7 @@ impl TraceParams {
             threshold,
             smooth: DEFAULT_SMOOTH,
             tolerance: PixelLength::from_px(DEFAULT_TOLERANCE_PX),
-            specks: Length::from_mm(DEFAULT_SPECKS_MM),
+            specks: Mm::from_mm(DEFAULT_SPECKS_MM),
             corners: DEFAULT_CORNERS,
             upscale: Upscale::Off,
             denoise: Denoise::Off,
@@ -442,9 +442,9 @@ mod tests {
     #[test]
     fn specks_are_clamped() {
         let mut params = TraceParams::with_threshold(128);
-        params.specks = Length::from_mm(f64::NAN);
+        params.specks = Mm::from_mm(f64::NAN);
         assert!(params.specks_mm().abs() < f64::EPSILON);
-        params.specks = Length::from_mm(99.0);
+        params.specks = Mm::from_mm(99.0);
         assert!((params.specks_mm() - 10.0).abs() < f64::EPSILON);
     }
 

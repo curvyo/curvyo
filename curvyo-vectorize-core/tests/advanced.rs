@@ -19,7 +19,7 @@ mod common;
 
 use common::quality::{Noise, measure, small_text};
 use common::{Picture, area, at_96_dpi, params, render, run};
-use curvyo_document_core::Affine;
+use curvyo_vectorize_core::PixelMap;
 use curvyo_vectorize_core::{Denoise, TraceParams, Upscale, auto_threshold};
 use kurbo::Shape;
 
@@ -141,7 +141,7 @@ fn denoise_low_removes_ringing_and_noise() {
         .collect();
     let jpeg = Picture::grey(200, 120, &levels);
     let threshold = auto_threshold(jpeg.raster());
-    let noisy = run(&jpeg, Affine::IDENTITY, &params(threshold, 80, 0.0));
+    let noisy = run(&jpeg, PixelMap::IDENTITY, &params(threshold, 80, 0.0));
     assert!(
         noisy.counts.paths > 1,
         "the fixture has specks without Denoise"
@@ -150,7 +150,7 @@ fn denoise_low_removes_ringing_and_noise() {
         denoise: Denoise::Low,
         ..params(threshold, 80, 0.0)
     };
-    let result = run(&jpeg, Affine::IDENTITY, &p);
+    let result = run(&jpeg, PixelMap::IDENTITY, &p);
     assert_eq!(result.counts.paths, 1, "{:?}", result.counts);
     let mut max = 0.0_f64;
     for seg in result.outlines[0].segments() {
@@ -175,7 +175,7 @@ fn upscale_auto_follows_the_4x_reference_closer() {
             upscale,
             ..params(threshold, 80, 0.0)
         };
-        let result = run(&small, Affine::IDENTITY, &p);
+        let result = run(&small, PixelMap::IDENTITY, &p);
         let in_4x: Vec<kurbo::BezPath> = result
             .outlines
             .iter()
@@ -231,7 +231,7 @@ fn a_noisy_photograph_traces_with_every_preset() {
 
 /// Outlines of the logo under `map`, with Upscale Off and Auto (Auto applies below 1 Mpx):
 /// both must land at the same millimetre positions, whatever offset or rotation the frame has.
-fn upscale_matches_off_under(map: Affine) {
+fn upscale_matches_off_under(map: PixelMap) {
     let trace_with = |upscale| {
         let p = TraceParams {
             upscale,
@@ -260,7 +260,7 @@ fn upscale_matches_off_under(map: Affine) {
 #[test]
 fn upscale_keeps_the_frame_offset() {
     let s = common::MM_PER_PX_96;
-    upscale_matches_off_under(Affine::new(s, 0.0, 0.0, s, 120.0, -45.0));
+    upscale_matches_off_under(PixelMap::new([s, 0.0, 0.0, s, 120.0, -45.0]));
 }
 
 /// Upscale keeps the picture where its frame puts it: a frame with offset and rotation.
@@ -268,12 +268,12 @@ fn upscale_keeps_the_frame_offset() {
 fn upscale_keeps_a_rotated_frame_offset() {
     let s = common::MM_PER_PX_96;
     let (sin, cos) = 30f64.to_radians().sin_cos();
-    upscale_matches_off_under(Affine::new(
+    upscale_matches_off_under(PixelMap::new([
         s * cos,
         s * sin,
         -s * sin,
         s * cos,
         80.0,
         150.0,
-    ));
+    ]));
 }

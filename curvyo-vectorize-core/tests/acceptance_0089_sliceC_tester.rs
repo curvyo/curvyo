@@ -22,9 +22,9 @@
     clippy::needless_pass_by_value
 )]
 
+use curvyo_vectorize_core::{Mm, PixelMap};
 use std::ops::ControlFlow;
 
-use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{
     DEFAULT_PICK_TOLERANCE, MAX_SWATCHES, METHOD_PARAMS, ParamKind, Raster, Rgb8, Selection,
     Swatches, TraceParams, TraceResult, selected, suggest_background, trace,
@@ -49,8 +49,8 @@ impl Pic {
     }
 }
 
-fn px_map() -> Affine {
-    Affine::new(MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0)
+fn px_map() -> PixelMap {
+    PixelMap::new([MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0])
 }
 
 /// A picture whose pixel (x, y) is `f(x, y)` as RGBA.
@@ -100,7 +100,7 @@ fn base(selection: Selection) -> TraceParams {
     TraceParams {
         selection,
         // Nothing but the test shapes is removed as a speck.
-        specks: curvyo_document_core::Length::from_mm(0.0),
+        specks: Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     }
 }
