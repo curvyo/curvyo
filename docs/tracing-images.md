@@ -32,8 +32,8 @@ For an image over 4 megapixels the preview is always the reduced copy (a screen 
 "Preview from a reduced copy"); the counts are those of the copy. Create paths then traces the
 full picture with the progress in the button at once; the drawing is not changed until it finishes.
 
-If a trace fails, the button says "Failed" with a red ring, with a **Retry** button (Enter on the
-canvas retries too); its tooltip, also read out by a screen reader, gives the reason, for example
+If a trace fails, the button says "Failed", with a **Retry** button (Enter on the
+canvas retries too); Retry and Analyse always run on a working trace worker, a fresh one after a failure; its tooltip, also read out by a screen reader, gives the reason, for example
 "Trace failed: out of memory at 16 Mpx. Your drawing is unchanged." The values stay; "Failed"
 goes with the next successful trace, a changed value, another image or leaving the tool.
 
@@ -118,7 +118,8 @@ Advanced block, sets them back to the analysis in one go (it is no History step;
 available, and with nothing changed it sets the same values again). If you change any setting
 before the analysis has answered, its answer is not applied to this image; Analyse applies it on
 request. If the analysis fails, the image keeps its automatic Threshold (a screen reader hears
-"Analysis failed · automatic Threshold used") until the next Analyse or image.
+"Analysis failed · automatic Threshold used") until the next Analyse or image; Analyse asks a fresh
+worker, so it always answers.
 Several selected images use the shown image's analysis.
 
 ## Settings
@@ -352,8 +353,11 @@ colour that is already there adds nothing (a screen reader hears "Same as #3366C
 colours the palette is exactly the picked colours beside the pipette and the field shows their
 number.
 
-The **palette** is the row of swatches right after the palette pipette, one per colour, largest
-area first, colours picked with the palette pipette first. The swatches are the picked colours of
+The **palette** is the row of swatches right after the palette pipette, one per colour of the
+result, largest area first, colours picked with the palette pipette first. A picked colour takes
+one of the Colours; the others go to the other colours of the image. A part that traces nothing
+yet (no mask paths, or covered by another part) shows its own picked colours: the palette pipette
+adds to them, the x removes one, and they apply when the part gets paths. The swatches are the picked colours of
 Pick colours: 20 px squares 4 px apart, the row as wide as its colours, so the bar does not grow a
 row for them (with Pick colours there is no palette row; the picked colours sit beside the pipette
 in the bar). Pointing at a swatch fades it and shows an x; its tooltip gives its colour code and

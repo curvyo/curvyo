@@ -1184,3 +1184,28 @@ unchanged (Enter / Space exclude, Shift+Enter, Delete, Backspace delete). Pick c
 With Multicolour the palette row is the active part's: a part without paths, or one another part covers completely,
 adds nothing and shows no palette. A chip pick joins the parts again from the kept results, so the row shows the new
 active part's colours and its x and the palette pipette change that part's settings.
+
+### 27.11 Every colour in the row; a part's own colours before it has paths; Analyse always answers (customer 2026-11-10)
+
+- **The palette row lists every colour of the active part's result:** the palette pipette's colours first, then the
+  others by area. A picked colour takes one of the Colours and the others go to the other colours of the image: with
+  Colours 3 and red picked, red, blue and black, not red and a blend of blue and black. Picking a colour the
+  palette already holds never costs a slot.
+- **A part without paths** (no mask paths yet, or covered by another part) traces nothing and shows no result
+  palette, but its own colours: the palette pipette's colours (or its kept palette) as swatches with the x. The
+  palette pipette adds to them and the x removes one; they apply when the part gets paths. Another part's colours
+  are never shown. Pick colours shows the part's picked colours beside its pipette as before.
+- **Failed is a plain state of the Trace button**, as Stopped: the alert glyph and "Failed" in the blue button, no
+  red ring; Retry beside it. The reason stays the tooltip and the hidden alert. The same for Recognise's button.
+- **Analyse and Retry always answer:** a worker that answered with an error (its wasm may have trapped), raised one
+  or sent an unreadable reply is ended, and the next job runs on a fresh worker; a worker that does not start within
+  20 s is replaced once before its jobs fail; an analysis that gets no answer within 30 s is asked of a fresh worker
+  once; a job stopped while its worker starts is never sent, so the next job does not wait behind it.
+
+### 27.12 The Exclude glyph follows Ctrl at rest (customer 2026-11-10)
+
+The release of Ctrl does arrive in the desktop webview (WebKitGTK), but its own key-up still reports Ctrl as held
+(`ctrlKey: true`), so the glyph stayed until the pointer moved. The glyph follows the editor's modifier tracker
+(`lib/keyModifiers.ts`): Ctrl (Cmd) is held while one of its keys is down, by the key, not by the event's flag; a
+pointer event's flags correct it, and a window blur or a hidden page forgets it. The x comes back on the release,
+with the pointer at rest. §27.9's "every pointer move re-reads the modifier" stays as the fallback.
