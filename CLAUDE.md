@@ -28,8 +28,10 @@ mobile companion later. Loaded into every session: keep it short, details live i
 | `implementer` | `plan.md`, builds one story test-first | scope, criteria |
 | `ux-engineer` | design system, UX notes, UI review | domain logic |
 | `tester` | acceptance tests from the spec, full gate, PASS/FAIL | production code |
+| `refactorer` | behaviour-preserving moves, renames, splits, dead-code removal | features, API or format changes |
 
-Agent definitions: `.claude/agents/`. Subagents report in at most ~30 lines plus file paths,
+Each role is a playbook in `docs/playbooks/<role>.md`; `.claude/agents/<role>.md` only sets model and
+effort and points to it. Subagents report in at most ~30 lines plus file paths,
 never spawn their own subagents, and never open PRs (the lead does).
 
 ## 3. Decide or ask
@@ -80,10 +82,12 @@ until its base is merged, is rebased onto `main`, then gets its PR.
 ## 4a. Tokens: model, machine, gate
 
 - **Model per task** (role default in `.claude/agents/`, the lead overrides per dispatch):
-  Haiku for mechanical work (clean rebases, dependency/advisory bumps, status rows, lint fixes
-  in tests, watching CI); Sonnet for tester, UX notes, spec drafts, browser checks, frontend
-  wiring after finished UX notes; Opus for lead, architect and core logic (document model,
-  format, geometry, text engine, sync), and for the tester on format or document-model changes.
+  Haiku for `tester`, `refactorer` and mechanical work (clean rebases, dependency/advisory
+  bumps, status rows, lint fixes in tests, watching CI); Sonnet (medium) for `implementer`,
+  `product-owner` drafts, browser checks, frontend wiring after finished UX notes; Opus (high)
+  for lead, `architect`, `ux-engineer` and core logic (document model, format, geometry, text
+  engine, sync, when the lead builds it itself), and for the tester on format or document-model
+  changes.
   **Escalate** to Fable only after two failed attempts on the same problem, with the failure
   handed over; never as a default.
 - **Tester on its own VM** (`navi-curvyo`, plain clone `~/curvyo`): the lead sends the branch
@@ -156,4 +160,4 @@ fix it, never work around it. CI also reports the editor wasm size (`metrics/was
 - CI: host gate on ubuntu plus wasm32 builds on every PR; Windows and macOS nightly only.
 - Renovate updates dependencies; the lead batches them into one weekly PR.
 - Code navigation: ProjectAtlas MCP (`projectatlas init` once, `scan` after a pull or switch;
-  see `.claude/agents/implementer.md`).
+  see `docs/playbooks/atlas.md`).
