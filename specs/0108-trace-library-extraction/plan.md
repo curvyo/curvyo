@@ -113,6 +113,17 @@ Default: keep the workspace licence.
 **Not asked (decided, vetoable at the demo) (Proposal):** font matching stays in Curvyo; shapes
 are returned as plain data; no behaviour change in the demo; no hard size limits.
 
-## Tools used for the plan
-`ponytail-audit` is the bloat pass of slice 0. The pstack skills are not installed here (only
-`setup-pstack`, which writes Cursor rules); slice 0 uses `ponytail-audit` and `code-simplification`.
+## Skills used per slice (ponytail and pstack, from `~/.claude/skills`)
+- Slice 0: `ponytail-audit` for the inventory; pstack `principle-subtract-before-you-add` (delete
+  before moving), `principle-laziness-protocol`, `principle-minimize-reader-load` and
+  `principle-type-system-discipline` for what to split or simplify.
+- Slice 1: pstack `blast-radius` to prove the one fact the change is safe because of (the goldens
+  stay byte-identical, native and wasm), as a script that runs the real code.
+- Slices 2 and 3: pstack `architect` to sketch the crate's types and signatures first, with
+  `principle-boundary-discipline` (guards only at the crate's entry points) and
+  `principle-model-the-domain` (plain-data shape results); `principle-migrate-callers-then-delete-legacy-apis`
+  (no re-exports, old crates deleted in the same series).
+- Slice 4: `ponytail-review` on the diff; pstack `unslop` and `no-comments` on the moved
+  doc comments.
+- Before the PR: pstack `interrogate` (adversarial multi-model review) on the crate's public API
+  and the adapter, and `principle-prove-it-works` in Chromium.
