@@ -67,8 +67,8 @@ whole move is testable (CLAUDE.md §4): the trace in the demo behaves exactly as
    files; history stays with `git log --follow`. Re-export nothing from the old crates; fix the
    callers. Remove the two empty old crates. ADR (new) amends 0011, 0023, 0028 by note.
 4. **Shrink the glue.** One adapter module in `ui-core`, one thin forwarding layer in
-   `editor-wasm`; delete the per-feature `*_glue` files that only rename calls. Target: wasm
-   glue below 1,000 lines (from 2,200), `trace_*` in `ui-core` below 1,500.
+   `editor-wasm`; delete the per-feature `*_glue` files that only rename calls. No line limit (customer, 2026-11-10): as lean as
+   is reasonable, but everything keeps working. Report the line counts before and after.
 5. **Extraction rehearsal (no new repo yet).** In a scratch directory, copy the crate out with
    `git subtree split`, build and test it alone on native and `wasm32`, and run the dependency
    and licence check (`cargo deny`). Output: the exact steps and a CI file for the new repo
