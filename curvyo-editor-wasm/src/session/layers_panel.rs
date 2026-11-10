@@ -547,6 +547,13 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
         // through, read-only inner rows, and the rows that are no document node.
         "via": row.via,
         "readOnly": row.read_only,
+        // A fixture row under the Fixtures row: its full id, kind word and Active state
+        // (`specs/0102` criterion 12); the calls take the full id text back.
+        "fixture": row.fixture.map(|f| json!({
+            "id": row.id.full_id(),
+            "kind": f.word,
+            "active": f.active,
+        })),
         "rowAction": match row.kind {
             RowKind::Layer => "select-contents",
             // `0050` criterion 38: a clone row's action is Select original (`0049`).

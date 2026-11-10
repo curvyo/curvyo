@@ -144,6 +144,7 @@ impl CloneDrop {
             badge: badge_of(self.mode),
             target: self.target.clone(),
             faint: false,
+            fit: None,
         }
     }
 

@@ -1,18 +1,14 @@
 //! Independent acceptance tests for `specs/0093-laser-workbench-shell` at the extension contract
-//! the shell dispatches through (ADR 0034): the compiled-in Laser manifest (criteria 2, 9, 11b),
+//! the shell dispatches through (ADR 0034): the compiled-in Laser manifest (criteria 2, 11b),
 //! the per-user disable list (11b), the Engraved grid outline as a property over its whole
 //! parameter range (9) and the overhang notice text (8). No network, no G-code (15).
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
 use curvyo_document_core::{DocumentSize, Point};
 use curvyo_extension_core::{Block, NoticeContext, Param, StoredParams};
-use curvyo_ui_core::{ExtensionSettings, fixture_drawing, manifest, manifests, notice};
-use proptest::prelude::*;
+use curvyo_ui_core::{ExtensionSettings, manifest, manifests, notice};
 
 const LASER: &str = "curvyo.laser";
-const GRID: &str = "curvyo.laser/engraved_grid";
-const TOL: f64 = 1e-6;
-
 fn grid_defaults() -> StoredParams {
     let m = manifest(LASER).unwrap();
     let kind = m
@@ -121,107 +117,6 @@ fn ac11b_a_damaged_settings_file_falls_back_to_everything_enabled() {
         !s.is_enabled(LASER),
         "an unknown key does not lose the disable list"
     );
-}
-
-// ---- criterion 9: the Engraved grid -------------------------------------------------------------
-
-#[test]
-fn ac9_the_default_grid_over_400_by_300_is_41_by_31_lines_of_0_1_mm() {
-    let d = fixture_drawing(GRID, &grid_defaults(), area(400.0, 300.0));
-    let verticals = d.lines.iter().filter(|l| l.start.x == l.end.x).count();
-    let horizontals = d.lines.iter().filter(|l| l.start.y == l.end.y).count();
-    assert_eq!((verticals, horizontals), (41, 31));
-    assert!((d.line_width.as_mm() - 0.1).abs() < TOL);
-}
-
-#[test]
-fn ac9_an_unknown_kind_or_process_draws_nothing() {
-    for kind in [
-        "curvyo.laser/pocket",
-        "acme.cnc/engraved_grid",
-        "engraved_grid",
-        "",
-        "/",
-    ] {
-        assert!(
-            fixture_drawing(kind, &grid_defaults(), area(400.0, 300.0))
-                .lines
-                .is_empty(),
-            "{kind:?}"
-        );
-    }
-}
-
-#[test]
-fn ac9_damaged_parameters_read_as_defaults_or_bounds_and_never_explode() {
-    let damaged: Vec<StoredParams> = vec![
-        StoredParams::new(),
-        serde_json::from_value(serde_json::json!({"spacing": {"mm": 0.0}})).unwrap(),
-        serde_json::from_value(serde_json::json!({"spacing": {"mm": -10.0}})).unwrap(),
-        serde_json::from_value(serde_json::json!({"spacing": "dense"})).unwrap(),
-        serde_json::from_value(serde_json::json!({"spacing": {"mm": 1e-300}})).unwrap(),
-        serde_json::from_value(serde_json::json!({"spacing": {"in": 1.0}})).unwrap(),
-        serde_json::from_value(serde_json::json!({"origin_x": {"mm": 1e300}})).unwrap(),
-    ];
-    for p in &damaged {
-        let d = fixture_drawing(GRID, p, area(400.0, 300.0));
-        // At most the minimum spacing's count (0.5 mm): 801 + 601.
-        assert!(d.lines.len() <= 801 + 601, "{p:?}: {} lines", d.lines.len());
-        for l in &d.lines {
-            for q in [l.start, l.end] {
-                assert!(q.x.is_finite() && q.y.is_finite(), "{p:?}");
-            }
-        }
-    }
-}
-
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(256))]
-
-    /// Every line lies on the output page, spans it whole, sits on the origin's lattice, and no
-    /// lattice line inside the area is missing.
-    #[test]
-    fn ac9_grid_lines_cover_the_area_on_the_lattice_and_stay_inside(
-        spacing in 0.5f64..500.0,
-        ox in -2000.0f64..2000.0,
-        oy in -2000.0f64..2000.0,
-        w in 1.0f64..2000.0,
-        h in 1.0f64..2000.0,
-    ) {
-        let d = fixture_drawing(GRID, &params(spacing, ox, oy), area(w, h));
-        let mut xs = Vec::new();
-        let mut ys = Vec::new();
-        for l in &d.lines {
-            let vertical = (l.start.x - l.end.x).abs() < TOL;
-            let horizontal = (l.start.y - l.end.y).abs() < TOL;
-            prop_assert!(vertical ^ horizontal, "axis-parallel: {l:?}");
-            for q in [l.start, l.end] {
-                prop_assert!(q.x >= -TOL && q.x <= w + TOL && q.y >= -TOL && q.y <= h + TOL,
-                    "inside the work area: {q:?}");
-            }
-            let (at, origin) = if vertical {
-                prop_assert!((l.start.y.min(l.end.y)).abs() < TOL && (l.start.y.max(l.end.y) - h).abs() < TOL);
-                xs.push(l.start.x);
-                (l.start.x, ox)
-            } else {
-                prop_assert!((l.start.x.min(l.end.x)).abs() < TOL && (l.start.x.max(l.end.x) - w).abs() < TOL);
-                ys.push(l.start.y);
-                (l.start.y, oy)
-            };
-            let k = (at - origin) / spacing;
-            prop_assert!((k - k.round()).abs() < 1e-6, "on the lattice: {at} from {origin} by {spacing}");
-        }
-        let expected = |origin: f64, extent: f64| {
-            let first = ((0.0 - origin) / spacing).ceil();
-            let last = ((extent - origin) / spacing).floor();
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let n = if last >= first { (last - first) as usize + 1 } else { 0 };
-            n
-        };
-        // Lines exactly on an edge may fall either way within the tolerance.
-        prop_assert!(xs.len().abs_diff(expected(ox, w)) <= 1, "{} vs {}", xs.len(), expected(ox, w));
-        prop_assert!(ys.len().abs_diff(expected(oy, h)) <= 1, "{} vs {}", ys.len(), expected(oy, h));
-    }
 }
 
 // ---- criterion 8: overhang notice ---------------------------------------------------------------

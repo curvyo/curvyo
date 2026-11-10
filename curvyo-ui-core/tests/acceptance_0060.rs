@@ -231,6 +231,8 @@ fn ac2_ac5_disabled_kind_or_temporary_suppression_drops_held_markers() {
             TargetKind::Guide => disabled.guides = false,
             TargetKind::Box => disabled.objects = false,
             TargetKind::Page => disabled.page = false,
+            // `0102`: fixture targets have no switch of their own here (gathered or not).
+            TargetKind::Fixture => unreachable!("not in the list"),
         }
         assert!(resolve(&disabled, &targets, &probe, &mut state).is_empty());
         assert!(state.is_empty());

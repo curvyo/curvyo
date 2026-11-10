@@ -38,9 +38,14 @@ impl Session {
         let profiles = &self.manufacturing.machine.profiles;
         let copy = &active.read.copy;
         let record = copy.id.as_deref().and_then(|id| profiles.find(id));
+        // "Differs from profile" compares the fixture set too, derived on every read (`0102`
+        // criterion 29).
+        let set = self.active_fixture_set();
         let state = match record {
             None => Some("missing"),
-            Some(record) if differs(copy, active.page, record) => Some("differs"),
+            Some(record) if differs(copy, active.page, record) || record.fixtures != set => {
+                Some("differs")
+            }
             Some(_) => None,
         };
         let user = record.filter(|record| !record.is_builtin());
@@ -65,6 +70,7 @@ impl Session {
             "builtin": copy.id.as_deref() == Some(GENERIC_LASER_ID),
             "state": state,
             "can_update": state == Some("differs") && user.is_some(),
+            "fixtures_in_profile": record.map_or(0, |record| record.fixtures.len()),
             "name_notice": active.read.name_damaged.then_some(DAMAGED_NAME_NOTICE),
             "connection": connection,
             "library_notices": profiles.load_notices(),

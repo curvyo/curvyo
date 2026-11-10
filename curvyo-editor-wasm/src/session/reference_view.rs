@@ -59,21 +59,27 @@ impl Session {
 
     /// The chip reports its mode: Relative or Absolute (the marks exist in Absolute only).
     pub fn set_move_chip_absolute(&mut self, absolute: bool) {
-        if let Some(entry) = self.select.move_entry_mut() {
+        if let Some(entry) = self.fixture_move_mut() {
+            entry.set_absolute(absolute);
+        } else if let Some(entry) = self.select.move_entry_mut() {
             entry.set_absolute(absolute);
         }
     }
 
     /// The chip reports the reference point its Reference control chose.
     pub fn set_move_reference(&mut self, reference: ReferencePoint) {
-        if let Some(entry) = self.select.move_entry_mut() {
+        if let Some(entry) = self.fixture_move_mut() {
+            entry.set_reference(reference);
+        } else if let Some(entry) = self.select.move_entry_mut() {
             entry.set_reference(reference);
         }
     }
 
     /// The chip reports the radio with the pointer or the focus, `None` when there is none.
     pub fn set_move_radio_hover(&mut self, hover: Option<ReferencePoint>) {
-        if let Some(entry) = self.select.move_entry_mut() {
+        if let Some(entry) = self.fixture_move_mut() {
+            entry.set_radio_hover(hover);
+        } else if let Some(entry) = self.select.move_entry_mut() {
             entry.set_radio_hover(hover);
         }
     }

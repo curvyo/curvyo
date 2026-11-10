@@ -25,6 +25,9 @@ pub enum TargetKind {
     Box,
     /// One of the page's six fractions.
     Page,
+    /// A snap point or grid line of an Active laser fixture (`specs/0102-laser-fixtures`
+    /// criterion 27). The caller gathers these only while the document's Fixtures switch is on.
+    Fixture,
 }
 
 impl TargetKind {
@@ -36,6 +39,7 @@ impl TargetKind {
             Self::Guide => settings.guides,
             Self::Box => settings.objects,
             Self::Page => settings.page,
+            Self::Fixture => true,
         }
     }
 }

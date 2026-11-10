@@ -1,0 +1,115 @@
+{
+  "armed": null,
+  "can_add_grid": false,
+  "damage_notices": [
+    "1 value damaged on Stop 1."
+  ],
+  "rows": [
+    {
+      "active": true,
+      "can_add_slot": false,
+      "grid": {
+        "major_every": 4,
+        "origin_x_mm": 2.0,
+        "origin_y_mm": 0.0,
+        "spacing_mm": 5.0,
+        "tapes": {
+          "bottom": true,
+          "left": true,
+          "right": true,
+          "top": false
+        }
+      },
+      "id": "hhpykmt2rhhv3",
+      "kind": "grid",
+      "name": "Grid 1",
+      "slots": [],
+      "visible": true
+    },
+    {
+      "active": true,
+      "can_add_slot": true,
+      "grid": null,
+      "id": "bitkumn0sygw2",
+      "kind": "holder",
+      "name": "Holder 1",
+      "slots": [
+        {
+          "cx_mm": 30.0,
+          "cy_mm": 40.0,
+          "h_mm": 25.0,
+          "id": "jmwbnf98nodw2",
+          "name": "Slot 1",
+          "outside": false,
+          "shape": "rect",
+          "w_mm": 40.0
+        },
+        {
+          "cx_mm": 90.0,
+          "cy_mm": 40.0,
+          "h_mm": 30.0,
+          "id": "vyl1enauhbwy0",
+          "name": "Slot 2",
+          "outside": false,
+          "shape": "circle",
+          "w_mm": 30.0
+        },
+        {
+          "cx_mm": 118.0,
+          "cy_mm": 40.0,
+          "h_mm": 10.0,
+          "id": "zsa22u0rkn0x2",
+          "name": "Slot 3",
+          "outside": true,
+          "shape": "rect",
+          "w_mm": 10.0
+        }
+      ],
+      "visible": true
+    },
+    {
+      "active": false,
+      "can_add_slot": false,
+      "grid": null,
+      "id": "33ps6gw1d1ty0",
+      "kind": "clamp",
+      "name": "Clamp 1",
+      "slots": [],
+      "visible": true
+    },
+    {
+      "active": true,
+      "can_add_slot": false,
+      "grid": null,
+      "id": "b7sjz8i98rpy0",
+      "kind": "stop",
+      "name": "Stop 1",
+      "slots": [],
+      "visible": false
+    },
+    {
+      "active": true,
+      "can_add_slot": false,
+      "grid": null,
+      "id": "jbvas14h3hmy0",
+      "kind": "screw",
+      "name": "Screw 1",
+      "slots": [],
+      "visible": true
+    },
+    {
+      "active": true,
+      "can_add_slot": false,
+      "grid": null,
+      "id": "6sx96c0dfdde2",
+      "kind": "unknown",
+      "name": "Pocket 1",
+      "slots": [],
+      "visible": true
+    }
+  ],
+  "selected": "bitkumn0sygw2",
+  "selected_slot": null,
+  "selection_announcement": "Holder 1 selected, 120.0 by 80.0 mm.",
+  "snapping_fixtures": true
+}

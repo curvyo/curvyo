@@ -7,8 +7,7 @@
 
 use std::collections::BTreeSet;
 
-use curvyo_document_core::DocumentSize;
-use curvyo_extension_core::{FixtureDrawing, Manifest, NoticeContext, StoredParams};
+use curvyo_extension_core::{Manifest, NoticeContext};
 use serde::{Deserialize, Serialize};
 
 /// Every compiled-in extension's manifest, in list order.
@@ -21,25 +20,6 @@ pub fn manifests() -> Vec<Manifest> {
 #[must_use]
 pub fn manifest(id: &str) -> Option<Manifest> {
     manifests().into_iter().find(|manifest| manifest.id == id)
-}
-
-/// The outline of a fixture of the stored kind `kind` (`<process>/<kind>`) over `work_area`; an
-/// unknown process or kind draws nothing (ADR 0033 §4).
-#[must_use]
-pub fn fixture_drawing(
-    kind: &str,
-    params: &StoredParams,
-    work_area: DocumentSize,
-) -> FixtureDrawing {
-    let Some((process, kind)) = kind.split_once('/') else {
-        return FixtureDrawing::empty();
-    };
-    match process {
-        curvyo_laser_core::PROCESS_ID => {
-            curvyo_laser_core::fixture_drawing(kind, params, work_area)
-        }
-        _ => FixtureDrawing::empty(),
-    }
 }
 
 /// The text of the notice `id` of `process`, `None` while it does not apply.
@@ -99,17 +79,6 @@ mod tests {
         assert_eq!(ids, vec!["curvyo.laser"]);
         assert!(manifest("curvyo.laser").is_some());
         assert!(manifest("example.cnc").is_none());
-    }
-
-    #[test]
-    fn fixtures_of_unknown_processes_or_kinds_draw_nothing() {
-        let area = DocumentSize::from_mm(100.0, 100.0);
-        let params = StoredParams::new();
-        let lines = |kind| fixture_drawing(kind, &params, area).lines.len();
-        assert_eq!(lines("curvyo.laser/engraved_grid"), 22);
-        assert_eq!(lines("curvyo.laser/pins"), 0);
-        assert_eq!(lines("example.cnc/vice"), 0);
-        assert_eq!(lines("garbage"), 0);
     }
 
     #[test]

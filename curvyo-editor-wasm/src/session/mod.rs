@@ -60,6 +60,7 @@ mod edit_context;
 mod edit_context_tests;
 mod edit_context_view;
 mod file_chord;
+mod fixtures;
 mod flip;
 mod formats;
 mod fracture;
@@ -112,6 +113,9 @@ mod offset_view;
 mod open_error;
 mod operations;
 #[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
+pub use fixtures::{
+    FitCue, FixtureKindView, FixtureLabel, FixtureRow, FixturesView, GridValues, SlotRow, TapesView,
+};
 pub use operations::OperationsViewMode;
 mod page_drag;
 mod page_tree_panel;
@@ -642,6 +646,8 @@ pub struct Session {
     manufacturing: manufacturing::ManufacturingState,
     /// The laser operations of the active laser page (`operations/`).
     operations: operations::OperationsState,
+    /// The laser fixtures of the active laser page (`fixtures/`, `specs/0102-laser-fixtures`).
+    fixtures: fixtures::FixtureState,
 }
 
 impl Session {
@@ -748,6 +754,7 @@ impl Session {
             tiling: None,
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
+            fixtures: fixtures::FixtureState::default(),
         }
     }
 
@@ -849,6 +856,7 @@ impl Session {
             tiling: None,
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
+            fixtures: fixtures::FixtureState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -984,6 +992,12 @@ impl Session {
                 }
                 return;
             }
+            // A press on another laser page's fixture only activates that page (`0102` crit. 11).
+            let page_before = if this.tool == Tool::Select {
+                this.active_page().id
+            } else {
+                String::new()
+            };
             this.press_page_view(point);
             this.sync_workbench();
 
@@ -1011,6 +1025,11 @@ impl Session {
                 return;
             }
             if this.page_drag_start(point) {
+                return;
+            }
+            // The outline of a fixture of the active laser page (`specs/0102` criteria 8 to 11).
+            if this.fixture_press(point, &page_before) {
+                this.button_down = true;
                 return;
             }
             if this.refuse_drawing_into_layer() {
@@ -1101,6 +1120,9 @@ impl Session {
             return;
         }
         if self.text_path_pointer_move(point) {
+            return;
+        }
+        if self.tool == Tool::Select && self.fixture_drag_move(point) {
             return;
         }
         match self.tool {
@@ -1219,6 +1241,9 @@ impl Session {
             if std::mem::take(&mut this.clone_drops.escaped) {
                 return;
             }
+            if this.tool == Tool::Select && this.fixture_drag_release(point) {
+                return;
+            }
             this.release_page_view(point);
             match this.tool {
                 Tool::Select => {
@@ -1301,6 +1326,11 @@ impl Session {
             // 2026-10-24).
             if matches!(this.tool, Tool::Select | Tool::Text) && this.open_text_path_entry_at(point)
             {
+                return DoubleClickHint::None;
+            }
+            // On a selected fixture's handle: its chip (`specs/0102-laser-fixtures` adrs.md
+            // §6a.4).
+            if this.tool == Tool::Select && this.open_fixture_entry_at_press() {
                 return DoubleClickHint::None;
             }
             match this.tool {

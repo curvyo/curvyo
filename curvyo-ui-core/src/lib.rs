@@ -73,7 +73,7 @@ pub mod key_backup_text;
 mod layer_move;
 mod layer_rows;
 mod page_tree_rows;
-pub use page_tree_rows::{PageTree, PlacedPageRow};
+pub use page_tree_rows::{FixtureTreeRow, PageTree, PlacedPageRow};
 mod layer_text;
 mod linked_clone;
 mod marquee;
@@ -298,7 +298,7 @@ pub use document_presets_view::{
     PresetEntry, PresetGroupView, PresetsView, orientation_swap, preset_pick_size, presets_view,
 };
 pub use ellipse_tool::EllipseTool;
-pub use extensions::{ExtensionSettings, fixture_drawing, manifest, manifests, notice};
+pub use extensions::{ExtensionSettings, manifest, manifests, notice};
 pub use face_style_pick::{
     Greyed, Pressed, StyleButton, StyleButtons, StylePress, WEIGHT_STEPS, family_target,
     family_tile, italic_target, press_italic, press_weight, style_buttons, weight_target,
@@ -370,8 +370,8 @@ pub use image_import_text::{
 pub use image_placement::{ImagePlacement, ImageTarget, STAGGER_MM, natural_size_mm, place_image};
 pub use layer_move::{Reorder, move_refusal_text, reorder_plans, unchanged_text};
 pub use layer_rows::{
-    Cause, Container, Expansion, Flags, LayerRow, LayerRows, RowFacts, RowKind, RowMark,
-    dimension_row_name, percent,
+    Cause, Container, Expansion, FixtureLine, Flags, LayerRow, LayerRows, RowFacts, RowKind,
+    RowMark, dimension_row_name, percent,
 };
 pub use layer_text::{
     DUPLICATE_FAILED_NOTICE, NothingToSelect, OpacityTarget, delete_locked_layer_notice,
@@ -587,7 +587,7 @@ pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,
 };
 pub use transform_entry::{
-    EntryField, EntryKind, EntryOutcome, InvalidReason, TransformEntry, format_degrees,
+    EntryField, EntryKind, EntryOutcome, InvalidReason, TransformEntry, format_degrees, format_mm,
     parse_entry_number,
 };
 pub use transform_handle_layout::{

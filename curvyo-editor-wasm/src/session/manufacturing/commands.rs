@@ -1,8 +1,10 @@
 //! The commands of a laser page (`0093` criteria 9, 10; `0098` criteria 4, 12): each is one
 //! history step recorded like every other command; values are clamped by the extension's schema.
 
-use curvyo_document_core::{FixtureAdd, Length, NewFixture, NewOutputPage, NodeId};
-use curvyo_extension_core::{FixtureKind, Param, ParamValue, WorkbenchContribution};
+use curvyo_document_core::{
+    ADD_OUTPUT_PAGE_COMMIT_LABEL, NewOutputPage, NodeId, PageCorner, ProfileChange,
+};
+use curvyo_extension_core::WorkbenchContribution;
 use curvyo_laser_core::{ProfileCopy, write_copy};
 
 use super::super::Session;
@@ -28,15 +30,38 @@ impl Session {
         let chosen = picked.is_some();
         let profile = picked.unwrap_or_else(|| self.initial_machine_profile());
         let copy = write_copy(&ProfileCopy::of(&profile));
+        // The page starts with the profile's fixture set in the same step (`0102` criterion 29).
         let page = self.recording_unguarded(|this| {
-            this.document
-                .add_output_page(NewOutputPage {
-                    process,
-                    label: workbench.label,
-                    profile: Some(&copy),
-                    work_area: profile.work_area,
-                })
-                .ok()
+            this.document.batch(ADD_OUTPUT_PAGE_COMMIT_LABEL, |d| {
+                let page = d
+                    .add_output_page(NewOutputPage {
+                        process,
+                        label: workbench.label,
+                        profile: Some(&copy),
+                        work_area: profile.work_area,
+                    })
+                    .ok()?;
+                if let (Some(id), false) = (page.kind.manufacturing(), profile.fixtures.is_empty())
+                {
+                    let origin = profile.values.origin;
+                    let anchor = PageCorner {
+                        right: origin.is_right(),
+                        bottom: origin.is_bottom(),
+                    };
+                    d.set_manufacturing_profile_and_fixtures(
+                        id,
+                        &copy,
+                        profile.work_area,
+                        anchor,
+                        ProfileChange::Pick,
+                        &profile.fixtures,
+                        // A page that has just been added owns no objects to carry.
+                        &curvyo_document_core::PageContents::new(),
+                    )
+                    .ok()?;
+                }
+                Some(page)
+            })
         })?;
         // A machine chosen in the Add page group is this computer's last pick (criterion 1).
         if chosen {
@@ -62,108 +87,9 @@ impl Session {
         }
         deleted
     }
-
-    /// Installs a fixture of `kind` with its defaults at the end of the active setup, named
-    /// "<Kind> N" (`0102` criterion 2). `None` for a kind the manifest does not declare.
-    pub fn add_fixture(&mut self, kind: &str) -> Option<NodeId> {
-        let manufacturing = self.active_manufacturing()?;
-        let contribution = workbench_of(&manufacturing.process)?;
-        let fixture = contribution.fixture_kind(kind)?;
-        let stored = format!("{}/{}", manufacturing.process, fixture.id);
-        let typed = curvyo_laser_core::FixtureKind::from_stored(&stored);
-        let add = match typed {
-            curvyo_laser_core::FixtureKind::Holder => FixtureAdd::Holder,
-            curvyo_laser_core::FixtureKind::Clamp => FixtureAdd::Clamp,
-            curvyo_laser_core::FixtureKind::Stop => FixtureAdd::Stop,
-            _ => FixtureAdd::Grid,
-        };
-        let params = Param::defaults(&fixture.params);
-        self.recording_unguarded(|this| {
-            this.document
-                .add_fixture(
-                    manufacturing.id,
-                    &NewFixture {
-                        add,
-                        kind: &stored,
-                        label: typed.word(),
-                        params: &params,
-                        matrix: None,
-                    },
-                )
-                .ok()
-        })
-    }
-
-    /// Removes the fixture `id` of the active manufacturing.
-    pub fn delete_fixture(&mut self, id: NodeId) -> bool {
-        if !self.fixture_of_active(id) {
-            return false;
-        }
-        self.recording_unguarded(|this| this.document.delete_fixture(id).is_ok())
-    }
-
-    /// Hides or shows the fixture `id` (criterion 10's eye button; one undo step).
-    pub fn set_fixture_visible(&mut self, id: NodeId, visible: bool) -> bool {
-        if !self.fixture_of_active(id) {
-            return false;
-        }
-        self.recording_unguarded(|this| {
-            this.document
-                .set_fixture_visible(id, visible)
-                .unwrap_or(false)
-        })
-    }
-
-    /// Sets the length parameter `key` of the fixture `id`, clamped into its bounds; the whole
-    /// parameter map is written in one step.
-    pub fn set_fixture_length(&mut self, id: NodeId, key: &str, value: Length) -> bool {
-        let Some(manufacturing) = self.active_manufacturing() else {
-            return false;
-        };
-        let Some(fixture) = manufacturing.fixtures.iter().find(|f| f.id == id) else {
-            return false;
-        };
-        let Some(contribution) = workbench_of(&manufacturing.process) else {
-            return false;
-        };
-        let Some(kind) = fixture_kind_of(&contribution, &manufacturing.process, &fixture.kind)
-        else {
-            return false;
-        };
-        let Some(accepted) = kind
-            .params
-            .iter()
-            .find(|param| param.key == key)
-            .and_then(|param| param.accept(ParamValue::Length(value)))
-        else {
-            return false;
-        };
-        let mut params = fixture.params.clone();
-        params.insert(key.to_owned(), accepted.to_stored());
-        self.recording_unguarded(|this| {
-            this.document
-                .set_fixture_params(id, &params)
-                .unwrap_or(false)
-        })
-    }
-
-    fn fixture_of_active(&self, id: NodeId) -> bool {
-        self.active_manufacturing()
-            .is_some_and(|m| m.fixtures.iter().any(|f| f.id == id))
-    }
 }
 
 /// The workbench contribution of the process `process`.
 pub(super) fn workbench_of(process: &str) -> Option<WorkbenchContribution> {
     curvyo_ui_core::manifest(process)?.workbench().cloned()
-}
-
-/// The fixture kind a stored `<process>/<kind>` names in this contribution.
-pub(super) fn fixture_kind_of<'a>(
-    contribution: &'a WorkbenchContribution,
-    process: &str,
-    stored: &str,
-) -> Option<&'a FixtureKind> {
-    let kind = stored.strip_prefix(process)?.strip_prefix('/')?;
-    contribution.fixture_kind(kind)
 }

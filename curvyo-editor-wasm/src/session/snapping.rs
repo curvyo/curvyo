@@ -30,6 +30,8 @@ pub struct SnappingDrag {
     boxes: Option<HashSet<NodeId>>,
     nodes: Option<HashSet<NodeId>>,
     anchors: HashSet<(NodeId, AnchorId)>,
+    /// The Active fixtures' targets of this drag, kept through a regather (`specs/0102`).
+    fixture_targets: Vec<curvyo_ui_core::SnapTarget>,
 }
 
 impl SnappingDrag {
@@ -62,6 +64,7 @@ impl SnappingDrag {
             boxes: exclusions.boxes.cloned(),
             nodes: exclusions.nodes.cloned(),
             anchors,
+            fixture_targets: Vec::new(),
         }
     }
 
@@ -132,6 +135,14 @@ impl SnappingState {
         }
     }
 
+    /// Adds the Active fixtures' targets to the drag in flight (`specs/0102` criteria 24, 27).
+    pub(super) fn set_fixture_targets(&mut self, extra: Vec<curvyo_ui_core::SnapTarget>) {
+        if let Some(drag) = &mut self.drag {
+            drag.fixture_targets = extra;
+            drag.targets = with_fixtures(&drag.targets, &drag.fixture_targets);
+        }
+    }
+
     /// Ends the drag (release, Escape, tool change).
     pub fn end_drag(&mut self) {
         self.drag = None;
@@ -140,6 +151,18 @@ impl SnappingState {
 
 mod records;
 pub use records::{SnappingSettingsRecord, SnappingToolbarRecord};
+
+/// `targets` without any fixture target, then `fixtures`.
+fn with_fixtures(targets: &SnapTargets, fixtures: &[curvyo_ui_core::SnapTarget]) -> SnapTargets {
+    let mut entries: Vec<curvyo_ui_core::SnapTarget> = targets
+        .entries()
+        .iter()
+        .filter(|t| t.kind != curvyo_ui_core::TargetKind::Fixture)
+        .copied()
+        .collect();
+    entries.extend_from_slice(fixtures);
+    SnapTargets::new(entries)
+}
 
 impl super::Session {
     /// Starts a snapping drag for the current selection, gathering targets from the current
@@ -167,6 +190,10 @@ impl super::Session {
             drag.grid_nodes = curvyo_ui_core::grid_snap_nodes(&read.nodes, &excluded_boxes);
         }
         self.snapping.version = Some(self.document.version());
+        let fixtures = self.fixture_snap_targets(false);
+        if !fixtures.is_empty() {
+            self.snapping.set_fixture_targets(fixtures);
+        }
     }
 
     /// Starts a snapping drag for shape creation, gathering targets from the current
@@ -258,6 +285,9 @@ impl super::Session {
                         anchors: Some(&drag.anchors),
                     },
                 );
+                if !drag.fixture_targets.is_empty() {
+                    drag.targets = with_fixtures(&drag.targets, &drag.fixture_targets);
+                }
                 drag.state.clear();
                 drag.pages = pages;
             }
@@ -374,6 +404,16 @@ impl super::Session {
     pub fn set_snapping_grid(&mut self, grid: bool) -> bool {
         let settings = self.document.snapping();
         self.set_snapping(curvyo_document_core::DocumentSnapping { grid, ..settings })
+    }
+
+    /// Sets the Fixtures target switch (`specs/0102-laser-fixtures` criterion 24): the register
+    /// `snapping_fixtures`, one step. Returns whether anything changed.
+    pub fn set_snapping_fixtures(&mut self, fixtures: bool) -> bool {
+        let settings = self.document.snapping();
+        self.set_snapping(curvyo_document_core::DocumentSnapping {
+            fixtures,
+            ..settings
+        })
     }
 
     /// Sets the grid snap point, `"centre"`, `"box"` or `"nodes"` (criterion 11). Returns

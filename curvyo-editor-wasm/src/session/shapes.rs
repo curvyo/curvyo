@@ -249,6 +249,10 @@ impl Session {
             return Some(readout);
         }
         if self.tool == Tool::Select {
+            // A screw knob of a laser fixture (`specs/0102` UX notes §4.4).
+            if let Some(readout) = self.fixture_readout() {
+                return Some(readout);
+            }
             return self.select_live_readout();
         }
         if self.tool == Tool::Node {

@@ -35,7 +35,7 @@ impl Session {
         let pages = self.shown_pages();
         let background = self.shown_background();
         let mut grids = self.grid_lists(&pages, background);
-        self.add_output_fixtures(&pages, &mut grids);
+        self.add_fixture_lists(&pages, &mut grids);
         let mut list = build_page_areas_with_grids(
             &pages,
             background,
@@ -69,6 +69,7 @@ impl Session {
         }
         list.extend(self.draw_list());
         list.extend(self.output_pages_overlay());
+        list.extend(self.fixture_overlay());
         list
     }
 

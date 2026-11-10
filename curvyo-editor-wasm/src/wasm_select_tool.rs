@@ -210,16 +210,20 @@ impl WasmSession {
     /// `negative`, `ratio-range`, `skew-range` or `too-large` (the
     /// chip stays open; criteria 19, 21, 27, 30, 31; 18, 19 of
     /// `unified-object-editing`; 11 of `edit-interaction-polish`).
-    /// `last_edited` is the index of the field edited last.
+    /// `last_edited` is the index of the field edited last. `third` is the text of a third
+    /// field: a laser stop's S chip (`specs/0102-laser-fixtures` criterion 23); absent otherwise.
     pub fn commit_transform_entry(
         &mut self,
         first: &str,
         second: &str,
         last_edited: u32,
+        third: Option<String>,
     ) -> String {
         let last = usize::try_from(last_edited).unwrap_or(0);
+        let third = third.unwrap_or_default();
         crate::wasm_move_entry::outcome_code(
-            self.session.commit_transform_entry(first, second, last),
+            self.session
+                .commit_transform_entry_fields(&[first, second, third.as_str()], last),
         )
     }
 

@@ -20,6 +20,8 @@ impl Session {
         if self.tool == super::Tool::Node {
             return self.node_select_all();
         }
+        // Select all never takes a fixture (`specs/0102` criterion 10).
+        self.clear_fixture_selection();
         let ids = self.page_selection_ids(&self.pickable_objects());
         let ids = self.units().widen(&ids);
         self.selection.set(&ids);

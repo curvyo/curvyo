@@ -23,6 +23,7 @@ mod dash_walk;
 mod decorations;
 mod document_area;
 mod fill;
+mod fixture_look;
 mod glyphs;
 mod grid_lines;
 mod group_box;
@@ -63,6 +64,10 @@ pub use decorations::{DecorationInput, Hovered};
 pub use document_area::{
     CheckerGrid, background_at, build_document_area, build_page_areas, build_page_areas_with_grids,
     checker_grid, checker_tone,
+};
+pub use fixture_look::{
+    BoardLook, FixtureLook, GridLook, ScrewLook, SlotLook, SlotOutline, StopLook, TapeLook,
+    TickLook, build_fixture_box, build_fixture_ghost, build_fixture_look, build_slot_cue,
 };
 pub use glyphs::{DrawList, Vertex};
 pub use grid_lines::{GridStroke, build_grid_lines, grid_ink};

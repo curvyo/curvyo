@@ -1,0 +1,10 @@
+{
+  "armed": null,
+  "can_add_grid": true,
+  "damage_notices": [],
+  "rows": [],
+  "selected": null,
+  "selected_slot": null,
+  "selection_announcement": null,
+  "snapping_fixtures": true
+}

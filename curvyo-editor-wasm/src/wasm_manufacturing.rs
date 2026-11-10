@@ -1,5 +1,6 @@
 //! Thin host bridge of laser pages (`specs/0093`, `specs/0098`): the kind list and the active
-//! laser page as JSON, and the commands of its Machine and Fixtures blocks.
+//! laser page as JSON, and the commands of its Machine block (the Fixtures block's are in
+//! `wasm_fixtures.rs`).
 
 use curvyo_document_core::Length;
 use wasm_bindgen::prelude::*;
@@ -53,31 +54,6 @@ impl WasmSession {
             .unwrap_or_default()
     }
 
-    /// Installs a fixture of `kind` in the active setup.
-    pub fn add_fixture(&mut self, kind: &str) -> bool {
-        self.session.add_fixture(kind).is_some()
-    }
-
-    /// Removes the fixture named by its full id.
-    pub fn delete_fixture(&mut self, id: &str) -> bool {
-        self.fixture(id)
-            .is_some_and(|id| self.session.delete_fixture(id))
-    }
-
-    /// Hides or shows the fixture named by its full id.
-    pub fn set_fixture_visible(&mut self, id: &str, visible: bool) -> bool {
-        self.fixture(id)
-            .is_some_and(|id| self.session.set_fixture_visible(id, visible))
-    }
-
-    /// Sets a length parameter of the fixture named by its full id, in mm.
-    pub fn set_fixture_length(&mut self, id: &str, key: &str, mm: f64) -> bool {
-        self.fixture(id).is_some_and(|id| {
-            self.session
-                .set_fixture_length(id, key, Length::from_mm(mm))
-        })
-    }
-
     /// Switches an extension on or off; returns the text of `extensions.toml` to keep.
     pub fn set_extension_enabled(&mut self, id: &str, enabled: bool) -> String {
         self.session.set_extension_enabled(id, enabled)
@@ -86,9 +62,5 @@ impl WasmSession {
     /// Reads the kept `extensions.toml`.
     pub fn load_extension_settings(&mut self, text: &str) {
         self.session.load_extension_settings(text);
-    }
-
-    fn fixture(&self, id: &str) -> Option<curvyo_document_core::NodeId> {
-        self.session.fixture_named(id)
     }
 }

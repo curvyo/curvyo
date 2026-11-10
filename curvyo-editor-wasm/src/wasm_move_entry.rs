@@ -45,6 +45,8 @@ pub struct MoveEntryChip {
     absolute: [[String; 2]; 9],
     reference: usize,
     copy_preset: bool,
+    /// Whether the chip shows its Copy check (not for a laser fixture).
+    pub copy_allowed: bool,
 }
 
 #[wasm_bindgen]
@@ -126,6 +128,7 @@ impl WasmSession {
             reference,
             box_bottom,
             copy_preset,
+            copy_allowed,
         } = self.session.move_entry()?;
         let view = self.session.view();
         let (center_x, center_y) = view.document_to_screen(center);
@@ -137,6 +140,7 @@ impl WasmSession {
             absolute: absolute_prefills,
             reference: reference.index(),
             copy_preset,
+            copy_allowed,
         })
     }
 

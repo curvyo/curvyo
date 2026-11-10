@@ -46,6 +46,8 @@ fn answer(badge: DropBadge) -> RowDragAnswer {
         target: (!matches!(badge, DropBadge::None | DropBadge::NoSketch) && !refused)
             .then(|| "mfg-1-2".to_owned()),
         faint: refused,
+        // `0102`: a fit cue is left out of the JSON when there is none.
+        fit: None,
     }
 }
 

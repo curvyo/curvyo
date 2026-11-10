@@ -12,7 +12,8 @@ use std::collections::{HashMap, HashSet};
 use curvyo_document_core::{NodeId, NodeKind, NodeRead, Opacity};
 
 use crate::layer_rows::{
-    Cause, Container, Expansion, Flags, LayerRow, LayerRows, RowFacts, RowKind, RowMark,
+    Cause, Container, Expansion, FixtureLine, Flags, LayerRow, LayerRows, RowFacts, RowKind,
+    RowMark,
 };
 use crate::share_text::cut_label;
 
@@ -30,6 +31,23 @@ pub struct PlacedPageRow<'a> {
     pub members: &'a HashSet<NodeId>,
 }
 
+/// A fixture of the page as its row under the Fixtures row reads it (`specs/0102` criterion 12).
+#[derive(Debug, Clone)]
+pub struct FixtureTreeRow<'a> {
+    /// The fixture's node id.
+    pub id: NodeId,
+    /// Its name.
+    pub name: &'a str,
+    /// Its kind word: "Grid", "Holder", "Clamp", "Stop" or "Unknown fixture".
+    pub word: &'static str,
+    /// Its Active state: on the bed.
+    pub active: bool,
+    /// Its eye: shown.
+    pub visible: bool,
+    /// Whether it is the canvas selection: its row is marked selected (criterion 12).
+    pub selected: bool,
+}
+
 /// What a laser page's tree shows besides the document's nodes.
 #[derive(Debug, Clone)]
 pub struct PageTree<'a> {
@@ -41,6 +59,8 @@ pub struct PageTree<'a> {
     pub own: &'a HashSet<NodeId>,
     /// Its placed pages, topmost first.
     pub placed: &'a [PlacedPageRow<'a>],
+    /// Its fixtures in creation order, listed under the Fixtures row.
+    pub fixtures: &'a [FixtureTreeRow<'a>],
     /// Whether the fixtures are shown.
     pub fixtures_shown: bool,
 }
@@ -102,7 +122,32 @@ fn plain_row(id: NodeId, kind: RowKind, name: &str, depth: usize, shown: bool) -
         via: None,
         read_only: false,
         page_tree: true,
+        fixture: None,
     }
+}
+
+/// The fixture rows under the Fixtures row, in creation order (`specs/0102` criterion 12).
+fn fixture_rows(fixtures: &[FixtureTreeRow<'_>]) -> Vec<LayerRow> {
+    fixtures
+        .iter()
+        .map(|fixture| {
+            let mut row = plain_row(
+                fixture.id,
+                RowKind::Fixture,
+                fixture.name,
+                2,
+                fixture.visible,
+            );
+            row.fixture = Some(FixtureLine {
+                word: fixture.word,
+                active: fixture.active,
+            });
+            if fixture.selected {
+                row.mark = RowMark::Selected;
+            }
+            row
+        })
+        .collect()
 }
 
 /// The layer that hides or locks a node, as the row names it ("layer Cut").
@@ -234,6 +279,7 @@ impl LayerRows {
             1,
             tree.fixtures_shown,
         ));
+        rows.extend(fixture_rows(tree.fixtures));
         mark_page_tree(&mut rows);
         LayerRows::from_rows(rows, objects)
     }
@@ -280,6 +326,7 @@ mod tests {
                 page_name: "Laser 1",
                 own,
                 placed: &placed,
+                fixtures: &[],
                 fixtures_shown: true,
             },
             expansion,
@@ -385,6 +432,7 @@ mod tests {
                 page_name: "Laser 1",
                 own: &none,
                 placed: &placed,
+                fixtures: &[],
                 fixtures_shown: true,
             },
             &Expansion::default(),
@@ -438,5 +486,85 @@ mod tests {
             None,
             "the source's own row is elsewhere"
         );
+    }
+
+    #[test]
+    fn criterion_12_each_fixture_is_listed_under_the_fixtures_row_in_creation_order() {
+        let document = Document::new(1);
+        let fixture = |counter: u64| -> NodeId {
+            serde_json::from_value(serde_json::json!({"peer": "9", "counter": counter})).unwrap()
+        };
+        let fixtures = [
+            FixtureTreeRow {
+                id: fixture(11),
+                name: "Grid 1",
+                word: "Grid",
+                active: true,
+                visible: true,
+                selected: false,
+            },
+            FixtureTreeRow {
+                id: fixture(12),
+                name: "Clamp 1",
+                word: "Clamp",
+                active: false,
+                visible: false,
+                selected: false,
+            },
+        ];
+        let none = HashSet::new();
+        let rows = LayerRows::for_laser_page(
+            &document.read_nodes(),
+            &PageTree {
+                page: page_id(),
+                page_name: "Laser 1",
+                own: &none,
+                placed: &[],
+                fixtures: &fixtures,
+                fixtures_shown: true,
+            },
+            &Expansion::default(),
+            RowFacts {
+                selected: &none,
+                active_layer: None,
+                entered: None,
+            },
+        );
+        let window = rows.window(0, usize::MAX);
+        let tail: Vec<(RowKind, usize, &str)> = window
+            .iter()
+            .rev()
+            .take(4)
+            .rev()
+            .map(|row| (row.kind, row.depth, row.name.as_str()))
+            .collect();
+        assert_eq!(
+            tail,
+            [
+                (RowKind::Note, 1, "Nothing on this page yet."),
+                (RowKind::Fixtures, 1, "Fixtures"),
+                (RowKind::Fixture, 2, "Grid 1"),
+                (RowKind::Fixture, 2, "Clamp 1"),
+            ]
+        );
+        let grid = &window[window.len() - 2];
+        assert_eq!(
+            grid.fixture,
+            Some(FixtureLine {
+                word: "Grid",
+                active: true
+            })
+        );
+        let clamp = window.last().unwrap();
+        assert_eq!(
+            clamp.fixture,
+            Some(FixtureLine {
+                word: "Clamp",
+                active: false
+            })
+        );
+        assert!(!clamp.is_own(), "a fixture row is no own object row");
+        assert_eq!(clamp.container, None, "fixture rows have no chevron");
+        assert!(clamp.page_tree);
     }
 }
