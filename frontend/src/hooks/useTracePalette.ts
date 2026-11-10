@@ -58,7 +58,8 @@ export interface TracePaletteApi {
 
 interface PaletteContext {
   active: boolean;
-  /** The active part adds something to the join; a part without paths has no palette (customer 2026-11-10). */
+  /** The active part adds something to the join; a part without paths shows its own colours only
+   * (customer 2026-11-10). */
   traced: boolean;
   /** The current values (the state the bar shows). */
   values: TraceValues;
@@ -96,7 +97,13 @@ export function useTracePalette({ active, traced, values, getSession, apply, cho
     [apply, choiceRef],
   );
 
-  const swatches = useMemo(() => (info ? stripOrder(info.colours) : []), [info]);
+  // A part that traces nothing has no result palette: its row is its own picked colours, which
+  // apply once it has paths (customer 2026-11-10, `ux-notes.md` §27.11).
+  const own = values.keptPalette ?? values.fixed;
+  const swatches = useMemo(
+    () => (traced ? (info ? stripOrder(info.colours) : []) : own.map((hex) => ({ hex, fixed: true, pixels: 0 }))),
+    [traced, info, own],
+  );
   const excluded = useCallback((hex: string) => values.excluded.includes(hex), [values.excluded]);
 
   const toggleExclude = useCallback(
@@ -107,6 +114,11 @@ export function useTracePalette({ active, traced, values, getSession, apply, cho
   );
   const remove = useCallback(
     (hex: string) => {
+      if (!traced) {
+        // The part's own colours: the colour leaves them, nothing is matched again.
+        edit((v) => (v.keptPalette ? { keptPalette: v.keptPalette.filter((c) => c !== hex) } : { fixed: v.fixed.filter((c) => c !== hex) }));
+        return;
+      }
       const next = deleteFromPalette(
         swatches.map((s) => s.hex),
         choiceRef.current.values.excluded,
@@ -118,7 +130,7 @@ export function useTracePalette({ active, traced, values, getSession, apply, cho
       setRemoved({ hex, kept: next.keptPalette.join() });
       edit(() => next);
     },
-    [swatches, choiceRef, edit],
+    [traced, swatches, choiceRef, edit],
   );
   const pick = useCallback(
     (hex: string) => {
@@ -150,7 +162,7 @@ export function useTracePalette({ active, traced, values, getSession, apply, cho
   }, [same]);
 
   const multi = values.output === MULTICOLOUR;
-  const shown = multi && !picking && traced ? swatches : NO_SWATCHES;
+  const shown = multi && !picking ? swatches : NO_SWATCHES;
   const excludedCount = swatches.filter((s) => values.excluded.includes(s.hex)).length;
   const note = !multi
     ? ""

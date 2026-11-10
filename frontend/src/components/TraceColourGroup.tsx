@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseE
 import { Swatch } from "@/components/panel/Swatch";
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { Tooltip as AppTooltip } from "@/components/ui/tooltip";
+import { pageCtrl } from "@/lib/heldCtrl";
 import { focusAfterRemoval, pickedKey } from "@/lib/tracePickedColours";
 import { AUTO, NO_BACKGROUND, PICK_BACKGROUND, PICK_COLOUR, PICK_TOOLTIP, PICKED_COLOURS, removePickedLabel } from "@/lib/traceText";
 
@@ -102,44 +103,10 @@ function CasedGlyph({ icon: Icon, className }: { icon: LucideIcon; className: st
   );
 }
 
-/** Whether Ctrl (Cmd on a Mac) is held, window-wide: a Ctrl+click excludes, so the hovered swatch
- * shows the Exclude glyph instead of the x (customer 2026-11-10). Every key and pointer event
- * brings the state up to date, so a missed key release cannot leave it stuck. */
-let ctrlHeld = false;
-const ctrlListeners = new Set<() => void>();
-function setCtrl(down: boolean) {
-  if (ctrlHeld !== down) {
-    ctrlHeld = down;
-    ctrlListeners.forEach((listen) => listen());
-  }
-}
-function subscribeCtrl(listen: () => void): () => void {
-  if (ctrlListeners.size === 0) {
-    window.addEventListener("keydown", onCtrlKey, true);
-    window.addEventListener("keyup", onCtrlKey, true);
-    window.addEventListener("pointermove", onCtrlKey, true);
-    window.addEventListener("blur", onCtrlBlur);
-  }
-  ctrlListeners.add(listen);
-  return () => {
-    ctrlListeners.delete(listen);
-    if (ctrlListeners.size === 0) {
-      window.removeEventListener("keydown", onCtrlKey, true);
-      window.removeEventListener("keyup", onCtrlKey, true);
-      window.removeEventListener("pointermove", onCtrlKey, true);
-      window.removeEventListener("blur", onCtrlBlur);
-      ctrlHeld = false;
-    }
-  };
-}
-function onCtrlKey(event: globalThis.KeyboardEvent | PointerEvent) {
-  setCtrl(event.ctrlKey || event.metaKey);
-}
-function onCtrlBlur() {
-  setCtrl(false);
-}
+/** Whether Ctrl (Cmd on a Mac) is held, window-wide (`ux-notes.md` §27.12): a hovered palette
+ * swatch shows the Exclude glyph instead of the x. */
 function useCtrlHeld(): boolean {
-  return useSyncExternalStore(subscribeCtrl, () => ctrlHeld, () => false);
+  return useSyncExternalStore(pageCtrl.subscribe, pageCtrl.get, () => false);
 }
 
 interface SwatchCellProps {
