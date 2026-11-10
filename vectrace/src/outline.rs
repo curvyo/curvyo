@@ -4,13 +4,20 @@
 //! within the room its clearance leaves (`clearance.rs`), plus the coarser contours the guard
 //! falls back to.
 
-use kurbo::{BezPath, Point, Vec2};
+use kurbo::{Point, Vec2};
 
 use crate::corners::{Corner, corners, inset, loop_start, midpoint};
-use crate::fit::{Piece, Seg, TANGENT_ARC, arc_length, fit_cubics, point_at};
-use crate::line::{Pins, Run, norm, segment_distance, simplify, straight_runs, unit};
+use crate::fit::{Seg, TANGENT_ARC};
+use crate::line::simplify;
 use crate::params::Geometry;
 use crate::smooth::{passes, smooth_closed, smooth_open};
+
+mod room;
+mod segments;
+use room::{Limits, Room, halved, held};
+pub use segments::node_count;
+pub(crate) use segments::to_path;
+use segments::{Rules, fit_closed, fit_span, open_polyline, polygon};
 
 /// The fall-back levels of one span (`guard.rs`): the fit of the freely smoothed contour
 /// within the room the smoothed contours leave each other; the fit of the contour smoothed
@@ -26,20 +33,6 @@ pub(crate) const CLEARANCE_REACH: f64 = 10.0;
 /// pixel) do not limit each other's room: the two sides of a sharp tip meet closer than that,
 /// and its corner may reach 4.5 px beyond its vertex.
 pub(crate) const APART_EDGES: usize = 16;
-
-/// Two outlines keep this much room between them, traced px (the guard's gap).
-const GAP: f64 = 0.1;
-
-/// The share of the room between two smoothed contours a fit may use on its side (the guard
-/// catches the rare crossing when both sides use more than half).
-const SMOOTH_SHARE: f64 = 1.0;
-
-/// The least room a part of an outline is ever given, traced px.
-const ROOM_MIN: f64 = 0.05;
-
-/// The share of a held point's room the smoothing may use (the fit keeps the rest), whatever
-/// the Tolerance, so a looser tolerance never smooths less.
-const SMOOTH_PART: f64 = 0.75;
 
 /// A corner-free chain is smoothed by at most its length divided by this.
 const SMALL_LOOP: f64 = 20.0;
@@ -147,41 +140,6 @@ pub(crate) enum Bound<'a> {
     /// The tolerances come from the walked contour's room less what smoothing used of it: the
     /// fit then never crosses another chain's.
     Walked,
-}
-
-/// The room a chain's parts have, from its clearances: per segment of the midpoint polyline
-/// (from the midpoint of edge `k` to that of edge `k + 1`) and per midpoint; `inset` is taken
-/// off everywhere (half a pixel for a contour on the pixel corners, which lie that far outside
-/// the midpoints).
-struct Room<'a> {
-    clearance: &'a [f64],
-    inset: f64,
-}
-
-impl Room<'_> {
-    /// Half the clearance of segment `k` less the gap: how far the outline may move there.
-    fn segment(&self, k: usize) -> f64 {
-        let n = self.clearance.len();
-        (self.clearance[k % n] / 2.0 - GAP - self.inset).max(ROOM_MIN)
-    }
-
-    /// The room at the midpoint of edge `k`: the smaller of its two segments'.
-    fn point(&self, k: usize) -> f64 {
-        let n = self.clearance.len();
-        self.segment((k + n - 1) % n).min(self.segment(k))
-    }
-
-    /// The room of a corner at vertex `vertex` with `zone`: the least over the edges of its
-    /// zone on both sides.
-    fn corner(&self, vertex: usize, zone: f64) -> f64 {
-        let n = self.clearance.len();
-        // invariant: zones are a few pixels.
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let z = (zone.ceil() as usize).max(1).min(n / 2);
-        (0..=2 * z)
-            .map(|t| self.segment((vertex + 2 * n - 1 - z + t) % n))
-            .fold(f64::INFINITY, f64::min)
-    }
 }
 
 impl Chain {
@@ -580,355 +538,12 @@ impl Chain {
     }
 }
 
-/// `values` halved.
-fn halved(values: &[f64]) -> Vec<f64> {
-    values.iter().map(|v| v / 2.0).collect()
-}
-
-/// What bounds a contour's smoothing and tolerances: the walked room, the bound, the
-/// tolerance.
-struct Limits<'a> {
-    room: &'a Room<'a>,
-    bound: Bound<'a>,
-    tolerance: f64,
-    /// The contour runs on the pixel corners instead of the edge midpoints.
-    on_corners: bool,
-}
-
-impl Limits<'_> {
-    /// The walked point of edge `e`: its midpoint, or the pixel corner it starts at.
-    fn point(&self, chain: &[Point], e: usize) -> Point {
-        if self.on_corners {
-            chain[e % chain.len()]
-        } else {
-            midpoint(chain, e)
-        }
-    }
-
-    /// The tolerance per segment of `smoothed` (one fewer than points, or as many when `cyclic`;
-    /// `slots` names each segment's chain edge). A point whose room among the smoothed contours
-    /// has collapsed to less than half its walked room (a thin feature smoothing closed), or
-    /// every point under [`Bound::Walked`], is first pulled back towards its walked position so
-    /// it keeps at least half its room, or the tolerance, for the fit; segments at such points
-    /// get their walked room less what smoothing still used, the others the bound's tolerance.
-    fn budgets(
-        &self,
-        raw: &[Point],
-        smoothed: &mut [Point],
-        point_room: &[f64],
-        segment_room: &[f64],
-        slots: &[usize],
-        cyclic: bool,
-    ) -> Vec<f64> {
-        let n = raw.len();
-        let segments = if cyclic { n } else { n - 1 };
-        let slot = |k: usize| slots[k.min(slots.len() - 1)];
-        let held: Vec<bool> = (0..n)
-            .map(|k| match self.bound {
-                Bound::Walked => true,
-                Bound::Free => false,
-                Bound::Smoothed(smooth) => {
-                    let walked = 2.0 * (point_room[k] + GAP);
-                    smooth[slot(k)] < 0.5 * walked
-                }
-            })
-            .collect();
-        let moved = clamp_moves(raw, smoothed, point_room, &held);
-        (0..segments)
-            .map(|i| {
-                let next = (i + 1) % n;
-                if held[i] || held[next] {
-                    let budget = segment_room[i] - moved[i].max(moved[next]);
-                    self.tolerance.min(budget).max(ROOM_MIN)
-                } else {
-                    match self.bound {
-                        Bound::Smoothed(smooth) => self
-                            .tolerance
-                            .min(smooth[slot(i)] * SMOOTH_SHARE - GAP)
-                            .max(ROOM_MIN),
-                        _ => self.tolerance,
-                    }
-                }
-            })
-            .collect()
-    }
-}
-
-/// A corner's position held within its room: the crossing of its sides, pulled back towards
-/// its vertex when the room around the vertex does not reach it.
-fn held(chain: &[Point], corner: Corner, room: &Room<'_>) -> Point {
-    let vertex = chain[corner.vertex];
-    let reach = room.corner(corner.vertex, corner.zone);
-    let offset = corner.at - vertex;
-    let distance = norm(offset);
-    if distance <= reach {
-        corner.at
-    } else {
-        vertex + offset * (reach / distance)
-    }
-}
-
-/// Pulls every `held` smoothed point back towards its raw point so that it keeps
-/// `1 - SMOOTH_PART` of its room for the fit; returns how far each point moved.
-fn clamp_moves(raw: &[Point], smoothed: &mut [Point], room: &[f64], held: &[bool]) -> Vec<f64> {
-    raw.iter()
-        .zip(smoothed.iter_mut())
-        .zip(room.iter().zip(held))
-        .map(|((&p, q), (&r, &held))| {
-            let limit = r * SMOOTH_PART;
-            let offset = *q - p;
-            let moved = norm(offset);
-            if held && moved > limit {
-                *q = p + offset * (limit / moved);
-                limit
-            } else {
-                moved
-            }
-        })
-        .collect()
-}
-
-/// The fitting constants of one outline, in traced pixels.
-struct Rules {
-    tolerance: f64,
-    run_tolerance: f64,
-    run_length: f64,
-    arc: f64,
-}
-
-/// The smoothed `span` between two corners: one line when it is straight within the tolerance
-/// (and `chords` allows it), else its straight runs as lines and cubics between them, the
-/// cubics at the corners along the corners' straight sides; `tols` is the tolerance per
-/// segment.
-fn fit_span(span: &Span, tols: &[f64], rules: &Rules, chords: bool, out: &mut Vec<Seg>) {
-    let q = &span.smoothed;
-    let (first, last) = (q[0], q[q.len() - 1]);
-    let at = |k: usize| -> f64 {
-        let before = tols[k.saturating_sub(1)];
-        let after = tols[k.min(tols.len() - 1)];
-        before.min(after)
-    };
-    if q.len() == 2
-        || (chords
-            && first != last
-            && q.iter()
-                .enumerate()
-                .all(|(k, &p)| segment_distance(p, first, last) <= at(k)))
-    {
-        out.push(Seg::Line(first, last));
-        return;
-    }
-    let runs = if chords {
-        let pins = Pins {
-            start: true,
-            end: true,
-        };
-        straight_runs(q, tols, rules.run_tolerance, rules.run_length, pins)
-    } else {
-        // Two corners only (a thin bar's two ends): a straight side is a line off the chord,
-        // joined to the corners by short lines.
-        let last = q.len() - 1;
-        let pins = Pins {
-            start: false,
-            end: false,
-        };
-        let length = arc_length(q);
-        straight_runs(
-            &q[1..last],
-            &tols[1..last - 1],
-            rules.tolerance,
-            0.6 * length,
-            pins,
-        )
-        .into_iter()
-        .map(|r| Run {
-            first: r.first + 1,
-            last: r.last + 1,
-            ..r
-        })
-        .collect()
-    };
-    assemble(q, tols, &runs, span.tangents, rules, out);
-}
-
-/// The closed corner-free chain `q` (last point = first): its straight runs as lines and
-/// cubics between them, tangent-continuous at the start.
-fn fit_closed(q: &[Point], tols: &[f64], rules: &Rules, out: &mut Vec<Seg>) {
-    let last = q.len() - 1;
-    let length = arc_length(q);
-    let reach = rules.arc.min(length / 4.0);
-    let Some(seam) = unit(point_at(q, reach) - point_at(q, length - reach)) else {
-        out.extend(polygon(&q[..last]));
-        return;
-    };
-    let pins = Pins {
-        start: false,
-        end: false,
-    };
-    let runs: Vec<Run> = straight_runs(
-        &q[1..last],
-        &tols[1..last - 1],
-        rules.run_tolerance,
-        rules.run_length,
-        pins,
-    )
-    .into_iter()
-    .map(|r| Run {
-        first: r.first + 1,
-        last: r.last + 1,
-        ..r
-    })
-    .collect();
-    if runs.is_empty() {
-        // Two halves meeting tangent-continuously at the middle point.
-        let mid = last / 2;
-        let at = arc_length(&q[..=mid]);
-        let Some(centre) = unit(point_at(q, at + reach) - point_at(q, at - reach)) else {
-            out.extend(polygon(&q[..last]));
-            return;
-        };
-        let halves = [
-            (0, mid, Some(seam), Some(-centre)),
-            (mid, last, Some(centre), Some(-seam)),
-        ];
-        for (i, j, t0, t1) in halves {
-            let piece = Piece {
-                q: &q[i..=j],
-                tols: &tols[i..j],
-                start: q[i],
-                end: q[j],
-                start_tangent: t0,
-                end_tangent: t1,
-            };
-            fit_cubics(piece, rules.tolerance, rules.arc, out);
-        }
-        return;
-    }
-    assemble(q, tols, &runs, (Some(seam), Some(-seam)), rules, out);
-}
-
-/// Lines for `runs` of `q` and cubics for the gaps, tangent-continuous at every run end;
-/// `(start, end)` are the tangents at `q`'s ends (`None`: free, at a corner).
-fn assemble(
-    q: &[Point],
-    tols: &[f64],
-    runs: &[Run],
-    (start, end): (Option<Vec2>, Option<Vec2>),
-    rules: &Rules,
-    out: &mut Vec<Seg>,
-) {
-    let last = q.len() - 1;
-    let (mut cursor, mut node, mut tangent) = (0, q[0], start);
-    for run in runs {
-        let direction = unit(run.to - run.from);
-        if run.first > cursor {
-            let piece = Piece {
-                q: &q[cursor..=run.first],
-                tols: &tols[cursor..run.first],
-                start: node,
-                end: run.from,
-                start_tangent: tangent,
-                end_tangent: direction.map(|d| -d),
-            };
-            fit_cubics(piece, rules.tolerance, rules.arc, out);
-        }
-        out.push(Seg::Line(run.from, run.to));
-        (cursor, node, tangent) = (run.last, run.to, direction);
-    }
-    if cursor < last {
-        let piece = Piece {
-            q: &q[cursor..],
-            tols: &tols[cursor..last],
-            start: node,
-            end: q[last],
-            start_tangent: tangent,
-            end_tangent: end,
-        };
-        fit_cubics(piece, rules.tolerance, rules.arc, out);
-    }
-}
-
-/// The closed polygon through `points`, points on a straight line between their neighbours
-/// left out.
-fn polygon(points: &[Point]) -> Vec<Seg> {
-    let n = points.len();
-    let kept: Vec<Point> = (0..n)
-        .filter(|&i| {
-            let (a, b, c) = (points[(i + n - 1) % n], points[i], points[(i + 1) % n]);
-            (b - a).cross(c - b) != 0.0 || (b - a).dot(c - b) < 0.0
-        })
-        .map(|i| points[i])
-        .collect();
-    let kept = if kept.len() >= 3 {
-        kept
-    } else {
-        points.to_vec()
-    };
-    let m = kept.len();
-    (0..m)
-        .map(|i| Seg::Line(kept[i], kept[(i + 1) % m]))
-        .collect()
-}
-
-/// The lines through `points`, in order (an open polyline).
-fn open_polyline(points: &[Point]) -> Vec<Seg> {
-    points.windows(2).map(|w| Seg::Line(w[0], w[1])).collect()
-}
-
-/// `segments` (a closed outline) as a closed path.
-pub(crate) fn to_path(segments: &[Seg]) -> BezPath {
-    let mut path = BezPath::new();
-    let Some(first) = segments.first() else {
-        return path;
-    };
-    path.move_to(match *first {
-        Seg::Line(p, _) | Seg::Cubic(p, _, _, _) => p,
-    });
-    for seg in segments {
-        match *seg {
-            // A line of no length is no node.
-            Seg::Line(a, b) if a == b => {}
-            Seg::Line(_, p) => path.line_to(p),
-            Seg::Cubic(_, c1, c2, p) => path.curve_to(c1, c2, p),
-        }
-    }
-    path.close_path();
-    path
-}
-
-/// The anchors of a closed outline: one per segment, the closing one not counted twice.
-#[must_use]
-pub fn node_count(path: &BezPath) -> usize {
-    use kurbo::PathEl;
-    let mut start = None;
-    let mut last = None;
-    let mut segments = 0;
-    for element in path.elements() {
-        match *element {
-            PathEl::MoveTo(p) => {
-                start = Some(p);
-                last = Some(p);
-            }
-            PathEl::LineTo(p) | PathEl::QuadTo(_, p) | PathEl::CurveTo(_, _, p) => {
-                segments += 1;
-                last = Some(p);
-            }
-            PathEl::ClosePath => {}
-        }
-    }
-    // The last segment ends on the start: its end is the first anchor again.
-    if segments > 0 && start == last {
-        segments
-    } else {
-        segments + 1
-    }
-}
-
 #[cfg(test)]
 // Test shapes are small, named by their formulas (x, y, w, h).
 #[allow(clippy::cast_precision_loss, clippy::many_single_char_names)]
 mod tests {
     use super::*;
+    use crate::line::segment_distance;
     use crate::params::geometry;
 
     fn chain(rows: &[&str]) -> Chain {
