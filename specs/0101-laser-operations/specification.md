@@ -1,6 +1,6 @@
 # Laser operations: an ordered operation list per laser page, assigned to any item, with Show, Output and Cuts last
 
-Status: Ready (2026-11-09; adrs.md, ADR 0046 (Proposed, accepted with the PR) and ux-notes.md exist; Fragen 167 to 170 answered by the customer 2026-11-09: 167 B, 168 A, 169 A, 170 A; revised 2026-11-10 after the review of PR #305, see Origin)
+Status: Done (PR #305; ADR 0046 accepted with the PR; Fragen 167 B, 168 A, 169 A, 170 A)
 Priority: Must
 Origin: Customer (concept A, `specs/0063-manufacturing-workbenches/concept-output-pages.md`, accepted 2026-11-05: Frage 140 A, 141 A, 142 B, 147 A, 148 A, 149 A, 153 A, 154 B, 155 A; feedback 2 to 4 and 9 of the same day). Slice 4 of `0063`, replaces the reserved `0027`. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
