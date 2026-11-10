@@ -42,6 +42,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { useDevices } from "@/hooks/useDevices";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { useOperations } from "@/hooks/useOperations";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
@@ -145,6 +146,7 @@ function Editor() {
   // Ctrl+V and Ctrl+C for images (`specs/0087-image-clipboard-and-drop`).
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
   const collab = useCollaboration(editor);
+  const operations = useOperations(editor);
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).
@@ -377,6 +379,7 @@ function Editor() {
         <div className="relative flex min-h-0 min-w-0">
         {workbench?.rail(workbenchContext)}
         <Canvas
+          overOperationRow={operations.dropKey !== null}
           editor={editor}
           sketch={sketch}
           onDropFiles={project.importFiles}
@@ -410,6 +413,7 @@ function Editor() {
           workspaceSync={workspaceSync}
           devices={devices}
           membership={membership}
+          operations={operations}
         />
       </div>
       <CursorStatus

@@ -1,5 +1,7 @@
 import { Frame, TriangleAlert } from "lucide-react";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
+import { OperationsSection } from "@/components/panel/OperationsSection";
+import type { OperationsApi } from "@/hooks/useOperations";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
 import type { WorkbenchesApi } from "@/hooks/useWorkbenches";
 import { contributionOf } from "@/workbenches/registry";
@@ -72,6 +74,8 @@ interface PropertiesPanelProps {
   collab: CollaborationApi;
   /** Roles, leave, add back and the notices (`specs/0097-membership-lifecycle`). */
   membership: MembershipApi;
+  /** The laser operations of the active laser page (`specs/0101-laser-operations`). */
+  operations: OperationsApi;
 }
 
 /**
@@ -102,6 +106,7 @@ export function PropertiesPanel({
   traceInfo,
   collab,
   membership,
+  operations,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
@@ -414,6 +419,7 @@ export function PropertiesPanel({
           className={
             doc.view.content === "history" ||
             doc.view.content === "layers" ||
+            doc.view.content === "operations" ||
             doc.view.content === "fonts"
               ? // The tabs with an inner scroll area, the list: the header, the buttons
                 // and the footer stay in view (`0020` criterion 43, `0050` criterion 3).
@@ -427,6 +433,7 @@ export function PropertiesPanel({
             className={
               doc.view.content === "history" ||
               doc.view.content === "layers" ||
+              doc.view.content === "operations" ||
               doc.view.content === "fonts"
                 ? "flex min-h-0 flex-1 flex-col outline-none"
                 : "outline-none"
@@ -530,6 +537,12 @@ export function PropertiesPanel({
                   ) : null}
                 </>
               )
+            ) : doc.view.content === "operations" ? (
+              <OperationsSection
+                api={operations}
+                selectionCount={editor.selectionCount}
+                onReturnFocus={returnFocus}
+              />
             ) : doc.view.content === "layers" ? (
               <LayersTab
                 getSession={getSession}

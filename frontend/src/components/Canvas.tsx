@@ -15,6 +15,7 @@ import { TextSink } from "@/components/TextSink";
 import { MoveBadges } from "@/components/MoveBadges";
 import { PickSetBadge } from "@/components/PickSetBadge";
 import { NudgeReadout } from "@/components/NudgeReadout";
+import { liveReadoutVisible } from "@/lib/operationRows";
 import { NodeContextMenu } from "@/components/NodeToolbar";
 import { MoveEntryChip } from "@/components/MoveEntryChip";
 import { OffsetEntryChip } from "@/components/OffsetEntryChip";
@@ -57,6 +58,8 @@ interface CanvasProps {
   overlay?: React.ReactNode;
   /** False in a manufacturing workbench: the drawing's page borders and names are absent there (`specs/0093` UX notes §3). */
   showPageFrames?: boolean;
+  /** The pointer is over an operation row of a canvas drag: the move readout is not drawn (`specs/0101` UX notes 6.3). */
+  overOperationRow?: boolean;
 }
 
 /**
@@ -71,7 +74,14 @@ interface CanvasProps {
  * (`specs/0001-project-file-foundation`'s "chrome never frames the canvas"
  * precedent, reaffirmed by `docs/design-system.md`).
  */
-export function Canvas({ editor, sketch, onDropFiles, overlay, showPageFrames = true }: CanvasProps) {
+export function Canvas({
+  editor,
+  sketch,
+  onDropFiles,
+  overlay,
+  showPageFrames = true,
+  overOperationRow = false,
+}: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
     editor.showHistoryNotice(clipboard_notice("link", ""), 5000, "canvas", "alert"),
@@ -302,7 +312,7 @@ export function Canvas({ editor, sketch, onDropFiles, overlay, showPageFrames = 
         viewKey={editor.zoomPercent}
         containerRef={editor.containerRef}
       />
-      {editor.liveReadout && (
+      {editor.liveReadout && liveReadoutVisible(editor.liveReadout, overOperationRow) && (
         <ReadoutChip
           text={editor.liveReadout.text}
           second={editor.liveReadout.second}
