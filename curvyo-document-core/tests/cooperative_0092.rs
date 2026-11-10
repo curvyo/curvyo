@@ -130,10 +130,18 @@ fn concurrent_resizes_of_different_pages_are_both_kept() {
     let bytes = pack(&base, "t").unwrap();
     let a = unpack(2, &bytes).unwrap();
     let b = unpack(3, &bytes).unwrap();
-    a.resize_page("first", DocumentSize::from_mm(100.0, 100.0))
-        .unwrap();
-    b.resize_page(&second.id, DocumentSize::from_mm(50.0, 60.0))
-        .unwrap();
+    a.resize_page(
+        "first",
+        DocumentSize::from_mm(100.0, 100.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    b.resize_page(
+        &second.id,
+        DocumentSize::from_mm(50.0, 60.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     merge(&a, &b);
     assert_eq!(a.pages(), b.pages());
     assert_eq!(a.pages()[0].size, DocumentSize::from_mm(100.0, 100.0));
@@ -175,7 +183,11 @@ fn move_page_writes_the_frame_and_moves_its_objects() {
     let before = change_count(&document);
     assert!(
         document
-            .move_page("first", Vec2::new(5.0, -7.0), &[id])
+            .move_page(
+                "first",
+                Vec2::new(5.0, -7.0),
+                &curvyo_document_core::PageContents::from([("first".to_owned(), vec![id])])
+            )
             .unwrap()
     );
     assert_eq!(change_count(&document), before + 1);
@@ -239,10 +251,18 @@ fn golden_page_frame_v34() {
         let second = document.add_page();
         document.rename_page(&second.id, "Second").unwrap();
         document
-            .move_page(&second.id, Vec2::new(0.0, 25.0), &[])
+            .move_page(
+                &second.id,
+                Vec2::new(0.0, 25.0),
+                &curvyo_document_core::PageContents::new(),
+            )
             .unwrap();
         document
-            .resize_page(&second.id, DocumentSize::from_mm(100.0, 120.0))
+            .resize_page(
+                &second.id,
+                DocumentSize::from_mm(100.0, 120.0),
+                &curvyo_document_core::PageContents::new(),
+            )
             .unwrap();
         let _ = id;
         std::fs::write(&path, pack(&document, "golden").unwrap()).unwrap();

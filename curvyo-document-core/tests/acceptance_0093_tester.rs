@@ -220,7 +220,8 @@ fn ac2_the_next_laser_page_takes_the_next_free_number() {
     let a = d.add_output_page(laser()).unwrap();
     let b = d.add_output_page(laser()).unwrap();
     assert_eq!(b.name, "Laser 2");
-    d.delete_page(&a.id).unwrap();
+    d.delete_page(&a.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     let c = d.add_output_page(laser()).unwrap();
     assert_eq!(c.name, "Laser 1", "the smallest free number");
 }
@@ -237,12 +238,20 @@ fn ac3_the_output_page_is_the_work_area_and_no_size_command_writes_it() {
     );
     let steps = d.own_step_count();
     assert!(
-        d.resize_page(&page.id, DocumentSize::from_mm(600.0, 400.0))
-            .is_err()
+        d.resize_page(
+            &page.id,
+            DocumentSize::from_mm(600.0, 400.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .is_err()
     );
     assert!(
-        d.fit_page_to_content(&page.id, (Point::new(0.0, 0.0), Point::new(5.0, 5.0)))
-            .is_err()
+        d.fit_page_to_content(
+            &page.id,
+            (Point::new(0.0, 0.0), Point::new(5.0, 5.0)),
+            &curvyo_document_core::PageContents::new()
+        )
+        .is_err()
     );
     assert_eq!(d.own_step_count(), steps);
 }
@@ -356,7 +365,8 @@ fn ac13_delete_takes_page_and_fixtures_leaves_drawing_and_undo_restores_everythi
     let before = json(&d);
 
     let steps = d.own_step_count();
-    d.delete_page(&output.id).unwrap();
+    d.delete_page(&output.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1, "delete is one step");
     assert!(d.manufacturings().is_empty());
     assert!(d.manufacturing(id).is_none());
@@ -393,10 +403,18 @@ fn ac13_deleting_twice_or_the_last_page_is_refused() {
     let d = Document::new(1);
     let o = rect(&d, 10.0, 10.0);
     let page = d.add_output_page(laser()).unwrap();
-    d.delete_page(&page.id).unwrap();
+    d.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     let steps = d.own_step_count();
-    assert!(d.delete_page(&page.id).is_err());
-    assert!(d.delete_page("first").is_err(), "the last page stays");
+    assert!(
+        d.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+            .is_err()
+    );
+    assert!(
+        d.delete_page("first", &curvyo_document_core::PageContents::new())
+            .is_err(),
+        "the last page stays"
+    );
     assert_eq!(d.own_step_count(), steps);
     assert_eq!(d.object_ids(), vec![o]);
 }
@@ -409,7 +427,8 @@ fn ac5_a_placement_of_a_deleted_page_goes_with_it_and_undo_brings_both_back() {
     let second = d.add_page();
     let id = add(&d);
     let d = with_placement(&d, &second.id);
-    d.delete_page(&second.id).unwrap();
+    d.delete_page(&second.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     let m = d.manufacturing(id).unwrap();
     assert_eq!(m.placements.len(), 0);
     let reopened = unpack(2, &pack(&d, "0.1.0").unwrap()).unwrap();
@@ -561,7 +580,11 @@ fn ac12_an_unknown_process_can_still_be_deleted_and_undone() {
     let d = unpack(4, &unknown_process_file()).unwrap();
     let id = d.manufacturings()[0].id;
     let full = d.manufacturing(id).unwrap();
-    d.delete_page(&full.page.clone().unwrap().id).unwrap();
+    d.delete_page(
+        &full.page.clone().unwrap().id,
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     assert!(d.manufacturings().is_empty());
     undo_last(&d);
     assert_eq!(d.manufacturing(id).unwrap(), full);

@@ -15,7 +15,7 @@ use curvyo_document_core::{
 use curvyo_sketch_core as sk;
 use curvyo_ui_core::{PageMembership, Reach};
 
-const REACHES: [Reach; 3] = [Reach::Touches, Reach::SharesArea, Reach::Inside];
+const REACHES: [Reach; 2] = [Reach::Touches, Reach::SharesArea];
 
 fn page(d: &Document, id: &str) -> Page {
     d.pages().into_iter().find(|p| p.id == id).unwrap()
@@ -52,6 +52,19 @@ fn pages_of(d: &Document, id: NodeId, reach: Reach) -> Vec<String> {
     let m = PageMembership::of(d, &pages);
     m.pages_of(&pages, id, bounds(d, id), reach)
         .map(|p| p.id.clone())
+        .collect()
+}
+
+/// The page that owns `id` by the centre of its bounds (ADR 0051 §4; replaces the "wholly
+/// inside" reach of `0059` criterion 9 that a frame move used to carry by).
+fn owner_of(d: &Document, id: NodeId) -> Vec<String> {
+    let pages = d.pages();
+    let m = PageMembership::of(d, &pages);
+    let (min, max) = bounds(d, id);
+    let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
+    m.owner_by_centre(&pages, id, centre)
+        .map(|p| p.id.clone())
+        .into_iter()
         .collect()
 }
 
@@ -96,8 +109,12 @@ fn ac1_a_sketch_crossing_its_frame_and_a_drawing_page_is_a_member_of_its_sketch_
     // Put the sketch page right next to the drawing page, then draw from the sketch page's
     // centre across its left edge onto the drawing page.
     let gap = sp.origin.x - (first.origin.x + first.size.width.as_mm());
-    d.move_page(&sp.id, Vec2::new(-gap, first.origin.y - sp.origin.y), &[])
-        .unwrap();
+    d.move_page(
+        &sp.id,
+        Vec2::new(-gap, first.origin.y - sp.origin.y),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let sp = page(&d, &sp.id);
     let half = sp.size.width.as_mm() / 2.0;
     let owner = d
@@ -123,7 +140,7 @@ fn ac1_a_sketch_crossing_its_frame_and_a_drawing_page_is_a_member_of_its_sketch_
     let m = PageMembership::of(&d, &pages);
     assert!(m.is_fixed(owner));
     assert!(!m.is_member(&first, owner, (min, max), Reach::Touches));
-    assert!(m.is_member(&sp, owner, (min, max), Reach::Inside));
+    assert_eq!(owner_of(&d, owner), vec![sp.id.clone()]);
 }
 
 #[test]
@@ -136,7 +153,7 @@ fn ac1_a_sketch_wholly_off_its_frame_still_belongs_to_it() {
             &Style::default(),
         )
         .unwrap();
-    assert_eq!(pages_of(&d, owner, Reach::Inside), vec![sp.id.clone()]);
+    assert_eq!(owner_of(&d, owner), vec![sp.id.clone()]);
 }
 
 #[test]
@@ -144,12 +161,19 @@ fn ac1_an_object_over_a_sketch_page_and_a_drawing_page_belongs_to_the_drawing_pa
     let d = Document::new(3);
     let sp = d.add_page_of(&PageKind::Sketch).unwrap();
     let first = page(&d, "first");
-    // Lay the sketch page over the drawing page's right half.
+    // Lay the sketch page over the drawing page's right half. A drop pushes the page it lands
+    // on away (`specs/0109` criterion 22), so the overlap of an older file is made by moving the
+    // drawing page out of the way and undoing only that move.
     let to = Vec2::new(
         first.origin.x + first.size.width.as_mm() / 2.0 - sp.origin.x,
         first.origin.y - sp.origin.y,
     );
-    d.move_page(&sp.id, to, &[]).unwrap();
+    let none = curvyo_document_core::PageContents::new();
+    d.move_page("first", Vec2::new(0.0, 5000.0), &none).unwrap();
+    let away = d.own_steps().last().unwrap().step;
+    d.move_page(&sp.id, to, &none).unwrap();
+    d.undo_step(away).unwrap();
+    assert_eq!(page(&d, "first"), first, "fixture: page 1 is back");
     let sp = page(&d, &sp.id);
     let r = rect(
         &d,
@@ -158,7 +182,7 @@ fn ac1_an_object_over_a_sketch_page_and_a_drawing_page_belongs_to_the_drawing_pa
     );
     assert!(first.overlaps(bounds(&d, r).0, bounds(&d, r).1));
     assert_eq!(pages_of(&d, r, Reach::Touches), vec!["first".to_owned()]);
-    assert_eq!(pages_of(&d, r, Reach::Inside), vec!["first".to_owned()]);
+    assert_eq!(owner_of(&d, r), vec!["first".to_owned()]);
 }
 
 #[test]
@@ -246,16 +270,12 @@ fn ac15_after_convert_objects_over_the_page_belong_to_it_by_position() {
         Point::new(sp.origin.x + 2.0, sp.origin.y + 2.0),
         Point::new(sp.origin.x + 8.0, sp.origin.y + 8.0),
     );
-    assert!(pages_of(&d, r, Reach::Inside).is_empty());
+    assert!(owner_of(&d, r).is_empty());
     let n = d.sketch(owner).unwrap().resolved.all_anchors().count();
     let ids: Vec<_> = (0..n as u64).map(|i| AnchorId::new(55, i)).collect();
     d.convert_sketch_page(&sp.id, &ids).unwrap();
-    assert_eq!(pages_of(&d, r, Reach::Inside), vec![sp.id.clone()]);
-    assert_eq!(
-        pages_of(&d, owner, Reach::Inside),
-        vec![sp.id.clone()],
-        "the paths too"
-    );
+    assert_eq!(owner_of(&d, r), vec![sp.id.clone()]);
+    assert_eq!(owner_of(&d, owner), vec![sp.id.clone()], "the paths too");
     let pages = d.pages();
     assert!(!PageMembership::of(&d, &pages).is_fixed(owner));
 }
@@ -274,7 +294,8 @@ fn ac17_after_deleting_the_sketch_page_objects_over_it_stay_on_the_pasteboard() 
         Point::new(sp.origin.x + 2.0, sp.origin.y + 2.0),
         Point::new(sp.origin.x + 8.0, sp.origin.y + 8.0),
     );
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert!(pages_of(&d, r, Reach::Touches).is_empty());
 }
 

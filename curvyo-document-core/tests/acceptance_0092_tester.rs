@@ -230,10 +230,18 @@ fn t31_resizes_of_different_pages_of_an_old_file_are_both_kept() {
     let pages = a.pages();
     assert!(pages.len() >= 2, "the fixture has several pages");
     let (first, second) = (pages[0].id.clone(), pages[1].id.clone());
-    a.resize_page(&first, DocumentSize::from_mm(250.0, 260.0))
-        .unwrap();
-    b.resize_page(&second, DocumentSize::from_mm(90.0, 95.0))
-        .unwrap();
+    a.resize_page(
+        &first,
+        DocumentSize::from_mm(250.0, 260.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    b.resize_page(
+        &second,
+        DocumentSize::from_mm(90.0, 95.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let (fa, fb) = (page_frame(&a, &first), page_frame(&b, &second));
     send(&a, &b);
     send(&b, &a);
@@ -271,9 +279,14 @@ fn t31_resize_of_a_page_deleted_by_a_peer_converges() {
     let bytes = pack(&base, "t").unwrap();
     let a = unpack(2, &bytes).unwrap();
     let b = unpack(3, &bytes).unwrap();
-    a.resize_page(&second.id, DocumentSize::from_mm(80.0, 80.0))
+    a.resize_page(
+        &second.id,
+        DocumentSize::from_mm(80.0, 80.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    b.delete_page(&second.id, &curvyo_document_core::PageContents::new())
         .unwrap();
-    b.delete_page(&second.id).unwrap();
     send(&a, &b);
     send(&b, &a);
     assert_eq!(a.pages(), b.pages());
@@ -362,13 +375,25 @@ fn format_34_keeps_old_page_origins_and_centres_on_resize() {
         .resize_page(
             &second.id,
             DocumentSize::from_mm(start.2 + 40.0, start.3 + 10.0),
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap();
     let after = page_frame(&opened, &second.id);
     assert!(near(centre(after), centre(start)), "{start:?} -> {after:?}");
+    // Page 1 lies beside the second page's left edge, which moved 20 mm out: page 1 moves with
+    // it and keeps its distance (`specs/0109` criterion 2).
+    let first_before = frame(&pages[0]);
     let first_after = frame(&opened.pages()[0]);
     assert!(
-        same_frame(first_after, frame(&pages[0])),
-        "page 1 untouched"
+        same_frame(
+            first_after,
+            (
+                first_before.0 - 20.0,
+                first_before.1,
+                first_before.2,
+                first_before.3
+            )
+        ),
+        "page 1 moves with the edge: {first_before:?} -> {first_after:?}"
     );
 }

@@ -40,9 +40,15 @@ impl WasmSession {
     pub fn rename_page(&mut self, id: &str, name: &str) -> bool {
         self.session.rename_page(id, name)
     }
-    /// Deletes a page frame, keeping its objects.
+    /// Deletes a page frame, keeping its objects; the pages behind it close the hole.
     pub fn delete_page(&mut self, id: &str) -> bool {
         self.session.delete_page(id)
+    }
+    /// The status region's text of the last auto-layout ("2 pages moved."), empty when the last
+    /// size change, drop or delete moved no other page (`specs/0109` ux-notes §7).
+    #[must_use]
+    pub fn pages_moved_text(&self) -> String {
+        self.session.pages_moved_text()
     }
     /// Reorders a page frame in the list.
     pub fn reorder_page(&mut self, id: &str, index: usize) -> bool {

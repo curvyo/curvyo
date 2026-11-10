@@ -140,11 +140,17 @@ impl Session {
             right: origin.is_right(),
             bottom: origin.is_bottom(),
         };
-        self.recording_unguarded(|this| {
+        let pages = self.document.pages();
+        let contents = self.page_contents();
+        let changed = self.recording_unguarded(|this| {
             this.document
-                .set_manufacturing_profile(id, &map, page, anchor, change)
+                .set_manufacturing_profile(id, &map, page, anchor, change, &contents)
                 .unwrap_or(false)
-        })
+        });
+        if let Some(output) = self.document.manufacturing(id).and_then(|m| m.page) {
+            self.note_moved_pages(&pages, &output.id);
+        }
+        changed
     }
 
     /// Picks the library profile `id` (criterion 5): the copy takes its values and the output

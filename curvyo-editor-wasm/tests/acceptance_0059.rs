@@ -43,8 +43,14 @@ fn press(s: &mut Session, point: Point) {
 fn ac4_overlapping_frame_resize_keeps_its_centre_and_moves_no_content() {
     let d = Document::new(600);
     let p = d.add_page();
-    d.move_page(&p.id, Vec2::new(100.0 - p.origin.x, 0.0), &[])
+    // Laid over Page 1 as in an older file: a drop pushes the page it lands on (`specs/0109`
+    // criterion 22), so Page 1 is moved out of the way and only that move is undone.
+    let none = curvyo_document_core::PageContents::new();
+    d.move_page("first", Vec2::new(0.0, 5000.0), &none).unwrap();
+    let away = d.own_steps().last().unwrap().step;
+    d.move_page(&p.id, Vec2::new(100.0 - p.origin.x, 0.0), &none)
         .unwrap();
+    d.undo_step(away).unwrap();
     let shared = rect(&d, 120.0, 30.0, 20.0);
     let exclusive = rect(&d, 250.0, 30.0, 20.0);
     let partial = rect(&d, 300.0, 60.0, 30.0);

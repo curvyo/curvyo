@@ -153,8 +153,12 @@ fn raw(d: &Document) -> LoroDoc {
 #[test]
 fn add_page_of_each_kind_takes_its_name_size_place_and_step() {
     let d = Document::new(1);
-    d.resize_page("first", DocumentSize::from_mm(125.0, 75.0))
-        .unwrap();
+    d.resize_page(
+        "first",
+        DocumentSize::from_mm(125.0, 75.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let drawing = d.add_page_of(&PageKind::Drawing).unwrap();
     assert_eq!(last_label(&d), "add_page");
     assert_eq!(drawing.name, "Page 2");
@@ -171,8 +175,12 @@ fn add_page_of_each_kind_takes_its_name_size_place_and_step() {
     let right = drawing.origin.x + drawing.size.width.as_mm();
     assert!(sketch.origin.x > right, "right of the last page");
     assert_eq!(sketch.origin.y, drawing.origin.y);
-    d.resize_page(&sketch.id, DocumentSize::from_mm(80.0, 80.0))
-        .unwrap();
+    d.resize_page(
+        &sketch.id,
+        DocumentSize::from_mm(80.0, 80.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let next = d.add_page_of(&PageKind::Sketch).unwrap();
     assert_eq!(next.name, "Sketch 2");
     assert_eq!(next.size, DocumentSize::from_mm(80.0, 80.0));
@@ -260,7 +268,8 @@ fn a_profile_change_keeps_the_origin_corner_and_the_placed_content_in_the_plane(
             &big,
             DocumentSize::from_mm(600.0, 400.0),
             corner,
-            ProfileChange::Pick
+            ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new()
         )
         .unwrap()
     );
@@ -293,6 +302,7 @@ fn a_profile_change_keeps_the_origin_corner_and_the_placed_content_in_the_plane(
         DocumentSize::from_mm(600.0, 400.0),
         tr,
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let frame = d.manufacturing(id).unwrap().page.unwrap();
@@ -311,7 +321,8 @@ fn deleting_a_laser_page_keeps_its_own_items_and_undo_restores_the_machine_data(
     let own = rect(&d, page.origin.x + 5.0, page.origin.y + 5.0);
     let full = d.manufacturing(id).unwrap();
     let steps = d.own_step_count();
-    d.delete_page(&page.id).unwrap();
+    d.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1);
     assert!(d.manufacturings().is_empty());
     assert!(d.object(own).is_some(), "own items stay where they lay");
@@ -337,14 +348,29 @@ fn an_unknown_or_output_page_refuses_resize_and_fit_but_moves() {
         .find(|p| matches!(p.kind, PageKind::Unknown(_)))
         .unwrap();
     assert!(matches!(
-        d.resize_page(&unknown.id, DocumentSize::from_mm(50.0, 50.0)),
+        d.resize_page(
+            &unknown.id,
+            DocumentSize::from_mm(50.0, 50.0),
+            &curvyo_document_core::PageContents::new()
+        ),
         Err(PageError::FixedSize)
     ));
     assert!(matches!(
-        d.fit_page_to_content(&unknown.id, (Point::new(0.0, 0.0), Point::new(1.0, 1.0))),
+        d.fit_page_to_content(
+            &unknown.id,
+            (Point::new(0.0, 0.0), Point::new(1.0, 1.0)),
+            &curvyo_document_core::PageContents::new()
+        ),
         Err(PageError::FixedSize)
     ));
-    assert!(d.move_page(&unknown.id, Vec2::new(5.0, 0.0), &[]).unwrap());
+    assert!(
+        d.move_page(
+            &unknown.id,
+            Vec2::new(5.0, 0.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .unwrap()
+    );
     assert!(d.rename_page(&unknown.id, "Kept").unwrap());
 }
 
@@ -410,7 +436,7 @@ fn migration_file() -> Vec<u8> {
     d.move_page(
         &holder.id,
         Vec2::new(-holder.origin.x, -holder.origin.y),
-        &[],
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let sketch = d

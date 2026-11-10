@@ -152,6 +152,7 @@ fn a_profile_write_is_one_step_with_its_page_and_an_unchanged_one_writes_nothing
                 DocumentSize::from_mm(500.0, 500.0),
                 PageCorner::default(),
                 ProfileChange::Pick,
+                &curvyo_document_core::PageContents::new(),
             )
             .unwrap()
     );
@@ -168,6 +169,7 @@ fn a_profile_write_is_one_step_with_its_page_and_an_unchanged_one_writes_nothing
                 DocumentSize::from_mm(500.0, 500.0),
                 PageCorner::default(),
                 ProfileChange::Pick,
+                &curvyo_document_core::PageContents::new(),
             )
             .unwrap()
     );
@@ -188,6 +190,7 @@ fn the_first_profile_write_of_a_format_35_file_drops_the_placeholder_name() {
             made.work_area(),
             PageCorner::default(),
             ProfileChange::EditMaxFeed,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap();
     let after = document.manufacturing(made.id).unwrap();

@@ -193,6 +193,15 @@ fn criterion_20_the_laser_tree_of_a_thousand_items_and_twenty_placed_pages() {
             work_area: DocumentSize::from_mm(2000.0, 2000.0),
         })
         .unwrap();
+    // Add page takes the size of the last drawing page: Page 1 becomes 60 x 60 mm first, so no
+    // later resize moves the laser page and its items along (`specs/0109` criterion 2).
+    d.resize_page(
+        "first",
+        DocumentSize::from_mm(60.0, 60.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    let laser = d.pages().into_iter().find(|q| q.id == laser.id).unwrap();
     for i in 0..1000 {
         let (col, row) = (f64::from(i % 40), f64::from(i / 40));
         square(
@@ -203,10 +212,6 @@ fn criterion_20_the_laser_tree_of_a_thousand_items_and_twenty_placed_pages() {
     }
     for p in 0..20 {
         let page = d.add_page();
-        d.resize_page(&page.id, DocumentSize::from_mm(60.0, 60.0))
-            .unwrap();
-        // A resize keeps the page's centre: read where it lies now.
-        let page = d.pages().into_iter().find(|q| q.id == page.id).unwrap();
         for i in 0..50 {
             let (col, row) = (f64::from(i % 10), f64::from(i / 10));
             square(

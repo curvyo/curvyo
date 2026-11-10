@@ -9,7 +9,11 @@ fn setup() -> (Session, Point) {
     let saved_document = Document::new(901);
     let page = saved_document.pages()[0].clone();
     saved_document
-        .move_page(&page.id, Vec2::new(300.0, -40.0), &[])
+        .move_page(
+            &page.id,
+            Vec2::new(300.0, -40.0),
+            &curvyo_document_core::PageContents::new(),
+        )
         .unwrap();
     let center = Point::new(
         300.0 + page.size.width.as_mm() / 2.0,

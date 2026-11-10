@@ -220,6 +220,7 @@ fn ac5_a_pick_writes_copy_and_work_area_in_one_step_and_keeps_placed_content() {
             DocumentSize::from_mm(600.0, 400.0),
             BOTTOM_LEFT,
             ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap()
     );
@@ -259,6 +260,7 @@ fn ac5_picking_the_same_profile_writes_nothing_and_adds_no_step() {
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let steps = d.own_step_count();
@@ -270,6 +272,7 @@ fn ac5_picking_the_same_profile_writes_nothing_and_adds_no_step() {
             DocumentSize::from_mm(600.0, 400.0),
             PageCorner::default(),
             ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap()
     );
@@ -294,8 +297,15 @@ fn ac5_each_profile_change_has_its_own_label() {
         let c = copy(USER_ID, "K40", 1_000 + i64::try_from(n).unwrap());
         let steps = d.own_step_count();
         assert!(
-            d.set_manufacturing_profile(id, &c, area, PageCorner::default(), change)
-                .unwrap()
+            d.set_manufacturing_profile(
+                id,
+                &c,
+                area,
+                PageCorner::default(),
+                change,
+                &curvyo_document_core::PageContents::new()
+            )
+            .unwrap()
         );
         assert_eq!(d.own_step_count(), steps + 1);
         assert_eq!(last_label(&d), label);
@@ -320,7 +330,8 @@ fn ac5_an_invalid_work_area_or_unknown_id_writes_nothing() {
                 &c,
                 DocumentSize::from_mm(w, h),
                 PageCorner::default(),
-                ProfileChange::Pick
+                ProfileChange::Pick,
+                &curvyo_document_core::PageContents::new()
             )
             .is_err(),
             "{w} x {h}"
@@ -338,6 +349,7 @@ fn ac5_an_invalid_work_area_or_unknown_id_writes_nothing() {
             DocumentSize::from_mm(400.0, 300.0),
             PageCorner::default(),
             ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new(),
         )
         .is_err()
     );
@@ -358,6 +370,7 @@ fn ac6_the_copy_is_one_register_with_whole_numbers_as_integers() {
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let bytes = pack(&d, "0.1.0").unwrap();
@@ -402,6 +415,7 @@ fn ac6_an_existing_manufacturing_does_not_change_when_nothing_writes_it() {
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let back = unpack(5, &pack(&d, "0.1.0").unwrap()).unwrap();
@@ -417,6 +431,7 @@ fn ac15_no_connection_data_and_no_library_entry_in_the_saved_file() {
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let bytes = pack(&d, "0.1.0").unwrap();
@@ -509,6 +524,7 @@ fn ac12_an_edited_600_by_400_copy_round_trips_exactly() {
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::EditMaxFeed,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let back = unpack(9, &pack(&d, "0.1.0").unwrap()).unwrap();
@@ -657,6 +673,7 @@ fn ac12_the_first_profile_write_on_a_format_35_file_stores_the_copy_and_drops_th
             m.work_area(),
             PageCorner::default(),
             ProfileChange::EditName,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap();
     assert!(changed);
@@ -723,6 +740,7 @@ fn adr0037_two_manufacturings_keep_independent_copies() {
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     assert_eq!(

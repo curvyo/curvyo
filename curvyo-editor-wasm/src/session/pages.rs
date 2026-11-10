@@ -1,7 +1,9 @@
 //! Session commands targeting spatial page frames.
 use super::{Session, SizeOutcome};
-use curvyo_document_core::{DocumentSize, NodeId, ObjectSnapshot, Page, PageKind, Point};
-use curvyo_ui_core::{PageMembership, Reach, object_bounds};
+use curvyo_document_core::{
+    DocumentSize, NodeId, ObjectSnapshot, Page, PageContents, PageKind, Point,
+};
+use curvyo_ui_core::{PageMembership, Reach};
 
 /// How far a press may travel, in screen px, and still be a click that activates a page.
 const CLICK_SLOP_PX: f64 = 4.0;
@@ -245,7 +247,10 @@ impl Session {
             return false;
         };
         let active = self.active_page().id == id;
-        let changed = self.recording_unguarded(|this| this.document.delete_page(id).is_ok());
+        let contents = self.page_contents();
+        let changed =
+            self.recording_unguarded(|this| this.document.delete_page(id, &contents).is_ok());
+        self.note_moved_pages(&pages, id);
         if changed && active {
             let pages = self.document.pages();
             self.page_view.active = Some(pages[index.min(pages.len() - 1)].id.clone());
@@ -270,43 +275,63 @@ impl Session {
         PageMembership::of(&self.document, &self.document.pages())
     }
 
-    /// What a frame move of `page` carries (`0059` criterion 9, ADR 0043 §3): the members wholly
-    /// on it; for a sketch page exactly its sketch.
     /// Whether a frame move of `page` leaves its content: the per-user switch, which a sketch
     /// page does not have (`specs/0099-sketch-pages` criterion 5).
     pub(super) fn frame_moves_alone(&self, page: &Page) -> bool {
         page.kind != PageKind::Sketch && self.page_view.frame_only.contains(&page.id)
     }
 
-    pub(super) fn contained_page_objects(&self, page: &Page) -> Vec<NodeId> {
-        if page.kind == PageKind::Sketch {
-            return self.document.page_sketch(&page.id).into_iter().collect();
-        }
-        let membership = self.page_membership();
-        self.document_read()
-            .leaves
-            .iter()
-            .filter(|object| {
-                membership.is_member(page, object.id(), object_bounds(object), Reach::Inside)
-            })
-            .map(ObjectSnapshot::id)
-            .collect()
+    /// What every page owns by centre now (ADR 0051 §4): what a page carries when a drag, a size
+    /// change or a delete moves it; for a sketch page exactly its sketch (ADR 0043 §3).
+    pub(super) fn page_contents(&self) -> PageContents {
+        let pages = self.document.pages();
+        curvyo_ui_core::page_contents(
+            &self.document,
+            &pages,
+            &self.page_membership(),
+            &self.document_read().leaves,
+        )
     }
-    /// Moves the frame to a global position, optionally carrying contained objects.
+
+    /// The contents a drag of `page` uses: [`Session::page_contents`] without the dragged
+    /// page's own entry when its frame moves alone (`specs/0109` criterion 25).
+    pub(super) fn drag_contents(&self, page: &Page) -> PageContents {
+        let mut contents = self.page_contents();
+        if self.frame_moves_alone(page) {
+            contents.remove(&page.id);
+        }
+        contents
+    }
+
+    /// Notes how many pages of `before` other than `except` the last command moved, for the
+    /// Document section's status region (`specs/0109` ux-notes §7).
+    pub(super) fn note_moved_pages(&mut self, before: &[Page], except: &str) {
+        let after = self.document.pages();
+        self.page_view.note_moved(before, &after, except);
+    }
+
+    /// The status region's text of the last auto-layout ("2 pages moved."), empty when it moved
+    /// no page.
+    #[must_use]
+    pub fn pages_moved_text(&self) -> String {
+        self.page_view.moved_text()
+    }
+
+    /// Moves the frame to a global position, carrying the objects it owns by centre unless it
+    /// moves alone, and pushing the pages it lands on (`specs/0109` criteria 21 to 25).
     pub fn move_page_to(&mut self, id: &str, origin: Point) -> bool {
-        let Some(page) = self.document.pages().into_iter().find(|p| p.id == id) else {
+        let pages = self.document.pages();
+        let Some(page) = pages.iter().find(|p| p.id == id).cloned() else {
             return false;
         };
-        let objects = if self.frame_moves_alone(&page) {
-            Vec::new()
-        } else {
-            self.contained_page_objects(&page)
-        };
-        self.recording_unguarded(|this| {
+        let contents = self.drag_contents(&page);
+        let moved = self.recording_unguarded(|this| {
             this.document
-                .move_page(id, page.origin.vector_to(origin), &objects)
+                .move_page(id, page.origin.vector_to(origin), &contents)
                 .unwrap_or(false)
-        })
+        });
+        self.note_moved_pages(&pages, id);
+        moved
     }
     pub(super) fn resize_active_page(&mut self, size: DocumentSize) -> SizeOutcome {
         let page = self.active_page();
@@ -314,11 +339,15 @@ impl Session {
         if page.kind.fixed_size() {
             return SizeOutcome::Unchanged;
         }
-        match self.document.resize_page(&page.id, size) {
+        let pages = self.document.pages();
+        let contents = self.page_contents();
+        let outcome = match self.document.resize_page(&page.id, size, &contents) {
             Ok(true) => SizeOutcome::Committed,
             Ok(false) => SizeOutcome::Unchanged,
             Err(_) => SizeOutcome::Invalid,
-        }
+        };
+        self.note_moved_pages(&pages, &page.id);
+        outcome
     }
     pub(super) fn fit_active_page(&mut self) -> super::FitOutcome {
         let page = self.active_page();
@@ -342,14 +371,21 @@ impl Session {
             min = Point::new(min.x.min(a.x), min.y.min(a.y));
             max = Point::new(max.x.max(b.x), max.y.max(b.y));
         }
-        // The frame goes onto the content; no object moves (ADR 0031 decision 9a).
-        match self.document.fit_page_to_content(&page.id, (min, max)) {
+        // The frame goes onto the content; no object on it moves (ADR 0031 decision 9a).
+        let pages = self.document.pages();
+        let contents = self.page_contents();
+        let outcome = match self
+            .document
+            .fit_page_to_content(&page.id, (min, max), &contents)
+        {
             Ok(true) => super::FitOutcome::Fitted,
             Ok(false) => super::FitOutcome::AlreadyFits,
             Err(_) => super::FitOutcome::TooLarge(curvyo_ui_core::content_too_large_message(
                 self.display_unit(),
             )),
-        }
+        };
+        self.note_moved_pages(&pages, &page.id);
+        outcome
     }
     /// The objects of `objects` Select all takes.
     pub(super) fn page_selection_ids(&self, objects: &[ObjectSnapshot]) -> Vec<NodeId> {

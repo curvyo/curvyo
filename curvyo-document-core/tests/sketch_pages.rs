@@ -7,13 +7,19 @@ use curvyo_sketch_core::{Entity, Position, Sketch};
 /// owns a sketch).
 fn sketch_document(peer: u64) -> Document {
     let d = Document::new(peer);
-    let page = d
-        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+    d.add_page_of(&curvyo_document_core::PageKind::Sketch)
         .unwrap();
-    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
-    // At the old first page's place, so the expected coordinates stay as written.
-    let back = curvyo_document_core::Vec2::new(-page.origin.x, -page.origin.y);
-    d.move_page(&page.id, back, &[]).unwrap();
+    d.delete_page(
+        curvyo_document_core::FIRST_PAGE_ID,
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    // Deleting page 1 closes the hole (`specs/0109` criterion 38): the sketch page now lies at
+    // the old first page's place, so the expected coordinates stay as written.
+    assert_eq!(
+        d.pages()[0].origin,
+        curvyo_document_core::Point::new(0.0, 0.0)
+    );
     d
 }
 
@@ -177,7 +183,8 @@ fn conversion_and_page_removal_preserve_claim_history_without_recentering() {
         .create_page_sketch(&page.id, &graph, &Style::default())
         .unwrap();
     let placement = doc.sketch(id).unwrap().placement;
-    doc.delete_page(&page.id).unwrap();
+    doc.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(doc.page_sketch(&page.id), None);
     // The sketch goes with its page (`specs/0099-sketch-pages` criterion 17).
     assert!(doc.sketch(id).is_none());

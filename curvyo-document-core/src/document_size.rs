@@ -105,7 +105,9 @@ impl Document {
     }
 
     /// Sets page `id`'s frame to `content` as [`Document::fit_to_content`] does for the document
-    /// size; the caller passes the bounds of the objects it fits the page to.
+    /// size; the caller passes the bounds of the objects it fits the page to. The pages beside
+    /// its moving edges move with them, carrying what `contents` says they own, in the same step
+    /// (ADR 0051 §2).
     ///
     /// # Errors
     /// [`PageError::NotFound`] for an unknown page, else the errors of
@@ -114,6 +116,7 @@ impl Document {
         &self,
         id: &str,
         content: (Point, Point),
+        contents: &crate::PageContents,
     ) -> Result<bool, PageError> {
         let frame = fitted_frame(content)?;
         let page = self
@@ -124,20 +127,17 @@ impl Document {
         if page.kind.fixed_size() {
             return Err(PageError::FixedSize);
         }
-        Ok(self.write_fitted_frame(&page, frame))
+        if fits(&page, frame) {
+            return Ok(false);
+        }
+        self.write_frame_with_layout(&page.id, frame, "fit_document_to_content", contents)?;
+        Ok(true)
     }
 
     /// Writes `frame` as `page`'s frame in one commit `fit_document_to_content`; `false` and
     /// nothing written when the frame stays within 1e-9 mm.
     fn write_fitted_frame(&self, page: &Page, frame: Frame) -> bool {
-        let unchanged = [
-            (frame.origin.x, page.origin.x),
-            (frame.origin.y, page.origin.y),
-            (frame.size.width.as_mm(), page.size.width.as_mm()),
-            (frame.size.height.as_mm(), page.size.height.as_mm()),
-        ]
-        .iter()
-        .all(|(a, b)| (a - b).abs() <= EQUAL_EPSILON_MM);
+        let unchanged = fits(page, frame);
         if !unchanged {
             self.write_frame_commit(&page.id, frame, "fit_document_to_content");
         }
@@ -155,6 +155,18 @@ impl Document {
         // invariant: pages() always holds at least one frame.
         pages.swap_remove(index)
     }
+}
+
+/// Whether `page`'s frame already equals `frame` within 1e-9 mm.
+fn fits(page: &Page, frame: Frame) -> bool {
+    [
+        (frame.origin.x, page.origin.x),
+        (frame.origin.y, page.origin.y),
+        (frame.size.width.as_mm(), page.size.width.as_mm()),
+        (frame.size.height.as_mm(), page.size.height.as_mm()),
+    ]
+    .iter()
+    .all(|(a, b)| (a - b).abs() <= EQUAL_EPSILON_MM)
 }
 
 /// The frame a fit writes for `content`: the box, a side under [`MIN_DOCUMENT_MM`] widened to it

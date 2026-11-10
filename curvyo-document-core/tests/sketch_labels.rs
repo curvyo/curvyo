@@ -9,13 +9,19 @@ use curvyo_sketch_core::{
 /// owns a sketch).
 fn sketch_document(peer: u64) -> Document {
     let d = Document::new(peer);
-    let page = d
-        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+    d.add_page_of(&curvyo_document_core::PageKind::Sketch)
         .unwrap();
-    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
-    // At the old first page's place, so the expected coordinates stay as written.
-    let back = curvyo_document_core::Vec2::new(-page.origin.x, -page.origin.y);
-    d.move_page(&page.id, back, &[]).unwrap();
+    d.delete_page(
+        curvyo_document_core::FIRST_PAGE_ID,
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    // Deleting page 1 closes the hole (`specs/0109` criterion 38): the sketch page now lies at
+    // the old first page's place, so the expected coordinates stay as written.
+    assert_eq!(
+        d.pages()[0].origin,
+        curvyo_document_core::Point::new(0.0, 0.0)
+    );
     d
 }
 

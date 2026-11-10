@@ -111,7 +111,7 @@ mod pen_entry;
 mod pen_entry_text;
 mod pen_target;
 mod pen_tool;
-pub use page_membership::{PageMembership, Reach};
+pub use page_membership::{PageMembership, Reach, page_contents};
 mod edit_context;
 mod edit_context_text;
 mod step_scope;

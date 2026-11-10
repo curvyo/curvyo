@@ -130,8 +130,12 @@ fn moving_a_sketch_frame_with_its_sketch_holds_every_clone_back() {
     let plain = d.linked_clone(&[sketch], &[]).unwrap()[0];
     let placed = d.place_linked_clone(sketch, Vec2::new(0.0, 200.0)).unwrap();
     let before = (bounds(&d, sketch), bounds(&d, plain), bounds(&d, placed));
-    d.move_page(&page, Vec2::new(30.0, -10.0), &[sketch])
-        .unwrap();
+    d.move_page(
+        &page,
+        Vec2::new(30.0, -10.0),
+        &curvyo_document_core::PageContents::from([(page.clone(), vec![sketch])]),
+    )
+    .unwrap();
     let moved = bounds(&d, sketch);
     assert!(close(
         moved,
@@ -247,7 +251,8 @@ fn deleting_a_sketch_page_turns_its_clones_into_paths_and_undo_relinks_them() {
     let outlines: Vec<_> = clones.iter().map(|&c| bounds(&d, c)).collect();
     let over_before = d.object(over);
     let steps = d.own_step_count();
-    d.delete_page(&page).unwrap();
+    d.delete_page(&page, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1);
     assert_eq!(last_label(&d), DELETE_SKETCH_PAGE_COMMIT_LABEL);
     assert!(d.pages().iter().all(|p| p.id != page));
@@ -268,9 +273,13 @@ fn deleting_a_sketch_page_turns_its_clones_into_paths_and_undo_relinks_them() {
 fn the_last_page_stays_and_an_empty_sketch_page_is_deleted_as_any_page() {
     let d = Document::new(1);
     let page = d.add_page_of(&PageKind::Sketch).unwrap();
-    d.delete_page(&page.id).unwrap();
+    d.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(last_label(&d), "delete_page");
-    assert!(d.delete_page("first").is_err());
+    assert!(
+        d.delete_page("first", &curvyo_document_core::PageContents::new())
+            .is_err()
+    );
 }
 
 // ---- criterion 19: the golden ------------------------------------------------------------

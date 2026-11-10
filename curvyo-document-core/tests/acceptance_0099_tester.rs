@@ -231,7 +231,8 @@ fn ac4_only_the_live_owner_of_a_live_sketch_page_is_fixed() {
     assert!(!d.is_fixed_sketch(c), "a clone of the sketch");
     let r = rect(&d, 1.0, 1.0, 5.0, 5.0);
     assert!(!d.is_fixed_sketch(r));
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert!(!d.is_fixed_sketch(owner), "page and sketch deleted");
     undo_last(&d);
     assert!(d.is_fixed_sketch(owner), "undo restores the fixed sketch");
@@ -281,7 +282,12 @@ fn ac5_the_frame_move_moves_the_sketch_and_holds_every_clone_and_foreign_object(
     let before_sketch = outline_of(&d, owner);
     let steps = d.own_step_count();
     let delta = Vec2::new(37.5, -12.25);
-    d.move_page(&sp.id, delta, &[owner]).unwrap();
+    d.move_page(
+        &sp.id,
+        delta,
+        &curvyo_document_core::PageContents::from([(sp.id.clone(), vec![owner])]),
+    )
+    .unwrap();
     assert_eq!(d.own_step_count(), steps + 1, "one undo step");
     assert_eq!(last_label(&d), "move_page");
     let moved = d.sketch(owner).unwrap().placement;
@@ -325,7 +331,12 @@ fn ac5_a_sketch_whose_outline_lies_outside_its_frame_still_moves_with_it() {
         "fixture: the outline lies wholly outside the frame"
     );
     let delta = Vec2::new(-10.0, 25.0);
-    d.move_page(&sp.id, delta, &[owner]).unwrap();
+    d.move_page(
+        &sp.id,
+        delta,
+        &curvyo_document_core::PageContents::from([(sp.id.clone(), vec![owner])]),
+    )
+    .unwrap();
     assert!(same_outline(
         &outline_of(&d, owner),
         &shifted(&before, delta),
@@ -346,7 +357,8 @@ fn ac6_resizing_a_sketch_page_keeps_the_sketch_and_the_clones_in_place() {
         DocumentSize::from_mm(40.0, 500.0),
     ] {
         let steps = d.own_step_count();
-        d.resize_page(&sp.id, size).unwrap();
+        d.resize_page(&sp.id, size, &curvyo_document_core::PageContents::new())
+            .unwrap();
         assert_eq!(d.own_step_count(), steps + 1, "one undo step");
         assert_eq!(page(&d, &sp.id).size, size);
         assert_eq!(
@@ -466,8 +478,12 @@ fn ac8_place_linked_clone_is_one_step_with_own_placement_and_the_translation() {
     assert_eq!(page(&d, &sp.id), sp);
     // Moving the sketch page never pushes it.
     let clone_before = outline_of(&d, c);
-    d.move_page(&sp.id, Vec2::new(20.0, 20.0), &[owner])
-        .unwrap();
+    d.move_page(
+        &sp.id,
+        Vec2::new(20.0, 20.0),
+        &curvyo_document_core::PageContents::from([(sp.id.clone(), vec![owner])]),
+    )
+    .unwrap();
     assert!(same_outline(&outline_of(&d, c), &clone_before, TOL));
     undo_last(&d);
     d.undo_step(place_step).unwrap();
@@ -501,7 +517,8 @@ fn ac8_place_linked_clone_refuses_anything_but_a_fixed_sketch_and_writes_nothing
     assert_eq!(d.version(), version, "nothing written");
     assert_eq!(d.own_step_count(), steps);
     // A deleted sketch page's sketch cannot be placed either.
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert!(d.place_linked_clone(owner, Vec2::new(0.0, 0.0)).is_err());
 }
 
@@ -671,7 +688,8 @@ fn ac17_delete_turns_every_clone_into_paths_and_undo_restores_them_as_clones() {
     let over_before = d.object(over).unwrap();
     let pages_before = d.pages();
     let steps = d.own_step_count();
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1, "one undo step");
     assert_eq!(last_label(&d), DELETE_SKETCH_PAGE_COMMIT_LABEL);
     assert_eq!(DELETE_SKETCH_PAGE_COMMIT_LABEL, "delete_sketch_page");
@@ -733,7 +751,8 @@ fn ac17_delete_turns_every_clone_into_paths_and_undo_restores_them_as_clones() {
 fn ac17_delete_keeps_the_parameters_of_a_driven_sketch_through_undo() {
     let (d, sp, owner) = with_sketch(&driven_line());
     let graph = d.sketch(owner).unwrap().graph;
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     undo_last(&d);
     assert_eq!(d.sketch(owner).unwrap().graph, graph);
     d.apply_sketch_delta(owner, &set_width(100.0)).unwrap();
@@ -745,12 +764,16 @@ fn ac17_delete_keeps_the_parameters_of_a_driven_sketch_through_undo() {
 fn ac17_the_last_page_cannot_be_deleted_even_a_sketch_page() {
     let d = Document::new(5);
     let sp = d.add_page_of(&PageKind::Sketch).unwrap();
-    d.delete_page("first").unwrap();
+    d.delete_page("first", &curvyo_document_core::PageContents::new())
+        .unwrap();
     let owner = d
         .create_page_sketch(&sp.id, &closed_box(), &Style::default())
         .unwrap();
     let version = d.version();
-    assert!(d.delete_page(&sp.id).is_err());
+    assert!(
+        d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+            .is_err()
+    );
     assert_eq!(d.version(), version, "nothing written");
     assert!(d.sketch(owner).is_some());
 }
@@ -761,7 +784,8 @@ fn ac17_an_empty_sketch_page_is_deleted_like_any_page() {
     let sp = d.add_page_of(&PageKind::Sketch).unwrap();
     let r = rect(&d, sp.origin.x + 1.0, sp.origin.y + 1.0, 4.0, 4.0);
     let steps = d.own_step_count();
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1);
     assert!(d.object(r).is_some());
     undo_last(&d);
@@ -783,7 +807,8 @@ fn ac17_delete_leaves_a_conflict_object_on_the_page_untouched() {
     let winner = a.page_sketch(&sp.id).unwrap();
     let loser = if winner == left { right } else { left };
     let loser_before = a.sketch(loser).unwrap().graph;
-    a.delete_page(&sp.id).unwrap();
+    a.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert!(a.sketch(winner).is_none(), "the owner goes");
     assert_eq!(
         a.sketch(loser).map(|s| s.graph),
@@ -801,7 +826,8 @@ fn ac17_a_clone_made_by_a_peer_while_the_page_is_deleted_is_removed_as_an_orphan
         .unwrap();
     let b = reopen(&a, 62);
     let late = b.place_linked_clone(owner, Vec2::new(-100.0, 0.0)).unwrap();
-    a.delete_page(&sp.id).unwrap();
+    a.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     exchange(&a, &b);
     a.remove_orphan_clones();
     assert!(
@@ -1021,7 +1047,8 @@ fn edge_a_locked_sketch_still_goes_with_its_page() {
     let c = d.place_linked_clone(owner, Vec2::new(-200.0, 0.0)).unwrap();
     d.set_node_locked(&[owner], true).unwrap();
     let steps = d.own_step_count();
-    d.delete_page(&sp.id).unwrap();
+    d.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1);
     assert!(d.sketch(owner).is_none());
     assert!(matches!(d.object(c), Some(ObjectSnapshot::Path(_))));
@@ -1094,7 +1121,8 @@ fn edge_a_peer_editing_the_sketch_while_its_page_is_deleted_converges() {
     let c = a.place_linked_clone(owner, Vec2::new(-150.0, 0.0)).unwrap();
     let b = reopen(&a, 83);
     b.apply_sketch_delta(owner, &set_width(100.0)).unwrap();
-    a.delete_page(&sp.id).unwrap();
+    a.delete_page(&sp.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     exchange(&a, &b);
     assert_eq!(a.pages(), b.pages());
     assert!(a.pages().iter().all(|p| p.id != sp.id));

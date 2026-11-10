@@ -1,13 +1,15 @@
-//! Page-edge gestures with a frozen contained-object set.
+//! Page-edge gestures with the ownership read frozen at the press.
 use super::{Session, Tool};
-use curvyo_document_core::{NodeId, ObjectSnapshot, Page, Point, Vec2};
+use curvyo_document_core::{ObjectSnapshot, Page, PageContents, Point, Vec2};
 use curvyo_ui_core::{PressTarget, classify_press};
 #[derive(Debug)]
 pub(super) struct PageDrag {
     page: Page,
     start: Point,
     delta: Vec2,
-    objects: Vec<NodeId>,
+    /// What every page owns at the press (`specs/0109` criteria 21, 22); the dragged page has no
+    /// entry when its frame moves alone.
+    contents: PageContents,
 }
 impl Session {
     pub(super) fn page_edge_at(&self, point: Point) -> Option<Page> {
@@ -52,11 +54,7 @@ impl Session {
         let Some(page) = self.page_edge_at(point) else {
             return false;
         };
-        let objects = if self.frame_moves_alone(&page) {
-            Vec::new()
-        } else {
-            self.contained_page_objects(&page)
-        };
+        let contents = self.drag_contents(&page);
         // A page of another workbench (a sketch page dragged from a drawing page) activates on
         // the release, so the drag keeps the tools it started with (`specs/0099` criterion 5).
         if self.workbench_of_kind(&page.kind) == self.workbench() {
@@ -66,7 +64,7 @@ impl Session {
             page,
             start: point,
             delta: Vec2::new(0.0, 0.0),
-            objects,
+            contents,
         });
         self.button_down = true;
         true
@@ -89,9 +87,11 @@ impl Session {
         let Some(drag) = self.page_drag.take() else {
             return false;
         };
+        let pages = self.document.pages();
         let _ = self
             .document
-            .move_page(&drag.page.id, drag.delta, &drag.objects);
+            .move_page(&drag.page.id, drag.delta, &drag.contents);
+        self.note_moved_pages(&pages, &drag.page.id);
         if self.workbench_of_kind(&drag.page.kind) == self.workbench() {
             self.page_view.press(&self.document.pages(), point, false);
         } else {
@@ -118,9 +118,12 @@ impl Session {
         objects
     }
     fn page_drag_preview(&self, objects: &mut [ObjectSnapshot]) {
-        if let Some(drag) = &self.page_drag {
+        if let Some(drag) = &self.page_drag
+            && let Some(carried) = drag.contents.get(&drag.page.id)
+        {
+            let carried: std::collections::HashSet<_> = carried.iter().copied().collect();
             for object in objects {
-                if drag.objects.contains(&object.id()) {
+                if carried.contains(&object.id()) {
                     *object = object.translated(drag.delta);
                 }
             }

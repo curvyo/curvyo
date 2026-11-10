@@ -1455,7 +1455,7 @@ fn edge_a_marquee_started_on_a_drawing_page_takes_objects_over_a_sketch_page_but
             right + 5.0 - f.sketch_page.origin.x,
             f.second.origin.y - f.sketch_page.origin.y,
         ),
-        &[owner],
+        &curvyo_document_core::PageContents::from([(f.sketch_page.id.clone(), vec![owner])]),
     )
     .unwrap();
     let sp = find_page(&d, &f.sketch_page.id);

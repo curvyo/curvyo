@@ -346,10 +346,18 @@ fn the_grid_moves_with_its_page_and_survives_a_resize() {
     let page = document.add_page();
     assert!(document.set_page_grid(&page.id, rotated_log()).unwrap());
     document
-        .move_page(&page.id, Vec2::new(30.0, -10.0), &[])
+        .move_page(
+            &page.id,
+            Vec2::new(30.0, -10.0),
+            &curvyo_document_core::PageContents::new(),
+        )
         .unwrap();
     document
-        .resize_page(&page.id, DocumentSize::from_mm(80.0, 60.0))
+        .resize_page(
+            &page.id,
+            DocumentSize::from_mm(80.0, 60.0),
+            &curvyo_document_core::PageContents::new(),
+        )
         .unwrap();
     let moved = document
         .pages()
@@ -364,7 +372,11 @@ fn the_origin_corner_measures_positive_into_the_page() {
     let document = Document::new(1);
     let mut page = document.add_page();
     document
-        .resize_page(&page.id, DocumentSize::from_mm(100.0, 50.0))
+        .resize_page(
+            &page.id,
+            DocumentSize::from_mm(100.0, 50.0),
+            &curvyo_document_core::PageContents::new(),
+        )
         .unwrap();
     page = document.pages()[1].clone();
     let (x, y) = (page.origin.x, page.origin.y);

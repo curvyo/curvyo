@@ -513,6 +513,15 @@ fn ac5_pick_takes_values_and_work_area_in_one_step_and_content_keeps_its_place()
     // Operations"; this test reads the drawing's own colour, which "View: Drawn" keeps.
     s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
     let red = red_box(&s);
+    let page_1 = |s: &Session| {
+        let p = opened(s)
+            .pages()
+            .into_iter()
+            .find(|p| p.id == "first")
+            .unwrap();
+        (p.origin.x, p.origin.y)
+    };
+    let corner = page_1(&s);
     let steps = s.undo_len();
     assert!(s.pick_machine_profile(&id(1)));
     assert_eq!(s.undo_len(), steps + 1, "one undo step");
@@ -524,16 +533,21 @@ fn ac5_pick_takes_values_and_work_area_in_one_step_and_content_keeps_its_place()
     assert_eq!(c["max_power"], 255);
     assert_eq!(c["laser_mode"], false);
     assert_eq!(work_area(&s), (600.0, 400.0));
+    // The K40's origin is top right: the laser page grows to the left, and Page 1 beside its left
+    // edge moves with that edge, carrying its drawing (`specs/0109` criterion 32).
+    let moved = page_1(&s);
+    let (dx, dy) = (moved.0 - corner.0, moved.1 - corner.1);
+    assert!(dx < 0.0 && dy.abs() < 1e-9, "Page 1 moved left: {dx}");
     let after = red_box(&s);
     for (a, b) in [
-        (red.0, after.0),
+        (red.0 + dx, after.0),
         (red.1, after.1),
-        (red.2, after.2),
+        (red.2 + dx, after.2),
         (red.3, after.3),
     ] {
         assert!(
             (a - b).abs() < 0.05,
-            "content relative to the top-left: {red:?} vs {after:?}"
+            "content keeps its place on its page: {red:?} vs {after:?}"
         );
     }
     assert!(machine(&s)["state"].is_null());

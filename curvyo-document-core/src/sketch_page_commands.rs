@@ -40,9 +40,17 @@ impl Document {
     /// Marks sketch page `page` deleted and removes its live owning sketch through the ordinary
     /// object removal, so every clone of it is repaired (`0049` criterion 31), in one commit
     /// labelled [`DELETE_SKETCH_PAGE_COMMIT_LABEL`] (ADR 0043 §5). Called by
-    /// [`Document::delete_page`] for a sketch page with a sketch.
-    pub(crate) fn delete_sketch_page(&self, page: &str, owner: NodeId) -> Result<(), PageError> {
+    /// [`Document::delete_page`] for a sketch page with a sketch, whose closing moves `close`
+    /// writes first, in the same step (ADR 0051 §3a), so a clone that moves is repaired where it
+    /// lands.
+    pub(crate) fn delete_sketch_page(
+        &self,
+        page: &str,
+        owner: NodeId,
+        close: impl FnOnce(&Self) -> Result<(), crate::ObjectEditError>,
+    ) -> Result<(), PageError> {
         self.batch(DELETE_SKETCH_PAGE_COMMIT_LABEL, |doc| {
+            close(doc)?;
             crate::pages::write(&doc.loro().get_map(ROOT_MAP), page, "deleted", true);
             doc.delete_objects(&[owner]).map_err(PageError::from)
         })

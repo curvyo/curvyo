@@ -381,6 +381,7 @@ fn ac12_differs_is_derived_from_a_fixture_record() {
             DocumentSize::from_mm(600.0, 400.0),
             curvyo_document_core::PageCorner::default(),
             ProfileChange::Reset,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap();
     let mut same = Session::open(6, &pack(&document, "test").unwrap()).unwrap();
