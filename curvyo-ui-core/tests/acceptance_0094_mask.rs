@@ -685,7 +685,7 @@ fn a_refused_clip_is_counted_and_named() {
     )
     .unwrap();
     let p = TraceParams {
-        specks: curvyo_document_core::Length::from_mm(0.0),
+        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     };
     let read = read_trace_wire(&trace_job_in(

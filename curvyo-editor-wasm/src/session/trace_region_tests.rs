@@ -189,7 +189,7 @@ fn c12_create_paths_leaves_the_mask_paths_and_undoes_in_one_step() {
         map,
         // The image is under a millimetre wide: no speck is ignored.
         &TraceParams {
-            specks: Length::from_mm(0.0),
+            specks: curvyo_ui_core::TraceMm::from_mm(0.0),
             ..TraceParams::with_threshold(128)
         },
         Some(&region),

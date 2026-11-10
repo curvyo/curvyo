@@ -11,7 +11,7 @@
     clippy::too_many_lines
 )]
 
-use curvyo_document_core::{Length, NodeId, ObjectSnapshot, PathSnapshot, unpack};
+use curvyo_document_core::{NodeId, ObjectSnapshot, PathSnapshot, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
 use curvyo_ui_core::{
     TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_with,
@@ -62,7 +62,7 @@ fn traced() -> (Session, NodeId, Vec<f64>) {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
     let wire = trace_colour_job_with(

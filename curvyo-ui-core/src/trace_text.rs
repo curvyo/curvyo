@@ -243,7 +243,7 @@ pub fn text_pass(
             invert: false,
             ignore_background: false,
             // A letter's dot or a full stop is no speck.
-            specks: curvyo_document_core::Length::from_mm(0.0),
+            specks: curvyo_vectorize_core::Mm::from_mm(0.0),
             ..*params
         };
         // The crop's pixels moved to their place in the picture, then mapped (`compose` applies
@@ -259,7 +259,7 @@ pub fn text_pass(
                 height: u32::try_from(ch).unwrap_or(0),
                 rgba: &crop,
             },
-            map,
+            curvyo_vectorize_core::PixelMap::new(map.to_array()),
             &own,
             &mut |_| ControlFlow::Continue(()),
         ) else {

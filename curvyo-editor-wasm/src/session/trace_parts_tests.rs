@@ -292,7 +292,7 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
         ))
         .to_array();
     let params = TraceParams {
-        specks: Length::from_mm(0.0),
+        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     };
     let clips = session.trace_part_clip_list();
@@ -454,7 +454,7 @@ fn c31_a_cropped_part_traces_as_the_whole_picture_does() {
     let region = TraceRegion::of_operands(&[vec![(square, true)]], false).unwrap();
     // Ignore below 1 mm: 1 mm² is 100 px, more than the 16 px margin.
     let params = TraceParams {
-        specks: Length::from_mm(1.0),
+        specks: curvyo_ui_core::TraceMm::from_mm(1.0),
         upscale: TraceUpscale::Off,
         ..TraceParams::with_threshold(128)
     };

@@ -23,7 +23,7 @@
 #[path = "support_0094/mod.rs"]
 mod support;
 
-use curvyo_document_core::{Length, Point, Tolerance, Vec2};
+use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
@@ -357,7 +357,7 @@ fn colour(tolerance: u8) -> Job {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     }))
 }
@@ -475,7 +475,7 @@ fn c23_a_different_rgb_in_a_part_stays_a_layer_of_its_own() {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
         invert: false,
         ..TraceParams::with_threshold(128)
     }));

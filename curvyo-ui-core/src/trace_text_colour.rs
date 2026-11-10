@@ -10,8 +10,8 @@ use std::ops::ControlFlow;
 
 use curvyo_document_core::Affine;
 use curvyo_vectorize_core::{
-    ColourParams, ColourTrace, PaletteEntry, Progress, Raster, Rgb8, Selection, TraceError,
-    colour_palette, suggest_background, trace_colours,
+    ColourParams, ColourTrace, PaletteEntry, PixelMap, Progress, Raster, Rgb8, Selection,
+    TraceError, colour_palette, suggest_background, trace_colours,
 };
 
 use crate::trace_ocr::OcrLine;
@@ -122,7 +122,7 @@ fn palette_of_picture(
     if pass.regions.is_empty() || matches!(params.trace.selection, Selection::PickColours { .. }) {
         return Ok(None);
     }
-    let palette = colour_palette(raster, map, params, &mut |p| {
+    let palette = colour_palette(raster, PixelMap::new(map.to_array()), params, &mut |p| {
         progress(p);
         ControlFlow::Continue(())
     })?;
@@ -152,7 +152,7 @@ fn trace_with_palette(
     progress: &mut dyn FnMut(Progress),
 ) -> Result<ColourTrace, TraceError> {
     let own = with_palette(params, palette);
-    let mut result = trace_colours(filled, map, &own, &mut |p| {
+    let mut result = trace_colours(filled, PixelMap::new(map.to_array()), &own, &mut |p| {
         progress(p);
         ControlFlow::Continue(())
     })?;
@@ -240,7 +240,7 @@ fn nearest(colour: Rgb8, candidates: &[Rgb8]) -> Option<Rgb8> {
 mod tests {
     use super::*;
     use crate::trace_transfer::{read_trace_wire, trace_colour_job_with};
-    use curvyo_document_core::Length;
+    use curvyo_vectorize_core::Mm;
     use curvyo_vectorize_core::TraceParams;
 
     const RED: [u8; 3] = [208, 34, 42];
@@ -300,7 +300,7 @@ mod tests {
                 background: Some(Rgb8::new(255, 255, 255)),
                 tolerance: 40,
             },
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..TraceParams::with_threshold(128)
         })
     }
@@ -391,7 +391,7 @@ mod tests {
         assert!(!read.texts.lines[0].excluded);
         // Brightness leaves the grey out of the palette: the nearest palette colour, not white.
         let brightness = ColourParams::new(TraceParams {
-            specks: Length::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..TraceParams::with_threshold(128)
         });
         let wire =

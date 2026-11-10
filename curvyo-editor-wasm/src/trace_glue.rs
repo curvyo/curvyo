@@ -2,12 +2,11 @@
 //! 41, 45, 59 and 60): the host's settings JSON read into trace values, and the schema and the
 //! presets written as JSON. Host-independent, so ordinary `cargo test` covers it.
 
-use curvyo_document_core::Length;
 use curvyo_ui_core::{
     TRACE_ADVANCED_PARAMS, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TRACE_DEFAULT_PICK_TOLERANCE,
     TRACE_MAX_COLOURS, TRACE_METHOD_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceColourParams,
-    TraceDenoise, TraceMethod, TraceParamKind, TraceParamUnit, TraceParams, TracePixelLength,
-    TraceRgb, TraceSwatches, TraceUpscale,
+    TraceDenoise, TraceMethod, TraceMm, TraceParamKind, TraceParamUnit, TraceParams,
+    TracePixelLength, TraceRgb, TraceSwatches, TraceUpscale,
 };
 
 /// `#RRGGBB` (or `RRGGBB`) as a colour; `None` for anything else.
@@ -89,7 +88,7 @@ pub fn trace_settings(settings: &str) -> TraceParams {
         specks: json
             .get("specks")
             .and_then(serde_json::Value::as_f64)
-            .map_or(first.specks, Length::from_mm),
+            .map_or(first.specks, TraceMm::from_mm),
         corners: byte("corners").unwrap_or(first.corners),
         upscale: byte("upscale").map_or(first.upscale, TraceUpscale::from_index),
         denoise: byte("denoise").map_or(first.denoise, TraceDenoise::from_index),

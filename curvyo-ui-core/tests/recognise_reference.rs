@@ -178,7 +178,7 @@ fn traced(rgba: &[u8], width: u32, height: u32, mm_per_px: f64, auto: bool) -> V
     let threshold = if auto { auto_threshold(raster) } else { 128 };
     let params = PRESETS[0].apply(TraceParams::with_threshold(threshold));
     let mut go = |_| ControlFlow::Continue(());
-    let map = curvyo_document_core::Affine::scale(mm_per_px, mm_per_px);
+    let map = curvyo_vectorize_core::PixelMap::scale(mm_per_px, mm_per_px);
     let result = trace(raster, map, &params, &mut go).unwrap();
     let mut out: Vec<BezPath> = Vec::new();
     for outline in &result.outlines {

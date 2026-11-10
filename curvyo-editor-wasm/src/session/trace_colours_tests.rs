@@ -2,7 +2,7 @@
 //! 25 and 29): Create paths writes one filled compound path per colour in one step; the
 //! palette of the preview and of a deleted colour.
 
-use curvyo_document_core::{Length, NodeId, ObjectSnapshot};
+use curvyo_document_core::{NodeId, ObjectSnapshot};
 use curvyo_ui_core::{
     TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_with,
 };
@@ -56,7 +56,7 @@ fn colour_wire_excluding(map: [f64; 6], excluded: &[TraceRgb]) -> Vec<f64> {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
     params.excluded = excluded.to_vec();
@@ -212,7 +212,7 @@ fn a_deleted_colour_is_matched_again_pixel_by_pixel_among_the_kept_colours() {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
     let palette_of = |params: &TraceColourParams| {
@@ -265,7 +265,7 @@ fn a_kept_palette_of_one_colour_is_traced_alone_and_none_does_not_fail() {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: Length::from_mm(0.0),
+        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
     let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
