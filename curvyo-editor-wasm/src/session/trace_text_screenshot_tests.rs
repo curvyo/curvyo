@@ -18,7 +18,7 @@ use super::trace_text_tests::{fit, fonts, model, session_with};
 type LineReport = (String, f64, bool, Option<(String, usize, usize, bool)>);
 
 /// The whole flow on fixture `file` (OCR, text pass, fit) with every line's outcome.
-#[allow(clippy::cast_precision_loss)] // a count of characters
+#[allow(clippy::cast_precision_loss, clippy::too_many_lines)] // a count of characters; the job spelled out
 fn fitted_lines(model: &OcrModel, file: &str) -> Vec<LineReport> {
     let (mut session, image) = session_with(file);
     let source = session.trace_source(image, false).unwrap();
@@ -31,7 +31,11 @@ fn fitted_lines(model: &OcrModel, file: &str) -> Vec<LineReport> {
     )
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let threshold = curvyo_ui_core::trace_auto_threshold(&source.rgba, source.width, source.height);
+    let threshold = curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+        width: source.width,
+        height: source.height,
+        rgba: &source.rgba,
+    });
     let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
@@ -190,9 +194,11 @@ fn the_fit_profile() {
         .unwrap();
         assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
         let params = TraceParams::with_threshold(curvyo_ui_core::trace_auto_threshold(
-            &source.rgba,
-            source.width,
-            source.height,
+            curvyo_ui_core::TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
         ));
         let t = cpu_seconds();
         let regions = trace_text_regions(&TraceJob {

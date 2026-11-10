@@ -5,8 +5,8 @@
 use std::ops::ControlFlow;
 
 use curvyo_vectorize_core::{
-    AnalysisReport, ColourParams as TraceColourParams, ColourTrace, Phase, PixelMap, Progress,
-    Raster, Rgb8 as TraceRgb, TraceError, TraceParams, trace, trace_colours,
+    ColourParams as TraceColourParams, ColourTrace, Phase, PixelMap, Progress, Raster,
+    Rgb8 as TraceRgb, TraceError, TraceParams, trace, trace_colours,
 };
 use kurbo::{BezPath, PathEl, Point};
 
@@ -243,59 +243,6 @@ pub(crate) fn write_colour_tail(wire: &mut Vec<f64>, result: &ColourTrace) {
         }
         wire.push(result.diagnostics.joined_regions as f64);
     }
-}
-
-/// The automatic Threshold of `rgba` (`width` x `height`), for the worker (criterion 9).
-#[must_use]
-pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
-    curvyo_vectorize_core::auto_threshold(Raster {
-        width,
-        height,
-        rgba,
-    })
-}
-
-/// The automatic analysis of `rgba` (`width` x `height`), for the worker (`specs/0089` slice F);
-/// `None` when the bytes do not match the size.
-#[must_use]
-pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> Option<AnalysisReport> {
-    curvyo_vectorize_core::analyse(Raster {
-        width,
-        height,
-        rgba,
-    })
-    .ok()
-}
-
-/// The background colour Remove background's Auto suggests for `rgba` (`width` x `height`),
-/// for the worker (`specs/0089` criterion 16); `None` for a transparent background.
-#[must_use]
-pub fn trace_suggest_background(rgba: &[u8], width: u32, height: u32) -> Option<TraceRgb> {
-    curvyo_vectorize_core::suggest_background(Raster {
-        width,
-        height,
-        rgba,
-    })
-}
-
-/// The colour the Trace pipette takes at pixel (`x`, `y`) of `rgba` (`specs/0089` criterion 17).
-#[must_use]
-pub fn trace_sample_colour(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    x: u32,
-    y: u32,
-) -> Option<TraceRgb> {
-    curvyo_vectorize_core::sample_colour(
-        Raster {
-            width,
-            height,
-            rgba,
-        },
-        x,
-        y,
-    )
 }
 
 pub(crate) fn status_only(status: TraceStatus) -> Vec<f64> {
@@ -771,12 +718,16 @@ mod tests {
     /// bytes that do not match the size.
     #[test]
     fn the_analysis_reads_valid_pictures_only() {
-        let report = trace_analyse(&square_picture(), 16, 16).unwrap();
-        assert_eq!(
-            report.proposal.threshold,
-            trace_auto_threshold(&square_picture(), 16, 16)
-        );
-        assert!(trace_analyse(&[0; 12], 16, 16).is_none());
+        use curvyo_vectorize_core::{analyse, auto_threshold};
+        let picture = square_picture();
+        let raster = |rgba| Raster {
+            width: 16,
+            height: 16,
+            rgba,
+        };
+        let report = analyse(raster(&picture)).unwrap();
+        assert_eq!(report.proposal.threshold, auto_threshold(raster(&picture)));
+        assert!(analyse(raster(&[0; 12])).is_err());
     }
 
     #[test]

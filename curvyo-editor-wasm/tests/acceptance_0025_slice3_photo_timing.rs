@@ -9,7 +9,12 @@
 //! The photo is not committed: `target/photo/iceberg.jpg`, see `SOURCES.md` next to this file's
 //! fixtures (`curvyo-image-core/tests/fixtures/tester/SOURCES.md`). Without it the test skips.
 
-#![allow(clippy::unwrap_used, clippy::cast_precision_loss, missing_docs)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::cast_precision_loss,
+    missing_docs,
+    clippy::too_many_lines
+)]
 
 mod cpu_time;
 
@@ -51,8 +56,13 @@ fn a_4000_px_photo_through_the_trace_tool_step_by_step() {
 
     let (reduced, took) = cpu_time_of(|| session.trace_source(image, true).unwrap());
     say("reduced copy (1000 px) for the worker", took);
-    let (threshold, took) =
-        cpu_time_of(|| trace_auto_threshold(&reduced.rgba, reduced.width, reduced.height));
+    let (threshold, took) = cpu_time_of(|| {
+        trace_auto_threshold(TraceRaster {
+            width: reduced.width,
+            height: reduced.height,
+            rgba: &reduced.rgba,
+        })
+    });
     say("automatic Threshold", took);
     let photo = TRACE_PRESETS.iter().find(|p| p.key == "photo").unwrap();
     let params = photo.apply(TraceParams::with_threshold(threshold));

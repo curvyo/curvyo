@@ -217,7 +217,11 @@ fn c12_letters_never_become_shapes() {
     )
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let threshold = curvyo_ui_core::trace_auto_threshold(&source.rgba, source.width, source.height);
+    let threshold = curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+        width: source.width,
+        height: source.height,
+        rgba: &source.rgba,
+    });
     let mut wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {

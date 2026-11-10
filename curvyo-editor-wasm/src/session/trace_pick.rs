@@ -5,7 +5,7 @@
 //! colours stays armed (Frage 89 A). Pan and zoom keep working.
 
 use curvyo_document_core::Point;
-use curvyo_ui_core::{TraceRgb, trace_sample_colour};
+use curvyo_ui_core::{TraceRaster, TraceRgb, trace_sample_colour};
 
 use super::{Session, Tool};
 
@@ -80,7 +80,15 @@ impl Session {
         }
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // checked >= 0
         let (x, y) = (pixel.x.floor() as u32, pixel.y.floor() as u32);
-        trace_sample_colour(&working.pixels, working.width, working.height, x, y)
+        trace_sample_colour(
+            TraceRaster {
+                width: working.width,
+                height: working.height,
+                rgba: &working.pixels,
+            },
+            x,
+            y,
+        )
     }
 
     /// A primary press while armed: takes the colour for the host (Shift adds), disarms after a

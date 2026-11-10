@@ -98,7 +98,7 @@ fn property_name(kind: TraceProperty) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_ui_core::trace_analyse;
+    use curvyo_ui_core::{TraceRaster, trace_analyse};
 
     /// A pale yellow panel on white: Remove background with white, its reason and every
     /// property by name.
@@ -116,7 +116,12 @@ mod tests {
                 }
             })
             .collect();
-        let report = trace_analyse(&rgba, 100, 100).unwrap();
+        let report = trace_analyse(TraceRaster {
+            width: 100,
+            height: 100,
+            rgba: &rgba,
+        })
+        .unwrap();
         let json: serde_json::Value = serde_json::from_str(&analysis_json(&report)).unwrap();
         assert_eq!(json["method"], 1);
         assert_eq!(json["background"], "#FFFFFF");

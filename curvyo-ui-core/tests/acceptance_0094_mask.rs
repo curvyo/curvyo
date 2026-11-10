@@ -511,7 +511,11 @@ fn c9_remove_background_reads_only_the_region() {
     assert!(defaults.analysis.is_some());
     // No mask: the whole picture's suggestion, as before.
     assert_eq!(
-        trace_suggest_background(&m2, SIDE, SIDE),
+        trace_suggest_background(TraceRaster {
+            width: SIDE,
+            height: SIDE,
+            rgba: &m2
+        }),
         curvyo_vectorize_core::suggest_background(curvyo_vectorize_core::Raster {
             width: SIDE,
             height: SIDE,
