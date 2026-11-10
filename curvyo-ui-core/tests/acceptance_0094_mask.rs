@@ -516,14 +516,14 @@ fn c9_remove_background_reads_only_the_region() {
             height: SIDE,
             rgba: &m2
         }),
-        curvyo_vectorize_core::suggest_background(curvyo_vectorize_core::Raster {
+        vectrace::suggest_background(vectrace::Raster {
             width: SIDE,
             height: SIDE,
             rgba: &m2
         })
     );
     let params = TraceParams {
-        selection: curvyo_vectorize_core::Selection::RemoveBackground {
+        selection: vectrace::Selection::RemoveBackground {
             background: defaults.background,
             tolerance: curvyo_ui_core::TRACE_DEFAULT_BACKGROUND_TOLERANCE,
         },
@@ -788,7 +788,7 @@ fn a_refused_clip_is_counted_and_named() {
     )
     .unwrap();
     let p = TraceParams {
-        specks: curvyo_vectorize_core::Mm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     };
     let read = read_trace_wire(&run_trace_job(

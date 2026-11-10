@@ -9,8 +9,7 @@ members = [
     "curvyo-text-core",
     "curvyo-svg-core",
     "curvyo-image-core",
-    "curvyo-vectorize-core",
-    "curvyo-ocr-core",
+    "vectrace",
     "curvyo-ui-core",
     "curvyo-crypto-core",
     "curvyo-sync-core",
@@ -127,5 +126,5 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.rten-base]
 opt-level = 3
-[profile.dev.package.curvyo-ocr-core]
+[profile.dev.package.vectrace]
 opt-level = 3

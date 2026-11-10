@@ -10,13 +10,13 @@
 
 use curvyo_document_core::{Point, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, Visible, boolean, visible_regions};
-use curvyo_vectorize_core::{Rgb8 as TraceRgb, node_count};
 use kurbo::{BezPath, Shape};
+use vectrace::{Rgb8 as TraceRgb, node_count};
 
 use crate::trace_region::{TRACE_REGION_TOLERANCE, TraceRegion, outer_sign, wound_polylines};
-use crate::trace_shapes::ShapeRegion;
-use crate::trace_text_wire::TraceTexts;
-use crate::trace_transfer::{TraceLayerWire, TraceStatus, TraceWire};
+use vectrace::job_text::TraceTexts;
+use vectrace::shapes::ShapeRegion;
+use vectrace::wire::{TraceLayerWire, TraceStatus, TraceWire};
 
 /// How far the box that stands for "everything" reaches past the picture, mm: far enough that
 /// no traced outline (which never leaves the picture) touches its edge (`adrs.md` decision 1).

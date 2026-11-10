@@ -15,8 +15,8 @@ use std::sync::Arc;
 use curvyo_document_core::FontKind;
 use curvyo_text_core::{Face, FaceStore, LayoutOptions, Mm, layout};
 use curvyo_ui_core::{FaceState, FontBlock, JobStep, ListedFace, RecogniseJob, recognise_tiers};
-use curvyo_vectorize_core::{PRESETS, Raster, TraceParams, auto_threshold, trace};
 use kurbo::{Affine, BezPath, PathEl, Point};
+use vectrace::{PRESETS, Raster, TraceParams, auto_threshold, trace};
 
 const FACES: &[(&str, &str, &str)] = &[
     (
@@ -178,7 +178,7 @@ fn traced(rgba: &[u8], width: u32, height: u32, mm_per_px: f64, auto: bool) -> V
     let threshold = if auto { auto_threshold(raster) } else { 128 };
     let params = PRESETS[0].apply(TraceParams::with_threshold(threshold));
     let mut go = |_| ControlFlow::Continue(());
-    let map = curvyo_vectorize_core::PixelMap::scale(mm_per_px, mm_per_px);
+    let map = vectrace::PixelMap::scale(mm_per_px, mm_per_px);
     let result = trace(raster, map, &params, &mut go).unwrap();
     let mut out: Vec<BezPath> = Vec::new();
     for outline in &result.outlines {

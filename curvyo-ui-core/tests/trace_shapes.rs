@@ -13,7 +13,7 @@ use curvyo_ui_core::{
     TracePrimitive, TraceRaster, TraceRgb, TraceShapeRegion, TraceWire, read_trace_wire,
     run_trace_job, trace_add_shapes,
 };
-use curvyo_vectorize_core::Angle;
+use vectrace::Angle;
 
 /// 10 px/mm.
 const MAP: [f64; 6] = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];

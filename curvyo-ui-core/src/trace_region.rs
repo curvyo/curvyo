@@ -13,7 +13,7 @@ use curvyo_geometry_core::signed_area_mm2;
 use curvyo_geometry_core::{BooleanError, BooleanOp, Outline, OutlineTriple, boolean};
 use kurbo::{BezPath, PathEl, Shape};
 
-use crate::trace_mask::{Clipped, Mask};
+use vectrace::mask::{Clipped, Mask};
 
 /// The kernel tolerance of the region and of the clip (`adrs.md` decision 1): the grid keeps
 /// 0.002 mm, curves are flattened at 0.003 mm, half of criterion 2's 0.01 mm is left.
@@ -165,10 +165,10 @@ impl TraceRegion {
             at += 1;
             Some(value)
         };
-        let polygons = crate::trace_transfer::count(next()?)?;
+        let polygons = vectrace::wire::count(next()?)?;
         let mut read = Vec::with_capacity(polygons.min(numbers.len()));
         for _ in 0..polygons {
-            let n = crate::trace_transfer::count(next()?)?;
+            let n = vectrace::wire::count(next()?)?;
             let mut polygon = Vec::with_capacity(n.min(numbers.len()));
             for _ in 0..n {
                 polygon.push(Point::new(next()?, next()?));
@@ -457,7 +457,7 @@ pub(crate) fn triples_of(path: &BezPath) -> Vec<Vec<OutlineTriple>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_vectorize_core::node_count;
+    use vectrace::node_count;
 
     /// The mask's clip as the outlines and whether anything changed.
     fn clip(region: &TraceRegion, outlines: &[BezPath]) -> (Vec<BezPath>, bool) {

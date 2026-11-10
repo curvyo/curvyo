@@ -6,9 +6,7 @@
 //! is rows times edges, not pixels times edges.
 
 use curvyo_document_core::{Affine, Point};
-use curvyo_vectorize_core::{
-    AnalysisReport, Raster, Rgb8, analyse, auto_threshold, suggest_background,
-};
+use vectrace::{AnalysisReport, Raster, Rgb8, analyse, auto_threshold, suggest_background};
 
 use crate::trace_region::TraceRegion;
 

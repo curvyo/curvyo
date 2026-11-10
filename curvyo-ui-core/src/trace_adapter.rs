@@ -6,12 +6,12 @@ use curvyo_document_core::{
     Angle as DocAngle, CornerRadii, Curve, EllipseFrame, InnerRatio, Length, LineJoin,
     Point as DocPoint, PointCount, RectBounds, Shape, StarFrame, drawing_outline_of_rotated,
 };
-use curvyo_vectorize_core::Angle;
 use kurbo::BezPath;
+use vectrace::Angle;
 
 use crate::svg_import_match::outline_path;
-use crate::trace_shapes::{Join, Primitive, ShapeRegion};
-use crate::trace_transfer::{TraceWire, read_wire};
+use vectrace::shapes::{Join, Primitive, ShapeRegion};
+use vectrace::wire::{TraceWire, read_wire};
 
 /// The document `Shape` of `primitive` and the rotation as the document's angle.
 ///
@@ -23,7 +23,7 @@ use crate::trace_transfer::{TraceWire, read_wire};
 #[allow(clippy::expect_used)] // invariant: counts and ratios were checked against these bounds.
 pub(crate) fn shape_of(primitive: &Primitive, rotation: Angle) -> (Shape, DocAngle) {
     let point = |p: kurbo::Point| DocPoint::new(p.x, p.y);
-    let star_frame = |centre, radius: curvyo_vectorize_core::Mm, angle: Angle| StarFrame {
+    let star_frame = |centre, radius: vectrace::Mm, angle: Angle| StarFrame {
         center: point(centre),
         radius: Length::from_mm(radius.as_mm()),
         angle: DocAngle::from_radians(angle.as_radians()),
@@ -169,7 +169,7 @@ pub(crate) fn keeps_fill(traced: &[&BezPath], drawn: &[BezPath]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_shapes::POINTS;
+    use vectrace::shapes::POINTS;
 
     fn square(x: f64, side: f64, clockwise: bool) -> BezPath {
         let mut p = BezPath::new();
@@ -211,11 +211,11 @@ mod tests {
         assert!(PointCount::new(POINTS.start() - 1).is_err());
         assert!(PointCount::new(POINTS.end() + 1).is_err());
         for ratio in [0.0, 1.0, f64::NAN, -0.5, 1.5] {
-            assert!(crate::trace_shapes::valid_ratio(ratio).is_none());
+            assert!(vectrace::shapes::valid_ratio(ratio).is_none());
             assert!(InnerRatio::new(ratio).is_err());
         }
         for ratio in [f64::MIN_POSITIVE, 0.5, 0.999_999] {
-            assert_eq!(crate::trace_shapes::valid_ratio(ratio), Some(ratio));
+            assert_eq!(vectrace::shapes::valid_ratio(ratio), Some(ratio));
             assert!(InnerRatio::new(ratio).is_ok());
         }
     }

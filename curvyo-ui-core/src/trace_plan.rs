@@ -13,7 +13,7 @@ use kurbo::BezPath;
 use crate::AnchorIdMinter;
 use crate::svg_import_shapes::{kind_from_handles, outlines};
 use crate::trace_adapter::{line_join, shape_of};
-use crate::trace_shapes::{Band, ShapeRegion};
+use vectrace::shapes::{Band, ShapeRegion};
 
 /// The name of an image that has none (the Layers panel's default).
 const IMAGE_DEFAULT_NAME: &str = "Image";
@@ -437,9 +437,9 @@ mod tests {
     /// compound path; the rest stays in the colour's path.
     #[test]
     fn recognised_shapes_are_primitives_and_compounds_in_their_colour() {
-        use crate::trace_shapes::Primitive;
         use curvyo_document_core::{Point, RectBounds};
-        use curvyo_vectorize_core::{Angle, Mm};
+        use vectrace::shapes::Primitive;
+        use vectrace::{Angle, Mm};
         let mut minter = AnchorIdMinter::new(3);
         let doc = curvyo_document_core::Document::new(1);
         let image = doc.create_rect(RectBounds {
