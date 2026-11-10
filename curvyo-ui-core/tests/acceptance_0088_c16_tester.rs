@@ -8,12 +8,12 @@
     clippy::cast_sign_loss
 )]
 
-use curvyo_ui_core::TracePrimitive;
-use curvyo_ui_core::{
-    TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
-    trace_add_shapes,
-};
+use curvyo_ui_core::read_trace_wire;
 use kurbo::{BezPath, Join, Shape as _, Stroke, StrokeOpts};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::shapes::Primitive;
+use vectrace::shapes::trace_add_shapes;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 const MM_PER_PX: f64 = 25.4 / 96.0;
 
@@ -102,7 +102,7 @@ fn c16_the_customers_8_star_is_a_stroked_star_with_the_traced_area() {
     assert_eq!(bands.len(), 1, "exactly one stroked band on the page");
     let region = bands[0];
     let band = region.band.unwrap();
-    let TracePrimitive::Star {
+    let Primitive::Star {
         centre,
         radius,
         angle,

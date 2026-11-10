@@ -35,12 +35,12 @@ use curvyo_editor_wasm::{
     Session, Tool, TraceCreateOutcome, trace_colour_settings, trace_recognise_shapes,
     trace_settings,
 };
-use curvyo_ui_core::{
-    TraceJob, TraceMode, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
-    trace_add_shapes,
-};
+use curvyo_ui_core::read_trace_wire;
 use kurbo::{Affine, BezPath, PathEl, Point};
 use proptest::prelude::*;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::shapes::trace_add_shapes;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const OFF: &str = r#"{"threshold":128}"#;
 const ON: &str = r#"{"threshold":128,"shapes":true}"#;
@@ -554,7 +554,7 @@ fn ellipse_of(p: &PrimitiveSnapshot) -> (f64, f64, (f64, f64), f64) {
     }
 }
 
-fn traced_with(host: &Host, settings: &str) -> curvyo_ui_core::TraceWire {
+fn traced_with(host: &Host, settings: &str) -> vectrace::wire::TraceWire {
     read_trace_wire(&host.wire(settings)).expect("a readable wire")
 }
 
@@ -1221,7 +1221,7 @@ fn c6_five_hundred_paths_recognise_in_under_two_seconds_of_cpu() {
 #[test]
 fn c15_the_recognition_crates_have_no_network_dependency() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    for krate in ["curvyo-ui-core", "curvyo-vectorize-core"] {
+    for krate in ["curvyo-ui-core", "vectrace"] {
         let toml = std::fs::read_to_string(root.join(krate).join("Cargo.toml")).unwrap();
         for banned in [
             "reqwest",

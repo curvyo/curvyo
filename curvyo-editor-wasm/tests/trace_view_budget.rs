@@ -18,14 +18,15 @@
 
 mod cpu_time;
 
-use curvyo_ui_core::{TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job};
 use std::time::Duration;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 use cpu_time::cpu_time_of;
 use curvyo_document_core::NodeId;
 use curvyo_editor_wasm::{Session, Tool};
-use curvyo_ui_core::TRACE_WIRE_HEADER;
 use image::ImageEncoder;
+use vectrace::wire::TRACE_WIRE_HEADER;
 
 const FRAME: Duration = Duration::from_millis(16);
 const HANDLER: Duration = Duration::from_millis(50);
@@ -162,11 +163,11 @@ fn trace_job(
     smooth: u8,
     specks_mm: f64,
 ) -> Vec<f64> {
-    let params = curvyo_ui_core::TraceParams {
+    let params = vectrace::TraceParams {
         threshold,
         smooth,
-        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
-        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+        specks: vectrace::Mm::from_mm(specks_mm),
+        ..vectrace::TraceParams::with_threshold(threshold)
     };
     run_trace_job(
         &TraceJob {

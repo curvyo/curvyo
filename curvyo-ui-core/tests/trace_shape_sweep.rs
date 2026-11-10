@@ -10,10 +10,12 @@
 
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use curvyo_ui_core::{
-    TraceJob, TraceJoin, TraceMode, TracePixelMap, TracePrimitive, TraceRaster, run_trace_job,
-};
-use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes};
+use curvyo_ui_core::read_trace_wire;
+use vectrace::TraceParams;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::shapes::trace_add_shapes;
+use vectrace::shapes::{Join as TraceJoin, Primitive as TracePrimitive};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 /// 10 px/mm.
 const MAP: [f64; 6] = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];

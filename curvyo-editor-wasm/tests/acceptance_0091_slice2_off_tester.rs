@@ -8,8 +8,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
-use curvyo_ui_core::{TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job};
 use std::path::PathBuf;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 use curvyo_document_core::{ObjectSnapshot, unpack};
 use curvyo_editor_wasm::{Session, Tool, trace_colour_settings};
@@ -34,12 +35,7 @@ fn record() -> PathBuf {
 
 /// The plain multicolour wire of `file` with `settings`, and the paths Create paths writes.
 fn off(file: &str, settings: &str) -> Value {
-    let bytes = std::fs::read(
-        root()
-            .join("curvyo-ocr-core/tests/fixtures/tester")
-            .join(file),
-    )
-    .unwrap();
+    let bytes = std::fs::read(root().join("vectrace/tests/fixtures/tester").join(file)).unwrap();
     let mut s = Session::new(91);
     s.resize_viewport(1600.0, 1000.0);
     s.import_begin(None);

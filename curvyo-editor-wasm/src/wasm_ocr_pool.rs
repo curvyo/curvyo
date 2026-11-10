@@ -24,7 +24,8 @@ pub struct OcrCropsJs {
 pub fn ocr_crops(rgba: &[u8], width: u32, height: u32) -> Option<OcrCropsJs> {
     OCR_MODEL.with(|m| {
         let model = m.borrow();
-        let crops = curvyo_ui_core::trace_crop_text(model.as_ref()?, rgba, width, height).ok()?;
+        let crops =
+            vectrace::ocr::accept::trace_crop_text(model.as_ref()?, rgba, width, height).ok()?;
         let (lines, samples) = crate::ocr_pool_glue::crops_wire(&crops);
         Some(OcrCropsJs { lines, samples })
     })

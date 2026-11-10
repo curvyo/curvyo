@@ -177,7 +177,7 @@ fn the_extra_reads_cost() {
         let (mut session, image) = super::trace_text_tests::session_with(file);
         let source = session.trace_source(image, false).unwrap();
         let started = process_seconds();
-        let lines = curvyo_ui_core::trace_read_text(
+        let lines = vectrace::ocr::accept::trace_read_text(
             &model,
             &source.rgba,
             source.width,

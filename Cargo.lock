@@ -940,6 +940,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_json",
+ "vectrace",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

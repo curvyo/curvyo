@@ -28,15 +28,19 @@ use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
-use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePixelMap,
-    TraceRaster, TraceRegion, TraceRegionError, TraceRgb, read_trace_wire, run_trace_job,
-    trace_add_shapes, trace_analyse, trace_auto_threshold, trace_region_defaults,
-    trace_suggest_background,
-};
+use curvyo_ui_core::{TraceRegion, TraceRegionError, read_trace_wire, trace_region_defaults};
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
 use support::{COLOUR, M1, M2, draw, map_100mm, text_quads, text_sheet};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::ocr::accept::OcrLine;
+use vectrace::shapes::trace_add_shapes;
+use vectrace::{
+    ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
+    Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams, analyse as trace_analyse,
+    auto_threshold as trace_auto_threshold, suggest_background as trace_suggest_background,
+};
 
 const N: u32 = 1000;
 /// Criterion 2's bound for a node outside the stencil edge.
@@ -1227,7 +1231,7 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
     );
     trace_add_shapes(&mut whole, map_100mm(n));
     let whole = read_trace_wire(&whole).unwrap();
-    let recognised = |w: &curvyo_ui_core::TraceWire| {
+    let recognised = |w: &vectrace::wire::TraceWire| {
         w.shapes
             .iter()
             .filter(|s| s.shapes.first().is_some_and(Option::is_some))
@@ -1298,7 +1302,7 @@ fn multicolour_every_layer_is_clipped_and_inside_plus_outside_is_the_unmasked_la
     let whole = job(None);
     let inside = job(Some(&region(r1(), false)));
     let outside = job(Some(&region(r1(), true)));
-    let per_layer = |w: &curvyo_ui_core::TraceWire| {
+    let per_layer = |w: &vectrace::wire::TraceWire| {
         let mut at = 0;
         let mut out = Vec::new();
         for l in &w.layers {

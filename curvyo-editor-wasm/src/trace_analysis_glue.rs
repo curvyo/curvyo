@@ -1,8 +1,9 @@
 //! The automatic analysis of a picture written as JSON for the Trace tool's page (`specs/0089`
 //! slice F). Host-independent, so ordinary `cargo test` covers it.
 
-use curvyo_ui_core::{
-    TraceAnalysis, TraceCapture, TraceImageType, TraceMethod, TraceProperty, TraceReason,
+use vectrace::{
+    AnalysisReport as TraceAnalysis, Capture as TraceCapture, ImageType as TraceImageType,
+    PropertyKind as TraceProperty, Reason as TraceReason, Selection as TraceMethod,
 };
 
 use crate::trace_glue::hex;
@@ -98,7 +99,7 @@ fn property_name(kind: TraceProperty) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use curvyo_ui_core::{TraceRaster, trace_analyse};
+    use vectrace::{Raster as TraceRaster, analyse as trace_analyse};
 
     /// A pale yellow panel on white: Remove background with white, its reason and every
     /// property by name.

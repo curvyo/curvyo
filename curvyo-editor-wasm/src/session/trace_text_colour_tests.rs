@@ -9,10 +9,14 @@
 //! ```
 
 use curvyo_document_core::{Color, NodeId, ObjectSnapshot};
-use curvyo_ui_core::{
-    OcrModel, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TraceColourParams, TraceJob, TraceMethod,
-    TraceMode, TraceParams, TracePixelMap, TraceRaster, TraceRgb, run_trace_job, trace_read_text,
-    trace_text_regions,
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::{
+    ColourParams as TraceColourParams,
+    DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE, PixelMap as TracePixelMap,
+    Raster as TraceRaster, Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
 };
 
 use super::trace_text_tests::{
@@ -403,14 +407,14 @@ fn the_colour_count_includes_colours_only_texts_use() {
             }
         })
         .collect();
-    let line = curvyo_ui_core::OcrLine {
+    let line = vectrace::ocr::accept::OcrLine {
         quad: [[8.0, 10.0], [52.0, 10.0], [52.0, 20.0], [8.0, 20.0]],
         text: "Il".to_owned(),
         confidence: vec![0.9, 0.9],
         positions: Vec::new(),
     };
     let mut params = colour_params();
-    params.trace.specks = curvyo_ui_core::TraceMm::from_mm(0.0);
+    params.trace.specks = vectrace::Mm::from_mm(0.0);
     let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {

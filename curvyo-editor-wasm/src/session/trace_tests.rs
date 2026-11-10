@@ -2,7 +2,8 @@
 //! and 55).
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
-use curvyo_ui_core::{TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 use super::{
     DoubleClickHint, EscapeStep, KeyInput, KeyOutcome, Session, Tool, TraceCreateOutcome,
@@ -326,12 +327,12 @@ fn outline_triangles(session: &Session) -> usize {
 
 /// Squares of 4 nodes, `count` of them, as the worker's numbers.
 fn many_squares(count: usize) -> Vec<f64> {
-    let mut wire = vec![0.0; curvyo_ui_core::TRACE_WIRE_HEADER];
+    let mut wire = vec![0.0; vectrace::wire::TRACE_WIRE_HEADER];
     #[allow(clippy::cast_precision_loss)]
     {
         wire[1] = count as f64;
         wire[2] = (count * 4) as f64;
-        wire[curvyo_ui_core::TRACE_WIRE_HEADER - 1] = count as f64;
+        wire[vectrace::wire::TRACE_WIRE_HEADER - 1] = count as f64;
     }
     for i in 0..count {
         #[allow(clippy::cast_precision_loss)]
@@ -394,8 +395,8 @@ fn the_trace_pipette_takes_the_colour_under_a_press() {
         f64::midpoint(corners[0].x, corners[2].x),
         f64::midpoint(corners[0].y, corners[2].y),
     );
-    let expected = curvyo_ui_core::trace_sample_colour(
-        curvyo_ui_core::TraceRaster {
+    let expected = vectrace::sample_colour(
+        vectrace::Raster {
             width: source.width,
             height: source.height,
             rgba: &source.rgba,
@@ -443,11 +444,11 @@ pub(super) fn trace_job(
     smooth: u8,
     specks_mm: f64,
 ) -> Vec<f64> {
-    let params = curvyo_ui_core::TraceParams {
+    let params = vectrace::TraceParams {
         threshold,
         smooth,
-        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
-        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+        specks: vectrace::Mm::from_mm(specks_mm),
+        ..vectrace::TraceParams::with_threshold(threshold)
     };
     run_trace_job(
         &TraceJob {

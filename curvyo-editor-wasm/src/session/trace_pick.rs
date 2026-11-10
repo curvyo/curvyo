@@ -1,11 +1,11 @@
 //! The Trace tool's pipette (`specs/0089-trace-quality-and-colour` criteria 16 and 17,
 //! `ux-notes.md` §6): while it is armed, a primary press on the image the preview shows takes
-//! the colour of its working image under the pointer (`curvyo_ui_core::trace_sample_colour`)
+//! the colour of its working image under the pointer (`vectrace::sample_colour`)
 //! for the host, and no tool sees the press. Remove background disarms after one pick; Pick
 //! colours stays armed (Frage 89 A). Pan and zoom keep working.
 
 use curvyo_document_core::Point;
-use curvyo_ui_core::{TraceRaster, TraceRgb, trace_sample_colour};
+use vectrace::{Raster as TraceRaster, Rgb8 as TraceRgb, sample_colour as trace_sample_colour};
 
 use super::{Session, Tool};
 

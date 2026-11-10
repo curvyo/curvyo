@@ -4,7 +4,7 @@
 //! the threshold (0.8, adrs.md), and not one short pattern repeated. Each case sits on one side of
 //! one boundary; the other conditions hold. Written from the specification.
 
-use curvyo_ui_core::OcrLine;
+use vectrace::ocr::accept::OcrLine;
 
 fn line(text: &str, confidence: f64) -> OcrLine {
     OcrLine {

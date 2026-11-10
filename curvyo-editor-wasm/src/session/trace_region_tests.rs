@@ -4,9 +4,9 @@
 #![allow(clippy::many_single_char_names)]
 
 use curvyo_document_core::{Length, NodeId, ObjectSnapshot, Point, RectBounds};
-use curvyo_ui_core::{
-    TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
-};
+use curvyo_ui_core::read_trace_wire;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 use super::{Session, Tool, TraceCreateOutcome, TraceSelection};
 
@@ -195,7 +195,7 @@ fn c12_create_paths_leaves_the_mask_paths_and_undoes_in_one_step() {
             mode: TraceMode::Mono(
                 // The image is under a millimetre wide: no speck is ignored.
                 &TraceParams {
-                    specks: curvyo_ui_core::TraceMm::from_mm(0.0),
+                    specks: vectrace::Mm::from_mm(0.0),
                     ..TraceParams::with_threshold(128)
                 },
             ),
@@ -347,7 +347,7 @@ fn a_grouped_mask_path_counts_as_its_paths() {
 fn a_refused_clip_shows_its_muted_notice() {
     let (mut session, image, _) = masked();
     session.set_tool(Tool::Trace);
-    let mut wire = vec![0.0; curvyo_ui_core::TRACE_WIRE_HEADER];
+    let mut wire = vec![0.0; vectrace::wire::TRACE_WIRE_HEADER];
     assert!(session.set_trace_preview(image, &wire));
     assert_eq!(session.trace_unclipped_notice(), "");
     wire.extend([-5.0, 2.0]);

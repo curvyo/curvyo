@@ -20,9 +20,10 @@ mod cpu_time;
 
 use cpu_time::cpu_time_of;
 use curvyo_editor_wasm::{Session, Tool};
-use curvyo_ui_core::{
-    TRACE_PRESETS, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, run_trace_job,
-    trace_auto_threshold,
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::{
+    PRESETS as TRACE_PRESETS, PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams,
+    auto_threshold as trace_auto_threshold,
 };
 
 fn say(step: &str, took: std::time::Duration) {

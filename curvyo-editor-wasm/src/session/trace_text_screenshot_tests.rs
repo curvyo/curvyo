@@ -6,10 +6,11 @@
 //! cargo test --release -p curvyo-editor-wasm --lib trace_text_screenshot -- --ignored --nocapture
 //! ```
 
-use curvyo_ui_core::{
-    OcrModel, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, run_trace_job,
-    trace_read_text, trace_text_regions,
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
+use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 use super::trace_text_tests::{fit, fonts, model, session_with};
 
@@ -31,7 +32,7 @@ fn fitted_lines(model: &OcrModel, file: &str) -> Vec<LineReport> {
     )
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let threshold = curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+    let threshold = vectrace::auto_threshold(vectrace::Raster {
         width: source.width,
         height: source.height,
         rgba: &source.rgba,
@@ -193,13 +194,11 @@ fn the_fit_profile() {
         )
         .unwrap();
         assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-        let params = TraceParams::with_threshold(curvyo_ui_core::trace_auto_threshold(
-            curvyo_ui_core::TraceRaster {
-                width: source.width,
-                height: source.height,
-                rgba: &source.rgba,
-            },
-        ));
+        let params = TraceParams::with_threshold(vectrace::auto_threshold(vectrace::Raster {
+            width: source.width,
+            height: source.height,
+            rgba: &source.rgba,
+        }));
         let t = cpu_seconds();
         let regions = trace_text_regions(&TraceJob {
             raster: TraceRaster {

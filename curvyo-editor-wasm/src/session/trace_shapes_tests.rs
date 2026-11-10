@@ -3,10 +3,11 @@
 //! in one step and one undo; the text poster with Recognise text on too.
 
 use curvyo_document_core::{Color, ObjectSnapshot, Shape};
-use curvyo_ui_core::{
-    TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
-    trace_add_shapes, trace_read_text,
-};
+use curvyo_ui_core::read_trace_wire;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::ocr::accept::trace_read_text;
+use vectrace::shapes::trace_add_shapes;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 use super::trace_text_tests::{cpu_seconds, fit, model, session_with, session_with_bytes};
 use super::{Session, TraceCreateOutcome};
@@ -217,7 +218,7 @@ fn c12_letters_never_become_shapes() {
     )
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let threshold = curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+    let threshold = vectrace::auto_threshold(vectrace::Raster {
         width: source.width,
         height: source.height,
         rgba: &source.rgba,
@@ -353,10 +354,10 @@ fn c6_five_hundred_paths_take_under_two_seconds() {
     assert!(session.set_trace_result(image, &wire));
 }
 
-/// The `curvyo-vectorize-core` golden pictures (binary PGM).
+/// The `vectrace` golden pictures (binary PGM).
 fn pgm(file: &str) -> (u32, u32, Vec<u8>) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../curvyo-vectorize-core/tests/fixtures/trace")
+        .join("../vectrace/tests/fixtures/trace")
         .join(file);
     let bytes = std::fs::read(path).unwrap();
     let text = String::from_utf8_lossy(&bytes[..20]).to_string();

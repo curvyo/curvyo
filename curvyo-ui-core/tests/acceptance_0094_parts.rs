@@ -9,11 +9,18 @@ use std::sync::OnceLock;
 use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceJob, TraceMode, TraceParams, TracePartArea,
-    TracePartClip, TracePixelMap, TraceRaster, TraceRegion, TraceRgb, TraceWire, join_trace_parts,
-    read_trace_wire, run_trace_job, trace_add_shapes, trace_part_clips,
+    TracePartArea, TracePartClip, TraceRegion, join_trace_parts, read_trace_wire, trace_part_clips,
 };
 use kurbo::{BezPath, PathEl, Shape};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::ocr::accept::OcrLine;
+use vectrace::shapes::trace_add_shapes;
+use vectrace::wire::TraceWire;
+use vectrace::{
+    ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
+    Rgb8 as TraceRgb, TraceParams,
+};
 
 const SIDE: u32 = 1000;
 /// 1000 px placed 100 mm wide: 10 px per mm.
@@ -409,7 +416,7 @@ fn c23_multicolour_parts_merge_by_colour() {
     let areas = [TracePartArea::Whole, r1()];
     let clips = trace_part_clips(&areas, &QUAD);
     let p = TraceColourParams::new(TraceParams {
-        selection: curvyo_ui_core::TraceMethod::RemoveBackground {
+        selection: vectrace::Selection::RemoveBackground {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
@@ -614,7 +621,7 @@ fn c30_text_and_shapes_follow_the_part_their_centre_lies_in() {
     let shapes: usize = joined
         .shapes
         .iter()
-        .map(curvyo_ui_core::TraceShapeRegion::primitives)
+        .map(vectrace::shapes::ShapeRegion::primitives)
         .sum();
     assert_eq!(shapes, 1, "{:?}", joined.shapes);
     // The shape points at the top disc's outline in the joined list.

@@ -13,11 +13,13 @@
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, PathSnapshot, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
-use curvyo_ui_core::{
-    TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePixelMap, TraceRaster,
-    TraceRgb, read_trace_wire, run_trace_job,
-};
+use curvyo_ui_core::read_trace_wire;
 use image::ImageEncoder;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::{
+    ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
+    Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
+};
 
 const RED: TraceRgb = TraceRgb::new(200, 30, 30);
 const GREEN: TraceRgb = TraceRgb::new(30, 160, 60);
@@ -62,7 +64,7 @@ fn traced() -> (Session, NodeId, Vec<f64>) {
             background: Some(TraceRgb::new(255, 255, 255)),
             tolerance: 40,
         },
-        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
     let wire = run_trace_job(
@@ -288,11 +290,11 @@ fn trace_job(
     smooth: u8,
     specks_mm: f64,
 ) -> Vec<f64> {
-    let params = curvyo_ui_core::TraceParams {
+    let params = vectrace::TraceParams {
         threshold,
         smooth,
-        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
-        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+        specks: vectrace::Mm::from_mm(specks_mm),
+        ..vectrace::TraceParams::with_threshold(threshold)
     };
     run_trace_job(
         &TraceJob {

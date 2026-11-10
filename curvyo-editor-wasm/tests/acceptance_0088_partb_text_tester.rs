@@ -19,11 +19,14 @@ use curvyo_document_core::{FontKind, ObjectSnapshot, Shape, unpack};
 use curvyo_editor_wasm::{
     FitWorker, Session, Tool, TraceCreateOutcome, trace_recognise_shapes, trace_settings,
 };
-use curvyo_ui_core::{
-    FontBlock, OcrModel, TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job,
-    trace_add_shapes, trace_read_text, trace_text_regions,
-};
+use curvyo_ui_core::FontBlock;
 use serde_json::Value;
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::shapes::trace_add_shapes;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const TOLERANCE_MM: f64 = 0.3;
 const TEXT_ON: &str = r#"{"threshold":128}"#;
@@ -38,9 +41,7 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn poster(file: &str) -> PathBuf {
-    root()
-        .join("curvyo-ocr-core/tests/fixtures/tester")
-        .join(file)
+    root().join("vectrace/tests/fixtures/tester").join(file)
 }
 
 fn model() -> OcrModel {
