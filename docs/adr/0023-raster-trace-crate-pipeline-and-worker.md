@@ -223,3 +223,11 @@ does not change, so the fallback is a crate-internal swap plus dropping the depe
   16 B/px it goes to `docs/technical-debt.md` (the criterion says so; no self-made limit).
 - Native and wasm differ in the last few nodes until the upstream `acos` fix lands (§4).
 - A plugin tracer (ADR 0005) would need an image type in the WIT interface; not written now.
+
+## Note 2026-11-10 ([ADR 0048](0048-vectrace-crate.md), Proposed)
+
+§1: the crate becomes `vectrace` (`vectrace/`) and has no `document-core` edge. §2: `pixel_map` is
+`vectrace::PixelMap` (the same `mul_add` arithmetic as `Affine`), and `TraceParams::specks` is
+`vectrace::Mm`. §5: the worker's jobs become one `vectrace::run(&Job)`, whose result is the
+unchanged `f64` wire, and the mask clip reaches it through the `Mask` trait. The decision text
+above is otherwise unchanged.

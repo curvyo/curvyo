@@ -139,3 +139,10 @@ Firefox since 89 (MDN; 159 here). Measured on the 2000 x 2000 reference poster i
 thread CPU): OCR 5.6 s without SIMD, 3.0 s with it; weights load 0.19 s. Native and wasm give the
 same strings, the same integer quads and bit-identical trace results (plain and with the text
 pass) on that poster. The step-0 check of §7 is thereby met.
+
+## Note 2026-11-10 ([ADR 0048](0048-vectrace-crate.md), Proposed)
+
+§1: `curvyo-ocr-core` becomes the module `vectrace::ocr` of the crate `vectrace`, with the same
+edges (external only) and the API of §2 unchanged; the line acceptance of `ui-core::trace_ocr`
+moves with it. §4: the scoped `rayon` exception applies to `vectrace` and its dependents, still
+only through `rten`. The weights stay Apache-2.0 and are still passed in as bytes.
