@@ -23,8 +23,8 @@ Only one agent should drive the browser at a time. Screenshots go to
 `target/browser-check/pages.png` and `target/browser-check/many-pages.png`.
 
 `pages.cjs` checks the page list, Add, active-frame visibility, rename commit and
-Escape/F2 focus, active-only resize, reorder, frame-only state, coordinate unit
-conversion, cancelled grip drag and deletion protection. `many-pages.cjs` checks
+Escape/F2 focus, active-only resize, reorder, frame-only state, cancelled grip drag
+and deletion protection. The Add page Kind group (Drawing default, Cancel, Add) is covered. `many-pages.cjs` checks
 200 rows and frames, first/last activation and a drawing interaction without JS
 errors. Its wall-clock duration is an observation; the CPU performance budget is
 asserted separately by Rust's `pages::two_hundred_pages_cpu_budget`.
