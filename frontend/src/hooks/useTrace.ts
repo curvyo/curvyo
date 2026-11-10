@@ -885,10 +885,23 @@ export function useTrace(
     [getSession, schedule],
   );
 
-  const palette = useTracePalette({ active, partId: partsApi.parts.find((part) => part.active)?.id ?? 0, values, getSession, apply, choiceRef });
+  const palette = useTracePalette({ active, traced: partsApi.parts.find((part) => part.active)?.contributes ?? true, values, getSession, apply, choiceRef });
   useEffect(() => {
     paletteRefresh.current = palette.refresh;
   }, [palette.refresh]);
+  // Another part became active: the session's palette is the one of the part before until the parts
+  // are joined again (kept results, so quick), which reads the new active part's palette.
+  const activePartId = partsApi.parts.find((part) => part.active)?.id;
+  const shownPartId = useRef(activePartId);
+  useEffect(() => {
+    if (shownPartId.current === activePartId) {
+      return;
+    }
+    shownPartId.current = activePartId;
+    if (active && partsApi.parts.length > 1) {
+      schedule(0);
+    }
+  }, [activePartId, active, partsApi.parts.length, schedule]);
 
   const setValue = useCallback(
     <K extends keyof TraceValues>(name: K, value: TraceValues[K], isDragging = false) => {

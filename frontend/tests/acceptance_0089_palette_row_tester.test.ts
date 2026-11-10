@@ -655,3 +655,16 @@ test("0089 §27.3 tester: hovering a swatch shows the x; with Ctrl held it shows
     await away(s);
   });
 });
+
+test("0089 §27.8 tester: with Multicolour a new part without paths shows no palette colours of part 1; part 1 keeps its colours", { skip: !BROWSER, timeout: 600_000 }, async () => {
+  await withApp(async (s) => {
+    await openOn(s, "parts.png", PICTURE);
+    await multicolour(s);
+    await waitFor("part 1 swatches", async () => ((await swatchNames(s)).length >= 2 ? true : null), 30_000);
+    const one = await hexesOf(s);
+    await s.evaluate(`document.querySelector('${BAR} button[aria-label="Add part"]').click()`);
+    await waitFor("part 2 starts without palette colours", async () => ((await swatchNames(s)).length === 0 ? true : null), 15_000);
+    await s.evaluate(`document.querySelector('${BAR} [role=radiogroup][aria-label=Parts] [data-trace-part="1"]').click()`);
+    await waitFor("part 1's colours are back", async () => ((await hexesOf(s)).join() === one.join() ? true : null), 30_000);
+  }, RECORD);
+});

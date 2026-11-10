@@ -654,3 +654,28 @@ test("0089 §24.7: Ignore below keeps its label and the widest value apart by 10
     }
   });
 });
+
+test("0089 §27.8: with Multicolour a new part has no palette until it has paths; the palette is the active part's; a part another part covers shows none", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    const at = await pickSetup(s);
+    await setAdvanced(s, true);
+    await s.evaluate(`[...document.querySelectorAll('${ADV} [role=radiogroup][aria-label=Output] [role=radio]')].find((r) => r.textContent === 'Multicolour').click()`);
+    await sleep(1500);
+    const hexes = async () =>
+      JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
+    await s.clickSel(PICK);
+    await s.click(at.a[0], at.a[1]);
+    await waitFor("part 1 with A", async () => ((await chipNames(s))[0] === "Part 1 of 1, inside, 1 path, active" ? true : null), 10_000);
+    await waitFor("part 1 palette", async () => ((await hexes()).length >= 1 ? true : null), 30_000);
+    // Add part: no paths, so nothing to trace and none of part 1's colours.
+    await s.clickSel(ADD);
+    await waitFor("chip 2", async () => ((await chipNames(s)).length === 2 ? true : null), 10_000);
+    await waitFor("no palette for the part without paths", async () => ((await hexes()).length === 0 ? true : null), 15_000);
+    // Its own paths: its own palette. Part 1 is covered by part 2 now and adds nothing.
+    await s.click(at.a[0], at.a[1]);
+    await waitFor("part 2 with A", async () => ((await chipNames(s))[1] === "Part 2 of 2, inside, 1 path, active" ? true : null), 10_000);
+    await waitFor("part 2 palette", async () => ((await hexes()).length >= 1 ? true : null), 60_000);
+    await s.clickSel(`${PARTS_GROUP} [data-trace-part="1"]`);
+    await waitFor("part 1 adds nothing, no palette", async () => ((await hexes()).length === 0 ? true : null), 60_000);
+  });
+});

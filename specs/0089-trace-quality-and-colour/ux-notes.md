@@ -1178,3 +1178,9 @@ event does not reach the desktop webview, so the Exclude glyph stayed on. The gl
 pointer move re-reads the modifier, so a missed key release cannot leave it stuck. Keys on a focused swatch are
 unchanged (Enter / Space exclude, Shift+Enter, Delete, Backspace delete). Pick colours' Shift+click adds a colour
 (canvas and pipette) is unchanged.
+
+### 27.10 The palette follows the active part (customer 2026-11-10)
+
+With Multicolour the palette row is the active part's: a part without paths, or one another part covers completely,
+adds nothing and shows no palette. A chip pick joins the parts again from the kept results, so the row shows the new
+active part's colours and its x and the palette pipette change that part's settings.

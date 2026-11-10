@@ -58,8 +58,8 @@ export interface TracePaletteApi {
 
 interface PaletteContext {
   active: boolean;
-  /** The active part: the palette of another part is not this part's (customer 2026-11-10). */
-  partId: number;
+  /** The active part adds something to the join; a part without paths has no palette (customer 2026-11-10). */
+  traced: boolean;
   /** The current values (the state the bar shows). */
   values: TraceValues;
   getSession: () => WasmSession | null;
@@ -67,7 +67,7 @@ interface PaletteContext {
   choiceRef: MutableRefObject<TraceChoice>;
 }
 
-export function useTracePalette({ active, partId, values, getSession, apply, choiceRef }: PaletteContext): TracePaletteApi {
+export function useTracePalette({ active, traced, values, getSession, apply, choiceRef }: PaletteContext): TracePaletteApi {
   const [info, setInfo] = useState<PaletteInfo | null>(null);
   const [same, setSame] = useState<string | null>(null);
   /** The colour last deleted and the kept palette it left: "Removed #..." is said until that changes. */
@@ -87,13 +87,6 @@ export function useTracePalette({ active, partId, values, getSession, apply, cho
       setRemoved(null);
     }
   }, [active, picking]);
-
-  // Another part became active: the palette read belongs to the part before until the next preview.
-  useEffect(() => {
-    setInfo(null);
-    setSame(null);
-    setRemoved(null);
-  }, [partId]);
 
   const edit = useCallback(
     (change: (v: TraceChoice["values"]) => Partial<TraceChoice["values"]>) => {
@@ -157,7 +150,7 @@ export function useTracePalette({ active, partId, values, getSession, apply, cho
   }, [same]);
 
   const multi = values.output === MULTICOLOUR;
-  const shown = multi && !picking ? swatches : NO_SWATCHES;
+  const shown = multi && !picking && traced ? swatches : NO_SWATCHES;
   const excludedCount = swatches.filter((s) => values.excluded.includes(s.hex)).length;
   const note = !multi
     ? ""
