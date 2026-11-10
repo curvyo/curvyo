@@ -90,9 +90,10 @@ until its base is merged, is rebased onto `main`, then gets its PR.
   changes.
   **Escalate** to Fable only after two failed attempts on the same problem, with the failure
   handed over; never as a default.
-- **Tester on its own VM** (`navi-curvyo`, plain clone `~/curvyo`): the lead sends the branch
-  name; the tester pulls it, commits acceptance tests to the branch, pushes, and reports
-  PASS/FAIL. The lead's checkout stays free; never two agents building in one checkout.
+- **Tester in the lead's checkout** (customer, 2026-11-10: no second VM): after the implementer
+  reports, the lead (or a Haiku `tester` agent, one at a time) writes the acceptance tests from the
+  spec in the same checkout and branch, runs the full gate and the browser files one by one, commits
+  the tests and reports PASS/FAIL. Never two agents building or driving a browser at once.
 - **Gate once:** during work only the affected crates; the full gate (§7) once before the push.
 - **No stacking by default:** one story at a time, the next starts after the merge. Only when
   the customer says so (nights, weekends) may one more branch build on an unmerged one, never
