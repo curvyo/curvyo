@@ -29,8 +29,8 @@ use curvyo_editor_wasm::{
     FitWorker, Session, Tool, TracedText, trace_colour_settings, trace_settings,
 };
 use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, trace_read_text, trace_text_colour_job_with, trace_text_job_with,
-    trace_text_regions_with,
+    FontBlock, OcrLine, OcrModel, trace_read_text, trace_text_colour_job_in, trace_text_job_in,
+    trace_text_regions_in,
 };
 use serde_json::Value;
 
@@ -174,23 +174,25 @@ impl Host {
     fn wire(&self, settings: &str, lines: &[OcrLine]) -> Vec<f64> {
         if settings == MULTI {
             let colour = trace_colour_settings(settings).expect("multicolour settings");
-            trace_text_colour_job_with(
+            trace_text_colour_job_in(
                 &self.rgba,
                 self.width,
                 self.height,
                 self.map,
                 &colour,
                 lines,
+                None,
                 &mut |_| {},
             )
         } else {
-            trace_text_job_with(
+            trace_text_job_in(
                 &self.rgba,
                 self.width,
                 self.height,
                 self.map,
                 &trace_settings(settings),
                 lines,
+                None,
                 &mut |_| {},
             )
         }
@@ -202,13 +204,14 @@ impl Host {
             self.s
                 .set_trace_ocr_lines(self.image, lines.to_vec(), (self.width, self.height))
         );
-        let regions = trace_text_regions_with(
+        let regions = trace_text_regions_in(
             &self.rgba,
             self.width,
             self.height,
             self.map,
             &trace_settings(settings),
             lines,
+            None,
         );
         let fitted = self
             .s

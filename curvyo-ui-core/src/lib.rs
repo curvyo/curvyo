@@ -553,7 +553,6 @@ pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
 };
-pub use trace_inpaint::inpaint as trace_inpaint;
 pub use trace_ocr::{
     LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, MIN_GUESSED_LINE_CONFIDENCE, MIN_LINE_CONFIDENCE,
     OcrError, OcrLine, OcrModel, trace_crop_text, trace_read_crop, trace_read_text,
@@ -564,25 +563,17 @@ pub use trace_plan::{
     trace_group_name, trace_style,
 };
 pub use trace_region::{
-    RegionOperand, TRACE_REGION_TOLERANCE, TraceRegion, TraceRegionError, mask_operand,
-    unclipped_notice,
+    RegionOperand, TraceRegion, TraceRegionError, mask_operand, unclipped_notice,
 };
 pub use trace_region_raster::{TraceRegionDefaults, trace_region_defaults};
-pub use trace_shapes::{
-    SHAPE_TOLERANCE_PX, SHAPE_TOLERANCE_SHARE, TraceBand, TraceShapeRegion, primitive_path,
-    recognise_shapes, trace_add_shapes,
-};
-pub use trace_text::{TextPass, TextRegion, text_pass};
-pub use trace_text_colour::{trace_text_colour_job_in, trace_text_colour_job_with};
+pub use trace_shapes::{TraceBand, TraceShapeRegion, recognise_shapes, trace_add_shapes};
+pub use trace_text_colour::trace_text_colour_job_in;
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};
-pub use trace_text_wire::{
-    TraceTextWire, TraceTexts, trace_text_job_in, trace_text_job_with, trace_text_regions_in,
-    trace_text_regions_with,
-};
+pub use trace_text_wire::{TraceTextWire, TraceTexts, trace_text_job_in, trace_text_regions_in};
 pub use trace_transfer::{
     TRACE_WIRE_HEADER, TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire, read_trace_wire,
-    trace_analyse, trace_auto_threshold, trace_colour_job_in, trace_colour_job_with, trace_job,
-    trace_job_in, trace_job_with, trace_sample_colour, trace_suggest_background,
+    trace_analyse, trace_auto_threshold, trace_colour_job_in, trace_job_in, trace_sample_colour,
+    trace_suggest_background,
 };
 pub use transform_drag::{
     CornerLinking, CornerRadiusScaling, ParamDragInfo, ScaleModes, StrokeScaling,

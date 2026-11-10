@@ -50,7 +50,7 @@ fn grown(quad: &[[f64; 2]; 4]) -> [[f64; 2]; 4] {
 
 /// One accepted line after the text pass.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextRegion {
+pub(crate) struct TextRegion {
     /// The OCR's string.
     pub text: String,
     /// The line's own trace, in document millimetres.
@@ -78,7 +78,7 @@ pub struct TextRegion {
 
 /// What the text pass hands to the main trace and back to the session.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TextPass {
+pub(crate) struct TextPass {
     /// The picture with the left-out pixels filled from their surroundings.
     pub rgba: Vec<u8>,
     /// Per pixel: left out.
@@ -89,10 +89,9 @@ pub struct TextPass {
     pub found: usize,
 }
 
-/// The luma of the main trace (Rec. 709, as `vectorize-core`).
+/// The luma of the main trace's pixel `px`.
 fn luma(px: &[u8]) -> u8 {
-    let weighted = 2126 * u32::from(px[0]) + 7152 * u32::from(px[1]) + 722 * u32::from(px[2]);
-    u8::try_from((weighted + 5000) / 10_000).unwrap_or(u8::MAX)
+    curvyo_vectorize_core::luma(px[0], px[1], px[2])
 }
 
 /// Whether the pixel centre `(x + 0.5, y + 0.5)` lies inside the convex `quad`.
@@ -183,7 +182,7 @@ fn threshold_and_polarity(
 /// trace settings `params` and the OCR `lines` (in this picture's pixels). Lines that are not
 /// accepted, or whose own trace has no outline, are left to the main trace.
 #[must_use]
-pub fn text_pass(
+pub(crate) fn text_pass(
     rgba: &[u8],
     width: u32,
     height: u32,

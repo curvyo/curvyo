@@ -79,26 +79,10 @@ pub struct TraceTexts {
 }
 
 /// One trace with the OCR `lines` (in this picture's pixels): the text pass, then
-/// [`crate::trace_job_with`] over the filled picture, then the text section. Without lines the
-/// numbers are exactly those of [`crate::trace_job_with`] (criteria 12 and 18).
-#[must_use]
-pub fn trace_text_job_with(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &TraceParams,
-    lines: &[OcrLine],
-    on_percent: &mut dyn FnMut(u8),
-) -> Vec<f64> {
-    trace_text_job_in(
-        rgba, width, height, pixel_map, params, lines, None, on_percent,
-    )
-}
-
-/// As [`trace_text_job_with`] with a mask `region` (`specs/0094` criterion 11): every line is
-/// left out of the main trace, only those whose box centre the region keeps stay as text, and the
-/// outlines are clipped; with no region exactly [`trace_text_job_with`].
+/// [`trace_job_in`] over the filled picture, then the text section. With a mask `region`
+/// (`specs/0094` criterion 11) every line is left out of the main trace, only those whose box
+/// centre the region keeps stay as text, and the outlines are clipped. Without lines the numbers
+/// are exactly those of [`trace_job_in`] (criteria 12 and 18).
 #[must_use]
 #[allow(clippy::too_many_arguments)] // the job's inputs, as the worker passes them
 pub fn trace_text_job_in(
@@ -184,22 +168,8 @@ pub(crate) fn write_texts(wire: &mut Vec<f64>, pass: &TextPass, fills: &[(Rgb8, 
 }
 
 /// The text pass alone (`specs/0091` criterion 25: the lines are decided before the main trace):
-/// the numbers of a result without outlines, then the text section of the accepted lines, as
-/// [`trace_text_job_with`] would write it.
-#[must_use]
-pub fn trace_text_regions_with(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &TraceParams,
-    lines: &[OcrLine],
-) -> Vec<f64> {
-    trace_text_regions_in(rgba, width, height, pixel_map, params, lines, None)
-}
-
-/// As [`trace_text_regions_with`], only the lines whose box centre `region` keeps
-/// (`specs/0094` criterion 11).
+/// the numbers of a result without outlines, then the text section of the accepted lines whose
+/// box centre `region` keeps (`specs/0094` criterion 11), as [`trace_text_job_in`] would write it.
 #[must_use]
 pub fn trace_text_regions_in(
     rgba: &[u8],
@@ -289,7 +259,7 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::{read_trace_wire, trace_job_with};
+    use crate::trace_transfer::{read_trace_wire, trace_job_in};
 
     /// A 40 x 20 picture with a black bar (the "text") on white.
     fn picture() -> Vec<u8> {
@@ -317,13 +287,14 @@ mod tests {
     #[test]
     fn the_text_section_round_trips_and_the_bar_leaves_the_main_trace() {
         let params = TraceParams::with_threshold(128);
-        let wire = trace_text_job_with(
+        let wire = trace_text_job_in(
             &picture(),
             40,
             20,
             MAP,
             &params,
             &[line("Grüße")],
+            None,
             &mut |_| {},
         );
         let read = read_trace_wire(&wire).unwrap();
@@ -341,23 +312,25 @@ mod tests {
     fn the_regions_are_the_text_section_of_the_job() {
         let params = TraceParams::with_threshold(128);
         let lines = [line("Grüße")];
-        let full = read_trace_wire(&trace_text_job_with(
+        let full = read_trace_wire(&trace_text_job_in(
             &picture(),
             40,
             20,
             MAP,
             &params,
             &lines,
+            None,
             &mut |_| {},
         ))
         .unwrap();
-        let regions = read_trace_wire(&trace_text_regions_with(
+        let regions = read_trace_wire(&trace_text_regions_in(
             &picture(),
             40,
             20,
             MAP,
             &params,
             &lines,
+            None,
         ))
         .unwrap();
         assert_eq!(regions.texts, full.texts);
@@ -368,9 +341,9 @@ mod tests {
     #[test]
     fn without_lines_the_job_is_the_plain_trace() {
         let params = TraceParams::with_threshold(128);
-        let plain = trace_job_with(&picture(), 40, 20, MAP, &params, &mut |_| {});
+        let plain = trace_job_in(&picture(), 40, 20, MAP, &params, None, &mut |_| {});
         assert_eq!(
-            trace_text_job_with(&picture(), 40, 20, MAP, &params, &[], &mut |_| {}),
+            trace_text_job_in(&picture(), 40, 20, MAP, &params, &[], None, &mut |_| {}),
             plain
         );
         let read = read_trace_wire(&plain).unwrap();

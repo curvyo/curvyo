@@ -15,7 +15,7 @@ mod cpu_time;
 
 use cpu_time::cpu_time_of;
 use curvyo_editor_wasm::{Session, Tool};
-use curvyo_ui_core::{TRACE_PRESETS, TraceParams, trace_auto_threshold, trace_job_with};
+use curvyo_ui_core::{TRACE_PRESETS, TraceParams, trace_auto_threshold, trace_job_in};
 
 fn say(step: &str, took: std::time::Duration) {
     println!("{step:<44} {:>9.1} ms CPU", took.as_secs_f64() * 1000.0);
@@ -55,12 +55,13 @@ fn a_4000_px_photo_through_the_trace_tool_step_by_step() {
     let params = photo.apply(TraceParams::with_threshold(threshold));
 
     let (wire, took) = cpu_time_of(|| {
-        trace_job_with(
+        trace_job_in(
             &reduced.rgba,
             reduced.width,
             reduced.height,
             reduced.map,
             &params,
+            None,
             &mut |_| {},
         )
     });
@@ -88,12 +89,13 @@ fn a_4000_px_photo_through_the_trace_tool_step_by_step() {
     let (full, took) = cpu_time_of(|| session.trace_source(image, false).unwrap());
     say("full-size pixels for the worker", took);
     let (wire, took) = cpu_time_of(|| {
-        trace_job_with(
+        trace_job_in(
             &full.rgba,
             full.width,
             full.height,
             full.map,
             &params,
+            None,
             &mut |_| {},
         )
     });
@@ -150,12 +152,13 @@ fn the_photo_at_other_thresholds_and_presets() {
             let preset = TRACE_PRESETS.iter().find(|p| p.key == key).unwrap();
             let params = preset.apply(TraceParams::with_threshold(threshold));
             let (wire, trace) = cpu_time_of(|| {
-                trace_job_with(
+                trace_job_in(
                     &full.rgba,
                     full.width,
                     full.height,
                     full.map,
                     &params,
+                    None,
                     &mut |_| {},
                 )
             });

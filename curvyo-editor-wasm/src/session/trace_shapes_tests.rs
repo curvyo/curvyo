@@ -4,8 +4,8 @@
 
 use curvyo_document_core::{Color, ObjectSnapshot, Shape};
 use curvyo_ui_core::{
-    TraceParams, read_trace_wire, trace_add_shapes, trace_colour_job_with, trace_job_with,
-    trace_read_text, trace_text_job_with,
+    TraceParams, read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
+    trace_read_text, trace_text_job_in,
 };
 
 use super::trace_text_tests::{cpu_seconds, fit, model, session_with, session_with_bytes};
@@ -72,21 +72,23 @@ fn traced(png: &[u8], multicolour: bool) -> Session {
             r##"{"output":1,"method":1,"background":"#FFFFFF","threshold":128,"specks":0}"##,
         )
         .unwrap();
-        trace_colour_job_with(
+        trace_colour_job_in(
             &source.rgba,
             source.width,
             source.height,
             source.map,
             &params,
+            None,
             &mut |_| {},
         )
     } else {
-        trace_job_with(
+        trace_job_in(
             &source.rgba,
             source.width,
             source.height,
             source.map,
             &TraceParams::with_threshold(128),
+            None,
             &mut |_| {},
         )
     };
@@ -204,13 +206,14 @@ fn c12_letters_never_become_shapes() {
     .unwrap();
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let threshold = curvyo_ui_core::trace_auto_threshold(&source.rgba, source.width, source.height);
-    let mut wire = trace_text_job_with(
+    let mut wire = trace_text_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &TraceParams::with_threshold(threshold),
         &lines,
+        None,
         &mut |_| {},
     );
     let started = cpu_seconds();
@@ -294,12 +297,13 @@ fn c6_five_hundred_paths_take_under_two_seconds() {
     });
     let (mut session, image) = session_with_bytes(&bytes, "many.png");
     let source = session.trace_source(image, false).unwrap();
-    let plain = trace_job_with(
+    let plain = trace_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     let mut wire = plain.clone();
@@ -356,12 +360,13 @@ fn native_record_of_the_shape_sections_matches_the_golden_file() {
     let mut record = serde_json::Map::new();
     for file in ["disc.pgm", "rectangle.pgm", "ring-with-dot.pgm"] {
         let (w, h, rgba) = pgm(file);
-        let plain = trace_job_with(
+        let plain = trace_job_in(
             &rgba,
             w,
             h,
             map,
             &crate::trace_glue::trace_settings(settings),
+            None,
             &mut |_| {},
         );
         let mut wire = plain.clone();

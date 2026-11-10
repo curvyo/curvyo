@@ -84,7 +84,7 @@ fn check(what: &str, took: Duration, budget: Duration) {
 fn a_pan_or_zoom_over_a_100000_node_preview_redraws_within_16_ms() {
     let (mut session, image) = traced_image(3200);
     let source = session.trace_source(image, false).unwrap();
-    let wire = curvyo_ui_core::trace_job(&source.rgba, 3200, 3200, source.map, 128, 80, 0.0);
+    let wire = trace_job(&source.rgba, 3200, 3200, source.map, 128, 80, 0.0);
     let nodes = wire[2];
     println!("preview of {nodes} nodes");
     assert!(nodes >= 100_000.0);
@@ -149,4 +149,23 @@ fn the_main_thread_handlers_of_a_16_mpx_trace_stay_under_50_ms() {
     check("a changed value", took, HANDLER);
     let (_, took) = cpu_time_of(|| session.trace_source(image, true).unwrap());
     check("the reduced copy again", took, HANDLER);
+}
+
+/// One trace with the three bar values and every other setting at its first-use value.
+fn trace_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    threshold: u8,
+    smooth: u8,
+    specks_mm: f64,
+) -> Vec<f64> {
+    let params = curvyo_ui_core::TraceParams {
+        threshold,
+        smooth,
+        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
+        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+    };
+    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
 }

@@ -41,7 +41,7 @@ pub fn trace_text_failed_notice() -> String {
 /// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `tolerance`,
 /// `specks` in mm, `corners`, `upscale` and `denoise` as choice indices, `invert`,
 /// `ignore_background`, `method`, `background`, `swatches`, `colour_tolerance`); the
-/// result as the flat numbers of `curvyo_ui_core::trace_job_with`. `progress` hears each higher
+/// result as the flat numbers of `curvyo_ui_core::trace_job_in`. `progress` hears each higher
 /// whole percent (criterion 10). Never throws: bad input reads as the status
 /// "invalid".
 #[wasm_bindgen]

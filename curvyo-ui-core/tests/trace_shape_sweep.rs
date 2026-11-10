@@ -11,7 +11,7 @@
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
 use curvyo_document_core::{LineJoin, Shape};
-use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_with};
+use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_in};
 
 /// 10 px/mm.
 const MAP: [f64; 6] = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];
@@ -71,12 +71,13 @@ fn recognised(rgba: &[u8]) -> Option<(&'static str, u32, f64, Option<f64>, f64)>
 }
 
 fn recognised_at(rgba: &[u8], side: u32) -> Option<(&'static str, u32, f64, Option<f64>, f64)> {
-    let mut wire = trace_job_with(
+    let mut wire = trace_job_in(
         rgba,
         side,
         side,
         MAP,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     trace_add_shapes(&mut wire, MAP);
@@ -240,12 +241,13 @@ fn the_customers_stars_are_stars() {
         0.0,
         0.0,
     ];
-    let mut wire = trace_job_with(
+    let mut wire = trace_job_in(
         png.as_raw(),
         w,
         h,
         map,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     trace_add_shapes(&mut wire, map);
@@ -288,12 +290,13 @@ fn the_customers_page_keeps_every_hole() {
         0.0,
         0.0,
     ];
-    let off = trace_job_with(
+    let off = trace_job_in(
         png.as_raw(),
         w,
         h,
         map,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     let mut on = off.clone();
@@ -415,12 +418,13 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
         0.0,
         0.0,
     ];
-    let off = trace_job_with(
+    let off = trace_job_in(
         png.as_raw(),
         w,
         h,
         map,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     let mut on = off.clone();

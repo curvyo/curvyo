@@ -21,11 +21,11 @@ pub(crate) const SHAPE_MARK: f64 = -4.0;
 
 /// The least tolerance, in picture pixels (`specs/0088` Frage 73: 0.2 mm at 10 px/mm; the rule of
 /// `specs/0091` criterion 26).
-pub const SHAPE_TOLERANCE_PX: f64 = 2.0;
+pub(crate) const SHAPE_TOLERANCE_PX: f64 = 2.0;
 
 /// The tolerance as a share of the square root of the outline's area (Proposal, `adrs.md`
 /// Part B): large shapes may stray a little more than the pixel floor.
-pub const SHAPE_TOLERANCE_SHARE: f64 = 0.01;
+pub(crate) const SHAPE_TOLERANCE_SHARE: f64 = 0.01;
 
 /// Numbers per outline in the section: the kind and six parameters.
 const SHAPE_NUMBERS: usize = 7;
@@ -228,14 +228,14 @@ fn parent_of(
 
 /// The outline a primitive draws, as a path.
 #[must_use]
-pub fn primitive_path(shape: &Shape, rotation: Angle) -> BezPath {
+pub(crate) fn primitive_path(shape: &Shape, rotation: Angle) -> BezPath {
     outline_path(&drawing_outline_of_rotated(shape, rotation))
 }
 
 /// [`primitive_path`] wound as `traced` is, so a hole stays a hole under the nonzero fill of a
 /// compound path (`specs/0088` Part B: a primitive's outline always winds one way).
 #[must_use]
-pub fn primitive_path_like(shape: &Shape, rotation: Angle, traced: &BezPath) -> BezPath {
+pub(crate) fn primitive_path_like(shape: &Shape, rotation: Angle, traced: &BezPath) -> BezPath {
     let path = primitive_path(shape, rotation);
     if kurbo::Shape::area(&path) * kurbo::Shape::area(traced) < 0.0 {
         path.reverse_subpaths()
@@ -535,7 +535,7 @@ fn read_band(next: &mut impl FnMut() -> Option<f64>, width: f64) -> Option<Trace
 }
 
 /// Adds the shape section to a trace result `wire` of a picture mapped by `pixel_map` (the
-/// worker's numbers of `trace_job_with`, `trace_colour_job_with` or the text jobs), after its text
+/// worker's numbers of `trace_job_in`, `trace_colour_job_in` or the text jobs), after its text
 /// section; a result that was not traced is left as it is.
 pub fn trace_add_shapes(wire: &mut Vec<f64>, pixel_map: [f64; 6]) {
     let Some((read, at)) = crate::trace_transfer::read_trace_body(wire) else {

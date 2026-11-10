@@ -9,7 +9,7 @@
 )]
 
 use curvyo_document_core::Shape;
-use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_with};
+use curvyo_ui_core::{TraceParams, read_trace_wire, trace_add_shapes, trace_job_in};
 use kurbo::{BezPath, Join, Shape as _, Stroke, StrokeOpts};
 
 const MM_PER_PX: f64 = 25.4 / 96.0;
@@ -74,12 +74,13 @@ fn c16_the_customers_8_star_is_a_stroked_star_with_the_traced_area() {
     .to_rgba8();
     let (w, h) = png.dimensions();
     let map = [MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0];
-    let off = trace_job_with(
+    let off = trace_job_in(
         png.as_raw(),
         w,
         h,
         map,
         &TraceParams::with_threshold(128),
+        None,
         &mut |_| {},
     );
     let mut on = off.clone();

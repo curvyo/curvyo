@@ -272,7 +272,7 @@ impl Session {
     }
 
     /// As [`Self::trace_fit_request`] for the lines of `regions` (the text pass alone of selected
-    /// image `image`, `trace_text_regions_with`), before its main trace (criterion 25): the fit
+    /// image `image`, `trace_text_regions_in`), before its main trace (criterion 25): the fit
     /// decides the lines, the trace then runs once with [`Self::trace_lines_to_trace`] and keeps
     /// the fit.
     pub fn trace_fit_request_for(

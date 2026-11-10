@@ -4,6 +4,7 @@
 //! colour. Colours are compared as their stored sRGB bytes (trial C1, `plan.md`): Euclidean
 //! distance for Remove background, the two-colour mixing model for Pick colours.
 
+use crate::palette::distance;
 use crate::params::{Selection, TraceParams};
 use crate::raster::{Raster, luma};
 
@@ -119,11 +120,6 @@ pub fn selected(raster: Raster<'_>, params: &TraceParams) -> Vec<bool> {
 /// A colour in byte units as `f64`.
 pub(crate) fn colour(r: u8, g: u8, b: u8) -> [f64; 3] {
     [f64::from(r), f64::from(g), f64::from(b)]
-}
-
-fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
-    let d = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-    (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
 }
 
 #[cfg(test)]

@@ -11,7 +11,6 @@ use curvyo_document_core::{
     Affine, Document, NewImage, NodeId, ObjectSnapshot, Opacity, Point, pack, unpack,
 };
 use curvyo_editor_wasm::{KeyInput, Session, Tool, TraceCreateOutcome, TraceSelection};
-use curvyo_ui_core::trace_job;
 
 fn picture(name: &str) -> Vec<u8> {
     std::fs::read(
@@ -234,4 +233,23 @@ fn create_without_a_settled_full_size_result_is_ignored_and_a_preview_is_not_a_r
     assert!(!session.set_trace_result(image, &[]));
     assert!(!session.set_trace_preview(image, &[f64::NAN; 12]));
     assert_eq!(reopened(&session).object_ids(), vec![image]);
+}
+
+/// One trace with the three bar values and every other setting at its first-use value.
+fn trace_job(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    threshold: u8,
+    smooth: u8,
+    specks_mm: f64,
+) -> Vec<f64> {
+    let params = curvyo_ui_core::TraceParams {
+        threshold,
+        smooth,
+        specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
+        ..curvyo_ui_core::TraceParams::with_threshold(threshold)
+    };
+    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
 }

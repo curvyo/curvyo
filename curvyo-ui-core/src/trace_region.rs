@@ -11,12 +11,12 @@
 use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::signed_area_mm2;
 use curvyo_geometry_core::{BooleanError, BooleanOp, Outline, OutlineTriple, boolean};
-use curvyo_vectorize_core::{ColourTrace, TraceResult};
+use curvyo_vectorize_core::{ColourTrace, TraceResult, node_count};
 use kurbo::{BezPath, PathEl, Shape};
 
 /// The kernel tolerance of the region and of the clip (`adrs.md` decision 1): the grid keeps
 /// 0.002 mm, curves are flattened at 0.003 mm, half of criterion 2's 0.01 mm is left.
-pub const TRACE_REGION_TOLERANCE: Tolerance = Tolerance::from_mm(0.005);
+pub(crate) const TRACE_REGION_TOLERANCE: Tolerance = Tolerance::from_mm(0.005);
 
 /// The area a masked trace keeps: the mask paths' union, or everything outside it.
 #[derive(Debug, Clone, PartialEq)]
@@ -492,32 +492,6 @@ pub(crate) fn triples_of(path: &BezPath) -> Vec<Vec<OutlineTriple>> {
         }
     }
     outlines
-}
-
-/// The anchors of a closed outline: one per segment, the closing one not counted twice (the
-/// count of `curvyo-vectorize-core`).
-pub(crate) fn node_count(path: &BezPath) -> usize {
-    let mut start = None;
-    let mut last = None;
-    let mut segments = 0;
-    for element in path.elements() {
-        match *element {
-            PathEl::MoveTo(p) => {
-                start = Some(p);
-                last = Some(p);
-            }
-            PathEl::LineTo(p) | PathEl::QuadTo(_, p) | PathEl::CurveTo(_, _, p) => {
-                segments += 1;
-                last = Some(p);
-            }
-            PathEl::ClosePath => {}
-        }
-    }
-    if segments > 0 && start == last {
-        segments
-    } else {
-        segments + 1
-    }
 }
 
 #[cfg(test)]

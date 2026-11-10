@@ -11,7 +11,7 @@
 use curvyo_document_core::{Color, NodeId, ObjectSnapshot};
 use curvyo_ui_core::{
     OcrModel, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TraceColourParams, TraceMethod, TraceParams,
-    TraceRgb, trace_read_text, trace_text_colour_job_with, trace_text_regions_with,
+    TraceRgb, trace_read_text, trace_text_colour_job_in, trace_text_regions_in,
 };
 
 use super::trace_text_tests::{
@@ -72,13 +72,14 @@ pub(super) fn run(model: &OcrModel, file: &str, params: &TraceColourParams) -> (
     times.ocr = cpu_seconds() - started;
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
     let started = cpu_seconds();
-    let regions = trace_text_regions_with(
+    let regions = trace_text_regions_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params.trace,
         &lines,
+        None,
     );
     times.regions = cpu_seconds() - started;
     let started = cpu_seconds();
@@ -88,23 +89,25 @@ pub(super) fn run(model: &OcrModel, file: &str, params: &TraceColourParams) -> (
     times.fit = cpu_seconds() - started;
     let (decided, _) = session.trace_lines_to_trace(image).unwrap();
     let started = cpu_seconds();
-    let wire = trace_text_colour_job_with(
+    let wire = trace_text_colour_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         params,
         &decided,
+        None,
         &mut |_| {},
     );
     times.trace = cpu_seconds() - started;
     let started = cpu_seconds();
-    let plain = curvyo_ui_core::trace_colour_job_with(
+    let plain = curvyo_ui_core::trace_colour_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         params,
+        None,
         &mut |_| {},
     );
     times.plain = cpu_seconds() - started;
@@ -317,13 +320,14 @@ fn native_record_of_the_small_colour_poster_matches_the_golden_file() {
         crate::trace_glue::ocr_lines_json(source.width, source.height, &lines)
     };
     let params = crate::trace_glue::trace_colour_settings(RECORD_SETTINGS).unwrap();
-    let wire = trace_text_colour_job_with(
+    let wire = trace_text_colour_job_in(
         &source.rgba,
         source.width,
         source.height,
         source.map,
         &params,
         &crate::trace_glue::read_ocr_lines(&ocr, source.width),
+        None,
         &mut |_| {},
     );
     let read = curvyo_ui_core::read_trace_wire(&wire).unwrap();
@@ -387,13 +391,14 @@ fn the_colour_count_includes_colours_only_texts_use() {
     };
     let mut params = colour_params();
     params.trace.specks = curvyo_ui_core::TraceMm::from_mm(0.0);
-    let wire = trace_text_colour_job_with(
+    let wire = trace_text_colour_job_in(
         &rgba,
         w,
         h,
         [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
         &params,
         &[line],
+        None,
         &mut |_| {},
     );
     let (mut session, image) = session_with("colour/colour_small.png");

@@ -28,27 +28,10 @@ const PALETTE_PERCENT: u32 = 25;
 
 /// One multicolour trace with the OCR `lines` (in this picture's pixels): the text pass, the
 /// palette of the picture as it is, the trace of the filled picture with that palette, then the
-/// numbers of [`crate::trace_colour_job_with`] with the text section (each line's fill) between the
-/// outlines and the palette. Without lines the numbers are exactly those of
-/// [`crate::trace_colour_job_with`] (criteria 12 and 24).
-#[must_use]
-pub fn trace_text_colour_job_with(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
-    params: &ColourParams,
-    lines: &[OcrLine],
-    on_percent: &mut dyn FnMut(u8),
-) -> Vec<f64> {
-    trace_text_colour_job_in(
-        rgba, width, height, pixel_map, params, lines, None, on_percent,
-    )
-}
-
-/// As [`trace_text_colour_job_with`] with a mask `region` (`specs/0094` criterion 11): only the
-/// lines whose box centre the region keeps stay as text, and each layer is clipped; with no
-/// region exactly [`trace_text_colour_job_with`].
+/// numbers of [`trace_colour_job_in`] with the text section (each line's fill) between the
+/// outlines and the palette. With a mask `region` (`specs/0094` criterion 11) only the lines
+/// whose box centre the region keeps stay as text, and each layer is clipped. Without lines the
+/// numbers are exactly those of [`trace_colour_job_in`] (criteria 12 and 24).
 #[must_use]
 #[allow(clippy::too_many_arguments)] // the job's inputs, as the worker passes them
 pub fn trace_text_colour_job_in(
@@ -239,7 +222,7 @@ fn nearest(colour: Rgb8, candidates: &[Rgb8]) -> Option<Rgb8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::{read_trace_wire, trace_colour_job_with};
+    use crate::trace_transfer::{read_trace_wire, trace_colour_job_in};
     use curvyo_vectorize_core::Mm;
     use curvyo_vectorize_core::TraceParams;
 
@@ -313,13 +296,14 @@ mod tests {
     /// outline with no letter hole.
     #[test]
     fn white_text_on_a_box_is_white_above_the_whole_box() {
-        let wire = trace_text_colour_job_with(
+        let wire = trace_text_colour_job_in(
             &white_on_red(),
             W,
             H,
             MAP,
             &params(),
             &[line()],
+            None,
             &mut |_| {},
         );
         let read = read_trace_wire(&wire).unwrap();
@@ -344,15 +328,17 @@ mod tests {
     #[test]
     fn red_text_on_white_keeps_its_red() {
         let rgba = red_on_white();
-        let wire = trace_text_colour_job_with(&rgba, W, H, MAP, &params(), &[line()], &mut |_| {});
+        let wire =
+            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
         let read = read_trace_wire(&wire).unwrap();
         assert_eq!(read.texts.lines[0].fill, Some(rgb(RED)));
-        let off = read_trace_wire(&trace_colour_job_with(
+        let off = read_trace_wire(&trace_colour_job_in(
             &rgba,
             W,
             H,
             MAP,
             &params(),
+            None,
             &mut |_| {},
         ))
         .unwrap();
@@ -380,7 +366,8 @@ mod tests {
             }
         });
         // Remove background keeps the grey as a palette colour.
-        let wire = trace_text_colour_job_with(&rgba, W, H, MAP, &params(), &[line()], &mut |_| {});
+        let wire =
+            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
         let read = read_trace_wire(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
@@ -395,7 +382,7 @@ mod tests {
             ..TraceParams::with_threshold(128)
         });
         let wire =
-            trace_text_colour_job_with(&rgba, W, H, MAP, &brightness, &[line()], &mut |_| {});
+            trace_text_colour_job_in(&rgba, W, H, MAP, &brightness, &[line()], None, &mut |_| {});
         let read = read_trace_wire(&wire).unwrap();
         assert_eq!(
             read.texts.lines[0].fill,
@@ -410,23 +397,25 @@ mod tests {
     fn a_text_in_an_excluded_colour_is_left_out() {
         let mut excluded = params();
         excluded.excluded = vec![rgb(RED)];
-        let wire = trace_text_colour_job_with(
+        let wire = trace_text_colour_job_in(
             &red_on_white(),
             W,
             H,
             MAP,
             &excluded,
             &[line()],
+            None,
             &mut |_| {},
         );
         assert!(read_trace_wire(&wire).unwrap().texts.lines[0].excluded);
-        let kept = trace_text_colour_job_with(
+        let kept = trace_text_colour_job_in(
             &red_on_white(),
             W,
             H,
             MAP,
             &params(),
             &[line()],
+            None,
             &mut |_| {},
         );
         assert!(!read_trace_wire(&kept).unwrap().texts.lines[0].excluded);
@@ -438,15 +427,16 @@ mod tests {
     fn without_lines_it_is_the_colour_job_and_it_repeats() {
         let rgba = white_on_red();
         assert_eq!(
-            trace_text_colour_job_with(&rgba, W, H, MAP, &params(), &[], &mut |_| {}),
-            trace_colour_job_with(&rgba, W, H, MAP, &params(), &mut |_| {})
+            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[], None, &mut |_| {}),
+            trace_colour_job_in(&rgba, W, H, MAP, &params(), None, &mut |_| {})
         );
         let mut seen = Vec::new();
-        let first = trace_text_colour_job_with(&rgba, W, H, MAP, &params(), &[line()], &mut |p| {
-            seen.push(p);
-        });
+        let first =
+            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |p| {
+                seen.push(p);
+            });
         let second =
-            trace_text_colour_job_with(&rgba, W, H, MAP, &params(), &[line()], &mut |_| {});
+            trace_text_colour_job_in(&rgba, W, H, MAP, &params(), &[line()], None, &mut |_| {});
         assert_eq!(first, second);
         assert!(seen.windows(2).all(|w| w[0] < w[1]), "{seen:?}");
         assert_eq!(seen.last(), Some(&100));
