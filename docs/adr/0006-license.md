@@ -138,3 +138,9 @@ involved the customer should confirm it with a lawyer.
 Extensions are AGPL-3.0-or-later as well (customer, 2026-10-17, spec `0065` EXT-LICENCE); how this
 applies to compiled-in extension crates is [ADR 0034](0034-extension-contract-compiled-in.md) §7.
 The decision above is unchanged.
+
+## Reader's note, 2026-11-10
+
+The crate `vectrace` ([ADR 0048](0048-vectrace-crate.md), Proposed) is licensed MIT OR Apache-2.0,
+by the customer's decision of 2026-11-10 (`specs/0108` Frage 3 A), so that it can live in its own
+repository. Curvyo itself stays AGPL-3.0-or-later. The decision above is unchanged.
