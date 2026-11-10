@@ -41,7 +41,7 @@ So the library itself has no Curvyo dependency left. What keeps the test suite f
    `deny check`, `doc -D warnings`, native vs wasm result check; nightly Windows and macOS test
    run; release by tag (`vX.Y.Z`) publishing to crates.io after the licence and name check.
 5. In this repo: `vectrace = { version = "0.1", ... }` (git or registry) replaces the path
-   dependency in `curvyo-ui-core` and `curvyo-editor-wasm`; delete `vectrace/`; the ADR 0048
-   status becomes Accepted.
+   dependency in `curvyo-ui-core` and `curvyo-editor-wasm`; delete `vectrace/`; ADR 0048 (Accepted
+   by then) gets a note naming the repository.
 6. Weights: `model.toml` and the ONNX files stay in Curvyo's `frontend/public/models/`; the
    standalone app and the SaaS ship their own copy.
