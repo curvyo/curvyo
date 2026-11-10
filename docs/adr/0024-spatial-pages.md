@@ -9,6 +9,7 @@ of rejected ADR 0012; extends ADRs 0002, 0009 and 0014. Customer clarification
 backward compatibility is not required.
 Note 2026-11-05: §1 and §3 amended by [ADR 0042](0042-page-kinds.md) (proposed): every page has a fixed kind; an owned output page is listed and in the plane.
 Note 2026-11-06: §1 and §5 amended by [ADR 0043](0043-sketch-pages-content-by-ownership.md) (proposed): a sketch page's only member is its owning sketch, objects over it count as pasteboard, its frame move carries the sketch only and holds clones back.
+Note 2026-11-10: §1 and §5 amended by [ADR 0051](0051-page-auto-layout-and-ownership-by-centre.md) (proposed): a page size change moves the frames beside its edges by the edges' change, and a dropped frame pushes the frames it lands on away, and a deleted frame's hole is closed by the frames behind it, in the same commit, each carrying the objects whose centre it holds; a frame drag carries by centre too.
 
 ## Context
 

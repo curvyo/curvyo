@@ -10,6 +10,19 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## Concurrent page size changes, drops or deletes can merge into overlapping pages (`0109`, 2026-11-10)
+
+ADR 0051 runs the page auto-layout only inside a local size command, drop or delete; reads, opens
+and merges never write. Two devices that change the size of pages, drop or delete pages
+concurrently each
+move their own neighbours, and the per-page frame registers merge last-writer-wins, so the merged
+plane can hold overlapping pages or a page moved twice. It converges and loses nothing; the overlap
+stays until the maker drags it apart (a size change, a drop and a delete never separate pages
+that overlapped before, ADR 0051 §2, §3, §3a).
+
+**Resolution:** a "tidy pages" command, or a layout pass in the sharing story's merge-residue
+handling (ADR 0015 Consequences), when a story asks for it.
+
 ## Concurrent moves can orphan clones through containment (`0100`, 2026-11-09)
 
 ADR 0045 §4 refuses a command that would put a clone inside a group its original draws, but two
