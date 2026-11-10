@@ -15,7 +15,7 @@ interface TracePaletteProps {
 /**
  * The palette of a multicolour trace beside Colours (`specs/0089` criteria 26 and 29, UX notes
  * §26, §27): the swatches of the Pick colours row, one Tab stop with roving arrows; a press on a
- * swatch's x deletes its colour, Shift+click toggles Exclude, a plain click elsewhere does
+ * swatch's x deletes its colour, Ctrl+click (Cmd on a Mac) toggles Exclude, a plain click elsewhere does
  * nothing. Nothing needs colour perception: the colour's code, name and state are the accessible
  * name.
  */
@@ -101,7 +101,7 @@ export function TracePalette({ palette, stale, onReturnFocus }: TracePaletteProp
                 return;
               }
               setFocus(index);
-              if (event.shiftKey) {
+              if (event.ctrlKey || event.metaKey) {
                 palette.toggleExclude(swatch.hex);
                 onReturnFocus();
               } else if (onRemoveGlyph(event)) {

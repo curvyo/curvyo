@@ -10,7 +10,7 @@ export const PALETTE = "Palette";
 
 /** The tooltip's second line, the swatch's way to exclude (customer 2026-11-09: "ganz kurz";
  * its x deletes, as the Pick colours swatches). */
-export const PALETTE_HINT = "Shift+click: exclude";
+export const PALETTE_HINT = "Ctrl+click: exclude";
 
 export function sameAsNote(hex: string): string {
   return `Same as ${hex}`;

@@ -1101,7 +1101,7 @@ replacement. Items marked **(Proposal)** are mine and vetoable at the demo.
 
 ### 27.2 Isolate removed (item 2)
 
-Shift+hover isolate, its dimming of the other colours' outlines in Overlay, "Isolating #RRGGBB" and the engine's
+Ctrl+hover isolate, its dimming of the other colours' outlines in Overlay, "Isolating #RRGGBB" and the engine's
 isolated colour (session state, the dimmed draw, the wasm call) are deleted. Nothing replaces them.
 
 ### 27.3 The palette swatches (item 2)
@@ -1111,13 +1111,13 @@ the swatch fades to 40 % and the cased Lucide `X` appears (on an excluded swatch
 - **A press on the x deletes the colour** with the re-match semantics of §26.3 (the palette becomes the other colours,
   every pixel matched again among them, a deleted excluded colour is no longer excluded; not a History step). After a
   pointer delete the keyboard goes back to the canvas.
-- **Shift+click anywhere on the cell toggles Exclude** (semantics of §26.3 unchanged). While Shift is held, the
+- **Ctrl+click anywhere on the cell toggles Exclude** (semantics of §26.3 unchanged). While Ctrl is held, the
   hovered or focused palette swatch shows the `Ban` (Exclude) glyph instead of the x, so the glyph says what the
   click will do (customer 2026-11-10).
 - **A plain click elsewhere on the swatch does nothing (Proposal:** "identical to Pick colours" and "a plain click on
   the body does nothing" are read together as: only the x deletes; the Pick colours row is unchanged, a click anywhere
   on its cell removes).
-- **Tooltip:** `#RRGGBB · Name`, then the tiny muted line `Shift+click: exclude` (replaces `PALETTE_HINT` of §26.6).
+- **Tooltip:** `#RRGGBB · Name`, then the tiny muted line `Ctrl+click: exclude` (replaces `PALETTE_HINT` of §26.6).
 - **Keyboard** (unchanged from §26.4): one Tab stop, Left / Right, Home / End; Enter or Space toggles Exclude;
   Shift+Enter, Delete or Backspace deletes, focus to the swatch now in its place, else the previous one, else (no
   colour left) back to the canvas. Accessible name `#4B392F · Brown`, plus `, excluded`. The hidden region says
@@ -1139,7 +1139,7 @@ the swatch fades to 40 % and the cased Lucide `X` appears (on an excluded swatch
 The palette pipette (`Pick palette colour from the image`, 28 px) sits before the palette row with Brightness **and
 with Remove background** (§26.1's "with Remove background no palette pipette" is withdrawn). It and the background
 pipette in the bar are two pipettes: each arms its own mode, pressing one disarms the other, the background pipette
-still ends after one pick, the palette pipette stays armed (Shift+click adds). Its picks are fixed palette colours of
+still ends after one pick, the palette pipette stays armed (Ctrl+click adds). Its picks are fixed palette colours of
 the Remove background trace as with Brightness. Leaving Multicolour disarms it with either method.
 
 ### 27.6 Superseded rules
@@ -1148,14 +1148,14 @@ the Remove background trace as with Brightness. Leaving Multicolour disarms it w
   notice-row line. The hidden region of §24.5 stays and gains segment 3a (27.1).
 - §25.4: the "Same as #3366CC" notice (3 s) is said by the hidden region only.
 - §26.1: "with Remove background (no palette pipette)"; §26.2: the hint line `Click: exclude · Shift: isolate /
-  delete`; §26.3: Shift+hover = Isolate, Click = Exclude, Shift+click = delete, "At least two colours stay"; §26.6:
+  delete`; §26.3: Ctrl+hover = Isolate, Click = Exclude, Ctrl+click = delete, "At least two colours stay"; §26.6:
   the string `PALETTE_HINT` and "Isolating #RRGGBB" in the hidden region.
 - `0094` UX notes §3: the "Part 2 of 3" state label.
 
 ### 27.7 Tests that change by design
 
-Tester files: `acceptance_0089_palette_row_tester` (Isolate, click = Exclude, Shift+click = delete, the two-colour
-floor, the hint line), `acceptance_0089_m_browser` (Shift+hover Isolate, click = Exclude),
+Tester files: `acceptance_0089_palette_row_tester` (Isolate, click = Exclude, Ctrl+click = delete, the two-colour
+floor, the hint line), `acceptance_0089_m_browser` (Ctrl+hover Isolate, click = Exclude),
 `acceptance_0089_sliceM_tester.rs` (c29 without Isolate), the notice-row reads of `acceptance_0089_cleanup_tester`,
 `_tidyup_tester`, `_colours_row_tester`, `_sliceF_tester`, `acceptance_0025_*` and `acceptance_0094_*` (read the
 hidden region or the Trace button's description instead), and `acceptance_0094_parts_*` ("Part 2 of 2" label).
@@ -1170,3 +1170,11 @@ hidden region or the Trace button's description instead), and `acceptance_0094_p
   palette, `join_trace_parts`), and each part's x deletes from its own colours.
 - Chip pick, Add part and Remove part restore each part's colours as part of its settings (criterion 29 unchanged:
   nothing is remembered across sessions).
+
+### 27.9 Ctrl instead of Shift (customer 2026-11-10)
+
+Exclude is **Ctrl+click** (Cmd on a Mac, where Ctrl+click is a right click), not Shift+click: the Shift key's release
+event does not reach the desktop webview, so the Exclude glyph stayed on. The glyph follows Ctrl (or Cmd), and every
+pointer move re-reads the modifier, so a missed key release cannot leave it stuck. Keys on a focused swatch are
+unchanged (Enter / Space exclude, Shift+Enter, Delete, Backspace delete). Pick colours' Shift+click adds a colour
+(canvas and pipette) is unchanged.

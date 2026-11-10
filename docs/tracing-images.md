@@ -357,7 +357,7 @@ area first, colours picked with the palette pipette first. The swatches are the 
 Pick colours: 20 px squares 4 px apart, the row as wide as its colours, so the bar does not grow a
 row for them (with Pick colours there is no palette row; the picked colours sit beside the pipette
 in the bar). Pointing at a swatch fades it and shows an x; its tooltip gives its colour code and
-name ("#4B392F · Brown") and, small, "Shift+click: exclude":
+name ("#4B392F · Brown") and, small, "Ctrl+click: exclude":
 
 - **The x**: deletes the colour. The palette becomes the other colours, and every pixel is
   matched again among them, as if the deleted colour had never been found: each of its pixels
@@ -367,9 +367,9 @@ name ("#4B392F · Brown") and, small, "Shift+click: exclude":
   traced and the Trace button is dimmed (its tooltip: "0 paths: no colour in the palette."), and
   the palette pipette adds colours again. A new method, a new Colours value or another image
   starts from the found palette again.
-- **Shift+click**: excludes the colour: it becomes background and is not traced; the swatch is
+- **Ctrl+click** (Cmd on a Mac): excludes the colour: it becomes background and is not traced; the swatch is
   drawn faded with a crossed circle (a screen reader hears "2 colours excluded"). A second
-  Shift+click brings it back.
+  Ctrl+click brings it back.
 - A plain click elsewhere on the swatch does nothing.
 
 On the keyboard the swatches are one Tab stop: the arrows, Home and End move between them, Enter
@@ -431,7 +431,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Ignore below: drops shapes and holes smaller than this size in mm.
 - Output: Single colour traces the content as one black shape; Multicolour gives one filled shape per colour, neighbours sharing their edges.
 - Colours: how many colours Multicolour finds, 2 to 16; Auto counts them in the image. With Pick colours the picked colours are the palette.
-- Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Shift+click excludes a colour: it becomes background and is not traced; a second Shift+click brings it back.
+- Palette: the colours of a Multicolour trace beside the palette pipette, largest area first. The x on a colour deletes it: the others are matched again as if it had never been found; with no colour left nothing is traced. Ctrl+click excludes a colour: it becomes background and is not traced; a second Ctrl+click brings it back.
 - Invert: traces what the method leaves out; transparent pixels never become shapes.
 - Drop border shapes: drops shapes that touch the image border.
 - Recognise text: reads the text in the picture first, sets each line as text in the nearest font and leaves it out of the paths.
