@@ -507,12 +507,19 @@ fn ac12_overlapping_pages_the_page_on_top_decides() {
         let d = Document::new(9106);
         let first = d.pages()[0].id.clone();
         let second = d.add_page();
+        // Laid over Page 1 as in an older file: a drop pushes the page it lands on
+        // (`specs/0109` criterion 22), so Page 1 is moved out of the way and only that move is
+        // undone.
+        let none = curvyo_document_core::PageContents::new();
+        d.move_page(&first, Vec2::new(0.0, 5000.0), &none).unwrap();
+        let away = d.own_steps().last().unwrap().step;
         d.move_page(
             &second.id,
             Vec2::new(100.0 - second.origin.x, -second.origin.y),
-            &[],
+            &none,
         )
         .unwrap();
+        d.undo_step(away).unwrap();
         d.set_page_grid(&first, shown()).unwrap();
         d.set_page_grid(
             &second.id,
@@ -570,7 +577,7 @@ fn ac13_rotated_grid_snaps_the_centre_to_a_rotated_intersection() {
             100.0 - page.size.width.as_mm(),
             100.0 - page.size.height.as_mm(),
         ),
-        &[],
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let mut s = session_of(&d);
@@ -588,8 +595,12 @@ fn ac12_page_move_keeps_the_grid_on_the_page() {
     // The grid's origin is the page's top-left corner: after moving the page by (3.3, 1.1) the
     // intersection near the square's centre is (23.3, 21.1).
     let d = square_doc(grid_only(GridSnapPoint::Centre), shown());
-    d.move_page(&d.pages()[0].id.clone(), Vec2::new(3.3, 1.1), &[])
-        .unwrap();
+    d.move_page(
+        &d.pages()[0].id.clone(),
+        Vec2::new(3.3, 1.1),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let mut s = session_of(&d);
     move_by(&mut s, Point::new(20.6, 20.6), Vec2::new(2.5, 0.6));
     let b = only_bounds(&s);

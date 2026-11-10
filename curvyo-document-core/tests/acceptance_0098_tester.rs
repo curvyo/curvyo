@@ -242,11 +242,19 @@ fn ac2_add_drawing_page_takes_the_size_of_the_last_drawing_page_not_of_the_last_
     let p2 = d.add_page_of(&PageKind::Drawing).unwrap();
     assert_eq!(p2.name, "Page 2");
     assert_eq!(p2.kind, PageKind::Drawing);
-    d.resize_page(&p2.id, DocumentSize::from_mm(125.0, 75.0))
-        .unwrap();
+    d.resize_page(
+        &p2.id,
+        DocumentSize::from_mm(125.0, 75.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let s = d.add_page_of(&PageKind::Sketch).unwrap();
-    d.resize_page(&s.id, DocumentSize::from_mm(50.0, 40.0))
-        .unwrap();
+    d.resize_page(
+        &s.id,
+        DocumentSize::from_mm(50.0, 40.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     add_laser(&d, &copy("generic-laser", "bottom_left"), 400.0, 300.0);
     let steps = d.own_step_count();
     let p3 = d.add_page_of(&PageKind::Drawing).unwrap();
@@ -294,8 +302,12 @@ fn ac2_names_never_repeat_an_existing_name() {
 #[test]
 fn ac3_sketch_page_size_falls_back_from_last_sketch_to_last_drawing_page() {
     let d = Document::new(1);
-    d.resize_page("first", DocumentSize::from_mm(125.0, 75.0))
-        .unwrap();
+    d.resize_page(
+        "first",
+        DocumentSize::from_mm(125.0, 75.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     add_laser(&d, &copy("generic-laser", "bottom_left"), 400.0, 300.0);
     let steps = d.own_step_count();
     let s1 = d.add_page_of(&PageKind::Sketch).unwrap();
@@ -313,8 +325,12 @@ fn ac3_sketch_page_size_falls_back_from_last_sketch_to_last_drawing_page() {
         None,
         "lazy: no node before the first edit"
     );
-    d.resize_page(&s1.id, DocumentSize::from_mm(60.0, 50.0))
-        .unwrap();
+    d.resize_page(
+        &s1.id,
+        DocumentSize::from_mm(60.0, 50.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let s2 = d.add_page_of(&PageKind::Sketch).unwrap();
     assert_eq!(s2.name, "Sketch 2");
     assert_eq!(
@@ -427,10 +443,19 @@ fn ac5_no_command_creates_an_output_or_unknown_page_through_add_page_or_changes_
     assert_eq!(d.own_step_count(), steps);
     let s = d.add_page_of(&PageKind::Sketch).unwrap();
     d.rename_page(&s.id, "Renamed").unwrap();
-    d.resize_page(&s.id, DocumentSize::from_mm(90.0, 90.0))
-        .unwrap();
+    d.resize_page(
+        &s.id,
+        DocumentSize::from_mm(90.0, 90.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     d.reorder_page(&s.id, 0).unwrap();
-    d.move_page(&s.id, Vec2::new(0.0, 500.0), &[]).unwrap();
+    d.move_page(
+        &s.id,
+        Vec2::new(0.0, 500.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     assert_eq!(page(&d, &s.id).kind, PageKind::Sketch);
     d.rename_page(&l.id, "Bed").unwrap();
     d.reorder_page(&l.id, 0).unwrap();
@@ -464,7 +489,14 @@ fn ac10_the_laser_page_is_listed_in_its_place_reordered_and_renamed_like_any_pag
     assert_eq!(d.page_kind(&l.id), Some(l.kind.clone()));
     // A frame move is allowed and carries the laser page (ADR 0042 §3).
     let own = rect(&d, l.origin.x + 10.0, l.origin.y + 10.0);
-    assert!(d.move_page(&l.id, Vec2::new(0.0, 400.0), &[own]).unwrap());
+    assert!(
+        d.move_page(
+            &l.id,
+            Vec2::new(0.0, 400.0),
+            &curvyo_document_core::PageContents::from([(l.id.clone(), vec![own])])
+        )
+        .unwrap()
+    );
     let moved = page(&d, &l.id);
     assert!((moved.origin.y - (l.origin.y + 400.0)).abs() < TOL);
     let ObjectSnapshot::Primitive(_) = d.object(own).unwrap() else {
@@ -513,6 +545,7 @@ fn resize_case(origin: &str, corner: PageCorner, expect_dx: f64, expect_dy: f64)
             DocumentSize::from_mm(600.0, 400.0),
             corner,
             ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap()
     );
@@ -618,6 +651,7 @@ fn ac14_placements_keep_their_global_place_through_a_profile_resize() {
             bottom: true,
         },
         ProfileChange::Pick,
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     let after = global(&d);
@@ -641,6 +675,7 @@ fn ac14_an_unchanged_profile_writes_nothing() {
                 bottom: true,
             },
             ProfileChange::Pick,
+            &curvyo_document_core::PageContents::new(),
         )
         .unwrap();
     assert!(!changed);
@@ -656,18 +691,30 @@ fn ac13_a_laser_page_refuses_a_size_command_but_drawing_and_sketch_pages_take_it
     let s = d.add_page_of(&PageKind::Sketch).unwrap();
     let steps = d.own_step_count();
     assert!(matches!(
-        d.resize_page(&l.id, DocumentSize::from_mm(100.0, 100.0)),
+        d.resize_page(
+            &l.id,
+            DocumentSize::from_mm(100.0, 100.0),
+            &curvyo_document_core::PageContents::new()
+        ),
         Err(PageError::FixedSize)
     ));
     assert_eq!(d.own_step_count(), steps);
     assert_eq!(page(&d, &l.id).size, DocumentSize::from_mm(400.0, 300.0));
     assert!(
-        d.resize_page(&s.id, DocumentSize::from_mm(100.0, 100.0))
-            .unwrap()
+        d.resize_page(
+            &s.id,
+            DocumentSize::from_mm(100.0, 100.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .unwrap()
     );
     assert!(
-        d.resize_page("first", DocumentSize::from_mm(100.0, 100.0))
-            .unwrap()
+        d.resize_page(
+            "first",
+            DocumentSize::from_mm(100.0, 100.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .unwrap()
     );
 }
 
@@ -685,7 +732,8 @@ fn ac16_deleting_a_laser_page_takes_its_machine_data_keeps_own_items_and_undo_re
     let first_before = page(&d, "first");
     let m_before = d.manufacturing(id).unwrap();
     let steps = d.own_step_count();
-    d.delete_page(&l.id).unwrap();
+    d.delete_page(&l.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_step_count(), steps + 1, "one step");
     assert!(d.pages().iter().all(|p| p.id != l.id));
     assert!(
@@ -709,10 +757,14 @@ fn ac16_deleting_a_laser_page_takes_its_machine_data_keeps_own_items_and_undo_re
 fn ac16_any_page_may_be_deleted_while_one_other_remains() {
     let d = Document::new(1);
     let l = add_laser(&d, &copy("generic-laser", "bottom_left"), 400.0, 300.0);
-    d.delete_page("first").unwrap();
+    d.delete_page("first", &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.pages().len(), 1);
     assert_eq!(d.pages()[0].id, l.id);
-    assert!(matches!(d.delete_page(&l.id), Err(PageError::LastPage)));
+    assert!(matches!(
+        d.delete_page(&l.id, &curvyo_document_core::PageContents::new()),
+        Err(PageError::LastPage)
+    ));
     assert_eq!(
         d.manufacturings().len(),
         1,
@@ -724,7 +776,8 @@ fn ac16_any_page_may_be_deleted_while_one_other_remains() {
 fn ac16_a_saved_file_after_deleting_a_laser_page_has_no_manufacturing() {
     let d = Document::new(1);
     let l = add_laser(&d, &copy("generic-laser", "bottom_left"), 400.0, 300.0);
-    d.delete_page(&l.id).unwrap();
+    d.delete_page(&l.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     let again = unpack(2, &pack(&d, "0.1.0").unwrap()).unwrap();
     assert_eq!(again.pages().len(), 1);
     assert!(again.manufacturings().is_empty());
@@ -749,12 +802,23 @@ fn ac18c_an_unknown_kind_is_listed_kept_fixed_size_and_saved_back_unchanged() {
     let d = unpack(2, &bytes).unwrap();
     assert_eq!(page(&d, &id).kind, PageKind::Unknown("template".into()));
     assert!(matches!(
-        d.resize_page(&id, DocumentSize::from_mm(10.0, 10.0)),
+        d.resize_page(
+            &id,
+            DocumentSize::from_mm(10.0, 10.0),
+            &curvyo_document_core::PageContents::new()
+        ),
         Err(PageError::FixedSize)
     ));
     assert!(d.rename_page(&id, "Kept").unwrap());
     assert!(d.reorder_page(&id, 0).unwrap());
-    assert!(d.move_page(&id, Vec2::new(5.0, 5.0), &[]).unwrap());
+    assert!(
+        d.move_page(
+            &id,
+            Vec2::new(5.0, 5.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .unwrap()
+    );
     let saved = pack(&d, "0.1.0").unwrap();
     assert_eq!(
         root_value(&stored(&saved), &format!("page.{id}.kind")),
@@ -763,7 +827,9 @@ fn ac18c_an_unknown_kind_is_listed_kept_fixed_size_and_saved_back_unchanged() {
     let again = unpack(3, &saved).unwrap();
     assert_eq!(page(&again, &id).kind, PageKind::Unknown("template".into()));
     assert!(
-        again.delete_page(&id).is_ok(),
+        again
+            .delete_page(&id, &curvyo_document_core::PageContents::new())
+            .is_ok(),
         "an unknown page may be deleted"
     );
 }
@@ -885,8 +951,12 @@ fn ac20_save_and_reopen_keeps_every_page_and_the_machine_data() {
 fn ac20_a_project_built_through_the_commands_round_trips() {
     let d = Document::new(1);
     let p2 = d.add_page_of(&PageKind::Drawing).unwrap();
-    d.resize_page(&p2.id, DocumentSize::from_mm(125.0, 75.0))
-        .unwrap();
+    d.resize_page(
+        &p2.id,
+        DocumentSize::from_mm(125.0, 75.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     rect(&d, 10.0, 10.0);
     let s = d.add_page_of(&PageKind::Sketch).unwrap();
     d.create_page_sketch(&s.id, &three_lines(), &Style::default())
@@ -959,8 +1029,12 @@ fn format_36_file() -> Vec<u8> {
     let d = Document::new(1);
     rect(&d, 10.0, 10.0);
     let s = d.add_page_of(&PageKind::Sketch).unwrap();
-    d.move_page(&s.id, Vec2::new(-s.origin.x, -s.origin.y), &[])
-        .unwrap();
+    d.move_page(
+        &s.id,
+        Vec2::new(-s.origin.x, -s.origin.y),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let sk = d
         .create_page_sketch(&s.id, &three_lines(), &Style::default())
         .unwrap();
@@ -990,6 +1064,17 @@ fn format_36_file() -> Vec<u8> {
         }
     }
     root.insert("page.first.sketch_owner", claim).unwrap();
+    // Laying the sketch page over page 1 pushed page 1 away (`specs/0109` criterion 22): put
+    // page 1 back at (0, 0), where a format-36 file has it.
+    let home: std::collections::HashMap<String, LoroValue> = [
+        ("x".to_owned(), LoroValue::Double(0.0)),
+        ("y".to_owned(), LoroValue::Double(0.0)),
+        ("width".to_owned(), LoroValue::Double(210.0)),
+        ("height".to_owned(), LoroValue::Double(297.0)),
+    ]
+    .into();
+    root.insert("page.first.frame", LoroValue::from(home))
+        .unwrap();
     for p in [&a, &b] {
         let frame: std::collections::HashMap<String, LoroValue> = [
             ("x".to_owned(), LoroValue::Double(0.0)),
@@ -1288,7 +1373,12 @@ fn ac2_edge_add_page_after_a_reorder_or_a_moved_page_lands_on_no_page() {
     d.reorder_page("first", 0).unwrap();
     // List order now: first, p2, laser; move the laser page to the far left.
     let l = d.pages()[2].clone();
-    d.move_page(&l.id, Vec2::new(-2000.0, 0.0), &[]).unwrap();
+    d.move_page(
+        &l.id,
+        Vec2::new(-2000.0, 0.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     d.add_page_of(&PageKind::Sketch).unwrap();
     d.add_page_of(&PageKind::Drawing).unwrap();
     assert_no_overlap(&d.pages());

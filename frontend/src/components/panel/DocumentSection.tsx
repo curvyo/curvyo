@@ -112,6 +112,12 @@ export function DocumentSection({
 
   return (
     <div className="flex flex-col gap-2">
+      {/* The live region is always in the tree, visually hidden, so its text change is
+          announced: the fit notice (its visible copy is text-only) or how many pages the last
+          size change, drop or delete moved (`specs/0109` ux-notes §7, no visible copy). */}
+      <p role="status" className="sr-only">
+        {notice ?? view.movedText}
+      </p>
       {fixedSize ? null : (
         <>
       <FormatsBrokenBlock formats={formats} />
@@ -190,11 +196,6 @@ export function DocumentSection({
               Fit to content
             </button>
           </Tooltip>
-          {/* The live region is always in the tree, visually hidden, so its text
-              change is announced; the visible notice is a text-only copy. */}
-          <p role="status" className="sr-only">
-            {notice}
-          </p>
           {notice && (
             <p
               aria-hidden

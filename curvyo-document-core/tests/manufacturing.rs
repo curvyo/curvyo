@@ -164,7 +164,11 @@ fn the_output_page_is_listed_with_its_kind_and_its_size_is_fixed() {
     assert_eq!(json(&document)["pages"].as_array().unwrap().len(), 2);
     assert_eq!(json(&document)["pages"][1]["kind"], "curvyo.laser");
     assert!(matches!(
-        document.resize_page(&pages[1].id, DocumentSize::from_mm(10.0, 10.0)),
+        document.resize_page(
+            &pages[1].id,
+            DocumentSize::from_mm(10.0, 10.0),
+            &curvyo_document_core::PageContents::new()
+        ),
         Err(curvyo_document_core::PageError::FixedSize)
     ));
 }
@@ -270,7 +274,9 @@ fn delete_page_takes_the_manufacturing_and_undo_restores_all_of_it() {
     let before = json(&document);
     let drawing = document.read_objects().objects.clone();
     let roots = document.children(None);
-    document.delete_page(&page.id).unwrap();
+    document
+        .delete_page(&page.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(last_label(&document), "delete_page");
     assert_eq!(document.manufacturings(), Vec::new());
     assert_eq!(document.read_objects().objects, drawing);

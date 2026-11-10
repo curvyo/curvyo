@@ -140,7 +140,8 @@ fn criterion_24_deleting_the_drawing_page_removes_its_placements_in_one_step() {
         .unwrap();
     d.place_page(&out.id, &other.id, Affine::IDENTITY).unwrap();
     let steps = d.own_steps().len();
-    d.delete_page(&drawing.id).unwrap();
+    d.delete_page(&drawing.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(d.own_steps().len(), steps + 1);
     let left: Vec<_> = d
         .placed_pages()

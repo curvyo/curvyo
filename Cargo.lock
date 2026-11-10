@@ -907,6 +907,7 @@ dependencies = [
  "curvyo-sketch-core",
  "kurbo",
  "loro",
+ "proptest",
  "rustix",
  "serde",
  "serde_json",

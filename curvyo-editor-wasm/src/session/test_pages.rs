@@ -1,9 +1,43 @@
 //! Test support: reaching a workbench by its page, for the session tests of earlier specs.
 #![allow(clippy::unwrap_used, dead_code)]
 
-use curvyo_document_core::NodeId;
+use curvyo_document_core::{Document, NodeId, Point};
 
 use super::{Session, Workbench};
+
+/// Lays page `id` with its corner at `origin` through a merged edit of another replica, as an
+/// older file or a peer's concurrent move does: a drop on the canvas pushes the page it lands on
+/// (`specs/0109` criterion 22), so a page laid over another for a test is not dropped there.
+pub(crate) fn lay_page_at(document: &Document, id: &str, origin: Point) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static PEER: AtomicU64 = AtomicU64::new(0xF1A_0000);
+    let page = document.pages().into_iter().find(|p| p.id == id).unwrap();
+    let loro = loro::LoroDoc::new();
+    loro.import(&document.export_loro_snapshot().unwrap())
+        .unwrap();
+    loro.set_peer_id(PEER.fetch_add(1, Ordering::Relaxed))
+        .unwrap();
+    let known = loro.oplog_vv();
+    let frame: std::collections::HashMap<String, loro::LoroValue> = [
+        ("x", origin.x),
+        ("y", origin.y),
+        ("width", page.size.width.as_mm()),
+        ("height", page.size.height.as_mm()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_owned(), loro::LoroValue::Double(v)))
+    .collect();
+    loro.get_map("root")
+        .insert(&format!("page.{id}.frame"), loro::LoroValue::from(frame))
+        .unwrap();
+    loro.commit();
+    let updates = loro.export(loro::ExportMode::updates(&known)).unwrap();
+    let epoch = document.history_epoch().unwrap_or_default();
+    let mut bytes = u32::try_from(epoch.len()).unwrap().to_le_bytes().to_vec();
+    bytes.extend_from_slice(epoch.as_bytes());
+    bytes.extend_from_slice(&updates);
+    document.import_updates(&bytes).unwrap();
+}
 
 /// Reaching a workbench by its page (`specs/0098-page-kinds` criterion 8), for tests written when
 /// a switcher chose the workbench: a sketch page of the active page's size laid over it, so every
@@ -37,7 +71,7 @@ impl PageKinds for Session {
         } else {
             let fresh = self.undo_len() == 0;
             let id = self.add_page_of_kind("sketch", None).unwrap();
-            self.move_page_to(&id, page.origin);
+            lay_page_at(&self.document, &id, page.origin);
             // A session without steps of its own keeps none, so the step counts stay as written.
             if fresh {
                 self.wipe_history();

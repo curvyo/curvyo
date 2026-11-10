@@ -1168,8 +1168,12 @@ fn ac18_a_turned_page_whose_turned_frame_misses_the_laser_page_is_off_it() {
     // axis-aligned bounds still overlap the corner, its frame does not.
     let d = Document::new(1);
     let first = page(&d, "first");
-    d.resize_page("first", DocumentSize::from_mm(100.0, 100.0))
-        .ok();
+    d.resize_page(
+        "first",
+        DocumentSize::from_mm(100.0, 100.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .ok();
     let first = page(&d, &first.id);
     let laser = add_laser(&d, 300.0, 300.0);
     let laser = page(&d, &laser.id);
@@ -1290,7 +1294,8 @@ fn ac24_deleting_a_drawing_page_removes_its_placed_pages_everywhere_in_one_step(
         )
         .unwrap();
     let steps = p.d.own_steps().len();
-    p.d.delete_page("first").unwrap();
+    p.d.delete_page("first", &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert_eq!(p.d.own_steps().len(), steps + 1, "one step");
     assert!(p.d.placed_page(a).is_none());
     assert!(p.d.placed_page(b).is_none());

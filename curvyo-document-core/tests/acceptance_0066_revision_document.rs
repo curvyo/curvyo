@@ -7,13 +7,19 @@ use curvyo_sketch_core::{Entity, Position, Sketch};
 /// owns a sketch).
 fn sketch_document(peer: u64) -> Document {
     let d = Document::new(peer);
-    let page = d
-        .add_page_of(&curvyo_document_core::PageKind::Sketch)
+    d.add_page_of(&curvyo_document_core::PageKind::Sketch)
         .unwrap();
-    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
-    // At the old first page's place, so the expected coordinates stay as written.
-    let back = curvyo_document_core::Vec2::new(-page.origin.x, -page.origin.y);
-    d.move_page(&page.id, back, &[]).unwrap();
+    d.delete_page(
+        curvyo_document_core::FIRST_PAGE_ID,
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    // Deleting page 1 closes the hole (`specs/0109` criterion 38): the sketch page now lies at
+    // the old first page's place, so the expected coordinates stay as written.
+    assert_eq!(
+        d.pages()[0].origin,
+        curvyo_document_core::Point::new(0.0, 0.0)
+    );
     d
 }
 
@@ -52,7 +58,12 @@ fn exchange(a: &Document, b: &Document) {
 fn r01_r02_first_owner_is_atomic_centered_and_roundtrips_with_stable_ids() {
     let d = sketch_document(71);
     let page = d.pages()[0].clone();
-    d.move_page(&page.id, Vec2::new(300.0, -40.0), &[]).unwrap();
+    d.move_page(
+        &page.id,
+        Vec2::new(300.0, -40.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let frame = d.pages()[0].clone();
     let before = d.version();
     let count = d.history_len();
@@ -233,7 +244,8 @@ fn r03_page_delete_takes_its_sketch_and_undo_restores_association() {
         .add_page_of(&curvyo_document_core::PageKind::Sketch)
         .unwrap();
     let id = create(&d, &page.id, 10.0);
-    d.delete_page(&page.id).unwrap();
+    d.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     let step = d.own_steps().last().unwrap().step;
     // `specs/0099-sketch-pages` criterion 17 (Frage 158 A): the sketch goes with its page.
     assert!(d.sketch(id).is_none());
@@ -280,10 +292,16 @@ fn r03_resize_does_not_recenter_and_explicit_content_move_applies_once() {
     d.resize_page(
         &page,
         curvyo_document_core::DocumentSize::from_mm(500.0, 400.0),
+        &curvyo_document_core::PageContents::new(),
     )
     .unwrap();
     assert_eq!(d.sketch(id).unwrap().placement, old.placement);
-    d.move_page(&page, Vec2::new(35.0, -12.0), &[id]).unwrap();
+    d.move_page(
+        &page,
+        Vec2::new(35.0, -12.0),
+        &curvyo_document_core::PageContents::from([(page.clone(), vec![id])]),
+    )
+    .unwrap();
     let new = d.sketch(id).unwrap();
     assert_eq!(new.graph, old.graph);
     for (a, b) in old.resolved.all_anchors().zip(new.resolved.all_anchors()) {

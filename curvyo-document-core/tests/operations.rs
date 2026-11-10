@@ -419,7 +419,8 @@ fn deleting_a_drawing_page_drops_the_keys_of_its_placements_in_the_same_step() {
         .unwrap();
     d.add_operation(mfg, &op("cut_out", "Cut-out 1"), 0, &[vec![placement]])
         .unwrap();
-    d.delete_page(&drawing.id).unwrap();
+    d.delete_page(&drawing.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     assert!(ops(&d, mfg)[0].members.is_empty());
 }
 

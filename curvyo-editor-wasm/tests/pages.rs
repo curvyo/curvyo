@@ -50,8 +50,11 @@ fn active_resize_moves_the_frame_only_and_rulers_follow_origin() {
         Point::new(second.origin.x - 50.0, second.origin.y)
     );
     assert_eq!(origin(&changed, partial), origin(&d, partial));
-    assert_eq!(origin(&changed, first), origin(&d, first));
-    assert_eq!(changed.pages()[0], d.pages()[0]);
+    // Page 1 lies beside the left edge, which moved 50 mm out: it moves with it and carries its
+    // drawing (`specs/0109` criteria 2, 14).
+    let shifted = Point::new(origin(&d, first).x - 50.0, origin(&d, first).y);
+    assert_eq!(origin(&changed, first), shifted);
+    assert_eq!(changed.pages()[0].origin, Point::new(-50.0, 0.0));
     s.resize_viewport(1200.0, 800.0);
     s.activate_page("first");
     s.activate_page(&second.id);
@@ -87,7 +90,10 @@ fn frame_drag_carries_contained_objects_is_cancelable_and_undoes_once() {
         origin(&moved, inside),
         Point::new(second.origin.x + 40.0, 30.0)
     );
-    assert_eq!(origin(&moved, partial), origin(&d, partial));
+    // Its centre lies on the frame's edge, which counts as inside (`specs/0109` criteria 18,
+    // 21): it moves with the page.
+    let carried = Point::new(origin(&d, partial).x + 30.0, origin(&d, partial).y + 20.0);
+    assert_eq!(origin(&moved, partial), carried);
     s.undo();
     assert_eq!(document(&s).pages(), d.pages());
     assert_eq!(origin(&document(&s), inside), origin(&d, inside));
@@ -153,8 +159,12 @@ fn two_hundred_pages_cpu_budget() {
     let d = Document::new(8);
     for i in 1..200 {
         let p = d.add_page();
-        d.resize_page(&p.id, DocumentSize::from_mm(100.0 + f64::from(i % 7), 80.0))
-            .unwrap();
+        d.resize_page(
+            &p.id,
+            DocumentSize::from_mm(100.0 + f64::from(i % 7), 80.0),
+            &curvyo_document_core::PageContents::new(),
+        )
+        .unwrap();
         rectangle(&d, p.origin.x + 10.0, p.origin.y + 10.0, 20.0, 20.0);
     }
     let bytes = pack(&d, "test").unwrap();
@@ -240,7 +250,8 @@ fn page_move_keeps_cross_page_clones_stationary_and_shared_layers_intact() {
     d.set_node_locked(&[layer], true).unwrap();
     let before = curvyo_ui_core::object_bounds(&d.object(clone).unwrap());
     let mut s = Session::open(11, &pack(&d, "test").unwrap()).unwrap();
-    assert!(s.move_page_to("first", Point::new(40.0, 60.0)));
+    // Moved left, so it lands on no page and pushes none (`specs/0109` criterion 22).
+    assert!(s.move_page_to("first", Point::new(-40.0, 60.0)));
     let moved = document(&s);
     assert_eq!(
         curvyo_ui_core::object_bounds(&moved.object(clone).unwrap()),
@@ -248,11 +259,17 @@ fn page_move_keeps_cross_page_clones_stationary_and_shared_layers_intact() {
     );
     assert_eq!(
         curvyo_ui_core::object_bounds(&moved.object(source).unwrap()).0,
-        Point::new(50.0, 70.0)
+        Point::new(-30.0, 70.0)
     );
+    // Its centre lies on Page 1's right edge, which counts as inside (`specs/0109` criteria 18,
+    // 21): it moves with the page.
+    let (min, max) = partial_before;
     assert_eq!(
         curvyo_ui_core::object_bounds(&moved.object(partial).unwrap()),
-        partial_before
+        (
+            Point::new(min.x - 40.0, min.y + 60.0),
+            Point::new(max.x - 40.0, max.y + 60.0)
+        )
     );
     assert_eq!(moved.parent_node(source), Some(layer));
     assert_eq!(moved.parent_node(clone), Some(layer));

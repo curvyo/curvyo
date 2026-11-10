@@ -315,7 +315,7 @@ impl Document {
         let page = Page {
             id: format!("mfg-{}-{}", node.peer, node.counter),
             name: crate::pages::next_free_name(&pages, new.label),
-            origin: crate::pages::next_page_origin(&pages, size),
+            origin: crate::pages::add_page_origin(&pages, size),
             size,
             grid: crate::PageGrid::DEFAULT,
             kind: crate::PageKind::Output {
@@ -409,12 +409,15 @@ impl Document {
     /// size, in one history step labelled by `change` (ADR 0039 §4); the format-35 machine name
     /// goes in the same step. The `anchor` corner (the copy's origin) keeps its place in the
     /// plane and the frame grows away from it; each placement keeps its place in the plane and
-    /// own items are not written (ADR 0042 §6, `specs/0098-page-kinds` criterion 14).
+    /// own items are not written (ADR 0042 §6, `specs/0098-page-kinds` criterion 14). The pages
+    /// beside the frame's moving edges move with them, carrying what `contents` says they own,
+    /// in the same step (ADR 0051 §2, `specs/0109` criterion 32).
     /// `Ok(false)` and nothing written when the copy, the size and the old key are unchanged.
     ///
     /// # Errors
     /// [`ManufacturingError::NotFound`] for an unknown manufacturing or one without its page;
-    /// [`ManufacturingError::Size`] for a side outside the page size limits.
+    /// [`ManufacturingError::Size`] for a side outside the page size limits;
+    /// [`ManufacturingError::OutOfRange`] when a moved page's objects would leave the range.
     pub fn set_manufacturing_profile(
         &self,
         id: NodeId,
@@ -422,6 +425,7 @@ impl Document {
         work_area: DocumentSize,
         anchor: PageCorner,
         change: ProfileChange,
+        contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
         let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
         let page = manufacturing.page.ok_or(ManufacturingError::NotFound)?;
@@ -439,50 +443,58 @@ impl Document {
             .get_tree(OBJECTS_TREE)
             .get_meta(tree_id_of(id))
             .map_err(|_| ManufacturingError::NotFound)?;
-        if !same_profile {
-            write_plain_map(&meta, KEY_PROFILE, profile);
-        }
-        if manufacturing.legacy_machine_name.is_some() {
-            meta.delete(KEY_MACHINE_NAME)
-                .map_err(|_| ManufacturingError::NotFound)?;
-        }
-        if !same_size {
-            let shift = Vec2::new(
-                if anchor.right {
-                    page.size.width.as_mm() - width.as_mm()
-                } else {
-                    0.0
-                },
-                if anchor.bottom {
-                    page.size.height.as_mm() - height.as_mm()
-                } else {
-                    0.0
-                },
-            );
-            write_frame(
-                &self.loro().get_map(ROOT_MAP),
-                &page.id,
-                Frame {
-                    origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
-                    size: DocumentSize { width, height },
-                },
-            );
-            let back = Affine::translation(Vec2::new(-shift.x, -shift.y));
-            let tree = self.loro().get_tree(OBJECTS_TREE);
-            for placement in &manufacturing.placements {
-                if let Ok(meta) = tree.get_meta(tree_id_of(placement.id)) {
-                    write_placement_link(
-                        &meta,
-                        &PlacementLink {
-                            page: placement.page.clone(),
-                            matrix: back.compose(placement.matrix),
-                        },
-                    );
+        let shift = Vec2::new(
+            if anchor.right {
+                page.size.width.as_mm() - width.as_mm()
+            } else {
+                0.0
+            },
+            if anchor.bottom {
+                page.size.height.as_mm() - height.as_mm()
+            } else {
+                0.0
+            },
+        );
+        let frame = Frame {
+            origin: Point::new(page.origin.x + shift.x, page.origin.y + shift.y),
+            size: DocumentSize { width, height },
+        };
+        let pages = self.pages();
+        let layout = if same_size {
+            crate::page_layout::Layout::default()
+        } else {
+            crate::page_layout::reflow(&pages, &page.id, frame)
+        };
+        self.check_layout(&layout, contents)
+            .map_err(|_| ManufacturingError::OutOfRange)?;
+        self.batch(change.label(), |doc| {
+            doc.write_layout(&pages, &layout, contents)
+                .map_err(|_| ManufacturingError::OutOfRange)?;
+            if !same_profile {
+                write_plain_map(&meta, KEY_PROFILE, profile);
+            }
+            if manufacturing.legacy_machine_name.is_some() {
+                meta.delete(KEY_MACHINE_NAME)
+                    .map_err(|_| ManufacturingError::NotFound)?;
+            }
+            if !same_size {
+                write_frame(&doc.loro().get_map(ROOT_MAP), &page.id, frame);
+                let back = Affine::translation(Vec2::new(-shift.x, -shift.y));
+                let tree = doc.loro().get_tree(OBJECTS_TREE);
+                for placement in &manufacturing.placements {
+                    if let Ok(meta) = tree.get_meta(tree_id_of(placement.id)) {
+                        write_placement_link(
+                            &meta,
+                            &PlacementLink {
+                                page: placement.page.clone(),
+                                matrix: back.compose(placement.matrix),
+                            },
+                        );
+                    }
                 }
             }
-        }
-        self.commit_with_label(change.label());
-        Ok(true)
+            Ok(true)
+        })
     }
 
     /// Installs a fixture of `kind` (`<process>/<kind>`) named `label`, numbered when the name is

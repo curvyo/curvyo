@@ -784,8 +784,12 @@ fn constrained_motion_hits_diagonal_guide_without_changing_locked_coordinate() {
 fn spatial_pages_contribute_exact_translated_fractions_without_zero_edges() {
     let d = Document::new(9);
     let second = d.add_page();
-    d.move_page(&second.id, Vec2::new(123.0, -450.0), &[])
-        .unwrap();
+    d.move_page(
+        &second.id,
+        Vec2::new(123.0, -450.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let pages = d.pages();
     let targets =
         SnapTargets::gather_pages(&[], &pages, &settings(8.0, 14.0), SnapExclusions::default());

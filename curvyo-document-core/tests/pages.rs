@@ -11,16 +11,32 @@ fn pages_edit_roundtrip_and_undo() {
     assert_eq!(doc.pages().len(), 2);
     assert_eq!(second.size, first.size);
     doc.rename_page(&second.id, "Coasters 🐈").unwrap();
-    doc.resize_page(&second.id, DocumentSize::from_mm(100.0, 120.0))
-        .unwrap();
-    doc.move_page(&second.id, Vec2::new(-30.0, 40.0), &[])
-        .unwrap();
+    doc.resize_page(
+        &second.id,
+        DocumentSize::from_mm(100.0, 120.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    doc.move_page(
+        &second.id,
+        Vec2::new(-30.0, 40.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     doc.reorder_page(&second.id, 0).unwrap();
     assert_eq!(doc.pages()[0].id, second.id);
     let restored = unpack(72, &pack(&doc, "pages").unwrap()).unwrap();
     assert_eq!(restored.pages(), doc.pages());
-    doc.delete_page(&second.id).unwrap();
-    assert_eq!(doc.pages(), vec![first]);
+    doc.delete_page(&second.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
+    // The second page's shrink pulled page 1 along its left edge and its drop pushed page 1
+    // away (`specs/0109` criteria 4, 22): page 1 is back alone, at its new place.
+    let pages = doc.pages();
+    assert_eq!(pages.len(), 1);
+    assert_eq!(
+        (pages[0].id.as_str(), pages[0].size),
+        (first.id.as_str(), first.size)
+    );
     let step = doc.own_steps().last().unwrap().step;
     doc.undo_step(step).unwrap();
     assert_eq!(doc.pages().len(), 2);
@@ -31,13 +47,27 @@ fn invalid_or_unchanged_edits_write_nothing() {
     let doc = Document::new(73);
     let page = doc.pages()[0].clone();
     let before = doc.version();
-    assert!(doc.delete_page(&page.id).is_err());
+    assert!(
+        doc.delete_page(&page.id, &curvyo_document_core::PageContents::new())
+            .is_err()
+    );
     assert!(doc.rename_page("missing", "name").is_err());
     assert!(!doc.rename_page(&page.id, &page.name).unwrap());
-    assert!(!doc.move_page(&page.id, Vec2::new(0.0, 0.0), &[]).unwrap());
     assert!(
-        doc.resize_page(&page.id, DocumentSize::from_mm(-1.0, 20.0))
-            .is_err()
+        !doc.move_page(
+            &page.id,
+            Vec2::new(0.0, 0.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .unwrap()
+    );
+    assert!(
+        doc.resize_page(
+            &page.id,
+            DocumentSize::from_mm(-1.0, 20.0),
+            &curvyo_document_core::PageContents::new()
+        )
+        .is_err()
     );
     assert!(doc.reorder_page(&page.id, 1).is_err());
     assert_eq!(before, doc.version());
@@ -68,14 +98,20 @@ fn independent_fields_and_concurrent_deletion_converge() {
     let second = a.add_page();
     let b = unpack(81, &pack(&a, "test").unwrap()).unwrap();
     a.rename_page(&second.id, "Board").unwrap();
-    b.resize_page(&second.id, DocumentSize::from_mm(100.0, 80.0))
-        .unwrap();
+    b.resize_page(
+        &second.id,
+        DocumentSize::from_mm(100.0, 80.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     merge(&a, &b);
     assert_eq!(a.pages(), b.pages());
     assert_eq!(a.pages()[1].name, "Board");
     assert_eq!(a.pages()[1].size, DocumentSize::from_mm(100.0, 80.0));
-    a.delete_page("first").unwrap();
-    b.delete_page(&second.id).unwrap();
+    a.delete_page("first", &curvyo_document_core::PageContents::new())
+        .unwrap();
+    b.delete_page(&second.id, &curvyo_document_core::PageContents::new())
+        .unwrap();
     merge(&a, &b);
     assert_eq!(a.pages(), b.pages());
     assert_eq!(a.pages().len(), 1);
@@ -103,7 +139,8 @@ fn equal_concurrent_ranks_and_exhausted_midpoints_can_be_reordered() {
 fn deleting_first_then_resizing_uses_the_visible_survivor() {
     let doc = Document::new(84);
     let second = doc.add_page();
-    doc.delete_page("first").unwrap();
+    doc.delete_page("first", &curvyo_document_core::PageContents::new())
+        .unwrap();
     doc.resize(DocumentSize::from_mm(40.0, 50.0)).unwrap();
     assert_eq!(doc.pages()[0].id, second.id);
     assert_eq!(doc.pages()[0].size, doc.size());

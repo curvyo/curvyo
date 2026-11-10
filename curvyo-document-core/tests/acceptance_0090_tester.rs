@@ -168,11 +168,19 @@ fn ac1_add_page_after_reorder_copies_from_the_last_page_in_list_order() {
     // 0059: the new page takes its size from the last page in list order.
     let d = Document::new(9007);
     let first = d.pages()[0].id.clone();
-    d.resize_page(&first, DocumentSize::from_mm(100.0, 100.0))
-        .unwrap();
+    d.resize_page(
+        &first,
+        DocumentSize::from_mm(100.0, 100.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     let second = d.add_page();
-    d.resize_page(&second.id, DocumentSize::from_mm(300.0, 50.0))
-        .unwrap();
+    d.resize_page(
+        &second.id,
+        DocumentSize::from_mm(300.0, 50.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     d.set_page_grid(&first, custom_grid()).unwrap();
     d.reorder_page(&first, 1).unwrap();
     let third = d.add_page();
@@ -185,10 +193,19 @@ fn ac16_page_move_and_resize_keep_the_grid_and_the_resize_keeps_the_centre() {
     let d = Document::new(9008);
     let first = d.pages()[0].id.clone();
     d.set_page_grid(&first, custom_grid()).unwrap();
-    d.move_page(&first, Vec2::new(-321.5, 44.0), &[]).unwrap();
+    d.move_page(
+        &first,
+        Vec2::new(-321.5, 44.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     assert_grid_eq(d.page_grid(&first), custom_grid());
-    d.resize_page(&first, DocumentSize::from_mm(17.0, 900.0))
-        .unwrap();
+    d.resize_page(
+        &first,
+        DocumentSize::from_mm(17.0, 900.0),
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
     assert_grid_eq(d.page_grid(&first), custom_grid());
     let page = d.pages()[0].clone();
     // Since format 34 the resize keeps the frame's centre (ADR 0031 decision 9a): the origin
@@ -329,7 +346,8 @@ fn ac1_valid_hand_made_registers_open() {
 fn ac1_damaged_register_on_a_deleted_page_is_still_refused() {
     let base = Document::new(9016);
     let second = base.add_page().id;
-    base.delete_page(&second).unwrap();
+    base.delete_page(&second, &curvyo_document_core::PageContents::new())
+        .unwrap();
     let bytes = file_with_root(
         &base,
         &format!("page.{second}.grid_spacing"),

@@ -77,6 +77,9 @@ export interface DocumentView {
   /** The status bar's size readout, e.g. "210.0 × 297.0 mm". */
   sizeText: string;
   presets: PresetsView;
+  /** What the last size change, drop or delete did to the other pages, for screen readers only:
+   * "2 pages moved.", empty when none moved (`specs/0109` ux-notes §7). */
+  movedText: string;
 }
 
 /** Before a session exists: nothing is shown, no text is formatted here (the
@@ -93,6 +96,7 @@ const INITIAL: DocumentView = {
   hasObjects: false,
   sizeText: "",
   presets: { subject: "", orientation: "none", groupNames: [], presets: [] },
+  movedText: "",
 };
 
 function readPresets(session: WasmSession): PresetsView {
@@ -155,6 +159,7 @@ function readView(session: WasmSession | null): DocumentView {
     hasObjects: session.document_has_objects(),
     sizeText: session.size_text(),
     presets: readPresets(session),
+    movedText: session.pages_moved_text(),
   };
 }
 

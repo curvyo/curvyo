@@ -1,7 +1,7 @@
 //! Shared by the session tests of earlier specs: reaching a workbench by its page.
 #![allow(dead_code, clippy::unwrap_used)]
 
-use curvyo_document_core::{Document, NodeId, PageKind, Vec2};
+use curvyo_document_core::{Document, NodeId, PageKind};
 use curvyo_editor_wasm::{Session, Workbench};
 
 /// Reaching a workbench by its page (`specs/0098-page-kinds` criterion 8), for tests written when
@@ -36,10 +36,15 @@ impl PageKinds for Session {
         } else {
             let fresh = self.undo_len() == 0;
             let id = self.add_page_of_kind("sketch", None).unwrap();
-            self.move_page_to(&id, page.origin);
-            // A session without steps of its own keeps none, so the step counts stay as written.
             if fresh {
-                self.wipe_history();
+                // A drop pushes the page it lands on (`specs/0109` criterion 22): the sketch page
+                // is laid over the active page in the file, as an older file holds it, and the
+                // session reopened from it keeps no steps, so the step counts stay as written.
+                let bytes = lay_page_at(&self.pack("test").unwrap(), &id, page.origin);
+                let peer = id.split('-').next().unwrap().parse().unwrap();
+                *self = Session::open(peer, &bytes).unwrap();
+            } else {
+                self.move_page_to(&id, page.origin);
             }
             id
         };
@@ -69,18 +74,48 @@ impl PageKinds for Session {
 pub fn sketch_document(peer: u64) -> Document {
     let d = Document::new(peer);
     let page = d.add_page_of(&PageKind::Sketch).unwrap();
-    d.delete_page(curvyo_document_core::FIRST_PAGE_ID).unwrap();
-    d.move_page(&page.id, Vec2::new(-page.origin.x, -page.origin.y), &[])
-        .unwrap();
+    d.delete_page(
+        curvyo_document_core::FIRST_PAGE_ID,
+        &curvyo_document_core::PageContents::new(),
+    )
+    .unwrap();
+    // Deleting page 1 closes the hole (`specs/0109` criterion 38): the sketch page now lies at
+    // (0, 0).
+    assert_eq!(
+        d.pages()[0].origin,
+        curvyo_document_core::Point::new(0.0, 0.0)
+    );
     d.rename_page(&page.id, "Page 1").unwrap();
     d
+}
+
+/// The file `bytes` with page `id`'s corner at `origin`, its size kept.
+pub fn lay_page_at(bytes: &[u8], id: &str, origin: curvyo_document_core::Point) -> Vec<u8> {
+    let document = curvyo_document_core::unpack(1, bytes).unwrap();
+    let page = document.pages().into_iter().find(|p| p.id == id).unwrap();
+    let loro = loro::LoroDoc::new();
+    loro.import(&document.export_loro_snapshot().unwrap())
+        .unwrap();
+    let frame: std::collections::HashMap<String, loro::LoroValue> = [
+        ("x", origin.x),
+        ("y", origin.y),
+        ("width", page.size.width.as_mm()),
+        ("height", page.size.height.as_mm()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_owned(), loro::LoroValue::Double(v)))
+    .collect();
+    loro.get_map("root")
+        .insert(&format!("page.{id}.frame"), loro::LoroValue::from(frame))
+        .unwrap();
+    loro.commit();
+    container(&loro)
 }
 
 /// `document` saved with a placement of `page` at identity under its first manufacturing, as a
 /// file of an older build holds it (`specs/0098` criterion 12: placements come only from older
 /// files).
 pub fn with_placement(document: &Document, page: &str) -> Vec<u8> {
-    use std::io::Write;
     let loro = loro::LoroDoc::new();
     loro.import(&document.export_loro_snapshot().unwrap())
         .unwrap();
@@ -106,6 +141,12 @@ pub fn with_placement(document: &Document, page: &str) -> Vec<u8> {
     meta.insert("placement_link", loro::LoroValue::from(link))
         .unwrap();
     loro.commit();
+    container(&loro)
+}
+
+/// The `.curvyo` file of the Loro document `loro` at the current format.
+fn container(loro: &loro::LoroDoc) -> Vec<u8> {
+    use std::io::Write;
     let manifest = serde_json::json!({
         "format_version": curvyo_document_core::CURRENT_FORMAT_VERSION,
         "loro_snapshot_version": curvyo_document_core::CURRENT_LORO_SNAPSHOT_VERSION,

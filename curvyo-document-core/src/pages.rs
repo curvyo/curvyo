@@ -4,13 +4,16 @@ use crate::document_size::{MAX_DOCUMENT_MM, MIN_DOCUMENT_MM, validated_document_
 use crate::page_frame::{Frame, read_frame, write_frame};
 use crate::page_grid::{PageGrid, grid_of_fields, grid_of_root, write_non_default};
 use crate::page_kind::PageKind;
-use crate::{Document, DocumentSize, DocumentSizeError, NodeId, ObjectEditError, Point, Vec2};
+use crate::page_layout::{Rect, close_gap, new_row_origin, page_gap, push_apart, reflow};
+use crate::{
+    Document, DocumentSize, DocumentSizeError, ObjectEditError, PageContents, Point, Vec2,
+};
 use loro::{LoroMap, LoroTree, LoroValue, ValueOrContainer};
 use serde::Serialize;
 
 /// Stable identity of the initial page.
 pub const FIRST_PAGE_ID: &str = "first";
-const EPS: f64 = 1e-9;
+use crate::page_layout::EPS;
 
 /// A named frame in the shared global drawing plane.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -309,7 +312,7 @@ pub(crate) fn next_page_origin(pages: &[Page], size: DocumentSize) -> Point {
     let Some(last) = pages.last() else {
         return Point::new(0.0, 0.0);
     };
-    let gap = 20.0_f64.max(0.1 * last.size.width.as_mm().max(last.size.height.as_mm()));
+    let gap = page_gap(last.size);
     let row: Vec<_> = pages
         .iter()
         .rev()
@@ -327,6 +330,24 @@ pub(crate) fn next_page_origin(pages: &[Page], size: DocumentSize) -> Point {
         );
     }
     origin
+}
+
+/// Where Add page puts a new page of `size` among `pages` (`specs/0109-page-autolayout`
+/// criterion 29, ADR 0051 §7): the Add page place, or the start of a new row below the lowest
+/// page when that place shares area with a page or lies closer to it than that page's gap.
+/// Existing pages never move.
+pub(crate) fn add_page_origin(pages: &[Page], size: DocumentSize) -> Point {
+    let origin = next_page_origin(pages, size);
+    let new = Rect::of(origin, size);
+    let crowded = pages
+        .iter()
+        .map(Rect::of_page)
+        .any(|r| new.shares_area(r) || new.distance(r) < r.gap() - EPS);
+    if crowded {
+        new_row_origin(pages.iter().map(Rect::of_page))
+    } else {
+        origin
+    }
 }
 
 impl Document {
@@ -394,7 +415,7 @@ impl Document {
         let page = Page {
             id: self.new_page_id(),
             name: next_free_name(&pages, prefix),
-            origin: next_page_origin(&pages, size),
+            origin: add_page_origin(&pages, size),
             size,
             grid,
             kind: kind.clone(),
@@ -466,30 +487,41 @@ impl Document {
         Ok(true)
     }
     /// Removes only the frame, preserving all objects; a sketch page goes with its sketch and an
-    /// output page with its machine data.
+    /// output page with its machine data. The pages behind it close the hole, carrying what
+    /// `contents` says they own, in the same step (ADR 0051 §3a, `specs/0109` criteria 35 to 41).
     /// # Errors
-    /// Refuses an unknown page or the last frame.
-    pub fn delete_page(&self, id: &str) -> Result<(), PageError> {
-        let page = self.find_page(id)?;
-        if self.pages().len() == 1 {
+    /// Refuses an unknown page, the last frame, or a closing move its objects cannot make.
+    pub fn delete_page(&self, id: &str, contents: &PageContents) -> Result<(), PageError> {
+        let pages = self.pages();
+        let page = pages
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
+            .ok_or(PageError::NotFound)?;
+        if pages.len() == 1 {
             return Err(PageError::LastPage);
         }
+        let layout = close_gap(&pages, id);
+        self.check_layout(&layout, contents)?;
         // A sketch page goes with its sketch; its clones are repaired (ADR 0043 §5).
         if let Some(owner) = self.sketch_to_delete_with(id, &page.kind) {
-            return self.delete_sketch_page(id, owner);
+            return self
+                .delete_sketch_page(id, owner, |doc| doc.write_layout(&pages, &layout, contents));
         }
-        write(&self.loro().get_map(ROOT_MAP), id, "deleted", true);
-        // Its placed pages go in the same step, on every laser page (`0100` criterion 24).
-        self.remove_placements_of(id);
-        // The page owns its machine data: the manufacturing goes in the same step, in one tree
-        // delete, so one undo restores the page with its copy, fixtures and placements
-        // (ADR 0042 §5, `specs/0098-page-kinds` criterion 16).
-        if let Some(manufacturing) = page.kind.manufacturing() {
-            self.remove_manufacturing_node(manufacturing)
-                .map_err(|_| PageError::NotFound)?;
-        }
-        self.commit_with_label("delete_page");
-        Ok(())
+        self.batch("delete_page", |doc| {
+            doc.write_layout(&pages, &layout, contents)?;
+            write(&doc.loro().get_map(ROOT_MAP), id, "deleted", true);
+            // Its placed pages go in the same step, on every laser page (`0100` criterion 24).
+            doc.remove_placements_of(id);
+            // The page owns its machine data: the manufacturing goes in the same step, in one
+            // tree delete, so one undo restores the page with its copy, fixtures and placements
+            // (ADR 0042 §5, `specs/0098-page-kinds` criterion 16).
+            if let Some(manufacturing) = page.kind.manufacturing() {
+                doc.remove_manufacturing_node(manufacturing)
+                    .map_err(|_| PageError::NotFound)?;
+            }
+            Ok(())
+        })
     }
     /// Moves one frame within the list without changing its geometry.
     /// # Errors
@@ -536,23 +568,24 @@ impl Document {
         self.commit_with_label("reorder_pages");
         Ok(true)
     }
-    fn validate_page_translation(&self, objects: &[NodeId], delta: Vec2) -> Result<(), PageError> {
-        let moved = objects
-            .iter()
-            .map(|id| {
-                self.object(*id)
-                    .map(|o| o.translated(delta))
-                    .ok_or(ObjectEditError::NoSuchObject)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        crate::transform_objects::check_numbers(&moved, false)?;
-        Ok(())
-    }
-    /// Translates a frame plus the caller's resolved contained leaves atomically.
+    /// Translates a frame by `delta` with the objects `contents` lists for it, and pushes away
+    /// the pages it comes to share area with, each carrying what `contents` says it owns, in one
+    /// step "Move page" (ADR 0051 §3, `specs/0109` criteria 21 to 25, 27). `contents` is read at
+    /// the press; a page dragged alone has no entry.
     /// # Errors
     /// Refuses unknown identities, non-finite movement or invalid object transforms.
-    pub fn move_page(&self, id: &str, delta: Vec2, objects: &[NodeId]) -> Result<bool, PageError> {
-        let page = self.find_page(id)?;
+    pub fn move_page(
+        &self,
+        id: &str,
+        delta: Vec2,
+        contents: &PageContents,
+    ) -> Result<bool, PageError> {
+        let pages = self.pages();
+        let page = pages
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
+            .ok_or(PageError::NotFound)?;
         if ![
             delta.x,
             delta.y,
@@ -567,27 +600,37 @@ impl Document {
         if delta.x.abs() <= EPS && delta.y.abs() <= EPS {
             return Ok(false);
         }
-        self.validate_page_translation(objects, delta)?;
+        let frame = Frame {
+            origin: page.origin.translated(delta),
+            size: page.size,
+        };
+        let carried = contents.get(id).map_or(&[][..], Vec::as_slice);
+        self.check_page_translation(carried, delta)?;
+        let layout = push_apart(&pages, id, frame);
+        self.check_layout(&layout, contents)?;
         self.batch("move_page", |doc| {
-            doc.translate_page_objects(objects, delta)?;
+            if !carried.is_empty() {
+                doc.translate_page_objects(carried, delta)?;
+            }
+            doc.write_layout(&pages, &layout, contents)?;
             let root = doc.loro().get_map(ROOT_MAP);
             write(&root, id, "deleted", false);
-            write_frame(
-                &root,
-                id,
-                Frame {
-                    origin: Point::new(page.origin.x + delta.x, page.origin.y + delta.y),
-                    size: page.size,
-                },
-            );
+            write_frame(&root, id, frame);
             Ok(true)
         })
     }
-    /// Resizes a frame around its centre in one commit; no object moves (ADR 0031 decision 9a).
+    /// Resizes a frame around its centre in one commit; no object on it moves (ADR 0031 decision
+    /// 9a). The pages beside its moving edges move with them, carrying what `contents` says they
+    /// own, in the same step (ADR 0051 §2, `specs/0109` criteria 1 to 13, 26).
     /// # Errors
     /// Refuses unknown identities or invalid sizes;
     /// [`PageError::FixedSize`] for an output page or a page of an unknown kind (ADR 0042 §3).
-    pub fn resize_page(&self, id: &str, size: DocumentSize) -> Result<bool, PageError> {
+    pub fn resize_page(
+        &self,
+        id: &str,
+        size: DocumentSize,
+        contents: &PageContents,
+    ) -> Result<bool, PageError> {
         let page = self.find_page(id)?;
         if page.kind.fixed_size() {
             return Err(PageError::FixedSize);
@@ -596,7 +639,38 @@ impl Document {
             validated_document_side(size.width)?,
             validated_document_side(size.height)?,
         );
-        Ok(self.write_page_frame(&page, size, "resize_page"))
+        let same = (size.width.as_mm() - page.size.width.as_mm()).abs() <= EPS
+            && (size.height.as_mm() - page.size.height.as_mm()).abs() <= EPS;
+        if same {
+            return Ok(false);
+        }
+        let frame = Frame {
+            origin: page.origin,
+            size: page.size,
+        }
+        .resized(size);
+        self.write_frame_with_layout(&page.id, frame, "resize_page", contents)?;
+        Ok(true)
+    }
+
+    /// Writes `frame` as page `id`'s frame with the reflow of ADR 0051 §2 in one step `label`.
+    pub(crate) fn write_frame_with_layout(
+        &self,
+        id: &str,
+        frame: Frame,
+        label: &str,
+        contents: &PageContents,
+    ) -> Result<(), PageError> {
+        let pages = self.pages();
+        let layout = reflow(&pages, id, frame);
+        self.check_layout(&layout, contents)?;
+        self.batch(label, |doc| {
+            doc.write_layout(&pages, &layout, contents)?;
+            let root = doc.loro().get_map(ROOT_MAP);
+            write(&root, id, "deleted", false);
+            write_frame(&root, id, frame);
+            Ok(())
+        })
     }
 
     /// Writes `page` resized to `size` around its centre and commits it under `label`; `false`
