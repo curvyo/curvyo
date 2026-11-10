@@ -29,10 +29,10 @@ use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceMethod, TraceParams, TraceRegion, TraceRegionError,
-    TraceRgb, read_trace_wire, trace_add_shapes, trace_analyse, trace_auto_threshold,
-    trace_colour_job_in, trace_job_in, trace_region_defaults, trace_suggest_background,
-    trace_text_job_in,
+    Mask, OcrLine, TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePixelMap,
+    TraceRaster, TraceRegion, TraceRegionError, TraceRgb, read_trace_wire, run_trace_job,
+    trace_add_shapes, trace_analyse, trace_auto_threshold, trace_region_defaults,
+    trace_suggest_background,
 };
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
@@ -205,31 +205,57 @@ fn m1() -> Vec<u8> {
 }
 
 fn inside_r1() -> Vec<f64> {
-    trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&region(r1(), false)),
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region(r1(), false)),
+            shapes: false,
+        },
         &mut |_| {},
     )
 }
 
 fn outside_r1() -> Vec<f64> {
-    trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&region(r1(), true)),
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region(r1(), true)),
+            shapes: false,
+        },
         &mut |_| {},
     )
 }
 
 fn unmasked() -> Vec<f64> {
-    trace_job_in(&m1(), N, N, map_100mm(N), &t50(), None, &mut |_| {})
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    )
 }
 
 fn covers(paths: &[BezPath], p: Point) -> bool {
@@ -303,10 +329,38 @@ fn colour_params() -> TraceColourParams {
 fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
     let n = 250;
     let m1 = draw(M1, n);
-    let no_mask = trace_job_in(&m1, n, n, map_100mm(n), &t50(), None, &mut |_| {});
+    let no_mask = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &m1,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    );
     assert_eq!(no_mask, golden("m1_250_t50"), "trace_job_in(None)");
     assert_eq!(
-        trace_job_in(&m1, n, n, map_100mm(n), &t50(), None, &mut |_| {}),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: n,
+                    height: n,
+                    rgba: &m1
+                },
+                map: TracePixelMap::new(map_100mm(n)),
+                mode: TraceMode::Mono(&t50()),
+                lines: &[],
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
         golden("m1_250_t50"),
         "trace_job_in"
     );
@@ -314,7 +368,21 @@ fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
     trace_add_shapes(&mut shapes, map_100mm(n));
     assert_eq!(shapes, golden("m1_250_t50_shapes"), "Recognise shapes");
     assert_eq!(
-        trace_job_in(&m1, n, n, skew_map(n), &t50(), None, &mut |_| {}),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: n,
+                    height: n,
+                    rgba: &m1
+                },
+                map: TracePixelMap::new(skew_map(n)),
+                mode: TraceMode::Mono(&t50()),
+                lines: &[],
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
         golden("m1_250_t50_skew"),
         "a rotated and skewed image"
     );
@@ -322,23 +390,79 @@ fn c1_without_a_mask_every_job_is_number_for_number_the_base_commits() {
     let col = draw(COLOUR, c);
     let colour = colour_params();
     assert_eq!(
-        trace_colour_job_in(&col, c, c, map_100mm(c), &colour, None, &mut |_| {}),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: c,
+                    height: c,
+                    rgba: &col
+                },
+                map: TracePixelMap::new(map_100mm(c)),
+                mode: TraceMode::Colours(&colour),
+                lines: &[],
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
         golden("colour_200"),
         "Multicolour"
     );
     assert_eq!(
-        trace_colour_job_in(&col, c, c, map_100mm(c), &colour, None, &mut |_| {}),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: c,
+                    height: c,
+                    rgba: &col
+                },
+                map: TracePixelMap::new(map_100mm(c)),
+                mode: TraceMode::Colours(&colour),
+                lines: &[],
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
         golden("colour_200")
     );
     let t = text_sheet(c);
     let p = TraceParams::with_threshold(128);
     assert_eq!(
-        trace_text_job_in(&t, c, c, map_100mm(c), &p, &ocr_lines(c), None, &mut |_| {}),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: c,
+                    height: c,
+                    rgba: &t
+                },
+                map: TracePixelMap::new(map_100mm(c)),
+                mode: TraceMode::Mono(&p),
+                lines: &ocr_lines(c),
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
         golden("text_200"),
         "Recognise text"
     );
     assert_eq!(
-        trace_text_job_in(&t, c, c, map_100mm(c), &p, &ocr_lines(c), None, &mut |_| {}),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: c,
+                    height: c,
+                    rgba: &t
+                },
+                map: TracePixelMap::new(map_100mm(c)),
+                mode: TraceMode::Mono(&p),
+                lines: &ocr_lines(c),
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
         golden("text_200")
     );
 }
@@ -472,13 +596,19 @@ fn c5_a_ring_mask_leaves_its_hole_untraced() {
         "the hole is no part of the region"
     );
     assert!(ring.keeps(Point::new(25.0, 40.0)));
-    let paths = outlines(&trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&ring),
+    let paths = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&ring),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     assert!(
@@ -527,13 +657,19 @@ fn c5_overlapping_masks_are_one_union_and_nothing_is_covered_twice() {
     ] {
         assert!(region.keeps(p), "{p:?} is in the union");
     }
-    let paths = outlines(&trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&region),
+    let paths = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     // Pairwise overlap of the result's outer shapes (positive outlines with their holes) is
@@ -609,13 +745,19 @@ fn c6_an_open_mask_path_is_closed_by_a_straight_line() {
         !region.keeps(Point::new(5.0, 80.0)),
         "beyond the closing line"
     );
-    let paths = outlines(&trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&region),
+    let paths = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     let triangle = vec![
@@ -657,13 +799,19 @@ fn c6_a_straight_open_path_alone_encloses_nothing_and_with_another_it_is_dropped
 #[test]
 fn c7_a_mask_beyond_the_image_traces_only_the_image() {
     let big = region(rect(-30.0, -30.0, 50.0, 130.0), false);
-    let paths = outlines(&trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&big),
+    let paths = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&big),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     let (xor, _) = seam(&paths, &[], &outlines(&inside_r1()));
@@ -676,25 +824,37 @@ fn c7_a_mask_beyond_the_image_traces_only_the_image() {
 #[test]
 fn c7_a_mask_outside_the_image_inside_traces_nothing_outside_traces_all() {
     let far = rect(200.0, 200.0, 260.0, 260.0);
-    let inside = read_trace_wire(&trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&region(far.clone(), false)),
+    let inside = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region(far.clone(), false)),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
     assert_eq!(inside.paths, 0, "0 paths");
     assert_eq!(inside.outlines.len(), 0);
-    let outside = trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&region(far, true)),
+    let outside = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region(far, true)),
+            shapes: false,
+        },
         &mut |_| {},
     );
     let (xor, _) = seam(&outlines(&outside), &[], &outlines(&unmasked()));
@@ -726,8 +886,23 @@ fn c8_case(map: [f64; 6]) {
         apply(map, n, n),
         apply(map, 0.0, n),
     ];
-    let job =
-        |r: Option<&dyn Mask>| outlines(&trace_job_in(&m1(), N, N, map, &t50(), r, &mut |_| {}));
+    let job = |r: Option<&dyn Mask>| {
+        outlines(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: N,
+                    height: N,
+                    rgba: &m1(),
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&t50()),
+                lines: &[],
+                mask: r,
+                shapes: false,
+            },
+            &mut |_| {},
+        ))
+    };
     let whole = job(None);
     for p in nodes(&whole) {
         assert!(
@@ -788,13 +963,19 @@ fn c9_remove_background_on_the_right_half_uses_the_paper_grey_and_traces_the_gre
         },
         ..TraceParams::with_threshold(128)
     };
-    let paths = outlines(&trace_job_in(
-        &m2,
-        N,
-        N,
-        map_100mm(N),
-        &params,
-        Some(&right),
+    let paths = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m2,
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&params),
+            lines: &[],
+            mask: Some(&right),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     assert!(
@@ -923,25 +1104,35 @@ fn c11_only_lines_whose_box_centre_is_in_the_region_become_text() {
     let sheet = text_sheet(n);
     let top = region(rect(0.0, 0.0, 100.0, 53.0), false);
     let p = TraceParams::with_threshold(128);
-    let wire = trace_text_job_in(
-        &sheet,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        &ocr_lines(n),
-        Some(&top),
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &sheet,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &ocr_lines(n),
+            mask: Some(&top),
+            shapes: false,
+        },
         &mut |_| {},
     );
     let read = read_trace_wire(&wire).unwrap();
-    let unmasked = read_trace_wire(&trace_text_job_in(
-        &sheet,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        &ocr_lines(n),
-        None,
+    let unmasked = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &sheet,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &ocr_lines(n),
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
@@ -992,7 +1183,21 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
     let n = 200;
     let sheet = shapes_sheet(n);
     let p = TraceParams::with_threshold(128);
-    let mut whole = trace_job_in(&sheet, n, n, map_100mm(n), &p, None, &mut |_| {});
+    let mut whole = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &sheet,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    );
     trace_add_shapes(&mut whole, map_100mm(n));
     let whole = read_trace_wire(&whole).unwrap();
     let recognised = |w: &curvyo_ui_core::TraceWire| {
@@ -1002,13 +1207,19 @@ fn c11_recognise_shapes_with_a_mask_keeps_nothing_outside_the_region() {
             .count()
     };
     assert_eq!(recognised(&whole), 3, "three shapes without a mask");
-    let mut masked = trace_job_in(
-        &sheet,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        Some(&region(r1(), false)),
+    let mut masked = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &sheet,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: Some(&region(r1(), false)),
+            shapes: false,
+        },
         &mut |_| {},
     );
     trace_add_shapes(&mut masked, map_100mm(n));
@@ -1040,13 +1251,19 @@ fn multicolour_every_layer_is_clipped_and_inside_plus_outside_is_the_unmasked_la
     let col = draw(COLOUR, n);
     let params = colour_params();
     let job = |r: Option<&dyn Mask>| {
-        read_trace_wire(&trace_colour_job_in(
-            &col,
-            n,
-            n,
-            map_100mm(n),
-            &params,
-            r,
+        read_trace_wire(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: n,
+                    height: n,
+                    rgba: &col,
+                },
+                map: TracePixelMap::new(map_100mm(n)),
+                mode: TraceMode::Colours(&params),
+                lines: &[],
+                mask: r,
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap()
@@ -1138,13 +1355,19 @@ fn a_mask_edge_across_a_ring_keeps_its_hole() {
         }
     }
     let p = TraceParams::with_threshold(128);
-    let whole = outlines(&trace_job_in(
-        &rgba,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        None,
+    let whole = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     ));
     // A diagonal half-plane through the ring's centre and through the "O".
@@ -1153,22 +1376,34 @@ fn a_mask_edge_across_a_ring_keeps_its_hole() {
         Point::new(110.0, -10.0),
         Point::new(-10.0, 110.0),
     ];
-    let a = outlines(&trace_job_in(
-        &rgba,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        Some(&region(edge.clone(), false)),
+    let a = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: Some(&region(edge.clone(), false)),
+            shapes: false,
+        },
         &mut |_| {},
     ));
-    let b = outlines(&trace_job_in(
-        &rgba,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        Some(&region(edge.clone(), true)),
+    let b = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: Some(&region(edge.clone(), true)),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     assert!(
@@ -1265,13 +1500,19 @@ fn degenerate_regions_are_refused_not_panicked_on() {
         ]],
         false,
     ) {
-        let read = read_trace_wire(&trace_job_in(
-            &m1(),
-            N,
-            N,
-            map_100mm(N),
-            &t50(),
-            Some(&flat),
+        let read = read_trace_wire(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: N,
+                    height: N,
+                    rgba: &m1(),
+                },
+                map: TracePixelMap::new(map_100mm(N)),
+                mode: TraceMode::Mono(&t50()),
+                lines: &[],
+                mask: Some(&flat),
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap();
@@ -1281,13 +1522,19 @@ fn degenerate_regions_are_refused_not_panicked_on() {
         );
     }
     // An empty picture with a mask is "invalid", not a panic.
-    let read = read_trace_wire(&trace_job_in(
-        &[],
-        0,
-        0,
-        map_100mm(1),
-        &t50(),
-        Some(&region(r1(), false)),
+    let read = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 0,
+                height: 0,
+                rgba: &[],
+            },
+            map: TracePixelMap::new(map_100mm(1)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&region(r1(), false)),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     assert!(read.is_some_and(|r| r.outlines.is_empty()));
@@ -1296,13 +1543,19 @@ fn degenerate_regions_are_refused_not_panicked_on() {
 #[test]
 fn a_mask_over_the_whole_image_inside_is_the_unmasked_trace() {
     let all = region(rect(-5.0, -5.0, 105.0, 105.0), false);
-    let a = outlines(&trace_job_in(
-        &m1(),
-        N,
-        N,
-        map_100mm(N),
-        &t50(),
-        Some(&all),
+    let a = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: N,
+                height: N,
+                rgba: &m1(),
+            },
+            map: TracePixelMap::new(map_100mm(N)),
+            mode: TraceMode::Mono(&t50()),
+            lines: &[],
+            mask: Some(&all),
+            shapes: false,
+        },
         &mut |_| {},
     ));
     let (xor, _) = seam(&a, &[], &outlines(&unmasked()));
@@ -1329,7 +1582,7 @@ proptest! {
             Point::new(x0 + w, y0 + h + skew),
             Point::new(x0, y0 + h),
         ];
-        let job = |r: Option<&dyn Mask>| outlines(&trace_job_in(&rgba, n, n, map, &t50(), r, &mut |_| {}));
+        let job = |r: Option<&dyn Mask>| outlines(&run_trace_job(&TraceJob { raster: TraceRaster { width: n, height: n, rgba: &rgba }, map: TracePixelMap::new(map), mode: TraceMode::Mono(&t50()), lines: &[], mask: r, shapes: false }, &mut |_| {}));
         let whole = job(None);
         let a = job(Some(&region(poly.clone(), false)));
         let b = job(Some(&region(poly.clone(), true)));
@@ -1364,25 +1617,37 @@ fn a_ring_cut_only_on_its_outer_outline_keeps_its_hole() {
         }
     }
     let p = TraceParams::with_threshold(128);
-    let whole = outlines(&trace_job_in(
-        &rgba,
-        n,
-        n,
-        map_100mm(n),
-        &p,
-        None,
+    let whole = outlines(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     ));
     // x = 75 cuts the outer circle (r 35) but not the hole (r 15).
     let left = rect(-10.0, -10.0, 75.0, 110.0);
     for outside in [false, true] {
-        let got = outlines(&trace_job_in(
-            &rgba,
-            n,
-            n,
-            map_100mm(n),
-            &p,
-            Some(&region(left.clone(), outside)),
+        let got = outlines(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: n,
+                    height: n,
+                    rgba: &rgba,
+                },
+                map: TracePixelMap::new(map_100mm(n)),
+                mode: TraceMode::Mono(&p),
+                lines: &[],
+                mask: Some(&region(left.clone(), outside)),
+                shapes: false,
+            },
             &mut |_| {},
         ));
         if !outside {
@@ -1492,13 +1757,19 @@ fn item3_the_unclipped_notice_counts_in_singular_and_plural() {
 
 #[test]
 fn item3_a_refused_clip_counts_every_crossing_shape_kept_whole_and_not_the_others() {
-    let wire = trace_job_in(
-        &far_picture(),
-        32,
-        32,
-        far_map(),
-        &far_params(),
-        Some(&far_left_half(false)),
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 32,
+                height: 32,
+                rgba: &far_picture(),
+            },
+            map: TracePixelMap::new(far_map()),
+            mode: TraceMode::Mono(&far_params()),
+            lines: &[],
+            mask: Some(&far_left_half(false)),
+            shapes: false,
+        },
         &mut |_| {},
     );
     let read = read_trace_wire(&wire).expect("a readable wire");
@@ -1522,13 +1793,19 @@ fn item3_a_refused_clip_counts_every_crossing_shape_kept_whole_and_not_the_other
 
 #[test]
 fn item3_outside_a_refused_clip_counts_only_what_it_kept() {
-    let read = read_trace_wire(&trace_job_in(
-        &far_picture(),
-        32,
-        32,
-        far_map(),
-        &far_params(),
-        Some(&far_left_half(true)),
+    let read = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 32,
+                height: 32,
+                rgba: &far_picture(),
+            },
+            map: TracePixelMap::new(far_map()),
+            mode: TraceMode::Mono(&far_params()),
+            lines: &[],
+            mask: Some(&far_left_half(true)),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
@@ -1541,13 +1818,19 @@ fn item3_outside_a_refused_clip_counts_only_what_it_kept() {
 
 #[test]
 fn item3_a_refused_multicolour_clip_is_counted_and_the_palette_still_reads() {
-    let wire = trace_colour_job_in(
-        &far_picture(),
-        32,
-        32,
-        far_map(),
-        &colour_params(),
-        Some(&far_left_half(false)),
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 32,
+                height: 32,
+                rgba: &far_picture(),
+            },
+            map: TracePixelMap::new(far_map()),
+            mode: TraceMode::Colours(&colour_params()),
+            lines: &[],
+            mask: Some(&far_left_half(false)),
+            shapes: false,
+        },
         &mut |_| {},
     );
     let read = read_trace_wire(&wire).expect("a readable multicolour wire");
@@ -1567,14 +1850,19 @@ fn item3_a_refused_clip_with_text_lines_and_shapes_keeps_every_section() {
         confidence: vec![0.99; 5],
         positions: Vec::new(),
     };
-    let mut wire = trace_text_job_in(
-        &far_picture(),
-        32,
-        32,
-        far_map(),
-        &far_params(),
-        &[line],
-        Some(&far_left_half(false)),
+    let mut wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 32,
+                height: 32,
+                rgba: &far_picture(),
+            },
+            map: TracePixelMap::new(far_map()),
+            mode: TraceMode::Mono(&far_params()),
+            lines: &[line],
+            mask: Some(&far_left_half(false)),
+            shapes: false,
+        },
         &mut |_| {},
     );
     let read = read_trace_wire(&wire).expect("a readable text wire");
@@ -1599,13 +1887,19 @@ fn item3_no_count_on_the_wire_when_every_clip_succeeds() {
         );
     }
     let n = 200;
-    let colour = trace_colour_job_in(
-        &draw(COLOUR, n),
-        n,
-        n,
-        map_100mm(n),
-        &colour_params(),
-        Some(&region(r1(), false)),
+    let colour = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: n,
+                height: n,
+                rgba: &draw(COLOUR, n),
+            },
+            map: TracePixelMap::new(map_100mm(n)),
+            mode: TraceMode::Colours(&colour_params()),
+            lines: &[],
+            mask: Some(&region(r1(), false)),
+            shapes: false,
+        },
         &mut |_| {},
     );
     let read = read_trace_wire(&colour).unwrap();

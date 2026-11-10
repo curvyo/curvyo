@@ -1,6 +1,6 @@
 //! One trace job of the Trace tool's worker and its result as a flat list of numbers
 //! (`specs/0025-raster-trace` criteria 11, 15, 16 and 17; ADR 0023 §5): the worker runs
-//! [`trace_job_in`], posts the numbers, and the session reads them back with [`read_wire`].
+//! `trace_job::run`, posts the numbers, and the session reads them back with [`read_wire`].
 
 use std::ops::ControlFlow;
 
@@ -129,26 +129,17 @@ pub(crate) fn job_percent(progress: Progress) -> u8 {
     u8::try_from(percent.min(100)).unwrap_or(100)
 }
 
-/// One trace for the worker: `rgba` (`width` x `height`, straight alpha) mapped by `pixel_map`
-/// (`[a, b, c, d, e, f]`) with `params`, the outlines clipped to `region` before they are written
-/// (`specs/0094` slice 1); the result as numbers. `on_percent` is called each time the job
-/// reaches a higher whole percent (criterion 10); the values only rise. Never panics on bad
-/// input: it says `Invalid`.
-#[must_use]
-pub fn trace_job_in(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
+/// One trace of `raster` (straight alpha) mapped by `map` with `params`, the outlines clipped to
+/// `mask` before they are written (`specs/0094` slice 1); the result as numbers. `on_percent` is
+/// called each time the job reaches a higher whole percent (criterion 10); the values only rise.
+/// Never panics on bad input: it says `Invalid`.
+pub(crate) fn mono_wire(
+    raster: Raster<'_>,
+    map: PixelMap,
     params: &TraceParams,
-    region: Option<&dyn Mask>,
+    mask: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
-    let raster = Raster {
-        width,
-        height,
-        rgba,
-    };
     let mut reported: Option<u8> = None;
     let mut go = |progress: Progress| {
         let percent = job_percent(progress);
@@ -158,9 +149,9 @@ pub fn trace_job_in(
         }
         ControlFlow::Continue(())
     };
-    match trace(raster, PixelMap::new(pixel_map), params, &mut go) {
+    match trace(raster, map, params, &mut go) {
         Ok(mut result) => {
-            let unclipped = region.map_or(0, |mask| clip_trace(mask, &mut result));
+            let unclipped = mask.map_or(0, |mask| clip_trace(mask, &mut result));
             #[allow(clippy::cast_precision_loss)] // counts far below 2^52
             let mut wire = vec![
                 TraceStatus::Traced.code(),
@@ -182,25 +173,16 @@ pub fn trace_job_in(
     }
 }
 
-/// One multicolour trace for the worker (`specs/0089` slice M): as [`trace_job_in`], the
-/// outlines layer by layer, each layer clipped to `region` before it is written
-/// (`specs/0094` slice 1), then the palette and the layers (each colour and its outline count)
-/// and the joined regions after them.
-#[must_use]
-pub fn trace_colour_job_in(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
+/// One multicolour trace (`specs/0089` slice M): as [`mono_wire`], the outlines layer by layer,
+/// each layer clipped to `mask` before it is written (`specs/0094` slice 1), then the palette and
+/// the layers (each colour and its outline count) and the joined regions after them.
+pub(crate) fn colour_wire(
+    raster: Raster<'_>,
+    map: PixelMap,
     params: &TraceColourParams,
-    region: Option<&dyn Mask>,
+    mask: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
-    let raster = Raster {
-        width,
-        height,
-        rgba,
-    };
     let mut reported: Option<u8> = None;
     let mut go = |progress: Progress| {
         let percent = job_percent(progress);
@@ -210,9 +192,9 @@ pub fn trace_colour_job_in(
         }
         ControlFlow::Continue(())
     };
-    match trace_colours(raster, PixelMap::new(pixel_map), params, &mut go) {
+    match trace_colours(raster, map, params, &mut go) {
         Ok(mut result) => {
-            let unclipped = region.map_or(0, |mask| clip_colours(mask, &mut result));
+            let unclipped = mask.map_or(0, |mask| clip_colours(mask, &mut result));
             let mut wire = colour_head(&result);
             write_unclipped(&mut wire, unclipped);
             write_colour_tail(&mut wire, &result);
@@ -508,6 +490,7 @@ fn read_colour_tail(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trace_job::{Job, Mode, run};
     use crate::trace_mask::test_double::BoxMask;
     use curvyo_vectorize_core::Mm;
 
@@ -541,20 +524,40 @@ mod tests {
             specks: Mm::from_mm(specks_mm),
             ..TraceParams::with_threshold(threshold)
         };
-        trace_job_in(rgba, width, height, pixel_map, &params, None, &mut |_| {})
+        run(
+            &Job {
+                raster: Raster {
+                    width,
+                    height,
+                    rgba,
+                },
+                map: PixelMap::new(pixel_map),
+                mode: Mode::Mono(&params),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        )
     }
 
     const SQUARE_MAP: [f64; 6] = [0.5, 0.0, 0.0, 0.5, 1.0, 2.0];
 
     fn job_with(mask: Option<&dyn Mask>) -> TraceWire {
         let params = TraceParams::with_threshold(128);
-        let wire = trace_job_in(
-            &square_picture(),
-            16,
-            16,
-            SQUARE_MAP,
-            &params,
-            mask,
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: 16,
+                    height: 16,
+                    rgba: &square_picture(),
+                },
+                map: PixelMap::new(SQUARE_MAP),
+                mode: Mode::Mono(&params),
+                lines: &[],
+                mask,
+                shapes: false,
+            },
             &mut |_| {},
         );
         read_wire(&wire).unwrap()
@@ -623,7 +626,21 @@ mod tests {
             min: Point::new(0.0, 0.0),
             max: Point::new(19.0, 20.0),
         };
-        let wire = trace_colour_job_in(&picture, 40, 20, map, &params, Some(&left), &mut |_| {});
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: 40,
+                    height: 20,
+                    rgba: &picture,
+                },
+                map: PixelMap::new(map),
+                mode: Mode::Colours(&params),
+                lines: &[],
+                mask: Some(&left),
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         let read = read_wire(&wire).unwrap();
         assert_eq!(read.layers.len(), 1);
         assert_eq!(read.layers[0].colour, TraceRgb::new(208, 34, 42));
@@ -635,13 +652,19 @@ mod tests {
     fn a_job_reports_a_rising_percentage_that_ends_at_100() {
         let mut seen = Vec::new();
         let params = TraceParams::with_threshold(128);
-        let wire = trace_job_in(
-            &square_picture(),
-            16,
-            16,
-            [0.5, 0.0, 0.0, 0.5, 1.0, 2.0],
-            &params,
-            None,
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: 16,
+                    height: 16,
+                    rgba: &square_picture(),
+                },
+                map: PixelMap::new([0.5, 0.0, 0.0, 0.5, 1.0, 2.0]),
+                mode: Mode::Mono(&params),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
             &mut |percent| seen.push(percent),
         );
         assert_eq!(read_wire(&wire).unwrap().status, TraceStatus::Traced);
@@ -706,7 +729,21 @@ mod tests {
             ..TraceParams::with_threshold(128)
         });
         let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
-        let wire = trace_colour_job_in(&picture, 40, 20, map, &params, None, &mut |_| {});
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: 40,
+                    height: 20,
+                    rgba: &picture,
+                },
+                map: PixelMap::new(map),
+                mode: Mode::Colours(&params),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         let read = read_wire(&wire).unwrap();
         assert_eq!(read.status, TraceStatus::Traced);
         assert_eq!(read.palette.len(), 2);

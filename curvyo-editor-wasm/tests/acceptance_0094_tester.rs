@@ -18,7 +18,9 @@ mod support;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
-use curvyo_ui_core::{Mask, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{
+    Mask, TraceJob, TraceMode, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
+};
 use image::ImageEncoder;
 use kurbo::PathEl;
 use support::{M1, base64, draw};
@@ -94,13 +96,19 @@ fn traced(s: &mut Session, image: NodeId, threshold: u8) -> Vec<f64> {
         !mask.is_empty(),
         "the region crosses in the settings"
     );
-    trace_job_in(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &trace_settings(&settings),
-        region.as_ref().map(|r| r as &dyn Mask),
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
+            map: TracePixelMap::new(source.map),
+            mode: TraceMode::Mono(&trace_settings(&settings)),
+            lines: &[],
+            mask: region.as_ref().map(|r| r as &dyn Mask),
+            shapes: false,
+        },
         &mut |_| {},
     )
 }
@@ -566,22 +574,34 @@ fn fnv(bytes: &[u8]) -> u32 {
 fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
     let region = trace_mask_region(settings);
     let mut wire = match curvyo_editor_wasm::trace_colour_settings(settings) {
-        Some(colour) => curvyo_ui_core::trace_colour_job_in(
-            rgba,
-            n,
-            n,
-            map,
-            &colour,
-            region.as_ref().map(|r| r as &dyn Mask),
+        Some(colour) => run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: n,
+                    height: n,
+                    rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Colours(&colour),
+                lines: &[],
+                mask: region.as_ref().map(|r| r as &dyn Mask),
+                shapes: false,
+            },
             &mut |_| {},
         ),
-        None => trace_job_in(
-            rgba,
-            n,
-            n,
-            map,
-            &trace_settings(settings),
-            region.as_ref().map(|r| r as &dyn Mask),
+        None => run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: n,
+                    height: n,
+                    rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&trace_settings(settings)),
+                lines: &[],
+                mask: region.as_ref().map(|r| r as &dyn Mask),
+                shapes: false,
+            },
             &mut |_| {},
         ),
     };

@@ -9,8 +9,9 @@
 
 use std::ops::ControlFlow;
 
-use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Raster, Rgb8, Selection, TraceParams, auto_threshold, trace};
+use curvyo_vectorize_core::{
+    Mm, PixelMap, Raster, Rgb8, Selection, TraceParams, auto_threshold, trace,
+};
 use kurbo::{BezPath, Point, Vec2};
 
 use crate::trace_inpaint::{inpaint, median};
@@ -178,19 +179,18 @@ fn threshold_and_polarity(
     (threshold, dark > light)
 }
 
-/// The text pass over `rgba` (`width` x `height`, straight alpha) mapped by `pixel_map`, with the
-/// trace settings `params` and the OCR `lines` (in this picture's pixels). Lines that are not
-/// accepted, or whose own trace has no outline, are left to the main trace.
+/// The text pass over `raster` (straight alpha) mapped by `pixel_map`, with the trace settings
+/// `params` and the OCR `lines` (in this picture's pixels). Lines that are not accepted, or whose
+/// own trace has no outline, are left to the main trace.
 #[must_use]
 pub(crate) fn text_pass(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: Affine,
+    raster: Raster<'_>,
+    pixel_map: PixelMap,
     params: &TraceParams,
     lines: &[OcrLine],
 ) -> TextPass {
-    let (w, h) = (width as usize, height as usize);
+    let rgba = raster.rgba;
+    let (w, h) = (raster.width as usize, raster.height as usize);
     let mut pass = TextPass {
         rgba: rgba.to_vec(),
         left_out: vec![false; w * h],
@@ -242,23 +242,21 @@ pub(crate) fn text_pass(
             invert: false,
             ignore_background: false,
             // A letter's dot or a full stop is no speck.
-            specks: curvyo_vectorize_core::Mm::from_mm(0.0),
+            specks: Mm::from_mm(0.0),
             ..*params
         };
         // The crop's pixels moved to their place in the picture, then mapped (`compose` applies
         // its right operand first).
         // invariant: the box lies inside the picture.
         #[allow(clippy::cast_precision_loss)]
-        let map = pixel_map.compose(Affine::translation(curvyo_document_core::Vec2::new(
-            x0 as f64, y0 as f64,
-        )));
+        let map = pixel_map.compose(PixelMap::translation(Vec2::new(x0 as f64, y0 as f64)));
         let Ok(result) = trace(
             Raster {
                 width: u32::try_from(cw).unwrap_or(0),
                 height: u32::try_from(ch).unwrap_or(0),
                 rgba: &crop,
             },
-            curvyo_vectorize_core::PixelMap::new(map.to_array()),
+            map,
             &own,
             &mut |_| ControlFlow::Continue(()),
         ) else {
@@ -299,12 +297,11 @@ pub(crate) fn text_pass(
 }
 
 /// The centre of `quad` (picture pixels) in document millimetres.
-fn quad_centre(quad: &[[f64; 2]; 4], pixel_map: Affine) -> Point {
+fn quad_centre(quad: &[[f64; 2]; 4], pixel_map: PixelMap) -> Point {
     let mid = quad
         .iter()
         .fold([0.0, 0.0], |c, p| [c[0] + p[0] / 4.0, c[1] + p[1] / 4.0]);
-    let p = pixel_map.apply_point(curvyo_document_core::Point::new(mid[0], mid[1]));
-    Point::new(p.x, p.y)
+    pixel_map.apply_point(Point::new(mid[0], mid[1]))
 }
 
 /// Sets what lies under each of `regions`: the median of its text pixels `inks` in the filled
@@ -387,6 +384,14 @@ mod tests {
         rgba
     }
 
+    fn raster(rgba: &[u8]) -> Raster<'_> {
+        Raster {
+            width: 40,
+            height: 20,
+            rgba,
+        }
+    }
+
     fn line() -> OcrLine {
         OcrLine {
             quad: [[6.0, 6.0], [34.0, 6.0], [34.0, 14.0], [6.0, 14.0]],
@@ -402,10 +407,8 @@ mod tests {
     fn light_text_on_a_box_is_left_out_and_the_box_stays_whole() {
         let rgba = picture();
         let pass = text_pass(
-            &rgba,
-            40,
-            20,
-            Affine::scale(0.1, 0.1),
+            raster(&rgba),
+            PixelMap::scale(0.1, 0.1),
             &TraceParams::with_threshold(128),
             &[line()],
         );
@@ -428,10 +431,8 @@ mod tests {
     fn a_line_traces_where_its_letters_are() {
         let rgba = picture();
         let pass = text_pass(
-            &rgba,
-            40,
-            20,
-            Affine::new(0.1, 0.0, 0.0, 0.1, 5.0, 7.0),
+            raster(&rgba),
+            PixelMap::new([0.1, 0.0, 0.0, 0.1, 5.0, 7.0]),
             &TraceParams::with_threshold(128),
             &[line()],
         );
@@ -455,10 +456,8 @@ mod tests {
         let mut weak = line();
         weak.confidence = vec![0.1, 0.1];
         let pass = text_pass(
-            &rgba,
-            40,
-            20,
-            Affine::scale(0.1, 0.1),
+            raster(&rgba),
+            PixelMap::scale(0.1, 0.1),
             &TraceParams::with_threshold(128),
             &[weak],
         );

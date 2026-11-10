@@ -3,6 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use curvyo_ui_core::{TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job};
 use std::sync::Arc;
 
 use curvyo_document_core::{Affine, Document, NewImage, NodeId, Point, pack};
@@ -105,5 +106,19 @@ fn trace_job(
         specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
         ..curvyo_ui_core::TraceParams::with_threshold(threshold)
     };
-    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width,
+                height,
+                rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    )
 }

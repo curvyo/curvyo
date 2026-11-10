@@ -9,9 +9,9 @@ use std::sync::OnceLock;
 use curvyo_document_core::{Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceParams, TracePartArea, TracePartClip, TraceRegion,
-    TraceRgb, TraceWire, join_trace_parts, read_trace_wire, trace_add_shapes, trace_colour_job_in,
-    trace_job_in, trace_part_clips, trace_text_job_in,
+    Mask, OcrLine, TraceColourParams, TraceJob, TraceMode, TraceParams, TracePartArea,
+    TracePartClip, TracePixelMap, TraceRaster, TraceRegion, TraceRgb, TraceWire, join_trace_parts,
+    read_trace_wire, run_trace_job, trace_add_shapes, trace_part_clips,
 };
 use kurbo::{BezPath, PathEl, Shape};
 
@@ -94,13 +94,19 @@ fn params(threshold: u8, smooth: u8) -> TraceParams {
 }
 
 fn trace(picture: &[u8], p: &TraceParams, clip: &TracePartClip) -> TraceWire {
-    read_trace_wire(&trace_job_in(
-        picture,
-        SIDE,
-        SIDE,
-        MAP,
-        p,
-        clip.region().map(|r| r as &dyn Mask),
+    read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: SIDE,
+                height: SIDE,
+                rgba: picture,
+            },
+            map: TracePixelMap::new(MAP),
+            mode: TraceMode::Mono(p),
+            lines: &[],
+            mask: clip.region().map(|r| r as &dyn Mask),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap()
@@ -412,13 +418,19 @@ fn c23_multicolour_parts_merge_by_colour() {
     let wires: Vec<TraceWire> = clips
         .iter()
         .map(|clip| {
-            read_trace_wire(&trace_colour_job_in(
-                &colour,
-                SIDE,
-                SIDE,
-                MAP,
-                &p,
-                clip.region().map(|r| r as &dyn Mask),
+            read_trace_wire(&run_trace_job(
+                &TraceJob {
+                    raster: TraceRaster {
+                        width: SIDE,
+                        height: SIDE,
+                        rgba: &colour,
+                    },
+                    map: TracePixelMap::new(MAP),
+                    mode: TraceMode::Colours(&p),
+                    lines: &[],
+                    mask: clip.region().map(|r| r as &dyn Mask),
+                    shapes: false,
+                },
                 &mut |_| {},
             ))
             .unwrap()
@@ -551,25 +563,36 @@ fn c30_text_and_shapes_follow_the_part_their_centre_lies_in() {
     let clips = trace_part_clips(&[TracePartArea::Whole, bottom], &quad);
     let p = TraceParams::with_threshold(128);
     let lines = [ocr_line(40.0), ocr_line(140.0)];
-    let mut first = trace_text_job_in(
-        &picture,
-        200,
-        200,
-        map,
-        &p,
-        &lines,
-        clips[0].region().map(|r| r as &dyn Mask),
+    let mut first = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 200,
+                height: 200,
+                rgba: &picture,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&p),
+            lines: &lines,
+            mask: clips[0].region().map(|r| r as &dyn Mask),
+            shapes: false,
+        },
         &mut |_| {},
     );
     trace_add_shapes(&mut first, map);
     let first = read_trace_wire(&first).unwrap();
-    let second = read_trace_wire(&trace_job_in(
-        &picture,
-        200,
-        200,
-        map,
-        &p,
-        clips[1].region().map(|r| r as &dyn Mask),
+    let second = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 200,
+                height: 200,
+                rgba: &picture,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: clips[1].region().map(|r| r as &dyn Mask),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();

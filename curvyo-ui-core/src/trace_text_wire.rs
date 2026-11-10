@@ -2,8 +2,7 @@
 //! (`specs/0091-trace-text-recognition` `adrs.md` decisions 1 to 3): the text pass runs first, the
 //! main trace walks the filled picture, and the accepted lines follow the outlines.
 
-use curvyo_document_core::Affine;
-use curvyo_vectorize_core::{Rgb8, TraceParams};
+use curvyo_vectorize_core::{PixelMap, Raster, Rgb8, TraceParams};
 use kurbo::{BezPath, Vec2};
 
 use crate::trace_mask::Mask;
@@ -11,7 +10,7 @@ use crate::trace_ocr::OcrLine;
 use crate::trace_text::TextPass;
 use crate::trace_text::text_pass;
 use crate::trace_transfer::{
-    TraceStatus, count, read_outlines, status_only, trace_job_in, write_outline,
+    TraceStatus, count, mono_wire, read_outlines, status_only, write_outline,
 };
 
 /// The number that opens the text section (no count is negative).
@@ -78,38 +77,29 @@ pub struct TraceTexts {
     pub lines: Vec<TraceTextWire>,
 }
 
-/// One trace with the OCR `lines` (in this picture's pixels): the text pass, then
-/// [`trace_job_in`] over the filled picture, then the text section. With a mask `region`
-/// (`specs/0094` criterion 11) every line is left out of the main trace, only those whose box
-/// centre the region keeps stay as text, and the outlines are clipped. Without lines the numbers
-/// are exactly those of [`trace_job_in`] (criteria 12 and 18).
-#[must_use]
-#[allow(clippy::too_many_arguments)] // the job's inputs, as the worker passes them
-pub fn trace_text_job_in(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
+/// One trace with the OCR `lines` (in this picture's pixels): the text pass, then [`mono_wire`]
+/// over the filled picture, then the text section. With a `mask` (`specs/0094` criterion 11)
+/// every line is left out of the main trace, only those whose box centre the mask keeps stay as
+/// text, and the outlines are clipped. Without lines the numbers are exactly those of
+/// [`mono_wire`] (criteria 12 and 18).
+pub(crate) fn text_mono_wire(
+    raster: Raster<'_>,
+    map: PixelMap,
     params: &TraceParams,
     lines: &[OcrLine],
-    region: Option<&dyn Mask>,
+    mask: Option<&dyn Mask>,
     on_percent: &mut dyn FnMut(u8),
 ) -> Vec<f64> {
     if lines.is_empty() {
-        return trace_job_in(rgba, width, height, pixel_map, params, region, on_percent);
+        return mono_wire(raster, map, params, mask, on_percent);
     }
-    let mut pass = text_pass(
-        rgba,
-        width,
-        height,
-        Affine::from_array(pixel_map),
-        params,
-        lines,
-    );
-    keep_lines_in(&mut pass, region);
-    let mut wire = trace_job_in(
-        &pass.rgba, width, height, pixel_map, params, region, on_percent,
-    );
+    let mut pass = text_pass(raster, map, params, lines);
+    keep_lines_in(&mut pass, mask);
+    let filled = Raster {
+        rgba: &pass.rgba,
+        ..raster
+    };
+    let mut wire = mono_wire(filled, map, params, mask, on_percent);
     if wire.first() != Some(&0.0) {
         return wire;
     }
@@ -169,26 +159,16 @@ pub(crate) fn write_texts(wire: &mut Vec<f64>, pass: &TextPass, fills: &[(Rgb8, 
 
 /// The text pass alone (`specs/0091` criterion 25: the lines are decided before the main trace):
 /// the numbers of a result without outlines, then the text section of the accepted lines whose
-/// box centre `region` keeps (`specs/0094` criterion 11), as [`trace_text_job_in`] would write it.
-#[must_use]
-pub fn trace_text_regions_in(
-    rgba: &[u8],
-    width: u32,
-    height: u32,
-    pixel_map: [f64; 6],
+/// box centre `mask` keeps (`specs/0094` criterion 11), as [`text_mono_wire`] would write it.
+pub(crate) fn text_regions_wire(
+    raster: Raster<'_>,
+    map: PixelMap,
     params: &TraceParams,
     lines: &[OcrLine],
-    region: Option<&dyn Mask>,
+    mask: Option<&dyn Mask>,
 ) -> Vec<f64> {
-    let mut pass = text_pass(
-        rgba,
-        width,
-        height,
-        Affine::from_array(pixel_map),
-        params,
-        lines,
-    );
-    keep_lines_in(&mut pass, region);
+    let mut pass = text_pass(raster, map, params, lines);
+    keep_lines_in(&mut pass, mask);
     let mut wire = status_only(TraceStatus::Traced);
     write_texts(&mut wire, &pass, &[]);
     wire
@@ -259,7 +239,8 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(TraceTexts, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trace_transfer::{read_wire, trace_job_in};
+    use crate::trace_job::{Job, Mode, run, text_regions};
+    use crate::trace_transfer::read_wire;
 
     /// A 40 x 20 picture with a black bar (the "text") on white.
     fn picture() -> Vec<u8> {
@@ -287,14 +268,19 @@ mod tests {
     #[test]
     fn the_text_section_round_trips_and_the_bar_leaves_the_main_trace() {
         let params = TraceParams::with_threshold(128);
-        let wire = trace_text_job_in(
-            &picture(),
-            40,
-            20,
-            MAP,
-            &params,
-            &[line("Grüße")],
-            None,
+        let wire = run(
+            &Job {
+                raster: Raster {
+                    width: 40,
+                    height: 20,
+                    rgba: &picture(),
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Mono(&params),
+                lines: &[line("Grüße")],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         );
         let read = read_wire(&wire).unwrap();
@@ -312,26 +298,34 @@ mod tests {
     fn the_regions_are_the_text_section_of_the_job() {
         let params = TraceParams::with_threshold(128);
         let lines = [line("Grüße")];
-        let full = read_wire(&trace_text_job_in(
-            &picture(),
-            40,
-            20,
-            MAP,
-            &params,
-            &lines,
-            None,
+        let full = read_wire(&run(
+            &Job {
+                raster: Raster {
+                    width: 40,
+                    height: 20,
+                    rgba: &picture(),
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Mono(&params),
+                lines: &lines,
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap();
-        let regions = read_wire(&trace_text_regions_in(
-            &picture(),
-            40,
-            20,
-            MAP,
-            &params,
-            &lines,
-            None,
-        ))
+        let regions = read_wire(&text_regions(&Job {
+            raster: Raster {
+                width: 40,
+                height: 20,
+                rgba: &picture(),
+            },
+            map: PixelMap::new(MAP),
+            mode: Mode::Mono(&params),
+            lines: &lines,
+            mask: None,
+            shapes: false,
+        }))
         .unwrap();
         assert_eq!(regions.texts, full.texts);
         assert_eq!(regions.outlines.len(), 0);
@@ -346,14 +340,19 @@ mod tests {
         let lines = [line("Grüße")];
         // The line's box centre is at pixel (20, 10): 2 mm, 1 mm.
         let run = |mask: &BoxMask| {
-            read_wire(&trace_text_job_in(
-                &picture(),
-                40,
-                20,
-                MAP,
-                &params,
-                &lines,
-                Some(mask),
+            read_wire(&run(
+                &Job {
+                    raster: Raster {
+                        width: 40,
+                        height: 20,
+                        rgba: &picture(),
+                    },
+                    map: PixelMap::new(MAP),
+                    mode: Mode::Mono(&params),
+                    lines: &lines,
+                    mask: Some(mask),
+                    shapes: false,
+                },
                 &mut |_| {},
             ))
             .unwrap()
@@ -375,15 +374,18 @@ mod tests {
             0,
             "its pixels stay out of the main trace"
         );
-        let only_text = read_wire(&trace_text_regions_in(
-            &picture(),
-            40,
-            20,
-            MAP,
-            &params,
-            &lines,
-            Some(&drops),
-        ))
+        let only_text = read_wire(&text_regions(&Job {
+            raster: Raster {
+                width: 40,
+                height: 20,
+                rgba: &picture(),
+            },
+            map: PixelMap::new(MAP),
+            mode: Mode::Mono(&params),
+            lines: &lines,
+            mask: Some(&drops),
+            shapes: false,
+        }))
         .unwrap();
         assert_eq!(only_text.texts.lines.len(), 0);
     }
@@ -392,9 +394,37 @@ mod tests {
     #[test]
     fn without_lines_the_job_is_the_plain_trace() {
         let params = TraceParams::with_threshold(128);
-        let plain = trace_job_in(&picture(), 40, 20, MAP, &params, None, &mut |_| {});
+        let plain = run(
+            &Job {
+                raster: Raster {
+                    width: 40,
+                    height: 20,
+                    rgba: &picture(),
+                },
+                map: PixelMap::new(MAP),
+                mode: Mode::Mono(&params),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         assert_eq!(
-            trace_text_job_in(&picture(), 40, 20, MAP, &params, &[], None, &mut |_| {}),
+            run(
+                &Job {
+                    raster: Raster {
+                        width: 40,
+                        height: 20,
+                        rgba: &picture()
+                    },
+                    map: PixelMap::new(MAP),
+                    mode: Mode::Mono(&params),
+                    lines: &[],
+                    mask: None,
+                    shapes: false
+                },
+                &mut |_| {}
+            ),
             plain
         );
         let read = read_wire(&plain).unwrap();

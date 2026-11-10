@@ -8,7 +8,10 @@
 mod cpu_time;
 
 use curvyo_document_core::{Point, Vec2};
-use curvyo_ui_core::{Mask, TraceParams, TraceRegion, read_trace_wire, trace_job_in};
+use curvyo_ui_core::{
+    Mask, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, TraceRegion,
+    read_trace_wire, run_trace_job,
+};
 
 /// A 2000 x 2000 px picture of 400 discs on a grid, 20 x 20 of them, placed 200 mm wide.
 fn picture() -> Vec<u8> {
@@ -35,13 +38,19 @@ fn picture() -> Vec<u8> {
 fn c16_the_stencil_clip_of_a_2000_px_trace_with_a_500_node_mask() {
     let map = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];
     let (wire, trace) = cpu_time::cpu_time_of(|| {
-        trace_job_in(
-            &picture(),
-            2000,
-            2000,
-            map,
-            &TraceParams::with_threshold(128),
-            None,
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: 2000,
+                    height: 2000,
+                    rgba: &picture(),
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
             &mut |_| {},
         )
     });
@@ -96,15 +105,28 @@ fn crop(
 #[test]
 #[ignore = "criterion 31 harness: run in release and read the printed numbers"]
 fn c31_four_quarter_parts_against_one_whole_trace() {
-    use curvyo_ui_core::{
-        TracePartArea, TracePartClip, join_trace_parts, trace_job_in, trace_part_clips,
-    };
+    use curvyo_ui_core::{TracePartArea, TracePartClip, join_trace_parts, trace_part_clips};
     let side = 2000_u32;
     let map = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];
     let rgba = picture();
     let params = TraceParams::with_threshold(128);
-    let (_, whole) =
-        cpu_time::cpu_time_of(|| trace_job_in(&rgba, side, side, map, &params, None, &mut |_| {}));
+    let (_, whole) = cpu_time::cpu_time_of(|| {
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: side,
+                    height: side,
+                    rgba: &rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&params),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        )
+    });
     // Four quarters of 100 x 100 mm, Inside; the margin of the session's crop: 16 px, or the
     // pixels of Ignore below when more.
     let specks = params.specks.as_mm();
@@ -152,13 +174,19 @@ fn c31_four_quarter_parts_against_one_whole_trace() {
                     (py + 1016).min(side),
                 );
                 let (pixels, moved) = crop(&rgba, side, cut, map);
-                read_trace_wire(&trace_job_in(
-                    &pixels,
-                    cut.2 - cut.0,
-                    cut.3 - cut.1,
-                    moved,
-                    &params,
-                    clip.region().map(|r| r as &dyn Mask),
+                read_trace_wire(&run_trace_job(
+                    &TraceJob {
+                        raster: TraceRaster {
+                            width: cut.2 - cut.0,
+                            height: cut.3 - cut.1,
+                            rgba: &pixels,
+                        },
+                        map: TracePixelMap::new(moved),
+                        mode: TraceMode::Mono(&params),
+                        lines: &[],
+                        mask: clip.region().map(|r| r as &dyn Mask),
+                        shapes: false,
+                    },
                     &mut |_| {},
                 ))
                 .unwrap()

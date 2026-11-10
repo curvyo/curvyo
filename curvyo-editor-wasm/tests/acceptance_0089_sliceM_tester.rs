@@ -14,7 +14,8 @@
 use curvyo_document_core::{NodeId, ObjectSnapshot, PathSnapshot, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome};
 use curvyo_ui_core::{
-    TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_in,
+    TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePixelMap, TraceRaster,
+    TraceRgb, read_trace_wire, run_trace_job,
 };
 use image::ImageEncoder;
 
@@ -64,13 +65,19 @@ fn traced() -> (Session, NodeId, Vec<f64>) {
         specks: curvyo_ui_core::TraceMm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     });
-    let wire = trace_colour_job_in(
-        &source.rgba,
-        source.width,
-        source.height,
-        source.map,
-        &params,
-        None,
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: source.width,
+                height: source.height,
+                rgba: &source.rgba,
+            },
+            map: TracePixelMap::new(source.map),
+            mode: TraceMode::Colours(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     );
     assert!(session.set_trace_preview(image, &wire));
@@ -287,5 +294,19 @@ fn trace_job(
         specks: curvyo_ui_core::TraceMm::from_mm(specks_mm),
         ..curvyo_ui_core::TraceParams::with_threshold(threshold)
     };
-    curvyo_ui_core::trace_job_in(rgba, width, height, map, &params, None, &mut |_| {})
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width,
+                height,
+                rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    )
 }

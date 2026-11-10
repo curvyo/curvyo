@@ -20,8 +20,8 @@ use curvyo_editor_wasm::{
     FitWorker, Session, Tool, TraceCreateOutcome, trace_recognise_shapes, trace_settings,
 };
 use curvyo_ui_core::{
-    FontBlock, OcrModel, trace_add_shapes, trace_read_text, trace_text_job_in,
-    trace_text_regions_in,
+    FontBlock, OcrModel, TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job,
+    trace_add_shapes, trace_read_text, trace_text_regions,
 };
 use serde_json::Value;
 
@@ -156,22 +156,36 @@ fn run(model: &OcrModel, settings: &str) -> Out {
     .unwrap();
     assert!(s.set_trace_ocr_lines(image, lines.clone(), (src.width, src.height)));
     let params = trace_settings(settings);
-    let regions = trace_text_regions_in(
-        &src.rgba, src.width, src.height, src.map, &params, &lines, None,
-    );
+    let regions = trace_text_regions(&TraceJob {
+        raster: TraceRaster {
+            width: src.width,
+            height: src.height,
+            rgba: &src.rgba,
+        },
+        map: TracePixelMap::new(src.map),
+        mode: TraceMode::Mono(&params),
+        lines: &lines,
+        mask: None,
+        shapes: false,
+    });
     if let Some(request) = s.trace_fit_request_for(image, &regions, TOLERANCE_MM, &[]) {
         let reply = fit(&request);
         assert!(s.set_trace_fit(&request, &reply));
     }
     let (decided, _) = s.trace_lines_to_trace(image).expect("kept lines");
-    let mut wire = trace_text_job_in(
-        &src.rgba,
-        src.width,
-        src.height,
-        src.map,
-        &params,
-        &decided,
-        None,
+    let mut wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: src.width,
+                height: src.height,
+                rgba: &src.rgba,
+            },
+            map: TracePixelMap::new(src.map),
+            mode: TraceMode::Mono(&params),
+            lines: &decided,
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     );
     if trace_recognise_shapes(settings) {

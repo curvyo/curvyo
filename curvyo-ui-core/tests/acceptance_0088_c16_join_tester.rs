@@ -11,10 +11,10 @@
     clippy::too_many_lines
 )]
 
-use curvyo_ui_core::{TraceJoin, TracePrimitive};
 use curvyo_ui_core::{
-    TraceParams, TraceShapeRegion, TraceWire, read_trace_wire, trace_add_shapes, trace_job_in,
+    TraceJob, TraceJoin, TraceMode, TracePixelMap, TracePrimitive, TraceRaster, run_trace_job,
 };
+use curvyo_ui_core::{TraceParams, TraceShapeRegion, TraceWire, read_trace_wire, trace_add_shapes};
 use kurbo::{BezPath, Join, ParamCurveNearest, Shape as _, Stroke, StrokeOpts};
 
 const MM_PER_PX: f64 = 0.1;
@@ -93,13 +93,19 @@ fn trace(w_mm: f64, h_mm: f64, ink: impl Fn(f64, f64) -> bool) -> (TraceWire, Tr
 
 fn run(rgba: &[u8], w: u32, h: u32) -> (TraceWire, TraceWire) {
     let map = [MM_PER_PX, 0.0, 0.0, MM_PER_PX, 0.0, 0.0];
-    let off = trace_job_in(
-        rgba,
-        w,
-        h,
-        map,
-        &TraceParams::with_threshold(128),
-        None,
+    let off = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: w,
+                height: h,
+                rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     );
     let mut on = off.clone();
@@ -403,13 +409,19 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_round() {
     .to_rgba8();
     let (w, h) = png.dimensions();
     let map = [25.4 / 96.0, 0.0, 0.0, 25.4 / 96.0, 0.0, 0.0];
-    let off = trace_job_in(
-        png.as_raw(),
-        w,
-        h,
-        map,
-        &TraceParams::with_threshold(128),
-        None,
+    let off = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: w,
+                height: h,
+                rgba: png.as_raw(),
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
         &mut |_| {},
     );
     let mut on = off.clone();

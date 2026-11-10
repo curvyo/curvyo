@@ -4,7 +4,8 @@
 
 use curvyo_document_core::{NodeId, ObjectSnapshot};
 use curvyo_ui_core::{
-    TraceColourParams, TraceMethod, TraceParams, TraceRgb, read_trace_wire, trace_colour_job_in,
+    TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePixelMap, TraceRaster,
+    TraceRgb, read_trace_wire, run_trace_job,
 };
 
 use super::{Session, Tool, TraceCreateOutcome};
@@ -60,7 +61,21 @@ fn colour_wire_excluding(map: [f64; 6], excluded: &[TraceRgb]) -> Vec<f64> {
         ..TraceParams::with_threshold(128)
     });
     params.excluded = excluded.to_vec();
-    trace_colour_job_in(&rgba, 40, 20, map, &params, None, &mut |_| {})
+    run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 40,
+                height: 20,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Colours(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    )
 }
 
 /// The fills and outline counts of the compound paths in the group Create paths wrote.
@@ -217,7 +232,21 @@ fn a_deleted_colour_is_matched_again_pixel_by_pixel_among_the_kept_colours() {
     });
     let palette_of = |params: &TraceColourParams| {
         let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
-        let wire = trace_colour_job_in(&rgba, 60, 20, map, params, None, &mut |_| {});
+        let wire = run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: 60,
+                    height: 20,
+                    rgba: &rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Colours(params),
+                lines: &[],
+                mask: None,
+                shapes: false,
+            },
+            &mut |_| {},
+        );
         read_trace_wire(&wire).unwrap().palette
     };
     let found = palette_of(&params);
@@ -271,7 +300,21 @@ fn a_kept_palette_of_one_colour_is_traced_alone_and_none_does_not_fail() {
     let map = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
     params.fixed = vec![RED];
     params.colours = Some(1);
-    let wire = trace_colour_job_in(&rgba, 40, 20, map, &params, None, &mut |_| {});
+    let wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 40,
+                height: 20,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Colours(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    );
     let palette: Vec<TraceRgb> = read_trace_wire(&wire)
         .unwrap()
         .palette
@@ -281,7 +324,21 @@ fn a_kept_palette_of_one_colour_is_traced_alone_and_none_does_not_fail() {
     assert_eq!(palette, [RED], "the one kept colour, nothing found anew");
     params.fixed.clear();
     params.colours = Some(0);
-    let none = trace_colour_job_in(&rgba, 40, 20, map, &params, None, &mut |_| {});
+    let none = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 40,
+                height: 20,
+                rgba: &rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Colours(&params),
+            lines: &[],
+            mask: None,
+            shapes: false,
+        },
+        &mut |_| {},
+    );
     assert!(
         read_trace_wire(&none).is_some(),
         "an empty kept palette still answers"

@@ -10,9 +10,9 @@ use std::sync::OnceLock;
 use curvyo_document_core::{Affine, Angle, Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceParams, TraceRegion, TraceRegionError, TraceRgb,
-    TraceWire, read_trace_wire, trace_add_shapes, trace_colour_job_in, trace_job_in,
-    trace_region_defaults, trace_suggest_background, trace_text_job_in, trace_text_regions_in,
+    Mask, OcrLine, TraceColourParams, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster,
+    TraceRegion, TraceRegionError, TraceRgb, TraceWire, read_trace_wire, run_trace_job,
+    trace_add_shapes, trace_region_defaults, trace_suggest_background, trace_text_regions,
     unclipped_notice,
 };
 use kurbo::{BezPath, PathEl, Shape};
@@ -75,13 +75,19 @@ fn params() -> TraceParams {
 }
 
 fn trace(map: [f64; 6], region: Option<&TraceRegion>) -> TraceWire {
-    read_trace_wire(&trace_job_in(
-        m1(),
-        SIDE,
-        SIDE,
-        map,
-        &params(),
-        region.map(|r| r as &dyn Mask),
+    read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: SIDE,
+                height: SIDE,
+                rgba: m1(),
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&params()),
+            lines: &[],
+            mask: region.map(|r| r as &dyn Mask),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap()
@@ -270,8 +276,36 @@ fn c1_without_a_region_the_numbers_are_the_unmasked_jobs() {
         .collect();
     let map = [0.5, 0.0, 0.0, 0.5, 3.0, 4.0];
     assert_eq!(
-        trace_job_in(&small, 64, 64, map, &params(), None, &mut |_| {}),
-        trace_job_in(&small, 64, 64, map, &params(), None, &mut |_| {})
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: 64,
+                    height: 64,
+                    rgba: &small
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&params()),
+                lines: &[],
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        ),
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: 64,
+                    height: 64,
+                    rgba: &small
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&params()),
+                lines: &[],
+                mask: None,
+                shapes: false
+            },
+            &mut |_| {}
+        )
     );
 }
 
@@ -434,8 +468,36 @@ fn clips_as_upright(place: Affine) {
 #[test]
 fn c15_the_same_masked_job_twice_gives_the_same_numbers() {
     let region = r1(false);
-    let first = trace_job_in(m1(), SIDE, SIDE, MAP, &params(), Some(&region), &mut |_| {});
-    let second = trace_job_in(m1(), SIDE, SIDE, MAP, &params(), Some(&region), &mut |_| {});
+    let first = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: SIDE,
+                height: SIDE,
+                rgba: m1(),
+            },
+            map: TracePixelMap::new(MAP),
+            mode: TraceMode::Mono(&params()),
+            lines: &[],
+            mask: Some(&region),
+            shapes: false,
+        },
+        &mut |_| {},
+    );
+    let second = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: SIDE,
+                height: SIDE,
+                rgba: m1(),
+            },
+            map: TracePixelMap::new(MAP),
+            mode: TraceMode::Mono(&params()),
+            lines: &[],
+            mask: Some(&region),
+            shapes: false,
+        },
+        &mut |_| {},
+    );
     assert_eq!(first, second);
 }
 
@@ -463,13 +525,19 @@ fn c9_remove_background_reads_only_the_region() {
         },
         ..TraceParams::with_threshold(128)
     };
-    let wire = read_trace_wire(&trace_job_in(
-        &m2,
-        SIDE,
-        SIDE,
-        MAP,
-        &params,
-        Some(&right),
+    let wire = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: SIDE,
+                height: SIDE,
+                rgba: &m2,
+            },
+            map: TracePixelMap::new(MAP),
+            mode: TraceMode::Mono(&params),
+            lines: &[],
+            mask: Some(&right),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
@@ -528,7 +596,21 @@ fn c11_only_lines_and_shapes_whose_centre_is_in_the_region_stay() {
         TraceRegion::of_operands(&[vec![(rect(0.0, 0.0, 200.0, 100.0), true)]], false).unwrap();
     let lines = [ocr_line(40.0), ocr_line(140.0)];
     let p = TraceParams::with_threshold(128);
-    let mut wire = trace_text_job_in(&picture, 200, 200, map, &p, &lines, Some(&top), &mut |_| {});
+    let mut wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 200,
+                height: 200,
+                rgba: &picture,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&p),
+            lines: &lines,
+            mask: Some(&top),
+            shapes: false,
+        },
+        &mut |_| {},
+    );
     let read = read_trace_wire(&wire).unwrap();
     assert_eq!(read.texts.lines.len(), 1, "only the top line becomes text");
     assert!(
@@ -546,15 +628,18 @@ fn c11_only_lines_and_shapes_whose_centre_is_in_the_region_stay() {
     // The bottom line is neither text nor traced: its pixels were left out.
     assert!(!paints(&read.outlines, Point::new(60.0, 140.0)));
     // The text pass alone (the fit's lines) decides alike.
-    let regions = read_trace_wire(&trace_text_regions_in(
-        &picture,
-        200,
-        200,
-        map,
-        &p,
-        &lines,
-        Some(&top),
-    ))
+    let regions = read_trace_wire(&trace_text_regions(&TraceJob {
+        raster: TraceRaster {
+            width: 200,
+            height: 200,
+            rgba: &picture,
+        },
+        map: TracePixelMap::new(map),
+        mode: TraceMode::Mono(&p),
+        lines: &lines,
+        mask: Some(&top),
+        shapes: false,
+    }))
     .unwrap();
     assert_eq!(regions.texts.lines.len(), 1);
     // Recognise shapes on the clipped outlines: only the top disc.
@@ -574,13 +659,19 @@ fn c11_only_lines_and_shapes_whose_centre_is_in_the_region_stay() {
 fn c2_multicolour_layers_are_clipped_too() {
     let params = TraceColourParams::new(TraceParams::with_threshold(50));
     let region = r1(false);
-    let wire = read_trace_wire(&trace_colour_job_in(
-        m1(),
-        SIDE,
-        SIDE,
-        MAP,
-        &params,
-        Some(&region),
+    let wire = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: SIDE,
+                height: SIDE,
+                rgba: m1(),
+            },
+            map: TracePixelMap::new(MAP),
+            mode: TraceMode::Colours(&params),
+            lines: &[],
+            mask: Some(&region),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
@@ -611,13 +702,19 @@ fn c4_a_ring_across_the_stencil_edge_keeps_its_hole_on_both_sides() {
         })
         .collect();
     let run = |region: Option<&TraceRegion>| {
-        read_trace_wire(&trace_job_in(
-            &ring,
-            SIDE,
-            SIDE,
-            MAP,
-            &params(),
-            region.map(|r| r as &dyn Mask),
+        read_trace_wire(&run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: SIDE,
+                    height: SIDE,
+                    rgba: &ring,
+                },
+                map: TracePixelMap::new(MAP),
+                mode: TraceMode::Mono(&params()),
+                lines: &[],
+                mask: region.map(|r| r as &dyn Mask),
+                shapes: false,
+            },
             &mut |_| {},
         ))
         .unwrap()
@@ -690,13 +787,19 @@ fn a_refused_clip_is_counted_and_named() {
         specks: curvyo_vectorize_core::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     };
-    let read = read_trace_wire(&trace_job_in(
-        &picture,
-        16,
-        16,
-        map,
-        &p,
-        Some(&half),
+    let read = read_trace_wire(&run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 16,
+                height: 16,
+                rgba: &picture,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&p),
+            lines: &[],
+            mask: Some(&half),
+            shapes: false,
+        },
         &mut |_| {},
     ))
     .unwrap();
