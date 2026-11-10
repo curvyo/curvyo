@@ -162,3 +162,9 @@ All edited in `docs/design-system.md` on 2026-11-10:
 ### 11. Open questions (defaults in the specification, "Open questions" 8 to 14)
 
 8 FMT-OPENS-AS, 9 FMT-RENAME-APPLY, 10 FMT-LOWER-BAR, 11 FMT-GROUP-ARM, 12 FMT-NOTICES, 13 FMT-PAGES-UNIT, 14 FMT-FILE-VERSION (architect).
+
+### Unit and Group rows of the add / edit form carry no tooltips (customer 2026-11-10)
+
+The Unit buttons (mm, cm, in, px) and the Group cells (the groups and "New group...") show no tooltip: it repeated
+what is written on them and got in the way. Their accessible names stay ("cm, centimetres", "Group lasercutter").
+

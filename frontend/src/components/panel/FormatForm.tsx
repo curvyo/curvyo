@@ -19,7 +19,7 @@ const UNIT_OPTIONS: readonly ToggleOption<FormUnit>[] = (
 ).map(([value, label]) => ({
   value,
   label,
-  tooltip: label.split(", ")[1],
+  tooltip: "",
   icon: <span className="text-sm">{value}</span>,
 }));
 
@@ -224,9 +224,9 @@ export function FormatForm({ formats, onReturnFocus }: FormatFormProps) {
               id: group.id,
               label: `Group ${group.name}`,
               content: group.name,
-              tooltip: group.name,
+              tooltip: "",
             })),
-            { id: NEW_GROUP, label: "New group", content: "New group…", tooltip: "Make a new group" },
+            { id: NEW_GROUP, label: "New group", content: "New group…", tooltip: "" },
           ]}
           value={newGroup ? NEW_GROUP : values.groupId}
           width="w-full"

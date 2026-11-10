@@ -258,6 +258,12 @@ test("0045 Part H in Chromium: symbol buttons, armed delete, inline rename, no l
     // Criterion 38: Add opens the form directly under the header row, focus in Name, pressed.
     await s.clickSel(label("Add format"));
     await waitFor("Name focused", async () => ((await activeLabel(s)) === "Format name" ? true : null));
+    // Customer 2026-11-10: no tooltips on the Unit and Group rows of the form.
+    for (const sel of ['[aria-label="Format unit"] [aria-label="cm, centimetres"]', 'form[aria-labelledby] [role=radio][aria-label^="Group "]']) {
+      await s.hover(sel);
+      await sleep(900);
+      assert.equal(await tooltip(s), "", `no tooltip over ${sel}`);
+    }
     assert.equal(await s.evaluate(`document.querySelector(${q(label("Add format"))}).getAttribute('aria-expanded')`), "true");
     assert.equal(
       await s.evaluate(`(() => { const f = document.querySelector('form[aria-labelledby]'); const g = document.querySelector('[role=group][aria-label=Formats]'); return !!(f.compareDocumentPosition(g) & Node.DOCUMENT_POSITION_FOLLOWING); })()`),

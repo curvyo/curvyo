@@ -6,7 +6,7 @@ import type { ReactElement, ReactNode } from "react";
 export const TooltipProvider = TooltipPrimitive.Provider;
 
 interface TooltipProps {
-  /** The text after a 400 ms rest. */
+  /** The text after a 400 ms rest; empty for no tooltip. */
   content: ReactNode;
   /** Which side opens. No default: the panel's tooltips open left, over the
    * canvas, and the tool rail's open right. */
@@ -22,6 +22,10 @@ interface TooltipProps {
  * it may cover the canvas but never the panel row it belongs to.
  */
 export function Tooltip({ content, side, offset = 8, children }: TooltipProps) {
+  // No content, no tooltip: the trigger alone (a row that needs none).
+  if (content === undefined || content === null || content === "") {
+    return children;
+  }
   return (
     <TooltipPrimitive.Root delayDuration={400}>
       <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>

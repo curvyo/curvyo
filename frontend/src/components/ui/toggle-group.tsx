@@ -7,7 +7,7 @@ export interface ToggleOption<T extends string> {
   value: T;
   /** The accessible name ("Miter join"). */
   label: string;
-  /** The tooltip text. */
+  /** The tooltip text; empty for none. */
   tooltip: string;
   icon: ReactNode;
   /** The item's width in px when it differs from the group's `itemWidth` (text items of
