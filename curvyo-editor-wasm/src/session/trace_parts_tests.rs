@@ -2,10 +2,10 @@
 //! criteria 18, 19, 24, 27 to 29 and 42).
 
 use curvyo_document_core::{Affine, Length, NodeId, ObjectSnapshot, Point, RectBounds};
-use curvyo_ui_core::{
-    Mask, TraceJob, TraceMode, TraceParams, TracePartClip, TracePixelMap, TraceRaster,
-    read_trace_wire, run_trace_job,
-};
+use curvyo_ui_core::{TracePartClip, read_trace_wire};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 use super::trace_parts::TRACE_PARTS_MAX;
 use super::{Session, Tool, TraceCreateOutcome};
@@ -295,7 +295,7 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
         ))
         .to_array();
     let params = TraceParams {
-        specks: curvyo_ui_core::TraceMm::from_mm(0.0),
+        specks: vectrace::Mm::from_mm(0.0),
         ..TraceParams::with_threshold(128)
     };
     let clips = session.trace_part_clip_list();
@@ -450,7 +450,8 @@ fn grid_picture() -> Vec<u8> {
 #[test]
 fn c31_a_cropped_part_traces_as_the_whole_picture_does() {
     use curvyo_document_core::Vec2;
-    use curvyo_ui_core::{TraceRegion, TraceUpscale};
+    use curvyo_ui_core::TraceRegion;
+    use vectrace::Upscale as TraceUpscale;
     let rgba = grid_picture();
     let map = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];
     let source = super::TraceSource {
@@ -469,7 +470,7 @@ fn c31_a_cropped_part_traces_as_the_whole_picture_does() {
     let region = TraceRegion::of_operands(&[vec![(square, true)]], false).unwrap();
     // Ignore below 1 mm: 1 mm² is 100 px, more than the 16 px margin.
     let params = TraceParams {
-        specks: curvyo_ui_core::TraceMm::from_mm(1.0),
+        specks: vectrace::Mm::from_mm(1.0),
         upscale: TraceUpscale::Off,
         ..TraceParams::with_threshold(128)
     };

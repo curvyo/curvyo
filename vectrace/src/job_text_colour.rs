@@ -155,7 +155,7 @@ fn background_of(raster: Raster<'_>, params: &ColourParams) -> Option<Rgb8> {
 }
 
 /// Excluded colours match within this distance, as the palette's own Exclude does (0.03 of the
-/// sRGB unit cube, `vectorize-core` `MERGE_DISTANCE`).
+/// sRGB unit cube, `vectrace` `MERGE_DISTANCE`).
 const EXCLUDE_DISTANCE_SQUARED: i32 = 58; // 7.65 squared, rounded down
 
 /// The fill of every accepted line of `pass` (decision 6) and whether the maker excluded it: the

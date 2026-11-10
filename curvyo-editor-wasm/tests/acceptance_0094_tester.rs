@@ -18,12 +18,13 @@ mod support;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
-use curvyo_ui_core::{
-    Mask, TraceJob, TraceMode, TracePixelMap, TraceRaster, read_trace_wire, run_trace_job,
-};
+use curvyo_ui_core::read_trace_wire;
 use image::ImageEncoder;
 use kurbo::PathEl;
 use support::{M1, base64, draw};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 /// The picture's size: 200 px over 100 mm.
 const PX: u32 = 200;
@@ -606,7 +607,7 @@ fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
         ),
     };
     if curvyo_editor_wasm::trace_recognise_shapes(settings) {
-        curvyo_ui_core::trace_add_shapes(&mut wire, map);
+        vectrace::shapes::trace_add_shapes(&mut wire, map);
     }
     wire
 }

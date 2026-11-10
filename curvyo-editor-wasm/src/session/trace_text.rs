@@ -5,8 +5,11 @@
 
 use curvyo_document_core::{AssetHash, FontKind, FontRef, NodeId};
 use curvyo_text_core::RecognisedRun;
-use curvyo_ui_core::{OcrLine, TraceRgb, TraceTextWire, TraceWire};
 use kurbo::BezPath;
+use vectrace::Rgb8 as TraceRgb;
+use vectrace::job_text::TraceTextWire;
+use vectrace::ocr::accept::OcrLine;
+use vectrace::wire::TraceWire;
 
 use super::Session;
 use super::trace_text_write::TracedText;

@@ -8,10 +8,10 @@
 mod cpu_time;
 
 use curvyo_document_core::{Point, Vec2};
-use curvyo_ui_core::{
-    Mask, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, TraceRegion,
-    read_trace_wire, run_trace_job,
-};
+use curvyo_ui_core::{TraceRegion, read_trace_wire};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 /// A 2000 x 2000 px picture of 400 discs on a grid, 20 x 20 of them, placed 200 mm wide.
 fn picture() -> Vec<u8> {
@@ -192,7 +192,7 @@ fn c31_four_quarter_parts_against_one_whole_trace() {
                 .unwrap()
             })
             .collect();
-        let pairs: Vec<(&curvyo_ui_core::TraceWire, &TracePartClip)> =
+        let pairs: Vec<(&vectrace::wire::TraceWire, &TracePartClip)> =
             wires.iter().zip(&clips).collect();
         join_trace_parts(&pairs, 0)
     });

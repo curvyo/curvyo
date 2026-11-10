@@ -1,6 +1,6 @@
 //! Tester cases for `specs/0091-trace-text-recognition` slice 3 (criteria 30 to 35): upside-down
 //! and steep text through Trace, on the tester's own fixtures
-//! (`curvyo-ocr-core/tests/fixtures/tester/make_turned.py`): the slice 1 poster and the slice 2
+//! (`vectrace/tests/fixtures/tester/make_turned.py`): the slice 1 poster and the slice 2
 //! colour poster turned by 180, a picture with a line at +90 and one at -90, a mixed picture and a
 //! line at 195. Written from the specification before the implementation was read; only public
 //! names were looked up.
@@ -28,11 +28,13 @@ use curvyo_document_core::{Document, FontKind, NodeId, ObjectSnapshot, TextSnaps
 use curvyo_editor_wasm::{
     FitWorker, Session, Tool, TracedText, trace_colour_settings, trace_settings,
 };
-use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, TraceJob, TraceMode, TracePixelMap, TraceRaster, run_trace_job,
-    trace_read_text, trace_text_regions,
-};
+use curvyo_ui_core::FontBlock;
 use serde_json::Value;
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+use vectrace::ocr::accept::{OcrLine, OcrModel, trace_read_text};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const TOLERANCE_MM: f64 = 0.3;
 const BW: &str = r#"{"threshold":128}"#;
@@ -66,9 +68,7 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn fixture(file: &str) -> PathBuf {
-    root()
-        .join("curvyo-ocr-core/tests/fixtures/tester")
-        .join(file)
+    root().join("vectrace/tests/fixtures/tester").join(file)
 }
 
 fn model() -> OcrModel {

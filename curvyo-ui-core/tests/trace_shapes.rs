@@ -8,12 +8,18 @@
     clippy::similar_names
 )]
 
-use curvyo_ui_core::{
-    TraceColourParams, TraceJob, TraceJoin, TraceMethod, TraceMode, TraceParams, TracePixelMap,
-    TracePrimitive, TraceRaster, TraceRgb, TraceShapeRegion, TraceWire, read_trace_wire,
-    run_trace_job, trace_add_shapes,
-};
+use curvyo_ui_core::read_trace_wire;
 use vectrace::Angle;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::shapes::{
+    Join as TraceJoin, Primitive as TracePrimitive, ShapeRegion as TraceShapeRegion,
+    trace_add_shapes,
+};
+use vectrace::wire::TraceWire;
+use vectrace::{
+    ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
+    Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
+};
 
 /// 10 px/mm.
 const MAP: [f64; 6] = [0.1, 0.0, 0.0, 0.1, 0.0, 0.0];

@@ -6,8 +6,8 @@
 //! are the line's, its padding included) and one `f32` array of their samples, line after line.
 //! A read: a JSON array with one entry per crop, the line as `ocr_lines_json` writes it or `null`.
 
-use curvyo_ui_core::{LineCrop, OCR_LINE_HEIGHT, OcrModel, trace_read_crop};
 use serde_json::{Value, json};
+use vectrace::ocr::accept::{LINE_HEIGHT as OCR_LINE_HEIGHT, LineCrop, OcrModel, trace_read_crop};
 
 /// The crops as the JSON of their quads and widths and their samples in one array.
 #[must_use]
@@ -83,7 +83,7 @@ pub fn read_crops(
 mod tests {
     use std::path::Path;
 
-    use curvyo_ui_core::{trace_crop_text, trace_read_text};
+    use vectrace::ocr::accept::{trace_crop_text, trace_read_text};
 
     use super::*;
 
@@ -101,8 +101,7 @@ mod tests {
     fn crops_read_in_shares_give_the_one_worker_read() {
         let model = model();
         let bytes = std::fs::read(
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../curvyo-ocr-core/tests/fixtures/poster.png"),
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../vectrace/tests/fixtures/poster.png"),
         )
         .unwrap();
         let image = curvyo_image_core::decode_working(&bytes).unwrap();

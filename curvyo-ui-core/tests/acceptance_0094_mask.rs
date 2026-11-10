@@ -10,12 +10,20 @@ use std::sync::OnceLock;
 use curvyo_document_core::{Affine, Angle, Point, Tolerance, Vec2};
 use curvyo_geometry_core::{BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2};
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster,
-    TraceRegion, TraceRegionError, TraceRgb, TraceWire, read_trace_wire, run_trace_job,
-    trace_add_shapes, trace_region_defaults, trace_suggest_background, trace_text_regions,
-    unclipped_notice,
+    TraceRegion, TraceRegionError, read_trace_wire, trace_region_defaults, unclipped_notice,
 };
 use kurbo::{BezPath, PathEl, Shape};
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+use vectrace::mask::Mask;
+use vectrace::ocr::accept::OcrLine;
+use vectrace::shapes::trace_add_shapes;
+use vectrace::wire::TraceWire;
+use vectrace::{
+    ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
+    Rgb8 as TraceRgb, TraceParams, suggest_background as trace_suggest_background,
+};
 
 const SIDE: u32 = 1000;
 /// 1000 px placed 100 mm wide: 10 px per mm.
@@ -525,7 +533,7 @@ fn c9_remove_background_reads_only_the_region() {
     let params = TraceParams {
         selection: vectrace::Selection::RemoveBackground {
             background: defaults.background,
-            tolerance: curvyo_ui_core::TRACE_DEFAULT_BACKGROUND_TOLERANCE,
+            tolerance: vectrace::DEFAULT_BACKGROUND_TOLERANCE,
         },
         ..TraceParams::with_threshold(128)
     };
@@ -652,7 +660,7 @@ fn c11_only_lines_and_shapes_whose_centre_is_in_the_region_stay() {
     assert_eq!(
         shapes
             .iter()
-            .map(curvyo_ui_core::TraceShapeRegion::primitives)
+            .map(vectrace::shapes::ShapeRegion::primitives)
             .sum::<usize>(),
         1,
         "{shapes:?}"

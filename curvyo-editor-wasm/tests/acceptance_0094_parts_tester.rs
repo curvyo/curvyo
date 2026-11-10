@@ -23,13 +23,13 @@ mod cpu_time;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
 use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
-use curvyo_ui_core::{
-    Mask, TraceJob, TraceMode, TracePixelMap, TraceRaster, TraceRegion, read_trace_wire,
-    run_trace_job,
-};
+use curvyo_ui_core::{TraceRegion, read_trace_wire};
 use image::ImageEncoder;
 use kurbo::{BezPath, PathEl};
 use support::{M1, base64, draw};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 /// The picture's size: 300 px over 100 mm.
 const PX: u32 = 300;
@@ -161,7 +161,7 @@ fn part_wire(s: &mut Session, image: NodeId, index: usize, settings: &str, cut: 
     };
     let params = trace_settings(&settings);
     let source = if cut {
-        let auto = params.upscale == curvyo_ui_core::TraceUpscale::Auto;
+        let auto = params.upscale == vectrace::Upscale::Auto;
         s.trace_part_source(image, index, false, params.specks.as_mm(), auto)
     } else {
         s.trace_source(image, false)
@@ -721,7 +721,7 @@ fn a_cut_out_part_traces_as_the_whole_picture_within_0_1_percent() {
         ] {
             for index in 0..2 {
                 let params = trace_settings(settings);
-                let auto = params.upscale == curvyo_ui_core::TraceUpscale::Auto;
+                let auto = params.upscale == vectrace::Upscale::Auto;
                 let cut_px = s
                     .trace_part_source(image, index, false, params.specks.as_mm(), auto)
                     .unwrap();
@@ -1087,7 +1087,7 @@ fn a_cut_out_part_with_upscale_auto_traces_as_the_whole_picture() {
     };
     // Unclipped, the cut-out's outlines must lie where the whole picture's do (D's box plus the
     // margin, 8..46 mm from the picture's left edge).
-    let left_of = |w: &curvyo_ui_core::TraceWire| {
+    let left_of = |w: &vectrace::wire::TraceWire| {
         use kurbo::Shape;
         w.outlines
             .iter()
@@ -1183,7 +1183,7 @@ fn a_whole_picture_with_upscale_auto_away_from_the_origin_lands_on_the_picture()
     );
     s.set_tool(Tool::Trace);
     let src = s.trace_source(image, false).unwrap();
-    assert!(curvyo_ui_core::TraceUpscale::Auto.applies(src.width, src.height));
+    assert!(vectrace::Upscale::Auto.applies(src.width, src.height));
     let trace = |settings: &str| {
         read_trace_wire(&run_trace_job(
             &TraceJob {
@@ -1204,7 +1204,7 @@ fn a_whole_picture_with_upscale_auto_away_from_the_origin_lands_on_the_picture()
     };
     let auto = trace(r#"{"threshold":100,"upscale":0}"#);
     let off = trace(r#"{"threshold":100,"upscale":1}"#);
-    let bbox = |w: &curvyo_ui_core::TraceWire| {
+    let bbox = |w: &vectrace::wire::TraceWire| {
         w.outlines
             .iter()
             .map(Shape::bounding_box)

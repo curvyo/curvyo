@@ -12,10 +12,11 @@ use std::path::{Path, PathBuf};
 
 use super::{Session, Tool, TraceCreateOutcome};
 use curvyo_document_core::{NodeId, ObjectSnapshot, TextSnapshot};
-use curvyo_ui_core::{
-    OcrModel, TraceJob, TraceMode, TraceParams, TracePixelMap, TraceRaster, run_trace_job,
-    trace_read_text, trace_text_regions,
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
 };
+use vectrace::ocr::accept::{OcrModel, trace_read_text};
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 /// The thread's CPU time in seconds (`CLAUDE.md` §5: timings are thread CPU time).
 #[allow(clippy::cast_precision_loss)] // seconds and nanoseconds of a test run
@@ -55,7 +56,7 @@ fn load_wanted(session: &mut Session) {
 
 /// A session with the included fonts listed and `file` imported, selected, in the Trace tool.
 pub(super) fn session_with(file: &str) -> (Session, NodeId) {
-    let bytes = std::fs::read(root().join("curvyo-ocr-core/tests/fixtures").join(file)).unwrap();
+    let bytes = std::fs::read(root().join("vectrace/tests/fixtures").join(file)).unwrap();
     session_with_bytes(&bytes, file)
 }
 
@@ -161,7 +162,7 @@ pub(super) fn run(model: &OcrModel, file: &str) -> Run {
     .unwrap();
     let ocr_seconds = cpu_seconds() - started;
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));
-    let threshold = curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+    let threshold = vectrace::auto_threshold(vectrace::Raster {
         width: source.width,
         height: source.height,
         rgba: &source.rgba,
@@ -342,7 +343,7 @@ fn a_ring_read_as_o_is_decided_before_the_one_trace() {
     )
     .unwrap();
     assert!(
-        lines.iter().any(curvyo_ui_core::OcrLine::accepted),
+        lines.iter().any(vectrace::ocr::accept::OcrLine::accepted),
         "{lines:?}"
     );
     assert!(session.set_trace_ocr_lines(image, lines.clone(), (source.width, source.height)));

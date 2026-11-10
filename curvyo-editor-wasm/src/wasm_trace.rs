@@ -41,7 +41,7 @@ pub fn trace_text_failed_notice() -> String {
 /// by `map` (`[a, b, c, d, e, f]`) with `settings` (JSON: `threshold`, `smooth`, `tolerance`,
 /// `specks` in mm, `corners`, `upscale` and `denoise` as choice indices, `invert`,
 /// `ignore_background`, `method`, `background`, `swatches`, `colour_tolerance`); the
-/// result as the flat numbers of `curvyo_ui_core::run_trace_job`. `progress` hears each higher
+/// result as the flat numbers of `vectrace::job::run`. `progress` hears each higher
 /// whole percent (criterion 10). Never throws: bad input reads as the status
 /// "invalid".
 #[wasm_bindgen]
@@ -67,34 +67,34 @@ fn job_wire(
     height: u32,
     map: &[f64],
     settings: &str,
-    lines: &[curvyo_ui_core::OcrLine],
+    lines: &[vectrace::ocr::accept::OcrLine],
     progress: &TraceProgressSink,
 ) -> Vec<f64> {
     let map: [f64; 6] = map.try_into().unwrap_or([f64::NAN; 6]);
     let region = crate::trace_glue::trace_mask_region(settings);
     let colour = crate::trace_glue::trace_colour_settings(settings);
     let mono = crate::trace_glue::trace_settings(settings);
-    let job = curvyo_ui_core::TraceJob {
-        raster: curvyo_ui_core::TraceRaster {
+    let job = vectrace::job::Job {
+        raster: vectrace::Raster {
             width,
             height,
             rgba,
         },
-        map: curvyo_ui_core::TracePixelMap::new(map),
+        map: vectrace::PixelMap::new(map),
         mode: colour.as_ref().map_or(
-            curvyo_ui_core::TraceMode::Mono(&mono),
-            curvyo_ui_core::TraceMode::Colours,
+            vectrace::job::Mode::Mono(&mono),
+            vectrace::job::Mode::Colours,
         ),
         lines,
-        mask: region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
+        mask: region.as_ref().map(|r| r as &dyn vectrace::mask::Mask),
         shapes: crate::trace_glue::recognise_shapes(settings),
     };
-    curvyo_ui_core::run_trace_job(&job, &mut |percent| progress.report(percent))
+    vectrace::job::run(&job, &mut |percent| progress.report(percent))
 }
 
 thread_local! {
     /// The text reader of this worker, loaded once (`specs/0091`, ADR 0028 §5).
-    pub(crate) static OCR_MODEL: std::cell::RefCell<Option<curvyo_ui_core::OcrModel>> =
+    pub(crate) static OCR_MODEL: std::cell::RefCell<Option<vectrace::ocr::accept::OcrModel>> =
         const { std::cell::RefCell::new(None) };
 }
 
@@ -106,12 +106,12 @@ pub fn ocr_load(detector: &[u8], recogniser: &[u8], alphabet: &str) -> String {
     if OCR_MODEL.with(|m| m.borrow().is_some()) {
         return String::new();
     }
-    match curvyo_ui_core::OcrModel::load(detector, recogniser, alphabet) {
+    match vectrace::ocr::accept::OcrModel::load(detector, recogniser, alphabet) {
         Ok(model) => {
             OCR_MODEL.with(|m| *m.borrow_mut() = Some(model));
             String::new()
         }
-        Err(curvyo_ui_core::OcrError::WrongModel) => "wrong_model".to_string(),
+        Err(vectrace::ocr::accept::OcrError::WrongModel) => "wrong_model".to_string(),
         Err(error) => error.to_string(),
     }
 }
@@ -138,7 +138,7 @@ pub fn ocr_job(rgba: &[u8], width: u32, height: u32, progress: &TraceProgressSin
             progress.report(percent);
             std::ops::ControlFlow::Continue(())
         };
-        curvyo_ui_core::trace_read_text(model, rgba, width, height, &mut report)
+        vectrace::ocr::accept::trace_read_text(model, rgba, width, height, &mut report)
             .map(|lines| crate::trace_glue::ocr_lines_json(width, height, &lines))
             .unwrap_or_default()
     })
@@ -217,16 +217,16 @@ pub fn trace_text_regions_job(
     let region = crate::trace_glue::trace_mask_region(settings);
     let mono = crate::trace_glue::trace_settings(settings);
     let lines = crate::trace_glue::read_ocr_lines(lines, width);
-    curvyo_ui_core::trace_text_regions(&curvyo_ui_core::TraceJob {
-        raster: curvyo_ui_core::TraceRaster {
+    vectrace::job::text_regions(&vectrace::job::Job {
+        raster: vectrace::Raster {
             width,
             height,
             rgba,
         },
-        map: curvyo_ui_core::TracePixelMap::new(map),
-        mode: curvyo_ui_core::TraceMode::Mono(&mono),
+        map: vectrace::PixelMap::new(map),
+        mode: vectrace::job::Mode::Mono(&mono),
         lines: &lines,
-        mask: region.as_ref().map(|r| r as &dyn curvyo_ui_core::Mask),
+        mask: region.as_ref().map(|r| r as &dyn vectrace::mask::Mask),
         shapes: false,
     })
 }
@@ -243,7 +243,7 @@ pub fn trace_presets() -> String {
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
-    curvyo_ui_core::trace_auto_threshold(curvyo_ui_core::TraceRaster {
+    vectrace::auto_threshold(vectrace::Raster {
         width,
         height,
         rgba,
@@ -255,7 +255,7 @@ pub fn trace_auto_threshold(rgba: &[u8], width: u32, height: u32) -> u8 {
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> String {
-    curvyo_ui_core::trace_analyse(curvyo_ui_core::TraceRaster {
+    vectrace::analyse(vectrace::Raster {
         width,
         height,
         rgba,
@@ -269,7 +269,7 @@ pub fn trace_analyse(rgba: &[u8], width: u32, height: u32) -> String {
 #[wasm_bindgen]
 #[must_use]
 pub fn trace_suggest_background(rgba: &[u8], width: u32, height: u32) -> String {
-    curvyo_ui_core::trace_suggest_background(curvyo_ui_core::TraceRaster {
+    vectrace::suggest_background(vectrace::Raster {
         width,
         height,
         rgba,

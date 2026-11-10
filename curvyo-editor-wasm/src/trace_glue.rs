@@ -2,11 +2,14 @@
 //! 41, 45, 59 and 60): the host's settings JSON read into trace values, and the schema and the
 //! presets written as JSON. Host-independent, so ordinary `cargo test` covers it.
 
-use curvyo_ui_core::{
-    TRACE_ADVANCED_PARAMS, TRACE_DEFAULT_BACKGROUND_TOLERANCE, TRACE_DEFAULT_PICK_TOLERANCE,
-    TRACE_MAX_COLOURS, TRACE_METHOD_PARAMS, TRACE_PARAMS, TRACE_PRESETS, TraceColourParams,
-    TraceDenoise, TraceMethod, TraceMm, TraceParamKind, TraceParamUnit, TraceParams,
-    TracePixelLength, TraceRgb, TraceSwatches, TraceUpscale,
+use vectrace::{
+    ADVANCED_PARAMS as TRACE_ADVANCED_PARAMS, ColourParams as TraceColourParams,
+    DEFAULT_BACKGROUND_TOLERANCE as TRACE_DEFAULT_BACKGROUND_TOLERANCE,
+    DEFAULT_PICK_TOLERANCE as TRACE_DEFAULT_PICK_TOLERANCE, Denoise as TraceDenoise,
+    MAX_COLOURS as TRACE_MAX_COLOURS, METHOD_PARAMS as TRACE_METHOD_PARAMS, Mm as TraceMm,
+    PARAMS as TRACE_PARAMS, PRESETS as TRACE_PRESETS, ParamKind as TraceParamKind,
+    ParamUnit as TraceParamUnit, PixelLength as TracePixelLength, Rgb8 as TraceRgb,
+    Selection as TraceMethod, Swatches as TraceSwatches, TraceParams, Upscale as TraceUpscale,
 };
 
 /// `#RRGGBB` (or `RRGGBB`) as a colour; `None` for anything else.
@@ -222,7 +225,7 @@ pub fn trace_params_json() -> String {
 /// The OCR lines of a picture `width` x `height` as the host keeps them (`specs/0091`
 /// decision 1): `{width, height, lines: [{quad: [[x, y] x 4], text, confidence: [..]}]}`.
 #[must_use]
-pub fn ocr_lines_json(width: u32, height: u32, lines: &[curvyo_ui_core::OcrLine]) -> String {
+pub fn ocr_lines_json(width: u32, height: u32, lines: &[vectrace::ocr::accept::OcrLine]) -> String {
     serde_json::json!({
         "width": width,
         "height": height,
@@ -239,7 +242,7 @@ pub fn ocr_lines_json(width: u32, height: u32, lines: &[curvyo_ui_core::OcrLine]
 /// The lines of [`ocr_lines_json`] for a picture `width` px wide (a reduced copy scales the
 /// quads); unreadable lines are dropped, unreadable JSON is no line.
 #[must_use]
-pub fn read_ocr_lines(json: &str, width: u32) -> Vec<curvyo_ui_core::OcrLine> {
+pub fn read_ocr_lines(json: &str, width: u32) -> Vec<vectrace::ocr::accept::OcrLine> {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
         return Vec::new();
     };
@@ -274,7 +277,7 @@ pub fn read_ocr_lines(json: &str, width: u32) -> Vec<curvyo_ui_core::OcrLine> {
                         .filter_map(number)
                         .collect();
                     Some(
-                        curvyo_ui_core::OcrLine {
+                        vectrace::ocr::accept::OcrLine {
                             quad,
                             text: line.get("text")?.as_str()?.to_owned(),
                             confidence,
@@ -416,7 +419,7 @@ mod tests {
     /// `specs/0091` decision 1: the lines cross as JSON and scale to a reduced copy.
     #[test]
     fn ocr_lines_cross_as_json_and_scale() {
-        let line = curvyo_ui_core::OcrLine {
+        let line = vectrace::ocr::accept::OcrLine {
             quad: [[0.0, 0.0], [100.0, 0.0], [100.0, 20.0], [0.0, 20.0]],
             text: "Grüße".to_owned(),
             confidence: vec![0.9; 5],

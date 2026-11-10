@@ -1,6 +1,6 @@
 //! Tester cases for `specs/0091-trace-text-recognition` slice 2 (criteria 23 and 24): text
 //! recognition in the multicolour Trace, on the tester's own colour posters
-//! (`curvyo-ocr-core/tests/fixtures/tester/make_colour.py`): red, green (a colour only the text
+//! (`vectrace/tests/fixtures/tester/make_colour.py`): red, green (a colour only the text
 //! has), blue and black text on white, white text on a blue box, a red disc, umlauts and ß.
 //! Written from the specification and adrs.md decision 6; only public names were looked up.
 //!
@@ -32,12 +32,15 @@ use curvyo_editor_wasm::{
     FitWorker, Session, Tool, TraceCreateOutcome, TracedText, ocr_lines_json, read_ocr_lines,
     trace_colour_settings, trace_settings,
 };
-use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, TraceJob, TraceMode, TracePixelMap, TraceRaster, TraceRgb,
-    TraceWire, read_trace_wire, run_trace_job, trace_read_text, trace_text_regions,
-};
+use curvyo_ui_core::{FontBlock, read_trace_wire};
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+use vectrace::ocr::accept::{OcrLine, OcrModel, trace_read_text};
+use vectrace::wire::TraceWire;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, Rgb8 as TraceRgb};
 
 const TOLERANCE_MM: f64 = 0.3;
 /// The frontend's first-use Multicolour settings (`settingsJson`): Brightness, automatic count.
@@ -62,9 +65,7 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn fixture(file: &str) -> PathBuf {
-    root()
-        .join("curvyo-ocr-core/tests/fixtures/tester")
-        .join(file)
+    root().join("vectrace/tests/fixtures/tester").join(file)
 }
 
 fn golden() -> PathBuf {

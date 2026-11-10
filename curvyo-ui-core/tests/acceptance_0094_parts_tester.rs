@@ -28,13 +28,19 @@ use curvyo_geometry_core::{
     BooleanError, BooleanOp, Outline, OutlineTriple, boolean, signed_area_mm2,
 };
 use curvyo_ui_core::{
-    Mask, OcrLine, TraceColourParams, TraceJob, TraceMethod, TraceMode, TraceParams, TracePartArea,
-    TracePartClip, TracePixelMap, TraceRaster, TraceRegion, TraceRgb, TraceStatus, TraceWire,
-    join_trace_parts, read_trace_wire, run_trace_job, trace_part_clips,
+    TracePartArea, TracePartClip, TraceRegion, join_trace_parts, read_trace_wire, trace_part_clips,
 };
 use kurbo::{BezPath, PathEl};
 use proptest::prelude::*;
 use support::{COLOUR, M1, draw, map_100mm, text_sheet};
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::mask::Mask;
+use vectrace::ocr::accept::OcrLine;
+use vectrace::wire::{TraceStatus, TraceWire};
+use vectrace::{
+    ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
+    Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
+};
 
 // ---------------------------------------------------------------------------------------------
 // Geometry helpers through the kernel (as the slice 1 tester's).

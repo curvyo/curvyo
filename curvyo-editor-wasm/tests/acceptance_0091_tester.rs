@@ -1,5 +1,5 @@
 //! Tester cases for `specs/0091-trace-text-recognition` slice 1 in the editor session: the
-//! tester's own posters (`curvyo-ocr-core/tests/fixtures/tester/`, `make_posters.py`) read with
+//! tester's own posters (`vectrace/tests/fixtures/tester/`, `make_posters.py`) read with
 //! the shipped weights, traced with the text pass, fitted to the included faces by the worker's
 //! fit (`FitWorker`, as the trace worker runs it) and written by Create paths. Written from the
 //! specification; only public names were looked up.
@@ -34,12 +34,15 @@ use curvyo_editor_wasm::{
     FitWorker, ObjectToPathOutcome, RowPress, Session, Tool, TraceCreateOutcome, TracedText,
     ocr_lines_json, read_ocr_lines, trace_settings,
 };
-use curvyo_ui_core::{
-    FontBlock, OcrLine, OcrModel, TraceJob, TraceMode, TracePixelMap, TraceRaster, TraceWire,
-    read_trace_wire, run_trace_job, trace_read_text, trace_text_regions,
-};
+use curvyo_ui_core::{FontBlock, read_trace_wire};
 use kurbo::{Affine, BezPath, Rect, Shape};
 use serde_json::Value;
+use vectrace::job::{
+    Job as TraceJob, Mode as TraceMode, run as run_trace_job, text_regions as trace_text_regions,
+};
+use vectrace::ocr::accept::{OcrLine, OcrModel, trace_read_text};
+use vectrace::wire::TraceWire;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const TOLERANCE_MM: f64 = 0.3;
 const SETTINGS: &str = r#"{"threshold":128}"#;
@@ -53,9 +56,7 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn poster(file: &str) -> PathBuf {
-    root()
-        .join("curvyo-ocr-core/tests/fixtures/tester")
-        .join(file)
+    root().join("vectrace/tests/fixtures/tester").join(file)
 }
 
 fn golden() -> PathBuf {
@@ -1510,10 +1511,8 @@ fn c26_the_poster_at_two_pixel_resolutions_decides_the_same() {
 }
 
 fn screenshot() -> Vec<u8> {
-    std::fs::read(
-        root().join("curvyo-ocr-core/tests/fixtures/customer/font-manager-screenshot.png"),
-    )
-    .unwrap()
+    std::fs::read(root().join("vectrace/tests/fixtures/customer/font-manager-screenshot.png"))
+        .unwrap()
 }
 
 /// The OCR line whose quad centre lies in `band` (source px).
@@ -1649,7 +1648,7 @@ fn timings_of_the_customer_screenshot_fit() {
 }
 
 // Round 3 (customer 2026-11-02, criteria 4 and 29): the tester's own lines in faces Curvyo does
-// not include (`curvyo-ocr-core/tests/fixtures/tester/make_r3.py`), each read line handed in as
+// not include (`vectrace/tests/fixtures/tester/make_r3.py`), each read line handed in as
 // the reader would (string, confidence, character positions from the rendered ink).
 
 /// Source Sans 3's cap height in em (OS/2 `sCapHeight` 660 of 1000).

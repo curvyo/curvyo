@@ -8,10 +8,9 @@ use std::sync::Arc;
 use curvyo_document_core::{AssetHash, DrawingNode, ImageSnapshot, NodeId, ObjectSnapshot, Point};
 use curvyo_image_core::WorkingImage;
 use curvyo_render_core::PreviewAnchor;
-use curvyo_ui_core::{
-    TraceLayerWire, TracePaletteWire, TraceShapeRegion, TraceStatus, TraceTarget, TraceWire,
-    hit_test_objects, plan_trace, read_trace_wire,
-};
+use curvyo_ui_core::{TraceTarget, hit_test_objects, plan_trace, read_trace_wire};
+use vectrace::shapes::ShapeRegion as TraceShapeRegion;
+use vectrace::wire::{TraceLayerWire, TracePaletteWire, TraceStatus, TraceWire};
 
 use super::select::DoubleClickHint;
 use super::trace_colours::with_leftovers;

@@ -11,11 +11,14 @@
     clippy::too_many_lines
 )]
 
-use curvyo_ui_core::{
-    TraceJob, TraceJoin, TraceMode, TracePixelMap, TracePrimitive, TraceRaster, run_trace_job,
-};
-use curvyo_ui_core::{TraceParams, TraceShapeRegion, TraceWire, read_trace_wire, trace_add_shapes};
+use curvyo_ui_core::read_trace_wire;
 use kurbo::{BezPath, Join, ParamCurveNearest, Shape as _, Stroke, StrokeOpts};
+use vectrace::TraceParams;
+use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::shapes::{Join as TraceJoin, Primitive as TracePrimitive};
+use vectrace::shapes::{ShapeRegion as TraceShapeRegion, trace_add_shapes};
+use vectrace::wire::TraceWire;
+use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const MM_PER_PX: f64 = 0.1;
 
@@ -134,7 +137,7 @@ fn region_area(wire: &TraceWire, r: &TraceShapeRegion) -> f64 {
         .sum()
 }
 
-fn centre_line(b: &curvyo_ui_core::TraceBand) -> BezPath {
+fn centre_line(b: &vectrace::shapes::Band) -> BezPath {
     match b.primitive {
         TracePrimitive::Star {
             centre,
@@ -153,7 +156,7 @@ fn centre_line(b: &curvyo_ui_core::TraceBand) -> BezPath {
     }
 }
 
-fn join_of(b: &curvyo_ui_core::TraceBand) -> Join {
+fn join_of(b: &vectrace::shapes::Band) -> Join {
     match b.join {
         TraceJoin::Bevel => Join::Bevel,
         TraceJoin::Miter => Join::Miter,

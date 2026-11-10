@@ -7,9 +7,10 @@ use std::cell::RefCell;
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, Point};
 use curvyo_ui_core::{
-    RegionOperand, TracePartArea, TracePartClip, TraceWire, join_trace_parts, mask_operand,
-    read_trace_wire, trace_part_clips,
+    RegionOperand, TracePartArea, TracePartClip, join_trace_parts, mask_operand, read_trace_wire,
+    trace_part_clips,
 };
+use vectrace::wire::TraceWire;
 
 use super::trace_region::{RegionCache, is_mask_path};
 use super::{Session, Tool, TraceSource};
@@ -328,7 +329,7 @@ impl Session {
     ) -> Option<Vec<f64>> {
         let clips = self.trace_part_clip_list();
         let empty = TraceWire {
-            status: curvyo_ui_core::TraceStatus::Traced,
+            status: vectrace::wire::TraceStatus::Traced,
             paths: 0,
             nodes: 0,
             specks_removed: 0,
@@ -338,7 +339,7 @@ impl Session {
             palette: Vec::new(),
             layers: Vec::new(),
             joined: 0,
-            texts: curvyo_ui_core::TraceTexts::default(),
+            texts: vectrace::job_text::TraceTexts::default(),
             shapes: Vec::new(),
             unclipped: 0,
         };
@@ -355,9 +356,9 @@ impl Session {
         #[allow(clippy::cast_precision_loss)] // counts far below 2^52
         let header = vec![
             match joined.status {
-                curvyo_ui_core::TraceStatus::Traced => 0.0,
-                curvyo_ui_core::TraceStatus::TooDetailed => 1.0,
-                curvyo_ui_core::TraceStatus::Invalid => 2.0,
+                vectrace::wire::TraceStatus::Traced => 0.0,
+                vectrace::wire::TraceStatus::TooDetailed => 1.0,
+                vectrace::wire::TraceStatus::Invalid => 2.0,
             },
             joined.paths as f64,
             joined.nodes as f64,
@@ -411,7 +412,7 @@ impl Session {
             CROP_MARGIN_PX.max(speck_px),
         );
         // Upscale Auto must decide alike for the cut-out and the picture.
-        let upscaled = |w: u32, h: u32| curvyo_ui_core::TraceUpscale::Auto.applies(w, h);
+        let upscaled = |w: u32, h: u32| vectrace::Upscale::Auto.applies(w, h);
         if upscale_auto && upscaled(width, height) != upscaled(cut.width, cut.height) {
             return Some(source);
         }

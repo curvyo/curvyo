@@ -3,7 +3,9 @@
 //! preview for the swatch row.
 
 use curvyo_document_core::Color;
-use curvyo_ui_core::{TraceColour, TraceLayerWire, TraceRgb};
+use curvyo_ui_core::TraceColour;
+use vectrace::Rgb8 as TraceRgb;
+use vectrace::wire::TraceLayerWire;
 
 use super::Session;
 
