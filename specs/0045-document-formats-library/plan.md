@@ -43,3 +43,37 @@ Built-in schema 2 and Slides off by default change what the `0030` tests saw:
 the fixtures and inline files say `format = 2`, `unit = "cm"` is valid now
 (`6e_unit_pt`), `format = 1` is the refused value (`6b_format_one`), and tests
 that press Slides switch the group on first.
+
+## Part H: formats panel restyle (criteria 35 to 44, `story/formats-panel-restyle`)
+
+Customer answers of 2026-11-10: FMT-OPENS-AS A, FMT-RENAME-APPLY A, FMT-LOWER-BAR A,
+FMT-GROUP-ARM A, FMT-PAGES-UNIT (Unit row stays), FMT-FILE-VERSION default (`format` stays 1).
+FMT-NOTICES decided otherwise than the default: no success notice at all (customer rule), so
+"Added", "Saved", "Imported ..." and "Moved to ..." go; failures stay; the sr-only regions announce.
+
+### Affected crates/modules
+- `curvyo-document-core`: `format_edit.rs` (no same-size refusal, `FormatReason::SameSizeAs` gone),
+  `format_library_file.rs` (user file may repeat sizes), `format_library_import.rs` (skip by group,
+  name and size), `document_presets.rs` (`with_sides` gone; the built-in file keeps its rule).
+  Fixtures `tests/fixtures/formats/`: `fail_same_size.toml` becomes `valid_same_size.toml`.
+- `curvyo-ui-core`: `format_list_view.rs` (armed and rename names, no edit-group, prompt or
+  orientation), `format_form.rs` (no orientation, no success notices).
+- `curvyo-editor-wasm`: `session/formats.rs` (`rename_format`, `rename_format_group`, no notices,
+  no orientation), `wasm_formats.rs`, `session/pages.rs` and `wasm_pages.rs` (`set_page_position`
+  and the page `xText`/`yText` go: no caller left).
+- `frontend`: `components/CornerControl.tsx` (shared by Machine block and Grid pane),
+  `panel/FormatList.tsx`, `FormatForm.tsx`, `FormatsBrokenBlock.tsx`, `PagesBlock.tsx`,
+  `hooks/useFormats.ts` (uses `useDeleteArm`).
+
+### Tasks
+- [x] 1. Core: duplicate sizes allowed in add, edit, user file and import; import skips by group, name and size; built-in file keeps the rule (AC 39). Rust tests first: `formats_of_one_size_are_allowed_and_survive_a_reload`, import golden files, tester tests changed by design.
+- [x] 2. `ui-core` list view: armed names, rename names, no group edit, no orientation, no success notices (AC 35 to 37, 42, 43); only the first of two formats of one size is selected (AC 39).
+- [x] 3. Session glue and wasm: `rename_format`, `rename_format_group`; new groups are portrait; success returns no notice (AC 42, 43).
+- [x] 4. Pages block without X and Y; `set_page_position` removed (AC 44).
+- [x] 5. Shared origin corner control for the Grid & Rulers pane (AC 41).
+- [x] 6. Formats panel: symbol buttons in the "All formats" row, armed delete, no lower bar, no "Opens as", inline rename (AC 35 to 38, 40, 42, 43).
+- [x] 7. Chromium check of the panel, the Origin picker and the Pages block (`acceptance_0045_formats_panel_browser.test.ts`).
+
+### Validation
+Rust tests first for the duplicate-size rule, import and rename; view tests in `ui-core`;
+Chromium test for armed delete, symbol buttons, rename, Origin picker and the Pages block.

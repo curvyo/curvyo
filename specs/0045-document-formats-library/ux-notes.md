@@ -4,7 +4,7 @@ The original UX notes (2026-10-10) are the section "UX notes" in `specification.
 
 ## Amendment 2026-11-10: Formats panel restyle (customer notes of 2026-11-06, items 1 to 6)
 
-Written by the ux-engineer. Status: **not built.** Criteria 35 to 44 of the specification. Rules that apply to all of it: no popup, no dialog, no hint labels or operating tips, no notice for a successful operation (customer rules; the existing notices "Added <name>." and "Imported ..." are not touched here, see open question 12).
+Written by the ux-engineer. Status: **built** (`story/formats-panel-restyle`). Criteria 35 to 44 of the specification. Rules that apply to all of it: no popup, no dialog, no hint labels or operating tips, no notice for a successful operation (customer rules; the notices "Added <name>.", "Saved <name>.", "Imported ..." and "Moved to document-formats.toml.broken." are removed, decided 2026-11-10, open question 12; failure notices stay).
 
 Scope of the customer notes: 1 restyle like the Fonts panel with armed delete and symbol buttons; 2 (added 2026-11-10, answer to the coordinator's question 143) page position fields leave the Pages block; 3 duplicate sizes allowed; 4 the lower bar goes; 5 Grid & Rulers origin picker; 6 no "Opens as", inline rename. Pages auto-layout and object-page ownership are separate stories and are not described here.
 
