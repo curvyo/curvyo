@@ -1923,7 +1923,7 @@ first slice's PR:
   although only the trace worker runs it. No limit (customer, 2026-10-24, see "Editor wasm size").
 - **Installer and web app +10.3 MB** of PaddleOCR weights in `frontend/public/models/` (Frage
   111 A), also in the repository.
-- **`rayon` in the wasm tree of `curvyo-ocr-core`, `ui-core` and `editor-wasm`**, only through
+- **`rayon` in the wasm tree of `vectrace`, `ui-core` and `editor-wasm`**, only through
   `rten`: a scoped exception to "no threads in `*-core`" and to the ADR 0011 §6 ban list.
 - **First OCR of an image costs 4 to 5 s** of worker CPU in wasm (single thread, `+simd128`);
   cached per image for the session only.
@@ -1935,7 +1935,7 @@ first slice's PR:
   customer's font manager screenshot (804 x 698 px, 78 lines) detection 0.35 s, recognition
   17.4 s. Natively on one thread 0.32 / 0.32 s and 0.10 / 3.22 s. Each line is padded to 1024 px
   for the recogniser; at 320 px the screenshot reads in 1.23 s natively but the poster loses two
-  umlauts (Ä read as Â, Å), so the pad stays. Tried 2026-11-02 (`curvyo-ocr-core/tests/padding.rs`
+  umlauts (Ä read as Â, Å), so the pad stays. Tried 2026-11-02 (`vectrace/tests/padding.rs`
   guards the strings of the 1024 px read): each line padded to its own width in 64 px buckets and
   lines of one width batched reads the screenshot in 3.85 s in wasm (0.83 s natively) and the
   poster in 0.72 s, but changes 23 of 94 strings ("Äpfel" read as "Apfel" on the tester poster;
@@ -1986,7 +1986,7 @@ follows it (`DashPattern::MAX_DASHES_PER_OBJECT`, read by `curvyo-render-core` a
 `visioncortex` labels the clusters of one crop with `u16` and panics at 65,535. Our labelling is
 `u32` and hands it one boundary at a time, so the panic cannot occur; the one place left where the
 library's limit would show is a single region with that many holes, and criterion 16 turns it into
-the status "Too much detail: raise Specks." (`curvyo-vectorize-core`, `MAX_HOLES_PER_REGION`).
+the status "Too much detail: raise Specks." (`vectrace`, `MAX_HOLES_PER_REGION`).
 
 **Resolution:** open; the reason went with visioncortex (`specs/0089` slice D walks every
 boundary itself on `u32` labels), so the limit can be lifted when criterion 16 is revisited.
