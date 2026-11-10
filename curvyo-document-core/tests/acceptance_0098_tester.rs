@@ -822,11 +822,12 @@ fn adr0042_a_claim_of_a_sketch_on_a_drawing_page_reads_as_no_owner() {
 // ---- criteria 19, 20: goldens and format -------------------------------------------------------
 
 #[test]
-// Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9).
+// Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9), to 39 by
+// `specs/0101-laser-operations` (ADR 0046 §4).
 fn ac20_save_writes_format_38() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 38);
+    assert_eq!(CURRENT_FORMAT_VERSION, 39);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 38);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 39);
 }
 
 #[test]

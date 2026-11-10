@@ -1,6 +1,6 @@
 //! The laser workbench extension (ADR 0034 §1): its manifest, the outlines of its fixtures, the
-//! text of its notices and its machine profiles (ADR 0038, ADR 0039). It receives document data
-//! and record texts as arguments and never writes.
+//! text of its notices, its machine profiles (ADR 0038, ADR 0039) and the rules of its operations
+//! (ADR 0046 §5). It receives document data and record texts as arguments and never writes.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(
@@ -14,7 +14,26 @@ mod machine_profile_copy;
 mod machine_profile_file;
 mod machine_profiles;
 mod manifest;
+mod operation_cut_out;
+mod operation_kind;
+mod operation_kind_run;
+mod operation_naming;
+mod operation_nearest;
+mod operation_sequence;
+mod operation_summary;
 mod overhang;
+
+/// The laser operations of `specs/0101-laser-operations` as pure rules over stored records
+/// (ADR 0046 §5).
+pub mod operations {
+    pub use crate::operation_cut_out::{CutOutError, cut_out_contours};
+    pub use crate::operation_kind::{KindRead, OperationKind, Section};
+    pub use crate::operation_kind_run::{KindRun, LeafShape, Lines, kind_run};
+    pub use crate::operation_naming::next_operation_name;
+    pub use crate::operation_nearest::{Assignment, ChainScope, OperationList, OperationRule};
+    pub use crate::operation_sequence::{cuts_last, insert_index, may_move, run_sequence};
+    pub use crate::operation_summary::{Hidden, Leaf, LeafStatus, Summary, leaf_status, summarize};
+}
 
 pub use engraved_grid::{ENGRAVED_GRID, engraved_grid};
 pub use machine_profile::{

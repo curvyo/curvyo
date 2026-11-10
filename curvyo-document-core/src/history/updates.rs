@@ -37,6 +37,8 @@ impl Document {
         if epoch.as_deref() != self.history_epoch().as_deref() {
             return Err(SyncError::EpochMismatch);
         }
+        // A peer's updates may carry membership keys: the sweep is on from here (ADR 0046 §3).
+        self.member_keys_may_exist.set(true);
         let status = self
             .loro()
             .import(bytes)

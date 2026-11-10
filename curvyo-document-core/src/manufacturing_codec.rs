@@ -53,7 +53,7 @@ pub(crate) fn is_manufacturing_node(tree: &LoroTree, id: TreeID) -> bool {
         .is_ok_and(|meta| meta_is_manufacturing(&meta))
 }
 
-/// Whether `id` is a manufacturing or one of its placements or fixtures (they are its direct
+/// Whether `id` is a manufacturing or one of its placements, fixtures or operations (its direct
 /// children): no drawing command reads or writes such a node.
 pub(crate) fn in_manufacturing_subtree(tree: &LoroTree, id: TreeID) -> bool {
     is_manufacturing_node(tree, id)
@@ -251,7 +251,7 @@ pub(crate) fn owner_text(id: TreeID) -> String {
 }
 
 /// The open-file check of ADR 0033 §7: every manufacturing names a process and a page, holds only
-/// placement and fixture leaves with readable registers, and every page owner of a live page
+/// placement, fixture and operation leaves with readable node registers, and every page owner of a live page
 /// names a live manufacturing (or a removed node, whose page is not shown).
 pub(crate) fn validate(loro: &LoroDoc) -> bool {
     let tree = loro.get_tree(OBJECTS_TREE);
@@ -308,6 +308,9 @@ fn child_is_valid(tree: &LoroTree, id: TreeID) -> bool {
         Some(SHAPE_FIXTURE) => {
             string(&meta, KEY_FIXTURE_KIND).is_some() && read_fixture_params(&meta).is_some()
         }
+        // An operation is kept whatever its registers hold: an unreadable one reads as Unknown
+        // and saves back unchanged (ADR 0046 §1, R-MFG-010).
+        Some(crate::operation_codec::SHAPE_OPERATION) => true,
         _ => false,
     }
 }

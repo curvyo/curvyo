@@ -36,6 +36,10 @@ mod marquee_overlay;
 mod move_axes;
 mod node_opacity;
 mod offset_preview;
+mod operation_hatch;
+mod operation_look;
+mod operation_object;
+mod operation_symbol;
 mod origin_marker;
 mod pen_cue;
 mod pen_preview;
@@ -73,6 +77,10 @@ pub use offset_preview::{
     OffsetCenterState, OffsetHandleState, PreviewAnchor, build_offset_center_handle,
     build_offset_grown_box, build_offset_handles, build_offset_preview, build_preview_outline,
 };
+pub use operation_hatch::{HATCH_LINES_PER_OBJECT, flatten, hatch_list, object_polygons};
+pub use operation_look::{OperationLook, look_style};
+pub use operation_object::{outer_outlines, restyled};
+pub use operation_symbol::{CHIP_CAP, ChipItem, Glyph, chips_list};
 pub use origin_marker::{ORIGIN_MARKER_MIN_PAGE_PX, build_origin_marker};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::build_pen_preview;
@@ -82,7 +90,10 @@ pub use select_box::{SelectDecorationInput, SelectionBox};
 pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph};
 pub use shape_preview::build_shape_live_preview;
 pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};
-pub use theme::{CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, PASTEBOARD_BG};
+pub use theme::{
+    CANVAS_BG, CHECKER_A, CHECKER_B, GUIDE, OP_CHIP_GROUND, OP_CUT, OP_ENGRAVE_HATCH, OP_INK,
+    OP_LANE_LINE, PASTEBOARD_BG,
+};
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};

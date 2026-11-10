@@ -12,5 +12,7 @@ workspace = true
 [dependencies]
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true

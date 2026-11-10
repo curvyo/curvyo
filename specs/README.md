@@ -1,7 +1,7 @@
 # Feature specs
 
 The list of all features comes first, then the convention for writing them.
-State of this list: 2026-11-09, synced up to #299; 0063 backlog of concept A added, 0099 specified, 0104 reserved. The customer
+State of this list: 2026-11-09, synced up to #299; 0063 backlog of concept A added, 0099 specified, 0101 specified (Ready), 0104 reserved. The customer
 renumbered every folder on 2026-10-09, see "Numbering" below.
 
 Spec-driven development, adapted from
@@ -154,13 +154,13 @@ own entry when the customer schedules it.
 | [0071](0071-pattern-fill/) | `pattern-fill` | Fill a closed shape with generated vector patterns (hatch, grid, dots, honeycomb, motif) as real geometry; Hatch, Grid and Dots are core, further generators extensions (decided 2026-10-17). Customer request of 2026-10-17. | Draft (sketch, 2026-10-17) | Could | R-EDIT-046 | - |
 | [0073](0073-parameter-handle-clone/) | `parameter-handle-clone` | Ctrl on a parameter handle (Curve, inner radius, Start, End, corner radius, sides) or an "As copy" check in its entry box makes an ordinary copy at the same place with the new value instead of changing the shape. Customer request of 2026-10-19. | Draft (sketch, 2026-10-19) | Should | R-EDIT-004 | - |
 | [0086](0086-stick-fonts/) | `stick-fonts` | OTF and TTF single-line ("stick") fonts with doubled-back outlines, read as one centre line per stroke; where they appear (Fonts tab or only a workbench) is open. Split from `0062` and `0076` (Frage 19). | Draft (parked 2026-10-26: customer wants to refine it first) | Should | R-FONT-002 | - |
+| [0101](0101-laser-operations/) | `laser-operations` | Slice 4 of `0063`: an ordered operation list per laser page (Cut, Score, Engrave, Engrave + Outline, Cut-out), assignment to any item at any depth (a placed page's members too), Show and Output, the Cuts last switch (on by default), a summary of what runs; nothing is output until `0029`. Replaces the reserved `0027`. Frage 167 to 170 open with defaults. | In review (to be built on story/0101-laser-operations; ADR 0046 accepted with the PR; Fragen 167 to 170 default) | Must | R-MFG-002, R-MFG-005 | 14 (from 0027) |
 
 ### Not yet specified (no folder, number reserved)
 
 | No. | Slug | What it delivers | Status | Priority | Requirements | MVP slice |
 |---|---|---|---|---|---|---|
 | 0027 | `manufacturing-roles` | Assign a cut or engrave role to geometry (by layer) within one file. **Superseded by 0101 `laser-operations`** (concept A of `0063`, 2026-11-05); PR #269 was closed unmerged (Frage 152 A), its geometry rules, look tokens and tests move into 0101. The number stays as a placeholder and is not reused. | Superseded by 0101 | Must | R-MFG-002 | 14 |
-| 0101 | `laser-operations` | Slice 4 of `0063`: an ordered operation list per laser page (Cut, Score, Engrave, Engrave + Outline, Cut-out), assignment at any depth, Show and Output, the Cuts last switch (on by default). Replaces 0027. | Not started | Must | R-MFG-002, R-MFG-005 | 14 (from 0027) |
 | 0102 | `laser-fixtures` | Slice 5a of `0063`: grid with tapes and major lines, holders with slots, clamps and stops as selectable objects of the bed, Active per fixture, fixture snapping with fit by size. | Not started | Should | R-MFG-007, R-MFG-008 | - |
 | 0103 | `fixture-jobs` | Slice 5b of `0063`: a fixture carries its own operations (engrave the board outlines once), listed below the work with Output off by default, stored with the machine setup. | Not started | Should | R-MFG-007 | - |
 | 0104 | `page-kind-change` | Follow-up of `0063` (customer request of 2026-11-05): turn an existing page into another kind in place (name, place and list position kept, one undo step). Open before it is specified: what happens to content, size, machine data and a sketch in each direction, and the ADR 0042 §3 change (see the epic, "Follow-up: changing a page's kind"). | Not started | Should | R-MFG-012 | - |
@@ -321,6 +321,7 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | 36 | 0026 `machine-profile` (one atomic `mfg_profile` map with the profile id and copied values, never the connection; `mfg_machine_name` of format 35 read as Generic laser; ADR 0039) | Done (PR #258). Goldens: `machine_profile_v36.curvyo`, `machine_profile_damaged_v36.curvyo`, `mfg_profile_not_a_map_v36.curvyo`, `laser_workbench_v36.curvyo` |
 | 37 | 0098 `page-kinds` (`page.<id>.kind` register, output pages listed and in the plane, the page owns the manufacturing; format-36 files convert at open in one `migrate_format` commit; ADR 0042) | Done (PR #279). Goldens: `page_kinds_v37`, `page_kind_damaged_v37`, `page_kind_unknown_v37`, `page_kinds_migration_v36` |
 | 38 | 0100 `bring-content-in` (a `clone_link` origin may be a group, text or image; placed pages move, turn and scale on their laser page; ADR 0045) | Done (PR #296). Golden: `bring_content_in_v38.curvyo` |
+| 39 | 0101 laser-operations (operation nodes under the manufacturing node; ADR 0046) | In review on story/0101-laser-operations |
 | none | 0099 `sketch-pages` (writes only existing registers: `kind` by Convert to paths, the sketch claim, `clone_link`, `own_placement`; membership is read, not stored) | Done (PR #287). Golden: `sketch_pages_v37.curvyo` |
 | 27 | 0060 `snapping` (seven document-root registers: enabled, the four target flags, capture and release px) | In progress (2026-10-30). Golden: `snapping_v27.curvyo`; old-file compatibility waived by the customer. |
 

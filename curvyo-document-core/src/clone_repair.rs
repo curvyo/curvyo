@@ -58,6 +58,7 @@ impl Document {
             }
         }
         let mut fixes = Vec::new();
+        let mut unlinked: Vec<TreeID> = Vec::new();
         for clone in self.object_ids() {
             let Some(&(origin, matrix)) = links.get(&clone) else {
                 continue;
@@ -86,6 +87,7 @@ impl Document {
             } else if !links.contains_key(&node)
                 && let Some(read) = self.read_clone(clone)
             {
+                unlinked.push(crate::paths::tree_id_of(clone));
                 if self.unlinks_as_copy(&read) {
                     fixes.push(Fix::Copy(Box::new(read)));
                 } else {
@@ -94,6 +96,9 @@ impl Document {
                 }
             }
         }
+        // A clone that stops being a clone (unlinked or copied) loses its members' keys in the
+        // same step; its own key keeps its node id (ADR 0046 §2 (c)).
+        self.remove_member_keys_of_clones(&unlinked);
         let copies = self.style_copies(&gone, &fixes);
         let mut repair = self.clone_repair.get();
         for (clone, style, opacity) in copies {

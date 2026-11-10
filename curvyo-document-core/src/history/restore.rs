@@ -219,6 +219,8 @@ impl Document {
             })
             .collect();
         let nodes = parents_first(nodes);
+        // The revived nodes may carry membership keys (ADR 0046 §3): the sweep is on from here.
+        self.member_keys_may_exist.set(true);
         revive_nodes(doc, &nodes, &header.format())?;
         Ok(!nodes.is_empty())
     }
