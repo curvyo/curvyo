@@ -216,11 +216,13 @@ impl Document {
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let converted = convert_linkless_outlines(&tree, &orphans);
-        let doomed: Vec<TreeID> = if converted == 0 {
+        // A clone that became a path loses its members' keys in the same step (ADR 0046 §2 (c)).
+        self.remove_member_keys_of_clones(&converted);
+        let doomed: Vec<TreeID> = if converted.is_empty() {
             orphans.iter().map(|&id| tree_id_of(id)).collect()
         } else {
             let mut repair = self.clone_repair.get();
-            repair.unlinked += converted;
+            repair.unlinked += converted.len();
             self.clone_repair.set(repair);
             self.read_objects()
                 .orphans
@@ -321,8 +323,8 @@ impl Document {
 /// Turns each orphan among `orphans` that is a clone with no link and a stored outline that reads
 /// as a path into that path, by removing its `shape` (`adrs.md` decision 6, amended 2026-10-14).
 /// Uncommitted. Returns how many it turned.
-fn convert_linkless_outlines(tree: &LoroTree, orphans: &[NodeId]) -> usize {
-    let mut converted = 0;
+fn convert_linkless_outlines(tree: &LoroTree, orphans: &[NodeId]) -> Vec<TreeID> {
+    let mut converted = Vec::new();
     for &id in orphans {
         let Ok(meta) = tree.get_meta(tree_id_of(id)) else {
             continue;
@@ -332,7 +334,7 @@ fn convert_linkless_outlines(tree: &LoroTree, orphans: &[NodeId]) -> usize {
             && crate::path_codec::validate_path_node(&meta)
             && meta.delete(crate::shape_codec::KEY_SHAPE).is_ok()
         {
-            converted += 1;
+            converted.push(tree_id_of(id));
         }
     }
     converted

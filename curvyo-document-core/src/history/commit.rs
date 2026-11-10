@@ -189,6 +189,8 @@ impl Document {
             state.continue_next.set(false);
             return None;
         }
+        // ADR 0046 §3: the member keys of deleted nodes go in this step.
+        self.sweep_dead_member_keys();
         // The last value of each linked dimension joins the step that changed its geometry
         // (ADR 0027 §4).
         let without_dimensions = self.refresh_dimension_kept();

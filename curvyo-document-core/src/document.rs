@@ -415,7 +415,19 @@ impl DocumentVersion {
 /// it opens unchanged and is not rewritten. Damage: none new; a clone inside what it draws is an
 /// orphan (ADR 0045 §4), repaired as before. The number is provisional by the rule above.
 /// Golden: `bring_content_in_v38.curvyo`; the version 37 goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 38;
+///
+/// Bumped to 39 in `laser-operations` (ADR 0046, `specs/0101-laser-operations`): a manufacturing
+/// may hold operation nodes (`shape = "operation"`, `name`, `op_kind`, `op_show`,
+/// `op_output`, `op_margin`, and one `member.<node id>` = `true` per assigned item), in list
+/// order, and carry `x.<process id>.cuts_last` (`crate::operation_codec`). A build that stops at
+/// 38 refuses any other child of a manufacturing as damage, so it must refuse every file of this
+/// build as too new. Migration from 38 is none: a format-38 file has no operation node, opens
+/// unchanged and is not rewritten. Damage: none new; an operation whose registers do not read
+/// (or whose kind is not known) is kept and saved back unchanged, and reads with no kind. The
+/// number is provisional by the rule above. Goldens: `operations_v39.curvyo`,
+/// `operations_unknown_kind_v39.curvyo`, `operations_unreadable_v39.curvyo`; the version 38
+/// golden stays.
+pub const CURRENT_FORMAT_VERSION: u32 = 39;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -472,6 +484,10 @@ pub struct Document {
     /// How many text clones became texts because their source was removed (`0080` criterion
     /// 41), since the session last read it.
     pub(crate) text_clones_unlinked: std::cell::Cell<usize>,
+    /// Whether a membership key may exist in the drawing: false only when no operation has written
+    /// one, nor a file or a peer brought one in (`operation::sweep_dead_member_keys` reads it, so a
+    /// document without keys pays nothing per commit).
+    pub(crate) member_keys_may_exist: std::cell::Cell<bool>,
     /// What the held-back rule of the last transform did (`crate::clone_hold`); view state.
     pub(crate) clone_hold: std::cell::Cell<crate::clone_hold::CloneHold>,
     /// The next counter of the anchor ids the clone repair takes (`crate::clone_repair`).
@@ -556,6 +572,7 @@ impl Document {
             clone_repair: std::cell::Cell::default(),
             kept_carriers: std::cell::Cell::default(),
             text_clones_unlinked: std::cell::Cell::default(),
+            member_keys_may_exist: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             placement_refusal: std::cell::Cell::default(),
@@ -613,7 +630,7 @@ impl Document {
         {
             return Err(OpenError::Damaged);
         }
-        Ok(Self {
+        let doc = Self {
             loro,
             commit_state: crate::history::CommitState::default(),
             container_index: std::cell::RefCell::default(),
@@ -623,6 +640,7 @@ impl Document {
             clone_repair: std::cell::Cell::default(),
             kept_carriers: std::cell::Cell::default(),
             text_clones_unlinked: std::cell::Cell::default(),
+            member_keys_may_exist: std::cell::Cell::default(),
             clone_hold: std::cell::Cell::default(),
             repair_ids: std::cell::Cell::default(),
             placement_refusal: std::cell::Cell::default(),
@@ -633,7 +651,11 @@ impl Document {
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
-        })
+        };
+        // One scan at open: a file with membership keys keeps the sweep on.
+        doc.member_keys_may_exist
+            .set(!doc.member_entries().is_empty());
+        Ok(doc)
     }
 
     /// The document's size in millimetres.

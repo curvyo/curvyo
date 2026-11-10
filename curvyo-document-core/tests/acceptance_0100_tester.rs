@@ -1343,17 +1343,18 @@ fn with_manifest_version(bytes: &[u8], version: u64) -> Vec<u8> {
 
 #[test]
 fn ac21_the_format_is_38_and_a_newer_file_is_refused() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 38);
+    // `specs/0101-laser-operations` bumps to 39 (ADR 0046 §4); the rule checked here is unchanged.
+    assert_eq!(CURRENT_FORMAT_VERSION, 39);
     let f = fx();
     f.d.place_linked_clones(&[f.g], to_laser(&f)).unwrap();
     let bytes = pack(&f.d, "t").unwrap();
-    assert_eq!(manifest_version(&bytes), 38);
-    let newer = with_manifest_version(&bytes, 39);
+    assert_eq!(manifest_version(&bytes), 39);
+    let newer = with_manifest_version(&bytes, 40);
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 39,
-            supported: 38
+            found: 40,
+            supported: 39
         })
     ));
 }

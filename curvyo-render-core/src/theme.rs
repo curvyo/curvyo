@@ -250,6 +250,24 @@ pub const GUIDE_GAP_PX: f64 = 3.0;
 /// one has 2.5:1 on `--pasteboard-bg`; this one 3.6:1 there and 5.8:1 on `--canvas-bg`.
 pub const GUIDE: RgbaColor = RgbaColor::opaque(0x16, 0x65, 0x34);
 
+/// `--cut` (`specs/0101-laser-operations/ux-notes.md` section 13.1): the line of every Cut and
+/// Cut-out, the only red of the output page. `#C8102E`, 4.81:1 on `--canvas-bg`.
+pub const OP_CUT: RgbaColor = RgbaColor::opaque(0xC8, 0x10, 0x2E);
+
+/// `--engrave-hatch` (ux-notes section 13.1): the hatch of Engrave and Engrave + Outline. `#C46A1C`,
+/// 3.17:1 on `--canvas-bg` (criterion 18's 3:1 holds; the lighter orange does not).
+pub const OP_ENGRAVE_HATCH: RgbaColor = RgbaColor::opaque(0xC4, 0x6A, 0x1C);
+
+/// `--toolbar-icon` (ux-notes section 13.1): the Score line, the Engrave + Outline outline and every
+/// ink symbol.
+pub const OP_INK: RgbaColor = RgbaColor::opaque(0x3A, 0x3A, 0x3F);
+
+/// `--toolbar-bg`: the ground of a symbol chip (ux-notes section 13.3).
+pub const OP_CHIP_GROUND: RgbaColor = RgbaColor::opaque(0xDC, 0xDC, 0xE0);
+
+/// `--lane-line` (ux-notes section 13.1): the Not assigned outline and the chip border.
+pub const OP_LANE_LINE: RgbaColor = RgbaColor::opaque(0x7B, 0x7B, 0x7F);
+
 /// The width of a guide path's line, screen-space pixels.
 pub const GUIDE_LINE_PX: f64 = 1.0;
 

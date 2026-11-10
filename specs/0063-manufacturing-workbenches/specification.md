@@ -106,7 +106,7 @@ Customer request of 2026-11-05 (translated): "Later there needs to be a way to c
 
 ## Architect work implied (not decided here)
 
-An amendment of the `0059` page ADR (a page `kind` register; for Sketch, the owned sketch) with a `format_version` bump (0098); an amendment of ADR 0032 §5 (owned page listed and in the plane) (0098); group clones, amending ADR 0015 (0100); an ADR for operations and assignments in the file, keyed by output-page node and inside a placed item by source node id, replacing ADR 0041 (0101); the fixture set and fixture jobs in the profile record, an ADR 0038 bump (0102, 0103). The run-order sections are derived from the kinds and the Cuts last switch, not stored per row.
+An amendment of the `0059` page ADR (a page `kind` register; for Sketch, the owned sketch) with a `format_version` bump (0098); an amendment of ADR 0032 §5 (owned page listed and in the plane) (0098); group clones, amending ADR 0015 (0100); an ADR for operations and assignments in the file, keyed by node id (an operation is a child node of the manufacturing; inside a placed item by source node id), ADR 0046 (0101), which amends ADR 0033 on acceptance; ADR 0041 is the membership lifecycle and is not replaced; the fixture set and fixture jobs in the profile record, an ADR 0038 bump (0102, 0103). The run-order sections are derived from the kinds and the Cuts last switch, not stored per row.
 
 ## Links
 

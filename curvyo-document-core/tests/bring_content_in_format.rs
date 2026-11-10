@@ -118,7 +118,8 @@ fn the_golden_reads_back_every_clone_placed_page_and_own_item() {
     let expected = golden_document();
     let bytes = read_golden();
     assert_eq!(manifest(&bytes)["format_version"], 38);
-    assert_eq!(CURRENT_FORMAT_VERSION, 38);
+    // `specs/0101-laser-operations` bumps to 39 (ADR 0046 §4); the v38 golden still opens.
+    assert_eq!(CURRENT_FORMAT_VERSION, 39);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let (a, b) = (expected.read_objects(), opened.read_objects());
@@ -178,8 +179,8 @@ fn a_build_of_format_37_refuses_the_golden_as_saved_by_a_newer_version() {
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 39,
-            supported: 38
+            found: 40,
+            supported: 39
         })
     ));
 }

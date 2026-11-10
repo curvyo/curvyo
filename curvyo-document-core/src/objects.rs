@@ -664,6 +664,8 @@ impl Document {
         }
         self.repair_clones_of_removed(&tree, &doomed);
         let parents = crate::group_tree::parents_of(&tree, &doomed);
+        // ADR 0046 §3, Frage 169 A: the member keys of the doomed nodes and their subtrees go in
+        // the same step, silently (the helper's cleanup).
         for tree_id in doomed {
             // invariant: every id here was just confirmed present above.
             #[allow(clippy::unwrap_used)]
