@@ -46,13 +46,6 @@ const assert=require('node:assert/strict');
  await page.getByRole('switch',{name:'Move frame only: Coaster 🦊',exact:true}).click();
  assert.equal(await page.getByRole('switch',{name:'Move frame only: Coaster 🦊',exact:true}).getAttribute('aria-checked'),'true');
 
- await page.getByRole('radio',{name:'cm, centimetres',exact:true}).click();
- const x=page.getByRole('spinbutton',{name:'Page X in cm',exact:true});
- const oldX=Number(await x.inputValue());
- await x.fill(String(oldX+1));await x.press('Enter');
- assert.equal(Number(await x.inputValue()),oldX+1);
- await page.getByRole('radio',{name:'mm, millimetres',exact:true}).click();
- assert(Math.abs(Number(await page.getByRole('spinbutton',{name:'Page X in mm',exact:true}).inputValue())-(oldX+1)*10)<0.001);
  const rowName=grid.getByRole('button',{name:'Coaster 🦊',exact:true});
  await rowName.focus();await rowName.press('F2');
  await grid.getByRole('textbox',{name:'Name of Coaster 🦊'}).fill('No rename');

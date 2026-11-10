@@ -415,9 +415,6 @@ export function PagesBlock({
           }}
         />
       )}
-      {pages[active] && (
-        <PagePosition key={pages[active].id} page={pages[active]} doc={doc} />
-      )}
       <span role="status" className="sr-only">
         {announcement}
       </span>
@@ -452,42 +449,6 @@ function RowLine({ page }: { page: PageRow }) {
       <span aria-hidden className="min-w-0 truncate opacity-65">
         {` · ${page.size}`}
       </span>
-    </div>
-  );
-}
-
-function PagePosition({ page, doc }: { page: PageRow; doc: DocumentPanelApi }) {
-  return (
-    <div className="flex gap-2 text-xs">
-      {(["x", "y"] as const).map((axis) => (
-        <label
-          key={`${axis}:${axis === "x" ? page.xText : page.yText}:${doc.view.unit}`}
-          className="flex min-w-0 items-center gap-1"
-        >
-          {axis.toUpperCase()}
-          <input
-            aria-label={`Page ${axis.toUpperCase()} in ${doc.view.unit}`}
-            type="number"
-            step="any"
-            className="min-w-0 w-full rounded border px-1 py-0.5 tabular-nums"
-            defaultValue={axis === "x" ? page.xText : page.yText}
-            onBlur={(e) => {
-              const n = Number(e.target.value);
-              if (e.target.value.trim() && Number.isFinite(n))
-                doc.pageAction(axis, page.id, e.target.value);
-            }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") {
-                e.currentTarget.value = axis === "x" ? page.xText : page.yText;
-                e.currentTarget.blur();
-              }
-            }}
-          />
-        </label>
-      ))}
-      <span className="self-center">{doc.view.unit}</span>
     </div>
   );
 }

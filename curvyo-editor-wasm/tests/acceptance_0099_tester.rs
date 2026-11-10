@@ -570,10 +570,10 @@ fn ac5_the_frame_alone_switch_never_applies_to_a_sketch_page() {
         (after[0].point.x - before[0].point.x - 50.0).abs() < TOL,
         "the sketch moves"
     );
-    // The Document tab's X field moves frame and sketch together.
+    // Moving the frame again moves frame and sketch together.
     f.s.activate_page(&sp.id);
     let x = sp.origin.x + 120.0;
-    assert!(f.s.set_page_position(&sp.id, "x", &format!("{x}")));
+    assert!(f.s.move_page_to(&sp.id, Point::new(x, sp.origin.y)));
     let again = outline_of(&doc(&f.s), f.sketch);
     let p = find_page(&doc(&f.s), &sp.id);
     assert!((again[0].point.x - before[0].point.x - (p.origin.x - sp.origin.x)).abs() < TOL);

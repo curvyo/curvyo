@@ -52,10 +52,6 @@ impl WasmSession {
     pub fn set_page_frame_only(&mut self, id: &str, on: bool) {
         self.session.set_page_frame_only(id, on);
     }
-    /// Applies one page-position field in display units.
-    pub fn set_page_position(&mut self, id: &str, axis: &str, text: &str) -> bool {
-        self.session.set_page_position(id, axis, text)
-    }
     /// Moves a frame to global millimetre coordinates.
     pub fn move_page_to(&mut self, id: &str, x: f64, y: f64) -> bool {
         self.session

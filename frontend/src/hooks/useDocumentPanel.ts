@@ -167,9 +167,7 @@ export interface DocumentPanelApi {
       | "rename"
       | "reorder"
       | "frameOnly"
-      | "move"
-      | "x"
-      | "y",
+      | "move",
     id?: string,
     value?: string | number | boolean,
     y?: number,
@@ -357,10 +355,6 @@ export function useDocumentPanel(editor: EditorHandle): DocumentPanelApi {
         break;
       case "frameOnly":
         session.set_page_frame_only(id, Boolean(value));
-        break;
-      case "x":
-      case "y":
-        session.set_page_position(id, action, String(value));
         break;
       case "move":
         session.move_page_to(id, Number(value), y);

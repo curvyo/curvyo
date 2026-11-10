@@ -21,8 +21,6 @@ export interface PageRow {
   machine: string | null;
   /** The full id of a laser page's manufacturing, `null` on another page. */
   manufacturing: string | null;
-  xText: string;
-  yText: string;
   x: number;
   y: number;
   screenX: number;
