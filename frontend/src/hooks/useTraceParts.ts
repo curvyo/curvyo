@@ -28,6 +28,11 @@ export interface TracePartsApi {
   setChoiceOf: (id: number, choice: TraceChoice) => void;
 }
 
+/** `choice` with no colour of its own: nothing picked, no fixed, excluded or kept colour. */
+function withoutColours(choice: TraceChoice): TraceChoice {
+  return { ...choice, values: { ...choice.values, swatches: [], fixed: [], excluded: [], keptPalette: null } };
+}
+
 /**
  * `partsJson` is the session's chips as last read; `choiceRef` holds the bar's (the active
  * part's) settings and `load` puts another part's settings into the bar.
@@ -91,12 +96,15 @@ export function useTraceParts(
     const id = session.add_trace_part();
     if (id >= 0) {
       // A copy of the settings of the part before (criterion 19), what the maker set in them
-      // included; the bar keeps showing them.
-      choices.current.set(id, choiceRef.current);
+      // included, but not its colours: a new part starts without picked colours (customer
+      // 2026-11-10).
+      const fresh = withoutColours(choiceRef.current);
+      choices.current.set(id, fresh);
+      load(fresh);
       makers.current.set(id, new Set(before === undefined ? [] : (makers.current.get(before) ?? [])));
     }
     onChange();
-  }, [getSession, onChange, storeActive, choiceRef]);
+  }, [getSession, onChange, storeActive, choiceRef, load]);
 
   const removePart = useCallback(
     (index: number) => {

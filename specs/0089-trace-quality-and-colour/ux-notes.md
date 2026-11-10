@@ -1111,7 +1111,9 @@ the swatch fades to 40 % and the cased Lucide `X` appears (on an excluded swatch
 - **A press on the x deletes the colour** with the re-match semantics of §26.3 (the palette becomes the other colours,
   every pixel matched again among them, a deleted excluded colour is no longer excluded; not a History step). After a
   pointer delete the keyboard goes back to the canvas.
-- **Shift+click anywhere on the cell toggles Exclude** (semantics of §26.3 unchanged).
+- **Shift+click anywhere on the cell toggles Exclude** (semantics of §26.3 unchanged). While Shift is held, the
+  hovered or focused palette swatch shows the `Ban` (Exclude) glyph instead of the x, so the glyph says what the
+  click will do (customer 2026-11-10).
 - **A plain click elsewhere on the swatch does nothing (Proposal:** "identical to Pick colours" and "a plain click on
   the body does nothing" are read together as: only the x deletes; the Pick colours row is unchanged, a click anywhere
   on its cell removes).
@@ -1157,3 +1159,14 @@ floor, the hint line), `acceptance_0089_m_browser` (Shift+hover Isolate, click =
 `acceptance_0089_sliceM_tester.rs` (c29 without Isolate), the notice-row reads of `acceptance_0089_cleanup_tester`,
 `_tidyup_tester`, `_colours_row_tester`, `_sliceF_tester`, `acceptance_0025_*` and `acceptance_0094_*` (read the
 hidden region or the Trace button's description instead), and `acceptance_0094_parts_*` ("Part 2 of 2" label).
+
+### 27.8 Colours belong to a part (customer 2026-11-10)
+
+- **A new part starts without colours:** Add part copies the active part's other settings (criterion 19) but not its
+  colours: nothing picked (Pick colours), no fixed, excluded or kept palette (Multicolour). The bar shows the empty
+  state at once.
+- **A part shows only its own colours:** the picked colours and the palette row are those of the active part. When
+  another part becomes active the palette row is empty until that part's preview is read (it is the active part's
+  palette, `join_trace_parts`), and each part's x deletes from its own colours.
+- Chip pick, Add part and Remove part restore each part's colours as part of its settings (criterion 29 unchanged:
+  nothing is remembered across sessions).
