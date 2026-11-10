@@ -96,7 +96,23 @@ pub(crate) fn palette(
     };
     let wanted = count.map(|n| n.clamp(lowest, MAX_COLOURS));
     let free = wanted.unwrap_or(MAX_COLOURS).saturating_sub(fixed_n);
-    let mut found = flat_colours(samples, wanted.is_none(), free, fixed_n);
+    // With a typed count a fixed colour explains the samples within the merge distance of it:
+    // they would only find it again and merge into it, taking a slot the other colours need
+    // (customer 2026-11-10). The automatic count has a slot for every group anyway.
+    let unexplained: Vec<[u8; 3]> = samples
+        .iter()
+        .copied()
+        .filter(|&s| {
+            wanted.is_none()
+                || fixed.iter().all(|&f| {
+                    distance(
+                        [f64::from(s[0]), f64::from(s[1]), f64::from(s[2])],
+                        bytes(f),
+                    ) >= MERGE_DISTANCE
+                })
+        })
+        .collect();
+    let mut found = flat_colours(&unexplained, wanted.is_none(), free, fixed_n);
     let slots = free.saturating_sub(found.len());
     let known: Vec<[f64; 3]> = found
         .iter()
@@ -682,6 +698,28 @@ mod tests {
         assert!(p[0].fixed && p[1].fixed && !p[2].fixed);
         // A count of 2 with two fixed colours: only the fixed ones.
         assert_eq!(palette(&s, &Lines::default(), Some(2), &fixed).len(), 2);
+    }
+
+    /// Customer 2026-11-10: a colour picked from the image takes one of the Colours, and the
+    /// others go to the other colours; the picked colour's own pixels do not take a slot again
+    /// (Colours 3 with red picked gave red and one blend of blue and black).
+    #[test]
+    fn a_fixed_colour_of_the_image_leaves_the_other_slots_to_the_other_colours() {
+        let mut s = many([208, 34, 42], 4000);
+        s.extend(many([35, 78, 184], 3000));
+        s.extend(many([20, 20, 20], 2000));
+        let red = Rgb8::new(208, 34, 42);
+        let p = palette(&s, &Lines::default(), Some(3), &[red]);
+        assert_eq!(
+            colours(&p),
+            [[208, 34, 42], [35, 78, 184], [20, 20, 20]],
+            "{p:?}"
+        );
+        // A picked shade within the merge distance of the image's colour explains it too.
+        let p = palette(&s, &Lines::default(), Some(3), &[Rgb8::new(204, 37, 40)]);
+        assert_eq!(colours(&p)[1..], [[35, 78, 184], [20, 20, 20]], "{p:?}");
+        // The automatic count finds the others too.
+        assert_eq!(palette(&s, &Lines::default(), None, &[red]).len(), 3);
     }
 
     #[test]
