@@ -42,6 +42,7 @@ import { useMembership } from "@/hooks/useMembership";
 import { useDevices } from "@/hooks/useDevices";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import { useFixtures } from "@/hooks/useFixtures";
 import { useOperations } from "@/hooks/useOperations";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
@@ -147,6 +148,8 @@ function Editor() {
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
   const collab = useCollaboration(editor);
   const operations = useOperations(editor);
+  // The laser fixtures of the active laser page (`specs/0102-laser-fixtures`).
+  const fixtures = useFixtures(editor);
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).
@@ -178,7 +181,9 @@ function Editor() {
             <RecogniseBar recognise={editor.recognise} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}
           {editor.tool === "select" && editor.tiling.open ? <TilingBar tiling={editor.tiling} /> : null}
-          {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open ? (
+          {/* A selected fixture has no Select bar: its handles and chips size and place it
+              (`specs/0102-laser-fixtures` criterion 14, UX notes §6.4). */}
+          {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open && !fixtures.view?.selected ? (
             <SelectToolbar
               moveOnly={editor.getSession()?.selection_move_only() ?? false}
               scaleStrokeWidth={editor.scaleStrokeWidth}
@@ -380,6 +385,7 @@ function Editor() {
         {workbench?.rail(workbenchContext)}
         <Canvas
           overOperationRow={operations.dropKey !== null}
+          fitCue={fixtures.fitCue}
           editor={editor}
           sketch={sketch}
           onDropFiles={project.importFiles}
@@ -414,6 +420,7 @@ function Editor() {
           devices={devices}
           membership={membership}
           operations={operations}
+          fixtures={fixtures}
         />
       </div>
       <CursorStatus

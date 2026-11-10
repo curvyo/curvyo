@@ -1,3 +1,4 @@
+import type { FitCue } from "@/lib/fixtureRows";
 import { MeasureOverlay } from "@/components/MeasureOverlay";
 import type { SketchApi } from "@/hooks/useSketch";
 import { SketchAnnotations } from "@/components/sketch/SketchAnnotations";
@@ -5,6 +6,7 @@ import { SketchEntryBox, SketchModeLabel } from "@/components/sketch/SketchCanva
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { PageFrames } from "@/components/PageFrames";
+import { FixtureLabels } from "@/components/FixtureLabels";
 import { PlacedPageTags } from "@/components/PlacedPageTags";
 import { EditHintChip } from "@/components/EditHintChip";
 import { HandleHintChip } from "@/components/HandleHintChip";
@@ -60,6 +62,8 @@ interface CanvasProps {
   showPageFrames?: boolean;
   /** The pointer is over an operation row of a canvas drag: the move readout is not drawn (`specs/0101` UX notes 6.3). */
   overOperationRow?: boolean;
+  /** The fit cue of the move in flight (`specs/0102` 7.2). */
+  fitCue?: FitCue | null;
 }
 
 /**
@@ -81,6 +85,7 @@ export function Canvas({
   overlay,
   showPageFrames = true,
   overOperationRow = false,
+  fitCue = null,
 }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
@@ -184,6 +189,7 @@ export function Canvas({
       </NodeContextMenu>
       {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} />}
       {showPageFrames && <PlacedPageTags getSession={editor.getSession} />}
+      {showPageFrames && <FixtureLabels getSession={editor.getSession} />}
       <SketchAnnotations sketch={sketch} />
       {sketch.view.workbench !== "sketch" && (
         <MeasureOverlay getSession={editor.getSession} measuring={editor.tool === "measure"} />
@@ -301,7 +307,7 @@ export function Canvas({
         onDismiss={editor.dismissEditHint}
       />
       <PenHintChip cue={penCue} containerRef={editor.containerRef} />
-      <MoveBadges badges={editor.moveBadges} containerRef={editor.containerRef} />
+      <MoveBadges badges={editor.moveBadges} containerRef={editor.containerRef} fit={fitCue} />
       <PickSetBadge at={editor.text.pickBadge} />
       <CloneTags tags={editor.clones.tags} />
       <FontMissingTags marks={editor.text.missingMarks} hidden={editor.isPanning} />

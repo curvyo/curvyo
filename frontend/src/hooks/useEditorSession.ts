@@ -30,6 +30,9 @@ import { ModifierTracker } from "@/lib/keyModifiers";
 import { isSecondPress, withheldPressIsDrag } from "@/lib/doubleClick";
 import { parseLayerNotice } from "@/lib/layerRows";
 import { FLIP_NOTICE_MS } from "@/lib/flipText";
+
+/** A fixture's Action notice stays 3 s (`specs/0102-laser-fixtures` UX notes §4.1). */
+const FIXTURE_NOTICE_MS = 3000;
 import { canvasLeavesKey } from "@/lib/fontPreviewKeys";
 import { type ArcBarApi, useArcBar } from "@/hooks/useArcBar";
 import { type FlipApi, useFlip } from "@/hooks/useFlip";
@@ -421,7 +424,11 @@ export interface TransformEntryState {
     | "inner-ratio"
     | "skew"
     | "arc-angle"
-    | "curve";
+    | "curve"
+    // A laser fixture's one-field chip (a leg, the thickness, a diameter) and its S chip of
+    // several fields (`specs/0102-laser-fixtures` adrs.md §6a.4).
+    | "fixture-length"
+    | "fixture-size";
   fields: TransformEntryField[];
   /** The muted second row of a corner radius entry ("All four corners" or "This
    * corner only", `specs/0013-rectangle-corner-radii/` criterion 6); empty for every
@@ -522,6 +529,8 @@ export interface MoveEntryState {
   referenceHints: string[];
   /** Whether the Copy check opens on (Ctrl at the second press). */
   copyPreset: boolean;
+  /** Whether the chip shows its Copy check: not for a laser fixture (`specs/0102` D21). */
+  copyAllowed: boolean;
 }
 
 /** The nine reference points, as the index of [`MoveEntryState.absolute`]. */
@@ -541,6 +550,7 @@ function readMoveEntry(
         reference_name(index: number): string;
         reference_hint_name(index: number): string;
         copy_preset(): boolean;
+        copy_allowed: boolean;
         free(): void;
       }
     | undefined,
@@ -558,6 +568,7 @@ function readMoveEntry(
     referenceNames: points.map((index) => raw.reference_name(index)),
     referenceHints: points.map((index) => raw.reference_hint_name(index)),
     copyPreset: raw.copy_preset(),
+    copyAllowed: raw.copy_allowed,
   };
   raw.free();
   return entry;
@@ -687,7 +698,8 @@ export interface EditorSession {
    * or `"invalid:<field>:number|negative|ratio-range|skew-range|too-large"`
    * (it stays
    * open). */
-  commitTransformEntry: (first: string, second: string, lastEdited: number) => string;
+  /** `third` is the third field of a laser stop's S chip (`specs/0102` criterion 23). */
+  commitTransformEntry: (first: string, second: string, lastEdited: number, third?: string) => string;
   /** Closes the entry without writing (Escape, blur). Idempotent. */
   cancelTransformEntry: () => void;
   /** For linked fields: the text the other field takes. */
@@ -1268,6 +1280,12 @@ export function useEditorSession(
       const contextNotice = session.take_context_notice();
       if (contextNotice !== "") {
         history.showNotice(contextNotice, FLIP_NOTICE_MS, "canvas", "alert");
+      }
+      // A fixture's chip set a value to its limit, or Delete on a grid says how
+      // (`specs/0102-laser-fixtures` UX notes §4.4, §10).
+      const fixtureNotice = session.take_fixture_notice();
+      if (fixtureNotice !== "") {
+        history.showNotice(fixtureNotice, FIXTURE_NOTICE_MS, "canvas");
       }
       // A resize that mirrored says so politely: "Resized. Mirrored left to right."
       const announcement = session.take_transform_announcement();
@@ -2760,12 +2778,12 @@ export function useEditorSession(
   );
 
   const commitTransformEntry = useCallback(
-    (first: string, second: string, lastEdited: number): string => {
+    (first: string, second: string, lastEdited: number, third?: string): string => {
       const session = sessionRef.current;
       if (!session) {
         return "unchanged";
       }
-      const outcome = session.commit_transform_entry(first, second, lastEdited);
+      const outcome = session.commit_transform_entry(first, second, lastEdited, third);
       showTransformNotice(session);
       syncFromSession();
       // A typed corner radius past its limit is committed limited and says

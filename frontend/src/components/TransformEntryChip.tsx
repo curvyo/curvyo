@@ -37,8 +37,9 @@ interface TransformEntryChipProps {
   /** The canvas container: the chip's coordinate space, and where focus
    * returns to. */
   containerRef: React.RefObject<HTMLDivElement | null>;
-  /** Enter: `"committed"`, `"unchanged"` or `"invalid:<field>:<reason>"`. */
-  onCommit: (first: string, second: string, lastEdited: number) => string;
+  /** Enter: `"committed"`, `"unchanged"` or `"invalid:<field>:<reason>"`. `third` is the third
+   * field of a laser stop's S chip. */
+  onCommit: (first: string, second: string, lastEdited: number, third?: string) => string;
   onCancel: () => void;
   onLinked: (field: number, text: string) => string | undefined;
   /** The note line for the typed texts while a size is negative ("Mirrored left to right"),
@@ -140,7 +141,7 @@ export function TransformEntryChip({
   };
 
   const submit = () => {
-    const outcome = onCommit(texts[0] ?? "", texts[1] ?? "", lastEdited);
+    const outcome = onCommit(texts[0] ?? "", texts[1] ?? "", lastEdited, texts[2]);
     if (outcome.startsWith("invalid:")) {
       const [, field, reason] = outcome.split(":");
       setInvalid({ field: Number(field), reason: asReason(reason) });
@@ -224,6 +225,8 @@ export function TransformEntryChip({
             ? "Curve"
             : isRatio
           ? "Inner ratio"
+          : entry.kind === "fixture-length" || entry.kind === "fixture-size"
+            ? (entry.fields[0]?.name.replace(" (mm)", "") ?? "Size")
           : entry.selection
             ? "Resize selection"
             : "Size";

@@ -1,7 +1,8 @@
 import { DropBadgePill } from "@/components/DropBadgePill";
-import { badgeWord } from "@/lib/dragAnswer";
+import { badgeWord, type DropBadgeKind } from "@/lib/dragAnswer";
+import { type FitCue, fitWord } from "@/lib/fixtureRows";
 import { Minus, MoveDiagonal, MoveHorizontal, MoveVertical, Plus } from "lucide-react";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MoveBadgeState } from "@/hooks/useEditorSession";
 
@@ -24,6 +25,8 @@ const READOUT_FLIP_PX = 36;
 interface MoveBadgesProps {
   badges: MoveBadgeState;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** The fit cue of the move in flight (`specs/0102` 7.2): it replaces the laser page's drop word. */
+  fit?: FitCue | null;
 }
 
 /**
@@ -39,7 +42,7 @@ interface MoveBadgesProps {
  * is used because an engine applies a changed cursor only on the next mouse
  * event.
  */
-export function MoveBadges({ badges, containerRef }: MoveBadgesProps) {
+export function MoveBadges({ badges, containerRef, fit = null }: MoveBadgesProps) {
   // Measured in a layout effect, never read from the ref during render, so the
   // badge is placed right on the frame it first shows.
   const [canvasWidth, setCanvasWidth] = useState(Number.POSITIVE_INFINITY);
@@ -49,6 +52,24 @@ export function MoveBadges({ badges, containerRef }: MoveBadgesProps) {
       setCanvasWidth((previous) => (previous === width ? previous : width));
     }
   }, [badges, containerRef]);
+  // The badge state only follows the pointer while a modifier badge shows, so the fit cue keeps its
+  // own pointer position, read from the canvas while the cue is up.
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
+  const fitting = fit !== null;
+  useEffect(() => {
+    const onMove = (event: PointerEvent) => {
+      const box = containerRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const at = { x: event.clientX - box.left, y: event.clientY - box.top };
+      lastPointer.current = at;
+      if (fitting) setPointer(at);
+    };
+    // The cue can come up between two moves: it starts from the last place the pointer was seen.
+    if (fitting && lastPointer.current) setPointer(lastPointer.current);
+    window.addEventListener("pointermove", onMove);
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [fitting, containerRef]);
   const shown = [
     badges.copy ? ("copy" as const) : null,
     badges.remove ? ("remove" as const) : null,
@@ -56,12 +77,21 @@ export function MoveBadges({ badges, containerRef }: MoveBadgesProps) {
   ].filter((badge) => badge !== null);
   // The Drop badge of a move over a laser page, right-below the hotspot (`specs/0100` UX notes
   // §2): glyph and word; it replaces the plus badge.
-  const dropBadge = badges.drop ? (
+  const dropKind: DropBadgeKind | null = badges.drop;
+  // The fit cue names the slot in words (`fitWord`); the highlight is never the only cue.
+  const dropBadge = fit ? (
+    pointer ? (
+      <DropBadgePill
+        position="absolute"
+        badge={{ kind: "fit", word: fitWord(fit.name, fit.turned), refused: false, x: pointer.x + 16, y: pointer.y + 16 }}
+      />
+    ) : null
+  ) : dropKind ? (
     <DropBadgePill
       position="absolute"
       badge={{
-        kind: badges.drop,
-        word: badgeWord(badges.drop, "") ?? "",
+        kind: dropKind,
+        word: badgeWord(dropKind, "") ?? "",
         refused: false,
         x: badges.x + 16,
         y: badges.y + 16,
