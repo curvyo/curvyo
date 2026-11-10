@@ -13,7 +13,6 @@ use std::f64::consts::{FRAC_PI_2, PI, TAU};
 use curvyo_ui_core::read_trace_wire;
 use vectrace::TraceParams;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
-use vectrace::shapes::trace_add_shapes;
 use vectrace::shapes::{Join as TraceJoin, Primitive as TracePrimitive};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
@@ -75,7 +74,7 @@ fn recognised(rgba: &[u8]) -> Option<(&'static str, u32, f64, Option<f64>, f64)>
 }
 
 fn recognised_at(rgba: &[u8], side: u32) -> Option<(&'static str, u32, f64, Option<f64>, f64)> {
-    let mut wire = run_trace_job(
+    let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: side,
@@ -86,11 +85,10 @@ fn recognised_at(rgba: &[u8], side: u32) -> Option<(&'static str, u32, f64, Opti
             mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
             lines: &[],
             mask: None,
-            shapes: false,
+            shapes: true,
         },
         &mut |_| {},
     );
-    trace_add_shapes(&mut wire, MAP);
     let read = read_trace_wire(&wire).unwrap();
     let region = read.shapes.first()?;
     Some(match *region.shapes[0].as_ref()? {
@@ -255,7 +253,7 @@ fn the_customers_stars_are_stars() {
         0.0,
         0.0,
     ];
-    let mut wire = run_trace_job(
+    let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: w,
@@ -266,11 +264,10 @@ fn the_customers_stars_are_stars() {
             mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
             lines: &[],
             mask: None,
-            shapes: false,
+            shapes: true,
         },
         &mut |_| {},
     );
-    trace_add_shapes(&mut wire, map);
     let read = read_trace_wire(&wire).unwrap();
     let mut stars: Vec<u32> = read
         .shapes
@@ -310,26 +307,26 @@ fn the_customers_page_keeps_every_hole() {
         0.0,
         0.0,
     ];
-    let off = run_trace_job(
-        &TraceJob {
-            raster: TraceRaster {
-                width: w,
-                height: h,
-                rgba: png.as_raw(),
+    let traced = |shapes: bool| {
+        run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: w,
+                    height: h,
+                    rgba: png.as_raw(),
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+                lines: &[],
+                mask: None,
+                shapes,
             },
-            map: TracePixelMap::new(map),
-            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
-            lines: &[],
-            mask: None,
-            shapes: false,
-        },
-        &mut |_| {},
-    );
-    let mut on = off.clone();
-    trace_add_shapes(&mut on, map);
+            &mut |_| {},
+        )
+    };
     let (off, on) = (
-        read_trace_wire(&off).unwrap(),
-        read_trace_wire(&on).unwrap(),
+        read_trace_wire(&traced(false)).unwrap(),
+        read_trace_wire(&traced(true)).unwrap(),
     );
     let signed = |p: &kurbo::BezPath| kurbo::Shape::area(p);
     let mut kinds = Vec::new();
@@ -459,8 +456,21 @@ fn the_customers_ten_outline_stars_are_stroked_stars() {
         },
         &mut |_| {},
     );
-    let mut on = off.clone();
-    trace_add_shapes(&mut on, map);
+    let on = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: w,
+                height: h,
+                rgba: png.as_raw(),
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+            lines: &[],
+            mask: None,
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     let (off, on) = (
         read_trace_wire(&off).unwrap(),
         read_trace_wire(&on).unwrap(),

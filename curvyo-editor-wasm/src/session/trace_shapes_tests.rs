@@ -6,7 +6,7 @@ use curvyo_document_core::{Color, ObjectSnapshot, Shape};
 use curvyo_ui_core::read_trace_wire;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::ocr::read_text;
-use vectrace::shapes::trace_add_shapes;
+use vectrace::shapes::add_shapes;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 use super::trace_text_tests::{cpu_seconds, fit, model, session_with, session_with_bytes};
@@ -68,7 +68,7 @@ fn made(session: &Session) -> Made {
 fn traced(png: &[u8], multicolour: bool) -> Session {
     let (mut session, image) = session_with_bytes(png, "shapes.png");
     let source = session.trace_source(image, false).unwrap();
-    let mut wire = if multicolour {
+    let wire = if multicolour {
         let params = crate::trace_glue::trace_colour_settings(
             r##"{"output":1,"method":1,"background":"#FFFFFF","threshold":128,"specks":0}"##,
         )
@@ -84,7 +84,7 @@ fn traced(png: &[u8], multicolour: bool) -> Session {
                 mode: TraceMode::Colours(&params),
                 lines: &[],
                 mask: None,
-                shapes: false,
+                shapes: true,
             },
             &mut |_| {},
         )
@@ -100,12 +100,11 @@ fn traced(png: &[u8], multicolour: bool) -> Session {
                 mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
                 lines: &[],
                 mask: None,
-                shapes: false,
+                shapes: true,
             },
             &mut |_| {},
         )
     };
-    trace_add_shapes(&mut wire, source.map);
     assert!(session.set_trace_result(image, &wire));
     assert!(session.set_trace_preview(image, &wire));
     session
@@ -239,7 +238,7 @@ fn c12_letters_never_become_shapes() {
         &mut |_| {},
     );
     let started = cpu_seconds();
-    trace_add_shapes(&mut wire, source.map);
+    add_shapes(&mut wire, source.map);
     let shape_seconds = cpu_seconds() - started;
     let read = read_trace_wire(&wire).unwrap();
     eprintln!(
@@ -336,7 +335,7 @@ fn c6_five_hundred_paths_take_under_two_seconds() {
     );
     let mut wire = plain.clone();
     let started = cpu_seconds();
-    trace_add_shapes(&mut wire, source.map);
+    add_shapes(&mut wire, source.map);
     let seconds = cpu_seconds() - started;
     let read = read_trace_wire(&wire).unwrap();
     eprintln!(
@@ -403,8 +402,21 @@ fn native_record_of_the_shape_sections_matches_the_golden_file() {
             },
             &mut |_| {},
         );
-        let mut wire = plain.clone();
-        trace_add_shapes(&mut wire, map);
+        let wire = run_trace_job(
+            &TraceJob {
+                raster: TraceRaster {
+                    width: w,
+                    height: h,
+                    rgba: &rgba,
+                },
+                map: TracePixelMap::new(map),
+                mode: TraceMode::Mono(&crate::trace_glue::trace_settings(settings)),
+                lines: &[],
+                mask: None,
+                shapes: true,
+            },
+            &mut |_| {},
+        );
         let read = read_trace_wire(&wire).unwrap();
         assert!(!read.shapes.is_empty(), "{file}");
         record.insert(file.to_owned(), serde_json::json!(wire[plain.len()..]));

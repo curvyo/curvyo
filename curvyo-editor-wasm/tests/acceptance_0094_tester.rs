@@ -574,7 +574,7 @@ fn fnv(bytes: &[u8]) -> u32 {
 /// The worker's `trace_job` as the wasm module runs it, natively.
 fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
     let region = trace_mask_region(settings);
-    let mut wire = match curvyo_editor_wasm::trace_colour_settings(settings) {
+    match curvyo_editor_wasm::trace_colour_settings(settings) {
         Some(colour) => run_trace_job(
             &TraceJob {
                 raster: TraceRaster {
@@ -586,7 +586,7 @@ fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
                 mode: TraceMode::Colours(&colour),
                 lines: &[],
                 mask: region.as_ref().map(|r| r as &dyn Mask),
-                shapes: false,
+                shapes: curvyo_editor_wasm::trace_recognise_shapes(settings),
             },
             &mut |_| {},
         ),
@@ -601,15 +601,11 @@ fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
                 mode: TraceMode::Mono(&trace_settings(settings)),
                 lines: &[],
                 mask: region.as_ref().map(|r| r as &dyn Mask),
-                shapes: false,
+                shapes: curvyo_editor_wasm::trace_recognise_shapes(settings),
             },
             &mut |_| {},
         ),
-    };
-    if curvyo_editor_wasm::trace_recognise_shapes(settings) {
-        vectrace::shapes::trace_add_shapes(&mut wire, map);
     }
-    wire
 }
 
 #[test]

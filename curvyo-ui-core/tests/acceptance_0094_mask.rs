@@ -19,7 +19,6 @@ use vectrace::job::{
 };
 use vectrace::mask::Mask;
 use vectrace::ocr::OcrLine;
-use vectrace::shapes::trace_add_shapes;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, TraceParams, suggest_background as trace_suggest_background,
@@ -655,7 +654,21 @@ fn c11_only_lines_and_shapes_whose_centre_is_in_the_region_stay() {
     .unwrap();
     assert_eq!(regions.texts.lines.len(), 1);
     // Recognise shapes on the clipped outlines: only the top disc.
-    trace_add_shapes(&mut wire, map);
+    wire = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: 200,
+                height: 200,
+                rgba: &picture,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&p),
+            lines: &lines,
+            mask: Some(&top),
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     let shapes = read_trace_wire(&wire).unwrap().shapes;
     assert_eq!(
         shapes

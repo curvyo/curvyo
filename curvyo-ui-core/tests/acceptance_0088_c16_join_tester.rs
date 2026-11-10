@@ -16,8 +16,8 @@ use kurbo::{BezPath, Join, ParamCurveNearest, Shape as _, Stroke, StrokeOpts};
 use vectrace::Output;
 use vectrace::TraceParams;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
+use vectrace::shapes::ShapeRegion;
 use vectrace::shapes::{Join as TraceJoin, Primitive as TracePrimitive};
-use vectrace::shapes::{ShapeRegion, trace_add_shapes};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster};
 
 const MM_PER_PX: f64 = 0.1;
@@ -111,8 +111,21 @@ fn run(rgba: &[u8], w: u32, h: u32) -> (Output, Output) {
         },
         &mut |_| {},
     );
-    let mut on = off.clone();
-    trace_add_shapes(&mut on, map);
+    let on = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: w,
+                height: h,
+                rgba,
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+            lines: &[],
+            mask: None,
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     (
         read_trace_wire(&off).unwrap(),
         read_trace_wire(&on).unwrap(),
@@ -427,8 +440,21 @@ fn customer_outline_stars_eight_mitred_one_bevelled_one_round() {
         },
         &mut |_| {},
     );
-    let mut on = off.clone();
-    trace_add_shapes(&mut on, map);
+    let on = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: w,
+                height: h,
+                rgba: png.as_raw(),
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+            lines: &[],
+            mask: None,
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     let (off, on) = (
         read_trace_wire(&off).unwrap(),
         read_trace_wire(&on).unwrap(),

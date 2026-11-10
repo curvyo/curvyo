@@ -52,37 +52,27 @@ mod trace;
 mod units;
 pub mod wire;
 
-// The integration tests' helpers (the quality set and its metrics) for the one unit test that
-// needs the trace before the node reduction (`trace::tests`).
-#[cfg(test)]
-extern crate self as vectrace;
-#[cfg(test)]
-#[path = "../tests/common/mod.rs"]
-#[allow(clippy::pedantic, clippy::all, missing_docs)]
-mod test_common;
-
 pub use analysis::{
-    AnalysisReport, Capture, ImageType, LOW_CONFIDENCE, Property, PropertyKind, Proposal, Reason,
-    analyse,
+    AnalysisReport, Capture, ImageType, Property, PropertyKind, Proposal, Reason, analyse,
 };
 pub use background::{sample_colour, suggest_background};
 pub use colour_trace::{
     ColourLayer, ColourParams, ColourTrace, PaletteEntry, colour_palette, trace_colours,
 };
 pub use outline::node_count;
-pub use palette::{DEFAULT_COLOURS, MAX_COLOURS, MIN_COLOURS};
+pub use palette::MAX_COLOURS;
 pub use params::{
     Denoise, MAX_SWATCHES, PRESETS, PixelLength, Preset, Rgb8, Selection, Swatches, TraceParams,
-    UPSCALE_AUTO_BELOW_PX, Upscale,
+    Upscale,
 };
 pub use progress::{Phase, Progress};
-pub use raster::{Raster, auto_threshold, luma};
+pub(crate) use raster::luma;
+pub use raster::{Raster, auto_threshold};
 pub use schema::{
-    ADVANCED_PARAMS, DEFAULT_CORNERS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD,
-    DEFAULT_TOLERANCE_PX, MAX_SPECKS_MM, MAX_TOLERANCE_PX, METHOD_PARAMS, MIN_TOLERANCE_PX, PARAMS,
-    ParamKind, ParamSpec, ParamUnit,
+    ADVANCED_PARAMS, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM, DEFAULT_THRESHOLD, DEFAULT_TOLERANCE_PX,
+    METHOD_PARAMS, PARAMS, ParamKind, ParamSpec, ParamUnit,
 };
 pub use select::{DEFAULT_BACKGROUND_TOLERANCE, DEFAULT_PICK_TOLERANCE, selected};
-pub use trace::{Counts, Diagnostics, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};
+pub use trace::{Counts, MAX_HOLES_PER_REGION, TraceError, TraceResult, trace};
 pub use units::{Angle, Mm, PixelMap};
 pub use wire::Output;

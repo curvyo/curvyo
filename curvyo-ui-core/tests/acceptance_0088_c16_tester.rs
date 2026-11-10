@@ -12,7 +12,6 @@ use curvyo_ui_core::read_trace_wire;
 use kurbo::{BezPath, Join, Shape as _, Stroke, StrokeOpts};
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::shapes::Primitive;
-use vectrace::shapes::trace_add_shapes;
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
 
 const MM_PER_PX: f64 = 25.4 / 96.0;
@@ -92,8 +91,21 @@ fn c16_the_customers_8_star_is_a_stroked_star_with_the_traced_area() {
         },
         &mut |_| {},
     );
-    let mut on = off.clone();
-    trace_add_shapes(&mut on, map);
+    let on = run_trace_job(
+        &TraceJob {
+            raster: TraceRaster {
+                width: w,
+                height: h,
+                rgba: png.as_raw(),
+            },
+            map: TracePixelMap::new(map),
+            mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
+            lines: &[],
+            mask: None,
+            shapes: true,
+        },
+        &mut |_| {},
+    );
     let (off, on) = (
         read_trace_wire(&off).unwrap(),
         read_trace_wire(&on).unwrap(),

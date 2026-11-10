@@ -16,7 +16,6 @@ use vectrace::Output;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::mask::Mask;
 use vectrace::ocr::OcrLine;
-use vectrace::shapes::trace_add_shapes;
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, TraceParams,
@@ -570,7 +569,7 @@ fn c30_text_and_shapes_follow_the_part_their_centre_lies_in() {
     let clips = trace_part_clips(&[TracePartArea::Whole, bottom], &quad);
     let p = TraceParams::with_threshold(128);
     let lines = [ocr_line(40.0), ocr_line(140.0)];
-    let mut first = run_trace_job(
+    let first = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: 200,
@@ -581,11 +580,10 @@ fn c30_text_and_shapes_follow_the_part_their_centre_lies_in() {
             mode: TraceMode::Mono(&p),
             lines: &lines,
             mask: clips[0].region().map(|r| r as &dyn Mask),
-            shapes: false,
+            shapes: true,
         },
         &mut |_| {},
     );
-    trace_add_shapes(&mut first, map);
     let first = read_trace_wire(&first).unwrap();
     let second = read_trace_wire(&run_trace_job(
         &TraceJob {

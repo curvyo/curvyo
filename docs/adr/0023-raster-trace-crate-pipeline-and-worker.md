@@ -228,6 +228,6 @@ does not change, so the fallback is a crate-internal swap plus dropping the depe
 
 §1: the crate becomes `vectrace` (`vectrace/`) and has no `document-core` edge. §2: `pixel_map` is
 `vectrace::PixelMap` (the same `mul_add` arithmetic as `Affine`), and `TraceParams::specks` is
-`vectrace::Mm`. §5: the worker's jobs become one `vectrace::run(&Job)`, whose result is the
+`vectrace::Mm`. §5: the worker's jobs become one `vectrace::job::run(&Job)`, whose result is the
 unchanged `f64` wire, and the mask clip reaches it through the `Mask` trait. The decision text
 above is otherwise unchanged.

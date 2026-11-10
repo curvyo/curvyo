@@ -12,9 +12,7 @@ use curvyo_ui_core::read_trace_wire;
 use vectrace::Angle;
 use vectrace::Output;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
-use vectrace::shapes::{
-    Join as TraceJoin, Primitive as TracePrimitive, ShapeRegion, trace_add_shapes,
-};
+use vectrace::shapes::{Join as TraceJoin, Primitive as TracePrimitive, ShapeRegion};
 use vectrace::{
     ColourParams as TraceColourParams, PixelMap as TracePixelMap, Raster as TraceRaster,
     Rgb8 as TraceRgb, Selection as TraceMethod, TraceParams,
@@ -55,7 +53,7 @@ fn picture_rgb(w: u32, h: u32, paint: impl Fn(f64, f64) -> Option<[u8; 3]>) -> V
 }
 
 fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, Output) {
-    let mut wire = run_trace_job(
+    let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: w,
@@ -66,13 +64,10 @@ fn traced(rgba: &[u8], w: u32, h: u32, shapes: bool) -> (Vec<f64>, Output) {
             mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
             lines: &[],
             mask: None,
-            shapes: false,
+            shapes,
         },
         &mut |_| {},
     );
-    if shapes {
-        trace_add_shapes(&mut wire, MAP);
-    }
     let read = read_trace_wire(&wire).unwrap();
     (wire, read)
 }
@@ -399,7 +394,7 @@ fn c9_the_0025_ring_and_dot_grid() {
     });
     for map in [[0.264_583_333, 0.0, 0.0, 0.264_583_333, 0.0, 0.0], MAP] {
         let shape_wire = |rgba: &[u8], side: u32| {
-            let mut wire = run_trace_job(
+            let wire = run_trace_job(
                 &TraceJob {
                     raster: TraceRaster {
                         width: side,
@@ -410,11 +405,10 @@ fn c9_the_0025_ring_and_dot_grid() {
                     mode: TraceMode::Mono(&TraceParams::with_threshold(128)),
                     lines: &[],
                     mask: None,
-                    shapes: false,
+                    shapes: true,
                 },
                 &mut |_| {},
             );
-            trace_add_shapes(&mut wire, map);
             read_trace_wire(&wire).unwrap()
         };
         let read = shape_wire(&ring, 200);
@@ -452,7 +446,7 @@ fn c10_multicolour_keeps_each_colour() {
         },
         ..TraceParams::with_threshold(128)
     });
-    let mut wire = run_trace_job(
+    let wire = run_trace_job(
         &TraceJob {
             raster: TraceRaster {
                 width: 1000,
@@ -463,11 +457,10 @@ fn c10_multicolour_keeps_each_colour() {
             mode: TraceMode::Colours(&params),
             lines: &[],
             mask: None,
-            shapes: false,
+            shapes: true,
         },
         &mut |_| {},
     );
-    trace_add_shapes(&mut wire, MAP);
     let read = read_trace_wire(&wire).unwrap();
     assert_eq!(read.layers.len(), 2);
     let layer_of = |i: usize| {
