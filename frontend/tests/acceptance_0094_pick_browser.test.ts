@@ -988,3 +988,50 @@ test("0089 §25.4: a right press on the canvas disarms the Pick colours pipette 
     assert.ok(menus.every(Boolean), `no native context menu: ${JSON.stringify(menus)}`);
   });
 });
+
+test("0089 §27.8: a new part starts without picked colours, another part's colours are not shown, and its own x removes", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(
+    async (s) => {
+      const file = path.join(SCRATCH, "stripes.png");
+      writeFileSync(file, STRIPES_PNG);
+      await s.tab("Layers");
+      await s.choose("[data-import-button]", file);
+      await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("stripes.png")) ? true : null));
+      await sleep(800);
+      const box = await pictureBox(s);
+      const w = 240;
+      const x0 = box.x1 + 1 - w;
+      const point = (i: number): [number, number] => [x0 + ((i + 0.5) * w) / 8, box.cy + 0.35 * w];
+      await openTrace(s);
+      await setAdvanced(s, false);
+      await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]').click()`);
+      await sleep(300);
+      await s.evaluate(`[...document.querySelectorAll('[role=menu][aria-label=Method] [role=menuitemradio]')].find((e) => e.textContent.includes('Pick colours')).click()`);
+      await sleep(1000);
+      await s.click(...point(0));
+      await shiftClick(s, ...point(1));
+      await waitFor("two picked", async () => ((await pickedRow(s)).cells.length === 2 ? true : null), 10_000);
+      // Add part: the new part is empty and the bar shows none of part 1's colours.
+      await setAdvanced(s, true);
+      await s.clickSel(`${ADV} button[aria-label="Add part"]`);
+      await setAdvanced(s, false);
+      await waitFor("no colours for part 2", async () => ((await pickedRow(s)).cells.length === 0 ? true : null), 10_000);
+      // Part 2 picks its own colour and removes it with its x.
+      await s.click(...point(2));
+      await waitFor("one picked in part 2", async () => {
+        const row = await pickedRow(s);
+        return row.names.length === 1 && row.names[0] === `Remove ${hexOf(STRIPES[2])}` ? true : null;
+      }, 10_000);
+      await s.evaluate(`document.querySelector('${BAR} [data-trace-picked-swatch]').click()`);
+      await waitFor("removed in part 2", async () => ((await pickedRow(s)).cells.length === 0 ? true : null), 10_000);
+      // Part 1 keeps its two colours.
+      await setAdvanced(s, true);
+      await s.clickSel(`${ADV} [role=radiogroup][aria-label=Parts] [data-trace-part="1"]`);
+      await setAdvanced(s, false);
+      await waitFor("part 1's colours", async () => {
+        const row = await pickedRow(s);
+        return row.names.join() === [STRIPES[0], STRIPES[1]].map((c) => `Remove ${hexOf(c)}`).join() ? true : null;
+      }, 10_000);
+    },
+  );
+});
