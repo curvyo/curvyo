@@ -635,3 +635,23 @@ test("0089 §26.6 tester: About Trace has one Palette entry, a Parts entry befor
   const design = readFileSync(path.resolve(FRONTEND, "..", "docs", "design-system.md"), "utf8");
   assert.ok(design.includes('"Shift+click: exclude"'), "the design system names the tooltip line (§27)");
 });
+
+test("0089 §27.3 tester: hovering a swatch shows the x; with Shift held it shows the Exclude glyph instead", { skip: !BROWSER, timeout: 400_000 }, async () => {
+  await withApp(async (s) => {
+    await openOn(s, "shiftglyph.png", PICTURE);
+    await pickMethod(s, "Remove background");
+    await sixColours(s);
+    const hex = (await swatchNames(s))[0].slice(0, 7);
+    const shown = async () =>
+      (await s.evaluate(`JSON.stringify([...document.querySelectorAll(${JSON.stringify(swatch(hex))} + ' svg')].filter((v) => getComputedStyle(v.parentElement).display !== 'none').map((v) => v.getAttribute('class').includes('lucide-x') ? 'x' : v.getAttribute('class').includes('lucide-ban') ? 'ban' : '?').filter((v, i, a) => a.indexOf(v) === i))`)) as string;
+    await moveTo(s, swatch(hex));
+    assert.equal(await shown(), '["x"]', "plain hover: the x");
+    await s.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 8 });
+    await sleep(300);
+    assert.equal(await shown(), '["ban"]', "Shift held: the Exclude glyph");
+    await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16, modifiers: 0 });
+    await sleep(300);
+    assert.equal(await shown(), '["x"]', "Shift released: the x again");
+    await away(s);
+  });
+});
