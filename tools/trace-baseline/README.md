@@ -1,6 +1,6 @@
 # Trace baselines (offline)
 
-The quality harness of `curvyo-vectorize-core` (`specs/0025-raster-trace` criteria 27 to 29,
+The quality harness of `vectrace` (`specs/0025-raster-trace` criteria 27 to 29,
 ADR 0023 §7) compares our trace with Inkscape's Trace Bitmap. Inkscape (GPL) never runs in CI and
 none of its output is committed: it runs here, by hand, and only its numbers go into
 `vectrace/tests/fixtures/trace/baseline.json`.
