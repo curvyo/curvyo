@@ -1,6 +1,6 @@
 //! Tester cases for `specs/0091-trace-text-recognition` slice 2 (criteria 23 and 24): text
 //! recognition in the multicolour Trace, on the tester's own colour posters
-//! (`vectrace/tests/fixtures/tester/make_colour.py`): red, green (a colour only the text
+//! (`tests/assets/vectrace-fixtures/tester/make_colour.py`): red, green (a colour only the text
 //! has), blue and black text on white, white text on a blue box, a red disc, umlauts and ß.
 //! Written from the specification and adrs.md decision 6; only public names were looked up.
 //!
@@ -65,7 +65,9 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn fixture(file: &str) -> PathBuf {
-    root().join("vectrace/tests/fixtures/tester").join(file)
+    root()
+        .join("tests/assets/vectrace-fixtures/tester")
+        .join(file)
 }
 
 fn golden() -> PathBuf {

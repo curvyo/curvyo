@@ -155,7 +155,7 @@ async function session(profile: string) {
 
 const BAR = "[role=toolbar][aria-label=Trace]";
 type S = Awaited<ReturnType<typeof session>>;
-const ROTATED = path.resolve(FRONTEND, "..", "vectrace", "tests", "fixtures", "rotated.png");
+const ROTATED = path.resolve(FRONTEND, "..", "tests", "assets", "vectrace-fixtures", "rotated.png");
 
 async function openTrace(s: S, file: string) {
   await s.send("Page.navigate", { url: `${ORIGIN}/` });
@@ -254,7 +254,7 @@ test("0091 slice 1 in Chromium: the switch, reading text offline, the text above
   }
 });
 
-const POSTER = path.resolve(FRONTEND, "..", "vectrace", "tests", "fixtures", "poster.png");
+const POSTER = path.resolve(FRONTEND, "..", "tests", "assets", "vectrace-fixtures", "poster.png");
 
 test("0091 slice 1 in Chromium: reading and fitting the poster keeps the main thread free", { skip: !BROWSER, timeout: 300_000 }, async () => {
   let vite: ChildProcess | null = null;
@@ -300,8 +300,8 @@ test("0091 slice 1 in Chromium: reading and fitting the poster keeps the main th
   }
 });
 
-const COLOUR_SMALL = path.resolve(FRONTEND, "..", "vectrace", "tests", "fixtures", "colour", "colour_small.png");
-const COLOUR_POSTER = path.resolve(FRONTEND, "..", "vectrace", "tests", "fixtures", "colour", "colour_poster.png");
+const COLOUR_SMALL = path.resolve(FRONTEND, "..", "tests", "assets", "vectrace-fixtures", "colour", "colour_small.png");
+const COLOUR_POSTER = path.resolve(FRONTEND, "..", "tests", "assets", "vectrace-fixtures", "colour", "colour_poster.png");
 const COLOUR_NATIVE = path.resolve(FRONTEND, "..", "curvyo-editor-wasm", "tests", "fixtures", "trace_text_colour_native.json");
 
 test("0091 slice 2 in Chromium: Recognise text drawn and honoured in Multicolour, coloured texts above the group in one step", { skip: !BROWSER, timeout: 300_000 }, async () => {

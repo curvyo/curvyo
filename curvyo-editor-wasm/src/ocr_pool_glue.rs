@@ -101,7 +101,8 @@ mod tests {
     fn crops_read_in_shares_give_the_one_worker_read() {
         let model = model();
         let bytes = std::fs::read(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../vectrace/tests/fixtures/poster.png"),
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../tests/assets/vectrace-fixtures/poster.png"),
         )
         .unwrap();
         let image = curvyo_image_core::decode_working(&bytes).unwrap();

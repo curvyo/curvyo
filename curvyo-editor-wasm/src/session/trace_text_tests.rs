@@ -56,7 +56,7 @@ fn load_wanted(session: &mut Session) {
 
 /// A session with the included fonts listed and `file` imported, selected, in the Trace tool.
 pub(super) fn session_with(file: &str) -> (Session, NodeId) {
-    let bytes = std::fs::read(root().join("vectrace/tests/fixtures").join(file)).unwrap();
+    let bytes = std::fs::read(root().join("tests/assets/vectrace-fixtures").join(file)).unwrap();
     session_with_bytes(&bytes, file)
 }
 

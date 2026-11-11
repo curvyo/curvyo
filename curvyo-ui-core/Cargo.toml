@@ -19,7 +19,7 @@ curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 # The bitmap decoder boundary of the image import (ADR 0017 §4).
 curvyo-image-core = { path = "../curvyo-image-core", version = "0.1.0" }
 # The raster tracer and the text reader of the Trace tool (ADR 0023 §1, ADR 0028 §1; ADR 0048 §1).
-vectrace = { path = "../vectrace", version = "0.1.0" }
+vectrace.workspace = true
 # The compiled-in extension contract and the laser workbench (ADR 0034 §2, §3).
 curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }

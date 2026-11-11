@@ -35,7 +35,12 @@ fn record() -> PathBuf {
 
 /// The plain multicolour wire of `file` with `settings`, and the paths Create paths writes.
 fn off(file: &str, settings: &str) -> Value {
-    let bytes = std::fs::read(root().join("vectrace/tests/fixtures/tester").join(file)).unwrap();
+    let bytes = std::fs::read(
+        root()
+            .join("tests/assets/vectrace-fixtures/tester")
+            .join(file),
+    )
+    .unwrap();
     let mut s = Session::new(91);
     s.resize_viewport(1600.0, 1000.0);
     s.import_begin(None);

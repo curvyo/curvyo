@@ -1,5 +1,5 @@
 # Licence record of the shipped text recognition weights (ADR 0028 §5). The files are the ONNX
-# conversion, unmodified. Checked by `vectrace/tests/model_record.rs`: every file of this
+# conversion, unmodified. Checked by `tests/model_record.rs` in https://github.com/curvyo/vectrace: every file of this
 # folder but this record and the licence text has an entry, an allowed licence and the SHA-256
 # that `vectrace::ocr` expects. Changing a file is a code change (new constants, new harness
 # baseline), never a silent swap.

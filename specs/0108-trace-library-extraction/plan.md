@@ -1,6 +1,6 @@
 # 0108 Trace library extraction: plan
 
-Status: **Approved by the customer, 2026-11-10**, with these answers: Frage 1 = B, the crate is
+Status: Done (PR #316, repo curvyo/vectrace). Approved by the customer, 2026-11-10, with these answers: Frage 1 = B, the crate is
 named `vectrace` (directory `vectrace/`, no Curvyo name); Frage 2 = A, OCR is a module of the same
 crate; Frage 3 = A, licence MIT OR Apache-2.0 (weights stay Apache-2.0). Branch
 `story/trace-library-extraction`.

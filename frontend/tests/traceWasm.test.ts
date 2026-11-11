@@ -1,5 +1,5 @@
 // `specs/0025-raster-trace` criterion 18 and `specs/0089` criterion 13a: the wasm build (the one
-// the worker runs in both builds) traces the golden fixtures of `vectrace` exactly like
+// the worker runs in both builds) traces the golden fixtures of `vectrace` (`tests/assets/vectrace-fixtures/trace`) exactly like
 // the native build: equal path and node counts, the golden points within 1e-6 mm (the tracer uses
 // basic operations and `sqrt` only), the boxes within the sampling sag of this test. Needs the wasm
 // bindings (`npm run build:wasm`).
@@ -10,7 +10,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
-const FIXTURES = path.join(ROOT, "vectrace", "tests", "fixtures", "trace");
+const FIXTURES = path.join(ROOT, "tests", "assets", "vectrace-fixtures", "trace");
 const BINDINGS = path.resolve(import.meta.dirname, "..", "src", "wasm-bindings");
 const WASM = path.join(BINDINGS, "curvyo_editor_wasm_bg.wasm");
 

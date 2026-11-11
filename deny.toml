@@ -123,3 +123,5 @@ wildcards = "deny"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# The trace library, pinned by revision in the workspace `Cargo.toml` (ADR 0048).
+allow-git = ["https://github.com/curvyo/vectrace"]
