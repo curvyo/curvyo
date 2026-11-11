@@ -2,8 +2,8 @@ name: Renovate
 
 on:
   schedule:
-    # Once a week, Monday.
-    - cron: "0 4 * * 1"
+    # Once a day.
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 jobs:
