@@ -222,11 +222,9 @@ Accepted deviations from §5, kept as they are:
   (`Counts`, `Diagnostics`, `Progress`, `Phase`, `Selection`, `Swatches`, `Denoise`, `Upscale`,
   `ColourLayer`, the analysis report types, `wire::{Palette, Layer, Text, Texts}`, the `MAX_*` and
   `DEFAULT_*` constants, the OCR model hashes and `LINE_HEIGHT`). They are part of the API.
-- `curvyo-document-core` is a dev-dependency of `vectrace` for the `PixelMap` bit test (§3 put
-  that test in Curvyo). It is extraction blocker 1 in `specs/0108-trace-library-extraction/
-  extraction.md` and goes with it.
+- The `PixelMap` bit test uses constants frozen from `document-core`'s `Affine`; vectrace has no `curvyo-*` crate, not even as a dev-dependency (done 2026-11-11).
 
-Required before the PR (review findings, `CLAUDE.md` §5 units): re-export `Diagnostics`
+Done before the PR (review findings, `CLAUDE.md` §5 units): re-export `Diagnostics`
 (its fields are public on `TraceResult` and `ColourTrace`); make `wire::Text::pixel` and `positions`
 `Mm`, `Preset::tolerance_px`/`specks_mm` and `DEFAULT_TOLERANCE_PX`/`DEFAULT_SPECKS_MM`
 `PixelLength` and `Mm`, and `add_shapes` take a `PixelMap`.
