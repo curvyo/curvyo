@@ -1,6 +1,6 @@
 # Fixture jobs: a fixture carries its own operations, listed below the work with Output off, stored with the machine setup
 
-Status: Ready (2026-11-11; `adrs.md`, ADR 0052 (Proposed, accepted with the PR) and `ux-notes.md` exist; Fragen 176, 177 and 178 open with defaults A, B, B)
+Status: Done (PR #330; ADR 0052 accepted with the PR; Fragen 176 A, 177 B, 178 B built as defaults, the Output turn-off after an output is a rule for 0029)
 Priority: Should
 Origin: Customer (concept `specs/0063-manufacturing-workbenches/concept-output-pages.md` §6 "Fixture jobs", accepted 2026-11-05 with feedback 11: "fixtures may need cutting or engraving themselves (a slide-in board with engraved coaster outlines)"; request of 2026-10-17 in `R-MFG-007`: "a fixture job cuts or engraves them before the parts"). Slice 5b of `specs/0063-manufacturing-workbenches/`, the last slice of the epic's fixtures. The customer's example: the coaster outlines of a slide-in board are engraved once. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
