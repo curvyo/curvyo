@@ -47,6 +47,22 @@ debug = false
 [profile.dev.package.sha2]
 opt-level = 3
 
+# The text reader runs the reference set in the ordinary test run; unoptimised it takes minutes.
+[profile.dev.package.rten]
+opt-level = 3
+[profile.dev.package.rten-gemm]
+opt-level = 3
+[profile.dev.package.rten-tensor]
+opt-level = 3
+[profile.dev.package.rten-vecmath]
+opt-level = 3
+[profile.dev.package.rten-simd]
+opt-level = 3
+[profile.dev.package.rten-base]
+opt-level = 3
+[profile.dev.package.vectrace]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = true
