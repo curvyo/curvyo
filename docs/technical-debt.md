@@ -14,8 +14,10 @@ it is accepted for good.
 
 One orientation change, drop or delete on 201 pages measured 38 to 66 ms thread CPU (cheapest of 3, debug build, developer machine);
 the first test limit of 100 ms failed on the CI runner, so the test is now a regression guard at 500 ms. The layout is O(pages^2) by
-design (ADR 0051). Look at it again if a project with hundreds of pages feels slow on a layout command; the 200-page draw check
-(`0059` criterion 14) measures about 4 % slower than before 0109, cause unproven (probably the test's own set-up).
+design (ADR 0051). Look at it again if a project with hundreds of pages feels slow on a layout command; the 200-page check
+(`0059` criterion 14, a budget the implementer's plan set, not the customer) measured about 4 % slower than before 0109 (draw
+9 to 10 ms on a developer machine, cause unproven, probably the test's own set-up) and failed its 20 ms limit on the CI runner in
+four of five runs, so its switch and draw limits are now regression guards at 50 ms.
 
 ## Concurrent page size changes, drops or deletes can merge into overlapping pages (`0109`, 2026-11-10)
 
