@@ -114,7 +114,8 @@ mod open_error;
 mod operations;
 #[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
 pub use fixtures::{
-    FitCue, FixtureKindView, FixtureLabel, FixtureRow, FixturesView, GridValues, SlotRow, TapesView,
+    AddTarget, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow, FixturesView,
+    GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
 };
 pub use operations::OperationsViewMode;
 mod page_drag;

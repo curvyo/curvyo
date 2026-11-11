@@ -1,0 +1,103 @@
+{
+  "add_to": null,
+  "count": 3,
+  "damage_notices": [],
+  "damaged": 0,
+  "groups": [
+    {
+      "fixture": "hhpykmt2rhhv3",
+      "jobs": [
+        {
+          "fixture_active": true,
+          "id": "33ps6gw1d1ty0",
+          "kind": {
+            "text": "cut",
+            "word": "Cut"
+          },
+          "name": "Cut 1",
+          "of": 1,
+          "output": false,
+          "parts_ticked": 1,
+          "parts_total": 2,
+          "position": 0,
+          "runs": false,
+          "show": true
+        }
+      ],
+      "kind": "grid",
+      "name": "Grid 1"
+    },
+    {
+      "fixture": "bitkumn0sygw2",
+      "jobs": [
+        {
+          "fixture_active": true,
+          "id": "idw8lqqt0rgf2",
+          "kind": {
+            "text": "engrave_outline",
+            "word": "Engrave + Outline"
+          },
+          "name": "Engrave + Outline 1",
+          "of": 1,
+          "output": true,
+          "parts_ticked": 2,
+          "parts_total": 2,
+          "position": 0,
+          "runs": true,
+          "show": true
+        }
+      ],
+      "kind": "holder",
+      "name": "Holder 1"
+    },
+    {
+      "fixture": "yl2r6cy8r6af2",
+      "jobs": [
+        {
+          "fixture_active": false,
+          "id": "urdqi58cou5h0",
+          "kind": {
+            "text": "score",
+            "word": "Score"
+          },
+          "name": "Score 1",
+          "of": 1,
+          "output": true,
+          "parts_ticked": 1,
+          "parts_total": 2,
+          "position": 0,
+          "runs": false,
+          "show": true
+        }
+      ],
+      "kind": "holder",
+      "name": "Holder 2"
+    }
+  ],
+  "parts": {
+    "job": "idw8lqqt0rgf2",
+    "rows": [
+      {
+        "kind": "engrave_outline",
+        "name": "Board",
+        "select": "bitkumn0sygw2",
+        "state": "running",
+        "ticked": true,
+        "token": "board"
+      },
+      {
+        "kind": "engrave_outline",
+        "name": "Coaster 1",
+        "select": "q8qqpcn65qsg0",
+        "state": "running",
+        "ticked": true,
+        "token": "slot:0"
+      }
+    ]
+  },
+  "running": 1,
+  "running_fixtures": [
+    "bitkumn0sygw2"
+  ],
+  "selected": "idw8lqqt0rgf2"
+}

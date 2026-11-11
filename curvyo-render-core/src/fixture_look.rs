@@ -130,6 +130,9 @@ pub struct BoardLook {
     pub corners: [Point; 4],
     /// Its readable slots.
     pub slots: Vec<SlotLook>,
+    /// Whether a running fixture job engraves the board: its ground is the canvas ground, so the
+    /// hatch over it keeps its contrast (`specs/0103-fixture-jobs` UX notes J6).
+    pub engraved: bool,
 }
 
 /// An L-stop as two filled legs.
@@ -291,7 +294,12 @@ fn board_triangles(list: &mut DrawList, board: &BoardLook, px: f64) {
         OUTLINE_PX * 3.0 * px,
         theme::SELECTION_CASING,
     );
-    fan(list, &board.corners, BOARD);
+    let ground = if board.engraved {
+        theme::CANVAS_BG
+    } else {
+        BOARD
+    };
+    fan(list, &board.corners, ground);
 }
 
 fn clamp_triangles(list: &mut DrawList, corners: [Point; 4], px: f64) {
@@ -456,12 +464,28 @@ mod tests {
             boards: vec![BoardLook {
                 corners: rect(0.0, 0.0, 100.0, 60.0),
                 slots: Vec::new(),
+                engraved: false,
             }],
             ..FixtureLook::default()
         };
         let list = build_fixture_look(&look, view(), 1.0);
         assert_eq!(list.triangles.first().unwrap().color, INK);
         assert_eq!(list.triangles.last().unwrap().color, BOARD);
+    }
+
+    #[test]
+    fn an_engraved_board_takes_the_canvas_ground() {
+        let look = FixtureLook {
+            boards: vec![BoardLook {
+                corners: rect(0.0, 0.0, 100.0, 60.0),
+                slots: Vec::new(),
+                engraved: true,
+            }],
+            ..FixtureLook::default()
+        };
+        let list = build_fixture_look(&look, view(), 1.0);
+        assert_eq!(list.triangles.first().unwrap().color, INK);
+        assert_eq!(list.triangles.last().unwrap().color, theme::CANVAS_BG);
     }
 
     #[test]

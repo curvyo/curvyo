@@ -87,9 +87,14 @@ pub(super) struct PlacedFixture {
     pub slots: Vec<PlacedSlot>,
     /// How many slots did not read.
     pub damaged_slots: usize,
-    /// How many values of the fixture did not read: the stored shape (document-core) and the
-    /// value ranges (laser-core).
+    /// How many values of the fixture did not read: the stored shape and its jobs' values
+    /// (document-core), the value ranges and the jobs' ticks of no part of the kind (laser-core).
     pub damaged: usize,
+    /// How many values of its fixture jobs did not read (`specs/0103` criterion 22): the
+    /// document's job values and the ticks of laser-core. The job notice counts these.
+    pub job_damaged: usize,
+    /// Its fixture jobs in their order (`specs/0103` criterion 3).
+    pub jobs: Vec<super::jobs::PlacedJob>,
 }
 
 /// The fixtures of one laser page.
@@ -186,6 +191,8 @@ impl PlacedFixture {
                 }
             }
         }
+        let (jobs, job_damage) = super::jobs::read_jobs(kind, snapshot.id, &slots, &snapshot.jobs);
+        let snapshot_job_damage: usize = snapshot.jobs.iter().map(|job| job.damaged).sum();
         Self {
             id: snapshot.id,
             name: snapshot.name.clone(),
@@ -197,7 +204,9 @@ impl PlacedFixture {
             shape,
             slots,
             damaged_slots,
-            damaged: snapshot.damaged + curvyo_laser_core::params_damage(kind, params),
+            damaged: snapshot.damaged + curvyo_laser_core::params_damage(kind, params) + job_damage,
+            job_damaged: snapshot_job_damage + job_damage,
+            jobs,
         }
     }
 

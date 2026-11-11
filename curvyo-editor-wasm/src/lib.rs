@@ -180,14 +180,15 @@ pub use session::{
     StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{
+    AddTarget, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow, FixturesView,
+    GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
+};
+pub use session::{
     BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, ListEdit,
     MarkerFiles, PreparedShare, SyncSeeds, TransportAction, WorkspaceLink, WorkspaceWrite,
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{DropBadge, RowDragAnswer, RowDragSource, SketchRowState, SketchUsage};
-pub use session::{
-    FitCue, FixtureKindView, FixtureLabel, FixtureRow, FixturesView, GridValues, SlotRow, TapesView,
-};
 pub use session::{
     FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
 };
@@ -217,6 +218,8 @@ pub use session::{SketchTool, Workbench};
 pub use workspace_glue::{WorkspaceGlue, workspace_copy_bytes};
 pub use workspace_tree_glue::{deleted_json, disk_answer_json, disk_scan, list_edit, stamps};
 
+#[cfg(target_arch = "wasm32")]
+mod wasm_fixture_jobs;
 #[cfg(target_arch = "wasm32")]
 mod wasm_fixtures;
 #[cfg(target_arch = "wasm32")]

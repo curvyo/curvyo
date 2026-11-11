@@ -1,4 +1,4 @@
-# Plan for Fixture jobs (0103), Part A
+# Plan for Fixture jobs (0103), Parts A to C
 
 Branch: `story/0103-fixture-jobs`. Scope of this run: Part A only (the core crates and the
 labels; no editor-wasm session work, which is Part B). Fragen 176 to 178 at their defaults:
@@ -63,8 +63,24 @@ format 3 (ADR 0052 §7).
   42 file is refused; superseded format 40 pins updated (fulfils AC 20, 21, 22).
 - [x] 8. ui-core: the ten labels with their fixed undo names in `history_names.rs` and in
   `FREE_STEPS` of `step_scope.rs` (fulfils AC 4, 9; adrs.md §7).
-- [ ] 9. Part B (not this run): editor-wasm session module `session/fixtures/jobs/`, the
-  Operations view contract, the summary line, the budgets, the frontend.
+- [x] 9. Part B, editor-wasm `session/fixtures/jobs/` (one new state field `FixtureState.job`):
+  add to the one selected fixture ("<Kind> <N>", Show on, Output off, no tick, selected), rename,
+  delete, move inside the fixture, Show and Output, tick and untick by part token, Select of a
+  part; an Unknown job takes rename and delete only; the run rule's answer per job and the
+  summary count (jobs, not parts); the jobs' tick damage (`job_parts`) in the fixture's damage
+  notice; "Differs from profile" compares the page's jobs as a write keeps them (unknown kinds
+  and ticks of no part left out); the canvas look of the parts (kind look, Not assigned look for
+  Output off, symbol chips, the canvas ground under an engraved board through
+  `BoardLook.engraved` in render-core); the Layers fixture rows carry their jobs for the chevron
+  (fulfils AC 2 to 5, 8, 9, 12, 13, 15, 17, 18, 21 to 23).
+- [x] 10. Part C: the view JSON `FixtureJobsView` (`fixtures/jobs/view_json.rs`), the shared
+  fixtures `curvyo-editor-wasm/tests/fixtures/fixture_jobs_view/` with the contract test
+  `tests/fixture_jobs_view_contract.rs`, the wasm bridge `src/wasm_fixture_jobs.rs`, the budgets
+  `tests/fixture_jobs_budget.rs` in the performance job (fulfils AC 1 to 4, 8, 17, 21, 26).
+- [x] 11. document-core: the slot commands move from `manufacturing_fixture_commands.rs` (611
+  lines) to `manufacturing_slot_commands.rs` (behaviour unchanged).
+- [ ] 12. Part D (not this run): the frontend (section, rows, Parts list, summary line, Layers
+  chevron, the drop refusal notice) and its decoder of the shared fixtures.
 
 ## Validation
 

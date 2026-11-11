@@ -151,7 +151,7 @@ const fn edge_name(edge: TapeEdge) -> &'static str {
     }
 }
 
-fn kind_view(kind: FixtureKind) -> FixtureKindView {
+pub(super) fn kind_view(kind: FixtureKind) -> FixtureKindView {
     match kind {
         FixtureKind::EngravedGrid => FixtureKindView::Grid,
         FixtureKind::Holder => FixtureKindView::Holder,

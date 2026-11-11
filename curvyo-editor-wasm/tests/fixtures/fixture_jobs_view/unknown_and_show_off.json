@@ -1,0 +1,68 @@
+{
+  "add_to": null,
+  "count": 2,
+  "damage_notices": [],
+  "damaged": 0,
+  "groups": [
+    {
+      "fixture": "hhpykmt2rhhv3",
+      "jobs": [
+        {
+          "fixture_active": true,
+          "id": "02b54jj57lxd3",
+          "kind": null,
+          "name": "Burn 1",
+          "of": 2,
+          "output": false,
+          "parts_ticked": 0,
+          "parts_total": 2,
+          "position": 0,
+          "runs": false,
+          "show": true
+        },
+        {
+          "fixture_active": true,
+          "id": "idw8lqqt0rgf2",
+          "kind": {
+            "text": "cut",
+            "word": "Cut"
+          },
+          "name": "Cut 1",
+          "of": 2,
+          "output": false,
+          "parts_ticked": 1,
+          "parts_total": 2,
+          "position": 1,
+          "runs": false,
+          "show": false
+        }
+      ],
+      "kind": "holder",
+      "name": "Holder 1"
+    }
+  ],
+  "parts": {
+    "job": "idw8lqqt0rgf2",
+    "rows": [
+      {
+        "kind": null,
+        "name": "Board",
+        "select": "hhpykmt2rhhv3",
+        "state": "unticked",
+        "ticked": false,
+        "token": "board"
+      },
+      {
+        "kind": null,
+        "name": "Coaster 1",
+        "select": "w7m4gct849tf1",
+        "state": "show_off",
+        "ticked": true,
+        "token": "slot:0"
+      }
+    ]
+  },
+  "running": 0,
+  "running_fixtures": [],
+  "selected": "idw8lqqt0rgf2"
+}

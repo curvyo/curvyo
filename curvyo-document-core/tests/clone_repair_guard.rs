@@ -30,6 +30,10 @@ const EXEMPT: &[(&str, &str)] = &[
         "manufacturing_fixture_commands.rs",
         "a fixture holds slots only, never an object a clone follows (moved from manufacturing.rs)",
     ),
+    (
+        "manufacturing_slot_commands.rs",
+        "a slot is no object a clone follows (moved from manufacturing_fixture_commands.rs)",
+    ),
 ];
 
 fn count(text: &str, call: &str) -> usize {

@@ -12,6 +12,7 @@ mod feedback;
 mod fit;
 mod handles;
 mod hit;
+mod jobs;
 mod keys;
 mod params;
 mod placed;
@@ -35,6 +36,9 @@ use curvyo_document_core::NodeId;
 use curvyo_laser_core::FixtureKind;
 
 pub use fit::FitCue;
+pub use jobs::{
+    AddTarget, FixtureJobsView, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
+};
 pub use view_json::{
     FixtureKindView, FixtureLabel, FixtureRow, FixturesView, GridValues, SlotRow, TapesView,
 };
@@ -70,6 +74,8 @@ pub(in crate::session) struct FixtureState {
     notice: Option<String>,
     /// A coarse pointer: the hit tolerance is 12 px instead of 4 (UX notes D12).
     coarse: bool,
+    /// The fixture job whose Parts list is open (`specs/0103` criterion 8, ADR 0052).
+    job: Option<NodeId>,
 }
 
 impl Session {

@@ -2,17 +2,33 @@
 //! the last pick, the commands of the Machine block, and the outbox of writes the host performs.
 //! Library edits are no history step; edits of the manufacturing's copy are one step each.
 
-use curvyo_document_core::{
-    DocumentSize, FixtureRecord, FixtureSnapshot, Length, PageCorner, ProfileChange,
-};
+use curvyo_document_core::{DocumentSize, FixtureRecord, Length, PageCorner, ProfileChange};
+use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::{
     Connection, CopyRead, LibraryWrite, MachineProfile, MachineProfiles, OriginCorner, ProfileCopy,
     clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port, clamp_power, clamp_work_area,
     is_profile_id, new_profile_id, read_choice, read_copy, save_as_name, write_choice, write_copy,
 };
+use curvyo_laser_core::{FixtureKind, FixturePart, job_parts};
 
 use super::super::Session;
 use super::commands::workbench_of;
+
+/// `record` with its jobs as a profile write keeps them: known kinds only, each tick a part of
+/// the fixture's kind, in Parts-list order (ADR 0052 §7).
+fn saved_jobs(mut record: FixtureRecord) -> FixtureRecord {
+    let kind = FixtureKind::from_stored(&record.kind);
+    let slots = record.slots.len();
+    record
+        .jobs
+        .retain(|job| OperationKind::parse(&job.kind).is_some());
+    for job in &mut record.jobs {
+        let (parts, _) = job_parts(kind, slots, &job.targets);
+        job.targets = parts.into_iter().map(FixturePart::target).collect();
+        job.targets.sort_unstable();
+    }
+    record
+}
 
 /// The notice of a pick or reset that removed fixtures (criterion 29, ADR 0050 section 6): it
 /// informs about a removal, so it is not a success notice.
@@ -179,10 +195,12 @@ impl Session {
         changed
     }
 
-    /// The fixtures of the active page as a profile set (`specs/0102` criterion 28).
+    /// The fixtures of the active page as a profile set (`specs/0102` criterion 28), its jobs as
+    /// a profile write keeps them, so "Differs from profile" compares like with like (ADR 0052
+    /// §7): a job of an unknown kind and a tick of no part of the kind are left out.
     pub(super) fn active_fixture_set(&self) -> Vec<FixtureRecord> {
         self.active_manufacturing()
-            .map(|m| m.fixtures.iter().map(FixtureSnapshot::record).collect())
+            .map(|m| m.fixtures.iter().map(|f| saved_jobs(f.record())).collect())
             .unwrap_or_default()
     }
 
