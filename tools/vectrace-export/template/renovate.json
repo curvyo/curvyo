@@ -1,0 +1,8 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    { "description": "rten and rten-tensor are pinned exactly (ADR 0028 in Curvyo): update both together by hand", "matchPackageNames": ["rten", "rten-tensor", "image"], "enabled": false }
+  ]
+}
