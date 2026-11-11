@@ -74,8 +74,8 @@ unicode-segmentation = { version = "1.13", default-features = false }
 # `zune-jpeg`, `image-webp`. No default features: no `rayon`, no BMP, GIF, TIFF or other formats.
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # The trace library lives in its own public repository (ADR 0048, specs/0108); Curvyo takes it
-# at a pinned revision, bumped by hand until the repository has release tags (docs/adr/0048).
-vectrace = { version = "0.1.0", git = "https://github.com/curvyo/vectrace", rev = "461d45c5a1d9bdacb740401e58615f3e4435a52b" }
+# at a release tag; Renovate bumps the tag (docs/adr/0048).
+vectrace = { version = "0.1.0", git = "https://github.com/curvyo/vectrace", tag = "v0.1.0" }
 # Property tests (dev-dependency of the geometry, ui and text crates).
 proptest = "1"
 

@@ -6261,7 +6261,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 [[package]]
 name = "vectrace"
 version = "0.1.0"
-source = "git+https://github.com/curvyo/vectrace?rev=461d45c5a1d9bdacb740401e58615f3e4435a52b#461d45c5a1d9bdacb740401e58615f3e4435a52b"
+source = "git+https://github.com/curvyo/vectrace?tag=v0.1.0#461d45c5a1d9bdacb740401e58615f3e4435a52b"
 dependencies = [
  "kurbo",
  "rten",

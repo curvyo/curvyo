@@ -2,8 +2,8 @@
 
 **Status:** Accepted (customer accepted PR #316 and the move to its own repository, 2026-11-11).
 The crate lives in the public repository https://github.com/curvyo/vectrace; Curvyo takes it as a
-git dependency pinned by `rev` (461d45c5a1d9bdacb740401e58615f3e4435a52b at the move), bumped by
-hand (Renovate follows tags, not a `rev`: switch to `tag` at the first release); crates.io publication comes later. Earlier status: Proposed (architect, 2026-11-10). These parts were decided by the customer on
+git dependency pinned by `tag` (`v0.1.0` = 461d45c5a1d9bdacb740401e58615f3e4435a52b, the commit of the move), bumped by
+Renovate; crates.io publication comes later. Earlier status: Proposed (architect, 2026-11-10). These parts were decided by the customer on
 2026-11-10 (`specs/0108-trace-library-extraction/plan.md`): the name `vectrace` in the directory
 `vectrace/` (Frage 1 B), OCR as a module of the same crate (Frage 2 A), and the licence
 MIT OR Apache-2.0, with the weights staying Apache-2.0 (Frage 3 A).  Amends by dated
