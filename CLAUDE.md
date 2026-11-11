@@ -116,6 +116,8 @@ Only one agent drives a browser.
 - Targets: desktop → browser → mobile; mobile gets no code until a story needs it.
 - Machines: job and output formats in core, device communication in `-io` crates; one machine
   family at a time, no universal machine abstraction before the second family.
+- `vectrace` (trace library, ADR 0048) is an external crate: https://github.com/curvyo/vectrace, a git
+  dependency with a pinned `rev` in the workspace `Cargo.toml`; bumped by hand (Renovate follows tags, not a `rev`, so switch to `tag` at the first release). Fixes go to that repo.
 - Crate suffixes `-core`, `-app`, `-io`, plus `-wasm` (ADR 0001) and `-server` (ADR 0004).
   Layout: ADR 0011; ADR index `docs/adr/index.md`; ADR format and CI structure
   `docs/guides/rust-workspace-blueprint.md`; requirements `docs/requirements.md`;

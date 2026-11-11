@@ -43,16 +43,16 @@ dependencies are covered by `Cargo.lock`, `frontend/package-lock.json` and `deny
   `languages/latin`), of PaddleOCR's `PP-OCRv3_mobile_det` and `latin_PP-OCRv5_mobile_rec`,
   <https://github.com/PaddlePaddle/PaddleOCR>, fetched 2026-10-31, unmodified.
 - **Licence:** Apache-2.0; the text ships next to the files as `LICENSE`. The record with the
-  SHA-256 of each file is `model.toml`, checked by `vectrace/tests/model_record.rs`.
+  SHA-256 of each file is `model.toml`, checked by `tests/model_record.rs` in curvyo/vectrace.
 - **Training data:** not itemised upstream; accepted by the customer (Frage 112 A, 2026-10-31).
 
 ## Trace reference images (`tests/assets/trace-references/`)
 
-- **Used in:** the `vectrace` reference and quality tests (`specs/0089-trace-quality-and-colour`).
+- **Used in:** `curvyo-ui-core/tests/recognise_reference.rs` (the three logos with text that
+  remain here). The full set, its sidecars and the reference and quality tests moved to
+  https://github.com/curvyo/vectrace (`specs/0089-trace-quality-and-colour`).
 - **Licence:** CC0 1.0 or public domain: the customer's own photos, scans and AI-generated logos
-  (declared CC0 1.0 in each sidecar, `vectrace/tests/fixtures/trace/reference/customer/*.json`),
-  openclipart.org and other CC0 sources listed in
-  `vectrace/tests/fixtures/trace/reference/SOURCES.md`.
-- **Moves with vectrace:** when `vectrace` gets its own repository the images go to its
-  `assets/trace-references/` (`tools/vectrace-export/`), together with the OCR weights
-  (Apache-2.0, `frontend/public/models/paddleocr-latin/`).
+  (declared CC0 1.0 in each sidecar), openclipart.org and other CC0 sources; the sidecars and
+  `SOURCES.md` are in https://github.com/curvyo/vectrace.
+- **Moved with vectrace (2026-11-11):** the other images live in curvyo/vectrace, CC0. The OCR
+  weights (Apache-2.0, `frontend/public/models/paddleocr-latin/`) stay here, served at runtime.

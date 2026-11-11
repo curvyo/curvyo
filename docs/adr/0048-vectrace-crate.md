@@ -1,10 +1,12 @@
 # ADR 0048: `vectrace`, one trace library crate
 
-**Status:** Proposed (architect, 2026-11-10). These parts were decided by the customer on
+**Status:** Accepted (customer accepted PR #316 and the move to its own repository, 2026-11-11).
+The crate lives in the public repository https://github.com/curvyo/vectrace; Curvyo takes it as a
+git dependency pinned by `rev` (461d45c5a1d9bdacb740401e58615f3e4435a52b at the move), bumped by
+hand (Renovate follows tags, not a `rev`: switch to `tag` at the first release); crates.io publication comes later. Earlier status: Proposed (architect, 2026-11-10). These parts were decided by the customer on
 2026-11-10 (`specs/0108-trace-library-extraction/plan.md`): the name `vectrace` in the directory
 `vectrace/` (Frage 1 B), OCR as a module of the same crate (Frage 2 A), and the licence
-MIT OR Apache-2.0, with the weights staying Apache-2.0 (Frage 3 A). This ADR becomes Accepted
-when the PR of `story/trace-library-extraction` (slices 1 to 5) is merged. Amends by dated
+MIT OR Apache-2.0, with the weights staying Apache-2.0 (Frage 3 A).  Amends by dated
 notes: [ADR 0011](0011-workspace-and-crate-layout.md)
 §2/§3/§6 (new crate, two crates removed), [ADR 0023](0023-raster-trace-crate-pipeline-and-worker.md)
 §1/§2/§5 (crate, `Affine` in the API, the worker job), [ADR 0028](0028-ocr-text-in-trace.md)

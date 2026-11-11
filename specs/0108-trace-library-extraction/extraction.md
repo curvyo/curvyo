@@ -93,3 +93,13 @@ overlays `tools/vectrace-export/template/` (standalone `Cargo.toml`, `deny.toml`
 commit. Push it to the new repository's `main` by hand. Rehearsed once into a scratch directory:
 fmt, clippy, wasm32 build and clippy, `cargo deny check`, `doc -D warnings` and the tests pass
 there; the tests also pass without assets (skipped with a message).
+
+## Done: Curvyo consumes the repository (2026-11-11, `chore/consume-vectrace`)
+
+`vectrace` lives in https://github.com/curvyo/vectrace (public). The workspace takes it as
+`vectrace = { version = "0.1.0", git = ..., rev = "461d45c5..." }`; `vectrace/` and
+`tools/vectrace-export/` are deleted. `deny.toml` allows that one git source. Kept here: the OCR
+weights (`frontend/public/models/paddleocr-latin/`), three reference logos for
+`curvyo-ui-core/tests/recognise_reference.rs`, and the poster, tester and golden pictures the
+editor-wasm tests read, now in `tests/assets/vectrace-fixtures/`. The trace quality, reference and
+memory jobs run in the vectrace repository's CI.

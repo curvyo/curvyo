@@ -9,7 +9,6 @@ members = [
     "curvyo-text-core",
     "curvyo-svg-core",
     "curvyo-image-core",
-    "vectrace",
     "curvyo-ui-core",
     "curvyo-crypto-core",
     "curvyo-sync-core",
@@ -74,6 +73,9 @@ unicode-segmentation = { version = "1.13", default-features = false }
 # input in wasm, and a decoder upgrade can change a lossy decode. MIT OR Apache-2.0; brings `png`,
 # `zune-jpeg`, `image-webp`. No default features: no `rayon`, no BMP, GIF, TIFF or other formats.
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+# The trace library lives in its own public repository (ADR 0048, specs/0108); Curvyo takes it
+# at a pinned revision, bumped by hand until the repository has release tags (docs/adr/0048).
+vectrace = { version = "0.1.0", git = "https://github.com/curvyo/vectrace", rev = "461d45c5a1d9bdacb740401e58615f3e4435a52b" }
 # Property tests (dev-dependency of the geometry, ui and text crates).
 proptest = "1"
 
@@ -125,6 +127,4 @@ opt-level = 3
 [profile.dev.package.rten-simd]
 opt-level = 3
 [profile.dev.package.rten-base]
-opt-level = 3
-[profile.dev.package.vectrace]
 opt-level = 3
