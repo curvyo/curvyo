@@ -2049,7 +2049,7 @@ fn c4_teil_3_no_face_reaches_half_its_letters_and_it_is_set_in_source_sans() {
     };
     let wire = traced(&host.wire(SETTINGS, &[line]));
     let source = &wire.texts.lines[0];
-    let k = FIT_PIXEL / source.pixel;
+    let k = FIT_PIXEL / source.pixel.as_mm();
     let outlines: Vec<BezPath> = source
         .outlines
         .iter()

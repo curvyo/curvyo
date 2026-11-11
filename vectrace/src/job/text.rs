@@ -119,7 +119,7 @@ mod tests {
         assert_ne!(read.texts.lines[0].outlines.len(), 0);
         // Frage 115 B and criterion 26: the garbage filter and the pixel size travel along.
         assert!(read.texts.lines[0].plausible);
-        assert!((read.texts.lines[0].pixel - 0.1).abs() < 1e-12);
+        assert!((read.texts.lines[0].pixel.as_mm() - 0.1).abs() < 1e-12);
     }
 
     /// Criterion 25: the text pass alone gives the text section the full job gives, no outline.
