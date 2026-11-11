@@ -96,35 +96,9 @@ debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
-
-# The asset hash runs over up to 512 MiB in the image tests (`specs/0058-bitmap-import`
-# criterion 17); unoptimised SHA-256 takes seconds there.
-[profile.dev.package.sha2]
-opt-level = 3
-
-# The keyring tests of `curvyo-crypto-core` replay every ancestor-closed subset of their graphs,
-# verifying each entry's ed25519 signature; unoptimised curve arithmetic makes that minutes.
-[profile.dev.package.curve25519-dalek]
 opt-level = 3
 
 [profile.release]
 codegen-units = 1
 lto = true
-opt-level = 3
-
-# The text reader's inference (ADR 0028) runs the reference set in the ordinary test run;
-# unoptimised it takes minutes instead of seconds.
-[profile.dev.package.rten]
-opt-level = 3
-[profile.dev.package.rten-gemm]
-opt-level = 3
-[profile.dev.package.rten-tensor]
-opt-level = 3
-[profile.dev.package.rten-vecmath]
-opt-level = 3
-[profile.dev.package.rten-simd]
-opt-level = 3
-[profile.dev.package.rten-base]
-opt-level = 3
-[profile.dev.package.vectrace]
 opt-level = 3
