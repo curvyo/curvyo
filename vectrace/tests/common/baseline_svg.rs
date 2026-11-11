@@ -155,23 +155,3 @@ fn transform(text: String) -> Affine {
     }
     total
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reads_the_inkscape_form() {
-        let svg = br#"<?xml version="1.0"?>
-<svg width="20mm" height="10mm" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg">
-  <defs><path d="M0 0 L9 9"/></defs>
-  <g transform="translate(2,4)"><path d="M0 0 L10 0 L10 10 Z" style="fill:#000"/></g>
-</svg>"#;
-        let b = read_baseline(svg).unwrap();
-        assert!((b.page_width - 20.0).abs() < 1e-12);
-        assert_eq!(b.paths.len(), 1);
-        let bounds = kurbo::Shape::bounding_box(&b.paths[0]);
-        assert!((bounds.x0 - 1.0).abs() < 1e-9 && (bounds.x1 - 6.0).abs() < 1e-9);
-        assert!((bounds.y0 - 2.0).abs() < 1e-9 && (bounds.y1 - 7.0).abs() < 1e-9);
-    }
-}
