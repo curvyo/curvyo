@@ -51,6 +51,18 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("remove_slot", "Remove slot"),
     ("set_slot", "Change slot"),
     ("move_to_slot", "Move to slot"),
+    // `specs/0103-fixture-jobs` criteria 2, 4 and 9 (adrs.md section 7): fixed per label, no job
+    // name.
+    ("add_fixture_job", "Add fixture job"),
+    ("rename_fixture_job", "Rename fixture job"),
+    ("delete_fixture_job", "Delete fixture job"),
+    ("set_fixture_job_show_on", "Show on"),
+    ("set_fixture_job_show_off", "Show off"),
+    ("set_fixture_job_output_on", "Output on"),
+    ("set_fixture_job_output_off", "Output off"),
+    ("move_fixture_job", "Move fixture job"),
+    ("assign_fixture_target", "Assign to fixture job"),
+    ("remove_fixture_target", "Remove from fixture job"),
     // `specs/0101-laser-operations` criteria 2 to 8, 15, 16, 23 and 27; the session names an
     // assignment after its operation ("Assign to Cut 1").
     ("add_operation", "Add operation"),

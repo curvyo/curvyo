@@ -291,7 +291,8 @@ fn the_round_trip_golden_reads_back_every_value_state_slot_and_place() {
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 40);
-    assert_eq!(CURRENT_FORMAT_VERSION, 40);
+    // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 41);
     let opened = open_unchanged(&bytes);
     let read = fixtures(&opened);
     assert_eq!(read, fixtures(&golden_document()));

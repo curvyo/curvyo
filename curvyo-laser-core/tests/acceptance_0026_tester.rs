@@ -427,8 +427,8 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
     assert!(text.ends_with("}\n"), "trailing newline");
     assert!(!text.ends_with("\n\n"));
     assert!(
-        // Record format 2 since `specs/0102-laser-fixtures` (ADR 0050 §1).
-        text.starts_with("{\n  \"format_version\": 2,\n  \"id\": "),
+        // Record format 3 since `specs/0103-fixture-jobs` (ADR 0052 §7).
+        text.starts_with("{\n  \"format_version\": 3,\n  \"id\": "),
         "{text}"
     );
     let order = [
@@ -980,8 +980,8 @@ fn ac13_one_damaged_record_uses_the_singular_notice() {
 fn ac13_a_newer_record_is_skipped_with_its_own_count() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
-        // Format 2 is current since `0102` (ADR 0050); 3 is newer.
-        m.insert("format_version".into(), json!(3));
+        // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
+        m.insert("format_version".into(), json!(4));
         m.insert("new_thing".into(), json!(true));
     });
     assert_eq!(
@@ -1023,15 +1023,16 @@ fn ac13_format_version_zero_or_missing_is_damage_not_newer() {
 
 #[test]
 fn ac13_the_size_limit_is_16_kib_inclusive() {
-    // Raised to 64 KiB with the fixture set (`0102`, ADR 0050 §1).
+    // Raised to 64 KiB with the fixture set (`0102`, ADR 0050 §1), to 128 KiB with the fixture
+    // jobs (`0103`, ADR 0052 §7).
     let p = user(1, "Padded");
     let text = write_record(&p);
-    assert_eq!(MAX_RECORD_BYTES, 64 * 1024);
+    assert_eq!(MAX_RECORD_BYTES, 128 * 1024);
     let at_limit = format!("{text}{}", " ".repeat(MAX_RECORD_BYTES - text.len()));
     assert_eq!(at_limit.len(), MAX_RECORD_BYTES);
     assert!(
         read_record(&record_file_name(&p.id), &at_limit).is_ok(),
-        "exactly 64 KiB reads"
+        "exactly 128 KiB reads"
     );
     let over = format!("{at_limit} ");
     assert_eq!(
@@ -1087,8 +1088,8 @@ fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
     // copy "under the same id" (criterion 8) -- which must not overwrite the newer file.
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
-        // Format 2 is current since `0102` (ADR 0050); 3 is newer.
-        m.insert("format_version".into(), json!(3));
+        // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
+        m.insert("format_version".into(), json!(4));
     });
     let mut lib = MachineProfiles::load(&[(record_file_name(&p.id), newer)]);
     let write = lib.add(p.clone());

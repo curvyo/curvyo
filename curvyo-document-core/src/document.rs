@@ -441,7 +441,20 @@ impl DocumentVersion {
 /// that is not a slot is refused. The number is provisional by the rule above. Goldens:
 /// `fixtures_v40.curvyo`, `fixtures_unknown_kind_v40.curvyo`, `fixtures_damaged_v40.curvyo`,
 /// `fixtures_slot_orphan_v40.curvyo`, `fixtures_grid_v39.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 40;
+///
+/// Bumped to 41 in `fixture-jobs` (ADR 0052, `specs/0103-fixture-jobs`): a fixture may hold job
+/// child nodes (`shape = "fixture_job"`, `name`, `op_kind`, `op_show` absent on, `op_output`
+/// absent off, and one `target.<node id>[.lines|.tapes|.head|.thread]` = `true` per ticked part)
+/// beside its slots. A build that stops at 40 refuses a fixture with a non-slot child as damage,
+/// so it must refuse every file of this build as too new. Migration from 40 is none: a format-40
+/// file has no job, opens unchanged and is not rewritten. Damage is read per field
+/// (`crate::fixture_job_codec`): a switch that is not a boolean, a kind that is missing or not a
+/// text, a tick whose value is not `true`; a key of a node that is not a part of the job's fixture
+/// is kept and is not damage; a job of an unknown kind is kept and saved back unchanged. The
+/// number is provisional by the rule above. Goldens: `fixture_jobs_v41.curvyo`,
+/// `fixture_jobs_unknown_kind_v41.curvyo`, `fixture_jobs_damaged_v41.curvyo`; the older goldens
+/// stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 41;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

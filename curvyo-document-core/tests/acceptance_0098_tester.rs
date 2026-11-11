@@ -900,9 +900,10 @@ fn adr0042_a_claim_of_a_sketch_on_a_drawing_page_reads_as_no_owner() {
 // Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9), to 39 by
 // `specs/0101-laser-operations` (ADR 0046 §4), to 40 by `specs/0102-laser-fixtures` (ADR 0049).
 fn ac20_save_writes_format_38() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 40);
+    // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 41);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 40);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 41);
 }
 
 #[test]

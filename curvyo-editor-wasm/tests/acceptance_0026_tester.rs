@@ -770,8 +770,8 @@ fn ac8_save_as_of_an_unknown_id_does_not_overwrite_a_skipped_newer_record() {
     let p = k40(1);
     let bytes = foreign_file(&p);
     let mut newer: Value = serde_json::from_str(&write_record(&p)).unwrap();
-    // Format 2 is current since `0102` (ADR 0050); 3 is newer.
-    newer["format_version"] = json!(3);
+    // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
+    newer["format_version"] = json!(4);
     let mut disk = Disk::new();
     disk.insert(record_file_name(&p.id), newer.to_string());
     let mut s = open_laser(&bytes, &disk);

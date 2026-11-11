@@ -87,6 +87,8 @@ mod drawing_content;
 mod drawing_insert;
 mod ellipse_arc;
 mod error;
+mod fixture_job;
+mod fixture_job_codec;
 mod font_assets;
 mod format_edit;
 mod format_library;
@@ -102,6 +104,17 @@ mod images;
 mod junction;
 mod layers;
 mod legacy_fill;
+pub use fixture_job::{
+    ADD_FIXTURE_JOB_COMMIT_LABEL, ASSIGN_FIXTURE_TARGET_COMMIT_LABEL,
+    DELETE_FIXTURE_JOB_COMMIT_LABEL, FixtureJobError, FixtureJobSwitch,
+    MOVE_FIXTURE_JOB_COMMIT_LABEL, REMOVE_FIXTURE_TARGET_COMMIT_LABEL,
+    RENAME_FIXTURE_JOB_COMMIT_LABEL, SET_FIXTURE_JOB_OUTPUT_OFF_COMMIT_LABEL,
+    SET_FIXTURE_JOB_OUTPUT_ON_COMMIT_LABEL, SET_FIXTURE_JOB_SHOW_OFF_COMMIT_LABEL,
+    SET_FIXTURE_JOB_SHOW_ON_COMMIT_LABEL,
+};
+pub use fixture_job_codec::{
+    FixtureJobSnapshot, FixturePartKey, JobRecord, JobTarget, PART_SUFFIXES, TargetRead,
+};
 mod manufacturing;
 mod manufacturing_codec;
 mod manufacturing_fixture_commands;

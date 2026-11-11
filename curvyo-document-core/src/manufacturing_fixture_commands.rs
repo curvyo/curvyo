@@ -5,6 +5,8 @@ use loro::{LoroMap, TreeID, TreeParentId};
 
 use crate::affine::Affine;
 use crate::document::{Document, OBJECTS_TREE};
+use crate::fixture_job::insert_job;
+use crate::fixture_job_codec::FixturePartKey;
 use crate::group_tree::node_id;
 use crate::manufacturing::{FixtureParams, ManufacturingError, next_numbered};
 use crate::manufacturing_codec::{
@@ -190,6 +192,7 @@ impl Document {
             params: with_thread_within_head(new.params).into_owned(),
             matrix: new.matrix,
             slots: Vec::new(),
+            jobs: Vec::new(),
         };
         let node = self.insert_fixture(tree_id_of(manufacturing), &record)?;
         self.commit_with_label(new.add.label());
@@ -415,12 +418,16 @@ impl Document {
         Ok(node_id(node))
     }
 
-    /// Removes the slot `id` in one step.
+    /// Removes the slot `id` in one step, with the ticks of its fixture's jobs on it
+    /// (`specs/0103` criterion 11).
     ///
     /// # Errors
     /// [`ManufacturingError::NoSuchSlot`] when `id` is not a live slot of a fixture.
     pub fn remove_slot(&self, id: NodeId) -> Result<(), ManufacturingError> {
         self.slot_meta(id)?;
+        if let Some(holder) = self.slot_holder(id) {
+            self.remove_slot_ticks(tree_id_of(holder), tree_id_of(id));
+        }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         tree.delete(tree_id_of(id))
             .map_err(|_| ManufacturingError::NoSuchSlot)?;
@@ -495,7 +502,8 @@ impl Document {
         Ok(())
     }
 
-    /// Creates, uncommitted, a fixture node from `record` with its slots at the end of `parent`.
+    /// Creates, uncommitted, a fixture node from `record` with its slots and its jobs (Output
+    /// off, ticks mapped to the new slots by index, ADR 0052 §7) at the end of `parent`.
     fn insert_fixture(
         &self,
         parent: TreeID,
@@ -510,8 +518,26 @@ impl Document {
             .get_meta(node)
             .map_err(|_| ManufacturingError::NotFound)?;
         write_fixture_registers(&meta, record);
+        let mut slots = Vec::with_capacity(record.slots.len());
         for slot in &record.slots {
-            self.insert_slot(node, slot)?;
+            slots.push(self.insert_slot(node, slot)?);
+        }
+        for job in &record.jobs {
+            let ticks: Vec<FixturePartKey> = job
+                .targets
+                .iter()
+                .filter_map(|target| {
+                    let part = match target.slot {
+                        None => node,
+                        Some(index) => *slots.get(index)?,
+                    };
+                    Some(FixturePartKey {
+                        node: node_id(part),
+                        suffix: target.suffix.clone(),
+                    })
+                })
+                .collect();
+            insert_job(&tree, node, job, &ticks).map_err(|_| ManufacturingError::NotFound)?;
         }
         Ok(node)
     }

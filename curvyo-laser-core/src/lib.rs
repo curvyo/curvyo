@@ -10,6 +10,7 @@
 
 mod fixture_fit;
 mod fixture_kind;
+mod fixture_part;
 mod fixture_slot;
 mod fixture_snap;
 mod fixture_stored;
@@ -37,7 +38,9 @@ pub mod operations {
     pub use crate::operation_kind_run::{KindRun, LeafShape, Lines, kind_run};
     pub use crate::operation_naming::next_operation_name;
     pub use crate::operation_nearest::{Assignment, ChainScope, OperationList, OperationRule};
-    pub use crate::operation_sequence::{cuts_last, insert_index, may_move, run_sequence};
+    pub use crate::operation_sequence::{
+        FixtureJobRead, cuts_last, fixture_block, insert_index, may_move, run_sequence,
+    };
     pub use crate::operation_summary::{Hidden, Leaf, LeafStatus, Summary, leaf_status, summarize};
 }
 
@@ -47,6 +50,7 @@ pub use fixture_kind::{
     board_side_range, grid_spacing_range, origin_offset_range, screw_diameters, screw_head_range,
     screw_thread_range, slot_size_range, stop_leg_range, stop_legs, stop_thickness_range,
 };
+pub use fixture_part::{FixturePart, job_parts};
 pub use fixture_slot::Slot;
 pub use fixture_snap::{Placement, board_points, stop_points};
 pub use fixture_stored::{SLOT_CIRCLE, SLOT_RECT, grid_spec, params_damage, read_slot, screw_spec};
@@ -67,7 +71,9 @@ pub use machine_profile_file::{
     MAX_RECORD_BYTES, RECORD_SUFFIX, RecordError, read_choice, read_record, record_file_name,
     record_id, write_choice, write_record,
 };
-pub use machine_profile_fixtures::{MAX_SET_FIXTURES, MAX_SET_SLOTS};
+pub use machine_profile_fixtures::{
+    MAX_SET_FIXTURES, MAX_SET_JOBS, MAX_SET_SLOTS, MAX_SET_TARGETS,
+};
 pub use machine_profiles::{LibraryWrite, MAX_RECORDS, MachineProfiles};
 pub use manifest::{ENGRAVED_GRID, PROCESS_ID, manifest};
 pub use overhang::{OVERHANG_NOTICE, OVERHANG_TOLERANCE, overhang_text};

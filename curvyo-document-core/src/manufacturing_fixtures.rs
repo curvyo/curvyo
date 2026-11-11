@@ -1,10 +1,11 @@
-//! The stored fixtures of a manufacturing (ADR 0049 §2, §3, §6): the fixture and slot nodes as
-//! read field by field, with a count of the values that did not read.
+//! The stored fixtures of a manufacturing (ADR 0049 §2, §3, §6, ADR 0052 §3): the fixture, slot
+//! and job nodes as read field by field, with a count of the values that did not read.
 
 use loro::{LoroMap, LoroTree, LoroValue, TreeID, TreeParentId, ValueOrContainer};
 use serde::Serialize;
 
 use crate::affine::{Affine, MATRIX_ENTRY_LIMIT};
+use crate::fixture_job_codec::{FixtureJobSnapshot, JobRecord, is_job_meta, read_job};
 use crate::group_tree::node_id;
 use crate::manufacturing::FixtureParams;
 use crate::manufacturing_codec::{
@@ -41,7 +42,10 @@ pub struct FixtureSnapshot {
     pub visible: bool,
     /// The slots that read, in tree order.
     pub slots: Vec<SlotSnapshot>,
-    /// How many stored values did not read (each read as its default, a slot skipped).
+    /// Its fixture jobs, in tree order (ADR 0052 §1).
+    pub jobs: Vec<FixtureJobSnapshot>,
+    /// How many stored values did not read (each read as its default, a slot skipped), its
+    /// jobs' damaged values included.
     pub damaged: usize,
 }
 
@@ -63,6 +67,11 @@ impl FixtureSnapshot {
                     name: slot.name.clone(),
                     params: slot.params.clone(),
                 })
+                .collect(),
+            jobs: self
+                .jobs
+                .iter()
+                .filter_map(FixtureJobSnapshot::record)
                 .collect(),
         }
     }
@@ -95,6 +104,8 @@ pub struct FixtureRecord {
     pub matrix: Option<Affine>,
     /// The slots, in order.
     pub slots: Vec<SlotRecord>,
+    /// The fixture jobs, in order, without Output (ADR 0052 §7).
+    pub jobs: Vec<JobRecord>,
 }
 
 /// A slot's values without a node.
@@ -130,12 +141,14 @@ fn read_fixture(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> FixtureSnapsho
     };
     damaged += matrix_damage + active_damage;
     let mut slots = Vec::new();
+    let mut job_nodes = Vec::new();
     for child in tree.children(TreeParentId::Node(node)).unwrap_or_default() {
-        match tree
-            .get_meta(child)
-            .ok()
-            .and_then(|slot| read_slot(child, &slot))
-        {
+        let child_meta = tree.get_meta(child).ok();
+        if child_meta.as_ref().is_some_and(is_job_meta) {
+            job_nodes.extend(child_meta.map(|meta| (child, meta)));
+            continue;
+        }
+        match child_meta.and_then(|slot| read_slot(child, &slot)) {
             Some((slot, slot_damage)) => {
                 damaged += slot_damage;
                 slots.push(slot);
@@ -143,6 +156,11 @@ fn read_fixture(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> FixtureSnapsho
             None => damaged += 1,
         }
     }
+    let jobs: Vec<FixtureJobSnapshot> = job_nodes
+        .iter()
+        .map(|(job, job_meta)| read_job(*job, job_meta, node, &slots))
+        .collect();
+    damaged += jobs.iter().map(|job| job.damaged).sum::<usize>();
     FixtureSnapshot {
         id: node_id(node),
         name: registers.name.unwrap_or_default(),
@@ -152,6 +170,7 @@ fn read_fixture(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> FixtureSnapsho
         active,
         visible: registers.visible,
         slots,
+        jobs,
         damaged,
     }
 }
