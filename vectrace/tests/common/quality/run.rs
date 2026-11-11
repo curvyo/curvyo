@@ -50,7 +50,7 @@ pub fn case_params(preset: &Preset, case: &Case) -> TraceParams {
 
 /// Traces `case` with `preset` and measures everything of criterion 3 but memory and wasm.
 pub fn measure(case: &Case, preset: &Preset) -> Row {
-    measure_with(case, &case_params(preset, case), preset.specks_mm)
+    measure_with(case, &case_params(preset, case), preset.specks_mm.as_mm())
 }
 
 /// Traces `case` with `p` and measures it as [`measure`] does, the reference mask without the

@@ -35,7 +35,7 @@ mod common;
 
 use std::collections::BTreeMap;
 use std::ops::ControlFlow;
-use vectrace::{Mm, PixelMap};
+use vectrace::PixelMap;
 
 use common::quality::{
     Kind, Metrics, QualityImage, area_error_true_pct, measure, measure_micro, photograph,
@@ -53,7 +53,7 @@ fn defaults(image: &QualityImage) -> TraceParams {
     TraceParams {
         threshold: auto_threshold(image.picture.raster()),
         smooth: DEFAULT_SMOOTH,
-        specks: Mm::from_mm(DEFAULT_SPECKS_MM),
+        specks: DEFAULT_SPECKS_MM,
         ..TraceParams::with_threshold(0)
     }
 }
@@ -95,7 +95,7 @@ fn candidate(image: &QualityImage) -> Metrics {
         .map(|o| kurbo::Affine::scale(1.0 / scale) * o.clone())
         .collect();
     let (width, height) = (image.picture.width as usize, image.picture.height as usize);
-    let speck_px = DEFAULT_SPECKS_MM * DEFAULT_SPECKS_MM / (scale * scale);
+    let speck_px = DEFAULT_SPECKS_MM.as_mm() * DEFAULT_SPECKS_MM.as_mm() / (scale * scale);
     let reference = without_specks(&mask_of(image, p.threshold), width, height, speck_px);
     measure(&in_px, &reference, width, height, scale)
 }
@@ -125,7 +125,7 @@ struct PresetRun {
 /// The micro-path area of a preset: 0.95 x its own Specks² (criterion 61, `adrs.md`
 /// 2026-10-28 point 6).
 fn micro_mm2(preset: &Preset) -> f64 {
-    0.95 * preset.specks_mm * preset.specks_mm
+    0.95 * preset.specks_mm.as_mm() * preset.specks_mm.as_mm()
 }
 
 /// `preset` on `image` at the image's automatic Threshold.
@@ -140,7 +140,7 @@ fn preset_run(preset: &Preset, image: &QualityImage) -> PresetRun {
         .map(|o| kurbo::Affine::scale(1.0 / scale) * o.clone())
         .collect();
     let (width, height) = (image.picture.width as usize, image.picture.height as usize);
-    let speck_px = preset.specks_mm * preset.specks_mm / (scale * scale);
+    let speck_px = preset.specks_mm.as_mm() * preset.specks_mm.as_mm() / (scale * scale);
     let reference = without_specks(&mask_of(image, threshold), width, height, speck_px);
     let metrics = measure_micro(&in_px, &reference, width, height, scale, micro_mm2(preset));
     // Outer outlines are clockwise on the canvas (positive in kurbo's sign), holes against.
@@ -532,7 +532,7 @@ fn quality_table() {
         baseline["candidate"] = serde_json::to_value(&ours_all).unwrap();
         baseline["settings"] = json!({
             "smooth": DEFAULT_SMOOTH,
-            "specks_mm": DEFAULT_SPECKS_MM,
+            "specks_mm": DEFAULT_SPECKS_MM.as_mm(),
             "threshold": "automatic",
         });
         std::fs::write(
@@ -876,7 +876,7 @@ fn line_art_2000() -> common::Picture {
 fn line_art_2000_budget() {
     let picture = line_art_2000();
     let map = PixelMap::scale(25.4 / 300.0, 25.4 / 300.0);
-    let p = params(128, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM);
+    let p = params(128, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM.as_mm());
     let mut last = common::thread_cpu_seconds();
     let mut longest = 0.0_f64;
     let start = last;

@@ -95,7 +95,7 @@ fn auto_is_at_least_the_default_per_group() {
     let mut groups: BTreeMap<&str, [f64; 4]> = BTreeMap::new();
     for case in synthetic_cases() {
         let (base, auto, report) = default_and_auto(&case.picture);
-        let specks = PRESETS[0].specks_mm;
+        let specks = PRESETS[0].specks_mm.as_mm();
         let a = measure_with(&case, &base, specks);
         let b = if auto == base {
             a.clone()

@@ -2,8 +2,9 @@
 //! 45; `specs/0089` Frage 85 B): the fields the bar's controls are generated from, with their
 //! defaults and steps.
 
-use crate::params::{Denoise, Selection, Upscale};
+use crate::params::{Denoise, PixelLength, Selection, Upscale};
 use crate::select::DEFAULT_PICK_TOLERANCE;
+use crate::units::Mm;
 
 /// What kind of value a setting holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +66,7 @@ pub const DEFAULT_SMOOTH: u8 = 80;
 
 /// The default deviation tolerance in source pixels (`specs/0089` Frage 85 B): the largest
 /// distance of an outline from the smoothed pixel border.
-pub const DEFAULT_TOLERANCE_PX: f64 = 0.5;
+pub const DEFAULT_TOLERANCE_PX: PixelLength = PixelLength::from_px(0.5);
 
 /// The smallest deviation tolerance in source pixels.
 pub const MIN_TOLERANCE_PX: f64 = 0.1;
@@ -74,7 +75,7 @@ pub const MIN_TOLERANCE_PX: f64 = 0.1;
 pub const MAX_TOLERANCE_PX: f64 = 3.0;
 
 /// The default Specks size in millimetres (criterion 4).
-pub const DEFAULT_SPECKS_MM: f64 = 0.5;
+pub const DEFAULT_SPECKS_MM: Mm = Mm::from_mm(0.5);
 
 /// The Threshold of a picture of one grey level, and of a first use before the image is read
 /// (criterion 9).
@@ -120,7 +121,7 @@ pub const PARAMS: &[ParamSpec] = &[
         unit: ParamUnit::Pixel,
         min: MIN_TOLERANCE_PX,
         max: MAX_TOLERANCE_PX,
-        default: DEFAULT_TOLERANCE_PX,
+        default: DEFAULT_TOLERANCE_PX.as_px(),
         step: 0.05,
         big_step: 0.5,
         fine_step: 0.01,
@@ -134,7 +135,7 @@ pub const PARAMS: &[ParamSpec] = &[
         unit: ParamUnit::Millimetre,
         min: 0.0,
         max: MAX_SPECKS_MM,
-        default: DEFAULT_SPECKS_MM,
+        default: DEFAULT_SPECKS_MM.as_mm(),
         step: 0.1,
         big_step: 1.0,
         fine_step: 0.01,

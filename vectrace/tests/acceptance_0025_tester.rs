@@ -97,7 +97,7 @@ fn run(pic: &Pic, map: PixelMap, p: &TraceParams) -> TraceResult {
 }
 
 fn defaults() -> TraceParams {
-    params(DEFAULT_THRESHOLD, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM)
+    params(DEFAULT_THRESHOLD, DEFAULT_SMOOTH, DEFAULT_SPECKS_MM.as_mm())
 }
 
 fn flat_points(path: &BezPath, tol: f64) -> Vec<Point> {
@@ -165,7 +165,8 @@ fn c06_schema_matches_criterion_8_of_0089() {
     assert!(tol.step > 0.0 && tol.fine_step > 0.0 && tol.fine_step <= tol.step);
     let logo = PRESETS.iter().find(|p| p.key == "logo").unwrap();
     assert_eq!(
-        tol.default, logo.tolerance_px,
+        tol.default,
+        logo.tolerance_px.as_px(),
         "Tolerance starts at Logo / Line art's value"
     );
     let c = by("corners").expect("Corners is a field of its own");
@@ -188,7 +189,7 @@ fn c06_schema_matches_criterion_8_of_0089() {
         "the bar's controls in order"
     );
     assert_eq!(DEFAULT_SMOOTH, 80);
-    assert_eq!(DEFAULT_SPECKS_MM, 0.5);
+    assert_eq!(DEFAULT_SPECKS_MM.as_mm(), 0.5);
     let mut names: Vec<_> = PARAMS
         .iter()
         .chain(ADVANCED_PARAMS)
@@ -763,7 +764,7 @@ fn quality_set() -> Vec<(&'static str, Pic)> {
 fn with_tolerance(threshold: u8, smooth: u8, tolerance_px: f64) -> TraceParams {
     TraceParams {
         tolerance: PixelLength::from_px(tolerance_px),
-        ..params(threshold, smooth, DEFAULT_SPECKS_MM)
+        ..params(threshold, smooth, DEFAULT_SPECKS_MM.as_mm())
     }
 }
 
@@ -783,7 +784,7 @@ fn c23_smooth_80_is_within_the_per_image_cap_of_smooth_20_at_a_fixed_tolerance()
             node_density(&run(
                 &pic,
                 px_map(),
-                &with_tolerance(128, s, DEFAULT_TOLERANCE_PX),
+                &with_tolerance(128, s, DEFAULT_TOLERANCE_PX.as_px()),
             ))
         };
         let (d20, d80) = (d(20), d(80));

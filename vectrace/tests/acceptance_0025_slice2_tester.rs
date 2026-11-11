@@ -175,7 +175,13 @@ fn c59_four_presets_in_order_with_the_customers_texts() {
 fn c60_the_values_of_the_table() {
     let v = |key: &str| {
         let p = preset(key);
-        (p.smooth, p.specks_mm, p.corners, p.upscale, p.denoise)
+        (
+            p.smooth,
+            p.specks_mm.as_mm(),
+            p.corners,
+            p.upscale,
+            p.denoise,
+        )
     };
     assert_eq!(v("logo"), (80, 0.5, 70, Upscale::Off, Denoise::Off));
     assert_eq!(v("photo"), (50, 0.1, 30, Upscale::Off, Denoise::Off));
@@ -199,7 +205,7 @@ fn c60_a_pick_sets_those_values_and_nothing_else() {
             (got.smooth, got.corners, got.upscale, got.denoise),
             (p.smooth, p.corners, p.upscale, p.denoise)
         );
-        assert_eq!(got.specks.as_mm(), p.specks_mm);
+        assert_eq!(got.specks.as_mm(), p.specks_mm.as_mm());
     }
 }
 
@@ -252,7 +258,7 @@ fn c45_the_schema_describes_the_advanced_controls_and_the_table_fits_it() {
     for p in PRESETS {
         let (s, k, c) = (by("smooth"), by("specks"), by("corners"));
         assert!((s.min..=s.max).contains(&f64::from(p.smooth)), "{}", p.key);
-        assert!((k.min..=k.max).contains(&p.specks_mm), "{}", p.key);
+        assert!((k.min..=k.max).contains(&p.specks_mm.as_mm()), "{}", p.key);
         assert!((c.min..=c.max).contains(&f64::from(p.corners)), "{}", p.key);
     }
 }

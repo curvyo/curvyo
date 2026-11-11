@@ -102,9 +102,9 @@ pub struct Preset {
     /// Smooth, 0 to 100.
     pub smooth: u8,
     /// Tolerance, source px.
-    pub tolerance_px: f64,
+    pub tolerance_px: PixelLength,
     /// Specks, mm.
-    pub specks_mm: f64,
+    pub specks_mm: Mm,
     /// Corners, 0 to 100.
     pub corners: u8,
     /// Upscale.
@@ -120,8 +120,8 @@ impl Preset {
     pub fn apply(&self, params: TraceParams) -> TraceParams {
         TraceParams {
             smooth: self.smooth,
-            tolerance: PixelLength::from_px(self.tolerance_px),
-            specks: Mm::from_mm(self.specks_mm),
+            tolerance: self.tolerance_px,
+            specks: self.specks_mm,
             corners: self.corners,
             upscale: self.upscale,
             denoise: self.denoise,
@@ -149,8 +149,8 @@ pub const PRESETS: &[Preset] = &[
         label: "Photo",
         detail: "Many shapes. Photos trace roughly.",
         smooth: 50,
-        tolerance_px: 0.5,
-        specks_mm: 0.1,
+        tolerance_px: PixelLength::from_px(0.5),
+        specks_mm: Mm::from_mm(0.1),
         corners: 30,
         upscale: Upscale::Off,
         denoise: Denoise::Off,
@@ -160,8 +160,8 @@ pub const PRESETS: &[Preset] = &[
         label: "Silhouette for cutting/carving",
         detail: "Closed, simple, few nodes.",
         smooth: 100,
-        tolerance_px: 1.5,
-        specks_mm: 2.0,
+        tolerance_px: PixelLength::from_px(1.5),
+        specks_mm: Mm::from_mm(2.0),
         corners: 70,
         upscale: Upscale::Off,
         denoise: Denoise::Low,
@@ -171,8 +171,8 @@ pub const PRESETS: &[Preset] = &[
         label: "Engraving",
         detail: "Keeps fine lines.",
         smooth: 80,
-        tolerance_px: 0.35,
-        specks_mm: 0.1,
+        tolerance_px: PixelLength::from_px(0.35),
+        specks_mm: Mm::from_mm(0.1),
         corners: 70,
         upscale: Upscale::Auto,
         denoise: Denoise::Off,
@@ -233,8 +233,8 @@ impl TraceParams {
             selection: Selection::Brightness,
             threshold,
             smooth: DEFAULT_SMOOTH,
-            tolerance: PixelLength::from_px(DEFAULT_TOLERANCE_PX),
-            specks: Mm::from_mm(DEFAULT_SPECKS_MM),
+            tolerance: DEFAULT_TOLERANCE_PX,
+            specks: DEFAULT_SPECKS_MM,
             corners: DEFAULT_CORNERS,
             upscale: Upscale::Off,
             denoise: Denoise::Off,
@@ -256,7 +256,7 @@ impl TraceParams {
         if px.is_finite() {
             px.clamp(MIN_TOLERANCE_PX, MAX_TOLERANCE_PX)
         } else {
-            DEFAULT_TOLERANCE_PX
+            DEFAULT_TOLERANCE_PX.as_px()
         }
     }
 
@@ -365,7 +365,7 @@ mod tests {
         for preset in PRESETS {
             for (name, value) in [
                 ("smooth", f64::from(preset.smooth)),
-                ("specks", preset.specks_mm),
+                ("specks", preset.specks_mm.as_mm()),
                 ("corners", f64::from(preset.corners)),
                 ("upscale", f64::from(preset.upscale.index())),
                 ("denoise", f64::from(preset.denoise.index())),
@@ -390,7 +390,15 @@ mod tests {
         // The values of criterion 60 (step 0 of slice 2, `adrs.md` 2026-10-28 second note).
         let values: Vec<_> = PRESETS
             .iter()
-            .map(|p| (p.smooth, p.specks_mm, p.corners, p.upscale, p.denoise))
+            .map(|p| {
+                (
+                    p.smooth,
+                    p.specks_mm.as_mm(),
+                    p.corners,
+                    p.upscale,
+                    p.denoise,
+                )
+            })
             .collect();
         assert_eq!(
             values,
@@ -430,9 +438,9 @@ mod tests {
     #[test]
     fn the_tolerance_is_clamped() {
         let mut params = TraceParams::with_threshold(128);
-        assert_eq!(params.tolerance_px(), DEFAULT_TOLERANCE_PX);
+        assert_eq!(params.tolerance_px(), DEFAULT_TOLERANCE_PX.as_px());
         params.tolerance = PixelLength::from_px(f64::NAN);
-        assert_eq!(params.tolerance_px(), DEFAULT_TOLERANCE_PX);
+        assert_eq!(params.tolerance_px(), DEFAULT_TOLERANCE_PX.as_px());
         params.tolerance = PixelLength::from_px(99.0);
         assert_eq!(params.tolerance_px(), MAX_TOLERANCE_PX);
         params.tolerance = PixelLength::from_px(0.0);
