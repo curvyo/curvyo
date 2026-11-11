@@ -1,6 +1,7 @@
 //! The shipped weights' licence record (ADR 0028 §5, `specs/0091-trace-text-recognition`
 //! criterion 15): every file of `frontend/public/models/paddleocr-latin/` but the record and the
-//! licence text has an entry with an allowed licence, its source and the SHA-256 this crate
+//! licence text has an entry in the record (`tests/fixtures/model.toml`, a copy of the one next
+//! to the weights) with an allowed licence, its source and the SHA-256 this crate
 //! expects; the record names the training-data statement.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -37,6 +38,12 @@ fn folder() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin")
 }
 
+/// The copy of the record this crate keeps (`tests/fixtures/model.toml`); the weights stay with
+/// the app, which keeps the original next to them.
+fn record_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/model.toml")
+}
+
 fn sha256(bytes: &[u8]) -> String {
     use std::fmt::Write;
     Sha256::digest(bytes)
@@ -49,8 +56,7 @@ fn sha256(bytes: &[u8]) -> String {
 
 #[test]
 fn every_weight_file_has_its_record_and_hash() {
-    let record: Record =
-        toml::from_str(&std::fs::read_to_string(folder().join("model.toml")).unwrap()).unwrap();
+    let record: Record = toml::from_str(&std::fs::read_to_string(record_path()).unwrap()).unwrap();
     assert_eq!(record.name, "PaddleOCR Latin (mobile)");
     assert!(
         ALLOWED.contains(&record.licence.as_str()),
@@ -62,6 +68,13 @@ fn every_weight_file_has_its_record_and_hash() {
     assert!(record.training_data.contains("Frage 112 A"));
     let licence = std::fs::read_to_string(folder().join(&record.licence_file)).unwrap();
     assert!(licence.contains("Apache License") && licence.contains("Version 2.0"));
+    if let Ok(original) = std::fs::read(folder().join("model.toml")) {
+        assert_eq!(
+            original,
+            std::fs::read(record_path()).unwrap(),
+            "tests/fixtures/model.toml is not the record next to the weights"
+        );
+    }
     let mut files: Vec<String> = std::fs::read_dir(folder())
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())

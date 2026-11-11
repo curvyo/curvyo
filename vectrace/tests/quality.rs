@@ -255,13 +255,10 @@ fn without_specks(mask: &[bool], width: usize, height: usize, min_pixels: f64) -
 
 /// The outlines of a baseline SVG (in its page's millimetres), split per subpath, in pixels.
 fn baseline_outlines(svg: &[u8], image: &QualityImage) -> Option<Vec<BezPath>> {
-    let drawing = curvyo_svg_core::read_svg(svg).ok()?;
-    let (page_w, _) = drawing.page?;
-    let px_per_mm = f64::from(image.picture.width) / page_w;
-    let mut paths = Vec::new();
-    collect_paths(&drawing.nodes, &mut paths);
+    let baseline = common::baseline_svg::read_baseline(svg)?;
+    let px_per_mm = f64::from(image.picture.width) / baseline.page_width;
     let mut outlines = Vec::new();
-    for path in paths {
+    for path in baseline.paths {
         let mut current = BezPath::new();
         for el in (kurbo::Affine::scale(px_per_mm) * path).elements() {
             if matches!(el, PathEl::MoveTo(_)) && !current.elements().is_empty() {
@@ -274,20 +271,6 @@ fn baseline_outlines(svg: &[u8], image: &QualityImage) -> Option<Vec<BezPath>> {
         }
     }
     Some(outlines)
-}
-
-fn collect_paths(nodes: &[curvyo_svg_core::SvgNode], out: &mut Vec<BezPath>) {
-    for node in nodes {
-        match node {
-            curvyo_svg_core::SvgNode::Group { children, .. } => collect_paths(children, out),
-            curvyo_svg_core::SvgNode::Leaf { leaf, .. } => {
-                if let curvyo_svg_core::LeafKind::Path { path, .. } = &leaf.kind {
-                    out.push(path.clone());
-                }
-            }
-            _ => {}
-        }
-    }
 }
 
 fn metrics_json(m: &Metrics) -> Value {

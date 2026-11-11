@@ -4,6 +4,7 @@
 
 #![allow(dead_code)]
 
+pub mod baseline_svg;
 pub mod decode;
 pub mod quality;
 

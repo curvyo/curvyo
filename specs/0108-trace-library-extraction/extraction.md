@@ -9,10 +9,10 @@ versions instead of `workspace = true`, the lints inline, the repo's `rust-toolc
 | `cargo build --lib` (native) | passes |
 | `cargo build --lib --target wasm32-unknown-unknown` | passes |
 | `cargo clippy --lib -D warnings`, native and wasm32 | passes |
-| `cargo test --lib` | **does not compile**: 2 blockers below |
-| integration tests (`tests/*.rs`) | not run: blockers below |
+| `cargo test --lib` | did not compile (2 blockers below); done since, see "Done" |
+| integration tests (`tests/*.rs`) | not run then; done since, see "Done" |
 
-So the library itself has no Curvyo dependency left. What keeps the test suite from standing alone:
+So the library itself has no Curvyo dependency left. What kept the test suite from standing alone (blockers 1 to 4 are done, 2026-11-11):
 
 1. `src/units.rs` test compares `PixelMap` bit for bit with `curvyo-document-core::Affine`.
    Fix before the move: freeze the expected bit patterns of the five fixed matrices as constants
@@ -31,8 +31,35 @@ So the library itself has no Curvyo dependency left. What keeps the test suite f
 5. Comments naming `curvyo-render-core` (`shapes/join.rs`) and Curvyo specs: reword when the repo
    exists; not a build matter.
 
+## Done (2026-11-11, on `story/trace-library-extraction`)
+
+`vectrace/Cargo.toml` has no `curvyo-*` dependency of any kind; `cargo tree -p vectrace --edges all`
+shows none.
+
+1. `src/units.rs`: the expected bits of the five matrices (compose, determinant, inverse, point and
+   vector) are constants, generated once from `Affine`; `curvyo-document-core` is gone.
+2. `tests/common/decode.rs` (`image =0.25.10`, `png`, `jpeg`, no default features): orientation
+   applied, gray and RGB widened to RGBA, 16-bit rounded to 8 bits as `decode_working` does; the
+   OCR unit test in `src/ocr/read.rs` includes the same file. Checked once against
+   `decode_working` on all 61 PNG and JPEG fixtures: identical size and bytes, so no reference
+   table or golden changed. The helper does not downscale (nothing in the fixtures needs it).
+3. `tests/common/baseline_svg.rs` is a 100-line reader of the Inkscape form (root `width` and
+   `viewBox`, nested `g` transforms, `path d`; the rest ignored). It matches `curvyo-svg-core` on
+   three hand-written samples (viewBox, matrix and scale, inches); the real baselines are not in
+   the repository (`TRACE_BASELINE_DIR`, the harness is `#[ignore]`), so it was not compared on
+   them. A full SVG reader was not reasonable.
+4. `tests/fixtures/model.toml` is the record the test reads; the test also checks it equals the
+   original next to the weights when that exists.
+
+Still open for the standalone repository: the OCR tests (`tests/{ocr_reference,turned,padding,
+model_record}.rs`, `acceptance_0091_tester.rs`, the unit test in `src/ocr/read.rs`, `src/ocr/model.rs`)
+still read the weights from `../frontend/public/models/paddleocr-latin/`. The new repository needs
+its own copy of the weights at a path (or an environment variable) the tests accept; decide when
+the repository is created. Review findings of ADR 0048 (units in `add_shapes`, `wire::Text`,
+`Preset`, `Diagnostics`) are done as well.
+
 ## Steps for the move (next task, not done here)
-1. Do fixes 1 to 4 on one branch in this repo; the full gate stays green.
+1. Fixes 1 to 4 are done (see above); the full gate stays green.
 2. `git subtree split -P vectrace -b vectrace-export`; push to the new repository's `main`
    (history of the crate is kept).
 3. In the new repo: workspace `Cargo.toml` with `[workspace.lints]` as above, `rust-toolchain.toml`,
