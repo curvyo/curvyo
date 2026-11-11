@@ -25,8 +25,6 @@ rustix = { version = "1.1", features = ["time"] }
 # The record test of the OCR module reads `model.toml` (ADR 0028 §5).
 toml.workspace = true
 serde.workspace = true
-# The bit-for-bit test of `units.rs` against `Affine` (ADR 0048 §3), dev only.
-curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 # The golden files of `tests/fixtures/trace/` (criterion 18).
 serde_json.workspace = true
 # The reference set's CC0 and local images are PNG and JPEG (`specs/0089` adrs.md §11, dev only).
