@@ -2,11 +2,11 @@
 
 Curvyo: one vector app to draw, prepare and produce work on laser cutters, cutting plotters,
 embroidery machines and CNC mills. Desktop first (Linux, Windows, macOS), browser second,
-mobile companion later. Loaded into every session: keep it short, details live in `docs/`.
+mobile companion later. Keep this file short; details live in `docs/`.
 
 ## 1. Language and reporting
 
-- Everything in the repo is English (code, docs, commits, PRs, UI). Plain, specific, no marketing.
+- Everything in the repo is English (code, docs, commits, PRs, UI).
 - Talk to the customer in German, informal "du".
 - **Final reply to the customer: exactly three short lines.**
   1. 🟢/🟡/🔴 what changed and its status. 🟢 only with the exact check that was run; 🟡 not
@@ -31,7 +31,7 @@ mobile companion later. Loaded into every session: keep it short, details live i
 | `refactorer` | behaviour-preserving moves, renames, splits, dead-code removal | features, API or format changes |
 
 Each role is a playbook in `docs/playbooks/<role>.md`; `.claude/agents/<role>.md` only sets model and
-effort and points to it. Subagents report in at most ~30 lines plus file paths,
+effort and points to it. Subagents give briefs and reports of at most ~30 lines plus file paths,
 never spawn their own subagents, and never open PRs (the lead does).
 
 ## 3. Decide or ask
@@ -72,12 +72,9 @@ docs, not the TypeScript.
 **Definition of Done:** every criterion covered by a test, gate green, docs updated, no new
 `TODO` without an issue link, customer accepted.
 
-**One checkout, one branch at a time** (`~/<project>/` on VMs, the clone itself; no worktrees,
-nothing outside the project directory). Agents in the same checkout run one at a time when
-they build or test; only docs-only agents run in parallel. Only one agent drives a browser.
-
-**Stacked PRs:** a PR is always opened against `main`. A branch stacked on an unmerged one waits
-until its base is merged, is rebased onto `main`, then gets its PR.
+**One checkout, one branch at a time** (no worktrees, nothing outside the project directory).
+Agents in the same checkout build or test one at a time; only docs-only agents run in parallel.
+Only one agent drives a browser.
 
 ## 4a. Tokens: model, machine, gate
 
@@ -93,15 +90,9 @@ until its base is merged, is rebased onto `main`, then gets its PR.
 - **Tester in the lead's checkout** (customer, 2026-11-10: no second VM): after the implementer
   reports, the lead (or a Haiku `tester` agent, one at a time) writes the acceptance tests from the
   spec in the same checkout and branch, runs the full gate and the browser files one by one, commits
-  the tests and reports PASS/FAIL. Never two agents building or driving a browser at once.
-- **Gate once:** during work only the affected crates; the full gate (§7) once before the push.
-- **No stacking by default:** one story at a time, the next starts after the merge. Only when
-  the customer says so (nights, weekends) may one more branch build on an unmerged one, never
-  more than 2 deep (customer, 2026-10-25).
+  the tests and reports PASS/FAIL.
 - **Verify by risk:** full tester pass for format, document model and public APIs; for
   `chore/` and `fix/` the gate plus one focused test.
-- **Short briefs and reports:** give agents the paths and criteria they need, not the history;
-  reports stay under ~30 lines.
 
 ## 5. Engineering rules
 
@@ -111,14 +102,11 @@ until its base is merged, is rebased onto `main`, then gets its PR.
   Functions over ~60 lines or modules over ~500 lines are split or justified in the PR.
 - `*-core` crates never depend on UI, platform or I/O crates; they use `#![forbid(unsafe_code)]`;
   `unsafe` elsewhere needs an ADR.
-- Errors: `thiserror` in libraries, `anyhow` only in binaries. No `unwrap`/`expect` outside
-  tests unless preceded by `// invariant: ...`.
+- Errors: `thiserror` in libraries, `anyhow` only in binaries. `unwrap`/`expect` outside
+  tests only after `// invariant: ...`.
 - Units are newtypes, never bare `f64`; every geometric comparison has an explicit tolerance.
-- Delete dead code; no commented-out code.
 - Every file-format importer/exporter has golden-file tests in `tests/fixtures/`.
 - Timing tests measure thread CPU time (e.g. `curvyo-editor-wasm/tests/cpu_time/`), never wall time.
-- Lints are enforced by the workspace `Cargo.toml` (`clippy::pedantic`, `unwrap_used` deny,
-  `missing_docs` warn).
 
 ## 6. Architecture
 
@@ -131,13 +119,14 @@ until its base is merged, is rebased onto `main`, then gets its PR.
 - Machines: job and output formats in core, device communication in `-io` crates; one machine
   family at a time, no universal machine abstraction before the second family.
 - Crate suffixes `-core`, `-app`, `-io`, plus `-wasm` (ADR 0001) and `-server` (ADR 0004).
-  Layout: ADR 0011. ADR index: `docs/adr/index.md`. ADR format, requirements split and CI
-  structure: `docs/guides/rust-workspace-blueprint.md`. Requirements: `docs/requirements.md`;
-  UI rules: `docs/design-system.md`; known debts: `docs/technical-debt.md`.
+  Layout: ADR 0011; ADR index `docs/adr/index.md`; ADR format and CI structure
+  `docs/guides/rust-workspace-blueprint.md`; requirements `docs/requirements.md`;
+  UI rules `docs/design-system.md`; known debts `docs/technical-debt.md`.
 
 ## 7. Quality gate
 
-Run locally before every push; push and open the PR only when green.
+Run the full gate once before every push (during work only the affected crates); push and open
+the PR only when green.
 
 ```text
 cargo fmt --all --check
@@ -150,16 +139,15 @@ RUSTDOCFLAGS="-D warnings" cargo doc -q --workspace --no-deps
 cd frontend && npm run build:wasm && npx tsc -b --noEmit && npm test && npx oxlint
 ```
 
-During work run only the affected crates; the full gate once at the end. A failing hook means
-fix it, never work around it. CI also reports the editor wasm size (`metrics/wasm-size`).
+A failing hook means fix it, never work around it. CI also reports the editor wasm size
+(`metrics/wasm-size`).
 
 ## 8. Git and GitHub
 
-- Trunk-based; `main` always releasable. Never push to `main`, never force-push shared branches.
+- Never push to `main`, never force-push shared branches.
 - Branches `story/<slug>`, `fix/<slug>`, `chore/<slug>`; Conventional Commits, scope = crate.
 - 1-5 self-contained commits per PR; rebase-merge (`docs/guides/git-workflow.md`).
-- `chore/` and `fix/` PRs merge without asking once CI is green; `story/` PRs need customer
-  acceptance every time.
+- `chore/` and `fix/` PRs merge without asking once CI is green; `story/` PRs wait for the customer.
 - CI: host gate on ubuntu plus wasm32 builds on every PR; Windows and macOS nightly only.
 - Renovate updates dependencies; the lead batches them into one weekly PR.
 - Code navigation: ProjectAtlas MCP (`projectatlas init` once, `scan` after a pull or switch;
