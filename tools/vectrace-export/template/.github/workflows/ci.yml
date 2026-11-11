@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.0
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-deny
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --message-format=short -- -D warnings
+      # The weights and reference images are in assets/ (ASSETS.md); a missing file fails.
+      - run: cargo nextest run --status-level fail
+        env:
+          VECTRACE_REQUIRE_ASSETS: "1"
+      - run: cargo build -q --lib --target wasm32-unknown-unknown
+      - run: cargo clippy --lib --target wasm32-unknown-unknown -- -D warnings
+      - run: cargo deny check
+      - run: cargo doc -q --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
