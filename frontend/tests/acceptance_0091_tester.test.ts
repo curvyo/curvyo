@@ -1,6 +1,6 @@
 // Tester cases for `specs/0091-trace-text-recognition` slice 1 in Chromium (CURVYO_E2E_BROWSER=
 // /path/to/chromium; the wasm bindings must be built), on the tester's own posters
-// (`vectrace/tests/fixtures/tester/`). Written from the specification and the UX notes.
+// (`tests/assets/vectrace-fixtures/tester/`). Written from the specification and the UX notes.
 // Covers: the poster end to end with the warning wording (criterion 5), texts above the group
 // (6), one undo (11), the weights fetched once from the app itself and nothing else leaving the
 // page (14), no second OCR after a setting change (16), the switch as an app setting (17), a stop
@@ -22,7 +22,7 @@ const ORIGIN = `http://localhost:${PORT}`;
 const FRONTEND = path.resolve(import.meta.dirname, "..");
 const ROOT = path.resolve(FRONTEND, "..");
 const SCRATCH = path.resolve(ROOT, "target", "e2e-0091-tester");
-const FIXTURES = path.resolve(ROOT, "vectrace", "tests", "fixtures", "tester");
+const FIXTURES = path.resolve(ROOT, "tests", "assets", "vectrace-fixtures", "tester");
 const POSTER = path.join(FIXTURES, "poster.png");
 const CLEAN = path.join(FIXTURES, "clean.png");
 const NATIVE = path.resolve(ROOT, "curvyo-editor-wasm", "tests", "fixtures", "acceptance_0091_tester_native.json");
@@ -508,7 +508,7 @@ test("0091 tester c15: the licence record names the weights' licence and the doc
 // while the pool reads and while it fits (criterion 19), the customer's screenshot, and the wall
 // times of the whole job with the main thread's long tasks.
 
-const SCREENSHOT = path.resolve(ROOT, "vectrace", "tests", "fixtures", "customer", "font-manager-screenshot.png");
+const SCREENSHOT = path.resolve(ROOT, "tests", "assets", "vectrace-fixtures", "customer", "font-manager-screenshot.png");
 
 /** Wraps every `Worker` of the page: logs the requests it is sent (`type`, whether text lines go
  * with a trace), the replies it posts (`kind`, progress left out) and its end; samples the Trace

@@ -1210,13 +1210,19 @@ fn c6_five_hundred_paths_recognise_in_under_two_seconds_of_cpu() {
     );
 }
 
-/// Criterion 15: nothing in the recognition reaches the network. The core crates have no network
-/// dependency, so the pass cannot; checked on the manifests.
+/// Criterion 15: nothing in the recognition reaches the network. The crates have no network
+/// dependency, so the pass cannot; checked on the manifest of `curvyo-ui-core` and on the
+/// dependency list of `vectrace` (an external git dependency) in `Cargo.lock`.
 #[test]
 fn c15_the_recognition_crates_have_no_network_dependency() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    for krate in ["curvyo-ui-core", "vectrace"] {
-        let toml = std::fs::read_to_string(root.join(krate).join("Cargo.toml")).unwrap();
+    let ui = std::fs::read_to_string(root.join("curvyo-ui-core/Cargo.toml")).unwrap();
+    let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap();
+    let block = lock
+        .split("[[package]]")
+        .find(|b| b.contains("name = \"vectrace\"\n"))
+        .expect("vectrace is in Cargo.lock");
+    for (krate, toml) in [("curvyo-ui-core", ui.as_str()), ("vectrace", block)] {
         for banned in [
             "reqwest",
             "hyper",

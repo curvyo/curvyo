@@ -1,6 +1,6 @@
 //! Tester cases for `specs/0091-trace-text-recognition` slice 3 (criteria 30 to 35): upside-down
 //! and steep text through Trace, on the tester's own fixtures
-//! (`vectrace/tests/fixtures/tester/make_turned.py`): the slice 1 poster and the slice 2
+//! (`tests/assets/vectrace-fixtures/tester/make_turned.py`): the slice 1 poster and the slice 2
 //! colour poster turned by 180, a picture with a line at +90 and one at -90, a mixed picture and a
 //! line at 195. Written from the specification before the implementation was read; only public
 //! names were looked up.
@@ -68,7 +68,9 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn fixture(file: &str) -> PathBuf {
-    root().join("vectrace/tests/fixtures/tester").join(file)
+    root()
+        .join("tests/assets/vectrace-fixtures/tester")
+        .join(file)
 }
 
 fn model() -> OcrModel {

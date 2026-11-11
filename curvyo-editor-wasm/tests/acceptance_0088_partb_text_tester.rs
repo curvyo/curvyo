@@ -40,7 +40,9 @@ fn fonts_dir() -> PathBuf {
 }
 
 fn poster(file: &str) -> PathBuf {
-    root().join("vectrace/tests/fixtures/tester").join(file)
+    root()
+        .join("tests/assets/vectrace-fixtures/tester")
+        .join(file)
 }
 
 fn model() -> OcrModel {

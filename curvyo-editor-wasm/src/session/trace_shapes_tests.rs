@@ -356,7 +356,7 @@ fn c6_five_hundred_paths_take_under_two_seconds() {
 /// The `vectrace` golden pictures (binary PGM).
 fn pgm(file: &str) -> (u32, u32, Vec<u8>) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../vectrace/tests/fixtures/trace")
+        .join("../tests/assets/vectrace-fixtures/trace")
         .join(file);
     let bytes = std::fs::read(path).unwrap();
     let text = String::from_utf8_lossy(&bytes[..20]).to_string();
