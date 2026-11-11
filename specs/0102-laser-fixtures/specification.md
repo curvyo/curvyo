@@ -1,6 +1,6 @@
 # Laser fixtures: the bed's grid, holders, clamps and stops as selectable objects, switched on per fixture, with parts snapping into slots
 
-Status: Ready (2026-11-10, revised 2026-11-10 after the review of PR #313 (handles and chips, screw added) and aligned to `ux-notes.md` (D22 to D27: the thread never above the head, no size fields in the block); adrs.md, ADR 0049, ADR 0050 and ux-notes.md exist; Fragen 171 to 175 answered by the customer 2026-11-10: A, with 173 at a 0.1 mm tolerance and 174 at B and C)
+Status: Done (PR #313; ADR 0049 and 0050 accepted with the PR; Fragen 171 A, 172 A, 173 A with 0.1 mm, 174 B and C, 175 A; revised 2026-11-10 after the customer's review: rectangle handles, no size fields, the screw kind)
 Priority: Should
 Origin: Customer (request of 2026-10-17, translated: "In the work area there can be fixtures to lay out or clamp the parts, plus maybe a measuring tape [...] they snap in by fitting size"; concept round 2 of 2026-11-05, feedback 4 and 11: "the engraved grid is good but needs measuring tapes and thicker major lines; fixtures are selectable; several active at once"). Slice 5a of `specs/0063-manufacturing-workbenches/`. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 
