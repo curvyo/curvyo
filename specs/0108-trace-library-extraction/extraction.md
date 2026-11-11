@@ -72,3 +72,24 @@ the repository is created. Review findings of ADR 0048 (units in `add_shapes`, `
    by then) gets a note naming the repository.
 6. Weights: `model.toml` and the ONNX files stay in Curvyo's `frontend/public/models/`; the
    standalone app and the SaaS ship their own copy.
+
+## Standalone tests and the export kit (2026-11-11, `chore/vectrace-standalone`)
+
+Assets: the tests find the OCR weights and the customer's reference images through
+`vectrace/tests/common/assets.rs`. Lookup order: `$VECTRACE_ASSETS/{models/paddleocr-latin,
+trace-references}`, else `assets/` in the crate directory (the new repository), else the Curvyo
+paths next to the crate. A missing directory skips the test with `skipped: ...` unless
+`VECTRACE_REQUIRE_ASSETS` is set, then it fails; Curvyo's CI sets it. The sidecars' `file`
+(`tests/assets/trace-references/<name>`) is mapped to the reference directory by the helper.
+
+Customer decision (Frage 4, VT-ASSETS, option B): images (CC0 1.0) and weights (Apache-2.0) go
+into the new repository as plain git, no LFS, under `assets/`. Curvyo's own copies stay until the
+repository exists; a follow-up deletes them.
+
+Export: `tools/vectrace-export/export.sh <new-dir>` runs `git subtree split -P vectrace` (history
+kept), clones it to `<new-dir>` (branch `main`, no remote), copies the assets into `assets/`, and
+overlays `tools/vectrace-export/template/` (standalone `Cargo.toml`, `deny.toml`, `README.md`,
+`ASSETS.md`, `.github/workflows/{ci,release}.yml`) plus the root `rust-toolchain.toml`, in one
+commit. Push it to the new repository's `main` by hand. Rehearsed once into a scratch directory:
+fmt, clippy, wasm32 build and clippy, `cargo deny check`, `doc -D warnings` and the tests pass
+there; the tests also pass without assets (skipped with a message).

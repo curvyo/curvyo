@@ -45,3 +45,14 @@ dependencies are covered by `Cargo.lock`, `frontend/package-lock.json` and `deny
 - **Licence:** Apache-2.0; the text ships next to the files as `LICENSE`. The record with the
   SHA-256 of each file is `model.toml`, checked by `vectrace/tests/model_record.rs`.
 - **Training data:** not itemised upstream; accepted by the customer (Frage 112 A, 2026-10-31).
+
+## Trace reference images (`tests/assets/trace-references/`)
+
+- **Used in:** the `vectrace` reference and quality tests (`specs/0089-trace-quality-and-colour`).
+- **Licence:** CC0 1.0 or public domain: the customer's own photos, scans and AI-generated logos
+  (declared CC0 1.0 in each sidecar, `vectrace/tests/fixtures/trace/reference/customer/*.json`),
+  openclipart.org and other CC0 sources listed in
+  `vectrace/tests/fixtures/trace/reference/SOURCES.md`.
+- **Moves with vectrace:** when `vectrace` gets its own repository the images go to its
+  `assets/trace-references/` (`tools/vectrace-export/`), together with the OCR weights
+  (Apache-2.0, `frontend/public/models/paddleocr-latin/`).
