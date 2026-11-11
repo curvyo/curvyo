@@ -39,27 +39,27 @@ toml = { version = "1.1", default-features = false, features = ["std", "parse", 
 zip = { version = "9", default-features = false, features = ["deflate"] }
 # Pinned exactly: undo of Delete revives a node through an injected tree move that the handler API
 # forbids (ADR 0014 §11). A Loro upgrade is taken only with `tests/loro_revival_canary.rs` green.
-loro = { version = "=1.16.2", default-features = false }
+loro = { version = "=1.17.1", default-features = false }
 kurbo = { version = "0.13", default-features = false, features = ["std"] }
 lyon = "1"
 # Pinned exactly: a polygon boolean engine whose rare defects would ruin a workpiece, so every
 # update is a reviewed PR that reruns the boolean fixtures and property tests
 # (specs/0016-boolean-operations/adrs.md).
-i_overlay = { version = "=9.0.1", default-features = false }
+i_overlay = { version = "=9.1.0", default-features = false }
 # Pinned exactly (ADR 0020 §2): the text engine turns hostile font bytes into outlines that become
 # cuts, inside a wasm module that cannot catch a panic. An update is a reviewed PR that reruns the
 # text-core tests and the hostile-input property test. `harfrust` is MIT; `skrifa` MIT OR Apache-2.0.
-harfrust = { version = "=0.14.0", default-features = false, features = ["std"] }
-skrifa = { version = "=0.48.0", default-features = false, features = ["std"] }
-sha2 = { version = "0.10", default-features = false }
+harfrust = { version = "=0.15.0", default-features = false, features = ["std"] }
+skrifa = { version = "=0.50.0", default-features = false, features = ["std"] }
+sha2 = { version = "0.11", default-features = false }
 # Pinned exactly (`specs/0076-single-line-fonts/adrs.md` decision 2): the XML reader of SVG fonts,
 # hostile input in wasm. MIT OR Apache-2.0, no dependencies, no `unsafe`, no I/O; already in
 # `Cargo.lock` through `fontdb`. Without `positions`.
-roxmltree = { version = "=0.20.0", default-features = false, features = ["std"] }
+roxmltree = { version = "=0.21.2", default-features = false, features = ["std"] }
 # Pinned exactly (ADR 0018 §4): the attribute grammars of the SVG import (transform, colour,
 # length, paint, number lists; not path data), hostile input in wasm. Apache-2.0 OR MIT,
 # linebender, `forbid(unsafe_code)`; its `kurbo` 0.13 and `siphasher` are already locked.
-svgtypes = { version = "=0.16.1", default-features = false, features = ["std"] }
+svgtypes = { version = "=0.16.2", default-features = false, features = ["std"] }
 # Pinned exactly (ADR 0018 §4): the `<style>` subset of the SVG import (`specs/0024` criterion 36).
 # Apache-2.0 OR MIT, linebender, no `unsafe`; its `log` is already locked.
 simplecss = { version = "=0.2.2", default-features = false }

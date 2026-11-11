@@ -31,7 +31,7 @@ keyring = { version = "3.6", default-features = false, features = ["sync-secret-
 argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
 chacha20poly1305 = { version = "0.11", default-features = false }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
-getrandom = "0.3"
+getrandom = "0.4"
 # Moves a deleted workspace document or folder to the OS trash, never erasing it
 # (`specs/0095-workspace` criteria 17 and 40, ADR 0037 decision 13): MIT. On Linux it writes the
 # freedesktop trash as files (no D-Bus stack); default features: `chrono` (already locked) dates the

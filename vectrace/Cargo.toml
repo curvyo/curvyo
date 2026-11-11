@@ -13,8 +13,8 @@ workspace = true
 kurbo.workspace = true
 thiserror.workspace = true
 # The text reader (ADR 0028 §1, the module `vectrace::ocr`): pinned exactly, the same as before the move.
-rten = { version = "=0.26.0", default-features = false, features = ["onnx_format"] }
-rten-tensor = { version = "=0.26.0", default-features = false }
+rten = { version = "=0.28.0", default-features = false, features = ["onnx_format"] }
+rten-tensor = { version = "=0.28.0", default-features = false }
 sha2.workspace = true
 
 [target.'cfg(unix)'.dev-dependencies]

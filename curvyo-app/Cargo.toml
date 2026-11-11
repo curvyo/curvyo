@@ -73,7 +73,7 @@ curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 kurbo.workspace = true
 # The Import button's GTK3 file chooser with our preview pane (`specs/0087-image-clipboard-and-drop`
 # adrs.md decision 6): MIT, already in the tree under Tauri at this version, safe API only.
-gtk = "0.18"
+gtk = "0.19"
 
 [dev-dependencies]
 # The key-file store of the credential command's test (`device_keys.rs`).

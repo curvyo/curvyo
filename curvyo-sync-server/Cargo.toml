@@ -20,7 +20,7 @@ anyhow = "1"
 thiserror.workspace = true
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
 # The `Challenge` nonces of the handshake (the relay rules take entropy from their caller).
-getrandom = "0.3"
+getrandom = "0.4"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 
 [dev-dependencies]
@@ -29,4 +29,4 @@ tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 tempfile = "3"
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
