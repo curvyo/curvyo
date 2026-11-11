@@ -30,7 +30,7 @@
 #                        go stale, and `--workspace` is not more expensive
 #                        here than the split would have been.
 #   core-wasm32       — one job per workspace member whose name ends in
-#                        `-core`, plus `curvyo-editor-wasm` and `vectrace` (see its own
+#                        `-core`, plus `curvyo-editor-wasm` and the external `vectrace` (see its own
 #                        comment) — discovered via `cargo metadata`, not
 #                        hardcoded, so a new `*-core` crate is picked up with
 #                        no workflow edit at all. Builds for
@@ -343,15 +343,11 @@ jobs:
 
       - name: cargo nextest
         shell: bash
-        env:
-          # vectrace tests skip when their weights or reference images are missing; here they are
-          # in the checkout, so a missing file must fail (tools/vectrace-export).
-          VECTRACE_REQUIRE_ASSETS: "1"
         run: cargo nextest run --workspace ${{ matrix.os != 'ubuntu-latest' && '--exclude curvyo-sync-server' || '' }} --status-level fail --no-fail-fast
 
   # Discovers the crates core-wasm32 below runs against, instead of a
   # hand-maintained list that silently misses a new crate: every workspace
-  # member whose name ends in `-core`, plus `curvyo-editor-wasm` and `vectrace` (see that
+  # member whose name ends in `-core`, plus `curvyo-editor-wasm`, and the external `vectrace` appended by name (see that
   # job's comment for why it's included by name rather than by suffix).
   discover-core-crates:
     name: discover core crates
@@ -366,7 +362,7 @@ jobs:
         run: |
           set -euo pipefail
           crates=$(cargo metadata --no-deps --format-version=1 \
-            | jq -c '[.packages[].name | select(endswith("-core") or . == "curvyo-editor-wasm" or . == "vectrace")]')
+            | jq -c '[.packages[].name | select(endswith("-core") or . == "curvyo-editor-wasm")] + ["vectrace"]')
           echo "Discovered: $crates"
           echo "crates=$crates" >> "$GITHUB_OUTPUT"
 
@@ -549,35 +545,6 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test sync_cpu_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test workspace_tree_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --lib frame_start_budget -- --nocapture
-
-  # The tracer's quality harness, its 2000 x 2000 px budget, its 16 Mpx memory test
-  # (specs/0025-raster-trace criteria 25 to 28, 36) and the reference set (specs/0089 slice A):
-  # nightly only, never the PR gate. A metric more than 5 % worse than
-  # tests/fixtures/trace/baseline.json fails the run.
-  trace-quality:
-    name: trace quality harness (nightly)
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install the pinned Rust toolchain
-        run: rustup show
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Run the quality harness, the budget and the memory test in release
-        run: |
-          cargo test --release -p vectrace --test quality -- --ignored --nocapture --test-threads=1
-          cargo test --release -p vectrace --test memory -- --ignored --nocapture
-
-      # specs/0089-trace-quality-and-colour slice A: the reference set at three resolutions with all
-      # four presets (about 5 minutes on the build host), guarded at +5 % like the harness above.
-      - name: Run the reference set in release
-        timeout-minutes: 30
-        run: |
-          cargo test --release -p vectrace --test reference -- --ignored --nocapture --test-threads=1 reference_table
 
   # Criterion 43 of specs/0016-boolean-operations: the golden results of the boolean kernel are
   # compared in the build that ships to the browser, run in Node by wasm-bindgen-test-runner
