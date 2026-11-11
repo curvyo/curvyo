@@ -6269,8 +6269,8 @@ name = "vectrace"
 version = "0.1.0"
 dependencies = [
  "cap",
- "curvyo-image-core",
  "curvyo-svg-core",
+ "image",
  "kurbo",
  "rten",
  "rten-tensor",

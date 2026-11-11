@@ -4,6 +4,7 @@
 
 #![allow(dead_code)]
 
+pub mod decode;
 pub mod quality;
 
 use std::ops::ControlFlow;

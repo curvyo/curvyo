@@ -49,7 +49,7 @@ pub fn sidecars() -> Vec<(PathBuf, Value)> {
 
 fn decode(path: &Path) -> Picture {
     let bytes = std::fs::read(path).unwrap();
-    let image = curvyo_image_core::decode_working(&bytes).unwrap();
+    let image = super::super::decode::decode_working(&bytes).unwrap();
     Picture {
         width: image.width,
         height: image.height,
@@ -200,7 +200,7 @@ pub fn local_images() -> Vec<RealImage> {
         .iter()
         .filter_map(|p| {
             let bytes = std::fs::read(p).ok()?;
-            let image = curvyo_image_core::decode_working(&bytes).ok()?;
+            let image = super::super::decode::decode_working(&bytes).ok()?;
             Some(RealImage {
                 id: format!("local.{:08x}", fnv(&bytes) >> 32),
                 group: None,

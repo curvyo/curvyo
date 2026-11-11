@@ -365,6 +365,10 @@ fn decode(
 }
 
 #[cfg(test)]
+#[path = "../../tests/common/decode.rs"]
+mod decode;
+
+#[cfg(test)]
 mod tests {
     use std::path::Path;
 
@@ -386,7 +390,7 @@ mod tests {
                 .join(file),
         )
         .unwrap();
-        let image = curvyo_image_core::decode_working(&bytes).unwrap();
+        let image = decode::decode_working(&bytes).unwrap();
         crate::ocr::crop_lines(model, image.width, image.height, &image.pixels, &mut |_| {
             std::ops::ControlFlow::Continue(())
         })
