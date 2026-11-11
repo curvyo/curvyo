@@ -74,3 +74,31 @@ fn a_hard_zigzag_answers_within_a_quarter_frame_either_way() {
     let (_, spent) = timed(&controls, false);
     assert!(spent < BUDGET, "zigzag took {spent:?}");
 }
+
+/// Customer 2026-11-11: a Pen hover whose Spiro has no near solution goes back toward the last
+/// place in a few solves from the shown shape; the worst hover of a sweep around the end of a
+/// 24-point wave stays within a quarter frame.
+#[test]
+fn a_held_pen_hover_answers_within_a_quarter_frame() {
+    use curvyo_editor_wasm::{Session, Tool};
+    use curvyo_ui_core::PenMode;
+    let mut session = Session::new(61);
+    session.set_tool(Tool::Pen);
+    assert!(session.set_pen_mode(PenMode::Spiro));
+    let mut last = Point::new(0.0, 0.0);
+    for i in 0..24 {
+        let x = 5.0 * f64::from(i);
+        last = Point::new(10.0 + x, 100.0 + 15.0 * (x / 15.0).sin());
+        session.pointer_hover(last, false, false);
+        session.pointer_down(last, false);
+        session.pointer_up(last, false, false);
+    }
+    let mut worst = Duration::ZERO;
+    for step in 0..32 {
+        let angle = std::f64::consts::TAU * f64::from(step) / 32.0;
+        let at = Point::new(last.x + 12.0 * angle.cos(), last.y + 12.0 * angle.sin());
+        let ((), spent) = cpu_time::cpu_time_of(|| session.pointer_hover(at, false, false));
+        worst = worst.max(spent);
+    }
+    assert!(worst < BUDGET, "worst held hover took {worst:?}");
+}

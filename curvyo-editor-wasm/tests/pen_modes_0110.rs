@@ -774,41 +774,30 @@ const ZIGZAG: [(f64, f64); 5] = [
     (143.0, 70.0),
 ];
 
-/// UX review U1: the notice says the points are joined by straight lines, so Enter commits the
-/// straight lines that were on screen, and the notice ends.
+/// Lead decision 2026-11-11 (Proposal, replaces the rule that a click without a near solution
+/// places nothing): every Spiro click places a control, the zigzag's looping fifth one too, with
+/// the curve solved from nothing; there is no notice, and Enter commits a Spiro that solves.
 #[test]
-fn an_unsolvable_spiro_commits_the_straight_lines_it_showed() {
+fn every_spiro_click_places_a_control_even_where_the_curve_loops() {
     let mut session = spiro_placed(&ZIGZAG, (160.0, 98.0));
-    assert!(
-        session
-            .take_unsupported_width_notice()
-            .contains("straight lines"),
-        "the live curve has no solution"
-    );
-    session.finish_pen();
-    assert!(session.take_spiro_notice_end(), "finishing ends the notice");
-    let document = unpack(42, &session.pack("test").unwrap()).unwrap();
-    let id = document.object_ids()[0];
-    let path = document.path(id).unwrap();
-    assert_eq!(path.curve_kind, curvyo_document_core::CurveKind::Bezier);
-    let points: Vec<_> = path
-        .anchors
+    let placed: Vec<_> = session
+        .pen_in_progress()
+        .unwrap()
         .iter()
         .map(|a| (a.point.x, a.point.y))
         .collect();
-    assert_eq!(
-        points,
-        ZIGZAG.to_vec(),
-        "the clicked points, joined straight"
-    );
+    assert_eq!(placed, ZIGZAG.to_vec(), "every click is a control");
+    assert_eq!(session.take_unsupported_width_notice(), "", "no notice");
+    session.finish_pen();
+    let document = unpack(42, &session.pack("test").unwrap()).unwrap();
+    let id = document.object_ids()[0];
+    let path = document.path(id).unwrap();
+    assert_eq!(path.curve_kind, curvyo_document_core::CurveKind::Spiro);
     assert!(
-        path.anchors
-            .iter()
-            .all(|a| a.handle_in.length() == 0.0 && a.handle_out.length() == 0.0),
-        "straight segments"
+        curvyo_ui_core::evaluate_spiro_nodes(&path.anchors, false, curvyo_ui_core::SPIRO_TOLERANCE)
+            .is_ok(),
+        "the stored curve solves"
     );
-    draw_once(&mut session);
-    assert_eq!(session.take_unsupported_width_notice(), "", "no new notice");
 }
 
 /// A Spiro that solves at Enter is committed as a Spiro.
@@ -817,7 +806,6 @@ fn a_solvable_spiro_is_committed_as_a_spiro() {
     let mut session = spiro_placed(&ZIGZAG[..3], (85.0, 65.0));
     assert_eq!(session.take_unsupported_width_notice(), "");
     session.finish_pen();
-    assert!(!session.take_spiro_notice_end(), "no notice to end");
     let document = unpack(43, &session.pack("test").unwrap()).unwrap();
     let id = document.object_ids()[0];
     assert_eq!(
@@ -826,19 +814,45 @@ fn a_solvable_spiro_is_committed_as_a_spiro() {
     );
 }
 
-/// The notice ends with Escape and with a mode change too.
+/// Customer 2026-11-11: a Node drag of a Spiro point past the place where its curve has no
+/// solution near the shown one stops there; the release writes that place, and the stored curve
+/// is the one shown.
 #[test]
-fn escape_or_a_mode_change_ends_the_spiro_notice() {
-    let mut session = spiro_placed(&ZIGZAG, (160.0, 98.0));
-    let _ = session.take_unsupported_width_notice();
-    let _ = session.escape();
-    assert!(session.take_spiro_notice_end());
-    let mut session = spiro_placed(&ZIGZAG, (160.0, 98.0));
-    let _ = session.take_unsupported_width_notice();
-    session.finish_pen();
-    let _ = session.take_spiro_notice_end();
-    assert!(session.set_pen_mode(PenMode::Lines));
-    assert!(!session.take_spiro_notice_end(), "ended once");
+fn a_node_drag_of_a_spiro_point_stops_where_its_curve_would_jump() {
+    use curvyo_document_core::{AnchorId, AnchorKind, CurveKind, Document, NewAnchor, pack};
+    let doc = Document::new(121);
+    let controls: Vec<_> = [(10.0, 40.0), (30.0, 50.0), (50.0, 31.0), (70.0, 50.0)]
+        .into_iter()
+        .zip(1..)
+        .map(|((x, y), i)| {
+            let mut a = NewAnchor::corner(AnchorId::new(121, i), Point::new(x, y));
+            a.kind = AnchorKind::Symmetric;
+            a
+        })
+        .collect();
+    let id = doc
+        .create_editable_curve(&controls, false, CurveKind::Spiro)
+        .unwrap();
+    let mut session = Session::open(122, &pack(&doc, "test").unwrap()).unwrap();
+    session.set_tool(Tool::Node);
+    draw_once(&mut session);
+    session.pointer_down(Point::new(50.0, 31.0), false);
+    for step in 1..=40 {
+        let at = Point::new(50.0, 31.0 - 0.5 * f64::from(step));
+        session.pointer_hover(at, false, false);
+        draw_once(&mut session);
+    }
+    session.pointer_up(Point::new(50.0, 11.0), false, false);
+    let stored = unpack(123, &session.pack("test").unwrap()).unwrap();
+    let moved = stored.path(id).unwrap().anchors[2].point;
+    assert!((moved.x - 50.0).abs() < 1e-9, "{moved:?}");
+    // The hold search stops at 0.5 mm (lead decision 2026-11-11, Proposal): the point stays
+    // within that of the fold, never past it.
+    assert!(
+        moved.y <= 31.0 && moved.y > 30.0,
+        "held before the fold: {moved:?}"
+    );
+    draw_once(&mut session);
 }
 
 /// UX review U10: a Spiro or B-spline point is a corner or smooth; it has no handles to make

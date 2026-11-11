@@ -204,7 +204,6 @@ impl Session {
                 self.evaluate_for_artwork(object);
             }
         }
-        self.note_spiro_failure();
         let mut unsupported_width = false;
         let mut width_ids = std::collections::HashSet::new();
         if artwork_objects
@@ -411,10 +410,13 @@ impl Session {
                     controls.push(next);
                 }
                 let curve = if self.pen.mode() == curvyo_ui_core::PenMode::Spiro {
-                    let curve = self.spiro_cache.borrow_mut().preview(&controls, closed);
-                    // Said in the frame that first draws the straight lines.
-                    self.note_spiro_failure();
-                    curve
+                    // Controls without a solution near the last curve keep that curve and the
+                    // points it goes through (customer 2026-11-11).
+                    let shown = self.spiro_cache.borrow_mut().preview(&controls, closed);
+                    shown.map(|(curve, through)| {
+                        controls = through;
+                        curve
+                    })
                 } else {
                     curvyo_ui_core::evaluate_bspline_nodes(&controls, false).ok()
                 };

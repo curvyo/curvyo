@@ -157,12 +157,6 @@ impl WasmSession {
         pen_mode(mode).is_some_and(|mode| self.session.set_pen_mode(mode))
     }
 
-    /// Whether the notice of a Spiro without solution ended since the last call (finish,
-    /// Escape, mode change): the host takes it off the screen.
-    pub fn take_spiro_notice_end(&self) -> bool {
-        self.session.take_spiro_notice_end()
-    }
-
     /// Why the Pen mode `mode` cannot be chosen now, or an empty string when it can.
     #[must_use]
     pub fn pen_mode_refusal(&self, mode: &str) -> String {

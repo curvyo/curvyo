@@ -230,6 +230,17 @@ merged snapshot.
   older build without a stored solution is drawn as straight lines, stays
   editable, and operations that need its evaluated geometry refuse with "This
   Spiro curve comes from an older build..." and change nothing.
+- Amendment (lead decision 2026-11-11, Proposal): every Pen click places a
+  control, solved from scratch where it has no near solution. While controls
+  only move, a curve without a loop (no segment sweeping more than 180 degrees)
+  never gets one (an added or removed control keeps the 270 degree limit); a moved
+  point whose curve would move more than four times as far as the point plus
+  2 mm is a jump and is refused; a held point catches up with the pointer at
+  most 1 mm per event faster than the pointer moves. Only a curve that already
+  loops may leave its loop for a fresh solution. The finished path keeps the
+  previewed shape and its spans: `stretch` is the largest singular value of a
+  placement (it was the Frobenius norm, which drew an unplaced path at a finer
+  tolerance than the Pen preview).
 - Remote updates are checked on a kept copy of the document instead of the live
   one (`import_updates_checked`); this doubles the log's memory for a live-shared
   document (`docs/technical-debt.md`).

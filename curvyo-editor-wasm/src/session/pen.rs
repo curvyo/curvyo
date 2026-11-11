@@ -63,46 +63,7 @@ impl Session {
 
     /// Changes Pen drawing mode when no path is being drawn.
     pub fn set_pen_mode(&mut self, mode: curvyo_ui_core::PenMode) -> bool {
-        let changed = self.pen_mode_refusal(mode).is_none() && self.pen.set_mode(mode);
-        if changed {
-            self.end_spiro_notice();
-        }
-        changed
-    }
-
-    /// Raises the notice of a Spiro without solution when a solve failed since the last call.
-    pub(super) fn note_spiro_failure(&self) {
-        if self.spiro_cache.borrow_mut().take_new_failure() {
-            *self.unsupported_width_notice.borrow_mut() =
-                Some(super::spiro_cache::SPIRO_FAILED_NOTICE.to_owned());
-            self.spiro_notice.set((true, false));
-        }
-    }
-
-    /// Ends the notice of a Spiro without solution, if it is on screen.
-    pub(super) fn end_spiro_notice(&self) {
-        if self.spiro_notice.get().0 {
-            self.spiro_notice.set((false, true));
-        }
-    }
-
-    /// Whether the notice of a Spiro without solution ended since the last call (the path was
-    /// finished or cancelled, or the mode changed): the host takes it off the screen.
-    pub fn take_spiro_notice_end(&self) -> bool {
-        let (shown, ended) = self.spiro_notice.get();
-        self.spiro_notice.set((shown, false));
-        ended
-    }
-
-    /// Whether Enter commits the Pen's Spiro in progress as straight lines: it is drawn so (its
-    /// live curve has no solution) or its placed points have none (UX review of 2026-11-10).
-    fn spiro_finishes_straight(&self) -> bool {
-        self.pen.mode() == curvyo_ui_core::PenMode::Spiro
-            && self.pen.in_progress_nodes().is_some_and(|nodes| {
-                nodes.len() >= 2
-                    && (self.spiro_cache.borrow().preview_failed()
-                        || super::spiro_cache::unsolvable(nodes))
-            })
+        self.pen_mode_refusal(mode).is_none() && self.pen.set_mode(mode)
     }
 
     /// Why `mode` cannot be chosen now, the one line beside the Pen bar; `None` when it can.
@@ -152,14 +113,21 @@ impl Session {
         }
         // A finish closes an open entry chip without adding (`0072` criterion 22).
         self.cancel_pen_entry();
-        let straight = self.spiro_finishes_straight();
+        // A Spiro's placed points always solve: each was taken only where the curve has a
+        // solution near the one shown (customer 2026-11-11). The stored curve starts from the
+        // shape the Pen showed.
+        if self.pen.mode() == curvyo_ui_core::PenMode::Spiro
+            && let Some(nodes) = self.pen.in_progress_nodes()
+        {
+            let nodes = nodes.to_vec();
+            self.spiro_cache
+                .borrow_mut()
+                .try_preview(&nodes, false, true);
+        }
         self.recording_unguarded(|this| {
-            if !(straight && this.pen.finish_straight(&this.document).is_some()) {
-                this.pen.finish(&this.document);
-            }
+            this.pen.finish(&this.document);
         });
         self.spiro_cache.borrow_mut().clear_preview();
-        self.end_spiro_notice();
     }
 
     /// A Pen release: commits what the press decided, remembers the notice of a join that moved
@@ -293,10 +261,23 @@ impl Session {
             let result =
                 self.resolve_snapping_direction(&curvyo_ui_core::SnapProbe::point(raw), direction);
             let node = raw.translated(result.offset);
+            // Every Spiro click places a control (lead decision 2026-11-11, Proposal).
+            let node = if self.pen.mode() == curvyo_ui_core::PenMode::Spiro && self.pen.is_placing()
+            {
+                self.spiro_pen_place(node)
+            } else {
+                node
+            };
             self.pen_cue.snap_press_offset = Some(point.vector_to(node));
             self.pen_cue.node = Some(node);
             node
         } else {
+            if self.pen.mode() == curvyo_ui_core::PenMode::Spiro
+                && matches!(action, PressAction::Close(_))
+                && !self.spiro_pen_may_close()
+            {
+                return;
+            }
             point
         };
         self.pen_cue.press = Some(target);
@@ -395,14 +376,17 @@ impl Session {
         })
     }
 
-    /// A secondary press with the Pen (`0072` criterion 19a, customer 2026-10-19): with a path in
-    /// progress it finishes the path as Enter does and places nothing. Returns whether it did;
-    /// with no path the press goes on as before.
+    /// A secondary press with the Pen (`0072` criterion 19a, customer 2026-10-19 and
+    /// 2026-11-11): with a path in progress it finishes the path as Enter does; it never places a
+    /// node or switches the tool. Returns whether the press was the Pen's: then the host passes
+    /// it to no tool.
     pub fn pen_secondary_press(&mut self) -> bool {
-        if self.tool != Tool::Pen || !self.pen_path_open() {
+        if self.tool != Tool::Pen {
             return false;
         }
-        self.finish_pen();
+        if self.pen_path_open() {
+            self.finish_pen();
+        }
         true
     }
 
@@ -626,6 +610,68 @@ mod tests {
         assert!(near(n.translated(node.handle_out), 150.1, 50.0));
         assert!(near(n.translated(node.handle_in), 109.9, 50.0));
         assert!(session.pen_drag_readout().is_none());
+    }
+
+    /// Customer 2026-11-11: Escape discards the unfinished path, a further Escape returns to the
+    /// Select tool; nothing is written.
+    #[test]
+    fn escape_discards_the_path_then_leaves_for_select() {
+        let mut session = pen_at_l();
+        ctrl_click(&mut session, Point::new(140.0, 50.0), false);
+        assert_eq!(
+            session.escape(),
+            super::super::keys::EscapeStep::ClearedState
+        );
+        assert!(session.pen_in_progress().is_none());
+        assert_eq!(session.tool, Tool::Pen);
+        assert_eq!(session.escape(), super::super::keys::EscapeStep::LeftTool);
+        assert_eq!(session.tool, Tool::Select);
+        assert_eq!(session.document.object_ids(), Vec::new());
+    }
+
+    /// The same with a Spiro in progress and its live point shown.
+    #[test]
+    fn escape_discards_a_spiro_in_progress_then_leaves_for_select() {
+        let mut session = Session::new(3);
+        session.set_tool(Tool::Pen);
+        assert!(session.set_pen_mode(curvyo_ui_core::PenMode::Spiro));
+        for (x, y) in [(20.0, 30.0), (30.0, 40.0), (40.0, 25.0)] {
+            let at = Point::new(x, y);
+            session.pointer_hover(at, false, false);
+            session.pointer_down(at, false);
+            session.pointer_up(at, false, false);
+        }
+        session.pointer_hover(Point::new(45.0, 50.0), false, false);
+        let _ = session.draw_list();
+        assert_eq!(
+            session.escape(),
+            super::super::keys::EscapeStep::ClearedState
+        );
+        assert!(session.pen_in_progress().is_none());
+        assert_eq!(session.escape(), super::super::keys::EscapeStep::LeftTool);
+        assert_eq!(session.tool, Tool::Select);
+    }
+
+    /// Customer 2026-11-11: a right click finishes the unfinished path as Enter does; with
+    /// nothing in progress it does nothing (no node, no tool switch). Either way the press is the
+    /// Pen's, so the host passes it to no tool.
+    #[test]
+    fn a_right_click_finishes_the_path_and_otherwise_does_nothing() {
+        let mut session = pen_at_l();
+        ctrl_click(&mut session, Point::new(140.0, 50.0), false);
+        assert!(session.pen_secondary_press());
+        assert!(session.pen_in_progress().is_none());
+        assert_eq!(session.document.object_ids().len(), 1);
+        assert_eq!(session.tool, Tool::Pen);
+        assert!(session.pen_secondary_press());
+        assert!(session.pen_in_progress().is_none());
+        assert_eq!(session.document.object_ids().len(), 1);
+        assert_eq!(session.tool, Tool::Pen);
+        let mut other = Session::new(2);
+        assert!(
+            !other.pen_secondary_press(),
+            "not the Pen's outside the Pen"
+        );
     }
 
     /// Criterion 5: the target test runs on the raw pointer, so a Ctrl-click on the first node

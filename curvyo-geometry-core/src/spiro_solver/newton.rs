@@ -6,6 +6,9 @@ use super::{Failure, Solution};
 
 /// Newton iterations before a curve is given up (libspiro needs about ten from zero).
 const MAX_ITERATIONS: usize = 16;
+/// Newton iterations from a nearby solution's coefficients or from straight segments (series and
+/// accurate integral; libspiro needs about ten from zero).
+const MAX_NEAR_ITERATIONS: usize = 10;
 /// A squared residual this large means the iteration runs away; it is given up at once.
 const RUNAWAY: f64 = 1e6;
 /// Step halvings tried when a full Newton step does not lower the residual.
@@ -66,13 +69,35 @@ pub(super) fn newton(
     points: &[(f64, f64)],
     closed: bool,
     wrapped: bool,
+    x: Vec<f64>,
+    damped: bool,
+) -> Result<Solution, Failure> {
+    iterate(points, closed, wrapped, x, damped, MAX_ITERATIONS)
+}
+
+/// [`newton`] from coefficients of a nearby solved curve: from so close a start it converges in
+/// a few steps or not at all, so it is given up early (a held Spiro point tries several places
+/// per pointer event).
+pub(super) fn newton_near(
+    points: &[(f64, f64)],
+    closed: bool,
+    x: Vec<f64>,
+) -> Result<Solution, Failure> {
+    iterate(points, closed, false, x, false, MAX_NEAR_ITERATIONS)
+}
+
+fn iterate(
+    points: &[(f64, f64)],
+    closed: bool,
+    wrapped: bool,
     mut x: Vec<f64>,
     damped: bool,
+    iterations: usize,
 ) -> Result<Solution, Failure> {
     let mut accurate = false;
     let layout = Layout::new(points, closed);
     let mut r = residual_mode(points, closed, wrapped, &x, accurate).ok_or(Failure::Invalid)?;
-    for _ in 0..MAX_ITERATIONS {
+    for _ in 0..iterations {
         if maximum(&r) < RESIDUAL {
             if accurate {
                 return Ok(Solution {

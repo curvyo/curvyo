@@ -28,6 +28,14 @@ impl Session {
     /// and inside list end there), then the tool ends it. A marquee that changed the selection
     /// sets the announcement (criterion 24).
     pub(super) fn node_pointer_up(&mut self, point: Point, modifiers: Modifiers) {
+        // A Spiro drag ends where its curves last had a solution near the shown ones.
+        let point = match self.node_spiro_pointer.take() {
+            Some(held) if !self.node_spiro_sources.is_empty() && self.node.drag_in_flight() => {
+                self.pointer_position = Some(held);
+                held
+            }
+            _ => point,
+        };
         let paths = self.node_paths();
         let threshold = self.hit_tolerances().drag_threshold;
         self.node
@@ -54,7 +62,7 @@ impl Session {
             .node
             .pointer_up(&self.document, point.translated(correction), modifiers);
         self.node_spiro_sources.clear();
-        self.spiro_cache.borrow_mut().clear_node_previews();
+        self.spiro_cache.borrow_mut().commit_node_previews();
         self.end_snapping_drag();
         if outcome == NodePointerUpOutcome::NodesSelected {
             self.announce_node_selection();

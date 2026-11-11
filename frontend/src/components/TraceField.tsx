@@ -16,6 +16,8 @@ export interface TraceFieldProps {
   display?: string;
   /** The field's width, px (150 unless given; `specs/0089` UX notes §24.7). */
   width?: number;
+  /** The accessible name when it says more than the label (the Pen bar's "Freehand smoothing"). */
+  name?: string;
 }
 
 /** The width of a Trace bar field, px (UX notes 20.1). */
@@ -30,7 +32,7 @@ const UNIT_WORDS: Readonly<Record<string, string>> = { "%": "percent", mm: "mill
  * double-click, Enter or F2 opens the number entry, the arrows step it; Ctrl+Enter creates the
  * paths, also in the entry; Escape in a drag puts the value back.
  */
-export function TraceField({ param, value, onValue, onEndDrag, onCreate, onReturnFocus, display, width = TRACE_FIELD_WIDTH }: TraceFieldProps) {
+export function TraceField({ param, value, onValue, onEndDrag, onCreate, onReturnFocus, display, width = TRACE_FIELD_WIDTH, name }: TraceFieldProps) {
   const shown = value ?? param.default;
   const pressing = useRef<{ start: number | null; last: number } | null>(null);
   const span = param.max - param.min;
@@ -68,7 +70,7 @@ export function TraceField({ param, value, onValue, onEndDrag, onCreate, onRetur
     >
       <ValueField
         label={param.label}
-        name={param.label}
+        name={name ?? param.label}
         text={text}
         bar={value === null || span <= 0 ? 0 : (shown - param.min) / span}
         mixed={false}

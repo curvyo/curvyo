@@ -5,7 +5,7 @@ mod linear;
 mod newton;
 
 use constraints::residual;
-use newton::newton;
+use newton::{newton, newton_near};
 
 #[derive(Debug)]
 pub(super) struct Solution {
@@ -25,8 +25,17 @@ const MAX_CONTINUATION_SOLVES: usize = 8;
 const MAX_WOUND_SEGMENTS: usize = 8;
 /// The smallest continuation step; a smaller one gives the curve up.
 const MIN_CONTINUATION_STEP: f64 = 1e-3;
+/// Newton solves the growing of an open curve may spend before it is given up.
+const MAX_GROWN_SOLVES: usize = 64;
 
-fn solve(controls: &[(f64, f64)], closed: bool) -> Result<Solution, Failure> {
+/// Solves one smooth run. With a `seed` (one coefficient set per segment, from an earlier solve of
+/// nearby controls) only Newton's iteration from it is tried, so the answer stays on the seed's
+/// branch, and given up early; without one, from zero and then the fallbacks.
+fn solve(
+    controls: &[(f64, f64)],
+    closed: bool,
+    seed: Option<&[[f64; 4]]>,
+) -> Result<Solution, Failure> {
     if controls.len() < if closed { 3 } else { 2 }
         || controls
             .iter()
@@ -68,19 +77,48 @@ fn solve(controls: &[(f64, f64)], closed: bool) -> Result<Solution, Failure> {
     if residual(&points, closed, &vec![0.0; 4 * nseg]).is_none() {
         return Err(Failure::Invalid);
     }
+    if let Some(seed) = seed {
+        // The coefficients are scale-free: a seed of moved controls is a start near the answer.
+        let start: Vec<f64> = seed.iter().flatten().copied().collect();
+        if start.len() != 4 * nseg {
+            return Err(Failure::Invalid);
+        }
+        return newton_near(&points, closed, start);
+    }
     // Levien's plain iteration from zero solves most curves in a few steps. Where its full steps
-    // run away, an open curve is followed from its chord to its control polygon, and a closed one
-    // gets steps that never raise the residual.
+    // run away, an open curve is grown one control at a time (as the Pen draws it) and then
+    // followed from its chord to its control polygon; a closed one gets steps that never raise
+    // the residual.
     let zero = vec![0.0; 4 * nseg];
     newton(&points, closed, false, zero.clone(), false)
         .or_else(|_| {
             if closed {
                 newton(&points, closed, false, zero, true)
             } else {
-                continuation(&points)
+                grown(&points).or_else(|_| continuation(&points))
             }
         })
         .or_else(|_| wound(&points, closed))
+}
+
+/// Solves an open curve by adding its controls one at a time, each solve starting from the
+/// previous one's coefficients and a straight new segment: the curve the Pen drew point by point.
+fn grown(points: &[(f64, f64)]) -> Result<Solution, Failure> {
+    let mut x = vec![0.0; 4];
+    let mut solves = 0;
+    for end in 3..=points.len() {
+        x.extend([0.0; 4]);
+        solves += 1;
+        if solves > MAX_GROWN_SOLVES {
+            return Err(Failure::NoConvergence);
+        }
+        let solution = newton(&points[..end], false, false, x, false)?;
+        if end == points.len() {
+            return Ok(solution);
+        }
+        x = solution.coefficients.into_iter().flatten().collect();
+    }
+    Err(Failure::NoConvergence)
 }
 
 /// The last resort for a short curve that has no solution without an extra turn at some knot (the
@@ -175,16 +213,28 @@ fn continuation(points: &[(f64, f64)]) -> Result<Solution, Failure> {
 }
 
 /// G4 runs separated at corner controls, each solved as an open curve.
+/// With a `seed` (one coefficient set per segment) each run is solved from its part of it only.
 pub(super) fn solve_corners(
     points: &[(f64, f64)],
     corners: &[bool],
     closed: bool,
+    seed: Option<&[[f64; 4]]>,
 ) -> Result<Solution, Failure> {
-    if points.len() != corners.len() || points.len() < if closed { 3 } else { 2 } {
+    if points.len() != corners.len()
+        || points.len() < if closed { 3 } else { 2 }
+        || seed.is_some_and(|seed| {
+            seed.len()
+                != if closed {
+                    points.len()
+                } else {
+                    points.len() - 1
+                }
+        })
+    {
         return Err(Failure::Invalid);
     }
     if !corners.iter().any(|corner| *corner) {
-        return solve(points, closed);
+        return solve(points, closed, seed);
     }
     let segments = if closed {
         points.len()
@@ -208,7 +258,13 @@ pub(super) fn solve_corners(
             }
             indices.push(next);
             let run: Vec<_> = indices.iter().map(|&i| points[i]).collect();
-            let result = solve(&run, false)?;
+            let run_seed: Option<Vec<_>> = seed.map(|seed| {
+                indices[..indices.len() - 1]
+                    .iter()
+                    .map(|&i| seed[i])
+                    .collect()
+            });
+            let result = solve(&run, false, run_seed.as_deref())?;
             max_residual = max_residual.max(result.max_residual);
             for (i, value) in indices.iter().zip(result.coefficients) {
                 coefficients[*i] = value;
@@ -222,7 +278,11 @@ pub(super) fn solve_corners(
         let mut start = 0;
         for end in 1..points.len() {
             if corners[end] || end == points.len() - 1 {
-                let result = solve(&points[start..=end], false)?;
+                let result = solve(
+                    &points[start..=end],
+                    false,
+                    seed.map(|seed| &seed[start..end]),
+                )?;
                 max_residual = max_residual.max(result.max_residual);
                 coefficients[start..end].copy_from_slice(&result.coefficients);
                 start = end;
@@ -275,7 +335,7 @@ mod reference_tests {
                     .skip(1)
                     .map(|value| value.parse().unwrap())
                     .collect();
-                let result = solve(&points, closed).unwrap();
+                let result = solve(&points, closed, None).unwrap();
                 assert_eq!(result.coefficients.len() * 4, expected.len());
                 for (actual, expected) in result.coefficients.iter().flatten().zip(expected) {
                     assert!(

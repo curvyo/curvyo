@@ -69,3 +69,33 @@ fn a_page_drag_leaves_a_stroke_whose_visible_outline_centre_is_outside() {
         "the stroke stayed"
     );
 }
+
+/// A page move with a variable-width stroke that has no outline (a path without length) is
+/// refused with the notice and changes nothing: what the page carries cannot be measured.
+#[test]
+fn a_page_move_is_refused_while_a_variable_stroke_has_no_outline() {
+    let mut session = Session::new(99);
+    let page = session.active_page();
+    let id = session.document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(99, 1), Point::new(20.0, 20.0)),
+            NewAnchor::corner(AnchorId::new(99, 2), Point::new(20.0, 20.0)),
+        ],
+        false,
+    );
+    for (n, position, multiplier) in [(3, 0.5, 2.0), (4, 0.0, 1.0)] {
+        session
+            .document
+            .set_width_point(id, AnchorId::new(99, n), position, multiplier)
+            .unwrap();
+    }
+    let before = session.document.version();
+    assert!(session.page_contents().is_none());
+    assert!(!session.move_page_to(&page.id, Point::new(30.0, 30.0)));
+    assert_eq!(session.document.version(), before, "nothing is written");
+    assert_eq!(session.active_page().origin, page.origin);
+    assert_eq!(
+        session.take_unsupported_width_notice(),
+        "Variable stroke geometry is not ready for this page operation."
+    );
+}

@@ -91,7 +91,7 @@ impl Session {
             );
         };
         let Some(path) = width_path(&self.document, &self.spiro_cache, *id) else {
-            return refuse(super::spiro_cache::SPIRO_FAILED_NOTICE);
+            return refuse(super::spiro_cache::SPIRO_UNSOLVED_NOTICE);
         };
         if path.is_compound() {
             return refuse("Width editing is not available for compound paths.");

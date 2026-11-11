@@ -125,8 +125,9 @@ impl WasmSession {
         self.session.take_pen_entry_notice().unwrap_or_default()
     }
 
-    /// A secondary press with the Pen: finishes the path in progress as Enter does and returns
-    /// `true`, or returns `false` with no path so the press goes on as before.
+    /// A secondary press: in the Pen it finishes the path in progress as Enter does (or does
+    /// nothing without one) and returns `true`, so the host passes the press to no tool; `false`
+    /// in any other tool.
     pub fn pen_secondary_press(&mut self) -> bool {
         self.session.pen_secondary_press()
     }

@@ -125,7 +125,7 @@ mod pen_entry_text;
 mod pen_target;
 pub use evaluate_path::{
     EvaluatePathError, SPIRO_TOLERANCE, evaluate_bspline_nodes, evaluate_object, evaluate_path,
-    evaluate_spiro_nodes, stretch,
+    evaluate_spiro_nodes, solve_spiro_nodes, solve_spiro_nodes_near, spiro_shape_nodes, stretch,
 };
 
 mod pen_tool;
