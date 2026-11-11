@@ -11,6 +11,9 @@
     clippy::cast_precision_loss
 )]
 
+#[path = "common/decode.rs"]
+mod decode;
+
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 
@@ -56,8 +59,8 @@ fn truth() -> Truth {
     toml::from_str(&std::fs::read_to_string(fixtures().join("truth.toml")).unwrap()).unwrap()
 }
 
-fn raster(file: &str) -> curvyo_image_core::WorkingImage {
-    curvyo_image_core::decode_working(&std::fs::read(fixtures().join(file)).unwrap()).unwrap()
+fn raster(file: &str) -> decode::WorkingImage {
+    decode::decode_working(&std::fs::read(fixtures().join(file)).unwrap()).unwrap()
 }
 
 fn go(_: OcrProgress) -> ControlFlow<()> {
@@ -356,8 +359,8 @@ fn ocr_time_of_the_tester_poster() {
     assert!(best <= 5.0, "OCR {best} s over the 5 s target");
 }
 
-fn screenshot() -> curvyo_image_core::WorkingImage {
-    curvyo_image_core::decode_working(
+fn screenshot() -> decode::WorkingImage {
+    decode::decode_working(
         &std::fs::read(
             Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("tests/fixtures/customer/font-manager-screenshot.png"),
@@ -369,11 +372,7 @@ fn screenshot() -> curvyo_image_core::WorkingImage {
 
 /// Reads `image`'s crops as the page's pool does: `workers` shares, each read in its own order
 /// (here: every `workers`-th crop, last share first), put back in line order.
-fn read_in_shares(
-    model: &OcrModel,
-    image: &curvyo_image_core::WorkingImage,
-    workers: usize,
-) -> Vec<TextLine> {
+fn read_in_shares(model: &OcrModel, image: &decode::WorkingImage, workers: usize) -> Vec<TextLine> {
     let crops = crop_lines(model, image.width, image.height, &image.pixels, &mut go).unwrap();
     let mut by_line: Vec<Option<TextLine>> = vec![None; crops.len()];
     for share in (0..workers).rev() {

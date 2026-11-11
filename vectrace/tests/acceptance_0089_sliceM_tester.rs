@@ -794,7 +794,7 @@ fn real_case(name: &str) {
     {
         let path = common::quality::real::reference_dir().join(name);
         let bytes = std::fs::read(&path).unwrap();
-        let img = curvyo_image_core::decode_working(&bytes).unwrap();
+        let img = common::decode::decode_working(&bytes).unwrap();
         let k = (img.width.max(img.height)).div_ceil(160);
         let (w, h) = (img.width / k, img.height / k);
         let mut rgba = Vec::new();

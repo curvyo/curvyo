@@ -6,6 +6,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
+#[path = "common/decode.rs"]
+mod decode;
+
 use std::path::{Path, PathBuf};
 
 use vectrace::ocr::{OcrModel, read_lines};
@@ -32,9 +35,7 @@ const FILES: [&str; 3] = [
 fn reads(model: &OcrModel) -> Vec<(String, String, f32)> {
     let mut out = Vec::new();
     for file in FILES {
-        let image =
-            curvyo_image_core::decode_working(&std::fs::read(fixtures().join(file)).unwrap())
-                .unwrap();
+        let image = decode::decode_working(&std::fs::read(fixtures().join(file)).unwrap()).unwrap();
         let lines = read_lines(model, image.width, image.height, &image.pixels, &mut |_| {
             std::ops::ControlFlow::Continue(())
         })

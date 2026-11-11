@@ -9,6 +9,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[path = "common/decode.rs"]
+mod decode;
+
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -41,7 +44,7 @@ fn model() -> OcrModel {
 
 fn read(model: &OcrModel, file: &str) -> Vec<TextLine> {
     let bytes = std::fs::read(fixtures().join(file)).unwrap();
-    let image = curvyo_image_core::decode_working(&bytes).unwrap();
+    let image = decode::decode_working(&bytes).unwrap();
     read_lines(model, image.width, image.height, &image.pixels, &mut |_| {
         std::ops::ControlFlow::Continue(())
     })
