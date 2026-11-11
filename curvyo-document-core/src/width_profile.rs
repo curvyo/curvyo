@@ -78,20 +78,19 @@ fn valid(position: f64, multiplier: f64, closed: bool) -> bool {
         && multiplier >= 0.0
 }
 
-pub(crate) fn valid_history_marker(loro: &loro::LoroDoc) -> bool {
-    let root = loro.get_map(crate::document::ROOT_MAP);
-    if let Some(value) = root.get(HISTORY_MARK) {
-        return matches!(value.get_deep_value(), loro::LoroValue::Bool(true));
-    }
-    let tree = loro.get_tree(crate::document::OBJECTS_TREE);
-    crate::group_tree::leaves_under(&tree, None)
-        .into_iter()
-        .all(|id| {
-            tree.get_meta(id).is_ok_and(|meta| {
-                !meta.keys().any(|name| name.starts_with(PREFIX))
-                    && !crate::curve_kind::has_extended(&meta)
-            })
-        })
+/// The root's extended-history marker: `None` when there is none, else whether it is well formed.
+pub(crate) fn history_marker(loro: &loro::LoroDoc) -> Option<bool> {
+    let value = loro.get_map(crate::document::ROOT_MAP).get(HISTORY_MARK)?;
+    Some(matches!(
+        value.get_deep_value(),
+        loro::LoroValue::Bool(true)
+    ))
+}
+
+/// Whether an object's metadata holds width points or an editable curve kind, which a document
+/// without the history marker must not.
+pub(crate) fn has_extended_meta(meta: &LoroMap) -> bool {
+    meta.keys().any(|name| name.starts_with(PREFIX)) || crate::curve_kind::has_extended(meta)
 }
 
 pub(crate) fn read(meta: &LoroMap, closed: bool) -> Option<Vec<WidthPoint>> {

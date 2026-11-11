@@ -62,49 +62,106 @@ pub(super) fn segment_ends(
         .then_some(values)
 }
 
-/// The constraint errors of a curve whose segments end as `ends`. With `wrapped`, a knot's angle
-/// error is reduced to one turn, so a curve that winds a full turn more at a knot also solves.
-pub(super) fn assemble_residual(
-    points: &[(f64, f64)],
+/// Where the constraints of a curve sit in its residual, and the bend of its chords at each knot.
+pub(super) struct Layout {
     closed: bool,
-    wrapped: bool,
-    ends: &[[[f64; 4]; 2]],
-) -> Option<Vec<f64>> {
-    let segments = ends.len();
-    let angles: Vec<_> = (0..segments)
-        .map(|i| {
-            let a = points[i];
-            let b = points[(i + 1) % points.len()];
-            (b.1 - a.1).atan2(b.0 - a.0)
-        })
-        .collect();
-    let mut out = Vec::with_capacity(4 * segments);
-    if !closed {
-        out.push(ends[0][0][2]);
-        out.push(ends[0][0][3]);
+    segments: usize,
+    /// The turn from the chord before a knot to the chord after it, reduced to one turn.
+    bends: Vec<f64>,
+}
+
+impl Layout {
+    pub(super) fn new(points: &[(f64, f64)], closed: bool) -> Self {
+        let segments = if closed {
+            points.len()
+        } else {
+            points.len() - 1
+        };
+        let angles: Vec<_> = (0..segments)
+            .map(|i| {
+                let a = points[i];
+                let b = points[(i + 1) % points.len()];
+                (b.1 - a.1).atan2(b.0 - a.0)
+            })
+            .collect();
+        let bends = (0..segments)
+            .map(|knot| {
+                let prev = (knot + segments - 1) % segments;
+                let angle = angles[knot] - angles[prev];
+                angle - std::f64::consts::TAU * (angle / std::f64::consts::TAU + 0.5).floor()
+            })
+            .collect();
+        Self {
+            closed,
+            segments,
+            bends,
+        }
     }
-    let first = usize::from(!closed);
-    for knot in first..segments {
-        let prev = (knot + segments - 1) % segments;
-        let mut angle = angles[knot] - angles[prev];
-        angle -= std::f64::consts::TAU * (angle / std::f64::consts::TAU + 0.5).floor();
+
+    /// The knots whose constraints segment `segment`'s coefficients move: its start and its end.
+    pub(super) fn knots_of(&self, segment: usize) -> [usize; 2] {
+        if self.closed {
+            [segment, (segment + 1) % self.segments]
+        } else {
+            [segment, segment + 1]
+        }
+    }
+
+    /// The first residual row of `knot`'s constraints and their values: two at an open end, four
+    /// at any other knot. `ends` are the ends of every segment.
+    pub(super) fn knot(
+        &self,
+        knot: usize,
+        wrapped: bool,
+        ends: &[[[f64; 4]; 2]],
+    ) -> (usize, [f64; 4], usize) {
+        if !self.closed && knot == 0 {
+            let start = &ends[0][0];
+            return (0, [start[2], start[3], 0.0, 0.0], 2);
+        }
+        if !self.closed && knot == self.segments {
+            let end = &ends[self.segments - 1][1];
+            return (4 * self.segments - 2, [end[2], end[3], 0.0, 0.0], 2);
+        }
+        let prev = (knot + self.segments - 1) % self.segments;
+        let (before, after) = (&ends[prev][1], &ends[knot][0]);
         // As in Levien's `spiro_iter`: the bend is reduced to one turn, the error is not, so a
         // solution a full turn away is no solution unless `wrapped`.
-        let delta = angle - ends[prev][1][0] - ends[knot][0][0];
-        out.push(if wrapped {
+        let delta = self.bends[knot] - before[0] - after[0];
+        let angle = if wrapped {
             delta - std::f64::consts::TAU * (delta / std::f64::consts::TAU + 0.5).floor()
         } else {
             delta
-        });
-        for (start, end) in ends[knot][0][1..].iter().zip(&ends[prev][1][1..]) {
-            out.push(start - end);
+        };
+        let row = if self.closed { 4 * knot } else { 4 * knot - 2 };
+        (
+            row,
+            [
+                angle,
+                after[1] - before[1],
+                after[2] - before[2],
+                after[3] - before[3],
+            ],
+            4,
+        )
+    }
+
+    /// The constraint errors of a curve whose segments end as `ends`. With `wrapped`, a knot's
+    /// angle error is reduced to one turn, so a curve that winds a full turn more at a knot also
+    /// solves.
+    pub(super) fn residual(&self, wrapped: bool, ends: &[[[f64; 4]; 2]]) -> Option<Vec<f64>> {
+        let mut out = vec![0.0; 4 * self.segments];
+        let knots = if self.closed {
+            self.segments
+        } else {
+            self.segments + 1
+        };
+        for knot in 0..knots {
+            let (row, values, count) = self.knot(knot, wrapped, ends);
+            out[row..row + count].copy_from_slice(&values[..count]);
         }
+        out.iter().all(|v| v.is_finite()).then_some(out)
     }
-    if !closed {
-        out.push(ends[segments - 1][1][2]);
-        out.push(ends[segments - 1][1][3]);
-    }
-    (out.len() == 4 * segments && out.iter().all(|v| v.is_finite())).then_some(out)
 }
 
 pub(super) fn residual(
@@ -130,7 +187,7 @@ pub(super) fn residual_mode(
     let ends: Option<Vec<_>> = (0..segments)
         .map(|i| segment_ends(points, i, &parameters[4 * i..4 * i + 4], accurate))
         .collect();
-    assemble_residual(points, closed, wrapped, &ends?)
+    Layout::new(points, closed).residual(wrapped, &ends?)
 }
 
 pub(super) fn maximum(values: &[f64]) -> f64 {

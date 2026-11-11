@@ -444,9 +444,22 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> Option<PathSnaps
 /// to defaults, matching slice 1's forward-compatible reading stance.
 pub(crate) fn validate_path_tree(loro: &LoroDoc, paths_tree_key: &str) -> bool {
     let tree = loro.get_tree(paths_tree_key);
+    // Without the history marker no object may carry extended path data; the one walk over the
+    // tree checks both.
+    let node_ok = match crate::width_profile::history_marker(loro) {
+        Some(false) => return false,
+        Some(true) => validate_object_node,
+        None => validate_unmarked_object_node,
+    };
     crate::sketch_page::valid_claims(&loro.get_map(crate::document::ROOT_MAP))
-        && crate::width_profile::valid_history_marker(loro)
-        && crate::group_tree::validate_tree(&tree, validate_object_node)
+        && crate::group_tree::validate_tree(&tree, node_ok)
+}
+
+/// [`validate_object_node`] for a document without the extended-history marker.
+fn validate_unmarked_object_node(tree: &LoroTree, id: loro::TreeID) -> bool {
+    tree.get_meta(id)
+        .is_ok_and(|meta| !crate::width_profile::has_extended_meta(&meta))
+        && validate_object_node(tree, id)
 }
 
 /// Dispatches one leaf object to path validation when its

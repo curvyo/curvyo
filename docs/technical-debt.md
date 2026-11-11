@@ -32,19 +32,22 @@ that overlapped before, ADR 0051 §2, §3, §3a).
 **Resolution:** a "tidy pages" command, or a layout pass in the sharing story's merge-residue
 handling (ADR 0015 Consequences), when a story asks for it.
 
-## Every synced message forks and re-imports the document (`0110`, 2026-11-11)
+## A live-shared document keeps a second copy of its log for checking updates (`0110`, 2026-11-11)
 
 To keep a newer-format or malformed update out of the live document, `import_updates_checked`
-(`curvyo-document-core/src/history/updates.rs`) forks the whole document, imports the update into
-the fork and into a fresh document, and walks the JSON of the new changes (`writes_newer_format`)
-before the real import: per message the cost grows with the document, not with the message. Opening
-a file (`Document::open`) likewise exports the whole oplog as JSON once to check the format
-registers. Fine for today's documents; a long shared session on a large drawing pays it on every
-remote change.
+(`curvyo-document-core/src/history/updates.rs`) imports each remote update into a trial copy of the
+log first and checks it there. The copy is made once (when the document is attached to a live link,
+or at the first import) and kept: it catches up with the local changes since the last import and
+takes the same bytes as the document, so a check costs the update plus one walk of the objects
+tree (the open-file validation, as before this story). A refused update drops the copy; the next
+import forks again. Release, 1,000 objects: one remote edit at frame start 3.6 ms (main 3.1 ms);
+the fork itself (about 5 ms with the warm-up walk) happens when the link is attached. The copy
+doubles the log's memory for a live-shared document. Opening a file (`Document::open`) still
+exports the whole oplog as JSON once to check the format registers.
 
-**Resolution:** check the update's own changes without forking (decode the update's change
-metadata, or keep a validated shadow version vector) and read the format registers from the state
-instead of the exported oplog; measure with a thread-CPU budget test on a large document first.
+**Resolution:** check the update's own changes without a copy (decode the update's change
+metadata) and validate only the objects the update touches; measure with
+`frame_start_budget_for_one_remote_edit_in_1000_objects` first.
 
 ## The variable-width and Spiro wasm budgets are not checked in CI (`0110`, 2026-11-11)
 
