@@ -118,11 +118,11 @@ jobs:
     name: frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "26"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -209,7 +209,7 @@ jobs:
         run: |
           npx --yes audit-ci@7.1.0 --high --allowlist GHSA-vfj7-8cjw-p6xm
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist
@@ -225,11 +225,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "26"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -287,7 +287,7 @@ jobs:
       matrix:
         os: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["ubuntu-latest","windows-latest","macos-latest"]' || '["ubuntu-latest"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The debug build of the whole workspace (about 500 test binaries) fills the runner's disk;
       # rust-lld then dies with SIGBUS ("ld terminated with signal 7") while it writes a binary.
@@ -318,7 +318,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: frontend-dist
           path: frontend/dist
@@ -359,7 +359,7 @@ jobs:
     outputs:
       crates: ${{ steps.list.outputs.crates }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install the pinned Rust toolchain
         run: rustup show
       - id: list
@@ -377,7 +377,7 @@ jobs:
     name: dependency edges (sync)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install the pinned Rust toolchain
         run: rustup show
       - name: Assert the curvyo dependencies of crypto-core, sync-core and sync-server
@@ -438,7 +438,7 @@ jobs:
       matrix:
         crate: ${{ fromJSON(needs.discover-core-crates.outputs.crates) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -506,7 +506,7 @@ jobs:
     name: performance budgets (release)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -560,7 +560,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -586,7 +586,7 @@ jobs:
     name: boolean golden results (wasm32)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -594,9 +594,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # The engine that runs the wasm test decides criterion 43: pin it, as the frontend job does.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "26"
 
       - name: Install wasm-bindgen CLI matching Cargo.lock
         run: |
@@ -619,7 +619,7 @@ jobs:
     name: cargo deny
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -642,7 +642,7 @@ jobs:
     needs: frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Tauri's Linux system libraries
         run: |
@@ -655,7 +655,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: frontend-dist
           path: frontend/dist

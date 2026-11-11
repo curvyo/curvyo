@@ -24,7 +24,7 @@ curvyo-text-core = { path = "../curvyo-text-core", version = "0.1.0" }
 # The credential store of device and document keys (ADR 0007 §1, ADR 0031 decision 12): the OS
 # keychain (Secret Service over libdbus, already linked by the Tauri shell; macOS Keychain; Windows
 # Credential Manager), MIT OR Apache-2.0. Not `zbus`, which `cargo deny` flags.
-keyring = { version = "3.6", default-features = false, features = ["sync-secret-service", "apple-native", "windows-native"] }
+keyring = { version = "4.0", default-features = false, features = ["sync-secret-service", "apple-native", "windows-native"] }
 # Its fallback, the encrypted key file under the maker's passphrase: Argon2id (RustCrypto, MIT OR
 # Apache-2.0) derives the key, XChaCha20-Poly1305 (the cipher of ADR 0008 §2, already locked)
 # seals the file, `getrandom` draws its salt and nonces (already locked).

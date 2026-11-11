@@ -48,7 +48,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -97,7 +97,7 @@ jobs:
       contents: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install the pinned Rust toolchain
         run: rustup show
@@ -148,7 +148,7 @@ jobs:
             --commit "${{ github.sha }}" \
             >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: metrics/wasm-size
           path: .metrics
