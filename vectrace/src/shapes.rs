@@ -13,7 +13,7 @@ mod star;
 
 use std::ops::RangeInclusive;
 
-use crate::{Angle, Mm};
+use crate::{Angle, Mm, PixelMap};
 use kurbo::{BezPath, Point};
 
 use crate::shapes::band::{band_of, stroked_area};
@@ -302,15 +302,14 @@ fn parent_of(
 /// traced is left as it is. The worker never calls it: it sets [`crate::job::Job::shapes`].
 /// It stays public for the tests that time the shape pass on its own, which a whole job would
 /// hide behind the trace.
-pub fn add_shapes(wire: &mut Vec<f64>, pixel_map: [f64; 6]) {
+pub fn add_shapes(wire: &mut Vec<f64>, pixel_map: PixelMap) {
     let Some((read, at)) = crate::wire::read_trace_body(wire) else {
         return;
     };
     if read.status != crate::wire::Status::Traced || wire.get(at) == Some(&SHAPE_MARK) {
         return;
     }
-    let [a, b, c, d, _, _] = pixel_map;
-    let pixel_mm = (a * d - b * c).abs().sqrt();
+    let pixel_mm = pixel_map.determinant().abs().sqrt();
     if !(pixel_mm > 0.0 && pixel_mm.is_finite()) {
         return;
     }

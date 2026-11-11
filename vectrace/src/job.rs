@@ -54,7 +54,7 @@ pub fn run(job: &Job<'_>, on_percent: &mut dyn FnMut(u8)) -> Vec<f64> {
         }
     };
     if job.shapes {
-        add_shapes(&mut wire, job.map.to_array());
+        add_shapes(&mut wire, job.map);
     }
     wire
 }
