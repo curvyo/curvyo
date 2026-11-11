@@ -43,7 +43,7 @@ shows none.
    OCR unit test in `src/ocr/read.rs` includes the same file. Checked once against
    `decode_working` on all 61 PNG and JPEG fixtures: identical size and bytes, so no reference
    table or golden changed. The helper does not downscale (nothing in the fixtures needs it).
-3. `tests/common/baseline_svg.rs` is a 100-line reader of the Inkscape form (root `width` and
+3. `tests/common/baseline_svg.rs` is a small reader (about 120 lines and a test) of the Inkscape form (root `width` and
    `viewBox`, nested `g` transforms, `path d`; the rest ignored). It matches `curvyo-svg-core` on
    three hand-written samples (viewBox, matrix and scale, inches); the real baselines are not in
    the repository (`TRACE_BASELINE_DIR`, the harness is `#[ignore]`), so it was not compared on
