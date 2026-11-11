@@ -238,7 +238,7 @@ fn c12_letters_never_become_shapes() {
         &mut |_| {},
     );
     let started = cpu_seconds();
-    add_shapes(&mut wire, source.map);
+    add_shapes(&mut wire, TracePixelMap::new(source.map));
     let shape_seconds = cpu_seconds() - started;
     let read = read_trace_wire(&wire).unwrap();
     eprintln!(
@@ -335,7 +335,7 @@ fn c6_five_hundred_paths_take_under_two_seconds() {
     );
     let mut wire = plain.clone();
     let started = cpu_seconds();
-    add_shapes(&mut wire, source.map);
+    add_shapes(&mut wire, TracePixelMap::new(source.map));
     let seconds = cpu_seconds() - started;
     let read = read_trace_wire(&wire).unwrap();
     eprintln!(
