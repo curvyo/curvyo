@@ -113,8 +113,6 @@ Only one agent drives a browser.
 - Core/platform split per `docs/guides/rust-workspace-blueprint.md` §1: domain logic lives in
   `*-core` crates with no filesystem, network, clock, threads or UI; callers pass everything in.
 - Every `*-core` crate builds for `wasm32-unknown-unknown` (checked in CI).
-- `vectrace` (ADR 0048, no suffix) is a core crate under every rule of this file; it has no `curvyo-*`
-  dependency and is MIT OR Apache-2.0.
 - Targets: desktop → browser → mobile; mobile gets no code until a story needs it.
 - Machines: job and output formats in core, device communication in `-io` crates; one machine
   family at a time, no universal machine abstraction before the second family.
@@ -132,7 +130,7 @@ the PR only when green.
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --message-format=short -- -D warnings
 cargo nextest run --workspace --status-level fail
-cargo build -q --target wasm32-unknown-unknown -p <each core crate, vectrace and curvyo-editor-wasm>
+cargo build -q --target wasm32-unknown-unknown -p <each core crate and curvyo-editor-wasm>
 cargo clippy --target wasm32-unknown-unknown -p <the same> -- -D warnings
 cargo deny check
 RUSTDOCFLAGS="-D warnings" cargo doc -q --workspace --no-deps
