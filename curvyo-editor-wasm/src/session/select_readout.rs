@@ -3,9 +3,7 @@
 //! `specs/0009-unified-object-editing`). Split out of `session/select_view.rs`.
 
 use curvyo_document_core::{ObjectSnapshot, Shape};
-use curvyo_ui_core::{
-    EditHandle, Side, format_degrees, mirror_line, oriented_bounds, signed_size_text,
-};
+use curvyo_ui_core::{EditHandle, Side, format_degrees, mirror_line, signed_size_text};
 
 use super::{Session, Tool};
 
@@ -92,7 +90,7 @@ impl Session {
                         format!("r {} mm", signed_size_text(frame.radius.as_mm(), false))
                     }
                     other => {
-                        let b = oriented_bounds(other);
+                        let b = self.cached_oriented_bounds(other)?;
                         format!(
                             "{} × {} mm",
                             signed_size_text(b.width(), sx < 0.0),

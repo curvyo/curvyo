@@ -119,6 +119,13 @@ impl Session {
             &ids,
             &import.assets,
         ) {
+            document.set_live_share(self.sync.as_ref().is_some_and(|link| {
+                link.ended.is_none()
+                    && link
+                        .workspace
+                        .as_ref()
+                        .is_none_or(|channel| channel.stream.is_some())
+            }));
             self.document = document;
             self.cache_pictures(&import);
         }
@@ -346,6 +353,31 @@ mod tests {
     }
 
     const TEXT_AND_IMAGE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100"><text x="10" y="30" style="font-family:'Source Sans 3';font-weight:bold;font-size:10px">Boho</text><text x="10" y="60" style="font-family:Lobster">Gone</text><image x="50" y="50" width="20" height="20" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="/></svg>"#;
+
+    #[test]
+    fn finishing_pending_svg_keeps_active_link_guard() {
+        use curvyo_document_core::{AnchorId, CurveKind, NewAnchor, Point};
+        let session = Session::open_file(5, TEXT_AND_IMAGE, "boho.svg").unwrap();
+        assert!(session.open_svg_waiting());
+        let mut net = super::super::sync_test_support::Net::new();
+        let a = super::super::sync_test_support::share_open(&mut net, session);
+        let session = net.s(a);
+        assert!(!session.continue_open_svg(true));
+        assert!(session.document.is_shared());
+        assert!(
+            session
+                .document
+                .create_editable_curve(
+                    &[
+                        NewAnchor::corner(AnchorId::new(5, 50), Point::new(0.0, 0.0)),
+                        NewAnchor::corner(AnchorId::new(5, 51), Point::new(10.0, 0.0)),
+                    ],
+                    false,
+                    CurveKind::BSpline
+                )
+                .is_err()
+        );
+    }
 
     /// Slice 2, criterion 106: Open waits for the faces of its texts, then the texts, the missing
     /// face and the image come in without a step.

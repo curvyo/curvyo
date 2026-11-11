@@ -133,10 +133,8 @@ fn centre_of(object: &ObjectSnapshot) -> curvyo_document_core::Point {
 /// outline.
 fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<curvyo_document_core::AnchorSnapshot>, bool)> {
     let path: Option<&PathSnapshot> = match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
-            Some(path)
-        }
+        ObjectSnapshot::Path(path) => Some(path),
+        ObjectSnapshot::Clone(clone) => Some(&clone.resolved),
         ObjectSnapshot::Text(_) | ObjectSnapshot::Sketch(_) => object.drawn_path(),
         ObjectSnapshot::Primitive(_) | ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_) => {
             None

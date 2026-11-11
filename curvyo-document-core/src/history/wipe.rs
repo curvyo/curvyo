@@ -23,11 +23,10 @@ pub(crate) fn encode_frontiers(frontiers: &Frontiers) -> String {
 }
 
 impl Document {
-    /// Whether the document has been shared (it has a keyring, ADR 0004 §1): it holds a share
-    /// record, or [`Document::mark_shared`] was called.
+    /// Whether the document is shared through a record, an active link or [`Document::mark_shared`].
     #[must_use]
     pub fn is_shared(&self) -> bool {
-        self.commit_state.is_shared()
+        self.commit_state.is_shared() || self.live_share.get()
     }
 
     /// Records that the document has a keyring: its history is not wiped any more.

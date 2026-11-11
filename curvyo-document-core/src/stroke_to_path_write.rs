@@ -144,7 +144,17 @@ fn write_one(
         .map_err(|_| ObjectEditError::NoSuchObject)?;
     let style = style_codec::read_style(&meta);
     let painted = stroke_outline_style(&style);
+    crate::width_profile::clear(&meta);
     if !style.fill.enabled {
+        if crate::curve_kind::read(&meta) == Some(crate::CurveKind::Spiro) {
+            // invariant: deleting existing keys from attached metadata cannot fail.
+            #[allow(clippy::unwrap_used)]
+            meta.delete(crate::curve_kind::KEY).unwrap();
+            if meta.get(crate::spiro_transform::KEY).is_some() {
+                #[allow(clippy::unwrap_used)]
+                meta.delete(crate::spiro_transform::KEY).unwrap();
+            }
+        }
         change_geometry(&meta, &OffsetGeometry::Path(outline.clone()));
         style_codec::write_changes(&meta, &style, &painted);
         return Ok(vec![target]);

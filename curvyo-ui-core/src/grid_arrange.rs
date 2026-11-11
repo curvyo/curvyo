@@ -4,7 +4,9 @@
 
 use curvyo_document_core::{Length, Vec2};
 
-use crate::align_commit::{AlignInput, AlignOutcome, BoxedUnits, commit_plan, unit_boxes};
+use crate::align_commit::{
+    AlignInput, AlignOutcome, BoxedUnits, commit_plan, unit_boxes_with_artwork,
+};
 use crate::align_labels::ARRANGE_GRID_COMMIT_LABEL;
 use crate::align_plan::{AlignAxis, AlignBox, translation};
 
@@ -161,7 +163,13 @@ pub fn arrange_selection_in_grid(
     gap: Length,
 ) -> AlignOutcome {
     let selected = input.units.selected(input.selection.ids());
-    let BoxedUnits { units, boxes } = unit_boxes(input.objects, &selected);
+    let BoxedUnits { units, boxes } = unit_boxes_with_artwork(
+        input.geometry_objects.unwrap_or(input.objects),
+        &selected,
+        input
+            .artwork
+            .unwrap_or(&crate::variable_artwork::synchronous_artwork),
+    );
     if boxes.len() < 2 {
         return AlignOutcome::NothingSelected;
     }

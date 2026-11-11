@@ -20,6 +20,7 @@
 mod boolean;
 mod boolean_cleanup;
 mod boolean_grid;
+mod bspline;
 mod curve_chords;
 mod curve_contacts;
 mod curve_intersections;
@@ -38,17 +39,23 @@ mod path_measure;
 mod pattern;
 mod region_contact;
 mod segment;
+mod spiro;
+mod spiro_approx;
+mod spiro_solver;
 mod stack_regions;
 mod stroke_dash;
 mod stroke_loops;
 mod stroke_markers;
 mod stroke_outline;
+mod variable_stroke;
 mod visible_region;
 mod weld;
 mod weld_lines;
+mod width_profile;
 
 pub use boolean::{BooleanError, BooleanOp, BooleanResult, Outline, boolean, signed_area_mm2};
 pub use boolean_grid::MAX_COORDINATE_MM;
+pub use bspline::{SplineControl, SplineCubic, SplineError, evaluate_bspline};
 pub use curve_intersections::{CutParameter, cut_parameters};
 pub use curvyo_document_core::Tolerance;
 pub use fracture::{Fracture, fracture_cells};
@@ -68,7 +75,10 @@ pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,
 };
+pub use spiro::{SpiroControl, SpiroCubic, SpiroError, evaluate_spiro};
 pub use stack_regions::StackError;
 pub use stroke_outline::{StrokeOutlineError, StrokeShape, stroke_outline};
+pub use variable_stroke::{VariableStrokeError, variable_stroke_outline};
 pub use visible_region::{Visible, visible_regions};
 pub use weld::{Welded, weld};
+pub use width_profile::{WidthPoint, WidthProfile};

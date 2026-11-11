@@ -448,10 +448,9 @@ fn criteria_17_to_19_a_laser_page_lists_its_own_tree() {
 // ---- what a move-only selection shows outside the canvas (UX notes §2, §3, §5) ----------------
 
 #[test]
-fn the_status_bar_the_announcer_the_home_label_and_the_layers_rows_name_the_home() {
+fn the_announcer_the_home_label_and_the_layers_rows_name_the_home() {
     let (mut s, b, _, on_b) = two_pages(106_220);
     s.selection.set(&[on_b]);
-    assert_eq!(s.out_of_context_status(), "Rectangle · Page 2");
     assert!(
         s.selection_announcement().ends_with(", on Page 2"),
         "{}",
@@ -474,7 +473,7 @@ fn the_status_bar_the_announcer_the_home_label_and_the_layers_rows_name_the_home
     assert_eq!(view["opacity"]["field"], false);
     // In context nothing of this shows.
     s.selection.clear();
-    assert_eq!(s.out_of_context_status(), "");
+    assert!(!s.selection_announcement().contains(", on "));
 }
 
 // ---- handle drags out of context (criteria 5 and 7) ------------------------------------------

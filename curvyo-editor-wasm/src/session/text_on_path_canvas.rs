@@ -56,6 +56,24 @@ impl Session {
         if changed.is_empty() || self.document_read().clones.texts_on.is_empty() {
             return Vec::new();
         }
+        let evaluated;
+        let changed = if changed.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| !path.curve_kind.is_bezier())
+        }) {
+            let Ok(paths) = changed
+                .iter()
+                .map(curvyo_ui_core::evaluate_object)
+                .collect::<Result<Vec<_>, _>>()
+            else {
+                return Vec::new();
+            };
+            evaluated = paths;
+            &evaluated
+        } else {
+            changed
+        };
         curvyo_document_core::text_path_previews(objects, changed, PREVIEW_CAP)
             .unwrap_or_default()
             .into_iter()

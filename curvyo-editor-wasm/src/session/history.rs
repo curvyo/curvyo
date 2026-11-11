@@ -8,7 +8,7 @@ use curvyo_document_core::{
     Timestamp,
 };
 use curvyo_ui_core::{
-    FINISH_PEN_FIRST, SelectionSnapshot, UndoStack, nothing_notice, object_bounds, objects_summary,
+    FINISH_PEN_FIRST, SelectionSnapshot, UndoStack, nothing_notice, objects_summary,
     operation_name, restore_notice, summary_shapes,
 };
 
@@ -414,19 +414,24 @@ impl Session {
             return false;
         }
         let view = self.viewport.view();
-        !self
+        let objects: Vec<_> = self
             .selection
             .ids()
             .iter()
             .filter_map(|id| self.document.object(*id))
-            .any(|object| {
-                let (low, high) = object_bounds(&object);
-                let (left, top) = view.document_to_screen(low);
-                let (right, bottom) = view.document_to_screen(high);
-                let (min_x, max_x) = (left.min(right), left.max(right));
-                let (min_y, max_y) = (top.min(bottom), top.max(bottom));
-                max_x >= 0.0 && min_x <= width && max_y >= 0.0 && min_y <= height
-            })
+            .collect();
+        !objects.iter().any(|object| {
+            let Some((low, high)) = curvyo_ui_core::object_bounds_with_artwork(object, &|path| {
+                self.width_artwork(path)
+            }) else {
+                return false;
+            };
+            let (left, top) = view.document_to_screen(low);
+            let (right, bottom) = view.document_to_screen(high);
+            let (min_x, max_x) = (left.min(right), left.max(right));
+            let (min_y, max_y) = (top.min(bottom), top.max(bottom));
+            max_x >= 0.0 && min_x <= width && max_y >= 0.0 && min_y <= height
+        })
     }
 }
 
@@ -463,4 +468,30 @@ pub(super) fn history_action(
         return super::key_table::KeyAction::Hint(super::keys::KeyHint::FinishPenFirst);
     }
     super::key_table::KeyAction::History(direction)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod variable_width_tests {
+    use super::*;
+    use curvyo_document_core::{AnchorId, NewAnchor, Point};
+
+    #[test]
+    fn a_variable_stroke_off_screen_is_measured_by_its_outline() {
+        let mut session = Session::new(1);
+        session.resize_viewport(100.0, 100.0);
+        let id = session.document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(1, 1), Point::new(5000.0, 10.0)),
+                NewAnchor::corner(AnchorId::new(1, 2), Point::new(5030.0, 10.0)),
+            ],
+            false,
+        );
+        session
+            .document
+            .set_width_point(id, AnchorId::new(1, 3), 0.5, 2.0)
+            .unwrap();
+        session.selection.set(&[id]);
+        assert!(session.selection_is_off_screen());
+    }
 }

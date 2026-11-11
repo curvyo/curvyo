@@ -52,6 +52,11 @@ pub struct PenEntryChipView {
 }
 
 impl Session {
+    pub(super) fn notice_blocked_curve(&mut self) {
+        self.pen_entries.notice =
+            Some("Editable curves cannot be created while this document is shared.".to_owned());
+    }
+
     /// The open Pen entry, if any.
     #[must_use]
     pub fn pen_entry(&self) -> Option<&PenEntry> {

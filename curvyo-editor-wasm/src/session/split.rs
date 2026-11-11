@@ -78,7 +78,8 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
-                        SplitRefusal::OutOfRange { offenders, .. }
+                        SplitRefusal::ExtendedPath { offenders }
+                        | SplitRefusal::OutOfRange { offenders, .. }
                         | SplitRefusal::Texts(curvyo_ui_core::TextRefusal { offenders, .. }) => {
                             Some(RefusalMarks::new(offenders.clone(), &selection))
                         }
@@ -132,6 +133,9 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
+                        BreakApartRefusal::ExtendedPath { offenders } => {
+                            Some(RefusalMarks::new(offenders.clone(), &selection))
+                        }
                         BreakApartRefusal::Texts(text) => {
                             Some(RefusalMarks::new(text.offenders.clone(), &selection))
                         }

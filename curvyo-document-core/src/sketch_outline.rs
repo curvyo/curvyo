@@ -98,6 +98,9 @@ pub(crate) fn outline_scaled(
         style: style.clone(),
         anchors: first.anchors,
         extra_subpaths: subpaths,
+        curve_kind: crate::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(placement.b.atan2(placement.a)),
     }
     .mapped(placement))

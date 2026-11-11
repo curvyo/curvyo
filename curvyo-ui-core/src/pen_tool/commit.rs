@@ -70,6 +70,28 @@ impl PenTool {
     /// Closes the path in progress with `join`: a new path becomes one created path, a continued
     /// one is grown and closed as the same object.
     pub(super) fn commit_close(&mut self, document: &Document, join: JoinType) -> PointerUpOutcome {
+        if matches!(self.mode, super::PenMode::BSpline | super::PenMode::Spiro) {
+            let State::Placing {
+                nodes, base: None, ..
+            } = &self.state
+            else {
+                return PointerUpOutcome::Ignored;
+            };
+            let result = document.create_editable_curve(
+                nodes,
+                true,
+                if self.mode == super::PenMode::Spiro {
+                    curvyo_document_core::CurveKind::Spiro
+                } else {
+                    curvyo_document_core::CurveKind::BSpline
+                },
+            );
+            if let Ok(id) = result {
+                self.state = State::Idle;
+                return PointerUpOutcome::Closed(id);
+            }
+            return PointerUpOutcome::Ignored;
+        }
         let Some(resolution) = self.resolve_close(join) else {
             return PointerUpOutcome::Placed;
         };

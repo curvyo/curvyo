@@ -92,7 +92,7 @@ impl Document {
                     fixes.push(Fix::Copy(Box::new(read)));
                 } else {
                     let opacity = crate::clone_write::source_opacity(tree, &read);
-                    fixes.push(Fix::Unlink(clone, read.resolved, opacity));
+                    fixes.push(Fix::Unlink(clone, *read.resolved, opacity));
                 }
             }
         }

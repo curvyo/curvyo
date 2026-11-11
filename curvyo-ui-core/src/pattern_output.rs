@@ -42,6 +42,16 @@ pub fn pattern_subject(object: &ObjectSnapshot) -> Option<PatternSubject> {
     ) {
         return None;
     }
+    let evaluated;
+    let object = if object
+        .drawn_path()
+        .is_some_and(|path| !path.curve_kind.is_bezier())
+    {
+        evaluated = crate::evaluate_object(object).ok()?;
+        &evaluated
+    } else {
+        object
+    };
     let style = object.style();
     let fill = style.fill.painted_pattern()?;
     let (outlines, _) = stroked_outlines_of(object);

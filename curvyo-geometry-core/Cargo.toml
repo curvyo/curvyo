@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "The Curvyo geometry kernel: hit-test geometry over cubic Bézier segments and boolean operations on closed outlines (pure, wasm-compatible)."
+description = "The Curvyo geometry kernel: cubic Bézier geometry, boolean operations, stroke and variable-width outlines, Spiro and B-spline curves (pure, wasm-compatible)."
 
 [lints]
 workspace = true
@@ -18,6 +18,8 @@ i_overlay.workspace = true
 # `Cargo.lock` through the workspace's dependencies.
 libm = { version = "0.2.16", default-features = false }
 thiserror.workspace = true
+# Safe Rust port of Levien’s Spiro reference, Apache-2.0; see ADR 0053.
+spiro-inner = { version = "0.1.0", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # Not built for wasm32 (it needs OS facilities there; the wasm build runs the golden test only).

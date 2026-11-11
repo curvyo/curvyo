@@ -233,11 +233,11 @@ fn c14_shift_ctrl_f_and_shift_ctrl_d() {
 #[test]
 fn c3_c10_c23_body_follows_the_tab_the_pen_and_the_scope() {
     use PanelContent::{Document, Empty, Style};
-    // Document tab: its section, except while the Pen has an unfinished path.
+    // Story 0110 keeps the Document section visible during an unfinished Pen path.
     assert_eq!(panel_body(DOC, false, false), Document);
     assert_eq!(panel_body(DOC, false, true), Document, "criterion 24");
-    assert_eq!(panel_body(DOC, true, false), Empty);
-    assert_eq!(panel_body(DOC, true, true), Empty);
+    assert_eq!(panel_body(DOC, true, false), Document);
+    assert_eq!(panel_body(DOC, true, true), Document);
     // Style tab: the Style area when the scope holds objects, nothing otherwise.
     assert_eq!(panel_body(STYLE, false, true), Style);
     assert_eq!(panel_body(STYLE, false, false), Empty);

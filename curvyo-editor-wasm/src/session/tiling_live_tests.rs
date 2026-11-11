@@ -85,7 +85,7 @@ fn frame_outlines(s: &Session, ids: &[NodeId]) -> Vec<PathSnapshot> {
     swap.apply_to(&mut artwork);
     ids.iter()
         .map(|id| match artwork.iter().find(|o| o.id() == *id) {
-            Some(ObjectSnapshot::Clone(clone)) => clone.resolved.clone(),
+            Some(ObjectSnapshot::Clone(clone)) => (*clone.resolved).clone(),
             Some(ObjectSnapshot::Path(path)) => path.clone(),
             other => panic!("not an outline: {other:?}"),
         })
@@ -96,7 +96,7 @@ fn frame_outlines(s: &Session, ids: &[NodeId]) -> Vec<PathSnapshot> {
 fn committed(s: &Session, ids: &[NodeId]) -> Vec<PathSnapshot> {
     ids.iter()
         .map(|&id| match s.document.object(id) {
-            Some(ObjectSnapshot::Clone(clone)) => clone.resolved,
+            Some(ObjectSnapshot::Clone(clone)) => *clone.resolved,
             Some(ObjectSnapshot::Path(path)) => path,
             other => panic!("not a clone: {other:?}"),
         })

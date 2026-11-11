@@ -199,6 +199,7 @@ impl Session {
         }
         self.sync_export();
         let mut link = self.sync.take()?;
+        self.document.set_live_share(false);
         if let Some(channel) = link.workspace.as_mut() {
             channel.switch_stream(None);
         }

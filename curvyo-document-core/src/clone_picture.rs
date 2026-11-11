@@ -166,6 +166,9 @@ pub(crate) fn primitive_path(primitive: &PrimitiveSnapshot) -> PathSnapshot {
             })
             .collect(),
         extra_subpaths: Vec::new(),
+        curve_kind: crate::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
     }
 }
@@ -316,6 +319,9 @@ fn picture_clone(
         style: crate::style_model::Style::default(),
         anchors: Vec::new(),
         extra_subpaths: Vec::new(),
+        curve_kind: crate::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
     };
     Some(crate::clone_model::CloneSnapshot::new(
@@ -398,7 +404,7 @@ fn group_list(
                 }
                 let own = leaf_opacity(clone.chain.style_source);
                 list.push(faded(
-                    ObjectSnapshot::Path(clone.resolved.clone()),
+                    ObjectSnapshot::Path((*clone.resolved).clone()),
                     through * own,
                 ));
             }

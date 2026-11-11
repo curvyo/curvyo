@@ -179,15 +179,15 @@ fn the_pen_tool_and_the_node_tool_without_a_path_leave_the_style_tab_without_con
 }
 
 #[test]
-fn the_pen_with_nothing_selected_shows_the_document_section_until_a_path_is_unfinished() {
+fn the_pen_with_nothing_selected_keeps_the_document_section_while_drawing() {
     let mut s = Session::new(1);
     s.set_tool(Tool::Pen);
     assert_eq!(s.panel_content(), PanelContent::Document);
     click(&mut s, pt(10.0, 10.0), false);
     assert_eq!(
         s.panel_content(),
-        PanelContent::Empty,
-        "an unfinished path, nothing selected: empty body"
+        PanelContent::Document,
+        "an unfinished path keeps the document body visible"
     );
     assert!(s.style_panel_state().is_none());
 }

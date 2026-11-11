@@ -920,6 +920,7 @@ dependencies = [
  "curvyo-crypto-core",
  "curvyo-document-core",
  "curvyo-extension-core",
+ "curvyo-geometry-core",
  "curvyo-image-core",
  "curvyo-laser-core",
  "curvyo-render-core",
@@ -961,6 +962,7 @@ dependencies = [
  "libm",
  "proptest",
  "rustix",
+ "spiro-inner",
  "thiserror 2.0.21",
  "wasm-bindgen-test",
 ]
@@ -5242,6 +5244,12 @@ checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spiro-inner"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad0035e3e6451669d2355e03b9a1d8c98226b00f1993d31fda918580f718ae91"
 
 [[package]]
 name = "stable_deref_trait"

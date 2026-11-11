@@ -110,6 +110,10 @@ pub enum ObjectEditError {
     /// nothing was written.
     #[error("a linked clone would move beyond the limit of 10 km")]
     CloneOutOfRange(NodeId),
+    /// An editable curve (Spiro) cannot be transformed while the document is shared
+    /// (`specs/0110-pen-modes-variable-stroke`, ADR 0053): nothing was written.
+    #[error("an editable curve cannot be changed while the document is shared")]
+    Shared,
 }
 
 /// One object to duplicate with [`Document::duplicate_objects`], and the
@@ -213,6 +217,28 @@ impl Document {
         } else {
             self.moved_clone_matrices(&ids, transform)?
         };
+        let spiro_metas: Vec<_> = metas
+            .iter()
+            .filter(|meta| crate::curve_kind::read(meta) == Some(crate::CurveKind::Spiro))
+            .collect();
+        if !spiro_metas.is_empty() {
+            if self.extended_edits_blocked()
+                || !offset.x.is_finite()
+                || !offset.y.is_finite()
+                || spiro_metas.iter().any(|meta| {
+                    crate::spiro_transform::read(meta).is_none_or(|placement| {
+                        let transformed =
+                            transform.compose(placement.unwrap_or(crate::Affine::IDENTITY));
+                        transformed.inverse_representable().is_none()
+                    })
+                })
+            {
+                return Err(ObjectEditError::NonFiniteGeometry);
+            }
+            if offset != Vec2::ZERO {
+                self.ensure_spiro_format();
+            }
+        }
         let staying = self.staying_dimensions(&ids.iter().copied().collect::<HashSet<NodeId>>());
         for (meta, id) in metas.iter().zip(&ids) {
             match clones.get(id) {
@@ -370,6 +396,50 @@ impl Document {
         self.duplicate_objects_in_page(sources, offset, text_shifts, None)
     }
 
+    fn validate_spiro_copies(
+        &self,
+        tree: &loro::LoroTree,
+        sources: &[&CopySource],
+        offset: Vec2,
+    ) -> Result<bool, ObjectEditError> {
+        let copies_spiro = sources.iter().any(|source| {
+            let id = tree_id_of(source.id);
+            std::iter::once(id)
+                .chain(crate::group_tree::leaves_under(tree, Some(id)))
+                .any(|id| {
+                    tree.get_meta(id).is_ok_and(|meta| {
+                        crate::curve_kind::read(&meta) == Some(crate::CurveKind::Spiro)
+                    })
+                })
+        });
+        if copies_spiro
+            && (self.extended_edits_blocked() || !offset.x.is_finite() || !offset.y.is_finite())
+        {
+            return Err(ObjectEditError::NonFiniteGeometry);
+        }
+        if copies_spiro
+            && sources.iter().any(|source| {
+                let id = tree_id_of(source.id);
+                std::iter::once(id)
+                    .chain(crate::group_tree::leaves_under(tree, Some(id)))
+                    .any(|id| {
+                        tree.get_meta(id).is_ok_and(|meta| {
+                            crate::curve_kind::read(&meta) == Some(crate::CurveKind::Spiro)
+                                && crate::spiro_transform::read(&meta).is_none_or(|placement| {
+                                    crate::Affine::translation(offset)
+                                        .compose(placement.unwrap_or(crate::Affine::IDENTITY))
+                                        .inverse_representable()
+                                        .is_none()
+                                })
+                        })
+                    })
+            })
+        {
+            return Err(ObjectEditError::NonFiniteGeometry);
+        }
+        Ok(copies_spiro)
+    }
+
     pub(crate) fn duplicate_objects_in_page(
         &self,
         sources: &[CopySource],
@@ -394,7 +464,11 @@ impl Document {
             check_anchor_ids(&tree, tree_id, &source.anchor_ids)?;
         }
 
+        let copies_spiro = self.validate_spiro_copies(&tree, &sources, offset)?;
         let sketch_claims = self.prepare_sketch_copies(&sources, target_page)?;
+        if copies_spiro && offset != Vec2::ZERO {
+            self.ensure_spiro_format();
+        }
 
         // `mov_after` needs the fractional-index feature on for this tree;
         // enabled on every call, as `split_at_anchor` does.
@@ -509,6 +583,10 @@ impl Document {
                 d.transform_placement_results(std::slice::from_ref(rotated), "rotate_object")
                     .map(|_| ())
             });
+        }
+        if matches!(rotated, ObjectSnapshot::Path(path) if path.curve_kind == crate::CurveKind::Spiro)
+        {
+            return self.transform_objects(std::slice::from_ref(rotated), false);
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(rotated.id());
@@ -857,6 +935,19 @@ pub(crate) fn renumber_anchors(meta: &loro::LoroMap, anchor_ids: &[AnchorId]) {
 pub(crate) fn translate_meta(meta: &loro::LoroMap, offset: Vec2) {
     match shape_codec::leaf_kind(meta) {
         shape_codec::LeafKind::Primitive(tag) => translate_primitive_meta(meta, &tag, offset),
+        shape_codec::LeafKind::Path
+            if crate::curve_kind::read(meta) == Some(crate::CurveKind::Spiro) =>
+        {
+            if offset != Vec2::ZERO
+                && let Some(placement) = crate::spiro_transform::read(meta)
+            {
+                crate::spiro_transform::write(
+                    meta,
+                    crate::Affine::translation(offset)
+                        .compose(placement.unwrap_or(crate::Affine::IDENTITY)),
+                );
+            }
+        }
         shape_codec::LeafKind::Path => translate_path_meta(meta, offset),
         shape_codec::LeafKind::Sketch => {
             crate::sketch_codec::map_placement(meta, crate::Affine::translation(offset));

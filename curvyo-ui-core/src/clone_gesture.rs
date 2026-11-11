@@ -20,6 +20,9 @@ pub(crate) fn affine_of(id: NodeId, f: &dyn Fn(&PathSnapshot) -> PathSnapshot) -
         style: Style::default(),
         anchors: vec![probe(0, 0.0, 0.0), probe(1, 1.0, 0.0), probe(2, 0.0, 1.0)],
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: curvyo_document_core::Angle::from_radians(0.0),
     });
     let [o, x, y] = [0, 1, 2].map(|k| mapped.anchors[k].point);
@@ -46,7 +49,7 @@ pub(crate) fn map_clone(
 /// The path a clone becomes if a gesture must unlink it: its drawn outline with placeholder
 /// anchor ids, which the session replaces with minted ones at the press.
 pub(crate) fn unlinked_placeholder(clone: &CloneSnapshot) -> PathSnapshot {
-    let mut path = clone.resolved.clone();
+    let mut path = (*clone.resolved).clone();
     for (k, anchor) in path.all_anchors_mut().enumerate() {
         anchor.id = AnchorId::new(0, k as u64);
     }

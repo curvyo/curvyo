@@ -616,6 +616,12 @@ export function useTrace(
       setStopped(false);
       setFailure(null);
       setLoading(false);
+      if (viewRef.current.maskFailed) {
+        setUnclipped("");
+        setStatus({ ...NO_STATUS, line: MASK_FAILED });
+        onChange();
+        return;
+      }
       if (readParts(viewRef.current.parts).length > 1) {
         // `specs/0094` slice 2: the parts' join; a part whose mask misses the image adds nothing.
         startTimers();
@@ -1012,7 +1018,7 @@ export function useTrace(
     const session = getSession();
     const current = viewRef.current;
     const severalParts = readParts(current.parts).length > 1;
-    if (!session || creating || current.images.length === 0 || (!severalParts && (current.maskOutsideImage || current.maskFailed))) {
+    if (!session || creating || current.images.length === 0 || (current.maskFailed || (!severalParts && current.maskOutsideImage))) {
       return;
     }
     const threshold = choiceRef.current.values.threshold;

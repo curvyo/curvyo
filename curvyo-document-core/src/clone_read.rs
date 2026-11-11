@@ -506,6 +506,9 @@ pub(crate) mod tests_support {
                 corner(4, 0.0, 10.0),
             ],
             extra_subpaths: Vec::new(),
+            curve_kind: crate::CurveKind::Bezier,
+            spiro_transform: None,
+            width_points: Vec::new(),
             rotation: Angle::from_radians(0.3),
         })
     }
@@ -687,6 +690,9 @@ mod tests {
                 style: Style::default(),
                 anchors: vec![corner(1, 0.0, 0.0), corner(2, 1e8, 1e8)],
                 extra_subpaths: Vec::new(),
+                curve_kind: crate::CurveKind::Bezier,
+                spiro_transform: None,
+                width_points: Vec::new(),
                 rotation: Angle::from_radians(0.0),
             })
         };

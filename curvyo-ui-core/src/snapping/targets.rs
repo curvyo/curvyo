@@ -1,7 +1,7 @@
 //! Immutable snapping targets collected from resolved geometry.
 use super::{
     AnchorId, DocumentSize, HashSet, NodeId, NodeRead, ObjectSnapshot, PAGE_FRACTIONS, Point,
-    SnapCurve, SnapSettings, SnapTarget, TargetAxis, TargetKind, object_bounds,
+    SnapCurve, SnapSettings, SnapTarget, TargetAxis, TargetKind,
 };
 /// The flat target list, built once at the start of a drag (`adrs.md` decision 5).
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -24,6 +24,13 @@ pub struct SnapExclusions<'a> {
     pub anchor: Option<(NodeId, AnchorId)>,
     /// All anchors moved by a multi-anchor gesture.
     pub anchors: Option<&'a HashSet<(NodeId, AnchorId)>>,
+}
+
+pub(super) fn control_point(path: &curvyo_document_core::PathSnapshot, point: Point) -> Point {
+    path.spiro_transform
+        .as_deref()
+        .copied()
+        .map_or(point, |matrix| matrix.apply_point(point))
 }
 
 impl SnapTargets {
@@ -71,6 +78,22 @@ impl SnapTargets {
         settings: &SnapSettings,
         exclusions: SnapExclusions<'_>,
     ) -> Self {
+        Self::gather_with_artwork(
+            nodes,
+            size,
+            settings,
+            exclusions,
+            &crate::variable_artwork::synchronous_artwork,
+        )
+    }
+
+    fn gather_with_artwork(
+        nodes: &[NodeRead],
+        size: DocumentSize,
+        settings: &SnapSettings,
+        exclusions: SnapExclusions<'_>,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> Self {
         let mut entries = Vec::new();
         let moving_boxes = super::collection::moving(nodes, exclusions.boxes);
         let mut moving_nodes = super::collection::moving(nodes, exclusions.nodes);
@@ -84,7 +107,7 @@ impl SnapTargets {
                     .filter(|id| !exclusions.boxes.is_some_and(|edited| edited.contains(id))),
             );
         }
-        let bounds = super::collection::group_bounds(nodes);
+        let bounds = super::collection::group_bounds(nodes, artwork);
         let moving_groups = super::collection::moving_groups(nodes, &moving_boxes);
         let excluded_box = |id: NodeId| moving_boxes.contains(&id);
         let excluded_nodes = |id: NodeId| moving_nodes.contains(&id);
@@ -106,8 +129,12 @@ impl SnapTargets {
             if read.guide && settings.guides && !excluded_box(read.id) {
                 push_guide_object(&mut entries, object, read.id, exclusions);
             }
-            if !read.guide && settings.objects && !excluded_box(read.id) {
-                let (min, max) = object_bounds(object);
+            if !read.guide
+                && settings.objects
+                && !excluded_box(read.id)
+                && let Some((min, max)) =
+                    crate::object_bounds::object_outline_bounds_with_artwork(object, artwork)
+            {
                 push_box(&mut entries, min, max, TargetKind::Box);
             }
             if settings.nodes
@@ -126,7 +153,10 @@ impl SnapTargets {
                 && let Some(path) = object.drawn_path()
             {
                 let is_path = matches!(object, ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_));
-                if is_path {
+                if is_path
+                    && (path.curve_kind.is_bezier()
+                        || path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+                {
                     for anchor in path.all_anchors() {
                         if exclusions.anchor == Some((read.id, anchor.id))
                             || exclusions
@@ -135,11 +165,8 @@ impl SnapTargets {
                         {
                             continue;
                         }
-                        entries.push(SnapTarget::point(
-                            anchor.point,
-                            (anchor.point, anchor.point),
-                            TargetKind::Node,
-                        ));
+                        let point = control_point(path, anchor.point);
+                        entries.push(SnapTarget::point(point, (point, point), TargetKind::Node));
                     }
                 }
             }
@@ -174,7 +201,25 @@ impl SnapTargets {
         settings: &SnapSettings,
         exclusions: SnapExclusions<'_>,
     ) -> Self {
-        let mut targets = Self::gather(
+        Self::gather_pages_with_artwork(
+            nodes,
+            pages,
+            settings,
+            exclusions,
+            &crate::variable_artwork::synchronous_artwork,
+        )
+    }
+
+    /// Builds snap targets using cached variable-stroke artwork.
+    #[must_use]
+    pub fn gather_pages_with_artwork(
+        nodes: &[NodeRead],
+        pages: &[curvyo_document_core::Page],
+        settings: &SnapSettings,
+        exclusions: SnapExclusions<'_>,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> Self {
+        let mut targets = Self::gather_with_artwork(
             nodes,
             DocumentSize::default(),
             &SnapSettings {
@@ -182,6 +227,7 @@ impl SnapTargets {
                 ..*settings
             },
             exclusions,
+            artwork,
         );
         if settings.page {
             for page in pages {
@@ -220,11 +266,9 @@ impl SnapTargets {
             if Some(anchor.id) == skip {
                 continue;
             }
-            self.entries.push(SnapTarget::point(
-                anchor.point,
-                (anchor.point, anchor.point),
-                TargetKind::Node,
-            ));
+            let point = control_point(path, anchor.point);
+            self.entries
+                .push(SnapTarget::point(point, (point, point), TargetKind::Node));
         }
         self.index = super::index::Index::build(&self.entries);
     }
@@ -283,7 +327,17 @@ fn push_guide_object(
     exclusions: SnapExclusions<'_>,
 ) {
     if let Some(path) = object.drawn_path() {
-        for subpath in path.subpaths() {
+        let evaluated;
+        let path = if path.curve_kind.is_bezier() {
+            Some(path)
+        } else {
+            evaluated = crate::evaluate_path(path).ok();
+            evaluated.as_ref()
+        };
+        for subpath in path
+            .into_iter()
+            .flat_map(curvyo_document_core::PathSnapshot::subpaths)
+        {
             for (a, b) in crate::hit_test::segment_pairs(subpath.anchors.len(), subpath.closed) {
                 let start = &subpath.anchors[a];
                 let end = &subpath.anchors[b];
@@ -316,7 +370,10 @@ fn push_guide_object(
             );
         }
     }
-    if let Some(path) = object.drawn_path() {
+    if let Some(path) = object.drawn_path()
+        && (path.curve_kind.is_bezier()
+            || path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+    {
         for anchor in path.all_anchors() {
             if exclusions.anchor == Some((id, anchor.id))
                 || exclusions
@@ -325,11 +382,8 @@ fn push_guide_object(
             {
                 continue;
             }
-            entries.push(SnapTarget::point(
-                anchor.point,
-                (anchor.point, anchor.point),
-                TargetKind::Guide,
-            ));
+            let point = control_point(path, anchor.point);
+            entries.push(SnapTarget::point(point, (point, point), TargetKind::Guide));
         }
     }
 }

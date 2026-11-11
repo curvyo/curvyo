@@ -269,3 +269,58 @@ fn a_clone_member_draws_in_the_look_of_its_own_path_assignment() {
         "the other member is in the Not assigned look"
     );
 }
+
+/// A laser page with one curve of `kind` through four points, cut by one operation
+/// (`specs/0110` criterion 2: Spiro and B-spline paths are drawn in every view).
+fn curve_page(kind: curvyo_document_core::CurveKind) -> (Vec<u8>, String) {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let d = Document::new(1);
+    let laser = d
+        .add_output_page(NewOutputPage {
+            process: "curvyo.laser",
+            label: "Laser",
+            profile: None,
+            work_area: DocumentSize::from_mm(400.0, 300.0),
+        })
+        .unwrap();
+    let o = laser.origin;
+    let controls: Vec<_> = [(10.0, 10.0), (30.0, 40.0), (50.0, 10.0), (70.0, 40.0)]
+        .iter()
+        .enumerate()
+        .map(|(i, &(x, y))| {
+            let mut node = NewAnchor::corner(
+                AnchorId::new(1, 100 + i as u64),
+                Point::new(o.x + x, o.y + y),
+            );
+            node.kind = curvyo_document_core::AnchorKind::Symmetric;
+            node
+        })
+        .collect();
+    let curve = d.create_editable_curve(&controls, false, kind).unwrap();
+    let m = laser.kind.manufacturing().unwrap();
+    d.add_operation(
+        m,
+        &NewOperation {
+            kind: "cut",
+            name: "Op 1",
+        },
+        0,
+        &[vec![curve]],
+    )
+    .unwrap();
+    (pack(&d, "look").unwrap(), laser.id)
+}
+
+#[test]
+fn spiro_and_b_spline_curves_are_drawn_in_their_laser_look_and_as_drawn() {
+    for kind in [
+        curvyo_document_core::CurveKind::Spiro,
+        curvyo_document_core::CurveKind::BSpline,
+    ] {
+        let (bytes, laser) = curve_page(kind);
+        let looked = open(&bytes, &laser, OperationsViewMode::Operations).draw_list();
+        assert!(triangles_in(&looked, OP_CUT) > 0, "{kind:?} in its look");
+        let drawn = open(&bytes, &laser, OperationsViewMode::Drawn).draw_list();
+        assert!(triangles_in(&drawn, BLACK) > 0, "{kind:?} as drawn");
+    }
+}

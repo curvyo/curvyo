@@ -25,7 +25,7 @@ export const TRACE_MIXED = "Use Object to path for text; one image at a time.";
 /** The mask paths cover none of the image (`specs/0094` criterion 7). */
 export const MASK_OUTSIDE_IMAGE = "0 paths: the mask is outside the image.";
 /** The mask paths could not be combined into one region (a kernel refusal). */
-export const MASK_FAILED = "0 paths: the mask paths could not be combined.";
+export const MASK_FAILED = "0 paths: the mask paths could not be combined. Convert unsupported editable curves to Bézier paths.";
 
 /** The pick button and Clear mask of the Mask group (`specs/0094` slice 1b, UX notes §11). */
 export const PICK_MASK_PATHS = "Pick mask paths";

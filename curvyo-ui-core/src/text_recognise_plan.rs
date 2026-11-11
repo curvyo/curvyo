@@ -45,7 +45,11 @@ fn selected_leaves<'a>(
 
 fn readable(object: &ObjectSnapshot) -> bool {
     match object {
-        ObjectSnapshot::Path(path) => path.subpaths().any(|s| s.closed),
+        ObjectSnapshot::Path(path) => {
+            path.curve_kind.is_bezier()
+                && path.width_points.is_empty()
+                && path.subpaths().any(|s| s.closed)
+        }
         _ => false,
     }
 }
@@ -106,6 +110,11 @@ pub fn recognise_subjects(
                         subjects.sources.push((path.id, index));
                     }
                 }
+            }
+            ObjectSnapshot::Path(path)
+                if !path.curve_kind.is_bezier() || !path.width_points.is_empty() =>
+            {
+                subjects.others += 1;
             }
             ObjectSnapshot::Path(_) => subjects.open_paths += 1,
             _ => subjects.others += 1,

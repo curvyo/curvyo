@@ -406,19 +406,22 @@ pub(crate) fn insert_anchor_at(list: &LoroMovableList, index: usize, anchor: &Ne
     write_anchor_fields(&map, anchor);
 }
 
-pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> PathSnapshot {
+pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> Option<PathSnapshot> {
     let anchors_list = anchors_container(meta);
     let anchors = (0..anchors_list.len())
         .map(|index| read_anchor_snapshot(&anchor_map_at(&anchors_list, index)))
         .collect();
-    PathSnapshot {
+    Some(PathSnapshot {
         id,
         closed: read_closed(meta),
         style: style_codec::read_style(meta),
         anchors,
         extra_subpaths: crate::subpath_codec::read_extra_subpaths(meta),
         rotation: read_rotation(meta),
-    }
+        curve_kind: crate::curve_kind::read(meta)?,
+        spiro_transform: crate::spiro_transform::read(meta)?.map(Box::new),
+        width_points: crate::width_profile::read(meta, read_closed(meta))?,
+    })
 }
 
 /// Validates that every path node in the `paths` tree matches the shape
@@ -442,6 +445,7 @@ pub(crate) fn read_path_snapshot(id: NodeId, meta: &LoroMap) -> PathSnapshot {
 pub(crate) fn validate_path_tree(loro: &LoroDoc, paths_tree_key: &str) -> bool {
     let tree = loro.get_tree(paths_tree_key);
     crate::sketch_page::valid_claims(&loro.get_map(crate::document::ROOT_MAP))
+        && crate::width_profile::valid_history_marker(loro)
         && crate::group_tree::validate_tree(&tree, validate_object_node)
 }
 
@@ -489,7 +493,10 @@ pub(crate) fn validate_path_node(meta: &LoroMap) -> bool {
     else {
         return false;
     };
-    rotation_is_valid(meta)
+    crate::curve_kind::read(meta).is_some()
+        && crate::spiro_transform::read(meta).is_some()
+        && crate::width_profile::read(meta, read_closed(meta)).is_some()
+        && rotation_is_valid(meta)
         && crate::subpath_codec::validate_extra_subpaths(meta)
         && style_validation::style_is_valid(meta)
         && (0..anchors.len()).all(|index| validate_anchor(&anchors, index))

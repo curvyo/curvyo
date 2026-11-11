@@ -18,6 +18,68 @@ use super::reference_view::{reference_box_list, reference_marks_list};
 use super::{Session, Tool};
 
 impl Session {
+    /// `object` with an editable curve replaced by the Bézier curve it draws: a Spiro from the
+    /// memo (a Node drag's live controls solved as they move), a B-spline evaluated; a curve that
+    /// cannot be evaluated is drawn through its controls with straight lines, never hidden.
+    fn evaluate_for_artwork(&self, object: &mut ObjectSnapshot) {
+        use curvyo_document_core::CurveKind;
+        if !object
+            .drawn_path()
+            .is_some_and(|path| path.curve_kind != CurveKind::Bezier)
+        {
+            return;
+        }
+        if let ObjectSnapshot::Clone(clone) = object
+            && clone.chain.root_outline.curve_kind == CurveKind::Spiro
+        {
+            let matrix = clone.chain.composed;
+            let root = self.spiro_cache.borrow_mut().lookup_with_tolerance(
+                &self.document,
+                &clone.chain.root_outline,
+                curvyo_ui_core::SPIRO_TOLERANCE.as_mm() / curvyo_ui_core::stretch(matrix),
+            );
+            if let Some(root) = root {
+                let mut mapped = root.mapped(matrix);
+                mapped.id = clone.resolved.id;
+                mapped.style = clone.resolved.style.clone();
+                mapped.rotation = clone.resolved.rotation;
+                *clone.resolved = mapped;
+                clone.chain.root_outline = std::sync::Arc::new(root);
+                return;
+            }
+        }
+        if let ObjectSnapshot::Path(path) = object
+            && path.curve_kind == CurveKind::Spiro
+        {
+            let node_drag = self.tool == Tool::Node
+                && self
+                    .document
+                    .path(path.id)
+                    .is_some_and(|source| source.anchors != path.anchors);
+            let mut cache = self.spiro_cache.borrow_mut();
+            let evaluated = if node_drag {
+                cache.node_preview(&self.document, path)
+            } else {
+                cache.lookup(&self.document, path)
+            };
+            if let Some(evaluated) = evaluated {
+                *path = evaluated;
+                return;
+            }
+        }
+        match curvyo_ui_core::evaluate_object(object) {
+            Ok(evaluated) => *object = evaluated,
+            Err(_) => match object {
+                ObjectSnapshot::Path(path) => control_polygon(path),
+                ObjectSnapshot::Clone(clone) => {
+                    control_polygon(&mut clone.resolved);
+                    control_polygon(std::sync::Arc::make_mut(&mut clone.chain.root_outline));
+                }
+                _ => {}
+            },
+        }
+    }
+
     /// The artwork of `objects`.
     pub(super) fn artwork_list(
         &self,
@@ -128,6 +190,51 @@ impl Session {
         if self.style.is_active() {
             self.style.apply_to(artwork_objects.to_mut());
         }
+        if let Some(preview) = self.width_preview_artwork(&artwork_objects) {
+            artwork_objects = Cow::Owned(preview);
+        }
+        // Artwork consumes evaluated curves; the node decorations below continue to use the
+        // original editable controls.
+        if artwork_objects.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind != curvyo_document_core::CurveKind::Bezier)
+        }) {
+            for object in artwork_objects.to_mut().iter_mut() {
+                self.evaluate_for_artwork(object);
+            }
+        }
+        self.note_spiro_failure();
+        let mut unsupported_width = false;
+        let mut width_ids = std::collections::HashSet::new();
+        if artwork_objects
+            .iter()
+            .any(|object| !curvyo_ui_core::profiled_paths(object).is_empty())
+        {
+            let mut expanded = Vec::with_capacity(artwork_objects.len() + 1);
+            for object in artwork_objects.iter() {
+                width_ids.extend(
+                    curvyo_ui_core::profiled_paths(object)
+                        .into_iter()
+                        .map(|path| path.id),
+                );
+                unsupported_width |= super::width_outlines::push_width_expanded(
+                    object,
+                    &|path| self.width_artwork(path),
+                    &mut expanded,
+                );
+            }
+            artwork_objects = Cow::Owned(expanded);
+        }
+        self.width_outlines.borrow_mut().retain(&width_ids);
+        if unsupported_width && !self.unsupported_width_shown.replace(true) {
+            *self.unsupported_width_notice.borrow_mut() = Some(
+                "A variable stroke has no outline: its path has no length or is out of range."
+                    .to_owned(),
+            );
+        } else if !unsupported_width {
+            self.unsupported_width_shown.set(false);
+        }
         // The Trace tool washes the images it traces (`specs/0025-raster-trace` criteria 2, 68).
         if self.tool == Tool::Trace {
             self.trace_artwork(artwork_objects.to_mut());
@@ -147,13 +254,15 @@ impl Session {
         // The dimensions over the artwork, following a drag in the same frame (`0070`).
         list.extend(self.dimension_layer(&artwork_objects));
         list.extend(self.kept_point_list());
+        list.extend(self.width_handle_overlay());
         // The blue half of a segment bend, over the artwork and under the nodes and handles.
         list.extend(self.bend_preview_list(view, &objects));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
+        let control_paths: Vec<_> = paths.iter().map(super::node::control_view).collect();
         let decorated = if self.tool == Tool::Node {
-            self.in_node_set(&paths)
+            self.in_node_set(&control_paths)
         } else {
-            Cow::Borrowed(&paths[..])
+            Cow::Borrowed(&control_paths[..])
         };
         list.extend(build_decorations(
             &decorated,
@@ -168,7 +277,24 @@ impl Session {
         // The ghost a Select drag leaves at the origin, where the blue outline of
         // `specs/0009-unified-object-editing` criterion 10 was until 2026-10-27: over the
         // artwork, under the boxes and handles.
-        list.extend(swap.ghost(&objects, view));
+        if objects.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        }) {
+            let ghost_objects: Vec<_> = self
+                .spiro_selection_objects(&objects)
+                .into_iter()
+                .filter(|object| {
+                    !object.drawn_path().is_some_and(|path| {
+                        path.curve_kind == curvyo_document_core::CurveKind::Spiro
+                    })
+                })
+                .collect();
+            list.extend(swap.ghost(&ghost_objects, view));
+        } else {
+            list.extend(swap.ghost(&objects, view));
+        }
         list.extend(clone_previews);
         // The texts on a carrier the Node tool drags follow it in the same frame (`0080`
         // criterion 24).
@@ -191,9 +317,19 @@ impl Session {
         let live_objects = Self::live_objects_in(&objects, live.as_ref());
         // A selected dimension has no box and no handles (`0070` UX notes §7).
         let live_objects = self.without_selected_dimensions(live_objects);
+        let selection_visuals = if live_objects.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        }) {
+            // A Spiro without solution shows its box around its control polygon.
+            Cow::Owned(self.spiro_pick_objects(&live_objects))
+        } else {
+            Cow::Borrowed(&live_objects[..])
+        };
         list.extend(build_select_draw_list(
             view,
-            &self.select_decoration_input_in(&live_objects),
+            &self.select_decoration_input_in(&selection_visuals),
         ));
         // The marks of a selected clone: over the selection and hover boxes, so a box that
         // coincides with an outline never hides its trace, and under the handles (`0049`).
@@ -204,7 +340,7 @@ impl Session {
             &self.refusal_objects(&objects),
             view,
         ));
-        if let Some(group) = self.group_decoration_input_in(&live_objects) {
+        if let Some(group) = self.group_decoration_input_in(&selection_visuals) {
             list.extend(build_group_draw_list(view, &group));
         }
         // The open tiling bar draws the dashed selection box only: transform handles would
@@ -212,7 +348,7 @@ impl Session {
         if self.tiling.is_none() {
             list.extend(build_transform_draw_list(
                 view,
-                &self.select_transform_decoration_input_in(&live_objects),
+                &self.select_transform_decoration_input_in(&selection_visuals),
             ));
         }
         // The nine marks of the typed move, above the handles.
@@ -229,6 +365,15 @@ impl Session {
         list.extend(self.creation_preview_list(view));
         // The text in edit mode: line box, selection, composition and caret (`0074`).
         list.extend(self.text_overlay_list(view, self.text_caret_on()));
+        if self.tool != Tool::Node {
+            self.spiro_cache.borrow_mut().clear_node_previews();
+        }
+        if self.tool != Tool::Pen
+            || self.pen.mode() != curvyo_ui_core::PenMode::Spiro
+            || self.pen.in_progress_nodes().is_none()
+        {
+            self.spiro_cache.borrow_mut().clear_preview();
+        }
         if self.tool == Tool::Pen
             && let Some(nodes) = self.pen.in_progress_nodes()
         {
@@ -243,14 +388,66 @@ impl Session {
                 self.pen
                     .pending_anchor(self.minter.peek(), handle, self.drag_threshold())
             });
-            list.extend(build_pen_preview(
-                nodes,
-                self.pen_rubber_band_end(),
-                pending.as_ref(),
-                view,
-                self.document.size(),
-                self.shown_background(),
-            ));
+            if matches!(
+                self.pen.mode(),
+                curvyo_ui_core::PenMode::BSpline | curvyo_ui_core::PenMode::Spiro
+            ) {
+                let mut controls = nodes.to_vec();
+                let closed = self.pen.mode() == curvyo_ui_core::PenMode::Spiro
+                    && nodes.len() >= 3
+                    && matches!(
+                        self.pen_target(),
+                        Some(curvyo_ui_core::PenTarget::Close { .. })
+                    );
+                if let Some(next) = pending {
+                    controls.push(next);
+                } else if let Some(point) = self.pen_rubber_band_end()
+                    && (self.pen.mode() != curvyo_ui_core::PenMode::Spiro
+                        || (!closed && controls.last().is_none_or(|last| last.point != point)))
+                {
+                    let mut next =
+                        curvyo_document_core::NewAnchor::corner(self.minter.peek(), point);
+                    next.kind = curvyo_document_core::AnchorKind::Symmetric;
+                    controls.push(next);
+                }
+                let curve = if self.pen.mode() == curvyo_ui_core::PenMode::Spiro {
+                    let curve = self.spiro_cache.borrow_mut().preview(&controls, closed);
+                    // Said in the frame that first draws the straight lines.
+                    self.note_spiro_failure();
+                    curve
+                } else {
+                    curvyo_ui_core::evaluate_bspline_nodes(&controls, false).ok()
+                };
+                if curve.is_some() || self.pen.mode() == curvyo_ui_core::PenMode::Spiro {
+                    let kind = if self.pen.mode() == curvyo_ui_core::PenMode::Spiro {
+                        curvyo_document_core::CurveKind::Spiro
+                    } else {
+                        curvyo_document_core::CurveKind::BSpline
+                    };
+                    list.extend(curvyo_render_core::build_curve_pen_preview(
+                        nodes,
+                        pending.as_ref(),
+                        curvyo_render_core::CurvePreview {
+                            curve: curve.as_deref().unwrap_or_default(),
+                            kind,
+                            controls: &controls,
+                        },
+                        closed,
+                        view,
+                        self.document.size(),
+                        self.shown_background(),
+                    ));
+                }
+            } else {
+                list.extend(build_pen_preview(
+                    nodes,
+                    self.pen_rubber_band_end(),
+                    pending.as_ref(),
+                    view,
+                    self.document.size(),
+                    self.shown_background(),
+                ));
+            }
         }
         // What a press would continue, join or close onto, before the click (`0034`).
         if self.tool == Tool::Pen {
@@ -340,6 +537,16 @@ impl Session {
             })
             .collect()
     }
+}
+
+/// `path` drawn through its controls with straight lines (an editable curve that cannot be
+/// evaluated stays visible).
+fn control_polygon(path: &mut curvyo_document_core::PathSnapshot) {
+    for anchor in &mut path.anchors {
+        anchor.handle_in = curvyo_document_core::Vec2::ZERO;
+        anchor.handle_out = curvyo_document_core::Vec2::ZERO;
+    }
+    path.curve_kind = curvyo_document_core::CurveKind::Bezier;
 }
 
 #[cfg(test)]

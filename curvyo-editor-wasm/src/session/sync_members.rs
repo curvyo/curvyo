@@ -141,6 +141,7 @@ impl Session {
             EndReason::Removed => SyncEnd::Removed,
             EndReason::Left => SyncEnd::Left,
         });
+        self.document.set_live_share(false);
         let Some(record) = ended_record(link, reason) else {
             return;
         };

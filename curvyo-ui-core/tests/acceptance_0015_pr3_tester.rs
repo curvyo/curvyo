@@ -318,7 +318,7 @@ fn panel_content(
 fn ac14a_panel_content_for_every_selection_and_pen_state() {
     for (selected, pen, want) in [
         (0, false, PanelContent::Document),
-        (0, true, PanelContent::Empty),
+        (0, true, PanelContent::Document), // Story 0110 supersedes 0015's empty panel.
         (1, false, PanelContent::Style),
         (1, true, PanelContent::Style),
         (2, false, PanelContent::Style),

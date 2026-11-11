@@ -781,7 +781,11 @@ export interface EditorSession {
     ms?: number,
     source?: "canvas" | "panel",
     kind?: "status" | "alert",
+    at?: { x: number; y: number },
   ) => void;
+  /** Shows a refusal near the client point `at`, or near the canvas pointer when absent
+   * (`specs/0110` UX review U8: one style for refusals, beside where the maker acted). */
+  showRefusal: (text: string, at?: { x: number; y: number }) => void;
   /** Wipes the history; the steps removed, -1 when ignored, -2 for a shared document. */
   wipeHistory: () => number;
   /** Hides the selected object's earlier history; the rows hidden, -1 when ignored. */
@@ -1188,6 +1192,31 @@ export function useEditorSession(
   const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
   // `showNotice` is stable (a callback without dependencies), so the render loop may keep it.
   const showNoticeRef = useRef(history.showNotice);
+  const dismissNoticeRef = useRef(history.dismissNotice);
+  const spiroNoticeRef = useRef<string | null>(null);
+  // Where the maker last pressed anywhere in the window (canvas, panel or bar): a refusal shows
+  // beside it (UX review U8).
+  const lastWindowPressRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const note = (event: PointerEvent) => {
+      lastWindowPressRef.current = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener("pointerdown", note, true);
+    return () => window.removeEventListener("pointerdown", note, true);
+  }, []);
+  const showRefusal = useCallback(
+    (text: string, at?: { x: number; y: number }) => {
+      let point = at;
+      const pointer = lastPointerRef.current;
+      const bounds = canvasRef.current?.getBoundingClientRect();
+      // A pointer on the canvas is the newest place; otherwise the last press.
+      if (!point && pointer && bounds) point = { x: bounds.left + pointer.x, y: bounds.top + pointer.y };
+      point ??= lastWindowPressRef.current ?? undefined;
+      history.showNotice(text, 8000, "canvas", "alert", point);
+    },
+    [history.showNotice],
+  );
+  const showRefusalRef = useRef(showRefusal);
   const { refresh: refreshHistory, handleKeyOutcome } = history;
   useEffect(() => {
     refreshHistoryRef.current = refreshHistory;
@@ -1266,8 +1295,12 @@ export function useEditorSession(
   const arcBar = useArcBar(getSession, syncFromSession, announceText, syncRevision);
   const showTransformNotice = useCallback(
     (session: WasmSession) => {
+      // A refusal of `specs/0110` shows beside the pointer in the alert look (UX review U8).
+      const refusal = session.transform_notice_is_refusal();
       const notice = session.take_transform_notice();
-      if (notice !== "") {
+      if (notice !== "" && refusal) {
+        showRefusalRef.current(notice);
+      } else if (notice !== "") {
         history.showNotice(notice, FLIP_NOTICE_MS, "canvas");
       }
       // A cloning drop that left guides out or was refused says so (`specs/0100` criterion 6).
@@ -1516,6 +1549,19 @@ export function useEditorSession(
         syncFromSessionRef.current();
       }
       session?.render();
+      // The refusals of width editing and the Spiro notice show beside the pointer (UX review
+      // U8); the Spiro notice ends with the path or a mode change (U1).
+      const unsupportedWidth = session?.take_unsupported_width_notice();
+      if (unsupportedWidth) {
+        spiroNoticeRef.current = unsupportedWidth;
+        showRefusalRef.current(unsupportedWidth);
+      }
+      const widthEditNotice = session?.take_width_edit_notice();
+      if (widthEditNotice) showRefusalRef.current(widthEditNotice);
+      if (session?.take_spiro_notice_end() && spiroNoticeRef.current !== null) {
+        dismissNoticeRef.current(spiroNoticeRef.current);
+        spiroNoticeRef.current = null;
+      }
       // An image of an opened project whose picture cannot be read, once per open
       // (`specs/0058-bitmap-import` criterion 30).
       const badAsset = session?.take_bad_asset_notice();
@@ -2991,6 +3037,7 @@ export function useEditorSession(
     wipeObjectHistory: history.wipeObject,
     runHistoryAction: history.runAction,
     showHistoryNotice: history.showNotice,
+    showRefusal,
     nudgeFeedback,
     convertSelected,
     makeLine,

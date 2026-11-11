@@ -41,7 +41,8 @@ fn round_trip(bytes: &[u8]) -> Vec<u8> {
 #[test]
 fn c25_the_format_number_is_39_for_this_slice() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 41);
+    // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
+    assert_eq!(CURRENT_FORMAT_VERSION, 42);
 }
 
 #[test]

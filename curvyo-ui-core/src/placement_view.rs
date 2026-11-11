@@ -39,6 +39,52 @@ pub fn placement_members<S: std::hash::BuildHasher>(
         .collect()
 }
 
+/// Page membership using cached variable-stroke artwork; unavailable artwork rejects the read.
+#[must_use]
+pub fn placement_members_with_artwork<S: std::hash::BuildHasher>(
+    objects: &[ObjectSnapshot],
+    source: &Page,
+    guides: &HashSet<NodeId, S>,
+    membership: &PageMembership,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<Vec<usize>> {
+    let mut members = Vec::new();
+    for (index, object) in objects.iter().enumerate() {
+        if guides.contains(&object.id()) {
+            continue;
+        }
+        let bounds = crate::object_bounds_with_artwork(object, artwork)?;
+        if membership.is_member(source, object.id(), bounds, Reach::Touches) {
+            members.push(index);
+        }
+    }
+    Some(members)
+}
+
+/// Placement bounds using cached artwork; unavailable artwork rejects the read.
+#[must_use]
+pub fn placed_bounds_with_artwork(
+    objects: &[ObjectSnapshot],
+    members: &[usize],
+    map: Affine,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<(Point, Point)> {
+    let mut union: Option<(Point, Point)> = None;
+    for &index in members {
+        let (min, max) = crate::object_bounds_with_artwork(&objects[index], artwork)?;
+        for corner in [min, Point::new(max.x, min.y), max, Point::new(min.x, max.y)] {
+            let p = map.apply_point(corner);
+            union = Some(union.map_or((p, p), |(lo, hi)| {
+                (
+                    Point::new(lo.x.min(p.x), lo.y.min(p.y)),
+                    Point::new(hi.x.max(p.x), hi.y.max(p.y)),
+                )
+            }));
+        }
+    }
+    union
+}
+
 /// The union of the members' bounds on the output page (the corners mapped by `map`), `None` for
 /// no member: what the overhang notice measures (criterion 8).
 #[must_use]

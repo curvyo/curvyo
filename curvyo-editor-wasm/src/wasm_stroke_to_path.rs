@@ -78,6 +78,14 @@ impl WasmSession {
                     ..StrokeToPathView::default()
                 }
             }
+            StrokeToPathOutcome::Refused(StrokeToPathRefusal::UnsupportedExtendedPath {
+                offenders,
+            }) => StrokeToPathView {
+                kind: "unsupported_extended_path".to_owned(),
+                count: count(offenders.len()),
+                of,
+                ..StrokeToPathView::default()
+            },
             StrokeToPathOutcome::Refused(StrokeToPathRefusal::Texts(texts)) => StrokeToPathView {
                 kind: crate::wasm_text::refusal_kind(&texts).to_owned(),
                 count: count(texts.offenders.len()),

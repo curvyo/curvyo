@@ -184,7 +184,7 @@ export function combineRefusalText(result: CombineResult): string | null {
 /** Whether a refused Combine outlines objects on the canvas: objects out of range and the
  * leaves of groups. */
 export function combineOutlinesObjects(result: CombineResult): boolean {
-  return ["out_of_range", "groups"].includes(result.kind) || textRefusalOutlines(result.kind);
+  return ["extended_path", "out_of_range", "groups"].includes(result.kind) || textRefusalOutlines(result.kind);
 }
 
 const NO_COMPOUND = "needs a compound path.";
@@ -198,6 +198,8 @@ export function splitRefusalText(result: SplitResult): string | null {
     return texts;
   }
   switch (result.kind) {
+    case "extended_path":
+      return sharedRefusalText("Split", { kind: result.kind, count: result.compounds, of: result.of ?? result.compounds });
     case "no_compound":
       return `Split ${NO_COMPOUND} ${NOTHING_CHANGED}`;
     case "groups":
@@ -231,6 +233,8 @@ export function breakApartRefusalText(result: BreakApartResult): string | null {
     return texts;
   }
   switch (result.kind) {
+    case "extended_path":
+      return sharedRefusalText("Break apart", { kind: result.kind, count: result.compounds, of: result.compounds });
     case "no_compound":
       return `Break apart ${NO_COMPOUND} ${NOTHING_CHANGED}`;
     case "groups":
@@ -269,7 +273,7 @@ export function cutRefusalText(result: CutResult): string | null {
  * and the objects out of range; "do not cross" outlines nothing. */
 export function cutOutlinesObjects(result: CutResult): boolean {
   return (
-    ["groups", "compound", "texts", "out_of_range"].includes(result.kind) ||
+    ["extended_path", "groups", "compound", "texts", "out_of_range"].includes(result.kind) ||
     textRefusalOutlines(result.kind)
   );
 }

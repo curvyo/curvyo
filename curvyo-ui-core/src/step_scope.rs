@@ -46,6 +46,8 @@ pub const MOVE_STEPS: &[&str] = &[
     "arrange_grid",
     // `specs/0102-laser-fixtures` adrs.md section 4: the placed page or clone dropped into a slot.
     "move_to_slot",
+    // A Spiro path's placement matrix (ADR 0053): where it is, not what it is.
+    "set_spiro_transform",
 ];
 
 /// The commands that are not about the selected objects: pages, manufacturing, profiles and
@@ -202,6 +204,12 @@ pub const EDIT_STEPS: &[&str] = &[
     "set_corner_radii",
     "set_ellipse_arc",
     "set_curve",
+    "set_curve_kind",
+    "set_width_point",
+    "remove_width_point",
+    "reset_width_profile",
+    "set_width_profile",
+    "convert_curve_to_bezier",
     "convert_to_paths",
     "edit_style",
     "move_anchors",

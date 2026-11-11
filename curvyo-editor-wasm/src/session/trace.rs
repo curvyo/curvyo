@@ -211,7 +211,8 @@ impl Session {
             .iter()
             .map(ObjectSnapshot::id)
             .collect();
-        let mask_failed = !mask.is_empty() && self.trace_mask_failure().is_some();
+        let mask_failed = (!mask.is_empty() && self.trace_mask_failure().is_some())
+            || self.trace_has_unsupported_mask();
         let mask_outside_image = !mask.is_empty() && !mask_failed && !self.trace_mask_meets_image();
         TraceView {
             selection,
@@ -233,6 +234,9 @@ impl Session {
     /// The working image of `image` (a reduced copy with `reduced`, criterion 10) and its pixel
     /// map, for the worker; `None` when it is not a selected image or its picture is unreadable.
     pub fn trace_source(&mut self, image: NodeId, reduced: bool) -> Option<TraceSource> {
+        if self.trace_has_unsupported_mask() {
+            return None;
+        }
         let (_, images) = self.trace_images();
         let snapshot = images.into_iter().find(|candidate| candidate.id == image)?;
         let working = self.working_image(&snapshot.asset)?;
@@ -260,6 +264,9 @@ impl Session {
     /// Shows the worker's result `wire` for `image` as the preview (criterion 8); `false` when the
     /// numbers are not a result.
     pub fn set_trace_preview(&mut self, image: NodeId, wire: &[f64]) -> bool {
+        if self.trace_has_unsupported_mask() {
+            return false;
+        }
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
@@ -334,6 +341,9 @@ impl Session {
     /// Keeps the worker's full-size result `wire` for `image` for Create paths; `false` when the
     /// numbers are not a result.
     pub fn set_trace_result(&mut self, image: NodeId, wire: &[f64]) -> bool {
+        if self.trace_has_unsupported_mask() {
+            return false;
+        }
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
@@ -388,7 +398,7 @@ impl Session {
     /// "Trace image"; the groups are selected and the Select tool is chosen. The images stay.
     pub fn create_traced_paths(&mut self) -> TraceCreateOutcome {
         self.recording(|this| -> TraceCreateOutcome {
-            if this.tool != Tool::Trace {
+            if this.tool != Tool::Trace || this.trace_has_unsupported_mask() {
                 return TraceCreateOutcome::Ignored;
             }
             let (_, images) = this.trace_images();

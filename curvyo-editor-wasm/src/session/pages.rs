@@ -249,7 +249,9 @@ impl Session {
             return false;
         };
         let active = self.active_page().id == id;
-        let contents = self.page_contents();
+        let Some(contents) = self.page_contents() else {
+            return false;
+        };
         let changed =
             self.recording_unguarded(|this| this.document.delete_page(id, &contents).is_ok());
         self.note_moved_pages(&pages, id);
@@ -283,26 +285,53 @@ impl Session {
         page.kind != PageKind::Sketch && self.page_view.frame_only.contains(&page.id)
     }
 
+    /// The outline box Fit page and the page guides measure `object` by: a variable-width
+    /// stroke by its visible outline; `None`, with the notice set, when it has none.
+    pub(super) fn page_fit_bounds(&self, object: &ObjectSnapshot) -> Option<(Point, Point)> {
+        if curvyo_ui_core::profiled_paths(object).is_empty() {
+            return Some(curvyo_ui_core::object_outline_bounds(object));
+        }
+        let bounds =
+            curvyo_ui_core::object_bounds_with_artwork(object, &|path| self.width_artwork(path));
+        if bounds.is_none() {
+            self.note_width_not_ready();
+        }
+        bounds
+    }
+
+    /// Notes that a variable stroke has no outline, so a page operation is refused.
+    fn note_width_not_ready(&self) {
+        *self.unsupported_width_notice.borrow_mut() =
+            Some("Variable stroke geometry is not ready for this page operation.".to_owned());
+    }
+
     /// What every page owns by centre now (ADR 0051 §4): what a page carries when a drag, a size
-    /// change or a delete moves it; for a sketch page exactly its sketch (ADR 0043 §3).
-    pub(super) fn page_contents(&self) -> PageContents {
+    /// change or a delete moves it; for a sketch page exactly its sketch (ADR 0043 §3). A
+    /// variable-width stroke counts with its visible outline; `None`, with the notice set, when
+    /// one of them has none.
+    pub(super) fn page_contents(&self) -> Option<PageContents> {
         let pages = self.document.pages();
-        curvyo_ui_core::page_contents(
+        let contents = curvyo_ui_core::page_contents_with_artwork(
             &self.document,
             &pages,
             &self.page_membership(),
             &self.document_read().leaves,
-        )
+            &|path| self.width_artwork(path),
+        );
+        if contents.is_none() {
+            self.note_width_not_ready();
+        }
+        contents
     }
 
     /// The contents a drag of `page` uses: [`Session::page_contents`] without the dragged
     /// page's own entry when its frame moves alone (`specs/0109` criterion 25).
-    pub(super) fn drag_contents(&self, page: &Page) -> PageContents {
-        let mut contents = self.page_contents();
+    pub(super) fn drag_contents(&self, page: &Page) -> Option<PageContents> {
+        let mut contents = self.page_contents()?;
         if self.frame_moves_alone(page) {
             contents.remove(&page.id);
         }
-        contents
+        Some(contents)
     }
 
     /// Notes how many pages of `before` other than `except` the last command moved, for the
@@ -326,7 +355,9 @@ impl Session {
         let Some(page) = pages.iter().find(|p| p.id == id).cloned() else {
             return false;
         };
-        let contents = self.drag_contents(&page);
+        let Some(contents) = self.drag_contents(&page) else {
+            return false;
+        };
         let moved = self.recording_unguarded(|this| {
             this.document
                 .move_page(id, page.origin.vector_to(origin), &contents)
@@ -342,7 +373,9 @@ impl Session {
             return SizeOutcome::Unchanged;
         }
         let pages = self.document.pages();
-        let contents = self.page_contents();
+        let Some(contents) = self.page_contents() else {
+            return SizeOutcome::Unchanged;
+        };
         let outcome = match self.document.resize_page(&page.id, size, &contents) {
             Ok(true) => SizeOutcome::Committed,
             Ok(false) => SizeOutcome::Unchanged,
@@ -355,27 +388,31 @@ impl Session {
         let page = self.active_page();
         let read = self.document_read();
         let membership = self.page_membership();
-        let objects: Vec<_> = read
-            .leaves
-            .iter()
-            .filter(|o| {
-                let bounds = curvyo_ui_core::object_outline_bounds(o);
-                membership.is_member(&page, o.id(), bounds, Reach::Touches)
-            })
-            .collect();
-        if objects.is_empty() {
-            return super::FitOutcome::Empty;
-        }
         let mut min = Point::new(f64::INFINITY, f64::INFINITY);
         let mut max = Point::new(f64::NEG_INFINITY, f64::NEG_INFINITY);
-        for object in &objects {
-            let (a, b) = curvyo_ui_core::object_outline_bounds(object);
-            min = Point::new(min.x.min(a.x), min.y.min(a.y));
-            max = Point::new(max.x.max(b.x), max.y.max(b.y));
+        let mut found = false;
+        for object in read
+            .visible
+            .iter()
+            .filter(|object| !read.guides.contains(&object.id()))
+        {
+            let Some((a, b)) = self.page_fit_bounds(object) else {
+                return super::FitOutcome::Blocked;
+            };
+            if membership.is_member(&page, object.id(), (a, b), Reach::Touches) {
+                found = true;
+                min = Point::new(min.x.min(a.x), min.y.min(a.y));
+                max = Point::new(max.x.max(b.x), max.y.max(b.y));
+            }
+        }
+        if !found {
+            return super::FitOutcome::Empty;
         }
         // The frame goes onto the content; no object on it moves (ADR 0031 decision 9a).
         let pages = self.document.pages();
-        let contents = self.page_contents();
+        let Some(contents) = self.page_contents() else {
+            return super::FitOutcome::Blocked;
+        };
         let outcome = match self
             .document
             .fit_page_to_content(&page.id, (min, max), &contents)
@@ -435,3 +472,7 @@ impl Session {
         serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_owned())
     }
 }
+
+#[cfg(test)]
+#[path = "page_width_tests.rs"]
+mod width_tests;

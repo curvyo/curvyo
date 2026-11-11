@@ -26,6 +26,19 @@ impl Session {
             // A document outside the shared workspace sends nothing on its room.
             return;
         }
+        if self.document.has_extended_path_history() {
+            if let Some(link) = self.sync.as_mut() {
+                link.notice(
+                    "Documents with editable curves or width profiles cannot be shared yet."
+                        .to_owned(),
+                    true,
+                );
+            }
+            return;
+        }
+        let Some(link) = self.sync.as_ref() else {
+            return;
+        };
         let Ok(bytes) = self.document.export_updates(&link.exported) else {
             return;
         };
@@ -118,7 +131,11 @@ impl Session {
     /// did not import and is rejected (criterion 25).
     fn apply_record(&mut self, kind: RecordKind, bytes: &[u8]) -> Option<bool> {
         match kind {
-            RecordKind::Update => self.document.import_updates(bytes).ok().map(|()| true),
+            RecordKind::Update => self
+                .document
+                .import_shared_updates(bytes)
+                .ok()
+                .map(|()| true),
             RecordKind::Asset => {
                 let Ok(hash) = self.document.insert_asset(bytes) else {
                     return Some(false);
@@ -152,6 +169,9 @@ impl Session {
         let Ok(received) = curvyo_document_core::unpack(self.peer.wrapping_add(1), bytes) else {
             return false;
         };
+        if received.has_extended_path_history() {
+            return false;
+        }
         let Ok(all) = received.export_updates(&DocumentVersion::never()) else {
             return false;
         };

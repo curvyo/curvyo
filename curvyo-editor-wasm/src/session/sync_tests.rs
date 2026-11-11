@@ -2,6 +2,7 @@
 //! 14 to 19, 21, through a shared workspace's open document since `specs/0105`): two or three
 //! editing sessions against one in-process relay, with the transport carried out as the host
 //! would (`TransportAction`s) on a virtual clock.
+#![allow(clippy::assert_is_empty)]
 
 use curvyo_document_core::Point;
 use serde_json::Value;
@@ -347,4 +348,207 @@ fn a_copy_on_a_device_that_is_no_participant_is_refused_and_stops() {
         ))
     );
     assert_eq!(device.session.take_sync_notice(), None);
+}
+
+/// The workspace snapshot of `session`'s document alone, or why it stays out (ADR 0053,
+/// compatibility with older sync peers).
+fn add_to_workspace(session: &Session) -> Result<(), crate::NotAdded> {
+    let bytes = curvyo_document_core::pack(&session.document, "test").unwrap();
+    let mut builder = crate::WorkspaceShareBuilder::new(
+        super::sync_test_support::ROOM,
+        0xa1,
+        1_800_000_000,
+        [4; 16],
+    );
+    builder.add_document(&["Poster.curvyo".to_owned()], &bytes, [5; 16])
+}
+
+#[test]
+fn sharing_refuses_a_document_with_a_width_profile() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let session = Session::new(1);
+    let path = session.document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    session
+        .document
+        .set_width_point(path, AnchorId::new(1, 3), 0.5, 2.0)
+        .unwrap();
+    assert_eq!(
+        add_to_workspace(&session),
+        Err(crate::NotAdded::UnsupportedDocument)
+    );
+}
+
+#[test]
+fn active_link_refuses_a_new_width_profile_before_mutation() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let session = Session::new(1);
+    let path = session.document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    let mut net = Net::new();
+    let a = share_open(&mut net, session);
+    let session = net.s(a);
+    let before = session.sync.as_ref().unwrap().exported.clone();
+    assert!(!session.set_pen_mode(curvyo_ui_core::PenMode::BSpline));
+    assert!(
+        session
+            .document
+            .set_width_point(path, AnchorId::new(1, 3), 0.5, 2.0)
+            .is_err()
+    );
+    session.sync_export();
+    assert_eq!(session.sync.as_ref().unwrap().exported, before);
+    assert!(session.document.width_points(path).unwrap().is_empty());
+    assert!(
+        session
+            .document
+            .create_editable_curve(
+                &[
+                    NewAnchor::corner(AnchorId::new(1, 4), Point::new(0.0, 0.0)),
+                    NewAnchor::corner(AnchorId::new(1, 5), Point::new(10.0, 0.0)),
+                ],
+                false,
+                curvyo_document_core::CurveKind::BSpline,
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn sharing_distinguishes_normal_wiped_history_from_undone_feature_history() {
+    use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
+    let mut normal = Session::new(21);
+    let _ = normal.document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(21, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(21, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    normal.document.wipe_history().unwrap();
+    assert_eq!(add_to_workspace(&normal), Ok(()));
+
+    let mut extended = Session::new(22);
+    extended
+        .document
+        .create_editable_curve(
+            &[
+                NewAnchor::corner(AnchorId::new(22, 1), Point::new(0.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(22, 2), Point::new(10.0, 0.0)),
+            ],
+            false,
+            CurveKind::BSpline,
+        )
+        .unwrap();
+    extended
+        .document
+        .undo_step(extended.document.own_steps().last().unwrap().step)
+        .unwrap();
+    extended.document.wipe_history().unwrap();
+    assert_eq!(
+        add_to_workspace(&extended),
+        Err(crate::NotAdded::UnsupportedDocument)
+    );
+}
+
+#[test]
+fn started_curve_reports_when_sharing_begins_before_finish() {
+    let mut session = Session::new(23);
+    session.set_tool(Tool::Pen);
+    assert!(session.set_pen_mode(curvyo_ui_core::PenMode::BSpline));
+    for point in [Point::new(0.0, 0.0), Point::new(10.0, 0.0)] {
+        session.pointer_down(point, false);
+        session.pointer_up(point, false, false);
+    }
+    let mut net = Net::new();
+    let a = share_open(&mut net, session);
+    let session = net.s(a);
+    session.finish_pen();
+    assert!(session.document.object_ids().is_empty());
+    assert!(
+        session
+            .take_pen_entry_notice()
+            .unwrap()
+            .contains("cannot be created")
+    );
+}
+
+#[test]
+fn shared_snapshot_with_extended_history_is_rejected_without_mutation() {
+    use curvyo_document_core::{AnchorId, CurveKind, Document, NewAnchor, pack};
+    let source = Document::new(25);
+    source
+        .create_editable_curve(
+            &[
+                NewAnchor::corner(AnchorId::new(25, 1), Point::new(0.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(25, 2), Point::new(10.0, 0.0)),
+            ],
+            false,
+            CurveKind::BSpline,
+        )
+        .unwrap();
+    let bytes = pack(&source, "test").unwrap();
+    let mut net = Net::new();
+    let a = share_open(&mut net, Session::new(26));
+    let session = net.s(a);
+    let before = session.document.version();
+    assert!(!session.merge_snapshot(&bytes));
+    assert_eq!(session.document.version(), before);
+}
+
+#[test]
+fn shared_update_with_extended_history_is_rejected_without_mutation() {
+    use curvyo_document_core::{AnchorId, NewAnchor, pack, unpack};
+    use curvyo_sync_core::RecordKind;
+    let session = Session::new(27);
+    let path = session.document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(27, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(27, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    let mut net = Net::new();
+    let a = share_open(&mut net, session);
+    let session = net.s(a);
+    let source = unpack(28, &pack(&session.document, "test").unwrap()).unwrap();
+    // A peer of an older build that does not refuse the feature writes it into the room.
+    source.set_workspace_share(None);
+    let before = session.document.version();
+    source
+        .set_width_point(path, AnchorId::new(28, 3), 0.5, 2.0)
+        .unwrap();
+    let update = source.export_updates(&before).unwrap();
+    session
+        .sync
+        .as_mut()
+        .unwrap()
+        .remote
+        .push_back((1, RecordKind::Update, update));
+    assert!(!session.sync_apply_remote());
+    assert_eq!(session.document.version(), before);
+    assert!(session.document.width_points(path).unwrap().is_empty());
+}
+
+#[test]
+fn joined_document_cannot_wipe_history_while_link_is_active() {
+    let (mut net, _, b) = shared_pair();
+    let document = &mut net.s(b).document;
+    let epoch = document.history_epoch();
+    let version = document.version();
+    let count = document.history_len();
+    assert!(document.wipe_history().is_err());
+    assert_eq!(document.history_epoch(), epoch);
+    assert_eq!(document.version(), version);
+    assert_eq!(document.history_len(), count);
 }

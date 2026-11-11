@@ -128,7 +128,15 @@ impl SelectTool {
         tolerances: TransformHandleTolerances,
         shift: bool,
     ) -> Option<(&'a ObjectSnapshot, OrientedBox, EditHandle)> {
-        Self::query_handle(objects, selection, point, tolerances, shift, false)
+        Self::query_handle(
+            objects,
+            selection,
+            point,
+            tolerances,
+            shift,
+            false,
+            &crate::variable_artwork::synchronous_artwork,
+        )
     }
 
     /// [`SelectTool::handle_at`] for hover, cursor and hint: also reports the
@@ -141,19 +149,41 @@ impl SelectTool {
         tolerances: TransformHandleTolerances,
         shift: bool,
     ) -> Option<(&'a ObjectSnapshot, OrientedBox, EditHandle)> {
-        Self::query_handle(objects, selection, point, tolerances, shift, true)
+        Self::query_handle(
+            objects,
+            selection,
+            point,
+            tolerances,
+            shift,
+            true,
+            &crate::variable_artwork::synchronous_artwork,
+        )
     }
 
-    fn query_handle<'a>(
+    /// Finds a hovered handle using cached variable-stroke artwork.
+    #[must_use]
+    pub fn hover_handle_at_with_artwork<'a>(
+        objects: &'a [ObjectSnapshot],
+        selection: &ObjectSelection,
+        point: Point,
+        tolerances: TransformHandleTolerances,
+        shift: bool,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> Option<(&'a ObjectSnapshot, OrientedBox, EditHandle)> {
+        Self::query_handle(objects, selection, point, tolerances, shift, true, artwork)
+    }
+
+    pub(super) fn query_handle<'a>(
         objects: &'a [ObjectSnapshot],
         selection: &ObjectSelection,
         point: Point,
         tolerances: TransformHandleTolerances,
         shift: bool,
         include_move: bool,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) -> Option<(&'a ObjectSnapshot, OrientedBox, EditHandle)> {
         let object = sole_selected(objects, selection)?;
-        let box_ = oriented_bounds(object);
+        let box_ = crate::oriented_box::oriented_bounds_with_artwork(object, artwork)?;
         let handles = drawn_edit_handles(object, &box_, &tolerances, shift);
         let hit = hit_transform_handle(&handles, &box_, point, &tolerances, include_move)?;
         Some((object, box_, hit))
@@ -165,11 +195,14 @@ impl SelectTool {
         objects: &[ObjectSnapshot],
         selection: &ObjectSelection,
         point: Point,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) -> bool {
         let Some(object) = sole_selected(objects, selection) else {
             return false;
         };
-        let box_ = oriented_bounds(object);
+        let Some(box_) = crate::oriented_box::oriented_bounds_with_artwork(object, artwork) else {
+            return false;
+        };
         let local = box_.to_local(point);
         local.x >= box_.min.x
             && local.x <= box_.max.x

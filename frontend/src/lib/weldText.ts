@@ -67,6 +67,6 @@ export function weldRefusalText(result: WeldResult): string | null {
 /** Whether a refusal outlines objects on the canvas. */
 export function weldRefusalOutlines(result: WeldResult): boolean {
   return (
-    result.kind === "no_area" || result.kind === "out_of_range" || textRefusalOutlines(result.kind)
+    result.kind === "extended_path" || result.kind === "no_area" || result.kind === "out_of_range" || textRefusalOutlines(result.kind)
   );
 }

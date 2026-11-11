@@ -454,7 +454,14 @@ impl DocumentVersion {
 /// number is provisional by the rule above. Goldens: `fixture_jobs_v41.curvyo`,
 /// `fixture_jobs_unknown_kind_v41.curvyo`, `fixture_jobs_damaged_v41.curvyo`; the older goldens
 /// stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 41;
+///
+/// Bumped to 42 in `pen-modes-variable-stroke` (ADR 0053, `specs/0110-pen-modes-variable-stroke`):
+/// editable curve kinds (Spiro, B-spline with their control points and the Spiro placement
+/// register) and independent width points cannot be interpreted safely by older readers. Absent
+/// keys keep ordinary Bézier and uniform-stroke behaviour; malformed extended data is refused.
+/// Migration from 41 is none. The number is provisional by the rule above. Golden:
+/// `pen_modes_v42.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 42;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -536,6 +543,8 @@ pub struct Document {
     pub(crate) share: std::cell::RefCell<Option<crate::container_share::WorkspaceShareRecord>>,
     /// The file held the share members of a document shared on its own (ADR 0044 decision 3).
     pub(crate) legacy_share: std::cell::Cell<bool>,
+    /// Whether a live collaboration link is attached; shared history is never wiped (ADR 0053).
+    pub(crate) live_share: std::cell::Cell<bool>,
 }
 
 impl Document {
@@ -610,6 +619,7 @@ impl Document {
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
+            live_share: std::cell::Cell::default(),
         }
     }
 
@@ -648,7 +658,9 @@ impl Document {
         if status.pending.is_some() {
             return Err(OpenError::Damaged);
         }
-        if !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
+        if !crate::history::updates::format_is_readable(&loro)
+            || crate::history::updates::writes_newer_format(&loro, &loro::VersionVector::default())
+            || !crate::path_codec::validate_path_tree(&loro, OBJECTS_TREE)
             || !crate::document_background::validate(&loro)
             || !crate::snapping::validate(&loro)
             || !crate::page_grid::validate(&loro)
@@ -678,6 +690,7 @@ impl Document {
             assets: std::cell::RefCell::default(),
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
+            live_share: std::cell::Cell::default(),
         };
         // One scan at open: a file with membership keys keeps the sweep on.
         doc.member_keys_may_exist
@@ -962,6 +975,12 @@ enum ObjectJson {
         /// so an ordinary path exports as before.
         #[serde(skip_serializing_if = "Vec::is_empty")]
         extra_subpaths: Vec<crate::path_model::SubpathSnapshot>,
+        #[serde(skip_serializing_if = "crate::CurveKind::is_bezier")]
+        curve_kind: crate::CurveKind,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        spiro_transform: Option<crate::Affine>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        width_points: Vec<crate::WidthPoint>,
         /// The path's own `rotation` register (`specs/0005-object-
         /// transform/adrs.md`): orientation only, never consulted to
         /// reconstruct geometry — see [`crate::path_model::PathSnapshot::rotation`].
@@ -1021,6 +1040,7 @@ fn stored_curve(curve: crate::ring_curve::Curve, default: crate::ring_curve::Cur
 }
 
 impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
+    #[allow(clippy::too_many_lines)] // Exhaustive serialization keeps each object variant together.
     fn from(snapshot: crate::primitive_model::ObjectSnapshot) -> Self {
         use crate::primitive_model::{ObjectSnapshot, Shape};
         match snapshot {
@@ -1043,6 +1063,9 @@ impl From<crate::primitive_model::ObjectSnapshot> for ObjectJson {
                 style: path.style,
                 anchors: path.anchors,
                 extra_subpaths: path.extra_subpaths,
+                curve_kind: path.curve_kind,
+                spiro_transform: path.spiro_transform.map(|value| *value),
+                width_points: path.width_points,
                 rotation: path.rotation,
             },
             ObjectSnapshot::Text(text) => Self::Text {

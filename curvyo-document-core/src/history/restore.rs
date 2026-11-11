@@ -132,6 +132,9 @@ impl Document {
             touched.root = root;
         }
         let (mut before, mut after) = read_versions(doc, &log, &touched)?;
+        // This monotone compatibility mark describes CRDT history, not editable state.
+        before.root.remove(crate::width_profile::HISTORY_MARK);
+        after.root.remove(crate::width_profile::HISTORY_MARK);
         if let Mode::Object {
             object, only: true, ..
         } = mode

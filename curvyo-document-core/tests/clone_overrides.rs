@@ -59,7 +59,7 @@ fn style_of(d: &Document, id: NodeId) -> Style {
 }
 
 fn drawn(d: &Document, id: NodeId) -> PathSnapshot {
-    clone_of(d, id).resolved
+    *clone_of(d, id).resolved
 }
 
 fn link(d: &Document, original: NodeId, x: f64, y: f64) -> NodeId {
@@ -191,7 +191,7 @@ fn ac11_own_style_copies_the_effective_style_and_opacity_and_draws_the_same() {
     let after = clone_of(&d, c);
     assert!(after.chain.own_style);
     assert_eq!(after.chain.style_source, c);
-    assert_eq!(after.resolved, before, "outline and style unchanged");
+    assert_eq!(*after.resolved, before, "outline and style unchanged");
     assert_eq!(after.resolved.style.stroke.color, RED);
     assert_eq!(after.resolved.style.stroke.width.as_mm(), 0.5);
     assert_eq!(node(&d, c).registers.opacity, opacity(0.8));
@@ -455,13 +455,13 @@ fn ac31_deleting_a_style_source_copies_its_style_onto_the_clone_behind() {
         b_now.chain.own_style && b_now.chain.own_placement,
         "kept and copied"
     );
-    assert_eq!(b_now.resolved, b_before);
+    assert_eq!(*b_now.resolved, b_before);
     assert_eq!(node(&d, b).registers.opacity, opacity(0.3));
     assert!(
         c_now.chain.own_style,
         "its source was A too: it gets the copy as well"
     );
-    assert_eq!(c_now.resolved, c_before);
+    assert_eq!(*c_now.resolved, c_before);
 }
 
 #[test]

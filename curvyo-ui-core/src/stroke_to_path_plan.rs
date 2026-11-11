@@ -34,6 +34,11 @@ pub enum StrokeToPathRefusal {
         /// The offending objects, to outline.
         offenders: Vec<NodeId>,
     },
+    /// Extended curves and width profiles cannot yet be converted safely.
+    UnsupportedExtendedPath {
+        /// The objects whose conversion is unsupported.
+        offenders: Vec<NodeId>,
+    },
 }
 
 /// What [`plan_stroke_to_path`] decided, ready for `Document::stroke_to_path`.
@@ -258,7 +263,39 @@ pub fn plan_stroke_to_path(
     names: &dyn Fn(NodeId) -> Option<String>,
     minter: &mut AnchorIdMinter,
 ) -> Result<StrokeToPathPlan, StrokeToPathRefusal> {
+    plan_stroke_to_path_with_artwork(objects, selected, skipped, names, minter, &|path| {
+        crate::verified_variable_stroke_artwork(path)
+            .ok()
+            .map(std::sync::Arc::new)
+    })
+}
+
+/// Plans conversion using already-computed variable-stroke artwork.
+///
+/// # Errors
+/// Returns a refusal when selected artwork is unavailable or cannot be converted.
+pub fn plan_stroke_to_path_with_artwork(
+    objects: &[ObjectSnapshot],
+    selected: &[NodeId],
+    skipped: &dyn Fn(NodeId) -> bool,
+    names: &dyn Fn(NodeId) -> Option<String>,
+    minter: &mut AnchorIdMinter,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Result<StrokeToPathPlan, StrokeToPathRefusal> {
     let leaves = candidates(objects, selected, skipped);
+    let offenders: Vec<NodeId> = leaves
+        .iter()
+        .filter(|object| {
+            object.drawn_path().is_some_and(|path| {
+                path.curve_kind != curvyo_document_core::CurveKind::Bezier
+                    || (!path.width_points.is_empty() && artwork(path).is_none())
+            })
+        })
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(StrokeToPathRefusal::UnsupportedExtendedPath { offenders });
+    }
     let text_ids: Vec<NodeId> = leaves
         .iter()
         .filter(|object| {
@@ -284,8 +321,40 @@ pub fn plan_stroke_to_path(
             walk_text(&mut walk, conversion, &text.style, minter);
             continue;
         }
-        let (outlines, markers) = stroked_outlines(object);
-        let result = outline_of(&outlines, object.style(), markers, minter);
+        let result = if let Some(path) = object
+            .drawn_path()
+            .filter(|path| !path.width_points.is_empty())
+        {
+            let result =
+                artwork(path).ok_or_else(|| StrokeToPathRefusal::UnsupportedExtendedPath {
+                    offenders: vec![object.id()],
+                })?;
+            result
+                .1
+                .as_ref()
+                .map_or(Err(StrokeOutlineError::Empty), |outline| {
+                    Ok(outline
+                        .subpaths()
+                        .map(|subpath| {
+                            (
+                                subpath
+                                    .anchors
+                                    .iter()
+                                    .map(|anchor| {
+                                        let mut fresh = *anchor;
+                                        fresh.id = minter.mint();
+                                        fresh
+                                    })
+                                    .collect(),
+                                true,
+                            )
+                        })
+                        .collect())
+                })
+        } else {
+            let (outlines, markers) = stroked_outlines(object);
+            outline_of(&outlines, object.style(), markers, minter)
+        };
         if walk.add(StrokeSubject::Object(object.id()), object.id(), result) {
             walk.plan.strokes += 1;
             walk.converted.insert(object.id());

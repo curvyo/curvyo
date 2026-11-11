@@ -533,6 +533,43 @@ impl NodeTool {
         }
     }
 
+    /// Whether the current Spiro controls still match those frozen at the start of a drag.
+    #[must_use]
+    pub fn spiro_drag_sources_match(&self, paths: &[PathSnapshot]) -> bool {
+        match &self.drag {
+            Drag::Nodes { starts, .. } => starts.iter().all(|(id, anchor_id, position)| {
+                paths
+                    .iter()
+                    .find(|path| path.id == *id)
+                    .is_some_and(|path| {
+                        path.curve_kind != curvyo_document_core::CurveKind::Spiro
+                            || path
+                                .anchor(*anchor_id)
+                                .is_some_and(|anchor| anchor.point == *position)
+                    })
+            }),
+            Drag::Handle {
+                path: id,
+                anchor: anchor_id,
+                kind,
+                start_handle_in,
+                start_handle_out,
+                ..
+            } => paths
+                .iter()
+                .find(|path| path.id == *id)
+                .is_some_and(|path| {
+                    path.curve_kind != curvyo_document_core::CurveKind::Spiro
+                        || path.anchor(*anchor_id).is_some_and(|anchor| {
+                            anchor.kind == *kind
+                                && anchor.handle_in == *start_handle_in
+                                && anchor.handle_out == *start_handle_out
+                        })
+                }),
+            _ => true,
+        }
+    }
+
     /// The pressed anchor's raw moved position during a node drag, the grid probe
     /// (`specs/0090-grid` criterion 11). `None` for any other gesture, or when the press
     /// deselected that anchor (Shift), so it does not move.
@@ -682,7 +719,18 @@ impl NodeTool {
                 if point == down_at {
                     return PointerUpOutcome::NoOp;
                 }
-                let moves = Self::resolve_node_positions(down_at, &starts, point);
+                let mut moves = Self::resolve_node_positions(down_at, &starts, point);
+                for (path, _, position) in &mut moves {
+                    if let Some(matrix) = document
+                        .path(*path)
+                        .and_then(|snapshot| snapshot.spiro_transform)
+                    {
+                        let Some(inverse) = matrix.inverse_representable() else {
+                            return PointerUpOutcome::NoOp;
+                        };
+                        *position = inverse.apply_point(*position);
+                    }
+                }
                 let _ = document.move_anchors(&moves);
                 PointerUpOutcome::NodesMoved
             }
@@ -701,7 +749,16 @@ impl NodeTool {
                 if point == down_at {
                     return PointerUpOutcome::NoOp;
                 }
-                let value = Self::resolve_handle_value(down_at, start_value, point);
+                let mut value = Self::resolve_handle_value(down_at, start_value, point);
+                if let Some(matrix) = document
+                    .path(path)
+                    .and_then(|snapshot| snapshot.spiro_transform)
+                {
+                    let Some(inverse) = matrix.inverse_representable() else {
+                        return PointerUpOutcome::NoOp;
+                    };
+                    value = inverse.apply_vector(value);
+                }
                 let _ = document.set_handle(path, anchor, slot, value);
                 PointerUpOutcome::HandleMoved
             }
@@ -780,12 +837,19 @@ impl NodeTool {
                 Some(start_anchor.handle_out == Vec2::ZERO && end_anchor.handle_in == Vec2::ZERO)
             });
         let join_block = self.join_check(document, paths).err();
+        // A Spiro or B-spline point is a corner or smooth: it has no handles to make
+        // asymmetric (`specs/0110` UX review U10).
+        let on_curve = self.selection.node_pairs().iter().any(|(path, _)| {
+            document
+                .path(*path)
+                .is_some_and(|path| !path.curve_kind.is_bezier())
+        });
         NodeToolbarState {
             can_insert: segment_is_line.is_some(),
             can_delete: has_nodes,
             can_convert_to_corner: has_nodes,
             can_convert_to_symmetric: has_nodes,
-            can_convert_to_asymmetric: has_nodes,
+            can_convert_to_asymmetric: has_nodes && !on_curve,
             can_make_line: segment_is_line == Some(false),
             can_make_curve: segment_is_line == Some(true),
             clone_only: false,
@@ -941,6 +1005,9 @@ impl NodeTool {
             return None;
         };
         let snapshot = paths.iter().find(|p| p.id == path)?;
+        if snapshot.curve_kind != curvyo_document_core::CurveKind::Bezier {
+            return None;
+        }
         let start_anchor = snapshot.anchor(start)?;
         let end_anchor = snapshot.anchor(end)?;
 
@@ -1002,6 +1069,9 @@ impl NodeTool {
     ) -> Option<NodeId> {
         let (path, start, end) = self.selection_segment()?;
         let snapshot = paths.iter().find(|p| p.id == path)?;
+        if snapshot.curve_kind != curvyo_document_core::CurveKind::Bezier {
+            return None;
+        }
         let start_anchor = snapshot.anchor(start)?;
         let end_anchor = snapshot.anchor(end)?;
 

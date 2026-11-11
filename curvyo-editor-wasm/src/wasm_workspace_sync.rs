@@ -69,7 +69,7 @@ impl WasmWorkspaceShare {
     }
 
     /// Adds a scanned document under the fresh id `document` (16 bytes): empty when added, else
-    /// `unreadable` or `name`.
+    /// `width-profile`, `unreadable` or `name`.
     pub fn add_document(&mut self, path: &str, bytes: &[u8], document: &[u8]) -> String {
         let (Some(builder), Ok(document)) = (self.builder.as_mut(), document.try_into()) else {
             return "unreadable".to_owned();
@@ -81,8 +81,14 @@ impl WasmWorkspaceShare {
                 let name = path
                     .last()
                     .map_or("", |n| curvyo_document_core::document_name(n));
-                self.not_added.push(name.to_owned());
+                self.not_added
+                    .push(if reason == NotAdded::UnsupportedDocument {
+                        format!("{name} (editable curves or width profiles cannot be shared yet)")
+                    } else {
+                        name.to_owned()
+                    });
                 match reason {
+                    NotAdded::UnsupportedDocument => "width-profile",
                     NotAdded::Unreadable => "unreadable",
                     NotAdded::Name => "name",
                 }

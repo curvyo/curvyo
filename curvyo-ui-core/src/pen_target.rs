@@ -38,6 +38,9 @@ impl EndNodeIndex {
     pub fn from_paths(paths: &[PathSnapshot]) -> Self {
         let mut ends = Vec::new();
         for (z, path) in paths.iter().enumerate() {
+            if !path.curve_kind.is_bezier() || !path.width_points.is_empty() {
+                continue;
+            }
             for outline in path.subpaths() {
                 if outline.closed || outline.anchors.len() < 2 {
                     continue;

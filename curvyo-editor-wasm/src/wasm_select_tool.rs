@@ -199,6 +199,12 @@ impl WasmSession {
         self.session.take_transform_notice()
     }
 
+    /// Whether the transform notice waiting to be taken is a refusal shown beside the pointer.
+    #[must_use]
+    pub fn transform_notice_is_refusal(&self) -> bool {
+        self.session.transform_notice_is_refusal()
+    }
+
     /// The polite announcement of the last release or Enter whose resize mirrored
     /// ("Resized. Mirrored left to right."), once; an empty string when there is none.
     pub fn take_transform_announcement(&mut self) -> String {

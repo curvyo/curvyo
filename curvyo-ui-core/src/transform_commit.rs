@@ -194,6 +194,15 @@ pub(crate) fn commit_resize(
                 None,
             );
         }
+        ObjectSnapshot::Path(path) if path.curve_kind == curvyo_document_core::CurveKind::Spiro => {
+            let _ = commit_group(
+                document,
+                std::slice::from_ref(result),
+                stroke_scaling,
+                group_label(EditHandle::Move),
+                None,
+            );
+        }
         ObjectSnapshot::Path(path) => {
             let anchors: Vec<(AnchorId, Point, Vec2, Vec2)> = path
                 .all_anchors()
@@ -244,6 +253,28 @@ pub(crate) fn is_sane(object: &ObjectSnapshot) -> bool {
 /// shows no preview and writes nothing (criterion 12 of
 /// `specs/0009-unified-object-editing/`).
 pub(crate) fn same_within_tolerance(a: &ObjectSnapshot, b: &ObjectSnapshot) -> bool {
+    if let (Some(left), Some(right)) = (a.drawn_path(), b.drawn_path())
+        && (left.curve_kind == curvyo_document_core::CurveKind::Spiro
+            || right.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        && left
+            .spiro_transform
+            .as_deref()
+            .copied()
+            .unwrap_or(curvyo_document_core::Affine::IDENTITY)
+            != right
+                .spiro_transform
+                .as_deref()
+                .copied()
+                .unwrap_or(curvyo_document_core::Affine::IDENTITY)
+    {
+        return false;
+    }
+    if let (ObjectSnapshot::Clone(left), ObjectSnapshot::Clone(right)) = (a, b)
+        && left.chain.root_outline.curve_kind == curvyo_document_core::CurveKind::Spiro
+        && left.chain.composed != right.chain.composed
+    {
+        return false;
+    }
     let ((xs, ra), (ys, rb)) = (numbers_of(a), numbers_of(b));
     xs.len() == ys.len()
         && (ra - rb).abs() <= SAME_ANGLE_EPSILON_RAD
@@ -385,6 +416,31 @@ mod tests {
     use curvyo_document_core::{AnchorId, Length, NewAnchor, RectBounds};
 
     use super::*;
+
+    #[test]
+    fn spiro_resize_commits_affine_and_keeps_local_controls() {
+        use curvyo_document_core::{Affine, CurveKind};
+        let document = Document::new(1);
+        let controls = [
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 10.0)),
+        ];
+        let id = document
+            .create_editable_curve(&controls, false, CurveKind::Spiro)
+            .unwrap();
+        let ObjectSnapshot::Path(path) = document.object(id).unwrap() else {
+            panic!("path")
+        };
+        let original = ObjectSnapshot::Path(path.clone());
+        let result = ObjectSnapshot::Path(path.mapped(Affine::new(2.0, 0.0, 0.4, 1.0, 3.0, 4.0)));
+        assert!(!same_within_tolerance(&original, &result));
+        commit_resize(&document, id, &result, StrokeScaling::Keep);
+        assert_eq!(document.object(id).unwrap(), result);
+        let step = document.own_steps().last().unwrap().step;
+        document.undo_step(step).unwrap();
+        assert_eq!(document.path(id).unwrap().anchors, controls);
+        assert_eq!(document.path(id).unwrap().spiro_transform, None);
+    }
 
     fn rect(document: &Document) -> NodeId {
         document.create_rect(RectBounds {

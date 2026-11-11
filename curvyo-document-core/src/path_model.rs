@@ -291,6 +291,15 @@ pub struct PathSnapshot {
     /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_subpaths: Vec<SubpathSnapshot>,
+    /// The editable curve kind; ordinary Bézier paths omit this field.
+    #[serde(default, skip_serializing_if = "crate::CurveKind::is_bezier")]
+    pub curve_kind: crate::CurveKind,
+    /// Local-to-document placement for editable Spiro controls; absent means identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spiro_transform: Option<Box<crate::Affine>>,
+    /// Independently mergeable width points; empty means uniform width.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub width_points: Vec<crate::WidthPoint>,
     /// This path's own cumulative rotation (`specs/0005-object-transform/
     /// adrs.md`: "used only to keep its selection box oriented on a later
     /// reselect... never consulted to render, hit-test, export or
@@ -377,6 +386,9 @@ pub enum PathEditError {
     /// segment) and did not get them.
     #[error("the given anchors are not an adjacent segment on this path")]
     NotAnAdjacentSegment,
+    /// This edit needs explicit conversion of editable curves or variable strokes.
+    #[error("convert editable curves to Bézier paths and variable strokes to outlines first")]
+    NeedsConversion,
     /// `Document::join_endpoints` refused: the two given anchors are not
     /// each the first-or-last anchor of an open path, are the same
     /// anchor, or (for two ends of the same path) that path has only two

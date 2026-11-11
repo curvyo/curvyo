@@ -74,7 +74,7 @@ fn undo_last(d: &Document) {
 /// The drawn outline's bounds of any object.
 fn bounds(d: &Document, id: NodeId) -> (Point, Point) {
     let path = match d.object(id).unwrap() {
-        ObjectSnapshot::Clone(clone) => clone.resolved,
+        ObjectSnapshot::Clone(clone) => *clone.resolved,
         ObjectSnapshot::Path(path) => path,
         ObjectSnapshot::Sketch(sketch) => sketch.resolved,
         other => panic!("no outline: {other:?}"),
@@ -363,10 +363,11 @@ fn read_golden() -> Vec<u8> {
 fn the_sketch_pages_golden_reads_back_every_page_sketch_clone_and_path_identical() {
     let expected = golden_document();
     let bytes = read_golden();
-    // `0099` made no bump (criterion 19); `0100` bumps to 38, `0101` to 39, and the v37 golden
+    // `0099` made no bump (criterion 19); `0100` bumps to 38, `0101` to 39, `0110` to 42, and the v37 golden
     // still opens.
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 41);
+    // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
+    assert_eq!(CURRENT_FORMAT_VERSION, 42);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.pages(), expected.pages());
     let kinds: Vec<_> = opened.pages().iter().map(|p| p.kind.clone()).collect();

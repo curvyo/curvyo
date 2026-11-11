@@ -236,6 +236,9 @@ pub(crate) fn glyph_path(
         style: glyph_style(text),
         anchors: first.anchors,
         extra_subpaths: outlines.collect(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation,
     }
 }

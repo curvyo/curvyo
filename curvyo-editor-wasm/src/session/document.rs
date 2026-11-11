@@ -8,8 +8,8 @@
 
 use curvyo_document_core::{DisplayUnit, DocumentSize, DocumentSizeError, Length};
 use curvyo_ui_core::{
-    content_bounds, content_too_large_message, document_side_message, format_cursor,
-    format_field_length, format_size, parse_document_side,
+    content_too_large_message, document_side_message, format_cursor, format_field_length,
+    format_size, parse_document_side,
 };
 
 use super::Session;
@@ -145,7 +145,25 @@ impl Session {
             if this.document.pages().len() > 1 {
                 return this.fit_active_page();
             }
-            let Some(bounds) = content_bounds(&this.document) else {
+            let read = this.document_read();
+            let mut bounds: Option<(curvyo_document_core::Point, curvyo_document_core::Point)> =
+                None;
+            for object in read
+                .visible
+                .iter()
+                .filter(|object| !read.guides.contains(&object.id()))
+            {
+                let Some((a, b)) = this.page_fit_bounds(object) else {
+                    return FitOutcome::Blocked;
+                };
+                bounds = Some(bounds.map_or((a, b), |(lo, hi)| {
+                    (
+                        curvyo_document_core::Point::new(lo.x.min(a.x), lo.y.min(a.y)),
+                        curvyo_document_core::Point::new(hi.x.max(b.x), hi.y.max(b.y)),
+                    )
+                }));
+            }
+            let Some(bounds) = bounds else {
                 return FitOutcome::Empty;
             };
             match this.document.fit_to_content(bounds) {
@@ -226,16 +244,16 @@ mod tests {
         assert_eq!(session.panel_content(), PanelContent::Document);
     }
 
-    /// Criterion 14a: an unfinished Pen path empties the panel.
+    /// An unfinished Pen path leaves the Document panel visible.
     #[test]
-    fn an_unfinished_pen_path_empties_the_panel() {
+    fn an_unfinished_pen_path_keeps_the_document_panel() {
         let mut session = Session::new(1);
         session.set_tool(super::super::Tool::Pen);
         for point in [Point::new(10.0, 10.0), Point::new(50.0, 40.0)] {
             session.pointer_down(point, false);
             session.pointer_up(point, false, false);
         }
-        assert_eq!(session.panel_content(), PanelContent::Empty);
+        assert_eq!(session.panel_content(), PanelContent::Document);
         session.finish_pen();
         assert_eq!(session.panel_content(), PanelContent::Document);
     }

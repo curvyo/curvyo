@@ -402,14 +402,14 @@ fn c10_switching_to_the_pen_with_a_selection_is_an_edge_to_empty() {
 }
 
 #[test]
-fn c10_an_unfinished_pen_path_empties_the_body_and_keeps_the_strip() {
+fn c10_an_unfinished_pen_path_keeps_the_document_and_strip() {
     let mut s = session_with_rect();
     s.set_tool(Tool::Pen);
     click(&mut s, 200.0, 200.0);
     click(&mut s, 260.0, 200.0);
     assert!(s.pen_in_progress().is_some(), "an unfinished path");
     let v = s.panel_view();
-    assert_eq!(v.content, PanelContent::Empty);
+    assert_eq!(v.content, PanelContent::Document);
     assert_eq!(v.tabs.len(), 9, "the strip stays");
     assert_eq!(active(&v), "document");
     // A press on a tab sets the active tab.
@@ -418,7 +418,7 @@ fn c10_an_unfinished_pen_path_empties_the_body_and_keeps_the_strip() {
         "dimmed: scope is empty in the Pen"
     );
     assert!(s.press_panel_tab("document"));
-    assert_eq!(s.panel_view().content, PanelContent::Empty);
+    assert_eq!(s.panel_view().content, PanelContent::Document);
     // The panel (and Document) comes back after the path is finished.
     s.finish_pen();
     assert!(s.pen_in_progress().is_none());
@@ -435,7 +435,7 @@ fn c10_a_selection_then_pen_then_unfinished_path_keeps_the_rule_pure() {
     s.set_tool(Tool::Pen);
     click(&mut s, 300.0, 300.0);
     let v = s.panel_view();
-    assert_eq!(v.content, PanelContent::Empty);
+    assert_eq!(v.content, PanelContent::Document);
     assert_eq!(active(&v), "document");
     s.escape(); // cancels the path
     assert!(s.pen_in_progress().is_none());
@@ -590,8 +590,8 @@ fn rapid_random_sequences_keep_the_strip_consistent_and_never_panic() {
                     assert_ne!(active(&v), "style", "seed {seed} step {step}");
                     assert_ne!(v.content, PanelContent::Style, "seed {seed} step {step}");
                 }
-                if v.content == PanelContent::Document {
-                    assert!(s.pen_in_progress().is_none(), "seed {seed} step {step}");
+                if s.pen_in_progress().is_some() && active(&v) == "document" {
+                    assert_eq!(v.content, PanelContent::Document, "seed {seed} step {step}");
                 }
             }
         }

@@ -101,3 +101,9 @@ test("results that are no refusal have no refusal text, and only some outline ob
   assert.equal(refusalOutlinesObjects(result("no_area", 1, 2)), true);
   assert.equal(refusalOutlinesObjects(result("empty")), false);
 });
+
+test("extended paths explain why the operation was refused", () => {
+  const refusal = result("extended_path", 1, 2);
+  assert.match(refusalText("union", refusal) ?? "", /convert.*Bézier.*variable strokes/i);
+  assert.equal(refusalOutlinesObjects(refusal), true);
+});

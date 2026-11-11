@@ -357,3 +357,25 @@ fn a_refused_clip_shows_its_muted_notice() {
         "2 shapes cross the mask edge unclipped."
     );
 }
+
+#[test]
+fn unsupported_mask_stops_single_trace_before_output() {
+    use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
+    let (mut session, image, _) = masked();
+    // A Spiro through one point has no curve: it cannot be a mask.
+    let nodes = [
+        NewAnchor::corner(AnchorId::new(180, 1), Point::new(5., 5.)),
+        NewAnchor::corner(AnchorId::new(180, 2), Point::new(5., 5.)),
+        NewAnchor::corner(AnchorId::new(180, 3), Point::new(5., 5.)),
+    ];
+    let bad = session
+        .document
+        .create_editable_curve(&nodes, true, CurveKind::Spiro)
+        .unwrap();
+    session.set_tool(Tool::Trace);
+    session.selection.set(&[image, bad]);
+    assert!(session.trace_view().mask_failed);
+    assert!(session.trace_source(image, false).is_none());
+    assert!(!session.set_trace_result(image, &[0.; 7]));
+    assert_eq!(session.create_traced_paths(), TraceCreateOutcome::Ignored);
+}

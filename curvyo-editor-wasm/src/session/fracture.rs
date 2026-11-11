@@ -78,7 +78,8 @@ impl Session {
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
                         StackRefusal::Operands(
-                            BooleanRefusal::NoArea { offenders, .. }
+                            BooleanRefusal::ExtendedPath { offenders, .. }
+                            | BooleanRefusal::NoArea { offenders, .. }
                             | BooleanRefusal::OutOfRange { offenders, .. }
                             | BooleanRefusal::Groups { offenders }
                             | BooleanRefusal::Texts(curvyo_ui_core::TextRefusal {

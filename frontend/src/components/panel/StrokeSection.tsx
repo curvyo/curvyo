@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { ColourBlock } from "@/components/panel/ColourBlock";
 import { ColourPicker } from "@/components/panel/ColourPicker";
 import { DashRows } from "@/components/panel/DashRows";
+import { EntryField } from "@/components/panel/EntryField";
 import { MarkerRows } from "@/components/panel/MarkerRows";
 import { PaintRow } from "@/components/panel/PaintRow";
 import { StyleRow } from "@/components/panel/StyleRow";
@@ -12,9 +13,24 @@ import { CAP_OPTIONS, JOIN_OPTIONS, PAINT_OPTIONS } from "@/components/panel/sty
 import { ValueField } from "@/components/panel/ValueField";
 import { useRowsFocus } from "@/components/panel/useRowsFocus";
 import { ToggleGroup } from "@/components/ui/toggle-group";
+import { Tooltip } from "@/components/ui/tooltip";
+import { WIDTH_PRESETS, WIDTH_PRESET_GLYPHS } from "@/lib/widthPresets";
 import type { StylePanelApi } from "@/hooks/useStylePanel";
 
+/** The segmented-control look of `ToggleGroup` for the width rows' command buttons. */
+const SEGMENTS =
+  "inline-flex w-fit shrink-0 self-start overflow-hidden rounded-[5px] border border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]";
+const SEGMENT =
+  "flex h-7 items-center justify-center bg-transparent text-[var(--toolbar-icon)] outline-none hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] aria-pressed:!bg-[var(--toolbar-icon-active-bg)] aria-pressed:!text-[var(--toolbar-icon-active-fg)]";
+const SEGMENT_DIVIDER = "border-l border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)]";
+
 const WIDTH_MESSAGES = { width: "Enter a number from 0 to 1000" } as const;
+const POINT_WIDTH_MESSAGES = { width: "Enter a width of 0 mm or more" } as const;
+
+/** A point width as the field shows it: up to three decimals, no trailing zeros. */
+function formatPointWidth(mm: number): string {
+  return String(Number(mm.toFixed(3)));
+}
 const PERCENT_MESSAGES = { percent: "Enter a number from 0 to 100" } as const;
 
 interface StrokeSectionProps {
@@ -116,6 +132,65 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
             onSubmit={(text) => panel.setText("stroke-width", text)}
             onReturnFocus={onReturnFocus}
           />
+          <StyleRow label="Profile">
+            {/* The segmented look; the preset the path has is marked (UX review U9). */}
+            <div role="group" aria-label="Width profile" className={SEGMENTS}>
+              {WIDTH_PRESETS.map((preset, index) => (
+                <Tooltip key={preset.code} content={preset.tooltip} side="bottom">
+                  <button
+                    type="button"
+                    aria-label={preset.label}
+                    aria-pressed={panel.widthPreset === preset.code}
+                    className={`${SEGMENT} w-9 ${index > 0 ? SEGMENT_DIVIDER : ""}`}
+                    onClick={() => {
+                      panel.applyWidthPreset(preset.code);
+                      onReturnFocus();
+                    }}
+                  >
+                    <svg width={18} height={18} viewBox="0 0 24 24" aria-hidden="true">
+                      <path d={WIDTH_PRESET_GLYPHS[preset.code]} fill="currentColor" />
+                    </svg>
+                  </button>
+                </Tooltip>
+              ))}
+            </div>
+          </StyleRow>
+          <StyleRow label="Edit">
+            {/* One Done only, in the canvas bar: here the button stays "Edit width", pressed
+             * while the mode is on (UX review U4, U9). */}
+            <div className={SEGMENTS}>
+              <button
+                type="button"
+                aria-pressed={panel.widthEditActive}
+                className={`${SEGMENT} px-3 text-xs whitespace-nowrap`}
+                onClick={() => {
+                  if (panel.widthEditActive) {
+                    panel.endWidthEdit();
+                  } else {
+                    panel.beginWidthEdit();
+                  }
+                  onReturnFocus();
+                }}
+              >
+                Edit width
+              </button>
+            </div>
+          </StyleRow>
+          {panel.widthEditActive && panel.widthPointMm !== null ? (
+            <StyleRow label="Point">
+              <EntryField
+                label="Width at the selected point, millimetres"
+                shown={formatPointWidth(panel.widthPointMm)}
+                mixed={false}
+                suffix="mm"
+                width={96}
+                inputMode="decimal"
+                onSubmit={panel.setWidthPointMm}
+                messages={POINT_WIDTH_MESSAGES}
+                onReturnFocus={onReturnFocus}
+              />
+            </StyleRow>
+          ) : null}
           <DashRows panel={panel} onReturnFocus={onReturnFocus} />
           <StyleRow label="Join">
             <ToggleGroup

@@ -30,6 +30,9 @@ pub(super) fn box_path(id: NodeId, corners: &[Point]) -> PathSnapshot {
             .map(|(i, p)| NewAnchor::corner(AnchorId::new(0, i as u64), *p))
             .collect(),
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: curvyo_document_core::Angle::from_radians(0.0),
     }
 }

@@ -44,6 +44,9 @@ impl From<CutOutcome> for CutResultView {
             CutOutcome::Ignored => view("ignored", 0, 0, 0),
             CutOutcome::Applied { paths, pieces } => view("applied", paths, paths, pieces),
             CutOutcome::Refused(refusal) => match refusal {
+                CutRefusal::ExtendedPath { offenders, of } => {
+                    view("extended_path", offenders.len(), of, 0)
+                }
                 CutRefusal::NoneSelected => view("none_selected", 0, 0, 0),
                 CutRefusal::Groups { offenders } => {
                     view("groups", offenders.len(), offenders.len(), 0)

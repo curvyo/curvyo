@@ -144,6 +144,9 @@ impl Document {
     /// Resolves and checks one growth without writing anything.
     fn plan_growth(&self, growth: &PathGrowth, close: bool) -> Result<Plan, PathEditError> {
         let survivor = self.path(growth.path).ok_or(PathEditError::NoSuchPath)?;
+        if !survivor.curve_kind.is_bezier() || !survivor.width_points.is_empty() {
+            return Err(PathEditError::NeedsConversion);
+        }
         let (outline, grown) = open_outline_at(&survivor, growth.end, growth.at)?;
         let absorbed_snapshot = match growth.absorb {
             Some((other, end, at)) => {
@@ -151,6 +154,9 @@ impl Document {
                     return Err(PathEditError::NotExtendable);
                 }
                 let snapshot = self.path(other).ok_or(PathEditError::NoSuchPath)?;
+                if !snapshot.curve_kind.is_bezier() || !snapshot.width_points.is_empty() {
+                    return Err(PathEditError::NeedsConversion);
+                }
                 let outline = outline_number(&snapshot, end, at)?;
                 Some((other, end, snapshot, outline))
             }

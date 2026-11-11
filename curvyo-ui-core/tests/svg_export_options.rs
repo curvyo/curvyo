@@ -110,7 +110,8 @@ fn export_with(
             active_page,
         },
         options,
-    );
+    )
+    .unwrap();
     let text = curvyo_svg_core::write_svg(&outcome.svg);
     (outcome, text)
 }

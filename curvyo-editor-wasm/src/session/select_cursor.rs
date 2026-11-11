@@ -5,7 +5,7 @@
 
 use curvyo_document_core::{Angle, ObjectSnapshot};
 use curvyo_ui_core::{
-    EditHandle, ParamHandle, PressTarget, classify_press, is_corner, oriented_bounds,
+    EditHandle, ParamHandle, PressTarget, classify_press_with_artwork, is_corner,
     resize_cursor_angle_degrees, skew_cursor_angle_degrees,
 };
 
@@ -106,7 +106,8 @@ impl Session {
             [only] => objects
                 .iter()
                 .find(|o| o.id() == *only)
-                .map_or(Angle::from_radians(0.0), |o| oriented_bounds(o).angle),
+                .and_then(|o| self.cached_oriented_bounds(o))
+                .map_or(Angle::from_radians(0.0), |bounds| bounds.angle),
             _ => Angle::from_radians(0.0),
         };
         match self.select_cursor_handle(&objects) {
@@ -139,7 +140,7 @@ impl Session {
         if self.select.drag_in_flight() {
             return "default";
         }
-        match classify_press(
+        match classify_press_with_artwork(
             objects,
             &self.pickable_objects(),
             &self.selection,
@@ -147,6 +148,7 @@ impl Session {
             self.object_tolerance(),
             self.transform_handle_tolerances(),
             self.held,
+            &|path| self.width_artwork(path),
         ) {
             PressTarget::InsideSelectedBox => "move",
             // The 8 px band around the outline of the sole selected object:

@@ -159,7 +159,7 @@ impl Document {
         if crate::shape_codec::read_shape_tag(&meta).is_some() {
             return None;
         }
-        Some(path_codec::read_path_snapshot(id, &meta))
+        path_codec::read_path_snapshot(id, &meta)
     }
 
     /// Moves every named anchor to its new absolute position, one commit

@@ -11,7 +11,7 @@ use curvyo_document_core::{Angle, NodeId, ObjectSnapshot, Point};
 
 use crate::ResizeDirection;
 use crate::conversion::GEOMETRIC_TOLERANCE_MM;
-use crate::object_bounds::object_outline_bounds;
+use crate::object_bounds::object_outline_bounds_with_artwork;
 use crate::oriented_box::OrientedBox;
 use crate::transform_handle_layout::{
     ALL_EIGHT, EditHandle, HandleSpec, TransformHandleTolerances, at_least,
@@ -43,13 +43,23 @@ impl GroupSelection {
     /// criterion 6).
     #[must_use]
     pub fn from_objects(objects: &[ObjectSnapshot], ids: &[NodeId]) -> Option<Self> {
+        Self::from_objects_with_artwork(objects, ids, &crate::variable_artwork::synchronous_artwork)
+    }
+
+    /// Computes a group box using cached variable-stroke artwork.
+    #[must_use]
+    pub fn from_objects_with_artwork(
+        objects: &[ObjectSnapshot],
+        ids: &[NodeId],
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> Option<Self> {
         let wanted: HashSet<NodeId> = ids.iter().copied().collect();
         let mut members = objects.iter().filter(|o| wanted.contains(&o.id()));
         let first = members.next()?;
-        let (mut min, mut max) = object_outline_bounds(first);
+        let (mut min, mut max) = object_outline_bounds_with_artwork(first, artwork)?;
         let mut count = 1;
         for object in members {
-            let (low, high) = object_outline_bounds(object);
+            let (low, high) = object_outline_bounds_with_artwork(object, artwork)?;
             min = Point::new(min.x.min(low.x), min.y.min(low.y));
             max = Point::new(max.x.max(high.x), max.y.max(high.y));
             count += 1;

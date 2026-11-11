@@ -92,6 +92,9 @@ pub fn primitive_as_path(
         style: primitive.style.clone(),
         anchors,
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: ObjectSnapshot::Primitive(primitive.clone()).orientation(),
     }
 }

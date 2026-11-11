@@ -26,6 +26,7 @@ pub(crate) struct Parts<'t, 'a> {
     document: &'t Document,
     fonts: &'t ImportFaces<'t>,
     options: SvgExportOptions,
+    artwork: &'t crate::VariableArtworkLookup<'t>,
     t: Affine,
     /// Per node: a leaf that is written.
     written: Vec<bool>,
@@ -47,6 +48,7 @@ impl<'t, 'a> Parts<'t, 'a> {
         options: SvgExportOptions,
         t: Affine,
         in_scope: &[bool],
+        artwork: &'t crate::VariableArtworkLookup<'t>,
     ) -> Self {
         let written: Vec<bool> = in_scope
             .iter()
@@ -70,6 +72,7 @@ impl<'t, 'a> Parts<'t, 'a> {
             document,
             fonts,
             options,
+            artwork,
             t,
             written,
             keys,
@@ -266,6 +269,39 @@ impl<'t, 'a> Parts<'t, 'a> {
     /// A path, primitive or clone, split into its fill and its stroke outline under Strokes as
     /// paths (criterion 146).
     fn shape(&self, object: &ObjectSnapshot, state: ExportState) -> Option<ExportNode> {
+        if let Some(path) = object
+            .drawn_path()
+            .filter(|path| !path.width_points.is_empty())
+        {
+            let artwork = (self.artwork)(path)?;
+            let (fill, outline) = artwork.as_ref();
+            let mut children = Vec::new();
+            if let Some(node) =
+                self.shape(&ObjectSnapshot::Path(fill.clone()), ExportState::default())
+            {
+                children.push(node);
+            }
+            if let Some(outline) = outline
+                && let Some(node) = self.shape(
+                    &ObjectSnapshot::Path(outline.clone()),
+                    ExportState::default(),
+                )
+            {
+                children.push(node);
+            }
+            return Some(ExportNode::Group {
+                state,
+                layer: false,
+                children,
+            });
+        }
+        if object
+            .drawn_path()
+            .is_some_and(|path| path.curve_kind != curvyo_document_core::CurveKind::Bezier)
+        {
+            let evaluated = crate::evaluate_object(object).ok()?;
+            return self.shape(&evaluated, state);
+        }
         if let Some(pieces) = crate::svg_export_pattern::pattern_pieces_node(object, self.t) {
             let region = self.plain_shape(object, ExportState::default())?;
             return Some(ExportNode::Group {

@@ -441,6 +441,21 @@ pub fn stroke_or_radius_factor(sx: f64, sy: f64) -> f64 {
     (sx * sy).abs().sqrt()
 }
 
+/// The relative difference of `|sx|` and `|sy|` up to which a resize counts as even.
+const EVEN_SCALE_TOLERANCE: f64 = 1e-9;
+
+/// The shear factor up to which a typed skew counts as none.
+pub(crate) const SHEAR_TOLERANCE: f64 = 1e-9;
+
+/// Whether a resize with per-axis factors `sx`/`sy` scales the two axes by different amounts
+/// (a mirror alone is even): such a resize cannot keep a variable-width stroke's look
+/// (ADR 0053, "Width points are geometry").
+#[must_use]
+pub fn scales_unevenly(sx: f64, sy: f64) -> bool {
+    let (x, y) = (sx.abs(), sy.abs());
+    (x - y).abs() > EVEN_SCALE_TOLERANCE * x.max(y)
+}
+
 /// The handle opposite `grabbed` across the box center: corner to opposite
 /// corner, side to opposite side (criterion 13). Taken in the box's own
 /// (rotated) frame.

@@ -12,7 +12,10 @@ use std::collections::HashMap;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Page, PageContents, PageKind, Point};
 
-use crate::{Units, object_outline_bounds};
+use crate::{
+    Units, VariableArtworkLookup, object_bounds::object_outline_bounds_with_artwork,
+    object_outline_bounds,
+};
 
 /// How far an object's bounds must reach onto a frame to count, per consumer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -177,6 +180,36 @@ pub fn page_contents(
     membership: &PageMembership,
     leaves: &[ObjectSnapshot],
 ) -> PageContents {
+    contents_by(document, pages, membership, leaves, &mut |leaf| {
+        Some(object_outline_bounds(leaf))
+    })
+    .unwrap_or_default()
+}
+
+/// [`page_contents`] measuring a variable-width stroke by the box of its visible outline from
+/// `artwork`; `None` while `artwork` has no outline for one of them.
+#[must_use]
+pub fn page_contents_with_artwork(
+    document: &Document,
+    pages: &[Page],
+    membership: &PageMembership,
+    leaves: &[ObjectSnapshot],
+    artwork: &VariableArtworkLookup<'_>,
+) -> Option<PageContents> {
+    contents_by(document, pages, membership, leaves, &mut |leaf| {
+        object_outline_bounds_with_artwork(leaf, artwork)
+    })
+}
+
+/// The ownership read behind [`page_contents`], with each leaf's box from `bounds`; `None` as soon
+/// as `bounds` has none for a leaf.
+fn contents_by(
+    document: &Document,
+    pages: &[Page],
+    membership: &PageMembership,
+    leaves: &[ObjectSnapshot],
+    bounds: &mut dyn FnMut(&ObjectSnapshot) -> Option<(Point, Point)>,
+) -> Option<PageContents> {
     let units = Units::build(document, None);
     let mut order: Vec<NodeId> = Vec::new();
     let mut boxes: HashMap<NodeId, ((Point, Point), Vec<NodeId>)> = HashMap::new();
@@ -190,7 +223,7 @@ pub fn page_contents(
         } else {
             units.unit_of(id)
         };
-        let (min, max) = object_outline_bounds(leaf);
+        let (min, max) = bounds(leaf)?;
         let entry = boxes.entry(unit).or_insert_with(|| {
             order.push(unit);
             ((min, max), Vec::new())
@@ -210,7 +243,7 @@ pub fn page_contents(
             contents.entry(page.id.clone()).or_default().extend(ids);
         }
     }
-    contents
+    Some(contents)
 }
 
 #[cfg(test)]

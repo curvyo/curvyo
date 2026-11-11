@@ -11,8 +11,8 @@ use curvyo_document_core::{Angle, DocumentVersion, NodeId, Point};
 use curvyo_ui_core::{
     CORNER_SIGNS, HANDLE_HIT_RADIUS_PX, Modifiers, ObjectSelection, OffsetDirection, OffsetJoin,
     OffsetPlan, OffsetRefusal, OffsetRequest, OffsetResultChoice, OffsetSide, OffsetSides,
-    OffsetValues, OrientedBox, PressTarget, classify_press, drag_distance, handle_positions,
-    hit_test_objects, next_offset_join, offset_box, offset_operands, plan_offset, snap_distance,
+    OffsetValues, OrientedBox, PressTarget, classify_press_with_artwork, drag_distance,
+    handle_positions, next_offset_join, offset_box, offset_operands, plan_offset, snap_distance,
 };
 
 use super::refusal::RefusalMarks;
@@ -261,7 +261,20 @@ impl Session {
         // An object out of context is no operand (`specs/0106` criterion 10).
         let pickable = self.edit_targets();
         let tolerance = self.object_tolerance();
-        if let Some(&hit) = hit_test_objects(&pickable, point, tolerance).first() {
+        let mut nothing = ObjectSelection::new();
+        let modifiers = Modifiers { shift, ..self.held };
+        let handle_tolerances = self.transform_handle_tolerances();
+        let hit = classify_press_with_artwork(
+            &objects,
+            &pickable,
+            &nothing,
+            point,
+            tolerance,
+            handle_tolerances,
+            Modifiers::default(),
+            &|path| self.width_artwork(path),
+        );
+        if let PressTarget::Object(hit) = hit {
             let units = self.units();
             let members = units.leaves_with(&hit);
             if shift {
@@ -271,12 +284,7 @@ impl Session {
             }
             return;
         }
-        // The Select tool's marquee, armed against no selection: its handles are not drawn in
-        // this tool, so they must not catch the press. The release combines with the real one.
-        let mut nothing = ObjectSelection::new();
-        let modifiers = Modifiers { shift, ..self.held };
-        let handle_tolerances = self.transform_handle_tolerances();
-        let target = classify_press(
+        let target = classify_press_with_artwork(
             &objects,
             &pickable,
             &nothing,
@@ -284,15 +292,17 @@ impl Session {
             tolerance,
             handle_tolerances,
             modifiers,
+            &super::width_outlines::memo_lookup(&self.width_outlines),
         );
         if matches!(target, PressTarget::Empty | PressTarget::Lasso) {
-            self.select.pointer_down(
+            self.select.pointer_down_with_artwork(
                 &objects,
                 &mut nothing,
                 point,
                 tolerance,
                 handle_tolerances,
                 modifiers,
+                &super::width_outlines::memo_lookup(&self.width_outlines),
             );
         }
     }
@@ -459,7 +469,8 @@ impl Session {
             }
             Err(refusal) => {
                 self.command_refusal = match &refusal {
-                    OffsetRefusal::OutOfRange { offenders, .. }
+                    OffsetRefusal::ExtendedPath { offenders, .. }
+                    | OffsetRefusal::OutOfRange { offenders, .. }
                     | OffsetRefusal::NoArea { offenders, .. }
                     | OffsetRefusal::Texts(curvyo_ui_core::TextRefusal { offenders, .. }) => {
                         Some(RefusalMarks::new(offenders.clone(), &self.selection))

@@ -531,6 +531,22 @@ pub fn quad_outline(corners: [Point; 4], width_mm: f64, color: RgbaColor) -> Dra
     list
 }
 
+/// The glyph of a node of `kind` on a curve of `curve`: on a Bézier path a square (corner),
+/// diamond (smooth) or triangle (asymmetric); on a Spiro or B-spline a square for a corner and a
+/// circle for a smooth point, which has no handles (`specs/0110` UX notes, review U10).
+pub(crate) fn node_glyph(
+    curve: curvyo_document_core::CurveKind,
+    kind: curvyo_document_core::AnchorKind,
+) -> fn(Point, f64, RgbaColor) -> DrawList {
+    use curvyo_document_core::AnchorKind;
+    match (curve.is_bezier(), kind) {
+        (_, AnchorKind::Corner) => square,
+        (true, AnchorKind::Symmetric) => diamond,
+        (true, AnchorKind::Asymmetric) => triangle,
+        (false, _) => circle,
+    }
+}
+
 /// A filled circle centered at `center`, `diameter_mm` across — a handle
 /// endpoint glyph.
 #[must_use]

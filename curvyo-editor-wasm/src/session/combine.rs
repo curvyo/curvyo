@@ -73,7 +73,8 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
-                        CombineRefusal::OutOfRange { offenders, .. }
+                        CombineRefusal::ExtendedPath { offenders, .. }
+                        | CombineRefusal::OutOfRange { offenders, .. }
                         | CombineRefusal::Groups { offenders }
                         | CombineRefusal::Texts(curvyo_ui_core::TextRefusal {
                             offenders, ..

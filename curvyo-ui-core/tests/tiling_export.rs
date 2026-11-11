@@ -28,7 +28,8 @@ fn export(document: &Document) -> String {
             active_page: 0,
         },
         SvgExportOptions::default(),
-    );
+    )
+    .unwrap();
     curvyo_svg_core::write_svg(&outcome.svg)
 }
 

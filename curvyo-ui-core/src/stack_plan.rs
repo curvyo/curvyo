@@ -66,6 +66,22 @@ impl<'a> Stack<'a> {
         if operands.len() < 2 {
             return Err(StackRefusal::Operands(BooleanRefusal::NeedsTwo));
         }
+        let offenders: Vec<NodeId> = operands
+            .iter()
+            .filter(|object| {
+                object.drawn_path().is_some_and(|path| {
+                    path.curve_kind != curvyo_document_core::CurveKind::Bezier
+                        || !path.width_points.is_empty()
+                })
+            })
+            .map(|object| object.id())
+            .collect();
+        if !offenders.is_empty() {
+            return Err(StackRefusal::Operands(BooleanRefusal::ExtendedPath {
+                offenders,
+                of: operands.len(),
+            }));
+        }
         let owned = operands.iter().map(|object| outlines_of(object)).collect();
         Ok(Self { operands, owned })
     }

@@ -62,6 +62,13 @@ pub(crate) fn is_compound(object: &ObjectSnapshot) -> bool {
 /// Why Combine was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CombineRefusal {
+    /// Editable geometry requires explicit conversion first.
+    ExtendedPath {
+        /// Objects requiring conversion.
+        offenders: Vec<NodeId>,
+        /// Number of selected objects.
+        of: usize,
+    },
     /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
     /// (`specs/0074-text-objects` criteria 24 and 29).
     Texts(crate::text_convert::TextRefusal),
@@ -236,6 +243,22 @@ pub fn plan_combine(
     let converted = crate::text_convert::texts_as_paths(objects);
     let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
+    let offenders: Vec<NodeId> = operands
+        .iter()
+        .filter(|object| {
+            object.drawn_path().is_some_and(|path| {
+                path.curve_kind != curvyo_document_core::CurveKind::Bezier
+                    || !path.width_points.is_empty()
+            })
+        })
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(CombineRefusal::ExtendedPath {
+            offenders,
+            of: operands.len(),
+        });
+    }
     let of = operands.len();
     if of < 2 {
         return Err(CombineRefusal::NeedsTwo);

@@ -54,6 +54,9 @@ impl From<SplitOutcome> for SplitResultView {
                 with_holes,
                 left_alone,
             } => view("applied", compounds, pieces, with_holes, left_alone),
+            SplitOutcome::Refused(SplitRefusal::ExtendedPath { offenders }) => {
+                view("extended_path", offenders.len(), 0, false, 0)
+            }
             SplitOutcome::Refused(SplitRefusal::NoCompound) => view("no_compound", 0, 0, false, 0),
             SplitOutcome::Refused(SplitRefusal::Texts(texts)) => Self {
                 of: count(texts.offenders.len()),
@@ -114,6 +117,9 @@ impl From<BreakApartOutcome> for BreakApartResultView {
                 single_nodes_removed: count(single_nodes_removed),
                 ..view("applied", compounds, pieces, with_holes)
             },
+            BreakApartOutcome::Refused(BreakApartRefusal::ExtendedPath { offenders }) => {
+                view("extended_path", offenders.len(), 0, false)
+            }
             BreakApartOutcome::Refused(BreakApartRefusal::NoCompound) => {
                 view("no_compound", 0, 0, false)
             }

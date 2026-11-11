@@ -67,7 +67,7 @@ fn ring(document: &Document, seed: u64, first: u64) -> NodeId {
 fn shown(document: &Document, node: NodeId) -> Option<PathSnapshot> {
     match document.read_objects().get(node)? {
         ObjectSnapshot::Path(p) => Some(p.clone()),
-        ObjectSnapshot::Clone(c) => Some(c.resolved.clone()),
+        ObjectSnapshot::Clone(c) => Some((*c.resolved).clone()),
         _ => None,
     }
 }

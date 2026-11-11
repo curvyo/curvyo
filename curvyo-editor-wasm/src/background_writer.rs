@@ -16,6 +16,10 @@ pub const WRITE_INTERVAL_MS: u64 = 5_000;
 /// Why a file was not written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WriteError {
+    /// Width profile data cannot yet be sent to older collaboration peers.
+    UnsupportedDocument,
+    /// A queued record could not be imported without losing or changing data.
+    RejectedRecord,
     /// The file is no container this build opens.
     Unreadable,
     /// The document could not be packed again.
@@ -25,6 +29,10 @@ pub enum WriteError {
 impl core::fmt::Display for WriteError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
+            Self::UnsupportedDocument => {
+                "documents with editable curves or width profiles cannot be shared yet"
+            }
+            Self::RejectedRecord => "a workspace update could not be read; it remains queued",
             Self::Unreadable => "the document file cannot be read",
             Self::Pack => "the document could not be written",
         })
@@ -163,7 +171,8 @@ impl BackgroundWriter {
     ) -> Result<Written, WriteError> {
         let queue = self.queues.entry(document).or_default();
         queue.asked = false;
-        let records = std::mem::take(&mut queue.records);
+        let mut records = std::mem::take(&mut queue.records);
+        records.sort_by_key(|record| record.seq);
         let Some(through) = records.iter().map(|r| r.seq).max() else {
             return Ok(Written {
                 bytes: bytes.to_vec(),
@@ -209,8 +218,11 @@ impl BackgroundWriter {
         let mut records = queue.records.clone();
         records.sort_by_key(|r| r.seq);
         let through = records.iter().map(|r| r.seq).max().unwrap_or(0);
-        let built = start_document(self.peer, &records).ok_or(WriteError::Unreadable)?;
-        import_records(self.peer, &built, &records);
+        let built = start_document(self.peer, &records)?.ok_or(WriteError::Unreadable)?;
+        import_records(self.peer, &built, &records)?;
+        if built.has_extended_path_history() {
+            return Err(WriteError::UnsupportedDocument);
+        }
         built.set_workspace_share(Some(WorkspaceShareRecord {
             workspace,
             document,
@@ -239,8 +251,8 @@ impl BackgroundWriter {
 }
 
 /// The file `bytes` of the document `(workspace, document)` with `records` imported, and the
-/// file's own changes the room lacks. A record that does not import is skipped (the room's
-/// next snapshot carries the document whole). Without a `workspace` (a file of no workspace
+/// file's own changes the room lacks. An unreadable record leaves the whole queue pending.
+/// Without a `workspace` (a file of no workspace
 /// record) the file is only merged.
 ///
 /// The file's record says what the room has: its `synced_version`, or, for a file without a
@@ -254,8 +266,11 @@ fn apply(
     records: &[Waiting],
 ) -> Result<(Vec<u8>, Option<Vec<u8>>), WriteError> {
     let file = unpack(peer, bytes).map_err(|_| WriteError::Unreadable)?;
+    if workspace.is_some() && file.has_extended_path_history() {
+        return Err(WriteError::UnsupportedDocument);
+    }
     let Some(workspace) = workspace else {
-        import_records(peer, &file, records);
+        import_records(peer, &file, records)?;
         return Ok((
             pack(&file, APP_VERSION).map_err(|_| WriteError::Pack)?,
             None,
@@ -273,12 +288,15 @@ fn apply(
         }
         _ => None,
     };
-    import_records(peer, &file, records);
+    import_records(peer, &file, records)?;
+    if file.has_extended_path_history() {
+        return Err(WriteError::UnsupportedDocument);
+    }
     let (synced, outgoing) = match (record, own) {
         (Some(_), Some((synced, updates))) => (synced, Some(updates)),
         (Some(_), None) => (file.version(), None),
         (None, _) => {
-            let room = room_version(peer, records);
+            let room = room_version(peer, records)?;
             if file.version() == room {
                 (room, None)
             } else {
@@ -298,49 +316,67 @@ fn apply(
 
 /// The version the records alone build: what the room holds of the document, as far as these
 /// records show it ([`DocumentVersion::never`] when they start none).
-fn room_version(peer: u64, records: &[Waiting]) -> DocumentVersion {
+fn room_version(peer: u64, records: &[Waiting]) -> Result<DocumentVersion, WriteError> {
     let mut sorted = records.to_vec();
     sorted.sort_by_key(|r| r.seq);
-    start_document(peer.wrapping_add(2), &sorted).map_or_else(DocumentVersion::never, |room| {
-        import_records(peer.wrapping_add(2), &room, &sorted);
-        room.version()
-    })
+    let Some(room) = start_document(peer.wrapping_add(2), &sorted)? else {
+        return Ok(DocumentVersion::never());
+    };
+    import_records(peer.wrapping_add(2), &room, &sorted)?;
+    Ok(room.version())
 }
 
 /// The document the first container among `records`, else the first update, starts.
-fn start_document(peer: u64, records: &[Waiting]) -> Option<Document> {
+fn start_document(peer: u64, records: &[Waiting]) -> Result<Option<Document>, WriteError> {
     if let Some(container) = records.iter().find(|r| r.kind == BackgroundKind::Container) {
-        return unpack(peer, &container.bytes).ok();
+        return unpack(peer, &container.bytes)
+            .map(Some)
+            .map_err(|_| WriteError::RejectedRecord);
     }
-    let first = records.iter().find(|r| r.kind == BackgroundKind::Update)?;
-    Document::from_updates(peer, &first.bytes).ok()
+    let Some(first) = records.iter().find(|r| r.kind == BackgroundKind::Update) else {
+        return Ok(None);
+    };
+    match Document::from_updates(peer, &first.bytes) {
+        Ok(document) => Ok(Some(document)),
+        Err(curvyo_document_core::SyncError::Pending) => Ok(None),
+        Err(_) => Err(WriteError::RejectedRecord),
+    }
 }
 
-/// Imports `records` into `document`; one that does not import is skipped.
-fn import_records(peer: u64, document: &Document, records: &[Waiting]) {
+/// Imports every record, refusing the batch if any record cannot be imported.
+fn import_records(peer: u64, document: &Document, records: &[Waiting]) -> Result<(), WriteError> {
     for record in records {
         match record.kind {
             BackgroundKind::Update => {
-                let _ = document.import_updates(&record.bytes);
+                document
+                    .import_updates(&record.bytes)
+                    .map_err(|_| WriteError::RejectedRecord)?;
             }
             BackgroundKind::Asset => {
-                let _ = document.insert_asset(&record.bytes);
+                document
+                    .insert_asset(&record.bytes)
+                    .map_err(|_| WriteError::RejectedRecord)?;
             }
             BackgroundKind::Container => {
-                let Ok(received) = unpack(peer.wrapping_add(1), &record.bytes) else {
-                    continue;
-                };
+                let received = unpack(peer.wrapping_add(1), &record.bytes)
+                    .map_err(|_| WriteError::RejectedRecord)?;
                 for hash in image_assets(&received) {
                     if let Some(picture) = received.asset(&hash) {
-                        let _ = document.insert_asset(&picture);
+                        document
+                            .insert_asset(&picture)
+                            .map_err(|_| WriteError::RejectedRecord)?;
                     }
                 }
-                if let Ok(all) = received.export_updates(&DocumentVersion::never()) {
-                    let _ = document.import_updates(&all);
-                }
+                let all = received
+                    .export_updates(&DocumentVersion::never())
+                    .map_err(|_| WriteError::RejectedRecord)?;
+                document
+                    .import_updates(&all)
+                    .map_err(|_| WriteError::RejectedRecord)?;
             }
         }
     }
+    Ok(())
 }
 
 /// The assets the images of `document` show.
@@ -383,6 +419,208 @@ mod tests {
         let before = document.version();
         rect(&document, 10.0);
         (file, document.export_updates(&before).unwrap())
+    }
+
+    #[test]
+    fn a_profiled_file_cannot_emit_background_updates() {
+        use curvyo_document_core::{AnchorId, NewAnchor};
+        let document = Document::new(3);
+        let path = document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(3, 1), Point::new(0.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(3, 2), Point::new(10.0, 0.0)),
+            ],
+            false,
+        );
+        document
+            .set_width_point(path, AnchorId::new(3, 3), 0.5, 2.0)
+            .unwrap();
+        let bytes = pack(&document, "test").unwrap();
+        assert!(matches!(
+            apply(9, (Some([1; 16]), [2; 16]), &bytes, &[]),
+            Err(WriteError::UnsupportedDocument)
+        ));
+    }
+
+    #[test]
+    fn incoming_extended_history_cannot_be_reexported_by_background_writer() {
+        use curvyo_document_core::{AnchorId, NewAnchor};
+        let document = Document::new(3);
+        let path = document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(3, 1), Point::new(0.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(3, 2), Point::new(10.0, 0.0)),
+            ],
+            false,
+        );
+        let file = pack(&document, "test").unwrap();
+        let before = document.version();
+        document
+            .set_width_point(path, AnchorId::new(3, 3), 0.5, 2.0)
+            .unwrap();
+        let records = [Waiting {
+            seq: 1,
+            kind: BackgroundKind::Update,
+            bytes: document.export_updates(&before).unwrap(),
+        }];
+        assert!(matches!(
+            apply(9, (Some([1; 16]), [2; 16]), &file, &records),
+            Err(WriteError::UnsupportedDocument)
+        ));
+    }
+
+    #[test]
+    fn background_creation_rejects_extended_container_and_retains_record() {
+        use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
+        let document = Document::new(3);
+        document
+            .create_editable_curve(
+                &[
+                    NewAnchor::corner(AnchorId::new(3, 1), Point::new(0.0, 0.0)),
+                    NewAnchor::corner(AnchorId::new(3, 2), Point::new(10.0, 0.0)),
+                ],
+                false,
+                CurveKind::BSpline,
+            )
+            .unwrap();
+        let mut writer = BackgroundWriter::new(9);
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 1,
+                kind: BackgroundKind::Container,
+                bytes: pack(&document, "test").unwrap(),
+            },
+        );
+        assert!(matches!(
+            writer.create([2; 16], [1; 16], 0),
+            Err(WriteError::UnsupportedDocument)
+        ));
+        assert!(!writer.is_idle());
+    }
+
+    #[test]
+    fn future_format_record_preserves_the_whole_background_queue() {
+        use loro::{ExportMode, LoroDoc};
+        let (file, normal_update) = file_and_update();
+        let base = unpack(12, &file).unwrap();
+        let all = base.export_updates(&DocumentVersion::never()).unwrap();
+        let raw = LoroDoc::new();
+        raw.import(&all[4..]).unwrap();
+        let before = raw.oplog_vv();
+        raw.set_peer_id(99).unwrap();
+        raw.get_map("root")
+            .insert(
+                "format_version",
+                i64::from(curvyo_document_core::CURRENT_FORMAT_VERSION) + 1,
+            )
+            .unwrap();
+        raw.commit();
+        let mut update = vec![0, 0, 0, 0];
+        update.extend(raw.export(ExportMode::updates(&before)).unwrap());
+        let mut writer = BackgroundWriter::new(9);
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 1,
+                kind: BackgroundKind::Update,
+                bytes: normal_update,
+            },
+        );
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 2,
+                kind: BackgroundKind::Update,
+                bytes: update.clone(),
+            },
+        );
+        assert!(writer.write_for([2; 16], [1; 16], &file, 0).is_err());
+        assert_eq!(writer.queues.get(&[2; 16]).unwrap().records.len(), 2);
+        assert_eq!(writer.forget([2; 16]), Some(2));
+        let mut writer = BackgroundWriter::new(9);
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 1,
+                kind: BackgroundKind::Container,
+                bytes: file,
+            },
+        );
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 2,
+                kind: BackgroundKind::Update,
+                bytes: update,
+            },
+        );
+        assert_eq!(
+            writer.create([2; 16], [1; 16], 0),
+            Err(WriteError::RejectedRecord)
+        );
+        assert_eq!(writer.queues.get(&[2; 16]).unwrap().records.len(), 2);
+    }
+
+    #[test]
+    fn unreadable_background_snapshot_is_reported_and_retained() {
+        let mut writer = BackgroundWriter::new(9);
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 7,
+                kind: BackgroundKind::Container,
+                bytes: b"invalid".to_vec(),
+            },
+        );
+        assert_eq!(
+            writer.create([2; 16], [1; 16], 0),
+            Err(WriteError::RejectedRecord)
+        );
+        assert_eq!(writer.forget([2; 16]), Some(7));
+    }
+
+    #[test]
+    fn reordered_updates_are_applied_in_sequence() {
+        let document = Document::new(45);
+        let file = pack(&document, "test").unwrap();
+        let before = document.version();
+        rect(&document, 0.0);
+        let first = document.export_updates(&before).unwrap();
+        let after_first = document.version();
+        rect(&document, 10.0);
+        let second = document.export_updates(&after_first).unwrap();
+        let mut writer = BackgroundWriter::new(9);
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 2,
+                kind: BackgroundKind::Update,
+                bytes: second,
+            },
+        );
+        assert_eq!(
+            writer.write_for([2; 16], [1; 16], &file, 0),
+            Err(WriteError::RejectedRecord)
+        );
+        writer.add(
+            [2; 16],
+            Waiting {
+                seq: 1,
+                kind: BackgroundKind::Update,
+                bytes: first,
+            },
+        );
+        let written = writer.write_for([2; 16], [1; 16], &file, 5_000).unwrap();
+        assert_eq!(written.through, 2);
+        assert_eq!(
+            unpack(50, &written.bytes)
+                .unwrap()
+                .read_objects()
+                .objects
+                .len(),
+            2
+        );
     }
 
     /// Criterion 32: a document's records are written into its file, which keeps its

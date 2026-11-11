@@ -165,6 +165,40 @@ impl Session {
         });
     }
 
+    /// Whether exactly one selected object is an editable B-spline.
+    #[must_use]
+    pub fn can_convert_selected_bspline_to_bezier(&self) -> bool {
+        let [id] = self.selection.ids() else {
+            return false;
+        };
+        self.document
+            .path(*id)
+            .is_some_and(|p| p.curve_kind == curvyo_document_core::CurveKind::BSpline)
+            && self.selected_group_leaves().is_empty()
+    }
+
+    /// Converts the selected B-spline to ordinary Bézier controls in one undo step.
+    pub fn convert_selected_bspline_to_bezier(&mut self) -> bool {
+        self.recording(|this| {
+            if !this.can_convert_selected_bspline_to_bezier() {
+                return false;
+            }
+            let id = this.selection.ids()[0];
+            let Some(source) = this.document.path(id) else {
+                return false;
+            };
+            let Ok(mut evaluated) = curvyo_ui_core::evaluate_path(&source) else {
+                return false;
+            };
+            for anchor in &mut evaluated.anchors {
+                anchor.id = this.minter.mint();
+            }
+            this.document
+                .convert_bspline_to_bezier(&source, &evaluated.anchors)
+                .is_ok()
+        })
+    }
+
     /// "Remove rounding" of the Select bar (`unified-object-editing` criterion
     /// 21): zeroes the radius of every selected rectangle that has one, in one
     /// commit; the other objects of the selection are left alone.

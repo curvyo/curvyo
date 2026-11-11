@@ -120,6 +120,7 @@ fn count(n: usize) -> u32 {
 /// The code, blamed count and selected count of a refusal.
 fn refusal_code(refusal: &OffsetRefusal) -> (&'static str, usize, usize) {
     match refusal {
+        OffsetRefusal::ExtendedPath { offenders, of } => ("extended_path", offenders.len(), *of),
         OffsetRefusal::NoOperands => ("no_operands", 0, 0),
         OffsetRefusal::ZeroDistance => ("zero", 0, 0),
         OffsetRefusal::OutOfRange { offenders, of } => ("out_of_range", offenders.len(), *of),

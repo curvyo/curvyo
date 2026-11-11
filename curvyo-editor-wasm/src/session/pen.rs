@@ -54,6 +54,90 @@ impl PenCueState {
 }
 
 impl Session {
+    pub(super) fn curve_pen_blocked(&self) -> bool {
+        matches!(
+            self.pen.mode(),
+            curvyo_ui_core::PenMode::BSpline | curvyo_ui_core::PenMode::Spiro
+        ) && self.document.is_shared()
+    }
+
+    /// Changes Pen drawing mode when no path is being drawn.
+    pub fn set_pen_mode(&mut self, mode: curvyo_ui_core::PenMode) -> bool {
+        let changed = self.pen_mode_refusal(mode).is_none() && self.pen.set_mode(mode);
+        if changed {
+            self.end_spiro_notice();
+        }
+        changed
+    }
+
+    /// Raises the notice of a Spiro without solution when a solve failed since the last call.
+    pub(super) fn note_spiro_failure(&self) {
+        if self.spiro_cache.borrow_mut().take_new_failure() {
+            *self.unsupported_width_notice.borrow_mut() =
+                Some(super::spiro_cache::SPIRO_FAILED_NOTICE.to_owned());
+            self.spiro_notice.set((true, false));
+        }
+    }
+
+    /// Ends the notice of a Spiro without solution, if it is on screen.
+    pub(super) fn end_spiro_notice(&self) {
+        if self.spiro_notice.get().0 {
+            self.spiro_notice.set((false, true));
+        }
+    }
+
+    /// Whether the notice of a Spiro without solution ended since the last call (the path was
+    /// finished or cancelled, or the mode changed): the host takes it off the screen.
+    pub fn take_spiro_notice_end(&self) -> bool {
+        let (shown, ended) = self.spiro_notice.get();
+        self.spiro_notice.set((shown, false));
+        ended
+    }
+
+    /// Whether Enter commits the Pen's Spiro in progress as straight lines: it is drawn so (its
+    /// live curve has no solution) or its placed points have none (UX review of 2026-11-10).
+    fn spiro_finishes_straight(&self) -> bool {
+        self.pen.mode() == curvyo_ui_core::PenMode::Spiro
+            && self.pen.in_progress_nodes().is_some_and(|nodes| {
+                nodes.len() >= 2
+                    && (self.spiro_cache.borrow().preview_failed()
+                        || super::spiro_cache::unsolvable(nodes))
+            })
+    }
+
+    /// Why `mode` cannot be chosen now, the one line beside the Pen bar; `None` when it can.
+    #[must_use]
+    pub fn pen_mode_refusal(&self, mode: curvyo_ui_core::PenMode) -> Option<&'static str> {
+        if self.pen.is_placing() {
+            Some("Finish the path first.")
+        } else if matches!(
+            mode,
+            curvyo_ui_core::PenMode::BSpline | curvyo_ui_core::PenMode::Spiro
+        ) && self.document.is_shared()
+        {
+            Some("Not in a shared document.")
+        } else {
+            None
+        }
+    }
+
+    /// The active Pen drawing mode.
+    #[must_use]
+    pub fn pen_mode(&self) -> curvyo_ui_core::PenMode {
+        self.pen.mode()
+    }
+
+    /// Sets the freehand simplification tolerance in document units.
+    pub fn set_pen_smoothing(&mut self, tolerance: Length) -> bool {
+        self.pen.set_freehand_smoothing(tolerance)
+    }
+
+    /// The freehand simplification tolerance.
+    #[must_use]
+    pub const fn pen_smoothing(&self) -> Length {
+        self.pen.freehand_smoothing()
+    }
+
     pub(super) fn drag_threshold(&self) -> Length {
         Length::from_mm(self.transform_handle_tolerances().drag_threshold_mm)
     }
@@ -62,16 +146,31 @@ impl Session {
     /// (Enter, or a double-click the host has already recognized).
     pub fn finish_pen(&mut self) {
         self.end_snapping_drag();
+        if self.curve_pen_blocked() && self.pen_path_open() {
+            self.notice_blocked_curve();
+            return;
+        }
         // A finish closes an open entry chip without adding (`0072` criterion 22).
         self.cancel_pen_entry();
+        let straight = self.spiro_finishes_straight();
         self.recording_unguarded(|this| {
-            this.pen.finish(&this.document);
+            if !(straight && this.pen.finish_straight(&this.document).is_some()) {
+                this.pen.finish(&this.document);
+            }
         });
+        self.spiro_cache.borrow_mut().clear_preview();
+        self.end_spiro_notice();
     }
 
     /// A Pen release: commits what the press decided, remembers the notice of a join that moved
     /// outlines (`0055` criterion 9), and forgets the press.
     pub(super) fn pen_pointer_up(&mut self, point: Point) {
+        if self.curve_pen_blocked() {
+            self.notice_blocked_curve();
+            self.pen_cue.release();
+            self.pen_cue.snap_press_offset = None;
+            return;
+        }
         let threshold = self.drag_threshold();
         let outcome = self
             .pen
@@ -151,19 +250,20 @@ impl Session {
         }
         let point = self.pointer_position?;
         let radius = self.point_tolerance_as_length();
-        Some(
+        Some(self.pen_mode_target(
             self.with_end_index(|index| {
                 pen_target(&self.pen, index, point, radius, self.held.shift)
             }),
-        )
+        ))
     }
 
     /// A Pen press at `point`: decide the action (`pen_target`), remember it for the cue, and begin
     /// the gesture.
     pub(super) fn pen_pointer_down(&mut self, point: Point, shift: bool) {
         let radius = self.point_tolerance_as_length();
-        let target =
-            self.with_end_index(|index| pen_target(&self.pen, index, point, radius, shift));
+        let target = self.pen_mode_target(
+            self.with_end_index(|index| pen_target(&self.pen, index, point, radius, shift)),
+        );
         let action = match &target {
             PenTarget::Continue(end) => self
                 .paths()
@@ -173,7 +273,13 @@ impl Session {
                     PressAction::Continue(continuation_of(end, path))
                 }),
             PenTarget::Join(end) => PressAction::Join(end.clone()),
-            PenTarget::Close { join, .. } => PressAction::Close(*join),
+            PenTarget::Close { join, .. } => {
+                PressAction::Close(if self.pen.mode() == curvyo_ui_core::PenMode::Lines {
+                    JoinType::Sharp
+                } else {
+                    *join
+                })
+            }
             PenTarget::Place | PenTarget::NewPathAt | PenTarget::PlaceOverEnd => PressAction::Place,
         };
         // The target test ran on the raw pointer; only a placed node is snapped (`0072`
@@ -195,6 +301,19 @@ impl Session {
         };
         self.pen_cue.press = Some(target);
         self.pen.pointer_down_action(point, action);
+    }
+
+    fn pen_mode_target(&self, target: PenTarget) -> PenTarget {
+        match self.pen.mode() {
+            curvyo_ui_core::PenMode::Bezier => target,
+            curvyo_ui_core::PenMode::Freehand => PenTarget::Place,
+            curvyo_ui_core::PenMode::Lines
+            | curvyo_ui_core::PenMode::BSpline
+            | curvyo_ui_core::PenMode::Spiro => match target {
+                PenTarget::Continue(_) | PenTarget::Join(_) => PenTarget::Place,
+                other => other,
+            },
+        }
     }
 
     /// The last node L of the path in progress, `None` before the first node is placed.
@@ -231,6 +350,9 @@ impl Session {
     /// The pointer of a node drag as the handle end: snapped about the new node N while Ctrl is
     /// held, read live (`0072` criterion 3). The node itself never moves.
     pub(super) fn pen_handle_point(&self, pointer: Point, ctrl: bool) -> Point {
+        if self.pen.mode() == curvyo_ui_core::PenMode::Freehand {
+            return pointer;
+        }
         let pointer = pointer.translated(
             self.pen_cue
                 .snap_press_offset
@@ -292,7 +414,9 @@ impl Session {
             Some(PenTarget::Continue(end) | PenTarget::Join(end)) => {
                 cue.target = Some((end.anchor.point, end.anchor.kind));
             }
-            Some(PenTarget::Close { join, .. }) => {
+            Some(PenTarget::Close { join, .. })
+                if self.pen.mode() != curvyo_ui_core::PenMode::Spiro =>
+            {
                 cue.closing = self.pen.closing_preview(join).map(|preview| ClosingCue {
                     from: preview.from,
                     to: preview.to,
@@ -400,6 +524,30 @@ impl Session {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_pen_mode_change_is_refused_with_the_reason_that_applies() {
+        use curvyo_ui_core::PenMode;
+        let mut session = Session::new(5);
+        session.set_tool(super::super::Tool::Pen);
+        assert_eq!(session.pen_mode_refusal(PenMode::Spiro), None);
+        session.pointer_down(Point::new(10.0, 10.0), false);
+        session.pointer_up(Point::new(10.0, 10.0), false, false);
+        assert_eq!(
+            session.pen_mode_refusal(PenMode::Lines),
+            Some("Finish the path first.")
+        );
+        assert!(!session.set_pen_mode(PenMode::Lines));
+        session.escape();
+        assert_eq!(session.pen_mode_refusal(PenMode::Spiro), None);
+        session.document.mark_shared();
+        assert_eq!(
+            session.pen_mode_refusal(PenMode::Spiro),
+            Some("Not in a shared document.")
+        );
+        assert_eq!(session.pen_mode_refusal(PenMode::Lines), None);
+        assert!(!session.set_pen_mode(PenMode::Spiro));
+    }
     use curvyo_document_core::Point;
 
     use super::super::{Session, Tool};

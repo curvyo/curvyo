@@ -46,6 +46,9 @@ pub enum CloneError {
     /// An object to unlink is not a clone, or its original cannot be found.
     #[error("only a linked clone can be unlinked")]
     NotAClone,
+    /// Editable curves cannot be copied into documents with active collaboration.
+    #[error("editable curves cannot be changed in a shared document")]
+    ExtendedShared,
     /// The fresh anchor ids of an unlink are not one per anchor of the clone's outline, all
     /// different.
     #[error("the fresh anchor ids do not match the clone's anchors")]
@@ -187,6 +190,15 @@ impl Document {
         let text_plan = self
             .plan_text_unlinks(texts)
             .map_err(|_| CloneError::NotAClone)?;
+        if planned
+            .iter()
+            .any(|(_, path, _)| path.spiro_transform.is_some())
+        {
+            if self.extended_edits_blocked() {
+                return Err(CloneError::ExtendedShared);
+            }
+            self.ensure_spiro_format();
+        }
         // Clones that follow an unlinked clone read it before it changes, and keep following it.
         for (meta, path, opacity) in &planned {
             crate::clone_write::unlink_meta(meta, path, *opacity);

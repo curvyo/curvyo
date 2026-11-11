@@ -418,6 +418,19 @@ impl GroupEntry {
         }
     }
 
+    /// Whether the typed `texts` resize the two axes by different amounts or shear.
+    #[must_use]
+    pub fn deforms(&self, texts: [&str; 2], last_edited: usize) -> bool {
+        match self.map_of(texts, last_edited).ok().flatten() {
+            Some(GroupMap::Scale { sx, sy, .. }) => crate::transform_math::scales_unevenly(sx, sy),
+            Some(GroupMap::Shear { ku, kv, .. }) => {
+                ku.abs() > crate::transform_math::SHEAR_TOLERANCE
+                    || kv.abs() > crate::transform_math::SHEAR_TOLERANCE
+            }
+            Some(GroupMap::Rotate { .. }) | None => false,
+        }
+    }
+
     /// The axes the typed `texts` set to 0.01 mm because they mean a size of 0
     /// (`specs/0056-mirror-and-negative-scale/` criterion 15), for the notice after
     /// the Enter: with linked fields only the field edited last.

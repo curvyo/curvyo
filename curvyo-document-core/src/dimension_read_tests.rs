@@ -25,6 +25,9 @@ fn path(n: i32, points: &[(f64, f64)], closed: bool) -> ObjectSnapshot {
             .map(|(i, &(x, y))| NewAnchor::corner(aid(i as u64 + 1), Point::new(x, y)))
             .collect(),
         extra_subpaths: Vec::new(),
+        curve_kind: crate::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
     })
 }

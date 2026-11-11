@@ -35,6 +35,7 @@ fn keys_replaced_by_unlink() -> impl Iterator<Item = &'static str> {
         KEY_CLOSED,
         KEY_EXTRA_SUBPATHS,
         KEY_ROTATION,
+        crate::curve_kind::KEY,
     ]
     .into_iter()
     .chain(crate::style_codec::ALL_STYLE_KEYS.iter().copied())
@@ -49,6 +50,11 @@ pub(crate) fn unlink_meta(meta: &LoroMap, path: &PathSnapshot, opacity: f64) {
     clear_clone_keys(meta);
     write_opacity_register(meta, opacity);
     path_codec::write_path_style(meta, path.closed, &path.style);
+    crate::curve_kind::write(meta, path.curve_kind);
+    if let Some(matrix) = path.spiro_transform.as_deref() {
+        crate::spiro_transform::write(meta, *matrix);
+    }
+    crate::width_profile::write(meta, &path.width_points);
     let list = path_codec::insert_anchors_container(meta);
     for anchor in &path.anchors {
         path_codec::push_anchor(&list, anchor);
@@ -85,6 +91,16 @@ pub(crate) fn source_opacity(tree: &LoroTree, clone: &crate::clone_model::CloneS
 /// Removes from the clone node `meta` its tag, link, overrides and `opacity` and any outline,
 /// style or rotation residue, so the caller can write it as a path. Uncommitted.
 pub(crate) fn clear_clone_keys(meta: &LoroMap) {
+    let width_keys: Vec<String> = meta
+        .keys()
+        .filter(|key| key.starts_with(crate::width_profile::PREFIX))
+        .map(|key| key.to_string())
+        .collect();
+    for key in width_keys {
+        // invariant: deleting a key from an attached map cannot fail.
+        #[allow(clippy::unwrap_used)]
+        meta.delete(&key).unwrap();
+    }
     for key in keys_replaced_by_unlink() {
         if meta.get(key).is_some() {
             // invariant: deleting a key just confirmed present on an attached map cannot fail.

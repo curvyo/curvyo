@@ -1,5 +1,5 @@
 //! What a move-only selection shows outside the canvas (`specs/0106-move-versus-edit` criterion
-//! 11, UX notes §2, §3 and §5): the Style line, the status bar text, the announcer's suffix, the
+//! 11, UX notes §2, §3 and §5): the Style line, the announcer's suffix, the
 //! bold home page labels and the Layers rows' "On Laser 1" line.
 
 use std::collections::HashSet;
@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use curvyo_document_core::NodeId;
 use curvyo_ui_core::{
     ActivePage, Home, Scope, home_row_line, in_context, object_bounds, object_kind_name,
-    objects_count_text, out_of_context_line, out_of_context_status, out_of_context_suffix,
+    objects_count_text, out_of_context_line, out_of_context_suffix,
 };
 
 use super::{Session, Workbench};
@@ -30,17 +30,6 @@ impl Session {
     #[must_use]
     pub fn selection_move_only(&self) -> bool {
         self.edit_scope() == Scope::MoveOnly
-    }
-
-    /// The status bar's text for a move-only selection: "Rectangle · Drawing 2" (UX notes §2);
-    /// empty otherwise.
-    #[must_use]
-    pub fn out_of_context_status(&self) -> String {
-        let homes = self.selection_homes();
-        if homes.scope == Scope::Edit {
-            return String::new();
-        }
-        out_of_context_status(&self.selection_subject(), &homes.names)
     }
 
     /// "Rectangle" for one selected object, "3 objects" for several.

@@ -46,6 +46,9 @@ fn line(node: NodeId, a: Point, b: Point) -> ObjectSnapshot {
             NewAnchor::corner(AnchorId::new(1, 2), b),
         ],
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::default(),
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
     })
 }

@@ -556,9 +556,7 @@ pub(crate) fn object_in(tree: &loro::LoroTree, id: NodeId) -> Option<ObjectSnaps
         Some(shape) => Some(ObjectSnapshot::Primitive(
             shape_codec::read_primitive_snapshot(id, &meta, &shape),
         )),
-        None => Some(ObjectSnapshot::Path(crate::path_codec::read_path_snapshot(
-            id, &meta,
-        ))),
+        None => crate::path_codec::read_path_snapshot(id, &meta).map(ObjectSnapshot::Path),
     }
 }
 

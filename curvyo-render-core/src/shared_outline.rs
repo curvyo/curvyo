@@ -200,7 +200,7 @@ mod tests {
         objects
             .iter()
             .map(|object| match object {
-                ObjectSnapshot::Clone(clone) => ObjectSnapshot::Path(clone.resolved.clone()),
+                ObjectSnapshot::Clone(clone) => ObjectSnapshot::Path((*clone.resolved).clone()),
                 other => other.clone(),
             })
             .collect()

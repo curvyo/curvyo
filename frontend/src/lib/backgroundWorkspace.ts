@@ -204,6 +204,7 @@ export class BackgroundWorkspace {
   private readonly host: BackgroundHost;
   private readonly transport: SyncTransport;
   private writer: BackgroundWriterLink | null = null;
+  private readonly failedDocuments = new Set<string>();
   /** File writes run one after the other. */
   private chain: Promise<void> = Promise.resolve();
   private joining: boolean;
@@ -477,18 +478,23 @@ export class BackgroundWorkspace {
         }
       });
     } else if (answer.type === "written") {
+      this.failedDocuments.delete(answer.document);
       this.chain = this.chain.then(async () => {
         if (this.stopped) {
           return;
         }
         const place = parsePlace(this.session.workspace_document_place(answer.document));
-        const bytes = sendLocal(this.session, answer.document, answer.bytes, answer.outgoing);
+        const bytes = sendLocal(this.session, answer.document, answer.bytes, answer.outgoing,
+          () => this.host.notice("A workspace update could not be sent; local changes remain unsent.", true));
         if (await this.write(place, answer.document, bytes, answer.created)) {
           this.session.background_written(answer.document, answer.through);
         }
       });
     } else if (answer.type === "skipped" && answer.through >= 0) {
       this.session.background_written(answer.document, answer.through);
+    } else if (answer.type === "failed" && answer.message && !this.failedDocuments.has(answer.document)) {
+      this.failedDocuments.add(answer.document);
+      this.host.notice(answer.message, true);
     }
   }
 

@@ -898,12 +898,14 @@ fn adr0042_a_claim_of_a_sketch_on_a_drawing_page_reads_as_no_owner() {
 
 #[test]
 // Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9), to 39 by
-// `specs/0101-laser-operations` (ADR 0046 §4), to 40 by `specs/0102-laser-fixtures` (ADR 0049).
+// `specs/0101-laser-operations` (ADR 0046 §4), to 40 by `specs/0102-laser-fixtures` (ADR 0049),
+// to 42 by `specs/0110-pen-modes-variable-stroke` (ADR 0053).
 fn ac20_save_writes_format_38() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 41);
+    // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
+    assert_eq!(CURRENT_FORMAT_VERSION, 42);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 41);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 42);
 }
 
 #[test]
@@ -1265,7 +1267,7 @@ fn ac19b_the_new_clone_has_its_own_placement() {
 fn ac19_the_converted_file_saves_as_the_current_format_and_does_not_convert_again() {
     let d = unpack(2, &format_36_file()).unwrap();
     let saved = pack(&d, "0.1.0").unwrap();
-    // The current format since `specs/0100-bring-content-in` is 38.
+    // The current format since `specs/0100-bring-content-in` is 40 (`specs/0110-pen-modes-variable-stroke`).
     assert_eq!(manifest_version(&saved), u64::from(CURRENT_FORMAT_VERSION));
     let again = unpack(3, &saved).unwrap();
     assert_eq!(again.own_step_count(), 0);

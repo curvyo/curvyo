@@ -207,7 +207,7 @@ fn c36_deleting_a_middle_laser_page_closes_the_hole_and_takes_its_machine_data()
 /// The anchor box of a path, clone or sketch.
 fn bounds(d: &Document, id: NodeId) -> (Point, Point) {
     let path = match d.object(id).unwrap() {
-        ObjectSnapshot::Clone(clone) => clone.resolved,
+        ObjectSnapshot::Clone(clone) => *clone.resolved,
         ObjectSnapshot::Path(path) => path,
         ObjectSnapshot::Sketch(sketch) => sketch.resolved,
         other => panic!("no outline: {other:?}"),
@@ -301,7 +301,8 @@ fn c19_a_clone_and_its_original_on_pages_that_move_apart_each_follow_their_own_p
 fn c28_the_format_has_no_bump_of_its_own() {
     // The auto-layout bumps nothing; 40 is the bump of `0102` laser-fixtures (ADR 0049).
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 41);
+    // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
+    assert_eq!(CURRENT_FORMAT_VERSION, 42);
 }
 
 #[test]

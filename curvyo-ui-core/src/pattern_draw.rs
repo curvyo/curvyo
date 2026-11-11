@@ -80,6 +80,9 @@ fn pieces_path(object: &ObjectSnapshot, pieces: &[PatternPiece]) -> Option<PathS
         style: piece_style(object.style(), fill.mode),
         anchors: first.anchors,
         extra_subpaths: outlines.collect(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: curvyo_document_core::Angle::from_radians(0.0),
     })
 }

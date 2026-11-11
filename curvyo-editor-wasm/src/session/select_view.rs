@@ -14,7 +14,6 @@ use curvyo_render_core::{
 };
 use curvyo_ui_core::{
     EditHandle, LiveEdit, ParamHandle, SelectTool, corner_local_position, is_drawn_handle,
-    oriented_bounds,
 };
 
 use super::Session;
@@ -89,7 +88,40 @@ impl Session {
     pub(super) fn select_decoration_input(&self) -> SelectDecorationInput {
         let objects = self.objects();
         let live = self.select_live_edit_in(&objects);
-        self.select_decoration_input_in(&Self::live_objects_in(&objects, live.as_ref()))
+        let live_objects = Self::live_objects_in(&objects, live.as_ref());
+        let visuals = self.spiro_pick_objects(&live_objects);
+        self.select_decoration_input_in(&visuals)
+    }
+
+    /// The box of the object `id` among `objects`, a variable stroke by its outline.
+    fn box_of(
+        &self,
+        objects: &[ObjectSnapshot],
+        id: curvyo_document_core::NodeId,
+    ) -> Option<(
+        curvyo_document_core::NodeId,
+        [curvyo_document_core::Point; 4],
+    )> {
+        objects
+            .iter()
+            .find(|object| object.id() == id)
+            .and_then(|object| self.cached_oriented_bounds(object))
+            .map(|bounds| (id, bounds.document_corners()))
+    }
+
+    /// One box around the objects among `objects` whose ids `member` accepts.
+    fn merged_box_of(
+        &self,
+        objects: &[ObjectSnapshot],
+        member: impl Fn(curvyo_document_core::NodeId) -> bool,
+    ) -> Option<[curvyo_document_core::Point; 4]> {
+        let corners: Vec<_> = objects
+            .iter()
+            .filter(|object| member(object.id()))
+            .filter_map(|object| self.cached_oriented_bounds(object))
+            .map(|bounds| bounds.document_corners())
+            .collect();
+        merged_corners(&corners)
     }
 
     /// [`Session::select_decoration_input`] over the live objects the caller
@@ -105,23 +137,13 @@ impl Session {
         let mut history_hovered: Vec<_> = self
             .history_hover
             .iter()
-            .filter_map(|&id| {
-                objects
-                    .iter()
-                    .find(|object| object.id() == id)
-                    .map(|object| (id, oriented_bounds(object).document_corners()))
-            })
+            .filter_map(|&id| self.box_of(objects, id))
             .collect();
         // The row under the pointer or the focus in the Layers list: its node's box, a group's
         // box for a group (`specs/0050-layers-and-objects-panel` criterion 15).
         if let Some((hovered, leaves)) = &self.panel.hover {
             let hovered = *hovered;
-            let corners: Vec<_> = objects
-                .iter()
-                .filter(|object| leaves.contains(&object.id()))
-                .map(|object| oriented_bounds(object).document_corners())
-                .collect();
-            if let Some(shown) = merged_corners(&corners) {
+            if let Some(shown) = self.merged_box_of(objects, |id| leaves.contains(&id)) {
                 history_hovered.push((hovered, shown));
             }
         }
@@ -137,12 +159,7 @@ impl Session {
         if self.tool == Tool::Text {
             // The Text tool shows the hover box of the text a click would edit, never a selected
             // box or a handle (`specs/0074-text-objects`, UX notes §1 "Hover").
-            let hovered = self.hovered_object.and_then(|id| {
-                objects
-                    .iter()
-                    .find(|object| object.id() == id)
-                    .map(|object| (id, oriented_bounds(object).document_corners()))
-            });
+            let hovered = self.hovered_object.and_then(|id| self.box_of(objects, id));
             return SelectDecorationInput {
                 hovered,
                 history_hovered,
@@ -167,12 +184,7 @@ impl Session {
             .ids()
             .iter()
             .filter(|_| !multi)
-            .filter_map(|&id| {
-                objects
-                    .iter()
-                    .find(|object| object.id() == id)
-                    .map(|object| (id, oriented_bounds(object).document_corners()))
-            })
+            .filter_map(|&id| self.box_of(objects, id))
             .collect();
         // No hover highlight of other objects while any Select-tool drag or
         // bar slider edit is in flight.
@@ -184,12 +196,8 @@ impl Session {
                 // What a click would select: the hovered leaf's group as one box (`0023`).
                 let units = self.units();
                 let leaves = units.leaves_with(&id);
-                let corners: Vec<_> = objects
-                    .iter()
-                    .filter(|object| leaves.contains(&object.id()))
-                    .map(|object| oriented_bounds(object).document_corners())
-                    .collect();
-                merged_corners(&corners).map(|shown| (id, shown))
+                self.merged_box_of(objects, |leaf| leaves.contains(&leaf))
+                    .map(|shown| (id, shown))
             });
         let key = self.key_mark_in(objects);
         SelectDecorationInput {
@@ -227,7 +235,10 @@ impl Session {
             let corners: Vec<_> = objects
                 .iter()
                 .filter(|object| units.leaves_with(&id).contains(&object.id()))
-                .map(|object| oriented_bounds(object).document_corners())
+                .filter_map(|object| {
+                    self.cached_oriented_bounds(object)
+                        .map(|bounds| bounds.document_corners())
+                })
                 .collect();
             merged_corners(&corners).map(|shown| (id, shown))
         });
@@ -247,16 +258,18 @@ impl Session {
         &self,
         objects: &[ObjectSnapshot],
     ) -> Option<(ObjectSnapshot, curvyo_ui_core::OrientedBox, EditHandle)> {
-        if self.select.drag_in_flight() || self.select.has_entry() {
+        // Width editing owns the pointer: no handle covers a diamond (UX review U2).
+        if self.select.drag_in_flight() || self.select.has_entry() || self.width_edit_active() {
             return None;
         }
         let point = self.pointer_position?;
-        SelectTool::hover_handle_at(
+        SelectTool::hover_handle_at_with_artwork(
             objects,
             &self.selection,
             point,
             self.transform_handle_tolerances(),
             self.held.shift,
+            &|path| self.width_artwork(path),
         )
         .map(|(object, box_, handle)| (object.clone(), box_, handle))
     }
@@ -300,7 +313,8 @@ impl Session {
         if let Some(handles) = self.text_path_handles() {
             return handles;
         }
-        if !self.select_box_tool() {
+        // Width editing hides the box's handles so none covers a diamond (UX review U2).
+        if !self.select_box_tool() || self.width_edit_active() {
             return TransformDecorationInput::default();
         }
         let tolerances = self.transform_handle_tolerances();
@@ -316,7 +330,9 @@ impl Session {
         let Some(object) = objects.iter().find(|o| o.id() == *only) else {
             return TransformDecorationInput::default();
         };
-        let box_ = oriented_bounds(object);
+        let Some(box_) = self.cached_oriented_bounds(object) else {
+            return TransformDecorationInput::default();
+        };
         // The centre handle hides while a resize, rotate, skew or parameter
         // drag runs or an entry is open: the pivot marker may live there, and
         // a parameter drag has it yield (criterion 8).

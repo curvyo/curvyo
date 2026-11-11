@@ -379,8 +379,12 @@ impl SelectTool {
                 None => SelectDoubleClickOutcome::Miss,
             };
         }
-        if Self::is_inside_selected_box(objects, selection, point)
-            && let Some(object) = sole_selected(objects, selection)
+        if Self::is_inside_selected_box(
+            objects,
+            selection,
+            point,
+            &crate::variable_artwork::synchronous_artwork,
+        ) && let Some(object) = sole_selected(objects, selection)
         {
             return hit_outcome_in(object, &self.units);
         }

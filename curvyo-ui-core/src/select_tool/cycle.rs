@@ -6,7 +6,7 @@ use curvyo_document_core::{NodeId, ObjectSnapshot, Point, Tolerance};
 
 use super::PressTarget;
 use super::handles::sole_selected;
-use crate::hit_test_object::hit_test_objects;
+use crate::hit_test_object::hit_test_objects_with_artwork;
 use crate::object_selection::ObjectSelection;
 use crate::units::Units;
 
@@ -88,9 +88,10 @@ impl ClickCycle {
         objects: &[ObjectSnapshot],
         tolerance: Tolerance,
         units: &Units,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) -> Option<NodeId> {
         if self.candidates.is_empty() {
-            for leaf in hit_test_objects(objects, self.at, tolerance) {
+            for leaf in hit_test_objects_with_artwork(objects, self.at, tolerance, artwork) {
                 let unit = units.unit_of(leaf);
                 if !self.candidates.contains(&unit) {
                     self.candidates.push(unit);

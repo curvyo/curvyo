@@ -442,3 +442,35 @@ fn bug_no_slide_after_edit_mode_escape_and_v() {
     assert!(session.text_path_live().is_none(), "no drag preview");
     assert!(session.live_readout().is_none(), "no drag readout");
 }
+
+#[test]
+fn editable_curve_as_text_carrier_reports_conversion_needed() {
+    use curvyo_document_core::{AnchorId, AnchorKind, CarrierRef, CurveKind, NewAnchor};
+    let (mut session, text, _) = badge();
+    let nodes = [(10., 10.), (30., 10.), (30., 30.)]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (x, y))| {
+            let mut a = NewAnchor::corner(AnchorId::new(200, i as u64), Point::new(x, y));
+            a.kind = AnchorKind::Symmetric;
+            a
+        })
+        .collect::<Vec<_>>();
+    let curve = session
+        .document
+        .create_editable_curve(&nodes, false, CurveKind::BSpline)
+        .unwrap();
+    session.put_on(
+        text,
+        CarrierRef {
+            node: curve,
+            outline: 0,
+        },
+    );
+    assert!(
+        session
+            .take_text_path_notice()
+            .contains("Convert the editable curve")
+    );
+    assert!(session.document.text(text).unwrap().on_path.is_none());
+}

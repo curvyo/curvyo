@@ -12,7 +12,7 @@
 //! `NodeId` has no public constructor outside `curvyo-document-core`.
 
 use curvyo_document_core::{
-    AnchorKind, AnchorSnapshot, DocumentBackground, DocumentSize, Point, Vec2, ViewTransform,
+    AnchorSnapshot, CurveKind, DocumentBackground, DocumentSize, Point, Vec2, ViewTransform,
 };
 
 use crate::document_area::background_at;
@@ -72,6 +72,65 @@ pub fn build_pen_preview(
     document_size: DocumentSize,
     background: DocumentBackground,
 ) -> DrawList {
+    build_preview(
+        nodes,
+        cursor,
+        pending,
+        None,
+        false,
+        view,
+        document_size,
+        background,
+    )
+}
+
+/// The live curve of a Spiro or B-spline in progress, evaluated by the caller.
+#[derive(Debug, Clone, Copy)]
+pub struct CurvePreview<'a> {
+    /// The evaluated curve, or the controls joined straight when it has no solution.
+    pub curve: &'a [AnchorSnapshot],
+    /// Spiro or B-spline: decides the node glyphs and whether the control polygon shows.
+    pub kind: CurveKind,
+    /// Every control point, the pointer's included: a B-spline's polygon runs through them.
+    pub controls: &'a [AnchorSnapshot],
+}
+
+/// Draws editable control points with a separately evaluated preview curve: a square for a
+/// corner, a circle for a smooth point, and a B-spline's control polygon as a 1 px accent line
+/// (`specs/0110` UX notes, review U5 and U10).
+#[must_use]
+pub fn build_curve_pen_preview(
+    nodes: &[AnchorSnapshot],
+    pending: Option<&AnchorSnapshot>,
+    curve: CurvePreview<'_>,
+    closed: bool,
+    view: ViewTransform,
+    document_size: DocumentSize,
+    background: DocumentBackground,
+) -> DrawList {
+    build_preview(
+        nodes,
+        None,
+        pending,
+        Some(curve),
+        closed,
+        view,
+        document_size,
+        background,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_preview(
+    nodes: &[AnchorSnapshot],
+    cursor: Option<Point>,
+    pending: Option<&AnchorSnapshot>,
+    curve: Option<CurvePreview<'_>>,
+    closed: bool,
+    view: ViewTransform,
+    document_size: DocumentSize,
+    background: DocumentBackground,
+) -> DrawList {
     let mut list = DrawList::default();
     if nodes.is_empty() && pending.is_none() {
         return list;
@@ -85,9 +144,14 @@ pub fn build_pen_preview(
     // gets, so a placed curve (acceptance criterion 2) already previews
     // correctly with no extra code here.
     let tolerance_mm = screen_px_to_mm(view, theme::DISPLAY_TOLERANCE_PX);
+    if let Some(preview) = curve.filter(|preview| preview.kind == CurveKind::BSpline) {
+        let points: Vec<_> = preview.controls.iter().map(|a| a.point).collect();
+        list.extend(crate::decorations::control_polygon(&points, closed, view));
+    }
+    let kind = curve.map_or(CurveKind::Bezier, |preview| preview.kind);
     list.extend(stroke::path_stroke(
-        nodes,
-        false,
+        curve.map_or(nodes, |preview| preview.curve),
+        closed,
         STROKE_WIDTH_MM,
         theme::ACCENT,
         tolerance_mm,
@@ -101,11 +165,7 @@ pub fn build_pen_preview(
     let line_width = screen_px_to_mm(view, theme::HANDLE_LINE_WIDTH_PX);
 
     for anchor in nodes {
-        let glyph = match anchor.kind {
-            AnchorKind::Corner => glyphs::square,
-            AnchorKind::Symmetric => glyphs::diamond,
-            AnchorKind::Asymmetric => glyphs::triangle,
-        };
+        let glyph = glyphs::node_glyph(kind, anchor.kind);
         list.extend(glyph(anchor.point, node_size, theme::ACCENT));
         list.extend(glyph(
             anchor.point,
@@ -139,7 +199,9 @@ pub fn build_pen_preview(
         // reshape (pending's own handles below still preview). A
         // sub-threshold press previews a straight segment the same way,
         // since `pending.handle_in` is then `Vec2::ZERO`.
-        if let Some(last) = nodes.last() {
+        if curve.is_none()
+            && let Some(last) = nodes.last()
+        {
             list.extend(stroke::segment_stroke(
                 last.point,
                 last.handle_out,
@@ -179,11 +241,7 @@ pub fn build_pen_preview(
         // other placed node above, by its own resolved `kind` — a corner
         // node below the drag threshold, a smooth node past it, matching
         // exactly what would commit.
-        let glyph = match pending.kind {
-            AnchorKind::Corner => glyphs::square,
-            AnchorKind::Symmetric => glyphs::diamond,
-            AnchorKind::Asymmetric => glyphs::triangle,
-        };
+        let glyph = glyphs::node_glyph(kind, pending.kind);
         list.extend(glyph(pending.point, node_size, theme::ACCENT));
         list.extend(glyph(
             pending.point,
@@ -211,9 +269,53 @@ pub fn build_pen_preview(
 
 #[cfg(test)]
 mod tests {
-    use curvyo_document_core::{AnchorId, NewAnchor};
+    use curvyo_document_core::{AnchorId, AnchorKind, NewAnchor};
 
     use super::*;
+
+    fn curve_preview(kind: CurveKind) -> DrawList {
+        let mut nodes = [
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 10.0)),
+        ];
+        nodes[1].kind = AnchorKind::Symmetric;
+        build_curve_pen_preview(
+            &nodes,
+            None,
+            CurvePreview {
+                curve: &nodes,
+                kind,
+                controls: &nodes,
+            },
+            false,
+            ViewTransform::identity(),
+            DocumentSize::default(),
+            DocumentBackground::DEFAULT,
+        )
+    }
+
+    /// UX review U5 and U10: a B-spline in progress shows its control polygon; Spiro and B-spline
+    /// smooth points are circles.
+    #[test]
+    fn a_bspline_in_progress_shows_its_polygon_and_round_smooth_points() {
+        let spiro = curve_preview(CurveKind::Spiro);
+        let bspline = curve_preview(CurveKind::BSpline);
+        let line = glyphs::thick_line(
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 10.0),
+            1.0,
+            theme::ACCENT,
+        );
+        assert_eq!(
+            bspline.triangle_count(),
+            spiro.triangle_count() + line.triangle_count()
+        );
+        let circle = glyphs::circle(Point::new(0.0, 0.0), 1.0, theme::ACCENT).triangle_count();
+        assert!(
+            spiro.triangle_count() >= 2 * circle,
+            "the smooth point is a circle"
+        );
+    }
 
     #[test]
     fn an_empty_in_progress_path_previews_as_nothing() {

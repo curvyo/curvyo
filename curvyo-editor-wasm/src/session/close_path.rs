@@ -97,6 +97,10 @@ impl Session {
             }
             match this.document.close_paths(&plan.growths) {
                 Ok(()) => ClosePathOutcome::of(plan.counts, true),
+                Err(curvyo_document_core::PathEditError::NeedsConversion) => {
+                    this.history.notice = Some("Convert editable curves to Bézier paths and variable strokes to outlines before closing. Nothing changed.".to_owned());
+                    ClosePathOutcome::default()
+                }
                 Err(_) => ClosePathOutcome::default(),
             }
         })

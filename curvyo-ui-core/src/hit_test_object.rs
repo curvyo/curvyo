@@ -15,7 +15,6 @@ use curvyo_geometry_core::{
 };
 
 use crate::hit_test::segment_pairs;
-use crate::object_bounds::object_outline_bounds;
 
 /// The distance from `point` to the nearest point on any segment of an
 /// anchor run of `len` anchors (`closed` or not), within `tolerance` — the
@@ -113,11 +112,50 @@ fn certainly_farther_than(object: &ObjectSnapshot, point: Point, margin: f64) ->
     }
 }
 
-pub(crate) fn distance_to_object(
+pub(crate) fn distance_to_object_with_artwork(
     object: &ObjectSnapshot,
     point: Point,
     tolerance: Tolerance,
+    artwork: &crate::VariableArtworkLookup<'_>,
 ) -> Option<f64> {
+    if let Some(path) = object
+        .drawn_path()
+        .filter(|path| !path.width_points.is_empty())
+    {
+        let computed = artwork(path)?;
+        let (fill, outline) = computed.as_ref().clone();
+        let a = fill
+            .style
+            .fill
+            .paints()
+            .then(|| {
+                distance_to_object_with_artwork(
+                    &ObjectSnapshot::Path(fill),
+                    point,
+                    tolerance,
+                    artwork,
+                )
+            })
+            .flatten();
+        let b = outline.and_then(|outline| {
+            distance_to_object_with_artwork(
+                &ObjectSnapshot::Path(outline),
+                point,
+                tolerance,
+                artwork,
+            )
+        });
+        return match (a, b) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) | (None, Some(a)) => Some(a),
+            (None, None) => None,
+        };
+    }
+    if needs_curve_evaluation(object) {
+        return crate::evaluate_object(object).ok().and_then(|evaluated| {
+            distance_to_object_with_artwork(&evaluated, point, tolerance, artwork)
+        });
+    }
     if certainly_farther_than(object, point, tolerance.as_mm()) {
         return None;
     }
@@ -126,8 +164,8 @@ pub(crate) fn distance_to_object(
         return picture
             .iter()
             .filter_map(|leaf| {
-                distance_to_object(leaf, point, tolerance)
-                    .or_else(|| fills_point(leaf, point).then_some(0.0))
+                distance_to_object_with_artwork(leaf, point, tolerance, artwork)
+                    .or_else(|| fills_point_with_artwork(leaf, point, artwork).then_some(0.0))
             })
             .min_by(f64::total_cmp);
     }
@@ -254,9 +292,34 @@ fn outlines_of(object: &ObjectSnapshot) -> Vec<(Vec<OutlineTriple>, bool)> {
 /// one's is bounded by its real closing segment (acceptance criterion 23). A
 /// compound path's interior is the nonzero winding over all its outlines, so
 /// a hole is not inside it (`specs/0016-boolean-operations` criterion 33).
-pub(crate) fn fills_point(object: &ObjectSnapshot, point: Point) -> bool {
+pub(crate) fn fills_point_with_artwork(
+    object: &ObjectSnapshot,
+    point: Point,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> bool {
     if let Some(picture) = object.picture() {
-        return picture.iter().any(|leaf| fills_point(leaf, point));
+        return picture
+            .iter()
+            .any(|leaf| fills_point_with_artwork(leaf, point, artwork));
+    }
+    if let Some(path) = object
+        .drawn_path()
+        .filter(|path| !path.width_points.is_empty())
+    {
+        let Some(computed) = artwork(path) else {
+            return false;
+        };
+        let (fill, outline) = computed.as_ref().clone();
+        return {
+            fills_point_with_artwork(&ObjectSnapshot::Path(fill), point, artwork)
+                || outline.is_some_and(|outline| {
+                    fills_point_with_artwork(&ObjectSnapshot::Path(outline), point, artwork)
+                })
+        };
+    }
+    if needs_curve_evaluation(object) {
+        return crate::evaluate_object(object)
+            .is_ok_and(|evaluated| fills_point_with_artwork(&evaluated, point, artwork));
     }
     if !object.style().fill.paints() || certainly_farther_than(object, point, 0.0) {
         return false;
@@ -291,6 +354,13 @@ pub(crate) fn fills_point(object: &ObjectSnapshot, point: Point) -> bool {
     contains_point_in_outlines(&borrowed, point)
 }
 
+fn needs_curve_evaluation(object: &ObjectSnapshot) -> bool {
+    matches!(object, ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_))
+        && object
+            .drawn_path()
+            .is_some_and(|path| path.curve_kind != curvyo_document_core::CurveKind::Bezier)
+}
+
 /// Hit-tests `point` against every object in `objects` — a path through
 /// its own anchors, a primitive through its own (rotation-aware)
 /// outline ([`curvyo_document_core::outline_of_rotated`]) — returning the one
@@ -311,12 +381,27 @@ pub fn hit_test_object(
     point: Point,
     tolerance: Tolerance,
 ) -> Option<NodeId> {
+    hit_test_object_with_artwork(
+        objects,
+        point,
+        tolerance,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+pub(crate) fn hit_test_object_with_artwork(
+    objects: &[ObjectSnapshot],
+    point: Point,
+    tolerance: Tolerance,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<NodeId> {
     let floor = objects
         .iter()
-        .rposition(|object| fills_point(object, point));
+        .rposition(|object| fills_point_with_artwork(object, point, artwork));
     let mut best: Option<(f64, NodeId)> = None;
     for object in &objects[floor.unwrap_or(0)..] {
-        let Some(distance) = distance_to_object(object, point, tolerance) else {
+        let Some(distance) = distance_to_object_with_artwork(object, point, tolerance, artwork)
+        else {
             continue;
         };
         let better = match best {
@@ -357,15 +442,29 @@ pub fn hit_test_objects(
     point: Point,
     tolerance: Tolerance,
 ) -> Vec<NodeId> {
+    hit_test_objects_with_artwork(
+        objects,
+        point,
+        tolerance,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+pub(crate) fn hit_test_objects_with_artwork(
+    objects: &[ObjectSnapshot],
+    point: Point,
+    tolerance: Tolerance,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Vec<NodeId> {
     let floor = objects
         .iter()
-        .rposition(|object| fills_point(object, point));
+        .rposition(|object| fills_point_with_artwork(object, point, artwork));
     let mut visible: Vec<(f64, usize)> = Vec::new();
     let mut covered: Vec<(f64, usize)> = Vec::new();
     for (index, object) in objects.iter().enumerate() {
-        let distance = distance_to_object(object, point, tolerance);
+        let distance = distance_to_object_with_artwork(object, point, tolerance, artwork);
         if floor.is_some_and(|floor| index < floor) {
-            if distance.is_some() || fills_point(object, point) {
+            if distance.is_some() || fills_point_with_artwork(object, point, artwork) {
                 covered.push((distance.unwrap_or(f64::INFINITY), index));
             }
         } else if let Some(distance) = distance {
@@ -411,17 +510,41 @@ pub fn hit_test_objects_along(
     line: &[Point],
     tolerance: Tolerance,
 ) -> Vec<NodeId> {
+    hit_test_objects_along_with_artwork(
+        objects,
+        line,
+        tolerance,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+pub(crate) fn hit_test_objects_along_with_artwork(
+    objects: &[ObjectSnapshot],
+    line: &[Point],
+    tolerance: Tolerance,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Vec<NodeId> {
     objects
         .iter()
-        .filter(|object| line_touches(object, line, tolerance))
+        .filter(|object| line_touches(object, line, tolerance, artwork))
         .map(ObjectSnapshot::id)
         .collect()
 }
 
-fn line_touches(object: &ObjectSnapshot, line: &[Point], tolerance: Tolerance) -> bool {
-    let (low, high) = object_outline_bounds(object);
+fn line_touches(
+    object: &ObjectSnapshot,
+    line: &[Point],
+    tolerance: Tolerance,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> bool {
+    let Some((low, high)) =
+        crate::object_bounds::object_outline_bounds_with_artwork(object, artwork)
+    else {
+        return false;
+    };
     let margin = tolerance.as_mm();
-    let near = |point: Point| distance_to_object(object, point, tolerance).is_some();
+    let near =
+        |point: Point| distance_to_object_with_artwork(object, point, tolerance, artwork).is_some();
     if let [only] = line {
         return near(*only);
     }
@@ -481,16 +604,31 @@ fn clipped_to_box(
 /// of another object, an unfilled object and an object below `selected` never
 /// qualify. `None` when `selected` is not among `objects`.
 #[must_use]
+#[cfg(test)]
 pub(crate) fn filled_interior_above(
     objects: &[ObjectSnapshot],
     selected: NodeId,
     point: Point,
 ) -> Option<NodeId> {
+    filled_interior_above_with_artwork(
+        objects,
+        selected,
+        point,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+pub(crate) fn filled_interior_above_with_artwork(
+    objects: &[ObjectSnapshot],
+    selected: NodeId,
+    point: Point,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<NodeId> {
     let index = objects.iter().position(|object| object.id() == selected)?;
     objects[index + 1..]
         .iter()
         .rev()
-        .find(|object| fills_point(object, point))
+        .find(|object| fills_point_with_artwork(object, point, artwork))
         .map(ObjectSnapshot::id)
 }
 

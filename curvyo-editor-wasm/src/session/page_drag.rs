@@ -1,7 +1,7 @@
 //! Page-edge gestures with the ownership read frozen at the press.
 use super::{Session, Tool};
 use curvyo_document_core::{ObjectSnapshot, Page, PageContents, Point, Vec2};
-use curvyo_ui_core::{PressTarget, classify_press};
+use curvyo_ui_core::{PressTarget, classify_press_with_artwork};
 #[derive(Debug)]
 pub(super) struct PageDrag {
     page: Page,
@@ -17,14 +17,15 @@ impl Session {
             return None;
         }
         if !matches!(
-            classify_press(
+            classify_press_with_artwork(
                 &self.objects(),
                 &self.pickable_objects(),
                 &self.selection,
                 point,
                 self.object_tolerance(),
                 self.transform_handle_tolerances(),
-                self.held
+                self.held,
+                &|path| self.width_artwork(path),
             ),
             PressTarget::Empty
         ) {
@@ -54,7 +55,11 @@ impl Session {
         let Some(page) = self.page_edge_at(point) else {
             return false;
         };
-        let contents = self.drag_contents(&page);
+        // A variable stroke still being calculated keeps the page where it is; the press is
+        // taken so it starts no marquee.
+        let Some(contents) = self.drag_contents(&page) else {
+            return true;
+        };
         // A page of another workbench (a sketch page dragged from a drawing page) activates on
         // the release, so the drag keeps the tools it started with (`specs/0099` criterion 5).
         if self.workbench_of_kind(&page.kind) == self.workbench() {

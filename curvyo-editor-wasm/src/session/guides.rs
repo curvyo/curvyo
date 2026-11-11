@@ -193,7 +193,9 @@ impl Session {
         }
         let read = self.document_read();
         for object in read.leaves.iter().filter(|o| read.guides.contains(&o.id())) {
-            let (low, high) = curvyo_ui_core::object_outline_bounds(object);
+            let Some((low, high)) = self.page_fit_bounds(object) else {
+                return;
+            };
             min = Point::new(min.x.min(low.x), min.y.min(low.y));
             max = Point::new(max.x.max(high.x), max.y.max(high.y));
         }

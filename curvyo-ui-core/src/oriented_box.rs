@@ -132,10 +132,8 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
                 pivot: shape_center(&primitive.shape),
             }
         }
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
-            path_oriented_bounds(path)
-        }
+        ObjectSnapshot::Path(path) => path_oriented_bounds(path),
+        ObjectSnapshot::Clone(clone) => path_oriented_bounds(&clone.resolved),
         // The oriented line box, so the box does not jump as letters with and without
         // descenders are typed (`specs/0074-text-objects`, UX notes §5).
         ObjectSnapshot::Text(text) => crate::text_box::line_box_oriented(text),
@@ -151,6 +149,40 @@ pub fn oriented_bounds(object: &ObjectSnapshot) -> OrientedBox {
             }
         }
     }
+}
+
+/// Computes oriented bounds using already-derived variable-stroke artwork.
+#[must_use]
+pub fn oriented_bounds_with_artwork(
+    object: &ObjectSnapshot,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<OrientedBox> {
+    // A clone of a group with a profiled member: the screen-aligned box of its drawn leaves.
+    if crate::object_bounds::profiled_picture(object).is_some() {
+        let (min, max) = crate::object_bounds::object_bounds_with_artwork(object, artwork)?;
+        return Some(OrientedBox {
+            min,
+            max,
+            angle: Angle::from_radians(0.0),
+            pivot: Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y)),
+        });
+    }
+    let Some(path) = object
+        .drawn_path()
+        .filter(|path| !path.width_points.is_empty())
+    else {
+        return Some(oriented_bounds(object));
+    };
+    let result = artwork(path)?;
+    let mut bounds = path_oriented_bounds(&result.0);
+    if let Some(outline) = &result.1 {
+        let other = path_oriented_bounds(outline);
+        bounds.min.x = bounds.min.x.min(other.min.x);
+        bounds.min.y = bounds.min.y.min(other.min.y);
+        bounds.max.x = bounds.max.x.max(other.max.x);
+        bounds.max.y = bounds.max.y.max(other.max.y);
+    }
+    Some(bounds)
 }
 
 fn path_oriented_bounds(path: &PathSnapshot) -> OrientedBox {

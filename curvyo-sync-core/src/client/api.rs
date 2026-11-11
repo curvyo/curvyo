@@ -143,6 +143,9 @@ pub enum SessionEvent {
 /// Why a session call was refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum SessionError {
+    /// This document contains data that cannot yet be shared safely with older peers.
+    #[error("documents with editable curves or width profiles cannot be shared yet")]
+    UnsupportedDocument,
     /// Only an admin may do this.
     #[error("only an admin can do this")]
     NotAdmin,

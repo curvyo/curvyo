@@ -143,6 +143,13 @@ pub fn boolean_availability(
 /// Why an operation was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BooleanRefusal {
+    /// Editable curves or width profiles require explicit conversion before this operation.
+    ExtendedPath {
+        /// Paths that cannot be converted implicitly.
+        offenders: Vec<NodeId>,
+        /// Number of selected objects.
+        of: usize,
+    },
     /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
     /// (`specs/0074-text-objects` criteria 24 and 29).
     Texts(crate::text_convert::TextRefusal),
@@ -311,6 +318,19 @@ pub fn plan_boolean(
     let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
     let of = operands.len();
+    let offenders: Vec<NodeId> = operands
+        .iter()
+        .filter(|object| {
+            object.drawn_path().is_some_and(|path| {
+                path.curve_kind != curvyo_document_core::CurveKind::Bezier
+                    || !path.width_points.is_empty()
+            })
+        })
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(BooleanRefusal::ExtendedPath { offenders, of });
+    }
     if boolean_availability(objects, selection) == BooleanAvailability::NeedsTwo {
         return Err(BooleanRefusal::NeedsTwo);
     }

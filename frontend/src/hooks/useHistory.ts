@@ -25,6 +25,9 @@ export interface CanvasNotice {
   source: "canvas" | "panel";
   /** A status is polite and takes the slot for 3 s; an alert is a refusal and stays 8 s. */
   kind: "status" | "alert";
+  /** A refusal near the pointer (`specs/0110` UX review U8): the client point it shows beside;
+   * absent for the notice slot. */
+  at?: { x: number; y: number };
 }
 
 /** The step names an undo and a redo would act on, `null` when a stack is empty. */
@@ -45,7 +48,10 @@ export interface HistoryApi {
     ms?: number,
     source?: "canvas" | "panel",
     kind?: "status" | "alert",
+    at?: { x: number; y: number },
   ) => void;
+  /** Takes the notice `text` off the screen if it is the one shown. */
+  dismissNotice: (text: string) => void;
   /** Re-reads the names of the next undo and redo. Call after any change of the session. */
   refresh: () => void;
   /** Runs an undo or redo from a button; `source` says where the notice shows. */
@@ -128,12 +134,17 @@ export function useHistory(
       ms?: number,
       source: "canvas" | "panel" = "canvas",
       kind: "status" | "alert" = "status",
+      at?: { x: number; y: number },
     ) => {
       counter.current += 1;
-      setNotice({ id: counter.current, text, ms: ms ?? noticeDurationMs(text), source, kind });
+      setNotice({ id: counter.current, text, ms: ms ?? noticeDurationMs(text), source, kind, at });
     },
     [],
   );
+
+  const dismissNotice = useCallback((text: string) => {
+    setNotice((current) => (current?.text === text ? null : current));
+  }, []);
 
   // A notice ends after its time, or when the next one replaces it. The timer clears only its own
   // notice: one that fires after a newer notice was set, before this effect is cleaned up, must
@@ -329,6 +340,7 @@ export function useHistory(
     busy,
     names,
     showNotice,
+    dismissNotice,
     refresh,
     press,
     wipe,

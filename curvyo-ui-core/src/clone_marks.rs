@@ -162,7 +162,7 @@ pub fn clone_marks(
     let covered: Vec<&curvyo_document_core::PathSnapshot> = selected
         .iter()
         .filter_map(|id| match by_id.get(id) {
-            Some(ObjectSnapshot::Clone(clone)) => Some(&clone.resolved),
+            Some(ObjectSnapshot::Clone(clone)) => Some(clone.resolved.as_ref()),
             _ => None,
         })
         .collect();

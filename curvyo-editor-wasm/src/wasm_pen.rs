@@ -91,6 +91,110 @@ fn count(n: usize) -> u32 {
 
 #[wasm_bindgen]
 impl WasmSession {
+    /// Starts editing the selected path's width profile.
+    pub fn begin_width_edit(&mut self) -> bool {
+        self.session.begin_width_edit()
+    }
+
+    /// Whether width profile editing is active.
+    #[must_use]
+    pub fn width_edit_active(&self) -> bool {
+        self.session.width_edit_active()
+    }
+
+    /// Leaves width profile editing.
+    pub fn end_width_edit(&mut self) {
+        self.session.end_width_edit();
+    }
+
+    /// Takes the latest width edit failure, or an empty string.
+    pub fn take_width_edit_notice(&mut self) -> String {
+        self.session.take_width_edit_notice()
+    }
+
+    /// Takes the warning about a variable stroke that cannot be rendered yet.
+    pub fn take_unsupported_width_notice(&self) -> String {
+        self.session.take_unsupported_width_notice()
+    }
+
+    /// Applies a ready-made width profile (`uniform`, `taper-start`, `taper-end`, `taper-both`)
+    /// to the selected path as one undo step: empty when written, else the refusal sentence.
+    pub fn apply_width_preset(&mut self, code: &str) -> String {
+        let Some(preset) = curvyo_ui_core::WidthPreset::from_code(code) else {
+            return "Unknown width profile.".to_owned();
+        };
+        self.session
+            .apply_width_preset(preset)
+            .err()
+            .unwrap_or_default()
+            .to_owned()
+    }
+
+    /// The code of the preset the selected path's width profile is, or an empty string.
+    #[must_use]
+    pub fn selected_width_preset(&self) -> String {
+        self.session
+            .selected_width_preset()
+            .map_or("", curvyo_ui_core::WidthPreset::code)
+            .to_owned()
+    }
+
+    /// The current Pen mode.
+    #[must_use]
+    pub fn pen_mode(&self) -> String {
+        match self.session.pen_mode() {
+            curvyo_ui_core::PenMode::Bezier => "bezier",
+            curvyo_ui_core::PenMode::Lines => "lines",
+            curvyo_ui_core::PenMode::Freehand => "freehand",
+            curvyo_ui_core::PenMode::BSpline => "bspline",
+            curvyo_ui_core::PenMode::Spiro => "spiro",
+        }
+        .to_owned()
+    }
+
+    /// Selects a Pen mode when no path is in progress.
+    pub fn set_pen_mode(&mut self, mode: &str) -> bool {
+        pen_mode(mode).is_some_and(|mode| self.session.set_pen_mode(mode))
+    }
+
+    /// Whether the notice of a Spiro without solution ended since the last call (finish,
+    /// Escape, mode change): the host takes it off the screen.
+    pub fn take_spiro_notice_end(&self) -> bool {
+        self.session.take_spiro_notice_end()
+    }
+
+    /// Why the Pen mode `mode` cannot be chosen now, or an empty string when it can.
+    #[must_use]
+    pub fn pen_mode_refusal(&self, mode: &str) -> String {
+        pen_mode(mode)
+            .and_then(|mode| self.session.pen_mode_refusal(mode))
+            .unwrap_or_default()
+            .to_owned()
+    }
+
+    /// The full width of the selected width point in millimetres, or NaN when none is selected.
+    #[must_use]
+    pub fn width_point_mm(&self) -> f64 {
+        self.session.width_point_mm().unwrap_or(f64::NAN)
+    }
+
+    /// Sets the full width of the selected width point, as one undo step.
+    pub fn set_width_point_mm(&mut self, mm: f64) -> bool {
+        self.session.set_width_point_mm(mm)
+    }
+
+    /// Sets the freehand simplification tolerance in millimetres.
+    pub fn set_pen_smoothing(&mut self, millimetres: f64) -> bool {
+        self.session
+            .set_pen_smoothing(curvyo_document_core::Length::from_mm(millimetres))
+    }
+
+    /// The freehand simplification tolerance in millimetres.
+    #[must_use]
+    pub fn pen_smoothing(&self) -> f64 {
+        self.session.pen_smoothing().as_mm()
+    }
+
     /// What a Pen press at the pointer would do now, for the cursor class and the hint chip.
     #[must_use]
     pub fn pen_cue(&self) -> PenCueView {
@@ -188,4 +292,16 @@ impl WasmSession {
             same_ends_outlines: count(outcome.same_ends_outlines),
         })
     }
+}
+
+/// The Pen mode of a wasm `code`.
+fn pen_mode(code: &str) -> Option<curvyo_ui_core::PenMode> {
+    Some(match code {
+        "bezier" => curvyo_ui_core::PenMode::Bezier,
+        "lines" => curvyo_ui_core::PenMode::Lines,
+        "freehand" => curvyo_ui_core::PenMode::Freehand,
+        "bspline" => curvyo_ui_core::PenMode::BSpline,
+        "spiro" => curvyo_ui_core::PenMode::Spiro,
+        _ => return None,
+    })
 }

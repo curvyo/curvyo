@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{
-    AnchorKind, HandleSlot, NodeId, PathSnapshot, Point, Vec2, ViewTransform,
+    CurveKind, HandleSlot, NodeId, PathSnapshot, Point, Vec2, ViewTransform,
 };
 
 use crate::color::RgbaColor;
@@ -135,6 +135,15 @@ pub fn build(paths: &[PathSnapshot], view: ViewTransform, input: &DecorationInpu
     // same spot (after a Split) the selected glyph is drawn above the other
     // and its accent fill stays visible (`specs/0010-edit-interaction-polish/`
     // criterion 50).
+    // A B-spline's control polygon, under its nodes (`specs/0110` UX notes, review U5).
+    for path in drawn_paths {
+        if path.curve_kind == CurveKind::BSpline {
+            for subpath in path.subpaths() {
+                let points: Vec<_> = subpath.anchors.iter().map(|a| a.point).collect();
+                list.extend(control_polygon(&points, subpath.closed, view));
+            }
+        }
+    }
     let sets = NodeSets::of(input);
     for draw_selected in [false, true] {
         for path in drawn_paths {
@@ -146,7 +155,7 @@ pub fn build(paths: &[PathSnapshot], view: ViewTransform, input: &DecorationInpu
                         &mut list,
                         &sizes,
                         input,
-                        path.id,
+                        (path.id, path.curve_kind),
                         anchor,
                         (selected, handles),
                     );
@@ -171,7 +180,7 @@ fn push_node(
     list: &mut DrawList,
     sizes: &Sizes,
     input: &DecorationInput,
-    path: NodeId,
+    (path, curve): (NodeId, CurveKind),
     anchor: &curvyo_document_core::AnchorSnapshot,
     (selected, shows_handles): (bool, bool),
 ) {
@@ -223,11 +232,7 @@ fn push_node(
         }
     }
 
-    let glyph = match anchor.kind {
-        AnchorKind::Corner => glyphs::square,
-        AnchorKind::Symmetric => glyphs::diamond,
-        AnchorKind::Asymmetric => glyphs::triangle,
-    };
+    let glyph = glyphs::node_glyph(curve, anchor.kind);
     if selected {
         list.extend(glyph(anchor.point, sizes.node, theme::ACCENT));
     } else {
@@ -247,6 +252,23 @@ fn push_node(
             theme::ACCENT_HOVER,
         ));
     }
+}
+
+/// The control polygon through `points`, a 1 px accent line (`specs/0110` UX notes).
+pub(crate) fn control_polygon(points: &[Point], closed: bool, view: ViewTransform) -> DrawList {
+    let width = screen_px_to_mm(view, 1.0);
+    let mut list = DrawList::default();
+    let closing = closed.then(|| (points.last(), points.first()));
+    let pairs = points
+        .windows(2)
+        .map(|pair| (pair.first(), pair.get(1)))
+        .chain(closing);
+    for (a, b) in pairs {
+        if let (Some(a), Some(b)) = (a, b) {
+            list.extend(glyphs::thick_line(*a, *b, width, theme::ACCENT));
+        }
+    }
+    list
 }
 
 /// The pre-selection rings of a node marquee (`specs/0053-node-marquee-selection/` UX notes):
@@ -357,7 +379,7 @@ fn selected_segment_overlay(
 
 #[cfg(test)]
 mod tests {
-    use curvyo_document_core::{AnchorId, Document, NewAnchor, Point};
+    use curvyo_document_core::{AnchorId, AnchorKind, Document, NewAnchor, Point};
 
     use super::*;
 
@@ -434,6 +456,46 @@ mod tests {
         // total); B's is a Corner square (2 quads = 4 triangles) — 6 in
         // all.
         assert_eq!(list.triangle_count(), 6);
+    }
+
+    /// A Spiro or B-spline path in the Node tool: a square for a corner, a circle for a smooth
+    /// node (UX review U10), and for a B-spline its control polygon as a thin accent line (U5).
+    fn curve_list(kind: curvyo_document_core::CurveKind) -> DrawList {
+        let mut path = {
+            let (document, path, _a, _b) = two_node_path();
+            document.path(path).expect("exists")
+        };
+        path.curve_kind = kind;
+        path.anchors[1].kind = AnchorKind::Symmetric;
+        build(&[path], ViewTransform::identity(), &nodes_on())
+    }
+
+    #[test]
+    fn a_smooth_curve_node_is_a_circle_and_a_corner_a_square() {
+        use curvyo_document_core::CurveKind;
+        let bezier = curve_list(CurveKind::Bezier);
+        let spiro = curve_list(CurveKind::Spiro);
+        // The Bézier smooth node is a diamond (2 quads); the Spiro one is two filled circles.
+        let circle =
+            glyphs::circle(Point::new(20.0, 0.0), 1.0, theme::NODE_STROKE).triangle_count();
+        assert_eq!(bezier.triangle_count(), 8);
+        assert_eq!(spiro.triangle_count(), 4 + 2 * circle);
+    }
+
+    #[test]
+    fn a_bspline_shows_its_control_polygon_in_the_node_tool() {
+        use curvyo_document_core::CurveKind;
+        let spiro = curve_list(CurveKind::Spiro);
+        let bspline = curve_list(CurveKind::BSpline);
+        assert!(
+            bspline.triangle_count() > spiro.triangle_count(),
+            "the polygon between its two points"
+        );
+        let line = &bspline.triangles[..6];
+        assert!(
+            line.iter().all(|v| v.color == theme::ACCENT),
+            "the polygon lies under the nodes, in the accent colour"
+        );
     }
 
     #[test]

@@ -34,6 +34,9 @@ pub struct TraceRegion {
 /// Why the mask paths make no region.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TraceRegionError {
+    /// A mask contains an editable curve that cannot be evaluated.
+    #[error("a mask curve cannot be evaluated")]
+    UnsupportedCurve,
     /// No mask path encloses an area: the trace has nothing to keep.
     #[error("no mask path encloses an area")]
     NoArea,
@@ -49,9 +52,21 @@ pub type RegionOperand = Vec<(Vec<OutlineTriple>, bool)>;
 /// The outlines of a mask path as the region's union reads them: the collector of the Boolean
 /// commands (a path's outlines, a clone's resolved ones, a primitive's rotated outline; text,
 /// images, sketches and dimensions have none).
-#[must_use]
-pub fn mask_operand(object: &curvyo_document_core::ObjectSnapshot) -> RegionOperand {
-    crate::boolean::outlines_of(object)
+/// # Errors
+/// Returns an error when an editable mask curve cannot be evaluated.
+pub fn mask_operand(
+    object: &curvyo_document_core::ObjectSnapshot,
+) -> Result<RegionOperand, TraceRegionError> {
+    if object
+        .drawn_path()
+        .is_some_and(|path| !path.curve_kind.is_bezier())
+    {
+        let evaluated =
+            crate::evaluate_object(object).map_err(|_| TraceRegionError::UnsupportedCurve)?;
+        Ok(crate::boolean::outlines_of(&evaluated))
+    } else {
+        Ok(crate::boolean::outlines_of(object))
+    }
 }
 
 impl TraceRegion {

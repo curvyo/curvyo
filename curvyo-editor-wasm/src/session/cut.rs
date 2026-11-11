@@ -52,7 +52,8 @@ impl Session {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     this.command_refusal = match &refusal {
-                        CutRefusal::Compound { offenders }
+                        CutRefusal::ExtendedPath { offenders, .. }
+                        | CutRefusal::Compound { offenders }
                         | CutRefusal::TextObjects { offenders }
                         | CutRefusal::OutOfRange { offenders, .. }
                         | CutRefusal::Texts(curvyo_ui_core::TextRefusal { offenders, .. }) => {

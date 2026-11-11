@@ -360,3 +360,49 @@ fn picking_generic_laser_removes_the_fixtures_and_undo_restores_them() {
     session.undo();
     assert_eq!(view(&session)["fixtures"].as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn placement_measures_variable_artwork_at_once_and_follows_its_profile() {
+    use curvyo_document_core::{AnchorId, NewAnchor};
+    let session = Session::open(3, LASER_V36).unwrap();
+    let id = session.document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(3, 101), Point::new(10.0, 10.0)),
+            NewAnchor::corner(AnchorId::new(3, 102), Point::new(30.0, 10.0)),
+        ],
+        false,
+    );
+    session
+        .document
+        .set_width_point(id, AnchorId::new(3, 103), 0.5, 2.0)
+        .unwrap();
+    let made = session.document.manufacturings()[0].clone();
+    let wide = session.placed_bounds_of(&made).unwrap();
+    assert!(session.take_unsupported_width_notice().is_empty());
+    let _ = session.frame_draw_list();
+    session
+        .document
+        .set_width_point(id, AnchorId::new(3, 103), 0.5, 1.0)
+        .unwrap();
+    let narrow = session.placed_bounds_of(&made).unwrap();
+    assert!(narrow.1.y - narrow.0.y < wide.1.y - wide.0.y);
+}
+
+#[test]
+fn placement_tessellation_uses_the_largest_nonuniform_scale() {
+    use curvyo_document_core::Affine;
+    let map = Affine::new(10.0, 0.0, 0.0, 0.1, 0.0, 0.0);
+    assert!((super::frame::linear_scale(map) - 10.0).abs() < 1e-12);
+    let rotated = Affine::new(0.0, 10.0, -0.1, 0.0, 0.0, 0.0);
+    assert!((super::frame::linear_scale(rotated) - 10.0).abs() < 1e-12);
+}
+
+#[test]
+fn enlarged_placement_requests_tolerance_in_source_space() {
+    use curvyo_document_core::Affine;
+    let tolerance = super::frame::placement_source_tolerance;
+    assert!(tolerance(Affine::scale(2.0, 2.0)).unwrap() <= 0.005);
+    assert!(tolerance(Affine::scale(10.0, 0.1)).unwrap() <= 0.001);
+    assert!(tolerance(Affine::scale(0.5, 0.8)).unwrap() <= 0.01);
+    assert!(tolerance(Affine::scale(f64::NAN, 1.0)).is_none());
+}

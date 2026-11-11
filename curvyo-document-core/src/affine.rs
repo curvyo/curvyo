@@ -1,7 +1,7 @@
 //! The 2x3 affine map a linked clone applies on top of its original
 //! (`specs/0049-linked-clone/adrs.md` decision 4).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::units::{Angle, Point, Vec2};
 
@@ -15,8 +15,8 @@ pub const SINGULAR_DETERMINANT: f64 = 1e-9;
 /// An affine map `x' = a·x + c·y + e`, `y' = b·x + d·y + f`, in SVG order, document
 /// millimetres, X right and Y down. The linear part is `(a, c; b, d)`; `e` and `f` are
 /// millimetres. Written to `document.json` as the list `[a, b, c, d, e, f]`.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-#[serde(into = "[f64; 6]")]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(into = "[f64; 6]", try_from = "[f64; 6]")]
 pub struct Affine {
     /// Row 1, column 1.
     pub a: f64,
@@ -143,6 +143,48 @@ impl Affine {
         ))
     }
 
+    /// Inverts a representable affine map without the clone-specific determinant threshold.
+    #[must_use]
+    pub fn inverse_representable(self) -> Option<Self> {
+        if !self.is_finite() {
+            return None;
+        }
+        let scale = self
+            .a
+            .abs()
+            .max(self.b.abs())
+            .max(self.c.abs())
+            .max(self.d.abs());
+        if scale == 0.0 {
+            return None;
+        }
+        let (a, b, c, d) = (
+            self.a / scale,
+            self.b / scale,
+            self.c / scale,
+            self.d / scale,
+        );
+        let determinant = a.mul_add(d, -c * b);
+        if determinant == 0.0 || !determinant.is_finite() {
+            return None;
+        }
+        let (a, b, c, d) = (
+            d / determinant / scale,
+            -b / determinant / scale,
+            -c / determinant / scale,
+            a / determinant / scale,
+        );
+        let result = Self::new(
+            a,
+            b,
+            c,
+            d,
+            -a.mul_add(self.e, c * self.f),
+            -b.mul_add(self.e, d * self.f),
+        );
+        result.is_finite().then_some(result)
+    }
+
     /// Whether every entry is a finite number.
     #[must_use]
     pub fn is_finite(self) -> bool {
@@ -165,6 +207,18 @@ impl Affine {
             && (self.a - self.d).abs() <= tolerance
             && (self.c + self.b).abs() <= tolerance
             && (self.a.mul_add(self.a, self.b * self.b) - 1.0).abs() <= tolerance
+    }
+}
+
+impl TryFrom<[f64; 6]> for Affine {
+    type Error = &'static str;
+    fn try_from(value: [f64; 6]) -> Result<Self, Self::Error> {
+        let matrix = Self::from_array(value);
+        if matrix.is_finite() && matrix.inverse_representable().is_some() {
+            Ok(matrix)
+        } else {
+            Err("invalid affine placement")
+        }
     }
 }
 

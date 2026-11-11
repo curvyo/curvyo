@@ -43,6 +43,8 @@ fn a_unit_without_leaves_in_the_objects_does_not_shift_the_others() {
     let units = Units::build(&document, None);
     let selection = ObjectSelection::new();
     let input = AlignInput {
+        geometry_objects: None,
+        artwork: None,
         document: &document,
         objects: &objects,
         units: &units,

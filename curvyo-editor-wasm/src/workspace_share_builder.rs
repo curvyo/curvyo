@@ -16,6 +16,8 @@ use crate::session::{APP_VERSION, PreparedShare};
 /// Why a scanned document stays out of the shared workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NotAdded {
+    /// Its editable curves or width profile are not supported by older collaboration peers.
+    UnsupportedDocument,
     /// It cannot be read.
     Unreadable,
     /// Its name or a folder's breaks a list naming rule, or differs from the name of a
@@ -124,6 +126,9 @@ impl WorkspaceShareBuilder {
     ) -> Result<(), NotAdded> {
         let (file, folder) = path.split_last().ok_or(NotAdded::Name)?;
         let opened = unpack(self.peer, bytes).map_err(|_| NotAdded::Unreadable)?;
+        if opened.has_extended_path_history() {
+            return Err(NotAdded::UnsupportedDocument);
+        }
         let parent = self.folder(folder)?;
         if self.files.iter().any(|(added, _)| same_path(added, path)) {
             return Err(NotAdded::Name);
@@ -213,6 +218,32 @@ mod tests {
 
     fn file() -> Vec<u8> {
         pack(&Document::new(3), "test").unwrap()
+    }
+
+    #[test]
+    fn profile_document_is_not_added_to_shared_snapshot() {
+        use curvyo_document_core::{AnchorId, NewAnchor, Point};
+        let document = Document::new(3);
+        let path = document.create_path(
+            &[
+                NewAnchor::corner(AnchorId::new(3, 1), Point::new(0.0, 0.0)),
+                NewAnchor::corner(AnchorId::new(3, 2), Point::new(10.0, 0.0)),
+            ],
+            false,
+        );
+        document
+            .set_width_point(path, AnchorId::new(3, 3), 0.5, 2.0)
+            .unwrap();
+        let mut builder = WorkspaceShareBuilder::new([0x57; 16], 9, 1, [3; 16]);
+        assert_eq!(
+            builder.add_document(
+                &p("profile.curvyo"),
+                &pack(&document, "test").unwrap(),
+                [0x11; 16]
+            ),
+            Err(NotAdded::UnsupportedDocument)
+        );
+        assert_eq!(builder.document_count(), 0);
     }
 
     /// Criterion 25: every readable document gets a fresh id and `share.json` v2, the list

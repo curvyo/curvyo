@@ -71,8 +71,12 @@ impl Session {
     pub fn finish_workspace_snapshot(&mut self, snapshot_id: [u8; 16]) -> Result<(), SessionError> {
         let channel = self.workspace_channel_mut().ok_or(SessionError::Ended)?;
         let covers = channel.snapshot_due.ok_or(SessionError::Ended)?;
-        let documents = std::mem::take(&mut channel.snapshot_documents);
-        self.upload_workspace_snapshot(covers, documents, snapshot_id)
+        let documents = channel.snapshot_documents.clone();
+        self.upload_workspace_snapshot(covers, documents, snapshot_id)?;
+        if let Some(channel) = self.workspace_channel_mut() {
+            channel.snapshot_documents.clear();
+        }
+        Ok(())
     }
 
     /// The file path of the workspace document `document`, as the list places it.
@@ -93,6 +97,14 @@ impl Session {
         documents: Vec<StreamEntry>,
         snapshot_id: [u8; 16],
     ) -> Result<(), SessionError> {
+        if self.document.has_extended_path_history()
+            || documents.iter().any(|entry| {
+                curvyo_document_core::unpack(self.peer, &entry.bytes)
+                    .map_or(true, |document| document.has_extended_path_history())
+            })
+        {
+            return Err(SessionError::UnsupportedDocument);
+        }
         let open = self.workspace_channel().and_then(|c| c.stream);
         let open_bytes = match open {
             Some(_) => Some(

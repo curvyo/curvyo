@@ -10,9 +10,12 @@ import { useFontPreview } from "@/hooks/useFontPreview";
 import { CanvasNotice } from "@/components/CanvasNotice";
 import { ErrorDialog } from "@/components/ErrorDialog";
 import { NodeToolbar } from "@/components/NodeToolbar";
+import { PenModeBar } from "@/components/PenModeBar";
 import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
+import { CurveToBezierButton } from "@/components/CurveToBezierButton";
 import { SelectToolbar } from "@/components/SelectToolbar";
+import { WidthDoneButton } from "@/components/WidthDoneButton";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { TraceBar } from "@/components/TraceBar";
@@ -22,7 +25,6 @@ import { useTraceInfo } from "@/hooks/useTraceInfo";
 import { focusCurrentFont } from "@/lib/textText";
 import { readRow2Open, writeRow2Open } from "@/lib/textBarRows";
 import { setPreviewOpen } from "@/lib/fontPreviewStore";
-import { CursorStatus } from "@/components/CursorStatus";
 import { createCursorPosition } from "@/lib/cursorPosition";
 import { useWorkbenches } from "@/hooks/useWorkbenches";
 import type { WorkbenchContext } from "@/workbenches/builtin";
@@ -48,7 +50,6 @@ import { useOperations } from "@/hooks/useOperations";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
-import { nodeCountText } from "@/lib/nodeText";
 import { isTauri, unsupportedReason } from "@/platform/host";
 
 /** The editor, or the reason this browser cannot run it. */
@@ -162,6 +163,9 @@ function Editor() {
   // Roles, leave, add back and the notices (`specs/0097-membership-lifecycle`).
   const membership = useMembership(editor, project, collab, workspace, workspaceSync, devices);
 
+  /** The Pen bar: centred, and at the right edge where the canvas is too narrow for it to clear
+   * the page's name label at the top left (`specs/0110` UX review U7). */
+  const PEN_BAR_PLACE = "justify-end min-[1100px]:justify-center";
   const workbench = workbenchEntry<WorkbenchContext, ReactNode>(activeKind(workbenches.list));
   const drawingOverlay = (
     <>
@@ -177,7 +181,11 @@ function Editor() {
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").
-            editor.tool === "select" || editor.tool === "trace" ? "justify-start" : "justify-center"
+            editor.tool === "select" || editor.tool === "trace" ? "justify-start" : editor.tool === "pen" ? PEN_BAR_PLACE : "justify-center"
+          } ${
+            // The Select bar's chips (Curve to Bézier, Width) go to a second row when they do
+            // not fit beside it, so they never squeeze it (`specs/0110` UX review U4).
+            editor.tool === "select" ? "flex-wrap items-start gap-y-2" : ""
           }`}
         >
           {editor.tool === "select" && editor.recognise.open ? (
@@ -244,6 +252,8 @@ function Editor() {
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
+          {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open ? <CurveToBezierButton editor={editor} /> : null}
+          {editor.tool === "select" || editor.tool === "pen" ? <WidthDoneButton editor={editor} /> : null}
           {editor.tool === "trace" ? (
             <TraceBar
               trace={editor.trace}
@@ -252,6 +262,7 @@ function Editor() {
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
+          {editor.tool === "pen" ? <PenModeBar editor={editor} /> : null}
           {editor.tool === "node" ? (
             <NodeToolbar
               closePath={{
@@ -427,15 +438,6 @@ function Editor() {
           fixtureJobs={fixtureJobs}
         />
       </div>
-      <CursorStatus
-        cursor={cursor}
-        format={documentPanel.cursorText}
-        sizeText={workbenches.view?.status ?? documentPanel.view.sizeText}
-        kind={workbenches.list.page.id ? workbenches.list.page : null}
-        zoomPercent={editor.zoomPercent}
-        nodeCountText={editor.tool === "node" ? nodeCountText(editor.nodeToolbarState) : null}
-        contextText={editor.getSession()?.out_of_context_status() ?? ""}
-      />
       <ErrorDialog
         title={openError?.title ?? "Can't open project"}
         message={openError?.message ?? null}
