@@ -31,9 +31,12 @@ fn find(in_assets: &str, in_workspace: &str) -> Option<PathBuf> {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let found = match std::env::var_os("VECTRACE_ASSETS") {
         Some(root) => Some(Path::new(&root).join(in_assets)).filter(|dir| dir.is_dir()),
-        None => [manifest.join("assets").join(in_assets), manifest.join(in_workspace)]
-            .into_iter()
-            .find(|dir| dir.is_dir()),
+        None => [
+            manifest.join("assets").join(in_assets),
+            manifest.join(in_workspace),
+        ]
+        .into_iter()
+        .find(|dir| dir.is_dir()),
     };
     if found.is_none() {
         let message =
