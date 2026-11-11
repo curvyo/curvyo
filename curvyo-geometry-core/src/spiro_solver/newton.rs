@@ -1,6 +1,6 @@
 //! Newton's iteration on the Spiro constraints, with its finite-difference Jacobian.
 
-use super::constraints::{assemble_residual, energy, maximum, residual_mode, segment_ends};
+use super::constraints::{Layout, energy, maximum, residual_mode, segment_ends};
 use super::linear::solve_linear;
 use super::{Failure, Solution};
 
@@ -16,22 +16,22 @@ const JACOBIAN_STEP: f64 = 1e-6;
 const RESIDUAL: f64 = 1e-8;
 
 /// The constraint Jacobian at `x` by central differences, one segment at a time: a segment's
-/// four coefficients only move the constraints at its two ends.
+/// four coefficients only move the constraints at its two ends, so only those rows are computed.
 fn jacobian(
     points: &[(f64, f64)],
-    closed: bool,
+    layout: &Layout,
     wrapped: bool,
     x: &[f64],
 ) -> Option<Vec<Vec<f64>>> {
     let n = x.len();
     let mut matrix = vec![vec![0.0; n]; n];
-    let base: Vec<_> = (0..n / 4)
+    let mut ends: Vec<_> = (0..n / 4)
         .map(|i| segment_ends(points, i, &x[4 * i..4 * i + 4], false))
         .collect::<Option<_>>()?;
     for col in 0..n {
         let step = JACOBIAN_STEP * (1.0 + x[col].abs());
         let segment = col / 4;
-        let mut ends = base.clone();
+        let base = ends[segment];
         let mut shifted = [
             x[4 * segment],
             x[4 * segment + 1],
@@ -39,14 +39,22 @@ fn jacobian(
             x[4 * segment + 3],
         ];
         shifted[col % 4] += step;
-        ends[segment] = segment_ends(points, segment, &shifted, false)?;
-        let plus = assemble_residual(points, closed, wrapped, &ends)?;
+        let plus = segment_ends(points, segment, &shifted, false)?;
         shifted[col % 4] -= 2.0 * step;
-        ends[segment] = segment_ends(points, segment, &shifted, false)?;
-        let minus = assemble_residual(points, closed, wrapped, &ends)?;
-        for row in 0..n {
-            matrix[row][col] = (plus[row] - minus[row]) / (2.0 * step);
+        let minus = segment_ends(points, segment, &shifted, false)?;
+        for knot in layout.knots_of(segment) {
+            ends[segment] = plus;
+            let (row, high, count) = layout.knot(knot, wrapped, &ends);
+            ends[segment] = minus;
+            let (_, low, _) = layout.knot(knot, wrapped, &ends);
+            for (target, (high, low)) in matrix[row..row + count]
+                .iter_mut()
+                .zip(high.iter().zip(&low))
+            {
+                target[col] = (high - low) / (2.0 * step);
+            }
         }
+        ends[segment] = base;
     }
     Some(matrix)
 }
@@ -62,6 +70,7 @@ pub(super) fn newton(
     damped: bool,
 ) -> Result<Solution, Failure> {
     let mut accurate = false;
+    let layout = Layout::new(points, closed);
     let mut r = residual_mode(points, closed, wrapped, &x, accurate).ok_or(Failure::Invalid)?;
     for _ in 0..MAX_ITERATIONS {
         if maximum(&r) < RESIDUAL {
@@ -81,7 +90,7 @@ pub(super) fn newton(
                 .ok_or(Failure::NoConvergence)?;
             continue;
         }
-        let matrix = jacobian(points, closed, wrapped, &x).ok_or(Failure::NoConvergence)?;
+        let matrix = jacobian(points, &layout, wrapped, &x).ok_or(Failure::NoConvergence)?;
         let rhs: Vec<f64> = r.iter().map(|v| -v).collect();
         let delta = solve_linear(matrix, rhs).ok_or(Failure::NoConvergence)?;
         let old = energy(&r);

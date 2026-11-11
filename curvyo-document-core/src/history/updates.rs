@@ -89,30 +89,70 @@ impl Document {
         // A peer's updates may carry membership keys: the sweep is on from here (ADR 0046 §3).
         self.member_keys_may_exist.set(true);
         // Loro can apply part of a malformed or incomplete update before reporting the
-        // problem. Validate a fork first so rejected data cannot mutate the live document.
-        let trial = self.loro().fork();
-        let before = trial.oplog_vv();
-        let status = trial.import(bytes).map_err(|_| SyncError::Malformed)?;
-        if status.pending.is_some() {
-            return Err(SyncError::Pending);
+        // problem. Validate on a copy first so rejected data cannot mutate the live document.
+        let mut slot = self.import_trial.borrow_mut();
+        let trial = self.caught_up_trial(slot.take());
+        let verdict = check_on_trial(&trial, bytes, shared);
+        if verdict.is_ok() {
+            self.loro()
+                .import(bytes)
+                .map_err(|_| SyncError::Malformed)?;
+            // The copy took the same bytes: it equals the document and serves the next import.
+            *slot = Some(trial);
         }
-        let alone = LoroDoc::new();
-        alone.import(bytes).map_err(|_| SyncError::Malformed)?;
-        if writes_newer_format(&alone, &VersionVector::default())
-            || writes_newer_format(&trial, &before)
-            || !format_is_readable(&trial)
-            || !crate::path_codec::validate_path_tree(&trial, OBJECTS_TREE)
-        {
-            return Err(SyncError::Malformed);
-        }
-        if shared && crate::width_profile::history_marker_written(&trial, &before) {
-            return Err(SyncError::Malformed);
-        }
-        self.loro()
-            .import(bytes)
-            .map_err(|_| SyncError::Malformed)?;
-        Ok(())
+        verdict
     }
+
+    /// Makes the trial copy of the log now, when there is none.
+    pub(crate) fn prepare_import_trial(&self) {
+        let mut slot = self.import_trial.borrow_mut();
+        if slot.is_none() {
+            let trial = self.loro().fork();
+            // A fork decodes its containers and indexes its tree on first read; one check of
+            // the whole tree here keeps that out of the first import.
+            let _ = crate::path_codec::validate_path_tree(&trial, OBJECTS_TREE);
+            *slot = Some(trial);
+        }
+    }
+
+    /// The trial copy of the log, brought up to this document's state: the kept one with the
+    /// local changes since the last import, or a fresh fork when there is none or it went its
+    /// own way.
+    fn caught_up_trial(&self, kept: Option<LoroDoc>) -> LoroDoc {
+        let live = self.loro().oplog_vv();
+        if let Some(trial) = kept.filter(|trial| live.includes_vv(&trial.oplog_vv())) {
+            let missing = self.loro().export(ExportMode::updates(&trial.oplog_vv()));
+            if missing.is_ok_and(|missing| trial.import(&missing).is_ok())
+                && trial.oplog_vv() == self.loro().oplog_vv()
+            {
+                return trial;
+            }
+        }
+        self.loro().fork()
+    }
+}
+
+/// Imports `bytes` into `trial` and checks the result like an opened file; `trial` holds the
+/// bytes afterwards either way.
+fn check_on_trial(trial: &LoroDoc, bytes: &[u8], shared: bool) -> Result<(), SyncError> {
+    let before = trial.oplog_vv();
+    let status = trial.import(bytes).map_err(|_| SyncError::Malformed)?;
+    if status.pending.is_some() {
+        return Err(SyncError::Pending);
+    }
+    let alone = LoroDoc::new();
+    alone.import(bytes).map_err(|_| SyncError::Malformed)?;
+    if writes_newer_format(&alone, &VersionVector::default())
+        || writes_newer_format(trial, &before)
+        || !format_is_readable(trial)
+        || !crate::path_codec::validate_path_tree(trial, OBJECTS_TREE)
+    {
+        return Err(SyncError::Malformed);
+    }
+    if shared && crate::width_profile::history_marker_written(trial, &before) {
+        return Err(SyncError::Malformed);
+    }
+    Ok(())
 }
 
 impl Document {

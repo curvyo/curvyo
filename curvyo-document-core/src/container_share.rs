@@ -115,9 +115,14 @@ impl WorkspaceShareRecord {
 }
 
 impl crate::Document {
-    /// Records whether this document is currently attached to a live collaboration link.
+    /// Records whether this document is currently attached to a live collaboration link. An
+    /// attached document prepares its copy for checking remote updates here, so the first update
+    /// a frame imports does not pay for it.
     pub fn set_live_share(&self, active: bool) {
         self.live_share.set(active);
+        if active {
+            self.prepare_import_trial();
+        }
     }
 
     /// Whether curve-kind and width-profile edits are refused because the document is shared

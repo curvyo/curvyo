@@ -177,6 +177,46 @@ fn shared_import_rejects_new_feature_history_without_mutation() {
     assert_eq!(peer.width_points(id).unwrap().len(), 1);
 }
 
+/// The copy remote updates are checked on is kept between imports: it follows the local edits
+/// made in between, and a refused update neither reaches the document nor spoils the next check.
+#[test]
+fn kept_trial_copy_follows_local_edits_and_refusals() {
+    let source = Document::new(33);
+    let first = path(&source);
+    let peer = unpack(34, &pack(&source, "test").unwrap()).unwrap();
+    peer.set_live_share(true);
+    let mut seen = peer.version();
+    let mut send = |source: &Document, peer: &Document, shared: bool| {
+        let update = source.export_updates(&seen).unwrap();
+        let result = if shared {
+            peer.import_shared_updates(&update)
+        } else {
+            peer.import_updates(&update)
+        };
+        if result.is_ok() {
+            seen = source.version();
+        }
+        result
+    };
+    let second = path(&source);
+    send(&source, &peer, true).unwrap();
+    let local = path(&peer);
+    let third = path(&source);
+    send(&source, &peer, true).unwrap();
+    source
+        .set_width_point(first, AnchorId::new(33, 9), 0.5, 2.0)
+        .unwrap();
+    let before = peer.version();
+    assert!(send(&source, &peer, true).is_err());
+    assert_eq!(peer.version(), before);
+    send(&source, &peer, false).unwrap();
+    for id in [first, second, third, local] {
+        assert!(peer.object(id).is_some());
+    }
+    assert_eq!(peer.width_points(first).unwrap().len(), 1);
+    assert_eq!(peer.object_ids().len(), 4);
+}
+
 #[test]
 fn invalid_incoming_marker_does_not_mutate_live_document() {
     use loro::{ExportMode, LoroDoc};

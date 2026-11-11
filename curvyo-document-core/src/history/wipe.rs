@@ -94,6 +94,7 @@ impl Document {
     /// Swaps in a rewritten log and forgets everything derived from the old one.
     fn replace_loro(&mut self, fresh: LoroDoc) {
         self.loro = fresh;
+        *self.import_trial.borrow_mut() = None;
         *self.step_index.borrow_mut() = super::StepIndex::default();
         *self.container_index.borrow_mut() = super::ContainerIndex::default();
         *self.object_index.borrow_mut() = super::ObjectIndex::default();

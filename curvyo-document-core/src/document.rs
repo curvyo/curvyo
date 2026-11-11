@@ -545,6 +545,10 @@ pub struct Document {
     pub(crate) legacy_share: std::cell::Cell<bool>,
     /// Whether a live collaboration link is attached; shared history is never wiped (ADR 0053).
     pub(crate) live_share: std::cell::Cell<bool>,
+    /// A copy of the log that remote updates are tried on before the document takes them
+    /// (`crate::history::updates`); kept between imports so a check costs the update, not a
+    /// fork of the whole document. Derived state, never stored.
+    pub(crate) import_trial: std::cell::RefCell<Option<LoroDoc>>,
 }
 
 impl Document {
@@ -620,6 +624,7 @@ impl Document {
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
             live_share: std::cell::Cell::default(),
+            import_trial: std::cell::RefCell::default(),
         }
     }
 
@@ -691,6 +696,7 @@ impl Document {
             share: std::cell::RefCell::default(),
             legacy_share: std::cell::Cell::default(),
             live_share: std::cell::Cell::default(),
+            import_trial: std::cell::RefCell::default(),
         };
         // One scan at open: a file with membership keys keeps the sweep on.
         doc.member_keys_may_exist
