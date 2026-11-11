@@ -40,6 +40,9 @@ export function strokeToPathNotice(result: StrokeToPathResult): StrokeToPathNoti
   if (result.kind === "applied") {
     return null;
   }
+  if (result.kind === "unsupported_extended_path") {
+    return { text: "Stroke to path is not yet available for editable curves or variable widths.", alert: true };
+  }
   const refusal = textRefusalText(result) ?? sharedRefusalText(STROKE_TO_PATH_NAME, result);
   return refusal ? { text: refusal, alert: true } : null;
 }

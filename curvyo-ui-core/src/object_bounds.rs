@@ -44,7 +44,24 @@ fn anchors_bounds(anchors: &[(Point, Vec2, Vec2)], closed: bool) -> (Point, Poin
 /// The bounds of all of a path's outlines (criterion 34: a compound path's
 /// selection box is the box of every outline).
 fn path_bounds(path: &PathSnapshot) -> (Point, Point) {
-    path.subpaths()
+    if !path.width_points.is_empty()
+        && let Ok((fill, outline)) = crate::verified_variable_stroke_artwork(path)
+    {
+        let (low, high) = path_bounds(&fill);
+        if let Some(outline) = outline {
+            let (other_low, other_high) = path_bounds(&outline);
+            return (
+                Point::new(low.x.min(other_low.x), low.y.min(other_low.y)),
+                Point::new(high.x.max(other_high.x), high.y.max(other_high.y)),
+            );
+        }
+        return (low, high);
+    }
+    let Ok(evaluated) = crate::evaluate_path(path) else {
+        return (Point::new(0.0, 0.0), Point::new(0.0, 0.0));
+    };
+    evaluated
+        .subpaths()
         .map(|subpath| {
             let anchors: Vec<_> = subpath
                 .anchors
@@ -154,6 +171,51 @@ pub fn object_outline_bounds(object: &ObjectSnapshot) -> (Point, Point) {
     }
 }
 
+pub(crate) fn object_outline_bounds_with_artwork(
+    object: &ObjectSnapshot,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<(Point, Point)> {
+    if let Some(picture) = profiled_picture(object) {
+        return leaves_union(picture, |leaf| {
+            object_outline_bounds_with_artwork(leaf, artwork)
+        });
+    }
+    let Some(path) = object
+        .drawn_path()
+        .filter(|path| !path.width_points.is_empty())
+    else {
+        return Some(object_outline_bounds(object));
+    };
+    let result = artwork(path)?;
+    let (low, high) = object_outline_bounds(&ObjectSnapshot::Path(result.0.clone()));
+    Some(result.1.as_ref().map_or((low, high), |outline| {
+        let (other_low, other_high) = object_outline_bounds(&ObjectSnapshot::Path(outline.clone()));
+        (
+            Point::new(low.x.min(other_low.x), low.y.min(other_low.y)),
+            Point::new(high.x.max(other_high.x), high.y.max(other_high.y)),
+        )
+    }))
+}
+
+/// Computes object bounds using cached variable-stroke artwork.
+#[must_use]
+pub fn object_bounds_with_artwork(
+    object: &ObjectSnapshot,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<(Point, Point)> {
+    if let Some(picture) = profiled_picture(object) {
+        return leaves_union(picture, |leaf| object_bounds_with_artwork(leaf, artwork));
+    }
+    if object
+        .drawn_path()
+        .is_some_and(|path| !path.width_points.is_empty())
+    {
+        object_outline_bounds_with_artwork(object, artwork)
+    } else {
+        Some(object_bounds(object))
+    }
+}
+
 /// The box around the outlines of every effectively visible object of
 /// `document`, on the pasteboard or not: the union of [`object_outline_bounds`]
 /// (curve extremes, rotated outlines, no stroke width). `None` for a document
@@ -178,6 +240,22 @@ pub fn content_bounds(document: &Document) -> Option<(Point, Point)> {
 }
 
 /// The box around every box of `boxes`; a point at the origin for none.
+/// The leaves of a picture clone that draws a variable-width stroke; `None` for any other object.
+pub(crate) fn profiled_picture(object: &ObjectSnapshot) -> Option<&[ObjectSnapshot]> {
+    object
+        .picture()
+        .filter(|_| !crate::profiled_paths(object).is_empty())
+}
+
+/// The union of `bounds` over `leaves`; `None` when one leaf has none.
+fn leaves_union(
+    leaves: &[ObjectSnapshot],
+    bounds: impl Fn(&ObjectSnapshot) -> Option<(Point, Point)>,
+) -> Option<(Point, Point)> {
+    let boxes = leaves.iter().map(bounds).collect::<Option<Vec<_>>>()?;
+    Some(union_of(boxes.into_iter()))
+}
+
 fn union_of(boxes: impl Iterator<Item = (Point, Point)>) -> (Point, Point) {
     boxes
         .reduce(|(a, b), (c, d)| {

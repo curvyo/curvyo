@@ -198,16 +198,16 @@ fn the_eyedropper_cursor_wins_over_group_handles_and_the_pen() {
     assert_eq!(session.cursor_hint(), "eyedropper");
 }
 
-/// `0034` criterion 2: a Pen continuation counts as an unfinished path, so the panel is empty.
+/// The document panel remains visible while continuing a Pen path.
 #[test]
-fn a_pen_continuation_empties_the_panel() {
+fn a_pen_continuation_keeps_the_document_panel() {
     let document = Document::new(1);
     let _ = document.create_path(&[node(1, 0.0, 0.0), node(2, 100.0, 0.0)], false);
     let mut session = session_of(&document, Tool::Pen);
     assert_eq!(session.panel_content(), PanelContent::Document);
     click(&mut session, pt(100.0, 0.0), false);
     assert!(session.pen_in_progress().is_some());
-    assert_eq!(session.panel_content(), PanelContent::Empty);
+    assert_eq!(session.panel_content(), PanelContent::Document);
     // Also with a selection behind the Pen.
     session.finish_pen();
     session.set_tool(Tool::Select);
@@ -216,7 +216,7 @@ fn a_pen_continuation_empties_the_panel() {
     session.set_tool(Tool::Pen);
     click(&mut session, pt(100.0, 0.0), false);
     assert!(session.pen_in_progress().is_some());
-    assert_eq!(session.panel_content(), PanelContent::Empty);
+    assert_eq!(session.panel_content(), PanelContent::Document);
 }
 
 /// `0019` criterion 6 with `0035` criterion 15: Break apart into several parts shows the

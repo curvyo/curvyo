@@ -75,7 +75,8 @@ impl Session {
                 Err(refusal) => {
                     let offenders = match &refusal {
                         WeldRefusal::Texts(texts) => &texts.offenders,
-                        WeldRefusal::NoArea { offenders, .. }
+                        WeldRefusal::ExtendedPath { offenders, .. }
+                        | WeldRefusal::NoArea { offenders, .. }
                         | WeldRefusal::OutOfRange { offenders, .. } => offenders,
                     };
                     this.command_refusal = Some(RefusalMarks::new(offenders.clone(), &selection));

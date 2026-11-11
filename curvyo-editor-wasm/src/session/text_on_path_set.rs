@@ -94,10 +94,16 @@ impl Session {
         if pairs.is_empty() {
             return;
         }
-        if self.document.put_text_on_paths(id, &pairs, true).is_ok() {
-            self.selection.select_single(id);
-            self.text_path.announcement = Some("Put on paths");
-            self.text_path.notice = Some(format!("Put text on {} paths.", pairs.len()));
+        match self.document.put_text_on_paths(id, &pairs, true) {
+            Ok(_) => {
+                self.selection.select_single(id);
+                self.text_path.announcement = Some("Put on paths");
+                self.text_path.notice = Some(format!("Put text on {} paths.", pairs.len()));
+            }
+            Err(curvyo_document_core::TextEditError::NeedsCurveConversion) => {
+                self.text_path.notice = Some("Convert the editable curve to Bézier before putting text on it. Nothing changed.".to_owned());
+            }
+            Err(_) => {}
         }
     }
 

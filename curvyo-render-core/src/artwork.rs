@@ -102,10 +102,8 @@ fn draw_one(
         // A clone with a rigid map of a plain root reuses the root's tessellation
         // (`specs/0049-linked-clone` criterion 44).
         ObjectSnapshot::Clone(clone) if shared.draw(list, clone, view) => {}
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
-            draw_path(list, path, view, budgets);
-        }
+        ObjectSnapshot::Path(path) => draw_path(list, path, view, budgets),
+        ObjectSnapshot::Clone(clone) => draw_path(list, &clone.resolved, view, budgets),
         ObjectSnapshot::Sketch(sketch) => {
             draw_path(list, &sketch.resolved, view, budgets);
         }
@@ -137,8 +135,10 @@ fn draw_guide(
     budgets: &mut FrameBudgets,
 ) {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. }) => {
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_) => {
+            let Some(path) = object.drawn_path() else {
+                return;
+            };
             let outlines: Vec<OutlineRef<'_>> = path
                 .subpaths()
                 .map(|subpath| OutlineRef {

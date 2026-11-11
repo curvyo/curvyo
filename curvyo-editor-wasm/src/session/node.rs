@@ -17,7 +17,36 @@ use curvyo_ui_core::{
 
 use super::{Session, Tool};
 
+pub(super) fn control_view(path: &PathSnapshot) -> PathSnapshot {
+    let mut view = path.clone();
+    if let Some(matrix) = path.spiro_transform.as_deref().copied() {
+        for anchor in view.all_anchors_mut() {
+            anchor.point = matrix.apply_point(anchor.point);
+            anchor.handle_in = matrix.apply_vector(anchor.handle_in);
+            anchor.handle_out = matrix.apply_vector(anchor.handle_out);
+        }
+    }
+    view
+}
+
 impl Session {
+    pub(super) fn capture_node_spiro_sources(&mut self, paths: &[PathSnapshot], point: Point) {
+        let moved = self.node.snapping_points(paths, point);
+        self.node_spiro_sources = moved
+            .into_iter()
+            .filter_map(|(id, _, _)| self.document.path(id))
+            .filter(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+            .fold(Vec::new(), |mut sources, path| {
+                if !sources
+                    .iter()
+                    .any(|source: &PathSnapshot| source.id == path.id)
+                {
+                    sources.push(path);
+                }
+                sources
+            });
+    }
+
     /// [`Session::paths`], with the node tool's in-flight drag (if any)
     /// substituted into the relevant anchor's live, not-yet-committed
     /// position/handle values — resolved by [`NodeTool::live_drag`]
@@ -62,7 +91,7 @@ impl Session {
         if self.cuts_node_set(&paths) {
             paths.retain(|path| self.selection.contains(path.id));
         }
-        paths
+        paths.iter().map(control_view).collect()
     }
 
     /// `paths` cut to the editing set: those whose id is selected, or all when none is.
@@ -109,10 +138,16 @@ impl Session {
             }
             LiveNodeDrag::Nodes { positions } => {
                 for (path, id, point) in positions {
-                    if let Some(snapshot) = paths.iter_mut().find(|p| p.id == path)
-                        && let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == id)
-                    {
-                        anchor.point = point;
+                    if let Some(snapshot) = paths.iter_mut().find(|p| p.id == path) {
+                        let local = snapshot
+                            .spiro_transform
+                            .as_deref()
+                            .copied()
+                            .and_then(curvyo_document_core::Affine::inverse_representable)
+                            .map_or(point, |inverse| inverse.apply_point(point));
+                        if let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == id) {
+                            anchor.point = local;
+                        }
                     }
                 }
             }
@@ -128,11 +163,20 @@ impl Session {
                 // `Document::set_handle` itself commits with) — a plain
                 // assignment, no slot/mirror logic of its own to
                 // independently drift from the commit.
-                if let Some(snapshot) = paths.iter_mut().find(|p| p.id == path)
-                    && let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == anchor)
-                {
-                    anchor.handle_in = handle_in;
-                    anchor.handle_out = handle_out;
+                if let Some(snapshot) = paths.iter_mut().find(|p| p.id == path) {
+                    let inverse = snapshot
+                        .spiro_transform
+                        .as_deref()
+                        .copied()
+                        .and_then(curvyo_document_core::Affine::inverse_representable);
+                    let local_in =
+                        inverse.map_or(handle_in, |matrix| matrix.apply_vector(handle_in));
+                    let local_out =
+                        inverse.map_or(handle_out, |matrix| matrix.apply_vector(handle_out));
+                    if let Some(anchor) = snapshot.all_anchors_mut().find(|a| a.id == anchor) {
+                        anchor.handle_in = local_in;
+                        anchor.handle_out = local_out;
+                    }
                 }
             }
         }
@@ -288,6 +332,9 @@ impl Session {
                     style: path.style.clone(),
                     anchors: segment.to_vec(),
                     extra_subpaths: Vec::new(),
+                    curve_kind: curvyo_document_core::CurveKind::Bezier,
+                    spiro_transform: None,
+                    width_points: Vec::new(),
                     rotation: path.rotation,
                 })
             })

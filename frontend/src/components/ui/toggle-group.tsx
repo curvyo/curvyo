@@ -27,8 +27,11 @@ interface ToggleGroupProps<T extends string> {
   disabled?: boolean;
   /** Item width in px: 40 for Join and Cap, 44 for Paint and Fill type. */
   itemWidth: number;
-  /** Item height in px: 28, or 32 for Fill type. */
+  /** Item height in px: 28, or 32 for Fill type and the Pen bar. */
   itemHeight?: number;
+  /** Where the tooltips open: left of the item, or below it for a bar at the top of the canvas
+   * (the Pen bar, `specs/0110` UX review U6). */
+  tooltipSide?: "left" | "bottom";
   /** After a mouse click, so the letter keys keep working. */
   onReturnFocus: () => void;
   /** Marks the group's tab stop as the panel's first focus target. */
@@ -56,6 +59,7 @@ export function ToggleGroup<T extends string>({
   disabled = false,
   itemWidth,
   itemHeight = 28,
+  tooltipSide = "left",
   onReturnFocus,
   firstFocus = false,
 }: ToggleGroupProps<T>) {
@@ -90,7 +94,7 @@ export function ToggleGroup<T extends string>({
       className={`inline-flex w-fit shrink-0 self-start overflow-hidden rounded-[5px] border ${BORDER}`}
     >
       {options.map((option, index) => (
-        <Tooltip key={option.value} side="left" content={option.tooltip}>
+        <Tooltip key={option.value} side={tooltipSide} content={option.tooltip}>
           <RadioGroup.Item
             value={option.value}
             data-value={option.value}

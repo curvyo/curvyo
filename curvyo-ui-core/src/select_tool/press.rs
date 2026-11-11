@@ -9,10 +9,9 @@ use curvyo_document_core::{NodeId, ObjectSnapshot, Point, Tolerance};
 use super::handles::sole_selected;
 use super::move_drag::MoveDrag;
 use super::{SelectDrag, SelectTool};
-use crate::hit_test_object::{filled_interior_above, hit_test_object};
+use crate::hit_test_object::{filled_interior_above_with_artwork, hit_test_object_with_artwork};
 use crate::modifiers::Modifiers;
 use crate::object_selection::ObjectSelection;
-use crate::oriented_box::oriented_bounds;
 use crate::transform_drag::DragOrigin;
 use crate::transform_handle_layout::{EditHandle, TransformHandleTolerances};
 use crate::units::Units;
@@ -86,6 +85,31 @@ pub fn classify_press(
     handle_tolerances: TransformHandleTolerances,
     modifiers: Modifiers,
 ) -> PressTarget {
+    classify_press_with_artwork(
+        objects,
+        pickable,
+        selection,
+        point,
+        tolerance,
+        handle_tolerances,
+        modifiers,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+/// Classifies a press using already-computed variable-stroke artwork.
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+pub fn classify_press_with_artwork(
+    objects: &[ObjectSnapshot],
+    pickable: &[ObjectSnapshot],
+    selection: &ObjectSelection,
+    point: Point,
+    tolerance: Tolerance,
+    handle_tolerances: TransformHandleTolerances,
+    modifiers: Modifiers,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> PressTarget {
     let shift = modifiers.shift;
     if PressTarget::arms_lasso(modifiers) {
         return PressTarget::Lasso;
@@ -95,27 +119,42 @@ pub fn classify_press(
     // criteria 11, 43 step 2). The box has no hit area of its own, so a press
     // that hits no handle goes on to the objects (criteria 16, 45).
     if selection.ids().len() >= 2 {
-        return match SelectTool::group_handle_at(
+        return match SelectTool::group_handle_at_with_artwork(
             objects,
             selection,
             point,
             handle_tolerances,
             shift,
             true,
+            artwork,
         ) {
             Some((_, EditHandle::Move)) => PressTarget::CentreHandle,
             Some((_, handle)) => PressTarget::Handle(handle),
-            None => hit_test_object(pickable, point, tolerance)
+            None => hit_test_object_with_artwork(pickable, point, tolerance, artwork)
                 .map_or(PressTarget::Empty, PressTarget::Object),
         };
     }
-    if let Some((_, _, handle)) =
-        SelectTool::handle_at(objects, selection, point, handle_tolerances, shift)
-    {
+    if let Some((_, _, handle)) = SelectTool::query_handle(
+        objects,
+        selection,
+        point,
+        handle_tolerances,
+        shift,
+        false,
+        artwork,
+    ) {
         return PressTarget::Handle(handle);
     }
     if matches!(
-        SelectTool::hover_handle_at(objects, selection, point, handle_tolerances, shift),
+        SelectTool::query_handle(
+            objects,
+            selection,
+            point,
+            handle_tolerances,
+            shift,
+            true,
+            artwork
+        ),
         Some((_, _, EditHandle::Move))
     ) {
         return PressTarget::CentreHandle;
@@ -127,12 +166,17 @@ pub fn classify_press(
     // exception is a *filled* object lying above the selected one at that
     // point: the press goes to it, or it could never be reached without
     // deselecting first (`0007` criterion 29).
-    if !shift && !modifiers.ctrl && SelectTool::is_inside_selected_box(objects, selection, point) {
-        let above = sole_selected(objects, selection)
-            .and_then(|selected| filled_interior_above(pickable, selected.id(), point));
+    if !shift
+        && !modifiers.ctrl
+        && SelectTool::is_inside_selected_box(objects, selection, point, artwork)
+    {
+        let above = sole_selected(objects, selection).and_then(|selected| {
+            filled_interior_above_with_artwork(pickable, selected.id(), point, artwork)
+        });
         return above.map_or(PressTarget::InsideSelectedBox, PressTarget::Object);
     }
-    hit_test_object(pickable, point, tolerance).map_or(PressTarget::Empty, PressTarget::Object)
+    hit_test_object_with_artwork(pickable, point, tolerance, artwork)
+        .map_or(PressTarget::Empty, PressTarget::Object)
 }
 
 /// The move a press on `hit`'s outline or body begins, with the selection
@@ -149,6 +193,7 @@ pub(super) fn begin_object_press(
     shift: bool,
     origin: DragOrigin,
     units: &Units,
+    artwork: &crate::VariableArtworkLookup<'_>,
 ) -> MoveDrag {
     if shift {
         // A group joins as a whole: the bounds of the move include all its leaves.
@@ -157,7 +202,7 @@ pub(super) fn begin_object_press(
         if joins.is_some() {
             wider.add_all(units.leaves_with(&hit));
         }
-        let mut drag = MoveDrag::new(origin, false, objects, &wider, None);
+        let mut drag = MoveDrag::new(origin, false, objects, &wider, None, artwork);
         drag.joins = joins;
         drag.pending_toggle = Some(hit);
         return drag;
@@ -166,7 +211,7 @@ pub(super) fn begin_object_press(
         // A group is selected as a whole (`0023` criterion 8).
         selection.set(units.leaves_with(&hit));
     }
-    MoveDrag::new(origin, false, objects, selection, None)
+    MoveDrag::new(origin, false, objects, selection, None, artwork)
 }
 
 impl SelectTool {
@@ -180,17 +225,20 @@ impl SelectTool {
         origin: DragOrigin,
         handle: EditHandle,
         tolerances: &TransformHandleTolerances,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) {
         // The handle of a multi-selection's group box begins a group drag.
         if selection.ids().len() >= 2 {
-            self.begin_group_press(objects, selection, origin, handle);
+            self.begin_group_press(objects, selection, origin, handle, artwork);
             return;
         }
         // A handle belongs to the sole selected object, so it exists here.
         let Some(object) = sole_selected(objects, selection) else {
             return;
         };
-        let box_ = oriented_bounds(object);
+        let Some(box_) = crate::oriented_box::oriented_bounds_with_artwork(object, artwork) else {
+            return;
+        };
         self.drag = SelectDrag::Transforming(
             self.begin_handle_drag(origin, object, box_, handle, tolerances),
         );

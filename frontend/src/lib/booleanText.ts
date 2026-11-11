@@ -113,6 +113,8 @@ export function sharedRefusalText(
 ): string | null {
   const objects = plural(result.of, "selected object", "selected objects");
   switch (result.kind) {
+    case "extended_path":
+      return `${name} requires converting editable curves to Bézier paths and variable strokes to outlines first. ${NOTHING_CHANGED}`;
     case "no_area": {
       const verb = result.count === 1 ? "has" : "have";
       // "1 of 1" reads wrong (`0068` UX notes, "Refusals").
@@ -149,6 +151,7 @@ export function refusalText(op: BooleanOp, result: BooleanResult): string | null
 export function refusalOutlinesObjects(result: BooleanResult): boolean {
   return (
     textRefusalOutlines(result.kind) ||
+    result.kind === "extended_path" ||
     result.kind === "no_area" ||
     result.kind === "out_of_range" ||
     result.kind === "groups"

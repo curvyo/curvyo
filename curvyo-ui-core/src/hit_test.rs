@@ -245,6 +245,10 @@ fn near_control_polygon(
 fn hit_test_segment(paths: &[PathSnapshot], point: Point, tolerance: Tolerance) -> Option<Hit> {
     let mut best: Option<(f64, Hit)> = None;
     for snapshot in paths {
+        // Editable spline controls are not Bézier artwork segments.
+        if snapshot.curve_kind != curvyo_document_core::CurveKind::Bezier {
+            continue;
+        }
         for (start, end) in segments(snapshot) {
             if !near_control_polygon(start, end, point, tolerance) {
                 continue;

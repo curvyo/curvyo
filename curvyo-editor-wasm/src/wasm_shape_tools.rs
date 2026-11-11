@@ -79,6 +79,28 @@ impl WasmSession {
         Ok(())
     }
 
+    /// Whether the selected B-spline can be offered for Bézier conversion.
+    #[must_use]
+    pub fn can_convert_selected_bspline_to_bezier(&self) -> bool {
+        self.session.can_convert_selected_bspline_to_bezier()
+    }
+
+    /// Converts the selected B-spline to a Bézier path.
+    pub fn convert_selected_bspline_to_bezier(&mut self) -> bool {
+        self.session.convert_selected_bspline_to_bezier()
+    }
+
+    /// Whether the selected Spiro can be offered for Bézier conversion.
+    #[must_use]
+    pub fn can_convert_selected_spiro_to_bezier(&self) -> bool {
+        self.session.can_convert_selected_spiro_to_bezier()
+    }
+
+    /// Converts the selected Spiro to a Bézier path.
+    pub fn convert_selected_spiro_to_bezier(&mut self) -> bool {
+        self.session.convert_selected_spiro_to_bezier()
+    }
+
     /// "Object to path" (acceptance criteria 17, 21, 22).
     pub fn convert_selected_to_paths(&mut self) {
         self.session.convert_selected_to_paths();

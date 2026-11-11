@@ -56,10 +56,14 @@ export function saveSvgExportOptions(
 /** What the session's `export_svg` answered. */
 export type SvgExportAnswer =
   | { kind: "svg"; objects: number; kept: number; text: string }
-  | { kind: "nothing-selected" };
+  | { kind: "nothing-selected" }
+  | { kind: "unsupported-extended-path" };
 
 /** Reads `"svg:<objects>:<kept>:<text>"` or `"nothing-selected"`. */
 export function parseSvgExportAnswer(answer: string): SvgExportAnswer {
+  if (answer === "unsupported-extended-path") {
+    return { kind: "unsupported-extended-path" };
+  }
   if (!answer.startsWith("svg:")) {
     return { kind: "nothing-selected" };
   }

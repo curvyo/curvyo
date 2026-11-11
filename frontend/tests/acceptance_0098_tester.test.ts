@@ -167,8 +167,8 @@ test("AC6: the header chip is on the page-scoped tabs only", () => {
   assert.deepEqual(names.sort(), ["document", "grid", "layers", "parameters", "sketches", "snapping", "style"]);
 });
 
-test("AC6: the chip is in the page row, the canvas label and the status bar", () => {
-  for (const file of ["components/panel/PagesBlock.tsx", "components/PageFrames.tsx", "components/StatusBar.tsx"]) {
+test("AC6: the chip is in the page row and the canvas label", () => {
+  for (const file of ["components/panel/PagesBlock.tsx", "components/PageFrames.tsx"]) {
     assert.match(source(file), /<KindChip/, file);
   }
 });
@@ -275,7 +275,6 @@ test("AC18a: the shell names no laser process", () => {
     "components/panel/PropertiesPanel.tsx",
     "components/panel/PagesBlock.tsx",
     "components/panel/AddPageGroup.tsx",
-    "components/StatusBar.tsx",
     "components/PageFrames.tsx",
     "workbenches/registry.ts",
   ]) {

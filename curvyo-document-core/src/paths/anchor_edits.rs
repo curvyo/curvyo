@@ -84,6 +84,27 @@ impl Document {
         Ok(())
     }
 
+    /// Whether deleting these nodes keeps every remaining closed B-spline evaluable.
+    #[must_use]
+    pub fn can_delete_anchors(&self, anchors: &[(NodeId, AnchorId)]) -> bool {
+        for (path, ids) in group_by_path(anchors) {
+            if let Some(snapshot) = self.path(path)
+                && snapshot.curve_kind == crate::CurveKind::BSpline
+                && snapshot.closed
+            {
+                let removed = snapshot
+                    .anchors
+                    .iter()
+                    .filter(|anchor| ids.contains(&anchor.id))
+                    .count();
+                if snapshot.anchors.len().saturating_sub(removed) == 2 {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     /// Removes the named anchors, whichever paths they are on, as **one commit**
     /// (`specs/0053-node-marquee-selection/` criterion 18). On each path the rule of
     /// `specs/0002-path-node-editing/` criterion 13 applies: the remaining anchors keep their
@@ -108,8 +129,12 @@ impl Document {
     /// Does not panic in practice: every index this deletes was just confirmed present in the
     /// same movable list, and every removed path was just confirmed to exist.
     pub fn delete_anchors(&self, anchors: &[(NodeId, AnchorId)]) {
+        if !self.can_delete_anchors(anchors) {
+            return;
+        }
+        let grouped = group_by_path(anchors);
         let mut resolved: Vec<(NodeId, LoroMap, OutlineCuts)> = Vec::new();
-        for (path, ids) in group_by_path(anchors) {
+        for (path, ids) in grouped {
             let Ok((meta, _)) = self.path_parts(path) else {
                 continue;
             };

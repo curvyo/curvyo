@@ -558,3 +558,32 @@ fn deleting_a_selected_mask_path_from_its_row_removes_it() {
     assert_eq!(session.trace_parts()[0].paths, 1);
     assert_eq!(session.tool, Tool::Trace);
 }
+
+#[test]
+fn unsupported_mask_in_inactive_part_stops_entire_composite() {
+    use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
+    let (mut session, image, _, right) = halves();
+    // A Spiro through one point has no curve: it cannot be a mask.
+    let nodes = [
+        NewAnchor::corner(AnchorId::new(181, 1), Point::new(5., 5.)),
+        NewAnchor::corner(AnchorId::new(181, 2), Point::new(5., 5.)),
+        NewAnchor::corner(AnchorId::new(181, 3), Point::new(5., 5.)),
+    ];
+    let bad = session
+        .document
+        .create_editable_curve(&nodes, true, CurveKind::Spiro)
+        .unwrap();
+    session.selection.set(&[image, bad]);
+    session.add_trace_part().unwrap();
+    session.selection.set(&[image, right]);
+    assert!(session.trace_view().mask_failed);
+    assert!(
+        session
+            .trace_part_clip_list()
+            .iter()
+            .all(|clip| !clip.contributes())
+    );
+    assert!(session.set_trace_joined(image, &[], true).is_none());
+    assert!(session.trace_source(image, false).is_none());
+    assert_eq!(session.create_traced_paths(), TraceCreateOutcome::Ignored);
+}

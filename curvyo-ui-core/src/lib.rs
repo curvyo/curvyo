@@ -39,6 +39,19 @@ mod display_unit_text;
 mod document_fit;
 mod document_presets_view;
 mod ellipse_tool;
+mod variable_artwork;
+mod width_edit_geometry;
+mod width_gesture;
+pub use variable_artwork::{
+    VariableArtworkError, VariableArtworkLookup, profiled_paths, variable_stroke_artwork,
+    verified_variable_stroke_artwork, verified_variable_stroke_artwork_with_tolerance,
+};
+pub use width_edit_geometry::{width_handle, width_multiplier_at_handle, width_position_at};
+pub use width_gesture::{WidthGesture, WidthGesturePart, width_hit};
+
+mod evaluate_path;
+mod width_preset;
+pub use width_preset::WidthPreset;
 mod extensions;
 mod face_style_pick;
 mod family_key;
@@ -110,8 +123,13 @@ mod pen_constraint;
 mod pen_entry;
 mod pen_entry_text;
 mod pen_target;
+pub use evaluate_path::{
+    EvaluatePathError, SPIRO_TOLERANCE, evaluate_bspline_nodes, evaluate_object, evaluate_path,
+    evaluate_spiro_nodes, stretch,
+};
+
 mod pen_tool;
-pub use page_membership::{PageMembership, Reach, page_contents};
+pub use page_membership::{PageMembership, Reach, page_contents, page_contents_with_artwork};
 mod edit_context;
 mod edit_context_text;
 mod step_scope;
@@ -121,7 +139,7 @@ pub use edit_context::{
 };
 pub use edit_context_text::{
     NO_DRAWING_PAGE_NOTICE, OutsideHomes, home_row_line, not_editable_notice, out_of_context_line,
-    out_of_context_status, out_of_context_suffix,
+    out_of_context_suffix,
 };
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
 mod placement_view;
@@ -222,7 +240,7 @@ pub mod workspace_tree_text;
 pub use align_commit::{
     AlignInput, AlignOutcome, AlignReference, BoxedUnits, align_page, align_reference,
     align_selection, distribute_page, distribute_reference, distribute_selection, page_object_ids,
-    unit_boxes,
+    page_object_ids_with_artwork, unit_boxes, unit_boxes_with_artwork,
 };
 pub use align_labels::distribute_commit_label;
 pub use align_plan::{
@@ -250,7 +268,7 @@ pub use close_path::{
 };
 pub use closing_join::{JoinType, resolve_closing_node};
 pub use colour_hsv::{Hsv, hsv_to_rgb, rgb_to_hsv};
-pub use colour_pick::{PaintTarget, PickedColour, pick_colour};
+pub use colour_pick::{PaintTarget, PickedColour, pick_colour, pick_colour_with_artwork};
 pub use combine::{
     COMBINE_COMMIT_LABEL, CombinePlan, CombineRefusal, PathAvailability, path_availability,
     plan_combine,
@@ -370,9 +388,12 @@ pub use node_tool::{
     PointerDownOutcome as NodePointerDownOutcome, PointerUpOutcome as NodePointerUpOutcome,
 };
 pub use nudge::{
-    Arrow, CONTINUATION_WINDOW_MS, NudgeEvent, NudgeOutcome, NudgeRun, nudge, selection_centre,
+    Arrow, CONTINUATION_WINDOW_MS, NudgeEvent, NudgeOutcome, NudgeRun, nudge, nudge_with_artwork,
+    selection_centre, selection_centre_with_artwork,
 };
-pub use object_bounds::{content_bounds, object_bounds, object_outline_bounds};
+pub use object_bounds::{
+    content_bounds, object_bounds, object_bounds_with_artwork, object_outline_bounds,
+};
 pub use object_history_text::{object_row_name, object_row_summary};
 pub use object_selection::{ObjectSelection, SelectionCombine};
 pub use offset_drag::{
@@ -386,7 +407,7 @@ pub use offset_entry::{
 pub use offset_plan::{
     OffsetItem, OffsetPlan, OffsetRefusal, OffsetRequest, OffsetShape, offset_operands, plan_offset,
 };
-pub use oriented_box::{OrientedBox, oriented_bounds};
+pub use oriented_box::{OrientedBox, oriented_bounds, oriented_bounds_with_artwork};
 pub use panel_content::{PanelContent, panel_body};
 pub use panel_tabs::{
     PanelTab, PanelTabEntry, PanelTabs, StyleBlocker, tab_entries, tab_entries_for,
@@ -416,9 +437,13 @@ pub use pen_entry_text::{
 };
 pub use pen_target::{EndNode, EndNodeIndex, PenTarget, continuation_of, pen_target};
 pub use pen_tool::{
-    ClosingPreview, Continuation, PenTool, PointerUpOutcome as PenPointerUpOutcome, PressAction,
+    ClosingPreview, Continuation, PenMode, PenTool, PointerUpOutcome as PenPointerUpOutcome,
+    PressAction,
 };
-pub use placement_view::{placed_bounds, placement_map, placement_members};
+pub use placement_view::{
+    placed_bounds, placed_bounds_with_artwork, placement_map, placement_members,
+    placement_members_with_artwork,
+};
 pub use poly_star_tool::{PolyStarMode, PolyStarSettings, PolygonStarTool};
 pub use preview_faces::{PREVIEW_FACE_BUDGET, PreviewFaces};
 pub use preview_sample::{MAX_SAMPLE_CHARS, sample_line};
@@ -440,8 +465,8 @@ pub use select_bar_arc::{CurveBarState, EllipseBarState, GreyReason};
 pub use select_tool::{
     Axis, EntryKey, GestureKind, GestureShape, KeyEntryRefusal, LiveEdit, LiveGesture,
     MoveEntryMode, MoveResolution, PressTarget, SelectDoubleClickOutcome, SelectPointerDownOutcome,
-    SelectTool, TransformHandleTolerances, classify_press, double_click, double_click_in,
-    entry_anchor,
+    SelectTool, TransformHandleTolerances, classify_press, classify_press_with_artwork,
+    double_click, double_click_in, entry_anchor,
 };
 pub use selection::NodeSelection;
 pub use shape_arc_edit::{
@@ -465,7 +490,7 @@ pub use split::{SPLIT_COMMIT_LABEL, SplitPlan, SplitRefusal, plan_split};
 pub use stack_plan::{MAX_STACK_PIECES, StackPlan, StackRefusal};
 pub use stroke_to_path_plan::{
     StrokeToPathPlan, StrokeToPathRefusal, draws_stroke, plan_stroke_to_path,
-    stroke_to_path_available,
+    plan_stroke_to_path_with_artwork, stroke_to_path_available,
 };
 pub use style_edit::StyleEditor;
 pub use style_entry::{
@@ -481,7 +506,10 @@ pub use style_scope::{
     StyleScope, StyleTool, is_single_line_text, object_kind_name, owns_style, skipped_clones,
     skipped_single_line_texts, style_scope, style_scope_in,
 };
-pub use svg_export::{ExportScope, SvgExportOptions, SvgExportOutcome, svg_export, svg_export_of};
+pub use svg_export::{
+    ExportScope, SvgExportOptions, SvgExportOutcome, SvgExportUnsupportedPath, svg_export,
+    svg_export_of, svg_export_of_with_artwork,
+};
 pub use svg_export_notices::{
     NOTHING_SELECTED_NOTICE, SVG_EXPORT_BUSY_OBJECTS, svg_export_busy_notice, svg_export_name,
     svg_export_notice, svg_export_notice_ms,
@@ -553,7 +581,7 @@ pub use transform_handle_layout::{
 pub use transform_math::{
     ExtentSigns, RECOVERED_EXTENT_MM, ResizedBox, ZERO_EXTENT_MM, ZeroRecovery, opposite_direction,
     resize_anchor_local_position, resize_local_box, resize_local_box_with_prior,
-    rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored,
+    rotate_delta_angle, rotate_delta_for, rotate_pivot, scaled_and_floored, scales_unevenly,
     stroke_or_radius_factor,
 };
 pub use undo_stack::{SelectionSnapshot, Target as UndoTarget, UndoStack};

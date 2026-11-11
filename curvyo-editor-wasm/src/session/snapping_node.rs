@@ -3,6 +3,7 @@ use super::Session;
 use curvyo_document_core::{Point, Vec2};
 use curvyo_ui_core::{SnapExclusions, SnapProbe};
 use std::collections::HashSet;
+use std::sync::Arc;
 impl Session {
     pub(super) fn begin_node_snapping(&mut self, point: Point) {
         let paths = self.node_paths();
@@ -13,6 +14,7 @@ impl Session {
         let anchors: HashSet<_> = moved.iter().map(|&(p, a, _)| (p, a)).collect();
         let boxes: HashSet<_> = moved.iter().map(|&(p, _, _)| p).collect();
         let read = self.document_read();
+        let artwork = self.frozen_width_artwork();
         self.snapping.update_stored(self.document.snapping());
         self.snapping.begin_drag(
             &read,
@@ -23,6 +25,12 @@ impl Session {
                 nodes: None,
                 anchor: None,
                 anchors: Some(&anchors),
+            },
+            &|path| {
+                artwork
+                    .get(&path.id)
+                    .filter(|(source, _)| source == path)
+                    .map(|(_, result)| Arc::clone(result))
             },
         );
         self.snapping

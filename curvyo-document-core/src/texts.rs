@@ -19,6 +19,9 @@ use crate::units::Length;
 /// Why a text command wrote nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum TextEditError {
+    /// An editable curve must be converted before it can carry text.
+    #[error("convert the editable curve to a Bézier path before putting text on it")]
+    NeedsCurveConversion,
     /// No live text object has this id.
     #[error("no such text")]
     NoSuchText,

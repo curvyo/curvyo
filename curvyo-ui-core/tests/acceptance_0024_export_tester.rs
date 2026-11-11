@@ -255,7 +255,8 @@ fn export_full(
             active_page: active,
         },
         options,
-    );
+    )
+    .unwrap();
     let text = outcome.text();
     assert_eq!(text, curvyo_svg_core::write_svg(&outcome.svg));
     Out {

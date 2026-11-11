@@ -20,10 +20,24 @@ impl SelectTool {
         objects: &[ObjectSnapshot],
         selection: &ObjectSelection,
     ) -> Option<GroupSelection> {
+        Self::group_of_with_artwork(
+            objects,
+            selection,
+            &crate::variable_artwork::synchronous_artwork,
+        )
+    }
+
+    /// Gets the selected group using cached variable-stroke artwork.
+    #[must_use]
+    pub fn group_of_with_artwork(
+        objects: &[ObjectSnapshot],
+        selection: &ObjectSelection,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> Option<GroupSelection> {
         if selection.ids().len() < 2 {
             return None;
         }
-        GroupSelection::from_objects(objects, selection.ids())
+        GroupSelection::from_objects_with_artwork(objects, selection.ids(), artwork)
     }
 
     /// Every handle the group box of the current multi-selection shows right
@@ -56,7 +70,29 @@ impl SelectTool {
         shift: bool,
         include_move: bool,
     ) -> Option<(GroupSelection, EditHandle)> {
-        let group = Self::group_of(objects, selection)?;
+        Self::group_handle_at_with_artwork(
+            objects,
+            selection,
+            point,
+            tolerances,
+            shift,
+            include_move,
+            &crate::variable_artwork::synchronous_artwork,
+        )
+    }
+
+    /// Finds a group handle using cached variable-stroke artwork.
+    #[must_use]
+    pub fn group_handle_at_with_artwork(
+        objects: &[ObjectSnapshot],
+        selection: &ObjectSelection,
+        point: Point,
+        tolerances: TransformHandleTolerances,
+        shift: bool,
+        include_move: bool,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> Option<(GroupSelection, EditHandle)> {
+        let group = Self::group_of_with_artwork(objects, selection, artwork)?;
         let handles = group_handles(&group, group.bounds(), &tolerances, shift);
         let hit = hit_group_handle(
             &group,

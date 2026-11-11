@@ -9,7 +9,7 @@ use curvyo_document_core::{
     Tolerance,
 };
 
-use crate::hit_test_object::{distance_to_object, fills_point};
+use crate::hit_test_object::{distance_to_object_with_artwork, fills_point_with_artwork};
 
 /// Which paint of an object a colour came from, or goes to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,16 +86,38 @@ pub fn pick_colour(
     size: DocumentSize,
     background: DocumentBackground,
 ) -> Option<PickedColour> {
+    pick_colour_with_artwork(
+        objects,
+        point,
+        tolerance,
+        size,
+        background,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+/// Picks a colour using already-computed variable-stroke artwork.
+#[must_use]
+pub fn pick_colour_with_artwork(
+    objects: &[ObjectSnapshot],
+    point: Point,
+    tolerance: Tolerance,
+    size: DocumentSize,
+    background: DocumentBackground,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<PickedColour> {
     let from_objects = objects.iter().rev().find_map(|object| {
         let style = object.style();
-        if style.stroke.enabled && distance_to_object(object, point, tolerance).is_some() {
+        if style.stroke.enabled
+            && distance_to_object_with_artwork(object, point, tolerance, artwork).is_some()
+        {
             return Some(PickedColour {
                 color: style.stroke.color,
                 opacity: style.stroke.opacity,
                 paint: PaintTarget::Stroke,
             });
         }
-        fills_point(object, point).then_some(PickedColour {
+        fills_point_with_artwork(object, point, artwork).then_some(PickedColour {
             color: style.fill.color,
             opacity: style.fill.opacity,
             paint: PaintTarget::Fill,

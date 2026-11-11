@@ -1327,6 +1327,7 @@ fn svg(s: &Session, active_page_only: bool) -> String {
     }) {
         SvgExportResult::Written { text, .. } => text,
         other @ SvgExportResult::NothingSelected => panic!("{other:?}"),
+        SvgExportResult::UnsupportedExtendedPath => panic!("unexpected unsupported extended path"),
     }
 }
 

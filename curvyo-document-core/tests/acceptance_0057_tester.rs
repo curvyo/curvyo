@@ -941,7 +941,7 @@ fn ac40_path_read_equals_unlink_for_overrides() {
     d.edit_style(&[c], &StyleEdit::StrokeColor(col(4, 5, 6)))
         .unwrap();
     let read = match d.object(c).unwrap() {
-        ObjectSnapshot::Clone(k) => k.resolved,
+        ObjectSnapshot::Clone(k) => *k.resolved,
         _ => panic!(),
     };
     d.unlink_clones(&[CopySource {

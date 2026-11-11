@@ -29,6 +29,12 @@ pub(crate) fn is_carrier(tree: &LoroTree, id: NodeId) -> bool {
             .is_ok_and(|meta| !crate::text_codec::is_text_meta(&meta))
 }
 
+pub(crate) fn extended_carrier(tree: &LoroTree, id: NodeId) -> bool {
+    crate::shapes::object_in(tree, id)
+        .and_then(|object| object.drawn_path().map(|p| !p.curve_kind.is_bezier()))
+        .unwrap_or(false)
+}
+
 fn node(id: TreeID) -> NodeId {
     NodeId::from_parts(id.peer, id.counter)
 }
@@ -61,6 +67,12 @@ impl Document {
             .any(|(carrier, _)| !crate::path_codec::node_exists(&tree, tree_id(carrier.node)))
         {
             return Err(TextEditError::NoSuchText);
+        }
+        if carriers
+            .iter()
+            .any(|(carrier, _)| extended_carrier(&tree, carrier.node))
+        {
+            return Err(TextEditError::NeedsCurveConversion);
         }
         let carriers: Vec<(CarrierRef, OnPathValues)> = carriers
             .iter()

@@ -131,8 +131,9 @@ impl SelectTool {
         selection: &ObjectSelection,
         origin: DragOrigin,
         handle: EditHandle,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) {
-        let Some(group) = Self::group_of(objects, selection) else {
+        let Some(group) = Self::group_of_with_artwork(objects, selection, artwork) else {
             return;
         };
         self.drag = SelectDrag::GroupTransforming(

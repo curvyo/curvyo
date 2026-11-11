@@ -1,7 +1,9 @@
 //! `Session`'s select all and arrow-key nudge: the two keys of `specs/0044-editing-quick-wins/`,
 //! as the session runs them once the key table of `keys.rs` has said yes.
 
-use curvyo_ui_core::{NudgeEvent, NudgeOutcome, NudgeRun, nudge, selection_centre};
+use curvyo_ui_core::{
+    NudgeEvent, NudgeOutcome, NudgeRun, nudge_with_artwork, selection_centre_with_artwork,
+};
 
 use super::Session;
 use super::keys::{KeyHint, KeyOutcome};
@@ -35,14 +37,25 @@ impl Session {
     }
 
     fn nudge_in_run(&mut self, event: NudgeEvent) -> KeyOutcome {
-        let objects = self.objects();
-        let outcome = nudge(
+        let objects = self.spiro_selection_objects(&self.objects());
+        let selected_ids = self.transform_selection_ids();
+        if objects.iter().any(|object| {
+            selected_ids.contains(&object.id())
+                && object
+                    .drawn_path()
+                    .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        }) {
+            self.transform_notice = Some(super::spiro_cache::SPIRO_UNSOLVED_NOTICE);
+            return KeyOutcome::Consumed;
+        }
+        let outcome = nudge_with_artwork(
             &self.document,
             &objects,
             self.selection.ids(),
             event,
             self.nudge_run.as_ref(),
             &mut self.minter,
+            &super::width_outlines::memo_lookup(&self.width_outlines),
         );
         match outcome {
             NudgeOutcome::Moved { run, new_run } => {
@@ -59,7 +72,10 @@ impl Session {
     #[must_use]
     pub fn nudge_readout(&self) -> Option<LiveReadout> {
         let run = self.nudge_run.as_ref()?;
-        let anchor = selection_centre(&self.objects(), self.selection.ids())?;
+        let anchor =
+            selection_centre_with_artwork(&self.objects(), self.selection.ids(), &|path| {
+                self.width_artwork(path)
+            })?;
         Some(LiveReadout {
             text: move_readout_text(run.total(), false),
             anchor,

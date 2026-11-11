@@ -99,7 +99,7 @@ fn about(pivot: Point, linear: Affine) -> Affine {
 
 fn drawn_points(d: &Document, id: NodeId) -> Vec<Point> {
     let path = match d.object(id) {
-        Some(ObjectSnapshot::Clone(clone)) => clone.resolved,
+        Some(ObjectSnapshot::Clone(clone)) => *clone.resolved,
         Some(ObjectSnapshot::Path(path)) => path,
         other => panic!("a clone or a path: {other:?}"),
     };

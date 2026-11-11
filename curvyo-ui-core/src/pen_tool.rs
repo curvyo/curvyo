@@ -29,6 +29,7 @@ use crate::closing_join::JoinType;
 use crate::pen_target::EndNode;
 
 mod commit;
+mod freehand;
 
 /// One node placed in the current pen session, in the shape
 /// [`Document::create_path`] needs.
@@ -77,9 +78,37 @@ pub enum PressAction {
 }
 
 /// The pen tool's state (idle, or placing a path).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum PenMode {
+    /// Corner clicks and draggable Bézier handles.
+    #[default]
+    Bezier,
+    /// Straight segments with corner vertices.
+    Lines,
+    /// A sampled freehand path committed on release.
+    Freehand,
+    /// Editable B-spline controls.
+    BSpline,
+    /// Editable Spiro controls (internal until the tool is enabled).
+    Spiro,
+}
+
+/// The pen tool's state (idle, or placing a path).
+#[derive(Debug)]
 pub struct PenTool {
     state: State,
+    mode: PenMode,
+    freehand_smoothing: Length,
+}
+
+impl Default for PenTool {
+    fn default() -> Self {
+        Self {
+            state: State::Idle,
+            mode: PenMode::Bezier,
+            freehand_smoothing: Length::from_mm(0.4),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -117,6 +146,8 @@ pub enum PointerUpOutcome {
     /// Acceptance criterion 5: the press landed on the closing node, so the path closed and
     /// committed as this [`NodeId`] (a new path object, or the continued one).
     Closed(NodeId),
+    /// A freehand path committed on release.
+    Finished(NodeId),
     /// The press landed on another path's end: the two became one path.
     Joined {
         /// The path the two became.
@@ -143,7 +174,37 @@ impl PenTool {
     /// A tool with no path in progress.
     #[must_use]
     pub fn new() -> Self {
-        Self { state: State::Idle }
+        Self::default()
+    }
+
+    /// The current drawing mode.
+    #[must_use]
+    pub const fn mode(&self) -> PenMode {
+        self.mode
+    }
+
+    /// Changes mode only when no path is in progress.
+    pub fn set_mode(&mut self, mode: PenMode) -> bool {
+        if self.is_placing() {
+            return false;
+        }
+        self.mode = mode;
+        true
+    }
+
+    /// Sets the freehand simplification tolerance in document units.
+    pub fn set_freehand_smoothing(&mut self, tolerance: Length) -> bool {
+        if self.is_placing() || !tolerance.as_mm().is_finite() || tolerance.as_mm() < 0.0 {
+            return false;
+        }
+        self.freehand_smoothing = tolerance;
+        true
+    }
+
+    /// The freehand simplification tolerance.
+    #[must_use]
+    pub const fn freehand_smoothing(&self) -> Length {
+        self.freehand_smoothing
     }
 
     /// Whether a path is currently being drawn.
@@ -201,6 +262,9 @@ impl PenTool {
         cursor: Point,
         drag_threshold: Length,
     ) -> Option<NewAnchor> {
+        if self.mode == PenMode::Freehand {
+            return None;
+        }
         let State::Placing { down, .. } = &self.state else {
             return None;
         };
@@ -208,7 +272,7 @@ impl PenTool {
         if down.action != PressAction::Place {
             return None;
         }
-        Some(Self::resolve_anchor(id, down.point, cursor, drag_threshold))
+        Some(self.resolve_anchor(id, down.point, cursor, drag_threshold))
     }
 
     /// The one rule for what anchor a press/release pair resolves to —
@@ -222,13 +286,19 @@ impl PenTool {
     /// press→release distance exceeds `drag_threshold`, or a plain corner
     /// node (no handles) otherwise.
     fn resolve_anchor(
+        &self,
         id: AnchorId,
         down: Point,
         release: Point,
         drag_threshold: Length,
     ) -> NewAnchor {
+        if matches!(self.mode, PenMode::BSpline | PenMode::Spiro) {
+            let mut anchor = NewAnchor::corner(id, down);
+            anchor.kind = AnchorKind::Symmetric;
+            return anchor;
+        }
         let drag = down.vector_to(release);
-        if drag.length() > drag_threshold.as_mm() {
+        if self.mode == PenMode::Bezier && drag.length() > drag_threshold.as_mm() {
             NewAnchor {
                 id,
                 point: down,
@@ -264,6 +334,11 @@ impl PenTool {
 
     /// A press at `point` whose action the caller decided (`crate::pen_target`).
     pub fn pointer_down_action(&mut self, point: Point, action: PressAction) {
+        let action = if self.mode == PenMode::Freehand {
+            PressAction::Place
+        } else {
+            action
+        };
         match &mut self.state {
             State::Idle => {
                 self.state = State::Placing {
@@ -275,6 +350,27 @@ impl PenTool {
             State::Placing { down, .. } => {
                 *down = Some(PointerDown { point, action });
             }
+        }
+    }
+
+    /// Adds a pointer sample while a freehand gesture is down.
+    pub fn freehand_move(&mut self, minter: &mut AnchorIdMinter, point: Point) {
+        if self.mode != PenMode::Freehand {
+            return;
+        }
+        let State::Placing {
+            nodes,
+            down: Some(down),
+            ..
+        } = &mut self.state
+        else {
+            return;
+        };
+        if nodes.is_empty() {
+            nodes.push(NewAnchor::corner(minter.mint(), down.point));
+        }
+        if nodes.last().is_some_and(|last| last.point != point) {
+            nodes.push(NewAnchor::corner(minter.mint(), point));
         }
     }
 
@@ -326,6 +422,18 @@ impl PenTool {
         point: Point,
         drag_threshold: Length,
     ) -> PointerUpOutcome {
+        if self.mode == PenMode::Freehand {
+            self.freehand_move(minter, point);
+            if let State::Placing { nodes, .. } = &mut self.state {
+                freehand::simplify(nodes, self.freehand_smoothing);
+            }
+            return if let Some(id) = self.finish(document) {
+                PointerUpOutcome::Finished(id)
+            } else {
+                self.escape();
+                PointerUpOutcome::Ignored
+            };
+        }
         let State::Placing { down, .. } = &mut self.state else {
             return PointerUpOutcome::Ignored;
         };
@@ -335,7 +443,7 @@ impl PenTool {
         match down.action {
             PressAction::Place => {
                 let id = minter.mint();
-                let anchor = Self::resolve_anchor(id, down.point, point, drag_threshold);
+                let anchor = self.resolve_anchor(id, down.point, point, drag_threshold);
                 if let State::Placing { nodes, .. } = &mut self.state {
                     nodes.push(anchor);
                 }
@@ -373,6 +481,12 @@ impl PenTool {
             return None;
         }
         let path_id = match base {
+            None if self.mode == PenMode::BSpline => document
+                .create_editable_curve(nodes, false, curvyo_document_core::CurveKind::BSpline)
+                .ok()?,
+            None if self.mode == PenMode::Spiro => document
+                .create_editable_curve(nodes, false, curvyo_document_core::CurveKind::Spiro)
+                .ok()?,
             None => document.create_path(nodes, false),
             Some(continuation) => {
                 let added = match continuation.end {
@@ -396,6 +510,28 @@ impl PenTool {
         };
         self.state = State::Idle;
         Some(path_id)
+    }
+
+    /// Commits a new path in progress as straight lines through its nodes, whatever the mode:
+    /// what a Spiro without solution shows (`specs/0110-pen-modes-variable-stroke`, UX review
+    /// of 2026-11-10). `None`, changing nothing, for a continuation or fewer than two nodes.
+    pub fn finish_straight(&mut self, document: &Document) -> Option<NodeId> {
+        let State::Placing {
+            nodes, base: None, ..
+        } = &self.state
+        else {
+            return None;
+        };
+        if nodes.len() < 2 {
+            return None;
+        }
+        let corners: Vec<_> = nodes
+            .iter()
+            .map(|node| NewAnchor::corner(node.id, node.point))
+            .collect();
+        let id = document.create_path(&corners, false);
+        self.state = State::Idle;
+        Some(id)
     }
 
     /// Acceptance criterion 4: discards the entire in-progress path, including a continuation's

@@ -86,7 +86,7 @@ impl Session {
     }
 
     /// The open skew entry, with the same checks.
-    fn open_skew_entry(&self) -> Option<&SkewEntry> {
+    pub(super) fn open_skew_entry(&self) -> Option<&SkewEntry> {
         if self.tool != Tool::Select {
             return None;
         }
@@ -161,7 +161,7 @@ impl Session {
 
     /// The open group entry, with the same checks: the Select tool is active
     /// and its objects are still the selection.
-    fn open_group_entry(&self) -> Option<&GroupEntry> {
+    pub(super) fn open_group_entry(&self) -> Option<&GroupEntry> {
         if self.tool != Tool::Select {
             return None;
         }
@@ -348,6 +348,13 @@ impl Session {
                         .map(|entry| entry.zero_recovery([first, second], last_edited))
                 })
                 .unwrap_or_default();
+            if this.selection_has_width_profile()
+                && this.entry_deforms([first, second], last_edited)
+            {
+                this.select.cancel_entry();
+                this.transform_notice = Some(super::width_transform::UNEVEN_WIDTH_NOTICE);
+                return EntryOutcome::Unchanged;
+            }
             let mirror = this.transform_entry_mirror_line(first, second, last_edited);
             let entry_handle = this.select.entry_handle();
             let outcome = this

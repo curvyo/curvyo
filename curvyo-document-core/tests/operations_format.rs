@@ -301,7 +301,8 @@ fn the_golden_reads_back_every_operation_switch_membership_and_cuts_last() {
     });
     assert_eq!(format_of(&bytes), 39);
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 41);
+    // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
+    assert_eq!(CURRENT_FORMAT_VERSION, 42);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let lists = all_operations(&opened);

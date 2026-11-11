@@ -397,10 +397,9 @@ mod tests {
         assert_eq!(active(&mut session), "document");
     }
 
-    /// Criterion 10: the strip stays during an unfinished Pen path, both
-    /// bodies are empty, and a press still sets the tab.
+    /// The Document body and strip remain visible during an unfinished Pen path.
     #[test]
-    fn an_unfinished_pen_path_empties_both_bodies_but_not_the_strip() {
+    fn an_unfinished_pen_path_keeps_the_document_and_strip() {
         let mut session = Session::new(1);
         session.set_tool(Tool::Pen);
         for point in [Point::new(10.0, 10.0), Point::new(50.0, 40.0)] {
@@ -408,12 +407,12 @@ mod tests {
             session.pointer_up(point, false, false);
         }
         let view = session.panel_view();
-        assert_eq!(view.content, PanelContent::Empty);
+        assert_eq!(view.content, PanelContent::Document);
         for name in ["file", "document", "style", "history"] {
             assert!(view.tabs.iter().any(|tab| tab.name == name), "{name}");
         }
         assert!(session.press_panel_tab("document"));
-        assert_eq!(session.panel_content(), PanelContent::Empty);
+        assert_eq!(session.panel_content(), PanelContent::Document);
         session.finish_pen();
         assert_eq!(session.panel_content(), PanelContent::Document);
     }

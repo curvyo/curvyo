@@ -54,6 +54,7 @@ mod stroke;
 mod text_edit_overlay;
 mod theme;
 mod tiling_overlay;
+mod width_handles;
 
 pub use artwork::{build_artwork, build_artwork_with_guides};
 pub use carrier_line::{build_carrier_hover, build_carrier_lines, build_carrier_picked};
@@ -88,7 +89,7 @@ pub use operation_object::{outer_outlines, restyled};
 pub use operation_symbol::{CHIP_CAP, ChipItem, Glyph, chips_list};
 pub use origin_marker::{ORIGIN_MARKER_MIN_PAGE_PX, build_origin_marker};
 pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
-pub use pen_preview::build_pen_preview;
+pub use pen_preview::{CurvePreview, build_curve_pen_preview, build_pen_preview};
 pub use reference_box::{ReferenceBoxInput, ReferenceMark};
 pub use refusal_outline::build_refusal_outlines;
 pub use select_box::{SelectDecorationInput, SelectionBox};
@@ -100,6 +101,7 @@ pub use theme::{
     OP_LANE_LINE, PASTEBOARD_BG,
 };
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
+pub use width_handles::{WidthDiamond, build_width_diamonds};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};
 

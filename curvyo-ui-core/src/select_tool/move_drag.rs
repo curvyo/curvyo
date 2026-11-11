@@ -11,7 +11,7 @@ use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, Vec2};
 use super::{SelectDrag, SelectTool};
 use crate::anchor_id_minter::AnchorIdMinter;
 use crate::modifiers::Modifiers;
-use crate::object_bounds::object_outline_bounds;
+use crate::object_bounds::object_outline_bounds_with_artwork;
 use crate::object_selection::ObjectSelection;
 use crate::transform_commit::{MOVE_EQUAL_EPSILON_MM, commit_move};
 use crate::transform_drag::DragOrigin;
@@ -93,6 +93,7 @@ impl MoveDrag {
         objects: &[ObjectSnapshot],
         selection: &ObjectSelection,
         joins: Option<NodeId>,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) -> Self {
         Self {
             origin,
@@ -100,7 +101,7 @@ impl MoveDrag {
             pending_toggle: None,
             joins,
             last_axis: None,
-            start_bounds: selected_bounds(objects, selection, joins),
+            start_bounds: selected_bounds(objects, selection, joins, artwork),
         }
     }
 
@@ -310,12 +311,13 @@ fn selected_bounds(
     objects: &[ObjectSnapshot],
     selection: &ObjectSelection,
     joins: Option<NodeId>,
+    artwork: &crate::VariableArtworkLookup<'_>,
 ) -> Option<(Point, Point)> {
     let selected: HashSet<NodeId> = selection.ids().iter().copied().chain(joins).collect();
     objects
         .iter()
         .filter(|object| selected.contains(&object.id()))
-        .map(object_outline_bounds)
+        .filter_map(|object| object_outline_bounds_with_artwork(object, artwork))
         .reduce(|(min, max), (low, high)| {
             (
                 Point::new(min.x.min(low.x), min.y.min(low.y)),

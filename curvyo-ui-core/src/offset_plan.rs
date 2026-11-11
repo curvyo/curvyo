@@ -39,6 +39,13 @@ pub struct OffsetRequest {
 /// Why an offset was refused. Nothing is written in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OffsetRefusal {
+    /// Editable geometry requires explicit conversion first.
+    ExtendedPath {
+        /// Objects requiring conversion.
+        offenders: Vec<NodeId>,
+        /// Number of selected objects.
+        of: usize,
+    },
     /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
     /// (`specs/0074-text-objects` criteria 24 and 29).
     Texts(crate::text_convert::TextRefusal),
@@ -231,6 +238,20 @@ pub fn plan_offset(
     let objects: &[ObjectSnapshot] = &converted;
     let operands = offset_operands(objects, selection);
     let of = operands.len();
+    let offenders: Vec<NodeId> = operands
+        .iter()
+        .filter(|object| {
+            object.drawn_path().is_some_and(|path| {
+                path.curve_kind != curvyo_document_core::CurveKind::Bezier
+                    || !path.width_points.is_empty()
+            })
+        })
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(OffsetRefusal::ExtendedPath { offenders, of });
+    }
+
     if operands.is_empty() {
         return Err(OffsetRefusal::NoOperands);
     }

@@ -95,7 +95,7 @@ impl OutlineNode {
 /// re-derive.
 enum JoinPlan {
     SameOutline(OutlineNode),
-    TwoOutlines { a: OutlineNode, b: OutlineNode },
+    TwoOutlines { a: OutlineNode, b: Box<OutlineNode> },
 }
 
 impl Document {
@@ -176,10 +176,16 @@ impl Document {
         b_anchor: AnchorId,
     ) -> Result<JoinPlan, PathEditError> {
         let a = OutlineNode::find(self, a_path, a_anchor)?;
+        if !a.snapshot.curve_kind.is_bezier() || !a.snapshot.width_points.is_empty() {
+            return Err(PathEditError::NeedsConversion);
+        }
         if !a.is_open_end() {
             return Err(PathEditError::NotJoinable);
         }
         let b = OutlineNode::find(self, b_path, b_anchor)?;
+        if !b.snapshot.curve_kind.is_bezier() || !b.snapshot.width_points.is_empty() {
+            return Err(PathEditError::NeedsConversion);
+        }
         if !b.is_open_end() || (a_path == b_path && a_anchor == b_anchor) {
             return Err(PathEditError::NotJoinable);
         }
@@ -192,7 +198,7 @@ impl Document {
             }
             return Ok(JoinPlan::SameOutline(a));
         }
-        Ok(JoinPlan::TwoOutlines { a, b })
+        Ok(JoinPlan::TwoOutlines { a, b: Box::new(b) })
     }
 
     /// The one-outline half of [`Document::join_endpoints`] (acceptance
@@ -372,6 +378,9 @@ impl Document {
     /// one place.
     fn resolve_split(&self, path: NodeId, anchor: AnchorId) -> Result<OutlineNode, PathEditError> {
         let node = OutlineNode::find(self, path, anchor)?;
+        if !node.snapshot.curve_kind.is_bezier() || !node.snapshot.width_points.is_empty() {
+            return Err(PathEditError::NeedsConversion);
+        }
         if node.is_open_end() {
             return Err(PathEditError::NotSplittable);
         }

@@ -12,8 +12,7 @@ pub enum PanelContent {
     Operations,
     /// The File tab: the project and the file commands (`specs/0051-sidebar-and-no-menu`).
     File,
-    /// The Document section: the Document tab is active and the Pen has no
-    /// unfinished path.
+    /// The Document section.
     Document,
     /// The Style area: the tool's scope holds objects to style.
     Style,
@@ -36,9 +35,7 @@ pub enum PanelContent {
     /// The active manufacturing workbench's schema-rendered tab (`specs/0093`).
     Workbench,
     /// Nothing: no heading, no text, no control (`specs/0017-style-panel-
-    /// rework` criterion 1). The Document tab with an unfinished Pen path, so
-    /// a resize would not move the path being drawn, or the Style tab with
-    /// nothing in the tool's scope.
+    /// rework` criterion 1): the Style tab with nothing in the tool's scope.
     Empty,
 }
 
@@ -46,17 +43,15 @@ pub enum PanelContent {
 /// tool's style scope (`style_scope`) holds any object. The panel's width, the
 /// canvas and the rulers never change with it.
 ///
-/// Document shows the Document section unless the Pen has an unfinished path
-/// (criterion 10). Style shows the Style area when the scope holds objects and
+/// Document remains visible during an unfinished Pen path. Style shows the Style area when the scope holds objects and
 /// is empty otherwise, which only the Pen rule can cause (criterion 23).
 #[must_use]
 pub fn panel_body(
     active: PanelTab,
-    pen_path_unfinished: bool,
+    _pen_path_unfinished: bool,
     style_has_objects: bool,
 ) -> PanelContent {
     match active {
-        PanelTab::Document if pen_path_unfinished => PanelContent::Empty,
         PanelTab::Document => PanelContent::Document,
         PanelTab::Style if style_has_objects => PanelContent::Style,
         PanelTab::Style => PanelContent::Empty,
@@ -86,8 +81,8 @@ mod tests {
         let rows = [
             (PanelTab::Document, false, false, Document),
             (PanelTab::Document, false, true, Document),
-            (PanelTab::Document, true, false, Empty),
-            (PanelTab::Document, true, true, Empty),
+            (PanelTab::Document, true, false, Document),
+            (PanelTab::Document, true, true, Document),
             (PanelTab::Style, false, true, Style),
             (PanelTab::Style, true, true, Style),
             (PanelTab::Style, false, false, Empty),

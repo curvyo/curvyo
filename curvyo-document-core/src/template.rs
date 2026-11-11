@@ -67,7 +67,7 @@ impl Document {
             .filter_map(|read| {
                 let object = match read.kind {
                     NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
-                        ObjectSnapshot::Path(clone.resolved)
+                        ObjectSnapshot::Path(*clone.resolved)
                     }
                     NodeKind::Leaf(object)
                         if !matches!(

@@ -167,7 +167,7 @@ fn raw_from_meta(id: NodeId, meta: &LoroMap) -> RawLeaf {
     }
     #[cfg(test)]
     PATH_READS.with(|count| count.set(count.get() + 1));
-    RawLeaf::Path(read_path_snapshot(id, meta))
+    read_path_snapshot(id, meta).map_or(RawLeaf::Unreadable(id), RawLeaf::Path)
 }
 
 /// The clone `id` resolved by collecting the leaves of its own chain and handing them to the one

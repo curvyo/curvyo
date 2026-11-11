@@ -6,7 +6,7 @@
 //! ephemeral: a tool change, Escape, a right press or the host ends it.
 
 use curvyo_document_core::{BackgroundPaint, DocumentBackground, Point, StyleEdit};
-use curvyo_ui_core::{PaintTarget, PickedColour, hex_text, pick_colour};
+use curvyo_ui_core::{PaintTarget, PickedColour, hex_text, pick_colour_with_artwork};
 
 use super::Session;
 
@@ -110,7 +110,14 @@ impl Session {
     /// What a press at `point` would take: an object's paint first, else the stored
     /// background. The stored one, not a drag's preview: `begin_colour_pick` flushed it.
     fn pick_at(&self, point: Point) -> Option<PickedColour> {
-        pick_colour(
+        if self.document_read().visible.iter().any(|object| {
+            curvyo_ui_core::profiled_paths(object)
+                .into_iter()
+                .any(|path| self.width_artwork(path).is_none())
+        }) {
+            return None;
+        }
+        pick_colour_with_artwork(
             // A hidden object is not sampled; a locked one is
             // (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
             &self.document_read().visible,
@@ -121,6 +128,7 @@ impl Session {
                 paint: BackgroundPaint::None,
                 ..self.document.background()
             },
+            &|path| self.width_artwork(path),
         )
         .or_else(|| {
             let bg = self.document.background();

@@ -3,6 +3,7 @@
 //! `specs/0019-multi-object-transform`). Split out of `path_model.rs`.
 
 use crate::affine::Affine;
+use crate::curve_kind::CurveKind;
 use crate::path_model::PathSnapshot;
 use crate::units::{Angle, Point, Vec2};
 
@@ -14,6 +15,17 @@ impl PathSnapshot {
     #[must_use]
     pub fn mapped(&self, m: Affine) -> Self {
         let mut mapped = self.clone();
+        if self.curve_kind == CurveKind::Spiro {
+            mapped.spiro_transform = Some(Box::new(
+                m.compose(
+                    self.spiro_transform
+                        .as_deref()
+                        .copied()
+                        .unwrap_or(Affine::IDENTITY),
+                ),
+            ));
+            return mapped;
+        }
         for anchor in mapped.all_anchors_mut() {
             anchor.point = m.apply_point(anchor.point);
             anchor.handle_in = m.apply_vector(anchor.handle_in);
@@ -32,6 +44,12 @@ impl PathSnapshot {
     /// sole source of truth for its actual geometry.
     #[must_use]
     pub fn rotated(&self, pivot: Point, angle: Angle) -> Self {
+        if self.curve_kind == CurveKind::Spiro {
+            let mut rotated = self.mapped(Affine::rotation_about(pivot, angle));
+            rotated.rotation =
+                Angle::from_radians(self.rotation.as_radians() + angle.as_radians()).normalized();
+            return rotated;
+        }
         let mut rotated = self.clone();
         for anchor in rotated.all_anchors_mut() {
             anchor.point = anchor.point.rotated_around(pivot, angle);
@@ -65,6 +83,9 @@ impl PathSnapshot {
     /// 20). `rotation` is untouched.
     #[must_use]
     pub fn scaled_along(&self, pivot: Point, sx: f64, sy: f64, axes: Angle) -> Self {
+        if self.curve_kind == CurveKind::Spiro {
+            return self.mapped(along_axes(pivot, axes, Affine::scale(sx, sy)));
+        }
         let into_local = Angle::from_radians(-axes.as_radians());
         let out_of_local = axes;
         let mut scaled = self.clone();
@@ -102,6 +123,13 @@ impl PathSnapshot {
     /// `specs/0019-multi-object-transform/` criterion 41). `rotation` is untouched.
     #[must_use]
     pub fn sheared_along(&self, pivot: Point, ku: f64, kv: f64, axes: Angle) -> Self {
+        if self.curve_kind == CurveKind::Spiro {
+            return self.mapped(along_axes(
+                pivot,
+                axes,
+                Affine::new(1.0, kv, ku, 1.0, 0.0, 0.0),
+            ));
+        }
         let into_local = Angle::from_radians(-axes.as_radians());
         let out_of_local = axes;
         let shear = |x: f64, y: f64| (x + ku * y, y + kv * x);
@@ -119,6 +147,17 @@ impl PathSnapshot {
         }
         sheared
     }
+}
+
+fn along_axes(pivot: Point, axes: Angle, linear: Affine) -> Affine {
+    Affine::rotation_about(pivot, axes)
+        .compose(Affine::translation(Vec2::new(pivot.x, pivot.y)))
+        .compose(linear)
+        .compose(Affine::translation(Vec2::new(-pivot.x, -pivot.y)))
+        .compose(Affine::rotation_about(
+            pivot,
+            Angle::from_radians(-axes.as_radians()),
+        ))
 }
 
 /// `point`, mapped into the local frame about `pivot` (rotate by
@@ -178,6 +217,9 @@ mod tests {
                 },
             ],
             extra_subpaths: Vec::new(),
+            curve_kind: crate::CurveKind::Bezier,
+            spiro_transform: None,
+            width_points: Vec::new(),
             rotation: Angle::from_radians(0.0),
         }
     }

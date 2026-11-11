@@ -233,6 +233,7 @@ impl Session {
     /// new link's state (a second return check ending on the first one's number showed the
     /// first one's answer).
     pub(super) fn install_link(&mut self, mut link: Box<SyncLink>) {
+        self.document.set_live_share(true);
         if let Some(old) = self.sync.as_ref() {
             link.revision = old.revision.wrapping_add(link.revision).max(1);
         }
@@ -388,6 +389,7 @@ impl Session {
             link.online = false;
             link.revision = link.revision.wrapping_add(1);
         }
+        self.document.set_live_share(false);
     }
 
     /// Drops a link that ended (a Share that failed or was cancelled, after [`Self::leave_sync`]

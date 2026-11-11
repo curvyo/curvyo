@@ -153,6 +153,9 @@ fn leaf_of(
                 style: primitive.style.clone(),
                 anchors,
                 extra_subpaths: Vec::new(),
+                curve_kind: crate::CurveKind::Bezier,
+                spiro_transform: None,
+                width_points: Vec::new(),
                 rotation: crate::units::Angle::from_radians(0.0),
             })
         }

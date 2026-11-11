@@ -57,7 +57,7 @@ scope.onmessage = (event) => {
       ? writer.create(request.document, request.workspace, Date.now())
       : writer.write(request.document, request.workspace, request.bytes, Date.now());
     if (!written) {
-      scope.postMessage({ type: "failed", document: request.document });
+      scope.postMessage({ type: "failed", document: request.document, message: writer.take_error() });
       return;
     }
     const reply: WriterResponse = {

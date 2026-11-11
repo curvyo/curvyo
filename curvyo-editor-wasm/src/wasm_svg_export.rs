@@ -33,6 +33,7 @@ impl WasmSession {
                 texts_kept_live,
             } => format!("svg:{objects}:{texts_kept_live}:{text}"),
             SvgExportResult::NothingSelected => "nothing-selected".to_owned(),
+            SvgExportResult::UnsupportedExtendedPath => "unsupported-extended-path".to_owned(),
         }
     }
 

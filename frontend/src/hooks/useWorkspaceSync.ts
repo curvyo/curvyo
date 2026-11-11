@@ -193,7 +193,8 @@ export function useWorkspaceSync(
   }, [getSession]);
 
 
-  const { pump: pumpWriter, stop: stopWriter } = useWorkspaceWriter(getSession, collab.drive, writingRef);
+  const writerNotice = useCallback((text: string) => showHistoryNotice(text, 8000, "canvas", "alert"), [showHistoryNotice]);
+  const { pump: pumpWriter, stop: stopWriter } = useWorkspaceWriter(getSession, collab.drive, writingRef, writerNotice);
   useSharedTree(getSession, project, workspace, writingRef);
 
   const opened = workspace.open ? workspace.name : "";

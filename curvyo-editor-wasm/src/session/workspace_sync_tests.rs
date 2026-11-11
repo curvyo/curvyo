@@ -15,6 +15,95 @@ pub(super) const WORKSPACE: [u8; 16] = [0x57; 16];
 pub(super) const LID: [u8; 16] = [0x11; 16];
 pub(super) const LEFT: [u8; 16] = [0x22; 16];
 
+#[test]
+fn snapshot_rejects_profiled_documents_before_upload() {
+    use curvyo_document_core::{AnchorId, NewAnchor, Point};
+    use curvyo_sync_core::{SessionError, StreamEntry};
+    let document = Document::new(3);
+    let path = document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(3, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(3, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    document
+        .set_width_point(path, AnchorId::new(3, 3), 0.5, 2.0)
+        .unwrap();
+    let entry = StreamEntry {
+        stream: LEFT,
+        bytes: pack(&document, "test").unwrap(),
+    };
+    let mut session = Session::new(1);
+    assert_eq!(
+        session.upload_workspace_snapshot(1, vec![entry], [1; 16]),
+        Err(SessionError::UnsupportedDocument)
+    );
+}
+
+#[test]
+fn workspace_adoption_and_local_send_reject_profiled_documents() {
+    use curvyo_document_core::{AnchorId, NewAnchor, Point};
+    use curvyo_sync_core::SessionError;
+    let document = Document::new(3);
+    let path = document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(3, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(3, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    document
+        .set_width_point(path, AnchorId::new(3, 3), 0.5, 2.0)
+        .unwrap();
+    let bytes = pack(&document, "test").unwrap();
+    let (mut net, a, _) = shared_workspace();
+    assert_eq!(
+        net.s(a).workspace_adopt_document([9; 16], &bytes),
+        Err(SessionError::UnsupportedDocument)
+    );
+    assert_eq!(
+        net.s(a).workspace_send_local(LEFT, &bytes, b"updates"),
+        Err(SessionError::UnsupportedDocument)
+    );
+}
+
+#[test]
+fn workspace_local_send_checks_outgoing_updates_not_only_file() {
+    use curvyo_document_core::{AnchorId, NewAnchor, Point};
+    use curvyo_sync_core::SessionError;
+    let document = Document::new(31);
+    let path = document.create_path(
+        &[
+            NewAnchor::corner(AnchorId::new(31, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(31, 2), Point::new(10.0, 0.0)),
+        ],
+        false,
+    );
+    let file = pack(&document, "test").unwrap();
+    let before = document.version();
+    document
+        .set_width_point(path, AnchorId::new(31, 3), 0.5, 2.0)
+        .unwrap();
+    let outgoing = document.export_updates(&before).unwrap();
+    let (mut net, a, _) = shared_workspace();
+    assert_eq!(
+        net.s(a).workspace_send_local(LEFT, &file, &outgoing),
+        Err(SessionError::UnsupportedDocument)
+    );
+}
+
+#[test]
+fn unrelated_open_document_can_wipe_history_with_workspace_link_attached() {
+    let (mut net, a, _) = shared_workspace();
+    let link = net.s(a).take_workspace_link().unwrap();
+    let mut local = Session::new(51);
+    draw_rect(&mut local, (0.0, 0.0), (10.0, 10.0));
+    local.attach_workspace_link(link);
+    assert!(!local.document.is_shared());
+    assert!(local.document.wipe_history().is_ok());
+}
+
 pub(super) fn p(text: &str) -> Vec<String> {
     text.split('/').map(str::to_owned).collect()
 }

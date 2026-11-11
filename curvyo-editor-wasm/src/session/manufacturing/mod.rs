@@ -3,7 +3,7 @@
 //! placement. All of it is session view state; nothing here writes the document.
 
 mod commands;
-mod frame;
+pub(super) mod frame;
 mod machine;
 mod machine_view;
 mod placed_drag;

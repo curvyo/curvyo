@@ -106,7 +106,7 @@ impl Document {
         for &clone in &decided.held_unlinked {
             if let Some(read) = read_one_clone(&tree, clone) {
                 let opacity = crate::clone_write::source_opacity(&tree, &read);
-                plan.unlinks.push((clone, read.resolved, opacity));
+                plan.unlinks.push((clone, *read.resolved, opacity));
             }
         }
         Ok(plan)

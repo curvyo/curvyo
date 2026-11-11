@@ -132,6 +132,7 @@ fn export(s: &Session, active_page_only: bool) -> String {
     match s.export_svg(options) {
         SvgExportResult::Written { text, .. } => text,
         SvgExportResult::NothingSelected => panic!("nothing selected"),
+        SvgExportResult::UnsupportedExtendedPath => panic!("unexpected unsupported extended path"),
     }
 }
 

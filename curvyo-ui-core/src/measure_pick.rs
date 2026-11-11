@@ -55,6 +55,9 @@ fn anchors_of(object: &ObjectSnapshot) -> Option<&PathSnapshot> {
 fn point_features(object: &ObjectSnapshot) -> Vec<(PointSlot, Point)> {
     let node = object.id();
     if let Some(path) = anchors_of(object) {
+        if !path.curve_kind.is_bezier() {
+            return Vec::new();
+        }
         let mut out = Vec::new();
         for outline in path.subpaths() {
             let count = outline.anchors.len();
@@ -340,6 +343,9 @@ fn segment_near(object: &ObjectSnapshot, p: Point, tolerance: f64) -> Option<(f6
         return edge_near(primitive, p, tolerance);
     }
     let path = anchors_of(object)?;
+    if !path.curve_kind.is_bezier() {
+        return None;
+    }
     path.subpaths()
         .flat_map(|outline| {
             let count = outline.anchors.len();

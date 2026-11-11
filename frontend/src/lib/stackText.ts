@@ -96,6 +96,7 @@ export function stackRefusalText(command: StackCommand, result: StackResult): st
 /** Whether a refusal outlines objects on the canvas (criterion 2). */
 export function stackRefusalOutlinesObjects(result: StackResult): boolean {
   return (
+    result.kind === "extended_path" ||
     result.kind === "no_area" ||
     result.kind === "out_of_range" ||
     result.kind === "groups" ||

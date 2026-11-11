@@ -40,12 +40,17 @@ pub(super) struct DocumentRead {
 impl DocumentRead {
     fn of(document: &Document, fonts: &TextFonts) -> Self {
         let mut nodes = document.read_nodes();
+        let unsupported_texts = resolve_extended_text_carriers(&mut nodes);
         // Each text is laid out once per read: drawing, hit tests and bounds read the outline
         // (`specs/0074-text-objects`, ADR 0020 §2).
         for read in &mut nodes {
             match &mut read.kind {
                 curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) => {
-                    text.outline = fonts.lay_out(text).map(Arc::new);
+                    text.outline = if unsupported_texts.contains(&text.id) {
+                        None
+                    } else {
+                        fonts.lay_out(text).map(Arc::new)
+                    };
                 }
                 // The texts a clone of a group or text draws are laid out under its matrix.
                 curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Clone(clone)) => {
@@ -126,6 +131,37 @@ fn lay_out_picture(clone: &mut curvyo_document_core::CloneSnapshot, fonts: &Text
         })
         .collect();
     clone.chain.picture = Some(laid);
+}
+
+/// Resolves historical text carriers from evaluated artwork before text layout.
+fn resolve_extended_text_carriers(nodes: &mut [NodeRead]) -> HashSet<NodeId> {
+    let mut unsupported = HashSet::new();
+    let mut carriers = std::collections::HashMap::new();
+    for node in nodes.iter() {
+        if let Some(object) = node.object()
+            && object
+                .drawn_path()
+                .is_some_and(|path| !path.curve_kind.is_bezier())
+        {
+            let curve = curvyo_ui_core::evaluate_object(object)
+                .ok()
+                .and_then(|evaluated| curvyo_document_core::carrier_curve(&evaluated, 0))
+                .map(Arc::new);
+            carriers.insert(node.id, curve);
+        }
+    }
+    for node in nodes {
+        if let curvyo_document_core::NodeKind::Leaf(ObjectSnapshot::Text(text)) = &mut node.kind
+            && let Some(on_path) = &mut text.on_path
+            && let Some(curve) = carriers.get(&on_path.carrier.node)
+        {
+            on_path.curve.clone_from(curve);
+            if curve.is_none() {
+                unsupported.insert(text.id);
+            }
+        }
+    }
+    unsupported
 }
 
 /// The cached read and whether a drag holds it.
@@ -278,5 +314,103 @@ mod tests {
     fn a_session_can_move_to_another_thread() {
         fn assert_send<T: Send>() {}
         assert_send::<super::super::Session>();
+    }
+}
+
+#[cfg(test)]
+mod extended_text_tests {
+    use super::*;
+    use curvyo_document_core::{
+        Affine, AnchorId, AnchorKind, CarrierRef, CurveKind, FontKind, FontRef, Length, NewAnchor,
+        NodeKind, OnPathValues, Point, TextLayoutValues,
+    };
+
+    #[test]
+    fn historical_text_uses_evaluated_carrier_and_refuses_unknown_curve() {
+        let d = Document::new(200);
+        let controls = [(0., 0.), (10., 0.), (10., 10.), (0., 10.)]
+            .into_iter()
+            .enumerate()
+            .map(|(i, (x, y))| {
+                let mut a = NewAnchor::corner(AnchorId::new(200, i as u64), Point::new(x, y));
+                a.kind = AnchorKind::Symmetric;
+                a
+            })
+            .collect::<Vec<_>>();
+        let path = d.create_path(&controls, false);
+        let font = FontRef {
+            family: "Example".into(),
+            style: "Regular".into(),
+            face_hash: "c".repeat(64),
+            face_index: 0,
+            kind: FontKind::Outline,
+        };
+        let text = d
+            .create_text(
+                "Text",
+                &font,
+                Length::from_mm(10.),
+                Affine::IDENTITY,
+                &TextLayoutValues::DEFAULT,
+            )
+            .unwrap();
+        d.put_text_on_path(
+            text,
+            CarrierRef {
+                node: path,
+                outline: 0,
+            },
+            &OnPathValues::at(Length::from_mm(0.)),
+            false,
+        )
+        .unwrap();
+        let mut nodes = d.read_nodes();
+        for node in &mut nodes {
+            if let NodeKind::Leaf(ObjectSnapshot::Path(p)) = &mut node.kind
+                && p.id == path
+            {
+                p.curve_kind = CurveKind::BSpline;
+            }
+        }
+        let object = nodes
+            .iter()
+            .find_map(|node| node.object().filter(|o| o.id() == path))
+            .unwrap();
+        let expected = curvyo_document_core::carrier_curve(
+            &curvyo_ui_core::evaluate_object(object).unwrap(),
+            0,
+        )
+        .unwrap();
+        assert!(resolve_extended_text_carriers(&mut nodes).is_empty());
+        let actual = nodes
+            .iter()
+            .find_map(|node| match &node.kind {
+                NodeKind::Leaf(ObjectSnapshot::Text(t)) if t.id == text => {
+                    t.on_path.as_ref()?.curve.as_deref()
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(actual, &expected);
+        for node in &mut nodes {
+            if let NodeKind::Leaf(ObjectSnapshot::Path(p)) = &mut node.kind
+                && p.id == path
+            {
+                // A Spiro through one point has no curve to carry the text.
+                p.curve_kind = CurveKind::Spiro;
+                for anchor in &mut p.anchors {
+                    anchor.point = curvyo_document_core::Point::new(1.0, 1.0);
+                }
+            }
+        }
+        assert!(resolve_extended_text_carriers(&mut nodes).contains(&text));
+        let actual = nodes
+            .iter()
+            .find_map(|node| match &node.kind {
+                NodeKind::Leaf(ObjectSnapshot::Text(t)) if t.id == text => t.on_path.as_ref(),
+                _ => None,
+            })
+            .unwrap();
+        assert!(actual.curve.is_none());
     }
 }

@@ -115,6 +115,17 @@ impl WorkspaceShareRecord {
 }
 
 impl crate::Document {
+    /// Records whether this document is currently attached to a live collaboration link.
+    pub fn set_live_share(&self, active: bool) {
+        self.live_share.set(active);
+    }
+
+    /// Whether curve-kind and width-profile edits are refused because the document is shared
+    /// (ADR 0053, compatibility with older sync peers).
+    pub(crate) fn extended_edits_blocked(&self) -> bool {
+        self.is_shared() || self.workspace_share().is_some()
+    }
+
     /// The record of a workspace document, `None` otherwise (`specs/0095-workspace` criterion
     /// 15).
     #[must_use]

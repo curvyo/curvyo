@@ -20,6 +20,13 @@ pub const WELD_COMMIT_LABEL: &str = "weld";
 /// Why Weld was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WeldRefusal {
+    /// Editable geometry requires explicit conversion first.
+    ExtendedPath {
+        /// Objects requiring conversion.
+        offenders: Vec<NodeId>,
+        /// Number of selected objects.
+        of: usize,
+    },
     /// Texts of the selection use a missing face or are not laid out yet (criterion 23), or are
     /// single-line texts, which have no area (`0076` criterion 19).
     Texts(TextRefusal),
@@ -275,6 +282,23 @@ pub fn plan_weld(
 ) -> Result<WeldPlan, WeldRefusal> {
     let leaves = leaves_in_order(objects, units);
     let ids: Vec<NodeId> = leaves.iter().map(|leaf| leaf.id()).collect();
+    let offenders: Vec<NodeId> = leaves
+        .iter()
+        .filter(|object| {
+            object.drawn_path().is_some_and(|path| {
+                path.curve_kind != curvyo_document_core::CurveKind::Bezier
+                    || !path.width_points.is_empty()
+            })
+        })
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(WeldRefusal::ExtendedPath {
+            offenders,
+            of: units.len(),
+        });
+    }
+
     if let Some(refusal) = area_refusal(objects, &ids) {
         return Err(WeldRefusal::Texts(refusal));
     }

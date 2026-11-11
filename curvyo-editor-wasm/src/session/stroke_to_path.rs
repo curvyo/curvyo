@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use curvyo_document_core::NodeId;
 use curvyo_ui_core::{
-    StrokeToPathRefusal, TextRefusal, plan_stroke_to_path, stroke_to_path_available,
+    StrokeToPathRefusal, TextRefusal, plan_stroke_to_path_with_artwork, stroke_to_path_available,
 };
 
 use super::Session;
@@ -75,7 +75,7 @@ impl Session {
             this.flush_select_bar_preview();
             this.end_colour_pick();
             let read = this.document_read();
-            let leaves = Arc::clone(&read.leaves);
+            let leaves = this.spiro_selection_objects(&read.leaves);
             let nodes = Arc::clone(&read.nodes);
             let names = |id: NodeId| {
                 nodes
@@ -85,23 +85,37 @@ impl Session {
             };
             let selection = this.selection.clone();
             let skips = this.stroke_skips();
-            let plan = match plan_stroke_to_path(
+            let mut plan = match plan_stroke_to_path_with_artwork(
                 &leaves,
                 selection.ids(),
                 &skips,
                 &names,
                 &mut this.minter,
+                &super::width_outlines::memo_lookup(&this.width_outlines),
             ) {
                 Ok(plan) => plan,
                 Err(refusal) => {
                     let offenders = match &refusal {
                         StrokeToPathRefusal::Texts(TextRefusal { offenders, .. })
-                        | StrokeToPathRefusal::OutOfRange { offenders } => offenders,
+                        | StrokeToPathRefusal::OutOfRange { offenders }
+                        | StrokeToPathRefusal::UnsupportedExtendedPath { offenders } => offenders,
                     };
                     this.command_refusal = Some(RefusalMarks::new(offenders.clone(), &selection));
                     return StrokeToPathOutcome::Refused(refusal);
                 }
             };
+            for unlink in &mut plan.write.unlinks {
+                if let Some(curvyo_document_core::ObjectSnapshot::Clone(clone)) =
+                    read.leaves.iter().find(|object| object.id() == unlink.id)
+                    && clone.chain.root_outline.curve_kind == curvyo_document_core::CurveKind::Spiro
+                {
+                    unlink.anchor_ids = clone
+                        .resolved
+                        .all_anchors()
+                        .map(|_| this.minter.mint())
+                        .collect();
+                }
+            }
             if plan.write.outlines.is_empty() {
                 return StrokeToPathOutcome::Ignored;
             }

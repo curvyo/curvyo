@@ -20,6 +20,11 @@ pub const BREAK_APART_COMMIT_LABEL: &str = "break_apart";
 /// Why Break apart was refused. Nothing was changed in either case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BreakApartRefusal {
+    /// An editable curve or variable width profile needs explicit conversion first.
+    ExtendedPath {
+        /// Paths requiring conversion.
+        offenders: Vec<NodeId>,
+    },
     /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
     /// (`specs/0074-text-objects` criteria 24 and 29).
     Texts(crate::text_convert::TextRefusal),
@@ -66,6 +71,19 @@ pub fn plan_break_apart(
     let converted = crate::text_convert::texts_as_paths(objects);
     let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
+    let offenders: Vec<NodeId> = operands
+        .iter()
+        .filter(|object| {
+            is_compound(object)
+                && object.drawn_path().is_some_and(|path| {
+                    !path.curve_kind.is_bezier() || !path.width_points.is_empty()
+                })
+        })
+        .map(|object| object.id())
+        .collect();
+    if !offenders.is_empty() {
+        return Err(BreakApartRefusal::ExtendedPath { offenders });
+    }
     if !operands.iter().any(|object| is_compound(object)) {
         return Err(BreakApartRefusal::NoCompound);
     }

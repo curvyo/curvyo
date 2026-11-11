@@ -89,6 +89,7 @@ fn export(s: &Session, options: SvgExportOptions) -> String {
     match s.export_svg(options) {
         SvgExportResult::Written { text, .. } => text,
         SvgExportResult::NothingSelected => panic!("nothing selected"),
+        SvgExportResult::UnsupportedExtendedPath => panic!("unexpected unsupported extended path"),
     }
 }
 

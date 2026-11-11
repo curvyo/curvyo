@@ -64,29 +64,6 @@ fn place_in_sentence(homes: &OutsideHomes) -> String {
     }
 }
 
-/// Every home by name, as the status bar lists them: "Page 2, Laser 1", "pasteboard".
-fn every_home(homes: &OutsideHomes) -> String {
-    homes
-        .names
-        .iter()
-        .map(|name| {
-            if name == "Pasteboard" {
-                "pasteboard".to_owned()
-            } else {
-                cut_label(name, NAME_CHARS)
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-/// The status bar's left text for a move-only selection: "Rectangle · Drawing 2", "Circle ·
-/// pasteboard", "2 objects · Page 2, Laser 1" (UX notes §2): every home is named.
-#[must_use]
-pub fn out_of_context_status(subject: &str, homes: &OutsideHomes) -> String {
-    format!("{subject} · {}", every_home(homes))
-}
-
 /// What the selection announcer adds for a move-only selection: ", on Drawing 2", ", on the
 /// pasteboard", ", on 3 pages" (UX notes §2).
 #[must_use]
@@ -148,20 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn the_status_bar_the_announcer_and_the_row_line_name_the_home() {
-        assert_eq!(
-            out_of_context_status("Rectangle", &homes(false, &["Drawing 2"])),
-            "Rectangle · Drawing 2"
-        );
-        assert_eq!(
-            out_of_context_status("Circle", &homes(false, &["Pasteboard"])),
-            "Circle · pasteboard"
-        );
-        assert_eq!(
-            out_of_context_status("2 objects", &homes(true, &["Page 2", "Laser 1"])),
-            "2 objects · Page 2, Laser 1",
-            "the status bar names every home"
-        );
+    fn the_announcer_and_the_row_line_name_the_home() {
         assert_eq!(
             out_of_context_suffix(&homes(false, &["Drawing 2"])),
             ", on Drawing 2"

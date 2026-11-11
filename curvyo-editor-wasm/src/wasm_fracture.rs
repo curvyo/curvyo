@@ -71,6 +71,9 @@ impl From<StackOutcome> for StackResultView {
                 ..view("applied", 0, operands)
             },
             StackOutcome::Refused(refusal) => match refusal {
+                StackRefusal::Operands(BooleanRefusal::ExtendedPath { offenders, of }) => {
+                    view("extended_path", offenders.len(), of)
+                }
                 StackRefusal::Operands(BooleanRefusal::NeedsTwo) => view("needs_two", 0, 0),
                 StackRefusal::Operands(BooleanRefusal::NoArea { offenders, of }) => {
                     view("no_area", offenders.len(), of)

@@ -9,8 +9,8 @@ use curvyo_document_core::{ObjectSnapshot, Point, Tolerance};
 
 use super::cycle::ClickCycle;
 use super::{SelectDrag, SelectTool};
-use crate::hit_test_object::hit_test_objects_along;
-use crate::marquee::{MarqueeMode, units_in_marquee};
+use crate::hit_test_object::hit_test_objects_along_with_artwork;
+use crate::marquee::{MarqueeMode, units_in_marquee_with_artwork};
 use crate::modifiers::Modifiers;
 use crate::object_selection::{ObjectSelection, SelectionCombine};
 use crate::transform_drag::DragOrigin;
@@ -189,6 +189,7 @@ impl SelectTool {
         selection: &mut ObjectSelection,
         point: Point,
         modifiers: Modifiers,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) {
         let combine = SelectionCombine::from_modifiers(modifiers.shift, modifiers.ctrl);
         if !drag.origin.is_active_at(point) {
@@ -202,13 +203,14 @@ impl SelectTool {
         let mode = MarqueeMode::for_drag(from, point, modifiers.alt);
         let pickable = self.hit_objects(objects);
         // A group takes its hidden and locked members along (criterion 21).
-        let found = self.units.widen(&units_in_marquee(
+        let found = self.units.widen(&units_in_marquee_with_artwork(
             pickable,
             &self.units,
             from,
             point,
             mode,
             BOX_TOLERANCE,
+            artwork,
         ));
         selection.retain_existing(objects);
         selection.apply(combine, &found);
@@ -226,6 +228,7 @@ impl SelectTool {
         selection: &mut ObjectSelection,
         point: Point,
         modifiers: Modifiers,
+        artwork: &crate::VariableArtworkLookup<'_>,
     ) {
         let tolerance = drag.tolerance;
         if !drag.origin.is_active_at(point) {
@@ -235,7 +238,7 @@ impl SelectTool {
                 _ => ClickCycle::fresh(at),
             };
             let pickable = self.hit_objects(objects);
-            if let Some(chosen) = cycle.advance(pickable, tolerance, &self.units) {
+            if let Some(chosen) = cycle.advance(pickable, tolerance, &self.units, artwork) {
                 selection.set(&self.units.leaves_of_unit(chosen));
                 self.cycle = Some(cycle);
             }
@@ -243,10 +246,11 @@ impl SelectTool {
         }
         self.cycle = None;
         let pickable = self.hit_objects(objects);
-        let found = self.units.widen(&hit_test_objects_along(
+        let found = self.units.widen(&hit_test_objects_along_with_artwork(
             pickable,
             &drag.line_to(point),
             tolerance,
+            artwork,
         ));
         selection.retain_existing(objects);
         selection.apply(

@@ -54,9 +54,38 @@ impl Session {
     }
 
     /// The objects of the context a press may hit: [`Session::objects`] without the hidden and
-    /// locked ones (`specs/0050-layers-and-objects-panel` criteria 19 and 20).
+    /// locked ones (`specs/0050-layers-and-objects-panel` criteria 19 and 20), a Spiro by its
+    /// curve or, without solution, by its control polygon.
     pub(super) fn pickable_objects(&self) -> Arc<[ObjectSnapshot]> {
-        self.held_context().pickable
+        let pickable = self.held_context().pickable;
+        if pickable.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        }) {
+            self.spiro_pick_objects(&pickable).into()
+        } else {
+            pickable
+        }
+    }
+
+    /// Each Spiro path among the stored pickable objects by id, as its control nodes: the Node
+    /// tool and the Pen edit these, not the curve [`Session::pickable_objects`] hits.
+    pub(super) fn spiro_controls(
+        &self,
+    ) -> std::collections::HashMap<NodeId, curvyo_document_core::PathSnapshot> {
+        self.held_context()
+            .pickable
+            .iter()
+            .filter_map(|object| match object {
+                ObjectSnapshot::Path(path)
+                    if path.curve_kind == curvyo_document_core::CurveKind::Spiro =>
+                {
+                    Some((path.id, path.clone()))
+                }
+                _ => None,
+            })
+            .collect()
     }
 
     /// The whole cached read of the document: the objects with the direct clones of each and an

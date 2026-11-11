@@ -26,6 +26,13 @@ pub const MAX_CUT_PIECES: usize = 10_000;
 /// Why Cut was refused. Nothing was changed in any of these cases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CutRefusal {
+    /// Editable geometry requires explicit conversion first.
+    ExtendedPath {
+        /// Objects requiring conversion.
+        offenders: Vec<NodeId>,
+        /// Number of selected objects.
+        of: usize,
+    },
     /// Texts of the selection use a missing face or are not laid out yet: nothing is converted
     /// (`specs/0074-text-objects` criteria 24 and 29).
     Texts(crate::text_convert::TextRefusal),
@@ -86,10 +93,10 @@ struct Contour {
 
 fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
     match object {
-        ObjectSnapshot::Path(path)
-        | ObjectSnapshot::Clone(curvyo_document_core::CloneSnapshot { resolved: path, .. })
-            if !path.is_compound() =>
+        ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_)
+            if object.drawn_path().is_some_and(|path| !path.is_compound()) =>
         {
+            let path = object.drawn_path()?;
             Some(Contour {
                 id: path.id,
                 anchors: path.anchors.clone(),
@@ -124,6 +131,18 @@ fn contour_of(object: &ObjectSnapshot) -> Option<Contour> {
     }
 }
 
+fn extended_offenders(operands: &[&ObjectSnapshot]) -> Vec<NodeId> {
+    operands
+        .iter()
+        .filter(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| !path.curve_kind.is_bezier() || !path.width_points.is_empty())
+        })
+        .map(|object| object.id())
+        .collect()
+}
+
 /// Plans Cut over the selected objects.
 ///
 /// # Errors
@@ -154,6 +173,13 @@ pub fn plan_cut(
     let converted = crate::text_convert::texts_as_paths(objects);
     let objects: &[ObjectSnapshot] = &converted;
     let operands = operands_in_order(objects, selection);
+    let offenders = extended_offenders(&operands);
+    if !offenders.is_empty() {
+        return Err(CutRefusal::ExtendedPath {
+            offenders,
+            of: operands.len(),
+        });
+    }
     if operands.is_empty() {
         return Err(CutRefusal::NoneSelected);
     }

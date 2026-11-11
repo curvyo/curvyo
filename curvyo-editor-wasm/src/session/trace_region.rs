@@ -21,7 +21,7 @@ const WASH_LEFT: f64 = 0.35;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RegionCache {
     /// The mask paths' outlines it was made from, in document order.
-    operands: Vec<RegionOperand>,
+    operands: Result<Vec<RegionOperand>, TraceRegionError>,
     /// The image's corners it was tested against.
     quad: [Point; 4],
     /// The union (Inside); `None` when no mask path encloses an area.
@@ -39,7 +39,9 @@ pub(crate) struct RegionCache {
 pub(super) fn is_mask_path(object: &ObjectSnapshot) -> bool {
     match object {
         ObjectSnapshot::Path(_) | ObjectSnapshot::Primitive(_) => true,
-        ObjectSnapshot::Clone(_) => !mask_operand(object).is_empty(),
+        ObjectSnapshot::Clone(_) => {
+            mask_operand(object).map_or(true, |operand| !operand.is_empty())
+        }
         ObjectSnapshot::Text(_)
         | ObjectSnapshot::Image(_)
         | ObjectSnapshot::Sketch(_)
@@ -48,8 +50,14 @@ pub(super) fn is_mask_path(object: &ObjectSnapshot) -> bool {
 }
 
 impl RegionCache {
-    pub(super) fn new(operands: Vec<RegionOperand>, quad: [Point; 4]) -> Self {
-        let region = TraceRegion::of_operands(&operands, false);
+    pub(super) fn new(
+        operands: Result<Vec<RegionOperand>, TraceRegionError>,
+        quad: [Point; 4],
+    ) -> Self {
+        let region = operands
+            .as_ref()
+            .map_err(Clone::clone)
+            .and_then(|operands| TraceRegion::of_operands(operands, false));
         let [beyond, within] = region.as_ref().ok().map_or_else(
             || [vec![quad.to_vec()], Vec::new()],
             |r| r.quad_parts(&quad),
@@ -65,8 +73,12 @@ impl RegionCache {
     }
 
     /// Whether it was made of `operands` over `quad`.
-    pub(super) fn made_of(&self, operands: &[RegionOperand], quad: [Point; 4]) -> bool {
-        self.operands == operands && self.quad == quad
+    pub(super) fn made_of(
+        &self,
+        operands: &Result<Vec<RegionOperand>, TraceRegionError>,
+        quad: [Point; 4],
+    ) -> bool {
+        &self.operands == operands && self.quad == quad
     }
 
     /// The union (Inside), or why there is none.
@@ -111,7 +123,8 @@ impl Session {
         }
         let (_, images) = self.trace_images();
         let quad = images.first()?.corners();
-        let operands: Vec<RegionOperand> = masks.iter().map(mask_operand).collect();
+        let operands: Result<Vec<RegionOperand>, TraceRegionError> =
+            masks.iter().map(mask_operand).collect();
         let mut cache = self.trace.region.borrow_mut();
         if cache
             .as_ref()
@@ -255,6 +268,9 @@ fn white_polygons(
         },
         anchors,
         extra_subpaths,
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
     }
 }

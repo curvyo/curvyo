@@ -105,6 +105,9 @@ impl From<WeldOutcome> for WeldResultView {
                 stroke_switched_on,
                 ..view("applied", 0, objects)
             },
+            WeldOutcome::Refused(WeldRefusal::ExtendedPath { offenders, of }) => {
+                view("extended_path", offenders.len(), of)
+            }
             WeldOutcome::Refused(WeldRefusal::NoArea { of, .. }) => view("no_area", of, of),
             WeldOutcome::Refused(WeldRefusal::OutOfRange { objects, of, .. }) => {
                 view("out_of_range", objects, of)

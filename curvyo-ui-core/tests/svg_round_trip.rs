@@ -347,7 +347,8 @@ fn export(
             active_page: 0,
         },
         options,
-    );
+    )
+    .unwrap();
     curvyo_svg_core::write_svg(&outcome.svg)
 }
 

@@ -267,23 +267,22 @@ fn ac14a_a_selection_shows_style_and_escape_reveals_the_document_section() {
 }
 
 #[test]
-fn ac14a_an_unfinished_pen_path_empties_the_panel_until_it_is_gone() {
+fn ac14a_an_unfinished_pen_path_keeps_the_document_panel_populated() {
     let mut s = session_of(&populated());
     s.set_tool(Tool::Pen);
     assert_eq!(s.panel_content(), PanelContent::Document);
     click(&mut s, 300.0, 300.0);
     assert!(s.pen_in_progress().is_some());
-    assert_eq!(s.panel_content(), PanelContent::Empty);
+    assert_eq!(s.panel_content(), PanelContent::Document);
     click(&mut s, 330.0, 340.0);
-    assert_eq!(s.panel_content(), PanelContent::Empty);
+    assert_eq!(s.panel_content(), PanelContent::Document);
     s.escape();
     assert!(s.pen_in_progress().is_none());
     assert_eq!(s.panel_content(), PanelContent::Document);
 }
 
-/// Switching tools while the Pen path is unfinished must not leave a path
-/// that a resize would then move the objects around. Observed: what the Pen
-/// does with its path on a tool switch, and that the panel and the Pen agree.
+/// Switching tools must still discard the unfinished path, independently of
+/// whether the Document panel is visible during the gesture (story 0110).
 #[test]
 fn ac14a_leaving_the_pen_with_an_unfinished_path_leaves_no_hidden_path() {
     let mut bad = Vec::new();
@@ -292,18 +291,16 @@ fn ac14a_leaving_the_pen_with_an_unfinished_path_leaves_no_hidden_path() {
         s.set_tool(Tool::Pen);
         click(&mut s, 300.0, 300.0);
         click(&mut s, 330.0, 340.0);
-        assert_eq!(s.panel_content(), PanelContent::Empty);
+        assert_eq!(s.panel_content(), PanelContent::Document);
         s.set_tool(other);
-        let shown = s.panel_content();
         s.set_tool(Tool::Pen);
-        if shown == PanelContent::Document && s.pen_in_progress().is_some() {
+        if s.pen_in_progress().is_some() {
             bad.push(other);
         }
     }
     assert!(
         bad.is_empty(),
-        "with {bad:?} the panel offers the Document section (a resize) while the Pen \
-         still holds an unfinished path that returns when the Pen is picked again"
+        "with {bad:?} an unfinished path returns when the Pen is picked again"
     );
 }
 

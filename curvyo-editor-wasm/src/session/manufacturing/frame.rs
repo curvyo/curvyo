@@ -64,6 +64,9 @@ impl Session {
                     Some(table) => self.looked_placed_members(table, id, &objects, view),
                     None => objects,
                 };
+                let Some(objects) = self.placed_artwork(&objects, to_plane.compose(map)) else {
+                    continue;
+                };
                 // A placed page in a Select drag is drawn where a release puts it, a copy beside
                 // the original; off its laser page at 40 % (`specs/0100` UX notes §5).
                 let mut drawn = vec![(Affine::IDENTITY, false)];
@@ -95,6 +98,29 @@ impl Session {
             }
         }
         list
+    }
+
+    /// The placed `objects` with curves evaluated and variable strokes expanded at the tolerance
+    /// of `map`; `None` when the map cannot be drawn at all.
+    fn placed_artwork(
+        &self,
+        objects: &[ObjectSnapshot],
+        map: Affine,
+    ) -> Option<Vec<ObjectSnapshot>> {
+        let tolerance = placement_source_tolerance(map)?;
+        let mut resolved = Vec::new();
+        for object in self.spiro_placement_objects(objects, tolerance) {
+            if curvyo_ui_core::profiled_paths(&object).is_empty() {
+                resolved.push(curvyo_ui_core::evaluate_object(&object).ok()?);
+                continue;
+            }
+            super::super::width_outlines::push_width_expanded(
+                &object,
+                &|path| self.width_artwork_at(path, tolerance),
+                &mut resolved,
+            );
+        }
+        Some(resolved)
     }
 
     /// The live map of each placed page in the Select edit in flight: the map from where it is to
@@ -192,7 +218,9 @@ impl Session {
         self.placements_of(manufacturing)
             .into_iter()
             .filter_map(|(_, map, members)| {
-                curvyo_ui_core::placed_bounds(&read.drawn, &members, map)
+                curvyo_ui_core::placed_bounds_with_artwork(&read.drawn, &members, map, &|path| {
+                    self.width_artwork(path)
+                })
             })
             .reduce(|(a, b), (c, d)| {
                 (
@@ -216,7 +244,7 @@ impl Session {
             .iter()
             .filter_map(|placement| {
                 let source = pages.iter().find(|page| page.id == placement.page)?.clone();
-                let members = self.placed_members(&read.drawn, &read.guides, &source);
+                let members = self.placed_members(&read.drawn, &read.guides, &source)?;
                 let map = curvyo_ui_core::placement_map(&source, placement.matrix);
                 Some((placement.id, map, members))
             })
@@ -228,18 +256,24 @@ impl Session {
         drawn: &Arc<[ObjectSnapshot]>,
         guides: &std::collections::HashSet<curvyo_document_core::NodeId>,
         page: &Page,
-    ) -> Arc<[usize]> {
+    ) -> Option<Arc<[usize]>> {
         let cache = &self.manufacturing.placed.0;
         if let Some(entry) = cache
             .borrow()
             .iter()
             .find(|entry| Arc::ptr_eq(&entry.drawn, drawn) && entry.page == *page)
         {
-            return Arc::clone(&entry.members);
+            return Some(Arc::clone(&entry.members));
         }
         let membership = self.page_membership();
-        let members: Arc<[usize]> =
-            curvyo_ui_core::placement_members(drawn, page, guides, &membership).into();
+        let members = curvyo_ui_core::placement_members_with_artwork(
+            drawn,
+            page,
+            guides,
+            &membership,
+            &|path| self.width_artwork(path),
+        )?;
+        let members: Arc<[usize]> = members.into();
         let mut entries = cache.borrow_mut();
         entries.retain(|entry| Arc::ptr_eq(&entry.drawn, drawn));
         entries.push(PlacedEntry {
@@ -247,7 +281,7 @@ impl Session {
             page: page.clone(),
             members: Arc::clone(&members),
         });
-        members
+        Some(members)
     }
 }
 
@@ -268,9 +302,26 @@ fn origin_marker(
     curvyo_render_core::build_origin_marker(Point::new(x, y), inward, width.min(height), view)
 }
 
-/// How much a placement map scales lengths (for the tessellation tolerance only): the square
-/// root of its determinant's magnitude, 1 for a degenerate map.
-fn linear_scale(map: Affine) -> f64 {
-    let det = map.a.mul_add(map.d, -(map.b * map.c)).abs();
-    if det > UNIFORM_EPS { det.sqrt() } else { 1.0 }
+/// Largest length scaling of a placement map, used for tessellation tolerance.
+pub(super) fn linear_scale(map: Affine) -> f64 {
+    let first = (map.a + map.d).hypot(map.b - map.c);
+    let second = (map.a - map.d).hypot(map.b + map.c);
+    let maximum = f64::midpoint(first, second);
+    if maximum.is_finite() && maximum > UNIFORM_EPS {
+        maximum
+    } else {
+        1.0
+    }
+}
+
+/// Source-space tolerance required to bound error after the placement transform.
+pub(in crate::session) fn placement_source_tolerance(map: Affine) -> Option<f64> {
+    if !map.to_array().iter().all(|v| v.is_finite()) {
+        return None;
+    }
+    let scale = linear_scale(map);
+    // Account conservatively for rounding in the singular-value calculation.
+    let upper = (scale * (1.0 + 16.0 * f64::EPSILON)).next_up().max(1.0);
+    let tolerance = (0.01 / upper).next_down();
+    (tolerance.is_finite() && tolerance > 0.0).then_some(tolerance)
 }

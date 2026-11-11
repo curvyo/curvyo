@@ -165,7 +165,9 @@ impl Session {
             bottom: origin.is_bottom(),
         };
         let pages = self.document.pages();
-        let contents = self.page_contents();
+        let Some(contents) = self.page_contents() else {
+            return false;
+        };
         // The fixtures a pick or reset removes say so, with the undo that brings them back
         // (criterion 29, ADR 0050 section 6). Nothing is posted when none went.
         let before = match fixtures {

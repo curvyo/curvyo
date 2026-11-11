@@ -29,13 +29,28 @@ pub(super) fn moving(nodes: &[NodeRead], selected: Option<&HashSet<NodeId>>) -> 
     result
 }
 
-pub(super) fn group_bounds(nodes: &[NodeRead]) -> HashMap<NodeId, (Point, Point)> {
+pub(super) fn group_bounds(
+    nodes: &[NodeRead],
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> HashMap<NodeId, (Point, Point)> {
     let mut bounds = HashMap::new();
+    let mut unavailable = HashSet::new();
     for node in nodes.iter().rev().filter(|n| n.visible) {
         if !node.guide
             && let Some(object) = node.object()
         {
-            bounds.insert(node.id, object_bounds(object));
+            if let Some(value) = crate::object_bounds::object_bounds_with_artwork(object, artwork) {
+                bounds.insert(node.id, value);
+            } else {
+                unavailable.insert(node.id);
+            }
+        }
+        if unavailable.contains(&node.id) {
+            bounds.remove(&node.id);
+            if let Some(parent) = node.parent {
+                unavailable.insert(parent);
+            }
+            continue;
         }
         if let (Some(parent), Some(&(lo, hi))) = (node.parent, bounds.get(&node.id)) {
             bounds
@@ -79,7 +94,10 @@ pub fn grid_snap_nodes(nodes: &[NodeRead], selected: &HashSet<NodeId>) -> Vec<Po
         };
         let is_path = matches!(object, ObjectSnapshot::Path(_) | ObjectSnapshot::Clone(_));
         match object.drawn_path() {
-            Some(path) if is_path => points.extend(path.all_anchors().map(|anchor| anchor.point)),
+            Some(path) if is_path => points.extend(
+                path.all_anchors()
+                    .map(|anchor| super::targets::control_point(path, anchor.point)),
+            ),
             _ => {
                 let (min, max) = object_bounds(object);
                 points.push(Point::new(

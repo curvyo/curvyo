@@ -47,7 +47,8 @@ fn export(document: &Document) -> String {
             active_page: 0,
         },
         SvgExportOptions::default(),
-    );
+    )
+    .unwrap();
     outcome.text()
 }
 
@@ -285,4 +286,30 @@ fn ac25_the_export_writes_the_pieces_before_the_outline() {
     let pieces = svg.find("<path id=\"path1\"").unwrap();
     let outline = svg.find("<rect id=\"rect1\"").unwrap();
     assert!(pieces < outline, "{svg}");
+}
+
+#[test]
+fn bspline_pattern_uses_evaluated_region() {
+    use curvyo_document_core::{AnchorId, AnchorKind, CurveKind, NewAnchor};
+    let d = Document::new(110);
+    let controls = [(0., 0.), (40., 0.), (40., 40.), (0., 40.)]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (x, y))| {
+            let mut a = NewAnchor::corner(AnchorId::new(110, i as u64), Point::new(x, y));
+            a.kind = AnchorKind::Symmetric;
+            a
+        })
+        .collect::<Vec<_>>();
+    let id = d
+        .create_editable_curve(&controls, true, CurveKind::BSpline)
+        .unwrap();
+    d.edit_style(&[id], &StyleEdit::FillPaint(FillPaint::Pattern))
+        .unwrap();
+    let raw = d.object(id).unwrap();
+    let evaluated = curvyo_ui_core::evaluate_object(&raw).unwrap();
+    assert_eq!(
+        object_pattern_pieces(&raw),
+        object_pattern_pieces(&evaluated)
+    );
 }

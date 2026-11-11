@@ -490,13 +490,7 @@ impl ObjectSnapshot {
     #[must_use]
     pub fn translated(&self, offset: Vec2) -> Self {
         match self {
-            Self::Path(path) => {
-                let mut path = path.clone();
-                for anchor in path.all_anchors_mut() {
-                    anchor.point = anchor.point.translated(offset);
-                }
-                Self::Path(path)
-            }
+            Self::Path(path) => Self::Path(path.mapped(Affine::translation(offset))),
             Self::Primitive(primitive) => {
                 let mut primitive = primitive.clone();
                 primitive.shape = translate_shape(primitive.shape, offset);
@@ -902,6 +896,9 @@ mod tests {
             style: Style::default(),
             anchors: Vec::new(),
             extra_subpaths: Vec::new(),
+            curve_kind: crate::CurveKind::Bezier,
+            spiro_transform: None,
+            width_points: Vec::new(),
             rotation: Angle::from_radians(-0.25),
         });
         assert!((path.orientation().as_radians() + 0.25).abs() < 1e-12);
@@ -1022,6 +1019,9 @@ mod tests {
             style: Style::default(),
             anchors: vec![anchor],
             extra_subpaths: Vec::new(),
+            curve_kind: crate::CurveKind::Bezier,
+            spiro_transform: None,
+            width_points: Vec::new(),
             rotation: Angle::from_radians(0.0),
         };
         let moved = ObjectSnapshot::Path(path).translated(Vec2::new(1.0, 2.0));

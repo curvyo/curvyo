@@ -200,14 +200,40 @@ pub(crate) fn dash_pieces(
     width: f64,
     cap: Cap,
 ) -> Option<Vec<DashPiece>> {
+    let spans = dash_spans(pattern, width, cap, measured.total())?;
+    let mut pieces = Vec::new();
+    for (start, end) in spans {
+        if end > start {
+            let dash = measured.between(start, end);
+            if !dash.is_empty() {
+                pieces.push(DashPiece::Dash(dash));
+            }
+        } else {
+            let (at, ahead) = measured.sample(start);
+            if ahead != Vec2::ZERO {
+                pieces.push(DashPiece::Dot { at, ahead });
+            }
+        }
+    }
+    Some(pieces)
+}
+
+/// The "on" spans of `pattern` at `width` millimetres along an outline of `length`, as start and
+/// end arc lengths (equal for a dot), or `None` when it draws solid. Dots are left out for a Butt
+/// cap; the last dash is cut at the end.
+pub(crate) fn dash_spans(
+    pattern: &DashPattern,
+    width: f64,
+    cap: Cap,
+    length: f64,
+) -> Option<Vec<(f64, f64)>> {
     let walk = Walk::new(pattern, width, cap)?;
-    let length = measured.total();
     let estimate = walk.estimate(length);
     if !(length > 0.0 && estimate.is_finite()) {
         return None;
     }
     let Walk { ratios, dots, .. } = walk;
-    let mut pieces = Vec::new();
+    let mut spans = Vec::new();
     let mut distance = 0.0_f64;
     // invariant: the estimate bounds the walk; the step cap also stops it if rounding ever failed
     // to advance the distance.
@@ -218,22 +244,12 @@ pub(crate) fn dash_pieces(
             break;
         }
         let run = ratios[step % ratios.len()] * width;
-        if step % 2 == 0 {
-            if run > 0.0 {
-                let dash = measured.between(distance, (distance + run).min(length));
-                if !dash.is_empty() {
-                    pieces.push(DashPiece::Dash(dash));
-                }
-            } else if dots {
-                let (at, ahead) = measured.sample(distance);
-                if ahead != Vec2::ZERO {
-                    pieces.push(DashPiece::Dot { at, ahead });
-                }
-            }
+        if step % 2 == 0 && (run > 0.0 || dots) {
+            spans.push((distance, (distance + run).min(length)));
         }
         distance += run;
     }
-    Some(pieces)
+    Some(spans)
 }
 
 #[cfg(test)]

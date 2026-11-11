@@ -122,13 +122,18 @@ impl Document {
     /// position, size, handle or rotation) that is not finite: a NaN or an
     /// infinity would be saved as `null`. The gesture layer already refuses such
     /// results; this is the second guard (`docs/technical-debt.md`: the older
-    /// single-object writers have none).
+    /// single-object writers have none);
+    /// [`ObjectEditError::Shared`] for a Spiro path while the document is shared.
+    #[allow(clippy::too_many_lines)] // Preflight and writes form one atomic operation.
     pub fn transform_objects(
         &self,
         results: &[ObjectSnapshot],
         write_stroke_width: bool,
     ) -> Result<(), ObjectEditError> {
         check_numbers(results, write_stroke_width)?;
+        if self.extended_edits_blocked() && results.iter().any(|object| matches!(object, ObjectSnapshot::Path(path) if path.curve_kind == crate::CurveKind::Spiro)) {
+            return Err(ObjectEditError::Shared);
+        }
         // A placed page's frame object writes its link (`specs/0100` criterion 17).
         if let Some(done) = self.transform_with_placements(results, write_stroke_width) {
             return done;
@@ -143,6 +148,11 @@ impl Document {
         self.clone_limits_hold(&links, results)
             .map_err(ObjectEditError::CloneOutOfRange)?;
         let hold = self.hold_for_results(&links, results)?;
+        if results.iter().any(
+            |object| matches!(object, ObjectSnapshot::Path(path) if path.spiro_transform.is_some()),
+        ) {
+            self.ensure_spiro_format();
+        }
         let staying = self.staying_dimensions(
             &results
                 .iter()
@@ -199,6 +209,13 @@ impl Document {
                     result,
                 } => {
                     write_anchors(anchors);
+                    if let ObjectSnapshot::Path(path) = result
+                        && path.curve_kind == crate::CurveKind::Spiro
+                        && let Some(matrix) = path.spiro_transform.as_deref().copied()
+                        && crate::spiro_transform::read(meta) != Some(Some(matrix))
+                    {
+                        crate::spiro_transform::write(meta, matrix);
+                    }
                     (meta, result)
                 }
                 Planned::Convert {
@@ -400,6 +417,9 @@ fn plan_one<'a>(
             })
         }
         (ObjectSnapshot::Path(path), None) => {
+            if crate::curve_kind::read(&meta) != Some(path.curve_kind) {
+                return Err(ObjectEditError::NoSuchObject);
+            }
             let positions = anchor_positions(&meta);
             let anchors = path
                 .all_anchors()
@@ -520,6 +540,10 @@ fn is_finite(object: &ObjectSnapshot) -> bool {
         ObjectSnapshot::Sketch(sketch) => sketch.placement.is_finite(),
         ObjectSnapshot::Path(path) => {
             rotation
+                && path.spiro_transform.as_deref().is_none_or(|matrix| {
+                    matrix.is_finite() && matrix.inverse_representable().is_some()
+                })
+                && (path.spiro_transform.is_none() || path.curve_kind == crate::CurveKind::Spiro)
                 && path.all_anchors().all(|a| {
                     point(a.point)
                         && a.handle_in.x.is_finite()

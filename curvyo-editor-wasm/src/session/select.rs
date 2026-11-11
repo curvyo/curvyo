@@ -9,6 +9,8 @@
 //! shares `Session`'s privacy boundary and its methods join the same type's
 //! `impl Session`.
 
+use std::borrow::Cow;
+
 use curvyo_document_core::Point;
 use curvyo_ui_core::{
     CornerLinking, CornerRadiusScaling, EditHandle, Modifiers, ParamHandle,
@@ -187,7 +189,16 @@ impl Session {
         // An object press ends a fixture selection: the two never mix (`specs/0102` crit. 8).
         self.clear_fixture_selection();
         self.sync_select_units();
-        let objects = self.objects();
+        let raw_objects = self.objects();
+        let objects = if raw_objects.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        }) {
+            Cow::Owned(self.spiro_pick_objects(&raw_objects))
+        } else {
+            Cow::Borrowed(&raw_objects[..])
+        };
         let tolerance = self.object_tolerance();
         let handle_tolerances = self.transform_handle_tolerances();
         // Ctrl and Alt are the cached state (the host sends them with the
@@ -198,17 +209,29 @@ impl Session {
         // criterion 5): the click itself commits nothing, so the mark is the
         // only effect a Ctrl-click has.
         self.key_object_press(point, shift);
-        self.select.pointer_down(
+        self.select.pointer_down_with_artwork(
             &objects,
             &mut self.selection,
             point,
             tolerance,
             handle_tolerances,
             modifiers,
+            &super::width_outlines::memo_lookup(&self.width_outlines),
         );
+        if !self.select.restore_drag_sources(&raw_objects) {
+            self.select.escape();
+            self.transform_notice = Some("The selected object changed; try again.");
+            return;
+        }
         // A resize that may turn shapes into paths carries the session's own
         // anchor ids from the first preview (`0019` decision 8).
         self.select.mint_conversion_ids(&mut self.minter);
+        let ids = self.transform_selection_ids();
+        self.select_drag_sources = raw_objects
+            .iter()
+            .filter(|object| ids.contains(&object.id()))
+            .filter_map(|object| self.document.object(object.id()))
+            .collect();
         // If a move drag began, start snapping.
         if self.select.drag_in_flight() {
             self.begin_snapping_drag_for_selection();
@@ -221,6 +244,81 @@ impl Session {
         self.clone_drop_begin();
     }
 
+    fn cancel_stale_select_sources(&mut self) -> bool {
+        if self
+            .select_drag_sources
+            .iter()
+            .any(|source| self.document.object(source.id()).as_ref() != Some(source))
+        {
+            self.select_drag_sources.clear();
+            self.select.escape();
+            self.end_snapping_drag();
+            self.transform_notice =
+                Some("The selection changed; the transformation was cancelled.");
+            return true;
+        }
+        false
+    }
+
+    /// What a Select release checks before it writes: the dragged sources and Spiro paths are
+    /// unchanged and solvable, and every transformed variable stroke has an outline. `None` when
+    /// the release was cancelled.
+    fn select_release_checks(
+        &mut self,
+        objects: &[curvyo_document_core::ObjectSnapshot],
+    ) -> Option<()> {
+        if self.cancel_stale_select_sources() {
+            return None;
+        }
+        if self.select.stale_spiro_drag(&self.document) {
+            self.select.escape();
+            self.end_snapping_drag();
+            self.transform_notice =
+                Some("The Spiro path changed during the drag; the transformation was cancelled.");
+            return None;
+        }
+        // A Spiro without solution may be clicked, but a transform of it is refused.
+        if self.selection_contains_spiro()
+            && let Some(live) = self.select_live_edit_in(objects)
+            && self
+                .spiro_selection_objects(&live.objects)
+                .iter()
+                .any(|object| {
+                    object.drawn_path().is_some_and(|path| {
+                        path.curve_kind == curvyo_document_core::CurveKind::Spiro
+                    }) && !objects.contains(object)
+                })
+        {
+            self.select.escape();
+            self.end_snapping_drag();
+            self.transform_notice = Some(super::spiro_cache::SPIRO_UNSOLVED_NOTICE);
+            return None;
+        }
+        if self.selection_has_width_profile() && self.select_drag_deforms() {
+            self.select.escape();
+            self.select_drag_sources.clear();
+            self.end_snapping_drag();
+            self.transform_notice = Some(super::width_transform::UNEVEN_WIDTH_NOTICE);
+            return None;
+        }
+        if let Some(live) = self.select_live_edit_in(objects) {
+            let candidates = self.spiro_selection_objects(&live.objects);
+            let selected_ids = self.transform_selection_ids();
+            let changed: Vec<_> = candidates
+                .into_iter()
+                .filter(|object| selected_ids.contains(&object.id()))
+                .collect();
+            if !self.width_outlines_exist(&changed) {
+                self.select.escape();
+                self.select_drag_sources.clear();
+                self.end_snapping_drag();
+                self.transform_notice = Some(super::width_transform::NO_OUTLINE_NOTICE);
+                return None;
+            }
+        }
+        Some(())
+    }
+
     /// Acceptance criteria 3, 15-18, 20, 41: commits whatever move/resize/
     /// rotate/skew drag [`Session::select_pointer_down`] began. `shift`/
     /// `ctrl` are the modifiers' state at release.
@@ -230,6 +328,9 @@ impl Session {
         self.held.ctrl = ctrl;
         self.sync_select_units();
         let objects = self.objects();
+        if self.select_release_checks(&objects).is_none() {
+            return;
+        }
         // A resize released through zero is announced with its mirror (`0056` UX notes).
         let mirror = self
             .select
@@ -259,7 +360,7 @@ impl Session {
         // Ctrl with Alt over a laser page is a copy (criterion 4).
         let alt = self.held.alt && self.clone_drop_mode() != super::DropMode::Copy;
         self.clone_drop_cancel();
-        let recovery = self.select.pointer_up_snapped(
+        let recovery = self.select.pointer_up_snapped_with_artwork(
             &self.document,
             &objects,
             &mut self.selection,
@@ -267,13 +368,17 @@ impl Session {
             Modifiers::new(shift, ctrl).with_alt(alt),
             &mut self.minter,
             snap_offset,
+            &super::width_outlines::memo_lookup(&self.width_outlines),
         );
+        self.select_drag_sources.clear();
         self.end_snapping_drag();
         if let Some(page) = target {
             self.activate_page(&page);
         }
         // A release that set an axis to 0.01 mm says so (`0056` criterion 15).
-        self.transform_notice = curvyo_ui_core::zero_recovery_notice(recovery);
+        if let Some(notice) = curvyo_ui_core::zero_recovery_notice(recovery) {
+            self.transform_notice = Some(notice);
+        }
         if self.has_unrecorded_steps() {
             self.transform_announcement = mirror
                 .map(resized_announcement)
@@ -323,7 +428,16 @@ impl Session {
         if self.select.drag_in_flight() {
             self.clone_drop_update(point);
         }
-        let objects = self.objects();
+        let raw_objects = self.objects();
+        let objects = if raw_objects.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        }) {
+            Cow::Owned(self.spiro_pick_objects(&raw_objects))
+        } else {
+            Cow::Borrowed(&raw_objects[..])
+        };
         // Nothing lights up while a drag runs; hover returns after release.
         // Otherwise hover lights the object a press at this point would
         // select, and nothing where a press would grab a handle, move the
@@ -332,7 +446,7 @@ impl Session {
         self.hovered_object = if self.select.drag_in_flight() {
             None
         } else {
-            match curvyo_ui_core::classify_press(
+            match curvyo_ui_core::classify_press_with_artwork(
                 &objects,
                 &self.pickable_objects(),
                 &self.selection,
@@ -340,6 +454,7 @@ impl Session {
                 self.object_tolerance(),
                 self.transform_handle_tolerances(),
                 modifiers,
+                &|path| self.width_artwork(path),
             ) {
                 curvyo_ui_core::PressTarget::Object(id) => Some(id),
                 _ => None,

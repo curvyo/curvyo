@@ -121,7 +121,8 @@ fn the_golden_reads_back_every_clone_placed_page_and_own_item() {
     // `specs/0101-laser-operations` bumps to 39 (ADR 0046 §4) and `specs/0102-laser-fixtures`
     // to 40 (ADR 0049); the v38 golden still opens.
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 41);
+    // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
+    assert_eq!(CURRENT_FORMAT_VERSION, 42);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let (a, b) = (expected.read_objects(), opened.read_objects());
@@ -158,7 +159,8 @@ fn the_golden_reads_back_every_clone_placed_page_and_own_item() {
 fn a_build_of_format_37_refuses_the_golden_as_saved_by_a_newer_version() {
     // A format-37 build checks `format_version` against its own 37: the golden's 38 is newer,
     // so it is refused before its clones could be read as orphans and deleted (ADR 0045 §9).
-    // This build plays that check one version up: a file of 41 is refused the same way.
+    // This build plays that check one version up: a file one version newer than this build is
+    // refused the same way.
     let bytes = read_golden();
     let mut archive = zip::ZipArchive::new(Cursor::new(&bytes[..])).unwrap();
     let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
@@ -181,8 +183,8 @@ fn a_build_of_format_37_refuses_the_golden_as_saved_by_a_newer_version() {
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 42,
-            supported: 41
+            found: 43,
+            supported: 42
         })
     ));
 }

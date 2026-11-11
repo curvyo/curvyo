@@ -167,7 +167,10 @@ fn encloses(object: &ObjectSnapshot, point: Point) -> bool {
     }
     let at = |p: Point| kurbo::Point::new(p.x, p.y);
     let mut path = BezPath::new();
-    for (anchors, _) in mask_operand(object)
+    let Ok(operand) = mask_operand(object) else {
+        return false;
+    };
+    for (anchors, _) in operand
         .iter()
         .filter(|(anchors, closed)| *closed && anchors.len() >= 2)
     {

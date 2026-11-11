@@ -89,6 +89,9 @@ impl From<BooleanOutcome> for BooleanResultView {
                 ..view("applied", operands, operands)
             },
             BooleanOutcome::Refused(refusal) => match refusal {
+                BooleanRefusal::ExtendedPath { offenders, of } => {
+                    view("extended_path", offenders.len(), of)
+                }
                 BooleanRefusal::NeedsTwo => view("needs_two", 0, 0),
                 BooleanRefusal::NoArea { offenders, of } => view("no_area", offenders.len(), of),
                 BooleanRefusal::OutOfRange { offenders, of } => {

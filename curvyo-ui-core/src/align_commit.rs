@@ -16,7 +16,6 @@ use crate::align_plan::{
     distribute_on_frame_translations, distribute_translations,
 };
 use crate::group_transform::commit_group;
-use crate::object_bounds::object_outline_bounds;
 use crate::object_selection::ObjectSelection;
 use crate::transform_drag::StrokeScaling;
 use crate::units::{SelectedUnit, Units};
@@ -89,10 +88,14 @@ pub struct AlignInput<'a> {
     pub document: &'a Document,
     /// The objects of the context.
     pub objects: &'a [ObjectSnapshot],
+    /// Evaluated geometry used for bounds; commits continue to use `objects`.
+    pub geometry_objects: Option<&'a [ObjectSnapshot]>,
     /// The grouping of the context's leaves.
     pub units: &'a Units,
     /// The current selection.
     pub selection: &'a ObjectSelection,
+    /// Optional precomputed variable-stroke artwork for the selected snapshots.
+    pub artwork: Option<&'a crate::VariableArtworkLookup<'a>>,
 }
 
 /// Every `unit` with its true bounding box, in its order: the union of its
@@ -101,15 +104,29 @@ pub struct AlignInput<'a> {
 /// plan over the boxes always lines up with its units.
 #[must_use]
 pub fn unit_boxes(objects: &[ObjectSnapshot], units: &[SelectedUnit]) -> BoxedUnits {
+    unit_boxes_with_artwork(
+        objects,
+        units,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+/// Collects unit bounds using cached artwork for variable profiles.
+#[must_use]
+pub fn unit_boxes_with_artwork(
+    objects: &[ObjectSnapshot],
+    units: &[SelectedUnit],
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> BoxedUnits {
     let mut found = BoxedUnits::default();
     for unit in units {
         let boxes: Vec<AlignBox> = unit
             .leaves
             .iter()
             .filter_map(|leaf| objects.iter().find(|object| object.id() == *leaf))
-            .map(|object| {
-                let (min, max) = object_outline_bounds(object);
-                AlignBox::new(min, max)
+            .filter_map(|object| {
+                crate::object_bounds::object_outline_bounds_with_artwork(object, artwork)
+                    .map(|(min, max)| AlignBox::new(min, max))
             })
             .collect();
         if let Some(union) = AlignBox::union(&boxes) {
@@ -137,10 +154,24 @@ pub struct BoxedUnits {
 /// read), so they never move and never count.
 #[must_use]
 pub fn page_object_ids(objects: &[ObjectSnapshot], page: &AlignBox) -> Vec<NodeId> {
+    page_object_ids_with_artwork(objects, page, &crate::variable_artwork::synchronous_artwork)
+}
+
+/// Finds page members using already-computed variable-stroke artwork.
+#[must_use]
+pub fn page_object_ids_with_artwork(
+    objects: &[ObjectSnapshot],
+    page: &AlignBox,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Vec<NodeId> {
     objects
         .iter()
         .filter(|object| {
-            let (min, max) = object_outline_bounds(object);
+            let Some((min, max)) =
+                crate::object_bounds::object_outline_bounds_with_artwork(object, artwork)
+            else {
+                return false;
+            };
             let box_ = AlignBox::new(min, max);
             box_.start(AlignAxis::Horizontal) <= page.end(AlignAxis::Horizontal)
                 && box_.end(AlignAxis::Horizontal) >= page.start(AlignAxis::Horizontal)
@@ -240,7 +271,13 @@ pub fn align_selection(
     command: AlignCommand,
 ) -> AlignOutcome {
     let selected = input.units.selected(input.selection.ids());
-    let BoxedUnits { units, boxes } = unit_boxes(input.objects, &selected);
+    let BoxedUnits { units, boxes } = unit_boxes_with_artwork(
+        input.geometry_objects.unwrap_or(input.objects),
+        &selected,
+        input
+            .artwork
+            .unwrap_or(&crate::variable_artwork::synchronous_artwork),
+    );
     let key_box = key.and_then(|id| {
         units
             .iter()
@@ -269,7 +306,13 @@ pub fn align_page(
     page: AlignBox,
     command: AlignCommand,
 ) -> AlignOutcome {
-    let BoxedUnits { units, boxes } = unit_boxes(input.objects, units);
+    let BoxedUnits { units, boxes } = unit_boxes_with_artwork(
+        input.geometry_objects.unwrap_or(input.objects),
+        units,
+        input
+            .artwork
+            .unwrap_or(&crate::variable_artwork::synchronous_artwork),
+    );
     if boxes.is_empty() {
         return AlignOutcome::NothingSelected;
     }
@@ -295,7 +338,13 @@ pub fn distribute_selection(
     gap: Option<Length>,
 ) -> AlignOutcome {
     let selected = input.units.selected(input.selection.ids());
-    let BoxedUnits { units, boxes } = unit_boxes(input.objects, &selected);
+    let BoxedUnits { units, boxes } = unit_boxes_with_artwork(
+        input.geometry_objects.unwrap_or(input.objects),
+        &selected,
+        input
+            .artwork
+            .unwrap_or(&crate::variable_artwork::synchronous_artwork),
+    );
     if boxes.is_empty() {
         return AlignOutcome::NothingSelected;
     }
@@ -316,7 +365,13 @@ pub fn distribute_page(
     mode: DistributeMode,
     gap: Option<Length>,
 ) -> AlignOutcome {
-    let BoxedUnits { units, boxes } = unit_boxes(input.objects, units);
+    let BoxedUnits { units, boxes } = unit_boxes_with_artwork(
+        input.geometry_objects.unwrap_or(input.objects),
+        units,
+        input
+            .artwork
+            .unwrap_or(&crate::variable_artwork::synchronous_artwork),
+    );
     if boxes.is_empty() {
         return AlignOutcome::NothingSelected;
     }

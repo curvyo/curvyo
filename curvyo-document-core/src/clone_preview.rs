@@ -116,7 +116,7 @@ pub fn clone_previews(
             .flatten()
             .filter_map(|object| match object {
                 ObjectSnapshot::Clone(clone) if wanted.contains(&clone.id()) => {
-                    Some(clone.resolved)
+                    Some(*clone.resolved)
                 }
                 _ => None,
             })

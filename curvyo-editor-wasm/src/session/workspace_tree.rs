@@ -258,6 +258,9 @@ impl Session {
             .ok_or(SessionError::Ended)?
             .workspace;
         let adopted = unpack(self.peer, bytes).map_err(|_| SessionError::Ended)?;
+        if adopted.has_extended_path_history() {
+            return Err(SessionError::UnsupportedDocument);
+        }
         adopted.set_workspace_share(Some(WorkspaceShareRecord {
             workspace,
             document,
@@ -309,6 +312,16 @@ impl Session {
             .ok_or(SessionError::Ended)?
             .workspace;
         let opened = unpack(self.peer, file).map_err(|_| SessionError::Ended)?;
+        if opened.has_extended_path_history() {
+            return Err(SessionError::UnsupportedDocument);
+        }
+        let probe = unpack(self.peer.wrapping_add(1), file).map_err(|_| SessionError::Ended)?;
+        probe
+            .import_updates(outgoing)
+            .map_err(|_| SessionError::UnsupportedDocument)?;
+        if probe.has_extended_path_history() {
+            return Err(SessionError::UnsupportedDocument);
+        }
         let pictures: Vec<Vec<u8>> = crate::background_writer::image_assets(&opened)
             .into_iter()
             .filter_map(|hash| opened.asset(&hash).map(|bytes| bytes.to_vec()))

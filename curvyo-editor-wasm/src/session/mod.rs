@@ -130,6 +130,11 @@ mod place_on;
 mod row_drag;
 mod sketch_moves;
 mod sketch_use;
+mod spiro_cache;
+mod width_edit;
+mod width_outlines;
+mod width_preset;
+mod width_transform;
 use clone_drop::DropMode;
 pub use row_drag::{DropBadge, RowDragAnswer, RowDragSource};
 pub use sketch_use::{SketchRowState, SketchUsage};
@@ -444,10 +449,13 @@ pub struct Session {
     minter: AnchorIdMinter,
     pen: PenTool,
     node: NodeTool,
+    node_spiro_sources: Vec<curvyo_document_core::PathSnapshot>,
+    width_edit: Option<width_edit::WidthEditState>,
     rectangle: RectangleTool,
     ellipse: EllipseTool,
     poly_star: PolygonStarTool,
     select: SelectTool,
+    select_drag_sources: Vec<curvyo_document_core::ObjectSnapshot>,
     /// Shared across the three shape tools (acceptance criterion 22:
     /// two or more primitives can be selected together) and the Select
     /// tool (`specs/0004-canvas-navigation-and-selection/adrs.md`: "one
@@ -530,6 +538,12 @@ pub struct Session {
     /// frame and event until the document changes (`object_cache.rs`). A Select or Node-tool drag
     /// keeps its first read for its whole life (`specs/0009-unified-object-editing` criterion 15).
     object_cache: object_cache::ObjectCache,
+    spiro_cache: std::cell::RefCell<spiro_cache::SpiroCache>,
+    /// The notice of a Spiro without solution is on screen, and whether it has ended since
+    /// (finish, Escape, mode change) for the host to take it away.
+    spiro_notice: std::cell::Cell<(bool, bool)>,
+    /// The variable-width outlines, memoised on their exact sources (`width_outlines.rs`).
+    width_outlines: std::cell::RefCell<width_outlines::WidthOutlines>,
     /// `window.devicePixelRatio` as of the last attach or resize, so the
     /// selection box can snap to whole device pixels
     /// (`edit-interaction-polish` criterion 65). Always positive and finite.
@@ -608,6 +622,8 @@ pub struct Session {
     /// The notice of an Open of an SVG that brought in nothing, until the host has taken it
     /// (`svg_import.rs`).
     open_notice: Option<String>,
+    unsupported_width_shown: std::cell::Cell<bool>,
+    unsupported_width_notice: std::cell::RefCell<Option<String>>,
     /// The working images of the canvas (`image_cache.rs`).
     images: image_cache::ImageCache,
     /// The import being added by the Import button (`image_import.rs`).
@@ -654,6 +670,7 @@ pub struct Session {
 impl Session {
     /// A brand-new, empty document (File → New), bound to `peer`.
     #[must_use]
+    #[allow(clippy::too_many_lines)] // Builds the session's complete initial state, field by field.
     pub fn new(peer: u64) -> Self {
         let document = Document::new(peer);
         let snapping_value = document.snapping();
@@ -666,10 +683,13 @@ impl Session {
             minter: AnchorIdMinter::new(peer),
             pen: PenTool::new(),
             node: NodeTool::new(),
+            node_spiro_sources: Vec::new(),
+            width_edit: None,
             rectangle: RectangleTool::new(),
             ellipse: EllipseTool::new(),
             poly_star: PolygonStarTool::new(),
             select: SelectTool::new(),
+            select_drag_sources: Vec::new(),
             selection: ObjectSelection::new(),
             sketch: sketch::SketchState::default(),
             // Select is the launch default for New and Open alike
@@ -709,6 +729,9 @@ impl Session {
             node_announcement_seq: 0,
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
+            spiro_cache: std::cell::RefCell::default(),
+            spiro_notice: std::cell::Cell::new((false, false)),
+            width_outlines: std::cell::RefCell::default(),
             device_pixel_ratio: 1.0,
             button_down: false,
             limit_notice: None,
@@ -737,6 +760,8 @@ impl Session {
             snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
+            unsupported_width_shown: std::cell::Cell::new(false),
+            unsupported_width_notice: std::cell::RefCell::new(None),
             images: image_cache::ImageCache::default(),
             import: None,
             pending_open: None,
@@ -764,6 +789,7 @@ impl Session {
     ///
     /// # Errors
     /// See [`curvyo_document_core::unpack`].
+    #[allow(clippy::too_many_lines)] // Reconstructs the session's complete state from one document.
     pub fn open(peer: u64, bytes: &[u8]) -> Result<Self, OpenError> {
         let document = curvyo_document_core::unpack(peer, bytes)?;
         let snapping_value = document.snapping();
@@ -776,10 +802,13 @@ impl Session {
             minter: AnchorIdMinter::new(peer),
             pen: PenTool::new(),
             node: NodeTool::new(),
+            node_spiro_sources: Vec::new(),
+            width_edit: None,
             rectangle: RectangleTool::new(),
             ellipse: EllipseTool::new(),
             poly_star: PolygonStarTool::new(),
             select: SelectTool::new(),
+            select_drag_sources: Vec::new(),
             selection: ObjectSelection::new(),
             sketch: sketch::SketchState::default(),
             tool: Tool::Select,
@@ -811,6 +840,9 @@ impl Session {
             node_announcement_seq: 0,
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
+            spiro_cache: std::cell::RefCell::default(),
+            spiro_notice: std::cell::Cell::new((false, false)),
+            width_outlines: std::cell::RefCell::default(),
             device_pixel_ratio: 1.0,
             button_down: false,
             limit_notice: None,
@@ -839,6 +871,8 @@ impl Session {
             snapping: snapping::SnappingState::new(snapping_value),
             orphan_notice: None,
             open_notice: None,
+            unsupported_width_shown: std::cell::Cell::new(false),
+            unsupported_width_notice: std::cell::RefCell::new(None),
             images: image_cache::ImageCache::default(),
             import: None,
             pending_open: None,
@@ -894,6 +928,7 @@ impl Session {
     /// no acceptance criterion exercises switching tools mid-drag, so
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
+        self.width_edit = None;
         self.end_snapping_drag();
         self.recording_unguarded(|this| {
             // Flushes any pending ratio-slider preview against the
@@ -923,7 +958,11 @@ impl Session {
             // unfinished path stays behind that the Document section's resize would
             // not move (`specs/0015-document-size-and-rulers/` criterion 14a).
             if this.tool == Tool::Pen && tool != Tool::Pen {
-                this.pen.finish(&this.document);
+                if this.curve_pen_blocked() && this.pen_path_open() {
+                    this.notice_blocked_curve();
+                } else {
+                    this.pen.finish(&this.document);
+                }
                 this.pen.escape();
             }
             // A creation tool starts from an empty selection: no selection box
@@ -955,11 +994,17 @@ impl Session {
     fn paths(&self) -> Vec<curvyo_document_core::PathSnapshot> {
         // A hidden or locked path is no target of the Node tool or the Pen
         // (`specs/0050-layers-and-objects-panel` criteria 19 and 20), nor a path out of context
-        // (`specs/0106` criterion 10).
+        // (`specs/0106` criterion 10). A Spiro is edited by its control nodes, while a press
+        // picks it by the curve it draws (`specs/0110-pen-modes-variable-stroke` criterion 2).
+        let controls = self.spiro_controls();
         self.edit_targets()
             .iter()
             .filter_map(|object| match object {
-                ObjectSnapshot::Path(path) => Some(path.clone()),
+                ObjectSnapshot::Path(path) => Some(
+                    controls
+                        .get(&path.id)
+                        .map_or_else(|| path.clone(), Clone::clone),
+                ),
                 _ => None,
             })
             .collect()
@@ -1037,6 +1082,10 @@ impl Session {
                 this.end_snapping_drag();
                 return;
             }
+            if this.width_pointer_down(point) {
+                this.button_down = true;
+                return;
+            }
             this.button_down = true;
             match this.tool {
                 Tool::Select => {
@@ -1065,6 +1114,7 @@ impl Session {
                     let tolerances = this.hit_tolerances();
                     this.node_announcement = None;
                     this.node.pointer_down(&paths, point, tolerances, shift);
+                    this.capture_node_spiro_sources(&paths, point);
                     this.begin_node_snapping(point);
                 }
                 Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
@@ -1123,7 +1173,9 @@ impl Session {
         if self.text_path_pointer_move(point) {
             return;
         }
-        if self.tool == Tool::Select && self.fixture_drag_move(point) {
+        if (self.tool == Tool::Select && self.fixture_drag_move(point))
+            || self.width_pointer_move(point)
+        {
             return;
         }
         match self.tool {
@@ -1160,7 +1212,12 @@ impl Session {
                 self.offset_hover(point);
             }
             Tool::Text => self.text_pointer_move(point),
-            Tool::Pen => self.pen_snap_hover(point),
+            Tool::Pen => {
+                if self.button_down {
+                    self.pen.freehand_move(&mut self.minter, point);
+                }
+                self.pen_snap_hover(point);
+            }
             Tool::Trace => self.trace_mask_pick_hover(point),
         }
     }
@@ -1227,6 +1284,9 @@ impl Session {
             this.pointer_position = Some(point);
             this.held.shift = shift;
             this.held.ctrl = constrain;
+            if this.width_pointer_up(point) {
+                return;
+            }
             if this.workbench() == Workbench::Sketch {
                 if !this.sketch_drawing_release(point, shift, constrain) {
                     this.sketch_pointer_up(point);

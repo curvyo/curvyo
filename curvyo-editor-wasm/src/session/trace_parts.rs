@@ -135,7 +135,8 @@ impl Session {
                 TracePartArea::Nothing
             };
         }
-        let operands: Vec<RegionOperand> = masks.iter().map(mask_operand).collect();
+        let operands: Result<Vec<RegionOperand>, curvyo_ui_core::TraceRegionError> =
+            masks.iter().map(mask_operand).collect();
         let cache = self.trace_part_region(operands, quad);
         match cache.region() {
             Ok(region) if cache.meets() => {
@@ -146,7 +147,11 @@ impl Session {
     }
 
     /// The region of `operands` over `quad`, from the recent ones when it was made before.
-    fn trace_part_region(&self, operands: Vec<RegionOperand>, quad: [Point; 4]) -> RegionCache {
+    fn trace_part_region(
+        &self,
+        operands: Result<Vec<RegionOperand>, curvyo_ui_core::TraceRegionError>,
+        quad: [Point; 4],
+    ) -> RegionCache {
         let mut regions = self.trace.parts.regions.borrow_mut();
         if let Some(found) = regions.iter().find(|c| c.made_of(&operands, quad)) {
             return found.clone();
@@ -159,11 +164,23 @@ impl Session {
         made
     }
 
+    /// Whether any selected or saved part has an unsupported mask curve.
+    pub(super) fn trace_has_unsupported_mask(&self) -> bool {
+        (0..self.trace_part_count()).any(|index| {
+            self.trace_part_masks(index)
+                .iter()
+                .any(|object| mask_operand(object).is_err())
+        })
+    }
+
     /// Each part's clip once the later parts are taken out (`curvyo_ui_core::trace_part_clips`);
     /// all nothing without one traced image.
     #[must_use]
     pub fn trace_part_clip_list(&self) -> Vec<TracePartClip> {
         let count = self.trace_part_count();
+        if self.trace_has_unsupported_mask() {
+            return vec![TracePartClip::Nothing; count];
+        }
         let Some((_, quad)) = self.trace_part_image() else {
             return vec![TracePartClip::Nothing; count];
         };
@@ -327,6 +344,9 @@ impl Session {
         wires: &[Option<&[f64]>],
         full: bool,
     ) -> Option<Vec<f64>> {
+        if self.trace_has_unsupported_mask() {
+            return None;
+        }
         let clips = self.trace_part_clip_list();
         let empty = Output {
             status: vectrace::wire::Status::Traced,

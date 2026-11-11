@@ -72,6 +72,9 @@ fn frame_of(image: &ImageSnapshot, style: Style) -> PathSnapshot {
         style,
         anchors,
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: Angle::from_radians(0.0),
     }
 }

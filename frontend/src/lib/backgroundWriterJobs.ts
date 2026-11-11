@@ -32,7 +32,7 @@ export type WriterResponse =
    * with `workspace_send_local` (`specs/0096-own-devices-sync` criterion 14). */
   | { type: "written"; document: string; bytes: Uint8Array; through: number; created: boolean; outgoing: Uint8Array }
   | { type: "skipped"; document: string; through: number }
-  | { type: "failed"; document: string }
+  | { type: "failed"; document: string; message?: string }
   | { type: "error"; message: string };
 
 /** The page's end of the worker: messages go out once it started; answers go to `onAnswer`. */
@@ -80,6 +80,7 @@ export function sendLocal(
   document: string,
   file: Uint8Array,
   outgoing: Uint8Array,
+  onFailure?: () => void,
 ): Uint8Array {
   if (outgoing.length === 0) {
     return file;
@@ -87,6 +88,7 @@ export function sendLocal(
   try {
     return session.workspace_send_local(document, file, outgoing);
   } catch {
+    onFailure?.();
     return file;
   }
 }

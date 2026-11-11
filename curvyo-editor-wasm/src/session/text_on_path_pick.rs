@@ -204,13 +204,15 @@ impl Session {
             return;
         };
         let values = self.put_values(&text, &curve);
-        if self
-            .document
-            .put_text_on_path(id, carrier, &values, true)
-            .is_ok()
-        {
-            self.selection.select_single(id);
-            self.text_path.announcement = Some("Put on path");
+        match self.document.put_text_on_path(id, carrier, &values, true) {
+            Ok(()) => {
+                self.selection.select_single(id);
+                self.text_path.announcement = Some("Put on path");
+            }
+            Err(curvyo_document_core::TextEditError::NeedsCurveConversion) => {
+                self.text_path.notice = Some("Convert the editable curve to Bézier before putting text on it. Nothing changed.".to_owned());
+            }
+            Err(_) => {}
         }
     }
 

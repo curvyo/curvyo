@@ -12,14 +12,14 @@ use crate::units::Angle;
 pub const MAX_CLONE_DEPTH: usize = 8;
 
 /// One resolved clone. It has no outline of its own: `resolved` is the root's outline under the
-/// composed matrix, with the style of its style source (ADR 0016 §3). The chain data sits behind a box so that a
-/// clone is no larger than a path or a primitive in every object list.
+/// composed matrix, with the style of its style source (ADR 0016 §3). The outline and chain
+/// sit behind boxes so that a clone stays compact in every object list.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CloneSnapshot {
     /// What the clone shows: the clone's own id, the root's anchors under
     /// [`CloneChain::composed`] (anchor ids kept), the root's `closed` flags and further outlines,
     /// the style of [`CloneChain::style_source`] (its effective style), rotation 0.
-    pub resolved: PathSnapshot,
+    pub resolved: Box<PathSnapshot>,
     /// What the clone follows and how.
     pub chain: Box<CloneChain>,
 }
@@ -86,7 +86,7 @@ impl CloneSnapshot {
         resolved.id = id;
         resolved.rotation = Angle::from_radians(0.0);
         Self {
-            resolved,
+            resolved: Box::new(resolved),
             chain: Box::new(chain),
         }
     }
@@ -110,7 +110,7 @@ impl CloneSnapshot {
         match &self.chain.picture {
             Some(picture) => picture.to_vec(),
             None => vec![crate::primitive_model::ObjectSnapshot::Path(
-                self.resolved.clone(),
+                (*self.resolved).clone(),
             )],
         }
     }
@@ -129,7 +129,7 @@ impl CloneSnapshot {
                 .collect()
         });
         Self {
-            resolved: self.resolved.mapped(g),
+            resolved: Box::new(self.resolved.mapped(g)),
             chain: Box::new(chain),
         }
     }

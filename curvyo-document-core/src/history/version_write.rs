@@ -52,6 +52,7 @@ fn own_fields(mut meta: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
 fn settings(mut root: BTreeMap<String, Node>) -> BTreeMap<String, Node> {
     root.remove(KEY_HISTORY_WIPED);
     root.remove(KEY_FORMAT_VERSION);
+    root.remove(crate::width_profile::HISTORY_MARK);
     root
 }
 

@@ -55,11 +55,13 @@ export function useWorkspaceWriter(
   getSession: () => WasmSession | null,
   drive: (session: WasmSession) => void,
   writingRef: MutableRefObject<Promise<void>>,
+  notice: (text: string) => void,
 ): WorkspaceWriterApi {
   /** The background writer's worker (criterion 32), started with the first record. */
   const writerRef = useRef<BackgroundWriterLink | null>(null);
   /** A workspace snapshot being built from the files. */
   const buildingRef = useRef(false);
+  const failedRef = useRef(new Set<string>());
 
   /** The worker's answers: it asks for a due document's file and hands back the written bytes.
    * A document with no file here yet is built from its records (criterion 35); a deleted one
@@ -93,13 +95,15 @@ export function useWorkspaceWriter(
           }
         });
       } else if (answer.type === "written") {
+        failedRef.current.delete(answer.document);
         writingRef.current = writingRef.current.then(async () => {
           const session = getSession();
           if (!session?.workspace_may_write(answer.document)) {
             return;
           }
           const place = parsePlace(session.workspace_document_place(answer.document));
-          const bytes = sendLocal(session, answer.document, answer.bytes, answer.outgoing);
+          const bytes = sendLocal(session, answer.document, answer.bytes, answer.outgoing,
+            () => notice("A workspace update could not be sent; local changes remain unsent."));
           if (await writePlace(place, answer.document, bytes, answer.created)) {
             getSession()?.background_written(answer.document, answer.through);
           }
@@ -107,9 +111,12 @@ export function useWorkspaceWriter(
       } else if (answer.type === "skipped" && answer.through >= 0) {
         // The open document's session holds these records itself.
         getSession()?.background_written(answer.document, answer.through);
+      } else if (answer.type === "failed" && answer.message && !failedRef.current.has(answer.document)) {
+        failedRef.current.add(answer.document);
+        notice(answer.message);
       }
     },
-    [getSession, writingRef],
+    [getSession, writingRef, notice],
   );
 
   /** Hands the session's background records to the worker. */

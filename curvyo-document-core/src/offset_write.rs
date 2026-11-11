@@ -170,7 +170,7 @@ impl Document {
                 } if origins.contains(target) => {
                     let mut path = match self.object(*target)? {
                         ObjectSnapshot::Path(path) => path,
-                        ObjectSnapshot::Clone(clone) => clone.resolved,
+                        ObjectSnapshot::Clone(clone) => *clone.resolved,
                         ObjectSnapshot::Sketch(_)
                         | ObjectSnapshot::Primitive(_)
                         | ObjectSnapshot::Text(_)

@@ -55,10 +55,11 @@ use move_drag::MoveDrag;
 pub(crate) use move_drag::lock_axis;
 pub use move_drag::{Axis, MoveResolution};
 use press::begin_object_press;
-pub use press::{PressTarget, classify_press};
+pub use press::{PressTarget, classify_press, classify_press_with_artwork};
 pub use preview::LiveEdit;
 
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::large_enum_variant)] // Gestures retain their snapshot without a per-drag allocation.
 enum SelectDrag {
     #[default]
     None,
@@ -104,6 +105,7 @@ pub enum SelectPointerDownOutcome {
 /// What a double-click on the Select tool did (`adrs.md`, "double-click on
 /// a handle").
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // A hit returns its snapshot directly to the editor.
 pub enum SelectDoubleClickOutcome {
     /// Nothing was hit; no handoff.
     Miss,
@@ -298,6 +300,29 @@ impl SelectTool {
         handle_tolerances: TransformHandleTolerances,
         modifiers: Modifiers,
     ) -> SelectPointerDownOutcome {
+        self.pointer_down_with_artwork(
+            objects,
+            selection,
+            point,
+            tolerance,
+            handle_tolerances,
+            modifiers,
+            &crate::variable_artwork::synchronous_artwork,
+        )
+    }
+
+    /// Begins a selection gesture using cached variable-stroke artwork for hit tests.
+    #[allow(clippy::too_many_arguments)]
+    pub fn pointer_down_with_artwork(
+        &mut self,
+        objects: &[ObjectSnapshot],
+        selection: &mut ObjectSelection,
+        point: Point,
+        tolerance: Tolerance,
+        handle_tolerances: TransformHandleTolerances,
+        modifiers: Modifiers,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> SelectPointerDownOutcome {
         self.entry = None;
         self.last_press_handle = None;
         // `adrs.md`: "ui-core filters the selection against the current
@@ -308,7 +333,7 @@ impl SelectTool {
         let shift = modifiers.shift;
         let origin = DragOrigin::new(point, handle_tolerances.drag_threshold_mm, shift);
         let pickable = self.hit_objects(objects);
-        let target = classify_press(
+        let target = press::classify_press_with_artwork(
             objects,
             pickable,
             selection,
@@ -316,6 +341,7 @@ impl SelectTool {
             tolerance,
             handle_tolerances,
             modifiers,
+            artwork,
         );
         // An Alt press keeps the cycle: its release without movement
         // continues it.
@@ -325,21 +351,30 @@ impl SelectTool {
         }
         match target {
             PressTarget::Handle(handle) => {
-                self.begin_handle_press(objects, selection, origin, handle, &handle_tolerances);
+                self.begin_handle_press(
+                    objects,
+                    selection,
+                    origin,
+                    handle,
+                    &handle_tolerances,
+                    artwork,
+                );
                 SelectPointerDownOutcome::Handle
             }
             // A double-click on the centre handle opens the typed move, so
             // its first press must be recognised as a press on it
             // (criterion 15).
             PressTarget::CentreHandle => {
-                self.drag =
-                    SelectDrag::Moving(MoveDrag::new(origin, true, objects, selection, None));
+                self.drag = SelectDrag::Moving(MoveDrag::new(
+                    origin, true, objects, selection, None, artwork,
+                ));
                 self.last_press_handle = Some(EditHandle::Move);
                 SelectPointerDownOutcome::Selected
             }
             PressTarget::InsideSelectedBox => {
-                self.drag =
-                    SelectDrag::Moving(MoveDrag::new(origin, false, objects, selection, None));
+                self.drag = SelectDrag::Moving(MoveDrag::new(
+                    origin, false, objects, selection, None, artwork,
+                ));
                 SelectPointerDownOutcome::Selected
             }
             PressTarget::Empty => {
@@ -354,6 +389,7 @@ impl SelectTool {
                     shift,
                     origin,
                     &self.units,
+                    artwork,
                 ));
                 SelectPointerDownOutcome::Selected
             }
@@ -363,6 +399,74 @@ impl SelectTool {
                 SelectPointerDownOutcome::Lasso
             }
         }
+    }
+
+    /// Replaces derived hit-test snapshots with the matching editable sources for a handle drag.
+    /// Returns false when a source disappeared between the two reads.
+    pub fn restore_drag_sources(&mut self, sources: &[ObjectSnapshot]) -> bool {
+        let source_for = |id| sources.iter().find(|object| object.id() == id).cloned();
+        match &mut self.drag {
+            SelectDrag::Transforming(drag) => {
+                let Some(source) = source_for(drag.start.id()) else {
+                    return false;
+                };
+                drag.start = source;
+            }
+            SelectDrag::GroupTransforming(drag) => {
+                let Some(starts) = drag
+                    .starts
+                    .iter()
+                    .map(|object| source_for(object.id()))
+                    .collect::<Option<Vec<_>>>()
+                else {
+                    return false;
+                };
+                drag.converted = crate::conversion::converted_for_handle(&starts, drag.handle);
+                drag.starts = starts;
+            }
+            _ => {}
+        }
+        true
+    }
+
+    /// Whether the sources frozen for a handle drag still match the live document.
+    #[must_use]
+    pub fn drag_sources_match(&self, sources: &[ObjectSnapshot]) -> bool {
+        let matches = |start: &ObjectSnapshot| sources.iter().any(|source| source == start);
+        match &self.drag {
+            SelectDrag::Transforming(drag) => matches(&drag.start),
+            SelectDrag::GroupTransforming(drag) => drag.starts.iter().all(matches),
+            _ => false,
+        }
+    }
+
+    /// Whether a Spiro handle drag must be cancelled because its source changed.
+    #[must_use]
+    pub fn stale_spiro_drag(&self, document: &Document) -> bool {
+        match &self.drag {
+            SelectDrag::Transforming(drag) => {
+                !Self::spiro_sources_still_current(document, std::slice::from_ref(&drag.start))
+            }
+            SelectDrag::GroupTransforming(drag) => {
+                !Self::spiro_sources_still_current(document, &drag.starts)
+            }
+            _ => false,
+        }
+    }
+
+    fn spiro_sources_still_current(document: &Document, sources: &[ObjectSnapshot]) -> bool {
+        sources.iter().all(|object| {
+            let spiro = match object {
+                ObjectSnapshot::Path(path) => {
+                    path.curve_kind == curvyo_document_core::CurveKind::Spiro
+                }
+                ObjectSnapshot::Clone(clone) => {
+                    clone.chain.root_outline.curve_kind == curvyo_document_core::CurveKind::Spiro
+                }
+                _ => false,
+            };
+            !spiro || crate::transform_commit::still_current(document, object)
+        })
     }
 
     /// The drag a press on `handle` of `object` begins: its start snapshot and
@@ -441,6 +545,31 @@ impl SelectTool {
         minter: &mut AnchorIdMinter,
         snap_offset: Vec2,
     ) -> ZeroRecovery {
+        self.pointer_up_snapped_with_artwork(
+            document,
+            objects,
+            selection,
+            point,
+            modifiers,
+            minter,
+            snap_offset,
+            &crate::variable_artwork::synchronous_artwork,
+        )
+    }
+
+    /// Releases a gesture using already-computed variable-stroke artwork.
+    #[allow(clippy::too_many_arguments)]
+    pub fn pointer_up_snapped_with_artwork(
+        &mut self,
+        document: &Document,
+        objects: &[ObjectSnapshot],
+        selection: &mut ObjectSelection,
+        point: Point,
+        modifiers: Modifiers,
+        minter: &mut AnchorIdMinter,
+        snap_offset: Vec2,
+        artwork: &crate::VariableArtworkLookup<'_>,
+    ) -> ZeroRecovery {
         let (shift, ctrl) = (modifiers.shift, modifiers.ctrl);
         match std::mem::take(&mut self.drag) {
             SelectDrag::None => {}
@@ -456,6 +585,9 @@ impl SelectTool {
                 );
             }
             SelectDrag::Transforming(drag) => {
+                if !Self::spiro_sources_still_current(document, std::slice::from_ref(&drag.start)) {
+                    return ZeroRecovery::default();
+                }
                 if !drag.origin.is_active_at(point) {
                     return ZeroRecovery::default();
                 }
@@ -471,6 +603,9 @@ impl SelectTool {
                 }
             }
             SelectDrag::GroupTransforming(drag) => {
+                if !Self::spiro_sources_still_current(document, &drag.starts) {
+                    return ZeroRecovery::default();
+                }
                 if !drag.origin.is_active_at(point) {
                     return ZeroRecovery::default();
                 }
@@ -494,10 +629,10 @@ impl SelectTool {
                 }
             }
             SelectDrag::Marquee(drag) => {
-                self.finish_marquee(&drag, objects, selection, point, modifiers);
+                self.finish_marquee(&drag, objects, selection, point, modifiers, artwork);
             }
             SelectDrag::Lasso(drag) => {
-                self.finish_lasso(&drag, objects, selection, point, modifiers);
+                self.finish_lasso(&drag, objects, selection, point, modifiers, artwork);
             }
         }
         ZeroRecovery::default()
@@ -597,6 +732,209 @@ mod tests {
 
     const NONE: Modifiers = Modifiers::NONE;
     use curvyo_document_core::CornerRadii;
+
+    #[test]
+    fn handle_drag_restores_editable_source_after_hit_geometry() {
+        use curvyo_document_core::CurveKind;
+        let document = Document::new(1);
+        let controls = [
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 10.0)),
+            NewAnchor::corner(AnchorId::new(1, 3), Point::new(20.0, 0.0)),
+        ];
+        let id = document
+            .create_editable_curve(&controls, false, CurveKind::Spiro)
+            .unwrap();
+        let source = document.object(id).unwrap();
+        let ObjectSnapshot::Path(mut evaluated) = source.clone() else {
+            panic!("path")
+        };
+        evaluated.curve_kind = CurveKind::Bezier;
+        evaluated.anchors[1].point = Point::new(10.0, 12.0);
+        let derived = ObjectSnapshot::Path(evaluated);
+        let bounds = oriented_bounds(&derived);
+        let mut tool = SelectTool::new();
+        let drag = tool.begin_handle_drag(
+            DragOrigin::new(Point::new(20.0, 12.0), 0.0, false),
+            &derived,
+            bounds,
+            EditHandle::Resize(ResizeDirection::Se),
+            &HANDLE_TOLERANCES,
+        );
+        tool.drag = SelectDrag::Transforming(drag);
+        assert!(tool.restore_drag_sources(std::slice::from_ref(&source)));
+        let SelectDrag::Transforming(drag) = &tool.drag else {
+            panic!("drag")
+        };
+        assert_eq!(drag.start, source);
+        assert_eq!(drag.start_box, bounds);
+        assert!(tool.drag_sources_match(std::slice::from_ref(&source)));
+        let mut changed = source.clone();
+        if let ObjectSnapshot::Path(path) = &mut changed {
+            path.anchors[0].point = Point::new(1.0, 0.0);
+        }
+        assert!(!tool.drag_sources_match(&[changed]));
+        document
+            .set_spiro_transform(
+                id,
+                curvyo_document_core::Affine::translation(Vec2::new(3.0, 4.0)),
+            )
+            .unwrap();
+        let version = document.version();
+        assert!(tool.stale_spiro_drag(&document));
+        let mut selection = ObjectSelection::new();
+        selection.select_single(id);
+        tool.pointer_up(
+            &document,
+            &[document.object(id).unwrap()],
+            &mut selection,
+            Point::new(30.0, 22.0),
+            Modifiers::NONE,
+            &mut AnchorIdMinter::new(2),
+        );
+        assert_eq!(document.version(), version);
+    }
+
+    #[test]
+    fn spiro_handle_preview_equals_committed_and_reopened_source() {
+        use curvyo_document_core::{CurveKind, pack, unpack};
+        let document = Document::new(1);
+        let controls = [
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 10.0)),
+            NewAnchor::corner(AnchorId::new(1, 3), Point::new(20.0, 0.0)),
+        ];
+        let id = document
+            .create_editable_curve(&controls, false, CurveKind::Spiro)
+            .unwrap();
+        let source = document.object(id).unwrap();
+        let ObjectSnapshot::Path(mut evaluated) = source.clone() else {
+            panic!("path")
+        };
+        evaluated.curve_kind = CurveKind::Bezier;
+        let derived = ObjectSnapshot::Path(evaluated);
+        let bounds = oriented_bounds(&derived);
+        let mut tool = SelectTool::new();
+        let drag = tool.begin_handle_drag(
+            DragOrigin::new(Point::new(20.0, 10.0), 0.0, false),
+            &derived,
+            bounds,
+            EditHandle::Resize(ResizeDirection::Se),
+            &HANDLE_TOLERANCES,
+        );
+        tool.drag = SelectDrag::Transforming(drag);
+        assert!(tool.restore_drag_sources(std::slice::from_ref(&source)));
+        let mut selection = ObjectSelection::new();
+        selection.select_single(id);
+        let point = Point::new(30.0, 20.0);
+        let preview = tool
+            .live_edit(
+                std::slice::from_ref(&source),
+                &selection,
+                point,
+                false,
+                false,
+            )
+            .unwrap();
+        assert_eq!(preview.objects.len(), 1);
+        tool.pointer_up(
+            &document,
+            std::slice::from_ref(&source),
+            &mut selection,
+            point,
+            Modifiers::NONE,
+            &mut AnchorIdMinter::new(2),
+        );
+        assert_eq!(document.object(id).unwrap(), preview.objects[0]);
+        let reopened = unpack(2, &pack(&document, "preview").unwrap()).unwrap();
+        assert_eq!(reopened.object(id).unwrap(), preview.objects[0]);
+    }
+
+    #[test]
+    fn spiro_and_clone_group_resize_preview_commits_without_baking() {
+        use curvyo_document_core::{Affine, CurveKind};
+        let document = Document::new(1);
+        let controls = [
+            NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+            NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 10.0)),
+            NewAnchor::corner(AnchorId::new(1, 3), Point::new(20.0, 0.0)),
+        ];
+        let id = document
+            .create_editable_curve(&controls, false, CurveKind::Spiro)
+            .unwrap();
+        let clone_id = document.linked_clone(&[id], &[]).unwrap()[0];
+        let ObjectSnapshot::Clone(clone) = document.object(clone_id).unwrap() else {
+            panic!("clone")
+        };
+        document
+            .transform_objects(
+                &[ObjectSnapshot::Clone(
+                    clone.mapped_by(Affine::translation(Vec2::new(30.0, 0.0))),
+                )],
+                false,
+            )
+            .unwrap();
+        let sources = vec![
+            document.object(id).unwrap(),
+            document.object(clone_id).unwrap(),
+        ];
+        let mut visuals = sources.clone();
+        for object in &mut visuals {
+            match object {
+                ObjectSnapshot::Path(path) => path.curve_kind = CurveKind::Bezier,
+                ObjectSnapshot::Clone(clone) => {
+                    clone.resolved.curve_kind = CurveKind::Bezier;
+                    std::sync::Arc::make_mut(&mut clone.chain.root_outline).curve_kind =
+                        CurveKind::Bezier;
+                }
+                _ => unreachable!(),
+            }
+        }
+        let mut selection = ObjectSelection::new();
+        selection.select_single(id);
+        selection.add(clone_id);
+        let mut tool = SelectTool::new();
+        tool.begin_group_press(
+            &visuals,
+            &selection,
+            DragOrigin::new(Point::new(50.0, 10.0), 0.0, false),
+            EditHandle::Resize(ResizeDirection::Se),
+            &|_| None,
+        );
+        assert!(matches!(tool.drag, SelectDrag::GroupTransforming(_)));
+        assert!(tool.restore_drag_sources(&sources));
+        let point = Point::new(75.0, 20.0);
+        let preview = tool
+            .live_edit(&sources, &selection, point, false, false)
+            .unwrap();
+        tool.pointer_up(
+            &document,
+            &sources,
+            &mut selection,
+            point,
+            Modifiers::NONE,
+            &mut AnchorIdMinter::new(2),
+        );
+        assert_eq!(
+            document.object(id).unwrap(),
+            preview
+                .objects
+                .iter()
+                .find(|o| o.id() == id)
+                .unwrap()
+                .clone()
+        );
+        assert_eq!(document.path(id).unwrap().anchors, controls);
+        let ObjectSnapshot::Clone(after) = document.object(clone_id).unwrap() else {
+            panic!("clone")
+        };
+        let ObjectSnapshot::Clone(before) =
+            preview.objects.iter().find(|o| o.id() == clone_id).unwrap()
+        else {
+            panic!("preview clone")
+        };
+        assert_eq!(after.resolved, before.resolved);
+    }
 
     /// The one radius of a rectangle whose four corner radii are equal (asserted).
     fn uniform_mm(radii: CornerRadii) -> f64 {

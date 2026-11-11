@@ -36,9 +36,25 @@ impl Session {
             self.node_click_on_nothing(point, modifiers);
         }
         let correction = self.resolve_node_snapping(point);
+        if self
+            .node_spiro_sources
+            .iter()
+            .any(|source| self.document.path(source.id).as_ref() != Some(source))
+            || !self.node.spiro_drag_sources_match(&self.node_paths())
+        {
+            self.node.cancel_drag();
+            self.node_spiro_sources.clear();
+            self.spiro_cache.borrow_mut().clear_node_previews();
+            self.end_snapping_drag();
+            self.transform_notice =
+                Some("The Spiro path changed during the drag; the node edit was cancelled.");
+            return;
+        }
         let outcome = self
             .node
             .pointer_up(&self.document, point.translated(correction), modifiers);
+        self.node_spiro_sources.clear();
+        self.spiro_cache.borrow_mut().clear_node_previews();
         self.end_snapping_drag();
         if outcome == NodePointerUpOutcome::NodesSelected {
             self.announce_node_selection();

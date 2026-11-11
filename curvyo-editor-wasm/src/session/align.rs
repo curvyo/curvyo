@@ -9,12 +9,20 @@ use std::hash::{Hash, Hasher};
 use curvyo_document_core::{Length, NodeId, ObjectSnapshot, Point};
 use curvyo_ui_core::{
     AlignAxis, AlignBox, AlignCommand, AlignInput, AlignOutcome, AlignReference, DistributeMode,
-    Modifiers, PressTarget, SelectedUnit, arrange_selection_in_grid, classify_press,
-    distribute_page, distribute_selection, oriented_bounds, page_object_ids,
+    Modifiers, PressTarget, SelectedUnit, arrange_selection_in_grid, distribute_page,
+    distribute_selection, page_object_ids_with_artwork,
 };
 
 use super::group_view::merged_corners;
 use super::{Session, Tool};
+
+/// The arrange press whose result is checked before it is written.
+#[derive(Debug, Clone, Copy)]
+enum ArrangeAction {
+    Align(AlignCommand),
+    Distribute(AlignAxis, DistributeMode, Option<f64>),
+    Grid(u32, u32, f64),
+}
 
 /// The align command of a wasm `code` (`"left"`, `"centre-h"`, `"right"`,
 /// `"top"`, `"centre-v"`, `"bottom"`); `None` for any other code, which then
@@ -96,7 +104,9 @@ impl Session {
     /// whole; hidden and locked objects are not pickable and never move.
     pub(super) fn page_units(&self) -> Vec<SelectedUnit> {
         let pickable = self.pickable_objects();
-        let ids = page_object_ids(&pickable, &self.active_page_box());
+        let ids = page_object_ids_with_artwork(&pickable, &self.active_page_box(), &|path| {
+            self.width_artwork(path)
+        });
         self.units().selected(&ids)
     }
 
@@ -130,7 +140,109 @@ impl Session {
         }
         self.select.cancel_entry();
         self.sync_select_units();
+        let units = self.units().selected(self.selection.ids());
+        let leaves: std::collections::HashSet<_> = units
+            .iter()
+            .flat_map(|unit| unit.leaves.iter().copied())
+            .collect();
+        if self
+            .spiro_selection_objects(&self.objects())
+            .iter()
+            .any(|object| {
+                (leaves.is_empty() || leaves.contains(&object.id()))
+                    && object.drawn_path().is_some_and(|path| {
+                        path.curve_kind == curvyo_document_core::CurveKind::Spiro
+                    })
+            })
+        {
+            self.transform_notice = Some(super::spiro_cache::SPIRO_UNSOLVED_NOTICE);
+            return false;
+        }
         true
+    }
+
+    fn arrange_reference(&self, action: ArrangeAction) -> AlignReference {
+        match action {
+            ArrangeAction::Align(_) => self.align_reference(),
+            ArrangeAction::Distribute(..) => self.distribute_reference(),
+            ArrangeAction::Grid(..) => AlignReference::Selection,
+        }
+    }
+
+    fn arrange_candidates(&self, action: ArrangeAction) -> Option<Vec<ObjectSnapshot>> {
+        let objects = self.spiro_selection_objects(&self.objects());
+        let reference = self.arrange_reference(action);
+        let selected = self.press_units(reference);
+        let boxed = curvyo_ui_core::unit_boxes_with_artwork(&objects, &selected, &|path| {
+            self.width_artwork(path)
+        });
+        if boxed.units.is_empty() {
+            return Some(Vec::new());
+        }
+        let plan = match action {
+            ArrangeAction::Align(command) => {
+                let reference_box = if reference.on_page() {
+                    self.active_page_box()
+                } else {
+                    self.key_object
+                        .and_then(|id| {
+                            boxed
+                                .units
+                                .iter()
+                                .position(|unit| unit.id == id)
+                                .map(|index| boxed.boxes[index])
+                        })
+                        .or_else(|| AlignBox::union(&boxed.boxes))?
+                };
+                curvyo_ui_core::align_translations(&boxed.boxes, &reference_box, command)
+            }
+            ArrangeAction::Distribute(axis, mode, gap) => {
+                let gap = gap.map(Length::from_mm);
+                if reference.on_page() {
+                    curvyo_ui_core::distribute_on_frame_translations(
+                        &boxed.boxes,
+                        &self.active_page_box(),
+                        axis,
+                        mode,
+                        gap,
+                    )
+                } else {
+                    curvyo_ui_core::distribute_translations(&boxed.boxes, axis, mode, gap)
+                }
+            }
+            ArrangeAction::Grid(rows, columns, gap) => {
+                let Some(plan) =
+                    curvyo_ui_core::grid_translations(&boxed.boxes, rows, columns, gap)
+                else {
+                    return Some(Vec::new());
+                };
+                plan
+            }
+        };
+        let mut candidates = Vec::new();
+        for (unit, offset) in boxed.units.iter().zip(plan) {
+            if offset == curvyo_document_core::Vec2::ZERO {
+                continue;
+            }
+            for id in &unit.leaves {
+                if let Some(object) = objects.iter().find(|object| object.id() == *id) {
+                    candidates.push(object.translated(offset));
+                }
+            }
+        }
+        Some(candidates)
+    }
+
+    /// Whether the arrangement may be written: every moved variable stroke keeps an outline.
+    fn preflight_arrange(&mut self, action: ArrangeAction) -> bool {
+        let Some(candidates) = self.arrange_candidates(action) else {
+            return false;
+        };
+        if self.width_outlines_exist(&candidates) {
+            return true;
+        }
+        self.transform_notice = Some(super::width_transform::NO_OUTLINE_NOTICE);
+        false
     }
 
     /// An align press: every unit's edge or centre onto the reference, one
@@ -145,14 +257,21 @@ impl Session {
         let on_page = reference.on_page();
         let (key, page) = (self.key_object, self.active_page_box());
         let units = self.press_units(reference);
+        if !self.preflight_arrange(ArrangeAction::Align(command)) {
+            return AlignOutcome::NothingSelected;
+        }
         self.recording_unguarded(|this| {
             let objects = this.objects();
+            let geometry = this.spiro_selection_objects(&objects);
             let all = this.units();
+            let artwork = |path: &curvyo_document_core::PathSnapshot| this.width_artwork(path);
             let input = AlignInput {
                 document: &this.document,
                 objects: &objects,
+                geometry_objects: Some(&geometry),
                 units: &all,
                 selection: &this.selection,
+                artwork: Some(&artwork),
             };
             if on_page {
                 curvyo_ui_core::align_page(&input, &units, page, command)
@@ -180,14 +299,21 @@ impl Session {
         let gap = gap_mm.map(Length::from_mm);
         let page = self.active_page_box();
         let units = self.press_units(reference);
+        if !self.preflight_arrange(ArrangeAction::Distribute(axis, mode, gap_mm)) {
+            return AlignOutcome::NothingSelected;
+        }
         self.recording_unguarded(|this| {
             let objects = this.objects();
+            let geometry = this.spiro_selection_objects(&objects);
             let all = this.units();
+            let artwork = |path: &curvyo_document_core::PathSnapshot| this.width_artwork(path);
             let input = AlignInput {
                 document: &this.document,
                 objects: &objects,
+                geometry_objects: Some(&geometry),
                 units: &all,
                 selection: &this.selection,
+                artwork: Some(&artwork),
             };
             if on_page {
                 distribute_page(&input, &units, page, axis, mode, gap)
@@ -204,14 +330,21 @@ impl Session {
         if !self.ready_for_bar_command() {
             return AlignOutcome::NothingSelected;
         }
+        if !self.preflight_arrange(ArrangeAction::Grid(rows, columns, gap_mm)) {
+            return AlignOutcome::NothingSelected;
+        }
         self.recording_unguarded(|this| {
             let objects = this.objects();
+            let geometry = this.spiro_selection_objects(&objects);
             let all = this.units();
+            let artwork = |path: &curvyo_document_core::PathSnapshot| this.width_artwork(path);
             let input = AlignInput {
                 document: &this.document,
                 objects: &objects,
+                geometry_objects: Some(&geometry),
                 units: &all,
                 selection: &this.selection,
+                artwork: Some(&artwork),
             };
             arrange_selection_in_grid(&input, rows, columns, Length::from_mm(gap_mm))
         })
@@ -241,7 +374,10 @@ impl Session {
         let corners: Vec<_> = objects
             .iter()
             .filter(|object| leaves.contains(&object.id()))
-            .map(|object| oriented_bounds(object).document_corners())
+            .filter_map(|object| {
+                self.cached_oriented_bounds(object)
+                    .map(|bounds| bounds.document_corners())
+            })
             .collect();
         merged_corners(&corners)
     }
@@ -265,7 +401,7 @@ impl Session {
         let pickable = self.pickable_objects();
         let tolerance = self.object_tolerance();
         let handle_tolerances = self.transform_handle_tolerances();
-        if let PressTarget::Object(id) = classify_press(
+        if let PressTarget::Object(id) = curvyo_ui_core::classify_press_with_artwork(
             &objects,
             &pickable,
             &self.selection,
@@ -273,6 +409,7 @@ impl Session {
             tolerance,
             handle_tolerances,
             modifiers,
+            &|path| self.width_artwork(path),
         ) {
             let units = self.units();
             let unit = units.unit_of(id);

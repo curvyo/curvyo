@@ -324,14 +324,12 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         onOpenError(String(error), OPEN_FILE_TITLE);
         return;
       }
+      if (opened.notice !== "") editor.showHistoryNotice(opened.notice);
       if (opened.svg) {
         // An SVG is an untitled project that no saved file holds (`0024` criterion 2): the host
         // forgets any path, and Save asks where, offering the SVG's name.
         await invoke("reset_project").catch(() => undefined);
         setInfo({ fileName: null, path: null, suggestedName: savedNameOf(name), sourceSvg: name });
-        if (opened.notice !== "") {
-          editor.showHistoryNotice(opened.notice);
-        }
         return;
       }
       await invoke("confirm_project_opened", { path }).catch(() => {
@@ -357,6 +355,7 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         const opened = await whileBusy(editor, bytes.length, svg_busy_notice(true, fileName), () =>
           editor.openFile(bytes, fileName),
         );
+        if (opened.notice !== "") editor.showHistoryNotice(opened.notice);
         // A new session starts on its own tab; switching from the tree keeps the File tab.
         if (inFileTab) {
           depsRef.current.panel.pressTab("file");
@@ -555,6 +554,10 @@ export function useProject(deps: ProjectDeps): ProjectApi {
         );
         if (answer.kind === "nothing-selected") {
           editor.showHistoryNotice(svg_export_nothing_selected(), 3000);
+          return;
+        }
+        if (answer.kind === "unsupported-extended-path") {
+          onOpenError("SVG export cannot represent some curves or variable stroke widths in the export. Spiro curves may still be computing or may have failed; try again after the preview is ready.", EXPORT_FAILED_TITLE);
           return;
         }
         if (isTauri) {

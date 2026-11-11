@@ -103,6 +103,9 @@ impl From<CombineOutcome> for CombineResultView {
                 styles_differ,
             },
             CombineOutcome::Refused(refusal) => match refusal {
+                CombineRefusal::ExtendedPath { offenders, of } => {
+                    refused("extended_path", offenders.len(), of)
+                }
                 CombineRefusal::NeedsTwo => refused("needs_two", 0, 0),
                 CombineRefusal::OutOfRange { offenders, of } => {
                     refused("out_of_range", offenders.len(), of)

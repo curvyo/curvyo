@@ -971,3 +971,98 @@ fn a_fixture_point_captures_both_axes_whatever_the_object_switches() {
     );
     assert_eq!(result.offset, Vec2::new(-2.0, 1.0));
 }
+
+#[test]
+fn bspline_control_points_are_not_artwork_snap_nodes() {
+    use curvyo_document_core::{AnchorId, AnchorKind, CurveKind, NewAnchor};
+    let document = Document::new(44);
+    let controls = [(0., 0.), (10., 0.), (10., 10.), (0., 10.)]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (x, y))| {
+            let mut a = NewAnchor::corner(AnchorId::new(44, i as u64), Point::new(x, y));
+            a.kind = AnchorKind::Symmetric;
+            a
+        })
+        .collect::<Vec<_>>();
+    document
+        .create_editable_curve(&controls, false, CurveKind::BSpline)
+        .unwrap();
+    let mut opts = settings(1., 1.);
+    opts.objects = false;
+    opts.page = false;
+    opts.guides = false;
+    let targets = SnapTargets::gather(
+        &document.read_nodes(),
+        document.size(),
+        &opts,
+        SnapExclusions::default(),
+    );
+    assert_eq!(targets.entries(), []);
+}
+
+#[test]
+fn spiro_snap_nodes_use_world_positions_and_preserve_exclusions() {
+    use curvyo_document_core::{Affine, AnchorId, CurveKind, NewAnchor};
+    let document = Document::new(1);
+    let controls = [
+        NewAnchor::corner(AnchorId::new(1, 1), Point::new(0.0, 0.0)),
+        NewAnchor::corner(AnchorId::new(1, 2), Point::new(10.0, 0.0)),
+    ];
+    let id = document
+        .create_editable_curve(&controls, false, CurveKind::Spiro)
+        .unwrap();
+    document
+        .set_spiro_transform(id, Affine::new(2.0, 0.0, 0.0, 3.0, 10.0, 20.0))
+        .unwrap();
+    let settings = SnapSettings {
+        objects: false,
+        guides: false,
+        page: false,
+        ..settings(8.0, 14.0)
+    };
+    let reads = document.read_nodes();
+    let targets = SnapTargets::gather(
+        &reads,
+        document.size(),
+        &settings,
+        SnapExclusions {
+            boxes: None,
+            nodes: None,
+            anchor: Some((id, controls[0].id)),
+            anchors: None,
+        },
+    );
+    assert!(
+        targets
+            .entries()
+            .iter()
+            .any(|entry| entry.point == Point::new(30.0, 20.0))
+    );
+    assert!(
+        !targets
+            .entries()
+            .iter()
+            .any(|entry| entry.point == Point::new(10.0, 20.0))
+    );
+    let selected = std::collections::HashSet::from([id]);
+    let probes = super::collection::grid_snap_nodes(&reads, &selected);
+    assert!(probes.contains(&Point::new(10.0, 20.0)));
+    assert!(probes.contains(&Point::new(30.0, 20.0)));
+    let clone_id = document.linked_clone(&[id], &[]).unwrap()[0];
+    let curvyo_document_core::ObjectSnapshot::Clone(clone) = document.object(clone_id).unwrap()
+    else {
+        panic!("clone")
+    };
+    let moved = clone.mapped_by(Affine::translation(curvyo_document_core::Vec2::new(
+        50.0, 0.0,
+    )));
+    document
+        .transform_objects(&[curvyo_document_core::ObjectSnapshot::Clone(moved)], false)
+        .unwrap();
+    let reads = document.read_nodes();
+    let clone_probes =
+        super::collection::grid_snap_nodes(&reads, &std::collections::HashSet::from([clone_id]));
+    assert!(clone_probes.contains(&Point::new(60.0, 20.0)));
+    assert!(clone_probes.contains(&Point::new(80.0, 20.0)));
+}

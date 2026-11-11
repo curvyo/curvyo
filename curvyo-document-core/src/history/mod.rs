@@ -26,7 +26,7 @@ mod step_id;
 mod step_index;
 mod step_log;
 mod touched;
-mod updates;
+pub(crate) mod updates;
 mod version_write;
 mod wipe;
 

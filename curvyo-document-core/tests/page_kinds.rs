@@ -667,7 +667,7 @@ fn a_format_36_file_converts_on_open_without_a_step_and_looks_the_same() {
     // external clone where it was.
     let before = unpack_without_migration(&stored);
     let outline = |o: &ObjectSnapshot| match o {
-        ObjectSnapshot::Clone(c) => c.resolved.clone(),
+        ObjectSnapshot::Clone(c) => (*c.resolved).clone(),
         ObjectSnapshot::Sketch(s) => s.resolved.clone(),
         other => panic!("unexpected {other:?}"),
     };

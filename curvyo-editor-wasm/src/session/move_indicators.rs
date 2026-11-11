@@ -4,7 +4,7 @@
 
 use curvyo_document_core::{ObjectSnapshot, Point, Vec2};
 use curvyo_render_core::{LockedAxis, MoveAxes};
-use curvyo_ui_core::{Axis, PressTarget, classify_press, oriented_bounds};
+use curvyo_ui_core::{Axis, PressTarget, classify_press_with_artwork};
 
 use super::shapes::LiveReadout;
 use super::{Session, Tool};
@@ -94,7 +94,7 @@ impl Session {
                 self.select.gesture_kind().is_some(),
             )
         } else {
-            let target = classify_press(
+            let target = classify_press_with_artwork(
                 &self.objects(),
                 &self.pickable_objects(),
                 &self.selection,
@@ -102,6 +102,7 @@ impl Session {
                 self.object_tolerance(),
                 self.transform_handle_tolerances(),
                 self.held,
+                &|path| self.width_artwork(path),
             );
             (
                 target.begins_move(),
@@ -171,11 +172,13 @@ impl Session {
         if let Some(centre) = self.group_centre(objects) {
             return Some(centre);
         }
-        let corners: Vec<Point> = objects
+        let mut corners = Vec::new();
+        for object in objects
             .iter()
             .filter(|object| self.selection.contains(object.id()))
-            .flat_map(|object| oriented_bounds(object).document_corners())
-            .collect();
+        {
+            corners.extend(self.cached_oriented_bounds(object)?.document_corners());
+        }
         let (first, rest) = corners.split_first()?;
         let (low, high) = rest.iter().fold((*first, *first), |(low, high), p| {
             (

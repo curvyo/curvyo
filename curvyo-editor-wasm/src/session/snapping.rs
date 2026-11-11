@@ -3,6 +3,8 @@
 //! once at the press, holds the ephemeral result for drawing, and drops it on
 //! release/Escape/tool change.
 
+use std::sync::Arc;
+
 use std::collections::HashSet;
 
 use curvyo_document_core::{AnchorId, DocumentSnapping, DocumentVersion, NodeId, Page, Point};
@@ -42,6 +44,7 @@ impl SnappingDrag {
         pages: &[Page],
         settings: SnapSettings,
         exclusions: SnapExclusions<'_>,
+        artwork: &curvyo_ui_core::VariableArtworkLookup<'_>,
     ) -> Self {
         let all = SnapSettings {
             objects: true,
@@ -50,7 +53,8 @@ impl SnappingDrag {
             page: true,
             ..settings
         };
-        let targets = SnapTargets::gather_pages(&read.nodes, pages, &all, exclusions);
+        let targets =
+            SnapTargets::gather_pages_with_artwork(&read.nodes, pages, &all, exclusions, artwork);
         let mut anchors = exclusions.anchors.cloned().unwrap_or_default();
         anchors.extend(exclusions.anchor);
         Self {
@@ -114,9 +118,12 @@ impl SnappingState {
         pages: &[Page],
         mm_per_px: f64,
         exclusions: SnapExclusions<'_>,
+        artwork: &curvyo_ui_core::VariableArtworkLookup<'_>,
     ) {
         let settings = SnapSettings::from_document(self.stored, mm_per_px);
-        self.drag = Some(SnappingDrag::new(read, pages, settings, exclusions));
+        self.drag = Some(SnappingDrag::new(
+            read, pages, settings, exclusions, artwork,
+        ));
     }
 
     /// The last resolved result, for drawing the marker.
@@ -183,9 +190,15 @@ impl super::Session {
             anchor: None,
             anchors: None,
         };
+        let artwork = self.frozen_width_artwork();
         self.snapping.update_stored(self.document.snapping());
         self.snapping
-            .begin_drag(&read, &pages, mm_per_px, exclusions);
+            .begin_drag(&read, &pages, mm_per_px, exclusions, &|path| {
+                artwork
+                    .get(&path.id)
+                    .filter(|(source, _)| source == path)
+                    .map(|(_, result)| Arc::clone(result))
+            });
         if let Some(drag) = &mut self.snapping.drag {
             drag.grid_nodes = curvyo_ui_core::grid_snap_nodes(&read.nodes, &excluded_boxes);
         }
@@ -226,9 +239,15 @@ impl super::Session {
             anchor: None,
             anchors: None,
         };
+        let artwork = self.frozen_width_artwork();
         self.snapping.update_stored(self.document.snapping());
         self.snapping
-            .begin_drag(&read, &pages, mm_per_px, exclusions);
+            .begin_drag(&read, &pages, mm_per_px, exclusions, &|path| {
+                artwork
+                    .get(&path.id)
+                    .filter(|(source, _)| source == path)
+                    .map(|(_, result)| Arc::clone(result))
+            });
         self.snapping.version = Some(self.document.version());
     }
 
@@ -266,6 +285,7 @@ impl super::Session {
         if self.snapping.drag.is_some() && self.snapping.version.as_ref() != Some(&version) {
             let read = self.document_read();
             let pages = self.document.pages();
+            let artwork = self.frozen_width_artwork();
             if let Some(drag) = &mut self.snapping.drag {
                 let all = SnapSettings {
                     objects: true,
@@ -274,7 +294,7 @@ impl super::Session {
                     page: true,
                     ..drag.settings
                 };
-                drag.targets = SnapTargets::gather_pages(
+                drag.targets = SnapTargets::gather_pages_with_artwork(
                     &read.nodes,
                     &pages,
                     &all,
@@ -283,6 +303,12 @@ impl super::Session {
                         nodes: drag.nodes.as_ref(),
                         anchor: None,
                         anchors: Some(&drag.anchors),
+                    },
+                    &|path| {
+                        artwork
+                            .get(&path.id)
+                            .filter(|(source, _)| source == path)
+                            .map(|(_, result)| Arc::clone(result))
                     },
                 );
                 if !drag.fixture_targets.is_empty() {

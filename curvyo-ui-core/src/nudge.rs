@@ -8,7 +8,6 @@ use curvyo_document_core::{
 };
 
 use crate::anchor_id_minter::AnchorIdMinter;
-use crate::object_bounds::object_outline_bounds;
 use crate::transform_commit::{commit_move, offset_within_limit};
 
 /// One plain arrow key moves the selection this far, in document millimetres, whatever the zoom
@@ -196,8 +195,29 @@ pub fn nudge(
     previous: Option<&NudgeRun>,
     minter: &mut AnchorIdMinter,
 ) -> NudgeOutcome {
+    nudge_with_artwork(
+        document,
+        objects,
+        selected,
+        event,
+        previous,
+        minter,
+        &crate::variable_artwork::synchronous_artwork,
+    )
+}
+
+/// Moves selected objects using cached variable-stroke bounds.
+pub fn nudge_with_artwork(
+    document: &Document,
+    objects: &[ObjectSnapshot],
+    selected: &[NodeId],
+    event: NudgeEvent,
+    previous: Option<&NudgeRun>,
+    minter: &mut AnchorIdMinter,
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> NudgeOutcome {
     let live = selected_objects(objects, selected);
-    let Some(bounds) = union_bounds(&live) else {
+    let Some(bounds) = union_bounds(&live, artwork) else {
         return NudgeOutcome::NothingToMove;
     };
     if !event.fits(bounds) {
@@ -230,7 +250,17 @@ pub fn nudge(
 /// none of them is there: where the move readout of a nudge sits.
 #[must_use]
 pub fn selection_centre(objects: &[ObjectSnapshot], ids: &[NodeId]) -> Option<Point> {
-    let (min, max) = union_bounds(&selected_objects(objects, ids))?;
+    selection_centre_with_artwork(objects, ids, &crate::variable_artwork::synchronous_artwork)
+}
+
+/// Finds the selection centre using cached variable-stroke bounds.
+#[must_use]
+pub fn selection_centre_with_artwork(
+    objects: &[ObjectSnapshot],
+    ids: &[NodeId],
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<Point> {
+    let (min, max) = union_bounds(&selected_objects(objects, ids), artwork)?;
     Some(Point::new(
         f64::midpoint(min.x, max.x),
         f64::midpoint(min.y, max.y),
@@ -247,10 +277,15 @@ fn selected_objects<'a>(objects: &'a [ObjectSnapshot], ids: &[NodeId]) -> Vec<&'
 }
 
 /// The box around the tight outlines of `objects` (`(min, max)` corners).
-fn union_bounds(objects: &[&ObjectSnapshot]) -> Option<(Point, Point)> {
+fn union_bounds(
+    objects: &[&ObjectSnapshot],
+    artwork: &crate::VariableArtworkLookup<'_>,
+) -> Option<(Point, Point)> {
     objects
         .iter()
-        .map(|object| object_outline_bounds(object))
+        .filter_map(|object| {
+            crate::object_bounds::object_outline_bounds_with_artwork(object, artwork)
+        })
         .reduce(|(min, max), (other_min, other_max)| {
             (
                 Point::new(min.x.min(other_min.x), min.y.min(other_min.y)),

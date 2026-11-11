@@ -175,6 +175,9 @@ mod tests {
                 })
                 .collect(),
             extra_subpaths: Vec::new(),
+            curve_kind: crate::CurveKind::Bezier,
+            spiro_transform: None,
+            width_points: Vec::new(),
             rotation: Angle::from_radians(0.0),
         }
     }

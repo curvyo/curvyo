@@ -18,6 +18,13 @@
 // to the stricter rule.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+mod width_profile;
+pub use width_profile::{WidthPoint, WidthPointError};
+
+mod curve_kind;
+mod spiro_transform;
+pub use curve_kind::{CurveKind, CurveKindError};
+
 mod affine;
 mod assets;
 mod clone_codec;

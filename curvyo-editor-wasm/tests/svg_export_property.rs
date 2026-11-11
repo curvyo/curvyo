@@ -129,6 +129,7 @@ fn export(s: &Session, options: SvgExportOptions) -> (String, usize, usize) {
             texts_kept_live,
         } => (text, objects, texts_kept_live),
         SvgExportResult::NothingSelected => panic!("nothing selected"),
+        SvgExportResult::UnsupportedExtendedPath => panic!("unexpected unsupported extended path"),
     }
 }
 

@@ -14,12 +14,6 @@ impl WasmSession {
         self.session.out_of_context_line()
     }
 
-    /// "Rectangle · Drawing 2" for the status bar while the selection is move-only, else empty.
-    #[must_use]
-    pub fn out_of_context_status(&self) -> String {
-        self.session.out_of_context_status()
-    }
-
     /// Whether the selection is move-only.
     #[must_use]
     pub fn selection_move_only(&self) -> bool {

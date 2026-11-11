@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 curvyo-sketch-core = { path = "../curvyo-sketch-core", version = "0.1.0" }
 curvyo-document-core = { path = "../curvyo-document-core", version = "0.1.0" }
+curvyo-geometry-core = { path = "../curvyo-geometry-core", version = "0.1.0" }
 curvyo-ui-core = { path = "../curvyo-ui-core", version = "0.1.0" }
 # The raster tracer and the text reader, imported by name (ADR 0048 §1: editor-wasm → vectrace).
 vectrace.workspace = true

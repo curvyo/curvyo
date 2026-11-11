@@ -18,6 +18,7 @@ use crate::style_model::Opacity;
 
 /// What a node is.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)] // Leaf snapshots are read together and avoid a per-object allocation.
 pub enum NodeKind {
     /// A layer: a group at the top level with the layer marker.
     Layer,

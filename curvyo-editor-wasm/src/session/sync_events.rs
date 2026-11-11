@@ -15,6 +15,14 @@ impl Session {
     pub(super) fn sync_pump(&mut self) {
         self.sync_drain();
         self.sync_pending();
+        self.document
+            .set_live_share(self.sync.as_ref().is_some_and(|link| {
+                link.ended.is_none()
+                    && link
+                        .workspace
+                        .as_ref()
+                        .is_none_or(|channel| channel.stream.is_some())
+            }));
     }
 
     fn sync_drain(&mut self) {
@@ -194,6 +202,16 @@ impl Session {
     }
 
     pub(super) fn upload_snapshot(&mut self, covers_seq: u64) {
+        if self.document.has_extended_path_history() {
+            if let Some(link) = self.sync.as_mut() {
+                link.notice(
+                    "Documents with editable curves or width profiles cannot be shared yet."
+                        .to_owned(),
+                    true,
+                );
+            }
+            return;
+        }
         if self.sync.is_none() {
             return;
         }

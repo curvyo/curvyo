@@ -482,7 +482,11 @@ impl Session {
                 }
                 was
             }
-            Tool::Node => self.node.cancel_drag(),
+            Tool::Node => {
+                self.node_spiro_sources.clear();
+                self.spiro_cache.borrow_mut().clear_node_previews();
+                self.node.cancel_drag()
+            }
             Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => self.shape_escape(),
             Tool::Offset => {
                 let marquee = self.select.drag_in_flight();
@@ -511,6 +515,9 @@ impl Session {
     /// With the pointer button still down steps 3 and 4 are skipped: only the
     /// drag is cancelled (criterion 49).
     pub fn escape(&mut self) -> EscapeStep {
+        if self.width_escape() {
+            return EscapeStep::ClearedState;
+        }
         if self.workbench() == super::Workbench::Sketch {
             return self.sketch_escape();
         }
@@ -562,6 +569,7 @@ impl Session {
             return EscapeStep::CancelledDrag;
         }
         if self.tool == Tool::Pen && self.pen.escape() {
+            self.end_spiro_notice();
             // The Pen's step 2 and 3 are one: the unfinished path goes,
             // also during a handle drag.
             return if self.button_down {
@@ -634,6 +642,9 @@ impl Session {
     /// has no way to cancel only a handle drag).
     pub(super) fn cancel_gesture(&mut self) {
         self.page_drag = None;
+        if self.width_cancel_drag() {
+            return;
+        }
         if !self.cancel_drag_in_flight() && self.tool == Tool::Pen {
             self.pen.escape();
         }
@@ -643,6 +654,9 @@ impl Session {
     /// toolbar's Delete button): removes every selected object when the
     /// Select or Node tool is active. A no-op for every other tool.
     pub fn delete_selected(&mut self) {
+        if self.width_delete_selected() {
+            return;
+        }
         self.recording_unguarded(|this| {
             this.flush_select_bar_preview();
             this.flush_style_preview();
@@ -654,7 +668,13 @@ impl Session {
                     this.select
                         .delete_selected(&this.document, &objects, &mut this.selection);
                 }
-                Tool::Node => this.node.delete_selected(&this.document),
+                Tool::Node => {
+                    if this.document.can_delete_anchors(this.node.selection().node_pairs()) {
+                        this.node.delete_selected(&this.document);
+                    } else {
+                        this.history.notice = Some("A closed B-spline needs at least three control points. Nothing changed.".to_owned());
+                    }
+                }
                 Tool::Pen
                 | Tool::Rectangle
                 | Tool::Ellipse

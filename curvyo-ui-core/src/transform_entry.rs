@@ -476,12 +476,26 @@ impl TransformEntry {
     /// box axes.
     #[must_use]
     pub fn mirror_line(&self, texts: [&str; 2], last_edited: usize) -> Option<&'static str> {
+        let (sx, sy) = self.resize_factors(texts, last_edited)?;
+        mirror_line(sx, sy)
+    }
+
+    /// Whether the typed `texts` resize the two box axes by different amounts.
+    #[must_use]
+    pub fn scales_unevenly(&self, texts: [&str; 2], last_edited: usize) -> bool {
+        self.resize_factors(texts, last_edited)
+            .is_some_and(|(sx, sy)| crate::transform_math::scales_unevenly(sx, sy))
+    }
+
+    /// The signed factors along the box axes the typed `texts` resize by, `None` for an invalid
+    /// text or a rotate entry.
+    fn resize_factors(&self, texts: [&str; 2], last_edited: usize) -> Option<(f64, f64)> {
         let targets = self.targets(texts, last_edited).ok()?;
         let (direction, delta) = self.resize_inputs(&targets)?;
         let resized = self
             .resize_options()
             .resized_box(&self.start_box, direction, delta);
-        mirror_line(resized.sx, resized.sy)
+        Some((resized.sx, resized.sy))
     }
 
     /// The typed targets: every edited field, or with linked fields the field edited

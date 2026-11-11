@@ -12,7 +12,7 @@ use curvyo_render_core::{
 };
 use curvyo_ui_core::{
     EditHandle, GroupBoxShape, GroupSelection, OrientedBox, SelectTool, format_degrees,
-    group_handles, is_corner, is_drawn_group_handle, oriented_bounds, signed_size_text,
+    group_handles, is_corner, is_drawn_group_handle, signed_size_text,
 };
 
 use super::select_readout::skew_readout;
@@ -60,7 +60,9 @@ impl Session {
         if !self.select_box_tool() {
             return None;
         }
-        SelectTool::group_of(objects, &self.selection)
+        SelectTool::group_of_with_artwork(objects, &self.selection, &|path| {
+            self.width_artwork(path)
+        })
     }
 
     /// The group box as drawn this frame: the box at the press turned by the live
@@ -103,8 +105,10 @@ impl Session {
                 .collect();
             let mut per_unit: Vec<Vec<[Point; 4]>> = vec![Vec::new(); selected_units.len()];
             for object in objects.iter().filter(|o| selected.contains(&o.id())) {
-                if let Some(&at) = unit_of.get(&object.id()) {
-                    per_unit[at].push(oriented_bounds(object).document_corners());
+                if let Some(&at) = unit_of.get(&object.id())
+                    && let Some(bounds) = self.cached_oriented_bounds(object)
+                {
+                    per_unit[at].push(bounds.document_corners());
                 }
             }
             let boxes: Vec<[Point; 4]> = per_unit
@@ -138,13 +142,14 @@ impl Session {
             return None;
         }
         let point = self.pointer_position?;
-        SelectTool::group_handle_at(
+        SelectTool::group_handle_at_with_artwork(
             objects,
             &self.selection,
             point,
             self.transform_handle_tolerances(),
             self.held.shift,
             true,
+            &|path| self.width_artwork(path),
         )
     }
 
@@ -337,7 +342,10 @@ impl Session {
                 let objects = self.objects();
                 let live = self.select_live_edit_in(&objects);
                 let live_objects = Self::live_objects_in(&objects, live.as_ref());
-                let group = SelectTool::group_of(&live_objects, &self.selection)?;
+                let group =
+                    SelectTool::group_of_with_artwork(&live_objects, &self.selection, &|path| {
+                        self.width_artwork(path)
+                    })?;
                 let (sx, sy) = self
                     .select
                     .live_resize_factors(

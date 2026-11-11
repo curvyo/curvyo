@@ -256,6 +256,9 @@ fn path_for(object: &ObjectSnapshot, first: u64, count: u64, rotation: Angle) ->
         style: object.style().clone(),
         anchors,
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation,
     })
 }

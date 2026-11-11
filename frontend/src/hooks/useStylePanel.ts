@@ -1,3 +1,4 @@
+import type { WidthPresetCode } from "@/lib/widthPresets";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePreviewGesture } from "@/hooks/usePreviewGesture";
@@ -335,6 +336,19 @@ export interface StyleSkipNotice {
 
 export interface StylePanelApi {
   view: StyleView;
+  widthEditActive: boolean;
+  /** The preset the selected path's width profile is, `""` for none (UX review U9). */
+  widthPreset: string;
+  beginWidthEdit: () => boolean;
+  endWidthEdit: () => void;
+  /** The full width of the width point selected on the canvas, millimetres; `null` when none
+   * is (`specs/0110` criterion 5). */
+  widthPointMm: number | null;
+  /** Sets the selected width point's full width from typed millimetres, one undo step:
+   * `"committed"` or `"invalid:width"`. */
+  setWidthPointMm: (text: string) => string;
+  /** Applies a ready-made width profile as one undo step (`specs/0110` criterion 5). */
+  applyWidthPreset: (code: WidthPresetCode) => void;
   /** The Pattern block (`specs/0071-pattern-fill`). */
   pattern: PatternView;
   /** The refusal of the last commit over the limit, for 8 s; empty otherwise. */
@@ -500,6 +514,28 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
 
   return {
     view,
+    widthEditActive: getSession()?.width_edit_active() ?? false,
+    widthPreset: getSession()?.selected_width_preset() ?? "",
+    // The bar's Done button follows the mode, so the whole editor re-reads it.
+    beginWidthEdit: () => {
+      const begun = act((s) => s.begin_width_edit(), false);
+      sync();
+      return begun;
+    },
+    endWidthEdit: () => {
+      run((s) => s.end_width_edit());
+      sync();
+    },
+    widthPointMm: (() => {
+      const mm = getSession()?.width_point_mm() ?? Number.NaN;
+      return Number.isFinite(mm) ? mm : null;
+    })(),
+    setWidthPointMm: (text) => {
+      const mm = Number(text.trim().replace(",", "."));
+      if (text.trim() === "" || !Number.isFinite(mm) || mm < 0) return "invalid:width";
+      return act((s) => s.set_width_point_mm(mm), false) ? "committed" : "invalid:width";
+    },
+    applyWidthPreset: (code) => run((s) => void s.apply_width_preset(code)),
     pattern,
     patternRefusal,
     setFillKind: (kind) => run((s) => void s.set_fill_kind(kind)),

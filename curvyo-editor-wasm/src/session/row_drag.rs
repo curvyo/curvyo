@@ -39,6 +39,9 @@ fn frame_path(page: &curvyo_document_core::Page) -> ObjectSnapshot {
             corner(3, x, y + h),
         ],
         extra_subpaths: Vec::new(),
+        curve_kind: curvyo_document_core::CurveKind::Bezier,
+        spiro_transform: None,
+        width_points: Vec::new(),
         rotation: curvyo_document_core::Angle::from_radians(0.0),
     })
 }

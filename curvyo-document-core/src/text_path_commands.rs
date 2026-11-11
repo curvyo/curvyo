@@ -34,6 +34,9 @@ impl Document {
         let meta = self.text_meta(text)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let carrier_tree = TreeID::new(carrier.node.peer, carrier.node.counter);
+        if crate::text_clone_commands::extended_carrier(&tree, carrier.node) {
+            return Err(TextEditError::NeedsCurveConversion);
+        }
         if carrier.node == text || !crate::text_clone_commands::is_carrier(&tree, carrier.node) {
             return Err(TextEditError::NoSuchText);
         }

@@ -28,6 +28,7 @@ fn whole(value: f64) -> u64 {
 #[wasm_bindgen]
 pub struct WasmBackgroundWriter {
     writer: BackgroundWriter,
+    error: Option<String>,
 }
 
 /// A document's file written with its waiting records.
@@ -52,6 +53,7 @@ impl WasmBackgroundWriter {
     pub fn new(peer: u64) -> Self {
         Self {
             writer: BackgroundWriter::new(peer),
+            error: None,
         }
     }
 
@@ -97,10 +99,13 @@ impl WasmBackgroundWriter {
     ) -> Option<WasmWrittenFile> {
         let id = unhex::<16>(document)?;
         let workspace = unhex::<16>(workspace)?;
-        let written = self
-            .writer
-            .write_for(id, workspace, bytes, whole(now))
-            .ok()?;
+        let written = match self.writer.write_for(id, workspace, bytes, whole(now)) {
+            Ok(written) => written,
+            Err(error) => {
+                self.error = Some(error.to_string());
+                return None;
+            }
+        };
         #[allow(clippy::cast_precision_loss)] // Sequences stay far below 2^53.
         Some(WasmWrittenFile {
             bytes: written.bytes,
@@ -114,13 +119,25 @@ impl WasmBackgroundWriter {
     pub fn create(&mut self, document: &str, workspace: &str, now: f64) -> Option<WasmWrittenFile> {
         let id = unhex::<16>(document)?;
         let workspace = unhex::<16>(workspace)?;
-        let (bytes, through) = self.writer.create(id, workspace, whole(now)).ok()?;
+        let (bytes, through) = match self.writer.create(id, workspace, whole(now)) {
+            Ok(written) => written,
+            Err(crate::background_writer::WriteError::Unreadable) => return None,
+            Err(error) => {
+                self.error = Some(error.to_string());
+                return None;
+            }
+        };
         #[allow(clippy::cast_precision_loss)] // Sequences stay far below 2^53.
         Some(WasmWrittenFile {
             bytes,
             through: through as f64,
             outgoing: Vec::new(),
         })
+    }
+
+    /// Takes the latest background write error for display to the user.
+    pub fn take_error(&mut self) -> String {
+        self.error.take().unwrap_or_default()
     }
 
     /// The file of `document` (hex) is not there yet: asked for again after the interval.

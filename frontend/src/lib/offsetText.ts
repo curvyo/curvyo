@@ -151,6 +151,7 @@ export function offsetRefusalText(outcome: OffsetOutcome): string | null {
       return `Inset is empty: nothing is left at ${formatDistance(outcome.distanceMm)} mm. ${NOTHING_CHANGED}`;
     case "groups":
       return `Offset does not work on groups. Ungroup first. ${NOTHING_CHANGED}`;
+    case "extended_path":
     case "no_area":
     case "out_of_range":
       return sharedRefusalText("Offset", outcome);

@@ -96,7 +96,7 @@ fn outlines(s: &Session, group: NodeId, source: NodeId) -> (PathSnapshot, Vec<Pa
         .tiling_instances(group)
         .into_iter()
         .map(|i| match d.object(i) {
-            Some(ObjectSnapshot::Clone(c)) => c.resolved,
+            Some(ObjectSnapshot::Clone(c)) => *c.resolved,
             other => panic!("not a clone: {other:?}"),
         })
         .collect();
