@@ -32,6 +32,40 @@ that overlapped before, ADR 0051 §2, §3, §3a).
 **Resolution:** a "tidy pages" command, or a layout pass in the sharing story's merge-residue
 handling (ADR 0015 Consequences), when a story asks for it.
 
+## Every synced message forks and re-imports the document (`0110`, 2026-11-11)
+
+To keep a newer-format or malformed update out of the live document, `import_updates_checked`
+(`curvyo-document-core/src/history/updates.rs`) forks the whole document, imports the update into
+the fork and into a fresh document, and walks the JSON of the new changes (`writes_newer_format`)
+before the real import: per message the cost grows with the document, not with the message. Opening
+a file (`Document::open`) likewise exports the whole oplog as JSON once to check the format
+registers. Fine for today's documents; a long shared session on a large drawing pays it on every
+remote change.
+
+**Resolution:** check the update's own changes without forking (decode the update's change
+metadata, or keep a validated shadow version vector) and read the format registers from the state
+instead of the exported oplog; measure with a thread-CPU budget test on a large document first.
+
+## The variable-width and Spiro wasm budgets are not checked in CI (`0110`, 2026-11-11)
+
+ADR 0053's amendment sets ≤ 4 ms in wasm for the typical variable-width outline and ≤ 16 ms for a
+200-node freehand path, and the Spiro solves are budgeted at 4 ms; the budget tests
+(`variable_stroke_cpu_budget.rs`, `spiro_cpu_budget.rs`) measure the native release build only. The
+wasm figures were not measured in CI; a regression that only the wasm build shows (no SIMD, a
+slower `f64` path) would go unnoticed.
+
+**Resolution:** run the two budget tests under `wasm-bindgen-test-runner` in the nightly job,
+measuring CPU time there (Node's `process.cpuUsage`), with the wasm limits.
+
+## Stroke to path of a variable width gives line segments (`0110`, 2026-11-10)
+
+The fast variable-width outline (ADR 0053, amendment 2026-11-10) is a polygon on the 0.001 mm grid within 0.01 mm of
+the exact edge, so Stroke to path and SVG export of a varying profile give many corner nodes instead of Bézier pieces.
+A uniform profile still uses the exact stroke outline.
+
+**Resolution:** fit cubics to the outline rings within the same tolerance when a story needs editable converted
+outlines or smaller SVG files.
+
 ## Concurrent moves can orphan clones through containment (`0100`, 2026-11-09)
 
 ADR 0045 §4 refuses a command that would put a clone inside a group its original draws, but two
