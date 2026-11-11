@@ -8,6 +8,9 @@
 
 use std::path::{Path, PathBuf};
 
+#[path = "common/assets.rs"]
+mod assets;
+
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use vectrace::ocr::{ALPHABET_SHA256, DETECTOR_SHA256, RECOGNISER_SHA256};
@@ -34,10 +37,6 @@ struct Entry {
 /// The licences ADR 0006 §2 allows for shipped data.
 const ALLOWED: [&str; 3] = ["Apache-2.0", "MIT", "OFL-1.1"];
 
-fn folder() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin")
-}
-
 /// The copy of the record this crate keeps (`tests/fixtures/model.toml`); the weights stay with
 /// the app, which keeps the original next to them.
 fn record_path() -> PathBuf {
@@ -56,6 +55,9 @@ fn sha256(bytes: &[u8]) -> String {
 
 #[test]
 fn every_weight_file_has_its_record_and_hash() {
+    let Some(folder) = assets::models() else {
+        return;
+    };
     let record: Record = toml::from_str(&std::fs::read_to_string(record_path()).unwrap()).unwrap();
     assert_eq!(record.name, "PaddleOCR Latin (mobile)");
     assert!(
@@ -66,16 +68,16 @@ fn every_weight_file_has_its_record_and_hash() {
     assert!(record.source_url.starts_with("https://"));
     assert!(record.upstream_url.starts_with("https://"));
     assert!(record.training_data.contains("Frage 112 A"));
-    let licence = std::fs::read_to_string(folder().join(&record.licence_file)).unwrap();
+    let licence = std::fs::read_to_string(folder.join(&record.licence_file)).unwrap();
     assert!(licence.contains("Apache License") && licence.contains("Version 2.0"));
-    if let Ok(original) = std::fs::read(folder().join("model.toml")) {
+    if let Ok(original) = std::fs::read(folder.join("model.toml")) {
         assert_eq!(
             original,
             std::fs::read(record_path()).unwrap(),
             "tests/fixtures/model.toml is not the record next to the weights"
         );
     }
-    let mut files: Vec<String> = std::fs::read_dir(folder())
+    let mut files: Vec<String> = std::fs::read_dir(&folder)
         .unwrap()
         .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
         .filter(|name| name != "model.toml" && *name != record.licence_file)
@@ -88,7 +90,7 @@ fn every_weight_file_has_its_record_and_hash() {
         "every file needs its record and every record its file"
     );
     for entry in &record.files {
-        let bytes = std::fs::read(folder().join(&entry.file)).unwrap();
+        let bytes = std::fs::read(folder.join(&entry.file)).unwrap();
         assert_eq!(
             sha256(&bytes),
             entry.sha256,

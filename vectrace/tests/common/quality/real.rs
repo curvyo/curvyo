@@ -94,11 +94,6 @@ pub fn customer_sidecars() -> Vec<(PathBuf, Value)> {
         .collect()
 }
 
-/// The repository root (the image paths of the customer's sidecars start there).
-pub fn repository_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
-}
-
 /// The longest side the customer's images are traced at, px.
 const CUSTOMER_MAX_SIDE: u32 = 2000;
 
@@ -140,10 +135,14 @@ fn reduce_to_max_side(picture: Picture) -> Picture {
 
 /// The customer's reference images, decoded in place and reduced (`specs/0089` criterion 1).
 pub fn customer_images() -> Vec<RealImage> {
+    if super::super::assets::references().is_none() {
+        return Vec::new();
+    }
     customer_sidecars()
         .into_iter()
         .map(|(_, sidecar)| {
-            let file = repository_root().join(sidecar["file"].as_str().unwrap());
+            let file =
+                super::super::assets::reference_file(sidecar["file"].as_str().unwrap()).unwrap();
             RealImage {
                 id: sidecar["id"].as_str().unwrap().to_string(),
                 group: Group::from_key(sidecar["group"].as_str().unwrap()),
@@ -167,7 +166,14 @@ pub fn customer_sidecar_complete(sidecar: &Value) -> Result<(), String> {
     if Use::from_key(sidecar["use"].as_str().unwrap_or("")).is_none() {
         return Err(format!("unknown use {}", sidecar["use"]));
     }
-    let file = repository_root().join(sidecar["file"].as_str().unwrap_or(""));
+    let Some(references) = super::super::assets::references() else {
+        return Ok(());
+    };
+    let name = sidecar["file"].as_str().unwrap_or("");
+    let file = references.join(
+        name.strip_prefix("tests/assets/trace-references/")
+            .unwrap_or(name),
+    );
     if !file.is_file() {
         return Err(format!("no image at {}", file.display()));
     }

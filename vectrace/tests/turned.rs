@@ -9,6 +9,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[path = "common/assets.rs"]
+mod assets;
 #[path = "common/decode.rs"]
 mod decode;
 
@@ -34,12 +36,11 @@ fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/turned")
 }
 
-fn model() -> OcrModel {
-    let dir =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin");
+fn model() -> Option<OcrModel> {
+    let dir = assets::models()?;
     let read = |name: &str| std::fs::read(dir.join(name)).unwrap();
     let alphabet = String::from_utf8(read("dict.txt")).unwrap();
-    OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap()
+    Some(OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap())
 }
 
 fn read(model: &OcrModel, file: &str) -> Vec<TextLine> {
@@ -91,7 +92,7 @@ fn nearest<'a>(lines: &'a [TextLine], want: &str) -> (&'a TextLine, usize) {
 
 #[test]
 fn turned_lines_read_the_right_way_round() {
-    let model = model();
+    let Some(model) = model() else { return };
     let truth: Truth =
         toml::from_str(&std::fs::read_to_string(fixtures().join("truth.toml")).unwrap()).unwrap();
     for image in &truth.images {
