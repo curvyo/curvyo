@@ -179,8 +179,8 @@ pub fn trace_presets_json() -> String {
                 "detail": p.detail,
                 "values": {
                     "smooth": p.smooth,
-                    "tolerance": p.tolerance_px,
-                    "specks": p.specks_mm,
+                    "tolerance": p.tolerance_px.as_px(),
+                    "specks": p.specks_mm.as_mm(),
                     "corners": p.corners,
                     "upscale": p.upscale.index(),
                     "denoise": p.denoise.index(),

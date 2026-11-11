@@ -169,7 +169,7 @@ fn wasm_settings(preset: &Preset, case: &Case) -> Value {
         "threshold": p.threshold,
         "smooth": p.smooth,
         "tolerance": p.tolerance.as_px(),
-        "specks": preset.specks_mm,
+        "specks": preset.specks_mm.as_mm(),
         "corners": p.corners,
         "upscale": p.upscale.index(),
         "denoise": p.denoise.index(),
@@ -457,7 +457,7 @@ fn reference_table() {
                 .and_then(|r| r.get(&case.key))
             {
                 let real = !case.key.contains('@');
-                for miss in misses(&value, old, preset.tolerance_px, real) {
+                for miss in misses(&value, old, preset.tolerance_px.as_px(), real) {
                     accepted.check_miss(
                         &mut regressions,
                         &format!("{} {}", preset.key, case.key),
