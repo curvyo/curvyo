@@ -30,8 +30,6 @@ serde_json.workspace = true
 # The reference set's CC0 and local images are PNG and JPEG (`specs/0089` adrs.md §11, dev only);
 # the same pin and decoders as `curvyo-image-core`, see `tests/common/decode.rs`.
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
-# The quality harness reads Inkscape's baseline SVGs (ADR 0023 §1, dev only).
-curvyo-svg-core = { path = "../curvyo-svg-core", version = "0.1.0" }
 # The counting global allocator of the memory test (criterion 26), dev only: MIT OR Apache-2.0,
 # no dependencies, keeps the `unsafe` of an allocator out of our code.
 cap = { version = "0.1.2", features = ["stats"] }
