@@ -3,9 +3,9 @@
 
 use kurbo::{BezPath, Vec2};
 
-use crate::Rgb8;
 use crate::text_pass::TextPass;
 use crate::wire::{count, read_outlines, write_outline};
+use crate::{Mm, Rgb8};
 
 /// The number that opens the text section (no count is negative).
 pub(crate) const TEXT_MARK: f64 = -1.0;
@@ -32,9 +32,9 @@ pub struct Text {
     pub plausible: bool,
     /// The size of one picture pixel along the line, document millimetres (the fit's tolerance,
     /// criterion 26).
-    pub pixel: f64,
-    /// Where the reader saw each character, mm along the line's unit direction (round 3).
-    pub positions: Vec<f64>,
+    pub pixel: Mm,
+    /// Where the reader saw each character, along the line's unit direction (round 3).
+    pub positions: Vec<Mm>,
     /// The text's fill in a multicolour result: the palette or background colour nearest the
     /// line's text pixels (slice 2, decision 6); `None` in black and white and in the text pass
     /// alone.
@@ -135,11 +135,11 @@ pub(crate) fn read_texts(tail: &[f64]) -> Option<(Texts, usize)> {
         let direction = Vec2::new(next(&mut at)?, next(&mut at)?);
         let masked = count(next(&mut at)?)?;
         let plausible = next(&mut at)? != 0.0;
-        let pixel = next(&mut at)?;
+        let pixel = Mm::from_mm(next(&mut at)?);
         let positions_count = count(next(&mut at)?)?;
         let mut positions = Vec::with_capacity(positions_count.min(tail.len()));
         for _ in 0..positions_count {
-            positions.push(next(&mut at)?);
+            positions.push(Mm::from_mm(next(&mut at)?));
         }
         let outlines = count(next(&mut at)?)?;
         let outlines = read_outlines(tail, &mut at, outlines)?;
