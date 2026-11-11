@@ -1,0 +1,13 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended"
+    ],
+    "packageRules": [
+        {
+            "description": "One weekly PR for all dependency updates; the lead merges it after the gate is green.",
+            "matchPackageNames": ["*"],
+            "groupName": "dependencies"
+        }
+    ]
+}
