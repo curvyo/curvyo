@@ -43,6 +43,7 @@ import { useDevices } from "@/hooks/useDevices";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useFixtures } from "@/hooks/useFixtures";
+import { useFixtureJobs } from "@/hooks/useFixtureJobs";
 import { useOperations } from "@/hooks/useOperations";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
@@ -150,6 +151,8 @@ function Editor() {
   const operations = useOperations(editor);
   // The laser fixtures of the active laser page (`specs/0102-laser-fixtures`).
   const fixtures = useFixtures(editor);
+  // The fixture jobs of the active laser page (`specs/0103-fixture-jobs`).
+  const fixtureJobs = useFixtureJobs(editor);
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).
@@ -421,6 +424,7 @@ function Editor() {
           membership={membership}
           operations={operations}
           fixtures={fixtures}
+          fixtureJobs={fixtureJobs}
         />
       </div>
       <CursorStatus

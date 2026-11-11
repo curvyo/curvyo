@@ -79,8 +79,18 @@ format 3 (ADR 0052 §7).
   `tests/fixture_jobs_budget.rs` in the performance job (fulfils AC 1 to 4, 8, 17, 21, 26).
 - [x] 11. document-core: the slot commands move from `manufacturing_fixture_commands.rs` (611
   lines) to `manufacturing_slot_commands.rs` (behaviour unchanged).
-- [ ] 12. Part D (not this run): the frontend (section, rows, Parts list, summary line, Layers
-  chevron, the drop refusal notice) and its decoder of the shared fixtures.
+- [x] 12. Part D: `frontend/src/lib/fixtureJobsView.ts` (checked decoder), `lib/fixtureJobRows.ts`
+  (labels, keys, arrows, drop, Parts rules, summary line, windowing constants), `hooks/useFixtureJobs.ts`
+  (incl. the work-drop refusal, criterion 10), `components/panel/FixtureJobsSection.tsx` +
+  `FixtureJobRow.tsx` + `FixtureJobParts.tsx` in the Operations tab between the list and the summary;
+  the job damage notice (criterion 22) and the window above 60 jobs. Tests:
+  `tests/fixtureJobsView.test.ts` (reads the Rust fixtures), `fixtureJobRows.test.ts`,
+  `fixtureJobsNotices.test.ts`. Rust: `damaged` and `damage_notices` in the view, `running` and
+  `running_fixtures` documented in ADR 0052 §6 (`adrs.md`), gap tests in
+  `curvyo-editor-wasm/tests/fixture_jobs_gaps_0103.rs` and `curvyo-laser-core/tests/fixture_jobs_limits_0103.rs`.
+  Open: the Layers chevron (the Layers list windows rows by the Rust window, so job rows need a
+  display index in Rust and LayersTab; not built); the summary's count button (no multi-select in
+  the bridge, the line is plain text); the Chromium check (not run).
 
 ## Validation
 
