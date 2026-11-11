@@ -1,14 +1,16 @@
 import { LineSquiggle } from "lucide-react";
 import { useReducer, useRef, type ReactNode } from "react";
 
+import { TraceField } from "@/components/TraceField";
 import { ToggleGroup } from "@/components/ui/toggle-group";
 import type { EditorSession } from "@/hooks/useEditorSession";
-import { PEN_MODES, type PenModeCode, showsSmoothing } from "@/lib/penModes";
+import { PEN_MODES, SMOOTHING_PARAM, type PenModeCode, showsSmoothing } from "@/lib/penModes";
 
-/** A mode glyph in the lucide grid (24 units, 2 px stroke), drawn at 18 px. */
+/** A mode glyph in the lucide grid (24 units, 2 px stroke), drawn at 16 px like the other bars'
+ * icons in their 28 px buttons. */
 function Glyph({ children }: { children: ReactNode }) {
   return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {children}
     </svg>
   );
@@ -64,13 +66,15 @@ const ICONS: Record<PenModeCode, ReactNode> = {
   spiro: <SpiroIcon />,
   bspline: <BSplineIcon />,
   lines: <LinesIcon />,
-  freehand: <LineSquiggle size={18} />,
+  freehand: <LineSquiggle size={16} />,
 };
 
 const OPTIONS = PEN_MODES.map((mode) => ({ ...mode, icon: ICONS[mode.value] }));
 
 /** The Pen bar (`specs/0110` criterion 1): one icon button per mode, Smoothing for Freehand. A
- * refused mode change shows beside the pointer in the refusal look (UX review U8). */
+ * refused mode change shows beside the pointer in the refusal look (UX review U8). The bar, its
+ * 28 px buttons and the Smoothing value field have the look of the other tool bars and of the
+ * Style panel's Opacity (customer 2026-11-11). */
 export function PenModeBar({ editor }: { editor: EditorSession }) {
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   const pressed = useRef<{ x: number; y: number } | null>(null);
@@ -90,7 +94,6 @@ export function PenModeBar({ editor }: { editor: EditorSession }) {
       return;
     }
     if (next === "freehand") current.set_pen_smoothing(smoothing / 100);
-    // A mode change ends the Spiro notice (UX review U1); the session says so on the next frame.
     editor.sync();
     refresh();
   };
@@ -105,7 +108,7 @@ export function PenModeBar({ editor }: { editor: EditorSession }) {
       onKeyDown={() => {
         pressed.current = null;
       }}
-      className="pointer-events-auto flex h-10 min-w-0 shrink-0 items-center gap-3 rounded-lg px-1 text-sm"
+      className="pointer-events-auto flex h-9 min-w-0 shrink-0 items-center gap-3 rounded-lg px-2 text-sm"
       style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
     >
       <ToggleGroup
@@ -113,26 +116,24 @@ export function PenModeBar({ editor }: { editor: EditorSession }) {
         options={OPTIONS}
         value={mode}
         onChange={select}
-        itemWidth={36}
-        itemHeight={32}
+        itemWidth={28}
+        itemHeight={28}
+        bar
         tooltipSide="bottom"
         onReturnFocus={() => editor.containerRef.current?.focus()}
       />
       {showsSmoothing(mode) ? (
-        <label className="flex items-center gap-2 pr-2 text-[var(--toolbar-icon)]">
-          Smoothing
-          <input
-            aria-label="Freehand smoothing"
-            type="range"
-            min="0"
-            max="100"
-            value={smoothing}
-            onChange={(event) => {
-              if (editor.getSession()?.set_pen_smoothing(Number(event.target.value) / 100)) refresh();
-            }}
-          />
-          <span className="w-9 tabular-nums">{smoothing}%</span>
-        </label>
+        <TraceField
+          param={SMOOTHING_PARAM}
+          name="Freehand smoothing"
+          value={smoothing}
+          onValue={(value) => {
+            if (editor.getSession()?.set_pen_smoothing(value / 100)) refresh();
+          }}
+          onEndDrag={() => undefined}
+          onCreate={() => undefined}
+          onReturnFocus={() => editor.containerRef.current?.focus()}
+        />
       ) : null}
     </div>
   );

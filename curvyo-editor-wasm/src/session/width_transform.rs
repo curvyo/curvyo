@@ -14,10 +14,9 @@ pub(super) const NO_OUTLINE_NOTICE: &str = "A variable stroke would have no outl
 
 /// The transform notices of `specs/0110` that are refusals: the host shows them beside the
 /// pointer in the alert look (UX review U8).
-const REFUSALS: [&str; 7] = [
+const REFUSALS: [&str; 6] = [
     UNEVEN_WIDTH_NOTICE,
     NO_OUTLINE_NOTICE,
-    super::spiro_cache::SPIRO_FAILED_NOTICE,
     super::spiro_cache::SPIRO_UNSOLVED_NOTICE,
     super::spiro_cache::CONVERT_REFERENCED_NOTICE,
     super::spiro_cache::CONVERT_SHARED_NOTICE,

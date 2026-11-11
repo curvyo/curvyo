@@ -1192,8 +1192,6 @@ export function useEditorSession(
   const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
   // `showNotice` is stable (a callback without dependencies), so the render loop may keep it.
   const showNoticeRef = useRef(history.showNotice);
-  const dismissNoticeRef = useRef(history.dismissNotice);
-  const spiroNoticeRef = useRef<string | null>(null);
   // Where the maker last pressed anywhere in the window (canvas, panel or bar): a refusal shows
   // beside it (UX review U8).
   const lastWindowPressRef = useRef<{ x: number; y: number } | null>(null);
@@ -1549,19 +1547,11 @@ export function useEditorSession(
         syncFromSessionRef.current();
       }
       session?.render();
-      // The refusals of width editing and the Spiro notice show beside the pointer (UX review
-      // U8); the Spiro notice ends with the path or a mode change (U1).
+      // The refusals of width editing show beside the pointer (UX review U8).
       const unsupportedWidth = session?.take_unsupported_width_notice();
-      if (unsupportedWidth) {
-        spiroNoticeRef.current = unsupportedWidth;
-        showRefusalRef.current(unsupportedWidth);
-      }
+      if (unsupportedWidth) showRefusalRef.current(unsupportedWidth);
       const widthEditNotice = session?.take_width_edit_notice();
       if (widthEditNotice) showRefusalRef.current(widthEditNotice);
-      if (session?.take_spiro_notice_end() && spiroNoticeRef.current !== null) {
-        dismissNoticeRef.current(spiroNoticeRef.current);
-        spiroNoticeRef.current = null;
-      }
       // An image of an opened project whose picture cannot be read, once per open
       // (`specs/0058-bitmap-import` criterion 30).
       const badAsset = session?.take_bad_asset_notice();
@@ -2252,8 +2242,9 @@ export function useEditorSession(
         return;
       }
 
-      // A secondary press with the Pen finishes the path in progress as Enter does and places
-      // nothing (`0072` criterion 19a, customer 2026-10-19).
+      // A secondary press with the Pen finishes the path in progress as Enter does; without one
+      // it does nothing. It never places a node or switches the tool (`0072` criterion 19a,
+      // customer 2026-10-19 and 2026-11-11).
       if (event.button === 2 && session.pen_secondary_press()) {
         event.preventDefault();
         syncFromSession();
@@ -2415,8 +2406,9 @@ export function useEditorSession(
         return;
       }
       if (event.button === 2 && sketchWorkbenchRef.current) return;
-      // The Measure tool ignores the secondary button (customer feedback on PR #243).
-      if (event.button === 2 && session.tool() === "measure") return;
+      // The Measure tool ignores the secondary button (customer feedback on PR #243); the Pen
+      // took its secondary press whole at the press.
+      if (event.button === 2 && (session.tool() === "measure" || session.tool() === "pen")) return;
       const { x, y } = canvasPoint(event);
 
       if (panningRef.current) {

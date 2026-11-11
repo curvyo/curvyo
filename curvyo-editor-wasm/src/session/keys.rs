@@ -484,6 +484,7 @@ impl Session {
             }
             Tool::Node => {
                 self.node_spiro_sources.clear();
+                self.node_spiro_pointer = None;
                 self.spiro_cache.borrow_mut().clear_node_previews();
                 self.node.cancel_drag()
             }
@@ -569,7 +570,6 @@ impl Session {
             return EscapeStep::CancelledDrag;
         }
         if self.tool == Tool::Pen && self.pen.escape() {
-            self.end_spiro_notice();
             // The Pen's step 2 and 3 are one: the unfinished path goes,
             // also during a handle drag.
             return if self.button_down {

@@ -50,8 +50,6 @@ export interface HistoryApi {
     kind?: "status" | "alert",
     at?: { x: number; y: number },
   ) => void;
-  /** Takes the notice `text` off the screen if it is the one shown. */
-  dismissNotice: (text: string) => void;
   /** Re-reads the names of the next undo and redo. Call after any change of the session. */
   refresh: () => void;
   /** Runs an undo or redo from a button; `source` says where the notice shows. */
@@ -141,10 +139,6 @@ export function useHistory(
     },
     [],
   );
-
-  const dismissNotice = useCallback((text: string) => {
-    setNotice((current) => (current?.text === text ? null : current));
-  }, []);
 
   // A notice ends after its time, or when the next one replaces it. The timer clears only its own
   // notice: one that fires after a newer notice was set, before this effect is cleaned up, must
@@ -340,7 +334,6 @@ export function useHistory(
     busy,
     names,
     showNotice,
-    dismissNotice,
     refresh,
     press,
     wipe,

@@ -1,11 +1,11 @@
-//! Memoises the Bézier geometry of Spiro paths by their exact controls, solved synchronously.
+//! Memoises the Bézier geometry of Spiro paths, each solved from its earlier shape so it never
+//! jumps to another solution.
 
-use curvyo_document_core::{CurveKind, Document, NewAnchor, NodeId, PathSnapshot, Tolerance};
+use curvyo_document_core::{
+    AnchorId, CurveKind, Document, NewAnchor, NodeId, PathSnapshot, Tolerance,
+};
+use curvyo_geometry_core::SpiroShape;
 use std::collections::HashMap;
-
-/// The notice when a Spiro curve has no solution and its control polygon is drawn instead.
-pub(super) const SPIRO_FAILED_NOTICE: &str =
-    "This Spiro curve cannot be solved; its points are joined by straight lines.";
 
 /// The refusals of Curve to Bézier on a Spiro: a dependent text or dimension, a shared
 /// document, a changed or invalid path.
@@ -16,48 +16,228 @@ pub(super) const CONVERT_SHARED_NOTICE: &str =
 pub(super) const CONVERT_FAILED_NOTICE: &str =
     "Spiro conversion failed because the path changed or its geometry is invalid.";
 
-/// The refusal of a transformation of a Spiro curve that has no solution.
+/// The refusal of a transformation, width edit or conversion of a Spiro curve without a solution:
+/// one that came in from an older build, since what this build draws and stores always has one
+/// (Proposal, customer 2026-11-11).
 pub(super) const SPIRO_UNSOLVED_NOTICE: &str =
-    "This Spiro curve cannot be solved; move its points with the Node tool first.";
+    "This Spiro curve comes from an older build; move one of its points with the Node tool first.";
 
-/// One solve: the controls it was made for and its anchors, `None` when the solver failed.
-#[derive(Debug)]
+/// One solve: the controls it was made for, their shape and anchors; no shape when the solver
+/// found none (a curve that came in from outside).
+#[derive(Debug, Clone)]
 struct Entry {
     controls: Vec<NewAnchor>,
     closed: bool,
     tolerance: f64,
+    shape: Option<SpiroShape>,
     output: Option<Vec<NewAnchor>>,
 }
 
 impl Entry {
-    fn solve(controls: &[NewAnchor], closed: bool, tolerance: f64) -> Self {
+    fn of_shape(controls: &[NewAnchor], closed: bool, tolerance: f64, shape: SpiroShape) -> Self {
+        let output = curvyo_ui_core::spiro_shape_nodes(
+            controls,
+            closed,
+            &shape,
+            Tolerance::from_mm(tolerance),
+        )
+        .ok();
         Self {
             controls: controls.to_vec(),
             closed,
             tolerance,
-            output: curvyo_ui_core::evaluate_spiro_nodes(
-                controls,
-                closed,
-                Tolerance::from_mm(tolerance),
-            )
-            .ok(),
+            shape: output.is_some().then_some(shape),
+            output,
         }
     }
 
+    /// `controls` solved from `earlier`'s shape (or from nothing), staying near it; `None` when
+    /// the curve has no solution there. Without `fresh` only the earlier shape is followed.
+    fn follow(
+        earlier: Option<&Self>,
+        controls: &[NewAnchor],
+        closed: bool,
+        tolerance: f64,
+        fresh: bool,
+    ) -> Option<Self> {
+        let near = near_of(earlier, controls, closed)?;
+        let shape = curvyo_ui_core::solve_spiro_nodes_near(controls, closed, &near, fresh).ok()?;
+        let entry = Self::of_shape(controls, closed, tolerance, shape);
+        entry.output.is_some().then_some(entry)
+    }
+
+    /// As [`Entry::follow`] for a point that moves: with the same controls as `earlier`, only
+    /// moved, the curve may move at most [`STEADY_FACTOR`] times as far as they did plus
+    /// [`STEADY_SLACK_MM`]; farther is a jump (lead decision 2026-11-11, Proposal).
+    fn follow_steadily(
+        earlier: Option<&Self>,
+        controls: &[NewAnchor],
+        closed: bool,
+        tolerance: f64,
+        fresh: bool,
+    ) -> Option<Self> {
+        let entry = Self::follow(earlier, controls, closed, tolerance, fresh)?;
+        let Some((earlier, before, after)) = earlier.and_then(|earlier| {
+            Some((
+                earlier,
+                earlier.output.as_deref()?,
+                entry.output.as_deref()?,
+            ))
+        }) else {
+            return Some(entry);
+        };
+        if earlier.closed != closed
+            || earlier.controls.len() != controls.len()
+            || earlier
+                .controls
+                .iter()
+                .zip(controls)
+                .any(|(a, b)| a.id != b.id)
+        {
+            return Some(entry);
+        }
+        let moved = earlier
+            .controls
+            .iter()
+            .zip(controls)
+            .map(|(a, b)| a.point.vector_to(b.point).length())
+            .fold(0.0, f64::max);
+        let allowed = STEADY_FACTOR * moved + STEADY_SLACK_MM;
+        // Anchors that pair up and stay within the allowance bound the move at once (the usual
+        // case); otherwise the move is measured against the other curve's chords.
+        let paired = before.len() == after.len()
+            && before
+                .iter()
+                .zip(after)
+                .all(|(a, b)| a.point.vector_to(b.point).length() <= allowed);
+        (paired || (reach(before, after) <= allowed && reach(after, before) <= allowed))
+            .then_some(entry)
+    }
+
+    /// `controls` solved from scratch, for a stored curve without an earlier shape.
+    fn fresh(controls: &[NewAnchor], closed: bool, tolerance: f64) -> Self {
+        match curvyo_ui_core::solve_spiro_nodes(controls, closed) {
+            Ok(shape) => Self::of_shape(controls, closed, tolerance, shape),
+            Err(_) => Self {
+                controls: controls.to_vec(),
+                closed,
+                tolerance,
+                shape: None,
+                output: None,
+            },
+        }
+    }
+
+    /// The same shape drawn to `tolerance`.
+    fn at_tolerance(&self, tolerance: f64) -> Self {
+        match &self.shape {
+            Some(shape) => Self::of_shape(&self.controls, self.closed, tolerance, shape.clone()),
+            None => self.clone(),
+        }
+    }
+
+    fn same_controls(&self, controls: &[NewAnchor], closed: bool) -> bool {
+        self.controls == controls && self.closed == closed
+    }
+
     fn serves(&self, controls: &[NewAnchor], closed: bool, tolerance: f64) -> bool {
-        self.controls == controls && self.closed == closed && self.tolerance <= tolerance
+        self.same_controls(controls, closed) && self.tolerance <= tolerance
     }
 }
 
+/// How many times as far as its controls moved a followed curve may move.
+const STEADY_FACTOR: f64 = 4.0;
+/// How far (mm) a followed curve may move beyond [`STEADY_FACTOR`] times its controls' move.
+const STEADY_SLACK_MM: f64 = 2.0;
+
+/// The farthest any anchor of `from` lies from the polyline through the anchors of `to`.
+fn reach(from: &[NewAnchor], to: &[NewAnchor]) -> f64 {
+    from.iter()
+        .map(|anchor| {
+            let p = anchor.point;
+            to.windows(2)
+                .map(|pair| distance_to_chord(p, pair[0].point, pair[1].point))
+                .fold(
+                    to.first()
+                        .map_or(f64::INFINITY, |q| q.point.vector_to(p).length()),
+                    f64::min,
+                )
+        })
+        .fold(0.0, f64::max)
+}
+
+fn distance_to_chord(
+    p: curvyo_document_core::Point,
+    a: curvyo_document_core::Point,
+    b: curvyo_document_core::Point,
+) -> f64 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let length = dx * dx + dy * dy;
+    let t = if length > 0.0 {
+        (((p.x - a.x) * dx + (p.y - a.y) * dy) / length).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (p.x - (a.x + t * dx)).hypot(p.y - (a.y + t * dy))
+}
+
+/// The earlier coefficients of each segment of `controls`, matched by the ids of its two end
+/// controls; `None` for a segment `earlier` does not have. `None` when `controls` cannot form a
+/// curve.
+fn near_of(
+    earlier: Option<&Entry>,
+    controls: &[NewAnchor],
+    closed: bool,
+) -> Option<Vec<Option<[f64; 4]>>> {
+    let segments = if closed {
+        controls.len()
+    } else {
+        controls.len().checked_sub(1)?
+    };
+    if segments == 0 || (closed && controls.len() < 3) {
+        return None;
+    }
+    let known: HashMap<(AnchorId, AnchorId), [f64; 4]> = earlier
+        .and_then(|entry| entry.shape.as_ref().map(|shape| (entry, shape)))
+        .map(|(entry, shape)| {
+            let count = entry.controls.len();
+            shape
+                .segments()
+                .iter()
+                .enumerate()
+                .map(|(i, k)| {
+                    (
+                        (entry.controls[i].id, entry.controls[(i + 1) % count].id),
+                        *k,
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(
+        (0..segments)
+            .map(|i| {
+                known
+                    .get(&(controls[i].id, controls[(i + 1) % controls.len()].id))
+                    .copied()
+            })
+            .collect(),
+    )
+}
+
 /// The last solve of each Spiro path, of the Pen's path in progress and of each path in a Node
-/// drag; a solve runs only when its controls change.
+/// drag. A solve runs only when its controls change, starts from the earlier shape, and is taken
+/// only when it stays near it; otherwise the earlier one is kept (customer 2026-11-11).
 #[derive(Debug, Default)]
 pub(super) struct SpiroCache {
     entries: HashMap<NodeId, Entry>,
     preview: Option<Entry>,
+    /// The Pen's latest refused controls, so a frame does not solve them again.
+    refused: Option<(Vec<NewAnchor>, bool)>,
+    /// The Pen's last preview, kept after its path ended: the shape a just drawn path starts
+    /// from.
+    retired: Option<Entry>,
     node_previews: HashMap<NodeId, Entry>,
-    /// A solve failed since the last [`SpiroCache::take_new_failure`].
-    new_failure: bool,
 }
 
 fn source_tolerance(path: &PathSnapshot, tolerance: f64) -> f64 {
@@ -81,8 +261,8 @@ fn placed_result(path: &PathSnapshot, anchors: &[NewAnchor]) -> PathSnapshot {
     result.mapped(placement)
 }
 
-/// The anchors of `entry`, or its controls joined by straight lines when the solve failed, so a
-/// curve that cannot be solved stays visible and editable.
+/// The anchors of `entry`; a curve without solution (one that came in from outside) as its
+/// controls joined by straight lines, so it stays visible and editable (Proposal).
 fn drawn(entry: &Entry) -> Vec<NewAnchor> {
     entry.output.clone().unwrap_or_else(|| {
         entry
@@ -93,51 +273,117 @@ fn drawn(entry: &Entry) -> Vec<NewAnchor> {
     })
 }
 
-/// Whether `controls` of an open curve have no solution at the Pen's tolerance.
-pub(super) fn unsolvable(controls: &[NewAnchor]) -> bool {
-    Entry::solve(controls, false, curvyo_ui_core::SPIRO_TOLERANCE.as_mm())
-        .output
-        .is_none()
-}
-
 impl SpiroCache {
-    /// Solves `controls` and notes a failure for the canvas notice.
-    fn solve(&mut self, controls: &[NewAnchor], closed: bool, tolerance: f64) -> Entry {
-        let entry = Entry::solve(controls, closed, tolerance);
-        self.new_failure |= entry.output.is_none();
-        entry
-    }
-
-    /// Whether a solve failed since the last call: the canvas says so once per failing edit.
-    pub fn take_new_failure(&mut self) -> bool {
-        std::mem::take(&mut self.new_failure)
-    }
-
-    /// Whether the Pen's path in progress is drawn as straight lines: its last solve failed.
-    pub fn preview_failed(&self) -> bool {
-        self.preview
-            .as_ref()
-            .is_some_and(|entry| entry.output.is_none())
-    }
-
-    /// The Pen's path in progress through `controls`, solved now when they changed.
-    pub fn preview(&mut self, controls: &[NewAnchor], closed: bool) -> Option<Vec<NewAnchor>> {
+    /// The Pen's path in progress through `controls`: their curve, or, when they have no
+    /// solution near the last one shown, the last one shown. Returns the curve and the controls
+    /// it goes through; `None` before there is a curve.
+    pub fn preview(
+        &mut self,
+        controls: &[NewAnchor],
+        closed: bool,
+    ) -> Option<(Vec<NewAnchor>, Vec<NewAnchor>)> {
         if controls.len() < if closed { 3 } else { 2 } {
-            self.clear_preview();
             return None;
         }
+        self.try_preview(controls, closed, true);
+        let entry = self.preview.as_ref()?;
+        Some((drawn(entry), entry.controls.clone()))
+    }
+
+    /// Takes `controls` as the Pen's path in progress when they solve near the last preview;
+    /// returns whether they did. A refusal keeps the last preview. Without `fresh` only the last
+    /// preview's shape is followed (a step of a held point's search).
+    pub fn try_preview(&mut self, controls: &[NewAnchor], closed: bool, fresh: bool) -> bool {
         let tolerance = curvyo_ui_core::SPIRO_TOLERANCE.as_mm();
-        if !self
+        if self
             .preview
             .as_ref()
             .is_some_and(|entry| entry.serves(controls, closed, tolerance))
         {
-            self.preview = Some(self.solve(controls, closed, tolerance));
+            return true;
         }
-        self.preview.as_ref().map(drawn)
+        if self
+            .refused
+            .as_ref()
+            .is_some_and(|(refused, was_closed)| refused == controls && *was_closed == closed)
+        {
+            return false;
+        }
+        if let Some(entry) =
+            Entry::follow_steadily(self.preview.as_ref(), controls, closed, tolerance, fresh)
+        {
+            self.preview = Some(entry);
+            self.refused = None;
+            true
+        } else {
+            self.refused = Some((controls.to_vec(), closed));
+            false
+        }
     }
 
-    /// `path` as a Node drag shows it: its live controls solved, under its placement.
+    /// Takes `controls` as the Pen's path in progress for a click: solved near the last preview
+    /// when they can be, else from nothing, since every click places a control (lead decision
+    /// 2026-11-11, Proposal). Returns whether they have a curve at all.
+    pub fn place_preview(&mut self, controls: &[NewAnchor], closed: bool) -> bool {
+        self.refused = None;
+        if self.try_preview(controls, closed, true) {
+            return true;
+        }
+        let entry = Entry::fresh(controls, closed, curvyo_ui_core::SPIRO_TOLERANCE.as_mm());
+        if entry.output.is_none() {
+            return false;
+        }
+        self.preview = Some(entry);
+        self.refused = None;
+        true
+    }
+
+    /// Remembers `controls` as refused for the Pen, so a frame does not solve them again.
+    pub fn refuse_preview(&mut self, controls: &[NewAnchor], closed: bool) {
+        self.refused = Some((controls.to_vec(), closed));
+    }
+
+    /// The controls of the Pen's last accepted preview.
+    pub fn preview_controls(&self) -> Option<&[NewAnchor]> {
+        self.preview.as_ref().map(|entry| entry.controls.as_slice())
+    }
+
+    /// Takes `path`'s live controls in a Node drag when they solve near the last ones taken (at
+    /// first, the stored curve's); returns whether they did. A refusal keeps the last ones.
+    /// Without `fresh` only the last shape is followed (a step of a held drag's search).
+    pub fn try_node(&mut self, document: &Document, path: &PathSnapshot, fresh: bool) -> bool {
+        let tolerance = source_tolerance(path, curvyo_ui_core::SPIRO_TOLERANCE.as_mm());
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return false;
+        }
+        if self
+            .node_previews
+            .get(&path.id)
+            .is_some_and(|entry| entry.serves(&path.anchors, path.closed, tolerance))
+        {
+            return true;
+        }
+        if !self.node_previews.contains_key(&path.id) {
+            let Some(source) = document.path(path.id) else {
+                return false;
+            };
+            let Some(start) = self.solved(document, &source, tolerance).cloned() else {
+                return false;
+            };
+            self.node_previews.insert(path.id, start);
+        }
+        let earlier = self.node_previews.get(&path.id);
+        match Entry::follow_steadily(earlier, &path.anchors, path.closed, tolerance, fresh) {
+            Some(entry) => {
+                self.node_previews.insert(path.id, entry);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// `path` as a Node drag shows it: the live controls the drag last took, solved, under its
+    /// placement.
     pub fn node_preview(
         &mut self,
         document: &Document,
@@ -147,20 +393,14 @@ impl SpiroCache {
         if source.curve_kind != CurveKind::Spiro || source.is_compound() {
             return None;
         }
-        let tolerance = source_tolerance(path, curvyo_ui_core::SPIRO_TOLERANCE.as_mm());
-        if !tolerance.is_finite() || tolerance <= 0.0 {
-            return None;
-        }
-        if !self
-            .node_previews
-            .get(&path.id)
-            .is_some_and(|entry| entry.serves(&path.anchors, path.closed, tolerance))
-        {
-            let entry = self.solve(&path.anchors, path.closed, tolerance);
-            self.node_previews.insert(path.id, entry);
-        }
+        self.try_node(document, path, true);
         let entry = self.node_previews.get(&path.id)?;
         Some(placed_result(path, &drawn(entry)))
+    }
+
+    /// The drag ended with its last taken controls written: they are the stored curves' shapes.
+    pub fn commit_node_previews(&mut self) {
+        self.entries.extend(self.node_previews.drain());
     }
 
     pub fn clear_node_previews(&mut self) {
@@ -168,7 +408,10 @@ impl SpiroCache {
     }
 
     pub fn clear_preview(&mut self) {
-        self.preview = None;
+        if let Some(entry) = self.preview.take() {
+            self.retired = Some(entry);
+        }
+        self.refused = None;
     }
 
     /// `path` evaluated to `tolerance` in document mm; `None` when it is not a Spiro path or the
@@ -202,8 +445,9 @@ impl SpiroCache {
         Some(placed_result(path, &drawn(entry)))
     }
 
-    /// The solve of `path`'s controls, made now when the memo does not serve it; `None` for a
-    /// path that is not a plain Spiro of the document.
+    /// The solve of `path`'s controls, made now when the memo does not serve it: from the
+    /// path's earlier shape (an edit, an undo), or the Pen's preview it was drawn from, or from
+    /// scratch; `None` for a path that is not a plain Spiro of the document.
     fn solved(
         &mut self,
         document: &Document,
@@ -222,194 +466,27 @@ impl SpiroCache {
         {
             return None;
         }
-        if !self
+        let served = self
             .entries
             .get(&path.id)
-            .is_some_and(|entry| entry.serves(&path.anchors, path.closed, tolerance))
-        {
-            let entry = self.solve(&path.anchors, path.closed, tolerance);
+            .is_some_and(|entry| entry.serves(&path.anchors, path.closed, tolerance));
+        if !served {
+            let entry = match self.entries.get(&path.id) {
+                Some(earlier) if earlier.same_controls(&path.anchors, path.closed) => {
+                    earlier.at_tolerance(tolerance)
+                }
+                earlier => match earlier.or(self.preview.as_ref()).or(self.retired.as_ref()) {
+                    // A path just drawn keeps the very shape the Pen showed.
+                    Some(shown) if shown.same_controls(&path.anchors, path.closed) => {
+                        shown.at_tolerance(tolerance)
+                    }
+                    earlier => Entry::follow(earlier, &path.anchors, path.closed, tolerance, true)
+                        .unwrap_or_else(|| Entry::fresh(&path.anchors, path.closed, tolerance)),
+                },
+            };
             self.entries.insert(path.id, entry);
         }
-        let entry = self.entries.get(&path.id)?;
-        Some(entry)
-    }
-}
-
-impl super::Session {
-    /// Whether one selected path can be offered for Spiro-to-Bézier conversion.
-    #[must_use]
-    pub fn can_convert_selected_spiro_to_bezier(&self) -> bool {
-        let [id] = self.selection.ids() else {
-            return false;
-        };
-        self.document
-            .path(*id)
-            .is_some_and(|path| path.curve_kind == CurveKind::Spiro)
-            && self.selected_group_leaves().is_empty()
-    }
-
-    /// Converts one selected Spiro path into the Bézier path it draws.
-    pub fn convert_selected_spiro_to_bezier(&mut self) -> bool {
-        self.recording(|this| {
-            let [id] = this.selection.ids() else {
-                return false;
-            };
-            let Some(source) = this.document.path(*id) else {
-                return false;
-            };
-            if source.curve_kind != CurveKind::Spiro || !this.selected_group_leaves().is_empty() {
-                return false;
-            }
-            let Some(mut evaluated) =
-                this.spiro_cache
-                    .borrow_mut()
-                    .ready(&this.document, &source, 0.01)
-            else {
-                this.transform_notice = Some(SPIRO_FAILED_NOTICE);
-                return false;
-            };
-            for anchor in &mut evaluated.anchors {
-                anchor.id = this.minter.mint();
-            }
-            match this
-                .document
-                .convert_spiro_to_bezier(&source, &evaluated.anchors)
-            {
-                Ok(()) => true,
-                Err(error) => {
-                    this.transform_notice = Some(match error {
-                        curvyo_document_core::CurveKindError::Referenced => {
-                            CONVERT_REFERENCED_NOTICE
-                        }
-                        curvyo_document_core::CurveKindError::Shared => CONVERT_SHARED_NOTICE,
-                        _ => CONVERT_FAILED_NOTICE,
-                    });
-                    false
-                }
-            }
-        })
-    }
-}
-
-impl super::Session {
-    /// `objects` with each Spiro path and each clone of one replaced by the Bézier path it
-    /// draws, for hit tests, bounds and transforms; a Spiro without solution stays as it is.
-    pub(super) fn spiro_selection_objects(
-        &self,
-        objects: &[curvyo_document_core::ObjectSnapshot],
-    ) -> Vec<curvyo_document_core::ObjectSnapshot> {
-        use curvyo_document_core::ObjectSnapshot;
-        objects
-            .iter()
-            .map(|object| match object {
-                ObjectSnapshot::Path(path) if path.curve_kind == CurveKind::Spiro => {
-                    let mut cache = self.spiro_cache.borrow_mut();
-                    let result = cache.ready(&self.document, path, 0.01);
-                    result.map_or_else(|| object.clone(), ObjectSnapshot::Path)
-                }
-                ObjectSnapshot::Clone(clone)
-                    if clone.chain.root_outline.curve_kind == CurveKind::Spiro =>
-                {
-                    let matrix = clone.chain.composed;
-                    let stretch = matrix
-                        .a
-                        .hypot(matrix.b)
-                        .hypot(matrix.c.hypot(matrix.d))
-                        .max(1.0);
-                    if let Some(root) = self.spiro_cache.borrow_mut().ready(
-                        &self.document,
-                        &clone.chain.root_outline,
-                        0.01 / stretch,
-                    ) {
-                        let mut clone = clone.clone();
-                        let mut mapped = root.mapped(matrix);
-                        mapped.id = clone.resolved.id;
-                        mapped.style = clone.resolved.style.clone();
-                        mapped.rotation = clone.resolved.rotation;
-                        clone.resolved = Box::new(mapped);
-                        clone.chain.root_outline = std::sync::Arc::new(root);
-                        ObjectSnapshot::Clone(clone)
-                    } else {
-                        object.clone()
-                    }
-                }
-                _ => object.clone(),
-            })
-            .collect()
-    }
-    /// `objects` as a press or hover picks them: as [`Session::spiro_selection_objects`], and a
-    /// Spiro without solution as its control polygon, so it can be clicked and selected. A
-    /// transform of it is still refused on release.
-    pub(super) fn spiro_pick_objects(
-        &self,
-        objects: &[curvyo_document_core::ObjectSnapshot],
-    ) -> Vec<curvyo_document_core::ObjectSnapshot> {
-        use curvyo_document_core::ObjectSnapshot;
-        self.spiro_selection_objects(objects)
-            .into_iter()
-            .map(|object| match object {
-                ObjectSnapshot::Path(path) if path.curve_kind == CurveKind::Spiro => self
-                    .spiro_cache
-                    .borrow_mut()
-                    .lookup(&self.document, &path)
-                    .map_or(ObjectSnapshot::Path(path), ObjectSnapshot::Path),
-                other => other,
-            })
-            .collect()
-    }
-
-    pub(super) fn spiro_placement_objects(
-        &self,
-        objects: &[curvyo_document_core::ObjectSnapshot],
-        tolerance: f64,
-    ) -> Vec<curvyo_document_core::ObjectSnapshot> {
-        use curvyo_document_core::ObjectSnapshot;
-        objects
-            .iter()
-            .map(|object| match object {
-                ObjectSnapshot::Path(path) if path.curve_kind == CurveKind::Spiro => self
-                    .spiro_cache
-                    .borrow_mut()
-                    .lookup_with_tolerance(&self.document, path, tolerance)
-                    .map_or_else(|| object.clone(), ObjectSnapshot::Path),
-                ObjectSnapshot::Clone(clone)
-                    if clone.chain.root_outline.curve_kind == CurveKind::Spiro =>
-                {
-                    let matrix = clone.chain.composed;
-                    let stretch = matrix
-                        .a
-                        .hypot(matrix.b)
-                        .hypot(matrix.c.hypot(matrix.d))
-                        .max(1.0);
-                    if let Some(root) = self.spiro_cache.borrow_mut().lookup_with_tolerance(
-                        &self.document,
-                        &clone.chain.root_outline,
-                        tolerance / stretch,
-                    ) {
-                        let mut clone = clone.clone();
-                        let mut mapped = root.mapped(matrix);
-                        mapped.id = clone.resolved.id;
-                        mapped.style = clone.resolved.style.clone();
-                        mapped.rotation = clone.resolved.rotation;
-                        *clone.resolved = mapped;
-                        clone.chain.root_outline = std::sync::Arc::new(root);
-                        ObjectSnapshot::Clone(clone)
-                    } else {
-                        object.clone()
-                    }
-                }
-                _ => object.clone(),
-            })
-            .collect()
-    }
-
-    pub(super) fn selection_contains_spiro(&self) -> bool {
-        self.transform_selection_ids().iter().any(|id| {
-            self.document
-                .object(*id)
-                .and_then(|object| object.drawn_path().map(|path| path.curve_kind))
-                .is_some_and(|kind| kind == CurveKind::Spiro)
-        })
+        self.entries.get(&path.id)
     }
 }
 
@@ -434,10 +511,56 @@ mod tests {
     fn a_preview_is_solved_at_once_and_kept_while_its_controls_stay() {
         let mut cache = SpiroCache::default();
         let controls = smooth(&[(0.0, 0.0), (10.0, 5.0), (20.0, 0.0)]);
-        let first = cache.preview(&controls, false).unwrap();
+        let (first, through) = cache.preview(&controls, false).unwrap();
         assert!(first.len() > controls.len(), "the curve, not the controls");
-        assert_eq!(cache.preview(&controls, false).unwrap(), first);
+        assert_eq!(through, controls);
+        assert_eq!(cache.preview(&controls, false).unwrap().0, first);
         assert!(cache.preview(&controls[..1], false).is_none());
+    }
+
+    /// Customer 2026-11-11: near a fold the curve moves far more than its point and past it the
+    /// only solution is on another branch; the preview keeps the last curve and the controls it goes through, and takes the next near one again.
+    #[test]
+    fn a_preview_without_a_near_solution_keeps_the_last_curve() {
+        let mut cache = SpiroCache::default();
+        let mut controls = smooth(&[(0.0, 0.0), (20.0, 10.0), (40.0, 0.0), (60.0, 10.0)]);
+        cache.preview(&controls, false).unwrap();
+        for step in 1..=8 {
+            controls[2].point = Point::new(40.0, -f64::from(step));
+            assert!(cache.try_preview(&controls, false, true), "step {step}");
+        }
+        let (curve, _) = cache.preview(&controls, false).unwrap();
+        let kept = controls.clone();
+        controls[2].point = Point::new(40.0, -10.0);
+        assert!(!cache.try_preview(&controls, false, true));
+        let (held, through) = cache.preview(&controls, false).unwrap();
+        assert_eq!(held, curve);
+        assert_eq!(through, kept);
+        controls[2].point = Point::new(40.0, -7.5);
+        let (next, through) = cache.preview(&controls, false).unwrap();
+        assert_ne!(next, curve);
+        assert_eq!(through, controls);
+    }
+
+    /// A drawn path starts from the Pen's preview: its stored curve is the one the Pen showed,
+    /// not another solution a fresh solve might find.
+    #[test]
+    fn a_drawn_path_keeps_the_shape_the_pen_showed() {
+        let document = Document::new(1);
+        let mut cache = SpiroCache::default();
+        let mut controls = smooth(&[(0.0, 0.0), (20.0, 10.0), (40.0, 0.0), (60.0, 10.0)]);
+        cache.preview(&controls, false).unwrap();
+        for step in 1..=8 {
+            controls[2].point = Point::new(40.0, -f64::from(step));
+            assert!(cache.try_preview(&controls, false, true));
+        }
+        let (shown, _) = cache.preview(&controls, false).unwrap();
+        let id = document
+            .create_editable_curve(&controls, false, CurveKind::Spiro)
+            .unwrap();
+        cache.clear_preview();
+        let path = document.path(id).unwrap();
+        assert_eq!(cache.lookup(&document, &path).unwrap().anchors, shown);
     }
 
     #[test]

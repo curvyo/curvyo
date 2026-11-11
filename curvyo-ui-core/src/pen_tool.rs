@@ -512,28 +512,6 @@ impl PenTool {
         Some(path_id)
     }
 
-    /// Commits a new path in progress as straight lines through its nodes, whatever the mode:
-    /// what a Spiro without solution shows (`specs/0110-pen-modes-variable-stroke`, UX review
-    /// of 2026-11-10). `None`, changing nothing, for a continuation or fewer than two nodes.
-    pub fn finish_straight(&mut self, document: &Document) -> Option<NodeId> {
-        let State::Placing {
-            nodes, base: None, ..
-        } = &self.state
-        else {
-            return None;
-        };
-        if nodes.len() < 2 {
-            return None;
-        }
-        let corners: Vec<_> = nodes
-            .iter()
-            .map(|node| NewAnchor::corner(node.id, node.point))
-            .collect();
-        let id = document.create_path(&corners, false);
-        self.state = State::Idle;
-        Some(id)
-    }
-
     /// Acceptance criterion 4: discards the entire in-progress path, including a continuation's
     /// new nodes (the continued path is untouched, `0034` criterion 25), writing nothing — not an
     /// undo (`specs/0002-path-node-editing/adrs.md`: "AC4's Escape is not an undo and must not be

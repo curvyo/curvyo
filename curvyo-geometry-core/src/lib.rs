@@ -75,7 +75,10 @@ pub use segment::{
     BentHandles, Subdivision, bend_segment_handles, nearest_point_on_segment, segment_bounds,
     subdivide_at_parameter,
 };
-pub use spiro::{SpiroControl, SpiroCubic, SpiroError, evaluate_spiro};
+pub use spiro::{
+    SPIRO_MAX_NEW_SWEEP, SPIRO_MAX_TURN_CHANGE, SpiroControl, SpiroCubic, SpiroError, SpiroShape,
+    evaluate_spiro, solve_spiro, solve_spiro_near, spiro_cubics,
+};
 pub use stack_regions::StackError;
 pub use stroke_outline::{StrokeOutlineError, StrokeShape, stroke_outline};
 pub use variable_stroke::{VariableStrokeError, variable_stroke_outline};

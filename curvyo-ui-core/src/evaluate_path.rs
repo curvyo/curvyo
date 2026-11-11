@@ -5,7 +5,8 @@ use curvyo_document_core::{
     Tolerance, Vec2,
 };
 use curvyo_geometry_core::{
-    SpiroControl, SpiroError, SplineControl, SplineError, evaluate_bspline, evaluate_spiro,
+    SpiroControl, SpiroError, SpiroShape, SplineControl, SplineError, evaluate_bspline,
+    solve_spiro, solve_spiro_near, spiro_cubics,
 };
 
 /// How far a drawn Spiro may stray from its exact curve, in document mm.
@@ -85,11 +86,17 @@ pub fn evaluate_path(path: &PathSnapshot) -> Result<PathSnapshot, EvaluatePathEr
 /// The largest factor by which `matrix` lengthens a vector, at least 1.
 #[must_use]
 pub fn stretch(matrix: Affine) -> f64 {
-    matrix
-        .a
-        .hypot(matrix.b)
-        .hypot(matrix.c.hypot(matrix.d))
-        .max(1.0)
+    // The largest singular value of the linear part: sqrt((s + sqrt(s^2 - 4 det^2)) / 2) with s
+    // the sum of the squared entries.
+    let sum = matrix.a.mul_add(
+        matrix.a,
+        matrix
+            .b
+            .mul_add(matrix.b, matrix.c.mul_add(matrix.c, matrix.d * matrix.d)),
+    );
+    let det = matrix.a.mul_add(matrix.d, -(matrix.b * matrix.c));
+    let root = (4.0 * det).mul_add(-det, sum * sum).max(0.0).sqrt();
+    f64::midpoint(sum, root).sqrt().max(1.0)
 }
 
 /// Evaluates Spiro controls (a corner node breaks the curve) into Bézier anchors.
@@ -101,14 +108,56 @@ pub fn evaluate_spiro_nodes(
     closed: bool,
     tolerance: Tolerance,
 ) -> Result<Vec<NewAnchor>, SpiroError> {
-    let controls: Vec<SpiroControl> = nodes
+    let shape = solve_spiro(&spiro_controls(nodes), closed)?;
+    spiro_shape_nodes(nodes, closed, &shape, tolerance)
+}
+
+/// The Spiro controls of `nodes`: a corner node breaks the curve's smoothness.
+fn spiro_controls(nodes: &[NewAnchor]) -> Vec<SpiroControl> {
+    nodes
         .iter()
         .map(|anchor| SpiroControl {
             point: anchor.point,
             corner: anchor.kind == AnchorKind::Corner,
         })
-        .collect();
-    let spans = evaluate_spiro(&controls, closed, tolerance)?;
+        .collect()
+}
+
+/// Solves Spiro controls from scratch, for a curve without an earlier shape.
+///
+/// # Errors
+/// Returns an error for invalid controls or when the solver finds no curve.
+pub fn solve_spiro_nodes(nodes: &[NewAnchor], closed: bool) -> Result<SpiroShape, SpiroError> {
+    solve_spiro(&spiro_controls(nodes), closed)
+}
+
+/// Solves Spiro controls that moved from an earlier solved shape, which the answer must stay
+/// near ([`curvyo_geometry_core::solve_spiro_near`], which says what `fresh` does); `near` holds
+/// one entry per segment.
+///
+/// # Errors
+/// [`SpiroError::Far`] when the only solution is far from the earlier shape; the solver's
+/// errors otherwise.
+pub fn solve_spiro_nodes_near(
+    nodes: &[NewAnchor],
+    closed: bool,
+    near: &[Option<[f64; 4]>],
+    fresh: bool,
+) -> Result<SpiroShape, SpiroError> {
+    solve_spiro_near(&spiro_controls(nodes), closed, near, fresh)
+}
+
+/// The Bézier anchors of a solved Spiro shape through `nodes`.
+///
+/// # Errors
+/// Returns an error when `shape` does not fit `nodes` or cannot be approximated.
+pub fn spiro_shape_nodes(
+    nodes: &[NewAnchor],
+    closed: bool,
+    shape: &SpiroShape,
+    tolerance: Tolerance,
+) -> Result<Vec<NewAnchor>, SpiroError> {
+    let spans = spiro_cubics(&spiro_controls(nodes), closed, shape, tolerance)?;
     let cubics: Vec<[Point; 4]> = spans
         .iter()
         .map(|span| [span.start, span.control1, span.control2, span.end])
@@ -162,4 +211,27 @@ fn anchors_of(spans: &[[Point; 4]], closed: bool) -> Vec<NewAnchor> {
         anchors.push(anchor);
     }
     anchors
+}
+
+#[cfg(test)]
+mod stretch_tests {
+    use super::stretch;
+    use curvyo_document_core::Affine;
+
+    /// The largest lengthening, not the Frobenius norm: the identity and a rotation lengthen
+    /// nothing, a scale by its larger factor, a shear by its largest singular value.
+    #[test]
+    fn stretch_is_the_largest_lengthening() {
+        assert!((stretch(Affine::IDENTITY) - 1.0).abs() < 1e-12);
+        let (sin, cos) = 0.6_f64.sin_cos();
+        assert!((stretch(Affine::new(cos, sin, -sin, cos, 5.0, 7.0)) - 1.0).abs() < 1e-12);
+        assert!((stretch(Affine::scale(3.0, 0.5)) - 3.0).abs() < 1e-12);
+        assert!(
+            (stretch(Affine::scale(0.2, 0.5)) - 1.0).abs() < 1e-12,
+            "at least 1"
+        );
+        // [[1, 1], [0, 1]]: singular values (sqrt(5) +- 1) / 2.
+        let shear = Affine::new(1.0, 0.0, 1.0, 1.0, 0.0, 0.0);
+        assert!((stretch(shear) - f64::midpoint(5.0_f64.sqrt(), 1.0)).abs() < 1e-12);
+    }
 }
