@@ -5,7 +5,7 @@
     ],
     "packageRules": [
         {
-            "description": "One weekly PR for all dependency updates; the lead merges it after the gate is green.",
+            "description": "One PR for all dependency updates, kept up to date daily; the lead merges it after the gate is green.",
             "matchPackageNames": ["*"],
             "groupName": "dependencies"
         }
