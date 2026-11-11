@@ -3,11 +3,14 @@
     "extends": [
         "config:recommended"
     ],
+    "dependencyDashboard": true,
+    "prConcurrentLimit": 5,
+    "prHourlyLimit": 5,
     "packageRules": [
         {
-            "description": "One PR for all dependency updates, kept up to date daily; the lead merges it after the gate is green.",
-            "matchPackageNames": ["*"],
-            "groupName": "dependencies"
+            "description": "The Import button's GTK file chooser uses the gtk version Tauri links; gtk 0.19 conflicts with it (links = gtk-3). Moves with Tauri.",
+            "matchPackageNames": ["gtk"],
+            "enabled": false
         }
     ]
 }
