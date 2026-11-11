@@ -6,6 +6,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
+#[path = "common/assets.rs"]
+mod assets;
 #[path = "common/decode.rs"]
 mod decode;
 
@@ -17,12 +19,11 @@ fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
-fn model() -> OcrModel {
-    let dir =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin");
+fn model() -> Option<OcrModel> {
+    let dir = assets::models()?;
     let read = |name: &str| std::fs::read(dir.join(name)).unwrap();
     let alphabet = String::from_utf8(read("dict.txt")).unwrap();
-    OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap()
+    Some(OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap())
 }
 
 const FILES: [&str; 3] = [
@@ -50,7 +51,8 @@ fn reads(model: &OcrModel) -> Vec<(String, String, f32)> {
 
 #[test]
 fn padding_keeps_every_read_string() {
-    let now = reads(&model());
+    let Some(model) = model() else { return };
+    let now = reads(&model);
     let path = fixtures().join("reads_1024.txt");
     if std::env::var_os("CURVYO_BLESS").is_some() {
         let mut text = String::new();

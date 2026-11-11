@@ -4,6 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::cast_precision_loss)]
 
+#[path = "common/assets.rs"]
+mod assets;
 #[path = "common/decode.rs"]
 mod decode;
 
@@ -24,18 +26,15 @@ struct Image {
     rotation_degrees: Option<f32>,
 }
 
-fn models() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin")
-}
-
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
-fn model() -> OcrModel {
-    let read = |name: &str| std::fs::read(models().join(name)).unwrap();
+fn model() -> Option<OcrModel> {
+    let dir = assets::models()?;
+    let read = |name: &str| std::fs::read(dir.join(name)).unwrap();
     let alphabet = String::from_utf8(read("dict.txt")).unwrap();
-    OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap()
+    Some(OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap())
 }
 
 fn read(model: &OcrModel, file: &str) -> Vec<TextLine> {
@@ -49,7 +48,7 @@ fn read(model: &OcrModel, file: &str) -> Vec<TextLine> {
 
 #[test]
 fn the_reference_set_reads_exactly() {
-    let model = model();
+    let Some(model) = model() else { return };
     let truth: Truth =
         toml::from_str(&std::fs::read_to_string(fixtures().join("truth.toml")).unwrap()).unwrap();
     for image in &truth.images {
@@ -81,7 +80,8 @@ fn the_reference_set_reads_exactly() {
 /// Criterion 2: every umlaut and ß of the clean poster is read where the source has it.
 #[test]
 fn umlauts_are_read() {
-    let lines = read(&model(), "poster.png");
+    let Some(model) = model() else { return };
+    let lines = read(&model, "poster.png");
     let all: String = lines
         .iter()
         .map(|l| l.text.as_str())
@@ -95,7 +95,7 @@ fn umlauts_are_read() {
 /// Criterion 13: the same image twice gives the same lines.
 #[test]
 fn a_read_is_deterministic() {
-    let model = model();
+    let Some(model) = model() else { return };
     assert_eq!(read(&model, "rotated.png"), read(&model, "rotated.png"));
 }
 
@@ -109,7 +109,7 @@ fn a_read_is_deterministic() {
 #[test]
 #[ignore = "harness: prints the numbers of the PR"]
 fn detection_and_recognition_times() {
-    let model = model();
+    let Some(model) = model() else { return };
     for file in [
         "poster.png",
         "tester/poster.png",

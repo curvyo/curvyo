@@ -343,6 +343,10 @@ jobs:
 
       - name: cargo nextest
         shell: bash
+        env:
+          # vectrace tests skip when their weights or reference images are missing; here they are
+          # in the checkout, so a missing file must fail (tools/vectrace-export).
+          VECTRACE_REQUIRE_ASSETS: "1"
         run: cargo nextest run --workspace ${{ matrix.os != 'ubuntu-latest' && '--exclude curvyo-sync-server' || '' }} --status-level fail --no-fail-fast
 
   # Discovers the crates core-wasm32 below runs against, instead of a

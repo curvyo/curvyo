@@ -11,6 +11,8 @@
     clippy::cast_precision_loss
 )]
 
+#[path = "common/assets.rs"]
+mod assets;
 #[path = "common/decode.rs"]
 mod decode;
 
@@ -33,26 +35,23 @@ struct Image {
     foreign: Option<String>,
 }
 
-fn models() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin")
-}
-
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tester")
 }
 
-fn files() -> (Vec<u8>, Vec<u8>, String) {
-    let read = |name: &str| std::fs::read(models().join(name)).unwrap();
-    (
+fn files() -> Option<(Vec<u8>, Vec<u8>, String)> {
+    let dir = assets::models()?;
+    let read = |name: &str| std::fs::read(dir.join(name)).unwrap();
+    Some((
         read("det.onnx"),
         read("rec.onnx"),
         String::from_utf8(read("dict.txt")).unwrap(),
-    )
+    ))
 }
 
-fn model() -> OcrModel {
-    let (det, rec, dict) = files();
-    OcrModel::load(&det, &rec, &dict).unwrap()
+fn model() -> Option<OcrModel> {
+    let (det, rec, dict) = files()?;
+    Some(OcrModel::load(&det, &rec, &dict).unwrap())
 }
 
 fn truth() -> Truth {
@@ -82,7 +81,7 @@ fn angle(line: &TextLine) -> f32 {
 /// line in the foreign face (criterion 4) is at least found.
 #[test]
 fn tester_poster_lines_read_exactly_with_umlauts_and_sharp_s() {
-    let model = model();
+    let Some(model) = model() else { return };
     let image = truth().images.into_iter().next().unwrap();
     let lines = read(&model, &image.file);
     let got: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
@@ -115,7 +114,7 @@ fn tester_poster_lines_read_exactly_with_umlauts_and_sharp_s() {
 /// Criterion 2: every umlaut and ß of the source is in the read text at its place.
 #[test]
 fn tester_poster_umlauts_and_sharp_s_per_character() {
-    let model = model();
+    let Some(model) = model() else { return };
     let image = truth().images.into_iter().next().unwrap();
     let lines = read(&model, &image.file);
     let mut checked = 0;
@@ -145,7 +144,7 @@ fn tester_poster_umlauts_and_sharp_s_per_character() {
 /// within 1 degree.
 #[test]
 fn rotated_lines_keep_their_rotation_within_one_degree() {
-    let model = model();
+    let Some(model) = model() else { return };
     for image in truth()
         .images
         .into_iter()
@@ -168,7 +167,7 @@ fn rotated_lines_keep_their_rotation_within_one_degree() {
 /// 15 degrees; vertical text is out of scope); reported, not asserted beyond "no crash".
 #[test]
 fn a_line_turned_ninety_degrees_is_reported() {
-    let model = model();
+    let Some(model) = model() else { return };
     let lines = read(&model, "rotated_90.png");
     eprintln!(
         "rotated_90: {:?}",
@@ -182,16 +181,16 @@ fn a_line_turned_ninety_degrees_is_reported() {
 /// Criterion 18 at the reader: a picture with no text gives no line.
 #[test]
 fn a_plain_shape_gives_no_line() {
-    let model = model();
+    let Some(model) = model() else { return };
     assert_eq!(read(&model, "plain.png"), Vec::new());
 }
 
 /// Criterion 13 at the reader: the same picture twice gives the same lines, bit for bit.
 #[test]
 fn tester_poster_reads_the_same_twice() {
-    let model = model();
+    let Some(model) = model() else { return };
     assert_eq!(read(&model, "poster.png"), read(&model, "poster.png"));
-    let other = self::model();
+    let other = self::model().unwrap();
     assert_eq!(
         read(&model, "rotated_30.png"),
         read(&other, "rotated_30.png")
@@ -202,7 +201,7 @@ fn tester_poster_reads_the_same_twice() {
 /// are read, both end with `Cancelled`; the model reads normally afterwards.
 #[test]
 fn a_stop_during_the_read_is_cancelled_and_leaves_the_model_usable() {
-    let model = model();
+    let Some(model) = model() else { return };
     let image = raster("poster.png");
     let mut stop_first = |_: OcrProgress| ControlFlow::Break(());
     assert_eq!(
@@ -242,7 +241,7 @@ fn a_stop_during_the_read_is_cancelled_and_leaves_the_model_usable() {
 /// backwards, ending at `total of total`.
 #[test]
 fn progress_counts_lines_up_and_ends_full() {
-    let model = model();
+    let Some(model) = model() else { return };
     let image = raster("poster.png");
     let mut seen = Vec::new();
     let lines = read_lines(&model, image.width, image.height, &image.pixels, &mut |p| {
@@ -270,7 +269,9 @@ fn progress_counts_lines_up_and_ends_full() {
 /// detector and recogniser are refused too.
 #[test]
 fn a_changed_or_swapped_weight_file_is_refused() {
-    let (det, rec, dict) = files();
+    let Some((det, rec, dict)) = files() else {
+        return;
+    };
     let mut changed = det.clone();
     let last = changed.len() - 1;
     changed[last] ^= 1;
@@ -298,7 +299,7 @@ fn a_changed_or_swapped_weight_file_is_refused() {
 /// Errors are `Invalid`, never a panic; tiny rasters give no line.
 #[test]
 fn degenerate_rasters_are_invalid_or_empty_never_a_panic() {
-    let model = model();
+    let Some(model) = model() else { return };
     assert!(matches!(
         read_lines(&model, 0, 0, &[], &mut go),
         Err(OcrError::Invalid(_))
@@ -334,7 +335,7 @@ fn degenerate_rasters_are_invalid_or_empty_never_a_panic() {
 #[test]
 #[ignore = "timing, release only"]
 fn ocr_time_of_the_tester_poster() {
-    let model = model();
+    let Some(model) = model() else { return };
     let image = raster("poster.png");
     let _ = read_lines(&model, image.width, image.height, &image.pixels, &mut go).unwrap();
     let cpu = || {
@@ -388,7 +389,7 @@ fn read_in_shares(model: &OcrModel, image: &decode::WorkingImage, workers: usize
 /// the full detection finds is lost.
 #[test]
 fn c28_pool_shares_read_the_same_lines_as_one_read() {
-    let model = model();
+    let Some(model) = model() else { return };
     for (name, image) in [
         ("poster", raster("poster.png")),
         ("screenshot", screenshot()),
@@ -418,7 +419,7 @@ fn c28_detection_and_recognition_times() {
         let ticks: u64 = fields[11].parse::<u64>().unwrap() + fields[12].parse::<u64>().unwrap();
         ticks as f64 / 100.0
     };
-    let model = model();
+    let Some(model) = model() else { return };
     for (name, image) in [
         ("poster", raster("poster.png")),
         ("screenshot", screenshot()),

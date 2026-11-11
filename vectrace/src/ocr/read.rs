@@ -369,17 +369,20 @@ fn decode(
 mod decode;
 
 #[cfg(test)]
+#[path = "../../tests/common/assets.rs"]
+mod assets;
+
+#[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use super::*;
 
-    fn model() -> OcrModel {
-        let dir =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public/models/paddleocr-latin");
+    fn model() -> Option<OcrModel> {
+        let dir = assets::models()?;
         let read = |name: &str| std::fs::read(dir.join(name)).unwrap();
         let alphabet = String::from_utf8(read("dict.txt")).unwrap();
-        OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap()
+        Some(OcrModel::load(&read("det.onnx"), &read("rec.onnx"), &alphabet).unwrap())
     }
 
     /// The crops of the fixture `file`.
@@ -418,7 +421,7 @@ mod tests {
     /// the padded line with its quad grown by the padding.
     #[test]
     fn the_padding_is_read_only_turned() {
-        let model = model();
+        let Some(model) = model() else { return };
         for crop in crops(&model, "poster.png") {
             let inner = crop.inner();
             assert_eq!(inner.rgb.len(), crop.width * LINE_HEIGHT * 3);
@@ -442,7 +445,7 @@ mod tests {
     /// no line is read a second time; the upside-down poster reads every line twice.
     #[test]
     fn only_unsure_or_steep_lines_are_read_twice() {
-        let model = model();
+        let Some(model) = model() else { return };
         for (file, twice) in [
             ("poster.png", 0),
             ("poster_noisy.jpg", 0),
