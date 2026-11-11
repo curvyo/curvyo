@@ -62,7 +62,8 @@ pub(crate) fn is_manufacturing_node(tree: &LoroTree, id: TreeID) -> bool {
 }
 
 /// Whether `id` is a manufacturing, one of its placements, fixtures or operations (its direct
-/// children) or a slot of one of its fixtures: no drawing command reads or writes such a node.
+/// children) or a slot or fixture job of one of its fixtures: no drawing command reads or writes
+/// such a node.
 pub(crate) fn in_manufacturing_subtree(tree: &LoroTree, id: TreeID) -> bool {
     let parent = |node: TreeID| match tree.parent(node) {
         Some(loro::TreeParentId::Node(parent)) => Some(parent),
@@ -240,7 +241,7 @@ pub(crate) fn owner_text(id: TreeID) -> String {
 
 /// The open-file check of ADR 0033 §7: every manufacturing names a process and a page, holds only
 /// placement, fixture, operation and orphan slot nodes with readable node registers, a fixture
-/// holds only slot leaves (ADR 0049 §3), and every page owner of a live page names a live
+/// holds only slot and job leaves (ADR 0049 §3, ADR 0052 §5), and every page owner of a live page names a live
 /// manufacturing (or a removed node, whose page is not shown).
 pub(crate) fn validate(loro: &LoroDoc) -> bool {
     let tree = loro.get_tree(OBJECTS_TREE);
@@ -308,13 +309,16 @@ fn child_is_valid(tree: &LoroTree, id: TreeID) -> bool {
     }
 }
 
-/// A child of a fixture: a slot node with readable node registers and no children; its values
-/// read per field.
+/// A child of a fixture: a slot or job node with readable node registers and no children; its
+/// values read per field, and a job of an unknown kind is kept (ADR 0052 §5).
 fn slot_is_valid(tree: &LoroTree, id: TreeID) -> bool {
     tree.children_num(id).unwrap_or(0) == 0
         && tree.get_meta(id).is_ok_and(|meta| {
             crate::node_registers::registers_are_valid(&meta, false)
-                && string(&meta, KEY_SHAPE).as_deref() == Some(SHAPE_FIXTURE_SLOT)
+                && matches!(
+                    string(&meta, KEY_SHAPE).as_deref(),
+                    Some(SHAPE_FIXTURE_SLOT | crate::fixture_job_codec::SHAPE_FIXTURE_JOB)
+                )
         })
 }
 

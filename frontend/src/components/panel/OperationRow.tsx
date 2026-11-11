@@ -93,13 +93,13 @@ export function OperationRowView(props: RowProps) {
       aria-selected={props.open}
       {...{ [ARM_ZONE]: `op:${key}` }}
       style={{ height: props.height }}
-      className={`relative flex flex-col overflow-hidden rounded px-1 ${armed ? "bg-[var(--destructive-soft)]" : ""} ${props.dropping ? "bg-[var(--value-fill)] outline outline-[1.5px] -outline-offset-[1.5px] outline-[var(--editor-accent)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
+      className={`relative flex flex-col overflow-hidden rounded px-1 has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""} ${props.dropping ? "bg-[var(--value-fill)] outline outline-[1.5px] -outline-offset-[1.5px] outline-[var(--editor-accent)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
     >
       {props.insertion ? (
         <div
           aria-hidden
           data-insertion={props.insertion}
-          className="pointer-events-none absolute left-0 right-0 h-[2px] bg-[var(--accent)]"
+          className="pointer-events-none absolute left-0 right-0 h-[2px] bg-[var(--editor-accent)]"
           style={props.insertion === "top" ? { top: 0 } : { bottom: 0 }}
         />
       ) : null}

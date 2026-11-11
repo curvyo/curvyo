@@ -522,6 +522,7 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test move_versus_edit_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test operations_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test fixtures_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test fixture_jobs_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture

@@ -48,7 +48,7 @@ fn rect(o: Point, (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> [Point; 4] {
 }
 
 /// The band and inner edge of the tape on `edge` of a `w` by `h` work area at `o`.
-fn band(edge: TapeEdge, o: Point, w: f64, h: f64) -> ([Point; 4], (Point, Point)) {
+pub(super) fn band(edge: TapeEdge, o: Point, w: f64, h: f64) -> ([Point; 4], (Point, Point)) {
     let b = BAND_MM;
     let (corners, inner) = match edge {
         TapeEdge::Bottom => (rect(o, (0.0, h - b), (w, h)), ((0.0, h - b), (w, h - b))),
@@ -65,6 +65,7 @@ impl Session {
     pub(super) fn fixture_look(&self, fixtures: &PageFixtures) -> FixtureLook {
         let mut look = FixtureLook::default();
         let page = &fixtures.page;
+        let engraved = self.engraved_boards(fixtures);
         for fixture in fixtures.fixtures.iter().filter(|f| f.shown()) {
             let fixture = self
                 .fixture_live_edit(fixture.id)
@@ -77,6 +78,7 @@ impl Session {
                 Shape::Board { width, height } => look.boards.push(BoardLook {
                     corners,
                     slots: board_slots(&fixture, *width, *height),
+                    engraved: engraved.contains(&fixture.id),
                 }),
                 Shape::Clamp { .. } => look.clamps.push(corners),
                 Shape::Stop {
@@ -159,10 +161,14 @@ impl Session {
             .filter_map(|fixtures| {
                 let index = pages.iter().position(|p| p.id == fixtures.page.id)?;
                 let look = self.fixture_look(fixtures);
-                Some((
-                    index,
-                    curvyo_render_core::build_fixture_look(&look, view, self.device_pixel_ratio),
-                ))
+                let mut list =
+                    curvyo_render_core::build_fixture_look(&look, view, self.device_pixel_ratio);
+                // The looks of the fixture jobs' parts lie over the fixtures (`0103` criterion
+                // 18); the layer keeps the first fragment, so they go first.
+                let mut jobs = self.fixture_job_triangles(fixtures);
+                jobs.append(&mut list.triangles);
+                list.triangles = jobs;
+                Some((index, list))
             })
             .collect()
     }

@@ -403,10 +403,11 @@ fn ac28_30_a_format_1_record_reads_as_the_empty_set() {
 
 #[test]
 fn ac30_any_write_writes_format_2_with_a_fixtures_array_even_when_empty() {
+    // Superseded by `0103` (ADR 0052 §7): any write is record format 3.
     let p = record(&format1()).unwrap();
     let text = write_record(&p);
     let back: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(back["format_version"], 2, "a write upgrades format 1");
+    assert_eq!(back["format_version"], 3, "a write upgrades format 1");
     assert_eq!(
         back["fixtures"],
         json!([]),
@@ -511,7 +512,8 @@ fn ac30_201_slots_in_the_set_are_over_the_limit() {
 #[test]
 fn ac30_a_newer_record_format_is_skipped() {
     let mut v = format2_with(json!([]));
-    v["format_version"] = json!(3);
+    // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
+    v["format_version"] = json!(4);
     assert!(record(&v).is_err());
 }
 
@@ -527,7 +529,8 @@ fn ac30_a_fixtures_key_in_a_format_1_record_is_an_unknown_key_and_damages_it() {
 
 #[test]
 fn ac30_the_record_text_limit_is_64_kib() {
-    assert_eq!(MAX_RECORD_BYTES, 64 * 1024);
+    // Raised to 128 KiB by `0103` (ADR 0052 §7).
+    assert_eq!(MAX_RECORD_BYTES, 128 * 1024);
 }
 
 #[test]

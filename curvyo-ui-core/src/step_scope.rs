@@ -92,6 +92,17 @@ pub const FREE_STEPS: &[&str] = &[
     "add_slot",
     "remove_slot",
     "set_slot",
+    // `specs/0103-fixture-jobs` adrs.md section 7: job commands write only fixture job nodes.
+    "add_fixture_job",
+    "rename_fixture_job",
+    "delete_fixture_job",
+    "set_fixture_job_show_on",
+    "set_fixture_job_show_off",
+    "set_fixture_job_output_on",
+    "set_fixture_job_output_off",
+    "move_fixture_job",
+    "assign_fixture_target",
+    "remove_fixture_target",
     // `specs/0101-laser-operations`: operations write only the manufacturing's operation nodes,
     // never the selected objects, so an assignment of a read-only inner object is allowed.
     "add_operation",

@@ -205,7 +205,7 @@ impl Session {
     }
 
     /// Whether the output page's leaves are drawn by their looks (criterion 18).
-    fn operations_view_on(&self) -> bool {
+    pub(in crate::session) fn operations_view_on(&self) -> bool {
         self.operations.view_mode == OperationsViewMode::Operations
     }
 

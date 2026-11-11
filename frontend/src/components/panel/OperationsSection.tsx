@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
@@ -28,6 +28,7 @@ import {
   type OperationsView,
 } from "@/lib/operationsView";
 import { visibleRange } from "@/lib/operationWindow";
+import { summaryWithFixtures } from "@/lib/fixtureJobRows";
 
 /** The list's scroll area: 300 px high; the rows outside it (and the overscan) are not drawn. */
 const VIEWPORT = 300;
@@ -38,6 +39,10 @@ interface OperationsSectionProps {
   /** Items selected on the canvas: the ticks show in the rows while it is above 0. */
   selectionCount: number;
   onReturnFocus: () => void;
+  /** The Fixture jobs section (`specs/0103-fixture-jobs`), drawn between the list and the summary. */
+  fixtureJobs?: ReactNode;
+  /** How many fixture jobs run: the summary's fixture line (criterion 17). */
+  fixtureRunning?: number;
 }
 
 /** The index of a key in the view's rows, `-1` for a row that is gone. */
@@ -72,7 +77,7 @@ function entryOfRow(entries: ListEntry[]): number[] {
 /** The names of the two section groups (`ux-notes.md` 4.3). */
 const SECTION_NAMES = { marking: "Marking", cutting: "Cutting" } as const;
 
-export function OperationsSection({ api, selectionCount, onReturnFocus }: OperationsSectionProps) {
+export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0 }: OperationsSectionProps) {
   const { view, notice, dropKey, dropBadge } = api;
   const [openKey, setOpenKey] = useState<string | null>(null);
   /** The row whose name is being edited in place (criterion 3): one at a time. */
@@ -317,7 +322,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus }: Operat
     if (id) setOpenKey(operationIdKey(id));
   };
 
-  const lines = summaryLines(view);
+  const lines = summaryWithFixtures(summaryLines(view), fixtureRunning);
   const openRow = openIndex >= 0 ? view.rows[openIndex] : null;
   return (
     <section aria-label="Operations" className="flex flex-col gap-2">
@@ -413,6 +418,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus }: Operat
         </div>
       )}
       <CloneMembers members={view.cloneMembers} view={view} openRow={openRow} api={api} />
+      {fixtureJobs}
       <section aria-label="Operations summary" className="flex flex-col text-xs tabular-nums text-[var(--toolbar-icon)]">
         <div role="status" aria-atomic="true" className="flex flex-col">
           {lines.map((line) =>

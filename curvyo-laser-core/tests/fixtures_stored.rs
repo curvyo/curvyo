@@ -1,8 +1,8 @@
-//! The document goldens of format 40 read through the laser's typed reader (`specs/0102` criteria
+//! The document goldens of formats 40 and 41 read through the laser's typed reader (`specs/0102` criteria
 //! 32 to 34): the damaged golden counts its text-in-a-number and skips its slot without a shape;
 //! the unknown kind reads as Unknown; the `0093` grid keeps its lines.
 
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::assert_is_empty)]
 
 use curvyo_document_core::{FixtureSnapshot, Length, OriginCorner, unpack};
 use curvyo_laser_core::{FixtureKind, grid_spec, params_damage, read_slot};
@@ -58,4 +58,65 @@ fn the_format_39_grid_keeps_its_spacing_over_the_0090_corner() {
     assert_eq!(spec.spacing, Length::from_mm(10.0));
     assert_eq!(spec.corner, OriginCorner::BottomRight);
     assert!(spec.tapes.bottom && spec.tapes.top && spec.tapes.left && spec.tapes.right);
+}
+
+/// The `0103` goldens of format 41 read through the run rule (criteria 13, 17, 20 to 22).
+fn job_reads(
+    fixtures: &[FixtureSnapshot],
+) -> Vec<(curvyo_laser_core::operations::FixtureJobRead, usize)> {
+    use curvyo_laser_core::operations::{FixtureJobRead, KindRead};
+    fixtures
+        .iter()
+        .flat_map(|fixture| {
+            let kind = FixtureKind::from_stored(&fixture.kind);
+            fixture.jobs.iter().map(move |job| {
+                let ticked = job.targets.iter().filter(|t| t.ticked).map(|t| &t.target);
+                let (parts, damaged) =
+                    curvyo_laser_core::job_parts(kind, fixture.slots.len(), ticked);
+                let read = FixtureJobRead {
+                    kind: KindRead::of(job.kind.as_deref()),
+                    output: job.output,
+                    fixture_active: fixture.active,
+                    parts,
+                };
+                (read, damaged)
+            })
+        })
+        .collect()
+}
+
+#[test]
+fn the_fixture_jobs_golden_runs_one_job_with_its_board_and_two_slots() {
+    use curvyo_laser_core::FixturePart;
+    use curvyo_laser_core::operations::fixture_block;
+    let reads = job_reads(&fixtures("fixture_jobs_v41.curvyo"));
+    let jobs: Vec<_> = reads.iter().map(|(read, _)| read.clone()).collect();
+    assert_eq!(
+        fixture_block(&jobs, true),
+        [0],
+        "Output off and inactive do not run"
+    );
+    assert_eq!(
+        jobs[0].parts,
+        [
+            FixturePart::Board,
+            FixturePart::Slot(0),
+            FixturePart::Slot(2)
+        ]
+    );
+    assert_eq!(jobs[1].parts, [FixturePart::GridLines]);
+    assert!(reads.iter().all(|(_, damaged)| *damaged == 0));
+}
+
+#[test]
+fn the_unknown_and_damaged_goldens_run_nothing_and_count_the_bad_suffix() {
+    use curvyo_laser_core::operations::fixture_block;
+    let unknown = job_reads(&fixtures("fixture_jobs_unknown_kind_v41.curvyo"));
+    let jobs: Vec<_> = unknown.iter().map(|(read, _)| read.clone()).collect();
+    assert!(fixture_block(&jobs, true).is_empty());
+    let read = fixtures("fixture_jobs_damaged_v41.curvyo");
+    let damaged = job_reads(&read);
+    assert_eq!(damaged[0].1, 1, "the tapes of a holder");
+    assert_eq!(read[0].damaged + damaged[0].1, 4, "the four damaged values");
+    assert!(!damaged[0].0.runs(), "a text Output reads off");
 }

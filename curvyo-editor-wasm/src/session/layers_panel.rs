@@ -248,6 +248,10 @@ impl Session {
             .map(|(offset, row)| {
                 let mut json = row_json(row, first + offset);
                 json["homeLine"] = Value::from(home_lines[offset].clone());
+                // A fixture with jobs gets the chevron and its job rows (`specs/0103` UX J15).
+                if row.fixture.is_some() {
+                    json["fixture"]["jobs"] = json!(self.fixture_layer_jobs(row.id));
+                }
                 // The trace group's tooltip repeats the success notice (`0025` criteria 30, 68).
                 json["traced"] = self
                     .traced_counts(row.id)

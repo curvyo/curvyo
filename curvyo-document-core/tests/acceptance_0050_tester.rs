@@ -734,6 +734,8 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             // `0102-laser-fixtures` (format 40) is a later build: its goldens hold fixtures
             // with their eye and names.
             || name.starts_with("fixtures_")
+            // `0103-fixture-jobs` (format 41) is a later build: its goldens hold fixtures too.
+            || name.starts_with("fixture_jobs_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

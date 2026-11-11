@@ -948,7 +948,8 @@ fn ac19_delete_of_a_placed_page_removes_the_reference_only() {
 #[test]
 fn ac21_format_stays_38_and_a_session_with_context_state_writes_nothing_new() {
     // `specs/0101-laser-operations` bumps to 39 (ADR 0046 §4); `0106` itself writes nothing new.
-    assert_eq!(CURRENT_FORMAT_VERSION, 40);
+    // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 41);
     let mut f = fixture();
     let before = doc(&f.s).read_objects().objects.len();
     select_by_clicks(&mut f.s, &[f.ra, f.rb]);

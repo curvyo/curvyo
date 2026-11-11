@@ -1,19 +1,22 @@
-//! The commands that write a manufacturing's fixtures and their slots (ADR 0049, `specs/0102`
-//! criteria 2 to 5, 14, 15, 18 to 20, 23 and 37 to 39), each one history step with its own label.
+//! The commands that write a manufacturing's fixtures (ADR 0049, `specs/0102` criteria 2 to 5,
+//! 14, 15, 18, 23 and 37 to 39), each one history step with its own label; the slots' commands
+//! are in `manufacturing_slot_commands`.
 
 use loro::{LoroMap, TreeID, TreeParentId};
 
 use crate::affine::Affine;
 use crate::document::{Document, OBJECTS_TREE};
+use crate::fixture_job::insert_job;
+use crate::fixture_job_codec::FixturePartKey;
 use crate::group_tree::node_id;
 use crate::manufacturing::{FixtureParams, ManufacturingError, next_numbered};
 use crate::manufacturing_codec::{
-    KEY_FIXTURE_ACTIVE, KEY_FIXTURE_PARAMS, KEY_SLOT_PARAMS, SHAPE_FIXTURE, SHAPE_FIXTURE_SLOT,
-    is_manufacturing_node, string, write_plain_map,
+    KEY_FIXTURE_ACTIVE, KEY_FIXTURE_PARAMS, KEY_SLOT_PARAMS, SHAPE_FIXTURE, is_manufacturing_node,
+    string, write_plain_map,
 };
 use crate::manufacturing_fixtures::{
-    FixtureRecord, MAX_SLOTS_PER_FIXTURE, SlotRecord, fixture_name, read_active, read_whole_map,
-    write_fixture_registers, write_matrix, write_slot_registers, write_visible,
+    FixtureRecord, fixture_name, read_active, read_whole_map, write_fixture_registers,
+    write_matrix, write_visible,
 };
 use crate::node_registers::{KEY_NAME, read_registers};
 use crate::path_codec::node_exists;
@@ -51,14 +54,6 @@ pub const SET_GRID_MAJOR_COMMIT_LABEL: &str = "set_grid_major";
 pub const SET_TAPE_EDGE_COMMIT_LABEL: &str = "set_tape_edge";
 /// The label of the grid's Origin X or Y field.
 pub const SET_GRID_ORIGIN_COMMIT_LABEL: &str = "set_grid_origin";
-/// The label of a slot's rename.
-pub const RENAME_SLOT_COMMIT_LABEL: &str = "rename_slot";
-/// The label of a slot's Shape switch.
-pub const SET_SLOT_SHAPE_COMMIT_LABEL: &str = "set_slot_shape";
-/// The label of a slot's Centre X or Y.
-pub const SET_SLOT_POSITION_COMMIT_LABEL: &str = "set_slot_position";
-/// The label of a slot's width, height or diameter.
-pub const SET_SLOT_SIZE_COMMIT_LABEL: &str = "set_slot_size";
 /// The label of a fixture's move.
 pub const MOVE_FIXTURE_COMMIT_LABEL: &str = "move_fixture";
 /// The label of a fixture's turn.
@@ -66,12 +61,6 @@ pub const ROTATE_FIXTURE_COMMIT_LABEL: &str = "rotate_fixture";
 /// The label of a fixture's resize by a handle or a chip: its sizes, its matrix and its slots'
 /// centres in one step.
 pub const RESIZE_FIXTURE_COMMIT_LABEL: &str = "resize_fixture";
-/// The label of Add slot.
-pub const ADD_SLOT_COMMIT_LABEL: &str = "add_slot";
-/// The label of a slot's removal.
-pub const REMOVE_SLOT_COMMIT_LABEL: &str = "remove_slot";
-/// The label of a slot field edit.
-pub const SET_SLOT_COMMIT_LABEL: &str = "set_slot";
 
 /// Which Add button made the fixture: the history name is fixed per label (ADR 0049 §9).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -190,6 +179,7 @@ impl Document {
             params: with_thread_within_head(new.params).into_owned(),
             matrix: new.matrix,
             slots: Vec::new(),
+            jobs: Vec::new(),
         };
         let node = self.insert_fixture(tree_id_of(manufacturing), &record)?;
         self.commit_with_label(new.add.label());
@@ -352,15 +342,6 @@ impl Document {
         Ok(true)
     }
 
-    /// The fixture node that holds the slot `id`.
-    fn slot_holder(&self, id: NodeId) -> Option<NodeId> {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        match tree.parent(tree_id_of(id)) {
-            Some(TreeParentId::Node(parent)) => Some(node_id(parent)),
-            _ => None,
-        }
-    }
-
     /// Moves or turns the fixture `id`: its `fixture_matrix` register alone, so a move never races
     /// a size edit (criterion 14, ADR 0049 §2). `Ok(false)` when the matrix is unchanged.
     ///
@@ -389,89 +370,6 @@ impl Document {
         Ok(true)
     }
 
-    /// Adds a slot "`label` N" with `params` at the end of the fixture `fixture` (criterion 19).
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchFixture`] when `fixture` is not a live fixture;
-    /// [`ManufacturingError::TooManySlots`] when it holds 50 slots already.
-    pub fn add_slot(
-        &self,
-        fixture: NodeId,
-        label: &str,
-        params: &FixtureParams,
-    ) -> Result<NodeId, ManufacturingError> {
-        self.fixture_meta(fixture)?;
-        let slots = self.fixture(fixture).map(|f| f.slots).unwrap_or_default();
-        if slots.len() >= MAX_SLOTS_PER_FIXTURE {
-            return Err(ManufacturingError::TooManySlots);
-        }
-        let taken: Vec<String> = slots.into_iter().map(|slot| slot.name).collect();
-        let record = SlotRecord {
-            name: next_numbered(label, &taken, false),
-            params: params.clone(),
-        };
-        let node = self.insert_slot(tree_id_of(fixture), &record)?;
-        self.commit_with_label(ADD_SLOT_COMMIT_LABEL);
-        Ok(node_id(node))
-    }
-
-    /// Removes the slot `id` in one step.
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchSlot`] when `id` is not a live slot of a fixture.
-    pub fn remove_slot(&self, id: NodeId) -> Result<(), ManufacturingError> {
-        self.slot_meta(id)?;
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        tree.delete(tree_id_of(id))
-            .map_err(|_| ManufacturingError::NoSuchSlot)?;
-        crate::groups::remove_emptied_groups(&tree, &[None]);
-        self.commit_with_label(REMOVE_SLOT_COMMIT_LABEL);
-        Ok(())
-    }
-
-    /// Writes the slot's name (cleaned, cut to 40 characters; an empty one keeps the old) and its
-    /// `slot_params` whole in one step. `Ok(false)` when both are unchanged.
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchSlot`] when `id` is not a live slot of a fixture.
-    pub fn set_slot(
-        &self,
-        id: NodeId,
-        name: &str,
-        params: &FixtureParams,
-    ) -> Result<bool, ManufacturingError> {
-        self.set_slot_labelled(id, name, params, SET_SLOT_COMMIT_LABEL)
-    }
-
-    /// [`Document::set_slot`] as the step `label`: one label per slot field (`rename_slot`,
-    /// `set_slot_shape`, `set_slot_position`, `set_slot_size`; `specs/0102` adrs.md §4).
-    ///
-    /// # Errors
-    /// [`ManufacturingError::NoSuchSlot`] when `id` is not a live slot of a fixture.
-    pub fn set_slot_labelled(
-        &self,
-        id: NodeId,
-        name: &str,
-        params: &FixtureParams,
-        label: &str,
-    ) -> Result<bool, ManufacturingError> {
-        let meta = self.slot_meta(id)?;
-        let name = fixture_name(name).filter(|n| read_registers(&meta).name.as_ref() != Some(n));
-        let same_params = read_whole_map(&meta, KEY_SLOT_PARAMS).as_ref() == Some(params);
-        if name.is_none() && same_params {
-            return Ok(false);
-        }
-        if let Some(name) = name {
-            meta.insert(KEY_NAME, name.as_str())
-                .map_err(|_| ManufacturingError::NoSuchSlot)?;
-        }
-        if !same_params {
-            write_plain_map(&meta, KEY_SLOT_PARAMS, params);
-        }
-        self.commit_with_label(label);
-        Ok(true)
-    }
-
     /// Replaces, uncommitted, every fixture of the manufacturing `manufacturing` by one new node
     /// per record, in order, with fresh ids: the fixture part of Pick and Reset from profile
     /// (ADR 0050 §4). Orphan slots are left as they are.
@@ -495,7 +393,8 @@ impl Document {
         Ok(())
     }
 
-    /// Creates, uncommitted, a fixture node from `record` with its slots at the end of `parent`.
+    /// Creates, uncommitted, a fixture node from `record` with its slots and its jobs (Output
+    /// off, ticks mapped to the new slots by index, ADR 0052 §7) at the end of `parent`.
     fn insert_fixture(
         &self,
         parent: TreeID,
@@ -510,27 +409,27 @@ impl Document {
             .get_meta(node)
             .map_err(|_| ManufacturingError::NotFound)?;
         write_fixture_registers(&meta, record);
+        let mut slots = Vec::with_capacity(record.slots.len());
         for slot in &record.slots {
-            self.insert_slot(node, slot)?;
+            slots.push(self.insert_slot(node, slot)?);
         }
-        Ok(node)
-    }
-
-    /// Creates, uncommitted, a slot node from `record` at the end of the fixture `parent`.
-    fn insert_slot(
-        &self,
-        parent: TreeID,
-        record: &SlotRecord,
-    ) -> Result<TreeID, ManufacturingError> {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        tree.enable_fractional_index(0);
-        let node = tree
-            .create(TreeParentId::Node(parent))
-            .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        let meta = tree
-            .get_meta(node)
-            .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        write_slot_registers(&meta, record);
+        for job in &record.jobs {
+            let ticks: Vec<FixturePartKey> = job
+                .targets
+                .iter()
+                .filter_map(|target| {
+                    let part = match target.slot {
+                        None => node,
+                        Some(index) => *slots.get(index)?,
+                    };
+                    Some(FixturePartKey {
+                        node: node_id(part),
+                        suffix: target.suffix.clone(),
+                    })
+                })
+                .collect();
+            insert_job(&tree, node, job, &ticks).map_err(|_| ManufacturingError::NotFound)?;
+        }
         Ok(node)
     }
 
@@ -547,7 +446,7 @@ impl Document {
             .find(|fixture| fixture.id == id)
     }
 
-    fn fixture_meta(&self, id: NodeId) -> Result<LoroMap, ManufacturingError> {
+    pub(crate) fn fixture_meta(&self, id: NodeId) -> Result<LoroMap, ManufacturingError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let node = tree_id_of(id);
         let parent = match tree.parent(node) {
@@ -561,24 +460,6 @@ impl Document {
             || string(&meta, KEY_SHAPE).as_deref() != Some(SHAPE_FIXTURE)
         {
             return Err(ManufacturingError::NoSuchFixture);
-        }
-        Ok(meta)
-    }
-
-    fn slot_meta(&self, id: NodeId) -> Result<LoroMap, ManufacturingError> {
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        let node = tree_id_of(id);
-        let parent = match tree.parent(node) {
-            Some(TreeParentId::Node(parent)) if node_exists(&tree, node) => parent,
-            _ => return Err(ManufacturingError::NoSuchSlot),
-        };
-        self.fixture_meta(node_id(parent))
-            .map_err(|_| ManufacturingError::NoSuchSlot)?;
-        let meta = tree
-            .get_meta(node)
-            .map_err(|_| ManufacturingError::NoSuchSlot)?;
-        if string(&meta, KEY_SHAPE).as_deref() != Some(SHAPE_FIXTURE_SLOT) {
-            return Err(ManufacturingError::NoSuchSlot);
         }
         Ok(meta)
     }

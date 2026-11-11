@@ -281,7 +281,7 @@ mod tests {
         let (name, text) = record(4, "newer");
         entries.push((
             name,
-            text.replace("\"format_version\": 2", "\"format_version\": 7"),
+            text.replace("\"format_version\": 3", "\"format_version\": 7"),
         ));
         entries.push(("notes.txt".to_owned(), "{".to_owned()));
         let library = MachineProfiles::load(&entries);

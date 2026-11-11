@@ -1,6 +1,8 @@
 import { Frame, TriangleAlert } from "lucide-react";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { OperationsSection } from "@/components/panel/OperationsSection";
+import { FixtureJobsSection } from "@/components/panel/FixtureJobsSection";
+import type { FixtureJobsApi } from "@/hooks/useFixtureJobs";
 import type { FixturesApi } from "@/hooks/useFixtures";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
@@ -79,6 +81,8 @@ interface PropertiesPanelProps {
   operations: OperationsApi;
   /** The laser fixtures of the active laser page (`specs/0102-laser-fixtures`). */
   fixtures: FixturesApi;
+  /** The fixture jobs of the active laser page (`specs/0103-fixture-jobs`). */
+  fixtureJobs: FixtureJobsApi;
 }
 
 /**
@@ -111,6 +115,7 @@ export function PropertiesPanel({
   membership,
   operations,
   fixtures,
+  fixtureJobs,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
@@ -423,10 +428,11 @@ export function PropertiesPanel({
           className={
             doc.view.content === "history" ||
             doc.view.content === "layers" ||
-            doc.view.content === "operations" ||
             doc.view.content === "fonts"
               ? // The tabs with an inner scroll area, the list: the header, the buttons
                 // and the footer stay in view (`0020` criterion 43, `0050` criterion 3).
+                // Operations is not one: its column scrolls as a whole, so the Fixture jobs
+                // section, the summary and the View switch stay reachable (`0103` ux-notes 3.2).
                 "flex min-h-0 flex-1 flex-col px-3 pb-3"
               : "properties-panel-body min-h-0 flex-1 px-3 pb-3"
           }
@@ -437,7 +443,6 @@ export function PropertiesPanel({
             className={
               doc.view.content === "history" ||
               doc.view.content === "layers" ||
-              doc.view.content === "operations" ||
               doc.view.content === "fonts"
                 ? "flex min-h-0 flex-1 flex-col outline-none"
                 : "outline-none"
@@ -547,6 +552,8 @@ export function PropertiesPanel({
                 api={operations}
                 selectionCount={editor.selectionCount}
                 onReturnFocus={returnFocus}
+                fixtureRunning={fixtureJobs.view?.running ?? 0}
+                fixtureJobs={<FixtureJobsSection api={fixtureJobs} selectFixture={fixtures.select} />}
               />
             ) : doc.view.content === "layers" ? (
               <LayersTab

@@ -250,6 +250,7 @@ fn set(name: &str) -> Vec<FixtureRecord> {
             name: "Slot 1".to_owned(),
             params: slot("circle"),
         }],
+        jobs: Vec::new(),
     }]
 }
 
