@@ -231,9 +231,15 @@ Merge of two computers' edits of the same profile is not built: the later file w
 data directory is synced. The file format (`machines/<uuid>.json`) is already the one the
 library crate will read, so the move is code only.
 
-**Resolution:** when `0028` (material records) or a second machine family arrives, a
-`curvyo-library-core` ADR extracts the shared envelope (`id`, `kind`, `format_version`,
-`modified`) and the merge, and `curvyo-laser-core` keeps only the laser fields.
+**Update 2026-11-11 (ADR 0055, spec `0028`):** material records (`materials/<uuid>.json`) join the
+profiles in `curvyo-laser-core`; the shared envelope (`id`, `kind`, `format_version`, `modified`,
+the id and size checks) becomes the module `record_envelope` there. Both records are laser-only
+and no merge exists, so a crate is still not justified.
+
+**Resolution:** when a second machine family or the record merge of ADR 0004 §8 arrives, a
+`curvyo-library-core` ADR moves `record_envelope` and the merge into that crate, and
+`curvyo-laser-core` keeps only the laser fields. The file formats of ADR 0038 and ADR 0055 do not
+change by the move.
 
 ## One 0020 tester test takes about five minutes in a debug build (2026-11-03)
 
@@ -718,6 +724,10 @@ catalogs do not: they are per-record files moved as files
 granularity and an append-only test-result log make conflicts rare, but editing
 the same material offline on two machines produces a conflict the user must
 resolve.
+
+Material records (ADR 0055) keep their test history inside the record; each history entry has
+its own id, so the merge of two copies of one material is a union of entries by id plus the later
+`sets` (2026-11-11).
 
 **Resolution:** detect and surface conflict copies in the UI with a
 side-by-side resolution view (a story), on top of
