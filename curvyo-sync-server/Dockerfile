@@ -7,7 +7,7 @@
 # `Dockerfile.dockerignore` next to this file keeps `target/`, `frontend/` and `.git` out of the
 # context (BuildKit reads it because of its name).
 
-FROM rust:1.99.0-bookworm AS build
+FROM rust:1.99.1-bookworm AS build
 RUN apt-get update \
     && apt-get install -y --no-install-recommends musl-tools \
     && rm -rf /var/lib/apt/lists/*

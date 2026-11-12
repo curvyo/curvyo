@@ -6,6 +6,6 @@
 # using `assert!` to check that a value is empty/not empty, which fired on
 # code that was clean under 1.98.1). Renovate bumps this deliberately, as
 # its own reviewable PR.
-channel = "1.99.0"
+channel = "1.99.1"
 components = ["rustfmt", "clippy"]
 targets = ["wasm32-unknown-unknown"]
