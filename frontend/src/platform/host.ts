@@ -128,17 +128,23 @@ const EXTENSIONS_KEY = "curvyo.extensions";
  * pick of this browser (ADR 0038 §1, §6). */
 const MACHINES_PREFIX = "curvyo.machines/";
 const MACHINE_CHOICE_KEY = "curvyo.machine-choice";
+/** The material records, one entry per material (`curvyo.materials/<id>`), their list order and
+ * the remembered test grid values of this browser (ADR 0055 §1, §5, §6). */
+const MATERIALS_PREFIX = "curvyo.materials/";
+const MATERIAL_ORDER_KEY = "curvyo.material-order";
+const TEST_GRID_CHOICE_KEY = "curvyo.test-grid-choice";
 /** The font library's text and the check cache in the browser build (`0075` decisions 1, 5). */
 const FONT_LIBRARY_KEY = "curvyo.font-library";
 const FONT_CHECKS_KEY = "curvyo.font-checks";
 
-/** Every stored machine profile record as `{ name: "<id>.json", text }`; other keys are ignored. */
-function listBrowserMachineProfiles(): { name: string; text: string }[] {
+/** Every stored record under `prefix` (machine profiles, materials) as `{ name: "<id>.json",
+ * text }`; other keys are ignored. */
+function listBrowserRecords(prefix: string): { name: string; text: string }[] {
   const records: { name: string; text: string }[] = [];
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index);
-    if (key?.startsWith(MACHINES_PREFIX)) {
-      records.push({ name: `${key.slice(MACHINES_PREFIX.length)}.json`, text: readStored(key) ?? "" });
+    if (key?.startsWith(prefix)) {
+      records.push({ name: `${key.slice(prefix.length)}.json`, text: readStored(key) ?? "" });
     }
   }
   return records;
@@ -230,12 +236,20 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   import_formats_file: () => pickTextFile(),
   read_extensions_file: () => readStored(EXTENSIONS_KEY),
   write_extensions_file: (args) => window.localStorage.setItem(EXTENSIONS_KEY, String(args?.text)),
-  list_machine_profiles: () => listBrowserMachineProfiles(),
+  list_machine_profiles: () => listBrowserRecords(MACHINES_PREFIX),
   write_machine_profile: (args) =>
     window.localStorage.setItem(`${MACHINES_PREFIX}${String(args?.id)}`, String(args?.text)),
   remove_machine_profile: (args) => window.localStorage.removeItem(`${MACHINES_PREFIX}${String(args?.id)}`),
   read_machine_choice: () => readStored(MACHINE_CHOICE_KEY),
   write_machine_choice: (args) => window.localStorage.setItem(MACHINE_CHOICE_KEY, String(args?.text)),
+  list_materials: () => listBrowserRecords(MATERIALS_PREFIX),
+  write_material: (args) =>
+    window.localStorage.setItem(`${MATERIALS_PREFIX}${String(args?.id)}`, String(args?.text)),
+  remove_material: (args) => window.localStorage.removeItem(`${MATERIALS_PREFIX}${String(args?.id)}`),
+  read_material_order: () => readStored(MATERIAL_ORDER_KEY),
+  write_material_order: (args) => window.localStorage.setItem(MATERIAL_ORDER_KEY, String(args?.text)),
+  read_test_grid_choice: () => readStored(TEST_GRID_CHOICE_KEY),
+  write_test_grid_choice: (args) => window.localStorage.setItem(TEST_GRID_CHOICE_KEY, String(args?.text)),
   export_formats_file: (args) => {
     downloadText("curvyo-formats.toml", String(args?.text));
     return true;

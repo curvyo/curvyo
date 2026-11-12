@@ -50,6 +50,9 @@ export interface EntryFieldProps {
   /** The input element, for a control beside the field that moves focus here (the
    * double-click on a colour slider, `specs/0047-transform-polish/` criterion 23). */
   inputRef?: React.Ref<HTMLInputElement>;
+  /** Up and Down step the typed text (Shift: by 10) and commit on key-up
+   * (`specs/0028` ux-notes 12): returns the new text, `null` for none. */
+  stepText?: (text: string, key: string, shift: boolean) => string | null;
 }
 
 /**
@@ -85,6 +88,7 @@ export function EntryField({
   commitOnBlur = false,
   inputMode = "text",
   inputRef,
+  stepText,
 }: EntryFieldProps) {
   const messageId = useId();
   const display = mixed ? "" : shown;
@@ -94,6 +98,7 @@ export function EntryField({
   const touched = useRef(initialText !== undefined);
   const input = useRef<HTMLInputElement>(null);
   const skipSelect = useRef(initialText !== undefined);
+  const stepped = useRef(false);
 
   useEffect(() => {
     if (autoFocus) {
@@ -190,8 +195,21 @@ export function EntryField({
             onClose?.();
           }
         }}
+        onKeyUp={(event) => {
+          if (stepped.current && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            stepped.current = false;
+            submit(event.currentTarget);
+          }
+        }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          const stepper = stepText?.(text, event.key, event.shiftKey);
+          if (stepper !== undefined && stepper !== null) {
+            event.preventDefault();
+            stepped.current = true;
+            touched.current = true;
+            setText(stepper);
+            setInvalid(null);
+          } else if (event.key === "Enter") {
             event.preventDefault();
             if (submit(event.currentTarget)) {
               event.currentTarget.blur();

@@ -59,3 +59,20 @@ export function OperationGlyph({ kind, size = 16 }: { kind: OperationKind; size?
       return <CircleHelp size={size} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className="shrink-0" />;
   }
 }
+
+/**
+ * The Test grid glyph of the Add test grid button (`specs/0028` `ux-notes.md` 2): nine outlined
+ * squares, 3 x 3, ink, 16 px. Not the fixture Grid `#` of `0102`.
+ */
+export function TestGridGlyph({ size = 16 }: { size?: number }) {
+  const squares = [0, 1, 2].flatMap((row) =>
+    [0, 1, 2].map((column) => (
+      <rect key={`${row}${column}`} x={0.75 + column * 5.5} y={0.75 + row * 5.5} width="3.5" height="3.5" />
+    )),
+  );
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden focusable={false} className="shrink-0">
+      {squares}
+    </svg>
+  );
+}

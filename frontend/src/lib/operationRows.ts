@@ -47,6 +47,10 @@ export function itemsText(count: number): string {
 export function rowName(row: OperationRow): string {
   if (row.kind === "unknown") return `${row.name}, unknown operation`;
   const off = row.output ? "" : ", Output off";
+  if (row.grid) {
+    const size = row.grid.columns === 0 ? "no grid" : `${row.grid.columns} by ${row.grid.rows} cells`;
+    return `${row.name}, ${KIND_WORDS[row.kind].toLowerCase()} test grid, ${size}${off}`;
+  }
   return `${row.name}, ${KIND_WORDS[row.kind]}, ${itemsText(row.items)}${off}`;
 }
 
@@ -189,10 +193,19 @@ export function nextFocusIndex(count: number, current: number, key: string): num
   }
 }
 
-/** The operation a digit 1 to 9 names (the number column of the rows); `null` past the rows. */
+/** The operation a digit 1 to 9 names (the number column of the rows); `null` past the rows.
+ * Test grid rows have no digit and are skipped (`specs/0028` UX notes §5, §12). */
 export function digitRow(view: OperationsView, digit: number): OperationRow | null {
   if (!Number.isInteger(digit) || digit < 1 || digit > 9) return null;
-  return view.rows[digit - 1] ?? null;
+  return view.rows.filter((row) => !row.grid).at(digit - 1) ?? null;
+}
+
+/** The number shown on row `index`: its place among the rows that are no test grid row, so the
+ * digits count past a grid (`specs/0028` UX notes §5); `null` for a grid row. */
+export function rowDigit(view: OperationsView, index: number): number | null {
+  const own = view.rows[index];
+  if (own === undefined || own.grid) return null;
+  return view.rows.slice(0, index).filter((row) => !row.grid).length + 1;
 }
 
 /** A run of consecutive entries drawn in one section group (`ux-notes.md` 4.3). */

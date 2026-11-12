@@ -122,6 +122,8 @@ export interface SelectToolbarProps {
   /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
    * criterion 1). */
   flipEnabled: boolean;
+  /** A whole test grid is selected: Flip and Guide are hidden (`specs/0028` UX notes §6.5). */
+  gridCommandsHidden?: boolean;
   flip: FlipApi;
   /** The Guide button (`specs/0046-document-shapes` criteria 9 and 10). */
   guideState: GuideState;
@@ -656,6 +658,7 @@ export function SelectToolbar({
   recognise,
   tile,
   flipEnabled,
+  gridCommandsHidden = false,
   flip,
   align,
   guideState,
@@ -916,14 +919,18 @@ export function SelectToolbar({
         {/* The Guide button directly after the Flip group, in every selection state, 4 px from
          * it like the two flip buttons from each other, so the row stays as narrow as it can
          * (`specs/0046-document-shapes` criterion 9, UX review 2). */}
-        <div className="flex items-start gap-1">
-          <FlipGroup enabled={flipEnabled} flip={flip} onReturnFocus={onReturnFocus} />
-          {edits ? (
-            <div className="py-1">
-              <GuideButton state={guideState} onToggle={onToggleGuide} onReturnFocus={onReturnFocus} />
-            </div>
-          ) : null}
-        </div>
+        {/* A whole test grid hides both: its shape comes from its fields (`specs/0028` UX notes
+         * §6.5). */}
+        {gridCommandsHidden ? null : (
+          <div className="flex items-start gap-1">
+            <FlipGroup enabled={flipEnabled} flip={flip} onReturnFocus={onReturnFocus} />
+            {edits ? (
+              <div className="py-1">
+                <GuideButton state={guideState} onToggle={onToggleGuide} onReturnFocus={onReturnFocus} />
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
       {groups.map((group, index) => (
         <BarGroup key={index} className="flex min-h-9 items-start">

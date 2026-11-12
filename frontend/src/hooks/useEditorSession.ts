@@ -754,6 +754,8 @@ export interface EditorSession {
   align: AlignApi;
   /** The flip buttons act: something is selected in the Select tool. */
   flipEnabled: boolean;
+  /** A whole test grid is selected: Flip and Guide are hidden (`specs/0028` UX notes §6.5). */
+  gridCommandsHidden: boolean;
   /** The Guide button of the Select bar (`specs/0046-document-shapes` criteria 9 and 10). */
   guideState: GuideState;
   /** A press of the Guide button: one step "Guide". */
@@ -1055,6 +1057,7 @@ export function useEditorSession(
   const [selectionAnnouncementSeq, setSelectionAnnouncementSeq] = useState(0);
   const [keyHint, setKeyHint] = useState<KeyHint | null>(null);
   const [flipEnabled, setFlipEnabled] = useState(false);
+  const [gridCommandsHidden, setGridCommandsHidden] = useState(false);
   const [alignBar, setAlignBar] = useState<AlignBarState>(NO_ALIGN_BAR);
   const [guideState, setGuideState] = useState<GuideState>("disabled");
   const keyHintCounter = useRef(0);
@@ -1158,6 +1161,7 @@ export function useEditorSession(
     setScaleCornerRadiusState(session.scale_corner_radius());
     setLinkCornersState(session.link_corners());
     setFlipEnabled(session.flip_enabled());
+    setGridCommandsHidden(session.select_bar_hides_grid_commands());
     const nextAlign = readAlignBar(session);
     setAlignBar((previous) => (sameAlignBar(previous, nextAlign) ? previous : nextAlign));
     setGuideState(readGuideState(session.guide_state()));
@@ -3015,6 +3019,7 @@ export function useEditorSession(
     trace,
     flip,
     flipEnabled,
+    gridCommandsHidden,
     align,
     guideState,
     toggleGuide,

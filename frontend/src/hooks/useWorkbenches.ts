@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import type { EditorSession } from "@/hooks/useEditorSession";
 import { storeExtensions } from "@/lib/extensionsFile";
 import { flushMachineWrites } from "@/lib/machineProfilesFile";
+import { flushMaterialWrites } from "@/lib/materialsFile";
 import { NO_WORKBENCHES, type WorkbenchList } from "@/workbenches/registry";
 
 /** The active laser page's values (`manufacturing_view_json`), `null` on another page. */
@@ -91,6 +92,7 @@ export function useWorkbenches(editor: EditorSession) {
       const result = command(session);
       sync();
       void flushMachineWrites(session, sync);
+      void flushMaterialWrites(session, sync);
       return result;
     },
     [getSession, sync],

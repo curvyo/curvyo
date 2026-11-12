@@ -3,6 +3,9 @@ import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { OperationsSection } from "@/components/panel/OperationsSection";
 import { FixtureJobsSection } from "@/components/panel/FixtureJobsSection";
 import type { FixtureJobsApi } from "@/hooks/useFixtureJobs";
+import { MaterialsSection } from "@/components/panel/MaterialsSection";
+import type { MaterialsApi } from "@/hooks/useMaterials";
+import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
 import type { FixturesApi } from "@/hooks/useFixtures";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
@@ -49,6 +52,7 @@ import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useGrid } from "@/hooks/useGrid";
+import { useTestGrid } from "@/hooks/useTestGrid";
 import { useSnapping } from "@/hooks/useSnapping";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
@@ -83,6 +87,10 @@ interface PropertiesPanelProps {
   fixtures: FixturesApi;
   /** The fixture jobs of the active laser page (`specs/0103-fixture-jobs`). */
   fixtureJobs: FixtureJobsApi;
+  /** The Settings block of the selected operations (`specs/0028-material-test-library`). */
+  operationSettings: OperationSettingsApi;
+  /** The Materials section (`specs/0028-material-test-library`). */
+  materials: MaterialsApi;
 }
 
 /**
@@ -116,6 +124,8 @@ export function PropertiesPanel({
   operations,
   fixtures,
   fixtureJobs,
+  operationSettings,
+  materials,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
   // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
@@ -154,6 +164,8 @@ export function PropertiesPanel({
   const formats = useFormats(getSession, doc);
   const snapping = useSnapping({ getSession, syncRevision: editor.syncRevision, sync:editor.sync });
   const grid = useGrid({ getSession, syncRevision: editor.syncRevision, sync: editor.sync });
+  // The test grid of the Operations tab (`specs/0028-material-test-library`).
+  const testGrid = useTestGrid({ getSession, syncRevision: editor.syncRevision, sync: editor.sync });
   const { shortcut } = doc;
   // In text edit mode the keyboard goes back to the text being edited, so typing goes on after a
   // click on a control (customer 2026-10-26), as after the Text bar's controls.
@@ -553,6 +565,11 @@ export function PropertiesPanel({
                 selectionCount={editor.selectionCount}
                 onReturnFocus={returnFocus}
                 fixtureRunning={fixtureJobs.view?.running ?? 0}
+                settings={operationSettings}
+                onEditMaterial={materials.edit}
+                materials={<MaterialsSection api={materials} onReturnFocus={returnFocus} />}
+                grid={testGrid}
+                materialsApi={materials}
                 fixtureJobs={<FixtureJobsSection api={fixtureJobs} selectFixture={fixtures.select} />}
               />
             ) : doc.view.content === "layers" ? (

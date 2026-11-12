@@ -2,10 +2,16 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
-import { OperationGlyph } from "@/components/panel/OperationGlyphs";
+import { OperationGlyph, TestGridGlyph } from "@/components/panel/OperationGlyphs";
+import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
+import { TestGridBlock } from "@/components/panel/TestGridBlock";
 import { PanelSwitch } from "@/components/ui/switch";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { useDeleteArm } from "@/hooks/useDeleteArm";
+import type { MaterialsApi } from "@/hooks/useMaterials";
+import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
+import type { TestGridApi } from "@/hooks/useTestGrid";
+import { NO_ROWS, extend, press as pressRow, prune, type PressMods, type RowSelection } from "@/lib/rowSelection";
 import {
   ADD_LABELS,
   ghostTop,
@@ -13,6 +19,7 @@ import {
   listEntries,
   nextFocusIndex,
   neighbourIndex,
+  rowDigit,
   sectionOf,
   sectionRuns,
   summaryLines,
@@ -43,6 +50,16 @@ interface OperationsSectionProps {
   fixtureJobs?: ReactNode;
   /** How many fixture jobs run: the summary's fixture line (criterion 17). */
   fixtureRunning?: number;
+  /** The Settings block's commands (`specs/0028-material-test-library`). */
+  settings: OperationSettingsApi;
+  /** "Edit material" in the Settings block: opens the Materials section on that material. */
+  onEditMaterial: (id: string) => void;
+  /** The Materials section, drawn after the summary. */
+  materials?: ReactNode;
+  /** The test grids: the sixth add button and the Grid block (`specs/0028` ux-notes 4 to 7). */
+  grid: TestGridApi;
+  /** The Materials commands the Save as material form calls. */
+  materialsApi: MaterialsApi;
 }
 
 /** The index of a key in the view's rows, `-1` for a row that is gone. */
@@ -77,9 +94,10 @@ function entryOfRow(entries: ListEntry[]): number[] {
 /** The names of the two section groups (`ux-notes.md` 4.3). */
 const SECTION_NAMES = { marking: "Marking", cutting: "Cutting" } as const;
 
-export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0 }: OperationsSectionProps) {
+export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0, settings, onEditMaterial, materials, grid, materialsApi }: OperationsSectionProps) {
   const { view, notice, dropKey, dropBadge } = api;
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  /** The selected rows (Ctrl and Shift extend, `specs/0028` ux-notes 8.2); one opens its Settings block. */
+  const [selection, setSelection] = useState<RowSelection>(NO_ROWS);
   /** The row whose name is being edited in place (criterion 3): one at a time. */
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   /** The one armed trash of the tab (`0081`): a row's trash by its key. */
@@ -94,10 +112,20 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   // The list changing under an armed trash disarms it (`0081`; ux-notes 4.5): a reorder, a row
   // added or removed, a Cuts last switch.
   const order = view ? view.rows.map((row) => operationIdKey(row.id)).join("|") + (view?.cutsLast ? "+" : "-") : "";
+  const orderKeys = view ? view.rows.map((row) => operationIdKey(row.id)) : [];
+  const selectedKeys = prune(selection, orderKeys).keys;
+  const openKey = selectedKeys.length === 1 ? selectedKeys[0] : null;
   const disarmArm = arm.disarm;
   useEffect(() => {
     disarmArm();
   }, [disarmArm, order]);
+
+  // The canvas selecting a grid (or Add test grid) selects its row in the list (ux-notes 6.1).
+  const gridGroupKey = grid.view ? operationIdKey(grid.view.group) : null;
+  const gridRowKey = grid.view?.row ? operationIdKey(grid.view.row) : null;
+  useEffect(() => {
+    if (gridRowKey !== null) setSelection({ keys: [gridRowKey], anchor: gridRowKey });
+  }, [gridGroupKey, gridRowKey]);
 
   const [stop, setStop] = useState(0);
   const [addStop, setAddStop] = useState(0);
@@ -239,10 +267,13 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   };
 
   const actions: RowActions = {
-    select: (row, rename = false) => {
-      setOpenKey(operationIdKey(row.id));
-      setStop(indexOfKey(view, operationIdKey(row.id)));
-      if (rename) setRenamingKey(operationIdKey(row.id));
+    select: (row, rename = false, mods?: PressMods) => {
+      const key = operationIdKey(row.id);
+      setSelection((previous) => pressRow(prune(previous, orderKeys), orderKeys, key, mods ?? { ctrl: false, shift: false }));
+      setStop(indexOfKey(view, key));
+      if (row.grid) grid.selectRow(row.id);
+      else if (grid.view !== null) grid.selectRow(null);
+      if (rename) setRenamingKey(key);
     },
     rename: (row, name) => {
       api.rename(row.id, name);
@@ -254,12 +285,14 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     },
     trash: (row) => {
       const key = operationIdKey(row.id);
-      const label = `Press again to delete ${row.name}. Its ${itemsText(row.items)} become Not assigned.`;
+      const label = row.grid
+        ? `Press again to delete ${row.name}. Its ${row.grid.columns * row.grid.rows} cells and labels become Not assigned.`
+        : `Press again to delete ${row.name}. Its ${itemsText(row.items)} become Not assigned.`;
       arm.press(`op:${key}`, label, () => {
         const index = indexOfKey(view, key);
         const left = view.rows.length - 1;
         if (api.remove(row.id)) {
-          setOpenKey(null);
+          setSelection(NO_ROWS);
           pending.current = left === 0 ? "add" : Math.min(index, left - 1);
         }
         return `${row.name} deleted.`;
@@ -304,6 +337,13 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     if (next !== null) {
       event.preventDefault();
       goToRow(next);
+      // Shift+Up and Shift+Down extend the selection by one row (criterion 27).
+      if (event.shiftKey && (event.key === "ArrowUp" || event.key === "ArrowDown") && current) {
+        const focus = view.rows[index];
+        if (focus) {
+          setSelection(extend(prune(selection, orderKeys), orderKeys, operationIdKey(focus.id), event.key === "ArrowUp" ? -1 : 1));
+        }
+      }
     }
   };
 
@@ -319,11 +359,17 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
 
   const press = (kind: string) => {
     const id = api.press(kind);
-    if (id) setOpenKey(operationIdKey(id));
+    if (id) setSelection({ keys: [operationIdKey(id)], anchor: operationIdKey(id) });
+  };
+  const pressGrid = () => {
+    const id = grid.add();
+    if (id) setSelection({ keys: [operationIdKey(id)], anchor: operationIdKey(id) });
   };
 
   const lines = summaryWithFixtures(summaryLines(view), fixtureRunning);
   const openRow = openIndex >= 0 ? view.rows[openIndex] : null;
+  // The Grid block shows while the one selected row is the row of the grid the session shows.
+  const gridView = openRow?.grid && grid.view?.row && operationIdKey(grid.view.row) === operationIdKey(openRow.id) ? grid.view : null;
   return (
     <section aria-label="Operations" className="flex flex-col gap-2">
       <div
@@ -347,7 +393,24 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
             <OperationGlyph kind={kind} />
           </button>
         ))}
+        <span aria-hidden className="w-2 shrink-0" />
+        <button
+          type="button"
+          aria-label="Add test grid"
+          title="Add test grid"
+          tabIndex={ADD_LABELS.length === addStop ? 0 : -1}
+          onFocus={() => setAddStop(ADD_LABELS.length)}
+          onClick={pressGrid}
+          className="flex h-7 w-7 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        >
+          <TestGridGlyph />
+        </button>
       </div>
+      {grid.notice ? (
+        <p role="alert" className="-mt-1 text-xs text-[var(--field-invalid)]">
+          {grid.notice}
+        </p>
+      ) : null}
       <PanelSwitch
         label="Cuts last"
         checked={view.cutsLast}
@@ -377,12 +440,13 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
                     key={operationIdKey(entry.row.id)}
                     row={entry.row}
                     index={entry.index}
+                    digit={rowDigit(view, entry.index)}
                     total={view.rows.length}
                     height={entry.height}
                     dropping={dropKey === operationIdKey(entry.row.id)}
                     dragSource={dragFrom === entry.index}
                     insertion={dragFrom !== null && dropAt === entry.index ? insertionEdge(dragFrom, dropAt) : null}
-                    open={openKey === operationIdKey(entry.row.id)}
+                    open={selectedKeys.includes(operationIdKey(entry.row.id))}
                     renaming={renamingKey === operationIdKey(entry.row.id)}
                     armed={arm.armed === `op:${operationIdKey(entry.row.id)}`}
                     canUp={canMove(view, entry.index, -1)}
@@ -417,6 +481,17 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           <div aria-hidden style={{ height: range.after }} />
         </div>
       )}
+      {gridView ? (
+        <TestGridBlock key={operationIdKey(gridView.group)} view={gridView} api={grid} materials={materialsApi} onReturnFocus={onReturnFocus} />
+      ) : null}
+      <OperationSettingsBlock
+        key={selectedKeys.join("|")}
+        rows={view.rows.filter((row) => selectedKeys.includes(operationIdKey(row.id)))}
+        pick={view.pick}
+        api={settings}
+        onEditMaterial={onEditMaterial}
+        onReturnFocus={onReturnFocus}
+      />
       <CloneMembers members={view.cloneMembers} view={view} openRow={openRow} api={api} />
       {fixtureJobs}
       <section aria-label="Operations summary" className="flex flex-col text-xs tabular-nums text-[var(--toolbar-icon)]">
@@ -432,6 +507,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           )}
         </div>
       </section>
+      {materials}
       <div role="radiogroup" aria-label="View" className="flex h-7 gap-1 self-start rounded border border-[var(--lane-line)] p-0.5 text-[13px]">
         {(["operations", "drawn"] as const).map((mode) => {
           const checked = view.viewMode === mode;
@@ -451,7 +527,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           );
         })}
       </div>
-      {notice ? (
+      {notice && notice !== settings.skip ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
           {notice}
         </p>

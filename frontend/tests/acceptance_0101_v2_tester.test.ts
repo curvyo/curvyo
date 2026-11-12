@@ -36,7 +36,9 @@ function keysDeep(value: unknown, out: string[] = []): string[] {
   return out;
 }
 
-const COLOUR_OR_MACHINE = /colou?r|swatch|hex|rgb|^power$|^speed$|^passes$|kerf|material/i;
+// Power, speed, passes and the material link left out since `specs/0028` (criteria 24 to 26 add
+// the settings to the Operations tab, amending `0101` Out of scope); colour and kerf stay out.
+const COLOUR_OR_MACHINE = /colou?r|swatch|hex|rgb|kerf/i;
 
 // ---- criterion 3 and 4: the armed trash (0081 timings, criterion 4 of 0101) -------------------
 

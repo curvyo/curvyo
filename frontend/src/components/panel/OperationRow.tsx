@@ -4,12 +4,14 @@ import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, 
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
 import { KIND_WORDS, focusAfterRename, itemsText, nameKeyAction, rowName, tickPressAdds } from "@/lib/operationRows";
+import { gridRowLine } from "@/lib/testGridFields";
 import type { OperationRow as Row } from "@/lib/operationsView";
+import type { PressMods } from "@/lib/rowSelection";
 
 /** What a row asks of the section: the session calls and the row's own states. */
 export interface RowActions {
   /** Selects the row; `rename` also opens the name in place (F2, double-click). */
-  select: (row: Row, rename?: boolean) => void;
+  select: (row: Row, rename?: boolean, mods?: PressMods) => void;
   /** Commits a new name (Enter, or leaving the field); an empty name reverts. */
   rename: (row: Row, name: string) => void;
   /** Leaves the in-place name field; `refocus` puts the focus back on the row (Enter, Escape). */
@@ -35,8 +37,10 @@ export interface RowProps {
   dragSource: boolean;
   /** The 2 px insertion line of a reorder drag, on the top or bottom edge of this row. */
   insertion: "top" | "bottom" | null;
-  /** The row's place in the whole list; its digit is `index + 1`. */
+  /** The row's place in the whole list. */
   index: number;
+  /** The number on line 2 (`rowDigit`): test grid rows have none (`specs/0028` UX notes §5). */
+  digit: number | null;
   /** The number of operations in the whole list (`aria-setsize`). */
   total: number;
   /** The row is the selected one (`aria-selected`). */
@@ -93,7 +97,7 @@ export function OperationRowView(props: RowProps) {
       aria-selected={props.open}
       {...{ [ARM_ZONE]: `op:${key}` }}
       style={{ height: props.height }}
-      className={`relative flex flex-col overflow-hidden rounded px-1 has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : ""} ${props.dropping ? "bg-[var(--value-fill)] outline outline-[1.5px] -outline-offset-[1.5px] outline-[var(--editor-accent)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
+      className={`relative flex flex-col overflow-hidden rounded px-1 has-[[data-row-name]:focus-visible]:ring-2 has-[[data-row-name]:focus-visible]:ring-inset has-[[data-row-name]:focus-visible]:ring-[var(--editor-accent)] ${armed ? "bg-[var(--destructive-soft)]" : props.open ? "bg-[var(--value-fill)]" : ""} ${props.dropping ? "bg-[var(--value-fill)] outline outline-[1.5px] -outline-offset-[1.5px] outline-[var(--editor-accent)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
     >
       {props.insertion ? (
         <div
@@ -106,7 +110,7 @@ export function OperationRowView(props: RowProps) {
       <div className="flex h-[26px] shrink-0 items-center gap-1" onPointerDown={(event) => {
         if (!renaming && (event.target as HTMLElement).closest("button:not([data-row-name]), input") === null) actions.dragStart(row, event);
       }}>
-        {props.selecting && !unknown ? (
+        {props.selecting && !unknown && !row.grid ? (
           <TickBox row={row} actions={actions} />
         ) : (
           <span className="flex h-4 w-4 shrink-0 items-center justify-center text-[var(--toolbar-icon)]">
@@ -124,7 +128,7 @@ export function OperationRowView(props: RowProps) {
             aria-label={rowName(row)}
             title={row.name}
             onFocus={props.onFocusRow}
-            onClick={() => actions.select(row)}
+            onClick={(event) => actions.select(row, false, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
             onDoubleClick={() => actions.select(row, true)}
             onKeyDown={(event) => onNameKey(event, row, armed, actions)}
             className={`min-w-0 flex-1 truncate text-left text-[13px] focus-visible:outline-none ${row.output ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
@@ -175,8 +179,10 @@ export function OperationRowView(props: RowProps) {
       </div>
       <div className="block truncate text-[11px] leading-[14px] text-[var(--panel-muted-fg)]">
         {unknown
-          ? `${index + 1} · Unknown operation`
-          : `${index + 1} · ${KIND_WORDS[row.kind]} · ${itemsText(row.items)}${row.output ? "" : " · Output off"}`}
+          ? `${props.digit} · Unknown operation`
+          : row.grid
+            ? gridRowLine(KIND_WORDS[row.kind], row.grid.columns, row.grid.rows, row.output)
+            : `${props.digit} · ${KIND_WORDS[row.kind]} · ${itemsText(row.items)}${row.output ? "" : " · Output off"}`}
       </div>
     </li>
   );

@@ -30,6 +30,7 @@ mod import_dialog;
 mod import_preview;
 mod local_files;
 mod machine_profiles;
+mod materials;
 #[cfg(any(target_os = "macos", test))]
 mod menu;
 #[cfg(target_os = "linux")]
@@ -134,6 +135,13 @@ fn commands() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         machine_profiles::remove_machine_profile,
         machine_profiles::read_machine_choice,
         machine_profiles::write_machine_choice,
+        materials::list_materials,
+        materials::write_material,
+        materials::remove_material,
+        materials::read_material_order,
+        materials::write_material_order,
+        materials::read_test_grid_choice,
+        materials::write_test_grid_choice,
         fonts::font_folder_list,
         fonts::system_font_list,
         fonts::font_bytes,
