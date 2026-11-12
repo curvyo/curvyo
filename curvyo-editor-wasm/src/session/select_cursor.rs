@@ -58,6 +58,9 @@ impl Session {
         if self.tool == Tool::Trace && self.trace_mask_pick() {
             return "pick-mask".to_string();
         }
+        if let Some(hint) = self.trace_mask_cursor() {
+            return hint.to_string();
+        }
         // Pick mode and the position handle of a text on path (`0080` UX notes §2, §3.1).
         if let Some(hint) = self.text_path_cursor() {
             return hint.to_string();

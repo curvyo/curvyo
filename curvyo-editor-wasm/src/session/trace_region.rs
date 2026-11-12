@@ -1,14 +1,16 @@
 //! The mask region of the Trace tool (`specs/0094-masked-composite-trace` slice 1, `adrs.md`
-//! decision 1): the paths selected with the image, their union made once per change of them, the
-//! test that it meets the image, its numbers for the worker and the Overlay's extra wash.
+//! decision 1; `specs/0114-image-trace-mask` slice 1): the active part's stored regions and the
+//! paths selected with the image, their mask made once per change of them, the test that it meets
+//! the image, its numbers for the worker and the Overlay's extra wash.
 
 use curvyo_document_core::{
     AnchorId, AnchorKind, AnchorSnapshot, Angle, Color, Fill, ObjectSnapshot, Opacity,
     PathSnapshot, Point, Stroke, Style, SubpathSnapshot, Vec2,
 };
-use curvyo_ui_core::{RegionOperand, TraceRegion, TraceRegionError, mask_operand};
+use curvyo_ui_core::{TraceRegion, TraceRegionError, mask_operand};
 
 use super::trace::TraceSelection;
+use super::trace_parts::SignedOperands;
 use super::{Session, Tool};
 
 /// What is left of the image outside the region in Overlay (UX notes §2): 12 %, on top of the
@@ -17,11 +19,12 @@ const REGION_WASH_LEFT: f64 = 0.12;
 /// What the ordinary wash leaves of the image (`trace_draw.rs`).
 const WASH_LEFT: f64 = 0.35;
 
-/// The region of one set of mask paths over one image.
+/// The region of one set of mask operands over one image.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RegionCache {
-    /// The mask paths' outlines it was made from, in document order.
-    operands: Result<Vec<RegionOperand>, TraceRegionError>,
+    /// The added operands (mask paths in document order, then added regions) and the
+    /// subtracted ones it was made from.
+    operands: SignedOperands,
     /// The image's corners it was tested against.
     quad: [Point; 4],
     /// The union (Inside); `None` when no mask path encloses an area.
@@ -50,14 +53,12 @@ pub(super) fn is_mask_path(object: &ObjectSnapshot) -> bool {
 }
 
 impl RegionCache {
-    pub(super) fn new(
-        operands: Result<Vec<RegionOperand>, TraceRegionError>,
-        quad: [Point; 4],
-    ) -> Self {
+    pub(super) fn new(operands: SignedOperands, quad: [Point; 4]) -> Self {
         let region = operands
+            .0
             .as_ref()
             .map_err(Clone::clone)
-            .and_then(|operands| TraceRegion::of_operands(operands, false));
+            .and_then(|added| TraceRegion::of_signed_operands(added, &operands.1, false));
         let [beyond, within] = region.as_ref().ok().map_or_else(
             || [vec![quad.to_vec()], Vec::new()],
             |r| r.quad_parts(&quad),
@@ -73,11 +74,7 @@ impl RegionCache {
     }
 
     /// Whether it was made of `operands` over `quad`.
-    pub(super) fn made_of(
-        &self,
-        operands: &Result<Vec<RegionOperand>, TraceRegionError>,
-        quad: [Point; 4],
-    ) -> bool {
+    pub(super) fn made_of(&self, operands: &SignedOperands, quad: [Point; 4]) -> bool {
         &self.operands == operands && self.quad == quad
     }
 
@@ -114,22 +111,18 @@ impl Session {
             .collect()
     }
 
-    /// The region of the selected mask paths over the selected image, made again only when the
-    /// paths or the image changed; `None` without mask paths.
+    /// The mask of the active part (its stored regions and the selected mask paths) over the
+    /// selected image, made again only when they or the image changed; `None` without either.
     fn trace_region_cache(&self) -> Option<RegionCache> {
         let masks = self.trace_mask_objects();
-        if masks.is_empty() {
+        let part = self.trace_active_mask_part()?;
+        if masks.is_empty() && part.regions.is_empty() {
             return None;
         }
-        let (_, images) = self.trace_images();
-        let quad = images.first()?.corners();
-        let operands: Result<Vec<RegionOperand>, TraceRegionError> =
-            masks.iter().map(mask_operand).collect();
+        let quad = self.trace_mask_image()?.corners();
+        let operands = self.trace_part_operands(&part, &masks);
         let mut cache = self.trace.region.borrow_mut();
-        if cache
-            .as_ref()
-            .is_none_or(|c| c.operands != operands || c.quad != quad)
-        {
+        if cache.as_ref().is_none_or(|c| !c.made_of(&operands, quad)) {
             *cache = Some(RegionCache::new(operands, quad));
         }
         cache.clone()
@@ -149,13 +142,13 @@ impl Session {
             .filter(|e| *e != TraceRegionError::NoArea)
     }
 
-    /// The region the trace keeps with the chosen mode, when mask paths are selected and cover
-    /// some of the image.
+    /// The region the trace keeps with the active part's mode, when it has regions or mask
+    /// paths and they cover some of the image.
     #[must_use]
     pub fn trace_region(&self) -> Option<TraceRegion> {
         let cache = self.trace_region_cache()?;
         let region = cache.region.ok().filter(|_| cache.meets)?;
-        Some(region.with_outside(self.trace.mask_outside))
+        Some(region.with_outside(self.trace_mask_outside()))
     }
 
     /// The region for the worker's settings (`"mask"`, `trace_glue::trace_mask_region`): `{"outside":
@@ -171,15 +164,32 @@ impl Session {
         })
     }
 
-    /// Chooses Inside (`false`) or Outside in the Mask item.
+    /// Chooses Inside (`false`) or Outside in the Mask item: for a stored part one step "Mask:
+    /// Inside" or "Mask: Outside" (`0114` criterion 17), for the implicit part tool state
+    /// (ADR 0061 §3).
     pub fn set_trace_mask_outside(&mut self, outside: bool) {
-        self.trace.mask_outside = outside && self.tool == Tool::Trace;
+        if self.tool != Tool::Trace {
+            self.trace.mask_outside = false;
+            return;
+        }
+        let stored = self.trace_active_mask_part().and_then(|part| part.stored);
+        match (stored, self.trace_mask_image()) {
+            (Some(part), Some(image)) => {
+                self.recording(|this| {
+                    this.document
+                        .set_trace_part_outside(image.id, &part, outside)
+                        .unwrap_or(false)
+                });
+            }
+            _ => self.trace.mask_outside = outside,
+        }
     }
 
-    /// Whether Outside is chosen.
+    /// Whether Outside is chosen for the active part.
     #[must_use]
     pub fn trace_mask_outside(&self) -> bool {
-        self.trace.mask_outside
+        self.trace_active_mask_part()
+            .map_or(self.trace.mask_outside, |part| part.outside)
     }
 
     /// Overlay with a mask (UX notes §2): the part of the image the trace does not keep washed
@@ -189,7 +199,7 @@ impl Session {
         let Some(cache) = self.trace_region_cache() else {
             return;
         };
-        let polygons = if self.trace.mask_outside {
+        let polygons = if self.trace_mask_outside() {
             &cache.within
         } else {
             &cache.beyond

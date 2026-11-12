@@ -251,11 +251,14 @@ mod trace_colours;
 #[cfg(test)]
 mod trace_colours_tests;
 mod trace_draw;
+mod trace_mask_input;
+mod trace_mask_overlay;
 mod trace_mask_pick;
 #[cfg(test)]
 mod trace_mask_pick_hit_tests;
 #[cfg(test)]
 mod trace_mask_pick_tests;
+mod trace_mask_tool;
 mod trace_mesh;
 mod trace_parts;
 #[cfg(test)]
@@ -356,6 +359,7 @@ pub use text_style::StyleOutcome;
 pub use tiling::TilingStatus;
 pub use tiling_handles::circle_handle;
 pub use trace::{TraceCreateOutcome, TraceSelection, TraceSource, TraceView};
+pub use trace_mask_tool::TraceRegionTool;
 pub use trace_pick::TracePickMode;
 pub use trace_text_write::TracedText;
 pub use weld::WeldOutcome;
@@ -1246,7 +1250,11 @@ impl Session {
                     self.spiro_pen_hold(end);
                 }
             }
-            Tool::Trace => self.trace_mask_pick_hover(point),
+            Tool::Trace => {
+                if !self.trace_mask_drag_move(point) {
+                    self.trace_mask_pick_hover(point);
+                }
+            }
         }
     }
 
@@ -1357,7 +1365,9 @@ impl Session {
                     this.offset_pointer_up(point, shift, constrain);
                 }
                 Tool::Text => this.text_pointer_up(),
-                Tool::Trace => {}
+                Tool::Trace => {
+                    this.trace_mask_release(point, shift, constrain);
+                }
             }
         });
     }

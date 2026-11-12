@@ -23,6 +23,7 @@ impl WasmSession {
                 serde_json::json!({
                     "id": part.id,
                     "paths": part.paths,
+                    "regions": part.regions,
                     "outside": part.outside,
                     "whole": part.whole,
                     "muted": part.muted,

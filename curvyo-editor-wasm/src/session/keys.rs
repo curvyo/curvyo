@@ -230,7 +230,8 @@ impl Session {
             Tool::PolygonStar => self.poly_star.drag_in_flight(),
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
             Tool::Measure => self.dimension_drag_in_flight(),
-            Tool::Pen | Tool::Text | Tool::Trace => false,
+            Tool::Trace => self.trace.mask.drag.is_some(),
+            Tool::Pen | Tool::Text => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
@@ -351,8 +352,11 @@ impl Session {
     }
 
     /// A key a mode takes before the key table: Enter in text-path pick mode (`0080` criterion
-    /// 2), the tiling bar's.
+    /// 2), the Trace tool's mask (Escape, Delete and the arrows, `specs/0114`), the tiling bar's.
     fn mode_key(&mut self, input: &KeyInput<'_>) -> Option<KeyOutcome> {
+        if let Some(outcome) = self.trace_mask_key(input) {
+            return Some(outcome);
+        }
         if input.key == "Enter" && !input.dom_blocked && self.confirm_text_path_pick() {
             return Some(KeyOutcome::Consumed);
         }
@@ -535,6 +539,9 @@ impl Session {
     /// With the pointer button still down steps 3 and 4 are skipped: only the
     /// drag is cancelled (criterion 49).
     pub fn escape(&mut self) -> EscapeStep {
+        if let Some(step) = self.trace_mask_escape() {
+            return step;
+        }
         if let Some(step) = self.escape_entries_and_pickers() {
             return step;
         }

@@ -296,6 +296,8 @@ pub struct TraceViewJs {
     pub selection: String,
     /// Mask paths selected with the image (`specs/0094`).
     pub mask_paths: u32,
+    /// The active part's stored regions (`specs/0114`).
+    pub mask_regions: u32,
     /// The mask paths cover none of the image (criterion 7).
     pub mask_outside_image: bool,
     /// The mask paths could not be combined (the kernel refused).
@@ -357,6 +359,7 @@ impl WasmSession {
             }
             .to_string(),
             mask_paths: count(view.mask.len()),
+            mask_regions: count(view.regions),
             mask_outside_image: view.mask_outside_image,
             mask_failed: view.mask_failed,
             images: view.images.into_iter().map(id_text).collect(),

@@ -232,14 +232,16 @@ fn c28_removing_a_part_renumbers_and_activates_the_one_before() {
     assert_eq!(session.selection.ids(), [image]);
 }
 
+/// Replaced by `specs/0114-image-trace-mask` criterion 19: the parts are the image's, so
+/// leaving the tool keeps them; on entry part 1 is active and the selected paths are its mask.
 #[test]
-fn c29_leaving_the_tool_leaves_one_part() {
+fn c29_leaving_the_tool_keeps_the_parts() {
     let (mut session, image, left, _) = halves();
     session.add_trace_part();
     session.selection.set(&[image, left]);
     session.set_tool(Tool::Select);
     session.set_tool(Tool::Trace);
-    assert_eq!(session.trace_part_count(), 1);
+    assert_eq!(session.trace_part_count(), 2);
     let parts = session.trace_parts();
     assert_eq!(parts[0].paths, 1, "the selected paths are part 1's mask");
     assert!(parts[0].active);
