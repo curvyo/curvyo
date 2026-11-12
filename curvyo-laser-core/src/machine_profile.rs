@@ -152,6 +152,9 @@ pub struct ProfileValues {
     pub max_power: PowerValue,
     /// Laser mode (dynamic power, GRBL `$32`).
     pub laser_mode: bool,
+    /// Whether the laser moves its focus height by itself (ADR 0056 §7); Z offset runs only with
+    /// it.
+    pub motorised_z: bool,
 }
 
 impl Default for ProfileValues {
@@ -162,6 +165,7 @@ impl Default for ProfileValues {
             max_feed: FeedRate::DEFAULT,
             max_power: PowerValue::DEFAULT,
             laser_mode: true,
+            motorised_z: false,
         }
     }
 }

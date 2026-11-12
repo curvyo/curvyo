@@ -477,7 +477,20 @@ impl DocumentVersion {
 /// operation Unknown. The number is provisional by the rule above. Goldens:
 /// `laser_settings_v43.curvyo`, `laser_settings_damaged_v43.curvyo`,
 /// `test_grid_hand_edited_v43.curvyo`, `test_grid_orphan_row_v43.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 43;
+///
+/// Bumped to 44 in `laser-operation-tools` (ADR 0056, `specs/0111-laser-operation-tools`): the
+/// `main` set (and `overrides.main`) of an Engrave kind's `op_settings` may hold `interval_mm`; an
+/// operation may carry `op_options` (one atomic map of plain values: `crosshatch`,
+/// `bidirectional`, `scan_angle_deg`, `overscan_pct`, `z_offset_mm`); the profile copy
+/// `mfg_profile` may hold `motorised_z`. A build that stops at 43 would read every Engrave with an
+/// interval as Damaged settings and would drop `motorised_z` silently on its next field edit of the
+/// copy, so it must refuse every file of this build as too new. Clone-member keys
+/// (`member.<clone>/<member>`) are legacy from here on: kept and saved back, read by no rule.
+/// Migration from 43 is none: a format-43 file opens with the defaults of the new values and is
+/// not rewritten. Damage: an `op_options` that does not read is Damaged settings (the extension
+/// decides; the kind stays readable). The number is provisional by the rule above. Goldens:
+/// `operation_tools_v44.curvyo`, `operation_options_damaged_v44.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 44;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

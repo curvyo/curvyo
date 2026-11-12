@@ -1,11 +1,13 @@
 //! The stored `op_settings` of an operation as plain values (ADR 0054 §1, `specs/0028` criteria
-//! 24 to 28): its numbers, its material link and its typed overrides, read with their damage.
+//! 24 to 28, ADR 0056 §5): its numbers, its material link and its typed overrides, read with their
+//! damage.
 
 use serde_json::{Map, Value, json};
 
 use crate::machine_profile::FeedRate;
-use crate::material::{MAX_MATERIAL_NAME_CHARS, Passes, PowerPercent, SetKind, Settings};
+use crate::material::{Interval, MAX_MATERIAL_NAME_CHARS, Passes, PowerPercent, SetKind, Settings};
 use crate::operation_kind::OperationKind;
+use crate::operation_options::hatches;
 
 /// A link of an operation to a material, with the name and `modified` it had when its numbers
 /// were last taken.
@@ -62,13 +64,19 @@ pub struct SetOverride {
     pub speed: Option<FeedRate>,
     /// Typed passes.
     pub passes: Option<Passes>,
+    /// A typed interval, read from a file (`overrides.main.interval_mm`, Engrave kinds only); no
+    /// command of this slice writes one (`specs/0111` criterion 19).
+    pub interval: Option<Interval>,
 }
 
 impl SetOverride {
     /// Whether no number is typed.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.power.is_none() && self.speed.is_none() && self.passes.is_none()
+        self.power.is_none()
+            && self.speed.is_none()
+            && self.passes.is_none()
+            && self.interval.is_none()
     }
 
     /// `set` with each typed number put over its field.
@@ -81,7 +89,7 @@ impl SetOverride {
         }
     }
 
-    /// The typed fields, in the order power, speed, passes.
+    /// The typed fields, in the order power, speed, passes (a typed interval is no [`Field`]).
     #[must_use]
     pub fn fields(&self) -> Vec<Field> {
         [
@@ -133,6 +141,8 @@ impl Overrides {
 pub struct StoredSettings {
     /// The kind's set: own numbers, or the material's as last seen.
     pub main: Settings,
+    /// `main.interval_mm` of an Engrave kind; absent reads as [`Interval::DEFAULT`].
+    pub interval: Option<Interval>,
     /// The outline of Engrave + Outline; absent, the outline runs with `main`.
     pub outline: Option<Settings>,
     /// The material link; absent means own numbers.
@@ -157,6 +167,9 @@ pub enum SettingsDamage {
     /// `overrides` without a link, empty, with an empty role map, an unknown key, a bad number,
     /// or an `outline` on a kind other than Engrave + Outline.
     BadOverride,
+    /// An `interval_mm` in an `outline` set or override, or on a kind that does not hatch, or one
+    /// out of range (ADR 0056 §5).
+    BadInterval,
 }
 
 /// The stored value as read.
@@ -171,6 +184,39 @@ pub enum SettingsRead {
 }
 
 const SET_KEYS: [&str; 3] = ["power_pct", "speed_mm_min", "passes"];
+/// The key of the hatch interval in `main` and `overrides.main`.
+const KEY_INTERVAL: &str = "interval_mm";
+
+/// The interval of a `main` set or override of an operation of kind `kind`, and the map without
+/// it: `Ok(None)` when absent; damage on a kind that does not hatch or for a bad value.
+fn split_interval(
+    value: &Value,
+    kind: OperationKind,
+) -> Result<(Option<Interval>, Value), SettingsDamage> {
+    let Some(map) = value.as_object() else {
+        return Ok((None, value.clone()));
+    };
+    let Some(stored) = map.get(KEY_INTERVAL) else {
+        return Ok((None, value.clone()));
+    };
+    if !hatches(kind) {
+        return Err(SettingsDamage::BadInterval);
+    }
+    let interval = stored
+        .as_f64()
+        .and_then(Interval::from_mm)
+        .ok_or(SettingsDamage::BadInterval)?;
+    let mut rest = map.clone();
+    rest.remove(KEY_INTERVAL);
+    Ok((Some(interval), Value::Object(rest)))
+}
+
+/// Whether `value` is a map holding an interval (never allowed in an `outline`).
+fn holds_interval(value: &Value) -> bool {
+    value
+        .as_object()
+        .is_some_and(|map| map.contains_key(KEY_INTERVAL))
+}
 
 /// A set of plain values; `None` when it is not a map of exactly the three valid numbers.
 fn read_set(value: &Value) -> Option<Settings> {
@@ -224,26 +270,45 @@ fn override_value(typed: &SetOverride) -> Value {
     if let Some(passes) = typed.passes {
         map.insert("passes".to_owned(), json!(passes.get()));
     }
+    if let Some(interval) = typed.interval {
+        map.insert(KEY_INTERVAL.to_owned(), json!(interval.mm()));
+    }
     Value::Object(map)
 }
 
-fn read_overrides(value: &Value, kind: OperationKind) -> Option<Overrides> {
-    let map = value.as_object()?;
+fn read_overrides(value: &Value, kind: OperationKind) -> Result<Overrides, SettingsDamage> {
+    let bad = SettingsDamage::BadOverride;
+    let map = value.as_object().ok_or(bad)?;
     if map.is_empty()
         || map
             .keys()
             .any(|k| !["main", "outline"].contains(&k.as_str()))
     {
-        return None;
+        return Err(bad);
     }
     if map.contains_key("outline") && kind != OperationKind::EngraveOutline {
-        return None;
+        return Err(bad);
     }
-    let role = |key: &str| map.get(key).map(read_override);
-    Some(Overrides {
-        main: role("main").unwrap_or(Some(SetOverride::default()))?,
-        outline: role("outline").unwrap_or(Some(SetOverride::default()))?,
-    })
+    let main = match map.get("main") {
+        None => SetOverride::default(),
+        Some(value) => {
+            let (interval, rest) = split_interval(value, kind)?;
+            let only_interval = interval.is_some() && rest.as_object().is_some_and(Map::is_empty);
+            let mut typed = if only_interval {
+                SetOverride::default()
+            } else {
+                read_override(&rest).ok_or(bad)?
+            };
+            typed.interval = interval;
+            typed
+        }
+    };
+    let outline = match map.get("outline") {
+        None => SetOverride::default(),
+        Some(value) if holds_interval(value) => return Err(SettingsDamage::BadInterval),
+        Some(value) => read_override(value).ok_or(bad)?,
+    };
+    Ok(Overrides { main, outline })
 }
 
 fn read_link(value: &Value) -> Option<MaterialLink> {
@@ -291,15 +356,14 @@ fn read_stored(value: &Value, kind: OperationKind) -> Result<StoredSettings, Set
     if map.keys().any(|k| !known.contains(&k.as_str())) {
         return Err(SettingsDamage::UnknownKey);
     }
-    let main = map
-        .get("main")
-        .and_then(read_set)
-        .ok_or(SettingsDamage::BadSet)?;
+    let (interval, main) = split_interval(map.get("main").ok_or(SettingsDamage::BadSet)?, kind)?;
+    let main = read_set(&main).ok_or(SettingsDamage::BadSet)?;
     let outline = match map.get("outline") {
         None => None,
         Some(_) if kind != OperationKind::EngraveOutline => {
             return Err(SettingsDamage::OutlineOnKind);
         }
+        Some(value) if holds_interval(value) => return Err(SettingsDamage::BadInterval),
         Some(value) => Some(read_set(value).ok_or(SettingsDamage::BadSet)?),
     };
     let material = match map.get("material") {
@@ -309,10 +373,11 @@ fn read_stored(value: &Value, kind: OperationKind) -> Result<StoredSettings, Set
     let overrides = match (map.get("overrides"), &material) {
         (None, _) => Overrides::default(),
         (Some(_), None) => return Err(SettingsDamage::BadOverride),
-        (Some(value), Some(_)) => read_overrides(value, kind).ok_or(SettingsDamage::BadOverride)?,
+        (Some(value), Some(_)) => read_overrides(value, kind)?,
     };
     Ok(StoredSettings {
         main,
+        interval,
         outline,
         material,
         overrides,
@@ -326,6 +391,7 @@ impl StoredSettings {
     pub fn own(kind: OperationKind, main: Settings, outline: Option<Settings>) -> Self {
         Self {
             main,
+            interval: None,
             outline: (kind == OperationKind::EngraveOutline).then(|| outline.unwrap_or(main)),
             material: None,
             overrides: Overrides::default(),
@@ -336,7 +402,11 @@ impl StoredSettings {
     #[must_use]
     pub fn to_value(&self) -> Value {
         let mut map = Map::new();
-        map.insert("main".to_owned(), set_value(&self.main));
+        let mut main = set_value(&self.main);
+        if let (Some(interval), Value::Object(fields)) = (self.interval, &mut main) {
+            fields.insert(KEY_INTERVAL.to_owned(), json!(interval.mm()));
+        }
+        map.insert("main".to_owned(), main);
         if let Some(outline) = &self.outline {
             map.insert("outline".to_owned(), set_value(outline));
         }
@@ -361,6 +431,13 @@ impl StoredSettings {
             }
         }
         Value::Object(map)
+    }
+
+    /// The stored interval of an operation of kind `kind`: the default when none is stored,
+    /// `None` for a kind that does not hatch.
+    #[must_use]
+    pub fn stored_interval(&self, kind: OperationKind) -> Option<Interval> {
+        hatches(kind).then(|| self.interval.unwrap_or_default())
     }
 
     /// The stored set of `role` for an operation of kind `kind`: the outline falls back to

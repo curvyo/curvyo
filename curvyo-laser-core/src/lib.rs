@@ -28,16 +28,19 @@ mod material_file;
 mod material_preferences;
 mod materials;
 mod operation_cut_out;
+mod operation_group;
 mod operation_kind;
 mod operation_kind_run;
 mod operation_naming;
 mod operation_nearest;
+mod operation_options;
 mod operation_sequence;
 mod operation_settings;
 mod operation_settings_rule;
 mod operation_summary;
 mod overhang;
 mod record_envelope;
+mod steps;
 mod test_grid;
 mod test_grid_layout;
 mod test_grid_run;
@@ -46,9 +49,12 @@ mod test_grid_run;
 /// (ADR 0046 §5).
 pub mod operations {
     pub use crate::operation_cut_out::{CutOutError, cut_out_contours};
+    pub use crate::operation_group::{
+        GroupTick, group_assign_keys, group_tick, group_unassign_keys,
+    };
     pub use crate::operation_kind::{KindRead, OperationKind, Section};
     pub use crate::operation_kind_run::{KindRun, LeafShape, Lines, kind_run};
-    pub use crate::operation_naming::{next_operation_name, next_test_grid_name};
+    pub use crate::operation_naming::{last_of_kind, next_operation_name, next_test_grid_name};
     pub use crate::operation_nearest::{Assignment, ChainScope, OperationList, OperationRule};
     pub use crate::operation_sequence::{
         FixtureJobRead, cuts_last, fixture_block, insert_index, may_move, run_sequence,
@@ -57,20 +63,25 @@ pub mod operations {
 }
 
 /// The settings of operations and the in-memory material model of
-/// `specs/0028-material-test-library` (ADR 0054 §1 to §3; ADR 0055 §2).
+/// `specs/0028-material-test-library` (ADR 0054 §1 to §3; ADR 0055 §2), with the operation-only
+/// settings of `specs/0111-laser-operation-tools` (ADR 0056 §5, §6).
 pub mod settings {
     pub use crate::material::{
-        CellIndex, HistoryEntry, HistoryEvent, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS,
-        MachineTie, Material, MaterialRead, MaterialSet, Passes, PowerPercent, SetKind, SetSource,
-        Settings, Thickness, next_modified,
+        CellIndex, HistoryEntry, HistoryEvent, Interval, MAX_HISTORY_ENTRIES,
+        MAX_MATERIAL_NAME_CHARS, MachineTie, Material, MaterialRead, MaterialSet, Passes,
+        PowerPercent, SetKind, SetSource, Settings, Thickness, next_modified,
+    };
+    pub use crate::operation_options::{
+        ENTER_NUMBER, ENTER_WHOLE_NUMBER, OperationOptions, OptionEdit, OptionsDamage, Overscan,
+        ScanAngle, ZOffset, hatches, read_options,
     };
     pub use crate::operation_settings::{
         Field, MaterialLink, Overrides, Role, SetOverride, SettingsDamage, SettingsRead,
         StoredSettings, read_settings, set_value,
     };
     pub use crate::operation_settings_rule::{
-        RunSettings, SettingsState, StoredReason, TypedNumber, edit_number, main_set, refresh,
-        reset_to_material, resolve, use_material, use_own_numbers,
+        RunSettings, SettingsState, StoredReason, TypedNumber, edit_interval, edit_number,
+        main_set, refresh, reset_to_material, resolve, use_material, use_own_numbers,
     };
 }
 

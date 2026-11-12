@@ -129,3 +129,71 @@ fn every_damage_of_adr_0054_is_named_and_read_as_damaged() {
         "overrides without a link"
     );
 }
+
+#[test]
+fn an_engrave_interval_reads_back_and_absent_reads_the_default() {
+    let value = json!({
+        "main": {"power_pct": 30.0, "speed_mm_min": 6000, "passes": 1, "interval_mm": 0.08},
+        "material": {"id": "m1", "name": "Birch", "modified": 5},
+        "overrides": {"main": {"interval_mm": 0.12}},
+    });
+    for kind in [OperationKind::Engrave, OperationKind::EngraveOutline] {
+        let SettingsRead::Stored(stored) = read_settings(Some(&value), kind) else {
+            panic!("reads for {kind:?}");
+        };
+        assert_eq!(stored.interval.unwrap().hundredths(), 8);
+        assert_eq!(stored.overrides.main.interval.unwrap().hundredths(), 12);
+        assert_eq!(stored.overrides.main.fields(), []);
+        assert_eq!(stored.to_value(), value);
+    }
+    let own = StoredSettings::own(OperationKind::Engrave, set(30.0, 6000, 1), None);
+    assert_eq!(own.interval, None);
+    assert_eq!(
+        own.stored_interval(OperationKind::Engrave),
+        Some(Interval::DEFAULT)
+    );
+    assert_eq!(own.stored_interval(OperationKind::Score), None);
+}
+
+#[test]
+fn an_interval_out_of_place_or_range_is_damage() {
+    let main = |interval: Value| {
+        json!({"main": {"power_pct": 30.0, "speed_mm_min": 6000, "passes": 1,
+                        "interval_mm": interval}})
+    };
+    for kind in [
+        OperationKind::Cut,
+        OperationKind::Score,
+        OperationKind::CutOut,
+    ] {
+        assert_eq!(
+            damage(&main(json!(0.1)), kind),
+            Some(SettingsDamage::BadInterval),
+            "{kind:?}"
+        );
+    }
+    for bad in [json!(0.005), json!(2.01), json!(0.125), json!("0.1")] {
+        assert_eq!(
+            damage(&main(bad.clone()), OperationKind::Engrave),
+            Some(SettingsDamage::BadInterval),
+            "{bad}"
+        );
+    }
+    let outline = json!({
+        "main": {"power_pct": 30.0, "speed_mm_min": 6000, "passes": 1},
+        "outline": {"power_pct": 30.0, "speed_mm_min": 6000, "passes": 1, "interval_mm": 0.1},
+    });
+    assert_eq!(
+        damage(&outline, OperationKind::EngraveOutline),
+        Some(SettingsDamage::BadInterval)
+    );
+    let outline_override = json!({
+        "main": {"power_pct": 30.0, "speed_mm_min": 6000, "passes": 1},
+        "material": {"id": "m1", "name": "Birch", "modified": 5},
+        "overrides": {"outline": {"interval_mm": 0.1}},
+    });
+    assert_eq!(
+        damage(&outline_override, OperationKind::EngraveOutline),
+        Some(SettingsDamage::BadInterval)
+    );
+}

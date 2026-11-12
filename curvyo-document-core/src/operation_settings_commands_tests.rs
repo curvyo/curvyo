@@ -214,3 +214,67 @@ fn the_save_refresh_is_a_reserved_commit_without_a_step_and_only_when_something_
     assert_eq!(settings_of(&d, m, a), Some(Value::Object(own(65.0))));
     assert!(!d.refresh_material_numbers(&refreshed).unwrap());
 }
+
+#[test]
+fn the_options_map_is_written_whole_in_one_edit_settings_step_beside_the_settings() {
+    let d = Document::new(1);
+    let m = laser(&d);
+    let a = op(&d, m, "engrave");
+    let options = |id| {
+        d.operations(m)
+            .unwrap()
+            .into_iter()
+            .find(|o| o.id == id)
+            .unwrap()
+            .options
+    };
+    assert_eq!(options(a), None, "absent: every default");
+    let steps = d.own_step_count();
+    let value = map(
+        json!({"crosshatch": true, "bidirectional": true, "scan_angle_deg": 15.0,
+                           "overscan_pct": 2, "z_offset_mm": 0.0}),
+    );
+    assert!(d.write_operation_options(a, &value).unwrap());
+    assert_eq!(d.own_step_count(), steps + 1);
+    assert!(last_message(&d).starts_with("edit_operation_settings;"));
+    assert_eq!(options(a), Some(Value::Object(value.clone())));
+    assert_eq!(settings_of(&d, m, a), None, "No settings can carry options");
+    assert!(!d.write_operation_options(a, &value).unwrap(), "unchanged");
+    assert_eq!(d.own_step_count(), steps + 1);
+    let write = [SettingsWrite {
+        operation: a,
+        value: Some(own(30.0)),
+    }];
+    d.write_operation_settings(SettingsStep::UseMaterial, &write)
+        .unwrap();
+    assert_eq!(
+        options(a),
+        Some(Value::Object(value)),
+        "a settings write never touches the options"
+    );
+    let meta = d.operation_meta(a).unwrap();
+    meta.insert(KEY_OP_OPTIONS, "on").unwrap();
+    d.commit_with_label(crate::operation::RENAME_OPERATION_COMMIT_LABEL);
+    let read = d.operations(m).unwrap().remove(0);
+    assert_eq!(read.options, Some(json!("on")));
+    assert_eq!(
+        read.kind.as_deref(),
+        Some("engrave"),
+        "the kind stays readable"
+    );
+}
+
+#[test]
+fn a_grid_row_takes_no_options() {
+    let d = Document::new(1);
+    let m = laser(&d);
+    let row = op(&d, m, "cut");
+    let meta = d.operation_meta(row).unwrap();
+    meta.insert(crate::operation_codec::KEY_OP_GRID, true)
+        .unwrap();
+    d.commit_with_label(crate::operation::RENAME_OPERATION_COMMIT_LABEL);
+    assert_eq!(
+        d.write_operation_options(row, &map(json!({"z_offset_mm": 1.0}))),
+        Err(OperationError::GridRow)
+    );
+}

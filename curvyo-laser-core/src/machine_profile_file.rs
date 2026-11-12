@@ -12,8 +12,11 @@ use crate::machine_profile_fixtures::{FixtureJson, read_set, write_set};
 use crate::record_envelope::{EnvelopeError, open, pretty, record_id};
 
 /// The record format this build writes and the newest it reads: 2 added the fixture set
-/// (ADR 0050 §1), 3 adds the fixture jobs of each entry (ADR 0052 §7).
-pub const RECORD_FORMAT_VERSION: u64 = 3;
+/// (ADR 0050 §1), 3 the fixture jobs of each entry (ADR 0052 §7), 4 adds `motorised_z`
+/// (ADR 0056 §7).
+pub const RECORD_FORMAT_VERSION: u64 = 4;
+/// The record format with fixture jobs and without `motorised_z`, still read (ADR 0056 §7).
+const RECORD_FORMAT_NO_Z: u64 = 3;
 /// The record format with a fixture set without jobs, still read (ADR 0052 §7).
 const RECORD_FORMAT_NO_JOBS: u64 = 2;
 /// The record format without a fixture set, still read (ADR 0050 §2).
@@ -59,6 +62,8 @@ struct RecordJson {
     max_feed_mm_per_min: FeedRate,
     max_power: PowerValue,
     laser_mode: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    motorised_z: Option<bool>,
     connection: ConnectionJson,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fixtures: Option<Vec<FixtureJson>>,
@@ -89,12 +94,14 @@ struct ChoiceJson {
 /// The profile the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordError::Newer`] for a `format_version` above 3; [`RecordError::Damaged`] for a text over
+/// [`RecordError::Newer`] for a `format_version` above 4; [`RecordError::Damaged`] for a text over
 /// 128 KiB, a JSON or type error, an unknown key (`fixtures` in a format 1 record, `jobs` in a
-/// format 2 entry, `output` in a job), a value out of its range, a kind other than `laser`, an id
-/// that differs from the file name, or a format 2 or 3 record whose fixture set is missing or
-/// damaged (ADR 0050 §2, ADR 0052 §7). A format 1 record reads with an empty set, a format 2
-/// record with no jobs. Nothing is written on read.
+/// format 2 entry, `output` in a job, `motorised_z` in a format 1 to 3 record), a value out of its
+/// range, a kind other than `laser`, an id that differs from the file name, a format 2 to 4 record
+/// whose fixture set is missing or damaged (ADR 0050 §2, ADR 0052 §7), or a format 4 record
+/// without `motorised_z`. A format 1 record reads with an empty set, a format 2 record with no
+/// jobs, a format 1 to 3 record without a motorised Z axis (ADR 0056 §7). Nothing is written on
+/// read.
 pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, RecordError> {
     let (value, version) = open(
         text,
@@ -112,8 +119,15 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
     let fixtures = match (version, record.fixtures) {
         (RECORD_FORMAT_NO_FIXTURES, None) => Vec::new(),
         (RECORD_FORMAT_NO_JOBS, Some(set)) => read_set(set, false).ok_or(RecordError::Damaged)?,
-        (RECORD_FORMAT_VERSION, Some(set)) => read_set(set, true).ok_or(RecordError::Damaged)?,
+        (RECORD_FORMAT_NO_Z | RECORD_FORMAT_VERSION, Some(set)) => {
+            read_set(set, true).ok_or(RecordError::Damaged)?
+        }
         _ => return Err(RecordError::Damaged),
+    };
+    let motorised_z = match (version, record.motorised_z) {
+        (RECORD_FORMAT_VERSION, Some(on)) => on,
+        (RECORD_FORMAT_VERSION, None) | (_, Some(_)) => return Err(RecordError::Damaged),
+        (_, None) => false,
     };
     let valid = record_id(file_name) == Some(record.id.as_str())
         && record.kind == KIND_LASER
@@ -134,6 +148,7 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
             max_feed: record.max_feed_mm_per_min,
             max_power: record.max_power,
             laser_mode: record.laser_mode,
+            motorised_z,
         },
         work_area: DocumentSize::from_mm(record.work_area_mm.width, record.work_area_mm.height),
         connection: Connection {
@@ -145,8 +160,8 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
     })
 }
 
-/// The canonical text of a record, always format 3 with its `fixtures` and their `jobs`
-/// (ADR 0050 §3, ADR 0052 §7): fixed key
+/// The canonical text of a record, always format 4 with `motorised_z`, its `fixtures` and their
+/// `jobs` (ADR 0050 §3, ADR 0052 §7, ADR 0056 §7): fixed key
 /// order, two-space indent, trailing newline, so read, write, read is the identity.
 #[must_use]
 pub fn write_record(profile: &MachineProfile) -> String {
@@ -164,6 +179,7 @@ pub fn write_record(profile: &MachineProfile) -> String {
         max_feed_mm_per_min: profile.values.max_feed,
         max_power: profile.values.max_power,
         laser_mode: profile.values.laser_mode,
+        motorised_z: Some(profile.values.motorised_z),
         connection: ConnectionJson {
             connector_address: profile.connection.connector_address.clone(),
             controller_port: profile.connection.controller_port.clone(),
@@ -223,6 +239,8 @@ mod tests {
             "format3_max_set.json",
             "format3_damaged_token.json",
             "format3_output_key.json",
+            "format3_motorised_z_key.json",
+            "format4_motorised_z.json",
             "generic_laser_copy.json",
             "damaged_not_json.json",
             "damaged_wrong_type.json",
@@ -236,14 +254,16 @@ mod tests {
     }
 
     #[test]
-    fn a_format_1_record_reads_with_an_empty_set_and_any_write_is_format_3() {
+    fn a_format_1_record_reads_with_an_empty_set_and_any_write_is_format_4() {
         let text = fixture("format1_full_record.json");
         let profile = read_record(&record_file_name(ID), &text).unwrap();
         assert_eq!(profile.values.name, "K40 in the garage");
         assert_eq!(profile.connection.controller_port, "/dev/ttyUSB0");
         assert_eq!(profile.fixtures, Vec::new());
         let written = write_record(&profile);
-        assert!(written.starts_with("{\n  \"format_version\": 3,"));
+        assert!(written.starts_with("{\n  \"format_version\": 4,"));
+        assert!(written.contains("\n  \"motorised_z\": false,\n  \"connection\""));
+        assert!(!profile.values.motorised_z);
         assert!(written.ends_with("  },\n  \"fixtures\": []\n}\n"));
         assert_eq!(
             read_record(&record_file_name(ID), &written).unwrap(),
@@ -252,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn a_format_2_set_reads_without_jobs_and_writes_format_3() {
+    fn a_format_2_set_reads_without_jobs_and_writes_format_4() {
         let text = fixture("format2_fixtures.json");
         let profile = read_record(&record_file_name(ID), &text).unwrap();
         let kinds: Vec<&str> = profile.fixtures.iter().map(|f| f.kind.as_str()).collect();
@@ -273,7 +293,7 @@ mod tests {
         assert!(!profile.fixtures[2].active);
         assert!(profile.fixtures.iter().all(|f| f.jobs.is_empty()));
         let written = write_record(&profile);
-        assert!(written.starts_with("{\n  \"format_version\": 3,"));
+        assert!(written.starts_with("{\n  \"format_version\": 4,"));
         assert_eq!(written.matches("\"jobs\": []").count(), 4);
         assert_eq!(
             read_record(&record_file_name(ID), &written).unwrap(),
@@ -282,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn a_format_3_set_reads_its_jobs_and_writes_back_byte_identical() {
+    fn a_format_3_set_reads_its_jobs_without_a_motorised_z_axis_and_writes_format_4() {
         let text = fixture("format3_fixture_jobs.json");
         let profile = read_record(&record_file_name(ID), &text).unwrap();
         let holder = &profile.fixtures[1];
@@ -297,8 +317,44 @@ mod tests {
             profile.fixtures[3].jobs[0].targets[1].suffix.as_deref(),
             Some("thread")
         );
-        assert_eq!(write_record(&profile), text);
+        assert!(!profile.values.motorised_z, "format 3 reads it as off");
+        let format_4 = text
+            .replacen("\"format_version\": 3", "\"format_version\": 4", 1)
+            .replacen(
+                "\"laser_mode\": false,\n",
+                "\"laser_mode\": false,\n  \"motorised_z\": false,\n",
+                1,
+            );
+        assert_eq!(write_record(&profile), format_4);
         assert!(!text.contains("output"), "a profile holds no Output");
+    }
+
+    #[test]
+    fn a_format_4_record_reads_its_motorised_z_axis_and_writes_back_byte_identical() {
+        let text = fixture("format4_motorised_z.json");
+        let profile = read_record(&record_file_name(ID), &text).unwrap();
+        assert!(profile.values.motorised_z);
+        assert_eq!(profile.fixtures[1].jobs.len(), 2);
+        assert_eq!(write_record(&profile), text);
+        let without = text.replacen("  \"motorised_z\": true,\n", "", 1);
+        assert_eq!(
+            read_record(&record_file_name(ID), &without),
+            Err(RecordError::Damaged),
+            "format 4 always has it"
+        );
+        let not_bool = text.replacen("\"motorised_z\": true", "\"motorised_z\": 1", 1);
+        assert_eq!(
+            read_record(&record_file_name(ID), &not_bool),
+            Err(RecordError::Damaged)
+        );
+        assert_eq!(
+            read_record(
+                &record_file_name(ID),
+                &fixture("format3_motorised_z_key.json")
+            ),
+            Err(RecordError::Damaged),
+            "the key in a format 3 record is unknown"
+        );
     }
 
     #[test]

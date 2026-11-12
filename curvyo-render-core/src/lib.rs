@@ -92,7 +92,7 @@ pub use pen_cue::{ClosingCue, PenCue, build_pen_cue};
 pub use pen_preview::{CurvePreview, build_curve_pen_preview, build_pen_preview};
 pub use reference_box::{ReferenceBoxInput, ReferenceMark};
 pub use refusal_outline::build_refusal_outlines;
-pub use select_box::{SelectDecorationInput, SelectionBox};
+pub use select_box::{SelectDecorationInput, SelectionBox, build_context_outline};
 pub use select_decoration::{TransformDecorationInput, TransformGlyphKind, TransformHandleGlyph};
 pub use shape_preview::build_shape_live_preview;
 pub use text_edit_overlay::{TextEditOverlay, build_text_edit_overlay};

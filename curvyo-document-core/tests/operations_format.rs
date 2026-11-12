@@ -118,23 +118,6 @@ fn golden_document() -> Document {
     d
 }
 
-/// A group of two paths, a linked clone of the group, and a Score assigned to the clone's member
-/// `b` by path (ADR 0046 §2, Frage 167 B).
-fn clone_member_document() -> Document {
-    let d = Document::new(1);
-    let (_, mfg) = laser(&d);
-    let c = |k: u64, x: f64, y: f64| NewAnchor::corner(AnchorId::new(1, k), Point::new(x, y));
-    let a = d.create_path(&[c(1, 0.0, 0.0), c(2, 10.0, 0.0), c(3, 10.0, 10.0)], true);
-    let b = d.create_path(&[c(4, 20.0, 0.0), c(5, 30.0, 5.0)], false);
-    let group = d.group_objects(&[a, b]).unwrap();
-    let clone = d
-        .place_linked_clones(&[group], Vec2::new(100.0, 0.0))
-        .unwrap()[0];
-    let path = d.clone_member_path(clone, b).unwrap();
-    add(&d, mfg, "score", "Score 1", &[path]);
-    d
-}
-
 /// One operation of a kind this build does not know, holding one member, beside a Cut.
 fn unknown_kind_document() -> Document {
     let d = Document::new(1);
@@ -302,8 +285,8 @@ fn the_golden_reads_back_every_operation_switch_membership_and_cuts_last() {
     assert_eq!(format_of(&bytes), 39);
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 43);
+    // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 44);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let lists = all_operations(&opened);
@@ -362,14 +345,12 @@ fn the_golden_reads_back_every_operation_switch_membership_and_cuts_last() {
 
 #[test]
 fn a_clone_member_key_is_a_path_and_reads_back_unchanged() {
-    let expected = clone_member_document();
-    let bytes = read_or_write("operations_clone_member_v39.curvyo", || {
-        pack(&clone_member_document(), "0.1.0").unwrap()
-    });
+    // Frage 212 A (ADR 0056 §2): the legacy key is read, kept and saved back unchanged; the laser
+    // rules ignore it.
+    let bytes = std::fs::read(fixture_path("operations_clone_member_v39.curvyo")).unwrap();
     assert_eq!(format_of(&bytes), 39);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
-    assert_eq!(all_operations(&opened), all_operations(&expected));
     let list = &all_operations(&opened)[0];
     assert_eq!(list[0].members.len(), 1);
     assert_eq!(list[0].members[0].len(), 2, "the clone, then its member");

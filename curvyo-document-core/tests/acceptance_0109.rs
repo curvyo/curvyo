@@ -302,8 +302,8 @@ fn c28_the_format_has_no_bump_of_its_own() {
     // The auto-layout bumps nothing; 40 is the bump of `0102` laser-fixtures (ADR 0049).
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 43);
+    // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 44);
 }
 
 #[test]

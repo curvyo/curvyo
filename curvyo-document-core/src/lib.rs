@@ -130,8 +130,9 @@ mod manufacturing_slot_commands;
 pub use manufacturing::{
     ADD_OUTPUT_PAGE_COMMIT_LABEL, DELETE_PLACEMENT_COMMIT_LABEL, EDIT_LASER_MODE_COMMIT_LABEL,
     EDIT_MAX_FEED_COMMIT_LABEL, EDIT_MAX_POWER_COMMIT_LABEL, EDIT_ORIGIN_CORNER_COMMIT_LABEL,
-    EDIT_PROFILE_NAME_COMMIT_LABEL, FixtureParams, ManufacturingError, ManufacturingSnapshot,
-    NewOutputPage, PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot, ProfileChange,
+    EDIT_PROFILE_NAME_COMMIT_LABEL, FixtureParams, MOTORISED_Z_OFF_COMMIT_LABEL,
+    MOTORISED_Z_ON_COMMIT_LABEL, ManufacturingError, ManufacturingSnapshot, NewOutputPage,
+    PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot, ProfileChange,
     RESET_PROFILE_COMMIT_LABEL, SAVE_AS_PROFILE_COMMIT_LABEL,
 };
 pub use manufacturing_fixture_commands::{

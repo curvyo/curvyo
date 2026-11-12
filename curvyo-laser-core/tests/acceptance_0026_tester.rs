@@ -427,8 +427,8 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
     assert!(text.ends_with("}\n"), "trailing newline");
     assert!(!text.ends_with("\n\n"));
     assert!(
-        // Record format 3 since `specs/0103-fixture-jobs` (ADR 0052 §7).
-        text.starts_with("{\n  \"format_version\": 3,\n  \"id\": "),
+        // Record format 4 since `specs/0111-laser-operation-tools` (ADR 0056 §7).
+        text.starts_with("{\n  \"format_version\": 4,\n  \"id\": "),
         "{text}"
     );
     let order = [
@@ -442,6 +442,7 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
         "\"max_feed_mm_per_min\"",
         "\"max_power\"",
         "\"laser_mode\"",
+        "\"motorised_z\"",
         "\"connection\"",
         "\"fixtures\"",
     ];
@@ -536,6 +537,8 @@ fn ac6_the_copy_holds_id_and_copied_values_and_no_connection_or_work_area() {
             "laser_mode",
             "max_feed_mm_per_min",
             "max_power",
+            // The motorised Z axis of `0111` (ADR 0056 §7).
+            "motorised_z",
             "name",
             "origin"
         ]
@@ -981,7 +984,7 @@ fn ac13_a_newer_record_is_skipped_with_its_own_count() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
         // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
-        m.insert("format_version".into(), json!(4));
+        m.insert("format_version".into(), json!(5));
         m.insert("new_thing".into(), json!(true));
     });
     assert_eq!(
@@ -1089,7 +1092,7 @@ fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
         // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
-        m.insert("format_version".into(), json!(4));
+        m.insert("format_version".into(), json!(5));
     });
     let mut lib = MachineProfiles::load(&[(record_file_name(&p.id), newer)]);
     let write = lib.add(p.clone());
@@ -1163,6 +1166,7 @@ fn ac15_a_record_holds_no_project_content() {
             "max_feed_mm_per_min",
             "max_power",
             "modified",
+            "motorised_z",
             "name",
             "origin",
             "work_area_mm"

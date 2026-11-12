@@ -39,8 +39,12 @@ fn ac24_a_format_3_fixture_jobs_record_reads_and_writes_back_equal() {
     let written = write_record(&profile);
     let before: Value = serde_json::from_str(&text).unwrap();
     let after: Value = serde_json::from_str(&written).unwrap();
+    // Superseded by `0111` (ADR 0056 §7): the write is record format 4 with `motorised_z` off.
+    let mut before = before;
+    before["format_version"] = serde_json::json!(4);
+    before["motorised_z"] = serde_json::json!(false);
     assert_eq!(after, before, "reads, and the write is equal to the file");
-    assert_eq!(after["format_version"], 3);
+    assert_eq!(after["format_version"], 4);
 }
 
 #[test]
@@ -62,7 +66,7 @@ fn ac24_a_format_2_record_reads_and_any_write_is_format_3_with_empty_jobs() {
     let text = golden("format2_fixtures.json");
     let profile = read_record(&record_file_name(ID), &text).expect("format 2 reads");
     let written: Value = serde_json::from_str(&write_record(&profile)).unwrap();
-    assert_eq!(written["format_version"], 3, "a write is format 3");
+    assert_eq!(written["format_version"], 4, "a write is format 4 (`0111`)");
     let entries = written["fixtures"]
         .as_array()
         .expect("the fixtures are written");

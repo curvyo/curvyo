@@ -1,0 +1,156 @@
+{
+  "format_version": 4,
+  "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+  "kind": "laser",
+  "modified": 1762171200000,
+  "name": "K40 in the garage",
+  "work_area_mm": {
+    "width": 600.0,
+    "height": 400.0
+  },
+  "origin": "top_left",
+  "max_feed_mm_per_min": 12000,
+  "max_power": 255,
+  "laser_mode": false,
+  "motorised_z": true,
+  "connection": {
+    "connector_address": "192.168.1.40:8080",
+    "controller_port": "/dev/ttyUSB0",
+    "baud_rate": 115200
+  },
+  "fixtures": [
+    {
+      "kind": "engraved_grid",
+      "name": "Grid 1",
+      "active": true,
+      "params": {
+        "major_every": 5,
+        "origin_x_mm": 0.0,
+        "origin_y_mm": 0.0,
+        "spacing_mm": 10.0,
+        "tapes": [
+          "bottom",
+          "top",
+          "left",
+          "right"
+        ]
+      },
+      "slots": [],
+      "jobs": [
+        {
+          "kind": "cut",
+          "name": "Cut 1",
+          "show": true,
+          "targets": [
+            "grid.lines",
+            "grid.tapes"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "holder",
+      "name": "Holder 1",
+      "active": true,
+      "params": {
+        "height_mm": 60.0,
+        "width_mm": 100.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        40.0,
+        25.0
+      ],
+      "slots": [
+        {
+          "name": "Slot 1",
+          "shape": "circle",
+          "cx_mm": 30.0,
+          "cy_mm": 30.0,
+          "w_mm": 0.0,
+          "h_mm": 0.0,
+          "d_mm": 12.0
+        },
+        {
+          "name": "Slot 2",
+          "shape": "rect",
+          "cx_mm": 70.0,
+          "cy_mm": 30.0,
+          "w_mm": 20.0,
+          "h_mm": 15.0,
+          "d_mm": 0.0
+        }
+      ],
+      "jobs": [
+        {
+          "kind": "engrave_outline",
+          "name": "Engrave + Outline 1",
+          "show": true,
+          "targets": [
+            "board",
+            "slot:0",
+            "slot:1"
+          ]
+        },
+        {
+          "kind": "cut_out",
+          "name": "Cut-out 1",
+          "show": false,
+          "targets": []
+        }
+      ]
+    },
+    {
+      "kind": "stop",
+      "name": "Stop 1",
+      "active": false,
+      "params": {
+        "leg_a_mm": 60.0,
+        "leg_b_mm": 60.0,
+        "thickness_mm": 5.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "slots": [],
+      "jobs": []
+    },
+    {
+      "kind": "screw",
+      "name": "Screw 1",
+      "active": true,
+      "params": {
+        "head_diameter_mm": 10.0,
+        "thread_diameter_mm": 6.0
+      },
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        120.0,
+        80.0
+      ],
+      "slots": [],
+      "jobs": [
+        {
+          "kind": "score",
+          "name": "Score 1",
+          "show": true,
+          "targets": [
+            "screw.head",
+            "screw.thread"
+          ]
+        }
+      ]
+    }
+  ]
+}
