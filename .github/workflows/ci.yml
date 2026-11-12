@@ -521,6 +521,7 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test tiling_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test move_versus_edit_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test operations_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test operation_tools_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test fixtures_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test fixture_jobs_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test material_test_library_budget -- --nocapture --test-threads=1
