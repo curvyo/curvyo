@@ -137,7 +137,7 @@ From top to bottom, 244px column less the 16px indent (228px), 4px between field
 1. Material pick (`MaterialPick`, inline list, `0028` 8.2, unchanged), 228 x 28px, `SwatchBook` 16px at the left of the value.
 2. Power (112px, "%") and Passes (112px, "×") in one row.
 3. Speed (228px, "mm/min").
-4. Interval (228px, "mm"), Engrave and Engrave + Outline only (criterion 19): two decimals, 0.01 to 2.00, default 0.10. Engrave + Outline keeps its two sub-groups ("Hatch" and "Outline", `0028` 8.3); Interval sits in "Hatch".
+4. Interval (124px, "mm", label inside; as built beside Passes, wrapping onto its own line where the two do not fit), Engrave and Engrave + Outline only (criterion 19): two decimals, 0.01 to 2.00, default 0.10. Engrave + Outline keeps its two sub-groups ("Hatch" and "Outline", `0028` 8.3); Interval sits in "Hatch".
 5. State and "Differs" lines, "Material 60" under a typed field, "Reset to material", "Edit material", "No settings": all as built in `OperationSettingsBlock` (`0028` 8.3, 8.4). The draft's one-line "Differs from the material's set (30 %)" with a glyph button is not built; the built lines stay (criterion 18, section 14 M5).
 
 In this slice Interval is the operation's own number: it gets no "Material" line and "Reset to material" leaves it (criterion 19).
@@ -145,7 +145,7 @@ In this slice Interval is the operation's own number: it gets no "Material" line
 ### 6.3 Lower part: the operation-only settings (criteria 20, 21)
 
 - A 1px hairline (section 2) 8px under the upper part, the lower part 8px under it.
-- **Engrave, Engrave + Outline**, row 1: Crosshatch toggle (28 x 28, `Hash`), 4px, Bidirectional fill toggle (28 x 28, `ArrowRightLeft`), 4px, Scan angle field (164px, "°"). Row 2: Overscanning (112px, "%") and, with a motorised Z axis, Z offset (112px, "mm").
+- **Engrave, Engrave + Outline**, row 1: Crosshatch toggle (28 x 28, `Hash`), 4px, Bidirectional fill toggle (28 x 28, `ArrowRightLeft`), 4px, Scan angle field (164px, "°"). Row 2: Overscanning (128px, "%"); with a motorised Z axis, Z offset (128px, "mm") on row 3. (UX review 2026-11-12: with the label inside, "Overscanning 50 %" and "Z offset -20.0 mm" do not fit 112px, so the fields wrap instead of clipping.)
 - **Cut, Score, Cut-out:** with a motorised Z axis, one row: Z offset (112px, "mm"). Without it the lower part and its hairline are absent (nothing to show).
 - Toggles: the "Link corners toggle" look (pressed: active fill, white glyph; unpressed: transparent, ink glyph). Name and tooltip "Crosshatch" and "Bidirectional fill", `aria-pressed`. No caption (criterion 20). Defaults off and on.
 - Fields: the bar number field (28px, label inside left 12px muted, unit inside right 12px). Labels "Scan angle", "Overscanning", "Z offset". Ranges and steps: Scan angle -90.0 to 90.0, one decimal, Up and Down by 1 (Shift 10); Overscanning 0 to 50, whole numbers (T8), default 2; Z offset -20.0 to 20.0, one decimal, Up and Down by 0.1 (Shift 1).

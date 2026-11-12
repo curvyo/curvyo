@@ -6,6 +6,8 @@ places the record model in `curvyo-laser-core` instead of the `curvyo-library-co
 ADR 0004 §8 and [ADR 0011](0011-workspace-and-crate-layout.md) §2 until a second user of it
 exists. Spec: `specs/0026-machine-profile` criteria 2, 3, 4, 9, 10, 13, 14, 15.
 
+**Note (ADR 0056, proposed 2026-11-12):** §2: the profile values gain `motorised_z` (default false), and the profile record becomes format 4 (0056 §7).
+
 ## Context
 
 A machine profile describes one physical laser (bed, origin corner, limits, how to reach it) and

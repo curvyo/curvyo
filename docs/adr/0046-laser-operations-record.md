@@ -2,6 +2,8 @@
 
 **Status:** Accepted 2026-11-10 (customer accepted PR #305; document model and file format). Frage 167 to 170 answered by the customer 2026-11-09: 167 B (a member of a clone takes its own assignment, addressed by path), 168 A, 169 A (an assignment whose object is deleted is dropped silently; no "Missing item" row), 170 A. On acceptance it amends [ADR 0033](0033-manufacturing-data-in-the-project-file.md) §1, §3 and §7 by a note on its Status line (operations are child nodes of the manufacturing; `cuts_last` is an `x.*` register; `format_version` 39 for the shape). It replaces nothing. [ADR 0041](0041-membership-lifecycle.md) is the membership lifecycle of `0097` and is not touched. Feature notes: [`0101` adrs.md](../../specs/0101-laser-operations/adrs.md). 2026-11-10, after the customer's review of PR #305: the per-operation colour is dropped (`op_color` removed; an operation has no colour; the look follows from its kind, see `0101` `adrs.md` decision 8). Format 39 is not merged, so there is no migration and no compatibility to keep.
 
+**Note (ADR 0056, proposed 2026-11-12):** §2 and §7: a group assignment also writes the keys of the group's inner nodes, and a key with a path of more than one id (`member.<clone>/<member>`) is legacy: kept, ignored, never written (0056 §1, §2).
+
 ## Context
 
 A laser page (ADR 0042 output page, owned by its manufacturing, ADR 0032 §4) needs an ordered list of operations (Cut, Score, Engrave, Engrave + Outline, Cut-out). An item of the output page (an own object, a group, a linked clone, a member of a clone, a placed page, or a member row of a placed page) may be in any number of them. The list order is the run order, and the Cuts last switch keeps cutting after marking. The rules that matter for the file:
