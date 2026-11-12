@@ -366,7 +366,7 @@ fn the_settings_golden_reads_back_every_register_link_override_and_grid() {
     });
     assert_eq!(format_of(&bytes), 43);
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 44);
+    assert_eq!(CURRENT_FORMAT_VERSION, 45);
     let d = open_unchanged(&bytes);
     let ops = operations(&d);
     assert_eq!(ops.len(), 5, "four operations and the grid row");
@@ -474,8 +474,8 @@ fn a_file_of_format_44_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 45,
-            supported: 44
+            found: 46,
+            supported: 45
         })
     ));
 }

@@ -7,6 +7,7 @@
 //!   image_placement : [a, b, c, d, e, f]     the unit square to document mm, finite, within
 //!                                            ±1e7; a singular map is allowed and draws nothing
 //!   + `name`, `visible`, `locked`, `opacity`; no style keys, no outline
+//!   + the trace mask `trace_*` (`trace_mask_codec.rs`, ADR 0061)
 //! ```
 
 use loro::{LoroMap, LoroValue, ValueOrContainer};
@@ -30,8 +31,13 @@ pub(crate) fn is_image_meta(meta: &LoroMap) -> bool {
     )
 }
 
-/// Writes a new image node's registers.
+/// Writes an image node's registers. Writing an asset other than the stored one removes the
+/// node's trace mask in the same commit, so a mask never moves silently onto other pixels
+/// (ADR 0061 §8, Frage 5 ASSET-SWAP).
 pub(crate) fn write_image(meta: &LoroMap, asset: &AssetHash, placement: Affine) {
+    if read_asset(meta).is_some_and(|stored| stored != *asset) {
+        crate::trace_mask_codec::remove_all(meta);
+    }
     crate::shape_codec::write_shape_tag(meta, SHAPE_IMAGE);
     // invariant: inserting a plain value under a known key on an attached map cannot fail.
     #[allow(clippy::unwrap_used)]
@@ -88,5 +94,38 @@ pub(crate) fn validate_image_node(meta: &LoroMap) -> bool {
 pub(crate) fn translate_image_meta(meta: &LoroMap, offset: crate::units::Vec2) {
     if let Some(placement) = read_placement(meta) {
         write_placement(meta, Affine::translation(offset).compose(placement));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::trace_mask_codec::{read_trace_mask, write_part, write_region};
+    use crate::trace_mask_model::{NewTraceRegion, TraceRegionKind, UnitPoint};
+
+    /// ADR 0061 §8 (Frage 5 ASSET-SWAP): writing another asset drops the mask; writing the same
+    /// asset again (a moved tiling instance) keeps it.
+    #[test]
+    fn a_new_asset_drops_the_trace_mask_and_the_same_asset_keeps_it() {
+        let doc = loro::LoroDoc::new();
+        let meta = doc.get_map("meta");
+        let placement = Affine::new(10.0, 0.0, 0.0, 10.0, 0.0, 0.0);
+        write_image(&meta, &AssetHash::of(b"a"), placement);
+        write_part(&meta, "0", 0, false);
+        let region = NewTraceRegion {
+            kind: TraceRegionKind::Rect,
+            subtract: false,
+            points: vec![UnitPoint::new(0.0, 0.0), UnitPoint::new(1.0, 1.0)],
+        };
+        write_region(&meta, "0", "1@1", 0, &region);
+        write_image(
+            &meta,
+            &AssetHash::of(b"a"),
+            Affine::translation(crate::units::Vec2::new(1.0, 0.0)),
+        );
+        assert_eq!(read_trace_mask(&meta).parts[0].regions.len(), 1);
+        write_image(&meta, &AssetHash::of(b"b"), placement);
+        assert!(read_trace_mask(&meta).is_empty());
+        assert_eq!(read_asset(&meta), Some(AssetHash::of(b"b")));
     }
 }

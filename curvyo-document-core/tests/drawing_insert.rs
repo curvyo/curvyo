@@ -184,7 +184,7 @@ fn ac2_ac77_a_document_from_a_drawing_has_no_step() {
     let reopened = curvyo_document_core::unpack(5, &bytes).unwrap();
     assert_eq!(reopened.read_objects().objects.len(), 3);
     // No format change of its own (criterion 77); `0058` took 25 for images, `0059` took 26 for pages, `0060` 27 for snapping, `0066` 28 and 29 for sketches, `0090` 30 for grids, `0070` 31 for dimensions, `0071` 32 for patterns, `0069` 33 for tilings, `0092` 34 for page frames, `0093` 35 for manufacturings, `0026` 36 for machine profiles, `0098` 37 for page kinds, `0100` 38 for clones of groups, `0101` 39 for laser operations, `0102` 40 for laser fixtures, `0103` 41 for fixture jobs, `0110` 42 for editable curves, `0028` 43 for laser settings and test grids.
-    assert!((24..=44).contains(&CURRENT_FORMAT_VERSION));
+    assert!((24..=45).contains(&CURRENT_FORMAT_VERSION));
 }
 
 fn drawing_text(string: &str, hash: &str) -> curvyo_document_core::DrawingText {

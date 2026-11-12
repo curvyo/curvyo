@@ -119,9 +119,9 @@ fn merge(a: &Document, b: &Document) {
 
 #[test]
 fn c25_the_format_is_44() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 44);
+    assert_eq!(CURRENT_FORMAT_VERSION, 45);
     let (d, _, _) = laser();
-    assert_eq!(format_of(&pack(&d, "t").unwrap()), 44);
+    assert_eq!(format_of(&pack(&d, "t").unwrap()), 45);
 }
 
 #[test]

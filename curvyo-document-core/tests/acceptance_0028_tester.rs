@@ -146,7 +146,7 @@ fn settings_survive_a_pack_round_trip_and_reopen_writes_no_step() {
         json!(22.0)
     );
     assert_eq!(format_of(&bytes), u64::from(CURRENT_FORMAT_VERSION));
-    assert_eq!(CURRENT_FORMAT_VERSION, 44);
+    assert_eq!(CURRENT_FORMAT_VERSION, 45);
 }
 
 // ---- format 41 ----------------------------------------------------------------------------------

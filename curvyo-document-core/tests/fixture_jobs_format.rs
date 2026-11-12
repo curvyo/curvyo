@@ -241,7 +241,7 @@ fn the_round_trip_golden_reads_back_every_job_switch_and_tick() {
     assert_eq!(format_of(&bytes), 41);
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053); the v41 golden stays.
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 44);
+    assert_eq!(CURRENT_FORMAT_VERSION, 45);
     let read = open_unchanged(&bytes);
     assert_eq!(read.len(), 4);
     let engrave = &read[0].jobs[0];
@@ -368,8 +368,8 @@ fn a_file_of_format_42_is_refused() {
         unpack(2, &bytes),
         // Superseded by `0110` (format 42) and `0028` (format 43): the next number is 44.
         Err(OpenError::FormatTooNew {
-            found: 45,
-            supported: 44
+            found: 46,
+            supported: 45
         })
     ));
 }
