@@ -145,6 +145,74 @@ impl Thickness {
     }
 }
 
+/// The distance between hatch lines, 0.01 to 2.00 mm with two decimals, kept in hundredths of a
+/// millimetre (ADR 0056 §5, `specs/0111` criterion 19).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Interval(u16);
+
+impl Interval {
+    /// The smallest interval, in hundredths of a millimetre.
+    pub const MIN_HUNDREDTHS: u16 = 1;
+    /// The largest interval, in hundredths of a millimetre.
+    pub const MAX_HUNDREDTHS: u16 = 200;
+    /// The interval of an operation that stores none, 0.10 mm.
+    pub const DEFAULT: Self = Self(10);
+    /// The chip text of a typed interval out of range (UX section 10).
+    pub const RANGE_TEXT: &'static str = "Interval is 0.01 to 2.00 mm.";
+
+    /// The interval of `hundredths` hundredths of a millimetre, `None` outside 0.01 to 2.00 mm.
+    #[must_use]
+    pub fn from_hundredths(hundredths: i64) -> Option<Self> {
+        u16::try_from(hundredths)
+            .ok()
+            .filter(|h| (Self::MIN_HUNDREDTHS..=Self::MAX_HUNDREDTHS).contains(h))
+            .map(Self)
+    }
+
+    /// The exact stored interval `mm`, `None` with more than two decimals or out of range.
+    #[must_use]
+    pub fn from_mm(mm: f64) -> Option<Self> {
+        Self::from_hundredths(crate::steps::exact_steps(mm, 100.0)?)
+    }
+
+    /// A typed interval, rounded to 0.01 mm; a value outside 0.01 to 2.00 mm is refused before
+    /// rounding (`specs/0111` criterion 24).
+    ///
+    /// # Errors
+    /// The chip text.
+    pub fn typed(mm: f64) -> Result<Self, &'static str> {
+        if !mm.is_finite() {
+            return Err(crate::operation_options::ENTER_NUMBER);
+        }
+        crate::steps::typed_steps(
+            mm,
+            100.0,
+            f64::from(Self::MIN_HUNDREDTHS),
+            f64::from(Self::MAX_HUNDREDTHS),
+        )
+        .and_then(Self::from_hundredths)
+        .ok_or(Self::RANGE_TEXT)
+    }
+
+    /// Hundredths of a millimetre.
+    #[must_use]
+    pub const fn hundredths(self) -> u16 {
+        self.0
+    }
+
+    /// The interval in mm.
+    #[must_use]
+    pub fn mm(self) -> f64 {
+        f64::from(self.0) / 100.0
+    }
+}
+
+impl Default for Interval {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// The three kinds a set belongs to; also the kind of a test grid (spec "Words").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SetKind {
@@ -367,6 +435,24 @@ mod tests {
         for bad in [0.0, 100.1, 2.55, f64::NAN, -1.0] {
             assert_eq!(Thickness::from_mm(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn interval_keeps_two_decimals_and_its_range() {
+        assert_eq!(Interval::default().mm(), 0.1);
+        assert_eq!(Interval::from_mm(0.01).unwrap().hundredths(), 1);
+        assert_eq!(Interval::from_mm(2.0).unwrap().hundredths(), 200);
+        assert_eq!(Interval::from_mm(0.25).unwrap().mm(), 0.25);
+        for bad in [0.0, 0.005, 2.01, 0.125, -0.1, f64::NAN] {
+            assert_eq!(Interval::from_mm(bad), None, "{bad}");
+        }
+        assert_eq!(Interval::typed(0.123).unwrap().hundredths(), 12);
+        assert_eq!(Interval::typed(0.004), Err("Interval is 0.01 to 2.00 mm."));
+        assert_eq!(Interval::typed(0.005), Err("Interval is 0.01 to 2.00 mm."));
+        assert_eq!(Interval::typed(2.004), Err("Interval is 0.01 to 2.00 mm."));
+        assert_eq!(Interval::typed(0.01).unwrap().hundredths(), 1);
+        assert_eq!(Interval::typed(2.5), Err("Interval is 0.01 to 2.00 mm."));
+        assert_eq!(Interval::typed(f64::INFINITY), Err("Enter a number."));
     }
 
     #[test]

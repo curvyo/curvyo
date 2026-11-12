@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::material::{MachineTie, MaterialSet, SetSource, Thickness};
+use crate::material::{Interval, MachineTie, MaterialSet, SetSource, Thickness};
 use crate::operation_settings::SetOverride;
 
 const PROFILE: &str = "generic-laser";
@@ -43,6 +43,7 @@ fn material(id: &str, modified: u64, sets: &[(SetKind, Settings)]) -> Material {
 fn linked(main: Settings, modified: u64, overrides: Overrides) -> SettingsRead {
     SettingsRead::Stored(StoredSettings {
         main,
+        interval: None,
         outline: None,
         material: Some(MaterialLink {
             id: "m1".to_owned(),
@@ -76,7 +77,7 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
             (SetKind::Score, set(15.0, 9000, 1)),
         ],
     );
-    let stored = use_material(&both, OperationKind::EngraveOutline).unwrap();
+    let stored = use_material(&both, OperationKind::EngraveOutline, &SettingsRead::None).unwrap();
     assert_eq!(stored.outline, Some(set(15.0, 9000, 1)));
     let link = stored.material.unwrap();
     assert_eq!(
@@ -85,20 +86,26 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
     );
     assert!(stored.overrides.is_empty(), "a pick clears typed numbers");
     let engrave_only = material("m2", 1, &[(SetKind::Engrave, set(30.0, 6000, 1))]);
-    let stored = use_material(&engrave_only, OperationKind::EngraveOutline).unwrap();
+    let stored = use_material(
+        &engrave_only,
+        OperationKind::EngraveOutline,
+        &SettingsRead::None,
+    )
+    .unwrap();
     assert_eq!(stored.outline, Some(set(30.0, 6000, 1)));
     assert_eq!(
         stored.material.unwrap().outline_from,
         Some(SetKind::Engrave)
     );
     assert_eq!(
-        use_material(&engrave_only, OperationKind::Cut),
+        use_material(&engrave_only, OperationKind::Cut, &SettingsRead::None),
         Err(SetKind::Cut),
         "skipped and named"
     );
     let cut = use_material(
         &material("m3", 1, &[(SetKind::Cut, set(60.0, 300, 2))]),
         OperationKind::CutOut,
+        &SettingsRead::None,
     )
     .unwrap();
     assert_eq!((cut.main, cut.outline), (set(60.0, 300, 2), None));
@@ -365,4 +372,89 @@ fn reset_and_own_numbers_end_the_typed_numbers_or_the_link() {
     let own_read = SettingsRead::Stored(own);
     let own_state = resolve(&own_read, cut, &library, PROFILE);
     assert_eq!(use_own_numbers(&own_read, &own_state, cut), None);
+}
+
+fn with_interval(read: SettingsRead, hundredths: i64) -> SettingsRead {
+    let SettingsRead::Stored(mut stored) = read else {
+        panic!("stored");
+    };
+    stored.interval = Interval::from_hundredths(hundredths);
+    SettingsRead::Stored(stored)
+}
+
+#[test]
+fn material_paths_keep_the_stored_interval_and_a_typed_interval_writes_main() {
+    // `specs/0111` criteria 19 and 23: no material holds an interval in this slice.
+    let kind = OperationKind::Engrave;
+    let birch = material("m1", 9, &[(SetKind::Engrave, set(35.0, 6000, 1))]);
+    let library = [MaterialRead::Loaded(birch.clone())];
+    let read = with_interval(linked(set(30.0, 6000, 1), 5, power_override(40.0)), 8);
+    let state = resolve(&read, kind, &library, PROFILE);
+    let eight = Interval::from_hundredths(8);
+    assert_eq!(state.run().unwrap().interval, eight);
+    assert_eq!(state.material().unwrap().interval, eight);
+
+    let picked = use_material(&birch, kind, &read).unwrap();
+    assert_eq!(picked.interval, eight, "a pick keeps the interval");
+    let refreshed = refresh(&read, kind, &library, PROFILE, false).unwrap();
+    assert_eq!(refreshed.interval, eight, "a refresh keeps it");
+    let reset = reset_to_material(&read).unwrap();
+    assert_eq!(reset.interval, eight, "Reset to material keeps it");
+    let own = use_own_numbers(&read, &state, kind).unwrap();
+    assert_eq!(own.interval, eight, "own numbers keep it");
+
+    let typed = Interval::from_hundredths(15).unwrap();
+    let edited = edit_interval(&read, kind, typed).unwrap();
+    assert_eq!(edited.interval, Some(typed), "into main, not an override");
+    assert_eq!(edited.overrides, read_overrides_of(&read));
+    assert!(edited.material.is_some(), "the link stays");
+    assert_eq!(
+        edit_interval(&SettingsRead::Stored(edited.clone()), kind, typed),
+        None,
+        "unchanged"
+    );
+    assert_eq!(
+        edit_interval(&read, OperationKind::Cut, typed),
+        None,
+        "a Cut has no interval"
+    );
+    assert_eq!(edit_interval(&SettingsRead::None, kind, typed), None);
+
+    let cut = linked(set(60.0, 300, 1), 5, Overrides::default());
+    let cut_state = resolve(&cut, OperationKind::Cut, &[], PROFILE);
+    assert_eq!(cut_state.run().unwrap().interval, None);
+    let absent = linked(set(30.0, 6000, 1), 5, Overrides::default());
+    assert_eq!(
+        resolve(&absent, kind, &[], PROFILE).run().unwrap().interval,
+        Some(Interval::DEFAULT)
+    );
+}
+
+#[test]
+fn an_interval_typed_over_the_link_in_a_file_runs_and_a_typed_interval_replaces_it() {
+    let kind = OperationKind::EngraveOutline;
+    let overrides = Overrides {
+        main: SetOverride {
+            interval: Interval::from_hundredths(20),
+            ..SetOverride::default()
+        },
+        ..Overrides::default()
+    };
+    let read = with_interval(linked(set(30.0, 6000, 1), 5, overrides), 8);
+    let state = resolve(&read, kind, &[], PROFILE);
+    assert_eq!(state.run().unwrap().interval, Interval::from_hundredths(20));
+    assert_eq!(
+        state.material().unwrap().interval,
+        Interval::from_hundredths(8)
+    );
+    let edited = edit_interval(&read, kind, Interval::from_hundredths(9).unwrap()).unwrap();
+    assert_eq!(edited.overrides, Overrides::default());
+    assert_eq!(edited.interval, Interval::from_hundredths(9));
+}
+
+fn read_overrides_of(read: &SettingsRead) -> Overrides {
+    let SettingsRead::Stored(stored) = read else {
+        panic!("stored");
+    };
+    stored.overrides
 }

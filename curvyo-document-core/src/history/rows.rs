@@ -183,6 +183,8 @@ pub fn is_document_level_label(label: &str) -> bool {
             | "edit_max_feed"
             | "edit_max_power"
             | "edit_laser_mode"
+            | "motorised_z_on"
+            | "motorised_z_off"
     )
 }
 

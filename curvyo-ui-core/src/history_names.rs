@@ -103,6 +103,9 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("edit_max_feed", "Edit max feed"),
     ("edit_max_power", "Edit max power"),
     ("edit_laser_mode", "Edit laser mode"),
+    // `specs/0111-laser-operation-tools` criterion 22.
+    ("motorised_z_on", "Motorised Z axis on"),
+    ("motorised_z_off", "Motorised Z axis off"),
     ("add_sketch", "Add sketch"),
     ("edit_sketch", "Edit sketch"),
     ("convert_sketch_to_path", "Sketch to path"),

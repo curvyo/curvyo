@@ -51,6 +51,7 @@ fn op(
         margin: Length::from_mm(0.0),
         members,
         settings: None,
+        options: None,
         grid: false,
     }
 }

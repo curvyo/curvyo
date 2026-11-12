@@ -82,8 +82,8 @@ fn damaged_total(d: &Document) -> usize {
 #[test]
 fn ac20_the_current_format_is_41() {
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
-    assert_eq!(CURRENT_FORMAT_VERSION, 43);
+    // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
+    assert_eq!(CURRENT_FORMAT_VERSION, 44);
 }
 
 #[test]
@@ -139,10 +139,10 @@ fn ac20_golden_v41_saves_as_format_41() {
             f.read_to_string(&mut t).unwrap();
             if t.contains("\"format_version\"") {
                 // Saved at the current format, 42 since `specs/0110-pen-modes-variable-stroke`, 43
-                // since `specs/0028-material-test-library`.
+                // since `specs/0028-material-test-library`, 44 since `specs/0111`.
                 assert!(
-                    t.contains("\"format_version\": 43") || t.contains("\"format_version\":43"),
-                    "the manifest says 43"
+                    t.contains("\"format_version\": 44") || t.contains("\"format_version\":44"),
+                    "the manifest says 44"
                 );
                 seen = true;
             }
@@ -209,8 +209,9 @@ fn ac20_a_format_42_file_is_refused() {
         "0.1.0",
     )
     .unwrap();
-    // Superseded by `0110` (format 42) and `0028` (format 43): the next number is refused.
-    let future = with_format(&bytes, 44);
+    // Superseded by `0110` (format 42), `0028` (format 43) and `0111` (format 44): the next number
+    // is refused.
+    let future = with_format(&bytes, 45);
     assert!(
         unpack(8, &future).is_err(),
         "a file of a later format is refused, not read"

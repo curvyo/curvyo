@@ -119,6 +119,13 @@ impl UndoStack {
         }
     }
 
+    /// The name the maker reads for `step` when the session gave it one ("Assign to Cut 1"),
+    /// `None` for a step named by its label or not on the stacks.
+    #[must_use]
+    pub fn custom_name(&self, step: StepRef) -> Option<&str> {
+        self.entries.get(&step)?.name.as_deref()
+    }
+
     /// The step an undo press acts on.
     #[must_use]
     pub fn undo_target(&self) -> Option<Target> {

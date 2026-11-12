@@ -45,6 +45,10 @@ pub const EDIT_MAX_FEED_COMMIT_LABEL: &str = "edit_max_feed";
 pub const EDIT_MAX_POWER_COMMIT_LABEL: &str = "edit_max_power";
 /// The label of an edit of the copy's laser mode.
 pub const EDIT_LASER_MODE_COMMIT_LABEL: &str = "edit_laser_mode";
+/// The label of the copy's motorised Z axis switched on (`specs/0111` criterion 22).
+pub const MOTORISED_Z_ON_COMMIT_LABEL: &str = "motorised_z_on";
+/// The label of the copy's motorised Z axis switched off (`specs/0111` criterion 22).
+pub const MOTORISED_Z_OFF_COMMIT_LABEL: &str = "motorised_z_off";
 
 /// Which change writes the machine profile copy; each is one history step with its own label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +69,11 @@ pub enum ProfileChange {
     EditMaxPower,
     /// The laser mode switch.
     EditLaserMode,
+    /// The Motorised Z axis switch, to `on` (ADR 0056 §7).
+    MotorisedZ {
+        /// The new state.
+        on: bool,
+    },
 }
 
 impl ProfileChange {
@@ -80,6 +89,8 @@ impl ProfileChange {
             Self::EditMaxFeed => EDIT_MAX_FEED_COMMIT_LABEL,
             Self::EditMaxPower => EDIT_MAX_POWER_COMMIT_LABEL,
             Self::EditLaserMode => EDIT_LASER_MODE_COMMIT_LABEL,
+            Self::MotorisedZ { on: true } => MOTORISED_Z_ON_COMMIT_LABEL,
+            Self::MotorisedZ { on: false } => MOTORISED_Z_OFF_COMMIT_LABEL,
         }
     }
 }

@@ -134,6 +134,12 @@ impl SelectTool {
         !matches!(self.drag, SelectDrag::None)
     }
 
+    /// Whether the drag in flight is a marquee or a lasso: it only selects, it moves nothing.
+    #[must_use]
+    pub const fn area_drag_in_flight(&self) -> bool {
+        matches!(self.drag, SelectDrag::Marquee(_) | SelectDrag::Lasso(_))
+    }
+
     /// Whether the parameter handles are drawn right now: not while the same
     /// object is moved, resized, rotated or skewed by drag (the box can cross
     /// the 72 px threshold mid-drag and they are no part of that gesture), but

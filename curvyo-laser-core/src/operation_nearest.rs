@@ -1,4 +1,5 @@
-//! The nearest rule of criterion 12: which operations a leaf runs with (ADR 0046 §5).
+//! The nearest rule of criterion 12: which operations a leaf runs with (ADR 0046 §5, ADR 0056
+//! §2).
 
 use std::collections::HashMap;
 
@@ -70,7 +71,9 @@ pub struct OperationList {
 
 impl OperationList {
     /// The list of `operations` (stored order) under the Cuts last switch. Missing items are not
-    /// targets: a gone node is in no chain.
+    /// targets: a gone node is in no chain. A key whose path holds more than one id (a clone
+    /// member's, Frage 212 A) is legacy: kept in the file, it is no target of any rule, tick or
+    /// count, so a leaf inside a clone runs with the clone's operations.
     #[must_use]
     pub fn new(operations: &[OperationSnapshot], cuts_last: bool) -> Self {
         let rules: Vec<OperationRule> = operations.iter().map(OperationRule::of).collect();
@@ -78,7 +81,7 @@ impl OperationList {
         let sequence = run_sequence(&kinds, cuts_last);
         let mut by_target: HashMap<Vec<NodeId>, Vec<usize>> = HashMap::new();
         for &at in &sequence {
-            for member in &operations[at].members {
+            for member in operations[at].members.iter().filter(|path| path.len() == 1) {
                 by_target.entry(member.clone()).or_default().push(at);
             }
         }
@@ -160,6 +163,7 @@ pub(crate) mod tests {
             margin: Length::from_mm(0.0),
             members: members.iter().map(|&member| vec![member]).collect(),
             settings: None,
+            options: None,
             grid: false,
         }
     }
@@ -187,6 +191,21 @@ pub(crate) mod tests {
             list.nearest(&[vec![id(9)]], ChainScope::Whole),
             None,
             "Not assigned"
+        );
+    }
+
+    #[test]
+    fn a_clone_member_key_is_legacy_and_the_member_runs_with_the_clone() {
+        let (clone, member) = (id(1), id(2));
+        let mut engrave = op(1, Some("engrave"), true, &[]);
+        engrave.members = vec![vec![clone, member]];
+        let list = OperationList::new(&[op(0, Some("cut"), true, &[clone]), engrave], true);
+        assert_eq!(list.operations_of(&[clone, member]), &[] as &[usize]);
+        let chain = [vec![clone, member], vec![clone]];
+        let assignment = list.nearest(&chain, ChainScope::Whole).unwrap();
+        assert_eq!(
+            (assignment.target, assignment.operations),
+            (vec![clone], vec![0])
         );
     }
 

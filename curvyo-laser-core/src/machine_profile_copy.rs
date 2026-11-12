@@ -1,5 +1,5 @@
-//! Reads and writes the machine profile copy of a manufacturing (ADR 0039 §1 to §3, §5, §6): the
-//! `mfg_profile` map, every field read on its own with its default on damage.
+//! Reads and writes the machine profile copy of a manufacturing (ADR 0039 §1 to §3, §5, §6;
+//! ADR 0056 §7): the `mfg_profile` map, every field read on its own with its default on damage.
 
 use curvyo_document_core::{DocumentSize, PRESET_MATCH_TOLERANCE};
 use curvyo_extension_core::StoredParams;
@@ -16,6 +16,7 @@ const ORIGIN: &str = "origin";
 const MAX_FEED: &str = "max_feed_mm_per_min";
 const MAX_POWER: &str = "max_power";
 const LASER_MODE: &str = "laser_mode";
+const MOTORISED_Z: &str = "motorised_z";
 
 /// The notice of a copy whose stored name was damaged (criterion 12).
 pub const DAMAGED_NAME_NOTICE: &str = "Name was damaged, showing Generic laser";
@@ -90,6 +91,10 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
             .get(LASER_MODE)
             .and_then(Value::as_bool)
             .unwrap_or(defaults.laser_mode),
+        motorised_z: stored
+            .get(MOTORISED_Z)
+            .and_then(Value::as_bool)
+            .unwrap_or(defaults.motorised_z),
     };
     CopyRead {
         copy: ProfileCopy {
@@ -128,6 +133,7 @@ pub fn write_copy(copy: &ProfileCopy) -> StoredParams {
         Value::from(copy.values.max_power.get()),
     );
     map.insert(LASER_MODE.to_owned(), Value::from(copy.values.laser_mode));
+    map.insert(MOTORISED_Z.to_owned(), Value::from(copy.values.motorised_z));
     map
 }
 
@@ -167,6 +173,7 @@ mod tests {
                 "laser_mode",
                 "max_feed_mm_per_min",
                 "max_power",
+                "motorised_z",
                 "name",
                 "origin"
             ]
@@ -184,6 +191,7 @@ mod tests {
             "max_feed_mm_per_min": "fast",
             "max_power": 0,
             "laser_mode": 1,
+            "motorised_z": "yes",
         }));
         let read = read_copy(Some(&map), None);
         assert!(read.name_damaged);
@@ -219,5 +227,20 @@ mod tests {
         let mut renamed = copy.clone();
         renamed.values.name = "Other".into();
         assert!(differs(&renamed, area, &record));
+        let mut motorised = copy.clone();
+        motorised.values.motorised_z = true;
+        assert!(differs(&motorised, area, &record));
+    }
+
+    #[test]
+    fn the_motorised_z_axis_is_copied_and_absent_reads_off() {
+        let mut profile = MachineProfile::generic_laser();
+        assert!(!profile.values.motorised_z, "Generic laser has none");
+        profile.values.motorised_z = true;
+        let map = write_copy(&ProfileCopy::of(&profile));
+        assert_eq!(map.get("motorised_z"), Some(&json!(true)));
+        assert!(read_copy(Some(&map), None).copy.values.motorised_z);
+        let older = stored(json!({"name": "K40", "laser_mode": false}));
+        assert!(!read_copy(Some(&older), None).copy.values.motorised_z);
     }
 }

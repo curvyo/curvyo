@@ -1,6 +1,7 @@
 //! The operation commands of `specs/0101-laser-operations` (ADR 0046 §1 to §3): each writes one
-//! history step under its label, memberships are `member.<path>` keys (a clone member by path),
-//! and deleting an operation, a target or a placement takes its keys with it in the same step.
+//! history step under its label, memberships are `member.<path>` keys (a clone member's path key
+//! is legacy since ADR 0056 §2: read and kept, ignored by the laser rules), and deleting an operation, a target or a
+//! placement takes its keys with it in the same step.
 
 #![allow(
     clippy::unwrap_used,
@@ -10,11 +11,73 @@
     clippy::many_single_char_names
 )]
 
+use std::io::{Cursor, Read, Write};
+
 use curvyo_document_core::{
     Affine, AnchorId, Document, DocumentSize, Length, MovePlan, MoveTarget, NewAnchor,
     NewOperation, NewOutputPage, NodeId, OperationError, OperationSnapshot, OperationSwitch, Page,
-    Point, RectBounds, StepRef, Vec2,
+    Point, RectBounds, StepRef, Vec2, pack, unpack,
 };
+
+/// The stored text of `id` (`<peer>:<counter>`, ADR 0046 §2).
+fn id_text(id: NodeId) -> String {
+    let value = serde_json::to_value(id).unwrap();
+    format!("{}:{}", value["peer"].as_str().unwrap(), value["counter"])
+}
+
+/// `d` saved, with the legacy key of `path` planted raw on its first operation (as a file of
+/// format 39 to 43 holds it; ADR 0056 §2), and opened again.
+fn with_legacy_key(d: &Document, path: &[NodeId]) -> Document {
+    let bytes = pack(d, "0.1.0").unwrap();
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut files = Vec::new();
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).unwrap();
+        let mut content = Vec::new();
+        file.read_to_end(&mut content).unwrap();
+        let name = file.name().unwrap().to_string();
+        files.push((name, content));
+    }
+    let key = format!(
+        "member.{}",
+        path.iter()
+            .map(|&id| id_text(id))
+            .collect::<Vec<_>>()
+            .join("/")
+    );
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for (name, mut content) in files {
+        if name == "document.loro" {
+            let loro = loro::LoroDoc::new();
+            loro.import(&content).unwrap();
+            let tree = loro.get_tree("paths");
+            let mut stack = tree.children(loro::TreeParentId::Root).unwrap();
+            let mut planted = false;
+            while let Some(node) = stack.pop() {
+                let meta = tree.get_meta(node).unwrap();
+                if !planted
+                    && meta.get("shape").and_then(|v| v.into_value().ok())
+                        == Some(loro::LoroValue::from("operation"))
+                {
+                    meta.insert(&key, true).unwrap();
+                    planted = true;
+                }
+                stack.extend(
+                    tree.children(loro::TreeParentId::Node(node))
+                        .unwrap_or_default(),
+                );
+            }
+            assert!(planted, "an operation to hold the key");
+            loro.commit();
+            content = loro.export(loro::ExportMode::Snapshot).unwrap();
+        }
+        writer
+            .start_file(name.clone(), zip::write::SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(&content).unwrap();
+    }
+    unpack(2, &writer.finish().unwrap().into_inner()).unwrap()
+}
 
 fn laser(d: &Document) -> (Page, NodeId) {
     let page = d
@@ -325,7 +388,7 @@ fn group_with_clone(d: &Document) -> (NodeId, NodeId, NodeId) {
 }
 
 #[test]
-fn a_clone_member_is_keyed_by_its_path_and_read_with_its_chain() {
+fn a_legacy_clone_member_key_is_read_by_its_path_and_kept() {
     let d = Document::new(1);
     let (_, mfg) = laser(&d);
     let (b, _group, clone) = group_with_clone(&d);
@@ -336,10 +399,32 @@ fn a_clone_member_is_keyed_by_its_path_and_read_with_its_chain() {
         "the clone, then the member (Frage 167 B)"
     );
     assert_eq!(d.clone_member_path(clone, clone), None);
-    d.add_operation(mfg, &op("score", "Score 1"), 0, std::slice::from_ref(&path))
+    d.add_operation(mfg, &op("score", "Score 1"), 0, &[])
         .unwrap();
-    assert_eq!(ops(&d, mfg)[0].members, vec![path.clone()]);
+    let d = with_legacy_key(&d, &path);
+    assert_eq!(ops(&d, mfg)[0].members, vec![path.clone()], "read and kept");
     assert_eq!(d.key_chain(&path), vec![path.clone(), vec![clone]]);
+}
+
+#[test]
+fn the_assign_commands_refuse_a_clone_member_path_key() {
+    // `specs/0111` criterion 14, ADR 0056 §2: a path key is read, never written again.
+    let d = Document::new(1);
+    let (_, mfg) = laser(&d);
+    let (b, _group, clone) = group_with_clone(&d);
+    let path = d.clone_member_path(clone, b).unwrap();
+    assert_eq!(
+        d.add_operation(mfg, &op("cut", "Cut 1"), 0, std::slice::from_ref(&path)),
+        Err(OperationError::NoSuchTarget)
+    );
+    let id = d
+        .add_operation(mfg, &op("cut", "Cut 1"), 0, &[vec![clone]])
+        .unwrap();
+    assert_eq!(
+        d.set_operation_members(id, &[path], true),
+        Err(OperationError::NoSuchTarget)
+    );
+    assert_eq!(ops(&d, mfg)[0].members, vec![vec![clone]]);
 }
 
 #[test]
@@ -348,8 +433,10 @@ fn deleting_the_original_member_drops_the_path_key_in_the_same_step_and_undo_res
     let (_, mfg) = laser(&d);
     let (b, _group, clone) = group_with_clone(&d);
     let path = d.clone_member_path(clone, b).unwrap();
-    d.add_operation(mfg, &op("score", "Score 1"), 0, std::slice::from_ref(&path))
+    d.add_operation(mfg, &op("score", "Score 1"), 0, &[])
         .unwrap();
+    let d = with_legacy_key(&d, &path);
+    assert_eq!(ops(&d, mfg)[0].members, vec![path.clone()]);
     d.delete_objects(&[b]).unwrap();
     assert_eq!(last_label(&d), "delete_objects");
     assert!(ops(&d, mfg)[0].members.is_empty(), "no Missing item row");
@@ -363,8 +450,10 @@ fn deleting_the_clone_drops_its_member_keys_in_the_same_step() {
     let (_, mfg) = laser(&d);
     let (b, _group, clone) = group_with_clone(&d);
     let path = d.clone_member_path(clone, b).unwrap();
-    d.add_operation(mfg, &op("score", "Score 1"), 0, &[path])
+    d.add_operation(mfg, &op("score", "Score 1"), 0, &[])
         .unwrap();
+    let d = with_legacy_key(&d, &path);
+    assert_eq!(ops(&d, mfg)[0].members.len(), 1);
     d.delete_objects(&[clone]).unwrap();
     assert!(ops(&d, mfg)[0].members.is_empty());
 }

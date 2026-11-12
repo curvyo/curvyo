@@ -1,8 +1,9 @@
 //! Which numbers an operation runs with and how its `op_settings` changes (ADR 0054 §2, §3;
-//! `specs/0028` criteria 24 to 27): one pure rule over the stored value and the loaded library.
+//! `specs/0028` criteria 24 to 27; ADR 0056 §5): one pure rule over the stored value and the
+//! loaded library.
 
 use crate::machine_profile::FeedRate;
-use crate::material::{Material, MaterialRead, Passes, PowerPercent, SetKind, Settings};
+use crate::material::{Interval, Material, MaterialRead, Passes, PowerPercent, SetKind, Settings};
 use crate::operation_kind::OperationKind;
 use crate::operation_settings::{
     Field, MaterialLink, Overrides, Role, SettingsDamage, SettingsRead, StoredSettings,
@@ -15,6 +16,8 @@ pub struct RunSettings {
     pub main: Settings,
     /// The outline set, only for Engrave + Outline.
     pub outline: Option<Settings>,
+    /// The hatch interval, only for Engrave and Engrave + Outline.
+    pub interval: Option<Interval>,
 }
 
 impl RunSettings {
@@ -40,6 +43,9 @@ impl RunSettings {
         Self {
             main: overrides.main.apply(self.main),
             outline: self.outline.map(|outline| overrides.outline.apply(outline)),
+            interval: self
+                .interval
+                .map(|interval| overrides.main.interval.unwrap_or(interval)),
         }
     }
 }
@@ -153,11 +159,13 @@ pub const fn main_set(kind: OperationKind) -> SetKind {
     }
 }
 
-/// The numbers `material` gives an operation of kind `kind` and the set that fed the outline;
-/// `Err` names the missing kind set.
+/// The numbers `material` gives an operation of kind `kind` whose stored interval is `interval`,
+/// and the set that fed the outline; `Err` names the missing kind set. A material set holds no
+/// interval in this slice, so the stored one stands for it (ADR 0056 §5 link rule).
 fn material_run(
     material: &Material,
     kind: OperationKind,
+    interval: Option<Interval>,
 ) -> Result<(RunSettings, Option<SetKind>), SetKind> {
     let needed = main_set(kind);
     let main = *material.set(needed).ok_or(needed)?;
@@ -166,6 +174,7 @@ fn material_run(
             RunSettings {
                 main,
                 outline: None,
+                interval,
             },
             None,
         ));
@@ -177,22 +186,38 @@ fn material_run(
         RunSettings {
             main,
             outline: Some(outline),
+            interval,
         },
         Some(from),
     ))
 }
 
-/// The value Use material writes for an operation of kind `kind`: the link with the record's
-/// `modified` and its numbers as they are now, no typed numbers (criterion 25, also when the
-/// linked material is picked again); `Err` names the set the material lacks, and the operation is
+/// The stored `main.interval_mm` of `read`, `None` when absent or not readable.
+fn kept_interval(read: &SettingsRead) -> Option<Interval> {
+    match read {
+        SettingsRead::Stored(stored) => stored.interval,
+        SettingsRead::None | SettingsRead::Damaged(_) => None,
+    }
+}
+
+/// The value Use material writes for an operation of kind `kind` whose settings read `previous`:
+/// the link with the record's `modified` and its numbers as they are now, no typed numbers
+/// (criterion 25, also when the linked material is picked again), the stored interval kept
+/// (`specs/0111` criteria 19, 23); `Err` names the set the material lacks, and the operation is
 /// skipped.
 ///
 /// # Errors
 /// The missing set kind.
-pub fn use_material(material: &Material, kind: OperationKind) -> Result<StoredSettings, SetKind> {
-    let (run, outline_from) = material_run(material, kind)?;
+pub fn use_material(
+    material: &Material,
+    kind: OperationKind,
+    previous: &SettingsRead,
+) -> Result<StoredSettings, SetKind> {
+    let interval = kept_interval(previous);
+    let (run, outline_from) = material_run(material, kind, interval)?;
     Ok(StoredSettings {
         main: run.main,
+        interval,
         outline: run.outline,
         material: Some(MaterialLink {
             id: material.id.clone(),
@@ -211,6 +236,7 @@ fn live_material<'a>(
     kind: OperationKind,
     materials: &'a [MaterialRead],
     profile_id: &str,
+    interval: Option<Interval>,
 ) -> Result<(&'a Material, RunSettings, Option<SetKind>), StoredReason> {
     let material = match materials.iter().find(|m| m.id() == link.id) {
         None => return Err(StoredReason::Missing),
@@ -221,7 +247,7 @@ fn live_material<'a>(
     if material.machine.id != profile_id {
         return Err(StoredReason::OtherMachine);
     }
-    let (run, from) = material_run(material, kind).map_err(StoredReason::NoSet)?;
+    let (run, from) = material_run(material, kind, interval).map_err(StoredReason::NoSet)?;
     Ok((material, run, from))
 }
 
@@ -261,12 +287,19 @@ pub fn resolve(
     let stored_run = RunSettings {
         main: stored.main,
         outline: stored.stored_set(kind, Role::Outline),
+        interval: stored.stored_interval(kind),
     };
     let Some(link) = &stored.material else {
         return SettingsState::Own(stored_run);
     };
     let overridden = overridden(&stored.overrides, kind);
-    match live_material(link, kind, materials, profile_id) {
+    match live_material(
+        link,
+        kind,
+        materials,
+        profile_id,
+        stored.stored_interval(kind),
+    ) {
         Ok((material, numbers, _)) => SettingsState::Live {
             name: material.name.clone(),
             material: numbers,
@@ -301,7 +334,7 @@ pub fn refresh(
     };
     let link = stored.material.as_ref()?;
     let (material, numbers, outline_from) =
-        live_material(link, kind, materials, profile_id).ok()?;
+        live_material(link, kind, materials, profile_id, stored.interval).ok()?;
     if guard && material.modified <= link.modified {
         return None;
     }
@@ -314,6 +347,7 @@ pub fn refresh(
     }
     Some(StoredSettings {
         main: numbers.main,
+        interval: stored.interval,
         outline: numbers.outline,
         material: Some(MaterialLink {
             id: link.id.clone(),
@@ -388,6 +422,27 @@ pub fn edit_number(
     (next != *stored).then_some(next)
 }
 
+/// The value Edit settings writes when `interval` is typed into an operation of kind `kind`
+/// (`specs/0111` criterion 19): `main.interval_mm` on the operation, also when it is linked (no
+/// material holds an interval in this slice), and an interval typed over the link before goes.
+/// `None` when nothing changes, for a kind that does not hatch, and for No settings and Damaged
+/// settings.
+#[must_use]
+pub fn edit_interval(
+    stored: &SettingsRead,
+    kind: OperationKind,
+    interval: Interval,
+) -> Option<StoredSettings> {
+    let SettingsRead::Stored(stored) = stored else {
+        return None;
+    };
+    stored.stored_interval(kind)?;
+    let mut next = stored.clone();
+    next.interval = Some(interval);
+    next.overrides.main.interval = None;
+    (next != *stored).then_some(next)
+}
+
 /// The value Reset to material writes: the link and stored numbers without typed numbers;
 /// `None` when nothing is typed.
 #[must_use]
@@ -414,7 +469,9 @@ pub fn use_own_numbers(
     };
     stored.material.as_ref()?;
     let run = state.run()?;
-    Some(StoredSettings::own(kind, run.main, run.outline))
+    let mut own = StoredSettings::own(kind, run.main, run.outline);
+    own.interval = stored.overrides.main.interval.or(stored.interval);
+    Some(own)
 }
 
 #[cfg(test)]

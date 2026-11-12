@@ -1,5 +1,5 @@
-//! The stored shape of a laser operation node (ADR 0046 §1, §2, §5; ADR 0054 §1, §4): its keys
-//! and how one record is read back.
+//! The stored shape of a laser operation node (ADR 0046 §1, §2, §5; ADR 0054 §1, §4; ADR 0056
+//! §6): its keys and how one record is read back.
 
 use loro::{LoroMap, LoroTree, LoroValue, TreeID, ValueOrContainer};
 
@@ -25,6 +25,9 @@ pub(crate) const KEY_OP_MARGIN: &str = "op_margin";
 /// The atomic settings map (ADR 0054 §1), plain values handed to the extension; absent is No
 /// settings.
 pub(crate) const KEY_OP_SETTINGS: &str = "op_settings";
+/// The atomic map of the operation-only settings (ADR 0056 §6), plain values handed to the
+/// extension; absent reads as every default there.
+pub(crate) const KEY_OP_OPTIONS: &str = "op_options";
 /// The grid row switch (ADR 0054 §4); absent reads as off.
 pub(crate) const KEY_OP_GRID: &str = "op_grid";
 /// The prefix of a membership key, `member.<path>` = `true`.
@@ -57,6 +60,9 @@ pub struct OperationSnapshot {
     /// The `op_settings` register as plain values, `None` when absent; a register that holds no
     /// plain value reads as `null` (Damaged settings, never an Unknown operation; ADR 0054 §1).
     pub settings: Option<serde_json::Value>,
+    /// The `op_options` register as plain values, `None` when absent; a register that holds no
+    /// plain value reads as `null` (Damaged settings, ADR 0056 §6).
+    pub options: Option<serde_json::Value>,
     /// Whether it is the row of a test grid (`op_grid`, ADR 0054 §4).
     pub grid: bool,
 }
@@ -86,9 +92,9 @@ fn switch(meta: &LoroMap, key: &str) -> Option<bool> {
     }
 }
 
-/// The `op_settings` register: `None` when absent, `null` when it holds no plain value.
-fn settings(meta: &LoroMap) -> Option<serde_json::Value> {
-    match meta.get(KEY_OP_SETTINGS)? {
+/// The plain-value register `key`: `None` when absent, `null` when it holds no plain value.
+fn plain_register(meta: &LoroMap, key: &str) -> Option<serde_json::Value> {
+    match meta.get(key)? {
         ValueOrContainer::Value(value) => Some(json_of(&value).unwrap_or(serde_json::Value::Null)),
         ValueOrContainer::Container(_) => Some(serde_json::Value::Null),
     }
@@ -152,7 +158,8 @@ pub(crate) fn read_operation(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> O
         output: output.unwrap_or(true),
         margin: Length::from_mm(margin_mm.unwrap_or(0.0)),
         members,
-        settings: settings(meta),
+        settings: plain_register(meta, KEY_OP_SETTINGS),
+        options: plain_register(meta, KEY_OP_OPTIONS),
         grid: grid.unwrap_or(false),
     }
 }

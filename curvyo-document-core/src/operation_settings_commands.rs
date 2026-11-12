@@ -1,6 +1,6 @@
-//! The commands that write the `op_settings` register of laser operations (ADR 0054 §3,
-//! `specs/0028` criteria 24 to 27); the values are made by the laser extension, which decides
-//! every rule.
+//! The commands that write the settings registers `op_settings` and `op_options` of laser
+//! operations (ADR 0054 §3, ADR 0056 §6; `specs/0028` criteria 24 to 27, `specs/0111` criteria 20,
+//! 24); the values are made by the laser extension, which decides every rule.
 
 use loro::{LoroMap, LoroValue, ValueOrContainer};
 
@@ -8,7 +8,7 @@ use crate::document::{Document, ROOT_MAP};
 use crate::history::LABEL_REFRESH_MATERIAL_NUMBERS;
 use crate::manufacturing_codec::{json_of, write_plain_map};
 use crate::operation::OperationError;
-use crate::operation_codec::{KEY_OP_SETTINGS, grid_switch};
+use crate::operation_codec::{KEY_OP_OPTIONS, KEY_OP_SETTINGS, grid_switch};
 use crate::path_model::NodeId;
 
 /// The label of a material pick (criteria 25, 27).
@@ -89,9 +89,9 @@ pub struct SettingsWrite {
     pub value: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
-/// The register as plain values, `None` when absent or not a plain map.
-fn stored(meta: &LoroMap) -> Option<serde_json::Value> {
-    match meta.get(KEY_OP_SETTINGS)? {
+/// The register `key` as plain values, `None` when absent or not a plain map.
+fn stored_at(meta: &LoroMap, key: &str) -> Option<serde_json::Value> {
+    match meta.get(key)? {
         ValueOrContainer::Value(value) => json_of(&value),
         ValueOrContainer::Container(_) => None,
     }
@@ -102,21 +102,24 @@ impl Document {
     fn settings_targets(&self, writes: &[SettingsWrite]) -> Result<Vec<LoroMap>, OperationError> {
         writes
             .iter()
-            .map(|write| {
-                let meta = self.operation_meta(write.operation)?;
-                if grid_switch(&meta) != Some(false) {
-                    return Err(OperationError::GridRow);
-                }
-                Ok(meta)
-            })
+            .map(|write| self.writable_operation_meta(write.operation))
             .collect()
+    }
+
+    /// The meta map of the live operation `id`, refused for a grid row.
+    fn writable_operation_meta(&self, id: NodeId) -> Result<LoroMap, OperationError> {
+        let meta = self.operation_meta(id)?;
+        if grid_switch(&meta) != Some(false) {
+            return Err(OperationError::GridRow);
+        }
+        Ok(meta)
     }
 
     /// Writes each value that differs from the stored one, uncommitted; whether any did.
     fn write_settings(metas: &[LoroMap], writes: &[SettingsWrite]) -> bool {
         let mut changed = false;
         for (meta, write) in metas.iter().zip(writes) {
-            let now = stored(meta);
+            let now = stored_at(meta, KEY_OP_SETTINGS);
             match &write.value {
                 Some(value)
                     if now.as_ref().and_then(serde_json::Value::as_object) != Some(value) =>
@@ -150,6 +153,28 @@ impl Document {
             return Ok(false);
         }
         self.commit_with_label(step.label());
+        Ok(true)
+    }
+
+    /// Writes the whole `op_options` map `value` of the operation `operation` in one history step
+    /// "Edit settings" (ADR 0056 §6: one commit per field or toggle). `Ok(false)` and nothing
+    /// written when it is already stored.
+    ///
+    /// # Errors
+    /// [`OperationError::NoSuchOperation`] when the id names no live operation;
+    /// [`OperationError::GridRow`] for a test grid row.
+    pub fn write_operation_options(
+        &self,
+        operation: NodeId,
+        value: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<bool, OperationError> {
+        let meta = self.writable_operation_meta(operation)?;
+        let now = stored_at(&meta, KEY_OP_OPTIONS);
+        if now.as_ref().and_then(serde_json::Value::as_object) == Some(value) {
+            return Ok(false);
+        }
+        write_plain_map(&meta, KEY_OP_OPTIONS, value);
+        self.commit_with_label(EDIT_OPERATION_SETTINGS_COMMIT_LABEL);
         Ok(true)
     }
 

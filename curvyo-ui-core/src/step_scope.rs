@@ -145,6 +145,8 @@ pub const FREE_STEPS: &[&str] = &[
     "edit_max_feed",
     "edit_max_power",
     "edit_laser_mode",
+    "motorised_z_on",
+    "motorised_z_off",
     "add_sketch",
     "edit_sketch",
     "place_sketch_clone",

@@ -396,6 +396,26 @@ pub fn build(view: ViewTransform, input: &SelectDecorationInput) -> DrawList {
     list
 }
 
+/// The outline of the entered read-only group of a laser page (`specs/0111` criterion 11):
+/// 1.5 px solid `--accent` over a casing, around `corners`, the box of all the group's members.
+#[must_use]
+pub fn build_context_outline(
+    view: ViewTransform,
+    corners: SelectionBox,
+    device_pixel_ratio: f64,
+) -> DrawList {
+    let screen = ScreenBox::new(view, corners, effective_ratio(device_pixel_ratio));
+    let corners = screen.document_corners(view);
+    let width_mm = screen.width_px * 1.5 / view.scale();
+    let mut list = quad_outline(
+        corners,
+        width_mm * theme::CASING_WIDTH_FACTOR,
+        theme::SELECTION_CASING,
+    );
+    list.extend(quad_outline(corners, width_mm, theme::ACCENT));
+    list
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1317,5 +1337,17 @@ mod tests {
             let best = contrast(line_px, fill).max(contrast(casing_px, fill));
             assert!(best >= 2.0, "{name}: {best:.2}");
         }
+    }
+
+    #[test]
+    fn the_context_outline_is_a_solid_accent_line_over_a_casing() {
+        let view = ViewTransform::identity();
+        let list = build_context_outline(view, axis_box(10.0, 10.0, 90.0, 60.0), 1.0);
+        assert!(list.triangles.iter().any(|v| v.color == theme::ACCENT));
+        assert!(
+            list.triangles
+                .iter()
+                .any(|v| v.color == theme::SELECTION_CASING)
+        );
     }
 }

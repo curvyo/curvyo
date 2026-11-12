@@ -167,7 +167,7 @@ impl Document {
     ///
     /// # Errors
     /// [`OperationError::NoSuchManufacturing`]; [`OperationError::NoSuchTarget`] when a member
-    /// is not a live node.
+    /// is not a live node or is a path of more than one node (ADR 0056 §2).
     ///
     /// # Panics
     /// Does not panic in practice: the meta map of a node just created exists.
@@ -180,7 +180,10 @@ impl Document {
     ) -> Result<NodeId, OperationError> {
         let parent = self.manufacturing_node(manufacturing)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        if members.iter().any(|m| !path_is_live(&tree, &tree_path(m))) {
+        if members
+            .iter()
+            .any(|m| m.len() != 1 || !path_is_live(&tree, &tree_path(m)))
+        {
             return Err(OperationError::NoSuchTarget);
         }
         let others = operation_nodes(&tree, parent);
@@ -297,12 +300,15 @@ impl Document {
         Ok(())
     }
 
-    /// Adds (`member` true) or removes the `targets` of the operation `id`, in one history step.
-    /// `Ok(false)` and nothing written when no key changes.
+    /// Adds (`member` true) or removes the `targets` of the operation `id`, in one history step
+    /// "Assign to" or "Remove from"; a group assignment and its untick (ADR 0056 §1) are one such
+    /// call with the group's and its members' keys. `Ok(false)` and nothing written when no key
+    /// changes.
     ///
     /// # Errors
     /// [`OperationError::NoSuchOperation`]; [`OperationError::NoSuchTarget`] when an added
-    /// target is not a live node; [`OperationError::GridRow`] for a test grid row.
+    /// target is not a live node or is a path of more than one node (a clone member, ADR 0056
+    /// §2); [`OperationError::GridRow`] for a test grid row.
     pub fn set_operation_members(
         &self,
         id: NodeId,
@@ -314,7 +320,12 @@ impl Document {
             return Err(OperationError::GridRow);
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        if member && targets.iter().any(|t| !path_is_live(&tree, &tree_path(t))) {
+        // A clone-member path key is legacy data only (ADR 0056 §2): never written again.
+        if member
+            && targets
+                .iter()
+                .any(|t| t.len() != 1 || !path_is_live(&tree, &tree_path(t)))
+        {
             return Err(OperationError::NoSuchTarget);
         }
         let mut changed = false;
