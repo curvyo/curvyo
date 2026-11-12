@@ -546,6 +546,7 @@ impl Document {
         crate::text_clone_commands::relink_copied_text_clones(&tree, &copying.made);
         crate::dimension_commands::relink_copied_dimensions(self, &tree, &copying.made, offset);
         crate::tiling_copy::relink_copied_tilings(&tree, &copying.made);
+        crate::test_grid_commands::give_copied_grids_rows(self, &tree, &copying.made);
         self.assign_sketch_copies(&copying.made, &sketch_claims);
         self.commit_with_label("duplicate_objects");
         Ok(created

@@ -159,6 +159,8 @@ pub(crate) mod tests {
             output,
             margin: Length::from_mm(0.0),
             members: members.iter().map(|&member| vec![member]).collect(),
+            settings: None,
+            grid: false,
         }
     }
 

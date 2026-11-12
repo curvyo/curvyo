@@ -9,8 +9,8 @@ use loro::{LoroDoc, VersionVector};
 use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
     KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_MIGRATE_FORMAT,
-    LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE,
-    LABEL_WIPE_OBJECT, StepHeader,
+    LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO,
+    LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT, StepHeader,
 };
 use super::step_id::{StepRef, shown_ids};
 use super::step_log::LogStep;
@@ -265,7 +265,11 @@ fn event_of(header: Option<&StepHeader>, step: StepRef) -> Option<Event> {
     };
     let target = |key: &str| header.extra_value(key).and_then(StepRef::decode);
     match header.label.as_str() {
-        LABEL_NEW_DOCUMENT | LABEL_MIGRATE_FORMAT | LABEL_WIPE | LABEL_WIPE_OBJECT => None,
+        LABEL_NEW_DOCUMENT
+        | LABEL_MIGRATE_FORMAT
+        | LABEL_REFRESH_MATERIAL_NUMBERS
+        | LABEL_WIPE
+        | LABEL_WIPE_OBJECT => None,
         LABEL_UNDO => target(KEY_UNDONE).map(Event::Undo),
         LABEL_REDO => target(KEY_REDONE).map(Event::Redo),
         _ => Some(Event::Do(step)),
@@ -277,7 +281,11 @@ fn event_of(header: Option<&StepHeader>, step: StepRef) -> Option<Event> {
 pub(crate) fn is_row(step: &LogStep) -> bool {
     !matches!(
         step.label.as_str(),
-        LABEL_NEW_DOCUMENT | LABEL_MIGRATE_FORMAT | LABEL_UNDO | LABEL_REDO
+        LABEL_NEW_DOCUMENT
+            | LABEL_MIGRATE_FORMAT
+            | LABEL_REFRESH_MATERIAL_NUMBERS
+            | LABEL_UNDO
+            | LABEL_REDO
     ) || step.header.is_none()
 }
 

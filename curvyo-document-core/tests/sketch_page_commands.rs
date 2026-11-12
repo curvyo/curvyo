@@ -367,7 +367,8 @@ fn the_sketch_pages_golden_reads_back_every_page_sketch_clone_and_path_identical
     // still opens.
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    assert_eq!(CURRENT_FORMAT_VERSION, 42);
+    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 43);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.pages(), expected.pages());
     let kinds: Vec<_> = opened.pages().iter().map(|p| p.kind.clone()).collect();

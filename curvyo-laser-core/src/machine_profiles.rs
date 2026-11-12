@@ -4,27 +4,11 @@
 use crate::machine_profile::{
     Connection, GENERIC_LASER_ID, MachineProfile, ProfileValues, copy_name,
 };
-use crate::machine_profile_file::{RecordError, read_record, record_id, write_record};
+use crate::machine_profile_file::{RecordError, read_record, write_record};
+use crate::record_envelope::{LibraryWrite, record_id};
 
 /// At most this many records are read, in file-name order.
 pub const MAX_RECORDS: usize = 1_000;
-
-/// What the host must do to keep one record (one file or one browser-storage entry).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LibraryWrite {
-    /// Replace the record `id` with `text` (atomic write).
-    Write {
-        /// The profile id; the file is `<id>.json`.
-        id: String,
-        /// The record text.
-        text: String,
-    },
-    /// Remove the record `id`.
-    Remove {
-        /// The profile id.
-        id: String,
-    },
-}
 
 /// The library: the built-in plus the user profiles that loaded, and how many were skipped.
 #[derive(Debug, Clone, PartialEq)]
@@ -264,8 +248,8 @@ fn write_of(profile: &MachineProfile) -> LibraryWrite {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::machine_profile::{OriginCorner, new_profile_id};
-    use crate::machine_profile_file::record_file_name;
+    use crate::machine_profile::OriginCorner;
+    use crate::record_envelope::{new_record_id as new_profile_id, record_file_name};
 
     fn record(seed: u8, name: &str) -> (String, String) {
         let mut profile = MachineProfile::generic_laser();

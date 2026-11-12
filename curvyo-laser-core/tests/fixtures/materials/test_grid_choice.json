@@ -1,0 +1,41 @@
+{
+  "format_version": 1,
+  "by_machine": {
+    "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f": {
+      "columns": 6,
+      "rows": 4,
+      "power_from_pct": 20.0,
+      "power_to_pct": 100.0,
+      "speed_from_mm_min": 120,
+      "speed_to_mm_min": 1200,
+      "cell_mm": 10.0,
+      "gap_mm": 3.0,
+      "labels": {
+        "on": false,
+        "kind": "score",
+        "height_mm": 2.5,
+        "power_pct": 20.0,
+        "speed_mm_min": 3000,
+        "passes": 1
+      }
+    },
+    "generic-laser": {
+      "columns": 5,
+      "rows": 5,
+      "power_from_pct": 20.0,
+      "power_to_pct": 100.0,
+      "speed_from_mm_min": 600,
+      "speed_to_mm_min": 6000,
+      "cell_mm": 10.0,
+      "gap_mm": 3.0,
+      "labels": {
+        "on": true,
+        "kind": "engrave",
+        "height_mm": 3.0,
+        "power_pct": 20.0,
+        "speed_mm_min": 3000,
+        "passes": 1
+      }
+    }
+  }
+}

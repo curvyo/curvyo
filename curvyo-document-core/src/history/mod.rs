@@ -52,8 +52,8 @@ pub use rows::{
 pub use stack_machine::{BranchMark, Event, STACK_LIMIT, StackMachine, Status};
 pub use step_header::{
     LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION, LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT,
-    LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_UNDO, LABEL_WIPE as WIPE_LABEL,
-    LABEL_WIPE_OBJECT,
+    LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO,
+    LABEL_WIPE as WIPE_LABEL, LABEL_WIPE_OBJECT,
 };
 pub use step_id::{MIN_SHOWN_ID_LEN, StepRef, shown_ids};
 pub(crate) use step_index::StepIndex;

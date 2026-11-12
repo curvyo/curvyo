@@ -53,6 +53,9 @@ fn drawn_edit_handles(
             .into_iter()
             .map(|(param, at)| (EditHandle::Param(param), at)),
     );
+    if tolerances.move_only {
+        handles.retain(|(handle, _)| *handle == EditHandle::Move);
+    }
     handles
 }
 

@@ -1,8 +1,6 @@
 //! The laser machine profile record with its limits and the built-in (ADR 0038 §2, §4, §5;
 //! `specs/0026-machine-profile` criteria 1, 2, 3 and 9).
 
-use std::fmt::Write as _;
-
 use curvyo_document_core::{DocumentSize, Length};
 use serde::{Deserialize, Serialize};
 
@@ -79,7 +77,7 @@ impl OriginCorner {
 macro_rules! bounded_integer {
     ($(#[$doc:meta])* $name:ident($int:ty), $min:expr, $max:expr, $default:expr) => {
         $(#[$doc])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
         #[serde(try_from = "u64", into = "u64")]
         pub struct $name($int);
 
@@ -435,40 +433,6 @@ pub fn save_as_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
     }
 }
 
-/// A new profile id: a lowercase UUID v4 from 16 random bytes the caller passes in (core has no
-/// random source; ADR 0038 §5).
-#[must_use]
-pub fn new_profile_id(random: [u8; 16]) -> String {
-    let mut bytes = random;
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let hex = bytes.iter().fold(String::with_capacity(32), |mut hex, b| {
-        let _ = write!(hex, "{b:02x}");
-        hex
-    });
-    format!(
-        "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..32]
-    )
-}
-
-/// Whether `id` is a lowercase UUID v4 (the id of a user profile and its file's name).
-#[must_use]
-pub fn is_profile_id(id: &str) -> bool {
-    let bytes = id.as_bytes();
-    bytes.len() == 36
-        && bytes.iter().enumerate().all(|(index, &b)| match index {
-            8 | 13 | 18 | 23 => b == b'-',
-            14 => b == b'4',
-            19 => matches!(b, b'8' | b'9' | b'a' | b'b'),
-            _ => b.is_ascii_digit() || (b'a'..=b'f').contains(&b),
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561,17 +525,6 @@ mod tests {
         let copied = copy_name(&long, |_| false);
         assert_eq!(copied.chars().count(), 60);
         assert!(copied.ends_with(" copy"));
-    }
-
-    #[test]
-    fn a_new_id_is_a_lowercase_uuid_v4() {
-        let id = new_profile_id([0xff; 16]);
-        assert_eq!(id, "ffffffff-ffff-4fff-bfff-ffffffffffff");
-        assert!(is_profile_id(&id));
-        assert!(is_profile_id(&new_profile_id([0; 16])));
-        assert!(!is_profile_id("generic-laser"));
-        assert!(!is_profile_id("FFFFFFFF-FFFF-4FFF-BFFF-FFFFFFFFFFFF"));
-        assert!(!is_profile_id("ffffffff-ffff-1fff-bfff-ffffffffffff"));
     }
 
     #[test]

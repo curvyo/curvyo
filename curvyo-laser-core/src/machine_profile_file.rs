@@ -1,14 +1,15 @@
-//! Reads and writes one machine profile record and the last-pick file (ADR 0038 §2, §3, §6).
+//! Reads and writes one machine profile record and the last-pick file (ADR 0038 §2, §3, §6), on
+//! the shared record envelope (ADR 0055 §7).
 
 use curvyo_document_core::DocumentSize;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::machine_profile::{
     BaudRate, Connection, FeedRate, MAX_CONNECTION_CHARS, MachineProfile, OriginCorner, PowerValue,
-    ProfileValues, is_profile_id, is_valid_name, is_valid_work_side,
+    ProfileValues, is_valid_name, is_valid_work_side,
 };
 use crate::machine_profile_fixtures::{FixtureJson, read_set, write_set};
+use crate::record_envelope::{EnvelopeError, open, pretty, record_id};
 
 /// The record format this build writes and the newest it reads: 2 added the fixture set
 /// (ADR 0050 §1), 3 adds the fixture jobs of each entry (ADR 0052 §7).
@@ -22,8 +23,6 @@ const CHOICE_FORMAT_VERSION: u64 = 1;
 /// The largest record text that is read; a longer one is damage (128 KiB since format 3, as a
 /// maximal set in the pretty form is above 64 KiB).
 pub const MAX_RECORD_BYTES: usize = 128 * 1024;
-/// The file name suffix of a record.
-pub const RECORD_SUFFIX: &str = ".json";
 /// The only machine family this build stores.
 const KIND_LASER: &str = "laser";
 
@@ -87,20 +86,6 @@ struct ChoiceJson {
     last_picked: String,
 }
 
-/// The id a record file name `<uuid>.json` carries; `None` for any other name, which is ignored.
-#[must_use]
-pub fn record_id(file_name: &str) -> Option<&str> {
-    file_name
-        .strip_suffix(RECORD_SUFFIX)
-        .filter(|id| is_profile_id(id))
-}
-
-/// The file name of the record `id`.
-#[must_use]
-pub fn record_file_name(id: &str) -> String {
-    format!("{id}{RECORD_SUFFIX}")
-}
-
 /// The profile the record file `file_name` holds.
 ///
 /// # Errors
@@ -111,15 +96,18 @@ pub fn record_file_name(id: &str) -> String {
 /// damaged (ADR 0050 §2, ADR 0052 §7). A format 1 record reads with an empty set, a format 2
 /// record with no jobs. Nothing is written on read.
 pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, RecordError> {
-    if text.len() > MAX_RECORD_BYTES {
-        return Err(RecordError::Damaged);
-    }
-    let value: Value = serde_json::from_str(text).map_err(|_| RecordError::Damaged)?;
-    let version = match value.get("format_version").and_then(Value::as_u64) {
-        Some(version @ RECORD_FORMAT_NO_FIXTURES..=RECORD_FORMAT_VERSION) => version,
-        Some(version) if version > RECORD_FORMAT_VERSION => return Err(RecordError::Newer),
-        _ => return Err(RecordError::Damaged),
-    };
+    let (value, version) = open(
+        text,
+        MAX_RECORD_BYTES,
+        RECORD_FORMAT_NO_FIXTURES,
+        RECORD_FORMAT_VERSION,
+    )
+    .map_err(|error| match error {
+        EnvelopeError::Newer => RecordError::Newer,
+        EnvelopeError::TooLarge | EnvelopeError::NotJson | EnvelopeError::BadVersion => {
+            RecordError::Damaged
+        }
+    })?;
     let record: RecordJson = serde_json::from_value(value).map_err(|_| RecordError::Damaged)?;
     let fixtures = match (version, record.fixtures) {
         (RECORD_FORMAT_NO_FIXTURES, None) => Vec::new(),
@@ -205,17 +193,10 @@ pub fn write_choice(id: &str) -> String {
     })
 }
 
-fn pretty(value: &impl Serialize) -> String {
-    // invariant: plain structs of strings, numbers and booleans always serialise.
-    #[allow(clippy::unwrap_used)]
-    let mut text = serde_json::to_string_pretty(value).unwrap();
-    text.push('\n');
-    text
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::record_envelope::record_file_name;
 
     const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
 
@@ -467,14 +448,6 @@ mod tests {
             read_record(&name, &fixture("newer_format.json")),
             Err(RecordError::Newer)
         );
-    }
-
-    #[test]
-    fn only_uuid_file_names_are_records() {
-        assert_eq!(record_id(&record_file_name(ID)), Some(ID));
-        assert_eq!(record_id("not-a-uuid.json"), None);
-        assert_eq!(record_id(&format!("{ID}.json.sync-conflict")), None);
-        assert_eq!(record_id(ID), None);
     }
 
     #[test]

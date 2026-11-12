@@ -1,0 +1,49 @@
+{
+  "format_version": 1,
+  "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+  "kind": "laser",
+  "modified": 1762948800000,
+  "name": "Cardboard",
+  "thickness_mm": 3.0,
+  "machine": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
+  "sets": {
+    "cut": {
+      "power_pct": 60.0,
+      "speed_mm_min": 300,
+      "passes": 2,
+      "source": {
+        "test": "5d1e7a2b-0c3f-4e6d-8a9b-7c6d5e4f3a2b"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": "5d1e7a2b-0c3f-4e6d-8a9b-7c6d5e4f3a2b",
+      "date": 1762862400000,
+      "event": "tested",
+      "kind": "cut",
+      "set": {
+        "power_pct": 60.0,
+        "speed_mm_min": 300,
+        "passes": 2
+      },
+      "grid": {
+        "columns": 5,
+        "rows": 5,
+        "power_from_pct": 20.0,
+        "power_to_pct": 100.0,
+        "speed_from_mm_min": 120,
+        "speed_to_mm_min": 1200,
+        "cell_mm": 10.0,
+        "gap_mm": 3.0
+      },
+      "cell": {
+        "column": 2,
+        "row": 1
+      }
+    }
+  ]
+}

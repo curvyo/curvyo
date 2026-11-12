@@ -461,7 +461,23 @@ impl DocumentVersion {
 /// keys keep ordinary Bézier and uniform-stroke behaviour; malformed extended data is refused.
 /// Migration from 41 is none. The number is provisional by the rule above. Golden:
 /// `pen_modes_v42.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 42;
+///
+/// Bumped to 43 in `material-test-library` (ADR 0054, `specs/0028-material-test-library`): an
+/// operation may carry `op_settings` (one atomic map of plain values: `main`, `outline`, the
+/// material link `material` with its `modified`, the typed `overrides`) and `op_grid` (a test
+/// grid row, whose one membership is its top group); a group may carry the test grid keys
+/// `x.curvyo.laser.test_grid` and `test_grid_worked`, its items `grid_cell` and `grid_label`; the
+/// root may carry `x.curvyo.laser.material_edit`; the label `refresh_material_numbers` is
+/// reserved (no step, no history row). A build that stops at 42 would read a grid row as an
+/// ordinary operation over the whole group: its copy would share the original's row and its
+/// delete would leave a row without a grid, silently, so it must refuse every file of this build
+/// as too new. Migration from 42 is none: a format-42 file opens with no settings on every
+/// operation and is not rewritten. Damage: an `op_settings` that does not read is Damaged settings
+/// (the extension decides; the kind stays readable); an `op_grid` that is not a boolean makes the
+/// operation Unknown. The number is provisional by the rule above. Goldens:
+/// `laser_settings_v43.curvyo`, `laser_settings_damaged_v43.curvyo`,
+/// `test_grid_hand_edited_v43.curvyo`, `test_grid_orphan_row_v43.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 43;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

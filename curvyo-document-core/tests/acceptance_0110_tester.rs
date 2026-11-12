@@ -37,10 +37,11 @@ fn manifest_version(bytes: &[u8]) -> u64 {
 /// and a save writes it.
 #[test]
 fn c8_format_version_is_42_and_written_on_save() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 42);
+    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 43);
     let doc = Document::new(1);
     let bytes = pack(&doc, "test").unwrap();
-    assert_eq!(manifest_version(&bytes), 42);
+    assert_eq!(manifest_version(&bytes), 43);
 }
 
 /// Criterion 8: the v42 golden opens here; the same bytes are refused by a reader one version
@@ -105,7 +106,7 @@ fn c8_a_newer_file_is_refused() {
         file.read_to_end(&mut content).unwrap();
         if name == "manifest.json" {
             let mut json: serde_json::Value = serde_json::from_slice(&content).unwrap();
-            json["format_version"] = serde_json::json!(43);
+            json["format_version"] = serde_json::json!(44);
             content = serde_json::to_vec(&json).unwrap();
         }
         writer
@@ -116,7 +117,7 @@ fn c8_a_newer_file_is_refused() {
     let newer = writer.finish().unwrap().into_inner();
     assert!(matches!(
         unpack(6, &newer),
-        Err(OpenError::FormatTooNew { found: 43, .. })
+        Err(OpenError::FormatTooNew { found: 44, .. })
     ));
 }
 
