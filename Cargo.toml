@@ -58,7 +58,7 @@ roxmltree = { version = "=0.20.0", default-features = false, features = ["std"] 
 # Pinned exactly (ADR 0018 §4): the attribute grammars of the SVG import (transform, colour,
 # length, paint, number lists; not path data), hostile input in wasm. Apache-2.0 OR MIT,
 # linebender, `forbid(unsafe_code)`; its `kurbo` 0.13 and `siphasher` are already locked.
-svgtypes = { version = "=0.16.1", default-features = false, features = ["std"] }
+svgtypes = { version = "=0.16.2", default-features = false, features = ["std"] }
 # Pinned exactly (ADR 0018 §4): the `<style>` subset of the SVG import (`specs/0024` criterion 36).
 # Apache-2.0 OR MIT, linebender, no `unsafe`; its `log` is already locked.
 simplecss = { version = "=0.2.2", default-features = false }
