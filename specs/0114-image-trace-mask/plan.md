@@ -39,6 +39,25 @@ rectangles are back; undo works; two peers keep both rectangles.
 9. Frontend: Rectangle and Subtract toggles added to the existing Mask group (layout move in
    slice 4), status texts. Criteria 2, 3, 8, 19.
 
+Implementer refinements for slice 1 (2026-11-12, **Proposal**):
+
+- Parts come from the document already in slice 1 (ADR 0061 §9: the commands "keep their names and
+  now write the document"): Add part, Remove part and Inside | Outside on a stored part write their
+  steps; with nothing stored there is the implicit part 1 whose mode is tool state. So slice 3
+  item 1 is mostly done here; slice 3 keeps the settings round trip in the UI.
+- The 0094 mask paths still work beside the regions until slice 4: a part's added operands are its
+  mask paths (the selection, for the active part) and its added regions; its subtracted regions
+  are taken out (`TraceRegion::of_signed_operands`). The mask paths of the other parts are kept per
+  stored part id in the session, as before.
+- The bar's values of the active part reach the session as tool state
+  (`set_trace_tool_settings(json)`, no step); the first gesture on an untouched image writes them
+  as `trace_settings.0`, Add part writes them without the picked colours as the new part's.
+- Chip ids stay small numbers for the frontend (part `0` is chip 0, the implicit part too, so the
+  bar's settings stay with the part when the first gesture stores it).
+- The region outlines and handles are drawn by a new `curvyo-render-core` module
+  `trace_mask_overlay.rs` (screen-pixel widths, as the marquee).
+- The mask labels are `FREE_STEPS` in `step_scope.rs`, as `trace_image`.
+
 ## Slice 2: Lasso
 
 1. `trace_region_edit.rs` lasso half: corners, rubber band, close on first point, double click
