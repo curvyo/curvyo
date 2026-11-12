@@ -14,6 +14,8 @@ import {
 } from "@/lib/historyText";
 import { objectWipedNotice, wipedNotice } from "@/lib/historyRows";
 import type { WasmSession } from "@/lib/editorSession";
+import { flushMaterialWrites, type MaterialWriteFailure } from "@/lib/materialsFile";
+import { undoFailureText } from "@/lib/materialRows";
 
 /** A line in the canvas notice slot (`docs/design-system.md`, "Canvas notice slot"). */
 export interface CanvasNotice {
@@ -97,6 +99,9 @@ function isTextEntry(target: EventTarget | null): boolean {
   );
 }
 
+/** A write failure after an undo or redo stays 8 s (ux-notes 13). */
+const MATERIAL_FAILURE_MS = 8000;
+
 /**
  * Undo and redo in the frontend (`specs/0020-undo-redo`): the canvas notice of every press, the
  * long-operation state of a large step and the keys outside the canvas (the tool rail and the
@@ -152,6 +157,16 @@ export function useHistory(
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  /** A record that could not be written back after an undo or redo (`specs/0028` ux-notes 13). */
+  const showMaterialFailure = useCallback(
+    (failure: MaterialWriteFailure | null, direction: HistoryDirection) => {
+      if (failure !== null) {
+        showNotice(undoFailureText(direction.includes("redo") ? "redo" : "undo", failure.name, failure.reason), MATERIAL_FAILURE_MS, "canvas", "alert");
+      }
+    },
+    [showNotice],
+  );
+
   const refresh = useCallback(() => {
     const session = getSession();
     if (!session) {
@@ -206,9 +221,13 @@ export function useHistory(
       if (text !== null) {
         showNotice(text, undefined, source);
       }
+      // An undone or redone material step writes its record back (`specs/0028` criterion 32).
+      void flushMaterialWrites(session, onChangeRef.current).then((failure) =>
+        showMaterialFailure(failure, direction),
+      );
       onChangeRef.current();
     },
-    [busy, getSession, runBusy, showNotice],
+    [busy, getSession, runBusy, showMaterialFailure, showNotice],
   );
 
   const handleKeyOutcome = useCallback(
@@ -219,9 +238,16 @@ export function useHistory(
         case "object-undo":
         case "object-redo": {
           onAppliedRef.current?.();
-          const text = noticeText(getSession()?.take_history_notice() ?? "");
+          const session = getSession();
+          const text = noticeText(session?.take_history_notice() ?? "");
           if (text !== null) {
             showNotice(text);
+          }
+          if (session) {
+            const direction = outcome.includes("redo") ? "redo" : "undo";
+            void flushMaterialWrites(session, onChangeRef.current).then((failure) =>
+              showMaterialFailure(failure, direction),
+            );
           }
           return true;
         }
@@ -244,7 +270,7 @@ export function useHistory(
           return false;
       }
     },
-    [getSession, runBusy, showNotice],
+    [getSession, runBusy, showMaterialFailure, showNotice],
   );
 
   // Undo and redo with the focus outside the canvas, in the tool rail or the Properties panel

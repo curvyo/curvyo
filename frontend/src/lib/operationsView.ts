@@ -6,6 +6,13 @@
  * Rust contract test reads the same fixtures (`curvyo-editor-wasm/tests/fixtures/operations_view/`).
  */
 
+import {
+  decodePick,
+  decodeSettings,
+  type OperationSettings,
+  type PickMaterial,
+} from "./operationSettingsView.ts";
+
 /** The node id as the session sends it: the JSON text is what the calls take back. */
 export interface OperationId {
   peer: string;
@@ -36,6 +43,17 @@ export interface OperationRow {
   marginMm: number;
   items: number;
   tick: TickState;
+  /** The Settings block (`specs/0028`); `null` for a test grid row and an unknown operation. */
+  settings: OperationSettings | null;
+  /** A test grid row's grid (`specs/0028` criterion 6); `null` for any other row. */
+  grid: GridRow | null;
+}
+
+/** What a test grid row shows: its top group (`null`: "no grid") and the grid's size in cells. */
+export interface GridRow {
+  group: OperationId | null;
+  columns: number;
+  rows: number;
 }
 
 /** The summary counts (criterion 17). Nothing here counts a missing object (Frage 169 A). */
@@ -85,6 +103,8 @@ export interface OperationsView {
   items: CountItems;
   cloneMembers: CloneMember[];
   viewMode: ViewMode;
+  /** The materials of this machine the Material pick lists. */
+  pick: PickMaterial[];
 }
 
 type Json = Record<string, unknown>;
@@ -141,6 +161,16 @@ function asTick(value: unknown): TickState | null {
   return value === "none" || value === "some" || value === "all" ? value : null;
 }
 
+function asGrid(value: unknown): GridRow | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value)) return undefined;
+  const group = value.group === null ? null : asId(value.group);
+  const columns = asCount(value.columns);
+  const rows = asCount(value.rows);
+  if ((value.group !== null && group === null) || columns === null || rows === null) return undefined;
+  return { group, columns, rows };
+}
+
 function asRow(value: unknown): OperationRow | null {
   if (!isObject(value)) return null;
   const id = asId(value.id);
@@ -148,7 +178,11 @@ function asRow(value: unknown): OperationRow | null {
   const section = asSection(value.section);
   const items = asCount(value.items);
   const tick = asTick(value.tick);
+  const settings = decodeSettings(value.settings);
+  const grid = asGrid(value.grid);
   if (
+    settings === undefined ||
+    grid === undefined ||
     id === null ||
     typeof value.name !== "string" ||
     section === undefined ||
@@ -175,6 +209,8 @@ function asRow(value: unknown): OperationRow | null {
     marginMm: value.margin_mm,
     items,
     tick,
+    settings,
+    grid,
   };
 }
 
@@ -259,7 +295,8 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
   const summary = asSummary(value.summary);
   const items = asItems(value.items);
   const viewMode = asViewMode(value.view_mode);
-  if (summary === null || items === null || viewMode === null || !Array.isArray(value.clone_members)) {
+  const pick = decodePick(value.pick);
+  if (summary === null || items === null || viewMode === null || pick === null || !Array.isArray(value.clone_members)) {
     return null;
   }
   const cloneMembers: CloneMember[] = [];
@@ -268,7 +305,7 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
     if (member === null) return null;
     cloneMembers.push(member);
   }
-  return { cutsLast: value.cuts_last, rows, summary, items, cloneMembers, viewMode };
+  return { cutsLast: value.cuts_last, rows, summary, items, cloneMembers, viewMode, pick };
 }
 
 /** The view a session's JSON text holds; `null` for bad JSON or a page without operations. */

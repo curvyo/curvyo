@@ -46,7 +46,9 @@ import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useFixtures } from "@/hooks/useFixtures";
 import { useFixtureJobs } from "@/hooks/useFixtureJobs";
+import { useMaterials } from "@/hooks/useMaterials";
 import { useOperations } from "@/hooks/useOperations";
+import { useOperationSettings } from "@/hooks/useOperationSettings";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
@@ -154,6 +156,9 @@ function Editor() {
   const fixtures = useFixtures(editor);
   // The fixture jobs of the active laser page (`specs/0103-fixture-jobs`).
   const fixtureJobs = useFixtureJobs(editor);
+  // The Settings block and the Materials section (`specs/0028-material-test-library`).
+  const operationSettings = useOperationSettings(editor);
+  const materials = useMaterials(editor);
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).
@@ -243,6 +248,7 @@ function Editor() {
                 notice: editor.recognise.barNotice,
               }}
               flipEnabled={editor.flipEnabled}
+              gridCommandsHidden={editor.gridCommandsHidden}
               flip={editor.flip}
               align={editor.align}
               guideState={editor.guideState}
@@ -436,6 +442,8 @@ function Editor() {
           operations={operations}
           fixtures={fixtures}
           fixtureJobs={fixtureJobs}
+          operationSettings={operationSettings}
+          materials={materials}
         />
       </div>
       <ErrorDialog

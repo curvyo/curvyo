@@ -10,6 +10,7 @@
 // frontend/.gitignore. This import only resolves once that has run.
 import { applyExtensions, extensionsFileReady } from "@/lib/extensionsFile";
 import { applyMachineProfiles, machineProfilesReady } from "@/lib/machineProfilesFile";
+import { applyMaterials, materialFilesReady } from "@/lib/materialsFile";
 import { applyFormats, formatsFileReady } from "@/lib/formatsFile";
 import init, {
   WasmSession,
@@ -63,10 +64,12 @@ export async function createSession(): Promise<WasmSession> {
   await formatsFileReady();
   await extensionsFileReady();
   await machineProfilesReady();
+  await materialFilesReady();
   const session = new WasmSession(mintPeerId());
   applyFormats(session);
   applyExtensions(session);
   applyMachineProfiles(session);
+  applyMaterials(session);
   return session;
 }
 
@@ -87,10 +90,12 @@ export async function openSession(bytes: Uint8Array): Promise<WasmSession> {
   await formatsFileReady();
   await extensionsFileReady();
   await machineProfilesReady();
+  await materialFilesReady();
   const session = WasmSession.open(mintPeerId(), bytes);
   applyFormats(session);
   applyExtensions(session);
   applyMachineProfiles(session);
+  applyMaterials(session);
   return session;
 }
 
@@ -103,10 +108,12 @@ export async function openFileSession(bytes: Uint8Array, fileName: string): Prom
   await formatsFileReady();
   await extensionsFileReady();
   await machineProfilesReady();
+  await materialFilesReady();
   const session = WasmSession.open_file(mintPeerId(), bytes, fileName);
   applyFormats(session);
   applyExtensions(session);
   applyMachineProfiles(session);
+  applyMaterials(session);
   return session;
 }
 
