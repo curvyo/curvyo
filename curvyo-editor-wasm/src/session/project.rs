@@ -21,6 +21,9 @@ impl Session {
     /// # Errors
     /// See [`curvyo_document_core::pack`].
     pub fn pack_for_save(&mut self) -> Result<Vec<u8>, SaveError> {
+        // The stored numbers beside material links follow the library (`specs/0028` Frage 187
+        // C): a reserved commit, no step, before the version is taken.
+        self.refresh_material_numbers_for_save();
         let version = self.document.version();
         // A document of a shared workspace keeps its workspace and id (`specs/0095-workspace`
         // criterion 15); the records applied so far are in the file once it is written.

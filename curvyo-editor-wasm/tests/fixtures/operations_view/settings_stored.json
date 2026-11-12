@@ -1,0 +1,192 @@
+{
+  "pick": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "kinds": [
+        "cut",
+        "engrave"
+      ],
+      "name": "Birch plywood",
+      "thickness_mm": 3.0
+    }
+  ],
+  "rows": [
+    {
+      "grid": null,
+      "kind": "score",
+      "name": "score 5",
+      "settings": {
+        "differs": null,
+        "disabled": [
+          {
+            "id": "22222222-2222-4222-8222-222222222222",
+            "reason": "No Score set"
+          }
+        ],
+        "material": {
+          "id": "22222222-2222-4222-8222-222222222222",
+          "name": "Birch plywood"
+        },
+        "needs": "score",
+        "over_feed": null,
+        "reason": "Material has no Score set, using stored numbers",
+        "reset": false,
+        "sets": [
+          {
+            "material": {
+              "passes": 1,
+              "power_pct": 12.5,
+              "speed_mm_min": 3000
+            },
+            "role": "main",
+            "run": {
+              "passes": 1,
+              "power_pct": 12.5,
+              "speed_mm_min": 3000
+            },
+            "typed": []
+          }
+        ],
+        "state": "stored"
+      }
+    },
+    {
+      "grid": null,
+      "kind": "cut",
+      "name": "cut 1",
+      "settings": {
+        "differs": "Differs from Cardboard",
+        "disabled": [],
+        "material": {
+          "id": "66666666-6666-4666-8666-666666666666",
+          "name": "Cardboard"
+        },
+        "needs": "cut",
+        "over_feed": null,
+        "reason": "Material not found, using stored numbers",
+        "reset": true,
+        "sets": [
+          {
+            "material": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "role": "main",
+            "run": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 400
+            },
+            "typed": [
+              "speed"
+            ]
+          }
+        ],
+        "state": "stored"
+      }
+    },
+    {
+      "grid": null,
+      "kind": "cut",
+      "name": "cut 2",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "name": "Cardboard"
+        },
+        "needs": "cut",
+        "over_feed": null,
+        "reason": "Material not found, using stored numbers",
+        "reset": false,
+        "sets": [
+          {
+            "material": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "role": "main",
+            "run": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "typed": []
+          }
+        ],
+        "state": "stored"
+      }
+    },
+    {
+      "grid": null,
+      "kind": "cut",
+      "name": "cut 3",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "Cardboard"
+        },
+        "needs": "cut",
+        "over_feed": null,
+        "reason": "Material not found, using stored numbers",
+        "reset": false,
+        "sets": [
+          {
+            "material": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "role": "main",
+            "run": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "typed": []
+          }
+        ],
+        "state": "stored"
+      }
+    },
+    {
+      "grid": null,
+      "kind": "cut",
+      "name": "cut 4",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": {
+          "id": "55555555-5555-4555-8555-555555555555",
+          "name": "Cardboard"
+        },
+        "needs": "cut",
+        "over_feed": null,
+        "reason": "Material not found, using stored numbers",
+        "reset": false,
+        "sets": [
+          {
+            "material": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "role": "main",
+            "run": {
+              "passes": 2,
+              "power_pct": 60.0,
+              "speed_mm_min": 300
+            },
+            "typed": []
+          }
+        ],
+        "state": "stored"
+      }
+    }
+  ]
+}

@@ -97,6 +97,7 @@ mod layers_panel_tests;
 mod layers_tests;
 mod layers_toolbar;
 mod manufacturing;
+mod materials;
 mod measure;
 mod move_entry;
 mod move_indicators;
@@ -117,7 +118,9 @@ pub use fixtures::{
     AddTarget, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow, FixturesView,
     GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
 };
+pub use materials::{MaterialWrite, MaterialsView, SaveAsMaterial};
 pub use operations::OperationsViewMode;
+pub use test_grid::TestGridView;
 mod page_drag;
 mod page_tree_panel;
 mod pages;
@@ -207,6 +210,7 @@ mod sync_test_support;
 #[cfg(test)]
 mod sync_tests;
 mod sync_view;
+mod test_grid;
 mod text;
 mod text_bar;
 mod text_clones;
@@ -671,6 +675,11 @@ pub struct Session {
     operations: operations::OperationsState,
     /// The laser fixtures of the active laser page (`fixtures/`, `specs/0102-laser-fixtures`).
     fixtures: fixtures::FixtureState,
+    /// The maker's materials and the journal of this session's material steps (`materials/`,
+    /// `specs/0028-material-test-library`).
+    materials: materials::MaterialsState,
+    /// The test grids of the active laser page (`test_grid/`, `specs/0028`).
+    test_grids: test_grid::TestGridState,
 }
 
 impl Session {
@@ -788,6 +797,8 @@ impl Session {
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
             fixtures: fixtures::FixtureState::default(),
+            materials: materials::MaterialsState::default(),
+            test_grids: test_grid::TestGridState::default(),
         }
     }
 
@@ -900,6 +911,8 @@ impl Session {
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
             fixtures: fixtures::FixtureState::default(),
+            materials: materials::MaterialsState::default(),
+            test_grids: test_grid::TestGridState::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();

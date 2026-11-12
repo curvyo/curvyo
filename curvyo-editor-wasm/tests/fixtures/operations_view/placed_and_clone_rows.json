@@ -20,8 +20,10 @@
     ],
     "runs_while_hidden": []
   },
+  "pick": [],
   "rows": [
     {
+      "grid": null,
       "id": {
         "counter": 43,
         "peer": "1"
@@ -32,10 +34,33 @@
       "name": "Engrave 1",
       "output": true,
       "section": "marking",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": null,
+        "needs": "engrave",
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": null,
+              "power_pct": null,
+              "speed_mm_min": null
+            },
+            "typed": []
+          }
+        ],
+        "state": "no_settings"
+      },
       "show": true,
       "tick": "none"
     },
     {
+      "grid": null,
       "id": {
         "counter": 48,
         "peer": "1"
@@ -46,10 +71,33 @@
       "name": "Score 1",
       "output": true,
       "section": "marking",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": null,
+        "needs": "score",
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": null,
+              "power_pct": null,
+              "speed_mm_min": null
+            },
+            "typed": []
+          }
+        ],
+        "state": "no_settings"
+      },
       "show": true,
       "tick": "none"
     },
     {
+      "grid": null,
       "id": {
         "counter": 38,
         "peer": "1"
@@ -60,6 +108,28 @@
       "name": "Cut 1",
       "output": true,
       "section": "cutting",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": null,
+        "needs": "cut",
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": null,
+              "power_pct": null,
+              "speed_mm_min": null
+            },
+            "typed": []
+          }
+        ],
+        "state": "no_settings"
+      },
       "show": true,
       "tick": "none"
     }

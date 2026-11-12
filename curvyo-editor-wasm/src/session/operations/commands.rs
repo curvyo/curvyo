@@ -12,9 +12,10 @@ use super::super::Session;
 impl Session {
     /// Adds an operation of the stored kind `kind` (`cut`, `score`, `engrave`, `engrave_outline`,
     /// `cut_out`) on the active laser page, named as criterion 2 says and placed in
-    /// its section. With items selected they are assigned to it in the same step (criterion 8).
-    /// `None` for an unknown kind, another page, or a selection of only guides and dimensions
-    /// (nothing is added then, and the refusal notice is shown).
+    /// its section. With items selected they are assigned to it in the same step (criterion 8);
+    /// items of a test grid are not, they run with their grid row (`specs/0028` criterion 6, a
+    /// notice names them). `None` for an unknown kind, another page, or a selection of only guides
+    /// and dimensions (nothing is added then, and the refusal notice is shown).
     pub fn press_operation_kind(&mut self, kind: &str) -> Option<NodeId> {
         self.operations.notice = None;
         let kind = OperationKind::parse(kind)?;
@@ -37,12 +38,18 @@ impl Session {
             kind: kind.as_str(),
             name: &name,
         };
-        self.note_skipped_guides(selection.guides);
-        self.recording_unguarded(|this| {
+        let added = self.recording_unguarded(|this| {
             this.document
                 .add_operation(active.manufacturing, &new, index, &selection.targets)
                 .ok()
-        })
+        });
+        if added.is_some() {
+            self.note_skipped(&selection, true);
+        } else {
+            // Never silently nothing (`specs/0028` UX review).
+            self.operations.notice = Some(super::ADD_REFUSED_NOTICE.to_owned());
+        }
+        added
     }
 
     /// Renames operation `id`; an empty name reverts (criterion 3). `false` when nothing changes.

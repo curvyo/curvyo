@@ -390,6 +390,13 @@ impl Session {
                 self.set_tool(tool);
                 KeyOutcome::ToolChanged
             }
+            // S, R and K do nothing for a whole test grid; M moves it (`specs/0028` ux-notes 6.5).
+            KeyAction::OpenEntry(key)
+                if !matches!(key, curvyo_ui_core::EntryKey::Move)
+                    && self.whole_test_grid_selected() =>
+            {
+                KeyOutcome::Consumed
+            }
             KeyAction::OpenEntry(key) => {
                 let objects = self.objects();
                 match self

@@ -1,0 +1,77 @@
+{
+  "load_notices": [
+    "33333333-3333-4333-8333-333333333333.json: Unknown key colour.",
+    "44444444-4444-4444-8444-444444444444.json: needs a newer Curvyo."
+  ],
+  "next_name": "Material 1",
+  "profile_name": "Generic laser",
+  "rows": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "kinds": [
+        "cut",
+        "score",
+        "engrave"
+      ],
+      "name": "Birch plywood",
+      "state": "loaded",
+      "thickness_mm": 3.0,
+      "uses": 0
+    },
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "reason": "Unknown key colour.",
+      "state": "damaged"
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Birch plywood",
+      "state": "newer"
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kinds": [
+        "cut"
+      ],
+      "name": "Cardboard",
+      "state": "loaded",
+      "thickness_mm": 3.0,
+      "uses": 0
+    }
+  ],
+  "selected": {
+    "id": "22222222-2222-4222-8222-222222222222",
+    "name": "Birch plywood",
+    "sets": [
+      {
+        "kind": "cut",
+        "numbers": {
+          "passes": 2,
+          "power_pct": 60.0,
+          "speed_mm_min": 300
+        },
+        "source": "Tested 2025-11-11, 5 × 5 grid, cell 60 %, 300 mm/min"
+      },
+      {
+        "kind": "score",
+        "numbers": {
+          "passes": 1,
+          "power_pct": 12.5,
+          "speed_mm_min": 3000
+        },
+        "source": "Edited by hand 2025-11-11"
+      },
+      {
+        "kind": "engrave",
+        "numbers": {
+          "passes": 1,
+          "power_pct": 35.0,
+          "speed_mm_min": 6000
+        },
+        "source": "Tested 2025-11-12, 4 × 3 grid, cell 35 %, 6000 mm/min"
+      }
+    ],
+    "thickness_mm": 3.0,
+    "uses": 0
+  }
+}
