@@ -1,7 +1,7 @@
-import { CircleAlert, Info, SquareDashedMousePointer, X } from "lucide-react";
+import { CircleAlert, Info, RectangleHorizontal, SquareDashedMousePointer, SquareMinus, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
 import { useEffect, useId, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 import { useRowStarts } from "@/components/SelectToolbar";
 import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
@@ -16,7 +16,10 @@ import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
   CLEAR_MASK,
+  MASK_RECTANGLE,
+  MASK_SUBTRACT,
   maskPickStatus,
+  maskToggleStatus,
   PICK_MASK_PATHS,
   TRACE_MIXED,
   TRACE_FINISH,
@@ -141,9 +144,10 @@ function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outsid
   );
 }
 
-/** The Mask group (`specs/0094` UX notes §1, §11; `specs/0089` UX notes §24.4): one flow item
- * after Preset, always drawn, never dimmed: the Pick mask paths toggle, the Inside / Outside
- * segments and Clear mask, which does nothing without mask paths. A mouse press hands the
+/** The Mask group (`specs/0094` UX notes §1, §11; `specs/0089` UX notes §24.4; `specs/0114`
+ * slice 1): one flow item after Preset, always drawn, never dimmed: the Rectangle and Subtract
+ * toggles, the Pick mask paths toggle (until `0114` slice 4), the Inside / Outside segments and
+ * Clear mask, which does nothing without mask paths or regions. A mouse press hands the
  * keyboard back to the canvas, a key keeps it; Escape on the armed toggle disarms and returns to
  * the canvas. The mode is announced politely, never shown as text. */
 function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: () => void }) {
@@ -160,6 +164,26 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
   const pressed = armed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
   return (
     <div data-trace-mask="" className="flex h-9 items-center gap-1">
+      <MaskToggle
+        name={MASK_RECTANGLE}
+        on={trace.maskTool === "rect"}
+        data="data-trace-mask-rect"
+        onToggle={(on) => trace.setMaskTool(on ? "rect" : "none")}
+        onReturnFocus={onReturnFocus}
+        onSay={setSaid}
+      >
+        <RectangleHorizontal size={16} strokeWidth={1.5} aria-hidden />
+      </MaskToggle>
+      <MaskToggle
+        name={MASK_SUBTRACT}
+        on={trace.subtract}
+        data="data-trace-mask-subtract"
+        onToggle={trace.setSubtract}
+        onReturnFocus={onReturnFocus}
+        onSay={setSaid}
+      >
+        <SquareMinus size={16} strokeWidth={1.5} aria-hidden />
+      </MaskToggle>
       <AppTooltip side="bottom" content={PICK_MASK_PATHS}>
         <button
           type="button"
@@ -193,7 +217,7 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
           data-trace-clear-mask=""
           onClick={(event) => {
             // Nothing to clear: no change, focus stays (`specs/0089` UX notes §24.4).
-            if (trace.mask.paths === 0) {
+            if (trace.mask.paths + trace.mask.regions === 0) {
               return;
             }
             trace.clearMask();
@@ -210,6 +234,49 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
         {said}
       </span>
     </div>
+  );
+}
+
+/** A toggle of the Mask group (`specs/0114` Behaviour 1): pressed or not, named by its tooltip;
+ * the change is said politely ("Rectangle on"). A mouse press hands the keyboard back to the
+ * canvas, a key keeps it. */
+function MaskToggle({
+  name,
+  on,
+  data,
+  onToggle,
+  onReturnFocus,
+  onSay,
+  children,
+}: {
+  name: string;
+  on: boolean;
+  data: string;
+  onToggle: (on: boolean) => void;
+  onReturnFocus: () => void;
+  onSay: (text: string) => void;
+  children: ReactNode;
+}) {
+  const pressed = on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
+  return (
+    <AppTooltip side="bottom" content={name}>
+      <button
+        type="button"
+        aria-label={name}
+        aria-pressed={on}
+        {...{ [data]: "" }}
+        onClick={(event) => {
+          onToggle(!on);
+          onSay(maskToggleStatus(name, !on));
+          if (event.detail > 0) {
+            onReturnFocus();
+          }
+        }}
+        className={`${ICON_BUTTON_CLASS} ${pressed}`}
+      >
+        {children}
+      </button>
+    </AppTooltip>
   );
 }
 

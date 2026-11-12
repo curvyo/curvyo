@@ -30,6 +30,15 @@ export const MASK_FAILED = "0 paths: the mask paths could not be combined. Conve
 /** The pick button and Clear mask of the Mask group (`specs/0094` slice 1b, UX notes §11). */
 export const PICK_MASK_PATHS = "Pick mask paths";
 export const CLEAR_MASK = "Clear mask";
+/** The region tool and the Subtract toggle of the Mask group (`specs/0114` Behaviour 1). */
+export const MASK_RECTANGLE = "Rectangle";
+export const MASK_SUBTRACT = "Subtract";
+
+/** The polite status of a Mask group toggle (`specs/0114` Behaviour 12, not visible):
+ * "Rectangle on", "Subtract off". */
+export function maskToggleStatus(name: string, on: boolean): string {
+  return `${name} ${on ? "on" : "off"}`;
+}
 
 /** The polite status of the pick mode (UX notes §11, not visible). */
 export function maskPickStatus(armed: boolean): string {

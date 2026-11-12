@@ -86,6 +86,8 @@ export interface ViewState {
   shown: string;
   /** Mask paths selected with the image (`specs/0094`). */
   maskPaths: number;
+  /** The active part's stored regions (`specs/0114`). */
+  maskRegions: number;
   /** The mask paths cover none of the image (criterion 7). */
   maskOutsideImage: boolean;
   /** The mask paths could not be combined (the kernel refused). */
@@ -96,7 +98,7 @@ export interface ViewState {
   parts: string;
 }
 
-export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskPaths: 0, maskOutsideImage: false, maskFailed: false, mask: "", parts: "" };
+export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskPaths: 0, maskRegions: 0, maskOutsideImage: false, maskFailed: false, mask: "", parts: "" };
 
 export function readView(session: WasmSession | null): ViewState {
   const raw = session?.trace_view();
@@ -108,9 +110,10 @@ export function readView(session: WasmSession | null): ViewState {
     images: raw.images,
     shown: raw.shown,
     maskPaths: raw.mask_paths,
+    maskRegions: raw.mask_regions,
     maskOutsideImage: raw.mask_outside_image,
     maskFailed: raw.mask_failed,
-    mask: raw.mask_paths > 0 && session ? session.trace_mask_json() : "",
+    mask: raw.mask_paths + raw.mask_regions > 0 && session ? session.trace_mask_json() : "",
     parts: session ? session.trace_parts() : "",
   };
   raw.free();

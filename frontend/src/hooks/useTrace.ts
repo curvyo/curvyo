@@ -58,7 +58,8 @@ import { trace_auto_threshold, trace_suggest_background, trace_text_failed_notic
 import { type RegionRead, forgetRegionValues, partAutoValues, readRegion, regionAnswer, viewValues } from "@/lib/traceMaskCaches";
 import { NO_VIEW, joinWires, loadParams, loadPresets, partPixelsOf, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import { NO_PART_LINE, type PartJob, type TracePartInfo, mayCrop, partEmptyText, partKey, partsCount, readParts, traceParts } from "@/lib/traceParts";
-import type { TraceApi } from "./traceApi";
+import type { MaskTool, TraceApi } from "./traceApi";
+import { partSettingsJson } from "@/lib/traceMaskSettings";
 import { useTraceParts } from "./useTraceParts";
 import { useTracePalette } from "./useTracePalette";
 import { useTraceMethod } from "./useTraceMethod";
@@ -142,6 +143,13 @@ export function useTrace(
   useEffect(() => {
     choiceRef.current = choice;
   }, [choice]);
+  // `specs/0114`: the bar's settings are the session's tool state, stored by the first mask
+  // gesture on an untouched image and by Add part.
+  useEffect(() => {
+    if (active) {
+      getSession()?.set_trace_tool_settings(partSettingsJson(choice));
+    }
+  }, [active, choice, getSession]);
   /** The view as last read; the sync effect below keeps it and the state together. */
   const viewRef = useRef(view);
   /** Another part's settings into the bar (`specs/0094` slice 2): its Threshold is the image's
@@ -806,6 +814,7 @@ export function useTrace(
       next.images.join() === previous.images.join() &&
       next.mask === previous.mask &&
       next.maskPaths === previous.maskPaths &&
+      next.maskRegions === previous.maskRegions &&
       next.maskOutsideImage === previous.maskOutsideImage &&
       next.maskFailed === previous.maskFailed &&
       next.parts === previous.parts
@@ -1227,6 +1236,23 @@ export function useTrace(
     onChange();
   }, [getSession, onChange]);
 
+  /** The region tool of the Mask group (`specs/0114` Behaviour 1): pressing the pressed one
+   * releases it. */
+  const setMaskTool = useCallback(
+    (tool: MaskTool) => {
+      getSession()?.set_trace_region_tool(tool);
+      onChange();
+    },
+    [getSession, onChange],
+  );
+  const setSubtract = useCallback(
+    (on: boolean) => {
+      getSession()?.set_trace_subtract(on);
+      onChange();
+    },
+    [getSession, onChange],
+  );
+
   /** Disarms the armed pipette, Escape's last step and a right press on the canvas (`ux-notes.md`
    * §25.4); `false` when it was not armed. */
   const disarmPick = useCallback((): boolean => {
@@ -1288,7 +1314,9 @@ export function useTrace(
   const session = active ? getSession() : null;
   // The Mask group is always drawn (`ux-notes.md` §24.4): the mode with or without mask paths.
   const maskOutside = session?.trace_mask_outside() ?? false;
-  const mask = { paths: view.selection === "images" ? view.maskPaths : 0, outside: maskOutside };
+  const images = view.selection === "images";
+  const mask = { paths: images ? view.maskPaths : 0, regions: images ? view.maskRegions : 0, outside: maskOutside };
+  const maskView = readMaskView(session);
   const parts = partsApi.parts;
   // `specs/0094` UX notes §7: with two or more parts "3 parts" replaces the mask segment, and an
   // active later part without paths says so last.
@@ -1339,6 +1367,10 @@ export function useTrace(
     selection: view.selection,
     mask,
     setMaskOutside,
+    maskTool: maskView.tool,
+    setMaskTool,
+    subtract: maskView.subtract,
+    setSubtract,
     maskPick,
     setMaskPick,
     clearMask,
@@ -1376,6 +1408,15 @@ export function useTrace(
     traceBlocked,
     palette,
   };
+}
+
+/** The Mask group's tool state as the session reports it (`trace_mask_view`). */
+function readMaskView(session: WasmSession | null): { tool: MaskTool; subtract: boolean } {
+  if (!session) {
+    return { tool: "none", subtract: false };
+  }
+  const raw = JSON.parse(session.trace_mask_view()) as { tool?: string; subtract?: boolean };
+  return { tool: raw.tool === "rect" ? "rect" : "none", subtract: raw.subtract === true };
 }
 
 /** The colours and joined regions of the shown multicolour preview, `null` for one colour. */
