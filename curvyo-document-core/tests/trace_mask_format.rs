@@ -36,7 +36,6 @@ fn settings(value: Value) -> TracePartSettings {
     serde_json::from_value(value).unwrap()
 }
 
-
 fn points(list: &[(f64, f64)]) -> Vec<UnitPoint> {
     list.iter().map(|&(u, v)| UnitPoint::new(u, v)).collect()
 }
