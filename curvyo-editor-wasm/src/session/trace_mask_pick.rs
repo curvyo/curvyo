@@ -54,8 +54,9 @@ impl Session {
         self.trace.mask_pick.refused
     }
 
-    /// Clear mask (criterion 40): only the traced image stays selected; the mask paths stay in
-    /// the document, nothing is written and the mode is unchanged.
+    /// Clear mask (criterion 40, `0114` criterion 20): only the traced image stays selected (the
+    /// mask paths stay in the document), and the active part's stored regions go in one step
+    /// "Clear mask"; the part, its mode and its settings stay.
     pub fn clear_trace_mask(&mut self) {
         if self.tool != Tool::Trace {
             return;
@@ -63,6 +64,15 @@ impl Session {
         let images = self.trace_view().images;
         if let [image] = images.as_slice() {
             self.selection.set(&[*image]);
+        }
+        let stored = self.trace_active_mask_part().and_then(|part| part.stored);
+        if let (Some(part), Some(image)) = (stored, self.trace_mask_image()) {
+            self.recording(|this| {
+                this.document
+                    .clear_trace_mask(image.id, &part)
+                    .unwrap_or(false)
+            });
+            self.trace.mask.selected = None;
         }
     }
 

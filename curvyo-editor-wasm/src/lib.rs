@@ -146,6 +146,8 @@ mod wasm_tiling;
 #[cfg(target_arch = "wasm32")]
 mod wasm_trace;
 #[cfg(target_arch = "wasm32")]
+mod wasm_trace_mask;
+#[cfg(target_arch = "wasm32")]
 mod wasm_trace_parts;
 #[cfg(target_arch = "wasm32")]
 mod wasm_trace_region;
@@ -170,6 +172,7 @@ pub use font_preview_glue::PreviewFacesGlue;
 pub use ocr_pool_glue::{crops_wire, read_crops, read_crops_wire};
 pub use pairing_glue::{PairPhase, PairingGlue};
 pub use session::SvgExportResult;
+pub use session::TraceRegionTool;
 pub use session::{
     APP_VERSION, BooleanOutcome, BreakApartOutcome, CloneOutcome, ClosePathOutcome, ClosePathState,
     CombineOutcome, CutOutcome, DocumentPresetsRecord, DocumentSide, DoubleClickHint, DropPlace,

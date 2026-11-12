@@ -463,38 +463,29 @@ fn c28_removing_a_part_renumbers_and_one_part_cannot_be_removed() {
     assert!(!s.remove_trace_part(7), "no such part");
 }
 
+/// Replaced by `specs/0114-image-trace-mask` criterion 19 and Behaviour 9 (customer 2026-11-12,
+/// ADR 0061 accepted 2026-11-13): the parts are stored on the image, so leaving the tool keeps
+/// them and entering it again shows them with part 1 active; Add part is one step each.
 #[test]
-fn c29_leaving_the_tool_leaves_one_part_and_nothing_is_stored() {
+fn c29_leaving_the_tool_keeps_the_stored_parts_with_part_one_active() {
     let (mut s, _, _) = three_paths();
     let before = s.pack("t").unwrap();
     assert!(s.add_trace_part().is_some());
     shift_click(&mut s, ON_B);
     assert!(s.add_trace_part().is_some());
     assert_eq!(s.trace_part_count(), 3);
-    assert_eq!(
+    assert_ne!(
         s.pack("t").unwrap(),
         before,
-        "nothing about parts is in the document"
+        "the parts are in the document"
     );
-    for leave in [Tool::Select, Tool::Rectangle] {
-        s.set_tool(leave);
+    for round in 0..2 {
+        s.set_tool(Tool::Select);
         s.set_tool(Tool::Trace);
-        assert_eq!(s.trace_part_count(), 1, "one part after {leave:?}");
+        assert_eq!(s.trace_part_count(), 3, "the parts after leaving {round}");
         let p = parts(&s);
-        assert_eq!(p[0]["active"], true);
+        assert_eq!(p[0]["active"], true, "part 1 is active on entry");
     }
-    // With only the image selected on entry: one whole-image part.
-    s.set_tool(Tool::Select);
-    s.set_tool(Tool::Trace);
-    s.clear_trace_mask();
-    s.set_tool(Tool::Select);
-    s.set_tool(Tool::Trace);
-    let p = parts(&s);
-    assert_eq!(p.as_array().unwrap().len(), 1);
-    assert_eq!(
-        p[0]["whole"], true,
-        "no mask unless paths are selected: {p}"
-    );
 }
 
 // ---------------------------------------------------------------------------------------------

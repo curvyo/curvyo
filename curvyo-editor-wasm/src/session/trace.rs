@@ -72,6 +72,8 @@ pub(super) struct TraceState {
     pub(super) region: std::cell::RefCell<Option<super::trace_region::RegionCache>>,
     /// The parts of a composite trace (`trace_parts.rs`, `specs/0094` slice 2).
     pub(super) parts: super::trace_parts::TraceParts,
+    /// The mask's region tools, selection and drag (`trace_mask_tool.rs`, `specs/0114`).
+    pub(super) mask: super::trace_mask_tool::TraceMaskTool,
 }
 
 /// The counts of each group Create paths wrote in this session, for its Layers row's tooltip
@@ -104,6 +106,8 @@ pub struct TraceView {
     pub shown: Option<NodeId>,
     /// The mask paths selected with the image, in document order (`specs/0094`).
     pub mask: Vec<NodeId>,
+    /// The active part's stored regions (`specs/0114`).
+    pub regions: usize,
     /// The mask paths enclose no area of the image: "0 paths: the mask is outside the image."
     /// (criterion 7).
     pub mask_outside_image: bool,
@@ -211,14 +215,20 @@ impl Session {
             .iter()
             .map(ObjectSnapshot::id)
             .collect();
-        let mask_failed = (!mask.is_empty() && self.trace_mask_failure().is_some())
-            || self.trace_has_unsupported_mask();
-        let mask_outside_image = !mask.is_empty() && !mask_failed && !self.trace_mask_meets_image();
+        let regions = self
+            .trace_active_mask_part()
+            .filter(|_| selection == TraceSelection::Images && images.len() == 1)
+            .map_or(0, |part| part.regions.len());
+        let masked = !mask.is_empty() || regions > 0;
+        let mask_failed =
+            (masked && self.trace_mask_failure().is_some()) || self.trace_has_unsupported_mask();
+        let mask_outside_image = masked && !mask_failed && !self.trace_mask_meets_image();
         TraceView {
             selection,
             images,
             shown,
             mask,
+            regions,
             mask_outside_image,
             mask_failed,
         }
@@ -500,7 +510,7 @@ impl Session {
     /// nothing else; on empty canvas it clears the selection (criterion 3). Armed, Pick mask
     /// paths takes it (`specs/0094` slice 1b).
     pub(super) fn trace_pointer_down(&mut self, point: Point, shift: bool) {
-        if self.trace_mask_pick_press(point) {
+        if self.trace_mask_pick_press(point) || self.trace_mask_press(point) {
             return;
         }
         // Shift+click builds the mask by the pick's hit rule, the traced image skipped, so a path

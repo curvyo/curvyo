@@ -307,6 +307,8 @@ impl Session {
         list.extend(self.tiling_draw_list(view));
         // The Trace tool's hollow preview outline (`specs/0025-raster-trace` criterion 8).
         self.trace_draw_into(view, &mut list);
+        // The mask's regions and handles over the picture (`specs/0114-image-trace-mask`).
+        list.extend(self.trace_mask_draw_list(view));
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.
