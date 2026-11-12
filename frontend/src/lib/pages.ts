@@ -31,6 +31,9 @@ export interface PageRow {
   sketch: SketchRow | null;
   /** The page a page-row drag would drop onto now (its frame cue, UX notes §2). */
   dropTarget: boolean;
+  /** A laser page's Operations view toggle: pressed or not (`specs/0111` criterion 15); `null` on
+   * any other page. */
+  operationsView?: boolean | null;
   /** A move-only selection's object belongs here: the label is semibold (`specs/0106` UX §2). */
   home?: boolean;
 }
@@ -42,3 +45,12 @@ export function readPages(json: string): PageRow[] {
 export function pageReading(name: string, word: string): string {
   return `${name}, ${word.toLowerCase()} page`;
 }
+
+/** Whether the page label draws the Operations view toggle: a laser page only, `operationsView`
+ * is pressed or not there and `null` elsewhere (`specs/0111` criterion 15). */
+export function operationsToggle(page: PageRow): { pressed: boolean } | null {
+  return typeof page.operationsView === "boolean" ? { pressed: page.operationsView } : null;
+}
+
+/** The accessible name and tooltip of the toggle; the pressed state is `aria-pressed`. */
+export const OPERATIONS_VIEW_NAME = "Operations view";

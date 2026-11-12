@@ -36,6 +36,9 @@ import type { TileSlot } from "@/lib/tilingText";
 import { RatioSlider } from "@/components/RatioSlider";
 import { RATIO_SLIDER_NAMES } from "@/lib/sliderNames";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
+import { OperationKindGroup } from "@/components/OperationKindGroup";
+import { enteredBarShown } from "@/lib/kindButtons";
+import type { KindButton } from "@/lib/operationsView";
 import type { SelectBarState } from "@/hooks/useEditorSession";
 import type { CloneBarNotice } from "@/hooks/useClones";
 import type { ArcBarApi } from "@/hooks/useArcBar";
@@ -136,6 +139,16 @@ export interface SelectToolbarProps {
   arcBar: ArcBarApi;
   /** The Tile slot (`specs/0069-tiling` UX notes §1): Tile, or Edit tiling and Release tiling. */
   tile?: { slot: TileSlot; onEnter: (byKeyboard: boolean) => void; onRelease: () => void };
+  /** The Operation group (`specs/0111-laser-operation-tools` criteria 1 and 11): the five kind
+   * buttons after the switches on a laser page; `buttons` is `null` while they are hidden.
+   * Inside an entered laser group (`entered`) the bar holds only this group. */
+  operationKinds?: {
+    buttons: readonly KindButton[] | null;
+    entered: boolean;
+    onPress: (kind: string, shift: boolean) => void;
+    /** Escape on a kind button inside the entered group leaves it. */
+    onLeaveGroup: () => void;
+  };
   /** Returns the keyboard focus to the canvas (after Enter or Escape in a
    * field). */
   onReturnFocus: () => void;
@@ -664,6 +677,7 @@ export function SelectToolbar({
   guideState,
   onToggleGuide,
   arcBar,
+  operationKinds,
   onReturnFocus,
 }: SelectToolbarProps) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -878,6 +892,30 @@ export function SelectToolbar({
       />,
     );
   }
+  const kindButtons = operationKinds && enteredBarShown(operationKinds.buttons) ? operationKinds.buttons : null;
+  // Inside an entered laser group the bar holds only the Operation group, and is absent with no
+  // member selected (`ux-notes.md` 4.2, M3).
+  if (operationKinds?.entered) {
+    if (!kindButtons) return null;
+    return (
+      <div
+        data-context-bar=""
+        className="pointer-events-auto flex min-w-0 flex-col rounded-lg px-2 text-sm"
+        style={{ background: "var(--toolbar-bg)", boxShadow: "var(--panel-elevation-shadow)" }}
+      >
+        <div className={BAR_ROW_CLASS}>
+          <OperationKindGroup
+            kinds={kindButtons}
+            onPress={operationKinds.onPress}
+            onLeaveGroup={() => {
+              operationKinds.onLeaveGroup();
+              onReturnFocus();
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       data-context-bar=""
@@ -912,10 +950,18 @@ export function SelectToolbar({
         />
       </div>
       )}
+      {/* The Operation group: right after the switches, before Flip, on a laser page with an
+       * in-context selection (`specs/0111` criterion 1, `ux-notes.md` 3.1, T1). */}
+      {kindButtons && operationKinds ? (
+        <div className="group/row relative flex min-h-9 items-start">
+          {bar.scaleSwitchesShown && <Divider />}
+          <OperationKindGroup kinds={kindButtons} onPress={operationKinds.onPress} />
+        </div>
+      ) : null}
       {/* The Flip group: second, after the switches, in every selection state, so the first
        * row does not move with the selection (`specs/0056-mirror-and-negative-scale/` D7). */}
       <div className="group/row relative flex min-h-9 items-start">
-        {bar.scaleSwitchesShown && <Divider />}
+        {(bar.scaleSwitchesShown || kindButtons) && <Divider />}
         {/* The Guide button directly after the Flip group, in every selection state, 4 px from
          * it like the two flip buttons from each other, so the row stays as narrow as it can
          * (`specs/0046-document-shapes` criterion 9, UX review 2). */}

@@ -17,6 +17,11 @@ interface SettingsNumberFieldsProps {
   onReturnFocus: () => void;
   /** The first field takes the panel's first focus. */
   firstFocus?: boolean;
+  /** A field beside Passes (the Interval of a hatch, `specs/0111` ux-notes 6.2). */
+  beside?: React.ReactNode;
+  /** The width of each field: 118 px below the list, 112 px in the unfolded row (`specs/0111`
+   * `ux-notes.md` 6.2, two fields and a gap in its 228 px column). */
+  fieldWidth?: number;
 }
 
 function valueOf(numbers: SettingsNumberFieldsProps["numbers"], field: SettingsField): number | null {
@@ -29,20 +34,20 @@ function valueOf(numbers: SettingsNumberFieldsProps["numbers"], field: SettingsF
  * shows "Material 60" under itself. Enter or leaving commits; the session answers with the chip.
  */
 export function SettingsNumberFields(props: SettingsNumberFieldsProps) {
-  const { numbers, nameOf, lineOf, descriptionOf, onCommit, onReturnFocus, firstFocus } = props;
+  const { numbers, nameOf, lineOf, descriptionOf, onCommit, onReturnFocus, firstFocus, beside, fieldWidth = 118 } = props;
   const cell = (field: SettingsField, first: boolean) => {
     const entry = FIELDS.find((candidate) => candidate.field === field);
     const line = lineOf?.(field) ?? null;
     const description = descriptionOf?.(field) ?? null;
     return (
-      <div key={field} className="flex w-[118px] flex-col">
+      <div key={field} className="flex flex-col" style={{ width: fieldWidth }}>
         <EntryField
           label={description ? `${nameOf(field)}, ${description}` : nameOf(field)}
           shown={numberText(valueOf(numbers, field))}
           mixed={false}
           suffix={entry?.unit}
           smallSuffix={field === "speed"}
-          width={118}
+          width={fieldWidth}
           gutter={field === "speed" ? 52 : undefined}
           commitOnBlur
           inputMode="decimal"
@@ -62,7 +67,10 @@ export function SettingsNumberFields(props: SettingsNumberFieldsProps) {
         {cell("power", true)}
         {cell("speed", false)}
       </div>
-      <div className="flex gap-1">{cell("passes", false)}</div>
+      <div className="flex flex-wrap gap-1">
+        {cell("passes", false)}
+        {beside}
+      </div>
     </div>
   );
 }

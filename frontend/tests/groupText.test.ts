@@ -101,3 +101,23 @@ test("crumbs have different accessible names", () => {
   const names = crumbRow(3).crumbs.map(crumbName);
   assert.deepEqual(names, ["Document", "Group, level 1", "Group, level 2", "Group, level 3"]);
 });
+
+// `specs/0111-laser-operation-tools` criterion 11: on a laser page the root crumb is the page name
+// and each level carries the group's name.
+test("a laser page names the root crumb after the page and each level after its group", () => {
+  const row = crumbRow(2, { root: "Coasters", groups: ["Group 3", "Inner"] });
+  assert.deepEqual(
+    row.crumbs.map((crumb) => [crumb.label, crumb.level, crumb.current]),
+    [["Coasters", 0, false], ["Group 3", 1, false], ["Inner", 2, true]],
+  );
+  assert.deepEqual(row.crumbs.map(crumbName), ["Coasters", "Group 3", "Inner"]);
+  assert.equal(row.collapsed, 0);
+});
+
+test("a laser page collapses the middle levels above three, keeping the page and the last two", () => {
+  const names = { root: "Coasters", groups: ["A", "B", "C", "D", "E"] };
+  const row = crumbRow(5, names);
+  assert.deepEqual(row.crumbs.map((crumb) => crumb.label), ["Coasters", "D", "E"]);
+  assert.equal(row.collapsed, 3);
+  assert.equal(crumbRow(1).crumbs[0].label, "Document");
+});

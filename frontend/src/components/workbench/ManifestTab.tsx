@@ -64,7 +64,7 @@ function Block({
     case "machine_profile":
       return view.machine ? (
         <>
-          <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} />
+          <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} onReturnFocus={onReturnFocus} />
           <PlacePage pages={pages} workbenches={workbenches} onReturnFocus={onReturnFocus} />
         </>
       ) : null;

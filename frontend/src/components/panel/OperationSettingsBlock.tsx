@@ -1,5 +1,5 @@
 import { Diff, Link2Off, RotateCcw, TriangleAlert } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import { MaterialPick } from "@/components/panel/MaterialPick";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
@@ -29,6 +29,11 @@ interface OperationSettingsBlockProps {
   /** "Edit material": opens the Materials section on that material. */
   onEditMaterial: (id: string) => void;
   onReturnFocus: () => void;
+  /** The block sits in the unfolded row, which already shows the name and kind: no head. */
+  embedded?: boolean;
+  /** The Interval field, beside Passes of the first set (Engrave and Engrave + Outline,
+   * `specs/0111` criterion 19). */
+  interval?: ReactNode;
 }
 
 const GLYPHS: Record<StateGlyph, typeof Link2Off> = {
@@ -57,7 +62,7 @@ function SetHeading({ set }: { set: SetView }) {
  * buttons Reset to material and Edit material, each only where it applies. With several
  * operations selected only the pick shows.
  */
-export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onReturnFocus }: OperationSettingsBlockProps) {
+export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onReturnFocus, embedded = false, interval }: OperationSettingsBlockProps) {
   const withSettings = rows.filter((row): row is OperationRow & { settings: OperationSettings } => row.settings !== null);
   const [status, setStatus] = useState("");
   const fieldsRef = useRef<HTMLDivElement>(null);
@@ -111,12 +116,14 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
       <p id={summaryId} className="sr-only">
         {blockSummary(settings)}
       </p>
-      <div className="flex h-6 items-center gap-2 text-[13px] font-semibold text-[var(--toolbar-icon)]">
-        {single.kind === "unknown" ? null : <OperationGlyph kind={single.kind} />}
-        <span className="min-w-0 truncate" title={single.name}>
-          {single.name}
-        </span>
-      </div>
+      {embedded ? null : (
+        <div className="flex h-6 items-center gap-2 text-[13px] font-semibold text-[var(--toolbar-icon)]">
+          {single.kind === "unknown" ? null : <OperationGlyph kind={single.kind} />}
+          <span className="min-w-0 truncate" title={single.name}>
+            {single.name}
+          </span>
+        </div>
+      )}
       {picker}
       {skip}
       {settings.state === "no_settings" ? (
@@ -138,7 +145,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
         );
       })}
       <div ref={fieldsRef} className="flex flex-col gap-1">
-        {settings.sets.map((set) => (
+        {settings.sets.map((set, at) => (
           <div key={set.role} className="flex flex-col">
             {twoSets ? <SetHeading set={set} /> : null}
             <SettingsNumberFields
@@ -148,6 +155,8 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
               descriptionOf={(field) => materialDescription(set, field)}
               onCommit={(field, number) => api.edit(single.id, set.role, field, number)}
               onReturnFocus={onReturnFocus}
+              beside={at === 0 ? interval : undefined}
+              fieldWidth={embedded ? 112 : undefined}
             />
           </div>
         ))}

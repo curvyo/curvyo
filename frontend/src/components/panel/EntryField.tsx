@@ -53,6 +53,9 @@ export interface EntryFieldProps {
   /** Up and Down step the typed text (Shift: by 10) and commit on key-up
    * (`specs/0028` ux-notes 12): returns the new text, `null` for none. */
   stepText?: (text: string, key: string, shift: boolean) => string | null;
+  /** A 12 px muted word inside the left edge ("Scan angle", `specs/0111` ux-notes 6.3); the
+   * accessible name stays `label`. */
+  prefix?: string;
 }
 
 /**
@@ -89,6 +92,7 @@ export function EntryField({
   inputMode = "text",
   inputRef,
   stepText,
+  prefix,
 }: EntryFieldProps) {
   const messageId = useId();
   const display = mixed ? "" : shown;
@@ -234,8 +238,19 @@ export function EntryField({
             ? "border-[var(--field-invalid)] shadow-[inset_0_0_0_2px_var(--field-invalid)]"
             : "border-[color-mix(in_srgb,var(--toolbar-icon)_60%,transparent)] focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)]"
         }`}
-        style={{ paddingRight: suffix && !mixed ? (gutter ?? (suffix.length > 1 ? 32 : 24)) : 6 }}
+        style={{
+          paddingRight: suffix && !mixed ? (gutter ?? (suffix.length > 1 ? 32 : 24)) : 6,
+          ...(prefix ? { paddingLeft: 8 + prefix.length * 6.5 } : {}),
+        }}
       />
+      {prefix && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-xs text-[var(--panel-muted-fg)]"
+        >
+          {prefix}
+        </span>
+      )}
       {suffix && !mixed && (
         <span
           aria-hidden

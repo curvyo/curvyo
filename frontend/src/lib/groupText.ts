@@ -83,6 +83,15 @@ export interface Crumb {
   label: string;
   level: number;
   current: boolean;
+  /** The accessible name where the label says it all (the named crumbs of a laser page). */
+  name?: string;
+}
+
+/** The names of a laser page's entered groups (`specs/0111` criterion 11): the root crumb is the
+ * page name, then one name per level, outermost first. */
+export interface CrumbNames {
+  root: string;
+  groups: readonly string[];
 }
 
 export interface CrumbRow {
@@ -93,10 +102,19 @@ export interface CrumbRow {
   collapsedAt: number;
 }
 
-export function crumbRow(depth: number): CrumbRow {
-  const all: Crumb[] = [{ label: "Document", level: 0, current: depth === 0 }];
+export function crumbRow(depth: number, names?: CrumbNames): CrumbRow {
+  const all: Crumb[] = [
+    names
+      ? { label: names.root, level: 0, current: depth === 0, name: names.root }
+      : { label: "Document", level: 0, current: depth === 0 },
+  ];
   for (let level = 1; level <= depth; level += 1) {
-    all.push({ label: "Group", level, current: level === depth });
+    const label = names?.groups[level - 1];
+    all.push(
+      label === undefined
+        ? { label: "Group", level, current: level === depth }
+        : { label, level, current: level === depth, name: label },
+    );
   }
   if (depth <= 3) {
     return { crumbs: all, collapsed: 0, collapsedAt: 0 };
@@ -111,6 +129,7 @@ export function crumbRow(depth: number): CrumbRow {
 
 /** The accessible name of a crumb: "Document", or "Group, level 2" so that the levels differ. */
 export function crumbName(crumb: Crumb): string {
+  if (crumb.name !== undefined) return crumb.name;
   return crumb.level === 0 ? crumb.label : `${crumb.label}, level ${crumb.level}`;
 }
 

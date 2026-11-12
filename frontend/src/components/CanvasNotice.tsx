@@ -1,6 +1,7 @@
 import { OpenGroups } from "@/components/OpenGroups";
 import type { ContextAnnouncement } from "@/hooks/useGrouping";
 import type { CanvasNotice as CanvasNoticeState } from "@/hooks/useHistory";
+import type { EnteredGroup } from "@/lib/operationsView";
 
 /** The widest and the usual height of a refusal shown beside the pointer, px. */
 const NEAR_WIDTH = 280;
@@ -13,6 +14,9 @@ interface CanvasNoticeProps {
   onLeaveToLevel: (level: number) => void;
   /** What a screen reader hears when a group is entered or left. */
   announcement: ContextAnnouncement;
+  /** The read-only group entered on a laser page (`specs/0111` criterion 11): the crumb is named
+   * after the page and the groups and says "Read-only"; `null` on every other page. */
+  laserGroup?: EnteredGroup | null;
   /** A persistent line under the notices: the History preview's readout or banner (`0042`). */
   persistent?: React.ReactNode;
 }
@@ -32,6 +36,7 @@ export function CanvasNotice({
   groupDepth,
   onLeaveToLevel,
   announcement,
+  laserGroup = null,
   persistent,
 }: CanvasNoticeProps) {
   const shown = notice !== null && notice.source === "canvas" ? notice : null;
@@ -74,7 +79,7 @@ export function CanvasNotice({
           </div>
         ) : null}
       </div>
-      <OpenGroups depth={groupDepth} onLeaveToLevel={onLeaveToLevel} />
+      <OpenGroups depth={laserGroup ? laserGroup.groups.length : groupDepth} onLeaveToLevel={onLeaveToLevel} laserGroup={laserGroup} />
       {persistent}
       <div role="status" aria-live="polite" className="sr-only">
         {announcement.text}

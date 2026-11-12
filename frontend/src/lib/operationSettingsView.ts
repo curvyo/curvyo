@@ -70,6 +70,28 @@ export interface OperationSettings {
   reset: boolean;
   needs: SetKind;
   disabled: DisabledPick[];
+  /** The Interval in mm for Engrave and Engrave + Outline with numbers (`specs/0111`); else `null`. */
+  intervalMm: number | null;
+  /** The operation-only settings of the lower part; `null` for Damaged settings. */
+  options: OperationOptions | null;
+  /** Whether Z offset shows: the machine has a motorised Z axis (`specs/0111` criterion 21). */
+  zOffsetShown: boolean;
+}
+
+/** The lower part of an unfolded row (`specs/0111` criterion 20). */
+export interface OperationOptions {
+  /** The hatch options, for Engrave and Engrave + Outline only. */
+  hatch: HatchOptions | null;
+  /** The stored Z offset in mm (kept even while hidden). */
+  zOffsetMm: number;
+}
+
+/** The four hatch options. */
+export interface HatchOptions {
+  crosshatch: boolean;
+  bidirectional: boolean;
+  scanAngleDeg: number;
+  overscanPct: number;
 }
 
 /** A material of the pick. */
@@ -167,6 +189,33 @@ function asDisabled(value: unknown): DisabledPick | null {
   return { id: value.id, reason: value.reason };
 }
 
+function asHatch(value: unknown): HatchOptions | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value)) return undefined;
+  if (
+    typeof value.crosshatch !== "boolean" ||
+    typeof value.bidirectional !== "boolean" ||
+    !finite(value.scan_angle_deg) ||
+    !whole(value.overscan_pct)
+  ) {
+    return undefined;
+  }
+  return {
+    crosshatch: value.crosshatch,
+    bidirectional: value.bidirectional,
+    scanAngleDeg: value.scan_angle_deg,
+    overscanPct: value.overscan_pct,
+  };
+}
+
+function asOptions(value: unknown): OperationOptions | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value)) return undefined;
+  const hatch = asHatch(value.hatch);
+  if (hatch === undefined || !finite(value.z_offset_mm)) return undefined;
+  return { hatch, zOffsetMm: value.z_offset_mm };
+}
+
 const STATES: readonly unknown[] = ["no_settings", "damaged", "own", "live", "stored"];
 
 /** One row's Settings block; `undefined` when wrong, `null` for a row that has none. */
@@ -178,7 +227,12 @@ export function decodeSettings(value: unknown): OperationSettings | null | undef
   const differs = nullable(value.differs, text);
   const overFeed = nullable(value.over_feed, text);
   const link = value.material === null ? null : asLink(value.material);
+  const intervalMm = nullable(value.interval_mm, finite);
+  const options = asOptions(value.options);
   if (
+    intervalMm === undefined ||
+    options === undefined ||
+    typeof value.z_offset_shown !== "boolean" ||
     !STATES.includes(value.state) ||
     needs === null ||
     reason === undefined ||
@@ -213,6 +267,9 @@ export function decodeSettings(value: unknown): OperationSettings | null | undef
     reset: value.reset,
     needs,
     disabled,
+    intervalMm,
+    options,
+    zOffsetShown: value.z_offset_shown,
   };
 }
 

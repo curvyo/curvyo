@@ -24,7 +24,12 @@ test("the five Rust states decode, and nothing else is in the folder", () => {
     "cuts_last_off",
     "empty",
     "five_kinds_cuts_last",
+    "group_tick_mixed",
+    "options_cut_z_hidden",
+    "options_damaged",
+    "options_engrave",
     "placed_and_clone_rows",
+    "select_bar_kinds",
     "unknown_and_clone_members",
   ]);
   for (const name of NAMES) {
@@ -109,29 +114,101 @@ test("the count items decode as node ids, and the items of each count match its 
   assert.deepEqual(view.items.running[0], { peer: "1", counter: 29 });
 });
 
-test("clone member rows decode with their clone, member and operations", () => {
-  const view = decodeOperationsView(fixture("unknown_and_clone_members"));
-  assert.ok(view);
-  assert.equal(view.cloneMembers.length, 2);
-  const member = view.cloneMembers[0];
-  assert.equal(member.cloneName, "Clone 1");
-  assert.equal(member.name, "Member 1");
-  assert.equal(member.operations.length, 1);
-  assert.deepEqual(member.operations[0], view.rows[1].id);
+// `specs/0111-laser-operation-tools` Part C1: the new fields, each checked (AC 1, 10, 17 to 21).
+type Raw = Record<string, unknown> & { rows: Array<Record<string, unknown>> };
+
+test("the kind buttons decode in bar order with their descriptions (AC 1, 2)", () => {
+  const view = decodeOperationsView(fixture("select_bar_kinds"));
+  assert.ok(view?.selectBarKinds);
+  assert.deepEqual(
+    view.selectBarKinds.map((button) => button.kind),
+    ["cut", "score", "engrave", "engrave_outline", "cut_out"],
+  );
+  assert.equal(view.selectBarKinds[2].description, "Assigns to Engrave 1");
+  assert.equal(view.selectBarKinds[0].description, "Creates Cut 1");
+  assert.equal(decodeOperationsView(fixture("empty"))?.selectBarKinds, null);
 });
 
-test("the view mode decodes to operations or drawn, and nothing else", () => {
+test("the Operations view toggle and the entered group decode (AC 11, 15)", () => {
   const view = decodeOperationsView(fixture("empty"));
   assert.ok(view);
-  assert.equal(view.viewMode, "operations");
-  const drawn = structuredClone(fixture("empty")) as Record<string, unknown>;
-  drawn.view_mode = "drawn";
-  assert.equal(decodeOperationsView(drawn)?.viewMode, "drawn");
-  drawn.view_mode = "outline";
-  assert.equal(decodeOperationsView(drawn), null);
-  const badItems = structuredClone(fixture("empty")) as Record<string, unknown>;
-  delete badItems.items;
-  assert.equal(decodeOperationsView(badItems), null);
+  assert.equal(view.operationsView, true);
+  assert.equal(view.enteredGroup, null);
+  const entered = structuredClone(fixture("empty")) as Raw;
+  entered.operations_view = false;
+  entered.entered_group = { page: "Coasters", groups: ["Group 3"] };
+  const decoded = decodeOperationsView(entered);
+  assert.equal(decoded?.operationsView, false);
+  assert.deepEqual(decoded?.enteredGroup, { page: "Coasters", groups: ["Group 3"] });
+});
+
+test("the mixed group row keeps its words and the unfolded row is marked (AC 10, 17)", () => {
+  const mixed = decodeOperationsView(fixture("group_tick_mixed"));
+  assert.ok(mixed);
+  assert.equal(mixed.rows[0].tick, "some");
+  assert.equal(mixed.rows[0].groupInPart, "Group vyl1en");
+  assert.equal(mixed.rows[1].groupInPart, null);
+  const engrave = decodeOperationsView(fixture("options_engrave"));
+  assert.equal(engrave?.rows[0].unfolded, true);
+  assert.equal(mixed.rows.some((row) => row.unfolded), false);
+});
+
+test("Interval, the hatch options and the Z offset capability decode (AC 19 to 21)", () => {
+  const engrave = decodeOperationsView(fixture("options_engrave"))?.rows[0].settings;
+  assert.ok(engrave);
+  assert.equal(engrave.intervalMm, 0.25);
+  assert.equal(engrave.zOffsetShown, true);
+  assert.deepEqual(engrave.options, {
+    hatch: { crosshatch: true, bidirectional: false, scanAngleDeg: 15, overscanPct: 5 },
+    zOffsetMm: 1.5,
+  });
+  const cut = decodeOperationsView(fixture("options_cut_z_hidden"))?.rows[0].settings;
+  assert.equal(cut?.options?.hatch, null);
+  assert.equal(cut?.options?.zOffsetMm, 1.5);
+  assert.equal(cut?.zOffsetShown, false);
+  assert.equal(cut?.intervalMm, null);
+  assert.equal(decodeOperationsView(fixture("options_damaged"))?.rows[0].settings?.options, null);
+});
+
+test("a view with a new field missing or of the wrong type is refused", () => {
+  const good = fixture("options_engrave") as Raw;
+  for (const key of ["operations_view", "select_bar_kinds", "entered_group"]) {
+    const broken = structuredClone(good);
+    delete broken[key];
+    assert.equal(decodeOperationsView(broken), null, `missing ${key}`);
+  }
+  for (const key of ["group_in_part", "unfolded"]) {
+    const broken = structuredClone(good);
+    delete broken.rows[0][key];
+    assert.equal(decodeOperationsView(broken), null, `missing row ${key}`);
+  }
+  const settings = (broken: Raw) => broken.rows[0].settings as Record<string, unknown>;
+  for (const key of ["interval_mm", "options", "z_offset_shown"]) {
+    const broken = structuredClone(good);
+    delete settings(broken)[key];
+    assert.equal(decodeOperationsView(broken), null, `missing settings ${key}`);
+  }
+  const wrong: Array<[string, (view: Raw) => void]> = [
+    ["operations_view", (v) => void (v.operations_view = "yes")],
+    ["kind button", (v) => void (v.select_bar_kinds = [{ kind: "teleport", description: "x" }])],
+    ["kind list", (v) => void (v.select_bar_kinds = "all")],
+    ["entered group", (v) => void (v.entered_group = { page: "P", groups: [] })],
+    ["entered page", (v) => void (v.entered_group = { page: 3, groups: ["G"] })],
+    ["unfolded", (v) => void (v.rows[0].unfolded = 1)],
+    ["group_in_part", (v) => void (v.rows[0].group_in_part = 3)],
+    ["interval", (v) => void (settings(v).interval_mm = "0.1")],
+    ["options", (v) => void (settings(v).options = [])],
+    ["hatch bool", (v) => void (((settings(v).options as Raw).hatch as Raw).crosshatch = "on")],
+    ["hatch overscan", (v) => void (((settings(v).options as Raw).hatch as Raw).overscan_pct = 2.5)],
+    ["hatch angle", (v) => void (((settings(v).options as Raw).hatch as Raw).scan_angle_deg = null)],
+    ["z offset", (v) => void ((settings(v).options as Raw).z_offset_mm = "1")],
+    ["z shown", (v) => void (settings(v).z_offset_shown = 1)],
+  ];
+  for (const [name, change] of wrong) {
+    const broken = structuredClone(good);
+    change(broken);
+    assert.equal(decodeOperationsView(broken), null, name);
+  }
 });
 
 // The settings part of `specs/0028-material-test-library`: the `settings_*` fixtures hold a row's

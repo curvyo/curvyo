@@ -118,7 +118,7 @@ export function MaterialPick(props: MaterialPickProps) {
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         onClick={() => (open ? close(false) : setOpen(true))}
-        className="flex h-7 w-[244px] items-center gap-1 rounded text-left hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        className="flex h-7 w-full max-w-[244px] items-center gap-1 rounded text-left hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         <Chevron size={12} aria-hidden className="shrink-0" />
         <span className="text-xs text-[var(--panel-muted-fg)]">Material</span>

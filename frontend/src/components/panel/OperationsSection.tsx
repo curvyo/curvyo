@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
-import { OperationGlyph, TestGridGlyph } from "@/components/panel/OperationGlyphs";
+import { TestGridGlyph } from "@/components/panel/OperationGlyphs";
+import { OperationBody } from "@/components/panel/OperationBody";
 import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
 import { TestGridBlock } from "@/components/panel/TestGridBlock";
 import { PanelSwitch } from "@/components/ui/switch";
@@ -10,11 +11,12 @@ import type { OperationsApi } from "@/hooks/useOperations";
 import { useDeleteArm } from "@/hooks/useDeleteArm";
 import type { MaterialsApi } from "@/hooks/useMaterials";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
+import type { OperationToolsApi } from "@/hooks/useOperationTools";
 import type { TestGridApi } from "@/hooks/useTestGrid";
 import { NO_ROWS, extend, press as pressRow, prune, type PressMods, type RowSelection } from "@/lib/rowSelection";
 import {
-  ADD_LABELS,
   ghostTop,
+  ROW_HEIGHT,
   insertionEdge,
   listEntries,
   nextFocusIndex,
@@ -26,14 +28,8 @@ import {
   itemsText,
   type ListEntry,
 } from "@/lib/operationRows";
-import {
-  operationIdKey,
-  type CloneMember,
-  type CountKey,
-  type OperationId,
-  type OperationRow,
-  type OperationsView,
-} from "@/lib/operationsView";
+import { operationIdKey, type CountKey, type OperationsView } from "@/lib/operationsView";
+import { bodyOpen, entryHeight, pressUnfolds } from "@/lib/operationUnfold";
 import { visibleRange } from "@/lib/operationWindow";
 import { summaryWithFixtures } from "@/lib/fixtureJobRows";
 
@@ -52,6 +48,9 @@ interface OperationsSectionProps {
   fixtureRunning?: number;
   /** The Settings block's commands (`specs/0028-material-test-library`). */
   settings: OperationSettingsApi;
+  /** The operation tools: the fold of a row, its options and the status of a kind press
+   * (`specs/0111-laser-operation-tools`). */
+  tools: OperationToolsApi;
   /** "Edit material" in the Settings block: opens the Materials section on that material. */
   onEditMaterial: (id: string) => void;
   /** The Materials section, drawn after the summary. */
@@ -94,7 +93,7 @@ function entryOfRow(entries: ListEntry[]): number[] {
 /** The names of the two section groups (`ux-notes.md` 4.3). */
 const SECTION_NAMES = { marking: "Marking", cutting: "Cutting" } as const;
 
-export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0, settings, onEditMaterial, materials, grid, materialsApi }: OperationsSectionProps) {
+export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0, settings, tools, onEditMaterial, materials, grid, materialsApi }: OperationsSectionProps) {
   const { view, notice, dropKey, dropBadge } = api;
   /** The selected rows (Ctrl and Shift extend, `specs/0028` ux-notes 8.2); one opens its Settings block. */
   const [selection, setSelection] = useState<RowSelection>(NO_ROWS);
@@ -115,6 +114,12 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const orderKeys = view ? view.rows.map((row) => operationIdKey(row.id)) : [];
   const selectedKeys = prune(selection, orderKeys).keys;
   const openKey = selectedKeys.length === 1 ? selectedKeys[0] : null;
+  /** The one open body's measured height, with the row it was measured for (UX 6.1, 12). */
+  const [measured, setMeasured] = useState<{ key: string; height: number } | null>(null);
+  const bodyKey = view ? (view.rows.find((row) => bodyOpen(row, selectedKeys)) ?? null) : null;
+  const openBodyKey = bodyKey ? operationIdKey(bodyKey.id) : null;
+  const bodyHeight = measured !== null && measured.key === openBodyKey ? measured.height : null;
+  const onBodyHeight = useCallback((key: string, height: number) => setMeasured({ key, height }), []);
   const disarmArm = arm.disarm;
   useEffect(() => {
     disarmArm();
@@ -128,7 +133,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   }, [gridGroupKey, gridRowKey]);
 
   const [stop, setStop] = useState(0);
-  const [addStop, setAddStop] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLDivElement>(null);
@@ -144,6 +148,44 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
       focusRow(listRef.current, target);
     }
   });
+
+  // A kind button press in the Select bar selects the row it wrote to (not unfolded) and brings it
+  // into view (`specs/0111` UX 3.3). A press from before this tab was drawn is not replayed.
+  const pressedSeq = tools.pressed?.seq ?? 0;
+  const pressedId = tools.pressed?.id ?? null;
+  const [seenPress, setSeenPress] = useState(pressedSeq);
+  if (pressedSeq > seenPress) {
+    setSeenPress(pressedSeq);
+    if (pressedId !== null) {
+      const key = operationIdKey(pressedId);
+      setSelection({ keys: [key], anchor: key });
+      const index = view ? indexOfKey(view, key) : -1;
+      if (index >= 0) setStop(index);
+    }
+  }
+  const latest = useRef({ view, openBodyKey, bodyHeight });
+  useEffect(() => {
+    latest.current = { view, openBodyKey, bodyHeight };
+  });
+  const scrolledPress = useRef(pressedSeq);
+  useEffect(() => {
+    if (pressedId === null || pressedSeq <= scrolledPress.current) return;
+    scrolledPress.current = pressedSeq;
+    const key = operationIdKey(pressedId);
+    const { view: current, openBodyKey: openKeyNow, bodyHeight: height } = latest.current;
+    const index = current ? indexOfKey(current, key) : -1;
+    if (!current || index < 0) return;
+    const entries = listEntries(current, openKeyNow, height);
+    const at = entryOfRow(entries)[index];
+    const list = listRef.current;
+    if (list && at !== undefined) {
+      const top = entries.slice(0, at).reduce((sum, entry) => sum + entry.height, 0);
+      if (top < list.scrollTop || top + entries[at].height > list.scrollTop + VIEWPORT) {
+        // The list's scroll event follows and keeps the window in step.
+        list.scrollTop = Math.max(0, top - VIEWPORT / 2);
+      }
+    }
+  }, [pressedSeq, pressedId]);
 
   const dropAtRef = useRef<number | null>(null);
   useEffect(() => {
@@ -239,13 +281,22 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     return null;
   }
 
-  const entries = listEntries(view, openKey);
+  const entries = listEntries(view, openBodyKey, bodyHeight);
   const rowEntry = entryOfRow(entries);
   const openIndex = openKey === null ? -1 : indexOfKey(view, openKey);
+  // The unfolded row is one tall item: the list grows to hold it and the row after it, up to
+  // 520 px; a list that fits in 520 px (section headings included) shows whole.
+  const listHeight = entries.reduce((sum, entry) => sum + entry.height, 0);
+  const viewport =
+    openBodyKey === null
+      ? VIEWPORT
+      : listHeight <= 520
+        ? Math.max(VIEWPORT, listHeight)
+        : Math.min(520, Math.max(VIEWPORT, entryHeight(true, bodyHeight) + ROW_HEIGHT));
   const range = visibleRange(
     entries.map((entry) => entry.height),
     scrollTop,
-    VIEWPORT,
+    viewport,
     OVERSCAN,
     rowEntry[stop] ?? null,
     openIndex >= 0 ? (rowEntry[openIndex] ?? null) : null,
@@ -257,8 +308,8 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     const at = rowEntry[index];
     if (list && at !== undefined) {
       const top = entries.slice(0, at).reduce((sum, entry) => sum + entry.height, 0);
-      if (top < list.scrollTop || top + entries[at].height > list.scrollTop + VIEWPORT) {
-        list.scrollTop = Math.max(0, top - VIEWPORT / 2);
+      if (top < list.scrollTop || top + entries[at].height > list.scrollTop + viewport) {
+        list.scrollTop = Math.max(0, top - viewport / 2);
         setScrollTop(list.scrollTop);
       }
     }
@@ -269,6 +320,9 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const actions: RowActions = {
     select: (row, rename = false, mods?: PressMods) => {
       const key = operationIdKey(row.id);
+      // A press unfolds the row or folds it again; a rename (the second press of a double-click)
+      // and a Ctrl or Shift press leave the fold alone (`specs/0111` UX 6.1).
+      if (!rename && pressUnfolds(row, selectedKeys, mods ?? { ctrl: false, shift: false })) tools.unfold(row.id);
       setSelection((previous) => pressRow(prune(previous, orderKeys), orderKeys, key, mods ?? { ctrl: false, shift: false }));
       setStop(indexOfKey(view, key));
       if (row.grid) grid.selectRow(row.id);
@@ -347,20 +401,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     }
   };
 
-  const onAddKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
-    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    const at = (addStop + step + buttons.length) % buttons.length;
-    setAddStop(at);
-    buttons[at]?.focus();
-  };
-
-  const press = (kind: string) => {
-    const id = api.press(kind);
-    if (id) setSelection({ keys: [operationIdKey(id)], anchor: operationIdKey(id) });
-  };
   const pressGrid = () => {
     const id = grid.add();
     if (id) setSelection({ keys: [operationIdKey(id)], anchor: operationIdKey(id) });
@@ -372,34 +412,13 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
   const gridView = openRow?.grid && grid.view?.row && operationIdKey(grid.view.row) === operationIdKey(openRow.id) ? grid.view : null;
   return (
     <section aria-label="Operations" className="flex flex-col gap-2">
-      <div
-        ref={addRef}
-        role="toolbar"
-        aria-label="Add operation"
-        onKeyDown={onAddKey}
-        className="flex h-7 items-center gap-1"
-      >
-        {ADD_LABELS.map(([kind, label], at) => (
-          <button
-            key={kind}
-            type="button"
-            aria-label={label}
-            title={selectionCount > 0 ? `${label}. Assigns the ${selectionCount} selected items.` : label}
-            tabIndex={at === addStop ? 0 : -1}
-            onFocus={() => setAddStop(at)}
-            onClick={() => press(kind)}
-            className="flex h-7 w-7 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-          >
-            <OperationGlyph kind={kind} />
-          </button>
-        ))}
-        <span aria-hidden className="w-2 shrink-0" />
+      {/* The Test grid button stays alone on the tab until `0112` replaces it by the tool
+          (`specs/0111` criterion 8); the kind buttons are in the Select bar. */}
+      <div ref={addRef} role="toolbar" aria-label="Test grid" className="flex h-7 items-center gap-1">
         <button
           type="button"
           aria-label="Add test grid"
           title="Add test grid"
-          tabIndex={ADD_LABELS.length === addStop ? 0 : -1}
-          onFocus={() => setAddStop(ADD_LABELS.length)}
           onClick={pressGrid}
           className="flex h-7 w-7 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
         >
@@ -426,7 +445,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           role={view.cutsLast ? "group" : "list"}
           onKeyDown={onListKey}
           onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-          style={{ maxHeight: VIEWPORT }}
+          style={{ maxHeight: viewport }}
           className="flex flex-col overflow-y-auto"
         >
           <div aria-hidden style={{ height: range.before }} />
@@ -447,6 +466,21 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
                     dragSource={dragFrom === entry.index}
                     insertion={dragFrom !== null && dropAt === entry.index ? insertionEdge(dragFrom, dropAt) : null}
                     open={selectedKeys.includes(operationIdKey(entry.row.id))}
+                    unfolded={openBodyKey === operationIdKey(entry.row.id)}
+                    body={
+                      openBodyKey === operationIdKey(entry.row.id) ? (
+                        <OperationBody
+                          row={entry.row}
+                          pick={view.pick}
+                          settings={settings}
+                          tools={tools}
+                          onEditMaterial={onEditMaterial}
+                          onReturnToRow={() => focusRow(listRef.current, entry.index)}
+                          rowKey={operationIdKey(entry.row.id)}
+                          onHeight={onBodyHeight}
+                        />
+                      ) : undefined
+                    }
                     renaming={renamingKey === operationIdKey(entry.row.id)}
                     armed={arm.armed === `op:${operationIdKey(entry.row.id)}`}
                     canUp={canMove(view, entry.index, -1)}
@@ -484,15 +518,18 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
       {gridView ? (
         <TestGridBlock key={operationIdKey(gridView.group)} view={gridView} api={grid} materials={materialsApi} onReturnFocus={onReturnFocus} />
       ) : null}
-      <OperationSettingsBlock
-        key={selectedKeys.join("|")}
-        rows={view.rows.filter((row) => selectedKeys.includes(operationIdKey(row.id)))}
-        pick={view.pick}
-        api={settings}
-        onEditMaterial={onEditMaterial}
-        onReturnFocus={onReturnFocus}
-      />
-      <CloneMembers members={view.cloneMembers} view={view} openRow={openRow} api={api} />
+      {/* One selected row shows its Settings in its unfolded body; several selected rows show
+          the Material pick alone, under the list (`0028` M10). */}
+      {selectedKeys.length > 1 ? (
+        <OperationSettingsBlock
+          key={selectedKeys.join("|")}
+          rows={view.rows.filter((row) => selectedKeys.includes(operationIdKey(row.id)))}
+          pick={view.pick}
+          api={settings}
+          onEditMaterial={onEditMaterial}
+          onReturnFocus={onReturnFocus}
+        />
+      ) : null}
       {fixtureJobs}
       <section aria-label="Operations summary" className="flex flex-col text-xs tabular-nums text-[var(--toolbar-icon)]">
         <div role="status" aria-atomic="true" className="flex flex-col">
@@ -508,25 +545,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
         </div>
       </section>
       {materials}
-      <div role="radiogroup" aria-label="View" className="flex h-7 gap-1 self-start rounded border border-[var(--lane-line)] p-0.5 text-[13px]">
-        {(["operations", "drawn"] as const).map((mode) => {
-          const checked = view.viewMode === mode;
-          return (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={checked}
-              tabIndex={checked ? 0 : -1}
-              title={mode === "operations" ? "View: Operations" : "View: Drawn"}
-              onClick={() => api.setDrawn(mode === "drawn")}
-              className={`rounded px-2 ${checked ? "bg-[var(--value-fill)] text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"} focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]`}
-            >
-              {mode === "operations" ? "Operations" : "Drawn"}
-            </button>
-          );
-        })}
-      </div>
       {notice && notice !== settings.skip ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
           {notice}
@@ -551,6 +569,10 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
       <div role="status" aria-atomic="true" className="sr-only">
         {arm.status}
       </div>
+      {/* "Cut 3 added." after a kind press: polite, nothing visible (`specs/0111` UX 10). */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {tools.status}
+      </div>
     </section>
   );
 }
@@ -574,67 +596,6 @@ function SummaryButton({
       {text}
     </button>
   );
-}
-
-/**
- * The clone member rows (criterion 11, Frage 167 B): read-only, one per member of each clone. A
- * member row takes the open operation: its check holds or drops the member in that operation.
- */
-function CloneMembers({
-  members,
-  view,
-  openRow,
-  api,
-}: {
-  members: CloneMember[];
-  view: OperationsView;
-  openRow: OperationRow | null;
-  api: OperationsApi;
-}) {
-  if (members.length === 0) return null;
-  const nameOf = (id: OperationId) =>
-    view.rows.find((row) => operationIdKey(row.id) === operationIdKey(id))?.name ?? "";
-  return (
-    <div role="group" aria-label="Clone members" className="flex flex-col gap-1">
-      <p className="text-[11px] font-semibold text-[var(--panel-muted-fg)]">Clone members</p>
-      <ul role="list" className="flex flex-col">
-        {members.map((member) => {
-          const held = openRow !== null && member.operations.some((id) => operationIdKey(id) === operationIdKey(openRow.id));
-          const chips = member.operations.map(nameOf).filter((name) => name !== "");
-          const label = `${member.name}, in ${member.cloneName}, read-only${chips.length ? `, ${chips.join(", ")}` : ""}`;
-          return (
-            <li key={`${operationIdKey(member.clone)}/${operationIdKey(member.member)}`} className="flex h-7 items-center gap-2 text-[13px] text-[var(--toolbar-icon)]">
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={held}
-                aria-readonly="true"
-                aria-disabled={openRow === null}
-                aria-label={label}
-                title={openRow === null ? "Open an operation to hold this member" : `${held ? "Remove from" : "Assign to"} ${openRow.name}`}
-                onClick={() => {
-                  if (openRow) setCloneMember(api, openRow.id, member, !held);
-                }}
-                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-              >
-                {held ? <span className="h-2 w-2 bg-[var(--toolbar-icon)]" /> : null}
-              </button>
-              <span className="min-w-0 flex-1 truncate">
-                {member.name}, in {member.cloneName}
-              </span>
-              <span className="flex max-w-[110px] shrink-0 truncate text-[11px] text-[var(--panel-muted-fg)]">
-                {chips.join(", ")}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function setCloneMember(api: OperationsApi, id: OperationId, member: CloneMember, on: boolean) {
-  api.setCloneMember(id, member.clone, member.member, on);
 }
 
 /** Moves the focus to the name button of the row at `index`. */

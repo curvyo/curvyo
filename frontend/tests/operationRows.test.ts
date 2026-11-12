@@ -29,6 +29,7 @@ import {
   focusAfterRename,
   ghostTop,
   nameKeyAction,
+  rowLine2,
 } from "../src/lib/operationRows.ts";
 
 function row(patch: Partial<OperationRow> & Pick<OperationRow, "name">): OperationRow {
@@ -41,6 +42,10 @@ function row(patch: Partial<OperationRow> & Pick<OperationRow, "name">): Operati
     marginMm: 0,
     items: 1,
     tick: "none",
+    groupInPart: null,
+    unfolded: false,
+    settings: null,
+    grid: null,
     ...patch,
   };
 }
@@ -225,6 +230,8 @@ test("a decoded Rust state gives the same groups and lines as the fixture reads"
         margin_mm: 0,
         items: 1,
         tick: "none",
+        group_in_part: null,
+        unfolded: false,
         settings: null,
         grid: null,
       },
@@ -232,8 +239,9 @@ test("a decoded Rust state gives the same groups and lines as the fixture reads"
     pick: [],
     summary: { operations: 1, running: 1, not_assigned: 0, runs_while_hidden: 0, output_off: 0 },
     items: { running: [], not_assigned: [], runs_while_hidden: [], output_off: [] },
-    clone_members: [],
-    view_mode: "operations",
+    operations_view: true,
+    select_bar_kinds: null,
+    entered_group: null,
   };
   const v = decodeOperationsView(json);
   assert.ok(v);
@@ -241,20 +249,26 @@ test("a decoded Rust state gives the same groups and lines as the fixture reads"
   assert.equal(listGroups(v)[0].rows.length, 1);
 });
 
-test("the flat entries carry a fixed height and a header per section; an open row is no taller (no details)", () => {
+test("the flat entries carry a fixed height and a header per section; only the open body makes a row taller", () => {
   const rows = [
     row({ name: "Score 1", kind: "score", section: "marking", id: { peer: "1", counter: 1 } }),
     row({ name: "Cut 1", kind: "cut", section: "cutting", id: { peer: "1", counter: 2 } }),
   ];
-  const entries = listEntries(view(rows), "1:2");
+  const closed = listEntries(view(rows), null);
   assert.deepEqual(
-    entries.map((e) => [e.kind, e.height]),
+    closed.map((e) => [e.kind, e.height]),
     [
       ["header", HEADER_HEIGHT],
       ["row", ROW_HEIGHT],
       ["header", HEADER_HEIGHT],
       ["row", ROW_HEIGHT],
     ],
+  );
+  // The open body is one tall window item: the row plus the measured body (`specs/0111` UX 12).
+  const entries = listEntries(view(rows), "1:2", 212);
+  assert.deepEqual(
+    entries.map((e) => e.height),
+    [HEADER_HEIGHT, ROW_HEIGHT, HEADER_HEIGHT, ROW_HEIGHT + 212],
   );
   assert.equal(entries[3].kind === "row" && entries[3].index, 1);
   const flat = listEntries({ ...view(rows), cutsLast: false }, null);
@@ -348,4 +362,24 @@ test("after a rename ends by Enter or Escape the focus stays on the row; a blur 
   assert.equal(focusAfterRename("enter"), true);
   assert.equal(focusAfterRename("escape"), true);
   assert.equal(focusAfterRename("blur"), false);
+});
+
+// `specs/0111-laser-operation-tools` ux-notes 4.1: a mixed group row says so on line 2.
+test("line 2 names the group in part after the count, before Output off (AC 10)", () => {
+  const mixed = row({ name: "Engrave 1", kind: "engrave", section: "marking", items: 2, tick: "some", groupInPart: "Group 3" });
+  assert.deepEqual(rowLine2(mixed, 1), { text: "1 · Engrave · 2 items", part: " · Group 3 in part", tail: "" });
+  const off = { ...mixed, output: false, groupInPart: "2 groups" };
+  assert.deepEqual(rowLine2(off, 2), { text: "2 · Engrave · 2 items", part: " · 2 groups in part", tail: " · Output off" });
+  assert.deepEqual(rowLine2(row({ name: "Cut 1", items: 1, groupInPart: null }), 3), {
+    text: "3 · Cut · 1 item",
+    part: "",
+    tail: "",
+  });
+});
+
+test("the accessible name carries the group in part (AC 10)", () => {
+  const mixed = row({ name: "Engrave 1", kind: "engrave", items: 2, groupInPart: "Group 3" });
+  assert.equal(rowName(mixed), "Engrave 1, Engrave, 2 items, Group 3 in part");
+  const off = row({ name: "Cut 1", kind: "cut", items: 1, output: false, groupInPart: "2 groups" });
+  assert.equal(rowName(off), "Cut 1, Cut, 1 item, 2 groups in part, Output off");
 });

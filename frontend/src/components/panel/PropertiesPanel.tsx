@@ -6,6 +6,7 @@ import type { FixtureJobsApi } from "@/hooks/useFixtureJobs";
 import { MaterialsSection } from "@/components/panel/MaterialsSection";
 import type { MaterialsApi } from "@/hooks/useMaterials";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
+import type { OperationToolsApi } from "@/hooks/useOperationTools";
 import type { FixturesApi } from "@/hooks/useFixtures";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { ExtensionsGroup } from "@/components/panel/ExtensionsGroup";
@@ -89,6 +90,8 @@ interface PropertiesPanelProps {
   fixtureJobs: FixtureJobsApi;
   /** The Settings block of the selected operations (`specs/0028-material-test-library`). */
   operationSettings: OperationSettingsApi;
+  /** The operation tools: the fold of a row, its options and the kind press status (`specs/0111`). */
+  operationTools: OperationToolsApi;
   /** The Materials section (`specs/0028-material-test-library`). */
   materials: MaterialsApi;
 }
@@ -125,6 +128,7 @@ export function PropertiesPanel({
   fixtures,
   fixtureJobs,
   operationSettings,
+  operationTools,
   materials,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
@@ -566,6 +570,7 @@ export function PropertiesPanel({
                 onReturnFocus={returnFocus}
                 fixtureRunning={fixtureJobs.view?.running ?? 0}
                 settings={operationSettings}
+                tools={operationTools}
                 onEditMaterial={materials.edit}
                 materials={<MaterialsSection api={materials} onReturnFocus={returnFocus} />}
                 grid={testGrid}
