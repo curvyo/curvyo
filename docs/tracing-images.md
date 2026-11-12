@@ -192,21 +192,45 @@ select the image together with them and press **Trace**. In the Trace tool, Shif
 adds it to the mask paths or takes it out again; Shift+click on empty canvas changes nothing.
 (`specs/0094-masked-composite-trace` slice 1.)
 
-**Pick mask paths**, the first button after Preset, does the same without Shift: press it, then click each
+**Pick mask paths**, the third button of the Mask group, does the same without Shift: press it, then click each
 path or group on the canvas to add it to the mask or take it out again; the button stays pressed
 until you press it again, press Escape (the first Escape only ends picking and keeps the mask), or
 leave the tool. A click on a text, a sketch or a second image adds nothing and the bar says "Use
 Object to path for text; one image at a time."; a click on the traced image or on empty canvas does
 nothing, and a double-click on the image does not create paths while picking. **Clear mask** (the
 x after Inside and Outside) takes all mask paths out of the mask at once and leaves the image
-selected; the paths stay in the document. Without mask paths it does nothing. (Slice 1b.)
+selected; the paths stay in the document. It also deletes the active part's rectangles, in one
+History step "Clear mask"; the part stays. Without mask paths or rectangles it does nothing.
+(Slice 1b; `specs/0114-image-trace-mask` slice 1.)
+
+**Rectangle**, the first button of the Mask group, draws the mask on the picture instead
+(`specs/0114-image-trace-mask` slice 1). While it is pressed, a drag on the picture draws a
+rectangle; its corners land on whole pixels of the picture, Shift draws it from the centre, Ctrl
+draws a square, and a drag under 2 px draws nothing. It stays pressed until you press it again or
+press Escape. With Rectangle not pressed, a click on a rectangle of the active part selects it
+(the topmost one, last drawn): drag inside it to move it, drag one of its eight handles to resize
+it (Shift about the centre, Ctrl keeps the proportions at a corner), the arrow keys move it 1 px
+(Shift 10 px), Delete or Backspace removes it, Escape drops the selection (a second Escape
+releases Rectangle). **Subtract**, the second button, takes the rectangles drawn while it is
+pressed out of the mask; they are drawn dashed. The rectangles drawn with Subtract are taken out
+of the others whatever order they were drawn in.
+
+The rectangles belong to the picture: they are saved in the file, come back when the picture is
+traced again (also after reopening the file or on another device through sync), move, scale and
+turn with the picture, are copied with Duplicate, and go when the picture is deleted (undo brings
+both back). Each change is one History step: "Draw rectangle", "Move region", "Resize region",
+"Delete region", "Clear mask", "Mask: Inside" or "Mask: Outside". Until the old way of selecting
+mask paths goes (`0114` slice 4), the rectangles and the selected mask paths together make the
+mask.
 
 The paths together are the mask: where they overlap they count once, the hole of a compound path is
 a hole in the mask, and an open path is closed by a straight line. Their fill and stroke do not
 matter. **Inside** and **Outside**, after Pick mask paths, are always in the bar: **Inside** (the
 default on every entry into the tool) traces only what lies inside the mask, **Outside** only what
 lies outside it. Without mask paths the whole image is traced either way; the choice applies once
-the first path is added. The mode is not remembered and is not part of a preset.
+the first path is added. Once a picture has a rectangle (or a second part) its mode is stored with
+it and comes back on the next entry; before that the mode is not remembered. It is not part of a
+preset.
 
 The trace ends exactly on the mask path: a shape that crosses it is cut there, so Inside and Outside
 of the same mask fit together without a gap or an overlap. A cut shape comes back as straight
@@ -256,9 +280,12 @@ as the whole image; with mask paths it is limited to them like any other part.
   parts below it follow, since their area changes).
 - Recognise text and Recognise shapes are settings of each part: a text line or a shape belongs to
   the part that holds its centre.
-- Parts last while the Trace tool is open: leaving the tool (Escape, S, another tool) or Create
-  paths ends them, and the next entry starts with one part. Only part 1's settings are
-  remembered, as before.
+- The parts are stored with the picture (`specs/0114-image-trace-mask` slice 1): Add part and
+  the trash are History steps ("Add part", "Remove part"), and leaving the tool or Create paths
+  no longer ends them; on the next entry the same parts are there with part 1 active. A part's
+  mask paths are still a selection and are not stored. The settings of a part are stored when the
+  part is made, but the bar does not read them back yet: on entry it shows the remembered
+  settings, as before.
 
 With two or more parts a screen reader hears "3 parts", and for an active later part without mask
 paths "Part 3 has no paths". When no part has anything to trace, the bar says "0 paths: no part has

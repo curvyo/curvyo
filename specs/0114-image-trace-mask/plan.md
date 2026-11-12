@@ -14,30 +14,40 @@ branch build, each ending with the gate of its crates; slice 5 runs the full gat
 The customer draws rectangles on a picture, closes the Trace tool, reopens the file, and the
 rectangles are back; undo works; two peers keep both rectangles.
 
-1. `curvyo-document-core/trace_mask_codec.rs`: keys and fields of ADR 0061 §1, ids, order, read
+1. [x] `curvyo-document-core/trace_mask_codec.rs` (with `trace_mask_model.rs` for the public types): keys and fields of ADR 0061 §1, ids, order, read
    with damage (§7), write; `Document::trace_mask(image)`. Tests: round trip, sorting by
    (order, id), every damage case. Criteria 12, 22.
-2. `trace_mask_commands.rs`: draw rect, move, resize, delete, clear, mode, add part, remove part
+2. [x] `trace_mask_commands.rs` (the lasso and settings commands too, `set_trace_part_settings`): draw rect, move, resize, delete, clear, mode, add part, remove part
    (rect only), part `0` on the first gesture, dangling sweep, labels. One commit each. Tests:
    one step per command, undo/redo, image delete and undo restores the mask. Criteria 16, 17, 20.
-3. Sync tests (two `LoroDoc` peers): concurrent new regions both kept, concurrent first gesture
+3. [x] Sync tests (two `Document` peers, `tests/acceptance_0114.rs`): concurrent new regions both kept, concurrent first gesture
    shares part `0`, same-region edits converge, remove part against draw, byte-identical
    serialisation. Criterion 18.
-4. `image_codec::write_image` asset-change drop; Duplicate and Ctrl drag copy carry the mask (test
+4. [x] `image_codec::write_image` asset-change drop; Duplicate and Ctrl drag copy carry the mask (test
    on `copy_subtree`). Criteria 14 (Duplicate part), Frage 5.
-5. `CURRENT_FORMAT_VERSION` 45 with its doc block; goldens `trace_mask_v45`,
+5. [x] `CURRENT_FORMAT_VERSION` 45 (45 was still free on `main`, 2026-11-12) with its doc block; goldens `trace_mask_v45`,
    `trace_mask_damaged_v45`; older goldens open with no mask; `document.json`. Criterion 22.
-6. `curvyo-ui-core/trace_mask.rs` and `TraceRegion::of_regions` (Union, then Difference, one
+6. [x] `curvyo-ui-core/trace_mask.rs` and `TraceRegion::of_regions` (Union, then Difference, one
    operand per region); `trace_region_edit.rs` rectangle half (drawn, hit, handles, resized,
    moved, pixel snap). Tests: R1 on M1 equals 0094 criterion 2 and 3 results; permutation of
    regions gives equal bytes; rotated and skewed placement. Criteria 2, 3, 8, 9, 11, 13.
-7. `curvyo-ui-core/trace_part_settings.rs` with part `0`'s settings written by the first gesture
+7. [x] `curvyo-ui-core/trace_part_settings.rs` with part `0`'s settings written by the first gesture
    (read back in slice 3 for the UI). Criterion 12 (partly).
-8. Session: `TraceMaskTool` struct, Rectangle tool input and overlay, parts read from the document
+8. [x] Session: `TraceMaskTool` struct, Rectangle tool input and overlay, parts read from the document
    (mask paths still selectable in parallel until slice 4), clips from stored regions into the
    existing worker path. Exports of ADR 0061 §9 for Rectangle, Subtract, mode, clear.
-9. Frontend: Rectangle and Subtract toggles added to the existing Mask group (layout move in
+9. [x] Frontend: Rectangle and Subtract toggles added to the existing Mask group (layout move in
    slice 4), status texts. Criteria 2, 3, 8, 19.
+
+Slice 1 done (2026-11-12): tests `curvyo-document-core/src/trace_mask_codec.rs`,
+`tests/acceptance_0114.rs` (criteria 12, 14 Duplicate, 16, 17, 18, 20, 22),
+`tests/trace_mask_format.rs` (22, goldens), `curvyo-ui-core/src/trace_mask.rs` (8, 11, 13),
+`trace_region_edit.rs`, `trace_part_settings.rs`, `curvyo-editor-wasm/tests/acceptance_0114_rect.rs`
+(2, 3, 8, 9, 11, 12, 16, 17, 19, 20), `frontend/tests/traceMaskRect.test.ts`. Left for later
+slices, as planned or found: the "Remove" badge while drawing with Subtract (criterion 8, with the
+lasso's ghost in slice 2); move and resize cursors over a region (UX notes); the clone golden
+`trace_mask_clone_v45` (slice 4); the bar reading a part's stored settings (slice 3); session-level
+criterion 13 with a turned image (ui-core covers the placement); the 50 ms frame budget (slice 5).
 
 Implementer refinements for slice 1 (2026-11-12, **Proposal**):
 
