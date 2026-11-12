@@ -5,18 +5,32 @@
 
 mod assign;
 mod commands;
+mod grid_look;
 mod index;
 mod items;
 mod look;
+mod settings;
+mod settings_view;
 #[cfg(test)]
 mod tests;
 mod view_json;
+
+pub(in crate::session) use settings::typed_number;
+#[cfg(test)]
+pub(in crate::session) use settings_view::SettingsView;
 
 use curvyo_document_core::{NodeId, OperationSnapshot};
 use curvyo_laser_core::operations::KindRead;
 
 /// The text of a refused assignment whose selection holds only guides or dimensions.
 pub(super) const NEVER_RUN_NOTICE: &str = "Guides never run.";
+
+/// The notice when selected items of a test grid are not assigned (`specs/0028` criterion 6).
+pub(super) const GRID_ITEMS_NOTICE: &str = "Test grid items run with their grid row only.";
+
+/// The notice when the document refused to add an operation, so a press never does nothing
+/// silently.
+pub(super) const ADD_REFUSED_NOTICE: &str = "The operation could not be added.";
 
 /// How the output page is drawn (criterion 18): by its operations' looks, or as drawn. Session
 /// state, not saved.
@@ -38,18 +52,21 @@ pub(in crate::session) struct OperationsState {
     view_mode: OperationsViewMode,
     /// The output page's leaves, for the drawing read they were built from (`index.rs`).
     leaves: index::LeafCache,
+    /// The numbers typed into an operation with No settings while power or speed is missing
+    /// (`specs/0028` UX notes §8.3).
+    settings_draft: Option<(NodeId, curvyo_laser_core::settings::SetOverride)>,
 }
 
 /// The operations of the active laser page, in stored list order.
-struct ActiveOperations {
-    manufacturing: NodeId,
-    operations: Vec<OperationSnapshot>,
-    cuts_last: bool,
+pub(in crate::session) struct ActiveOperations {
+    pub(in crate::session) manufacturing: NodeId,
+    pub(in crate::session) operations: Vec<OperationSnapshot>,
+    pub(in crate::session) cuts_last: bool,
 }
 
 impl ActiveOperations {
     /// Each operation's kind as read, in list order.
-    fn kinds(&self) -> Vec<KindRead> {
+    pub(in crate::session) fn kinds(&self) -> Vec<KindRead> {
         self.operations
             .iter()
             .map(|op| KindRead::of(op.kind.as_deref()))
@@ -65,7 +82,7 @@ impl super::Session {
 
     /// The operations of the active laser page, `None` on another page or while its extension is
     /// switched off (criterion 28).
-    fn active_operations(&self) -> Option<ActiveOperations> {
+    pub(in crate::session) fn active_operations(&self) -> Option<ActiveOperations> {
         let manufacturing = self.active_manufacturing()?;
         if !self.manufacturing_available(manufacturing.id) {
             return None;

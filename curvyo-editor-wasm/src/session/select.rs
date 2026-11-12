@@ -176,6 +176,8 @@ impl Session {
         if self.edit_scope() == curvyo_ui_core::Scope::MoveOnly {
             tolerances.param_min_side_mm = f64::INFINITY;
         }
+        // A whole test grid keeps its box and centre move only (`specs/0028` ux-notes 6.5).
+        tolerances.move_only = self.whole_test_grid_selected();
         tolerances
     }
 

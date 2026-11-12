@@ -1,0 +1,104 @@
+{
+  "pick": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "kinds": [
+        "cut",
+        "score",
+        "engrave"
+      ],
+      "name": "Birch plywood",
+      "thickness_mm": 3.0
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kinds": [
+        "cut"
+      ],
+      "name": "Cardboard",
+      "thickness_mm": 3.0
+    }
+  ],
+  "rows": [
+    {
+      "grid": null,
+      "kind": "engrave",
+      "name": "engrave 2",
+      "settings": {
+        "differs": null,
+        "disabled": [
+          {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "reason": "No Engrave set"
+          }
+        ],
+        "material": null,
+        "needs": "engrave",
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": null,
+              "power_pct": null,
+              "speed_mm_min": null
+            },
+            "typed": []
+          }
+        ],
+        "state": "no_settings"
+      }
+    },
+    {
+      "grid": null,
+      "kind": "score",
+      "name": "score 3",
+      "settings": {
+        "differs": null,
+        "disabled": [
+          {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "reason": "No Score set"
+          }
+        ],
+        "material": null,
+        "needs": "score",
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [],
+        "state": "damaged"
+      }
+    },
+    {
+      "grid": null,
+      "kind": "cut",
+      "name": "cut 1",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "material": null,
+        "needs": "cut",
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": 1,
+              "power_pct": 40.0,
+              "speed_mm_min": 900
+            },
+            "typed": []
+          }
+        ],
+        "state": "own"
+      }
+    }
+  ]
+}

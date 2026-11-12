@@ -94,6 +94,8 @@ impl Session {
             && linked_clone_shown(&self.selection, &self.units())
             && self.selected_placement().is_none()
             && !self.selection_only_dimensions()
+            // A whole test grid is no original (`specs/0028` UX notes §6.5).
+            && !self.whole_test_grid_selected()
     }
 
     /// Linked clone (criteria 1 to 3, 5, 52): one clone above each selected object in one commit,

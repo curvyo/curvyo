@@ -193,6 +193,7 @@ pub use session::{
     FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
 };
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
+pub use session::{MaterialWrite, MaterialsView, SaveAsMaterial, TestGridView};
 pub use session::{OperationsViewMode, TilingStatus, circle_handle};
 pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
@@ -227,8 +228,12 @@ mod wasm_machine_profiles;
 #[cfg(target_arch = "wasm32")]
 mod wasm_manufacturing;
 #[cfg(target_arch = "wasm32")]
+mod wasm_materials;
+#[cfg(target_arch = "wasm32")]
 mod wasm_measure;
 #[cfg(target_arch = "wasm32")]
 mod wasm_operations;
 #[cfg(target_arch = "wasm32")]
 mod wasm_sketch;
+#[cfg(target_arch = "wasm32")]
+mod wasm_test_grid;

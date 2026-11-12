@@ -2,6 +2,7 @@
 //! 10; ADR 0046 §2 and Frage 167 B). Guides and dimensions are never targets (criterion 10).
 
 use curvyo_document_core::{NodeId, ObjectSnapshot};
+use curvyo_laser_core::operations::OperationList;
 
 use super::super::Session;
 
@@ -14,6 +15,9 @@ pub(super) struct Selection {
     pub(super) guides: usize,
     /// Every selected item that is not a target (guides and dimensions).
     pub(super) skipped: usize,
+    /// The selected items of a test grid: they run with their grid row only (`specs/0028`
+    /// criterion 6), so they are neither targets nor counted as skipped.
+    pub(super) in_grid: usize,
 }
 
 /// The notice of criterion 10 for `guides` selected guides.
@@ -33,7 +37,9 @@ impl Session {
         let mut selection = Selection::default();
         for unit in self.units().selected(self.selection.ids()) {
             let id = unit.id;
-            if read.guides.contains(&id) {
+            if self.in_test_grid(id) {
+                selection.in_grid += 1;
+            } else if read.guides.contains(&id) {
                 selection.guides += 1;
                 selection.skipped += 1;
             } else if read
@@ -49,10 +55,13 @@ impl Session {
         selection
     }
 
-    /// Sets the notice of criterion 10 when the selection held guides (the assigned rest goes on).
-    pub(super) fn note_skipped_guides(&mut self, guides: usize) {
-        if guides > 0 {
-            self.operations.notice = Some(not_assigned_notice(guides));
+    /// Sets the notice of criterion 10 when the selection held guides, else, for an assignment
+    /// (`adding`), the grid notice when it held items of a test grid (the assigned rest goes on).
+    pub(super) fn note_skipped(&mut self, selection: &Selection, adding: bool) {
+        if selection.guides > 0 {
+            self.operations.notice = Some(not_assigned_notice(selection.guides));
+        } else if adding && selection.in_grid > 0 {
+            self.operations.notice = Some(super::GRID_ITEMS_NOTICE.to_owned());
         }
     }
 
@@ -93,15 +102,20 @@ impl Session {
 
     /// Number key `number` (1 to 9): toggles the selection in operation `number` of the list
     /// (criterion 8). Every selected item in it is removed; otherwise (none or some) all are added.
+    /// The digits count the rows as shown and skip test grid rows (`specs/0028` UX notes §5).
     pub fn toggle_selection_by_number(&mut self, number: usize) -> bool {
         self.operations.notice = None;
         let Some(active) = self.active_operations() else {
             return false;
         };
-        let Some(op) = number
-            .checked_sub(1)
-            .and_then(|at| active.operations.get(at))
-        else {
+        let list = OperationList::new(&active.operations, active.cuts_last);
+        let Some(op) = number.checked_sub(1).and_then(|at| {
+            list.sequence()
+                .iter()
+                .map(|&index| &active.operations[index])
+                .filter(|op| !op.grid)
+                .nth(at)
+        }) else {
             return false;
         };
         let selection = self.selection_targets();
@@ -115,16 +129,19 @@ impl Session {
     }
 
     /// Writes the selection's targets into or out of operation `id`, one step; a selection of only
-    /// guides or dimensions writes nothing and sets the refusal notice.
+    /// guides, dimensions or test grid items writes nothing and sets the refusal notice.
     fn write_targets(&mut self, id: NodeId, selection: &Selection, member: bool) -> bool {
         if selection.targets.is_empty() {
-            // Only guides name themselves in the notice; dimensions are skipped silently.
+            // Only guides and grid items name themselves in the notice; dimensions are skipped
+            // silently.
             if selection.guides > 0 {
                 self.operations.notice = Some(super::NEVER_RUN_NOTICE.to_owned());
+            } else if member && selection.in_grid > 0 {
+                self.operations.notice = Some(super::GRID_ITEMS_NOTICE.to_owned());
             }
             return false;
         }
-        self.note_skipped_guides(selection.guides);
+        self.note_skipped(selection, member);
         let targets = selection.targets.clone();
         self.recording_unguarded(|this| {
             this.document

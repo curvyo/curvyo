@@ -90,8 +90,14 @@ impl Session {
     /// selection change), then returns the strip and the body.
     pub fn panel_view(&self) -> PanelView {
         let non_empty = self.panel_scope_non_empty();
+        let grid_edge = self.grid_selection_edge();
         let active = self.update_panel_tabs(|tabs| {
             tabs.observe(non_empty);
+            // A test grid selected on the canvas is edited in the Operations tab (`specs/0028`
+            // UX notes §6.1, M3); History, Layers, File and Fonts stay.
+            if grid_edge && matches!(tabs.active(), PanelTab::Style | PanelTab::Document) {
+                tabs.press(PanelTab::Operations, non_empty);
+            }
             tabs.active()
         });
         let sketch = self.workbench() == super::Workbench::Sketch;

@@ -133,9 +133,8 @@ fn c2_c18_the_view_json_has_no_colour_or_machine_key_after_all_five_kinds() {
                 || k.contains("swatch")
                 || k.contains("rgb")
                 || k.contains("hex")
-                || k == "power"
-                || k == "speed"
-                || k == "passes"
+            // Power, speed and passes are allowed since `specs/0028` (criteria 24 to 26 add the
+            // settings to the Operations tab, amending `0101` Out of scope).
         })
         .collect();
     assert!(bad.is_empty(), "keys that must not exist: {bad:?}");

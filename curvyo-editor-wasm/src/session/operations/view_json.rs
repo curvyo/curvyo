@@ -11,6 +11,9 @@ use serde::Serialize;
 use super::super::Session;
 use super::OperationsViewMode;
 use super::items::{CloneMemberView, ItemLists, clone_member_rows, item_lists};
+use super::settings_view::{
+    GridRowView, PickView, SettingsView, grid_row_view, pick_views, settings_view,
+};
 
 /// The whole Operations tab of the active laser page.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -27,6 +30,9 @@ pub struct OperationsView {
     pub clone_members: Vec<CloneMemberView>,
     /// How the output page is drawn (criterion 18).
     pub view_mode: OperationsViewMode,
+    /// The materials of this machine the Material pick lists (`specs/0028` criterion 25), in the
+    /// order of the Materials section; damaged and newer records are not listed.
+    pub pick: Vec<PickView>,
 }
 
 /// One operation's row.
@@ -50,6 +56,11 @@ pub struct RowView {
     pub items: usize,
     /// How the current selection stands in it: none, some or all of the selection (ticks).
     pub tick: TickView,
+    /// Its Settings block (`specs/0028` criteria 24 to 26); `None` for a grid row and an
+    /// unknown operation.
+    pub settings: Option<SettingsView>,
+    /// The grid of a test grid row (`specs/0028` criterion 6); `None` for any other row.
+    pub grid: Option<GridRowView>,
 }
 
 /// The kinds of the rows; the five known ones and the unknown one.
@@ -142,6 +153,7 @@ impl Session {
             }),
         );
         let selection = self.selection_targets();
+        let pick = pick_views(self);
         let rows = list
             .sequence()
             .iter()
@@ -167,6 +179,8 @@ impl Session {
                         (n, total) if n == total => TickView::All,
                         _ => TickView::Some,
                     },
+                    settings: settings_view(self, op, &pick),
+                    grid: grid_row_view(self, op),
                 }
             })
             .collect();
@@ -177,6 +191,7 @@ impl Session {
             items: item_lists(&list, &leaves),
             clone_members: clone_member_rows(&active.operations, &leaves),
             view_mode: self.operations.view_mode,
+            pick,
         })
     }
 

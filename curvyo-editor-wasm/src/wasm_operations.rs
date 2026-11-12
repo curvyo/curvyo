@@ -12,6 +12,15 @@ fn node(text: &str) -> Option<NodeId> {
     serde_json::from_str(text).ok()
 }
 
+/// The node ids of a JSON array of id texts; anything unreadable is left out.
+fn nodes(json: &str) -> Vec<NodeId> {
+    serde_json::from_str::<Vec<String>>(json)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|text| node(text))
+        .collect()
+}
+
 #[wasm_bindgen]
 impl WasmSession {
     /// Adds an operation of the stored kind (`cut`, `score`, `engrave`, `engrave_outline`,
@@ -119,5 +128,37 @@ impl WasmSession {
     /// The notice of the last operation command (criterion 10), `None` when there is none.
     pub fn operations_notice(&self) -> Option<String> {
         self.session.operations_notice()
+    }
+
+    /// The Material pick for the operations `ids` (a JSON array of id texts, `specs/0028`
+    /// criteria 25, 27): `material` empty means "Own numbers". Whether anything was written; the
+    /// skip notice comes with [`WasmSession::operations_notice`].
+    pub fn pick_operation_material(&mut self, ids: &str, material: &str) -> bool {
+        let ids = nodes(ids);
+        if material.is_empty() {
+            self.session.use_own_numbers_on(&ids)
+        } else {
+            self.session.use_material_on(&ids, material)
+        }
+    }
+
+    /// Types `value` into the `field` (`power`, `speed`, `passes`) of the `role` set (`main`,
+    /// `outline`) of operation `id` (criterion 24). The chip, empty when taken.
+    pub fn edit_operation_setting(
+        &mut self,
+        id: &str,
+        role: &str,
+        field: &str,
+        value: f64,
+    ) -> String {
+        node(id)
+            .map(|id| self.session.edit_operation_setting(id, role, field, value))
+            .and_then(Result::err)
+            .unwrap_or_default()
+    }
+
+    /// Reset to material of operation `id` (criterion 24). Whether it changed.
+    pub fn reset_operation_to_material(&mut self, id: &str) -> bool {
+        node(id).is_some_and(|id| self.session.reset_operation_to_material(id))
     }
 }

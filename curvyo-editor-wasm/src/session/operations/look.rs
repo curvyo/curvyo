@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use curvyo_document_core::{NodeId, ObjectSnapshot, OperationSnapshot, ViewTransform};
+use curvyo_document_core::{NodeId, ObjectSnapshot, OperationSnapshot, Point, ViewTransform};
 use curvyo_laser_core::operations::{ChainScope, Hidden, KindRead, OperationKind, OperationList};
 use curvyo_render_core::{
     ChipItem, DrawList, Glyph, OperationLook, chips_list, hatch_list, object_polygons, restyled,
@@ -16,6 +16,7 @@ use curvyo_render_core::{
 
 use super::super::Session;
 use super::OperationsViewMode;
+use super::grid_look::GridLooks;
 use super::index::IndexedLeaf;
 
 /// What a leaf is drawn as on the output page.
@@ -71,12 +72,15 @@ fn hatched(look: OperationLook) -> bool {
     matches!(look, OperationLook::AreaFill | OperationLook::AreaWithLine)
 }
 
-/// The look of one leaf: the operations holding it, in stored order, with Show on.
+/// The look of one leaf: the operations holding it, in stored order, with Show on. A grid row
+/// gives its tagged items their part's look (`grid_parts`, `specs/0028` UX notes §11); any other
+/// item under it runs nothing and is Not assigned.
 fn leaf_look(
     list: &OperationList,
     operations: &[OperationSnapshot],
     chain: &[Vec<NodeId>],
     hidden: Hidden,
+    grid_parts: &HashMap<NodeId, OperationLook>,
 ) -> LeafLook {
     if hidden != Hidden::No {
         return LeafLook::Hidden;
@@ -84,17 +88,28 @@ fn leaf_look(
     let Some(assignment) = list.nearest(chain, ChainScope::Whole) else {
         return LeafLook::Own;
     };
+    let leaf = chain.first().and_then(|first| first.first()).copied();
     let mut positions = assignment.operations;
     positions.sort_unstable();
+    let runs = |at: &usize| {
+        let op = &operations[*at];
+        !op.grid || leaf.is_some_and(|leaf| grid_parts.contains_key(&leaf))
+    };
+    if !positions.iter().any(runs) {
+        return LeafLook::Own;
+    }
     let looks: Vec<OperationLook> = positions
         .into_iter()
-        .filter(|&at| operations[at].show)
+        .filter(|at| runs(at) && operations[*at].show)
         .map(|at| {
             let op = &operations[at];
-            if op.output {
-                look_of(KindRead::of(op.kind.as_deref()))
-            } else {
+            if !op.output {
                 OperationLook::MutedDashed
+            } else if op.grid {
+                leaf.and_then(|leaf| grid_parts.get(&leaf).copied())
+                    .unwrap_or(OperationLook::MutedDashed)
+            } else {
+                look_of(KindRead::of(op.kind.as_deref()))
             }
         })
         .collect();
@@ -127,6 +142,7 @@ impl LookTable {
         cuts_last: bool,
         placements: &[NodeId],
         manufacturing: NodeId,
+        grid_parts: &HashMap<NodeId, OperationLook>,
     ) -> Self {
         let list = OperationList::new(operations, cuts_last);
         let mut table = Self {
@@ -136,7 +152,7 @@ impl LookTable {
             clone_members: HashMap::new(),
         };
         for leaf in leaves {
-            let look = leaf_look(&list, operations, &leaf.chain, leaf.hidden);
+            let look = leaf_look(&list, operations, &leaf.chain, leaf.hidden, grid_parts);
             let (Some(first), Some(tail)) = (leaf.chain.first(), leaf.chain.last()) else {
                 continue;
             };
@@ -192,6 +208,15 @@ impl Session {
     /// is switched off (criterion 28).
     pub(in crate::session) fn operation_look_table(&self) -> Option<LookTable> {
         let active = self.active_operations()?;
+        let grids = self.grid_looks(&active.operations);
+        self.look_table_with(&active, &grids)
+    }
+
+    fn look_table_with(
+        &self,
+        active: &super::ActiveOperations,
+        grids: &GridLooks,
+    ) -> Option<LookTable> {
         let manufacturing = self.active_manufacturing()?;
         let leaves = self.output_leaves(&manufacturing);
         let placements: Vec<NodeId> = manufacturing.placements.iter().map(|p| p.id).collect();
@@ -201,6 +226,7 @@ impl Session {
             active.cuts_last,
             &placements,
             manufacturing.id,
+            &grids.parts,
         ))
     }
 
@@ -218,7 +244,9 @@ impl Session {
         objects: &[ObjectSnapshot],
         view: ViewTransform,
     ) -> Option<(Vec<ObjectSnapshot>, DrawList)> {
-        let table = self.operation_look_table()?;
+        let active = self.active_operations()?;
+        let grids = self.grid_looks(&active.operations);
+        let table = self.look_table_with(&active, &grids)?;
         let operations_view = self.operations_view_on();
         let mut out = Vec::with_capacity(objects.len());
         let mut overlay = DrawList::default();
@@ -262,6 +290,10 @@ impl Session {
                 {
                     overlay.extend(hatch_list(&polygons, view));
                 }
+                // A grid's items share one chip row over the grid (UX notes §11).
+                if grids.parts.contains_key(&object.id()) {
+                    continue;
+                }
                 let mut glyphs: Vec<Glyph> = looks.iter().filter_map(|&l| glyph_of(l)).collect();
                 glyphs.sort_by_key(|g| *g as u8);
                 glyphs.dedup();
@@ -275,12 +307,27 @@ impl Session {
                 }
             }
         }
+        let drawn: HashMap<NodeId, (Point, Point)> = objects
+            .iter()
+            .filter(|object| grids.parts.contains_key(&object.id()))
+            .filter(|object| {
+                table
+                    .own
+                    .get(&object.id())
+                    .is_none_or(|look| !matches!(look, LeafLook::Hidden))
+            })
+            .map(|object| (object.id(), curvyo_ui_core::object_bounds(object)))
+            .collect();
+        let bounds = |id: NodeId| drawn.get(&id).copied();
         if operations_view {
             chips.reverse();
             chips.sort_by_key(|(is_selected, _)| !is_selected);
-            let items: Vec<ChipItem> = chips.into_iter().map(|(_, chip)| chip).collect();
+            let mut items: Vec<ChipItem> = grids.chips(&bounds);
+            items.extend(chips.into_iter().map(|(_, chip)| chip));
             overlay.extend(chips_list(&items, self.viewport.canvas_size(), view));
         }
+        // The Worked chip is a record of the test: drawn in both views (UX notes §7.3).
+        overlay.extend(grids.worked_chips(&bounds, view));
         Some((out, overlay))
     }
 
