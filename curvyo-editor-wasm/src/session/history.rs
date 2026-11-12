@@ -51,6 +51,9 @@ pub(super) struct HistoryState {
     recorded: usize,
     clock: Clock,
     pub(super) notice: Option<String>,
+    /// The name of the steps the running command writes, when its label's name is too general
+    /// ("Assign to Cut 1", `specs/0111` criteria 3 to 5 and 10).
+    step_name: Option<String>,
     /// The folded and unfolded branches of the History list (`history_list.rs`).
     pub(super) list: super::history_list::ListState,
     /// The Mode switch and the version a preview shows (`history_preview.rs`).
@@ -64,6 +67,7 @@ impl HistoryState {
             recorded: 0,
             clock: wall_clock,
             notice: None,
+            step_name: None,
             list: super::history_list::ListState::default(),
             preview: super::history_preview::PreviewState::default(),
         }
@@ -102,6 +106,11 @@ impl Session {
     /// opts out, so a new command is an edit by default.
     pub(super) fn recording<R: Default>(&mut self, body: impl FnOnce(&mut Self) -> R) -> R {
         self.sync_context();
+        // Inside a group of a laser page every guarded edit is refused silently (`specs/0111`
+        // criterion 11, UX notes T4).
+        if self.in_read_only_group() {
+            return R::default();
+        }
         if self.edit_scope() == curvyo_ui_core::Scope::MoveOnly {
             self.edit_context.refused = true;
             return R::default();
@@ -150,6 +159,19 @@ impl Session {
         result
     }
 
+    /// As [`Session::recording_unguarded`], with every step `body` writes named `name` on the
+    /// stacks and in the History tab instead of its label's name.
+    pub(super) fn recording_named<R>(
+        &mut self,
+        name: String,
+        body: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        self.history.step_name = Some(name);
+        let result = self.recording_unguarded(body);
+        self.history.step_name = None;
+        result
+    }
+
     /// Whether the command running now has written a step that is not on the undo stack
     /// yet: something was committed.
     pub(super) fn has_unrecorded_steps(&self) -> bool {
@@ -175,6 +197,7 @@ impl Session {
                 };
                 format!("{verb} {}", operation_name(reverted))
             });
+            let name = name.or_else(|| self.history.step_name.clone());
             self.history.stack.record_named(
                 step.step,
                 &step.label,

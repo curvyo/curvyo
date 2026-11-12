@@ -76,6 +76,9 @@ pub const PASTED_IMAGE_NAME: &str = "Pasted image";
 /// The name of dropped image data that has no file name (criterion 20).
 pub const DROPPED_IMAGE_NAME: &str = "Dropped image";
 
+/// The notice of an import refused in a read-only entered group (`specs/0111` criterion 11).
+pub(super) const READ_ONLY_IMPORT_NOTICE: &str = "Read-only: press Esc to leave the group first.";
+
 /// The files of an import being added.
 #[derive(Default)]
 pub(super) struct ImportBatch {
@@ -203,6 +206,14 @@ impl Session {
                 waiting: false,
             };
         };
+        if self.in_read_only_group() {
+            return ImportOutcome {
+                imported: 0,
+                notice: READ_ONLY_IMPORT_NOTICE.to_owned(),
+                alert: true,
+                waiting: false,
+            };
+        }
         let ready = batch.planned.iter().all(|(_, planned)| match planned {
             Planned::Svg { drawing, .. } => self.svg_faces_ready(drawing),
             Planned::Image(_) => true,

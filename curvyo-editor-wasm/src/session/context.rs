@@ -225,7 +225,7 @@ impl Session {
     }
 
     /// The entered groups from the outermost to the innermost, as the document holds them now.
-    fn context_chain(&self) -> Vec<NodeId> {
+    pub(super) fn context_chain(&self) -> Vec<NodeId> {
         let Some(group) = self.context_group() else {
             return Vec::new();
         };

@@ -10,15 +10,15 @@
     clippy::manual_midpoint
 )]
 
+mod operation_shims;
 use curvyo_document_core::{
     AnchorId, AnchorKind, Color, CurveKind, Document, DocumentSize, Length, NewAnchor,
     NewOperation, NewOutputPage, NodeId, PathSnapshot, Point, StyleEdit, pack, unpack,
 };
-use curvyo_editor_wasm::{
-    CombineOutcome, OperationsViewMode, Session, StrokeToPathOutcome, SvgExportResult, Tool,
-};
+use curvyo_editor_wasm::{CombineOutcome, Session, StrokeToPathOutcome, SvgExportResult, Tool};
 use curvyo_render_core::{DrawList, OP_CUT};
 use curvyo_ui_core::{PenMode, SvgExportOptions, WidthPreset};
+use operation_shims::{OperationsViewMode, set_view};
 
 // ---------- helpers ----------
 
@@ -649,7 +649,7 @@ fn c6_operations_look_keeps_the_centre_line_proxy_for_machine_output() {
         s.resize_viewport(1600.0, 1000.0);
         s.set_tool(Tool::Select);
         assert!(s.activate_page(&laser.id));
-        s.set_operations_view_mode(mode);
+        set_view(&mut s, mode);
         s.draw_list()
     };
     let far = (o.y + 56.0, o.y + 59.5);

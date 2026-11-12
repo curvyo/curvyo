@@ -224,7 +224,7 @@ fn criterion_10_moving_the_whole_grid_is_no_hand_edit() {
 #[test]
 fn criterion_8_a_kind_change_rebuilds_clears_the_mark_and_moves_the_row() {
     let mut s = laser_with_fonts();
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     let (row, group) = add_grid(&mut s);
     assert!(s.press_test_cell(1, 1));
     assert_eq!(s.set_test_grid_kind("engrave"), Ok(true));
@@ -303,11 +303,12 @@ fn ux_7_3_the_worked_chip_is_drawn_in_both_views_and_cells_take_their_kind_look(
             .map(|(_, overlay)| overlay.triangles.len())
             .unwrap()
     };
-    s.set_operations_view_mode(crate::session::OperationsViewMode::Drawn);
+    let page = s.active_page().id;
+    assert!(s.toggle_operations_view(&page));
     let unmarked = overlay_len(&s);
     assert!(s.press_test_cell(1, 1));
     assert!(overlay_len(&s) > unmarked, "the Worked chip in View: Drawn");
-    s.set_operations_view_mode(crate::session::OperationsViewMode::Operations);
+    assert!(s.toggle_operations_view(&page));
     let objects = s.objects();
     let (looked, _) = s.operation_looked_artwork(&objects, view).unwrap();
     let cell = s.document.test_grid(group).unwrap().cells[0].id;
@@ -362,17 +363,16 @@ fn far_circle(s: &mut Session) -> NodeId {
 }
 
 #[test]
-fn criterion_6_add_operation_with_a_grid_selected_adds_an_empty_operation() {
+fn criterion_6_a_kind_press_with_a_grid_selected_adds_nothing_and_names_the_skip() {
+    // `specs/0111` criterion 8 supersedes the empty operation this press added.
     let mut s = laser_with_fonts();
     let (_, group) = add_grid(&mut s);
     assert_eq!(s.selected_test_grid(), Some(group));
     let steps = s.undo_len();
-    let op = s
-        .press_operation_kind("score")
-        .expect("an operation is added");
-    assert_eq!(s.undo_len(), steps + 1);
-    let added = ops(&s).into_iter().find(|o| o.id == op).unwrap();
-    assert!(added.members.is_empty(), "grid items stay in the grid row");
+    let rows = ops(&s).len();
+    assert_eq!(s.press_operation_kind("score", false), None);
+    assert_eq!(s.undo_len(), steps);
+    assert_eq!(ops(&s).len(), rows, "no operation is added");
     let notice = s.operations_notice().expect("the skip is named");
     assert!(notice.chars().count() <= 70, "{notice}");
 }
@@ -382,7 +382,7 @@ fn criterion_6_a_grid_item_is_not_assigned_by_hand_to_another_operation() {
     let mut s = laser_with_fonts();
     let (_, group) = add_grid(&mut s);
     let circle = far_circle(&mut s);
-    let cut = s.press_operation_kind("cut").unwrap();
+    let cut = s.add_test_operation("cut").unwrap();
     let cell = s.document.test_grid(group).unwrap().cells[0].id;
     let steps = s.undo_len();
     s.selection.set(&[cell]);
@@ -426,27 +426,23 @@ fn criterion_9_after_a_field_edit_the_selection_holds_the_rebuilt_grid() {
 }
 
 #[test]
-fn criterion_6_add_operation_after_a_grid_edit_never_silently_does_nothing() {
+fn criterion_6_a_kind_press_after_a_grid_edit_never_silently_does_nothing() {
     let mut s = laser_with_fonts();
     add_grid(&mut s);
     assert_eq!(s.set_test_grid_field("columns", "6"), Ok(true));
     let steps = s.undo_len();
-    let added = s.press_operation_kind("cut");
-    assert!(added.is_some() || s.operations_notice().is_some());
-    assert!(
-        added.is_some(),
-        "the grid selection adds an empty operation"
-    );
-    assert_eq!(s.undo_len(), steps + 1);
+    assert_eq!(s.press_operation_kind("cut", false), None);
+    assert!(s.operations_notice().is_some(), "the refusal is named");
+    assert_eq!(s.undo_len(), steps);
 }
 
 #[test]
 fn ux_5_number_keys_skip_grid_rows() {
     let mut s = laser_with_fonts();
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     add_grid(&mut s);
     s.selection.set(&[]);
-    let second = s.press_operation_kind("cut").unwrap();
+    let second = s.add_test_operation("cut").unwrap();
     let circle = far_circle(&mut s);
     let shown: Vec<NodeId> = s
         .operations_view()

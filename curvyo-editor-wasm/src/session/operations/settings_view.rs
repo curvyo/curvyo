@@ -1,12 +1,13 @@
 //! The `settings`, `grid` and `pick` parts of the Operations tab's JSON (`specs/0028` criteria 6,
-//! 24 to 27; UX notes §5, §8; `adrs.md` §6): what one row's Settings block and grid line show.
+//! 24 to 27; UX notes §5, §8; `adrs.md` §6): what one row's Settings block (the unfolded row's
+//! body of `specs/0111` criteria 18 to 21) and grid line show.
 
 use curvyo_document_core::{NodeId, OperationSnapshot};
 use curvyo_laser_core::FeedRate;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Field, MaterialRead, Role, SetKind, SetOverride, Settings, SettingsRead, SettingsState,
-    main_set, read_settings, resolve,
+    Field, Interval, MaterialRead, OperationOptions, Role, SetKind, SetOverride, Settings,
+    SettingsRead, SettingsState, hatches, main_set, read_options, resolve,
 };
 use curvyo_laser_core::test_grids::GridRecipe;
 use serde::Serialize;
@@ -138,6 +139,48 @@ pub struct SettingsView {
     pub needs: SetKindView,
     /// The pick's materials this operation cannot take.
     pub disabled: Vec<DisabledPickView>,
+    /// The Interval in mm of Engrave and Engrave + Outline (`specs/0111` criterion 19): the one
+    /// that runs, or with No settings the draft's (0.10 until typed); `None` otherwise.
+    pub interval_mm: Option<f64>,
+    /// The operation-only settings of the lower part (`specs/0111` criterion 20); `None` for
+    /// Damaged settings.
+    pub options: Option<OptionsView>,
+    /// Whether Z offset is shown: the machine has a motorised Z axis (`specs/0111` criterion 21).
+    pub z_offset_shown: bool,
+}
+
+/// The lower part of an unfolded row (`specs/0111` criterion 20).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct OptionsView {
+    /// The hatch options, for Engrave and Engrave + Outline only.
+    pub hatch: Option<HatchOptionsView>,
+    /// The stored Z offset in mm (shown only with `z_offset_shown`, kept either way).
+    pub z_offset_mm: f64,
+}
+
+/// The four hatch options.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct HatchOptionsView {
+    /// Crosshatch.
+    pub crosshatch: bool,
+    /// Bidirectional fill.
+    pub bidirectional: bool,
+    /// Scan angle in degrees.
+    pub scan_angle_deg: f64,
+    /// Overscanning in percent.
+    pub overscan_pct: u8,
+}
+
+fn options_view(options: OperationOptions, kind: OperationKind) -> OptionsView {
+    OptionsView {
+        hatch: hatches(kind).then(|| HatchOptionsView {
+            crosshatch: options.crosshatch,
+            bidirectional: options.bidirectional,
+            scan_angle_deg: options.scan_angle.degrees(),
+            overscan_pct: options.overscan.percent(),
+        }),
+        z_offset_mm: options.z_offset.mm(),
+    }
 }
 
 /// A material of the pick.
@@ -278,6 +321,22 @@ fn over_feed_text(state: &SettingsState, max_feed: FeedRate) -> Option<String> {
         })
 }
 
+/// The Interval field of a hatching row: the one that runs, or the draft's with No settings.
+fn interval_view(
+    session: &Session,
+    id: NodeId,
+    state: &SettingsState,
+    kind: OperationKind,
+) -> Option<f64> {
+    let interval = match state {
+        SettingsState::NoSettings => {
+            hatches(kind).then(|| session.draft_interval(id).unwrap_or(Interval::DEFAULT))
+        }
+        _ => state.run().and_then(|run| run.interval),
+    };
+    interval.map(Interval::mm)
+}
+
 /// The Settings block of `op`, `None` for a grid row and an unknown kind.
 pub(super) fn settings_view(
     session: &Session,
@@ -288,8 +347,9 @@ pub(super) fn settings_view(
         return None;
     }
     let kind = OperationKind::parse(op.kind.as_deref()?)?;
-    let read = read_settings(op.settings.as_ref(), kind);
+    let read = super::settings::operation_read(op, kind);
     let profile = session.active_profile_id().unwrap_or_default();
+    let options = read_options(op.options.as_ref(), kind).ok();
     let state = resolve(&read, kind, session.materials().reads(), &profile);
     let needs = main_set(kind);
     let needs_view = SetKindView::from(needs);
@@ -330,6 +390,9 @@ pub(super) fn settings_view(
         reset: !overridden.is_empty(),
         needs: needs_view,
         disabled,
+        interval_mm: interval_view(session, op.id, &state, kind),
+        options: options.map(|options| options_view(options, kind)),
+        z_offset_shown: session.active_motorised_z(),
     })
 }
 

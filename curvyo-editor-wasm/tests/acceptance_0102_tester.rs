@@ -861,8 +861,8 @@ fn ac28_save_as_profile_stores_the_set_and_writes_format_2() {
     let writes = s.take_machine_writes_json();
     let texts = record_texts(&writes);
     let record: Value = serde_json::from_str(texts.last().expect("a record was written")).unwrap();
-    // Record format 3 since `0103` (ADR 0052 §7).
-    assert_eq!(record["format_version"], 3, "any write is format 3");
+    // Record format 3 since `0103` (ADR 0052 §7), 4 since `0111` (ADR 0056 §7).
+    assert_eq!(record["format_version"], 4, "any write is format 4");
     assert_eq!(record["fixtures"].as_array().unwrap().len(), 2);
     assert_eq!(record["id"], id);
     assert_eq!(record["fixtures"][1]["slots"].as_array().unwrap().len(), 2);

@@ -3,19 +3,20 @@
 //! drawn in the looks of the operations that hold it, in list order; an item with no operation, or
 //! with an Output off one, is in the Not assigned look; an item held only by Show-off operations is
 //! not drawn. The kind decides the look (ADR 0046 decision 8): there is no colour per operation.
-//! The hatch of the Engrave kinds and the symbol chips are drawn over the artwork. "View: Drawn"
-//! keeps every item's own look and draws no symbols.
+//! The hatch of the Engrave kinds and the symbol chips are drawn over the artwork. With the page's
+//! Operations view toggle unpressed (`specs/0111` criterion 15) every item keeps its own look and
+//! no symbols are drawn.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use curvyo_document_core::{NodeId, ObjectSnapshot, OperationSnapshot, Point, ViewTransform};
 use curvyo_laser_core::operations::{ChainScope, Hidden, KindRead, OperationKind, OperationList};
 use curvyo_render_core::{
-    ChipItem, DrawList, Glyph, OperationLook, chips_list, hatch_list, object_polygons, restyled,
+    CONTEXT_DIM, ChipItem, DrawList, Glyph, OperationLook, chips_list, dim_outside, hatch_list,
+    object_polygons, restyled,
 };
 
 use super::super::Session;
-use super::OperationsViewMode;
 use super::grid_look::GridLooks;
 use super::index::IndexedLeaf;
 
@@ -41,6 +42,40 @@ pub(in crate::session) struct LookTable {
     own: HashMap<NodeId, LeafLook>,
     inner: HashMap<(NodeId, NodeId), LeafLook>,
     clone_members: HashMap<(NodeId, NodeId), LeafLook>,
+}
+
+/// What the chip overlay of a frame needs: the items, the looks, the chips in drawing order of the
+/// items inside and the ones outside an entered group.
+struct ChipRows<'a> {
+    objects: &'a [ObjectSnapshot],
+    grids: &'a GridLooks,
+    table: &'a LookTable,
+    chips: Vec<(bool, ChipItem)>,
+    outside: Vec<(bool, ChipItem)>,
+    operations_view: bool,
+}
+
+impl ChipRows<'_> {
+    /// Adds the chip of item `id`: drawing order is selected items first, then the rest top first
+    /// (ux-notes 13.4); an item outside an entered group goes to the dimmed ones.
+    fn add(&mut self, id: NodeId, chip: ChipItem, selected: bool, dimming: &Dimming) {
+        if dimming.outside(id) {
+            self.outside.push((false, chip));
+        } else {
+            self.chips.push((selected, chip));
+        }
+    }
+}
+
+/// `list` with every colour at [`CONTEXT_DIM`] of its alpha: what lies outside an entered group.
+fn dimmed_list(mut list: DrawList) -> DrawList {
+    for vertex in &mut list.triangles {
+        // invariant: the product of a byte and a fraction in 0..=1 is a byte.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let alpha = (f64::from(vertex.color.a) * CONTEXT_DIM).round() as u8;
+        vertex.color.a = alpha;
+    }
+    list
 }
 
 /// The look of an operation's kind (ux-notes section 3); Unknown is the Not assigned look.
@@ -230,9 +265,13 @@ impl Session {
         ))
     }
 
-    /// Whether the output page's leaves are drawn by their looks (criterion 18).
+    /// Whether the active laser page's leaves are drawn by their looks: its Operations view
+    /// toggle is pressed (`specs/0111` criterion 15).
     pub(in crate::session) fn operations_view_on(&self) -> bool {
-        self.operations.view_mode == OperationsViewMode::Operations
+        match self.workbench() {
+            super::super::Workbench::Manufacturing(id) => self.operations_view_pressed(id),
+            _ => true,
+        }
     }
 
     /// The artwork objects with the looks of the active laser page applied, and the overlay of the
@@ -250,63 +289,75 @@ impl Session {
         let operations_view = self.operations_view_on();
         let mut out = Vec::with_capacity(objects.len());
         let mut overlay = DrawList::default();
-        // Chips in drawing order: selected items first, then the rest top first (ux-notes 13.4).
-        let mut chips: Vec<(bool, ChipItem)> = Vec::new();
+        let dimming = self.entered_group_dimming();
+        let mut rows = ChipRows {
+            objects,
+            grids: &grids,
+            table: &table,
+            chips: Vec::new(),
+            outside: Vec::new(),
+            operations_view,
+        };
         let selected = self.selection.ids();
         for object in objects {
             if let ObjectSnapshot::Clone(clone) = object
                 && clone.chain.picture.is_some()
             {
-                let looked = picture_looked(clone, &table, view);
-                if operations_view {
-                    out.extend(looked);
-                } else {
-                    // Drawn: only the Show-off leaves are dropped, every other leaf keeps its own look.
-                    out.extend(looked.into_iter().filter(|leaf| {
-                        table
-                            .clone_members
-                            .get(&(clone.resolved.id, leaf.id()))
-                            .or_else(|| table.own.get(&clone.resolved.id))
-                            .is_none_or(|look| !matches!(look, LeafLook::Hidden))
-                    }));
-                }
+                out.extend(picture_clone_leaves(
+                    clone,
+                    &table,
+                    view,
+                    operations_view,
+                    &dimming,
+                ));
                 continue;
             }
-            let look = table.own.get(&object.id());
-            let Some(look) = look else {
+            let Some(look) = table.own.get(&object.id()) else {
                 out.push(object.clone());
                 continue;
             };
             if !operations_view {
-                if !matches!(look, LeafLook::Hidden) {
-                    out.push(object.clone());
-                }
+                out.extend((!matches!(look, LeafLook::Hidden)).then(|| object.clone()));
                 continue;
             }
-            out.extend(drawn_as(object, look, view));
+            out.extend(dimming.dim(object.id(), drawn_as(object, look, view)));
             if let LeafLook::Shown(looks) = look {
-                if let Some(polygons) =
-                    object_polygons(object).filter(|_| looks.iter().any(|&l| hatched(l)))
-                {
-                    overlay.extend(hatch_list(&polygons, view));
+                if let Some(hatch) = hatch_overlay(object, looks, view, &dimming) {
+                    overlay.extend(hatch);
                 }
                 // A grid's items share one chip row over the grid (UX notes §11).
                 if grids.parts.contains_key(&object.id()) {
                     continue;
                 }
-                let mut glyphs: Vec<Glyph> = looks.iter().filter_map(|&l| glyph_of(l)).collect();
-                glyphs.sort_by_key(|g| *g as u8);
-                glyphs.dedup();
-                if !glyphs.is_empty() {
-                    let (min, max) = curvyo_ui_core::object_bounds(object);
-                    let chip = ChipItem {
-                        bounds: (min, max),
-                        glyphs,
-                    };
-                    chips.push((selected.contains(&object.id()), chip));
+                if let Some(chip) = chip_of(object, looks) {
+                    rows.add(object.id(), chip, selected.contains(&object.id()), &dimming);
                 }
             }
         }
+        self.chips_overlay(&mut overlay, rows, view);
+        Some((out, overlay))
+    }
+
+    /// In a read-only entered group everything outside recedes: the looks restyle the already
+    /// dimmed objects, so the dimming is applied again to the looked copies and the overlay.
+    fn entered_group_dimming(&self) -> Dimming {
+        Dimming(
+            self.in_read_only_group()
+                .then(|| self.objects().iter().map(ObjectSnapshot::id).collect()),
+        )
+    }
+
+    /// The symbol chips of the looked items, the dimmed ones of the items outside an entered
+    /// group, and the grids' chips, drawn into `overlay`.
+    fn chips_overlay(&self, overlay: &mut DrawList, rows: ChipRows<'_>, view: ViewTransform) {
+        let ChipRows {
+            objects,
+            grids,
+            table,
+            mut chips,
+            outside: mut outside_chips,
+            operations_view,
+        } = rows;
         let drawn: HashMap<NodeId, (Point, Point)> = objects
             .iter()
             .filter(|object| grids.parts.contains_key(&object.id()))
@@ -325,10 +376,19 @@ impl Session {
             let mut items: Vec<ChipItem> = grids.chips(&bounds);
             items.extend(chips.into_iter().map(|(_, chip)| chip));
             overlay.extend(chips_list(&items, self.viewport.canvas_size(), view));
+            if !outside_chips.is_empty() {
+                outside_chips.reverse();
+                let items: Vec<ChipItem> =
+                    outside_chips.into_iter().map(|(_, chip)| chip).collect();
+                overlay.extend(dimmed_list(chips_list(
+                    &items,
+                    self.viewport.canvas_size(),
+                    view,
+                )));
+            }
         }
         // The Worked chip is a record of the test: drawn in both views (UX notes §7.3).
         overlay.extend(grids.worked_chips(&bounds, view));
-        Some((out, overlay))
     }
 
     /// The members of one placed page as drawn on the output page: each member is in its look for
@@ -352,6 +412,75 @@ impl Session {
         }
         out
     }
+}
+
+/// The entered laser group's members, when one is entered: everything else recedes.
+struct Dimming(Option<HashSet<NodeId>>);
+
+impl Dimming {
+    fn outside(&self, id: NodeId) -> bool {
+        self.0.as_ref().is_some_and(|inside| !inside.contains(&id))
+    }
+
+    fn dim(&self, id: NodeId, looked: Vec<ObjectSnapshot>) -> Vec<ObjectSnapshot> {
+        if self.outside(id) {
+            dim_outside(&looked, &|_| false)
+        } else {
+            looked
+        }
+    }
+}
+
+/// The looked leaves of a clone with a picture; in the Drawn view only the Show-off leaves are
+/// dropped, every other leaf keeps its own look.
+fn picture_clone_leaves(
+    clone: &curvyo_document_core::CloneSnapshot,
+    table: &LookTable,
+    view: ViewTransform,
+    operations_view: bool,
+    dimming: &Dimming,
+) -> Vec<ObjectSnapshot> {
+    let looked = dimming.dim(clone.resolved.id, picture_looked(clone, table, view));
+    if operations_view {
+        return looked;
+    }
+    looked
+        .into_iter()
+        .filter(|leaf| {
+            table
+                .clone_members
+                .get(&(clone.resolved.id, leaf.id()))
+                .or_else(|| table.own.get(&clone.resolved.id))
+                .is_none_or(|look| !matches!(look, LeafLook::Hidden))
+        })
+        .collect()
+}
+
+/// The hatch of `object` when one of its looks is hatched, dimmed when it is outside the group.
+fn hatch_overlay(
+    object: &ObjectSnapshot,
+    looks: &[OperationLook],
+    view: ViewTransform,
+    dimming: &Dimming,
+) -> Option<DrawList> {
+    let polygons = object_polygons(object).filter(|_| looks.iter().any(|&l| hatched(l)))?;
+    let hatch = hatch_list(&polygons, view);
+    Some(if dimming.outside(object.id()) {
+        dimmed_list(hatch)
+    } else {
+        hatch
+    })
+}
+
+/// The symbol chip of `object`, `None` when none of its looks has a glyph.
+fn chip_of(object: &ObjectSnapshot, looks: &[OperationLook]) -> Option<ChipItem> {
+    let mut glyphs: Vec<Glyph> = looks.iter().filter_map(|&l| glyph_of(l)).collect();
+    glyphs.sort_by_key(|g| *g as u8);
+    glyphs.dedup();
+    (!glyphs.is_empty()).then(|| ChipItem {
+        bounds: curvyo_ui_core::object_bounds(object),
+        glyphs,
+    })
 }
 
 #[cfg(test)]

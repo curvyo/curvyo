@@ -320,6 +320,18 @@ impl Session {
         }
     }
 
+    /// The key table's action for `input`; [`KeyAction::Consume`] when a group of a laser page
+    /// is entered and the action is refused there silently: only selection, Escape, undo and
+    /// entering a nested group act (`specs/0111` criterion 11, UX notes T4).
+    fn table_action(&self, input: &KeyInput<'_>) -> KeyAction {
+        let action = decide(input, self.key_state());
+        if !self.in_read_only_group() || read_only_key(action) {
+            action
+        } else {
+            KeyAction::Consume
+        }
+    }
+
     /// The facts of the session the key table reads.
     pub(super) fn key_state(&self) -> KeyState {
         KeyState {
@@ -384,7 +396,7 @@ impl Session {
         if let Some(outcome) = self.fixture_key(&input) {
             return outcome;
         }
-        match decide(&input, self.key_state()) {
+        match self.table_action(&input) {
             KeyAction::Ignore => KeyOutcome::Ignored,
             KeyAction::SetTool(tool) => {
                 self.set_tool(tool);
@@ -523,68 +535,92 @@ impl Session {
     /// With the pointer button still down steps 3 and 4 are skipped: only the
     /// drag is cancelled (criterion 49).
     pub fn escape(&mut self) -> EscapeStep {
+        if let Some(step) = self.escape_entries_and_pickers() {
+            return step;
+        }
+        if let Some(step) = self.escape_drags_and_pen() {
+            return step;
+        }
+        self.escape_selection_and_tool()
+    }
+
+    /// Escape steps for the width, sketch, page, fixture, colour and entry states; `None` when
+    /// none was open.
+    fn escape_entries_and_pickers(&mut self) -> Option<EscapeStep> {
         if self.width_escape() {
-            return EscapeStep::ClearedState;
+            return Some(EscapeStep::ClearedState);
         }
         if self.workbench() == super::Workbench::Sketch {
-            return self.sketch_escape();
+            return Some(self.sketch_escape());
         }
         if self.page_drag.take().is_some() {
-            return EscapeStep::ClearedState;
+            return Some(EscapeStep::ClearedState);
         }
         // A fixture's drag, then its selection (`specs/0102-laser-fixtures` UX notes §10).
         if self.cancel_fixture_drag() {
-            return EscapeStep::CancelledDrag;
+            return Some(EscapeStep::CancelledDrag);
         }
         if self.selected_fixture().is_some() {
             self.clear_fixture_selection();
-            return EscapeStep::ClearedState;
+            return Some(EscapeStep::ClearedState);
         }
         // Picking a colour ends first (`0017` criterion 60).
         if self.colour_pick_target().is_some() {
             self.end_colour_pick();
-            return EscapeStep::ClearedState;
+            return Some(EscapeStep::ClearedState);
         }
         if self.select.has_entry() {
             self.select.cancel_entry();
-            return EscapeStep::ClosedEntry;
+            return Some(EscapeStep::ClosedEntry);
         }
+        None
+    }
+
+    /// Escape steps that end an open entry chip, a drag, a pick mode, a placement or the Pen path;
+    /// `None` when none was open.
+    fn escape_drags_and_pen(&mut self) -> Option<EscapeStep> {
         // The Offset entry chip closes without writing; the selection stays (`0038` criterion 54).
         if self.offset_chip_open() {
             self.close_offset_chip();
-            return EscapeStep::ClosedEntry;
+            return Some(EscapeStep::ClosedEntry);
         }
         // The Pen entry chip closes alone; the path stays (`0072` criterion 22).
         if self.cancel_pen_entry() {
-            return EscapeStep::ClosedEntry;
+            return Some(EscapeStep::ClosedEntry);
         }
         if self.cancel_text_path_drag() {
-            return EscapeStep::CancelledDrag;
+            return Some(EscapeStep::CancelledDrag);
         }
         if self.cancel_drag_in_flight()
             || self.cancel_dimension_drag()
             || self.cancel_kept_point_drag()
         {
-            return EscapeStep::CancelledDrag;
+            return Some(EscapeStep::CancelledDrag);
         }
         // Pick mode ends before the selection clears (`0080` UX notes §2).
         if self.cancel_text_path_pick() {
-            return EscapeStep::ClearedState;
+            return Some(EscapeStep::ClearedState);
         }
         // A placement is step 2 too (`0052` criterion 7). It is not in `cancel_drag_in_flight`,
         // which a lost pointer and a window blur also call: those must not cancel it.
         if self.cancel_placement() {
-            return EscapeStep::CancelledDrag;
+            return Some(EscapeStep::CancelledDrag);
         }
         if self.tool == Tool::Pen && self.pen.escape() {
             // The Pen's step 2 and 3 are one: the unfinished path goes,
             // also during a handle drag.
-            return if self.button_down {
+            return Some(if self.button_down {
                 EscapeStep::CancelledDrag
             } else {
                 EscapeStep::ClearedState
-            };
+            });
         }
+        None
+    }
+
+    /// The last Escape steps: the key object, a text edit, the entered group, the selection, the
+    /// innermost group, then the tool.
+    fn escape_selection_and_tool(&mut self) -> EscapeStep {
         if self.button_down {
             return EscapeStep::Nothing;
         }
@@ -598,6 +634,13 @@ impl Session {
         // cascade that writes (`specs/0074-text-objects` criterion 7).
         if self.finish_text_edit() {
             return EscapeStep::ClearedState;
+        }
+        // Escape inside a group of a laser page leaves it in one press with the group selected
+        // (`specs/0111` criterion 13, UX notes T5).
+        if self.tool == Tool::Select && self.in_read_only_group() {
+            self.select.end_cycle();
+            self.leave_read_only_group(true);
+            return EscapeStep::LeftGroup;
         }
         let cleared = match self.tool {
             Tool::Pen
@@ -661,7 +704,8 @@ impl Session {
     /// toolbar's Delete button): removes every selected object when the
     /// Select or Node tool is active. A no-op for every other tool.
     pub fn delete_selected(&mut self) {
-        if self.width_delete_selected() {
+        // Nothing is deleted inside a group of a laser page (`specs/0111` criterion 11).
+        if self.in_read_only_group() || self.width_delete_selected() {
             return;
         }
         self.recording_unguarded(|this| {
@@ -693,6 +737,22 @@ impl Session {
             }
         });
     }
+}
+
+/// Whether `action` may run inside a read-only group of a laser page (`specs/0111` criteria 11 to
+/// 13): selection, Escape, undo and redo, entering a nested group and the Select tool letter.
+fn read_only_key(action: KeyAction) -> bool {
+    matches!(
+        action,
+        KeyAction::Ignore
+            | KeyAction::Escape
+            | KeyAction::Hint(_)
+            | KeyAction::Consume
+            | KeyAction::History(_)
+            | KeyAction::SelectAll
+            | KeyAction::EnterGroup
+            | KeyAction::SetTool(Tool::Select)
+    )
 }
 
 #[cfg(test)]

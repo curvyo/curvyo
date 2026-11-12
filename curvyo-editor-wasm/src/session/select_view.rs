@@ -124,6 +124,18 @@ impl Session {
         merged_corners(&corners)
     }
 
+    /// The box of all the members of the entered read-only group of a laser page (`specs/0111`
+    /// criterion 11), outlined on the canvas; `None` elsewhere.
+    pub(super) fn context_outline_box(
+        &self,
+        objects: &[ObjectSnapshot],
+    ) -> Option<[curvyo_document_core::Point; 4]> {
+        if !self.in_read_only_group() || !self.select_box_tool() {
+            return None;
+        }
+        self.merged_box_of(objects, |_| true)
+    }
+
     /// [`Session::select_decoration_input`] over the live objects the caller
     /// already built, so a frame reads and substitutes once.
     pub(super) fn select_decoration_input_in(
@@ -314,7 +326,8 @@ impl Session {
             return handles;
         }
         // Width editing hides the box's handles so none covers a diamond (UX review U2).
-        if !self.select_box_tool() || self.width_edit_active() {
+        // A read-only entered group shows no handle, knob or pivot (`specs/0111` criterion 11).
+        if !self.select_box_tool() || self.width_edit_active() || self.in_read_only_group() {
             return TransformDecorationInput::default();
         }
         let tolerances = self.transform_handle_tolerances();

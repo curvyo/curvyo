@@ -2,13 +2,13 @@
 //! the state each operation's numbers are in through the laser rule, and the writes of Use
 //! material, Own numbers, Edit settings and Reset to material, each one step.
 
-use curvyo_document_core::{NodeId, SettingsStep, SettingsWrite};
+use curvyo_document_core::{NodeId, OperationSnapshot, SettingsStep, SettingsWrite};
 use curvyo_laser_core::FeedRate;
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::settings::{
-    Field, Passes, PowerPercent, Role, SetOverride, Settings, SettingsRead, SettingsState,
-    StoredSettings, TypedNumber, edit_number, read_settings, reset_to_material, resolve,
-    use_material, use_own_numbers,
+    Field, Interval, Passes, PowerPercent, Role, SetOverride, Settings, SettingsDamage,
+    SettingsRead, SettingsState, StoredSettings, TypedNumber, edit_number, read_options,
+    read_settings, reset_to_material, resolve, use_material, use_own_numbers,
 };
 
 use super::super::Session;
@@ -71,6 +71,15 @@ pub(in crate::session) fn field_of(name: &str) -> Option<Field> {
     }
 }
 
+/// What is typed into an operation with No settings before power and speed are both there
+/// (`specs/0028` UX notes §8.3): the numbers, and the Interval of a hatching kind (`specs/0111`
+/// criterion 19), written together with them.
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::session) struct SettingsDraft {
+    set: SetOverride,
+    interval: Option<Interval>,
+}
+
 /// An operation of the active laser page with what its settings read.
 pub(in crate::session) struct SettingsTarget {
     pub(in crate::session) id: NodeId,
@@ -78,6 +87,19 @@ pub(in crate::session) struct SettingsTarget {
     pub(in crate::session) kind: OperationKind,
     pub(in crate::session) read: SettingsRead,
     pub(in crate::session) state: SettingsState,
+}
+
+/// What operation `op` of kind `kind` reads for its numbers: damaged `op_options` make the whole
+/// operation read as Damaged settings, so nothing runs and no material command writes it (ADR 0056
+/// §6; the kind of damage is not shown).
+pub(in crate::session) fn operation_read(
+    op: &OperationSnapshot,
+    kind: OperationKind,
+) -> SettingsRead {
+    if read_options(op.options.as_ref(), kind).is_err() {
+        return SettingsRead::Damaged(SettingsDamage::NotAMap);
+    }
+    read_settings(op.settings.as_ref(), kind)
 }
 
 fn plain(stored: &StoredSettings) -> Option<serde_json::Map<String, serde_json::Value>> {
@@ -97,7 +119,7 @@ impl Session {
             return None;
         }
         let kind = OperationKind::parse(op.kind.as_deref()?)?;
-        let read = read_settings(op.settings.as_ref(), kind);
+        let read = operation_read(op, kind);
         let profile = self.active_profile_id().unwrap_or_default();
         let state = resolve(&read, kind, self.materials.library().reads(), &profile);
         Some(SettingsTarget {
@@ -126,15 +148,27 @@ impl Session {
         let mut writes = Vec::new();
         let mut skipped: Vec<(String, &'static str)> = Vec::new();
         for target in ids.iter().filter_map(|&id| self.settings_target(id)) {
-            match use_material(&found, target.kind) {
-                Ok(stored) => writes.push(SettingsWrite {
-                    operation: target.id,
-                    value: plain(&stored),
-                }),
+            match use_material(&found, target.kind, &target.read) {
+                Ok(mut stored) => {
+                    if target.read == SettingsRead::None {
+                        stored.interval = self.draft_interval(target.id).or(stored.interval);
+                    }
+                    writes.push(SettingsWrite {
+                        operation: target.id,
+                        value: plain(&stored),
+                    });
+                }
                 Err(kind) => skipped.push((target.name, kind.label())),
             }
         }
         self.operations.notice = skip_notice(&skipped, &found.name);
+        if writes.iter().any(|write| {
+            self.operations
+                .settings_draft
+                .is_some_and(|(op, _)| op == write.operation)
+        }) {
+            self.operations.settings_draft = None;
+        }
         self.write_settings_step(SettingsStep::UseMaterial, &writes)
     }
 
@@ -207,16 +241,13 @@ impl Session {
         if role != Role::Main {
             return false;
         }
-        let mut draft = match self.operations.settings_draft {
-            Some((op, draft)) if op == target.id => draft,
-            _ => SetOverride::default(),
-        };
+        let mut draft = self.draft_of(target.id);
         match number {
-            TypedNumber::Power(power) => draft.power = Some(power),
-            TypedNumber::Speed(speed) => draft.speed = Some(speed),
-            TypedNumber::Passes(passes) => draft.passes = Some(passes),
+            TypedNumber::Power(power) => draft.set.power = Some(power),
+            TypedNumber::Speed(speed) => draft.set.speed = Some(speed),
+            TypedNumber::Passes(passes) => draft.set.passes = Some(passes),
         }
-        let (Some(power), Some(speed)) = (draft.power, draft.speed) else {
+        let (Some(power), Some(speed)) = (draft.set.power, draft.set.speed) else {
             self.operations.settings_draft = Some((target.id, draft));
             return false;
         };
@@ -224,9 +255,10 @@ impl Session {
         let main = Settings {
             power,
             speed,
-            passes: draft.passes.unwrap_or(Passes::ONE),
+            passes: draft.set.passes.unwrap_or(Passes::ONE),
         };
-        let stored = StoredSettings::own(target.kind, main, None);
+        let mut stored = StoredSettings::own(target.kind, main, None);
+        stored.interval = draft.interval;
         let write = SettingsWrite {
             operation: target.id,
             value: plain(&stored),
@@ -255,7 +287,35 @@ impl Session {
     pub(in crate::session) fn settings_draft(&self, id: NodeId) -> Option<SetOverride> {
         self.operations
             .settings_draft
-            .and_then(|(op, draft)| (op == id).then_some(draft))
+            .and_then(|(op, draft)| (op == id).then_some(draft.set))
+    }
+
+    /// The Interval typed into an operation with No settings, until its numbers are written.
+    pub(in crate::session) fn draft_interval(&self, id: NodeId) -> Option<Interval> {
+        self.operations
+            .settings_draft
+            .and_then(|(op, draft)| (op == id).then_some(draft.interval)?)
+    }
+
+    /// The draft of operation `id`, empty when another operation's draft is kept.
+    fn draft_of(&self, id: NodeId) -> SettingsDraft {
+        match self.operations.settings_draft {
+            Some((op, draft)) if op == id => draft,
+            _ => SettingsDraft::default(),
+        }
+    }
+
+    /// Keeps `interval` typed into operation `id` with No settings until power and speed are
+    /// typed (criterion 19): nothing is written, so the result is always `false`.
+    pub(in crate::session) fn type_interval_into_draft(
+        &mut self,
+        id: NodeId,
+        interval: Interval,
+    ) -> bool {
+        let mut draft = self.draft_of(id);
+        draft.interval = Some(interval);
+        self.operations.settings_draft = Some((id, draft));
+        false
     }
 
     fn write_settings_step(&mut self, step: SettingsStep, writes: &[SettingsWrite]) -> bool {

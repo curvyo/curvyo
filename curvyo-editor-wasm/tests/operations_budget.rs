@@ -8,6 +8,8 @@
 #![allow(clippy::unwrap_used, clippy::cast_precision_loss)]
 
 mod cpu_time;
+mod operation_shims;
+use operation_shims::add_operation;
 
 use std::time::Duration;
 
@@ -108,7 +110,7 @@ fn criterion_29_a_press_assigning_a_thousand_selected_items() {
             assert_eq!(s.selected_object_count(), 1000);
             s
         },
-        |s| assert!(s.press_operation_kind("cut").is_some()),
+        |s| assert!(add_operation(s, "cut").is_some()),
     );
     eprintln!("criterion 29 a: press of 1000 items {cost:?} (CPU time)");
     assert!(!TIMED || cost < BUDGET, "{cost:?}");

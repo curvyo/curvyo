@@ -64,6 +64,7 @@ impl Session {
                 "max_feed": copy.values.max_feed.get(),
                 "max_power": copy.values.max_power.get(),
                 "laser_mode": copy.values.laser_mode,
+                "motorised_z": copy.values.motorised_z,
                 "width": active.page.width.as_mm(),
                 "height": active.page.height.as_mm(),
             },

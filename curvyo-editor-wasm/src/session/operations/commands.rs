@@ -1,57 +1,14 @@
-//! The commands of an operation's own row and of the list: add, rename, colour, delete, margin,
-//! the Show and Output switches, Cuts last and the reorder (`specs/0101-laser-operations`
-//! criteria 2 to 6, 15, 16, 23). Each is one history step with the label of the history table.
+//! The commands of an operation's own row and of the list: rename, delete, margin, the Show and
+//! Output switches, Cuts last and the reorder (`specs/0101-laser-operations` criteria 3 to 6, 15,
+//! 16, 23). Each is one history step with the label of the history table. Operations are created
+//! by assignment only (`kind_press.rs`, `specs/0111` criterion 8).
 
-use curvyo_document_core::{Length, NewOperation, NodeId, OperationSwitch};
-use curvyo_laser_core::operations::{
-    OperationKind, insert_index, may_move, next_operation_name, run_sequence,
-};
+use curvyo_document_core::{Length, NodeId, OperationSwitch};
+use curvyo_laser_core::operations::{may_move, run_sequence};
 
 use super::super::Session;
 
 impl Session {
-    /// Adds an operation of the stored kind `kind` (`cut`, `score`, `engrave`, `engrave_outline`,
-    /// `cut_out`) on the active laser page, named as criterion 2 says and placed in
-    /// its section. With items selected they are assigned to it in the same step (criterion 8);
-    /// items of a test grid are not, they run with their grid row (`specs/0028` criterion 6, a
-    /// notice names them). `None` for an unknown kind, another page, or a selection of only guides
-    /// and dimensions (nothing is added then, and the refusal notice is shown).
-    pub fn press_operation_kind(&mut self, kind: &str) -> Option<NodeId> {
-        self.operations.notice = None;
-        let kind = OperationKind::parse(kind)?;
-        let active = self.active_operations()?;
-        let selection = self.selection_targets();
-        if selection.targets.is_empty() && selection.skipped > 0 {
-            if selection.guides > 0 {
-                self.operations.notice = Some(super::NEVER_RUN_NOTICE.to_owned());
-            }
-            return None;
-        }
-        let names: Vec<&str> = active
-            .operations
-            .iter()
-            .map(|op| op.name.as_str())
-            .collect();
-        let name = next_operation_name(kind, names);
-        let index = insert_index(&active.kinds(), kind.section(), active.cuts_last);
-        let new = NewOperation {
-            kind: kind.as_str(),
-            name: &name,
-        };
-        let added = self.recording_unguarded(|this| {
-            this.document
-                .add_operation(active.manufacturing, &new, index, &selection.targets)
-                .ok()
-        });
-        if added.is_some() {
-            self.note_skipped(&selection, true);
-        } else {
-            // Never silently nothing (`specs/0028` UX review).
-            self.operations.notice = Some(super::ADD_REFUSED_NOTICE.to_owned());
-        }
-        added
-    }
-
     /// Renames operation `id`; an empty name reverts (criterion 3). `false` when nothing changes.
     pub fn rename_operation(&mut self, id: NodeId, name: &str) -> bool {
         self.operations.notice = None;

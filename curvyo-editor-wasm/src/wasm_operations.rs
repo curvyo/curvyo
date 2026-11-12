@@ -23,12 +23,45 @@ fn nodes(json: &str) -> Vec<NodeId> {
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// Adds an operation of the stored kind (`cut`, `score`, `engrave`, `engrave_outline`,
-    /// `cut_out`) on the active laser page, with the selection assigned (criterion 8). The new
-    /// operation's id as JSON text, `None` when nothing was added.
-    pub fn press_operation_kind(&mut self, kind: &str) -> Option<String> {
-        let id = self.session.press_operation_kind(kind)?;
+    /// A press on the Select bar's kind button `kind` (`cut`, `score`, `engrave`,
+    /// `engrave_outline`, `cut_out`), `shift` held or not (`specs/0111` criteria 3 to 5): the
+    /// operation written to as JSON text, `None` when nothing changed.
+    pub fn press_operation_kind(&mut self, kind: &str, shift: bool) -> Option<String> {
+        let id = self.session.press_operation_kind(kind, shift)?;
         serde_json::to_string(&id).ok()
+    }
+
+    /// The polite status of the last kind press ("Cut 3 added."), once; empty when none.
+    pub fn take_operations_status(&mut self) -> String {
+        self.session.take_operations_status()
+    }
+
+    /// A press on operation row `id` (`specs/0111` criterion 17): it unfolds, or folds when it
+    /// was unfolded. Whether the row is of the active page.
+    pub fn unfold_operation_row(&mut self, id: &str) -> bool {
+        node(id).is_some_and(|id| self.session.unfold_operation_row(id))
+    }
+
+    /// The Operations view toggle in the label of laser page `page` (`specs/0111` criterion 15).
+    /// Whether it is a laser page. Session state, no step.
+    pub fn toggle_operations_view(&mut self, page: &str) -> bool {
+        self.session.toggle_operations_view(page)
+    }
+
+    /// Types `value` into the option field `option` of operation `id` (`interval`, `scan_angle`,
+    /// `overscan`, `z_offset`) or presses a toggle (`crosshatch`, `bidirectional`; non-zero is
+    /// on), `specs/0111` criteria 19 to 24. The chip, empty when taken or nothing changed.
+    pub fn edit_operation_option(&mut self, id: &str, option: &str, value: f64) -> String {
+        node(id)
+            .map(|id| self.session.edit_operation_option(id, option, value))
+            .and_then(Result::err)
+            .unwrap_or_default()
+    }
+
+    /// The Motorised Z axis switch of the active laser page's profile copy (`specs/0111`
+    /// criterion 22). Whether it changed.
+    pub fn set_motorised_z(&mut self, on: bool) -> bool {
+        self.session.set_machine_motorised_z(on)
     }
 
     /// Renames operation `id` (criterion 3). Whether it changed.
@@ -79,23 +112,6 @@ impl WasmSession {
         node(id).is_some_and(|id| self.session.set_selection_in_operation(id, on))
     }
 
-    /// Assigns or removes the clone member `member` of clone `clone` in operation `id`, by its
-    /// path (Frage 167 B).
-    pub fn set_clone_member_in_operation(
-        &mut self,
-        id: &str,
-        clone: &str,
-        member: &str,
-        on: bool,
-    ) -> bool {
-        match (node(id), node(clone), node(member)) {
-            (Some(id), Some(clone), Some(member)) => self
-                .session
-                .set_clone_member_in_operation(id, clone, member, on),
-            _ => false,
-        }
-    }
-
     /// The number keys 1 to 9: toggles the selection in operation `number` of the list
     /// (criterion 8). Whether it changed.
     pub fn toggle_selection_by_number(&mut self, number: u32) -> bool {
@@ -106,17 +122,6 @@ impl WasmSession {
     /// `runs_while_hidden`, `output_off`), criterion 17. Whether it selected.
     pub fn select_operation_items(&mut self, which: &str) -> bool {
         self.session.select_operation_items(which)
-    }
-
-    /// Draws the output page by its operations (`false`) or as drawn (`true`), criterion 18.
-    /// Whether it changed. Session state, no step.
-    pub fn set_operations_drawn(&mut self, drawn: bool) -> bool {
-        let mode = if drawn {
-            crate::session::OperationsViewMode::Drawn
-        } else {
-            crate::session::OperationsViewMode::Operations
-        };
-        self.session.set_operations_view_mode(mode)
     }
 
     /// The Operations tab as JSON (`specs/0101` criteria 1, 5, 17): rows in run order, ticks over the

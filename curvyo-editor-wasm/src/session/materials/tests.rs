@@ -42,7 +42,7 @@ fn saved_birch() -> (Session, String) {
 
 fn cut_with_birch() -> (Session, String, NodeId) {
     let (mut s, id) = saved_birch();
-    let cut = s.press_operation_kind("cut").unwrap();
+    let cut = s.add_test_operation("cut").unwrap();
     assert!(s.use_material_on(&[cut], &id));
     (s, id, cut)
 }
@@ -299,8 +299,8 @@ fn criterion_24_a_typed_number_keeps_the_link_and_reset_removes_it() {
 #[test]
 fn criterion_27_a_pick_for_several_skips_a_kind_without_a_set_and_says_so() {
     let (mut s, id) = saved_birch();
-    let cut = s.press_operation_kind("cut").unwrap();
-    let score = s.press_operation_kind("score").unwrap();
+    let cut = s.add_test_operation("cut").unwrap();
+    let score = s.add_test_operation("score").unwrap();
     assert!(s.use_material_on(&[cut, score], &id));
     assert_eq!(undo_label(&mut s), "Use material");
     assert_eq!(
@@ -314,7 +314,7 @@ fn criterion_27_a_pick_for_several_skips_a_kind_without_a_set_and_says_so() {
 #[test]
 fn criterion_24_no_settings_waits_for_power_and_speed() {
     let (mut s, _) = saved_birch();
-    let cut = s.press_operation_kind("cut").unwrap();
+    let cut = s.add_test_operation("cut").unwrap();
     let steps = s.undo_len();
     assert_eq!(
         s.edit_operation_setting(cut, "main", "power", 50.0),

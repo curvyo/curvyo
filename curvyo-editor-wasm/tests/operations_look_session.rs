@@ -4,14 +4,17 @@
 
 #![allow(clippy::unwrap_used)]
 
+mod legacy_key;
+mod operation_shims;
 use curvyo_document_core::{
     Document, DocumentSize, NewOperation, NewOutputPage, NodeId, OperationSwitch, Point,
     RectBounds, pack,
 };
-use curvyo_editor_wasm::{OperationsViewMode, Session, Tool};
+use curvyo_editor_wasm::{Session, Tool};
 use curvyo_render_core::{
     DrawList, OP_CHIP_GROUND, OP_CUT, OP_ENGRAVE_HATCH, OP_INK, OP_LANE_LINE, RgbaColor,
 };
+use operation_shims::{OperationsViewMode, set_view};
 
 const BLACK: RgbaColor = RgbaColor::opaque(0, 0, 0);
 
@@ -45,7 +48,7 @@ fn open(bytes: &[u8], laser: &str, mode: OperationsViewMode) -> Session {
     s.resize_viewport(1600.0, 1000.0);
     s.set_tool(Tool::Select);
     assert!(s.activate_page(laser));
-    s.set_operations_view_mode(mode);
+    set_view(&mut s, mode);
     s
 }
 
@@ -151,9 +154,9 @@ fn switching_the_view_back_and_forth_changes_the_drawing() {
     let (bytes, laser, _) = page(Some("cut"));
     let mut s = open(&bytes, &laser, OperationsViewMode::Operations);
     assert!(triangles_in(&s.draw_list(), OP_CUT) > 0);
-    assert!(s.set_operations_view_mode(OperationsViewMode::Drawn));
+    assert!(set_view(&mut s, OperationsViewMode::Drawn));
     assert_eq!(triangles_in(&s.draw_list(), OP_CUT), 0);
-    assert!(s.set_operations_view_mode(OperationsViewMode::Operations));
+    assert!(set_view(&mut s, OperationsViewMode::Operations));
     assert!(triangles_in(&s.draw_list(), OP_CUT) > 0);
 }
 
@@ -224,7 +227,8 @@ fn placed_page(kind: Option<&str>) -> (Vec<u8>, String) {
 }
 
 /// A laser page with a group of two 10 mm squares and a linked clone of it. The clone's first
-/// member is assigned to a Cut operation by its path (criterion 11). Returns the file and the page.
+/// member is assigned to a Cut operation by its path, as a file of format 39 to 43 holds it (Frage
+/// 212 A). Returns the file and the page.
 fn clone_of_group(member_kind: Option<&str>) -> (Vec<u8>, String) {
     let d = Document::new(1);
     let laser = d
@@ -249,24 +253,30 @@ fn clone_of_group(member_kind: Option<&str>) -> (Vec<u8>, String) {
     if let Some(kind) = member_kind {
         let m = laser.kind.manufacturing().unwrap();
         let path = d.clone_member_path(clone, first).unwrap();
-        d.add_operation(m, &NewOperation { kind, name: "Op 1" }, 0, &[path])
+        d.add_operation(m, &NewOperation { kind, name: "Op 1" }, 0, &[])
             .unwrap();
+        // No command writes a member key any more (`specs/0111` criterion 14): an old file's.
+        let d = legacy_key::with_legacy_key(&d, "Op 1", &path);
+        return (pack(&d, "clone").unwrap(), laser.id);
     }
     (pack(&d, "clone").unwrap(), laser.id)
 }
 
+/// Superseded by `specs/0111` criterion 14 (Frage 212 A, ADR 0056 §2): a clone member's path key
+/// is legacy and runs nothing; the members take the clone's operations (here none).
 #[test]
-fn a_clone_member_draws_in_the_look_of_its_own_path_assignment() {
+fn a_legacy_clone_member_key_draws_nothing_and_the_members_follow_the_clone() {
     let (bytes, laser) = clone_of_group(Some("cut"));
     let s = open(&bytes, &laser, OperationsViewMode::Operations);
     let list = s.draw_list();
-    assert!(
-        triangles_in(&list, OP_CUT) > 0,
-        "the assigned member is red"
+    assert_eq!(
+        triangles_in(&list, OP_CUT),
+        0,
+        "the legacy key draws no Cut"
     );
     assert!(
         triangles_in(&list, OP_LANE_LINE) > 0,
-        "the other member is in the Not assigned look"
+        "both members are in the Not assigned look"
     );
 }
 

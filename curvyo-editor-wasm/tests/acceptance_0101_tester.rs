@@ -14,11 +14,13 @@
     missing_docs
 )]
 
+mod operation_shims;
 use curvyo_document_core::{
     Document, DocumentSize, NewOutputPage, NodeId, OperationSwitch, Page, Point, RectBounds, pack,
     unpack,
 };
 use curvyo_editor_wasm::{KeyInput, Session, Tool};
+use operation_shims::{OperationsViewMode, add_operation, set_view};
 use serde_json::Value;
 
 const LASER: &str = "curvyo.laser";
@@ -162,8 +164,10 @@ fn c1_a_new_laser_page_has_an_empty_list_and_nothing_runs() {
 #[test]
 fn c2_press_adds_named_operation_in_section_with_show_and_output_on() {
     let mut f = fixture();
+    // `specs/0111` criterion 8: an operation is made by assigning a selection.
+    click(&mut f.s, centre(&f.l, 10.0, 10.0));
     let before = f.s.undo_len();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = f.s.press_operation_kind("cut", false).unwrap();
     assert_eq!(f.s.undo_len(), before + 1, "one undo step");
     let row = rows(&f.s)[0].clone();
     assert_eq!(row["name"], "Cut 1");
@@ -177,8 +181,8 @@ fn c2_press_adds_named_operation_in_section_with_show_and_output_on() {
     assert!(row["id"].is_object(), "the row carries its node id");
     assert!(format!("{cut:?}").contains("NodeId"));
 
-    f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("score").unwrap();
+    f.s.press_operation_kind("cut", true).unwrap();
+    f.s.press_operation_kind("score", false).unwrap();
     assert_eq!(
         names(&f.s),
         vec!["Score 1", "Cut 1", "Cut 2"],
@@ -190,7 +194,8 @@ fn c2_press_adds_named_operation_in_section_with_show_and_output_on() {
 #[test]
 fn c2_press_undo_restores_the_list_in_one_step() {
     let mut f = fixture();
-    f.s.press_operation_kind("engrave").unwrap();
+    click(&mut f.s, centre(&f.l, 10.0, 10.0));
+    f.s.press_operation_kind("engrave", false).unwrap();
     assert_eq!(names(&f.s), vec!["Engrave 1"]);
     f.s.undo();
     assert!(
@@ -202,11 +207,11 @@ fn c2_press_undo_restores_the_list_in_one_step() {
 #[test]
 fn c2_name_takes_the_lowest_unused_number_of_that_kind() {
     let mut f = fixture();
-    let c1 = f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("cut").unwrap();
+    let c1 = add_operation(&mut f.s, "cut").unwrap();
+    add_operation(&mut f.s, "cut").unwrap();
     assert_eq!(names(&f.s), vec!["Cut 1", "Cut 2"]);
     assert!(f.s.delete_operation(c1));
-    f.s.press_operation_kind("cut").unwrap();
+    add_operation(&mut f.s, "cut").unwrap();
     assert_eq!(names(&f.s), vec!["Cut 2", "Cut 1"], "Cut 1 is free again");
 }
 
@@ -215,7 +220,7 @@ fn c2_name_takes_the_lowest_unused_number_of_that_kind() {
 #[test]
 fn c3_rename_shows_at_once_and_is_one_undo_step() {
     let mut f = fixture();
-    let id = f.s.press_operation_kind("cut").unwrap();
+    let id = add_operation(&mut f.s, "cut").unwrap();
     let before = f.s.undo_len();
     assert!(f.s.rename_operation(id, "Outer frame"));
     assert_eq!(f.s.undo_len(), before + 1);
@@ -227,8 +232,8 @@ fn c3_rename_shows_at_once_and_is_one_undo_step() {
 #[test]
 fn c3_an_empty_name_reverts_and_names_need_not_be_unique() {
     let mut f = fixture();
-    let a = f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("score").unwrap();
+    let a = add_operation(&mut f.s, "cut").unwrap();
+    add_operation(&mut f.s, "score").unwrap();
     let _ = f.s.rename_operation(a, "");
     assert_eq!(
         names(&f.s),
@@ -247,7 +252,7 @@ fn c3_an_empty_name_reverts_and_names_need_not_be_unique() {
 #[test]
 fn c4_delete_removes_memberships_and_undo_restores_them_exactly() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     assert!(f.s.set_selection_in_operation(cut, true));
     assert_eq!(count(&f.s, "running"), 1);
@@ -273,8 +278,8 @@ fn c4_delete_removes_memberships_and_undo_restores_them_exactly() {
 #[test]
 fn c5_cuts_last_on_refuses_a_cut_dragged_above_the_section_line() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("score").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
+    add_operation(&mut f.s, "score").unwrap();
     assert_eq!(names(&f.s), vec!["Score 1", "Cut 1"]);
     let before = f.s.undo_len();
     assert!(
@@ -288,8 +293,8 @@ fn c5_cuts_last_on_refuses_a_cut_dragged_above_the_section_line() {
 #[test]
 fn c6_cuts_last_off_moves_nothing_then_on_moves_cutting_below_marking() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("engrave").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
+    add_operation(&mut f.s, "engrave").unwrap();
     assert_eq!(names(&f.s), vec!["Engrave 1", "Cut 1"]);
 
     let before = f.s.undo_len();
@@ -318,9 +323,9 @@ fn c6_cuts_last_off_moves_nothing_then_on_moves_cutting_below_marking() {
 #[test]
 fn c6_cuts_last_off_new_operation_lands_at_the_end_of_the_list() {
     let mut f = fixture();
-    f.s.press_operation_kind("cut").unwrap();
+    add_operation(&mut f.s, "cut").unwrap();
     f.s.set_cuts_last(false);
-    f.s.press_operation_kind("score").unwrap();
+    add_operation(&mut f.s, "score").unwrap();
     assert_eq!(names(&f.s), vec!["Cut 1", "Score 1"]);
 }
 
@@ -331,7 +336,7 @@ fn c8_kind_button_with_a_selection_creates_and_assigns_in_one_step() {
     let mut f = fixture();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     let before = f.s.undo_len();
-    let id = f.s.press_operation_kind("engrave");
+    let id = add_operation(&mut f.s, "engrave");
     assert!(id.is_some());
     assert_eq!(
         f.s.undo_len(),
@@ -347,7 +352,7 @@ fn c8_kind_button_with_a_selection_creates_and_assigns_in_one_step() {
 #[test]
 fn c8_ticking_an_operation_adds_the_selection_and_unticking_removes_it() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     shift_click(&mut f.s, centre(&f.l, 60.0, 10.0));
     assert!(f.s.set_selection_in_operation(cut, true));
@@ -363,8 +368,8 @@ fn c8_ticking_an_operation_adds_the_selection_and_unticking_removes_it() {
 #[test]
 fn c9_removing_one_membership_keeps_the_other_operations() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
-    let engrave = f.s.press_operation_kind("engrave").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
+    let engrave = add_operation(&mut f.s, "engrave").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     assert!(f.s.set_selection_in_operation(cut, true));
     assert!(f.s.set_selection_in_operation(engrave, true));
@@ -385,8 +390,8 @@ fn c9_removing_one_membership_keeps_the_other_operations() {
 #[test]
 fn c8_number_key_toggles_membership_in_the_nth_operation() {
     let mut f = fixture();
-    f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("engrave").unwrap();
+    add_operation(&mut f.s, "cut").unwrap();
+    add_operation(&mut f.s, "engrave").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     assert_eq!(
         names(&f.s),
@@ -429,7 +434,7 @@ fn c10_guides_get_no_operation_and_the_notice_names_them() {
 
     click(&mut s, centre(&l, 10.0, 10.0));
     shift_click(&mut s, centre(&l, 60.0, 10.0));
-    let id = s.press_operation_kind("cut").unwrap();
+    let id = add_operation(&mut s, "cut").unwrap();
     assert_eq!(row_items(&s, "Cut 1"), 1, "only the item is assigned");
     assert_eq!(count(&s, "running"), 1);
     let notice = s.operations_notice().unwrap_or_default();
@@ -463,7 +468,7 @@ fn c10_a_selection_of_only_guides_adds_nothing_and_writes_no_step() {
     s.wipe_history();
     click(&mut s, centre(&l, 10.0, 10.0));
     let before = s.undo_len();
-    let _ = s.press_operation_kind("cut");
+    let _ = add_operation(&mut s, "cut");
     assert_eq!(count(&s, "running"), 0);
     assert_eq!(s.undo_len(), before, "no step for guides only");
     let notice = s.operations_notice().unwrap_or_default();
@@ -481,7 +486,7 @@ fn c10_a_selection_of_only_guides_adds_nothing_and_writes_no_step() {
 #[test]
 fn c14_a_linked_clone_starts_not_assigned_and_leaves_the_original_running() {
     let mut f = fixture();
-    f.s.press_operation_kind("engrave").unwrap();
+    add_operation(&mut f.s, "engrave").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     assert!(f.s.set_selection_in_operation(f.s.operations_view().unwrap().rows[0].id, true));
     assert_eq!(count(&f.s, "running"), 1);
@@ -504,7 +509,7 @@ fn c14_a_linked_clone_starts_not_assigned_and_leaves_the_original_running() {
 #[test]
 fn c15_show_is_view_only_and_output_off_stops_what_runs() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     assert!(f.s.set_selection_in_operation(cut, true));
     assert_eq!(count(&f.s, "running"), 1);
@@ -527,7 +532,7 @@ fn c15_show_is_view_only_and_output_off_stops_what_runs() {
 #[test]
 fn c16_output_on_with_show_off_runs() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     assert!(f.s.set_operation_switch(cut, OperationSwitch::Show, false));
@@ -541,7 +546,7 @@ fn c16_output_on_with_show_off_runs() {
 #[test]
 fn c17_summary_counts_are_disjoint_and_cover_every_leaf() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     let running = count(&f.s, "running");
@@ -566,7 +571,7 @@ fn c17_summary_counts_are_disjoint_and_cover_every_leaf() {
 #[test]
 fn c17_the_count_button_selects_the_items_it_counts() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     key(&mut f.s, "Escape", false, false);
@@ -580,11 +585,12 @@ fn c17_the_count_button_selects_the_items_it_counts() {
 
 #[test]
 fn c18_view_defaults_to_operations_and_drawn_is_session_state() {
+    // `specs/0111` criterion 15: the switch is the page label's Operations view toggle.
     let mut f = fixture();
-    assert_eq!(view(&f.s)["view_mode"], "operations");
-    assert!(f.s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn));
-    assert_eq!(view(&f.s)["view_mode"], "drawn");
+    assert_eq!(view(&f.s)["operations_view"], true);
     let before = f.s.undo_len();
+    assert!(set_view(&mut f.s, OperationsViewMode::Drawn));
+    assert_eq!(view(&f.s)["operations_view"], false);
     assert_eq!(f.s.undo_len(), before, "the view switch is not a step");
 }
 
@@ -593,7 +599,7 @@ fn c18_view_defaults_to_operations_and_drawn_is_session_state() {
 #[test]
 fn c27_deleting_an_assigned_object_drops_the_assignment_silently() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     assert_eq!(count(&f.s, "running"), 1);
@@ -619,7 +625,7 @@ fn c27_deleting_an_assigned_object_drops_the_assignment_silently() {
 #[test]
 fn c27_deleting_a_group_drops_the_assignments_of_its_members_and_undo_restores() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     shift_click(&mut f.s, centre(&f.l, 60.0, 10.0));
     let _ = f.s.group_selection();
@@ -642,7 +648,7 @@ fn c27_deleting_a_group_drops_the_assignments_of_its_members_and_undo_restores()
 #[test]
 fn c27_undo_of_a_delete_restores_nothing_it_did_not_remove() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 60.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
@@ -730,7 +736,7 @@ fn c17_the_live_view_json_has_the_fixture_keys() {
     .unwrap();
     let fixture: Value = serde_json::from_str(&fixture_text).unwrap();
     let mut s = fixture_session();
-    s.press_operation_kind("cut").unwrap();
+    add_operation(&mut s, "cut").unwrap();
     let live = view(&s);
     let keys = |v: &Value| -> Vec<String> {
         let mut k: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
@@ -761,6 +767,9 @@ fn fixture_session() -> Session {
             work_area: DocumentSize::from_mm(400.0, 300.0),
         })
         .unwrap();
+    // One item: an operation is made by assigning it (`specs/0111` criterion 8).
+    let l = d.pages().into_iter().find(|p| p.id == made.id).unwrap();
+    rect(&d, &l, 10.0, 10.0);
     let mut s = Session::open(7, &pack(&d, "0101-keys").unwrap()).unwrap();
     s.resize_viewport(1600.0, 1000.0);
     s.activate_page(&made.id);
@@ -787,7 +796,7 @@ fn saved_members(s: &Session, name: &str) -> Vec<Vec<NodeId>> {
 #[test]
 fn c12_a_selected_group_is_assigned_as_the_group_node() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     shift_click(&mut f.s, centre(&f.l, 60.0, 10.0));
     let _ = f.s.group_selection();
@@ -813,7 +822,7 @@ fn c12_a_selected_group_is_assigned_as_the_group_node() {
 #[test]
 fn c27_ungrouping_drops_the_group_assignment_silently_and_undo_restores_it() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     shift_click(&mut f.s, centre(&f.l, 60.0, 10.0));
     let _ = f.s.group_selection();
@@ -846,7 +855,7 @@ fn c27_ungrouping_drops_the_group_assignment_silently_and_undo_restores_it() {
 #[test]
 fn c28_deleting_the_laser_page_deletes_its_operations_and_one_undo_restores_them() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     assert_eq!(count(&f.s, "running"), 1);

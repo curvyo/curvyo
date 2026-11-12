@@ -7,7 +7,6 @@ use curvyo_render_core::{OP_CUT, OP_ENGRAVE_HATCH, OP_LANE_LINE};
 
 use super::super::super::Session;
 use super::super::tests::{laser, last_label};
-use crate::session::OperationsViewMode;
 
 fn jobs(s: &Session) -> super::FixtureJobsView {
     s.fixture_jobs_view().expect("a laser page")
@@ -308,12 +307,13 @@ fn criterion_18_a_running_part_takes_its_kind_look_and_output_off_the_not_assign
     assert!(s.set_fixture_job_switch(cut, FixtureJobSwitch::Output, true));
     assert!(s.set_fixture_job_part(cut, "slot:0", true));
     assert!(look_colours(&s).contains(&OP_CUT));
-    assert!(s.set_operations_view_mode(OperationsViewMode::Drawn));
+    let page = s.active_page().id;
+    assert!(s.toggle_operations_view(&page));
     assert!(
         look_colours(&s).is_empty(),
         "View: Drawn keeps the fixture ink"
     );
-    assert!(s.set_operations_view_mode(OperationsViewMode::Operations));
+    assert!(s.toggle_operations_view(&page));
     assert!(s.set_fixture_job_switch(job, FixtureJobSwitch::Show, false));
     assert!(s.set_fixture_job_switch(cut, FixtureJobSwitch::Show, false));
     assert!(look_colours(&s).is_empty(), "Show off: fixture ink");

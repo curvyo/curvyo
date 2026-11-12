@@ -4,6 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
+mod operation_shims;
+use operation_shims::add_operation;
 use std::path::PathBuf;
 
 use curvyo_document_core::{
@@ -14,6 +16,8 @@ use serde_json::Value;
 
 const LASER: &str = "curvyo.laser";
 
+/// The laser page with one rectangle on it (a work operation is made by assigning one,
+/// `specs/0111` criterion 8).
 fn one_page() -> Session {
     let d = Document::new(1);
     let made = d
@@ -24,6 +28,11 @@ fn one_page() -> Session {
             work_area: DocumentSize::from_mm(600.0, 400.0),
         })
         .unwrap();
+    let o = made.origin;
+    let _ = d.create_rect(curvyo_document_core::RectBounds::from_corners(
+        curvyo_document_core::Point::new(o.x + 500.0, o.y + 300.0),
+        curvyo_document_core::Point::new(o.x + 520.0, o.y + 320.0),
+    ));
     let mut s = Session::open(9401, &pack(&d, "0103-gaps").unwrap()).unwrap();
     s.resize_viewport(1600.0, 1000.0);
     s.set_tool(Tool::Select);
@@ -91,7 +100,7 @@ fn ac16_a_fixture_job_and_a_work_operation_do_not_change_each_other() {
     let job = s.add_fixture_job("engrave").unwrap();
     assert!(s.set_fixture_job_part(job, "board", true));
     assert!(s.set_fixture_job_switch(job, FixtureJobSwitch::Output, true));
-    let op = s.press_operation_kind("cut").expect("a work operation");
+    let op = add_operation(&mut s, "cut").expect("a work operation");
     let runs_before = (
         fj(&s)["running"].clone(),
         ops(&s)["summary"]["operations"].clone(),
