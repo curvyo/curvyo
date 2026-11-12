@@ -113,6 +113,66 @@ impl TraceRegion {
         Err(TraceRegionError::NoArea)
     }
 
+    /// The union of `added` minus the union of `subtracted` (one operand per region, in stored
+    /// order; ADR 0061 §2), Inside or `outside`. An operand without area is dropped and the call
+    /// made of the others, as [`Self::of_operands`] does.
+    ///
+    /// # Errors
+    /// [`TraceRegionError::NoArea`] when nothing is left; [`TraceRegionError::Kernel`] when the
+    /// kernel refuses for another reason.
+    pub fn of_signed_operands(
+        added: &[RegionOperand],
+        subtracted: &[RegionOperand],
+        outside: bool,
+    ) -> Result<Self, TraceRegionError> {
+        let union = Self::of_operands(added, false)?;
+        if subtracted.is_empty() {
+            return Ok(union.with_outside(outside));
+        }
+        let corner = |p: &Point| -> OutlineTriple { (*p, Vec2::ZERO, Vec2::ZERO) };
+        let base: Vec<Vec<OutlineTriple>> = union
+            .polygons
+            .iter()
+            .map(|p| p.iter().map(corner).collect())
+            .collect();
+        let base: Vec<Outline<'_>> = base.iter().map(|p| Outline::new(p, true)).collect();
+        let mut kept: Vec<&RegionOperand> = subtracted.iter().collect();
+        loop {
+            let owned: Vec<Vec<Outline<'_>>> = kept
+                .iter()
+                .map(|operand| {
+                    operand
+                        .iter()
+                        .map(|(anchors, closed)| Outline::new(anchors, *closed))
+                        .collect()
+                })
+                .collect();
+            let mut refs: Vec<&[Outline<'_>]> = vec![&base];
+            refs.extend(owned.iter().map(Vec::as_slice));
+            if kept.is_empty() {
+                return Ok(union.with_outside(outside));
+            }
+            match boolean(BooleanOp::Difference, &refs, TRACE_REGION_TOLERANCE) {
+                Ok(result) => {
+                    return Self::from_polygons(result.into_outlines(), outside)
+                        .ok_or(TraceRegionError::NoArea);
+                }
+                Err(BooleanError::EmptyOperands(bad) | BooleanError::OutOfRange(bad))
+                    if !bad.contains(&0) =>
+                {
+                    kept = kept
+                        .into_iter()
+                        .enumerate()
+                        .filter(|(i, _)| !bad.contains(&(i + 1)))
+                        .map(|(_, operand)| operand)
+                        .collect();
+                }
+                Err(BooleanError::EmptyResult) => return Err(TraceRegionError::NoArea),
+                Err(error) => return Err(TraceRegionError::Kernel(error)),
+            }
+        }
+    }
+
     /// A region of closed `polygons` (document millimetres; nonzero rule); `None` when none has
     /// three points or a coordinate is not finite.
     #[must_use]

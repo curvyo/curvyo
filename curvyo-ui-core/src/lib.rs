@@ -215,9 +215,12 @@ mod trace_adapter;
 mod trace_fit;
 mod trace_fit_guess;
 mod trace_fit_turn;
+mod trace_mask;
+mod trace_part_settings;
 mod trace_parts;
 mod trace_plan;
 mod trace_region;
+mod trace_region_edit;
 mod trace_region_raster;
 mod trace_text_notice;
 mod trace_words;
@@ -556,6 +559,8 @@ pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
 };
+pub use trace_mask::{part_operands, part_region, region_operand, region_outline_mm, unit_to_mm};
+pub use trace_part_settings::{read_part_settings, without_picked_colours, written_part_settings};
 pub use trace_parts::{TracePartArea, TracePartClip, join_trace_parts, trace_part_clips};
 pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
@@ -563,6 +568,11 @@ pub use trace_plan::{
 };
 pub use trace_region::{
     RegionOperand, TraceRegion, TraceRegionError, mask_operand, unclipped_notice,
+};
+pub use trace_region_edit::{
+    Handle as TraceRegionHandle, PxRect, drawn as drawn_trace_rect,
+    handle_at as trace_rect_handle_at, moved as moved_trace_rect, rect_at as trace_rect_at,
+    resized as resized_trace_rect,
 };
 pub use trace_region_raster::{TraceRegionDefaults, trace_region_defaults};
 pub use trace_text_notice::{TEXT_FAILED_NOTICE, WarnedText, traced_text_warning};

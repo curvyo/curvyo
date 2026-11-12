@@ -25,6 +25,9 @@ curvyo-extension-core = { path = "../curvyo-extension-core", version = "0.1.0" }
 curvyo-laser-core = { path = "../curvyo-laser-core", version = "0.1.0" }
 kurbo.workspace = true
 serde.workspace = true
+# The stored trace settings of a part are a map of plain JSON values (ADR 0061 §5); the
+# workspace's version, already a dependency of `curvyo-document-core`.
+serde_json.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
@@ -33,7 +36,6 @@ toml.workspace = true
 # tests for the resize/rotate drag arithmetic (`CLAUDE.md`'s tester role,
 # "Geometry ... property tests with proptest"). Same crate and version
 # `curvyo-geometry-core` already uses.
-serde_json.workspace = true
 # `tests/svg_text_budget.rs` encodes the 12-megapixel JPEG of `specs/0024-svg-import-export`
 # criterion 108 in memory; the workspace's own pinned `image`.
 image.workspace = true
