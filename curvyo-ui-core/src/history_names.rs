@@ -291,6 +291,19 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("pattern_whole_pieces", "Pattern: whole pieces"),
     // `specs/0025-raster-trace` criterion 13.
     ("trace_image", "Trace image"),
+    // `specs/0114-image-trace-mask` criterion 17, ADR 0061 §6.
+    ("draw_trace_rectangle", "Draw rectangle"),
+    ("draw_trace_lasso", "Draw lasso"),
+    ("move_trace_region", "Move region"),
+    ("resize_trace_region", "Resize region"),
+    ("move_trace_lasso_corner", "Move lasso corner"),
+    ("delete_trace_region", "Delete region"),
+    ("clear_trace_mask", "Clear mask"),
+    ("trace_mask_inside", "Mask: Inside"),
+    ("trace_mask_outside", "Mask: Outside"),
+    ("add_trace_part", "Add part"),
+    ("remove_trace_part", "Remove part"),
+    ("edit_trace_settings", "Change trace settings"),
     // `specs/0088-trace-recognition` criterion 6.
     ("recognise_text", "Recognise text"),
     ("import_svg", "Import SVG"),
@@ -430,6 +443,19 @@ mod tests {
         assert_eq!(
             known_operation_name(dc::LABEL_REFRESH_MATERIAL_NUMBERS),
             None
+        );
+    }
+
+    #[test]
+    fn the_trace_mask_labels_are_named() {
+        for label in curvyo_document_core::TRACE_MASK_LABELS {
+            assert!(known_operation_name(label).is_some(), "{label}");
+        }
+        assert_eq!(operation_name("draw_trace_rectangle"), "Draw rectangle");
+        assert_eq!(operation_name("trace_mask_outside"), "Mask: Outside");
+        assert_eq!(
+            operation_name("edit_trace_settings"),
+            "Change trace settings"
         );
     }
 
