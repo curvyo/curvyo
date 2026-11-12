@@ -1,6 +1,6 @@
 # Laser operation tools: operation buttons in the Select bar, groups, the Operations view toggle, settings unfolded in the row
 
-Status: Draft (Ready after the customer merges this PR)
+Status: Done (PR #350)
 Priority: Must
 Origin: Customer (laser redesign after the PR #333 demo, 2026-11-12: Fragen 197 A, 198, 205 B, the added decisions on operation settings and the motorised Z axis; screens "die sehen gut aus"). Slice 1 of 3 of the redesign (`0112` `test-grid-and-materials`, `0113` `fixture-sets-and-pins` follow). Details marked **(Proposal)** are the product owner's and vetoable at the demo; the P-numbers refer to `docs/design-drafts/2026-11-laser-redesign/README.md`.
 
