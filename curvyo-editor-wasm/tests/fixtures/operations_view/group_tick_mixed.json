@@ -1,0 +1,147 @@
+{
+  "cuts_last": true,
+  "entered_group": null,
+  "items": {
+    "not_assigned": [],
+    "output_off": [],
+    "running": [
+      {
+        "counter": 17,
+        "peer": "1"
+      },
+      {
+        "counter": 26,
+        "peer": "1"
+      }
+    ],
+    "runs_while_hidden": []
+  },
+  "operations_view": true,
+  "pick": [],
+  "rows": [
+    {
+      "grid": null,
+      "group_in_part": "Group vyl1en",
+      "id": {
+        "counter": 39,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "engrave",
+      "margin_mm": 0.0,
+      "name": "Engrave 1",
+      "output": true,
+      "section": "marking",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "interval_mm": 0.1,
+        "material": null,
+        "needs": "engrave",
+        "options": {
+          "hatch": {
+            "bidirectional": true,
+            "crosshatch": false,
+            "overscan_pct": 2,
+            "scan_angle_deg": 0.0
+          },
+          "z_offset_mm": 0.0
+        },
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": null,
+              "power_pct": null,
+              "speed_mm_min": null
+            },
+            "typed": []
+          }
+        ],
+        "state": "no_settings",
+        "z_offset_shown": false
+      },
+      "show": true,
+      "tick": "some",
+      "unfolded": false
+    },
+    {
+      "grid": null,
+      "group_in_part": null,
+      "id": {
+        "counter": 44,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "cut",
+      "margin_mm": 0.0,
+      "name": "Cut 1",
+      "output": true,
+      "section": "cutting",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "interval_mm": null,
+        "material": null,
+        "needs": "cut",
+        "options": {
+          "hatch": null,
+          "z_offset_mm": 0.0
+        },
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [
+          {
+            "material": null,
+            "role": "main",
+            "run": {
+              "passes": null,
+              "power_pct": null,
+              "speed_mm_min": null
+            },
+            "typed": []
+          }
+        ],
+        "state": "no_settings",
+        "z_offset_shown": false
+      },
+      "show": true,
+      "tick": "all",
+      "unfolded": false
+    }
+  ],
+  "select_bar_kinds": [
+    {
+      "description": "Assigns to Cut 1",
+      "kind": "cut"
+    },
+    {
+      "description": "Creates Score 1",
+      "kind": "score"
+    },
+    {
+      "description": "Assigns to Engrave 1",
+      "kind": "engrave"
+    },
+    {
+      "description": "Creates Engrave + Outline 1",
+      "kind": "engrave_outline"
+    },
+    {
+      "description": "Creates Cut-out 1",
+      "kind": "cut_out"
+    }
+  ],
+  "summary": {
+    "not_assigned": 0,
+    "operations": 2,
+    "output_off": 0,
+    "running": 2,
+    "runs_while_hidden": 0
+  }
+}

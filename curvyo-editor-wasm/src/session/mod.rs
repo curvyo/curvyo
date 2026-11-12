@@ -119,7 +119,6 @@ pub use fixtures::{
     GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
 };
 pub use materials::{MaterialWrite, MaterialsView, SaveAsMaterial};
-pub use operations::OperationsViewMode;
 pub use test_grid::TestGridView;
 mod page_drag;
 mod page_tree_panel;

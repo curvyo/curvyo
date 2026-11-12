@@ -21,6 +21,8 @@
 )]
 
 mod cpu_time;
+mod operation_shims;
+use operation_shims::{OperationsViewMode, set_view};
 
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read};
@@ -511,7 +513,7 @@ fn ac5_pick_takes_values_and_work_area_in_one_step_and_content_keeps_its_place()
     let mut s = with_laser(&disk_of(&[k40(1)]));
     // `0101` criterion 18: the unassigned content is in the Not assigned look under "View:
     // Operations"; this test reads the drawing's own colour, which "View: Drawn" keeps.
-    s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
+    set_view(&mut s, OperationsViewMode::Drawn);
     let red = red_box(&s);
     let page_1 = |s: &Session| {
         let p = opened(s)
@@ -770,8 +772,8 @@ fn ac8_save_as_of_an_unknown_id_does_not_overwrite_a_skipped_newer_record() {
     let p = k40(1);
     let bytes = foreign_file(&p);
     let mut newer: Value = serde_json::from_str(&write_record(&p)).unwrap();
-    // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
-    newer["format_version"] = json!(4);
+    // Format 4 is current since `0111` (ADR 0056 §7); 5 is newer.
+    newer["format_version"] = json!(5);
     let mut disk = Disk::new();
     disk.insert(record_file_name(&p.id), newer.to_string());
     let mut s = open_laser(&bytes, &disk);

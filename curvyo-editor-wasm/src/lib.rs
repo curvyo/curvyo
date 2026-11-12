@@ -194,9 +194,9 @@ pub use session::{
 };
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
 pub use session::{MaterialWrite, MaterialsView, SaveAsMaterial, TestGridView};
-pub use session::{OperationsViewMode, TilingStatus, circle_handle};
 pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
+pub use session::{TilingStatus, circle_handle};
 pub use session::{
     TraceCreateOutcome, TracePickMode, TraceSelection, TraceSource, TraceView, TracedText,
 };

@@ -16,6 +16,8 @@
 )]
 
 mod cpu_time;
+mod operation_shims;
+use operation_shims::{OperationsViewMode, set_view};
 
 use std::path::PathBuf;
 
@@ -1083,7 +1085,7 @@ fn ac12_0093_6_a_drawing_edit_shows_live_in_the_placed_page() {
     assert!(s.activate_page(&laser));
     // `0101` criterion 14, 18: unassigned placed content is in the Not assigned look under "View:
     // Operations"; these read its own red under "View: Drawn".
-    s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
+    set_view(&mut s, OperationsViewMode::Drawn);
     close4(
         red_box_right_of(&s, o.x).expect("the placed page is drawn"),
         (o.x + 10.0, o.y + 20.0, o.x + 50.0, o.y + 40.0),
@@ -1118,7 +1120,7 @@ fn ac12_0093_8_content_past_the_work_area_is_drawn_whole_and_named() {
     assert!(s.activate_page(&laser));
     // `0101` criterion 14, 18: unassigned placed content is in the Not assigned look under "View:
     // Operations"; these read its own red under "View: Drawn".
-    s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
+    set_view(&mut s, OperationsViewMode::Drawn);
     close4(
         red_box_right_of(&s, o.x).unwrap(),
         (o.x, o.y, o.x + 440.0, o.y + 312.0),
@@ -1145,7 +1147,7 @@ fn ac12_0093_9_grid_lines_are_drawn_below_the_placed_drawing() {
     assert!(s.activate_page(&laser));
     // `0101` criterion 14, 18: unassigned placed content is in the Not assigned look under "View:
     // Operations"; these read its own red under "View: Drawn".
-    s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
+    set_view(&mut s, OperationsViewMode::Drawn);
     let first_red = |s: &Session| {
         s.frame_draw_list()
             .triangles
@@ -1175,7 +1177,7 @@ fn ac12_0093_13_deleting_the_placed_drawing_page_removes_the_placement_and_undo_
     assert!(s.activate_page(&laser));
     // `0101` criterion 14, 18: unassigned placed content is in the Not assigned look under "View:
     // Operations"; these read its own red under "View: Drawn".
-    s.set_operations_view_mode(curvyo_editor_wasm::OperationsViewMode::Drawn);
+    set_view(&mut s, OperationsViewMode::Drawn);
     assert!(red_box_right_of(&s, o.x).is_none(), "draws nothing");
     assert_eq!(
         opened(&s).manufacturings()[0].placements.len(),

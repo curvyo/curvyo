@@ -49,8 +49,13 @@ fn author_word(author: Author) -> &'static str {
     }
 }
 
-/// The name, whether the table knows the label, the row class and the summary of a row.
-fn row_words(row: &HistoryRow, summary: Option<String>) -> (String, bool, &'static str, String) {
+/// The name, whether the table knows the label, the row class and the summary of a row; `custom`
+/// is the name the session gave the step ("Assign to Cut 1").
+fn row_words(
+    row: &HistoryRow,
+    custom: Option<&str>,
+    summary: Option<String>,
+) -> (String, bool, &'static str, String) {
     let summary = summary.unwrap_or_default();
     if row.label == curvyo_document_core::WIPE_LABEL {
         return ("History wiped".to_owned(), true, "step", summary);
@@ -80,7 +85,7 @@ fn row_words(row: &HistoryRow, summary: Option<String>) -> (String, bool, &'stat
         return (name, true, class, format!("{noun} {}", revert.shown_id));
     }
     (
-        operation_name(&row.label).to_owned(),
+        custom.map_or_else(|| operation_name(&row.label).to_owned(), str::to_owned),
         known_operation_name(&row.label).is_some(),
         "step",
         summary,
@@ -113,7 +118,8 @@ impl Session {
     fn row_json(&self, row: &HistoryRow) -> Value {
         let touched: Vec<_> = row.objects.iter().map(|o| (o.shape, o.role)).collect();
         let shapes = summary_shapes(&row.label, &touched);
-        let (name, known, class, summary) = row_words(row, objects_summary(&shapes));
+        let custom = self.history.stack.custom_name(row.step);
+        let (name, known, class, summary) = row_words(row, custom, objects_summary(&shapes));
         let objects: Vec<Value> = row
             .objects
             .iter()

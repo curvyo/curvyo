@@ -3,11 +3,41 @@
 //! Session-level tests of `specs/0101-laser-operations` criteria 2 to 10, 14 to 16 and 23 (the
 //! commands, the assignment rules and their history labels).
 
-use curvyo_document_core::{Direction, NodeId, OperationSnapshot, OperationSwitch};
+use curvyo_document_core::{Direction, NewOperation, NodeId, OperationSnapshot, OperationSwitch};
+use curvyo_laser_core::operations::{OperationKind, insert_index, next_operation_name};
 
 use super::super::Session;
-use super::OperationsViewMode;
 use crate::session::align_test_support::draw_rect;
+
+impl Session {
+    /// The tests' stand-in for the kind press of `specs/0101` (every press creates): with targets
+    /// selected a Shift press (create and assign); with nothing selected an operation with no
+    /// member, named and placed as a press names and places it, as a test grid or an old file
+    /// leaves one (`specs/0111` criterion 8 removed that route from the tab).
+    pub(in crate::session) fn add_test_operation(&mut self, kind: &str) -> Option<NodeId> {
+        let selection = self.selection_targets();
+        if !selection.targets.is_empty() || selection.skipped > 0 {
+            return self.press_operation_kind(kind, true);
+        }
+        let kind = OperationKind::parse(kind)?;
+        let active = self.active_operations()?;
+        let name = next_operation_name(kind, active.operations.iter().map(|op| op.name.as_str()));
+        let index = insert_index(&active.kinds(), kind.section(), active.cuts_last);
+        self.recording_unguarded(|this| {
+            this.document
+                .add_operation(
+                    active.manufacturing,
+                    &NewOperation {
+                        kind: kind.as_str(),
+                        name: &name,
+                    },
+                    index,
+                    &[],
+                )
+                .ok()
+        })
+    }
+}
 
 /// A drawing with two rectangles, and a laser page made active.
 fn laser_with_two() -> (Session, NodeId, NodeId) {
@@ -45,7 +75,7 @@ fn undo_label(s: &mut Session) -> String {
 fn criterion_2_a_kind_press_adds_the_first_cut_with_both_switches_on() {
     let (mut s, _, _) = laser_with_two();
     let steps = s.undo_len();
-    let id = s.press_operation_kind("cut").unwrap();
+    let id = s.add_test_operation("cut").unwrap();
     let op = ops(&s).remove(0);
     assert_eq!(op.id, id);
     assert_eq!(op.name, "Cut 1");
@@ -57,18 +87,18 @@ fn criterion_2_a_kind_press_adds_the_first_cut_with_both_switches_on() {
 #[test]
 fn criterion_2_names_count_per_kind_in_list_order() {
     let (mut s, _, _) = laser_with_two();
-    s.press_operation_kind("cut").unwrap();
-    s.press_operation_kind("cut").unwrap();
-    s.press_operation_kind("score").unwrap();
+    s.add_test_operation("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
+    s.add_test_operation("score").unwrap();
     assert_eq!(names(&s), ["Score 1", "Cut 1", "Cut 2"]);
 }
 
 #[test]
 fn criterion_5_a_new_operation_lands_at_the_end_of_its_section() {
     let (mut s, _, _) = laser_with_two();
-    s.press_operation_kind("cut").unwrap();
-    s.press_operation_kind("engrave").unwrap();
-    s.press_operation_kind("score").unwrap();
+    s.add_test_operation("cut").unwrap();
+    s.add_test_operation("engrave").unwrap();
+    s.add_test_operation("score").unwrap();
     assert_eq!(names(&s), ["Engrave 1", "Score 1", "Cut 1"]);
 }
 
@@ -76,10 +106,10 @@ fn criterion_5_a_new_operation_lands_at_the_end_of_its_section() {
 fn criterion_8_a_kind_press_with_items_selected_assigns_them_in_one_step() {
     let (mut s, a, _) = laser_with_two();
     s.selection.set(&[a]);
-    let id = s.press_operation_kind("cut").unwrap();
+    let id = s.add_test_operation("cut").unwrap();
     assert_eq!(ops(&s)[0].members, vec![vec![a]]);
     assert_eq!(ops(&s)[0].id, id);
-    assert_eq!(undo_label(&mut s), "Assign to operation");
+    assert_eq!(undo_label(&mut s), "Assign to Cut 1");
 }
 
 #[test]
@@ -87,7 +117,7 @@ fn criterion_10_guides_are_not_targets_and_a_notice_names_them() {
     let (mut s, a, b) = laser_with_two();
     guide(&mut s, a);
     s.selection.set(&[a, b]);
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     assert_eq!(ops(&s)[0].members, vec![vec![b]]);
     assert_eq!(
         s.operations_notice().as_deref(),
@@ -101,7 +131,7 @@ fn criterion_10_a_selection_of_only_guides_adds_nothing_and_writes_no_step() {
     guide(&mut s, a);
     s.selection.set(&[a]);
     let steps = s.undo_len();
-    assert!(s.press_operation_kind("cut").is_none());
+    assert!(s.add_test_operation("cut").is_none());
     assert!(ops(&s).is_empty());
     assert_eq!(s.undo_len(), steps);
     assert_eq!(s.operations_notice().as_deref(), Some("Guides never run."));
@@ -110,7 +140,7 @@ fn criterion_10_a_selection_of_only_guides_adds_nothing_and_writes_no_step() {
 #[test]
 fn criterion_3_rename_reverts_on_an_empty_name_and_is_one_step() {
     let (mut s, _, _) = laser_with_two();
-    let id = s.press_operation_kind("cut").unwrap();
+    let id = s.add_test_operation("cut").unwrap();
     assert!(!s.rename_operation(id, "   "));
     assert_eq!(names(&s), ["Cut 1"]);
     assert!(s.rename_operation(id, "Outline"));
@@ -124,7 +154,7 @@ fn criterion_3_rename_reverts_on_an_empty_name_and_is_one_step() {
 fn criterion_4_delete_drops_the_operation_and_undo_brings_it_back_with_its_members() {
     let (mut s, a, _) = laser_with_two();
     s.selection.set(&[a]);
-    let id = s.press_operation_kind("cut").unwrap();
+    let id = s.add_test_operation("cut").unwrap();
     assert!(s.delete_operation(id));
     assert!(ops(&s).is_empty());
     assert_eq!(undo_label(&mut s), "Delete operation");
@@ -136,7 +166,7 @@ fn criterion_4_delete_drops_the_operation_and_undo_brings_it_back_with_its_membe
 fn criterion_27_deleting_a_target_drops_its_assignment_with_no_notice() {
     let (mut s, a, _) = laser_with_two();
     s.selection.set(&[a]);
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     s.recording_unguarded(|this| this.document.delete_objects(&[a]).unwrap());
     assert!(ops(&s)[0].members.is_empty());
     assert_eq!(s.operations_notice(), None);
@@ -145,23 +175,23 @@ fn criterion_27_deleting_a_target_drops_its_assignment_with_no_notice() {
 #[test]
 fn criterion_8_tick_adds_the_selection_and_untick_removes_it() {
     let (mut s, a, _) = laser_with_two();
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     let id = id_named(&s, "Cut 1");
     s.selection.set(&[a]);
     assert!(s.set_selection_in_operation(id, true));
-    assert_eq!(undo_label(&mut s), "Assign to operation");
+    assert_eq!(undo_label(&mut s), "Assign to Cut 1");
     s.undo();
     assert!(s.set_selection_in_operation(id, true));
     assert!(s.set_selection_in_operation(id, false));
     assert!(ops(&s)[0].members.is_empty());
-    assert_eq!(undo_label(&mut s), "Remove from operation");
+    assert_eq!(undo_label(&mut s), "Remove from Cut 1");
 }
 
 #[test]
 fn criterion_8_number_keys_toggle_the_selection_in_operation_n() {
     let (mut s, a, b) = laser_with_two();
-    s.press_operation_kind("cut").unwrap();
-    s.press_operation_kind("score").unwrap();
+    s.add_test_operation("cut").unwrap();
+    s.add_test_operation("score").unwrap();
     s.selection.set(&[a, b]);
     assert!(!s.toggle_selection_by_number(9));
     assert!(s.toggle_selection_by_number(2));
@@ -174,9 +204,9 @@ fn criterion_8_number_keys_toggle_the_selection_in_operation_n() {
 fn criterion_9_removing_from_one_operation_keeps_the_other_memberships() {
     let (mut s, a, _) = laser_with_two();
     s.selection.set(&[a]);
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     s.selection.set(&[]);
-    s.press_operation_kind("score").unwrap();
+    s.add_test_operation("score").unwrap();
     s.selection.set(&[a]);
     let cut = id_named(&s, "Cut 1");
     assert!(s.set_selection_in_operation(id_named(&s, "Score 1"), true));
@@ -187,30 +217,29 @@ fn criterion_9_removing_from_one_operation_keeps_the_other_memberships() {
 }
 
 #[test]
-fn criterion_11_a_clone_member_is_assigned_by_its_path_not_by_its_own_id() {
+fn criterion_14_a_clone_is_assigned_as_a_whole_and_no_route_assigns_a_member() {
+    // `specs/0111` criterion 14 supersedes the member route of Frage 167 B (ADR 0056 §2).
     let (mut s, a, b) = laser_with_two();
     let clone = s.recording_unguarded(|this| {
         let group = this.document.group_objects(&[a, b]).unwrap();
         this.document.linked_clone(&[group], &[]).unwrap()[0]
     });
-    let clone_member = s.document.clone_member_path(clone, a).unwrap();
-    assert_eq!(clone_member, vec![clone, a]);
-    s.press_operation_kind("cut").unwrap();
-    let id = id_named(&s, "Cut 1");
-    assert!(s.set_clone_member_in_operation(id, clone, a, true));
-    assert_eq!(ops(&s)[0].members, vec![vec![clone, a]]);
-    assert!(!ops(&s)[0].members.contains(&vec![a]));
+    s.selection.set(&[clone]);
+    let id = s.press_operation_kind("cut", false).unwrap();
+    assert_eq!(ops(&s)[0].members, vec![vec![clone]]);
+    let path = s.document.clone_member_path(clone, a).unwrap();
+    assert!(s.document.set_operation_members(id, &[path], true).is_err());
 }
 
 #[test]
 fn criterion_6_cuts_last_off_moves_nothing_and_on_puts_the_cutting_below_the_marking() {
     let (mut s, _, _) = laser_with_two();
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     assert!(s.set_cuts_last(false));
     assert_eq!(undo_label(&mut s), "Cuts last off");
     s.undo();
     assert!(s.set_cuts_last(false));
-    s.press_operation_kind("score").unwrap();
+    s.add_test_operation("score").unwrap();
     assert_eq!(names(&s), ["Cut 1", "Score 1"]);
     assert!(s.set_cuts_last(true));
     assert_eq!(names(&s), ["Score 1", "Cut 1"]);
@@ -220,9 +249,9 @@ fn criterion_6_cuts_last_off_moves_nothing_and_on_puts_the_cutting_below_the_mar
 #[test]
 fn criterion_5_with_cuts_last_on_a_move_inside_a_section_only() {
     let (mut s, _, _) = laser_with_two();
-    s.press_operation_kind("score").unwrap();
-    s.press_operation_kind("cut").unwrap();
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("score").unwrap();
+    s.add_test_operation("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     let cut2 = id_named(&s, "Cut 2");
     let score = id_named(&s, "Score 1");
     assert!(!s.move_operation(cut2, 0));
@@ -236,9 +265,9 @@ fn criterion_5_with_cuts_last_on_a_move_inside_a_section_only() {
 #[test]
 fn criterion_6_with_cuts_last_off_any_operation_moves_anywhere() {
     let (mut s, _, _) = laser_with_two();
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     assert!(s.set_cuts_last(false));
-    s.press_operation_kind("score").unwrap();
+    s.add_test_operation("score").unwrap();
     let score = id_named(&s, "Score 1");
     assert!(s.move_operation(score, 0));
     assert_eq!(names(&s), ["Score 1", "Cut 1"]);
@@ -247,7 +276,7 @@ fn criterion_6_with_cuts_last_off_any_operation_moves_anywhere() {
 #[test]
 fn criterion_15_and_16_show_and_output_are_stored_with_their_own_labels() {
     let (mut s, _, _) = laser_with_two();
-    let id = s.press_operation_kind("cut").unwrap();
+    let id = s.add_test_operation("cut").unwrap();
     assert!(s.set_operation_switch(id, OperationSwitch::Show, false));
     assert_eq!(undo_label(&mut s), "Show or hide operation");
     s.undo();
@@ -259,7 +288,7 @@ fn criterion_15_and_16_show_and_output_are_stored_with_their_own_labels() {
 #[test]
 fn criterion_23_the_margin_is_zero_or_positive_and_one_step() {
     let (mut s, _, _) = laser_with_two();
-    let id = s.press_operation_kind("cut_out").unwrap();
+    let id = s.add_test_operation("cut_out").unwrap();
     assert!(!s.set_operation_margin(id, -1.0));
     assert!(s.set_operation_margin(id, 2.5));
     assert!((ops(&s)[0].margin.as_mm() - 2.5).abs() < 1e-9);
@@ -269,7 +298,7 @@ fn criterion_23_the_margin_is_zero_or_positive_and_one_step() {
 #[test]
 fn criterion_9_an_operation_of_another_laser_page_is_never_touched() {
     let (mut s, _, _) = laser_with_two();
-    let first = s.press_operation_kind("cut").unwrap();
+    let first = s.add_test_operation("cut").unwrap();
     s.add_page_of_kind("curvyo.laser", None).unwrap();
     assert!(ops(&s).is_empty());
     assert!(!s.delete_operation(first));
@@ -279,14 +308,14 @@ fn criterion_9_an_operation_of_another_laser_page_is_never_touched() {
 fn criterion_1_the_commands_need_an_active_laser_page() {
     let (mut s, _, _) = laser_with_two();
     s.activate_page(curvyo_document_core::FIRST_PAGE_ID);
-    assert!(s.press_operation_kind("cut").is_none());
+    assert!(s.add_test_operation("cut").is_none());
     assert!(!s.set_cuts_last(false));
 }
 
 #[test]
 fn an_unknown_kind_text_adds_nothing() {
     let (mut s, _, _) = laser_with_two();
-    assert!(s.press_operation_kind("plasma").is_none());
+    assert!(s.add_test_operation("plasma").is_none());
     assert!(ops(&s).is_empty());
 }
 
@@ -326,7 +355,7 @@ fn criterion_12_and_17_clone_members_are_the_leaves_of_a_cloned_group() {
         this.document.linked_clone(&[group], &[]).unwrap()[0]
     });
     s.selection.set(&[]);
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     let id = id_named(&s, "Cut 1");
     // The clone as a whole: its two members run (criterion 12, nearest rule), the two originals
     // of the group are own items with no assignment.
@@ -338,24 +367,15 @@ fn criterion_12_and_17_clone_members_are_the_leaves_of_a_cloned_group() {
         (2, 2),
         "{summary:?}"
     );
-    // One member by its path: the other member and the clone's originals stay out.
-    s.selection.set(&[clone]);
-    assert!(s.set_selection_in_operation(id, false));
-    s.selection.set(&[]);
-    assert!(s.set_clone_member_in_operation(id, clone, a, true));
-    let summary = s.operations_view().unwrap().summary;
-    assert_eq!(
-        (summary.running, summary.not_assigned),
-        (1, 3),
-        "{summary:?}"
-    );
+    // A member's own key is no longer written (`specs/0111` criterion 14): the members run with
+    // the clone.
 }
 
 #[test]
 fn criterion_17_each_count_lists_its_items_and_a_count_button_selects_them() {
     let (mut s, a, b) = laser_with_two_on_the_page();
     s.selection.set(&[a]);
-    s.press_operation_kind("cut").unwrap();
+    s.add_test_operation("cut").unwrap();
     s.selection.set(&[]);
     let view = s.operations_view().unwrap();
     assert_eq!(view.items.running, vec![a]);
@@ -369,49 +389,6 @@ fn criterion_17_each_count_lists_its_items_and_a_count_button_selects_them() {
     assert_eq!(s.selection.ids(), &[a]);
     assert!(!s.select_operation_items("nothing"));
     assert_eq!(s.selection.ids(), &[a], "an unknown count changes nothing");
-}
-
-#[test]
-fn criterion_11_clone_members_are_rows_that_show_the_operations_they_are_in() {
-    let (mut s, a, b) = laser_with_two_on_the_page();
-    let clone = s.recording_unguarded(|this| {
-        let group = this.document.group_objects(&[a, b]).unwrap();
-        this.document.linked_clone(&[group], &[]).unwrap()[0]
-    });
-    s.selection.set(&[]);
-    let id = s.press_operation_kind("cut").unwrap();
-    assert!(s.set_clone_member_in_operation(id, clone, a, true));
-    let view = s.operations_view().unwrap();
-    assert_eq!(
-        view.clone_members.len(),
-        2,
-        "one row per member of the clone"
-    );
-    let in_cut = view.clone_members.iter().find(|m| m.member == a).unwrap();
-    assert_eq!(in_cut.clone, clone);
-    assert_eq!(in_cut.operations, vec![id]);
-    let other = view.clone_members.iter().find(|m| m.member == b).unwrap();
-    assert!(other.operations.is_empty());
-    assert_eq!(
-        in_cut.clone_name, other.clone_name,
-        "members of one clone share its name"
-    );
-}
-
-#[test]
-fn the_view_switch_is_session_state_and_writes_no_step() {
-    let (mut s, _, _) = laser_with_two_on_the_page();
-    let steps = s.undo_len();
-    assert_eq!(
-        s.operations_view().unwrap().view_mode,
-        OperationsViewMode::Operations
-    );
-    assert!(s.set_operations_view_mode(OperationsViewMode::Drawn));
-    assert_eq!(
-        s.operations_view().unwrap().view_mode,
-        OperationsViewMode::Drawn
-    );
-    assert_eq!(s.undo_len(), steps, "a view switch is not a step");
 }
 
 #[test]

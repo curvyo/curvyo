@@ -1,18 +1,26 @@
-//! The laser operations of the active laser page (`specs/0101-laser-operations` criteria 2 to 10,
-//! 15, 16; ADR 0046 §1 to §4): the commands that add, rename, colour, delete and reorder
-//! operations, assign and remove items, and switch Show, Output and Cuts last. What runs is
-//! decided by `curvyo-laser-core`; the document writes each command as one step.
+//! The laser operations of the active laser page (`specs/0101-laser-operations` criteria 3 to 10,
+//! 15, 16; `specs/0111-laser-operation-tools`; ADR 0046 §1 to §4, ADR 0056): the commands that
+//! create operations by assignment, rename, delete and reorder them, assign and remove items, and
+//! switch Show, Output and Cuts last. What runs is decided by `curvyo-laser-core`; the document
+//! writes each command as one step.
 
 mod assign;
 mod commands;
 mod grid_look;
 mod index;
 mod items;
+mod kind_press;
 mod look;
+mod options;
 mod settings;
 mod settings_view;
 #[cfg(test)]
 mod tests;
+mod tools;
+#[cfg(test)]
+mod tools_option_tests;
+#[cfg(test)]
+mod tools_tests;
 mod view_json;
 
 pub(in crate::session) use settings::typed_number;
@@ -32,29 +40,19 @@ pub(super) const GRID_ITEMS_NOTICE: &str = "Test grid items run with their grid 
 /// silently.
 pub(super) const ADD_REFUSED_NOTICE: &str = "The operation could not be added.";
 
-/// How the output page is drawn (criterion 18): by its operations' looks, or as drawn. Session
-/// state, not saved.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OperationsViewMode {
-    /// Every leaf by its operation's look (the default).
-    #[default]
-    Operations,
-    /// The drawing's own style of every item.
-    Drawn,
-}
-
 /// What the session keeps for operations: the notice of the last assignment, shown until the next
-/// operation command (criterion 10), and the view switch (criterion 18).
+/// operation command (criterion 10), the polite status of the last kind press (`specs/0111` UX
+/// notes §10) and the state of the operation tools (`tools.rs`).
 #[derive(Debug, Default)]
 pub(in crate::session) struct OperationsState {
     notice: Option<String>,
-    view_mode: OperationsViewMode,
+    status: Option<String>,
+    tools: tools::OperationTools,
     /// The output page's leaves, for the drawing read they were built from (`index.rs`).
     leaves: index::LeafCache,
     /// The numbers typed into an operation with No settings while power or speed is missing
-    /// (`specs/0028` UX notes §8.3).
-    settings_draft: Option<(NodeId, curvyo_laser_core::settings::SetOverride)>,
+    /// (`specs/0028` UX notes §8.3), with its typed Interval (`specs/0111` criterion 19).
+    settings_draft: Option<(NodeId, settings::SettingsDraft)>,
 }
 
 /// The operations of the active laser page, in stored list order.
@@ -97,7 +95,7 @@ impl super::Session {
 
     /// Whether `id` is an operation of the active laser page: an operation of another laser page
     /// is never touched from here (criterion 9).
-    fn is_active_operation(&self, id: NodeId) -> bool {
+    pub(in crate::session) fn is_active_operation(&self, id: NodeId) -> bool {
         self.active_operations()
             .is_some_and(|active| active.operations.iter().any(|op| op.id == id))
     }
@@ -106,5 +104,11 @@ impl super::Session {
     #[must_use]
     pub fn operations_notice(&self) -> Option<String> {
         self.operations.notice.clone()
+    }
+
+    /// The polite status of the last kind press ("Cut 3 added.", "Assigned to Engrave 1."), once
+    /// (`specs/0111` UX notes §10); empty when there is none.
+    pub fn take_operations_status(&mut self) -> String {
+        self.operations.status.take().unwrap_or_default()
     }
 }

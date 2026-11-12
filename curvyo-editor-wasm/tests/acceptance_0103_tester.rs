@@ -690,7 +690,8 @@ fn ac23_save_as_profile_writes_format_3_with_jobs_tokens_and_no_output_key() {
     assert!(s.set_fixture_job_switch(id, FixtureJobSwitch::Output, true));
     let _ = s.save_machine_profile([7; 16], 50);
     let record = profile_record(&s.take_machine_writes_json());
-    assert_eq!(record["format_version"], 3, "any write is format 3");
+    // Record format 4 since `0111` (ADR 0056 §7).
+    assert_eq!(record["format_version"], 4, "any write is format 4");
     let job = &record["fixtures"][0]["jobs"][0];
     assert_eq!(job["kind"], "engrave_outline");
     assert_eq!(job["show"], true);

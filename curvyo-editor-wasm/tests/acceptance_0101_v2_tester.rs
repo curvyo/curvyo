@@ -13,12 +13,14 @@
     missing_docs
 )]
 
+mod operation_shims;
 use curvyo_document_core::{
     Document, DocumentSize, NewOutputPage, NodeId, OperationSwitch, Page, Point, RectBounds,
     ViewTransform, pack,
 };
-use curvyo_editor_wasm::{OperationsViewMode, Session, Tool};
+use curvyo_editor_wasm::{Session, Tool};
 use curvyo_render_core::{CHIP_CAP, ChipItem, Glyph, chips_list};
+use operation_shims::{OperationsViewMode, add_operation, set_view};
 use serde_json::Value;
 
 const LASER: &str = "curvyo.laser";
@@ -118,7 +120,7 @@ fn c2_c18_the_view_json_has_no_colour_or_machine_key_after_all_five_kinds() {
     let mut f = fixture();
     let ids: Vec<NodeId> = ["cut", "score", "engrave", "engrave_outline", "cut_out"]
         .iter()
-        .map(|k| f.s.press_operation_kind(k).unwrap())
+        .map(|k| add_operation(&mut f.s, k).unwrap())
         .collect();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(ids[0], true);
@@ -143,9 +145,9 @@ fn c2_c18_the_view_json_has_no_colour_or_machine_key_after_all_five_kinds() {
 #[test]
 fn c2_no_row_carries_a_colour_even_after_rename_and_move() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     assert!(f.s.rename_operation(cut, "Outer"));
-    f.s.press_operation_kind("engrave").unwrap();
+    add_operation(&mut f.s, "engrave").unwrap();
     for row in view(&f.s)["rows"].as_array().unwrap() {
         let obj = row.as_object().unwrap();
         assert!(
@@ -166,14 +168,14 @@ fn c18_cut_draws_in_cut_red_and_the_drawing_is_not_red_under_view_drawn() {
         !has(&before, CUT_RED),
         "a plain drawing has no operation red"
     );
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     assert!(
         has(&colours(&f.s), CUT_RED),
         "a Cut item is drawn in the Cut red under View: Operations"
     );
-    assert!(f.s.set_operations_view_mode(OperationsViewMode::Drawn));
+    assert!(set_view(&mut f.s, OperationsViewMode::Drawn));
     assert!(
         !has(&colours(&f.s), CUT_RED),
         "View: Drawn shows the drawing's own style"
@@ -183,7 +185,7 @@ fn c18_cut_draws_in_cut_red_and_the_drawing_is_not_red_under_view_drawn() {
 #[test]
 fn c18_engrave_is_hatched_in_pale_orange_and_is_not_cut_red() {
     let mut f = fixture();
-    let eng = f.s.press_operation_kind("engrave").unwrap();
+    let eng = add_operation(&mut f.s, "engrave").unwrap();
     click(&mut f.s, centre(&f.l, 60.0, 10.0));
     f.s.set_selection_in_operation(eng, true);
     let c = colours(&f.s);
@@ -197,7 +199,7 @@ fn c18_engrave_is_hatched_in_pale_orange_and_is_not_cut_red() {
 #[test]
 fn c18_score_is_ink_and_never_red() {
     let mut f = fixture();
-    let sc = f.s.press_operation_kind("score").unwrap();
+    let sc = add_operation(&mut f.s, "score").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(sc, true);
     let c = colours(&f.s);
@@ -219,7 +221,7 @@ fn c18_not_assigned_items_carry_no_operation_colour() {
 #[test]
 fn c15_show_off_takes_the_item_off_the_canvas_and_output_on_still_runs() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     assert!(
@@ -240,7 +242,7 @@ fn c15_show_off_takes_the_item_off_the_canvas_and_output_on_still_runs() {
 #[test]
 fn c3_a_name_of_129_characters_is_not_stored_longer_than_128() {
     let mut f = fixture();
-    let id = f.s.press_operation_kind("cut").unwrap();
+    let id = add_operation(&mut f.s, "cut").unwrap();
     let long: String = "x".repeat(129);
     let _ = f.s.rename_operation(id, &long);
     let stored = names(&f.s).pop().unwrap();
@@ -254,7 +256,7 @@ fn c3_a_name_of_129_characters_is_not_stored_longer_than_128() {
 #[test]
 fn c3_a_blank_name_reverts_to_the_old_name() {
     let mut f = fixture();
-    let id = f.s.press_operation_kind("cut").unwrap();
+    let id = add_operation(&mut f.s, "cut").unwrap();
     let before = names(&f.s);
     let _ = f.s.rename_operation(id, "   ");
     assert_eq!(
@@ -267,7 +269,7 @@ fn c3_a_blank_name_reverts_to_the_old_name() {
 #[test]
 fn c3_rename_is_one_undo_step_and_undo_brings_the_old_name_back() {
     let mut f = fixture();
-    let id = f.s.press_operation_kind("cut").unwrap();
+    let id = add_operation(&mut f.s, "cut").unwrap();
     let before = f.s.undo_len();
     assert!(f.s.rename_operation(id, "Frame"));
     assert_eq!(f.s.undo_len(), before + 1);
@@ -280,7 +282,7 @@ fn c3_rename_is_one_undo_step_and_undo_brings_the_old_name_back() {
 #[test]
 fn c4_delete_is_one_undo_step_and_the_items_become_not_assigned() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
     click(&mut f.s, centre(&f.l, 10.0, 10.0));
     f.s.set_selection_in_operation(cut, true);
     let before = f.s.undo_len();
@@ -297,9 +299,9 @@ fn c4_delete_is_one_undo_step_and_the_items_become_not_assigned() {
 #[test]
 fn c5_a_move_inside_cutting_is_one_step_and_undoes() {
     let mut f = fixture();
-    f.s.press_operation_kind("score").unwrap();
-    f.s.press_operation_kind("cut").unwrap();
-    let cut2 = f.s.press_operation_kind("cut").unwrap();
+    add_operation(&mut f.s, "score").unwrap();
+    add_operation(&mut f.s, "cut").unwrap();
+    let cut2 = add_operation(&mut f.s, "cut").unwrap();
     assert_eq!(names(&f.s), vec!["Score 1", "Cut 1", "Cut 2"]);
     let before = f.s.undo_len();
     assert!(
@@ -315,8 +317,8 @@ fn c5_a_move_inside_cutting_is_one_step_and_undoes() {
 #[test]
 fn c5_a_score_dragged_below_the_section_line_into_cutting_is_refused() {
     let mut f = fixture();
-    let sc = f.s.press_operation_kind("score").unwrap();
-    f.s.press_operation_kind("cut").unwrap();
+    let sc = add_operation(&mut f.s, "score").unwrap();
+    add_operation(&mut f.s, "cut").unwrap();
     assert_eq!(names(&f.s), vec!["Score 1", "Cut 1"]);
     let before = f.s.undo_len();
     assert!(
@@ -330,8 +332,8 @@ fn c5_a_score_dragged_below_the_section_line_into_cutting_is_refused() {
 #[test]
 fn c6_cuts_last_off_lets_a_cut_go_above_marking_and_back_on_moves_it_down() {
     let mut f = fixture();
-    let cut = f.s.press_operation_kind("cut").unwrap();
-    f.s.press_operation_kind("engrave").unwrap();
+    let cut = add_operation(&mut f.s, "cut").unwrap();
+    add_operation(&mut f.s, "engrave").unwrap();
     assert!(f.s.set_cuts_last(false));
     assert!(
         f.s.move_operation(cut, 0),

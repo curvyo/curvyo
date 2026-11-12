@@ -1,0 +1,58 @@
+{
+  "cuts_last": true,
+  "entered_group": null,
+  "items": {
+    "not_assigned": [],
+    "output_off": [],
+    "running": [
+      {
+        "counter": 17,
+        "peer": "1"
+      }
+    ],
+    "runs_while_hidden": []
+  },
+  "operations_view": true,
+  "pick": [],
+  "rows": [
+    {
+      "grid": null,
+      "group_in_part": null,
+      "id": {
+        "counter": 26,
+        "peer": "1"
+      },
+      "items": 1,
+      "kind": "engrave",
+      "margin_mm": 0.0,
+      "name": "Engrave 1",
+      "output": true,
+      "section": "marking",
+      "settings": {
+        "differs": null,
+        "disabled": [],
+        "interval_mm": null,
+        "material": null,
+        "needs": "engrave",
+        "options": null,
+        "over_feed": null,
+        "reason": null,
+        "reset": false,
+        "sets": [],
+        "state": "damaged",
+        "z_offset_shown": false
+      },
+      "show": true,
+      "tick": "none",
+      "unfolded": true
+    }
+  ],
+  "select_bar_kinds": null,
+  "summary": {
+    "not_assigned": 0,
+    "operations": 1,
+    "output_off": 0,
+    "running": 1,
+    "runs_while_hidden": 0
+  }
+}

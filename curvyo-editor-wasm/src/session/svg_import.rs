@@ -184,6 +184,13 @@ impl Session {
         bytes: &[u8],
         file_name: &str,
     ) -> Result<SvgImportOutcome, String> {
+        // Inside a group of a laser page nothing is imported, as a file drop (`specs/0111`
+        // criterion 11).
+        if self.in_read_only_group() {
+            return Ok(SvgImportOutcome::Nothing(
+                super::image_import::READ_ONLY_IMPORT_NOTICE.to_owned(),
+            ));
+        }
         let drawing = read_svg_drawing(bytes)?;
         if !self.svg_faces_ready(&drawing) {
             return Ok(SvgImportOutcome::Waiting);

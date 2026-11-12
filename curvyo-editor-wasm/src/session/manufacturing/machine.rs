@@ -236,7 +236,7 @@ impl Session {
 
     /// Edits one value of the copy (criterion 7): `edit` changes the values and returns the
     /// notice; one step with `change`'s label.
-    fn edit_copy(
+    pub(in crate::session) fn edit_copy(
         &mut self,
         change: ProfileChange,
         edit: impl FnOnce(&mut ProfileCopy) -> Option<Option<String>>,

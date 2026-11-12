@@ -15,6 +15,8 @@
 )]
 
 mod cpu_time;
+mod operation_shims;
+use operation_shims::add_operation;
 
 use std::time::Duration;
 
@@ -63,7 +65,7 @@ fn scene() -> (Session, Page, Vec<NodeId>) {
 fn fifty_operations(s: &mut Session) -> Vec<NodeId> {
     let kinds = ["cut", "score", "engrave", "engrave_outline", "cut_out"];
     (0..50)
-        .map(|i| s.press_operation_kind(kinds[i % 5]).unwrap())
+        .map(|i| add_operation(s, kinds[i % 5]).unwrap())
         .collect()
 }
 
@@ -99,7 +101,7 @@ fn c29a_a_kind_press_on_a_1000_item_selection_creates_and_assigns() {
     let (mut s, _l, _ids) = scene();
     fifty_operations(&mut s);
     select_all(&mut s);
-    let (id, took) = cpu_time_of(|| s.press_operation_kind("engrave"));
+    let (id, took) = cpu_time_of(|| s.press_operation_kind("engrave", true));
     assert!(id.is_some());
     println!("criterion 29 (a) kind press over 1000 items: {took:?}");
     if !cfg!(debug_assertions) {

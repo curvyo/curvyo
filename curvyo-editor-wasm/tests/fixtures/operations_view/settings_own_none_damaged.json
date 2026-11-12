@@ -32,8 +32,18 @@
             "reason": "No Engrave set"
           }
         ],
+        "interval_mm": 0.1,
         "material": null,
         "needs": "engrave",
+        "options": {
+          "hatch": {
+            "bidirectional": true,
+            "crosshatch": false,
+            "overscan_pct": 2,
+            "scan_angle_deg": 0.0
+          },
+          "z_offset_mm": 0.0
+        },
         "over_feed": null,
         "reason": null,
         "reset": false,
@@ -49,7 +59,8 @@
             "typed": []
           }
         ],
-        "state": "no_settings"
+        "state": "no_settings",
+        "z_offset_shown": false
       }
     },
     {
@@ -64,13 +75,19 @@
             "reason": "No Score set"
           }
         ],
+        "interval_mm": null,
         "material": null,
         "needs": "score",
+        "options": {
+          "hatch": null,
+          "z_offset_mm": 0.0
+        },
         "over_feed": null,
         "reason": null,
         "reset": false,
         "sets": [],
-        "state": "damaged"
+        "state": "damaged",
+        "z_offset_shown": false
       }
     },
     {
@@ -80,8 +97,13 @@
       "settings": {
         "differs": null,
         "disabled": [],
+        "interval_mm": null,
         "material": null,
         "needs": "cut",
+        "options": {
+          "hatch": null,
+          "z_offset_mm": 0.0
+        },
         "over_feed": null,
         "reason": null,
         "reset": false,
@@ -97,7 +119,8 @@
             "typed": []
           }
         ],
-        "state": "own"
+        "state": "own",
+        "z_offset_shown": false
       }
     }
   ]

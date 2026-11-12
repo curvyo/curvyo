@@ -46,6 +46,7 @@ impl Session {
     #[must_use]
     pub fn clipboard_allowed(&self, blocked: bool) -> bool {
         !(blocked
+            || self.in_read_only_group()
             || self.button_down
             || self.operation_in_flight()
             || self.select.has_entry()

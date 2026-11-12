@@ -61,6 +61,10 @@ impl Session {
             self.tiling = None;
             self.clear_fixture_selection();
             self.note_active_drawing_page();
+            // A group entered on a laser page is left with the page (`specs/0111` criterion 13).
+            if self.in_read_only_group() {
+                self.leave_read_only_group(false);
+            }
         }
         self.page_view.active = Some(id.to_owned());
         let left = self.sketch.workbench;
@@ -467,7 +471,13 @@ impl Session {
             let (x,y)=self.view().document_to_screen(p.origin);
             let chip = self.kind_chip(&p.kind);
             let sketch = self.sketch_row_json(p);
-            serde_json::json!({"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str()),"home":homes.contains(&p.id)})
+            // The Operations view toggle of a laser page's label (`specs/0111` criterion 15).
+            let operations_view = p
+                .kind
+                .manufacturing()
+                .filter(|&m| self.manufacturing_available(m))
+                .map(|m| self.operations_view_pressed(m));
+            serde_json::json!({"operationsView":operations_view,"id":p.id,"name":p.name,"active":p.id==active,"frameOnly":self.frame_moves_alone(p),"kind":chip.kind,"kindWord":chip.word,"kindIcon":chip.icon,"kindOff":chip.off,"fixedSize":p.kind.fixed_size(),"manufacturing":p.kind.manufacturing().map(NodeId::full_id),"machine":self.machine_name_of(&p.kind),"size":curvyo_ui_core::format_size(p.size,self.display_unit()),"x":p.origin.x,"y":p.origin.y,"screenX":x,"screenY":y,"screenWidth":p.size.width.as_mm()*self.view().scale(),"screenHeight":p.size.height.as_mm()*self.view().scale(),"sketch":sketch,"dropTarget":drop_target==Some(p.id.as_str()),"home":homes.contains(&p.id)})
         }).collect();
         serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_owned())
     }

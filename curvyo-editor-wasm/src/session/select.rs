@@ -192,20 +192,18 @@ impl Session {
         self.clear_fixture_selection();
         self.sync_select_units();
         let raw_objects = self.objects();
-        let objects = if raw_objects.iter().any(|object| {
-            object
-                .drawn_path()
-                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
-        }) {
-            Cow::Owned(self.spiro_pick_objects(&raw_objects))
-        } else {
-            Cow::Borrowed(&raw_objects[..])
-        };
+        let objects = self.select_pick_objects(&raw_objects);
         let tolerance = self.object_tolerance();
         let handle_tolerances = self.transform_handle_tolerances();
         // Ctrl and Alt are the cached state (the host sends them with the
         // press); Alt decides at this press whether the drag is a lasso.
         let modifiers = Modifiers { shift, ..self.held };
+        // A press outside an entered laser group leaves it and selects what it hits
+        // (`specs/0111` criterion 13).
+        if self.leave_read_only_group_at(point) {
+            self.sync_select_units();
+            return self.select_pointer_down(point, shift);
+        }
         // A Ctrl-press on an already selected object marks or clears the key
         // object before the press runs (`specs/0061-align-and-distribute/`
         // criterion 5): the click itself commits nothing, so the mark is the
@@ -234,6 +232,7 @@ impl Session {
             .filter(|object| ids.contains(&object.id()))
             .filter_map(|object| self.document.object(object.id()))
             .collect();
+        self.refuse_read_only_drag();
         // If a move drag began, start snapping.
         if self.select.drag_in_flight() {
             self.begin_snapping_drag_for_selection();
@@ -244,6 +243,34 @@ impl Session {
         }
         // A move may end as a cloning drop on a laser page (`specs/0100`).
         self.clone_drop_begin();
+    }
+
+    /// The objects a Select press picks from: Spiro paths are picked by their solved curve.
+    fn select_pick_objects<'a>(
+        &self,
+        raw_objects: &'a [curvyo_document_core::ObjectSnapshot],
+    ) -> Cow<'a, [curvyo_document_core::ObjectSnapshot]> {
+        let has_spiro = raw_objects.iter().any(|object| {
+            object
+                .drawn_path()
+                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
+        });
+        if has_spiro {
+            Cow::Owned(self.spiro_pick_objects(raw_objects))
+        } else {
+            Cow::Borrowed(raw_objects)
+        }
+    }
+
+    /// Inside an entered laser group a press only selects: a move or handle drag is refused
+    /// silently, a marquee goes on (`specs/0111` criteria 11, 12).
+    fn refuse_read_only_drag(&mut self) {
+        if self.in_read_only_group()
+            && self.select.drag_in_flight()
+            && !self.select.area_drag_in_flight()
+        {
+            self.select.escape();
+        }
     }
 
     fn cancel_stale_select_sources(&mut self) -> bool {
@@ -431,15 +458,7 @@ impl Session {
             self.clone_drop_update(point);
         }
         let raw_objects = self.objects();
-        let objects = if raw_objects.iter().any(|object| {
-            object
-                .drawn_path()
-                .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
-        }) {
-            Cow::Owned(self.spiro_pick_objects(&raw_objects))
-        } else {
-            Cow::Borrowed(&raw_objects[..])
-        };
+        let objects = self.select_pick_objects(&raw_objects);
         // Nothing lights up while a drag runs; hover returns after release.
         // Otherwise hover lights the object a press at this point would
         // select, and nothing where a press would grab a handle, move the
@@ -484,6 +503,12 @@ impl Session {
         ctrl: bool,
     ) -> DoubleClickHint {
         self.sync_select_units();
+        // Inside a group of a laser page only a nested group is entered, one level (`specs/0111`
+        // criterion 11); every edit a double-click opens elsewhere is refused silently.
+        if self.in_read_only_group() {
+            self.read_only_double_click(point);
+            return DoubleClickHint::None;
+        }
         let objects = self.objects();
         let tolerance = self.object_tolerance();
         let handle_tolerances = self.transform_handle_tolerances();
@@ -506,12 +531,7 @@ impl Session {
             SelectDoubleClickOutcome::EditHint => DoubleClickHint::EditHint,
             // A clone of a page's sketch opens its sketch page (`specs/0099` criterion 13).
             SelectDoubleClickOutcome::Clone => {
-                let hit = curvyo_ui_core::hit_test_objects(&objects, point, tolerance);
-                if self.open_sketch_page_of(&hit) {
-                    DoubleClickHint::None
-                } else {
-                    DoubleClickHint::Clone
-                }
+                self.clone_double_click_hint(&objects, point, tolerance)
             }
             // A text opens for editing in the Text tool (`specs/0074-text-objects` criterion 10).
             SelectDoubleClickOutcome::Text(id) => {
@@ -531,6 +551,21 @@ impl Session {
             SelectDoubleClickOutcome::EntryOpened | SelectDoubleClickOutcome::NoNodes => {
                 DoubleClickHint::None
             }
+        }
+    }
+
+    /// A double-click on a clone: the clone's sketch page opens, else the host shows the clone hint.
+    fn clone_double_click_hint(
+        &mut self,
+        objects: &[curvyo_document_core::ObjectSnapshot],
+        point: Point,
+        tolerance: curvyo_document_core::Tolerance,
+    ) -> DoubleClickHint {
+        let hit = curvyo_ui_core::hit_test_objects(objects, point, tolerance);
+        if self.open_sketch_page_of(&hit) {
+            DoubleClickHint::None
+        } else {
+            DoubleClickHint::Clone
         }
     }
 

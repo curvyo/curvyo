@@ -330,6 +330,13 @@ impl Session {
             view,
             &self.select_decoration_input_in(&selection_visuals),
         ));
+        if let Some(corners) = self.context_outline_box(&selection_visuals) {
+            list.extend(curvyo_render_core::build_context_outline(
+                view,
+                corners,
+                self.device_pixel_ratio,
+            ));
+        }
         // The marks of a selected clone: over the selection and hover boxes, so a box that
         // coincides with an outline never hides its trace, and under the handles (`0049`).
         list.extend(self.clone_mark_layer(view, &objects, previewing));

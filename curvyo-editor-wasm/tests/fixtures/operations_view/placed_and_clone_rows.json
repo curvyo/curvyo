@@ -1,6 +1,6 @@
 {
-  "clone_members": [],
   "cuts_last": true,
+  "entered_group": null,
   "items": {
     "not_assigned": [],
     "output_off": [],
@@ -20,10 +20,12 @@
     ],
     "runs_while_hidden": []
   },
+  "operations_view": true,
   "pick": [],
   "rows": [
     {
       "grid": null,
+      "group_in_part": null,
       "id": {
         "counter": 43,
         "peer": "1"
@@ -37,8 +39,18 @@
       "settings": {
         "differs": null,
         "disabled": [],
+        "interval_mm": 0.1,
         "material": null,
         "needs": "engrave",
+        "options": {
+          "hatch": {
+            "bidirectional": true,
+            "crosshatch": false,
+            "overscan_pct": 2,
+            "scan_angle_deg": 0.0
+          },
+          "z_offset_mm": 0.0
+        },
         "over_feed": null,
         "reason": null,
         "reset": false,
@@ -54,13 +66,16 @@
             "typed": []
           }
         ],
-        "state": "no_settings"
+        "state": "no_settings",
+        "z_offset_shown": false
       },
       "show": true,
-      "tick": "none"
+      "tick": "none",
+      "unfolded": false
     },
     {
       "grid": null,
+      "group_in_part": null,
       "id": {
         "counter": 48,
         "peer": "1"
@@ -74,8 +89,13 @@
       "settings": {
         "differs": null,
         "disabled": [],
+        "interval_mm": null,
         "material": null,
         "needs": "score",
+        "options": {
+          "hatch": null,
+          "z_offset_mm": 0.0
+        },
         "over_feed": null,
         "reason": null,
         "reset": false,
@@ -91,13 +111,16 @@
             "typed": []
           }
         ],
-        "state": "no_settings"
+        "state": "no_settings",
+        "z_offset_shown": false
       },
       "show": true,
-      "tick": "none"
+      "tick": "none",
+      "unfolded": false
     },
     {
       "grid": null,
+      "group_in_part": null,
       "id": {
         "counter": 38,
         "peer": "1"
@@ -111,8 +134,13 @@
       "settings": {
         "differs": null,
         "disabled": [],
+        "interval_mm": null,
         "material": null,
         "needs": "cut",
+        "options": {
+          "hatch": null,
+          "z_offset_mm": 0.0
+        },
         "over_feed": null,
         "reason": null,
         "reset": false,
@@ -128,18 +156,20 @@
             "typed": []
           }
         ],
-        "state": "no_settings"
+        "state": "no_settings",
+        "z_offset_shown": false
       },
       "show": true,
-      "tick": "none"
+      "tick": "none",
+      "unfolded": false
     }
   ],
+  "select_bar_kinds": null,
   "summary": {
     "not_assigned": 0,
     "operations": 3,
     "output_off": 0,
     "running": 3,
     "runs_while_hidden": 0
-  },
-  "view_mode": "operations"
+  }
 }
