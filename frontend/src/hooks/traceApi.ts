@@ -9,6 +9,9 @@ import type {
   TraceValues,
 } from "@/lib/traceText";
 
+/** A region tool of the Mask group (`specs/0114`): Rectangle or none. */
+export type MaskTool = "none" | "rect";
+
 /** The Trace tool in the frontend (`specs/0025-raster-trace` criteria 1 to 5, 9 to 13, 15, 16,
  * 46, 52 to 54): the bar's state, the worker jobs with their timers, the progress slot, Create
  * paths. The canvas always shows Overlay (`specs/0089` UX notes §24.1).
@@ -22,9 +25,16 @@ export interface TraceApi {
   selection: "empty" | "other" | "images" | "mixed";
   /** The Mask group (`specs/0089` UX notes §24.4, always drawn): the mask paths selected with the
    * image (0 for none) and the chosen mode, Inside on every entry. */
-  mask: { paths: number; outside: boolean };
-  /** Inside (`false`) or Outside, not remembered (criterion 17). */
+  mask: { paths: number; regions: number; outside: boolean };
+  /** Inside (`false`) or Outside: a step on a stored part (`specs/0114`), tool state before. */
   setMaskOutside: (outside: boolean) => void;
+  /** The pressed region tool of the Mask group (`specs/0114` Behaviour 1). */
+  maskTool: MaskTool;
+  /** Presses a region tool; `"none"` releases it. */
+  setMaskTool: (tool: MaskTool) => void;
+  /** Subtract is pressed: a region drawn now is taken out of the mask. */
+  subtract: boolean;
+  setSubtract: (on: boolean) => void;
   /** Pick mask paths is armed (`specs/0094` slice 1b, UX notes §11). */
   maskPick: boolean;
   /** Arms or disarms Pick mask paths. */
