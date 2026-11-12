@@ -154,6 +154,10 @@ pub use manufacturing_slot_commands::{
 };
 mod operation;
 mod operation_codec;
+mod operation_members;
+mod operation_settings_commands;
+mod test_grid_codec;
+mod test_grid_commands;
 pub use operation::{
     ADD_OPERATION_COMMIT_LABEL, ASSIGN_TO_OPERATION_COMMIT_LABEL, CUTS_LAST_OFF_COMMIT_LABEL,
     CUTS_LAST_ON_COMMIT_LABEL, DELETE_OPERATION_COMMIT_LABEL, MOVE_OPERATION_COMMIT_LABEL,
@@ -162,6 +166,19 @@ pub use operation::{
     SET_OPERATION_OUTPUT_COMMIT_LABEL, SET_OPERATION_SHOW_COMMIT_LABEL,
 };
 pub use operation_codec::OperationSnapshot;
+pub use operation_settings_commands::{
+    DELETE_MATERIAL_COMMIT_LABEL, EDIT_MATERIAL_COMMIT_LABEL, EDIT_OPERATION_SETTINGS_COMMIT_LABEL,
+    MaterialStep, RENAME_MATERIAL_COMMIT_LABEL, RESET_TO_MATERIAL_COMMIT_LABEL,
+    SAVE_AS_MATERIAL_COMMIT_LABEL, SettingsStep, SettingsWrite, USE_MATERIAL_COMMIT_LABEL,
+    USE_OWN_NUMBERS_COMMIT_LABEL,
+};
+pub use test_grid_codec::{GridItem, TestGridSnapshot};
+pub use test_grid_commands::{
+    ADD_TEST_GRID_COMMIT_LABEL, DELETE_TEST_GRID_ROW_COMMIT_LABEL, EDIT_TEST_GRID_COMMIT_LABEL,
+    GridItems, MARK_TEST_CELL_COMMIT_LABEL, MadeTestGrid, NewGridCell, NewGridLabel, NewTestGrid,
+    REBUILD_TEST_GRID_COMMIT_LABEL, RENAME_TEST_GRID_COMMIT_LABEL, RowMove, TestGridEdit,
+    TestGridError, UNMARK_TEST_CELL_COMMIT_LABEL,
+};
 mod node_edit;
 mod node_move;
 mod node_read;
@@ -288,11 +305,11 @@ pub use history::{
     Author, BranchMark, Direction, Event, FAR_STEP_OPS, GoToReport, HistoricalDocument,
     HistoryBranch, HistoryError, HistoryRow, LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION,
     LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO,
-    LABEL_UNDO, LABEL_WIPE_OBJECT, MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult,
-    ObjectRow, ObjectRowClass, ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep,
-    RestoreReport, Role, RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason,
-    StackMachine, Status, StepKind, StepRef, SyncError, TouchedObject, WIPE_LABEL,
-    is_document_level_label, shown_ids,
+    LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE_OBJECT, MIN_SHOWN_ID_LEN, ObjectReport,
+    ObjectRestore, ObjectResult, ObjectRow, ObjectRowClass, ObjectShape, ObjectStatus,
+    ObjectTarget, ObjectTargets, OwnStep, RestoreReport, Role, RowRevert, RowVersion,
+    SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind, StepRef, SyncError,
+    TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,

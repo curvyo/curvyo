@@ -76,6 +76,23 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("move_operation", "Move operation"),
     ("cuts_last_on", "Cuts last on"),
     ("cuts_last_off", "Cuts last off"),
+    // `specs/0028-material-test-library` adrs.md section 7: the grid, the settings of an
+    // operation and the material edits of the open project.
+    ("add_test_grid", "Add test grid"),
+    ("edit_test_grid", "Edit test grid"),
+    ("rebuild_test_grid", "Rebuild test grid"),
+    ("mark_test_cell", "Mark cell"),
+    ("unmark_test_cell", "Unmark cell"),
+    ("rename_test_grid", "Rename test grid"),
+    ("delete_test_grid_row", "Delete test grid row"),
+    ("use_material", "Use material"),
+    ("use_own_numbers", "Use own numbers"),
+    ("edit_operation_settings", "Edit settings"),
+    ("reset_to_material", "Reset to material"),
+    ("save_as_material", "Save as material"),
+    ("edit_material", "Edit material"),
+    ("rename_material", "Rename material"),
+    ("delete_material", "Delete material"),
     ("remove_missing_items", "Remove missing items"),
     // `specs/0026-machine-profile` criteria 3, 5 and 7 (UX notes §2).
     ("pick_profile", "Pick profile"),
@@ -309,6 +326,7 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
 pub const RESERVED_LABELS: &[&str] = &[
     curvyo_document_core::LABEL_NEW_DOCUMENT,
     curvyo_document_core::LABEL_MIGRATE_FORMAT,
+    curvyo_document_core::LABEL_REFRESH_MATERIAL_NUMBERS,
     curvyo_document_core::LABEL_UNDO,
     curvyo_document_core::LABEL_REDO,
     curvyo_document_core::WIPE_LABEL,
@@ -374,6 +392,42 @@ mod tests {
         assert_eq!(operation_name("offset_path"), "Offset");
         assert_eq!(operation_name("something_old"), "Edit");
         assert_eq!(known_operation_name("something_old"), None);
+    }
+
+    #[test]
+    fn the_material_test_library_steps_are_named_and_the_save_refresh_is_reserved() {
+        use curvyo_document_core as dc;
+        for (label, name) in [
+            (dc::ADD_TEST_GRID_COMMIT_LABEL, "Add test grid"),
+            (dc::EDIT_TEST_GRID_COMMIT_LABEL, "Edit test grid"),
+            (dc::REBUILD_TEST_GRID_COMMIT_LABEL, "Rebuild test grid"),
+            (dc::MARK_TEST_CELL_COMMIT_LABEL, "Mark cell"),
+            (dc::UNMARK_TEST_CELL_COMMIT_LABEL, "Unmark cell"),
+            (dc::RENAME_TEST_GRID_COMMIT_LABEL, "Rename test grid"),
+            (
+                dc::DELETE_TEST_GRID_ROW_COMMIT_LABEL,
+                "Delete test grid row",
+            ),
+            (dc::USE_MATERIAL_COMMIT_LABEL, "Use material"),
+            (dc::USE_OWN_NUMBERS_COMMIT_LABEL, "Use own numbers"),
+            (dc::EDIT_OPERATION_SETTINGS_COMMIT_LABEL, "Edit settings"),
+            (dc::RESET_TO_MATERIAL_COMMIT_LABEL, "Reset to material"),
+            (dc::SAVE_AS_MATERIAL_COMMIT_LABEL, "Save as material"),
+            (dc::EDIT_MATERIAL_COMMIT_LABEL, "Edit material"),
+            (dc::RENAME_MATERIAL_COMMIT_LABEL, "Rename material"),
+            (dc::DELETE_MATERIAL_COMMIT_LABEL, "Delete material"),
+        ] {
+            assert_eq!(operation_name(label), name, "{label}");
+            assert!(
+                crate::step_scope::FREE_STEPS.contains(&label),
+                "{label} is in one step-scope list"
+            );
+        }
+        assert!(RESERVED_LABELS.contains(&dc::LABEL_REFRESH_MATERIAL_NUMBERS));
+        assert_eq!(
+            known_operation_name(dc::LABEL_REFRESH_MATERIAL_NUMBERS),
+            None
+        );
     }
 
     #[test]

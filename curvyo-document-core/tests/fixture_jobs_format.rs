@@ -240,7 +240,8 @@ fn the_round_trip_golden_reads_back_every_job_switch_and_tick() {
     let bytes = read_or_write("fixture_jobs_v41.curvyo", golden_bytes);
     assert_eq!(format_of(&bytes), 41);
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053); the v41 golden stays.
-    assert_eq!(CURRENT_FORMAT_VERSION, 42);
+    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 43);
     let read = open_unchanged(&bytes);
     assert_eq!(read.len(), 4);
     let engrave = &read[0].jobs[0];
@@ -365,9 +366,10 @@ fn a_file_of_format_42_is_refused() {
     );
     assert!(matches!(
         unpack(2, &bytes),
+        // Superseded by `0110` (format 42) and `0028` (format 43): the next number is 44.
         Err(OpenError::FormatTooNew {
-            found: 43,
-            supported: 42
+            found: 44,
+            supported: 43
         })
     ));
 }

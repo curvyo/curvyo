@@ -736,6 +736,9 @@ fn ac46_files_of_earlier_builds_open_without_layers_or_flags() {
             || name.starts_with("fixtures_")
             // `0103-fixture-jobs` (format 41) is a later build: its goldens hold fixtures too.
             || name.starts_with("fixture_jobs_")
+            // `0028-material-test-library` (format 43) is a later build: its grids are named.
+            || name.starts_with("laser_settings")
+            || name.starts_with("test_grid_")
             || name.contains("damaged")
             || name.contains("truncated")
             || name.contains("too_deep")

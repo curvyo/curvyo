@@ -1,0 +1,116 @@
+{
+  "format_version": 1,
+  "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+  "kind": "laser",
+  "modified": 1762948800000,
+  "name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+  "thickness_mm": 3.0,
+  "machine": {
+    "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+    "name": "K40 in the garage"
+  },
+  "sets": {
+    "cut": {
+      "power_pct": 60.0,
+      "speed_mm_min": 300,
+      "passes": 2,
+      "source": {
+        "test": "5d1e7a2b-0c3f-4e6d-8a9b-7c6d5e4f3a2b"
+      }
+    },
+    "score": {
+      "power_pct": 12.5,
+      "speed_mm_min": 3000,
+      "passes": 1,
+      "source": "edited"
+    },
+    "engrave": {
+      "power_pct": 35.0,
+      "speed_mm_min": 6000,
+      "passes": 1,
+      "source": {
+        "test": "4d5e6f7a-8b9c-4dae-bf01-3b4c5d6e7f80"
+      }
+    }
+  },
+  "history": [
+    {
+      "id": "5d1e7a2b-0c3f-4e6d-8a9b-7c6d5e4f3a2b",
+      "date": 1762862400000,
+      "event": "tested",
+      "kind": "cut",
+      "set": {
+        "power_pct": 60.0,
+        "speed_mm_min": 300,
+        "passes": 2
+      },
+      "grid": {
+        "columns": 5,
+        "rows": 5,
+        "power_from_pct": 20.0,
+        "power_to_pct": 100.0,
+        "speed_from_mm_min": 120,
+        "speed_to_mm_min": 1200,
+        "cell_mm": 10.0,
+        "gap_mm": 3.0
+      },
+      "cell": {
+        "column": 2,
+        "row": 1
+      }
+    },
+    {
+      "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "date": 1762866000000,
+      "event": "edited",
+      "kind": "score",
+      "set": {
+        "power_pct": 15.0,
+        "speed_mm_min": 3000,
+        "passes": 1
+      }
+    },
+    {
+      "id": "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+      "date": 1762869600000,
+      "event": "removed",
+      "kind": "score"
+    },
+    {
+      "id": "3c4d5e6f-7a8b-4c9d-ae0f-2a3b4c5d6e7f",
+      "date": 1762873200000,
+      "event": "edited",
+      "kind": "score",
+      "set": {
+        "power_pct": 12.5,
+        "speed_mm_min": 3000,
+        "passes": 1
+      }
+    },
+    {
+      "id": "4d5e6f7a-8b9c-4dae-bf01-3b4c5d6e7f80",
+      "date": 1762948800000,
+      "event": "tested",
+      "kind": "engrave",
+      "set": {
+        "power_pct": 35.0,
+        "speed_mm_min": 6000,
+        "passes": 1
+      },
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "power_from_pct": 20.0,
+        "power_to_pct": 100.0,
+        "speed_from_mm_min": 3000,
+        "speed_to_mm_min": 6000,
+        "cell_mm": 10.0,
+        "gap_mm": 3.0
+      },
+      "cell": {
+        "column": 1,
+        "row": 2
+      }
+    }
+  ]
+}

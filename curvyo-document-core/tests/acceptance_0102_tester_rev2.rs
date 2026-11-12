@@ -103,7 +103,8 @@ fn ac39_a_screw_round_trips_with_its_thread_and_head_diameters() {
 fn ac39_format_40_is_the_current_format_and_the_screw_needs_no_bump() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    assert_eq!(CURRENT_FORMAT_VERSION, 42);
+    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 43);
 }
 
 // ---- golden fixtures_v40: one of each of the five kinds, the screw included ----------------------
@@ -239,8 +240,9 @@ fn with_format(bytes: &[u8], to: i64) -> Vec<u8> {
 fn ac31_a_format_41_file_is_refused_and_a_format_40_file_opens() {
     let d = Document::new(41);
     let bytes = pack(&d, "0.1.0").unwrap();
-    // Superseded by `0103` (format 41) and `0110` (format 42): the control opens at 42, and 43 is refused.
-    assert!(unpack(42, &bytes).is_ok(), "the control: format 42 opens");
-    let future = with_format(&bytes, 43);
-    assert!(unpack(43, &future).is_err(), "format 43 is refused");
+    // Superseded by `0103` (format 41), `0110` (format 42) and `0028` (format 43): the control opens
+    // at 43, and 44 is refused.
+    assert!(unpack(42, &bytes).is_ok(), "the control: format 43 opens");
+    let future = with_format(&bytes, 44);
+    assert!(unpack(43, &future).is_err(), "format 44 is refused");
 }

@@ -845,7 +845,8 @@ fn ac17_a_clone_made_by_a_peer_while_the_page_is_deleted_is_removed_as_an_orphan
 fn ac19_the_format_stays_37_until_0100_bumps_it_to_38() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    assert_eq!(CURRENT_FORMAT_VERSION, 42);
+    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 43);
 }
 
 fn criterion_19_project() -> (Document, Vec<NodeId>) {

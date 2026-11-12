@@ -607,6 +607,9 @@ fn ac27_files_of_earlier_builds_open_unchanged() {
             || name.starts_with("bring_content_in_")
             // `0101-laser-operations` (format 39) is a later build: its golden holds a group.
             || name.starts_with("operations_")
+            // `0028-material-test-library` (format 43) is a later build: a test grid is a group.
+            || name.starts_with("laser_settings")
+            || name.starts_with("test_grid_")
         {
             continue;
         }

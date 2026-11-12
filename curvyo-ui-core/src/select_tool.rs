@@ -991,6 +991,7 @@ mod tests {
         param_pitch_mm: 1.4,
         param_min_side_mm: 1e9,
         param_centre_yield_mm: 2.0,
+        move_only: false,
     };
 
     #[test]

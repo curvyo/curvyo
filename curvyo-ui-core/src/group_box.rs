@@ -179,6 +179,9 @@ pub fn group_handles(
     if at_least(group.side_mm(), tolerances.center_min_side_mm) {
         handles.push((EditHandle::Move, box_.to_document(box_.local_center())));
     }
+    if tolerances.move_only {
+        handles.retain(|(handle, _)| *handle == EditHandle::Move);
+    }
     handles
 }
 
@@ -332,6 +335,24 @@ mod tests {
         let point = group_of(&document, &[c, d]).expect("group");
         assert_eq!(point.shape(), GroupBoxShape::Point);
         assert_eq!(point.side_mm(), 0.0);
+    }
+
+    /// `specs/0028` `ux-notes.md` 6.5: a move-only group box keeps its centre move and nothing else.
+    #[test]
+    fn a_move_only_group_box_shows_the_centre_move_only() {
+        let document = Document::new(1);
+        let a = rect(&document, 0.0, 0.0, 40.0, 40.0);
+        let b = rect(&document, 60.0, 0.0, 40.0, 40.0);
+        let group = group_of(&document, &[a, b]).expect("group");
+        let tolerances = TransformHandleTolerances {
+            move_only: true,
+            ..TransformHandleTolerances::at_scale(5.0)
+        };
+        let handles: Vec<EditHandle> = group_handles(&group, group.bounds(), &tolerances, true)
+            .into_iter()
+            .map(|(handle, _)| handle)
+            .collect();
+        assert_eq!(handles, vec![EditHandle::Move]);
     }
 
     /// Criterion 10: the centre handle from 48 px, not before; corner resize and

@@ -296,6 +296,13 @@ impl Document {
     /// of this session's stacks and no row of the history list; nothing is committed when
     /// `write` wrote nothing.
     pub(crate) fn commit_migration(&self, write: impl FnOnce(&Self)) {
+        self.commit_reserved(LABEL_MIGRATE_FORMAT, write);
+    }
+
+    /// Runs `write` as one commit with the reserved label `label`, which is no step of this
+    /// session's stacks and no row of the history list; nothing is committed when `write` wrote
+    /// nothing.
+    pub(crate) fn commit_reserved(&self, label: &str, write: impl FnOnce(&Self)) {
         self.commit_state
             .batch_depth
             .set(self.commit_state.batch_depth.get() + 1);
@@ -304,7 +311,7 @@ impl Document {
             write(self);
         }
         if self.loro().get_pending_txn_len() > 0 {
-            let header = StepHeader::new(LABEL_MIGRATE_FORMAT, 0, self.commit_state.time.get());
+            let header = StepHeader::new(label, 0, self.commit_state.time.get());
             self.loro()
                 .commit_with(CommitOptions::new().commit_msg(&header.format()));
         }

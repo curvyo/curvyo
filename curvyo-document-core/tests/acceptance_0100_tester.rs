@@ -1352,17 +1352,18 @@ fn ac21_the_format_is_38_and_a_newer_file_is_refused() {
     // 40 (ADR 0049); the rule checked here is unchanged.
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
-    assert_eq!(CURRENT_FORMAT_VERSION, 42);
+    // Format 43 since `specs/0028-material-test-library` (ADR 0054 §6).
+    assert_eq!(CURRENT_FORMAT_VERSION, 43);
     let f = fx();
     f.d.place_linked_clones(&[f.g], to_laser(&f)).unwrap();
     let bytes = pack(&f.d, "t").unwrap();
-    assert_eq!(manifest_version(&bytes), 42);
-    let newer = with_manifest_version(&bytes, 43);
+    assert_eq!(manifest_version(&bytes), 43);
+    let newer = with_manifest_version(&bytes, 44);
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 43,
-            supported: 42
+            found: 44,
+            supported: 43
         })
     ));
 }

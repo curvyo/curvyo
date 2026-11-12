@@ -149,6 +149,9 @@ pub struct TransformHandleTolerances {
     /// The centre handle is not drawn while a parameter handle is within
     /// this distance of the box centre (20 px, criterion 8).
     pub param_centre_yield_mm: f64,
+    /// A group box shows only its centre move handle: no resize, rotate or skew handle is drawn
+    /// or hit (a test grid's size comes from its fields, `specs/0028` `ux-notes.md` 6.5).
+    pub move_only: bool,
 }
 
 /// The dead zone radius of every Select-tool drag on the selected object, and
@@ -177,6 +180,7 @@ impl TransformHandleTolerances {
             param_pitch_mm: mm(KNOB_PITCH_PX),
             param_min_side_mm: mm(PARAM_MIN_SIDE_PX),
             param_centre_yield_mm: mm(CENTRE_YIELD_PX),
+            move_only: false,
         }
     }
 }

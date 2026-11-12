@@ -102,6 +102,7 @@ pub use theme::{
 };
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 pub use width_handles::{WidthDiamond, build_width_diamonds};
+pub use worked_chip::{WORKED_CHIP_PX, worked_chip_list};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};
 
@@ -212,6 +213,7 @@ pub use measure_marks::{
     build_measure_dots, build_measure_line, build_measure_radius, build_pick_band,
 };
 mod sketch_overlay;
+mod worked_chip;
 pub use sketch_overlay::{
     SketchAxisState, SketchPointGlyph, build_sketch_axes, build_sketch_capture_marker,
     build_sketch_lock_guide, build_sketch_overlay, build_sketch_preview, build_sketch_solved,
