@@ -1,6 +1,6 @@
 # ADRs for the image trace mask
 
-Status: Proposed (architect, 2026-11-12). File shape, sync and history: [ADR 0061](../../docs/adr/0061-image-trace-mask-in-the-project-file.md) (`needs-customer` by rule; the behaviour is the customer's decision of 2026-11-12, quoted there, and the spec defaults Frage 1 to 5: CLONE-MASK A, MASK-SETTINGS A, SYNC-MASK A, ELLIPSE-REGION later, ASSET-SWAP drop). Decisions marked **(Proposal)** are the architect's and vetoable at the demo. No new crate, no new dependency, no trait, no generic.
+Status: Accepted (customer 2026-11-13, Frage 10 A; architect 2026-11-12). File shape, sync and history: [ADR 0061](../../docs/adr/0061-image-trace-mask-in-the-project-file.md) (`needs-customer` by rule; the behaviour is the customer's decision of 2026-11-12, quoted there, and the spec defaults Frage 1 to 5: CLONE-MASK A, MASK-SETTINGS A, SYNC-MASK A, ELLIPSE-REGION later, ASSET-SWAP drop). Decisions marked **(Proposal)** are the architect's and vetoable at the demo. No new crate, no new dependency, no trait, no generic.
 
 ## Depends on
 
