@@ -43,6 +43,10 @@ export interface OperationRow {
   marginMm: number;
   items: number;
   tick: TickState;
+  /** "Group 3" or "2 groups" while selected groups run in it in part; else `null`. */
+  groupInPart: string | null;
+  /** The row is the unfolded one (`specs/0111` criterion 17). */
+  unfolded: boolean;
   /** The Settings block (`specs/0028`); `null` for a test grid row and an unknown operation. */
   settings: OperationSettings | null;
   /** A test grid row's grid (`specs/0028` criterion 6); `null` for any other row. */
@@ -82,18 +86,19 @@ export const COUNT_WIRE: Record<CountKey, string> = {
   outputOff: "output_off",
 };
 
-/** One clone member row: read-only, assignable by path through its clone (criterion 11). */
-export interface CloneMember {
-  clone: OperationId;
-  cloneName: string;
-  member: OperationId;
-  name: string;
-  /** The operations that hold this member through its clone. */
-  operations: OperationId[];
+/** One Select-bar kind button: the kind and what a press does (`specs/0111` criterion 2). */
+export interface KindButton {
+  kind: Exclude<OperationKind, "unknown">;
+  /** "Assigns to Engrave 1" or "Creates Cut 1": the accessible description, never the name. */
+  description: string;
 }
 
-/** How the output page is drawn (criterion 18). */
-export type ViewMode = "operations" | "drawn";
+/** The read-only entered group's crumb (`specs/0111` criterion 11): the page, then the groups. */
+export interface EnteredGroup {
+  page: string;
+  /** The entered groups' names, outermost first. */
+  groups: string[];
+}
 
 /** The whole Operations tab of the active laser page. */
 export interface OperationsView {
@@ -101,8 +106,12 @@ export interface OperationsView {
   rows: OperationRow[];
   summary: OperationsSummary;
   items: CountItems;
-  cloneMembers: CloneMember[];
-  viewMode: ViewMode;
+  /** Whether the page's Operations view toggle is pressed (`specs/0111` criterion 15). */
+  operationsView: boolean;
+  /** The five kind buttons in bar order; `null` while the Select bar hides them. */
+  selectBarKinds: KindButton[] | null;
+  /** The read-only entered group; `null` at the root. */
+  enteredGroup: EnteredGroup | null;
   /** The materials of this machine the Material pick lists. */
   pick: PickMaterial[];
 }
@@ -180,7 +189,10 @@ function asRow(value: unknown): OperationRow | null {
   const tick = asTick(value.tick);
   const settings = decodeSettings(value.settings);
   const grid = asGrid(value.grid);
+  const groupInPart = value.group_in_part === null ? null : typeof value.group_in_part === "string" ? value.group_in_part : undefined;
   if (
+    groupInPart === undefined ||
+    typeof value.unfolded !== "boolean" ||
     settings === undefined ||
     grid === undefined ||
     id === null ||
@@ -209,6 +221,8 @@ function asRow(value: unknown): OperationRow | null {
     marginMm: value.margin_mm,
     items,
     tick,
+    groupInPart,
+    unfolded: value.unfolded,
     settings,
     grid,
   };
@@ -237,25 +251,26 @@ function asItems(value: unknown): CountItems | null {
   return { running, notAssigned, runsWhileHidden, outputOff };
 }
 
-function asCloneMember(value: unknown): CloneMember | null {
-  if (!isObject(value)) return null;
-  const clone = asId(value.clone);
-  const member = asId(value.member);
-  const operations = asIdList(value.operations);
-  if (
-    clone === null ||
-    member === null ||
-    operations === null ||
-    typeof value.clone_name !== "string" ||
-    typeof value.name !== "string"
-  ) {
-    return null;
+const BUTTON_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out"] as const;
+
+function asKindButtons(value: unknown): KindButton[] | null | undefined {
+  if (value === null) return null;
+  if (!Array.isArray(value)) return undefined;
+  const buttons: KindButton[] = [];
+  for (const raw of value) {
+    if (!isObject(raw) || typeof raw.description !== "string") return undefined;
+    const kind = (BUTTON_KINDS as readonly unknown[]).includes(raw.kind) ? (raw.kind as KindButton["kind"]) : null;
+    if (kind === null) return undefined;
+    buttons.push({ kind, description: raw.description });
   }
-  return { clone, cloneName: value.clone_name, member, name: value.name, operations };
+  return buttons;
 }
 
-function asViewMode(value: unknown): ViewMode | null {
-  return value === "operations" || value === "drawn" ? value : null;
+function asEnteredGroup(value: unknown): EnteredGroup | null | undefined {
+  if (value === null) return null;
+  if (!isObject(value) || typeof value.page !== "string" || !Array.isArray(value.groups)) return undefined;
+  if (value.groups.length === 0 || !value.groups.every((name) => typeof name === "string")) return undefined;
+  return { page: value.page, groups: value.groups as string[] };
 }
 
 function asSummary(value: unknown): OperationsSummary | null {
@@ -294,18 +309,29 @@ export function decodeOperationsView(value: unknown): OperationsView | null {
   }
   const summary = asSummary(value.summary);
   const items = asItems(value.items);
-  const viewMode = asViewMode(value.view_mode);
   const pick = decodePick(value.pick);
-  if (summary === null || items === null || viewMode === null || pick === null || !Array.isArray(value.clone_members)) {
+  const selectBarKinds = asKindButtons(value.select_bar_kinds);
+  const enteredGroup = asEnteredGroup(value.entered_group);
+  if (
+    summary === null ||
+    items === null ||
+    pick === null ||
+    typeof value.operations_view !== "boolean" ||
+    selectBarKinds === undefined ||
+    enteredGroup === undefined
+  ) {
     return null;
   }
-  const cloneMembers: CloneMember[] = [];
-  for (const raw of value.clone_members) {
-    const member = asCloneMember(raw);
-    if (member === null) return null;
-    cloneMembers.push(member);
-  }
-  return { cutsLast: value.cuts_last, rows, summary, items, cloneMembers, viewMode, pick };
+  return {
+    cutsLast: value.cuts_last,
+    rows,
+    summary,
+    items,
+    operationsView: value.operations_view,
+    selectBarKinds,
+    enteredGroup,
+    pick,
+  };
 }
 
 /** The view a session's JSON text holds; `null` for bad JSON or a page without operations. */

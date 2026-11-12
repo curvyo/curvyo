@@ -5,7 +5,6 @@ import type { DropBadge } from "@/components/DropBadgePill";
 import { assignWord, digitRow } from "@/lib/operationRows";
 import {
   COUNT_WIRE,
-  decodeOperationId,
   decodeOperationsText,
   operationIdKey,
   operationIdText,
@@ -36,8 +35,6 @@ export interface OperationsApi {
   dropKey: string | null;
   /** The "Assign to <name>" badge beside the pointer over a row (`ux-notes.md` 6.3), `null` otherwise. */
   dropBadge: DropBadge | null;
-  /** Adds an operation of `kind` with the selection assigned; the new id, `null` when refused. */
-  press: (kind: string) => OperationId | null;
   rename: (id: OperationId, name: string) => boolean;
   remove: (id: OperationId) => boolean;
   setShow: (id: OperationId, on: boolean) => boolean;
@@ -47,12 +44,8 @@ export interface OperationsApi {
   move: (id: OperationId, to: number) => boolean;
   /** Ticks (`on`) or unticks the selection in the operation. */
   tick: (id: OperationId, on: boolean) => boolean;
-  /** Holds (`on`) or drops a clone member, by its clone, in the operation. */
-  setCloneMember: (id: OperationId, clone: OperationId, member: OperationId, on: boolean) => boolean;
   /** Selects the items of a summary count on the canvas (criterion 17). */
   selectItems: (count: CountKey) => boolean;
-  /** Draws the output page as drawn (`true`) or by its operations (`false`) (criterion 18). */
-  setDrawn: (drawn: boolean) => boolean;
 }
 
 interface Snapshot {
@@ -95,14 +88,6 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
     [getSession, sync],
   );
 
-  const press = useCallback(
-    (kind: string) =>
-      run<OperationId | null>(null, (s) => {
-        const text = s.press_operation_kind(kind);
-        return text === undefined ? null : decodeOperationId(text);
-      }),
-    [run],
-  );
   const rename = useCallback(
     (id: OperationId, name: string) => run(false, (s) => s.rename_operation(operationIdText(id), name)),
     [run],
@@ -128,18 +113,10 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
     (id: OperationId, on: boolean) => run(false, (s) => s.set_selection_in_operation(operationIdText(id), on)),
     [run],
   );
-  const setCloneMember = useCallback(
-    (id: OperationId, clone: OperationId, member: OperationId, on: boolean) =>
-      run(false, (s) =>
-        s.set_clone_member_in_operation(operationIdText(id), operationIdText(clone), operationIdText(member), on),
-      ),
-    [run],
-  );
   const selectItems = useCallback(
     (count: CountKey) => run(false, (s) => s.select_operation_items(COUNT_WIRE[count])),
     [run],
   );
-  const setDrawn = useCallback((drawn: boolean) => run(false, (s) => s.set_operations_drawn(drawn)), [run]);
 
   // A canvas drag that ends over an operation row assigns the selection to it, in one step, and
   // the drag is cancelled first (Escape: no move, no step), so the items do not move. The window
@@ -214,7 +191,6 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
     notice: snapshot.notice,
     dropKey,
     dropBadge,
-    press,
     rename,
     remove,
     setShow,
@@ -222,8 +198,6 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
     setCutsLast,
     move,
     tick,
-    setCloneMember,
     selectItems,
-    setDrawn,
   };
 }

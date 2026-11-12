@@ -64,6 +64,8 @@ interface CanvasProps {
   overOperationRow?: boolean;
   /** The fit cue of the move in flight (`specs/0102` 7.2). */
   fitCue?: FitCue | null;
+  /** The Operations view toggle in a laser page's label (`specs/0111` criterion 15). */
+  onToggleOperationsView?: (page: string) => void;
 }
 
 /**
@@ -86,6 +88,7 @@ export function Canvas({
   showPageFrames = true,
   overOperationRow = false,
   fitCue = null,
+  onToggleOperationsView,
 }: CanvasProps) {
   const penCue = usePenCue(editor);
   const drop = useFileDrop(editor.canvasRef, onDropFiles, () =>
@@ -187,7 +190,7 @@ export function Canvas({
         />
 
       </NodeContextMenu>
-      {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} />}
+      {showPageFrames && <PageFrames getSession={editor.getSession} dropTarget={editor.moveBadges.dropTarget} onToggleOperationsView={onToggleOperationsView} />}
       {showPageFrames && <PlacedPageTags getSession={editor.getSession} />}
       {showPageFrames && <FixtureLabels getSession={editor.getSession} />}
       <SketchAnnotations sketch={sketch} />

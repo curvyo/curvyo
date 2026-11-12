@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { CornerControl } from "@/components/CornerControl";
 import { ToolbarSwitch } from "@/components/ToolbarSwitch";
+import { PanelSwitch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { MachineProfileList } from "@/components/workbench/MachineProfileList";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
@@ -46,6 +47,8 @@ interface MachineBlockProps {
   workbenches: WorkbenchesApi;
   /** The document's display unit, for the read-only work area line. */
   unit?: UnitSymbol;
+  /** After a mouse click on a switch the keyboard goes back to the canvas. */
+  onReturnFocus?: () => void;
 }
 
 /**
@@ -54,7 +57,7 @@ interface MachineBlockProps {
  * (each edit one undo step) and the connection of the chosen saved profile (library, no undo).
  * Host-drawn from the session's view; the extension only places it (`adrs.md` note 4).
  */
-export function MachineBlock({ label, machine, workbenches, unit = "mm" }: MachineBlockProps) {
+export function MachineBlock({ label, machine, workbenches, unit = "mm", onReturnFocus = () => {} }: MachineBlockProps) {
   const api = workbenches.machine;
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -242,6 +245,16 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm" }: Machi
             tooltip="Laser mode"
             checked={copy.laser_mode}
             onCheckedChange={(on) => api.setLaserMode(on)}
+          />
+        </div>
+        {/* The capability Z offset reads (`specs/0111` criterion 22): one undo step on the page's
+            profile copy; default off. */}
+        <div className="flex h-7 items-center justify-between">
+          <PanelSwitch
+            label="Motorised Z axis"
+            checked={copy.motorised_z === true}
+            onCheckedChange={(on) => api.setMotorisedZ(on)}
+            onReturnFocus={onReturnFocus}
           />
         </div>
       </div>

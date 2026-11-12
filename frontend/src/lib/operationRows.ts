@@ -5,6 +5,9 @@
  * component only draws what these return.
  */
 
+import { ROW_HEIGHT, entryHeight } from "./operationUnfold.ts";
+
+export { ROW_HEIGHT };
 import {
   operationIdKey,
   type CountKey,
@@ -25,16 +28,6 @@ export const KIND_WORDS: Record<OperationKind, string> = {
   unknown: "Unknown operation",
 };
 
-/** The add buttons' accessible names (`ux-notes.md` section 10). */
-export const ADD_LABELS = [
-  ["cut", "Add Cut"],
-  ["score", "Add Score"],
-  ["engrave", "Add Engrave"],
-  ["engrave_outline", "Add Engrave + Outline"],
-  ["cut_out", "Add Cut-out"],
-] as const;
-
-
 /** How far Page Up and Page Down move the focus (`ux-notes.md` section 9). */
 export const ROW_JUMP = 5;
 
@@ -51,7 +44,18 @@ export function rowName(row: OperationRow): string {
     const size = row.grid.columns === 0 ? "no grid" : `${row.grid.columns} by ${row.grid.rows} cells`;
     return `${row.name}, ${KIND_WORDS[row.kind].toLowerCase()} test grid, ${size}${off}`;
   }
-  return `${row.name}, ${KIND_WORDS[row.kind]}, ${itemsText(row.items)}${off}`;
+  const part = row.groupInPart === null ? "" : `, ${row.groupInPart} in part`;
+  return `${row.name}, ${KIND_WORDS[row.kind]}, ${itemsText(row.items)}${part}${off}`;
+}
+
+/** Line 2 of a known, non-grid row in three parts: the muted text, the semibold group words of a
+ * mixed tick (`specs/0111` `ux-notes.md` 4.1, after the count) and the muted tail. */
+export function rowLine2(row: OperationRow, digit: number | null): { text: string; part: string; tail: string } {
+  return {
+    text: `${digit} · ${KIND_WORDS[row.kind]} · ${itemsText(row.items)}`,
+    part: row.groupInPart === null ? "" : ` · ${row.groupInPart} in part`,
+    tail: row.output ? "" : " · Output off",
+  };
 }
 
 /** A stable React key of a row: the node id. */
@@ -130,8 +134,6 @@ export function summaryLines(view: OperationsView): SummaryLine[] {
 /** The height of a header row, of an operation row, and of its open details (`ux-notes.md` 4.1,
  * 4.2, 4.4): fixed, so the window and the scrollbar agree. */
 export const HEADER_HEIGHT = 24;
-/** One operation row: 40 px (`ux-notes.md` 4.2); 48 px with a coarse pointer, by CSS. */
-export const ROW_HEIGHT = 40;
 
 /** One entry of the list as it is drawn: a section header, or an operation row. */
 export type ListEntry =
@@ -139,14 +141,19 @@ export type ListEntry =
   | { kind: "row"; row: OperationRow; index: number; height: number };
 
 /** The list flattened in drawing order (headers with Cuts last on), each with its height. */
-export function listEntries(view: OperationsView, _openKey: string | null = null): ListEntry[] {
+export function listEntries(
+  view: OperationsView,
+  openKey: string | null = null,
+  measuredBody: number | null = null,
+): ListEntry[] {
   const entries: ListEntry[] = [];
   for (const group of listGroups(view)) {
     if (group.section !== null) {
       entries.push({ kind: "header", section: group.section, height: HEADER_HEIGHT });
     }
     for (const { row, index } of group.rows) {
-      entries.push({ kind: "row", row, index, height: ROW_HEIGHT });
+      // The one unfolded row (`openKey`) is a single tall item: the row and its body.
+      entries.push({ kind: "row", row, index, height: entryHeight(openKey === operationIdKey(row.id), measuredBody) });
     }
   }
   return entries;

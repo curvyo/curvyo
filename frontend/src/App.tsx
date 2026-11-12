@@ -49,6 +49,7 @@ import { useFixtureJobs } from "@/hooks/useFixtureJobs";
 import { useMaterials } from "@/hooks/useMaterials";
 import { useOperations } from "@/hooks/useOperations";
 import { useOperationSettings } from "@/hooks/useOperationSettings";
+import { useOperationTools } from "@/hooks/useOperationTools";
 import { CollaborationPill } from "@/components/CollaborationPill";
 import { PresenceOverlay } from "@/components/PresenceOverlay";
 import { RULER_THICKNESS_PX } from "@/lib/rulerDraw";
@@ -152,6 +153,8 @@ function Editor() {
   useImageClipboard(editor, project.pasteImage, project.pasteFiles);
   const collab = useCollaboration(editor);
   const operations = useOperations(editor);
+  // The Select bar's kind buttons, the unfolded row and the Operations view toggle (`specs/0111`).
+  const operationTools = useOperationTools(editor);
   // The laser fixtures of the active laser page (`specs/0102-laser-fixtures`).
   const fixtures = useFixtures(editor);
   // The fixture jobs of the active laser page (`specs/0103-fixture-jobs`).
@@ -254,6 +257,12 @@ function Editor() {
               guideState={editor.guideState}
               onToggleGuide={editor.toggleGuide}
               arcBar={editor.arcBar}
+              operationKinds={{
+                buttons: operations.view?.selectBarKinds ?? null,
+                entered: operations.view?.enteredGroup != null,
+                onPress: (kind, shift) => operationTools.press(kind, shift),
+                onLeaveGroup: operationTools.leaveGroup,
+              }}
               tile={{ slot: editor.tiling.slot, onEnter: editor.tiling.enter, onRelease: editor.tiling.release }}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
@@ -339,6 +348,7 @@ function Editor() {
             editor.containerRef.current?.focus();
           }}
           announcement={editor.grouping.announcement}
+          laserGroup={operations.view?.enteredGroup ?? null}
           persistent={<HistoryPreviewLine getSession={editor.getSession} />}
         />
     </>
@@ -411,6 +421,7 @@ function Editor() {
           onDropFiles={project.importFiles}
           overlay={<PresenceOverlay getSession={editor.getSession} />}
           showPageFrames
+          onToggleOperationsView={operationTools.toggleView}
         />
         <CollaborationPill
           view={collab.view}
@@ -443,6 +454,7 @@ function Editor() {
           fixtures={fixtures}
           fixtureJobs={fixtureJobs}
           operationSettings={operationSettings}
+          operationTools={operationTools}
           materials={materials}
         />
       </div>

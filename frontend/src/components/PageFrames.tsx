@@ -1,15 +1,20 @@
+import { ListTree } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { WasmSession } from "@/lib/editorSession";
-import { readPages } from "@/lib/pages";
+import { OPERATIONS_VIEW_NAME, operationsToggle, readPages } from "@/lib/pages";
+import { Tooltip } from "@/components/ui/tooltip";
 import { KindChip } from "@/components/KindChip";
 /** Screen-sized page chrome above the un-clipped drawing. Geometry comes from Rust. */
 export function PageFrames({
   getSession,
   dropTarget = null,
+  onToggleOperationsView,
 }: {
   getSession: () => WasmSession | null;
   /** The laser page a canvas drag of objects is over (its badge is no refusal): frame cue. */
   dropTarget?: string | null;
+  /** The Operations view toggle of a laser page's label (`specs/0111` criterion 15). */
+  onToggleOperationsView?: (page: string) => void;
 }) {
   const [json, setJson] = useState("[]");
   useEffect(() => {
@@ -28,7 +33,6 @@ export function PageFrames({
   }, [getSession]);
   return (
     <div
-      aria-hidden
       className="pointer-events-none absolute inset-0 overflow-hidden"
       data-page-frames=""
     >
@@ -52,6 +56,7 @@ export function PageFrames({
           {(page.dropTarget || page.id === dropTarget) && (
             <div
               data-drop-target=""
+              aria-hidden
               className="absolute"
               style={{ inset: -4, outline: "2px solid var(--editor-accent)" }}
             />
@@ -64,19 +69,59 @@ export function PageFrames({
               className="absolute bottom-full left-0 mb-1 flex max-w-full items-center gap-1.5 whitespace-nowrap text-xs"
               style={{ color: "var(--toolbar-icon)" }}
             >
-              <span className={`min-w-0 truncate ${page.active || page.home ? "font-semibold" : ""}`}>{page.name}</span>
-              <KindChip
-                size={12}
-                kind={{
-                  icon: page.kindIcon,
-                  word: page.screenWidth >= 96 ? page.kindWord : "",
-                  off: page.kindOff,
-                }}
-              />
+              <span aria-hidden className={`min-w-0 truncate ${page.active || page.home ? "font-semibold" : ""}`}>
+                {page.name}
+              </span>
+              <span aria-hidden className="flex shrink-0 items-center">
+                <KindChip
+                  size={12}
+                  kind={{
+                    icon: page.kindIcon,
+                    word: page.screenWidth >= 96 ? page.kindWord : "",
+                    off: page.kindOff,
+                  }}
+                />
+              </span>
+              {operationsToggle(page) && onToggleOperationsView ? (
+                <OperationsViewToggle
+                  pressed={operationsToggle(page)?.pressed ?? true}
+                  onPress={() => onToggleOperationsView(page.id)}
+                />
+              ) : null}
             </span>
           )}
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * The Operations view toggle after the Laser chip (`specs/0111-laser-operation-tools`
+ * `ux-notes.md` 5): a 20 px `ListTree` button in a 24 px hit area, pressed by default (the
+ * pressed look of the "Link corners toggle"), a thin border when unpressed so it still reads as a
+ * button over the pasteboard. Per page and session only; no step, no notice.
+ */
+function OperationsViewToggle({ pressed, onPress }: { pressed: boolean; onPress: () => void }) {
+  return (
+    <Tooltip side="bottom" content={OPERATIONS_VIEW_NAME}>
+      <button
+        type="button"
+        aria-pressed={pressed}
+        aria-label={OPERATIONS_VIEW_NAME}
+        onClick={onPress}
+        className="pointer-events-auto -my-0.5 flex size-6 shrink-0 items-center justify-center rounded-[7px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+      >
+        <span
+          className={`flex size-5 items-center justify-center rounded-[5px] text-[var(--toolbar-icon)] ${
+            pressed
+              ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]"
+              : "border border-[color-mix(in_srgb,var(--toolbar-icon)_25%,transparent)] hover:bg-[var(--editor-accent-hover)]"
+          }`}
+        >
+          <ListTree aria-hidden size={14} strokeWidth={1.5} absoluteStrokeWidth />
+        </span>
+      </button>
+    </Tooltip>
   );
 }
