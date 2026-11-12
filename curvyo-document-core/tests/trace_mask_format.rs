@@ -36,14 +36,6 @@ fn settings(value: Value) -> TracePartSettings {
     serde_json::from_value(value).unwrap()
 }
 
-fn image(d: &Document, bytes: &'static [u8], name: &str, placement: Affine) -> NodeId {
-    d.add_images(&[NewImage {
-        bytes: Arc::from(bytes),
-        placement,
-        name: name.into(),
-    }])
-    .unwrap()[0]
-}
 
 fn points(list: &[(f64, f64)]) -> Vec<UnitPoint> {
     list.iter().map(|&(u, v)| UnitPoint::new(u, v)).collect()
@@ -62,13 +54,23 @@ fn region(kind: TraceRegionKind, subtract: bool, list: &[(f64, f64)]) -> NewTrac
 fn golden_document() -> Document {
     let d = Document::new(1);
     let turned = Affine::new(86.6, 50.0, -40.0, 86.6, 20.0, 10.0);
-    let m1 = image(&d, b"m1 picture", "M1", turned);
-    image(
-        &d,
-        b"m2 picture",
-        "M2",
-        Affine::new(100.0, 0.0, 0.0, 100.0, 150.0, 0.0),
-    );
+    // One import of both pictures, so no two adjacent steps share a label (the legacy-history
+    // oracle of `0020`).
+    let ids = d
+        .add_images(&[
+            NewImage {
+                bytes: Arc::from(&b"m1 picture"[..]),
+                placement: turned,
+                name: "M1".into(),
+            },
+            NewImage {
+                bytes: Arc::from(&b"m2 picture"[..]),
+                placement: Affine::new(100.0, 0.0, 0.0, 100.0, 150.0, 0.0),
+                name: "M2".into(),
+            },
+        ])
+        .unwrap();
+    let m1 = ids[0];
     let first = ImplicitTracePart {
         outside: false,
         settings: settings(json!({"threshold": 50, "smooth": 80, "method": "brightness"})),
