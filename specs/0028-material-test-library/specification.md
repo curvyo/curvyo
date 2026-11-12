@@ -1,6 +1,6 @@
 # Material test library: a power/speed test grid for the page's machine, the cell that worked, a reusable material record, settings on the operation
 
-Status: Draft
+Status: Done (PR #333)
 Priority: Must
 Origin: Customer (R-MAT-001 to R-MAT-003; MVP slice 15; `0063` slice 6 "Settings and output"). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
