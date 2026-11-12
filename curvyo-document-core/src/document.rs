@@ -490,7 +490,19 @@ impl DocumentVersion {
 /// not rewritten. Damage: an `op_options` that does not read is Damaged settings (the extension
 /// decides; the kind stays readable). The number is provisional by the rule above. Goldens:
 /// `operation_tools_v44.curvyo`, `operation_options_damaged_v44.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 44;
+///
+/// Bumped to 45 in `image-trace-mask` (ADR 0061, `specs/0114-image-trace-mask`): an image node may
+/// carry its trace mask as keyed registers `trace_part.<part>` (`{order, outside}`),
+/// `trace_settings.<part>` (one atomic map of plain values) and `trace_region.<part>.<region>`
+/// (`{order, kind, subtract, points}` in the image's unit square). A build that stops at 44 would
+/// open the file, show no mask and trace the whole picture where the maker expects the stored
+/// mask, and its tiling update would not drop a mask on an asset change, so it must refuse every
+/// file of this build as too new. Migration from 44 is none: masks were never stored, and mask
+/// paths drawn under `0094` stay ordinary paths; a format-44 file opens unchanged and is not
+/// rewritten. Damage is read as ADR 0061 §7 says and never repaired on read. The number was the
+/// next free one at merge. Goldens: `trace_mask_v45.curvyo`, `trace_mask_damaged_v45.curvyo`;
+/// the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 45;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";
@@ -871,7 +883,15 @@ impl Document {
                     // Residue on a clone without own style (ADR 0016 §5).
                     registers.opacity = None;
                 }
-                Some(NodeJson { object, registers })
+                let trace_mask = matches!(object, ObjectJson::Image { .. })
+                    .then(|| self.trace_mask(id))
+                    .flatten()
+                    .filter(|mask| !mask.is_empty());
+                Some(NodeJson {
+                    object,
+                    registers,
+                    trace_mask,
+                })
             })
             .collect()
     }
@@ -906,6 +926,9 @@ struct NodeJson {
     object: ObjectJson,
     #[serde(flatten)]
     registers: RegistersJson,
+    /// An image's stored trace mask (ADR 0061 §11), left out when nothing is stored.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trace_mask: Option<crate::trace_mask_model::TraceMask>,
 }
 
 /// The registers of one node in `document.json`; each is left out at its default.

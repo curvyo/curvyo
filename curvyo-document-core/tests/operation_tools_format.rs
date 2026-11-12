@@ -273,7 +273,7 @@ fn the_operation_tools_golden_reads_back_every_option_interval_copy_and_group_ke
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 44);
-    assert_eq!(CURRENT_FORMAT_VERSION, 44);
+    assert_eq!(CURRENT_FORMAT_VERSION, 45);
     let d = open_unchanged(&bytes);
     let mfgs = d.manufacturings();
     assert_eq!(mfgs.len(), 2);
@@ -388,8 +388,8 @@ fn a_file_of_format_45_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 45,
-            supported: 44
+            found: 46,
+            supported: 45
         })
     ));
 }

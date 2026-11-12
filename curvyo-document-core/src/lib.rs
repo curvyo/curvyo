@@ -317,6 +317,9 @@ pub use image_model::{
     PASTE_IMAGE_COMMIT_LABEL, no_paint,
 };
 pub use images::{ImageInsertError, NewImage};
+mod trace_mask_codec;
+mod trace_mask_commands;
+mod trace_mask_model;
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use layers::{DELETE_LAYER_COMMIT_LABEL, INITIAL_LAYER_NAME, NEW_LAYER_COMMIT_LABEL};
 pub use node_edit::{
@@ -395,6 +398,15 @@ pub use tiling_model::{
     RELEASE_TILING_COMMIT_LABEL, RecipeError, SpacingMode, TILE_COMMIT_LABEL, TILING_GROUP_NAME,
     TILING_MAX_COUNT, TILING_WARN_COUNT, TilingCell, TilingError, TilingLayout, TilingRecipe,
     TilingRequest, TilingResult, Variance, hue_shifted,
+};
+pub use trace_mask_codec::FIRST_TRACE_PART;
+pub use trace_mask_model::{
+    ADD_TRACE_PART_LABEL, CLEAR_TRACE_MASK_LABEL, DELETE_TRACE_REGION_LABEL,
+    DRAW_TRACE_LASSO_LABEL, DRAW_TRACE_RECTANGLE_LABEL, EDIT_TRACE_SETTINGS_LABEL,
+    ImplicitTracePart, MOVE_TRACE_LASSO_CORNER_LABEL, MOVE_TRACE_REGION_LABEL, NewTraceRegion,
+    REMOVE_TRACE_PART_LABEL, RESIZE_TRACE_REGION_LABEL, TRACE_MASK_INSIDE_LABEL, TRACE_MASK_LABELS,
+    TRACE_MASK_OUTSIDE_LABEL, TraceMask, TraceMaskError, TraceMaskPart, TraceMaskRegion,
+    TracePartRef, TracePartSettings, TraceRegionEdit, TraceRegionKind, UNIT_LIMIT, UnitPoint,
 };
 pub use units::{Angle, DocumentSize, Length, Point, Timestamp, Tolerance, Vec2, ViewTransform};
 pub use workspace_disk_plan::{DiskOp, DiskPlan, DiskState, ListPlace, ScannedDocument, plan_disk};
