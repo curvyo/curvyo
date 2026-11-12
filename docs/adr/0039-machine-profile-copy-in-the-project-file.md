@@ -6,6 +6,8 @@
 12, 15.
 Note 2026-11-05: §4 amended by [ADR 0042](0042-page-kinds.md) (proposed): a pick resizes the output page about the copy's origin corner; the work area is never typed on the page.
 
+**Note (ADR 0056, proposed 2026-11-12):** §1 and §5: the project's copy of a profile carries `motorised_z` (0056 §7); the project format is 44.
+
 ## Context
 
 ADR 0033 §1 gave the manufacturing a placeholder register `mfg_machine_name` and said it would be
