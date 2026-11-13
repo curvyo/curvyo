@@ -13,8 +13,8 @@
 use std::collections::HashMap;
 
 use loro::{
-    ContainerID, ContainerType, ExportMode, JsonMapOp, JsonOpContent, LoroDoc, LoroMap, LoroValue,
-    ValueOrContainer, VersionVector,
+    ContainerID, ContainerType, ExportMode, JsonMapOp, JsonOpContent, LoroDoc, LoroMap,
+    LoroMapValue, LoroValue, ValueOrContainer, VersionVector,
 };
 
 use crate::document::DocumentVersion;
@@ -204,6 +204,10 @@ impl LibraryList {
 
     /// Records the item `id` of `kind` as switched on with `text`, the exact record text.
     ///
+    /// The entry's fields are written in a fixed order (a plain `HashMap` would leave its
+    /// random iteration order in the update bytes, so no two runs would produce the same
+    /// golden or wire bytes).
+    ///
     /// # Errors
     /// [`LibraryListError::BadId`], [`LibraryListError::TooLarge`],
     /// [`LibraryListError::Encode`].
@@ -214,9 +218,10 @@ impl LibraryList {
         if text.len() > kind.max_text_bytes() {
             return Err(LibraryListError::TooLarge);
         }
-        let mut value = HashMap::new();
-        value.insert(KEY_SYNC.to_owned(), LoroValue::from(true));
-        value.insert(KEY_TEXT.to_owned(), LoroValue::from(text));
+        let value = vec![
+            (KEY_SYNC.to_owned(), LoroValue::from(true)),
+            (KEY_TEXT.to_owned(), LoroValue::from(text)),
+        ];
         self.write(kind.map(), id, value)
     }
 
@@ -233,8 +238,7 @@ impl LibraryList {
         if self.entry(kind, id).is_none() {
             return Ok(());
         }
-        let mut value = HashMap::new();
-        value.insert(KEY_SYNC.to_owned(), LoroValue::from(false));
+        let value = vec![(KEY_SYNC.to_owned(), LoroValue::from(false))];
         self.write(kind.map(), id, value)
     }
 
@@ -292,11 +296,11 @@ impl LibraryList {
         &self,
         map: &str,
         key: &str,
-        value: HashMap<String, LoroValue>,
+        value: Vec<(String, LoroValue)>,
     ) -> Result<(), LibraryListError> {
         self.doc
             .get_map(map)
-            .insert(key, LoroValue::from(value))
+            .insert(key, LoroValue::Map(LoroMapValue::from(value)))
             .map_err(|_| LibraryListError::Encode)?;
         self.doc.commit();
         Ok(())
