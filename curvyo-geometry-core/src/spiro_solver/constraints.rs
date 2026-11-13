@@ -8,7 +8,9 @@ const CHORD_FLOOR: f64 = 1e-12;
 /// The tolerance of the accurate integral that polishes a solution.
 const ACCURATE_INTEGRAL_TOLERANCE: f64 = 1e-10;
 
-/// Unit-scale smooth Spiro constraints: G4 at each smooth knot and natural open ends.
+/// The tangent angle, curvature and its first two derivatives (Levien's `compute_ends`) at the
+/// start and the end of segment `i` with coefficients `parameters`, at unit scale; `None` for a
+/// segment without a direction or with values that are not finite.
 // The short names are those of Levien's formulas (`k` the coefficients, `l` the length ratio).
 #[allow(clippy::many_single_char_names)]
 pub(super) fn segment_ends(
@@ -107,92 +109,24 @@ impl Layout {
         }
     }
 
-    /// The first residual row of `knot`'s constraints and their values: two at an open end, four
-    /// at any other knot. `ends` are the ends of every segment.
-    pub(super) fn knot(
-        &self,
-        knot: usize,
-        wrapped: bool,
-        ends: &[[[f64; 4]; 2]],
-    ) -> (usize, [f64; 4], usize) {
-        if !self.closed && knot == 0 {
-            let start = &ends[0][0];
-            return (0, [start[2], start[3], 0.0, 0.0], 2);
-        }
-        if !self.closed && knot == self.segments {
-            let end = &ends[self.segments - 1][1];
-            return (4 * self.segments - 2, [end[2], end[3], 0.0, 0.0], 2);
-        }
+    /// The angle and curvature errors at smooth `knot` (not an open end), the angle error
+    /// reduced to one turn when `wrapped`. `ends` are the ends of every segment.
+    pub(super) fn knot(&self, knot: usize, wrapped: bool, ends: &[[[f64; 4]; 2]]) -> [f64; 2] {
         let prev = (knot + self.segments - 1) % self.segments;
         let (before, after) = (&ends[prev][1], &ends[knot][0]);
-        // As in Levien's `spiro_iter`: the bend is reduced to one turn, the error is not, so a
-        // solution a full turn away is no solution unless `wrapped`.
+        // The bend is reduced to one turn, and so is the error, as libspiro's and Inkscape's
+        // `spiro_iter` reduce the angle errors (Levien's permissive original does not; procedure
+        // only, no source taken).
         let delta = self.bends[knot] - before[0] - after[0];
         let angle = if wrapped {
             delta - std::f64::consts::TAU * (delta / std::f64::consts::TAU + 0.5).floor()
         } else {
             delta
         };
-        let row = if self.closed { 4 * knot } else { 4 * knot - 2 };
-        (
-            row,
-            [
-                angle,
-                after[1] - before[1],
-                after[2] - before[2],
-                after[3] - before[3],
-            ],
-            4,
-        )
+        [angle, after[1] - before[1]]
     }
-
-    /// The constraint errors of a curve whose segments end as `ends`. With `wrapped`, a knot's
-    /// angle error is reduced to one turn, so a curve that winds a full turn more at a knot also
-    /// solves.
-    pub(super) fn residual(&self, wrapped: bool, ends: &[[[f64; 4]; 2]]) -> Option<Vec<f64>> {
-        let mut out = vec![0.0; 4 * self.segments];
-        let knots = if self.closed {
-            self.segments
-        } else {
-            self.segments + 1
-        };
-        for knot in 0..knots {
-            let (row, values, count) = self.knot(knot, wrapped, ends);
-            out[row..row + count].copy_from_slice(&values[..count]);
-        }
-        out.iter().all(|v| v.is_finite()).then_some(out)
-    }
-}
-
-pub(super) fn residual(
-    points: &[(f64, f64)],
-    closed: bool,
-    parameters: &[f64],
-) -> Option<Vec<f64>> {
-    residual_mode(points, closed, false, parameters, true)
-}
-
-pub(super) fn residual_mode(
-    points: &[(f64, f64)],
-    closed: bool,
-    wrapped: bool,
-    parameters: &[f64],
-    accurate: bool,
-) -> Option<Vec<f64>> {
-    let segments = if closed {
-        points.len()
-    } else {
-        points.len() - 1
-    };
-    let ends: Option<Vec<_>> = (0..segments)
-        .map(|i| segment_ends(points, i, &parameters[4 * i..4 * i + 4], accurate))
-        .collect();
-    Layout::new(points, closed).residual(wrapped, &ends?)
 }
 
 pub(super) fn maximum(values: &[f64]) -> f64 {
     values.iter().map(|v| v.abs()).fold(0.0, f64::max)
-}
-pub(super) fn energy(values: &[f64]) -> f64 {
-    values.iter().map(|v| v * v).sum()
 }

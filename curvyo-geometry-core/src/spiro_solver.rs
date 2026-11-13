@@ -1,17 +1,10 @@
-//! Solves Spiro interpolation constraints with residual validation.
+//! Solves the Spiro interpolation constraints of a curve's smooth runs.
 
+mod clothoid;
 mod constraints;
 mod linear;
-mod newton;
 
-use constraints::residual;
-use newton::{newton, newton_near};
-
-#[derive(Debug)]
-pub(super) struct Solution {
-    pub coefficients: Vec<[f64; 4]>,
-    pub max_residual: f64,
-}
+use clothoid::solve_g2;
 
 #[derive(Debug)]
 pub(super) enum Failure {
@@ -19,23 +12,15 @@ pub(super) enum Failure {
     NoConvergence,
 }
 
-/// Newton solves a continuation may spend before an open curve is given up.
-const MAX_CONTINUATION_SOLVES: usize = 8;
-/// The longest run the wound last resort is tried on; longer ones fail fast instead.
-const MAX_WOUND_SEGMENTS: usize = 8;
-/// The smallest continuation step; a smaller one gives the curve up.
-const MIN_CONTINUATION_STEP: f64 = 1e-3;
-/// Newton solves the growing of an open curve may spend before it is given up.
-const MAX_GROWN_SOLVES: usize = 64;
+/// Two controls closer than this (in units of the run's size) are one point: the segment between
+/// them has no direction and is drawn as that point.
+const COINCIDENT: f64 = 1e-9;
 
-/// Solves one smooth run. With a `seed` (one coefficient set per segment, from an earlier solve of
-/// nearby controls) only Newton's iteration from it is tried, so the answer stays on the seed's
-/// branch, and given up early; without one, from zero and then the fallbacks.
-fn solve(
-    controls: &[(f64, f64)],
-    closed: bool,
-    seed: Option<&[[f64; 4]]>,
-) -> Result<Solution, Failure> {
+/// The coefficients of one smooth run (one set per segment). Coincident neighbours are one
+/// control to the solve and their segment is a point (straight, zero long), so a point placed on
+/// another never leaves the curve without a direction (Inkscape offsets such points by a hair
+/// instead). Always an answer for finite controls: see [`solve_g2`].
+fn solve(controls: &[(f64, f64)], closed: bool) -> Result<Vec<[f64; 4]>, Failure> {
     if controls.len() < if closed { 3 } else { 2 }
         || controls
             .iter()
@@ -43,198 +28,90 @@ fn solve(
     {
         return Err(Failure::Invalid);
     }
-    let (mut left, mut right, mut top, mut bottom) = (
-        f64::INFINITY,
-        f64::NEG_INFINITY,
-        f64::INFINITY,
-        f64::NEG_INFINITY,
-    );
-    for &(x, y) in controls {
-        left = left.min(x);
-        right = right.max(x);
-        top = top.min(y);
-        bottom = bottom.max(y);
+    let n = controls.len();
+    let segments = if closed { n } else { n - 1 };
+    let mut coefficients = vec![[0.0; 4]; segments];
+    let Some(points) = unit_scale(controls) else {
+        // Every control on one spot: the curve is that point.
+        return Ok(coefficients);
+    };
+    let apart = |i: usize| {
+        let (a, b) = (points[i], points[(i + 1) % n]);
+        (b.0 - a.0).hypot(b.1 - a.1) > COINCIDENT
+    };
+    let kept: Vec<usize> = (0..segments).filter(|&i| apart(i)).collect();
+    let mut run: Vec<_> = kept.iter().map(|&i| points[i]).collect();
+    if !closed && let Some(&last) = kept.last() {
+        run.push(points[last + 1]);
     }
-    let scale = (right - left).max(bottom - top);
-    if !scale.is_finite() || scale <= 0.0 {
-        return Err(Failure::Invalid);
+    if run.len() < if closed { 3 } else { 2 } {
+        return Ok(coefficients);
     }
-    let points: Vec<_> = controls
+    for (&segment, k) in kept.iter().zip(solve_g2(&run, closed)) {
+        coefficients[segment] = k;
+    }
+    Ok(coefficients)
+}
+
+/// The controls about their centroid in units of their root mean square distance from it, `None`
+/// when they all lie on one spot. The unit does not change when the controls move, turn or scale,
+/// so neither do the solver's absolute thresholds (its curvature errors scale with the unit).
+fn unit_scale(controls: &[(f64, f64)]) -> Option<Vec<(f64, f64)>> {
+    let n = count(controls.len());
+    let (cx, cy) = controls
         .iter()
-        .map(|&(x, y)| ((x - left) / scale, (y - top) / scale))
-        .collect();
-    let nseg = if closed {
-        points.len()
-    } else {
-        points.len() - 1
-    };
-    if nseg == 1 {
-        return Ok(Solution {
-            coefficients: vec![[0.0; 4]],
-            max_residual: 0.0,
-        });
-    }
-    if residual(&points, closed, &vec![0.0; 4 * nseg]).is_none() {
-        return Err(Failure::Invalid);
-    }
-    if let Some(seed) = seed {
-        // The coefficients are scale-free: a seed of moved controls is a start near the answer.
-        let start: Vec<f64> = seed.iter().flatten().copied().collect();
-        if start.len() != 4 * nseg {
-            return Err(Failure::Invalid);
-        }
-        return newton_near(&points, closed, start);
-    }
-    // Levien's plain iteration from zero solves most curves in a few steps. Where its full steps
-    // run away, an open curve is grown one control at a time (as the Pen draws it) and then
-    // followed from its chord to its control polygon; a closed one gets steps that never raise
-    // the residual.
-    let zero = vec![0.0; 4 * nseg];
-    newton(&points, closed, false, zero.clone(), false)
-        .or_else(|_| {
-            if closed {
-                newton(&points, closed, false, zero, true)
-            } else {
-                grown(&points).or_else(|_| continuation(&points))
-            }
-        })
-        .or_else(|_| wound(&points, closed))
-}
-
-/// Solves an open curve by adding its controls one at a time, each solve starting from the
-/// previous one's coefficients and a straight new segment: the curve the Pen drew point by point.
-fn grown(points: &[(f64, f64)]) -> Result<Solution, Failure> {
-    let mut x = vec![0.0; 4];
-    let mut solves = 0;
-    for end in 3..=points.len() {
-        x.extend([0.0; 4]);
-        solves += 1;
-        if solves > MAX_GROWN_SOLVES {
-            return Err(Failure::NoConvergence);
-        }
-        let solution = newton(&points[..end], false, false, x, false)?;
-        if end == points.len() {
-            return Ok(solution);
-        }
-        x = solution.coefficients.into_iter().flatten().collect();
-    }
-    Err(Failure::NoConvergence)
-}
-
-/// The last resort for a short curve that has no solution without an extra turn at some knot (the
-/// looping answers of the libspiro fork): Newton on the wrapped constraints from a few seeds that
-/// bend the middle segments, keeping the answer with the smallest coefficients.
-fn wound(points: &[(f64, f64)], closed: bool) -> Result<Solution, Failure> {
-    let nseg = if closed {
-        points.len()
-    } else {
-        points.len() - 1
-    };
-    if nseg > MAX_WOUND_SEGMENTS {
-        return Err(Failure::NoConvergence);
-    }
-    let cost = |solution: &Solution| {
-        solution
-            .coefficients
+        .fold((0.0, 0.0), |(sx, sy), &(x, y)| (sx + x / n, sy + y / n));
+    let scale = (controls
+        .iter()
+        .map(|&(x, y)| (x - cx).powi(2) + (y - cy).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
+    (scale.is_finite() && scale > 0.0).then(|| {
+        controls
             .iter()
-            .flatten()
-            .map(|value| value.abs())
-            .fold(0.0, f64::max)
-    };
-    [4.0_f64, 6.0, 8.0, -4.0, -6.0, -8.0]
-        .into_iter()
-        .filter_map(|outer| {
-            let seed = (0..4 * nseg)
-                .map(|i| {
-                    let segment = i / 4;
-                    let distance = count(segment.min(nseg - 1 - segment));
-                    let normalized = 1.0 - 2.0 * distance / count(nseg - 1);
-                    if i % 4 == 0 {
-                        outer * (0.11 + 0.89 * normalized * normalized)
-                    } else {
-                        0.0
-                    }
-                })
-                .collect();
-            newton(points, closed, true, seed, false).ok()
-        })
-        .min_by(|a, b| cost(a).total_cmp(&cost(b)))
-        .ok_or(Failure::NoConvergence)
-}
-
-/// Solves an open curve by moving its controls from the chord to their places in steps, each
-/// solve starting from the previous one's coefficients; a step that fails is halved.
-fn continuation(points: &[(f64, f64)]) -> Result<Solution, Failure> {
-    let start = points[0];
-    let end = points[points.len() - 1];
-    let last = count(points.len() - 1);
-    let blend = |amount: f64| -> Vec<(f64, f64)> {
-        points
-            .iter()
-            .enumerate()
-            .map(|(i, &(px, py))| {
-                let t = count(i) / last;
-                let base = (
-                    start.0 + t * (end.0 - start.0),
-                    start.1 + t * (end.1 - start.1),
-                );
-                (
-                    base.0 + amount * (px - base.0),
-                    base.1 + amount * (py - base.1),
-                )
-            })
+            .map(|&(x, y)| ((x - cx) / scale, (y - cy) / scale))
             .collect()
-    };
-    let mut x = vec![0.0; 4 * (points.len() - 1)];
-    let mut progress = 0.0_f64;
-    let mut increment = 0.25_f64;
-    let mut solves = 0;
-    while progress < 1.0 {
-        solves += 1;
-        if solves > MAX_CONTINUATION_SOLVES {
-            return Err(Failure::NoConvergence);
-        }
-        let next = (progress + increment).min(1.0);
-        if let Ok(solution) = newton(&blend(next), false, false, x.clone(), false) {
-            if next >= 1.0 {
-                return Ok(solution);
-            }
-            x = solution.coefficients.into_iter().flatten().collect();
-            progress = next;
-            increment = (increment * 1.5).min(0.5);
-        } else {
-            increment *= 0.5;
-            if increment < MIN_CONTINUATION_STEP {
-                return Err(Failure::NoConvergence);
-            }
-        }
-    }
-    Err(Failure::NoConvergence)
+    })
 }
 
-/// G4 runs separated at corner controls, each solved as an open curve.
-/// With a `seed` (one coefficient set per segment) each run is solved from its part of it only.
+/// The indices of the controls of each smooth run between corner controls, in order (a corner
+/// is an open end to the segments beside it, as libspiro's `v` point); one closed run of all
+/// controls when there is no corner.
+fn runs(corners: &[bool], closed: bool) -> Vec<Vec<usize>> {
+    let n = corners.len();
+    let Some(first) = corners.iter().position(|corner| *corner) else {
+        return vec![(0..n).collect()];
+    };
+    let (start, end) = if closed {
+        (first, first + n)
+    } else {
+        (0, n - 1)
+    };
+    let mut out = Vec::new();
+    let mut run = vec![start % n];
+    for i in start + 1..=end {
+        run.push(i % n);
+        if corners[i % n] || i == end {
+            out.push(std::mem::replace(&mut run, vec![i % n]));
+        }
+    }
+    out
+}
+
+/// The coefficients of every segment of a curve (one set per segment; for a closed curve the
+/// last one closes it): its smooth runs between corners, each solved as an open curve, or the
+/// whole curve as one run without a corner.
 pub(super) fn solve_corners(
     points: &[(f64, f64)],
     corners: &[bool],
     closed: bool,
-    seed: Option<&[[f64; 4]]>,
-) -> Result<Solution, Failure> {
-    if points.len() != corners.len()
-        || points.len() < if closed { 3 } else { 2 }
-        || seed.is_some_and(|seed| {
-            seed.len()
-                != if closed {
-                    points.len()
-                } else {
-                    points.len() - 1
-                }
-        })
-    {
+) -> Result<Vec<[f64; 4]>, Failure> {
+    if points.len() != corners.len() || points.len() < if closed { 3 } else { 2 } {
         return Err(Failure::Invalid);
     }
     if !corners.iter().any(|corner| *corner) {
-        return solve(points, closed, seed);
+        return solve(points, closed);
     }
     let segments = if closed {
         points.len()
@@ -242,108 +119,17 @@ pub(super) fn solve_corners(
         points.len() - 1
     };
     let mut coefficients = vec![[0.0; 4]; segments];
-    let mut max_residual = 0.0_f64;
-    if closed {
-        let first = corners
-            .iter()
-            .position(|corner| *corner)
-            .ok_or(Failure::Invalid)?;
-        let mut start = first;
-        loop {
-            let mut indices = vec![start];
-            let mut next = (start + 1) % points.len();
-            while next != first && !corners[next] {
-                indices.push(next);
-                next = (next + 1) % points.len();
-            }
-            indices.push(next);
-            let run: Vec<_> = indices.iter().map(|&i| points[i]).collect();
-            let run_seed: Option<Vec<_>> = seed.map(|seed| {
-                indices[..indices.len() - 1]
-                    .iter()
-                    .map(|&i| seed[i])
-                    .collect()
-            });
-            let result = solve(&run, false, run_seed.as_deref())?;
-            max_residual = max_residual.max(result.max_residual);
-            for (i, value) in indices.iter().zip(result.coefficients) {
-                coefficients[*i] = value;
-            }
-            start = next;
-            if start == first {
-                break;
-            }
-        }
-    } else {
-        let mut start = 0;
-        for end in 1..points.len() {
-            if corners[end] || end == points.len() - 1 {
-                let result = solve(
-                    &points[start..=end],
-                    false,
-                    seed.map(|seed| &seed[start..end]),
-                )?;
-                max_residual = max_residual.max(result.max_residual);
-                coefficients[start..end].copy_from_slice(&result.coefficients);
-                start = end;
-            }
+    for indices in runs(corners, closed) {
+        let run: Vec<_> = indices.iter().map(|&i| points[i]).collect();
+        for (&i, k) in indices.iter().zip(solve(&run, false)?) {
+            coefficients[i] = k;
         }
     }
-    Ok(Solution {
-        coefficients,
-        max_residual,
-    })
+    Ok(coefficients)
 }
 
 /// A segment or control count as a float: exact, the counts are far below 2^52.
 #[allow(clippy::cast_precision_loss)]
 const fn count(n: usize) -> f64 {
     n as f64
-}
-
-#[cfg(test)]
-#[allow(clippy::cast_precision_loss)]
-mod reference_tests {
-    use super::*;
-
-    #[test]
-    fn matches_independent_open_and_closed_libspiro_coefficients() {
-        for (closed, fixture) in [
-            (
-                false,
-                include_str!("../tests/fixtures/spiro-libspiro-20220722-open.txt"),
-            ),
-            (
-                true,
-                include_str!("../tests/fixtures/spiro-libspiro-20220722-closed.txt"),
-            ),
-        ] {
-            for (case, line) in fixture.lines().enumerate() {
-                let points: Vec<_> = (0..5)
-                    .map(|i| {
-                        if closed {
-                            let angle = std::f64::consts::TAU * i as f64 / 5.0;
-                            let radius = 1.0 + 0.12 * ((case * 13 + i * 7) as f64).sin();
-                            (radius * angle.cos(), radius * angle.sin())
-                        } else {
-                            (i as f64, ((case * 17 + i * 11) as f64).sin() * 0.3)
-                        }
-                    })
-                    .collect();
-                let expected: Vec<f64> = line
-                    .split_whitespace()
-                    .skip(1)
-                    .map(|value| value.parse().unwrap())
-                    .collect();
-                let result = solve(&points, closed, None).unwrap();
-                assert_eq!(result.coefficients.len() * 4, expected.len());
-                for (actual, expected) in result.coefficients.iter().flatten().zip(expected) {
-                    assert!(
-                        (actual - expected).abs() < 1e-4,
-                        "case {case}: {actual} != {expected}"
-                    );
-                }
-            }
-        }
-    }
 }

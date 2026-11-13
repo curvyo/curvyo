@@ -6,7 +6,7 @@ use curvyo_document_core::{
 };
 use curvyo_geometry_core::{
     SpiroControl, SpiroError, SpiroShape, SplineControl, SplineError, evaluate_bspline,
-    solve_spiro, solve_spiro_near, spiro_cubics,
+    solve_spiro, spiro_cubics,
 };
 
 /// How far a drawn Spiro may stray from its exact curve, in document mm.
@@ -102,7 +102,7 @@ pub fn stretch(matrix: Affine) -> f64 {
 /// Evaluates Spiro controls (a corner node breaks the curve) into Bézier anchors.
 ///
 /// # Errors
-/// Returns an error for invalid controls or when the solver finds no curve.
+/// Returns an error for too few or non-finite controls or an invalid tolerance.
 pub fn evaluate_spiro_nodes(
     nodes: &[NewAnchor],
     closed: bool,
@@ -123,28 +123,12 @@ fn spiro_controls(nodes: &[NewAnchor]) -> Vec<SpiroControl> {
         .collect()
 }
 
-/// Solves Spiro controls from scratch, for a curve without an earlier shape.
+/// Solves Spiro controls: a function of the controls alone (`specs/0114`).
 ///
 /// # Errors
-/// Returns an error for invalid controls or when the solver finds no curve.
+/// Returns an error for too few or non-finite controls.
 pub fn solve_spiro_nodes(nodes: &[NewAnchor], closed: bool) -> Result<SpiroShape, SpiroError> {
     solve_spiro(&spiro_controls(nodes), closed)
-}
-
-/// Solves Spiro controls that moved from an earlier solved shape, which the answer must stay
-/// near ([`curvyo_geometry_core::solve_spiro_near`], which says what `fresh` does); `near` holds
-/// one entry per segment.
-///
-/// # Errors
-/// [`SpiroError::Far`] when the only solution is far from the earlier shape; the solver's
-/// errors otherwise.
-pub fn solve_spiro_nodes_near(
-    nodes: &[NewAnchor],
-    closed: bool,
-    near: &[Option<[f64; 4]>],
-    fresh: bool,
-) -> Result<SpiroShape, SpiroError> {
-    solve_spiro_near(&spiro_controls(nodes), closed, near, fresh)
 }
 
 /// The Bézier anchors of a solved Spiro shape through `nodes`.

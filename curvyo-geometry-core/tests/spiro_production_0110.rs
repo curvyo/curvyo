@@ -85,29 +85,6 @@ fn sampled_distance(spans: &[curvyo_geometry_core::SpiroCubic], target: Point) -
 }
 
 #[test]
-fn six_point_loop_matches_independent_libspiro_geometry() {
-    let controls = [
-        (0.0, 1.0),
-        (1.0, 2.0),
-        (2.0, 0.0),
-        (3.0, 0.0),
-        (4.0, 2.0),
-        (5.0, 1.0),
-    ]
-    .map(|(x, y)| SpiroControl {
-        point: Point::new(x, y),
-        corner: false,
-    });
-    let result = evaluate_spiro(&controls, false, Tolerance::from_mm(0.001)).unwrap();
-    for target in [
-        Point::new(2.144_661_689_23, -1.313_177_168_15),
-        Point::new(4.874_642_975_31, 1.917_303_309_88),
-    ] {
-        assert!(sampled_distance(&result, target) < 0.02);
-    }
-}
-
-#[test]
 fn closed_quarter_circle_and_scaled_copy_match() {
     let controls = [(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0), (0.0, -1.0)].map(|(x, y)| SpiroControl {
         point: Point::new(x, y),

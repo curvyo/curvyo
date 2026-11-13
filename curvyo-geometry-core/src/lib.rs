@@ -76,8 +76,7 @@ pub use segment::{
     subdivide_at_parameter,
 };
 pub use spiro::{
-    SPIRO_MAX_NEW_SWEEP, SPIRO_MAX_TURN_CHANGE, SpiroControl, SpiroCubic, SpiroError, SpiroShape,
-    evaluate_spiro, solve_spiro, solve_spiro_near, spiro_cubics,
+    SpiroControl, SpiroCubic, SpiroError, SpiroShape, evaluate_spiro, solve_spiro, spiro_cubics,
 };
 pub use stack_regions::StackError;
 pub use stroke_outline::{StrokeOutlineError, StrokeShape, stroke_outline};
