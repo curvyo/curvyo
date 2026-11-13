@@ -1,6 +1,6 @@
 # Fonts, machines and materials across my devices
 
-Status: Ready (2026-11-13; ADR 0062 proposed, needs-customer; Fragen 214 to 217 carry defaults)
+Status: Ready (2026-11-13; ADR 0062 accepted 2026-11-13; Fragen 214 to 217 answered A)
 Priority: Must
 Origin: Customer (request of 2026-11-13, translated): "in curvyo installierte fonts und machines sollen über das sync feature übertragen werden können. dazu brauchen wir einen symbol toggle schalter an den fonts zum sync einschalten, ebenso an den machines." and "materials sollen natürlich auch gesynced werden ;)". Everything marked Proposal is the product owner's and vetoable at the demo.
 
@@ -27,7 +27,7 @@ What we do better: no account, no password, end-to end encrypted as `0096` is (t
 ## Words
 
 - **Library item**: one record of one of the three per-user libraries — a Curvyo font (file bytes plus its metadata), a machine profile record, a material record. System fonts, the shipped Included fonts and Generic laser are not library items (criterion 26).
-- **Synced item**: an item whose per-item toggle is on. It travels through the device group of `0096` (paired devices, sealed list, ADR 0040) end to end encrypted; the mechanism, rooms and blob transfer are decided in ADR 0062 (proposed).
+- **Synced item**: an item whose per-item toggle is on. It travels through the device group of `0096` (paired devices, sealed list, ADR 0040) end to end encrypted; the mechanism, rooms and blob transfer are decided in ADR 0062 (accepted).
 - **Per-item toggle**: the symbol switch on every font row, machine row and material row that turns sync of that one item on or off.
 - Pairing, device group, removal, rotation: as built in `0096`.
 
@@ -42,7 +42,7 @@ Why this order: machine and material records are small JSON files (under 16 KiB 
 
 ## Acceptance criteria
 
-Setup as `0096`: instances A and B of the desktop app, each with its own data directory and credential store, one `curvyo-sync-server`, and A and B paired as built in `0096` (criteria 1 to 3 there) unless a criterion says otherwise. Unless said otherwise both are online. A holds: one Curvyo font F1 (a TTF, family name `ZQX-FONT-7731`, with a tag `ZQX-TAG-7731`), one user machine profile P1 named `ZQX-MACH-7731` (not Generic laser), one material record M1 named `ZQX-MAT-7731` with one judged test; B holds none of them. The Included fonts and Generic laser exist on both (shipped). A browser instance R (as `0096` slice 1b) is used where a criterion names it. Criteria marked [ADR] depend on the mechanism of ADR 0062 (proposed); where the UI is named, `ux-engineer` fills `ux-notes.md`. Fragen 214 to 217 carry their defaults until answered.
+Setup as `0096`: instances A and B of the desktop app, each with its own data directory and credential store, one `curvyo-sync-server`, and A and B paired as built in `0096` (criteria 1 to 3 there) unless a criterion says otherwise. Unless said otherwise both are online. A holds: one Curvyo font F1 (a TTF, family name `ZQX-FONT-7731`, with a tag `ZQX-TAG-7731`), one user machine profile P1 named `ZQX-MACH-7731` (not Generic laser), one material record M1 named `ZQX-MAT-7731` with one judged test; B holds none of them. The Included fonts and Generic laser exist on both (shipped). A browser instance R (as `0096` slice 1b) is used where a criterion names it. Criteria marked [ADR] depend on the mechanism of ADR 0062 (accepted); where the UI is named, `ux-engineer` fills `ux-notes.md`. Fragen 214 to 217 are answered (all A, 2026-11-13).
 
 ### The per-item toggles
 
@@ -104,34 +104,17 @@ Hints from the product owner, not decisions: the per-item toggle is a small symb
 ## Customer decisions
 
 - 2026-11-13 (request, translated): the installed fonts, machines and materials are to travel through the device sync, with a symbol toggle switch on the fonts, the machines and the materials.
+- 2026-11-13 (with the merge of PR #354): Fragen 214 to 217 answered with their defaults, all A.
+  - 214 TOGGLE-DEFAULT A: the toggles default on — the first sync writes every existing item on behind the one confirm (criterion 3), and a new item starts on (criterion 4); the toggle is there to switch single items off.
+  - 215 OFF-REACH A: switching one item off keeps the copies on the other devices as local items with a notice (criterion 10), as `0096` criterion 13 does for workspaces.
+  - 216 RECORD-CONFLICT A: on reconnect the newer `modified` wins on both devices and the losing version is kept as "<name> (from <device name>)" with a notice; no edit is lost (criterion 9).
+  - 217 LIB-BLOCK A: no "My libraries" block in the Share tab; the sync state stands on every font, machine and material row (`ux-notes.md` section 6).
 
-### Open questions
-
-**Frage 214 (TOGGLE-DEFAULT): What is the default state of the per-item toggles once devices are paired?**
-- A (recommended): on. At the first pairing all existing items are on behind the one confirm (criterion 3), and a new item starts on; the toggle is there to switch single items off (a licensed font, for example).
-- B: off. Every item starts off and the maker switches each on, as workspaces do (SYNC-SCOPE B of `0096`).
-Default if unanswered: A.
-
-**Frage 215 (OFF-REACH): What does switching one item off on one device do on the other devices?**
-- A (recommended): the item stays there as a local copy with a notice and can be deleted there by hand (criterion 10; the precedent of `0096` criterion 13 for workspaces).
-- B: the item is removed on the other devices too (the switch deletes remotely).
-Default if unanswered: A.
-
-**Frage 216 (RECORD-CONFLICT): Two devices edit the same machine or material record offline — what happens on reconnect?**
-- A (recommended): the newer `modified` wins on both devices and the losing version is kept as "<name> (from <device name>)" with a notice; no edit is lost, no hand merging (criterion 9).
-- B: both versions are always kept as copies and the maker merges by hand.
-- C: silent last-writer-wins; simplest, but an edit is lost without a trace.
-Default if unanswered: A.
-
-**Frage 217 (LIB-BLOCK): A "My libraries" block in the Share tab?** (from the UX notes, section 6)
-- A (recommended): no block — the sync state of each library stands where the maker edits it, on every font, machine and material row; the Share tab keeps the My devices block and the per-workspace switch only.
-- B: a "My libraries" block with a fonts/machines/materials row and a count each.
-- C: as B, plus a master switch per library.
-Default if unanswered: A.
+No customer question is open. The Proposal items of ADR 0062 (the budgets 16 MiB per font file and 512 MiB total, material photos as blobs) were part of the answered Fragen and stand accepted.
 
 ## Links
 
 Requirements: R-SYS-004, R-SYS-012, R-FONT-006, R-MFG-001, R-MAT-005 in `docs/requirements.md`.
-ADRs: 0038 (machine records, `modified`, machine-choice per computer), 0040 (device group), 0044 (workspace the only unit of sharing), 0047 (document fonts, context), 0055/0058 (material records), and the proposed `docs/adr/0062-synced-per-user-libraries.md` (rooms, blob transfer, budgets) in `docs/adr/`.
+ADRs: 0038 (machine records, `modified`, machine-choice per computer), 0040 (device group), 0044 (workspace the only unit of sharing), 0047 (document fonts, context), 0055/0058 (material records), and `docs/adr/0062-synced-per-user-libraries.md` (rooms, blob transfer, budgets; accepted 2026-11-13) in `docs/adr/`.
 Related specs: `specs/0096-own-devices-sync/` (the device sync this rides on), `specs/0026-machine-profile/`, `specs/0028-material-test-library/` and `specs/0112-test-grid-and-materials/`, `specs/0075-font-library/`, `specs/0107-document-fonts/` (fonts inside documents).
-PR: none yet.
+PR: spec #354.

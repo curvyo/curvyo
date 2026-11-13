@@ -1,7 +1,8 @@
 # ADR 0062: Synced per-user libraries: one library stream in the device group room
 
-**Status:** Proposed 2026-11-13, `needs-customer` (persistence/sync: per-user library data leaves the
-machine through the relay). Asked by `specs/0116-library-sync` (customer request of 2026-11-13).
+**Status:** Accepted 2026-11-13 (customer, with the merge of spec PR #354 and the answers of the same
+day: Fragen 214 to 217 default A — first sync writes all items on, budgets as written, newest
+`modified` wins with a conflict copy, no Share-tab library block). Asked by `specs/0116-library-sync` (customer request of 2026-11-13).
 Extends [ADR 0040](0040-own-devices-pairing-and-device-group.md) (the device group room gains a
 second sealed stream); carries the record texts of [ADR 0038](0038-machine-profile-records.md)
 (machines), [ADR 0055](0055-material-records.md)/[ADR 0058](0058-material-records-shared-across-lasers.md)
@@ -114,9 +115,9 @@ built for documents.
 - The relay learns nothing new: one more sealed stream's size and cadence in the room it already
   links (ADR 0040 decision 10); names, tags and record contents stay sealed.
 
-## Needs the customer
+## The customer
 
-The PO asks with their own question numbers: the first-sync default of decision 4 (all on), the
-budgets of decision 6 (16 MiB per font file, 512 MiB total), and conflict copy with notice versus
-silent last-writer-wins of decision 5. Recommendation: as written. Default if unanswered: as
-written (the Proposal items are vetoable at the demo).
+Answered 2026-11-13 (all A, with the merge of spec PR #354): the first-sync default of decision 4
+(all on), the budgets of decision 6 (16 MiB per font file, 512 MiB total), conflict copy with
+notice over silent last-writer-wins of decision 5, and no Share-tab library block. The remaining
+(Proposal) items stand accepted as written.
