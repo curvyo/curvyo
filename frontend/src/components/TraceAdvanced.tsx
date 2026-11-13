@@ -1,5 +1,5 @@
 import { Contrast, ImageMinus, Pipette, ScanText, Shapes, type LucideIcon } from "lucide-react";
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
@@ -200,16 +200,35 @@ interface TraceAdvancedProps {
   /** The palette pipette (Multicolour without Pick colours) is armed. */
   paletteArmed: boolean;
   onPalettePipette: () => void;
-  /** The Parts group (`specs/0094` slice 2; `specs/0089` UX notes §24.3): first in the last row. */
+  /** The Parts and Mask unit (`specs/0114` UX notes §2.2), after Corners and before Analyse. */
   parts?: ReactNode;
+  /** The block's one-line width when it changes, px (`specs/0114` UX notes §2.5). */
+  onLineWidth?: (width: number) => void;
+}
+
+/** The width `element` needs on one line, px: for a wrapping flow (`data-flow`) the sum of its
+ * items' one-line widths, its gaps and its padding; else its own width. Absolutely placed
+ * children (the hidden status regions) take none. */
+export function oneLineWidth(element: HTMLElement): number {
+  if (element.dataset.flow === undefined) {
+    return element.getBoundingClientRect().width;
+  }
+  const style = getComputedStyle(element);
+  const items = (Array.from(element.children) as HTMLElement[]).filter((child) => {
+    const cs = getComputedStyle(child);
+    return cs.display !== "none" && cs.position !== "absolute";
+  });
+  const gap = Number.parseFloat(style.columnGap) || 0;
+  const padding = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
+  return padding + items.reduce((sum, item) => sum + oneLineWidth(item), 0) + gap * Math.max(0, items.length - 1);
 }
 
 /**
  * The Advanced block (`specs/0025-raster-trace` criteria 11, 41, 44, 71; UX notes 20.4, 20.5):
  * below the main rows inside the bar, after a divider: the Output row (with Multicolour the
  * Colours field, the palette pipette and the palette's swatches) with the four icon toggles,
- * Denoise, Upscale and Corners, and last the Parts group and the Analyse button
- * at the far right (`specs/0089` UX notes §24.3), wrapping by whole groups.
+ * Denoise, Upscale and Corners, the Parts and Mask unit (`specs/0114` UX notes §2.3) and the
+ * Analyse button at the far right, one flowing line that wraps by whole items.
  */
 export function TraceAdvanced({
   params,
@@ -226,17 +245,32 @@ export function TraceAdvanced({
   paletteArmed,
   onPalettePipette,
   parts,
+  onLineWidth,
 }: TraceAdvancedProps) {
   const param = (name: TraceParam["name"]) => params.find((p) => p.name === name);
+  const blockRef = useRef<HTMLDivElement>(null);
+  // Measured after every render and every resize: the items' widths do not depend on the
+  // block's, so the measure is stable while the block wraps.
+  useLayoutEffect(() => {
+    const block = blockRef.current;
+    if (!block || !onLineWidth) {
+      return undefined;
+    }
+    const measure = () => onLineWidth(oneLineWidth(block));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(block);
+    return () => observer.disconnect();
+  });
   const denoise = param("denoise");
   const upscale = param("upscale");
   const corners = param("corners");
   return (
-    <div id={id} role="group" aria-label="Advanced" className="mt-1 flex max-h-[min(60vh,360px)] flex-wrap gap-x-2 overflow-y-auto border-t border-[var(--toolbar-icon)]/25 py-1 pr-1">
+    <div ref={blockRef} id={id} role="group" aria-label="Advanced" data-flow="" className="mt-1 flex max-h-[min(60vh,360px)] flex-wrap gap-x-2 overflow-y-auto border-t border-[var(--toolbar-icon)]/25 py-1 pr-1">
       {/* 1. Output, the Colours field, the Brightness palette pipette and the toggles, one row at
           4 px gaps so the four toggles fit beside Output at 800 x 600 with the panel open
           (`specs/0088` UX notes B2, lead 2026-11-03). */}
-      <div data-trace-output-row="" className="flex flex-wrap items-center gap-x-1">
+      <div data-trace-output-row="" data-flow="" className="flex flex-wrap items-center gap-x-1">
         <ChoicePill param={OUTPUT_PARAM} bare value={values.output} onValue={(v) => setValue("output", v)} onReturnFocus={onReturnFocus} />
         {values.output === MULTICOLOUR ? (
           <div data-trace-colours="palette" className="flex min-h-9 items-start gap-1">
@@ -327,7 +361,7 @@ export function TraceAdvanced({
           />
         </div>
       ) : null}
-      {/* 4. The last row: the Parts group, then Analyse at the far right; each wraps as a whole. */}
+      {/* 4. The Parts and Mask unit, then Analyse at the far right; each wraps as a whole. */}
       {parts}
       <div className="ml-auto flex h-9 items-center">
         <button

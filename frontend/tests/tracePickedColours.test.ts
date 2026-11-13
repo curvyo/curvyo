@@ -85,9 +85,9 @@ async function barHtml(overrides: Record<string, unknown> = {}, values: Record<s
     pick: noop, note: "", sameNote: "", refresh: noop,
   };
   const trace = {
-    active: true, available: true, selection: "images", mask: { paths: 0, outside: false }, setMaskOutside: noop,
-    maskPick: false, setMaskPick: noop, maskRefused: false, clearMask: noop,
-    parts: [{ id: 1, paths: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }],
+    active: true, available: true, selection: "images", mask: { regions: 0, outside: false }, setMaskOutside: noop,
+    clearMask: noop,
+    parts: [{ id: 1, regions: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }],
     selectPart: noop, addPart: noop, removePart: noop, imagesLabel: "", params: text.TRACE_PARAMS_FALLBACK, presets,
     values: { ...choice.values, threshold: 128, method: text.PICK_COLOURS, ...values }, choice, presetLabel: presets[0].label, advancedOpen: false,
     status: text.NO_STATUS, countsStale: false, slot: { kind: "none" }, retrace: noop, creating: false,

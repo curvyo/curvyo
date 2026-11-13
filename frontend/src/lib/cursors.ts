@@ -37,9 +37,6 @@
  * - `"pick-carrier"`: the pointer arrow with the On path glyph at its lower right, pick mode of
  *   text on path (`specs/0080-text-on-path` UX notes §2); hotspot at the arrow tip, `crosshair`
  *   where custom cursor images are ignored.
- * - `"pick-mask"`: the pointer arrow with the Pick mask paths glyph (a dashed square) at its lower
- *   right, Pick mask paths of the Trace tool (`specs/0094` UX notes §11); hotspot at the arrow
- *   tip, `crosshair` where custom cursor images are ignored.
  * - anything else: no override (the tool's normal cursor).
  */
 
@@ -86,23 +83,6 @@ const PADLOCK_SHACKLE = "M15.5 16.5v-2a2 2 0 0 1 4 0v2";
 /** The On path glyph at 10px at the arrow's lower right: an arc with a "T" on its apex. */
 const ON_PATH_MARK = "M12.5 22 Q17 15 21.5 22 M17 18.5V13.5M15 13.5h4";
 
-/** The Pick mask paths glyph at 10px at the arrow's lower right: a dashed square. */
-const MASK_MARK = "M12.5 13.5h9v9h-9z";
-
-/** The pointer arrow over a white casing, tip at (3, 3), with `mark` drawn outlined. */
-function arrowWithMark(mark: string, dashed = false): string {
-  const arrow =
-    `<path d="${POINTER_ARROW}" fill="white" stroke="white" stroke-width="3" stroke-linejoin="round"/>` +
-    `<path d="${POINTER_ARROW}" fill="white" stroke="black" stroke-width="1.2" stroke-linejoin="round"/>`;
-  const dash = dashed ? ` stroke-dasharray="2.5 1.5"` : "";
-  const marked =
-    `<path d="${mark}" fill="white" stroke="white" stroke-width="3.5" stroke-linejoin="round"/>` +
-    `<path d="${mark}" fill="none" stroke="black" stroke-width="1.5"${dash}/>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">` + arrow + marked + `</svg>`,
-  )}") 3 3, crosshair`;
-}
-
 /** The built-in resize cursor nearest to a double arrow at `degrees`. */
 export function nearestBuiltInResizeCursor(degrees: number): string {
   const normalized = ((degrees % 180) + 180) % 180;
@@ -137,9 +117,6 @@ export function cursorForHint(hint: string): string | undefined {
         outlined(ON_PATH_MARK) +
         `</svg>`,
     )}") 3 3, crosshair`;
-  }
-  if (hint === "pick-mask") {
-    return arrowWithMark(MASK_MARK, true);
   }
   if (hint === "crosshair") {
     return "crosshair";

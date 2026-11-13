@@ -331,7 +331,8 @@ const NINE_PNG = rgbPng(480, 100, (x, y) => {
 async function scanColours(s: S): Promise<Map<string, number>> {
   const [cx, cy, cw, ch] = await canvasRect(s);
   const found = new Map<string, number>();
-  for (let x = cx + 20; x < cx + cw - 20; x += 4) {
+  // From beside the tool palettes: crossing them dwells over a button, whose tooltip then covers the canvas.
+  for (let x = cx + 200; x < cx + cw - 20; x += 4) {
     await s.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y: cy + ch / 2 });
     await sleep(40);
     const hex = (await chip(s)).match(/#[0-9A-F]{6}/)?.[0];
@@ -700,8 +701,9 @@ test("0089C tester: at 800 x 600 nothing overlaps, clips or leaves the window; r
         overlaps: string[]; outside: string[]; clipped: string[]; texts: string[]; labels: string[]; height: number; top: number; bottom: number; vh: number; vw: number; slotRightGap: number; insideBar: boolean };
     // The row counts of ux-notes.md §25.1, §25.4 (2026-11-09; Ignore below 171 px joins the expander and Trace, the colours group
     // is as wide as its content, customer 2026-11-09; Advanced closed, no picks): Brightness 6 / 3 rows, Remove background 7 / 3,
-    // Pick colours 6 / 3 (the pipette alone shares Colour tolerance's line).
-    const asBuilt: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [216, 108] };
+    // Pick colours 6 / 3 (the pipette alone shares Colour tolerance's line). `specs/0114` UX notes §2.1: the Mask group left
+    // the first row, so panel open is one row (36 px) less: 180, 216 and 180 px.
+    const asBuilt: Record<string, [number, number]> = { Brightness: [180, 108], "Remove background": [216, 108], "Pick colours": [180, 108] };
     await s.evaluate(`document.querySelector('${BAR} [aria-label="Fewer trace options"]')?.click()`);
     await sleep(400);
     const all: string[] = [];

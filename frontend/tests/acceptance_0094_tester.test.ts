@@ -1,4 +1,6 @@
-// Tester cases for `specs/0094-masked-composite-trace` slice 1 in the real app (Chromium via
+// Tester cases for `specs/0094-masked-composite-trace` slice 1, re-based on `specs/0114-image-trace-mask`
+// (the mask paths, Shift+click and the mixed-selection row are gone: the regions are drawn with
+// Rectangle in the Mask group of the Parts row, and stay on the image) in the real app (Chromium via
 // DevTools; set CURVYO_E2E_BROWSER=/path/to/chromium; the wasm bindings must be built). Written
 // from the specification and the UX notes before the implementation was read: the Mask item after
 // the View pill with Inside on entry (criteria 1, 17), Inside and Outside, Create paths with the
@@ -290,8 +292,6 @@ const at = (img: Shot, x: number, y: number) => {
   const i = (Math.round(y) * img.width + Math.round(x)) * 4;
   return [img.data[i], img.data[i + 1], img.data[i + 2]];
 };
-
-const ADV = `${BAR} [role=group][aria-label=Advanced]`;
 const EXPANDER = `${BAR} button[aria-expanded][aria-controls]`;
 const HINT = /\b(click|press|drag|tap|hold|try|use|tip|hint|you can|choose|select a|to (pick|add|remove|create))\b/i;
 
@@ -347,8 +347,6 @@ const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector
 const traceButton = (s: S) => s.evaluate(`(() => { const b = document.querySelector('${BAR} [data-trace-slot] , ${BAR} button[data-trace-slot]'); return b ? JSON.stringify({ disabled: b.getAttribute('aria-disabled'), describedby: b.getAttribute('aria-describedby'), reason: b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby'))?.textContent ?? '' : '' }) : 'null'; })()`).then((v) => JSON.parse(v as string) as { disabled: string | null; describedby: string | null; reason: string } | null);
 const settledCounts = (s: S) => waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 
-const BRIGHTNESS_BAR = ["About Trace", "Preset", "Pick mask paths", "Mask", "Clear mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
-
 // ------------------------------------------------------------------ 0094 fixtures and helpers
 /** M1 of the spec at `n` px (the tester's `support_0094` arithmetic, pixel centres in M1's own 1000 px frame). */
 function m1Ink(u: number, v: number): "paper" | "disc" | "square" | "bar" | "grey" {
@@ -362,7 +360,7 @@ const M1_PNG = rgbPng(400, 400, (x, y) => {
   const ink = m1Ink((x + 0.5) * 2.5, (y + 0.5) * 2.5);
   return ink === "paper" ? [255, 255, 255] : ink === "grey" ? [128, 128, 128] : [0, 0, 0];
 });
-const MASKED_BAR = ["About Trace", "Preset", "Pick mask paths", "Mask", "Clear mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "Fewer trace options", "Trace"];
+const MASKED_BAR = ["About Trace", "Preset", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "Fewer trace options", "Trace"];
 const NATIVE = path.resolve(FRONTEND, "..", "curvyo-editor-wasm", "tests", "fixtures", "acceptance_0094_tester_native.json");
 
 /** The screen box of the picture: the bar of M1 is the longest dark horizontal run on screen and
@@ -409,14 +407,28 @@ async function drag(s: S, from: [number, number], to: [number, number]) {
   await sleep(500);
 }
 
-const shiftClick = async (s: S, x: number, y: number) => {
-  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers: 8 });
-  }
+/** Presses the Mask group's Rectangle, drags `from` to `to` over the picture and releases the tool. */
+async function drawRegion(s: S, from: [number, number], to: [number, number]) {
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+  await drag(s, from, to);
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
   await sleep(600);
+}
+
+/** The region of `part` ("left" half of the picture, or "outside" right of it) as the corners of a drag. */
+const regionOf = (box: { x0: number; x1: number; y0: number; y1: number; cx: number; cy: number }, part: "left" | "right" | "outside"): [[number, number], [number, number]] => {
+  // The bar covers the canvas above the picture, so a region starts 6 px above it and ends 30 px below.
+  const top = box.y0 - 6;
+  const bottom = box.y1 + 30;
+  return part === "left"
+    ? [[box.x0 - 30, top], [box.cx, bottom]]
+    : part === "right"
+      ? [[box.cx, top], [box.x1 + 30, bottom]]
+      : [[box.x1 + 40, box.cy - 20], [box.x1 + 90, box.cy + 20]];
 };
 
-/** Imports M1, draws a rectangle over `part` of it ("left" half, or "outside" right of it), selects both with Ctrl+A and opens Trace. */
+/** Imports M1, opens Trace on it with Advanced open and draws a region over `part` of it with
+ * Rectangle (`specs/0114`). */
 async function maskedOn(s: S, part: "left" | "outside" = "left") {
   const file = path.join(SCRATCH, "m1.png");
   writeFileSync(file, M1_PNG);
@@ -425,22 +437,12 @@ async function maskedOn(s: S, part: "left" | "outside" = "left") {
   await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("m1.png")) ? true : null));
   await sleep(800);
   const box = await pictureBox(s);
-  const h = box.y1 - box.y0;
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  await s.key("r", 82);
-  if (part === "left") {
-    await drag(s, [box.x0 - 30, box.cy - 0.6 * h], [box.cx, box.cy + 0.6 * h]);
-  } else {
-    await drag(s, [box.x1 + 40, box.cy - 20], [box.x1 + 90, box.cy + 20]);
-  }
-  await s.key("s", 83);
-  await focusCanvas(s);
-  await s.key("a", 65, 2);
-  await waitFor("two objects selected", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
   await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
   await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
   await sleep(1000);
+  await setAdvanced(s, true);
+  const [from, to] = regionOf(box, part);
+  await drawRegion(s, from, to);
   return box;
 }
 const maskState = async (s: S) =>
@@ -455,10 +457,10 @@ const maskPaths = async (s: S) => Number((await advText(s)).match(/(?:Inside|Out
 
 // ------------------------------------------------------------------ 0094 cases
 
-test("0094 c1, c17 (§24.4): the Mask group follows Preset with Inside on entry; Outside changes the trace; leaving the tool forgets it; an image alone has the same bar with no mask paths", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 c1, c17 (§24.4) with `0114`: the Mask group sits in the Parts row with Inside on entry; Outside changes the trace; leaving the tool keeps the region and the mode with the image; an image alone has the same bar with no regions", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await maskedOn(s);
-    assert.deepEqual(await barControls(s), MASKED_BAR, "the Mask group directly after Preset");
+    assert.deepEqual(await barControls(s), MASKED_BAR, "the first row has no Mask group");
     assert.equal(await maskState(s), "Inside=true,Outside=false", "Inside is selected");
     await settledCounts(s);
     const inside = await advancedStatus(s);
@@ -471,41 +473,31 @@ test("0094 c1, c17 (§24.4): the Mask group follows Preset with Inside on entry;
     for (const text of await barStrings(s)) {
       assert.doesNotMatch(text, HINT, `no hint text: ${text}`);
     }
-    // c17: the tool left and entered again starts with Inside.
+    // `0114` Behaviour 9: the tool left and entered again shows the stored part as it was left.
     await focusCanvas(s);
     await s.key("s", 83);
     await waitFor("the Trace bar closes", async () => ((await s.evaluate(`!document.querySelector('${BAR}')`)) ? true : null), 10_000);
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
     await sleep(800);
-    assert.equal(await maskState(s), "Inside=true,Outside=false", "Inside again on entry");
+    await setAdvanced(s, true);
+    assert.equal(await maskState(s), "Inside=false,Outside=true", "the stored part keeps its mode");
   });
   await withApp(async (s) => {
-    await openOn(s, "alone.png", M1_PNG, false);
-    assert.equal(await maskPaths(s), 0, "an image alone has no mask paths");
-    assert.equal(await maskState(s), "Inside=true,Outside=false", "§24.4: the Mask group is there without mask paths, Inside selected");
-    assert.deepEqual(await barControls(s), BRIGHTNESS_BAR, "today's bar");
-    await setAdvanced(s, true);
+    await openOn(s, "alone.png", M1_PNG, true);
+    assert.equal(await maskPaths(s), 0, "an image alone has no regions");
+    assert.equal(await maskState(s), "Inside=true,Outside=false", "§24.4: the Mask group is there without regions, Inside selected");
+    assert.deepEqual(await barControls(s), MASKED_BAR, "the first row of the bar");
     await settledCounts(s);
     assert.doesNotMatch(await advText(s), /Inside|Outside/);
   });
 });
 
-test("0094 c12, c13: Create paths with a mask makes one group, leaves the rectangle, one undo restores; Shift+click on the path removes and adds it", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 c12 with `0114` criterion 19: Create paths with a region makes one group, the region stays on the image, one undo restores", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
-    const box = await maskedOn(s);
+    await maskedOn(s);
     await settledCounts(s);
     const before = await s.layerRows();
-    // c13: Shift+click on the rectangle's edge outside the picture removes it, again adds it.
-    const edge: [number, number] = [box.x0 - 30, box.cy];
-    await shiftClick(s, edge[0], edge[1]);
-    await waitFor("the Mask item goes", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
-    await shiftClick(s, edge[0], edge[1]);
-    await waitFor("the Mask item comes back", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
-    const canvas = await canvasRect(s);
-    await shiftClick(s, canvas[0] + canvas[2] - 20, canvas[1] + canvas[3] - 20);
-    assert.ok((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true"), "Shift+click on empty canvas changes nothing");
-    await settledCounts(s);
     await s.clickSel(`${BAR} [data-trace-slot] button, ${BAR} button[data-trace-slot]`);
     await waitFor("the trace group", async () => ((await s.layerRows()).some((r) => r?.startsWith("Trace of")) ? true : null), 30_000);
     const after = await s.layerRows();
@@ -514,6 +506,15 @@ test("0094 c12, c13: Create paths with a mask makes one group, leaves the rectan
     }
     assert.equal(after.filter((r) => r?.startsWith("Trace of")).length, 1, "one group");
     assert.doesNotMatch(await s.statusText(), /created|done|success/i, "no success notice");
+    // The region stays with the image: the tool opened on the picture again shows it.
+    await s.clickSel(`[role=row][aria-label="m1.png, image"]`);
+    await waitFor("Trace offered", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
+    await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
+    await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
+    await sleep(800);
+    await setAdvanced(s, true);
+    await settledCounts(s);
+    assert.ok((await maskPaths(s)) > 0, "the region is still on the image");
     await focusCanvas(s);
     await s.key("z", 90, 2);
     await waitFor("undo", async () => (!(await s.layerRows()).some((r) => r?.startsWith("Trace of")) ? true : null), 10_000);
@@ -535,9 +536,8 @@ test("0094 c7: a mask outside the picture says so, dims Trace and Enter creates 
   });
 });
 
-test("0094 c14: a second image Ctrl+clicked in Layers next to the mask path gives the mixed row and dims Trace", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 c14 as `0114` criterion 21 and Frage 11 A: a second image next to the first keeps the full bar without the Parts and Mask unit, no mixed row exists", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
-    // The second picture first, moved away from the centre, then M1 and its mask on top.
     const file = path.join(SCRATCH, "second.png");
     writeFileSync(file, rgbPng(80, 80, () => [40, 40, 40]));
     await s.tab("Layers");
@@ -551,40 +551,25 @@ test("0094 c14: a second image Ctrl+clicked in Layers next to the mask path give
     await s.choose("[data-import-button]", file2);
     await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("m1.png")) ? true : null));
     await sleep(800);
-    const box = await pictureBox(s);
-    const h = box.y1 - box.y0;
-    await focusCanvas(s);
-    await press(s, "Escape", 27);
-    await s.key("r", 82);
-    await drag(s, [box.x0 - 30, box.cy - 0.6 * h], [box.cx, box.cy + 0.6 * h]);
-    await s.key("s", 83);
-    // Select M1 and the rectangle only: click the rectangle's edge, Shift+click the picture.
-    await s.click(box.x0 - 30, box.cy);
-    await shiftClick(s, box.x1 - 5, box.cy);
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
     await sleep(800);
-    assert.ok((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true"), "image and rectangle make a masked trace");
+    await setAdvanced(s, true);
+    assert.equal(await s.evaluate(`!!document.querySelector('${BAR} [data-trace-mask]')`), true, "one image: the Mask group is there");
     // Add the second picture with a Ctrl+click on its Layers row; the Trace tool stays.
     const row = JSON.parse((await s.evaluate(`JSON.stringify((() => { const r = [...document.querySelectorAll('[role=row][aria-level]')].find((e) => e.getAttribute('aria-label') === 'second.png, image').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })())`)) as string) as [number, number];
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
       await s.send("Input.dispatchMouseEvent", { type, x: row[0], y: row[1], button: "left", clickCount: 1, modifiers: 2 });
     }
-    await sleep(600);
-    await waitFor("the mixed row", async () => ((await s.evaluate(`document.querySelector('${BAR}').textContent`)) as string).includes("Use Object to path for text; one image at a time.") ? true : null, 10_000);
-    // Criterion 14 as amended (re-test 2026-11-05): the row stands in place of the bar's
-    // controls with no Trace button, as the "not an image" row.
-    assert.equal(await traceButton(s), null, "no Trace button");
+    await sleep(800);
+    await waitFor("the unit goes", async () => ((await s.evaluate(`!document.querySelector('${BAR} [data-trace-mask]') && !document.querySelector('${BAR} [data-trace-parts]')`)) ? true : null), 10_000);
+    const text = (await s.evaluate(`document.querySelector('${BAR}').textContent`)) as string;
+    assert.ok(!text.includes("one image at a time"), "no mixed-selection row");
     const controls = await barControls(s);
-    for (const name of ["Mask", "Method", "Threshold", "Trace"]) {
-      assert.ok(!controls.includes(name), `no ${name} with the row: ${JSON.stringify(controls)}`);
+    for (const name of ["Method", "Threshold", "Trace"]) {
+      assert.ok(controls.includes(name), `${name} stays: ${JSON.stringify(controls)}`);
     }
-    assert.equal(await maskPaths(s), 0, "no mask paths for a mixed selection");
-    const rows = await s.layerRows();
-    await focusCanvas(s);
-    await press(s, "Enter", 13);
-    await sleep(1000);
-    assert.deepEqual(await s.layerRows(), rows, "Enter creates nothing");
+    assert.notEqual((await traceButton(s))?.disabled, "true", "Trace is not dimmed");
   });
 });
 
@@ -663,10 +648,10 @@ const pickMethod = async (s: S, label: string) => {
 const methodNow = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} button[aria-label=Method]')?.textContent ?? ''`)) as string;
 const analysisLine = async (s: S) => (await s.evaluate(ANALYSIS_LINE_JS)) as string;
 
-/** Imports `png`, draws a rectangle over its `half` reaching 30 px beyond the picture, then
- * selects the image alone (`both` false: a click on the picture's other half) or image and
- * rectangle (Ctrl+A), and opens Trace with Advanced open. The rectangle's outer edge point. */
-async function halfMasked(s: S, png: Buffer, half: "left" | "right", both: boolean) {
+/** Imports `png`, opens Trace on it with Advanced open and, when `region` is true, draws a
+ * rectangle region over its `half` (reaching 30 px beyond the picture) with Rectangle
+ * (`specs/0114`). Returns a function that draws the same region. */
+async function halfMasked(s: S, png: Buffer, half: "left" | "right", region: boolean) {
   const file = path.join(SCRATCH, "half.png");
   writeFileSync(file, png);
   await s.tab("Layers");
@@ -674,32 +659,19 @@ async function halfMasked(s: S, png: Buffer, half: "left" | "right", both: boole
   await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("half.png")) ? true : null));
   await sleep(800);
   const box = await pictureBox(s);
-  const h = box.y1 - box.y0;
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  await s.key("r", 82);
-  if (half === "right") {
-    await drag(s, [box.cx, box.cy - 0.6 * h], [box.x1 + 30, box.cy + 0.6 * h]);
-  } else {
-    await drag(s, [box.x0 - 30, box.cy - 0.6 * h], [box.cx, box.cy + 0.6 * h]);
-  }
-  await s.key("s", 83);
-  const edge: [number, number] = half === "right" ? [box.x1 + 30, box.cy] : [box.x0 - 30, box.cy];
-  if (both) {
-    await focusCanvas(s);
-    await s.key("a", 65, 2);
-  } else {
-    const w = box.x1 - box.x0;
-    await s.click(half === "right" ? box.x0 + 0.1 * w : box.x1 - 0.1 * w, box.y0 + 0.1 * h);
-  }
+  const [from, to] = regionOf(box, half);
   await waitFor("the Trace button", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
   await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
   await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
   await sleep(1000);
   await setAdvanced(s, true);
+  const draw = () => drawRegion(s, from, to);
+  if (region) {
+    await draw();
+  }
   await settledCounts(s);
   await sleep(1500);
-  return edge;
+  return draw;
 }
 
 /** Waits until the analysis row is settled (not "Analysing...") and the counts are shown. */
@@ -712,7 +684,7 @@ async function settledAnalysis(s: S) {
   await sleep(1500);
 }
 
-test("0094 item 2: a mask added with Shift+click re-reads the automatic Threshold from the region as a fresh masked trace does; removing it reads the whole picture again", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 item 2: a region drawn with Rectangle re-reads the automatic Threshold from the region as a fresh masked trace does; Clear mask reads the whole picture again", { skip: !BROWSER, timeout: 300_000 }, async () => {
   let fresh = "";
   let freshLine = "";
   await withApp(async (s) => {
@@ -723,21 +695,21 @@ test("0094 item 2: a mask added with Shift+click re-reads the automatic Threshol
     freshLine = await analysisLine(s);
   });
   await withApp(async (s) => {
-    const edge = await halfMasked(s, GREY_RIGHT_PNG, "right", false);
+    const draw = await halfMasked(s, GREY_RIGHT_PNG, "right", false);
     assert.equal(await maskPaths(s), 0, "the image alone");
     await settledAnalysis(s);
     const whole = (await fieldValue(s, "Threshold")) ?? `(no Threshold, method ${await methodNow(s)})`;
     const wholeLine = await analysisLine(s);
-    await shiftClick(s, edge[0], edge[1]);
-    await waitFor("the Mask item", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await draw();
+    await waitFor("the Region", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     await settledAnalysis(s);
     const masked = (await fieldValue(s, "Threshold")) ?? `(no Threshold, method ${await methodNow(s)})`;
     console.log(JSON.stringify({ whole, wholeLine, masked, maskedLine: await analysisLine(s), fresh, freshLine }));
     assert.notEqual(fresh, whole, "fixture: the right half's automatic Threshold differs from the whole picture's");
     assert.equal(masked, fresh, "the new mask's Threshold is the region's, as a fresh masked trace reads it");
     assert.equal(await analysisLine(s), freshLine, "the analysis is the region's");
-    await shiftClick(s, edge[0], edge[1]);
-    await waitFor("the Mask item goes", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
+    await s.clickSel(`${BAR} [data-trace-clear-mask]`);
+    await waitFor("the region goes", async () => ((await maskPaths(s)) === 0 ? true : null), 10_000);
     await settledAnalysis(s);
     assert.equal(await fieldValue(s, "Threshold") ?? `(no Threshold, method ${await methodNow(s)})`, whole, "without the mask the whole picture's value again");
   });
@@ -787,31 +759,31 @@ test("0089 §25.2: the automatic Threshold changes once per Inside / Outside swi
 // and the fresh analysis is applied as if the maker had edited nothing (`useTrace.ts:292-306`:
 // `edited` sees only a kept Threshold or an edit before the first analysis), so a Method the
 // maker chose is replaced by the region's; 0089 (lead 2026-10-31) keeps a maker's edits.
-test("0094 item 2: a Threshold the maker set and a Method the maker chose stay when a mask is added", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0094 item 2: a Threshold the maker set and a Method the maker chose stay when a region is drawn", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
-    const edge = await halfMasked(s, GREY_RIGHT_PNG, "right", false);
+    const draw = await halfMasked(s, GREY_RIGHT_PNG, "right", false);
     await settledAnalysis(s);
     if ((await methodNow(s)) !== "Brightness") await pickMethod(s, "Brightness");
     await typeInto(s, "Threshold", "33");
     await settledCounts(s);
     assert.equal(await fieldValue(s, "Threshold"), "33");
-    await shiftClick(s, edge[0], edge[1]);
-    await waitFor("the Mask item", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await draw();
+    await waitFor("the Region", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     await settledAnalysis(s);
     assert.equal(await methodNow(s), "Brightness");
     assert.equal(await fieldValue(s, "Threshold"), "33", "the maker's Threshold stays");
   });
   await withApp(async (s) => {
     // The left half is black on white paper; the maker picks a method of their own first.
-    const edge = await halfMasked(s, GREY_RIGHT_PNG, "left", false);
+    const draw = await halfMasked(s, GREY_RIGHT_PNG, "left", false);
     await settledAnalysis(s);
     const before = await methodNow(s);
     const chosen = before === "Remove background" ? "Brightness" : "Remove background";
     await pickMethod(s, chosen);
     await settledCounts(s);
     assert.equal(await methodNow(s), chosen);
-    await shiftClick(s, edge[0], edge[1]);
-    await waitFor("the Mask item", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
+    await draw();
+    await waitFor("the Region", async () => ((await maskPaths(s)) > 0 && (await maskState(s)).startsWith("Inside=true") ? true : null), 10_000);
     await settledAnalysis(s);
     console.log(JSON.stringify({ before, chosen, after: await methodNow(s), line: await analysisLine(s) }));
     assert.equal(await methodNow(s), chosen, "the maker's Method stays when the region is analysed");

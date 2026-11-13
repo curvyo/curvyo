@@ -534,10 +534,15 @@ test("0089 §25.4: at 800 x 600 the bar never scrolls or leaves the window from 
         assert.equal(v[open].group.h, seen[0][open].group.h, `${n} colours: the swatches stay on one line`);
       }
       assert.equal(v.false.height, 108, `${n} colours, panel closed: 3 rows`);
-      assert.ok(sameLine(v.false.tol, v.false.group), `${n} colours, panel closed: Colour tolerance and the group share a line`);
+      // `0114` UX notes §2.1: the first row is 264 px narrower, so Colour tolerance now sits on line 1 and the
+      // group follows it as a whole: on its line while it fits (up to one colour at 800 x 600), else whole on line 2.
+      const closedShares = sameLine(v.false.tol, v.false.group);
+      assert.ok(closedShares || (v.false.group.y > v.false.tol.y + 20 && v.false.group.x < v.false.tol.x), `${n} colours, panel closed: the group shares Colour tolerance's line or wraps below it as a whole ${JSON.stringify([v.false.tol, v.false.group])}`);
+      assert.equal(closedShares, Number(n) <= 1, `${n} colours, panel closed: the group ${Number(n) <= 1 ? "fits" : "wraps"}`);
       const shares = Number(n) <= 5;
       assert.equal(sameLine(v.true.tol, v.true.group), shares, `${n} colours, panel open: the group ${shares ? "shares" : "leaves"} Colour tolerance's line`);
-      assert.equal(v.true.height, shares ? 216 : 252, `${n} colours, panel open: ${shares ? 6 : 7} rows`);
+      // `0114` UX notes §2.1: the Mask line left the first row, one row (36 px) less than before.
+      assert.equal(v.true.height, shares ? 180 : 216, `${n} colours, panel open: ${shares ? 5 : 6} rows`);
     }
     // The Advanced block keeps its rows at 800 x 600 with eight colours.
     await viewport(s, 800, 600);

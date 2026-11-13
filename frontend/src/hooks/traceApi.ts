@@ -9,8 +9,8 @@ import type {
   TraceValues,
 } from "@/lib/traceText";
 
-/** A region tool of the Mask group (`specs/0114`): Rectangle or none. */
-export type MaskTool = "none" | "rect";
+/** A region tool of the Mask group (`specs/0114`): Rectangle, Lasso or none. */
+export type MaskTool = "none" | "rect" | "lasso";
 
 /** The Trace tool in the frontend (`specs/0025-raster-trace` criteria 1 to 5, 9 to 13, 15, 16,
  * 46, 52 to 54): the bar's state, the worker jobs with their timers, the progress slot, Create
@@ -19,13 +19,12 @@ export type MaskTool = "none" | "rect";
 export interface TraceApi {
   /** The Trace tool is the active tool. */
   active: boolean;
-  /** The Select bar shows the Trace button (only images selected). */
+  /** The Select bar shows the Trace button (an image or image-root clone in the selection). */
   available: boolean;
   /** What is selected, to the tool. */
-  selection: "empty" | "other" | "images" | "mixed";
-  /** The Mask group (`specs/0089` UX notes §24.4, always drawn): the mask paths selected with the
-   * image (0 for none) and the chosen mode, Inside on every entry. */
-  mask: { paths: number; regions: number; outside: boolean };
+  selection: "empty" | "other" | "images";
+  /** The Mask group (`specs/0114` UX notes §1): the active part's regions and its mode. */
+  mask: { regions: number; outside: boolean };
   /** Inside (`false`) or Outside: a step on a stored part (`specs/0114`), tool state before. */
   setMaskOutside: (outside: boolean) => void;
   /** The pressed region tool of the Mask group (`specs/0114` Behaviour 1). */
@@ -35,17 +34,18 @@ export interface TraceApi {
   /** Subtract is pressed: a region drawn now is taken out of the mask. */
   subtract: boolean;
   setSubtract: (on: boolean) => void;
-  /** Pick mask paths is armed (`specs/0094` slice 1b, UX notes §11). */
-  maskPick: boolean;
-  /** Arms or disarms Pick mask paths. */
-  setMaskPick: (armed: boolean) => void;
-  /** Clear mask: only the image stays selected (criterion 40). */
+  /** The image or the clone's root is locked: the Mask group's controls are unavailable
+   * (`specs/0114` UX notes §8). */
+  maskLocked: boolean;
+  /** Two or more images are selected: the Parts and Mask unit is not drawn (Frage 11 A). */
+  multiImage: boolean;
+  /** Clear mask: the active part's regions go in one step (`specs/0114` criterion 20). */
   clearMask: () => void;
   /** The parts' chips (`specs/0094` slice 2, UX notes §3); one whole-image part at least. */
   parts: TracePartInfo[];
-  /** A chip pick: the part becomes active with its settings and mask paths. */
+  /** A chip pick: the part becomes active with its settings and regions. */
   selectPart: (index: number) => void;
-  /** Add part: a copy of the active part's settings, no mask paths. */
+  /** Add part: a copy of the active part's settings, no regions. */
   addPart: () => void;
   /** Remove part `index` (after the inline confirm). */
   removePart: (index: number) => void;

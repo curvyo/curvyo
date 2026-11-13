@@ -345,7 +345,8 @@ const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector
 const traceButton = (s: S) => s.evaluate(`(() => { const b = document.querySelector('${BAR} [data-trace-slot] , ${BAR} button[data-trace-slot]'); return b ? JSON.stringify({ disabled: b.getAttribute('aria-disabled'), describedby: b.getAttribute('aria-describedby'), reason: b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby'))?.textContent ?? '' : '' }) : 'null'; })()`).then((v) => JSON.parse(v as string) as { disabled: string | null; describedby: string | null; reason: string } | null);
 const settledCounts = (s: S) => waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 
-const BRIGHTNESS_BAR = ["About Trace", "Preset", "Pick mask paths", "Mask", "Clear mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
+// `specs/0114` criterion 1: the Mask group left the first row for the Parts row of Advanced.
+const BRIGHTNESS_BAR = ["About Trace", "Preset", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
 
 // ------------------------------------------------------------------ 0094 fixtures and helpers
 /** M1 of the spec at `n` px (the tester's `support_0094` arithmetic, pixel centres in M1's own 1000 px frame). */
@@ -405,14 +406,8 @@ async function drag(s: S, from: [number, number], to: [number, number]) {
   await sleep(500);
 }
 
-const shiftClick = async (s: S, x: number, y: number) => {
-  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers: 8 });
-  }
-  await sleep(600);
-};
-
-/** Imports M1, draws a rectangle over `part` of it ("left" half, or "outside" right of it), selects both with Ctrl+A and opens Trace. */
+/** Imports M1, opens Trace on it and draws a rectangle region with the Mask group's Rectangle over
+ * `part` of it ("left" half, or "outside" right of it; `specs/0114`), Advanced open. */
 async function maskedOn(s: S, part: "left" | "outside" = "left") {
   const file = path.join(SCRATCH, "m1.png");
   writeFileSync(file, M1_PNG);
@@ -421,24 +416,26 @@ async function maskedOn(s: S, part: "left" | "outside" = "left") {
   await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("m1.png")) ? true : null));
   await sleep(800);
   const box = await pictureBox(s);
-  const h = box.y1 - box.y0;
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  await s.key("r", 82);
-  if (part === "left") {
-    await drag(s, [box.x0 - 30, box.cy - 0.6 * h], [box.cx, box.cy + 0.6 * h]);
-  } else {
-    await drag(s, [box.x1 + 40, box.cy - 20], [box.x1 + 90, box.cy + 20]);
-  }
-  await s.key("s", 83);
-  await focusCanvas(s);
-  await s.key("a", 65, 2);
-  await waitFor("two objects selected", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
+  await s.evaluate(`document.activeElement?.blur?.()`);
+  await s.clickSel(`[role=row][aria-label*="m1.png"]`);
+  await waitFor("Trace offered", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
   await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
   await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
   await sleep(1000);
+  await setAdvanced(s, true);
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+  if (part === "left") {
+    await drag(s, [box.x0 - 30, await regionTop(s, box)], [box.cx, box.y1 + 30]);
+  } else {
+    await drag(s, [box.x1 + 40, box.cy - 20], [box.x1 + 90, box.cy + 20]);
+  }
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+  await sleep(600);
   return box;
 }
+/** Where a region may start on screen: 6 px above the picture, but below the bar that covers the canvas. */
+const regionTop = async (s: S, box: { y0: number }) =>
+  Math.max(box.y0 - 6, Number(await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().bottom`)) + 6);
 const maskState = async (s: S) =>
   (await s.evaluate(`(() => { const g = document.querySelector('${BAR} [role=radiogroup][aria-label=Mask]'); if (!g) return 'absent';
     return [...g.querySelectorAll('[role=radio]')].map((r) => r.textContent.trim() + '=' + r.getAttribute('aria-checked')).join(','); })()`)) as string;
@@ -506,7 +503,6 @@ const historyText = async (s: S) => {
 const selectionCount = async (s: S) =>
   Number((await s.evaluate(`(() => { const all = [...document.querySelectorAll('*')].filter((e) => e.children.length === 0 && /^\\d+ objects?$/.test(e.textContent.trim())); return all.length ? all[all.length - 1].textContent.trim().split(' ')[0] : '-1'; })()`)) as string);
 
-const MASK_STOPS = ["Pick mask paths", "Mask", "Clear mask"];
 
 // ------------------------------------------------------------------ 24.1: no View pill, no views, no keys
 
@@ -609,31 +605,32 @@ test("0089 §24.2, §24.7: the value fields are 150 px wide, Ignore below 171 px
   });
 });
 
-test("0089 §24.2: the bar order is i, Preset, Mask group, Method, main field, Smooth, Tolerance, Ignore below, expander, Trace; the Mask group is 192 px (28 + 4 + 128 + 4 + 28) and one flow item", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 §24.2 as `0114` UX notes §2 keeps it: the bar order is i, Preset, Method, main field, Smooth, Tolerance, Ignore below, expander, Trace; the Mask group is 256 px (3 x 28 + 128 + 28 + 4 gaps) in the Parts row", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
-    await openOn(s, "lines.png", LINES, false);
+    await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
+    await setAdvanced(s, false);
     assert.deepEqual(await barControls(s), BRIGHTNESS_BAR);
-    const group = (await rectOf(s, `${BAR} [data-trace-mask]`))!;
-    assert.ok(Math.abs(group.w - 192) <= 1, `the group is ${group.w} px`);
-    const preset = (await rectOf(s, `${BAR} button[aria-label=Preset]`))!;
-    const method = (await rectOf(s, `${BAR} button[aria-label=Method]`))!;
+    assert.equal(await s.evaluate(`!!document.querySelector('${BAR} [data-trace-mask]')`), false, "no Mask group with Advanced closed");
+    await setAdvanced(s, true);
+    const group = (await rectOf(s, `${ADV} [data-trace-mask]`))!;
+    assert.ok(Math.abs(group.w - 256) <= 1, `the group is ${group.w} px`);
+    const trash = (await rectOf(s, `${ADV} [data-trace-remove-part]`))!;
     const sameLine = (a: { y: number; h: number }, b: { y: number; h: number }) => Math.abs(a.y + a.h / 2 - (b.y + b.h / 2)) < 14;
-    assert.ok(sameLine(preset, group) ? group.x >= preset.right - 1 : group.y > preset.y, "the group follows Preset");
-    assert.ok(sameLine(group, method) ? method.x >= group.right - 1 : method.y > group.y, "Method follows the group");
-    for (const stop of ["Pick mask paths", "Clear mask"]) {
-      const b = (await rectOf(s, `${BAR} [aria-label="${stop}"]`))!;
+    assert.ok(sameLine(trash, group) ? group.x >= trash.right + 24 : group.y > trash.y, "the group follows the trash, 25 px after it");
+    for (const stop of ["Rectangle", "Lasso", "Subtract", "Clear mask"]) {
+      const b = (await rectOf(s, `${ADV} [aria-label="${stop}"]`))!;
       assert.ok(b.w >= 28 && b.h >= 28, `${stop} is at least 28 x 28`);
       assert.ok(b.y >= group.y - 1 && b.bottom <= group.bottom + 1, `${stop} is inside the group's line`);
     }
-    const pill = (await rectOf(s, `${BAR} [role=radiogroup][aria-label=Mask]`))!;
+    const pill = (await rectOf(s, `${ADV} [role=radiogroup][aria-label=Mask]`))!;
     assert.ok(Math.abs(pill.w - 128) <= 1, `Inside / Outside is ${pill.w} px`);
   });
 });
 
 // ------------------------------------------------------------------ 24.3: the last Advanced row
 
-test("0089 §24.3: the Advanced block ends with Corners | Parts | Analyse; Parts has a muted label that is no Tab stop; Analyse is at the far right; the group grows 32 + 4 + chips + 4 + 28 + 4 + 28", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.3 (`0114` UX notes §2.3): the Advanced block ends with Corners | Parts and Mask | Analyse; Parts has a muted label that is no Tab stop; Analyse is at the far right; the group grows 32 + 4 + chips + 4 + 28 + 4 + 28", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
@@ -675,7 +672,7 @@ test("0089 §24.3: the Advanced block ends with Corners | Parts | Analyse; Parts
       stops.push(name);
     }
     const tail = stops.slice(stops.indexOf("Corners"));
-    assert.deepEqual(tail, ["Corners", "Parts", "Add part", "Analyse"], `the last stops: ${JSON.stringify(stops)}`);
+    assert.deepEqual(tail, ["Corners", "Parts", "Add part", "Rectangle", "Lasso", "Subtract", "Mask", "Clear mask", "Analyse"], `the last stops: ${JSON.stringify(stops)}`);
     assert.ok(!stops.some((n) => /^Remove part|^Keep/.test(n)), "Remove part is no Tab stop");
     assert.equal(stops.filter((n) => n === "Parts").length, 1, "the chips are one stop");
     assert.ok(!stops.includes("Part 2 of 3"), "the bar's 'Part 2 of 3' label is no stop");
@@ -688,14 +685,14 @@ test("0089 §24.3: the Advanced block ends with Corners | Parts | Analyse; Parts
 
 // ------------------------------------------------------------------ 24.4: the mask group is always there
 
-test("0089 §24.4: the Mask group is drawn for every method and state, never dimmed or aria-disabled, Inside on entry, and the bar does not move when the first path is picked", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.4 (`0114` UX notes §1): the Mask group is drawn for every method and state with Advanced open, never dimmed or aria-disabled, Inside on entry", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
-    await openOn(s, "lines.png", LINES, false);
+    await openOn(s, "lines.png", LINES, true);
     const undimmed = async (tag: string) => {
       const info = JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-mask] button')].map((b) => { const cs = getComputedStyle(b); let o = 1; for (let n = b; n && n !== document.body; n = n.parentElement) o *= Number(getComputedStyle(n).opacity);
         return { name: b.getAttribute('aria-label') || b.textContent.trim(), ariaDisabled: b.getAttribute('aria-disabled'), disabled: b.disabled, opacity: o, pe: cs.pointerEvents }; }))`)) as string) as
         { name: string; ariaDisabled: string | null; disabled: boolean; opacity: number; pe: string }[];
-      assert.deepEqual(info.map((i) => i.name), ["Pick mask paths", "Inside", "Outside", "Clear mask"], `${tag}: the three controls are drawn`);
+      assert.deepEqual(info.map((i) => i.name), ["Rectangle", "Lasso", "Subtract", "Inside", "Outside", "Clear mask"], `${tag}: the controls are drawn`);
       for (const i of info) {
         assert.equal(i.ariaDisabled, null, `${tag}: ${i.name} has no aria-disabled`);
         assert.equal(i.disabled, false, `${tag}: ${i.name} is enabled`);
@@ -711,12 +708,10 @@ test("0089 §24.4: the Mask group is drawn for every method and state, never dim
     await pickMethod(s, "Brightness");
     await setOutput(s, "Multicolour").catch(() => undefined);
     await undimmed("Multicolour");
-    await setAdvanced(s, true);
-    await undimmed("Advanced open");
   });
 });
 
-test("0089 §24.4: the first mask path changes neither the bar's width, nor its height, nor the place of any control", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.4 with `0114`: the first region changes neither the first row's box nor the place of any of its controls", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     const file = path.join(SCRATCH, "m1.png");
     writeFileSync(file, M1_PNG);
@@ -725,20 +720,14 @@ test("0089 §24.4: the first mask path changes neither the bar's width, nor its 
     await waitFor("the image row", async () => ((await s.layerRows()).some((r) => r?.includes("m1.png")) ? true : null));
     await sleep(800);
     const box = await pictureBox(s);
-    const h = box.y1 - box.y0;
-    await focusCanvas(s);
-    await press(s, "Escape", 27);
-    await s.key("r", 82);
-    await drag(s, [box.x0 - 30, box.cy - 0.6 * h], [box.cx, box.cy + 0.6 * h]);
-    await s.key("s", 83);
-    // Enter the tool with the picture alone first: no mask path.
+    // Enter the tool with the picture alone: no region.
     await s.evaluate(`document.activeElement?.blur?.()`);
     await s.clickSel(`[role=row][aria-label*="m1.png"]`);
     await waitFor("Trace offered", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
     await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
     await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
     await sleep(1000);
-    await setAdvanced(s, false);
+    await setAdvanced(s, true);
     await settledCounts(s);
     const survey = async () =>
       (await s.evaluate(`JSON.stringify((() => { const bar = document.querySelector('${BAR}').getBoundingClientRect();
@@ -746,21 +735,23 @@ test("0089 §24.4: the first mask path changes neither the bar's width, nor its 
           .map((e) => { const r = e.getBoundingClientRect(); return [e.getAttribute('aria-label') || e.textContent.trim(), Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; });
         return { bar: [Math.round(bar.x), Math.round(bar.y), Math.round(bar.width), Math.round(bar.height)], items }; })())`)) as string;
     const before = JSON.parse(await survey()) as { bar: number[]; items: [string, number, number, number, number][] };
-    assert.equal(await maskPaths(s), 0, "no mask path yet");
-    // Select the picture and the rectangle: Shift+click on the rectangle outside the picture adds its path.
-    await shiftClick(s, box.x0 - 30, box.cy);
-    await waitFor("one mask path", async () => ((await maskPaths(s)) === 1 ? true : null), 20_000);
+    assert.equal(await maskPaths(s), 0, "no region yet");
+    // Rectangle, a drag over the left half, Rectangle released.
+    await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+    await drag(s, [box.x0 - 30, await regionTop(s, box)], [box.cx, box.y1 + 30]);
+    await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+    await waitFor("one region", async () => ((await maskPaths(s)) === 1 ? true : null), 20_000);
     await settledCounts(s);
     const after = JSON.parse(await survey()) as { bar: number[]; items: [string, number, number, number, number][] };
     assert.deepEqual(after.bar, before.bar, "the bar's box did not change");
     assert.deepEqual(after.items, before.items, "no control moved or changed size");
-    assert.equal(await barControls(s).then((c) => c.slice(0, 6).join("|")), ["About Trace", "Preset", ...MASK_STOPS, "Method"].join("|"));
+    assert.equal(await barControls(s).then((c) => c.slice(0, 3).join("|")), ["About Trace", "Preset", "Method"].join("|"));
   });
 });
 
-test("0089 §24.4: with no mask path Inside / Outside is selectable and changes nothing, and Clear mask is a no-op: no state change, no notice, no history step, focus stays", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.4: with no region Inside / Outside is selectable and changes nothing, and Clear mask is a no-op: no state change, no notice, no history step, focus stays", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
-    await openOn(s, "lines.png", LINES, false);
+    await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     const status = await hiddenRegion(s);
@@ -795,20 +786,20 @@ test("0089 §24.4: with no mask path Inside / Outside is selectable and changes 
   });
 });
 
-test("0089 §24.4: with a path Clear mask removes it and a key press keeps focus on the button (it does not disappear); Outside survives a cleared mask until the next entry", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.4 with `0114` criterion 20: with a region Clear mask removes it and a key press keeps focus on the button (it does not disappear); the part keeps Outside", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await maskedOn(s, "left");
     await settledCounts(s);
-    assert.ok((await maskPaths(s)) > 0, "a mask path");
+    assert.ok((await maskPaths(s)) > 0, "a region");
     await clickMask(s, "Outside");
     await sleep(600);
     await s.evaluate(`document.querySelector('${BAR} [data-trace-clear-mask]').focus()`);
     await s.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
     await s.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
-    await waitFor("no mask path", async () => ((await maskPaths(s)) === 0 ? true : null), 15_000);
+    await waitFor("no region", async () => ((await maskPaths(s)) === 0 ? true : null), 15_000);
     assert.equal(await s.evaluate(`!!document.querySelector('${BAR} [data-trace-clear-mask]')`), true, "Clear mask is still drawn");
     assert.equal(await s.evaluate(`document.activeElement?.hasAttribute('data-trace-clear-mask')`), true, "focus stays on Clear mask after a key press");
-    assert.equal(await maskState(s), "Inside=false,Outside=true", "the choice is kept for the first path added later");
+    assert.equal(await maskState(s), "Inside=false,Outside=true", "the part and its mode stay");
   });
 });
 
@@ -938,14 +929,16 @@ test("0089 §24.2, §24.3: at 800 x 600 with the panel open and closed, Advanced
         const targets = [...bar.querySelectorAll('button, [role=spinbutton], [role=radio]')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('.sr-only'); });
         const small = targets.filter((e) => { const r = e.getBoundingClientRect(); return r.width < 28 - 0.5 || r.height < 28 - 0.5; }).map((e) => (e.getAttribute('aria-label') || e.textContent.trim()) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
         const outside = targets.filter((e) => { const r = e.getBoundingClientRect(); return r.right > b.right + 0.5 || r.left < b.left - 0.5 || r.right > innerWidth + 0.5; }).map((e) => e.getAttribute('aria-label') || e.textContent.trim());
-        // Whole groups: the Mask group's three controls, and Pick mask paths..Clear mask, share one line; so do the Parts label, chips and buttons of one part.
+        // Whole groups: the Mask group's controls share one line; so do the Parts label, chips and buttons of one part.
         const line = (sel) => { const e = document.querySelector(sel); if (!e) return null; const ys = [...e.querySelectorAll('button')].map((x) => Math.round(x.getBoundingClientRect().top)); return [...new Set(ys)].length; };
         const sc = document.scrollingElement;
         return { small, outside, mask: line('[data-trace-mask]'), parts: line('[data-trace-parts]'), hscroll: sc.scrollWidth > innerWidth + 1, barScroll: bar.scrollWidth > bar.clientWidth + 1, bottom: b.bottom, vh: innerHeight, height: Math.round(b.height) };
       })())`)) as string) as { small: string[]; outside: string[]; mask: number | null; parts: number | null; hscroll: boolean; barScroll: boolean; bottom: number; vh: number; height: number };
       assert.deepEqual(m.small, [], `${tag}: every target is at least 28 x 28`);
       assert.deepEqual(m.outside, [], `${tag}: nothing past the bar's edge`);
-      assert.equal(m.mask, 1, `${tag}: the Mask group is one line`);
+      if (m.mask !== null) {
+        assert.equal(m.mask, 1, `${tag}: the Mask group is one line`);
+      }
       if (m.parts !== null) {
         assert.equal(m.parts, 1, `${tag}: the Parts group is one line (1 part)`);
       }
@@ -968,9 +961,14 @@ test("0089 §24.2, §24.3: at 800 x 600 with the panel open and closed, Advanced
       await sleep(600);
     }
     await survey("3 parts");
+    // `specs/0114` UX notes §2.3 at 800 x 600: the Parts group and the Mask group on lines of their
+    // own, both at the block's start, the divider not drawn; Analyse right-aligned on its own line.
     const parts = (await rectOf(s, `${ADV} [data-trace-parts]`))!;
+    const mask = (await rectOf(s, `${ADV} [data-trace-mask]`))!;
     const analyse = (await rectOf(s, `${ADV} [data-trace-analyse]`))!;
-    assert.ok(Math.abs(analyse.y - parts.y) < 14 && analyse.x >= parts.right - 1, "Parts (192) and Analyse (75) share a line: 192 + 8 + 75 = 275 fits 304");
+    assert.ok(mask.y >= parts.bottom - 1 && Math.abs(mask.x - parts.x) <= 1, "the Mask group wraps below the Parts group");
+    assert.equal(await s.evaluate(`getComputedStyle(document.querySelector('${ADV} [data-trace-mask] > span[aria-hidden]')).visibility`), "hidden", "no divider at a line start");
+    assert.ok(analyse.y >= mask.bottom - 1, "Analyse on its own line");
     // Eight parts: the group wraps inside itself (label and chips first, Add and Remove on a second line), one Tab stop group.
     for (let i = 0; i < 5; i++) {
       await s.clickSel(`${ADV} [data-trace-add-part]`);

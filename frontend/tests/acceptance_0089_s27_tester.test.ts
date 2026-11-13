@@ -668,7 +668,7 @@ test("0089 §27.4 tester: delete by keyboard down to no colour: focus lands on t
 
 // ------------------------------------------------------------------ 800 x 600
 
-test("0089 §27 tester: at 800 x 600 the bar does not wrap beyond the rows of §24.2 (Brightness, Advanced closed: 6 rows panel open, §25.1) and never overflows sideways; no row for a notice", { skip: !BROWSER, timeout: 500_000 }, async () => {
+test("0089 §27 tester: at 800 x 600 the bar does not wrap beyond the rows of §24.2 (Brightness, Advanced closed: 5 rows panel open, `0114` UX notes §2.1) and never overflows sideways; no row for a notice", { skip: !BROWSER, timeout: 500_000 }, async () => {
   await withApp(
     async (s) => {
       await openOn(s, "narrow.png", PICTURE);
@@ -680,7 +680,7 @@ test("0089 §27 tester: at 800 x 600 the bar does not wrap beyond the rows of §
       const open = await rowsOf();
       console.log("panel open:", JSON.stringify(open));
       assert.equal(open.overflow, false);
-      assert.equal(open.rows, 6, `panel open: 6 rows, 216 px (§25.1, still true under §27): ${JSON.stringify(open)}`);
+      assert.equal(open.rows, 5, `panel open: 5 rows, 180 px (0114 UX notes §2.1, the Mask line left): ${JSON.stringify(open)}`);
       await noStatusText(s, "800x600 Brightness");
       const hide = await s.evaluate(`!!document.querySelector('[aria-label="Hide panel"]')`);
       if (hide) {

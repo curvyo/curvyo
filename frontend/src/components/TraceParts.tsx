@@ -4,6 +4,7 @@ import { type KeyboardEvent, useEffect, useRef } from "react";
 import { ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
+import { MASK_LOCKED } from "@/lib/traceText";
 import {
   ADD_PART,
   KEEP_ONE_PART,
@@ -24,6 +25,9 @@ const ARM_TRANSITION = "transition-colors duration-[120ms] ease-out motion-reduc
 
 interface TracePartsProps {
   parts: readonly TracePartInfo[];
+  /** The image is locked: Add part and the trash unavailable, the chips still pick a part
+   * (`specs/0114` UX notes §8). */
+  locked?: boolean;
   onSelect: (index: number) => void;
   onAdd: () => void;
   onRemove: (index: number) => void;
@@ -31,14 +35,14 @@ interface TracePartsProps {
 }
 
 /**
- * The Parts group, first in the last row of the Advanced block (`specs/0094` slice 2, criteria 18,
- * 19, 28, 32; UX notes §3 to §5; `specs/0089` UX notes §24.3): the muted label "Parts", one radio
+ * The Parts group of the Advanced line's Parts and Mask unit (`specs/0094` slice 2, criteria 18,
+ * 19, 28, 32; UX notes §3 to §5; `specs/0114` UX notes §2.2): the muted label "Parts", one radio
  * group of numbered chips (roving focus, the arrows, Home and End make a part active), Add part,
  * and the trash of the active part with the inline confirm of `0081` (Delete on a chip arms it
  * too). Left to right is creation and stacking order. It wraps as one whole item; past the
  * block's width Add and Remove go to a second line together.
  */
-export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: TracePartsProps) {
+export function TraceParts({ parts, locked = false, onSelect, onAdd, onRemove, onReturnFocus }: TracePartsProps) {
   const arm = useDeleteArm();
   const chips = useRef<(HTMLButtonElement | null)[]>([]);
   const active = Math.max(0, parts.findIndex((p) => p.active));
@@ -50,7 +54,7 @@ export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: 
     disarm();
   }, [shape, disarm]);
   const armed = arm.armed === ZONE;
-  const canRemove = count > 1;
+  const canRemove = count > 1 && !locked;
   const pressTrash = () => {
     if (!canRemove) {
       return;
@@ -95,18 +99,19 @@ export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: 
       chips.current[next]?.focus();
     }
   };
-  const full = count >= PARTS_MAX;
+  const full = count >= PARTS_MAX || locked;
   const plain = "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
   return (
     <div
       data-trace-parts=""
+      data-flow=""
       {...{ [ARM_ZONE]: ZONE }}
       className={`flex min-h-9 max-w-full min-w-0 flex-wrap items-center gap-1 rounded-md ${ARM_TRANSITION} ${armed ? "bg-[var(--destructive-soft)]" : ""}`}
     >
       <span aria-hidden className="flex h-9 w-8 shrink-0 items-center text-xs text-[var(--toolbar-icon)] opacity-70">
         {PARTS}
       </span>
-      <div role="radiogroup" aria-label={PARTS} className="flex flex-wrap items-center gap-1" onKeyDown={keyDown}>
+      <div role="radiogroup" aria-label={PARTS} data-flow="" className="flex flex-wrap items-center gap-1" onKeyDown={keyDown}>
         {parts.map((part, index) => {
           const on = index === active;
           const look = on
@@ -147,7 +152,7 @@ export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: 
         })}
       </div>
       <div className="flex h-9 items-center gap-1">
-        <Tooltip side="bottom" content={full ? PARTS_AT_MOST : ADD_PART}>
+        <Tooltip side="bottom" content={locked ? MASK_LOCKED : full ? PARTS_AT_MOST : ADD_PART}>
           <button
             type="button"
             aria-label={ADD_PART}
@@ -163,7 +168,7 @@ export function TraceParts({ parts, onSelect, onAdd, onRemove, onReturnFocus }: 
             <Plus size={16} strokeWidth={1.5} aria-hidden />
           </button>
         </Tooltip>
-        <Tooltip side="bottom" content={canRemove ? removePartText(active, armed) : KEEP_ONE_PART}>
+        <Tooltip side="bottom" content={locked ? MASK_LOCKED : canRemove ? removePartText(active, armed) : KEEP_ONE_PART}>
           <button
             type="button"
             tabIndex={-1}

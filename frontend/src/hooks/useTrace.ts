@@ -6,7 +6,6 @@ import {
   MASK_FAILED,
   MASK_OUTSIDE_IMAGE,
   NO_STATUS,
-  TRACE_MIXED,
   nothingToTrace,
   maskText,
   PICK_COLOURS,
@@ -59,7 +58,7 @@ import { type RegionRead, forgetRegionValues, partAutoValues, readRegion, region
 import { NO_VIEW, joinWires, loadParams, loadPresets, partPixelsOf, pixelsOf, readView, type ViewState } from "@/lib/traceSource";
 import { NO_PART_LINE, type PartJob, type TracePartInfo, mayCrop, partEmptyText, partKey, partsCount, readParts, traceParts } from "@/lib/traceParts";
 import type { MaskTool, TraceApi } from "./traceApi";
-import { partSettingsJson } from "@/lib/traceMaskSettings";
+import { readPartChoice, storedPartSettingsJson } from "@/lib/traceMaskSettings";
 import { useTraceParts } from "./useTraceParts";
 import { useTracePalette } from "./useTracePalette";
 import { useTraceMethod } from "./useTraceMethod";
@@ -143,13 +142,43 @@ export function useTrace(
   useEffect(() => {
     choiceRef.current = choice;
   }, [choice]);
+  /** Whether the maker set the shown image's Threshold for the active part: a stored part keeps
+   * it as a number, else as Auto (ADR 0061 §5). */
+  const makerThresholdNow = (): boolean => {
+    const id = viewRef.current.shown;
+    const parts = readParts(viewRef.current.parts);
+    const at = parts.find((p) => p.active);
+    if (parts.length > 1 && at) {
+      return partsRef.current.makerOf(at.id).has("threshold");
+    }
+    return id !== "" && makerThreshold.current.has(id);
+  };
   // `specs/0114`: the bar's settings are the session's tool state, stored by the first mask
   // gesture on an untouched image and by Add part.
   useEffect(() => {
     if (active) {
-      getSession()?.set_trace_tool_settings(partSettingsJson(choice));
+      getSession()?.set_trace_tool_settings(storedPartSettingsJson(choice, makerThresholdNow()));
     }
   }, [active, choice, getSession]);
+  /** The end of a settings gesture (`specs/0114` slice 3): the active part's settings written,
+   * one step "Change trace settings" on a stored part, tool state on an untouched image. */
+  const writePartSettings = useCallback(
+    (next: TraceChoice) => {
+      const session = getSession();
+      if (!session || viewRef.current.images.length !== 1) {
+        return;
+      }
+      const index = Math.max(0, readParts(viewRef.current.parts).findIndex((p) => p.active));
+      if (session.set_trace_part_settings(index, storedPartSettingsJson(next, makerThresholdNow()))) {
+        onChange();
+      }
+    },
+    [getSession, onChange],
+  );
+  /** Create paths asked while a lasso was in progress: the lasso is closed first, then Create
+   * paths runs once the view of the closed mask is read (UX notes §6). */
+  const pendingCreate = useRef(false);
+  const createRef = useRef<() => void>(() => undefined);
   /** The view as last read; the sync effect below keeps it and the state together. */
   const viewRef = useRef(view);
   /** Another part's settings into the bar (`specs/0094` slice 2): its Threshold is the image's
@@ -813,13 +842,21 @@ export function useTrace(
       next.shown === previous.shown &&
       next.images.join() === previous.images.join() &&
       next.mask === previous.mask &&
-      next.maskPaths === previous.maskPaths &&
       next.maskRegions === previous.maskRegions &&
       next.maskOutsideImage === previous.maskOutsideImage &&
       next.maskFailed === previous.maskFailed &&
-      next.parts === previous.parts
+      next.parts === previous.parts &&
+      next.partSettings === previous.partSettings
     ) {
       return;
+    }
+    // `specs/0114` criterion 17: an undo, a redo or a peer changed the active part's stored
+    // settings: they are shown (not while a value is dragged, whose end writes them).
+    if (active && session && next.partSettings !== "" && next.partSettings !== previous.partSettings && !dragging.current) {
+      const stored = readPartChoice(next.partSettings, choiceRef.current);
+      if (stored && storedPartSettingsJson(stored, stored.values.threshold !== null) !== storedPartSettingsJson(choiceRef.current, makerThresholdNow())) {
+        partsRef.current.reshow();
+      }
     }
     if (next.shown !== previous.shown) {
       partsRef.current.cache.current.clear();
@@ -862,6 +899,10 @@ export function useTrace(
       setValues((v) => viewValues(v, sameImage, known, background));
       void runPreview(true);
     }
+    if (pendingCreate.current) {
+      pendingCreate.current = false;
+      createRef.current();
+    }
   }, [syncRevision, active, getSession, cancelAll, runPreview, setValues]);
 
   /** Takes a new choice: remembered, the kept results dropped, a preview after the debounce. An
@@ -894,6 +935,10 @@ export function useTrace(
       if (readParts(viewRef.current.parts).findIndex((p) => p.active) <= 0) {
         writeChoice(next);
       }
+      // A stored part keeps its settings (`specs/0114` slice 3): written at the gesture's end.
+      if (!dragging.current) {
+        writePartSettings(next);
+      }
       results.current.clear();
       session?.clear_trace_results();
       session?.set_trace_preview_stale(false);
@@ -902,7 +947,7 @@ export function useTrace(
       setLoading(false);
       schedule(DEBOUNCE_MS);
     },
-    [getSession, schedule],
+    [getSession, schedule, writePartSettings],
   );
 
   const palette = useTracePalette({ active, traced: partsApi.parts.find((part) => part.active)?.contributes ?? true, values, getSession, apply, choiceRef });
@@ -956,9 +1001,10 @@ export function useTrace(
   const endDrag = useCallback(() => {
     if (dragging.current) {
       dragging.current = false;
+      writePartSettings(choiceRef.current);
       schedule(0);
     }
-  }, [schedule]);
+  }, [schedule, writePartSettings]);
 
   /** Stop or the first Escape (criteria 10, 53): the old outline at 50 %, "Stopped" with Retry in
    * the slot, Enter traces again. */
@@ -1000,6 +1046,8 @@ export function useTrace(
       setChoice(next);
       writeChoice(next);
       setAnalysisState({ kind: "auto", analysis });
+      // Analyse is the maker's gesture: a stored part keeps its values (`specs/0114` slice 3).
+      writePartSettings(next);
     }
     results.current.clear();
     getSession()?.clear_trace_results();
@@ -1007,7 +1055,7 @@ export function useTrace(
     setStopped(false);
     setFailure(null);
     schedule(0);
-  }, [getSession, schedule]);
+  }, [getSession, schedule, writePartSettings]);
 
   /** Trace again or Retry: the preview at once, with the values as they are. */
   const retrace = useCallback(() => {
@@ -1018,6 +1066,49 @@ export function useTrace(
   }, [schedule]);
 
 
+  /** Several images selected (Frage 11 A): image `id` traced with its own stored parts, each with
+   * its stored settings and clip, joined and kept for Create paths. `false` when it stores no
+   * mask (it is traced with the bar's settings) or a newer job took over. */
+  const imageWithOwnMask = useCallback(
+    async (session: WasmSession, id: string, index: number, stale: () => boolean): Promise<boolean> => {
+      const parts = readParts(session.trace_image_parts(id));
+      if (parts.length < 2 && parts.every((p) => p.regions === 0)) {
+        return false;
+      }
+      setProgress(index);
+      const auto = await thresholdOf(session, id);
+      if (stale()) {
+        return false;
+      }
+      const background = backgrounds.current.get(id) ?? "";
+      const jobs: (PartJob | null)[] = parts.map((part, at) => {
+        const stored = readPartChoice(session.trace_image_part_settings(id, at), choiceRef.current) ?? choiceRef.current;
+        const v = stored.values;
+        const threshold = v.threshold ?? auto;
+        if (!part.contributes || threshold === null || nothingToTrace(v) !== "") {
+          return null;
+        }
+        const settings = settingsJson(v, threshold, v.backgroundAuto ? background : (v.background ?? ""), part.mask);
+        return { settings, text: false, key: partKey(`${id}|${settings}`, false, false), crop: false };
+      });
+      const out = await traceParts(
+        { pixels: () => pixelsOf(session, id, false), join: (wires) => joinWires(session, id, wires, true) },
+        runner(),
+        jobs,
+        partsRef.current.cache.current,
+        "",
+        (p) => {
+          if (!stale()) {
+            setPercent(p);
+          }
+        },
+        stale,
+      );
+      return out !== null && !out.missing;
+    },
+    [thresholdOf, runner, setPercent],
+  );
+
   const create = useCallback(() => {
     if (stopped || failure !== null) {
       // Stopped or failed: Enter, Ctrl+Enter and a double-click trace again (UX notes 19).
@@ -1025,6 +1116,13 @@ export function useTrace(
       return;
     }
     const session = getSession();
+    // A lasso in progress is closed first; Create paths runs on the closed mask (UX notes §6).
+    if (session?.trace_lasso_open()) {
+      session.close_trace_lasso();
+      pendingCreate.current = true;
+      onChange();
+      return;
+    }
     const current = viewRef.current;
     const severalParts = readParts(current.parts).length > 1;
     if (!session || creating || current.images.length === 0 || (current.maskFailed || (!severalParts && current.maskOutsideImage))) {
@@ -1094,6 +1192,11 @@ export function useTrace(
           return;
         }
         for (const [index, id] of current.images.entries()) {
+          // Frage 11 A: of several images, one with a stored mask is traced with its own parts
+          // and their settings.
+          if (current.images.length > 1 && (await imageWithOwnMask(session, id, index, () => mine !== generation.current))) {
+            continue;
+          }
           if (v.method === PICK_COLOURS && !backgrounds.current.has(id)) {
             await thresholdOf(session, id);
           }
@@ -1163,7 +1266,10 @@ export function useTrace(
         }
       }
     })();
-  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, fitInputs, runner, joinedJob, resolveParts]);
+  }, [getSession, creating, stopped, failure, retrace, status.canCreate, startTimers, clearTimers, thresholdOf, onChange, returnFocus, fail, setPercent, textLines, fitTexts, fitInputs, runner, joinedJob, resolveParts, imageWithOwnMask]);
+  useEffect(() => {
+    createRef.current = create;
+  }, [create]);
 
   // Leaving the tool ends every job.
   useEffect(() => {
@@ -1222,15 +1328,6 @@ export function useTrace(
     [getSession, onChange],
   );
 
-  /** Pick mask paths (`specs/0094` slice 1b): the session's mode; a pick changes the selection,
-   * so the sync above traces again. */
-  const setMaskPick = useCallback(
-    (armed: boolean) => {
-      getSession()?.set_trace_mask_pick(armed);
-      onChange();
-    },
-    [getSession, onChange],
-  );
   const clearMask = useCallback(() => {
     getSession()?.clear_trace_mask();
     onChange();
@@ -1270,12 +1367,11 @@ export function useTrace(
       if (!active) {
         return false;
       }
-      // Armed Pick mask paths ends first, before a running trace stops (`specs/0094` criterion 39).
+      // A region drag or a lasso in progress takes Escape and Enter first: the session cancels
+      // the drag, discards or finishes the lasso (`specs/0114` UX notes §7).
       const session = getSession();
-      if (event.key === "Escape" && session?.trace_mask_pick()) {
-        session.set_trace_mask_pick(false);
-        onChange();
-        return true;
+      if ((event.key === "Escape" || event.key === "Enter") && session?.trace_mask_holds_keys()) {
+        return false;
       }
       const plain = !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey;
       if (event.key === "Enter" && plain && !event.repeat) {
@@ -1293,7 +1389,7 @@ export function useTrace(
       }
       return false;
     },
-    [active, create, creating, stop, getSession, onChange, disarmPick],
+    [active, create, creating, stop, getSession, disarmPick],
   );
 
 
@@ -1312,17 +1408,15 @@ export function useTrace(
     ? READING_TEXT
     : [textLinesText(...textCounts), shapesText(shapeCount)].filter((t) => t !== "").join(" · ");
   const session = active ? getSession() : null;
-  // The Mask group is always drawn (`ux-notes.md` §24.4): the mode with or without mask paths.
+  // The Mask group (`specs/0114` UX notes §1): the mode with or without regions.
   const maskOutside = session?.trace_mask_outside() ?? false;
   const images = view.selection === "images";
-  const mask = { paths: images ? view.maskPaths : 0, regions: images ? view.maskRegions : 0, outside: maskOutside };
+  const mask = { regions: images ? view.maskRegions : 0, outside: maskOutside };
   const maskView = readMaskView(session);
   const parts = partsApi.parts;
   // `specs/0094` UX notes §7: with two or more parts "3 parts" replaces the mask segment, and an
   // active later part without paths says so last.
   const pickMode = session?.trace_pick_mode() ?? "";
-  const maskPick = session?.trace_mask_pick() ?? false;
-  const maskRefused = session?.trace_mask_pick_refused() ?? false;
   // The bar draws no notice (`ux-notes.md` §27): the hidden region says them as they were worded.
   const notices = [
     imagesLabel(progress, view.images.length),
@@ -1330,13 +1424,12 @@ export function useTrace(
     status.message,
     [status.muted, unclipped].filter((t) => t !== "").join(" "),
     palette.sameNote,
-    maskRefused ? TRACE_MIXED : "",
     // Pick colours says its own reason last (`picked`).
     active && values.method !== PICK_COLOURS ? nothingToTrace(values) : "",
   ];
   const nextAnnouncement = traceAnnouncement({
     analysis: analysisLine(analysisState),
-    mask: parts.length > 1 ? partsCount(parts.length) : maskText(mask.outside, mask.paths),
+    mask: parts.length > 1 ? partsCount(parts.length) : maskText(mask.outside, mask.regions),
     counts: status.counts,
     countsMuted: status.countsMuted,
     notices,
@@ -1371,8 +1464,8 @@ export function useTrace(
     setMaskTool,
     subtract: maskView.subtract,
     setSubtract,
-    maskPick,
-    setMaskPick,
+    maskLocked: maskView.locked,
+    multiImage: view.images.length > 1,
     clearMask,
     parts,
     selectPart: partsApi.selectPart,
@@ -1411,12 +1504,13 @@ export function useTrace(
 }
 
 /** The Mask group's tool state as the session reports it (`trace_mask_view`). */
-function readMaskView(session: WasmSession | null): { tool: MaskTool; subtract: boolean } {
+function readMaskView(session: WasmSession | null): { tool: MaskTool; subtract: boolean; locked: boolean } {
   if (!session) {
-    return { tool: "none", subtract: false };
+    return { tool: "none", subtract: false, locked: false };
   }
-  const raw = JSON.parse(session.trace_mask_view()) as { tool?: string; subtract?: boolean };
-  return { tool: raw.tool === "rect" ? "rect" : "none", subtract: raw.subtract === true };
+  const raw = JSON.parse(session.trace_mask_view()) as { tool?: string; subtract?: boolean; locked?: boolean };
+  const tool: MaskTool = raw.tool === "rect" ? "rect" : raw.tool === "lasso" ? "lasso" : "none";
+  return { tool, subtract: raw.subtract === true, locked: raw.locked === true };
 }
 
 /** The colours and joined regions of the shown multicolour preview, `null` for one colour. */

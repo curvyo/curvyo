@@ -120,7 +120,7 @@ test("the cache keeps at most its limit, the oldest leaving first", () => {
 
 const part = (over: Partial<TracePartInfo>): TracePartInfo => ({
   id: 0,
-  paths: 0,
+  regions: 0,
   outside: false,
   whole: false,
   muted: false,
@@ -130,17 +130,17 @@ const part = (over: Partial<TracePartInfo>): TracePartInfo => ({
   ...over,
 });
 
-test("criterion 32: a chip is named by its number, mode, paths and state", () => {
-  assert.equal(partName(1, 3, part({ paths: 2, active: true })), "Part 2 of 3, inside, 2 paths, active");
-  assert.equal(partName(2, 3, part({ paths: 1, outside: true })), "Part 3 of 3, outside, 1 path");
+test("criterion 32 (`0114` UX notes §4): a chip is named by its number, mode, region count and state", () => {
+  assert.equal(partName(1, 3, part({ regions: 2, active: true })), "Part 2 of 3, inside, 2 paths, active");
+  assert.equal(partName(2, 3, part({ regions: 1, outside: true })), "Part 3 of 3, outside, 1 path");
   assert.equal(partName(0, 3, part({ whole: true })), "Part 1 of 3, whole image");
   assert.equal(partName(1, 2, part({ muted: true })), "Part 2 of 2, no paths");
-  assert.equal(partTooltip(1, 3, part({ paths: 2, active: true })), "Part 2 of 3, inside, 2 paths");
+  assert.equal(partTooltip(1, 3, part({ regions: 2, active: true })), "Part 2 of 3, inside, 2 paths");
 });
 
 test("the counts and the trash name follow the parts", () => {
   const one = [part({ active: true, whole: true })];
-  const three = [part({ whole: true }), part({ paths: 1 }), part({ muted: true, active: true })];
+  const three = [part({ whole: true }), part({ regions: 1 }), part({ muted: true, active: true })];
   assert.equal(partsCount(1), "");
   assert.equal(partsCount(3), "3 parts");
   assert.equal(partEmptyText(three), "Part 3 has no paths");
@@ -149,7 +149,7 @@ test("the counts and the trash name follow the parts", () => {
   assert.equal(removePartText(1, false), "Remove part 2");
   assert.equal(removePartText(1, true), "Press again to remove part 2");
   assert.equal(readParts("").length, 1);
-  assert.equal(readParts('[{"id":4,"paths":1,"outside":true,"whole":false,"muted":false,"active":true,"contributes":true,"mask":""}]')[0].id, 4);
+  assert.equal(readParts('[{"id":4,"regions":1,"outside":true,"whole":false,"muted":false,"active":true,"contributes":true,"mask":""}]')[0].id, 4);
 });
 
 test("criterion 31: a part is cut out only without text, Drop border shapes and Denoise", () => {

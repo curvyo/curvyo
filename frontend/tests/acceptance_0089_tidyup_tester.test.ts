@@ -452,12 +452,14 @@ const lineText = async (s: S) => (await s.evaluate(ANALYSIS_LINE_JS)) as string;
 const waitState = (s: S, want: string, ms = 30_000) =>
   waitFor(`the analysis row to be ${want}`, async () => (((await s.evaluate(ANALYSIS_STATE_JS)) as string) === want ? true : null), ms);
 
-const MASK_STOPS = ["Pick mask paths", "Mask", "Clear mask"];
+/** The Mask group left the first row for the Parts row of Advanced (`specs/0114` criterion 1): no
+ * Mask stop between Preset and Method. */
+const MASK_STOPS: string[] = [];
 const BRIGHTNESS_BAR = ["About Trace", "Preset", ...MASK_STOPS, "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
 
 // ------------------------------------------------------------------ 0089 22 / 0025 71: the bar contents per method
 
-test("0089 tidy-up c22 (§24.2): the bar holds About Trace, Preset, the Mask group, Method, the one main field, Smooth, Tolerance, Ignore below, the expander and Trace for Brightness, in Single and Multicolour", { skip: !BROWSER, timeout: 300_000 }, async () => {
+test("0089 tidy-up c22 (§24.2, `0114` criterion 1): the bar holds About Trace, Preset, Method, the one main field, Smooth, Tolerance, Ignore below, the expander and Trace for Brightness, in Single and Multicolour", { skip: !BROWSER, timeout: 300_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, true);
     await pickMethod(s, "Brightness");
@@ -487,8 +489,8 @@ test("0089 tidy-up c22, c17: Remove background keeps the chip, hex, Auto and pip
       await setAdvanced(s, false);
       const bar = await barControls(s);
       console.log(`Remove background, ${output}:`, JSON.stringify(bar));
-      assert.deepEqual(bar.slice(0, 7), ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance"]);
-      const group = bar.slice(7, bar.indexOf("Smooth"));
+      assert.deepEqual(bar.slice(0, 4), ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance"]);
+      const group = bar.slice(4, bar.indexOf("Smooth"));
       assert.ok(group.includes("Auto") && group.some((g) => /^Pick background colour/.test(g)), `the group has Auto and the pipette: ${JSON.stringify(group)}`);
       assert.deepEqual(bar.slice(bar.indexOf("Smooth")), ["Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
       await setAdvanced(s, true);
@@ -807,8 +809,8 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
     await pickMethod(s, "Remove background");
     const removal = await tabStops(s);
     console.log("Remove background:", JSON.stringify(removal));
-    assert.deepEqual(removal.slice(0, 7), ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance"]);
-    const group = removal.slice(7, removal.indexOf("Smooth"));
+    assert.deepEqual(removal.slice(0, 4), ["About Trace", "Preset", ...MASK_STOPS, "Method", "Colour tolerance"]);
+    const group = removal.slice(4, removal.indexOf("Smooth"));
     assert.ok(group.indexOf("Auto") >= 0 && group.findIndex((g) => /^Pick background colour/.test(g)) > group.indexOf("Auto"), `Auto, then the pipette: ${JSON.stringify(group)}`);
     assert.deepEqual(removal.slice(removal.indexOf("Smooth")), ["Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"]);
     await pickMethod(s, "Pick colours");
@@ -818,21 +820,21 @@ test("0025 tidy-up c57: Tab order with Advanced closed follows ux-notes 22.4 for
   });
 });
 
-test("0025 tidy-up c57 (§24.3, §26): Tab order with Advanced open: Output, Colours, palette pipette, the palette swatches, the toggles, Denoise, Upscale, Corners, then Parts, Add part and Analyse last (0091 ux-notes §7; 0088 Part B ux-notes B2)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0025 tidy-up c57 (§24.3, §26): Tab order with Advanced open: Output, Colours, palette pipette, the palette swatches, the toggles, Denoise, Upscale, Corners, then Parts, Add part, the Mask group and Analyse last (`0114` UX notes §3; 0091 ux-notes §7; 0088 Part B ux-notes B2)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "pale.png", PALE, true);
     await pickMethod(s, "Brightness");
     await settledCounts(s);
     const single = await tabStops(s);
     console.log("Brightness, Single, Advanced open:", JSON.stringify(single));
-    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Analyse"]);
+    assert.deepEqual(single, [...BRIGHTNESS_BAR.slice(0, -2), "Fewer trace options", "Trace", "Output", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Rectangle", "Lasso", "Subtract", "Mask", "Clear mask", "Analyse"]);
     await setOutput(s, "Multicolour");
     await settledCounts(s);
     const multi = await tabStops(s);
     console.log("Brightness, Multicolour, Advanced open:", JSON.stringify(multi));
     const tail = multi.slice(multi.indexOf("Trace") + 1);
     assert.equal(tail.filter((n) => n === "swatch").length, 1, `the swatch row is one Tab stop: ${JSON.stringify(tail)}`);
-    assert.deepEqual(tail, ["Output", "Colours", "Pick palette colour from the image", "swatch", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Analyse"], "the swatches follow the palette pipette (ux-notes §26)");
+    assert.deepEqual(tail, ["Output", "Colours", "Pick palette colour from the image", "swatch", "Invert", "Drop border shapes", "Recognise text", "Recognise shapes", "Denoise", "Upscale", "Corners", "Parts", "Add part", "Rectangle", "Lasso", "Subtract", "Mask", "Clear mask", "Analyse"], "the swatches follow the palette pipette (ux-notes §26)");
     // Pick colours has its pipette in the bar and none in Advanced.
     await pickMethod(s, "Pick colours");
     await setOutput(s, "Single colour");
@@ -845,11 +847,11 @@ test("0025 tidy-up c57 (§24.3, §26): Tab order with Advanced open: Output, Col
 
 // ------------------------------------------------------------------ 0089 22 / ux-notes 22.1: the bar heights at 800 x 600
 
-test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, panel open and closed (§25.1, §25.4: Brightness 216 / 108, Remove background 252 / 108, Pick colours 216 / 108 px, no notice row)", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, panel open and closed (`0114` UX notes §2.1: the Mask group left the first row, Brightness 180 / 108, Remove background 216 / 108, Pick colours 180 / 108 px, no notice row)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "two.png", TWO, false);
-    // §25.1: Ignore below (171) joins the expander and Trace on the last row, so Brightness is 6 rows, 216 px and Remove background loses the same row, 288 to 252 px, panel open; Pick colours with nothing picked is 6 rows too (§25.4: the group is as wide as its content, customer 2026-11-09).
-    const expected: Record<string, [number, number]> = { Brightness: [216, 108], "Remove background": [252, 108], "Pick colours": [216, 108] };
+    // §25.1: Ignore below (171) joins the expander and Trace on the last row, so Brightness was 6 rows, 216 px, and with `0114` the Mask line goes: 5 rows, 180 px (UX notes §2.1); Remove background 216 px, Pick colours 180 px (§25.4: the group is as wide as its content, customer 2026-11-09).
+    const expected: Record<string, [number, number]> = { Brightness: [180, 108], "Remove background": [216, 108], "Pick colours": [180, 108] };
     const seen: string[] = [];
     for (const method of ["Brightness", "Remove background", "Pick colours"]) {
       await pickMethod(s, method);
@@ -874,7 +876,7 @@ test("0089 tidy-up 22.1, §24.2: bar heights at 800 x 600 with Advanced closed, 
   }, "", 800, 600);
 });
 
-test("0089 tidy-up 22.3, §24.3: the Advanced block adds about 180 px (panel open) and 90 px (closed; 0088 Part B ux-notes B2, 40 px margin of 22.3) to the Single colour Brightness bar at 800 x 600", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 tidy-up 22.3, §24.3: the Advanced block adds about 265 px (panel open; `0114` UX notes §2.3: 7 lines) and 90 px (closed; 0088 Part B ux-notes B2, 40 px margin of 22.3) to the Single colour Brightness bar at 800 x 600", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await openOn(s, "lines.png", LINES, false);
     await pickMethod(s, "Brightness");
@@ -891,7 +893,7 @@ test("0089 tidy-up 22.3, §24.3: the Advanced block adds about 180 px (panel ope
       const height = await barHeight(s);
       const added = height - closed[String(open)];
       console.log(`Advanced open, panel ${open ? "open" : "closed"}: bar ${height} px, block ${added} px`);
-      assert.ok(Math.abs(added - (open ? 180 : 90)) <= 40, `Advanced adds ${added} px, §24.3 says about ${open ? 180 : 90}`);
+      assert.ok(Math.abs(added - (open ? 265 : 90)) <= 40, `Advanced adds ${added} px, §24.3 says about ${open ? 265 : 90}`);
     }
   }, "", 800, 600);
 });

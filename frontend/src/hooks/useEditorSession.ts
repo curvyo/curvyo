@@ -2303,6 +2303,17 @@ export function useEditorSession(
         return;
       }
 
+      // A right press in the Trace tool finishes a lasso in progress, closed by a straight side;
+      // without one it does nothing: it never sets a corner, selects or opens a menu (`specs/0114`,
+      // customer 2026-11-13).
+      if (event.button === 2 && session.tool() === "trace") {
+        event.preventDefault();
+        if (session.trace_mask_secondary_press()) {
+          syncFromSession();
+        }
+        return;
+      }
+
       // A secondary press with the Pen finishes the path in progress as Enter does; without one
       // it does nothing. It never places a node or switches the tool (`0072` criterion 19a,
       // customer 2026-10-19 and 2026-11-11).

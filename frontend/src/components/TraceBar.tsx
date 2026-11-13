@@ -1,9 +1,9 @@
-import { CircleAlert, Info, RectangleHorizontal, SquareDashedMousePointer, SquareMinus, X } from "lucide-react";
+import { CircleAlert, Info, Lasso, Square, SquareMinus, X } from "lucide-react";
 import { Tooltip } from "radix-ui";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
-import { useRowStarts } from "@/components/SelectToolbar";
+import { Divider, useRowStarts } from "@/components/SelectToolbar";
 import { ExpandButton, ICON_BUTTON_CLASS } from "@/components/TextBar";
 import { TraceAdvanced } from "@/components/TraceAdvanced";
 import { TraceParts } from "@/components/TraceParts";
@@ -16,12 +16,11 @@ import type { TraceApi } from "@/hooks/useTrace";
 import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
   CLEAR_MASK,
+  MASK_LASSO,
+  MASK_LOCKED,
   MASK_RECTANGLE,
   MASK_SUBTRACT,
-  maskPickStatus,
   maskToggleStatus,
-  PICK_MASK_PATHS,
-  TRACE_MIXED,
   TRACE_FINISH,
   TRACE_METHODS,
   PICK_COLOURS,
@@ -64,9 +63,14 @@ const SPECKS_FIELD_WIDTH = 171;
 /** The bar's one flow (UX notes 21.2): wraps by whole items, 8 px between them, top-aligned. */
 const TRACE_ROW_CLASS = "flex min-w-0 flex-wrap items-start gap-x-2 gap-y-0";
 
-/** A full-width row under the controls whose text never widens the bar (customer 2026-10-31): its
- * intrinsic width is zero, so the bar is as wide as its controls and the row wraps inside it. */
+/** A full-width row under the controls whose content never widens the bar by its max-content
+ * (customer 2026-10-31): its intrinsic width is zero; the bar takes the Advanced line's measured
+ * one-line width instead (`specs/0114` UX notes §2.5). */
 const FOLLOWS_WIDTH_CLASS = "[contain:inline-size]";
+/** The bar's own padding left and right, px (`px-2`). */
+const BAR_PADDING = 16;
+/** The gap between the Parts group and the Mask group, px (`specs/0114` UX notes §2.2). */
+const UNIT_GAP_CLASS = "gap-x-[25px]";
 
 /** The Select bar's Trace button (criterion 1): last, in a group of its own; a press chooses the
  * Trace tool. */
@@ -106,9 +110,12 @@ export function TraceButton({ onTrace, onReturnFocus }: { onTrace: () => void; o
 /** The Inside / Outside segments of the Mask group (`specs/0094` UX notes §1) in the segmented
  * look of the bar's pills; arrows move and select, no wrap. Selectable with no mask path
  * (`specs/0089` UX notes §24.4). */
-function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outside: boolean) => void }) {
+function MaskPill({ outside, onOutside, locked }: { outside: boolean; onOutside: (outside: boolean) => void; locked: boolean }) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const keyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (locked) {
+      return;
+    }
     const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
     const next = Math.min(1, Math.max(0, (outside ? 1 : 0) + step));
     if (step !== 0) {
@@ -118,7 +125,14 @@ function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outsid
     }
   };
   return (
-    <div role="radiogroup" aria-label="Mask" className="my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40" onKeyDown={keyDown}>
+    <div
+      role="radiogroup"
+      aria-label="Mask"
+      aria-disabled={locked || undefined}
+      title={locked ? MASK_LOCKED : undefined}
+      className={`my-1 flex h-7 overflow-hidden rounded-md outline outline-1 -outline-offset-1 outline-[var(--toolbar-icon)]/40 ${locked ? "opacity-50" : ""}`}
+      onKeyDown={keyDown}
+    >
       {(["Inside", "Outside"] as const).map((label, index) => {
         const on = (index === 1) === outside;
         return (
@@ -131,7 +145,11 @@ function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outsid
             role="radio"
             aria-checked={on}
             tabIndex={on ? 0 : -1}
-            onClick={() => onOutside(index === 1)}
+            onClick={() => {
+              if (!locked) {
+                onOutside(index === 1);
+              }
+            }}
             className={`flex h-full w-16 items-center justify-center text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent)] ${
               on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]"
             }`}
@@ -144,80 +162,60 @@ function MaskPill({ outside, onOutside }: { outside: boolean; onOutside: (outsid
   );
 }
 
-/** The Mask group (`specs/0094` UX notes §1, §11; `specs/0089` UX notes §24.4; `specs/0114`
- * slice 1): one flow item after Preset, always drawn, never dimmed: the Rectangle and Subtract
- * toggles, the Pick mask paths toggle (until `0114` slice 4), the Inside / Outside segments and
- * Clear mask, which does nothing without mask paths or regions. A mouse press hands the
- * keyboard back to the canvas, a key keeps it; Escape on the armed toggle disarms and returns to
- * the canvas. The mode is announced politely, never shown as text. */
+/** The Mask group (`specs/0114` UX notes §1, §2.2): Rectangle, Lasso, Subtract, the Inside /
+ * Outside segments and Clear mask, behind the trash of the Parts group with the bar's divider,
+ * which is hidden when the group starts a line. Rectangle and Lasso exclude each other; Subtract is
+ * independent. On a locked image the controls are unavailable ("Locked"). A mouse press hands the
+ * keyboard back to the canvas, a key keeps it; a press is said politely, never shown as text. */
 function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: () => void }) {
   const [said, setSaid] = useState("");
-  const armed = trace.maskPick;
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    setSaid(maskPickStatus(armed));
-  }, [armed]);
-  const pressed = armed ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
+  const locked = trace.maskLocked;
   return (
-    <div data-trace-mask="" className="flex h-9 items-center gap-1">
+    <div data-trace-mask="" className="group/row relative flex h-9 items-center gap-1">
+      <Divider />
       <MaskToggle
         name={MASK_RECTANGLE}
         on={trace.maskTool === "rect"}
         data="data-trace-mask-rect"
+        locked={locked}
         onToggle={(on) => trace.setMaskTool(on ? "rect" : "none")}
         onReturnFocus={onReturnFocus}
         onSay={setSaid}
       >
-        <RectangleHorizontal size={16} strokeWidth={1.5} aria-hidden />
+        <Square size={16} strokeWidth={1.5} aria-hidden />
+      </MaskToggle>
+      <MaskToggle
+        name={MASK_LASSO}
+        on={trace.maskTool === "lasso"}
+        data="data-trace-mask-lasso"
+        locked={locked}
+        onToggle={(on) => trace.setMaskTool(on ? "lasso" : "none")}
+        onReturnFocus={onReturnFocus}
+        onSay={setSaid}
+      >
+        <Lasso size={16} strokeWidth={1.5} aria-hidden />
       </MaskToggle>
       <MaskToggle
         name={MASK_SUBTRACT}
         on={trace.subtract}
         data="data-trace-mask-subtract"
+        locked={locked}
         onToggle={trace.setSubtract}
         onReturnFocus={onReturnFocus}
         onSay={setSaid}
       >
         <SquareMinus size={16} strokeWidth={1.5} aria-hidden />
       </MaskToggle>
-      <AppTooltip side="bottom" content={PICK_MASK_PATHS}>
-        <button
-          type="button"
-          aria-label={PICK_MASK_PATHS}
-          aria-pressed={armed}
-          data-trace-mask-pick=""
-          onClick={(event) => {
-            trace.setMaskPick(!armed);
-            if (event.detail > 0) {
-              onReturnFocus();
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && armed) {
-              event.preventDefault();
-              event.stopPropagation();
-              trace.setMaskPick(false);
-              onReturnFocus();
-            }
-          }}
-          className={`${ICON_BUTTON_CLASS} ${pressed}`}
-        >
-          <SquareDashedMousePointer size={16} strokeWidth={1.5} aria-hidden />
-        </button>
-      </AppTooltip>
-      <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} />
-      <AppTooltip side="bottom" content={CLEAR_MASK}>
+      <MaskPill outside={trace.mask.outside} onOutside={trace.setMaskOutside} locked={locked} />
+      <AppTooltip side="bottom" content={locked ? MASK_LOCKED : CLEAR_MASK}>
         <button
           type="button"
           aria-label={CLEAR_MASK}
+          aria-disabled={locked || undefined}
           data-trace-clear-mask=""
           onClick={(event) => {
             // Nothing to clear: no change, focus stays (`specs/0089` UX notes §24.4).
-            if (trace.mask.paths + trace.mask.regions === 0) {
+            if (locked || trace.mask.regions === 0) {
               return;
             }
             trace.clearMask();
@@ -225,7 +223,7 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
               onReturnFocus();
             }
           }}
-          className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]`}
+          className={`${ICON_BUTTON_CLASS} text-[var(--toolbar-icon)] ${locked ? "cursor-default opacity-50" : "hover:bg-[var(--editor-accent-hover)]"}`}
         >
           <X size={16} strokeWidth={1.5} aria-hidden />
         </button>
@@ -237,6 +235,27 @@ function MaskGroup({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: (
   );
 }
 
+/** The Parts and Mask unit of the Advanced line (`specs/0114` UX notes §2.2): the Parts group,
+ * then the Mask group; it wraps as a whole first, then the Mask group goes to its own line. Not
+ * drawn with two or more images selected (Frage 11 A). */
+function PartsAndMask({ trace, onReturnFocus }: { trace: TraceApi; onReturnFocus: () => void }) {
+  const unitRef = useRef<HTMLDivElement>(null);
+  useRowStarts(unitRef);
+  return (
+    <div ref={unitRef} data-trace-unit="" data-flow="" className={`flex max-w-full flex-wrap items-center gap-y-0 ${UNIT_GAP_CLASS}`}>
+      <TraceParts
+        parts={trace.parts}
+        locked={trace.maskLocked}
+        onSelect={trace.selectPart}
+        onAdd={trace.addPart}
+        onRemove={trace.removePart}
+        onReturnFocus={onReturnFocus}
+      />
+      <MaskGroup trace={trace} onReturnFocus={onReturnFocus} />
+    </div>
+  );
+}
+
 /** A toggle of the Mask group (`specs/0114` Behaviour 1): pressed or not, named by its tooltip;
  * the change is said politely ("Rectangle on"). A mouse press hands the keyboard back to the
  * canvas, a key keeps it. */
@@ -244,6 +263,7 @@ function MaskToggle({
   name,
   on,
   data,
+  locked,
   onToggle,
   onReturnFocus,
   onSay,
@@ -252,6 +272,8 @@ function MaskToggle({
   name: string;
   on: boolean;
   data: string;
+  /** The image is locked: unavailable, "Locked" (`specs/0114` UX notes §8). */
+  locked: boolean;
   onToggle: (on: boolean) => void;
   onReturnFocus: () => void;
   onSay: (text: string) => void;
@@ -259,20 +281,24 @@ function MaskToggle({
 }) {
   const pressed = on ? "bg-[var(--toolbar-icon-active-bg)] text-[var(--toolbar-icon-active-fg)]" : "text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)]";
   return (
-    <AppTooltip side="bottom" content={name}>
+    <AppTooltip side="bottom" content={locked ? MASK_LOCKED : name}>
       <button
         type="button"
         aria-label={name}
         aria-pressed={on}
+        aria-disabled={locked || undefined}
         {...{ [data]: "" }}
         onClick={(event) => {
+          if (locked) {
+            return;
+          }
           onToggle(!on);
           onSay(maskToggleStatus(name, !on));
           if (event.detail > 0) {
             onReturnFocus();
           }
         }}
-        className={`${ICON_BUTTON_CLASS} ${pressed}`}
+        className={`${ICON_BUTTON_CLASS} ${locked ? "cursor-default opacity-50 text-[var(--toolbar-icon)]" : pressed}`}
       >
         {children}
       </button>
@@ -426,10 +452,11 @@ interface TraceBarProps {
 /**
  * The Trace bar in the overlay row (`specs/0025-raster-trace` criteria 1 to 5, 10 to 12, 15, 37,
  * 40, 41, 46, 51 to 54, 57, 71; UX notes section 21.2; `specs/0089` criterion 14, Frage 84, 85 B):
- * one flow of the "i" button, Preset, the Mask group, Method, Threshold or Colour tolerance, the
+ * one flow of the "i" button, Preset, Method, Threshold or Colour tolerance, the
  * method's pipette group, Smooth, Tolerance, Ignore below, and at the far right the expander and
  * the Trace button, wrapping by whole items; under it, when open, the Advanced block that holds
- * everything else (`ux-notes.md` §22, §24). The bar draws no status or notice text (§27): one
+ * everything else (`ux-notes.md` §22, §24), the Parts and Mask unit among it (`specs/0114` UX
+ * notes §2). The bar draws no status or notice text (§27): one
  * hidden status region announces the result and the notices, the dimmed Trace button names its
  * reason.
  * With nothing or something else selected it is one row of words.
@@ -437,6 +464,24 @@ interface TraceBarProps {
 export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   useRowStarts(rowRef);
+  /** The Advanced line's one-line width, px (`specs/0114` UX notes §2.5): with Advanced open the
+   * bar is as wide as the wider of its first row and that line, at most the available width. */
+  const [advancedLine, setAdvancedLine] = useState(0);
+  /** The width the bar area offers, px: a percentage `min-width` would resolve against the bar's own
+   * shrink-wrapped wrapper, so the cap is measured on the area (`data-bar-area`). */
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(0);
+  useLayoutEffect(() => {
+    const area = wrapperRef.current?.parentElement;
+    if (!area) {
+      return undefined;
+    }
+    const measure = () => setAvailable(area.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    return () => observer.disconnect();
+  });
   const advancedId = useId();
   const descriptionId = useId();
   const param = (name: TraceParam["name"]) => trace.params.find((p) => p.name === name)!;
@@ -453,7 +498,7 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
         <div className="flex h-9 items-center gap-3">
           {label}
           <span className="text-[var(--toolbar-icon)]">
-            {trace.selection === "empty" ? TRACE_EMPTY : trace.selection === "mixed" ? TRACE_MIXED : TRACE_NOT_IMAGE}
+            {trace.selection === "empty" ? TRACE_EMPTY : TRACE_NOT_IMAGE}
           </span>
           {trace.selection === "empty" ? (
             <button type="button" className={BUTTON_CLASS} onClick={onImport}>
@@ -524,11 +569,15 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
     ) : null;
   const methodLabel = TRACE_METHODS[method]?.label ?? TRACE_METHODS[0].label;
   return (
-    <div className="pointer-events-none flex min-w-0 flex-col gap-2">
+    <div ref={wrapperRef} className="pointer-events-none flex min-w-0 flex-col gap-2">
     <div
       data-context-bar=""
       className={pill}
-      style={pillStyle}
+      style={
+        trace.advancedOpen && advancedLine > 0
+          ? { ...pillStyle, minWidth: `${Math.ceil(available > 0 ? Math.min(advancedLine + BAR_PADDING, available) : advancedLine + BAR_PADDING)}px` }
+          : pillStyle
+      }
       role="toolbar"
       aria-label="Trace"
       aria-describedby={descriptionId}
@@ -550,7 +599,6 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
             onPick={trace.pick}
           />
         </div>
-        <MaskGroup trace={trace} onReturnFocus={onReturnFocus} />
         <div className="flex h-9 items-center">
           <TracePresetMenu
             name="Method"
@@ -598,7 +646,8 @@ export function TraceBar({ trace, info, onImport, onReturnFocus }: TraceBarProps
               coloursFound={trace.palette.found}
               paletteArmed={trace.pickMode === "colours" && trace.values.method !== PICK_COLOURS}
               onPalettePipette={() => trace.setPicking(trace.pickMode !== "colours", true)}
-              parts={<TraceParts parts={trace.parts} onSelect={trace.selectPart} onAdd={trace.addPart} onRemove={trace.removePart} onReturnFocus={onReturnFocus} />}
+              parts={trace.multiImage ? null : <PartsAndMask trace={trace} onReturnFocus={onReturnFocus} />}
+              onLineWidth={setAdvancedLine}
             />
           </div>
         ) : null}
