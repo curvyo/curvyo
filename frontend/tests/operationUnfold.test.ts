@@ -12,13 +12,12 @@ import {
 import { ROW_HEIGHT } from "../src/lib/operationRows.ts";
 
 const settings = {} as never;
-const base = { id: { peer: "1", counter: 7 }, kind: "engrave", unfolded: false, grid: null, settings } as never;
+const base = { id: { peer: "1", counter: 7 }, kind: "engrave", unfolded: false, source: null, settings } as never;
 const row = (patch: Record<string, unknown> = {}) => ({ ...(base as object), ...patch }) as never;
 
-test("only a known, settings-bearing, non-grid row unfolds", () => {
+test("only a known, settings-bearing row unfolds", () => {
   assert.equal(canUnfold(row()), true);
   assert.equal(canUnfold(row({ kind: "unknown", settings: null })), false);
-  assert.equal(canUnfold(row({ grid: { group: null, columns: 0, rows: 0 }, settings: null })), false);
   assert.equal(canUnfold(row({ settings: null })), false);
 });
 

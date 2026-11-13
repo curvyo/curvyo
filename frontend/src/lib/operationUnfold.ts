@@ -14,9 +14,9 @@ export const ROW_HEIGHT = 40;
  * hairline and the lower part). */
 export const UNFOLDED_BODY_ESTIMATE = 300;
 
-/** Whether a row has a body: a known operation with settings and no test grid row. */
+/** Whether a row has a body: a known operation with settings. */
 export function canUnfold(row: OperationRow): boolean {
-  return row.kind !== "unknown" && row.grid === null && row.settings !== null;
+  return row.kind !== "unknown" && row.settings !== null;
 }
 
 /** Whether the row draws its body: the session holds it unfolded and it is the one selected row

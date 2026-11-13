@@ -1,12 +1,17 @@
-// The host write list a session hands out after a library step (`specs/0028-material-test-library`
-// adrs.md §6), decoded field by field: the frontend never trusts unchecked JSON.
+// The host write list a session hands out after a library step (`specs/0112-test-grid-and-
+// materials` adrs.md Finding 3, ADR 0058 §1, §4, §5), decoded field by field: the frontend never
+// trusts unchecked JSON.
 
-/** One write of a library step, or a preference file's new text. */
+/** One write of a library step, a photo file, the retired ids or a preference file's new text.
+ * A photo write's bytes are taken from the session by `handle`. */
 export type MaterialWrite =
   | { op: "write"; id: string; text: string }
   | { op: "remove"; id: string }
   | { op: "order"; text: string }
-  | { op: "grid_choice"; text: string };
+  | { op: "grid_choice"; text: string }
+  | { op: "retired"; text: string }
+  | { op: "write_photo"; name: string; handle: number }
+  | { op: "remove_photo"; name: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -17,7 +22,7 @@ export function decodeMaterialWrite(value: unknown): MaterialWrite | null {
   if (!isRecord(value)) {
     return null;
   }
-  const { op, id, text } = value;
+  const { op, id, text, name, handle } = value;
   switch (op) {
     case "write":
       return typeof id === "string" && typeof text === "string" ? { op, id, text } : null;
@@ -25,7 +30,14 @@ export function decodeMaterialWrite(value: unknown): MaterialWrite | null {
       return typeof id === "string" ? { op, id } : null;
     case "order":
     case "grid_choice":
+    case "retired":
       return typeof text === "string" ? { op, text } : null;
+    case "write_photo":
+      return typeof name === "string" && Number.isSafeInteger(handle) && (handle as number) >= 0
+        ? { op, name, handle: handle as number }
+        : null;
+    case "remove_photo":
+      return typeof name === "string" ? { op, name } : null;
     default:
       return null;
   }

@@ -2,17 +2,13 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKe
 
 import { DropBadgePill } from "@/components/DropBadgePill";
 import { OperationRowView, type RowActions } from "@/components/panel/OperationRow";
-import { TestGridGlyph } from "@/components/panel/OperationGlyphs";
 import { OperationBody } from "@/components/panel/OperationBody";
 import { OperationSettingsBlock } from "@/components/panel/OperationSettingsBlock";
-import { TestGridBlock } from "@/components/panel/TestGridBlock";
 import { PanelSwitch } from "@/components/ui/switch";
 import type { OperationsApi } from "@/hooks/useOperations";
 import { useDeleteArm } from "@/hooks/useDeleteArm";
-import type { MaterialsApi } from "@/hooks/useMaterials";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
 import type { OperationToolsApi } from "@/hooks/useOperationTools";
-import type { TestGridApi } from "@/hooks/useTestGrid";
 import { NO_ROWS, extend, press as pressRow, prune, type PressMods, type RowSelection } from "@/lib/rowSelection";
 import {
   ghostTop,
@@ -51,14 +47,8 @@ interface OperationsSectionProps {
   /** The operation tools: the fold of a row, its options and the status of a kind press
    * (`specs/0111-laser-operation-tools`). */
   tools: OperationToolsApi;
-  /** "Edit material" in the Settings block: opens the Materials section on that material. */
+  /** "Edit material" in the Settings block: opens the Materials tab on that material. */
   onEditMaterial: (id: string) => void;
-  /** The Materials section, drawn after the summary. */
-  materials?: ReactNode;
-  /** The test grids: the sixth add button and the Grid block (`specs/0028` ux-notes 4 to 7). */
-  grid: TestGridApi;
-  /** The Materials commands the Save as material form calls. */
-  materialsApi: MaterialsApi;
 }
 
 /** The index of a key in the view's rows, `-1` for a row that is gone. */
@@ -93,7 +83,7 @@ function entryOfRow(entries: ListEntry[]): number[] {
 /** The names of the two section groups (`ux-notes.md` 4.3). */
 const SECTION_NAMES = { marking: "Marking", cutting: "Cutting" } as const;
 
-export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0, settings, tools, onEditMaterial, materials, grid, materialsApi }: OperationsSectionProps) {
+export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJobs, fixtureRunning = 0, settings, tools, onEditMaterial }: OperationsSectionProps) {
   const { view, notice, dropKey, dropBadge } = api;
   /** The selected rows (Ctrl and Shift extend, `specs/0028` ux-notes 8.2); one opens its Settings block. */
   const [selection, setSelection] = useState<RowSelection>(NO_ROWS);
@@ -125,17 +115,10 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     disarmArm();
   }, [disarmArm, order]);
 
-  // The canvas selecting a grid (or Add test grid) selects its row in the list (ux-notes 6.1).
-  const gridGroupKey = grid.view ? operationIdKey(grid.view.group) : null;
-  const gridRowKey = grid.view?.row ? operationIdKey(grid.view.row) : null;
-  useEffect(() => {
-    if (gridRowKey !== null) setSelection({ keys: [gridRowKey], anchor: gridRowKey });
-  }, [gridGroupKey, gridRowKey]);
-
   const [stop, setStop] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  const addRef = useRef<HTMLDivElement>(null);
+  const addRef = useRef<HTMLElement>(null);
   /** A row to focus after the next render: a moved row keeps the focus, a deleted one hands it on. */
   const pending = useRef<number | "add" | null>(null);
 
@@ -143,7 +126,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     const target = pending.current;
     pending.current = null;
     if (target === "add") {
-      addRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      addRef.current?.querySelector<HTMLElement>("button")?.focus();
     } else if (typeof target === "number") {
       focusRow(listRef.current, target);
     }
@@ -325,8 +308,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
       if (!rename && pressUnfolds(row, selectedKeys, mods ?? { ctrl: false, shift: false })) tools.unfold(row.id);
       setSelection((previous) => pressRow(prune(previous, orderKeys), orderKeys, key, mods ?? { ctrl: false, shift: false }));
       setStop(indexOfKey(view, key));
-      if (row.grid) grid.selectRow(row.id);
-      else if (grid.view !== null) grid.selectRow(null);
       if (rename) setRenamingKey(key);
     },
     rename: (row, name) => {
@@ -339,9 +320,7 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     },
     trash: (row) => {
       const key = operationIdKey(row.id);
-      const label = row.grid
-        ? `Press again to delete ${row.name}. Its ${row.grid.columns * row.grid.rows} cells and labels become Not assigned.`
-        : `Press again to delete ${row.name}. Its ${itemsText(row.items)} become Not assigned.`;
+      const label = `Press again to delete ${row.name}. Its ${itemsText(row.items)} become Not assigned.`;
       arm.press(`op:${key}`, label, () => {
         const index = indexOfKey(view, key);
         const left = view.rows.length - 1;
@@ -401,35 +380,9 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
     }
   };
 
-  const pressGrid = () => {
-    const id = grid.add();
-    if (id) setSelection({ keys: [operationIdKey(id)], anchor: operationIdKey(id) });
-  };
-
   const lines = summaryWithFixtures(summaryLines(view), fixtureRunning);
-  const openRow = openIndex >= 0 ? view.rows[openIndex] : null;
-  // The Grid block shows while the one selected row is the row of the grid the session shows.
-  const gridView = openRow?.grid && grid.view?.row && operationIdKey(grid.view.row) === operationIdKey(openRow.id) ? grid.view : null;
   return (
-    <section aria-label="Operations" className="flex flex-col gap-2">
-      {/* The Test grid button stays alone on the tab until `0112` replaces it by the tool
-          (`specs/0111` criterion 8); the kind buttons are in the Select bar. */}
-      <div ref={addRef} role="toolbar" aria-label="Test grid" className="flex h-7 items-center gap-1">
-        <button
-          type="button"
-          aria-label="Add test grid"
-          title="Add test grid"
-          onClick={pressGrid}
-          className="flex h-7 w-7 items-center justify-center rounded text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
-        >
-          <TestGridGlyph />
-        </button>
-      </div>
-      {grid.notice ? (
-        <p role="alert" className="-mt-1 text-xs text-[var(--field-invalid)]">
-          {grid.notice}
-        </p>
-      ) : null}
+    <section ref={addRef} aria-label="Operations" className="flex flex-col gap-2">
       <PanelSwitch
         label="Cuts last"
         checked={view.cutsLast}
@@ -515,9 +468,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           <div aria-hidden style={{ height: range.after }} />
         </div>
       )}
-      {gridView ? (
-        <TestGridBlock key={operationIdKey(gridView.group)} view={gridView} api={grid} materials={materialsApi} onReturnFocus={onReturnFocus} />
-      ) : null}
       {/* One selected row shows its Settings in its unfolded body; several selected rows show
           the Material pick alone, under the list (`0028` M10). */}
       {selectedKeys.length > 1 ? (
@@ -544,7 +494,6 @@ export function OperationsSection({ api, selectionCount, onReturnFocus, fixtureJ
           )}
         </div>
       </section>
-      {materials}
       {notice && notice !== settings.skip ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
           {notice}

@@ -45,7 +45,7 @@ function row(patch: Partial<OperationRow> & Pick<OperationRow, "name">): Operati
     groupInPart: null,
     unfolded: false,
     settings: null,
-    grid: null,
+    source: null,
     ...patch,
   };
 }
@@ -233,7 +233,7 @@ test("a decoded Rust state gives the same groups and lines as the fixture reads"
         group_in_part: null,
         unfolded: false,
         settings: null,
-        grid: null,
+        source: null,
       },
     ],
     pick: [],

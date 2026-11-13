@@ -72,7 +72,8 @@ export type Tool =
   | "offset"
   | "text"
   | "trace"
-  | "measure";
+  | "measure"
+  | "test-grid";
 
 /** The polygon/star tool-options bar's mode toggle (acceptance criteria
  * 11 vs. 12). */

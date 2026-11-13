@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 
-import { OperationGlyph } from "@/components/panel/OperationGlyphs";
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { hasTrash, line2Text, materialKeyAction, materialRowName, rowTitle } from "@/lib/materialRows";
 import type { MaterialRow as Row } from "@/lib/materialsView";
@@ -31,6 +30,7 @@ interface MaterialRowProps {
   row: Row;
   index: number;
   total: number;
+  /** The material is the unfolded one. */
   selected: boolean;
   renaming: boolean;
   armed: boolean;
@@ -51,24 +51,11 @@ const CONTROL =
 /** The id attribute the section finds a row by. */
 export const MATERIAL_ROW = "data-material-id";
 
-/** The kind symbols of a loaded row (Cut red, the others ink). */
-function Symbols({ row }: { row: Row }) {
-  if (row.state !== "loaded") return null;
-  if (row.kinds.length === 0) return <span>no sets</span>;
-  return (
-    <span className="flex gap-1" aria-hidden>
-      {row.kinds.map((kind) => (
-        <OperationGlyph key={kind} kind={kind} size={12} />
-      ))}
-    </span>
-  );
-}
-
 /**
- * One row of the Materials section (`specs/0028` `ux-notes.md` 10.2, 10.4): line 1 the name (in
- * place rename), the armed trash and the arrows; line 2 the thickness and the kind symbols. A
- * damaged row shows the warning symbol and its reason, a newer one "Needs a newer Curvyo" and no
- * trash. The selected material's fields sit under the row.
+ * One row of the Materials tab (`specs/0112` `ux-notes.md` 7.3): line 1 the name (in place
+ * rename), the thickness, the armed trash and the arrows; line 2 the counts. A damaged row shows
+ * the warning symbol and its reason, a newer or older one its words and no trash. The unfolded
+ * material's body sits under the row.
  */
 export function MaterialRowView(props: MaterialRowProps) {
   const { row, index, total, selected, renaming, armed, actions } = props;
@@ -83,7 +70,7 @@ export function MaterialRowView(props: MaterialRowProps) {
       {...{ [ARM_ZONE]: `material:${row.id}` }}
       className={`relative flex flex-col rounded px-1 ${selected ? "bg-[var(--value-fill)]" : ""} ${armed ? "bg-[var(--destructive-soft)]" : ""} ${props.dragSource ? "outline outline-[1.5px] -outline-offset-[1.5px] outline-dashed outline-[var(--drag-ghost)]" : ""}`}
     >
-      {selected ? <span aria-hidden className="absolute left-0 top-0 h-10 w-[3px] rounded bg-[var(--accent)]" /> : null}
+      {selected ? <span aria-hidden className="absolute bottom-0 left-0 top-0 w-[3px] rounded bg-[var(--accent)]" /> : null}
       {props.dropping ? (
         <div
           aria-hidden
@@ -121,25 +108,20 @@ export function MaterialRowView(props: MaterialRowProps) {
               {rowTitle(row)}
             </button>
           )}
+          {renaming || row.state !== "loaded" ? null : (
+            <span className="shrink-0 text-xs tabular-nums text-[var(--panel-muted-fg)]">{thicknessText(row.thicknessMm)}</span>
+          )}
           {renaming ? null : (
             <>
               {hasTrash(row) ? <TrashButton row={row} armed={armed} actions={actions} /> : <span className="h-6 w-6 shrink-0" aria-hidden />}
-              <span className="w-1 shrink-0" />
+              <span className="w-2 shrink-0" />
               {props.canUp ? <ArrowButton row={row} up actions={actions} /> : <span className="h-6 w-6 shrink-0" aria-hidden />}
               {props.canDown ? <ArrowButton row={row} up={false} actions={actions} /> : <span className="h-6 w-6 shrink-0" aria-hidden />}
             </>
           )}
         </div>
         <div className="flex h-[14px] items-center gap-1 truncate text-[11px] leading-[14px] text-[var(--panel-muted-fg)]" title={line2Text(row)}>
-          {row.state === "loaded" ? (
-            <>
-              <span className="tabular-nums">{thicknessText(row.thicknessMm)}</span>
-              <span aria-hidden>·</span>
-              <Symbols row={row} />
-            </>
-          ) : (
-            <span className="truncate">{line2Text(row)}</span>
-          )}
+          <span className="truncate">{line2Text(row)}</span>
         </div>
       </div>
       {props.children}

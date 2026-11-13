@@ -20,6 +20,8 @@ import {
 import { ARGS_HEADER, asciiJson } from "@/lib/binaryArgs";
 import { browserDeviceName } from "@/lib/browserDevice";
 import { browserKeyStore, readDeviceKeys, writeRoomKeys } from "@/lib/deviceKeyStore";
+import { recordTextRefusal } from "@/lib/materialHostWrites";
+import { browserPhotoCommands, indexedDbPhotoStore } from "@/lib/materialPhotoStore";
 import { browserWorkspaceCommands, forgetOpenDocument, saveOpenDocument } from "@/platform/browserWorkspaces";
 import { detectPlatform, type PlatformKind } from "@/lib/platformKind";
 import type { OpenPayload, SaveOutcome } from "@/lib/projectState";
@@ -133,6 +135,11 @@ const MACHINE_CHOICE_KEY = "curvyo.machine-choice";
 const MATERIALS_PREFIX = "curvyo.materials/";
 const MATERIAL_ORDER_KEY = "curvyo.material-order";
 const TEST_GRID_CHOICE_KEY = "curvyo.test-grid-choice";
+/** The test ids never given again (ADR 0058 §1, §4); the photos are in IndexedDB
+ * (`materialPhotoStore`), `localStorage` cannot hold them. */
+const RETIRED_TEST_IDS_KEY = "curvyo.retired-test-ids";
+/** The browser's material photo commands over IndexedDB. */
+const browserPhotos = browserPhotoCommands(indexedDbPhotoStore);
 /** The font library's text and the check cache in the browser build (`0075` decisions 1, 5). */
 const FONT_LIBRARY_KEY = "curvyo.font-library";
 const FONT_CHECKS_KEY = "curvyo.font-checks";
@@ -243,13 +250,24 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   read_machine_choice: () => readStored(MACHINE_CHOICE_KEY),
   write_machine_choice: (args) => window.localStorage.setItem(MACHINE_CHOICE_KEY, String(args?.text)),
   list_materials: () => listBrowserRecords(MATERIALS_PREFIX),
-  write_material: (args) =>
-    window.localStorage.setItem(`${MATERIALS_PREFIX}${String(args?.id)}`, String(args?.text)),
+  write_material: (args) => {
+    const text = String(args?.text);
+    const refusal = recordTextRefusal(text);
+    if (refusal !== null) {
+      throw new Error(refusal);
+    }
+    window.localStorage.setItem(`${MATERIALS_PREFIX}${String(args?.id)}`, text);
+  },
   remove_material: (args) => window.localStorage.removeItem(`${MATERIALS_PREFIX}${String(args?.id)}`),
   read_material_order: () => readStored(MATERIAL_ORDER_KEY),
   write_material_order: (args) => window.localStorage.setItem(MATERIAL_ORDER_KEY, String(args?.text)),
   read_test_grid_choice: () => readStored(TEST_GRID_CHOICE_KEY),
   write_test_grid_choice: (args) => window.localStorage.setItem(TEST_GRID_CHOICE_KEY, String(args?.text)),
+  read_retired_test_ids: () => readStored(RETIRED_TEST_IDS_KEY),
+  write_retired_test_ids: (args) => window.localStorage.setItem(RETIRED_TEST_IDS_KEY, String(args?.text)),
+  read_material_photo: (args) => browserPhotos.read_material_photo(args),
+  write_material_photo: (args) => browserPhotos.write_material_photo(args),
+  remove_material_photo: (args) => browserPhotos.remove_material_photo(args),
   export_formats_file: (args) => {
     downloadText("curvyo-formats.toml", String(args?.text));
     return true;

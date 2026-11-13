@@ -1,3 +1,4 @@
+import { SwatchBook } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 
 import { OperationOptionsPart, OptionFieldView } from "@/components/panel/OperationOptionsPart";
@@ -70,7 +71,14 @@ export function OperationBody({ row, pick, settings, tools, onEditMaterial, onRe
         onEditMaterial={onEditMaterial}
         onReturnFocus={onReturnToRow}
         interval={interval}
+        noPick={row.source?.cell === true}
       />
+      {row.source ? (
+        <p className="flex min-h-4 items-start gap-1 text-[11px] text-[var(--panel-muted-fg)]">
+          <SwatchBook size={12} aria-hidden className="mt-px shrink-0" />
+          <span>{row.source.text}</span>
+        </p>
+      ) : null}
       <OperationOptionsPart row={row} tools={tools} onReturnFocus={onReturnToRow} />
     </div>
   );
