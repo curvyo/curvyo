@@ -113,6 +113,7 @@ mod images;
 mod junction;
 mod layers;
 mod legacy_fill;
+mod library_list;
 pub use fixture_job::{
     ADD_FIXTURE_JOB_COMMIT_LABEL, ASSIGN_FIXTURE_TARGET_COMMIT_LABEL,
     DELETE_FIXTURE_JOB_COMMIT_LABEL, FixtureJobError, FixtureJobSwitch,
@@ -366,6 +367,10 @@ pub use gradient_model::{
 };
 pub use junction::{COINCIDENT_MM, interior_handle, merged_junction};
 pub use layers::{DELETE_LAYER_COMMIT_LABEL, INITIAL_LAYER_NAME, NEW_LAYER_COMMIT_LABEL};
+pub use library_list::{
+    LIBRARY_LIST_FORMAT_VERSION, LibraryEntry, LibraryKind, LibraryList, LibraryListError,
+    MAX_MACHINE_TEXT_BYTES, MAX_MATERIAL_TEXT_BYTES,
+};
 pub use node_edit::{
     RENAME_NODE_COMMIT_LABEL, SET_NODE_LOCKED_COMMIT_LABEL, SET_NODE_OPACITY_COMMIT_LABEL,
     SET_NODE_VISIBLE_COMMIT_LABEL,
