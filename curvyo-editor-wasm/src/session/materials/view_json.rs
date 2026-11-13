@@ -1,132 +1,29 @@
-//! The Materials section's view as JSON (`specs/0028` criteria 19 to 23, 29; UX notes §10;
-//! `adrs.md` §6): the one producer of `materials_view`, pinned by the shared fixtures in
+//! Builds the Materials tab view from the session (`specs/0112` criteria 16 to 28; UX notes 7, 8; `adrs.md`
+//! finding 3): the one producer of `materials_view`, pinned by the shared fixtures in
 //! `curvyo-editor-wasm/tests/fixtures/materials_view/`.
 
-use curvyo_laser_core::material_library::Materials;
-use curvyo_laser_core::settings::{HistoryEvent, Material, MaterialRead, SetKind, SetSource};
-use serde::Serialize;
+use curvyo_laser_core::grids::{Param, Side, TestId};
+use curvyo_laser_core::library::{
+    LaserSets, MAX_MATERIALS, Material, MaterialRead, Set, SetSource, TestRecord, photo_file_name,
+};
+use curvyo_laser_core::settings::SetKind;
+use std::fmt::Write as _;
 
 use super::super::Session;
 
-/// The Materials section of the active laser page.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct MaterialsView {
-    /// The name of the page's profile copy ("Materials of `<profile name>`").
-    pub profile_name: String,
-    /// The rows of this machine in the maker's order.
-    pub rows: Vec<MaterialRowView>,
-    /// The selected material's fields, `None` when no readable row is selected.
-    pub selected: Option<MaterialFieldsView>,
-    /// The default name of a new material, "Material `<N>`".
-    pub next_name: String,
-    /// One notice per damaged or newer record of the load.
-    pub load_notices: Vec<String>,
-}
+use super::view_types::{
+    AxisView, CellView, LaserBlockView, LaserView, MaterialBodyView, MaterialRowView,
+    MaterialsView, PlaceView, SetKindView, SetView, TestDetailView, TestRowView,
+};
 
-/// One row of the section.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "state", rename_all = "snake_case")]
-pub enum MaterialRowView {
-    /// A readable material.
-    Loaded {
-        /// Its id.
-        id: String,
-        /// Its name.
-        name: String,
-        /// Its thickness in mm.
-        thickness_mm: f64,
-        /// The kinds it has sets for, in the order Cut, Score, Engrave.
-        kinds: Vec<SetKindView>,
-        /// How many operations of the open project point to it.
-        uses: usize,
-    },
-    /// A damaged record (criterion 29).
-    Damaged {
-        /// Its id.
-        id: String,
-        /// The reason.
-        reason: String,
-    },
-    /// A record of a newer format.
-    Newer {
-        /// Its id.
-        id: String,
-        /// The name its JSON names, when readable.
-        name: Option<String>,
-    },
-}
+const KINDS: [SetKind; 3] = [SetKind::Cut, SetKind::Score, SetKind::Engrave];
 
-/// The kinds of a set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SetKindView {
-    /// Cut.
-    Cut,
-    /// Score.
-    Score,
-    /// Engrave.
-    Engrave,
-}
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
-impl From<SetKind> for SetKindView {
-    fn from(kind: SetKind) -> Self {
-        match kind {
-            SetKind::Cut => Self::Cut,
-            SetKind::Score => Self::Score,
-            SetKind::Engrave => Self::Engrave,
-        }
-    }
-}
-
-/// The three numbers of a set.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct NumbersView {
-    /// Power in percent.
-    pub power_pct: f64,
-    /// Speed in mm/min.
-    pub speed_mm_min: u64,
-    /// Passes.
-    pub passes: u8,
-}
-
-impl From<curvyo_laser_core::settings::Settings> for NumbersView {
-    fn from(set: curvyo_laser_core::settings::Settings) -> Self {
-        Self {
-            power_pct: set.power.percent(),
-            speed_mm_min: u64::from(set.speed.get()),
-            passes: set.passes.get(),
-        }
-    }
-}
-
-/// The fields of the selected material (UX notes §10.3).
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct MaterialFieldsView {
-    /// Its id.
-    pub id: String,
-    /// Its name.
-    pub name: String,
-    /// Its thickness in mm.
-    pub thickness_mm: f64,
-    /// How many operations of the open project point to it.
-    pub uses: usize,
-    /// Its sets in the order Cut, Score, Engrave.
-    pub sets: Vec<SetFieldsView>,
-}
-
-/// One set of the selected material.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SetFieldsView {
-    /// Its kind.
-    pub kind: SetKindView,
-    /// Its numbers.
-    pub numbers: NumbersView,
-    /// The source line ("Tested 2026-11-10, 5 × 5 grid, cell 60 %, 3000 mm/min").
-    pub source: String,
-}
-
-/// The civil date of Unix milliseconds `ms`, "2026-11-10" (UTC).
-pub(in crate::session) fn date_text(ms: u64) -> String {
+/// The civil date of Unix milliseconds `ms` (UTC): year, month 1 to 12, day.
+fn civil(ms: u64) -> (i64, usize, i64) {
     let days = i64::try_from(ms / 86_400_000).unwrap_or(0);
     // Howard Hinnant's days-to-civil.
     let z = days + 719_468;
@@ -138,170 +35,348 @@ pub(in crate::session) fn date_text(ms: u64) -> String {
     let day = doy - (153 * mp + 2) / 5 + 1;
     let month = if mp < 10 { mp + 3 } else { mp - 9 };
     let year = yoe + era * 400 + i64::from(month <= 2);
-    format!("{year:04}-{month:02}-{day:02}")
+    (year, usize::try_from(month).unwrap_or(1), day)
 }
 
-/// The source line of the `kind` set of `material` (UX notes §10.3).
-fn source_line(material: &Material, kind: SetKind) -> String {
-    let Some(set) = material.sets.get(&kind) else {
-        return String::new();
-    };
-    match &set.source {
-        SetSource::Test(entry) => material
-            .history
-            .iter()
-            .find(|e| &e.id == entry)
-            .and_then(|e| match &e.event {
-                HistoryEvent::Tested { grid, set, .. } => Some(format!(
-                    "Tested {}, {} × {} grid, cell {} %, {} mm/min",
-                    date_text(e.date),
-                    grid.columns,
-                    grid.rows,
-                    set.power,
-                    set.speed.get()
-                )),
-                _ => None,
-            })
-            .unwrap_or_default(),
-        SetSource::Edited => material
-            .history
-            .iter()
-            .rev()
-            .find(|e| e.kind == kind && matches!(e.event, HistoryEvent::Edited { .. }))
-            .map_or_else(
-                || "Edited by hand".to_owned(),
-                |e| format!("Edited by hand {}", date_text(e.date)),
-            ),
+/// "12 Nov".
+pub(in crate::session) fn short_date(ms: u64) -> String {
+    let (_, month, day) = civil(ms);
+    format!("{day} {}", MONTHS[month.clamp(1, 12) - 1])
+}
+
+/// "12 Nov 2026".
+pub(in crate::session) fn long_date(ms: u64) -> String {
+    let (year, month, day) = civil(ms);
+    format!("{day} {} {year}", MONTHS[month.clamp(1, 12) - 1])
+}
+
+/// "1 laser", "2 lasers"; `None` at 0.
+fn count(n: usize, word: &str) -> Option<String> {
+    match n {
+        0 => None,
+        1 => Some(format!("1 {word}")),
+        n => Some(format!("{n} {word}s")),
     }
 }
 
-const KINDS: [SetKind; 3] = [SetKind::Cut, SetKind::Score, SetKind::Engrave];
-
-/// The listed rows of the library for `profile_id`.
-fn material_rows(
-    library: &Materials,
-    profile_id: &str,
-    uses: &dyn Fn(&str) -> usize,
-) -> Vec<MaterialRowView> {
-    library
-        .listed(profile_id)
-        .into_iter()
-        .map(|read| match read {
-            MaterialRead::Loaded(material) => MaterialRowView::Loaded {
-                id: material.id.clone(),
-                name: material.name.clone(),
-                thickness_mm: material.thickness.mm(),
-                kinds: KINDS
-                    .into_iter()
-                    .filter(|kind| material.sets.contains_key(kind))
-                    .map(SetKindView::from)
-                    .collect(),
-                uses: uses(&material.id),
-            },
-            MaterialRead::Damaged { id, reason } => MaterialRowView::Damaged {
-                id: id.clone(),
-                reason: reason.clone(),
-            },
-            MaterialRead::Newer { id } => MaterialRowView::Newer {
-                id: id.clone(),
-                name: library.name_of(id).map(str::to_owned),
-            },
-        })
-        .collect()
+/// Line 2 of a material row (UX 7.3).
+fn row_line(material: &Material) -> String {
+    let parts: Vec<String> = [
+        count(material.lasers.len(), "laser"),
+        count(material.set_count(), "set"),
+        count(material.tests.len(), "test"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if parts.is_empty() {
+        "No sets".to_owned()
+    } else {
+        parts.join(" · ")
+    }
 }
 
-/// The fields of the selected material, `uses` operations linking it.
-fn selected_fields(material: &Material, uses: usize) -> MaterialFieldsView {
-    MaterialFieldsView {
-        id: material.id.clone(),
-        name: material.name.clone(),
-        thickness_mm: material.thickness.mm(),
-        uses,
-        sets: KINDS
-            .into_iter()
-            .filter_map(|kind| {
-                let set = material.sets.get(&kind)?;
-                Some(SetFieldsView {
-                    kind: kind.into(),
-                    numbers: set.settings.into(),
-                    source: source_line(material, kind),
-                })
-            })
+fn source_text(set: &Set) -> String {
+    match &set.source {
+        SetSource::Test(id) => format!("Test {id}"),
+        SetSource::Typed => "Typed".to_owned(),
+        SetSource::History(_) => "Test".to_owned(),
+    }
+}
+
+fn set_view(kind: SetKind, set: &Set) -> SetView {
+    SetView {
+        kind: kind.into(),
+        numbers: set.numbers.settings.into(),
+        interval_mm: set
+            .numbers
+            .interval
+            .map(curvyo_laser_core::settings::Interval::mm),
+        source: source_text(set),
+    }
+}
+
+/// "60 %, 1950 mm/min, 1 ×" (and ", 0.08 mm" with an interval).
+fn numbers_text(set: &Set) -> String {
+    let s = set.numbers.settings;
+    let mut text = format!(
+        "{} %, {} mm/min, {} ×",
+        s.power,
+        s.speed.get(),
+        s.passes.get()
+    );
+    if let Some(interval) = set.numbers.interval {
+        let _ = write!(text, ", {:.2} mm", interval.mm());
+    }
+    text
+}
+
+fn axis_view(test: &TestRecord, side: Side) -> AxisView {
+    let axis = test.recipe.axis(side);
+    AxisView {
+        title: axis.param().title().to_owned(),
+        unit: param_words(axis.param()).1,
+        values: (0..axis.count())
+            .map(|i| axis.value(i).to_string())
             .collect(),
     }
 }
 
-/// The first `n` for which "Material n" is free among the loaded names of `profile_id`.
-fn next_material_number(library: &Materials, profile_id: &str) -> usize {
-    let names: Vec<&str> = library
-        .listed(profile_id)
-        .into_iter()
-        .filter_map(|read| match read {
-            MaterialRead::Loaded(material) => Some(material.name.as_str()),
-            _ => None,
-        })
-        .collect();
-    (1..=names.len() + 1)
-        .find(|n| !names.contains(&format!("Material {n}").as_str()))
-        .unwrap_or(1)
+/// The word and unit of a parameter in the axes line.
+pub(in crate::session) const fn param_words(param: Param) -> (&'static str, &'static str) {
+    match param {
+        Param::Power => ("Power", " %"),
+        Param::Speed => ("Speed", " mm/min"),
+        Param::Passes => ("Passes", " ×"),
+        Param::Interval => ("Interval", " mm"),
+    }
+}
+
+/// "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2026".
+fn axes_line(test: &TestRecord) -> String {
+    let side = |side| {
+        let axis = test.recipe.axis(side);
+        let (min, max) = (axis.min(), axis.max());
+        let (word, unit) = param_words(axis.param());
+        format!("{word} {min}–{max}{unit}")
+    };
+    let mut parts = vec![format!("{} × {}", side(Side::Columns), side(Side::Rows))];
+    parts.extend(
+        test.recipe
+            .fixed_values()
+            .into_iter()
+            .map(|value| format!("{value}{}", param_words(value.param).1)),
+    );
+    parts.push(format!("cell {} mm", test.recipe.cell().as_mm()));
+    parts.push(long_date(test.created));
+    parts.join(" · ")
 }
 
 impl Session {
-    /// How many laser operations link each material id.
-    fn material_use_counts(&self) -> std::collections::HashMap<String, usize> {
-        let mut counts = std::collections::HashMap::<String, usize>::new();
-        for op in self.laser_operations() {
-            if let Some(id) = op.material_id() {
-                *counts.entry(id.to_owned()).or_default() += 1;
-            }
-        }
-        counts
+    /// The page name of the laser page holding a grid with the test id `id`, if any.
+    fn test_page(&self, id: TestId) -> Option<String> {
+        self.placed_test_grids()
+            .into_iter()
+            .find(|grid| grid.id == id)
+            .map(|grid| grid.page_name)
     }
 
-    /// The Materials section of the active laser page, `None` on another page.
+    fn test_row(&self, test: &TestRecord) -> TestRowView {
+        let line = match test.lasered {
+            Some(at) => format!("Lasered {} · {}", short_date(at), test.machine.name),
+            None => format!(
+                "Not lasered · {}",
+                self.test_page(test.id)
+                    .unwrap_or_else(|| "not on a page".to_owned())
+            ),
+        };
+        TestRowView {
+            id: test.id.to_string(),
+            kind: test.recipe.kind().into(),
+            lasered: test.lasered.is_some(),
+            line,
+            photo: test.photo.is_some(),
+        }
+    }
+
+    fn test_detail(&self, material: &Material, test: &TestRecord) -> TestDetailView {
+        let page = self.test_page(test.id);
+        let on = page
+            .as_ref()
+            .map_or_else(|| "not on a page".to_owned(), |p| format!("on {p}"));
+        let state_line = match test.lasered {
+            Some(at) => format!("Lasered {} · {on}", long_date(at)),
+            None => format!("Not lasered · {on}"),
+        };
+        let kind = test.recipe.kind();
+        let set_line = test.best.and(
+            material
+                .set_for(&test.machine.id, kind)
+                .filter(|set| set.source == SetSource::Test(test.id))
+                .map(|set| {
+                    format!(
+                        "{} set of {}: {}",
+                        kind.label(),
+                        test.machine.name,
+                        numbers_text(set)
+                    )
+                }),
+        );
+        let page_name = self.active_page().name;
+        TestDetailView {
+            id: test.id.to_string(),
+            kind: kind.into(),
+            head: format!("{} · {}", kind.label(), test.machine.name),
+            state_line,
+            axes_line: axes_line(test),
+            columns: axis_view(test, Side::Columns),
+            rows: axis_view(test, Side::Rows),
+            best: test.best.map(|c| CellView {
+                column: c.column,
+                row: c.row,
+            }),
+            set_line,
+            note: test.note.clone(),
+            photo: test
+                .photo
+                .map(|kind| photo_file_name(&material.id, test.id, kind)),
+            place: PlaceView {
+                on_page: page.is_some(),
+                label: if page.is_some() {
+                    "Select on page".to_owned()
+                } else {
+                    format!("Place on {page_name}")
+                },
+            },
+        }
+    }
+
+    fn laser_block(&self, laser: &LaserSets, this_page: bool) -> LaserBlockView {
+        let tab = &self.materials.tab;
+        LaserBlockView {
+            laser: LaserView {
+                id: laser.machine.id.clone(),
+                name: laser.machine.name.clone(),
+            },
+            this_page,
+            open: if this_page {
+                !tab.page_laser_folded
+            } else {
+                tab.open_lasers.contains(&laser.machine.id)
+            },
+            sets: KINDS
+                .into_iter()
+                .filter_map(|kind| laser.sets.get(&kind).map(|set| set_view(kind, set)))
+                .collect(),
+            missing: KINDS
+                .into_iter()
+                .filter(|kind| !laser.sets.contains_key(kind))
+                .map(SetKindView::from)
+                .collect(),
+        }
+    }
+
+    fn material_body(&self, material: &Material) -> MaterialBodyView {
+        let page = self.active_laser();
+        let page_id = page.as_ref().map(|l| l.id.clone());
+        let mut lasers: Vec<LaserSets> = material.lasers.clone();
+        let picked = self.materials.tab.picked_lasers.get(&material.id);
+        for laser in page.iter().chain(picked.into_iter().flatten()) {
+            if !lasers.iter().any(|l| l.machine.id == laser.id) {
+                lasers.push(LaserSets {
+                    machine: laser.clone(),
+                    sets: std::collections::BTreeMap::new(),
+                });
+            }
+        }
+        lasers.sort_by_key(|l| Some(&l.machine.id) != page_id.as_ref());
+        let blocks = lasers
+            .iter()
+            .map(|l| self.laser_block(l, Some(&l.machine.id) == page_id.as_ref()))
+            .collect();
+        let other_lasers = self
+            .machine_profiles()
+            .listed()
+            .into_iter()
+            .filter(|p| !lasers.iter().any(|l| l.machine.id == p.id))
+            .map(|p| LaserView {
+                id: p.id.clone(),
+                name: p.values.name.clone(),
+            })
+            .collect();
+        let test = self
+            .materials
+            .tab
+            .open_test
+            .and_then(|id| material.test(id))
+            .map(|test| self.test_detail(material, test));
+        MaterialBodyView {
+            id: material.id.clone(),
+            name: material.name.clone(),
+            thickness_mm: material.thickness.mm(),
+            lasers: blocks,
+            laser_pick_open: self.materials.tab.laser_pick_open,
+            other_lasers,
+            tests: material
+                .tests
+                .iter()
+                .rev()
+                .map(|t| self.test_row(t))
+                .collect(),
+            test,
+        }
+    }
+
+    /// The default name of a new material: "Material `<N>`" with the first free number.
+    fn next_material_name(&self) -> String {
+        (1..=MAX_MATERIALS + 1)
+            .map(|n| format!("Material {n}"))
+            .find(|name| {
+                !self
+                    .materials
+                    .library
+                    .reads()
+                    .iter()
+                    .any(|read| matches!(read, MaterialRead::Loaded(m) if &m.name == name))
+            })
+            .unwrap_or_default()
+    }
+
+    /// The Materials tab, `None` off a laser page.
     #[must_use]
     pub fn materials_view(&self) -> Option<MaterialsView> {
-        if !self.operations_available() {
-            return None;
-        }
-        let copy = self.active_copy()?;
-        let profile_id = copy.read.copy.id.clone().unwrap_or_default();
-        let library = self.materials.library();
-        let counts = self.material_use_counts();
-        let uses = |id: &str| counts.get(id).copied().unwrap_or(0);
-        let rows = material_rows(library, &profile_id, &uses);
-        let selected = self
+        self.active_copy()?;
+        let library = &self.materials.library;
+        let rows = library
+            .listed()
+            .into_iter()
+            .map(|read| match read {
+                MaterialRead::Loaded(material) => MaterialRowView::Loaded {
+                    id: material.id.clone(),
+                    name: material.name.clone(),
+                    thickness_mm: material.thickness.mm(),
+                    line: row_line(material),
+                    tests: material.tests.len(),
+                },
+                MaterialRead::Damaged { id, reason } => MaterialRowView::Damaged {
+                    id: id.clone(),
+                    reason: reason.clone(),
+                },
+                MaterialRead::Newer { id } => MaterialRowView::Newer {
+                    id: id.clone(),
+                    name: library.name_of(id).map(str::to_owned),
+                },
+                MaterialRead::Older { id } => MaterialRowView::Older {
+                    id: id.clone(),
+                    name: library.name_of(id).map(str::to_owned),
+                },
+            })
+            .collect();
+        let unfolded = self
             .materials
-            .selected
+            .tab
+            .unfolded
             .as_deref()
             .and_then(|id| library.find(id))
-            .filter(|material| material.machine.id == profile_id)
-            .map(|material| selected_fields(material, uses(&material.id)));
-        let next = next_material_number(library, &profile_id);
+            .map(|material| self.material_body(material));
+        let mut load_notices = library.load_notices().to_vec();
+        load_notices.extend(self.materials.retired_notice.map(str::to_owned));
         Some(MaterialsView {
-            profile_name: copy.read.copy.values.name,
+            page_laser: self.active_laser().map(|l| LaserView {
+                id: l.id,
+                name: l.name,
+            }),
             rows,
-            selected,
-            next_name: format!("Material {next}"),
-            load_notices: library.load_notices().to_vec(),
+            unfolded,
+            form_open: self.materials.tab.form_open,
+            next_name: self.next_material_name(),
+            load_notices,
         })
     }
 
-    /// The Materials section as JSON, `null` on another page.
+    /// The Materials tab as JSON, `null` off a laser page.
     #[must_use]
     pub fn materials_view_json(&self) -> String {
         serde_json::to_string(&self.materials_view()).unwrap_or_else(|_| "null".to_owned())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::date_text;
-
-    #[test]
-    fn dates_are_civil_utc_days() {
-        assert_eq!(date_text(0), "1970-01-01");
-        assert_eq!(date_text(1_762_862_400_000), "2025-11-11");
-        assert_eq!(date_text(1_709_164_800_000), "2024-02-29");
     }
 }

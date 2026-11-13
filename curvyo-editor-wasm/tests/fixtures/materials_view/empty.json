@@ -1,7 +1,11 @@
 {
+  "form_open": false,
   "load_notices": [],
   "next_name": "Material 1",
-  "profile_name": "Generic laser",
+  "page_laser": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
   "rows": [],
-  "selected": null
+  "unfolded": null
 }

@@ -20,7 +20,7 @@
   "pick": [],
   "rows": [
     {
-      "grid": null,
+      "source": null,
       "group_in_part": null,
       "id": {
         "counter": 35,
@@ -65,7 +65,7 @@
       "unfolded": false
     },
     {
-      "grid": null,
+      "source": null,
       "group_in_part": null,
       "id": {
         "counter": 40,

@@ -309,6 +309,8 @@ impl Session {
         self.trace_draw_into(view, &mut list);
         // The mask's regions and handles over the picture (`specs/0114-image-trace-mask`).
         list.extend(self.trace_mask_draw_list(view));
+        // The Test grid tool's outline of the grid a press would place (`specs/0112` UX 3).
+        list.extend(self.test_grid_draw_list(view));
         // The pale red box of a move drag or the open typed move (`0047` criteria 33, 36): above
         // the blue preview, whose white casing would otherwise cover it where the two coincide
         // (an unrotated object), and below the selection box and the handles.

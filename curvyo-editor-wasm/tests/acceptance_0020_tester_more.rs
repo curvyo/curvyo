@@ -878,6 +878,10 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
                 | "sketch_page_assignment_invalid_v29.curvyo"
                 | "sketch_dimension_label_v29.curvyo"
                 | "sketch_label_invalid_v29.curvyo"
+                // `specs/0112` Part B: two grids placed one after the other, two steps.
+                | "test_grid_damaged_v46.curvyo"
+                | "test_grid_orphan_rows_v46.curvyo"
+                | "test_grid_v46.curvyo"
         );
         if matches!(
             name,

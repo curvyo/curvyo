@@ -131,14 +131,14 @@ fn criterion_19_an_interval_typed_with_no_settings_is_a_draft_written_with_the_n
 #[test]
 fn criterion_19_a_material_pick_with_no_settings_writes_the_draft_interval() {
     const BIRCH: &str = "22222222-2222-4222-8222-222222222222";
-    let set = serde_json::json!({"power_pct": 35.0, "speed_mm_min": 6000, "passes": 1});
+    // Record format 2 (`specs/0112`): one laser with its Engrave set.
     let record = serde_json::json!({
-        "format_version": 1, "id": BIRCH, "kind": "laser", "modified": 1_762_948_800_000_u64,
+        "format_version": 2, "id": BIRCH, "kind": "laser", "modified": 1_762_948_800_000_u64,
         "name": "Birch", "thickness_mm": 3.0,
-        "machine": {"id": "generic-laser", "name": "Generic laser"},
-        "sets": {"engrave": {"power_pct": 35.0, "speed_mm_min": 6000, "passes": 1, "source": "edited"}},
-        "history": [{"id": "aaaaaaaa-0000-4000-8000-000000000000", "date": 1_762_948_800_000_u64,
-            "event": "edited", "kind": "engrave", "set": set}]
+        "lasers": [{"machine": {"id": "generic-laser", "name": "Generic laser"},
+            "sets": {"engrave": {"power_pct": 35.0, "speed_mm_min": 6000, "passes": 1,
+                "interval_mm": 0.08, "source": "typed"}}}],
+        "tests": [], "history": []
     });
     let mut f = fixture(false);
     f.s.load_materials(&[(format!("{BIRCH}.json"), record.to_string())], None);

@@ -1,0 +1,148 @@
+{
+  "form_open": false,
+  "load_notices": [],
+  "next_name": "Material 1",
+  "page_laser": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
+  "rows": [
+    {
+      "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+      "line": "2 lasers · 3 sets · 3 tests",
+      "name": "Birch plywood",
+      "state": "loaded",
+      "tests": 3,
+      "thickness_mm": 3.0
+    }
+  ],
+  "unfolded": {
+    "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+    "laser_pick_open": false,
+    "lasers": [
+      {
+        "laser": {
+          "id": "generic-laser",
+          "name": "Generic laser"
+        },
+        "missing": [
+          "cut",
+          "engrave"
+        ],
+        "open": true,
+        "sets": [
+          {
+            "interval_mm": null,
+            "kind": "score",
+            "numbers": {
+              "passes": 2,
+              "power_pct": 12.5,
+              "speed_mm_min": 3000
+            },
+            "source": "Typed"
+          }
+        ],
+        "this_page": true
+      },
+      {
+        "laser": {
+          "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+          "name": "Diode 20 W"
+        },
+        "missing": [
+          "score"
+        ],
+        "open": true,
+        "sets": [
+          {
+            "interval_mm": null,
+            "kind": "cut",
+            "numbers": {
+              "passes": 1,
+              "power_pct": 60.0,
+              "speed_mm_min": 1950
+            },
+            "source": "Test 7K2QX"
+          },
+          {
+            "interval_mm": 0.08,
+            "kind": "engrave",
+            "numbers": {
+              "passes": 1,
+              "power_pct": 30.0,
+              "speed_mm_min": 6000
+            },
+            "source": "Typed"
+          }
+        ],
+        "this_page": false
+      }
+    ],
+    "name": "Birch plywood",
+    "other_lasers": [],
+    "test": {
+      "axes_line": "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2025",
+      "best": {
+        "column": 2,
+        "row": 1
+      },
+      "columns": {
+        "title": "Power %",
+        "unit": " %",
+        "values": [
+          "20",
+          "40",
+          "60",
+          "80",
+          "100"
+        ]
+      },
+      "head": "Cut · Diode 20 W",
+      "id": "7K2QX",
+      "kind": "cut",
+      "note": "Clean edge at 60 %.",
+      "photo": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c.7K2QX.jpg",
+      "place": {
+        "label": "Place on Laser 1",
+        "on_page": false
+      },
+      "rows": {
+        "title": "mm/min",
+        "unit": " mm/min",
+        "values": [
+          "600",
+          "1950",
+          "3300",
+          "4650",
+          "6000"
+        ]
+      },
+      "set_line": "Cut set of Diode 20 W: 60 %, 1950 mm/min, 1 ×",
+      "state_line": "Lasered 12 Nov 2025 · not on a page"
+    },
+    "tests": [
+      {
+        "id": "4H8ZP",
+        "kind": "engrave",
+        "lasered": false,
+        "line": "Not lasered · not on a page",
+        "photo": false
+      },
+      {
+        "id": "8PL4D",
+        "kind": "cut",
+        "lasered": false,
+        "line": "Not lasered · not on a page",
+        "photo": false
+      },
+      {
+        "id": "7K2QX",
+        "kind": "cut",
+        "lasered": true,
+        "line": "Lasered 12 Nov · Diode 20 W",
+        "photo": true
+      }
+    ],
+    "thickness_mm": 3.0
+  }
+}

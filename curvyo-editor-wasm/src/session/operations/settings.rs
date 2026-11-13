@@ -145,10 +145,11 @@ impl Session {
         let Some(found) = self.materials.library().find(material).cloned() else {
             return false;
         };
+        let profile = self.active_profile_id().unwrap_or_default();
         let mut writes = Vec::new();
         let mut skipped: Vec<(String, &'static str)> = Vec::new();
         for target in ids.iter().filter_map(|&id| self.settings_target(id)) {
-            match use_material(&found, target.kind, &target.read) {
+            match use_material(&found, &profile, target.kind, &target.read) {
                 Ok(mut stored) => {
                     if target.read == SettingsRead::None {
                         stored.interval = self.draft_interval(target.id).or(stored.interval);
@@ -323,9 +324,17 @@ impl Session {
             return false;
         }
         self.recording_unguarded(|this| {
-            this.document
+            let done = this
+                .document
                 .write_operation_settings(step, writes)
-                .unwrap_or(false)
+                .unwrap_or(false);
+            // A settings or material edit of a Lasered grid's row gives the grid a new id
+            // (`specs/0112` criterion 11).
+            if done {
+                let rows: Vec<NodeId> = writes.iter().map(|w| w.operation).collect();
+                this.renew_lasered_grids_of(&rows);
+            }
+            done
         })
     }
 }

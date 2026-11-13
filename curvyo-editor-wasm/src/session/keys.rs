@@ -231,7 +231,7 @@ impl Session {
             Tool::Offset => self.offset_drag_in_flight() || self.select.drag_in_flight(),
             Tool::Measure => self.dimension_drag_in_flight(),
             Tool::Trace => self.trace.mask.drag.is_some(),
-            Tool::Pen | Tool::Text => false,
+            Tool::Pen | Tool::Text | Tool::TestGrid => false,
         };
         // A drag of a panel value field is a drag too (`specs/0020-undo-redo` criterion 6a).
         // A click-to-create placement is an operation in flight (`0052` criterion 8).
@@ -519,7 +519,7 @@ impl Session {
                 self.cancel_offset_drag() || marquee
             }
             Tool::Measure => self.measure_escape(),
-            Tool::Pen | Tool::Text | Tool::Trace => false,
+            Tool::Pen | Tool::Text | Tool::Trace | Tool::TestGrid => false,
         }
     }
 
@@ -655,7 +655,8 @@ impl Session {
             | Tool::PolygonStar
             | Tool::Text
             | Tool::Measure
-            | Tool::Trace => false,
+            | Tool::Trace
+            | Tool::TestGrid => false,
             Tool::Node => self.node.clear_selection(),
             Tool::Select | Tool::Offset => {
                 let had = !self.selection.is_empty();
@@ -739,7 +740,8 @@ impl Session {
                 | Tool::Offset
                 | Tool::Text
                 | Tool::Measure
-                | Tool::Trace => {}
+                | Tool::Trace
+                | Tool::TestGrid => {}
             }
         });
     }

@@ -259,7 +259,7 @@ fn ac8_tools_and_tabs_follow_the_kind_and_activation_is_no_step() {
     // Document; the other tabs are the drawing tabs.
     let laser_tabs: Vec<_> = tabs(&s)
         .into_iter()
-        .filter(|n| *n != "operations")
+        .filter(|n| *n != "operations" && *n != "materials")
         .collect();
     assert_eq!(
         laser_tabs, VECTOR_TABS,

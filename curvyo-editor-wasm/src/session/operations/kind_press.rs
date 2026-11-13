@@ -97,13 +97,17 @@ impl Session {
     }
 
     /// The kind buttons of the Select bar (criteria 1, 2), in bar order; `None` (absent) with no
-    /// selection or a selection that holds an out-of-context object. `active` is the active laser
+    /// selection, a selection that holds an out-of-context object or a test grid's item. `active` is the active laser
     /// page's operations.
     pub(super) fn select_bar_kinds(
         &self,
         active: &ActiveOperations,
     ) -> Option<Vec<KindButtonView>> {
         if self.selection.ids().is_empty() || self.edit_scope() != Scope::Edit {
+            return None;
+        }
+        // A grid selection has the Test grid bar, not the kind buttons (`specs/0112` UX G4).
+        if self.selection.ids().iter().any(|&id| self.in_test_grid(id)) {
             return None;
         }
         let names = || active.operations.iter().map(|op| op.name.as_str());

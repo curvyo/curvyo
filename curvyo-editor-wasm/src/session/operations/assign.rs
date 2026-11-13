@@ -245,9 +245,15 @@ impl Session {
         let verb = if member { "Assign to" } else { "Remove from" };
         let id = op.id;
         self.recording_named(format!("{verb} {}", op.name), |this| {
-            this.document
+            let done = this
+                .document
                 .set_operation_members(id, &keys, member)
-                .unwrap_or(false)
+                .unwrap_or(false);
+            // A membership edit of a Lasered grid's row gives the grid a new id (`0112` 11).
+            if done {
+                this.renew_lasered_grids_of(&[id]);
+            }
+            done
         })
     }
 }

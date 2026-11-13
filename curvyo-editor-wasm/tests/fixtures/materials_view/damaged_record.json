@@ -1,0 +1,19 @@
+{
+  "form_open": false,
+  "load_notices": [
+    "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c.json: A Cut set has an interval."
+  ],
+  "next_name": "Material 1",
+  "page_laser": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
+  "rows": [
+    {
+      "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+      "reason": "A Cut set has an interval.",
+      "state": "damaged"
+    }
+  ],
+  "unfolded": null
+}

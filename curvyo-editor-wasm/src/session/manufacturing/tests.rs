@@ -110,7 +110,7 @@ fn ac8_the_tabs_follow_the_page_kind() {
     assert_eq!(
         laser
             .iter()
-            .filter(|n| **n != "operations")
+            .filter(|n| **n != "operations" && **n != "materials")
             .copied()
             .collect::<Vec<_>>(),
         drawing,

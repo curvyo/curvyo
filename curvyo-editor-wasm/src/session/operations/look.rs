@@ -387,8 +387,6 @@ impl Session {
                 )));
             }
         }
-        // The Worked chip is a record of the test: drawn in both views (UX notes §7.3).
-        overlay.extend(grids.worked_chips(&bounds, view));
     }
 
     /// The members of one placed page as drawn on the output page: each member is in its look for

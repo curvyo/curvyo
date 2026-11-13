@@ -1,0 +1,88 @@
+{
+  "form_open": false,
+  "load_notices": [],
+  "next_name": "Material 1",
+  "page_laser": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
+  "rows": [
+    {
+      "id": "03030303-0303-4303-8303-030303030303",
+      "line": "1 test",
+      "name": "Birch 3 mm",
+      "state": "loaded",
+      "tests": 1,
+      "thickness_mm": 3.0
+    }
+  ],
+  "unfolded": {
+    "id": "03030303-0303-4303-8303-030303030303",
+    "laser_pick_open": false,
+    "lasers": [
+      {
+        "laser": {
+          "id": "generic-laser",
+          "name": "Generic laser"
+        },
+        "missing": [
+          "cut",
+          "score",
+          "engrave"
+        ],
+        "open": true,
+        "sets": [],
+        "this_page": true
+      }
+    ],
+    "name": "Birch 3 mm",
+    "other_lasers": [],
+    "test": {
+      "axes_line": "Power 20–100 % × Speed 600–6000 mm/min · 1 × · cell 10 mm · 12 Nov 2025",
+      "best": null,
+      "columns": {
+        "title": "Power %",
+        "unit": " %",
+        "values": [
+          "20",
+          "40",
+          "60",
+          "80",
+          "100"
+        ]
+      },
+      "head": "Cut · Generic laser",
+      "id": "M8W1O",
+      "kind": "cut",
+      "note": "",
+      "photo": null,
+      "place": {
+        "label": "Select on page",
+        "on_page": true
+      },
+      "rows": {
+        "title": "mm/min",
+        "unit": " mm/min",
+        "values": [
+          "600",
+          "1950",
+          "3300",
+          "4650",
+          "6000"
+        ]
+      },
+      "set_line": null,
+      "state_line": "Not lasered · on Laser 1"
+    },
+    "tests": [
+      {
+        "id": "M8W1O",
+        "kind": "cut",
+        "lasered": false,
+        "line": "Not lasered · Laser 1",
+        "photo": false
+      }
+    ],
+    "thickness_mm": 3.0
+  }
+}

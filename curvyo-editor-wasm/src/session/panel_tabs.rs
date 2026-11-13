@@ -26,7 +26,8 @@ fn tab_of_kind(name: &str, sketch: bool) -> bool {
 /// Whether `tab` may show on the active page: the Operations tab only on a laser page with its
 /// extension on (`specs/0101-laser-operations` criterion 1, 28), the drawing tabs as `tab_of_kind`.
 fn tab_allowed(tab: PanelTab, sketch: bool, laser: bool) -> bool {
-    (tab != PanelTab::Operations || laser) && tab_of_kind(tab.name(), sketch)
+    (!matches!(tab, PanelTab::Operations | PanelTab::Materials) || laser)
+        && tab_of_kind(tab.name(), sketch)
 }
 
 /// The key a page kind's last tab is kept under (criterion 9): an output page by its process,
@@ -90,14 +91,8 @@ impl Session {
     /// selection change), then returns the strip and the body.
     pub fn panel_view(&self) -> PanelView {
         let non_empty = self.panel_scope_non_empty();
-        let grid_edge = self.grid_selection_edge();
         let active = self.update_panel_tabs(|tabs| {
             tabs.observe(non_empty);
-            // A test grid selected on the canvas is edited in the Operations tab (`specs/0028`
-            // UX notes §6.1, M3); History, Layers, File and Fonts stay.
-            if grid_edge && matches!(tabs.active(), PanelTab::Style | PanelTab::Document) {
-                tabs.press(PanelTab::Operations, non_empty);
-            }
             tabs.active()
         });
         let sketch = self.workbench() == super::Workbench::Sketch;
@@ -115,11 +110,30 @@ impl Session {
                 at,
                 PanelTab::Operations.entry_labelled("Operations", active == PanelTab::Operations),
             );
+            // The Materials tab comes right after Operations (`specs/0112` criterion 16).
+            tabs.insert(
+                at + 1,
+                PanelTab::Materials.entry_labelled("Materials", active == PanelTab::Materials),
+            );
         }
         PanelView {
             content: panel_body(active, self.pen_path_unfinished(), non_empty),
             tabs,
         }
+    }
+
+    /// A placed test grid (`specs/0112` criterion 12): its rows are what the maker reads next, so
+    /// the edge from an empty scope hands Document over to Operations, not to the Style tab of
+    /// "Group of 38 objects"; any other tab stays.
+    pub(super) fn show_operations_for_new_grid(&self) {
+        let non_empty = self.panel_scope_non_empty();
+        self.update_panel_tabs(|tabs| {
+            let was = tabs.active();
+            tabs.observe(non_empty);
+            if was == PanelTab::Document {
+                let _ = tabs.press(PanelTab::Operations, non_empty);
+            }
+        });
     }
 
     /// Hands the tab over when the active page's kind changes (`specs/0098` criterion 9): the
@@ -162,7 +176,8 @@ impl Session {
         let Some(tab) = PanelTab::from_name(name) else {
             return false;
         };
-        if tab == PanelTab::Operations && !self.operations_available() {
+        if matches!(tab, PanelTab::Operations | PanelTab::Materials) && !self.operations_available()
+        {
             return false;
         }
         let non_empty = self.panel_scope_non_empty();
@@ -262,6 +277,7 @@ impl PanelTabsRecord {
             PanelContent::Share => "share",
             PanelContent::Workbench => "workbench",
             PanelContent::Operations => "operations",
+            PanelContent::Materials => "materials",
             PanelContent::Empty => "empty",
         };
         Self {

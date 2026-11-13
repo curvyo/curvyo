@@ -1,59 +1,56 @@
 {
-  "fields": {
-    "cell_mm": 10.0,
-    "columns": 5,
-    "gap_mm": 3.0,
-    "power_from_pct": 20.0,
-    "power_to_pct": 100.0,
-    "rows": 5,
-    "speed_from_mm_min": 600,
-    "speed_to_mm_min": 6000
+  "cell_mm": 10.0,
+  "columns": {
+    "count": 5,
+    "max": 100.0,
+    "min": 20.0,
+    "offered": [
+      "power",
+      "speed",
+      "passes",
+      "interval"
+    ],
+    "param": "power"
   },
+  "crosshatch": true,
   "fit": null,
   "group": {
     "counter": 0,
-    "peer": "3"
+    "peer": "5"
   },
-  "hand_edited": false,
-  "height_mm": 70.0,
+  "height_mm": 66.0,
+  "id": "M8W1O",
   "invalid": {
-    "chip": "Columns are 2 to 12.",
-    "field": "columns",
-    "typed": "13"
+    "cause": "Cell size is 3 to 50 mm.",
+    "field": "cell",
+    "typed": "60"
   },
-  "kind": "cut",
-  "labels": {
-    "height_mm": 3.0,
-    "kind": "engrave",
-    "on": true,
-    "passes": 1,
-    "power_pct": 20.0,
-    "speed_mm_min": 3000
-  },
-  "machine": "Generic laser",
+  "kind": "engrave",
+  "lasered": false,
+  "material": null,
+  "materials": [],
   "max_feed_mm_min": 6000,
-  "name": "Test grid 1",
-  "result": {
-    "powers": [
-      20.0,
-      40.0,
-      60.0,
-      80.0,
-      100.0
+  "rows": {
+    "count": 5,
+    "max": 6000.0,
+    "min": 600.0,
+    "offered": [
+      "power",
+      "speed",
+      "passes",
+      "interval"
     ],
-    "speeds": [
-      600,
-      1950,
-      3300,
-      4650,
-      6000
-    ]
+    "param": "speed"
   },
-  "row": {
-    "counter": 427,
-    "peer": "3"
-  },
-  "selected_cell": null,
-  "width_mm": 72.09146341463415,
-  "worked": null
+  "shared": [
+    {
+      "param": "passes",
+      "value": 1.0
+    },
+    {
+      "param": "interval",
+      "value": 0.1
+    }
+  ],
+  "width_mm": 75.60060975609755
 }

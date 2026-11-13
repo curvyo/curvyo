@@ -117,9 +117,15 @@ impl Session {
             return Ok(false);
         };
         Ok(self.recording_unguarded(|this| {
-            this.document
+            let done = this
+                .document
                 .write_operation_options(id, &map)
-                .unwrap_or(false)
+                .unwrap_or(false);
+            // An options edit of a Lasered grid's row gives the grid a new id (`0112` 11).
+            if done {
+                this.renew_lasered_grids_of(&[id]);
+            }
+            done
         }))
     }
 
@@ -144,9 +150,14 @@ impl Session {
             value: Some(map),
         };
         self.recording_unguarded(|this| {
-            this.document
+            let done = this
+                .document
                 .write_operation_settings(SettingsStep::EditSettings, &[write])
-                .unwrap_or(false)
+                .unwrap_or(false);
+            if done {
+                this.renew_lasered_grids_of(&[id]);
+            }
+            done
         })
     }
 }

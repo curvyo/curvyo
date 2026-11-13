@@ -33,6 +33,7 @@ impl Session {
             | Tool::Offset
             | Tool::Text
             | Tool::Trace
+            | Tool::TestGrid
             | Tool::Measure => StyleTool::Other,
         }
     }

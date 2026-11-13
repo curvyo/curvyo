@@ -12,7 +12,7 @@
   ],
   "rows": [
     {
-      "grid": null,
+      "source": null,
       "kind": "score",
       "name": "score 5",
       "settings": {
@@ -57,7 +57,7 @@
       }
     },
     {
-      "grid": null,
+      "source": null,
       "kind": "cut",
       "name": "cut 1",
       "settings": {
@@ -99,7 +99,7 @@
       }
     },
     {
-      "grid": null,
+      "source": null,
       "kind": "cut",
       "name": "cut 2",
       "settings": {
@@ -139,7 +139,7 @@
       }
     },
     {
-      "grid": null,
+      "source": null,
       "kind": "cut",
       "name": "cut 3",
       "settings": {
@@ -179,7 +179,7 @@
       }
     },
     {
-      "grid": null,
+      "source": null,
       "kind": "cut",
       "name": "cut 4",
       "settings": {

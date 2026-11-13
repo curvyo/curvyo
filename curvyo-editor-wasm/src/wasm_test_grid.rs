@@ -1,97 +1,84 @@
-//! Thin host bridge of the test grids (`specs/0028-material-test-library` criteria 1 to 14): the
-//! add button, the Grid block's fields, Rebuild, the result table and its view; strings and
-//! scalars only (ADR 0001 §5). A command's text result is its chip or refusal, empty when taken.
+//! Thin host bridge of the Test grid tool (`specs/0112-test-grid-and-materials` criteria 1 to
+//! 6, 11): the press, the bar's commits and its view; strings and scalars only (ADR 0001 §5). A
+//! command's text result is its cause or refusal, empty when taken. The Lasered test hook is not
+//! bound here (ADR 0057 §5).
 
-use curvyo_document_core::NodeId;
+use curvyo_document_core::Point;
 use wasm_bindgen::prelude::*;
 
 use crate::wasm_api::WasmSession;
 
-/// The node id a host sends back (its JSON text), `None` for anything else.
-fn node(text: &str) -> Option<NodeId> {
-    serde_json::from_str(text).ok()
+/// The text of a refusal, empty when the command was taken.
+fn text_of<T>(result: Result<T, String>) -> String {
+    result.err().unwrap_or_default()
 }
 
 #[wasm_bindgen]
 impl WasmSession {
-    /// Add test grid: `{"ok": true, "row": <id>}` or `{"ok": false, "text"}` with the refusal
-    /// shown under the button.
-    pub fn press_add_test_grid(&mut self) -> String {
-        let result = match self.session.press_add_test_grid() {
-            Ok(row) => serde_json::json!({"ok": true, "row": row}),
-            Err(text) => serde_json::json!({"ok": false, "text": text}),
-        };
-        result.to_string()
+    /// Whether the Test grid tool is offered (a laser page).
+    #[must_use]
+    pub fn test_grid_tool_available(&self) -> bool {
+        self.session.test_grid_tool_available()
     }
 
-    /// Whether the Select bar hides Flip and Guide for a whole test grid (UX notes §6.5; Object to
-    /// path and Linked clone are hidden by their own flags).
+    /// A press of the tool at `x`, `y` in document mm; Enter places at the first free spot with
+    /// `at_free_spot`. The refusal, empty when placed or selected.
+    pub fn test_grid_press(&mut self, x: f64, y: f64, at_free_spot: bool) -> String {
+        let point = (!at_free_spot).then(|| Point::new(x, y));
+        text_of(self.session.test_grid_press(point))
+    }
+
+    /// Whether the Select bar shows the Test grid bar for a whole test grid (UX G3).
     #[must_use]
     pub fn select_bar_hides_grid_commands(&self) -> bool {
         self.session.select_bar_hides_grid_commands()
     }
 
-    /// The grid row pressed in the list (its id text; empty: none).
-    pub fn select_test_grid_row(&mut self, row: &str) {
-        self.session.select_test_grid_row(node(row));
-    }
-
-    /// The Grid block's field `field` (`columns`, `rows`, `power_from`, `power_to`,
-    /// `speed_from`, `speed_to`, `cell`, `gap`, `label_height`, `label_power`, `label_speed`,
-    /// `label_passes`) typed as `typed`. The chip, empty when taken.
+    /// Types `typed` into the bar's field `field`.
     pub fn set_test_grid_field(&mut self, field: &str, typed: &str) -> String {
-        self.session
-            .set_test_grid_field(field, typed)
-            .err()
-            .unwrap_or_default()
+        text_of(self.session.set_test_grid_field(field, typed))
     }
 
-    /// The Kind radiogroup (`cut`, `score`, `engrave`). The bed cause, empty when taken.
+    /// The parameter switch of `side` (`columns`, `rows`).
+    pub fn set_test_grid_axis(&mut self, side: &str, param: &str) -> String {
+        text_of(self.session.set_test_grid_axis(side, param))
+    }
+
+    /// The Kind segments.
     pub fn set_test_grid_kind(&mut self, kind: &str) -> String {
-        self.session
-            .set_test_grid_kind(kind)
-            .err()
-            .unwrap_or_default()
+        text_of(self.session.set_test_grid_kind(kind))
     }
 
-    /// The Labels switch. The cause, empty when taken.
-    pub fn set_test_grid_labels(&mut self, on: bool) -> String {
-        self.session
-            .set_test_grid_labels(on)
-            .err()
-            .unwrap_or_default()
+    /// The Crosshatch toggle.
+    pub fn set_test_grid_crosshatch(&mut self, on: bool) -> String {
+        text_of(self.session.set_test_grid_crosshatch(on))
     }
 
-    /// The label kind (`engrave`, `score`). The refusal, empty when taken.
-    pub fn set_test_grid_label_kind(&mut self, kind: &str) -> String {
-        self.session
-            .set_test_grid_label_kind(kind)
-            .err()
-            .unwrap_or_default()
+    /// The material dropdown (`id` empty: no material).
+    pub fn pick_test_grid_material(&mut self, id: &str) -> String {
+        text_of(
+            self.session
+                .pick_test_grid_material((!id.is_empty()).then_some(id)),
+        )
     }
 
-    /// Rebuild of a hand-edited grid. Whether it rebuilt.
-    pub fn rebuild_test_grid(&mut self) -> bool {
-        self.session.rebuild_test_grid()
+    /// Random bytes for new test ids (`crypto.getRandomValues`).
+    pub fn feed_test_grid_random(&mut self, bytes: &[u8]) {
+        self.session.feed_test_grid_random(bytes);
     }
 
-    /// A press on the result table's cell: mark, or unmark the marked one.
-    pub fn press_test_cell(&mut self, column: u8, row: u8) -> bool {
-        self.session.press_test_cell(column, row)
-    }
-
-    /// The Grid block's "Select": the grid becomes the canvas selection.
-    pub fn select_test_grid_on_canvas(&mut self) -> bool {
-        self.session.select_focused_test_grid()
-    }
-
-    /// The Grid block as JSON, `null` when none shows.
+    /// The bar as JSON, `null` when none shows.
     pub fn test_grid_view_json(&self) -> String {
         self.session.test_grid_view_json()
     }
 
-    /// The refusal of the last Add test grid, `None` when it added one.
+    /// The refusal of the last press, `None` when it placed.
     pub fn test_grid_notice(&self) -> Option<String> {
         self.session.test_grid_notice()
+    }
+
+    /// The sr-only status ("New test id 8PL4D."), once.
+    pub fn take_test_grid_status(&mut self) -> Option<String> {
+        self.session.take_test_grid_status()
     }
 }
