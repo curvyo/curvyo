@@ -123,7 +123,7 @@ fn spiro_controls(nodes: &[NewAnchor]) -> Vec<SpiroControl> {
         .collect()
 }
 
-/// Solves Spiro controls: a function of the controls alone (`specs/0114`).
+/// Solves Spiro controls: a function of the controls alone (`specs/0115`).
 ///
 /// # Errors
 /// Returns an error for too few or non-finite controls.

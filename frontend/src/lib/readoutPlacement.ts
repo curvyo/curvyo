@@ -436,7 +436,7 @@ export function placeSketchChip(
 export const WIDTH_CHIP_CLEAR_PX = 14;
 
 /**
- * The typed-width field and the wheel readout of a width point (`specs/0114` criteria 6 and 7, UX
+ * The typed-width field and the wheel readout of a width point (`specs/0115` criteria 6 and 7, UX
  * review 2026-11-12): below the diamond (`above` for the readout, which the hand on the wheel
  * would cover below), on the other side when there is no room, so the stroke beside the diamond
  * stays visible. Its left edge starts just left of the diamond, or its right edge ends just

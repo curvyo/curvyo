@@ -152,7 +152,7 @@ interface NodeToolbarProps {
   selectionCount: number;
   /** The Close path group (`0034-pen-path-extension`); the bar has none without it. */
   closePath?: React.ComponentProps<typeof ClosePathGroup>;
-  /** Edit width (`specs/0114` criterion 4), last in the bar; renders nothing when not offered. */
+  /** Edit width (`specs/0115` criterion 4), last in the bar; renders nothing when not offered. */
   widthEdit?: React.ReactNode;
 }
 

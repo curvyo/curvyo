@@ -3,7 +3,7 @@
 use crate::{DrawList, glyphs, theme};
 use curvyo_document_core::{Point, ViewTransform};
 
-/// The size of a width diamond, screen pixels (`specs/0114` criterion 5).
+/// The size of a width diamond, screen pixels (`specs/0115` criterion 5).
 pub const WIDTH_DIAMOND_PX: f64 = 16.0;
 /// The dark ring around a diamond and the light casing around that, screen pixels each side.
 const RING_PX: f64 = 1.5;

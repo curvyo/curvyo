@@ -388,7 +388,7 @@ Consequence: Stroke to path and SVG export of a varying profile give line
 segments within 0.01 mm instead of Bézier pieces (more nodes); tracked in
 `docs/technical-debt.md`.
 
-### Amendment 2026-11-12: the curvature-continuous Spiro (`0114`, customer decisions SPIRO-G2 A and SPIRO-WINDING A; details Proposal)
+### Amendment 2026-11-12: the curvature-continuous Spiro (`0115`, customer decisions SPIRO-G2 A and SPIRO-WINDING A; details Proposal)
 
 The customer found the Spiro of 2026-11-11 sticky and named Inkscape as the reference. The
 measurement (`curvyo-editor-wasm/src/session/spiro_cache/measure.rs`) showed that the G4 curve
@@ -400,10 +400,10 @@ hold rules could only stall there.
   clothoid segments (two coefficients) between smooth controls, a circular arc (one) at an open
   end or beside a corner, a straight segment between two ends; angle and curvature continuous at
   every smooth control. `SpiroShape` keeps four coefficients per segment, the last two zero.
-  (The G4 fallback of the first `0114` build for runs without a G2 curve is gone with the hold,
+  (The G4 fallback of the first `0115` build for runs without a G2 curve is gone with the hold,
   see below: one parametrisation, one procedure.)
 - **Pure function of the controls (amended 2026-11-12, after the customer tried the PR: "the
-  mouse is far from the last solution, it feels very slow").** The hold of the first `0114` build
+  mouse is far from the last solution, it feels very slow").** The hold of the first `0115` build
   (the 9.5 mm jump limit, 4× the pointer's move + 2 mm, the 270° loop limit, the stepwise
   catch-up with side steps of 35° and 70°, the click that stored the held point) is removed. Every
   Spiro, the Pen's live point and every Node drag included, is drawn as its controls solved by one
@@ -427,7 +427,7 @@ hold rules could only stall there.
   hair). A shape whose segment cannot be approximated by cubics is drawn as its control polygon.
   The answer depends on the controls only through their shape (about their centroid, in units of
   their spread), so a moved, turned or scaled curve solves the same. Measured
-  (`specs/0114-spiro-smoothing-and-width-handles/plan.md`): G2 converges for 91 % of random open
+  (`specs/0115-spiro-smoothing-and-width-handles/plan.md`): G2 converges for 91 % of random open
   and 93 % of random closed control sets and 99.9 % of a wave with the pointer anywhere, G4 with
   the same procedure for 59 %, 46 % and 83 %, so the curve stays G2.
 - **Shape change (customer-approved exception to `0110` criterion 8, SPIRO-G2 A, 2026-11-12).**
@@ -436,7 +436,7 @@ hold rules could only stall there.
   Spiro: the drawing, SVG export, Stroke to path and machine/cut output (all evaluate the same
   controls). Width points are arc-length fractions of the centre line, so a stored profile keeps
   its widths at its fractions and slides with the new shape. Tight zigzags change a second time: with no G2 curve they are drawn as the
-  last iterate, not the G4 fallback of the first `0114` build.
+  last iterate, not the G4 fallback of the first `0115` build.
 - **Solver version.** The format does not record which solver drew a path, and the cache key of
   "Spiro evaluation in the session" contains no solver version (it is a disposable in-process
   cache, emptied on open; the earlier text naming one was wrong). Stored curves therefore depend
@@ -447,11 +447,11 @@ hold rules could only stall there.
   (`docs/technical-debt.md`).
 - **Tests.** This amendment replaces "libspiro references on native and wasm" with the G2
   reference test. The `spiro-inner` port of libspiro returns NaN for open `c` paths, so the G4
-  reference fixtures are removed and `spiro_g2_reference_0114.rs` checks properties (three
+  reference fixtures are removed and `spiro_g2_reference_0115.rs` checks properties (three
   controls give their circle, closed controls on a circle give it, angle and curvature continuous,
   end arcs, the curve through its controls). It runs native only; a wasm run of it is debt
   (`docs/technical-debt.md`). The SVG export of Spiro paths has a golden
-  (`curvyo-editor-wasm/tests/spiro_0114.rs`).
+  (`curvyo-editor-wasm/tests/spiro_0115.rs`).
 - **Source of the formulation.** Levien's permissive original (Apache-2.0 or MIT), not the GPL
   `libspiro` fork (`docs/third-party/spiro-inner.md`).
 - **Not solved (SPIRO-WINDING A, customer, 2026-11-12).** A point circling its neighbour crosses

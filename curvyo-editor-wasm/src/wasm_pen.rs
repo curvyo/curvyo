@@ -192,7 +192,7 @@ impl WasmSession {
     }
 
     /// Whether the screen point (`x`, `y`) is over a width point in width editing: the host's
-    /// wheel goes to [`WasmSession::width_wheel`] there instead of zooming (`specs/0114`).
+    /// wheel goes to [`WasmSession::width_wheel`] there instead of zooming (`specs/0115`).
     #[must_use]
     pub fn width_point_under(&self, x: f64, y: f64) -> bool {
         self.session

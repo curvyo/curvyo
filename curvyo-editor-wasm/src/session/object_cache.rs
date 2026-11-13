@@ -397,7 +397,7 @@ mod extended_text_tests {
                 && p.id == path
             {
                 // A Spiro too far out to be drawn at any tolerance has no curve to carry the
-                // text (since `specs/0114` a Spiro through one point is that point).
+                // text (since `specs/0115` a Spiro through one point is that point).
                 p.curve_kind = CurveKind::Spiro;
                 for (anchor, sign) in p.anchors.iter_mut().zip([1.0, -1.0].iter().cycle()) {
                     anchor.point = curvyo_document_core::Point::new(sign * 1e300, anchor.point.y);

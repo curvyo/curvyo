@@ -363,7 +363,7 @@ fn unsupported_mask_stops_single_trace_before_output() {
     use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
     let (mut session, image, _) = masked();
     // A Spiro too far out to be drawn at any tolerance has no curve: it cannot be a mask (every
-    // Spiro of ordinary controls has one since `specs/0114`, even through one point).
+    // Spiro of ordinary controls has one since `specs/0115`, even through one point).
     let nodes = [
         NewAnchor::corner(AnchorId::new(180, 1), Point::new(1e300, 5.)),
         NewAnchor::corner(AnchorId::new(180, 2), Point::new(5., 1e300)),

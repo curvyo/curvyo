@@ -1,7 +1,7 @@
 //! The CPU cost of solving a Spiro curve (`specs/0110-pen-modes-variable-stroke` criterion 2):
 //! the session solves a drawn path synchronously while points are placed, so one solve of a
 //! realistic path fits well inside a 16 ms frame, and a curve whose iteration does not converge
-//! stops just as fast (ten iterations at most, `specs/0114`). Native thread CPU time is a lower bound for wasm, hence the 4 ms margin.
+//! stops just as fast (ten iterations at most, `specs/0115`). Native thread CPU time is a lower bound for wasm, hence the 4 ms margin.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -75,7 +75,7 @@ fn a_hard_zigzag_answers_within_a_quarter_frame_either_way() {
     assert!(spent < BUDGET, "zigzag took {spent:?}");
 }
 
-/// The rebuild of the Pen's live Spiro at one pointer event (`specs/0114` criterion 3): the hover
+/// The rebuild of the Pen's live Spiro at one pointer event (`specs/0115` criterion 3): the hover
 /// and the frame drawn after it solve the curve from its controls, within 2 ms in an optimised
 /// build for waves of 3, 8 and 20 controls with the pointer circling the last one, and for the
 /// hairpin (three controls nearly on a line) with the pointer circling its end.

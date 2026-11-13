@@ -566,7 +566,7 @@ fn trace_mask_evaluates_splines_and_refuses_unsupported_curves() {
     spiro.curve_kind = CurveKind::Spiro;
     assert!(curvyo_ui_core::mask_operand(&ObjectSnapshot::Path(spiro.clone())).is_ok());
     // Controls too far out to be drawn at any tolerance have no curve: refused, not masked as
-    // their polygon (since `specs/0114` controls on one point are that point).
+    // their polygon (since `specs/0115` controls on one point are that point).
     let mut unsupported = spiro;
     for (anchor, sign) in unsupported
         .anchors

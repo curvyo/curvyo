@@ -1705,7 +1705,7 @@ Decisions and reasoning: `specs/0100-bring-content-in/ux-notes.md`; sketches b, 
 | Guides left out of a clone | Action notice (status, 3s, canvas notice slot) "2 guides were not cloned. Guides never run." A partial result, so it is kept despite "no notice after a success" |
 
 
-## Width editing (`0110`, revised by `0114`, 2026-11-12)
+## Width editing (`0110`, revised by `0115`, 2026-11-12)
 
 | Element | Value | Note |
 |---|---|---|

@@ -60,9 +60,9 @@ slower `f64` path) would go unnoticed.
 **Resolution:** run the two budget tests under `wasm-bindgen-test-runner` in the nightly job,
 measuring CPU time there (Node's `process.cpuUsage`), with the wasm limits.
 
-## Stored Spiro curves depend on the solver version, which the format does not record (`0114`, 2026-11-12)
+## Stored Spiro curves depend on the solver version, which the format does not record (`0115`, 2026-11-12)
 
-A Spiro path stores only its controls; the curve is derived by the solver. `0114` changed the solver
+A Spiro path stores only its controls; the curve is derived by the solver. `0115` changed the solver
 from G4 to G2 (customer SPIRO-G2 A, an exception to `0110` criterion 8), and nothing in the file says
 which solver drew a path. A format-42 file opened on a `0110` build draws the G4 curve for the same
 controls without warning, and a width profile slides with the shape. Live peers cannot diverge today
@@ -74,16 +74,16 @@ of controls whose iteration does not converge a second time, still without a for
 **Resolution:** before the share block is lifted, peers must agree on the solver version (capability
 protocol) or the version is stored per path; the next change of the Spiro solver needs the same.
 
-## Spiro G2 has no wasm test (`0114`, 2026-11-12)
+## Spiro G2 has no wasm test (`0115`, 2026-11-12)
 
-`spiro_g2_reference_0114.rs` runs on native only (the wasm build of `curvyo-geometry-core` runs the
+`spiro_g2_reference_0115.rs` runs on native only (the wasm build of `curvyo-geometry-core` runs the
 golden test only). The SVG export of Spiro paths has a golden since the tester's review
-(`curvyo-editor-wasm/tests/spiro_0114.rs`).
+(`curvyo-editor-wasm/tests/spiro_0115.rs`).
 
 **Resolution:** run the G2 property tests under `wasm-bindgen-test-runner` with the nightly budget
 tests.
 
-## No native-versus-wasm golden of the G2 walks (`0114`, 2026-11-13)
+## No native-versus-wasm golden of the G2 walks (`0115`, 2026-11-13)
 
 The Spiro answer is the same on one platform, but across native and wasm only within floating-point,
 and can differ near the discrete decisions (`floor` in `wrap_turns`, the `drawable_step` bisection,
@@ -92,10 +92,10 @@ stores the curve (only the controls), so this is acceptable.
 
 **Resolution:** a golden of the G2 walks run on both targets, with the wasm test above.
 
-## The live Spiro stroke is tessellated off the screen too (`0114`, 2026-11-13)
+## The live Spiro stroke is tessellated off the screen too (`0115`, 2026-11-13)
 
 The Pen's preview stroke is flattened at screen tolerance over its whole length. In a drawing
-100 m wide (the `far x1000` family of `acceptance_0114_random_tester.rs`) that is some 30 000
+100 m wide (the `far x1000` family of `acceptance_0115_random_tester.rs`) that is some 30 000
 triangles, most of them off the screen, up to about 1.7 ms of a pointer event of at most about
 2.3 ms; laser-bed drawings stay at or below 1.2 ms. The test holds that family to one 16 ms frame,
 the others to the 2 ms of criterion 3.

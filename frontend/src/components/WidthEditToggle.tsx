@@ -5,7 +5,7 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import { WIDTH_PRESET_GLYPHS } from "@/lib/widthPresets";
 
 /**
- * Edit width in the tool bar (`specs/0114` criterion 4): last in the Select and Node bars
+ * Edit width in the tool bar (`specs/0115` criterion 4): last in the Select and Node bars
  * (`inBar`) when one stroked path is selected, and as a chip of its own while width editing is on
  * in another tool. Pressed while editing,
  * where it reads "Done" and leaves the mode as Escape does (the only Done, UX review U4). A

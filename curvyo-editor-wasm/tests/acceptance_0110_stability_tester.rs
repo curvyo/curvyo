@@ -3,7 +3,7 @@
 //! right click finishes the path (with nothing in progress it does nothing); a Spiro never shows
 //! a "cannot be solved" notice or a straight-line fallback, never jumps while a point is moved,
 //! and is stored and reopened as shown. Written from the brief before reading the implementation.
-//! Amended for `specs/0114` (customer 2026-11-12, the curve is a function of its controls): a
+//! Amended for `specs/0115` (customer 2026-11-12, the curve is a function of its controls): a
 //! moved point's curve turns over at once where the point crosses the line behind a neighbour,
 //! by at most [`TURNOVER_LIMIT`]; drags across a neighbour are checked for storing and reopening.
 #![allow(
@@ -63,9 +63,9 @@ fn reach(a: &[Vertex], b: &[Vertex]) -> f64 {
 
 /// The Hausdorff distance between two drawings, in mm; 0 when both are empty.
 ///
-/// Amended by the implementer for `specs/0114` (2026-11-12, needs the tester's re-check): the
+/// Amended by the implementer for `specs/0115` (2026-11-12, needs the tester's re-check): the
 /// triangle edges are sampled every 1 mm, so a long flat span drawn with few vertices no longer
-/// reads as a move of half its length (the G2 Spiro of `0114` draws such spans).
+/// reads as a move of half its length (the G2 Spiro of `0115` draws such spans).
 fn distance(a: &[Vertex], b: &[Vertex]) -> f64 {
     if a.is_empty() && b.is_empty() {
         return 0.0;
@@ -279,7 +279,7 @@ fn right_click_belongs_to_the_pen_only() {
 /// with pointer steps of 0.5 mm. A jump to another solution moves the curve by tens of mm.
 const JUMP_LIMIT: f64 = 10.0;
 /// The largest move of the drawing between two pointer events while the Pen's point circles or
-/// doubles back 15 mm from the last node (`specs/0114`): where the point crosses the line behind
+/// doubles back 15 mm from the last node (`specs/0115`): where the point crosses the line behind
 /// that node the curve turns over, by less than the point's distance from it.
 const TURNOVER_LIMIT: f64 = 15.0;
 const STEP: f64 = 0.5;
@@ -386,7 +386,7 @@ fn spiro_pen_point_circling_the_last_node_never_jumps_or_falls_back() {
         "worst {:.1} mm, {} of {} events over 4 mm",
         jump.moved, jump.over_spec, jump.events
     );
-    // `specs/0114` criterion 2: a move above 4 x the step + 2 mm at no more than 1 % of events.
+    // `specs/0115` criterion 2: a move above 4 x the step + 2 mm at no more than 1 % of events.
     assert!(
         jump.over_spec * 100 <= jump.events,
         "{} of {} events moved more than 4 mm",
@@ -421,7 +421,7 @@ fn spiro_pen_point_doubling_back_past_the_path_never_jumps_or_falls_back() {
         "worst {:.1} mm, {} of {} events over 4 mm",
         jump.moved, jump.over_spec, jump.events
     );
-    // `specs/0114` criterion 2: a move above 4 x the step + 2 mm at no more than 1 % of events.
+    // `specs/0115` criterion 2: a move above 4 x the step + 2 mm at no more than 1 % of events.
     assert!(
         jump.over_spec * 100 <= jump.events,
         "{} of {} events moved more than 4 mm",
@@ -607,7 +607,7 @@ struct Jump {
     /// 2 mm from the dragged point's neighbour (Node drags only).
     over: usize,
     /// Events at which the drawing passes no closer than 1 mm to the pointer (edge samples are
-    /// 1 mm apart): the dragged point stayed behind (Node drags only, `specs/0114`: never).
+    /// 1 mm apart): the dragged point stayed behind (Node drags only, `specs/0115`: never).
     stalls: usize,
     /// Events at which the drawing moved more than 4 x the step + 2 mm, and of all events.
     over_spec: usize,
@@ -691,7 +691,7 @@ fn spiro_four() -> (Session, [Point; 4]) {
 }
 
 /// A Node drag far out and back never jumps; onto and round its neighbour the curve turns over
-/// at no more than two events away from the neighbour (`specs/0114`); every release stores and
+/// at no more than two events away from the neighbour (`specs/0115`); every release stores and
 /// reopens what was shown.
 #[test]
 fn spiro_node_drag_across_hard_places_is_stored_and_reopened_as_shown() {
@@ -720,11 +720,11 @@ fn spiro_node_drag_across_hard_places_is_stored_and_reopened_as_shown() {
             "track {n}: worst {:.1} mm at ({:.1}, {:.1}), {} over {JUMP_LIMIT} mm clear of the neighbour, {} of {} events over 4 mm, {} stalls",
             jump.moved, jump.at.x, jump.at.y, jump.over, jump.over_spec, jump.events, jump.stalls
         );
-        // `specs/0114` criterion 2: the dragged point is under the pointer at every event.
+        // `specs/0115` criterion 2: the dragged point is under the pointer at every event.
         if jump.stalls > 0 {
             failures.push(format!("track {n}: {} stalls", jump.stalls));
         }
-        // Onto and round the neighbour the curve turns over at once (`specs/0114`): away from
+        // Onto and round the neighbour the curve turns over at once (`specs/0115`): away from
         // the neighbour it may move more than the jump limit at two events at most; the track
         // that stays clear of the neighbour is held to the limit.
         if n > 0 && jump.over > 2 {

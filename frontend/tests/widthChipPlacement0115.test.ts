@@ -1,5 +1,5 @@
 // Run with `npm test`. The typed-width field and the wheel readout of a width point
-// (`specs/0114` criteria 6 and 7, UX review 2026-11-12) open below or above the diamond, never
+// (`specs/0115` criteria 6 and 7, UX review 2026-11-12) open below or above the diamond, never
 // up and to the right over the stroke, and stay inside the canvas (`src/lib/readoutPlacement.ts`).
 
 import assert from "node:assert/strict";

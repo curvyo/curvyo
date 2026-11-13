@@ -23,14 +23,14 @@ initial port README explicitly identifies Levien's original C source and its
 Apache-2.0/MIT licence; the `integrate_spiro` and `compute_ends` formulas were
 compared against the original `ppedit/spiro.c`; Curvyo's endpoint calculation
 uses those same formulas. Curvyo does not incorporate
-code from the GPL `libspiro` fork. The curvature-continuous (`c` point) formulation of `0114`
+code from the GPL `libspiro` fork. The curvature-continuous (`c` point) formulation of `0115`
 (clothoid segments, end arcs) follows Levien's permissive original (Apache-2.0 or MIT), the
 `ppedit/spiro.c` source above, in Curvyo's own solver; no code is taken from
 the GPL fork. Its numerical output (G4 `o` points) was test data
-until `0114` (2026-11-12) moved the solver to curvature-continuous `c` points, which are
+until `0115` (2026-11-12) moved the solver to curvature-continuous `c` points, which are
 checked by property tests instead.
 
-Since 2026-11-12 (`0114`, after the customer's review) the solver runs the iteration of Levien's
+Since 2026-11-12 (`0115`, after the customer's review) the solver runs the iteration of Levien's
 `solve_spiro` as Inkscape's Spiro mode does: from straight segments, at most ten full Newton steps
 with the angle errors and each segment's turn reduced after every step, and the last iterate drawn
 without a convergence check. Inkscape's `src/live_effects/spiro.cpp` (GPL-2.0-or-later) and

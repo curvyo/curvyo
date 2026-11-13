@@ -19,7 +19,7 @@ struct WidthDrag {
     gesture: WidthGesture,
     /// The press added a new point: the release writes it even without movement.
     added: bool,
-    /// A wheel burst, written by `end_width_wheel` (`specs/0114` criterion 7).
+    /// A wheel burst, written by `end_width_wheel` (`specs/0115` criterion 7).
     wheel: bool,
     source: Option<PathSnapshot>,
     /// The latest pointer, where the live readout sits.
@@ -121,7 +121,7 @@ impl Session {
     }
 
     /// Whether the tool bar offers Edit width: one path is selected and it has a stroke
-    /// (`specs/0114` criterion 4). Starting may still be refused with a notice.
+    /// (`specs/0115` criterion 4). Starting may still be refused with a notice.
     #[must_use]
     pub fn width_edit_offered(&self) -> bool {
         let [id] = self.selection.ids() else {

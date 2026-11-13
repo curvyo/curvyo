@@ -1,4 +1,4 @@
-//! Tester acceptance for `specs/0114-spiro-smoothing-and-width-handles` criteria 2 and 4 to 7 at
+//! Tester acceptance for `specs/0115-spiro-smoothing-and-width-handles` criteria 2 and 4 to 7 at
 //! the session, and the amended `0110` criterion 8 (a Spiro saved by the `0110` build, format 42,
 //! opens and draws). Written from the specification; the Pen walks are those named by criterion 2
 //! (`session/spiro_cache/measure.rs`), measured here from the draw list only.
@@ -191,7 +191,7 @@ fn vertex_distance(a: &[Vertex], b: &[Vertex]) -> f64 {
     reach(a, b).max(reach(b, a))
 }
 
-/// The `0110` stability tester's measure as amended for `0114`: vertices plus edge points 1 mm
+/// The `0110` stability tester's measure as amended for `0115`: vertices plus edge points 1 mm
 /// apart, vertex to vertex.
 fn amended_distance(a: &[Vertex], b: &[Vertex]) -> f64 {
     let pts = |t: &[Vertex]| dense(t, 1.0);
@@ -326,7 +326,7 @@ struct Figures {
     polygon: usize,
 }
 
-/// A move of the curve between two pointer events above this (mm) is a turnover (`specs/0114`
+/// A move of the curve between two pointer events above this (mm) is a turnover (`specs/0115`
 /// criterion 2 as amended 2026-11-12): the curve is a function of the controls, so where the
 /// pointer crosses the line behind a neighbour it flips from one side to the other at once.
 const TURNOVER_MM: f64 = 10.0;
@@ -570,7 +570,7 @@ fn c2_a_click_anywhere_on_a_walk_stores_and_reopens_what_was_shown() {
 fn amended_0110_distance_agrees_with_the_exact_edge_distance() {
     for (n, (name, placed, path)) in walks().into_iter().take(4).enumerate() {
         let f = pen_walk(&placed, &path, 120 + n as u64);
-        // Since `specs/0114` drops the hold, a turnover moves the bounding box by more than
+        // Since `specs/0115` drops the hold, a turnover moves the bounding box by more than
         // 10 mm, which the walk takes as its move without the exact measure; the re-check runs on
         // the worst pair the exact measure saw.
         println!(
@@ -1098,7 +1098,7 @@ fn covers(tris: &[Vertex], p: Point, r: f64) -> bool {
 
 #[test]
 fn old_0110_spiro_document_opens_and_draws_through_its_controls() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 44, "no format bump in 0114");
+    assert_eq!(CURRENT_FORMAT_VERSION, 45, "no format bump in 0115");
     let (doc, paths) = old_spiro_doc();
     let bytes = pack(&doc, "old").unwrap();
     let mut s = Session::open(6, &bytes).unwrap();

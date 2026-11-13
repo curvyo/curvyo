@@ -32,7 +32,7 @@ impl Entry {
         }
     }
 
-    /// `controls` solved: the same curve wherever they come from (`specs/0114` criterion 2).
+    /// `controls` solved: the same curve wherever they come from (`specs/0115` criterion 2).
     pub(super) fn fresh(controls: &[NewAnchor], closed: bool, tolerance: f64) -> Self {
         match curvyo_ui_core::solve_spiro_nodes(controls, closed) {
             Ok(shape) => Self::of_shape(controls, closed, tolerance, shape),

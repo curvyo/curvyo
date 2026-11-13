@@ -1,6 +1,6 @@
-//! `specs/0114-spiro-smoothing-and-width-handles` at the session: a Node drag of a Spiro whose
+//! `specs/0115-spiro-smoothing-and-width-handles` at the session: a Node drag of a Spiro whose
 //! iteration does not converge stores and reopens what it showed (criterion 2), and the SVG export
-//! of Spiro paths (criterion 1). The golden is in `tests/fixtures/export/spiro_0114/`; regenerate
+//! of Spiro paths (criterion 1). The golden is in `tests/fixtures/export/spiro_0115/`; regenerate
 //! with `CURVYO_UPDATE_GOLDEN=1` and review the diff.
 #![allow(clippy::unwrap_used, clippy::assert_is_empty, missing_docs)]
 
@@ -155,7 +155,7 @@ fn spiro_paths_export_as_their_curves() {
     };
     golden(
         &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/export/spiro_0114/spiro.exported.svg"),
+            .join("tests/fixtures/export/spiro_0115/spiro.exported.svg"),
         &text,
     );
 }

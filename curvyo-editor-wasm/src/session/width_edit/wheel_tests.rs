@@ -1,4 +1,4 @@
-//! `specs/0114` criteria 5 to 7: the hit area of a width diamond, the typed width a double-click
+//! `specs/0115` criteria 5 to 7: the hit area of a width diamond, the typed width a double-click
 //! opens and the wheel over a width point.
 
 use super::*;

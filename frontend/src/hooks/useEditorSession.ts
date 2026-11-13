@@ -254,7 +254,7 @@ const MARK_TOUCH_SLOP_PX = 8;
 const WHEEL_LINE_HEIGHT_PX = 16;
 /** One wheel notch in pixels (Chrome and Firefox send about 100 per notch). */
 const WHEEL_NOTCH_PX = 100;
-/** A pause this long ends a wheel burst over a width point (`specs/0114` criterion 7). */
+/** A pause this long ends a wheel burst over a width point (`specs/0115` criterion 7). */
 const WIDTH_WHEEL_BURST_MS = 500;
 /** How long the wheel readout of a width point stays after the last notch (UX review
  * 2026-11-12). */
@@ -652,7 +652,7 @@ export interface EditorSession {
   editHint: EditHint | null;
   /** Closes the edit hint (3 s, a press, a key, the pointer leaving). */
   dismissEditHint: () => void;
-  /** The typed width field of a width point, or `null` (`specs/0114` criterion 6). */
+  /** The typed width field of a width point, or `null` (`specs/0115` criterion 6). */
   widthEntry: WidthEntry | null;
   /** The live width beside a width point while the wheel turns it, or `null`. */
   widthWheelReadout: WidthChipAt | null;
@@ -1043,7 +1043,7 @@ export function useEditorSession(
   const [cursorHint, setCursorHint] = useState("default");
   const [editHint, setEditHint] = useState<EditHint | null>(null);
   const editHintCounter = useRef(0);
-  /** The typed width a double-click on a width point opened (`specs/0114` criterion 6). */
+  /** The typed width a double-click on a width point opened (`specs/0115` criterion 6). */
   const [widthEntry, setWidthEntry] = useState<WidthEntry | null>(null);
   const widthEntryCounter = useRef(0);
   /** The pending end of a wheel burst over a width point (criterion 7). */
@@ -1544,7 +1544,7 @@ export function useEditorSession(
       const { deltaX, deltaY } = normalizedWheelDelta(event);
       // Over a width point in width editing every wheel event, Ctrl or Meta and a trackpad
       // pinch too, sets its width and never zooms or pans, one undo step per burst
-      // (`specs/0114` criterion 7); Shift is the fine step and often turns the wheel into a
+      // (`specs/0115` criterion 7); Shift is the fine step and often turns the wheel into a
       // horizontal one.
       const overWidthPoint = session.width_edit_active() && session.width_point_under(x, y);
       if (overWidthPoint || (widthWheelTimer.current !== null && session.width_edit_active())) {

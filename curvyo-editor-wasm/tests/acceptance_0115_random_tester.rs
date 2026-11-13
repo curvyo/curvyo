@@ -1,4 +1,4 @@
-//! Tester acceptance for `specs/0114-spiro-smoothing-and-width-handles` criteria 2 and 3 on
+//! Tester acceptance for `specs/0115-spiro-smoothing-and-width-handles` criteria 2 and 3 on
 //! random Pen input: open and closed Spiros of 2 to 20 points, free, coincident, collinear or far
 //! from the origin, are drawn finite at every pointer event without a notice and within the
 //! per-event budget; the curve is a function of its controls (the same clicks with a different
@@ -202,7 +202,7 @@ fn lines_artwork(points: &[Point], closed: bool) -> Vec<Vertex> {
 /// controls, unchanged by a reopen, by an undo and redo and by the undo of a Node drag.
 #[test]
 fn random_spiros_are_finite_within_budget_and_a_function_of_their_controls() {
-    let mut rng = Lcg(0x0114_0002);
+    let mut rng = Lcg(0x0115_0002);
     let cases = if cfg!(debug_assertions) { 60 } else { 300 };
     let mut stats = std::collections::BTreeMap::new();
     let mut worst_case = std::collections::BTreeMap::new();
