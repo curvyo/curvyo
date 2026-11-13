@@ -325,3 +325,32 @@ fn c14_a_paste_of_the_copied_picture_carries_its_trace_mask() {
     plain.selection.set(&[id]);
     assert_eq!(plain.image_copy().unwrap().mask, "");
 }
+
+/// `specs/0114` criterion 14: Duplicate (the layers toolbar) and a copy through the document's
+/// copy carry the image's trace mask with its parts and regions.
+#[test]
+fn c14_duplicate_carries_the_trace_mask() {
+    let mut s = session();
+    paste(&mut s, None, &marker_png(), "logo.png");
+    let image = images(&s)[0].id;
+    s.set_tool(Tool::Trace);
+    s.set_trace_region_tool(super::TraceRegionTool::Rect);
+    let c = images(&s)[0].corners();
+    let (a, b) = (c[0], Point::new(f64::midpoint(c[0].x, c[2].x), c[2].y));
+    s.pointer_down(a, false);
+    s.pointer_hover(b, false, false);
+    s.pointer_up(b, false, false);
+    s.set_tool(Tool::Select);
+    s.selection.set(&[image]);
+    let mask = s.document.trace_mask(image).unwrap();
+    assert!(!mask.is_empty());
+    s.duplicate_layer_target();
+    let all = images(&s);
+    assert_eq!(all.len(), 2);
+    let copy = all.iter().map(|i| i.id).find(|id| *id != image).unwrap();
+    assert_eq!(
+        s.document.trace_mask(copy),
+        Some(mask),
+        "the copy keeps the mask"
+    );
+}

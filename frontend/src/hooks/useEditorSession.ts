@@ -1,3 +1,4 @@
+import { memoForImport } from "@/lib/imageClipboard";
 import { createSketchPresentation, type SketchPresentation } from "@/lib/sketchPresentation";
 import { type DropBadgeKind, decodeDragAnswer } from "@/lib/dragAnswer";
 import { type SketchView } from "@/lib/sketchView";
@@ -1687,6 +1688,11 @@ export function useEditorSession(
 
   const importBegin = useCallback((origin: ImportOrigin, at: { x: number; y: number } | null) => {
     sessionRef.current?.import_begin(origin, at !== null, at?.x ?? 0, at?.y ?? 0);
+    // A paste of the last copied picture carries its trace mask (`specs/0114` criterion 14).
+    const memo = memoForImport(origin);
+    if (memo) {
+      sessionRef.current?.set_import_trace_mask(memo.fingerprint, memo.mask);
+    }
   }, []);
 
   const lastCanvasPointer = useCallback(() => lastPointerRef.current, []);
