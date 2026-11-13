@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6282e9c5ef36ba47b82fbedf2438cdad5c5b69687dc59b8b0e2a7d724b2cfabf # shrinks to pts = [(10.471844573820992, 59.91411268375973), (80.05781677136069, 59.32062300234336), (36.430848575426154, 99.57296621494535), (36.72248976618793, 52.21279753265008)], closed = true, angle = 5.0102211459066766, scale = 0.3, dx = 0.0, dy = 0.0
+cc 3081f998857cb39ba15122e15ea177990db804b20c05d29ffa98b4b62244d452 # shrinks to pts = [(76.64285238068688, 18.217089039402232), (12.422834340640778, 16.8132922691557), (64.74617684988084, 81.95292340462568), (1.1897865152568978, 12.509958625080031), (39.35942563894882, 58.38596848666424)], closed = false, angle = 0.9764965724546631, scale = 0.3, dx = -31.082312112390188, dy = -23.17596533805784
