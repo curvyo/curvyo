@@ -45,6 +45,7 @@ mod job_raster_work;
 mod job_timeline;
 mod job_write;
 mod job_write_grbl;
+mod library_merge;
 mod machine_profile;
 mod machine_profile_copy;
 mod machine_profile_file;
@@ -241,6 +242,10 @@ pub use fixture_stored::{
 };
 pub use grid_layout::{
     GridLayout, GridSpec, Lattice, Number, Tape, TapeEdge, TapeEdges, Tick, layout,
+};
+pub use library_merge::{
+    CONFLICT_SUFFIX, MergeReason, RecordMerge, conflict_id, merge_machine_record,
+    merge_material_record,
 };
 pub use machine_profile::{
     BaudRate, Connection, FeedRate, GENERIC_LASER_ID, GENERIC_LASER_NAME, Limited,
