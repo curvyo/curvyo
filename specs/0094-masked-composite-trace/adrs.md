@@ -1,5 +1,7 @@
 # ADRs for masked and composite trace
 
+> **2026-11-13:** the mask-as-selected-paths model and "parts dropped on leaving the tool" are replaced by [ADR 0061](../../docs/adr/0061-image-trace-mask-in-the-project-file.md) (spec `0114`); the clip, stack, join and worker hand-off below stay.
+
 Architect, 2026-11-04. Feature-local decisions for slice 1 (one mask region per trace, Inside or
 Outside, picked by selecting the image plus paths), with the hooks slice 2 (parts and Join) needs.
 Assumes the spec's defaults Frage 130 A to 134 A. Every choice below is a **(Proposal)**,

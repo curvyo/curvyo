@@ -1,5 +1,7 @@
 # Masked and composite trace: trace only parts of a picture, each with its own settings, and join them
 
+Replaced in part by [0114](../0114-image-trace-mask/specification.md) (2026-11-13): the mask paths, Pick mask paths, Shift+click and the mixed-selection row (slice 1, 1b) and the rule that parts end when the tool is left are gone; the regions are drawn on the picture and stored with the image. Everything else of this spec stays (exact stencil edge, Inside / Outside, parts, stacking, Join, analysis per part).
+
 Status: Ready (2026-11-04; Fragen 130 to 134 unanswered, defaults A applied, vetoable at the demo)
 Priority: Should
 Origin: Customer (2026-11-03); everything marked Proposal is the product owner's

@@ -1,6 +1,6 @@
 # ADR 0017: Image nodes, embedded assets and bitmap decoding
 
-**Status:** Accepted 2026-10-16 by the customer for the decision to use the `image` crate and the image node/asset design; the spike (wasm size, decode time in the webview, peak memory, geiger, hostile files, deny) still has to confirm the numbers before the build starts; if the spike fails, the ADR is reopened. **Spike done 2026-10-26: the numbers hold; three corrections in "Spike result" (no change to the customer's decisions).** `needs-customer` (document model: a new node kind; file format:
+**Status:** (2026-11-13 note: images also carry a trace mask, ADR 0061.) Accepted 2026-10-16 by the customer for the decision to use the `image` crate and the image node/asset design; the spike (wasm size, decode time in the webview, peak memory, geiger, hostile files, deny) still has to confirm the numbers before the build starts; if the spike fails, the ADR is reopened. **Spike done 2026-10-26: the numbers hold; three corrections in "Spike result" (no change to the customer's decisions).** `needs-customer` (document model: a new node kind; file format:
 `assets/` in the container; new crate and dependencies). Extends [ADR 0002](0002-document-model-units-and-svg-round-trip.md)
 §5 and §10 (images were named in the owned SVG subset, never modelled), [ADR 0004](0004-persistence-and-cross-machine-sync.md)
 §1 (`assets/` in the container) and §9 (format refusal), [ADR 0014](0014-history-undo-and-branches.md)
