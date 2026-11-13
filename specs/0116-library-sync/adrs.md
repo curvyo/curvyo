@@ -5,7 +5,7 @@ Architect, 2026-11-13, for the customer request of 2026-11-13: the maker's three
 across the maker's own paired devices, with a per-item sync toggle on every font, machine and
 material row. Constants marked Proposal are vetoable at the demo.
 
-- [ADR 0062](../../docs/adr/0062-synced-per-user-libraries.md) (new, Proposed, `needs-customer`):
+- [ADR 0062](../../docs/adr/0062-synced-per-user-libraries.md) (new, accepted 2026-11-13):
   the whole feature — one library stream as the second sealed stream of the device group room,
   machine/material entries as the existing record texts keyed by uuid, font entries keyed by the
   file's SHA-256, blobs sealed like workspace snapshot parts, the per-item toggle in the stream,
