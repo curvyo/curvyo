@@ -317,7 +317,6 @@ type Box = { x: number; y: number; w: number; h: number };
 const ORDER: [string, string][] = [
   ["i", `${BAR} button[aria-label="About Trace"]`],
   ["Preset", `${BAR} button[aria-label=Preset]`],
-  ["Mask group", `${BAR} [data-trace-mask]`],
   ["Method", `${BAR} button[aria-label=Method]`],
   ["method field", `${BAR} [role=spinbutton][aria-label=Threshold], ${BAR} [role=spinbutton][aria-label="Colour tolerance"]`],
   ["Smooth", `${BAR} [role=spinbutton][aria-label=Smooth]`],
@@ -329,7 +328,7 @@ const ORDER: [string, string][] = [
 
 const orderBoxes = async (s: S, extra: [string, string][] = []) =>
   JSON.parse(
-    (await s.evaluate(`JSON.stringify(${JSON.stringify([...ORDER.slice(0, 5), ...extra, ...ORDER.slice(5)])}.map(([name, sel]) => { const e = document.querySelector(sel); const b = e ? e.getBoundingClientRect() : null;
+    (await s.evaluate(`JSON.stringify(${JSON.stringify([...ORDER.slice(0, 4), ...extra, ...ORDER.slice(4)])}.map(([name, sel]) => { const e = document.querySelector(sel); const b = e ? e.getBoundingClientRect() : null;
       return [name, b ? { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) } : null]; }))`)) as string,
   ) as [string, Box | null][];
 
@@ -427,7 +426,7 @@ test("0089E tester c22, c22a: order, no overlap, no clipping, no label before th
               assert.ok(slot.y + slot.height / 2 > exp.y + exp.h / 2 - 14 && (Math.abs(slot.y - exp.y) < 14 ? slot.x >= exp.x + exp.w : true), `${where}: the button is right of the expander (or on a later line)`);
               // Nothing before the method's own fields moves when the method changes.
               first ??= boxes;
-              for (let i = 0; i <= 3; i++) assert.deepEqual(boxes[i], first[i], `${where}: ${boxes[i][0]} keeps its place`);
+              for (let i = 0; i <= 2; i++) assert.deepEqual(boxes[i], first[i], `${where}: ${boxes[i][0]} keeps its place`);
               report.push(`${where}: bar ${m.height} px`);
             }
           }

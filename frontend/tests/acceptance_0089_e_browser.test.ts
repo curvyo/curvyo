@@ -235,7 +235,6 @@ const escape = async (s: S) => {
 const BAR_ITEMS: [string, string][] = [
   ["i", `${BAR} button[aria-label="About Trace"]`],
   ["Preset", `${BAR} button[aria-label=Preset]`],
-  ["Mask group", `${BAR} [data-trace-mask]`],
   ["Method", `${BAR} button[aria-label=Method]`],
   ["method field", `${BAR} [role=spinbutton][aria-label=Threshold], ${BAR} [role=spinbutton][aria-label="Colour tolerance"]`],
   ["Smooth", `${BAR} [role=spinbutton][aria-label=Smooth]`],
@@ -302,7 +301,7 @@ test("0089 E in Chromium: the bar order for every method, 1280 x 800 and 800 x 6
           assert.ok(Math.abs(finish.x + finish.w - (bar.right - 8)) < 1.5, `${where}: the Trace button at the far right`);
           // Nothing before the method's own fields moves when the method changes.
           first ??= boxes;
-          for (let i = 0; i <= 4; i++) {
+          for (let i = 0; i <= 3; i++) {
             assert.deepEqual(boxes[i], first[i], `${where}: ${boxes[i][0]} keeps its place`);
           }
           rows.push(`${where}: bar ${Math.round(bar.height)} px`);

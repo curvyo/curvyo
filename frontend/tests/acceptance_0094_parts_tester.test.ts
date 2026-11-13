@@ -397,12 +397,14 @@ async function drag(s: S, from: [number, number], to: [number, number]) {
   await sleep(500);
 }
 
-const shiftClick = async (s: S, x: number, y: number) => {
-  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers: 8 });
-  }
+/** Presses the Mask group's Rectangle, drags `from` to `to` over the picture and releases the tool
+ * (`specs/0114`: the regions of the active part). */
+async function drawRegion(s: S, from: [number, number], to: [number, number]) {
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+  await drag(s, from, to);
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
   await sleep(600);
-};
+}
 
 const maskState = async (s: S) =>
   (await s.evaluate(`(() => { const g = document.querySelector('${BAR} [role=radiogroup][aria-label=Mask]'); if (!g) return 'absent';
@@ -462,9 +464,10 @@ const reenter = async (s: S) => {
   await setAdvanced(s, true);
 };
 
-/** Imports `png` (default M1), draws a rectangle over the left half (L) and one over the right
- * half (R), each reaching 30 px beyond the picture, selects all and opens Trace; then Shift+click
- * takes R off part 1. Returns the picture box and R's outer edge spot. */
+/** Imports `png` (default M1), opens Trace on it with Advanced open and draws a region over the
+ * left half (L) with Rectangle, reaching 30 px beyond the picture (`specs/0114`). `drawRight`
+ * and `drawLeft` draw R and L again into the active part; `left` and `right` are spots inside
+ * them. Part 1 holds L. */
 async function twoHalves(s: S, png: Buffer = M1_PNG, name = "m1.png") {
   const file = path.join(SCRATCH, name);
   writeFileSync(file, png);
@@ -474,50 +477,34 @@ async function twoHalves(s: S, png: Buffer = M1_PNG, name = "m1.png") {
   await sleep(800);
   const box = await pictureBox(s);
   const h = box.y1 - box.y0;
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  // The top of the canvas holds the bars: the rectangles start below them.
-  const canvas = await canvasRect(s);
-  const barBottom = Number(await s.evaluate(`Math.max(0, ...[...document.querySelectorAll('[data-context-bar]')].map((e) => e.getBoundingClientRect().bottom))`));
-  const top = Math.max(box.cy - 0.6 * h, canvas[1] + 90, barBottom + 12);
-  const bottom = Math.min(box.cy + 0.6 * h, canvas[1] + canvas[3] - 12);
-  // The tool palettes sit over the canvas's left edge.
-  const palettes = Number(await s.evaluate(`Math.max(0, ...[...document.querySelectorAll('[role=toolbar]')].map((e) => e.getBoundingClientRect()).filter((r) => r.left < 200 && r.height > 200).map((r) => r.right))`));
-  const leftEdge = Math.max(box.x0 - 30, palettes + 12);
-  await s.key("r", 82);
-  await drag(s, [leftEdge, top], [box.cx, bottom]);
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  await s.key("r", 82);
-  const rightEdge = Math.min(box.x1 + 30, canvas[0] + canvas[2] - 12);
-  await drag(s, [rightEdge, top], [box.cx + 6, bottom]);
-  await s.key("s", 83);
-  const rows = await s.layerRows();
-  if (rows.filter((r) => /^Rectangle/i.test(r ?? "")).length !== 2) {
-    const out = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
-    writeFileSync(path.join(SCRATCH, "debug.png"), Buffer.from(out.result?.data ?? "", "base64"));
-  }
-  assert.equal(rows.filter((r) => /^Rectangle/i.test(r ?? "")).length, 2, `two rectangles: ${JSON.stringify(rows)}, box ${JSON.stringify(box)}, canvas ${JSON.stringify(canvas)}`);
-  await focusCanvas(s);
-  await s.key("a", 65, 2);
   await waitFor("Trace offered", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
   await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
   await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
   await sleep(1000);
   await setAdvanced(s, true);
-  const left: [number, number] = [leftEdge + 15, box.cy + 0.3 * h];
-  // A closed outline is hit by its interior, the traced image skipped (criterion 35's rule).
-  const right: [number, number] = [Math.min(box.x1 + 15, rightEdge - 15), box.cy + 0.3 * h];
-  await shiftClick(s, right[0], right[1]);
-  await waitFor("part 1 has L only", async () => (/Inside 1 path(?!s)/.test(await advText(s)) ? true : null), 20_000);
-  return { box, left, right };
+  // The bar covers the canvas above the picture: a region starts below it.
+  const canvas = await canvasRect(s);
+  const barBottom = Number(await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().bottom`));
+  const top = Math.max(box.y0 - 6, barBottom + 6);
+  const bottom = Math.min(box.y1 + 30, canvas[1] + canvas[3] - 12);
+  // The tool palettes sit over the canvas's left edge.
+  const palettes = Number(await s.evaluate(`Math.max(0, ...[...document.querySelectorAll('[role=toolbar]')].map((e) => e.getBoundingClientRect()).filter((r) => r.left < 200 && r.height > 200).map((r) => r.right))`));
+  const leftEdge = Math.max(box.x0 - 30, palettes + 12);
+  const rightEdge = Math.min(box.x1 + 30, canvas[0] + canvas[2] - 12);
+  const drawLeft = () => drawRegion(s, [leftEdge, top], [box.cx, bottom]);
+  const drawRight = () => drawRegion(s, [rightEdge, top], [box.cx + 6, bottom]);
+  await drawLeft();
+  await waitFor("part 1 has L only", async () => (((await chips(s))[0]?.name ?? "").includes("inside, 1 path,") ? true : null), 30_000);
+  const left: [number, number] = [leftEdge + 15 + 30, box.cy + 0.3 * h];
+  const right: [number, number] = [box.x1 - 15, box.cy + 0.3 * h];
+  return { box, left, right, drawLeft, drawRight };
 }
 
 /** Two parts: 1 = L, 2 = R. */
 async function twoParts(s: S, png?: Buffer, name?: string) {
   const scene = await twoHalves(s, png, name);
   await addPart(s);
-  await shiftClick(s, scene.right[0], scene.right[1]);
+  await scene.drawRight();
   await waitFor("part 2 has R", async () => ((await chips(s))[1]?.name.includes("1 path") ? true : null), 20_000);
   return scene;
 }
@@ -563,8 +550,8 @@ test("0094 c18, c19, c32, c43: chip 1 and Add part, a new part copies the values
     assert.equal(await maskState(s), "Inside=true,Outside=false", "§24.4: the Mask group is drawn, Inside, with no paths yet");
     assert.doesNotMatch(await advText(s), /Inside \d|Outside \d/, "no mask paths yet");
     assert.doesNotMatch((await s.evaluate(`document.querySelector('${BAR}').textContent`)) as string, /Part 2 of 2/, "`specs/0089` ux-notes §27: no state label in the bar");
-    // c19: Shift+click assigns R to part 2.
-    await shiftClick(s, scene.right[0], scene.right[1]);
+    // c19: a region drawn now belongs to part 2.
+    await scene.drawRight();
     await waitFor("part 2 has R", async () => ((await chips(s))[1].name === "Part 2 of 2, inside, 1 path, active" ? true : null), 20_000);
     assert.equal((await chips(s))[0].name, "Part 1 of 2, inside, 1 path", "part 1 keeps L");
     await typeInto(s, "Threshold", "40");
@@ -608,7 +595,7 @@ test("0094 c18, c19, c32, c43: chip 1 and Add part, a new part copies the values
   }, "", TALL[0], TALL[1]);
 });
 
-test("0094 c28, c29: the trash arms first and removes on a press after 400 ms, chips renumber; leaving the tool leaves one part", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0094 c28, c29: the trash arms first and removes on a press after 400 ms, chips renumber; leaving the tool keeps the parts with the image (`0114` criterion 19)", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await twoHalves(s);
     assert.equal(await trashName(s), "Keep at least one part", "one part cannot be removed");
@@ -639,11 +626,11 @@ test("0094 c28, c29: the trash arms first and removes on a press after 400 ms, c
     assert.deepEqual(c.map((x) => x.text.replace(/\s/g, "")), ["1", "2"], "renumbered");
     assert.match(c[1].name, /^Part 2 of 2/);
     assert.doesNotMatch(await s.statusText(), /removed|deleted|success/i, "no notice after the removal");
-    // c29: leaving the tool and entering again: one part.
+    // c29 as `0114` criterion 19: leaving the tool and entering again shows the same parts, part 1 active.
     await reenter(s);
     const after = await chips(s);
-    assert.equal(after.length, 1, "one part after leaving the tool");
-    assert.ok(after[0].checked);
+    assert.equal(after.length, 2, "the parts stay after leaving the tool");
+    assert.ok(after[0].checked, "the first part is active");
   }, "", TALL[0], TALL[1]);
 });
 
@@ -767,7 +754,7 @@ test("0094 region-only analysis per part: a Threshold the maker set stays with i
     await addPart(s);
     assert.equal(await spin(s, "Threshold"), 77, "Add part copies the value");
     // Part 2's region becomes R: its automatic values are read from R, the copied maker value stays.
-    await shiftClick(s, scene.right[0], scene.right[1]);
+    await scene.drawRight();
     await waitFor("part 2 has R", async () => ((await chips(s))[1]?.name.includes("1 path") ? true : null), 20_000);
     await settledCounts(s);
     await sleep(1500);
@@ -776,7 +763,7 @@ test("0094 region-only analysis per part: a Threshold the maker set stays with i
     await settledCounts(s);
     assert.equal(await spin(s, "Threshold"), 77, "part 1 keeps the value the maker set");
     // Part 1 gets R too (its region changes and is read again): the value stays.
-    await shiftClick(s, scene.right[0], scene.right[1]);
+    await scene.drawRight();
     await settledCounts(s);
     await sleep(1500);
     assert.equal(await spin(s, "Threshold"), 77, "a new region read leaves the maker's value");
@@ -836,37 +823,23 @@ test("0094 Denoise (adrs.md slice 2, Crop): a part with Denoise is traced from t
   }, COUNT_JOBS, TALL[0], TALL[1]);
 });
 
-test("0094 slice 2: in Trace, Delete on a selected mask path's Layers row removes that path alone and keeps the image selected", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0094 slice 2 as `0114` criteria 3 and 7: in Trace, a click inside a region selects it and Delete removes that region alone, the image stays", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     const scene = await twoHalves(s);
-    // Part 1 takes R again: L and R are its mask paths and selected with the image.
-    await shiftClick(s, scene.right[0], scene.right[1]);
+    // Part 1 takes R too: L and R are its regions.
+    await scene.drawRight();
     await waitFor("part 1 has L and R", async () => (/Inside 2 paths/.test(await advText(s)) ? true : null), 20_000);
     await settledCounts(s);
-    await s.tab("Layers");
-    const before = await s.layerRows();
-    const selected = async () =>
-      JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('[role=row][aria-level]')].map((r) => [r.getAttribute('aria-label'), r.getAttribute('aria-selected') === 'true']))`)) as string) as [string, boolean][];
-    const sel = await selected();
-    console.log("rows before:", JSON.stringify(sel));
-    const rects = sel.filter(([l]) => /^Rectangle/i.test(l));
-    assert.equal(rects.length, 2);
-    assert.ok(rects.every(([, on]) => on), "both mask paths are selected");
-    const imageRow = sel.find(([l]) => l.includes("m1.png"));
-    assert.ok(imageRow?.[1], "the image is selected");
-    // Focus the second rectangle row (no press: the selection stays) and press Delete.
-    await s.evaluate(`[...document.querySelectorAll('[role=row][aria-level]')].filter((r) => /^Rectangle/i.test(r.getAttribute('aria-label')))[1].focus()`);
-    await sleep(300);
+    // A click inside R only (right of L's edge at the centre) selects R; Delete removes it.
+    await s.click(scene.box.x1 - 20, scene.box.cy + 0.3 * (scene.box.y1 - scene.box.y0));
+    await sleep(500);
     await press(s, "Delete", 46);
     await sleep(1500);
-    const after = await selected();
-    console.log("rows after:", JSON.stringify(after));
-    assert.equal(after.filter(([l]) => /^Rectangle/i.test(l)).length, 1, "that path alone is deleted");
-    assert.equal(after.length, before.length - 1, "nothing else is deleted");
-    assert.ok(after.find(([l]) => l.includes("m1.png"))?.[1], "the image stays selected");
-    assert.ok(await s.evaluate(`!!document.querySelector('${BAR}')`), "the tool stays open");
     await waitFor("part 1 has one path", async () => (/Inside 1 path(?!s)/.test(await advText(s)) ? true : null), 20_000);
     assert.equal((await chips(s))[0].name, "Part 1 of 1, inside, 1 path, active");
+    assert.ok(await s.evaluate(`!!document.querySelector('${BAR}')`), "the tool stays open");
+    await s.tab("Layers");
+    assert.ok((await s.layerRows()).some((r) => r?.includes("m1.png")), "the image is still there");
     await settledCounts(s);
     assert.doesNotMatch(await s.statusText(), /error|failed/i);
   }, "", TALL[0], TALL[1]);
@@ -876,9 +849,10 @@ for (const [label, left, right] of [["grey", [255, 255, 255], [0xd8, 0xd8, 0xd8]
 test(`0094 Proposal control (slice 1, criterion 9): one part over the ${label} paper alone finds its own background`, { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     const scene = await twoHalves(s, m1At(400, [...right], [...left]), "m2.png");
-    // One part, R only.
-    await shiftClick(s, scene.right[0], scene.right[1]);
-    await shiftClick(s, scene.left[0], scene.left[1]);
+    // One part, R only: Clear mask takes L away, R is drawn.
+    await s.clickSel(`${BAR} [data-trace-clear-mask]`);
+    await sleep(600);
+    await scene.drawRight();
     await waitFor("R alone", async () => (/Inside 1 path(?!s)/.test(await advText(s)) && (await chips(s)).length === 1 ? true : null), 20_000);
     await pickMethod(s, "Remove background");
     await settledCounts(s);
@@ -898,7 +872,7 @@ test("0094 determinism: the editor wasm replays the native parts record on two o
   const native = JSON.parse(readFileSync(NATIVE, "utf8")) as {
     svg: string;
     viewport: [number, number];
-    steps: { do: string; x?: number; y?: number }[];
+    steps: { do: string; x0?: number; y0?: number; x1?: number; y1?: number }[];
     parts: { settings: string; specks: number; width: number; height: number; map: number[]; rgba_fnv32: number; wire: number[] }[];
     header: number[];
   };
@@ -914,8 +888,11 @@ test("0094 determinism: the editor wasm replays the native parts record on two o
           w.set_tool('trace');
           for (const step of native.steps) {
             if (step.do === 'add_part') { w.add_trace_part(); continue; }
-            w.pointer_down(step.x, step.y, true, false, false);
-            w.pointer_up(step.x, step.y, true, false, false);
+            w.set_trace_region_tool('rect');
+            w.pointer_down(step.x0, step.y0, false, false, false);
+            w.pointer_hover(step.x1, step.y1, false, false, false);
+            w.pointer_up(step.x1, step.y1, false, false, false);
+            w.set_trace_region_tool('none');
           }
           const id = w.trace_view().shown;
           const chips = JSON.parse(w.trace_parts());
@@ -927,7 +904,7 @@ test("0094 determinism: the editor wasm replays the native parts record on two o
           });
           const flat = Float64Array.from(parts.flatMap((p) => p.wire));
           const header = Array.from(w.set_trace_joined(id, flat, Uint32Array.from(parts.map((p) => p.wire.length)), true));
-          return { parts, header, chips: chips.map((c) => c.paths) };
+          return { parts, header, chips: chips.map((c) => c.regions) };
         };
         const a = await import('/src/wasm-bindings/curvyo_editor_wasm.js?own-instance');
         await a.default();

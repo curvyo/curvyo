@@ -151,7 +151,7 @@ test("criterion 70: the info page's exact text", () => {
   "Photo: many shapes, photos trace roughly.",
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-  "Mask: the paths that limit the trace; Pick mask paths adds or takes them out, Inside traces what lies inside them, Outside what lies outside, Clear mask takes them all out.",
+  "Mask: the regions drawn on the picture that limit the trace; Rectangle drags one, Lasso sets its corners one click at a time and closes them with a right click, a double click, Enter or a click on the first corner (Esc discards it), Subtract takes the next regions out, Inside traces what lies inside them, Outside what lies outside, Clear mask deletes the active part's regions.",
   "Method: how pixels become shapes.",
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",

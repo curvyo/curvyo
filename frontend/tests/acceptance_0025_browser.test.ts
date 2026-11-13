@@ -358,7 +358,7 @@ test("0025 in Chromium at 800x600: no Trace bar control passes the bar's right e
       const parts = block.querySelector('[data-trace-parts]');
       const corners = block.querySelector('[role=spinbutton][aria-label=Corners]');
       const analyse = block.querySelector('[data-trace-analyse]');
-      const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')].filter((e) => !parts?.contains(e));
+      const controls = [...block.querySelectorAll('button[aria-pressed], [role=radiogroup], [role=spinbutton]')].filter((e) => !parts?.contains(e) && !e.closest('[data-trace-mask]'));
       const after = (a, b) => !!a && !!b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
       return { names: controls.map((e) => e.getAttribute('aria-label')), firstRow: controls.filter((e) => y(e) === y(controls[0])).map((e) => e.getAttribute('aria-label')),
         order: after(corners, parts) && after(parts, analyse) && block.lastElementChild.contains(analyse),

@@ -293,20 +293,6 @@ const ADV = `${BAR} [role=group][aria-label=Advanced]`;
 const EXPANDER = `${BAR} button[aria-expanded][aria-controls]`;
 const HINT = /\b(click|press|drag|tap|hold|try|use|tip|hint|you can|choose|select a|to (pick|add|remove|create))\b/i;
 
-/** Imports `png` as `name` and opens the Trace bar on it; Advanced is set to `advanced`. */
-async function openOn(s: S, name: string, png: Buffer, advanced = false) {
-  const file = path.join(SCRATCH, name);
-  writeFileSync(file, png);
-  await s.tab("Layers");
-  const before = (await s.layerRows()).length;
-  await s.choose("[data-import-button]", file);
-  await waitFor("the image row", async () => ((await s.layerRows()).length > before ? true : null));
-  await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
-  await waitFor("the Trace bar", async () => ((await s.evaluate(`!!document.querySelector('${BAR}')`)) ? true : null));
-  await sleep(1000);
-  await setAdvanced(s, advanced);
-}
-
 async function setAdvanced(s: S, open: boolean) {
   const now = (await s.evaluate(`document.querySelector('${EXPANDER}')?.getAttribute('aria-expanded')`)) === "true";
   if (now !== open) {
@@ -330,12 +316,6 @@ const withApp = async (fn: (s: S) => Promise<void>, preload = "", width = 1280, 
 
 const focusCanvas = (s: S) => s.evaluate(`document.activeElement?.blur?.(); [...document.querySelectorAll('canvas')].map((c) => c.closest('[tabindex]')).find(Boolean)?.focus()`);
 
-/** The named controls of the bar outside the Advanced block, in document order. */
-const barControls = async (s: S) =>
-  JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelector('${BAR}').querySelectorAll('button, [role=spinbutton], [role=radiogroup]')]
-    .filter((e) => !e.closest('[role=group][aria-label=Advanced]') && (e.matches('[role=radiogroup]') || !e.closest('[role=radiogroup]')))
-    .map((e) => e.getAttribute('aria-label') || e.textContent.trim()))`)) as string) as string[];
-
 /** Every user-visible string of the bar and its Advanced block: labels, titles and text. */
 const barStrings = async (s: S) =>
   JSON.parse((await s.evaluate(`JSON.stringify([...new Set([...document.querySelector('${BAR}').querySelectorAll('*')].flatMap((e) =>
@@ -343,7 +323,6 @@ const barStrings = async (s: S) =>
 
 /** The bar's one hidden status region (`specs/0089` UX notes §24.5): it says the counts and "2 parts". */
 const advancedStatus = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-hidden-status]')?.textContent ?? ''`)) as string;
-const traceButton = (s: S) => s.evaluate(`(() => { const b = document.querySelector('${BAR} [data-trace-slot] , ${BAR} button[data-trace-slot]'); return b ? JSON.stringify({ disabled: b.getAttribute('aria-disabled'), describedby: b.getAttribute('aria-describedby'), reason: b.getAttribute('aria-describedby') ? document.getElementById(b.getAttribute('aria-describedby'))?.textContent ?? '' : '' }) : 'null'; })()`).then((v) => JSON.parse(v as string) as { disabled: string | null; describedby: string | null; reason: string } | null);
 const settledCounts = (s: S) => waitFor("a trace result", async () => (/(^|\. )(\d+ colours?, )?\d+ paths?, \d+ nodes?/.test(await advancedStatus(s)) ? true : null), 60_000);
 
 
@@ -405,12 +384,14 @@ async function drag(s: S, from: [number, number], to: [number, number]) {
   await sleep(500);
 }
 
-const shiftClick = async (s: S, x: number, y: number) => {
-  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
-    await s.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1, modifiers: 8 });
-  }
+/** Presses the Mask group's Rectangle, drags `from` to `to` over the picture and releases the tool
+ * (`specs/0114`: a region of the active part). */
+async function drawRegion(s: S, from: [number, number], to: [number, number]) {
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
+  await drag(s, from, to);
+  await s.clickSel(`${BAR} [data-trace-mask-rect]`);
   await sleep(600);
-};
+}
 const maskState = async (s: S) =>
   (await s.evaluate(`(() => { const g = document.querySelector('${BAR} [role=radiogroup][aria-label=Mask]'); if (!g) return 'absent';
     return [...g.querySelectorAll('[role=radio]')].map((r) => r.textContent.trim() + '=' + r.getAttribute('aria-checked')).join(','); })()`)) as string;
@@ -418,14 +399,9 @@ const advText = advancedStatus;
 
 // ------------------------------------------------------------------ slice 1b helpers
 
-const PICK = `${BAR} button[aria-label="Pick mask paths"]`;
+const RECT = `${BAR} [data-trace-mask-rect]`;
 const CLEAR = `${BAR} button[aria-label="Clear mask"]`;
-const pressedState = async (s: S) => (await s.evaluate(`document.querySelector('${PICK}')?.getAttribute('aria-pressed') ?? 'absent'`)) as string;
-const hasClear = async (s: S) => (await s.evaluate(`!!document.querySelector('${CLEAR}')`)) as boolean;
-const canvasCursor = async (s: S) =>
-  (await s.evaluate(`(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
-    const e = c.closest('[style*="cursor"]'); return e ? e.style.cursor : ''; })()`)) as string;
-const focusedName = async (s: S) => (await s.evaluate(`(() => { const e = document.activeElement; return e ? (e.getAttribute('aria-label') || e.textContent.trim()) : ''; })()`)) as string;
+const pressedState = async (s: S) => (await s.evaluate(`document.querySelector('${RECT}')?.getAttribute('aria-pressed') ?? 'absent'`)) as string;
 const traceRows = async (s: S) => (await s.layerRows()).filter((r) => r?.startsWith("Trace of")).length;
 const openTrace = async (s: S) => {
   await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].find((b) => b.textContent === 'Trace').click()`);
@@ -433,9 +409,10 @@ const openTrace = async (s: S) => {
   await sleep(800);
 };
 
-/** Imports M1, draws rectangle A over its left half and a small rectangle B over its bottom right
- * corner (the top is under the bar), selects the picture alone and opens Trace. Returns where a press hits A's and B's edges
- * outside the picture, and a point of the picture outside both. */
+/** Imports M1, selects the picture alone and opens Trace with Advanced open. Returns `drawA` and
+ * `drawB`, which draw region A (the left half, reaching 30 px beyond the picture) and a small
+ * region B (its bottom right corner, the top is under the bar) with Rectangle into the active
+ * part (`specs/0114`), and a point of the picture outside both. */
 async function pickSetup(s: S) {
   const file = path.join(SCRATCH, "m1.png");
   writeFileSync(file, M1_PNG);
@@ -446,23 +423,18 @@ async function pickSetup(s: S) {
   const box = await pictureBox(s);
   const w = box.x1 - box.x0;
   const h = box.y1 - box.y0;
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  await s.key("r", 82);
-  await drag(s, [box.x0 - 30, box.cy - 0.6 * h], [box.cx, box.cy + 0.6 * h]);
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  await s.key("r", 82);
-  await drag(s, [box.x1 + 30, box.y1 - 0.25 * h], [box.cx + 0.2 * w, box.y1 - 0.02 * h]);
-  await waitFor("two rectangles", async () => ((await s.layerRows()).filter((r) => r?.endsWith("rectangle")).length === 2 ? true : null), 10_000);
-  await s.key("s", 83);
-  await focusCanvas(s);
-  await press(s, "Escape", 27);
-  const image: [number, number] = [box.cx + 0.3 * w, box.cy - 0.1 * h];
-  await s.click(image[0], image[1]);
   await waitFor("the picture alone selected", async () => ((await s.evaluate(`[...document.querySelectorAll('[data-context-bar] button')].some((b) => b.textContent === 'Trace')`)) ? true : null), 10_000);
   await openTrace(s);
-  return { box, a: [box.x0 - 30, box.cy] as [number, number], b: [box.x1 + 30, box.y1 - 0.1 * h] as [number, number], image };
+  await setAdvanced(s, true);
+  // The bar's height changes with Multicolour: where a region may start is read when it is drawn.
+  const top = async () => Math.max(box.y0 - 6, Number(await s.evaluate(`document.querySelector('${BAR}').getBoundingClientRect().bottom`)) + 6);
+  const image: [number, number] = [box.cx + 0.3 * w, box.cy - 0.1 * h];
+  return {
+    box,
+    image,
+    drawA: async () => drawRegion(s, [box.x0 - 30, await top()], [box.cx, box.y1 + 30]),
+    drawB: () => drawRegion(s, [box.x1 + 30, box.y1 - 0.25 * h], [box.cx + 0.2 * w, box.y1 - 0.02 * h]),
+  };
 }
 
 // ------------------------------------------------------------------ slice 2 cases
@@ -475,52 +447,54 @@ const chipNames = async (s: S) =>
 const partLabel = async (s: S) => (await s.evaluate(`document.querySelector('${BAR} [data-trace-part-label]')?.textContent ?? ''`)) as string;
 const rectangles = async (s: S) => (await s.layerRows()).filter((r) => r?.endsWith("rectangle")).length;
 
-test("0094 c18, c19, c24, c32, c42: chip 1, picks into each part, a chip pick loads its mask, one group in one step", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0094 c18, c19, c24, c32, c42 with `0114`: chip 1, regions drawn into each part, a chip pick loads its mask, one group in one step, the regions stay", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     const at = await pickSetup(s);
-    await setAdvanced(s, true);
     // c18: the Parts group with its label, chip 1 (the whole image) and Add part.
     assert.equal(await s.evaluate(`document.querySelector('${ADV} [data-trace-parts] > span[aria-hidden]')?.textContent`), "Parts");
     assert.deepEqual(await chipNames(s), ["Part 1 of 1, whole image, active"]);
     assert.equal(await s.evaluate(`document.querySelector('${ADD}')?.getAttribute('aria-disabled')`), null);
     assert.equal(await partLabel(s), "", "no part label with one part");
-    // Part 1: rectangle A, picked.
-    await s.clickSel(PICK);
-    await s.click(at.a[0], at.a[1]);
+    // Part 1: region A.
+    await at.drawA();
     await waitFor("part 1 with A", async () => ((await chipNames(s))[0] === "Part 1 of 1, inside, 1 path, active" ? true : null), 10_000);
-    // c19: Add part, active, no paths, muted; the pick mode stays armed (c42).
+    // c19: Add part, active, no paths, muted; a pressed Rectangle stays pressed (c42).
+    await s.clickSel(RECT);
     await s.clickSel(ADD);
     await waitFor("chip 2", async () => ((await chipNames(s)).length === 2 ? true : null), 10_000);
     assert.deepEqual(await chipNames(s), ["Part 1 of 2, inside, 1 path", "Part 2 of 2, no paths, active"]);
-    assert.equal(await pressedState(s), "true", "Add part leaves the mode armed");
+    assert.equal(await pressedState(s), "true", "Add part leaves the tool pressed");
     assert.equal(await partLabel(s), "", "`specs/0089` ux-notes §27: no 'Part 2 of 2' label");
     assert.equal(await maskState(s), "Inside=true,Outside=false", "part 2 starts Inside, the group stays");
-    // A pick goes into the active part only.
-    await s.click(at.b[0], at.b[1]);
+    // A region goes into the active part only.
+    await s.clickSel(RECT);
+    await at.drawB();
     await waitFor("part 2 with B", async () => ((await chipNames(s))[1] === "Part 2 of 2, inside, 1 path, active" ? true : null), 10_000);
     assert.equal((await chipNames(s))[0], "Part 1 of 2, inside, 1 path");
     await settledCounts(s);
     assert.match(await advText(s), /2 parts/, "the status segment");
-    // A chip pick makes part 1 active with its mask; the mode stays armed.
+    // A chip pick makes part 1 active with its mask.
     await s.clickSel(`${PARTS_GROUP} [data-trace-part="1"]`);
     await waitFor("part 1 active", async () => ((await chipNames(s))[0] === "Part 1 of 2, inside, 1 path, active" ? true : null), 10_000);
     assert.equal(await maskState(s), "Inside=true,Outside=false");
-    assert.equal(await pressedState(s), "true");
     assert.equal(await partLabel(s), "");
     // c42: Clear mask empties part 1 only.
     await s.clickSel(CLEAR);
     await waitFor("part 1 whole again", async () => ((await chipNames(s))[0] === "Part 1 of 2, whole image, active" ? true : null), 10_000);
     assert.equal((await chipNames(s))[1], "Part 2 of 2, inside, 1 path");
-    // c24: Create paths joins the parts into one group in one step; the mask paths stay.
-    await s.clickSel(PICK);
+    // c24: Create paths joins the parts into one group in one step; the regions stay with the image.
+    const before = await chipNames(s);
     await settledCounts(s);
     await s.clickSel(`${BAR} button[data-trace-slot=none]`);
     await waitFor("one trace group", async () => ((await traceRows(s)) === 1 ? true : null), 60_000);
-    assert.equal(await rectangles(s), 2, "the mask paths are unchanged");
+    assert.equal(await rectangles(s), 0, "no helper path exists");
     assert.doesNotMatch(await s.statusText(), /created|traced \d/i, "no success notice");
     await s.key("z", 90, 2);
     await waitFor("undone", async () => ((await traceRows(s)) === 0 ? true : null), 10_000);
-    assert.equal(await rectangles(s), 2);
+    await s.clickSel(`[role=row][aria-label="m1.png, image"]`);
+    await openTrace(s);
+    await setAdvanced(s, true);
+    assert.deepEqual(await chipNames(s), before, "the parts and regions stayed on the image");
   });
 });
 
@@ -528,7 +502,6 @@ test("0094 c18, c28, c29, c43: Add part stops at 8, the trash removes with the i
   await withApp(
     async (s) => {
       await pickSetup(s);
-      await setAdvanced(s, true);
       for (let n = 2; n <= 8; n++) {
         await s.clickSel(ADD);
         await waitFor(`chip ${n}`, async () => ((await chipNames(s)).length === n ? true : null), 10_000);
@@ -556,21 +529,20 @@ test("0094 c18, c28, c29, c43: Add part stops at 8, the trash removes with the i
       for (const text of await barStrings(s)) {
         assert.doesNotMatch(text, HINT, text);
       }
-      // c29: leaving the tool and entering again leaves one part.
+      // c29 as `0114` criterion 19: leaving the tool and entering again shows the same parts.
       await focusCanvas(s);
       await press(s, "Escape", 27);
       await s.key("s", 83);
       await openTrace(s);
       await setAdvanced(s, true);
-      assert.equal((await chipNames(s)).length, 1);
+      assert.equal((await chipNames(s)).length, 7, "the parts stay with the image");
     },
   );
 });
 
-test("0089 §24.3: at 800 x 600 with the panel open the last row is Corners | Parts | Analyse, wrapping by whole groups", { skip: !BROWSER, timeout: 400_000 }, async () => {
+test("0089 §24.3 as `0114` UX notes §2.3: at 800 x 600 with the panel open the Parts group and the Mask group wrap by whole groups, each on its own line, Analyse right-aligned below", { skip: !BROWSER, timeout: 400_000 }, async () => {
   await withApp(async (s) => {
     await pickSetup(s);
-    await setAdvanced(s, true);
     await s.send("Emulation.setDeviceMetricsOverride", { width: 800, height: 600, deviceScaleFactor: 1, mobile: false });
     await sleep(800);
     if (await s.evaluate(`!!document.querySelector('[aria-label="Show panel"]')`)) {
@@ -582,15 +554,19 @@ test("0089 §24.3: at 800 x 600 with the panel open the last row is Corners | Pa
         const top = (e) => Math.round(e.getBoundingClientRect().top);
         const corners = block.querySelector('[role=spinbutton][aria-label=Corners]').parentElement;
         const parts = block.querySelector('[data-trace-parts]');
+        const mask = block.querySelector('[data-trace-mask]');
         const analyse = block.querySelector('[data-trace-analyse]');
         const lines = [...parts.querySelectorAll('button')].map(top).sort((a, b) => a - b).filter((t, i, all) => i === 0 || t - all[i - 1] > 10).length;
         const targets = [...block.querySelectorAll('button, [role=spinbutton]')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height));
         const inner = block.getBoundingClientRect().right - parseFloat(getComputedStyle(block).paddingRight);
-        return { cornersTop: top(corners), partsTop: top(parts), analyseTop: top(analyse), partsLines: lines,
-          partsWidth: Math.round(parts.getBoundingClientRect().width), blockWidth: Math.round(block.clientWidth),
+        const divider = mask.querySelector('[aria-hidden][class*="w-px"], [data-divider]');
+        return { cornersTop: top(corners), partsTop: top(parts), maskTop: top(mask), analyseTop: top(analyse), partsLines: lines,
+          maskX: Math.round(mask.getBoundingClientRect().left - block.getBoundingClientRect().left), partsX: Math.round(parts.getBoundingClientRect().left - block.getBoundingClientRect().left),
+          partsWidth: Math.round(parts.getBoundingClientRect().width), maskWidth: Math.round(mask.getBoundingClientRect().width), blockWidth: Math.round(block.clientWidth),
           analyseRight: Math.round(inner - analyse.getBoundingClientRect().right), minTarget: Math.min(...targets),
+          dividerShown: divider ? getComputedStyle(divider).visibility !== 'hidden' && divider.getBoundingClientRect().width > 0 : false,
           blockScroll: block.scrollWidth > block.clientWidth, pageScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })())`)) as string) as {
-        cornersTop: number; partsTop: number; analyseTop: number; partsLines: number; partsWidth: number; blockWidth: number; analyseRight: number; minTarget: number; blockScroll: boolean; pageScroll: boolean;
+        cornersTop: number; partsTop: number; maskTop: number; analyseTop: number; partsLines: number; maskX: number; partsX: number; partsWidth: number; maskWidth: number; blockWidth: number; analyseRight: number; minTarget: number; dividerShown: boolean; blockScroll: boolean; pageScroll: boolean;
       };
     const shots: Record<number, Awaited<ReturnType<typeof lastRow>>> = {};
     for (const n of [1, 3, 8]) {
@@ -604,25 +580,22 @@ test("0089 §24.3: at 800 x 600 with the panel open the last row is Corners | Pa
       const shot = (await s.send("Page.captureScreenshot", { format: "png" })) as { result?: { data?: string } };
       writeFileSync(path.join(SCRATCH, `parts-${n}-800x600.png`), Buffer.from(shot.result?.data ?? "", "base64"));
     }
-    console.log("last row at 800 x 600, 1, 3 and 8 parts:", JSON.stringify(shots));
+    console.log("Parts and Mask at 800 x 600, 1, 3 and 8 parts:", JSON.stringify(shots));
     for (const [n, r] of Object.entries(shots)) {
       assert.equal(r.blockScroll || r.pageScroll, false, `no horizontal scroll with ${n} parts`);
       assert.ok(r.minTarget >= 28, `every target at least 28 px with ${n} parts, got ${r.minTarget}`);
       assert.ok(r.analyseRight <= 1, `Analyse at the far right with ${n} parts, ${r.analyseRight} px short`);
-      assert.ok(r.analyseTop >= r.partsTop, "Analyse after Parts");
+      assert.ok(r.partsTop > r.cornersTop, `the unit wrapped as a whole below Corners with ${n} parts`);
+      assert.ok(r.maskTop > r.partsTop, `the Mask group on its own line below the Parts group with ${n} parts`);
+      assert.ok(r.analyseTop > r.maskTop, `Analyse below the Mask group with ${n} parts`);
+      assert.equal(r.partsX, r.maskX, `the Mask group starts a line at the Parts group's x with ${n} parts`);
+      assert.equal(r.dividerShown, false, `no divider at a wrap with ${n} parts`);
+      assert.ok(Math.abs(r.maskWidth - 256) <= 2, `the Mask group is 256 px, got ${r.maskWidth}`);
     }
-    // One part, 128 px: beside Corners; Analyse on its own line.
     assert.ok(Math.abs(shots[1].partsWidth - 128) <= 2, `one part is 128 px, got ${shots[1].partsWidth}`);
-    // A 28 px control sits 4 px lower in its 36 px line than a 36 px item.
-    assert.ok(Math.abs(shots[1].partsTop - shots[1].cornersTop) <= 6, "Corners and Parts share a line with one part");
-    assert.ok(shots[1].analyseTop > shots[1].partsTop, "Analyse wraps to its own line with one part");
-    // Three parts, 192 px: Parts on its own line, Analyse beside it.
-    assert.ok(shots[3].partsTop > shots[3].cornersTop + 20, "Parts moves to its own line with three parts");
-    assert.ok(Math.abs(shots[3].analyseTop - shots[3].partsTop) <= 4, "Parts and Analyse share a line with three parts");
     assert.equal(shots[3].partsLines, 1, "the group is one line with three parts");
-    // Eight parts: the group wraps inside itself (Add and Remove on a second line), Analyse below.
+    // Eight parts: the group wraps inside itself (Add and Remove on a second line).
     assert.equal(shots[8].partsLines, 2, "Add and Remove on a second line with eight parts");
-    assert.ok(shots[8].analyseTop > shots[8].partsTop, "Analyse below the parts with eight parts");
   });
 });
 
@@ -663,8 +636,7 @@ test("0089 §27.8: with Multicolour a new part has no palette until it has paths
     await sleep(1500);
     const hexes = async () =>
       JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
-    await s.clickSel(PICK);
-    await s.click(at.a[0], at.a[1]);
+    await at.drawA();
     await waitFor("part 1 with A", async () => ((await chipNames(s))[0] === "Part 1 of 1, inside, 1 path, active" ? true : null), 10_000);
     await waitFor("part 1 palette", async () => ((await hexes()).length >= 1 ? true : null), 30_000);
     // Add part: no paths, so nothing to trace and none of part 1's colours.
@@ -672,7 +644,7 @@ test("0089 §27.8: with Multicolour a new part has no palette until it has paths
     await waitFor("chip 2", async () => ((await chipNames(s)).length === 2 ? true : null), 10_000);
     await waitFor("no palette for the part without paths", async () => ((await hexes()).length === 0 ? true : null), 15_000);
     // Its own paths: its own palette. Part 1 is covered by part 2 now and adds nothing.
-    await s.click(at.a[0], at.a[1]);
+    await at.drawA();
     await waitFor("part 2 with A", async () => ((await chipNames(s))[1] === "Part 2 of 2, inside, 1 path, active" ? true : null), 10_000);
     await waitFor("part 2 palette", async () => ((await hexes()).length >= 1 ? true : null), 60_000);
     await s.clickSel(`${PARTS_GROUP} [data-trace-part="1"]`);
@@ -688,8 +660,7 @@ test("0089 §27.11: in a part without paths the palette pipette adds the part's 
     await sleep(1500);
     const hexes = async () =>
       JSON.parse((await s.evaluate(`JSON.stringify([...document.querySelectorAll('${BAR} [data-trace-palette-swatch]')].map((e) => e.getAttribute('data-trace-palette-swatch')))`)) as string) as string[];
-    await s.clickSel(PICK);
-    await s.click(at.a[0], at.a[1]);
+    await at.drawA();
     await waitFor("part 1 with A", async () => ((await chipNames(s))[0] === "Part 1 of 1, inside, 1 path, active" ? true : null), 10_000);
     await waitFor("part 1 palette", async () => ((await hexes()).length >= 1 ? true : null), 30_000);
     await s.clickSel(ADD);

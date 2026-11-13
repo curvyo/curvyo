@@ -41,9 +41,9 @@ async function barHtml(overrides: Record<string, unknown> = {}): Promise<string>
   const choice = (text.firstChoice as (p: unknown) => { values: Record<string, unknown> })(presets);
   const palette = await paletteStub();
   const trace = {
-    active: true, available: true, selection: "images", mask: { paths: 0, outside: false }, setMaskOutside: noop,
-    maskPick: false, setMaskPick: noop, maskRefused: false, clearMask: noop,
-    parts: [{ id: 1, paths: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }],
+    active: true, available: true, selection: "images", mask: { regions: 0, outside: false }, setMaskOutside: noop,
+    maskTool: "none", setMaskTool: noop, subtract: false, setSubtract: noop, maskLocked: false, multiImage: false, clearMask: noop,
+    parts: [{ id: 1, regions: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }],
     selectPart: noop, addPart: noop, removePart: noop, imagesLabel: "", params: text.TRACE_PARAMS_FALLBACK, presets,
     values: { ...choice.values, threshold: 128 }, choice, presetLabel: presets[0].label, advancedOpen: false,
     status: text.NO_STATUS, countsStale: false, slot: { kind: "none" }, retrace: noop, creating: false,
@@ -76,32 +76,37 @@ function stops(html: string): string[] {
   return names;
 }
 
-test("§24.1, §24.4: no View pill; the Mask group is drawn with no mask path, never dimmed", async () => {
-  const html = await barHtml();
+test("§24.1, §24.4 (`0114` UX notes §1): no View pill; the Mask group is drawn with no region, never dimmed", async () => {
+  const html = await barHtml({ advancedOpen: true });
   assert.doesNotMatch(html, /aria-label="View"/, "no View pill");
   for (const name of ["Overlay", "Image"]) {
     assert.doesNotMatch(html, new RegExp(`aria-label="${name}"`));
   }
   const group = /<div data-trace-mask=""[^>]*>([\s\S]*?)<span role="status"/.exec(html)?.[1] ?? "";
-  assert.match(group, /aria-label="Pick mask paths"/);
+  assert.doesNotMatch(html, /Pick mask paths/);
+  assert.match(group, /aria-label="Rectangle"/);
+  assert.match(group, /aria-label="Lasso"/);
+  assert.match(group, /aria-label="Subtract"/);
   assert.match(group, /role="radiogroup" aria-label="Mask"/);
   assert.match(group, /aria-label="Clear mask"/);
   assert.doesNotMatch(group, /aria-disabled|opacity-50/, "nothing dimmed");
   assert.match(group, /role="radio" aria-checked="true" tabindex="0"[^>]*>Inside</, "Inside on entry");
-  assert.match(await barHtml({ mask: { paths: 0, outside: true } }), /role="radio" aria-checked="true" tabindex="0"[^>]*>Outside</, "Outside selectable without a path");
+  assert.match(await barHtml({ advancedOpen: true, mask: { regions: 0, outside: true } }), /role="radio" aria-checked="true" tabindex="0"[^>]*>Outside</, "Outside selectable without a region");
 });
 
-test("§24.2: the bar's Tab order: i, Preset, Pick mask paths, Mask, Clear mask, Method, fields, expander, Trace", async () => {
+test("§24.2 (`0114` UX notes §3): the first row's Tab order: i, Preset, Method, fields, expander, Trace; no Mask stops", async () => {
   const names = stops(await barHtml());
   const at = (n: string) => names.indexOf(n);
-  const order = ["About Trace", "Preset", "Pick mask paths", "radio:Inside", "Clear mask", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
+  const order = ["About Trace", "Preset", "Method", "Threshold", "Smooth", "Tolerance", "Ignore below", "More trace options", "Trace"];
   const positions = order.map(at);
   assert.ok(positions.every((p) => p >= 0), `every stop is present: ${JSON.stringify(names)}`);
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, `in this order: ${JSON.stringify(names)}`);
-  assert.equal(names.filter((n) => n.startsWith("radio:")).length, 1, "Inside / Outside is one stop");
+  for (const gone of ["Pick mask paths", "Rectangle", "Lasso", "Subtract", "radio:Inside", "Clear mask"]) {
+    assert.equal(at(gone), -1, `${gone} is not in the first row`);
+  }
 });
 
-test("§24.3: in Advanced the Parts group with its label follows Corners, then Analyse last", async () => {
+test("§24.3 (`0114` UX notes §2, §3): in Advanced the Parts and Mask unit follows Corners, then Analyse last", async () => {
   const html = await barHtml({ advancedOpen: true });
   const corners = html.indexOf("Corners");
   const parts = html.indexOf('data-trace-parts=""');
@@ -110,7 +115,8 @@ test("§24.3: in Advanced the Parts group with its label follows Corners, then A
   assert.match(html, /<span aria-hidden="true"[^>]*>Parts<\/span>/, "the muted label, hidden from the reader");
   assert.match(html, /role="radiogroup" aria-label="Parts"/);
   const names = stops(html);
-  assert.deepEqual(names.slice(-3), ["radio:Part 1", "Add part", "Analyse"].map((n) => names.find((x) => x.startsWith(n)) ?? n), JSON.stringify(names));
+  const tail = ["radio:Part 1", "Add part", "Rectangle", "Lasso", "Subtract", "radio:Inside", "Clear mask", "Analyse"];
+  assert.deepEqual(names.slice(-tail.length), tail.map((n) => names.find((x) => x.startsWith(n)) ?? n), JSON.stringify(names));
 });
 
 test("§24.5: no analysis line, no status line; one hidden region, Advanced open or closed", async () => {
@@ -136,17 +142,16 @@ test("§27: the bar shows no status or notice text; Trace keeps its reason as to
     traceBlocked: "No colours found.",
     analysis: { kind: "failed" },
     imagesLabel: "Tracing 1 of 3 images",
-    maskRefused: true,
     palette: { ...((await paletteStub()) as object), sameNote: "Same as #3366CC" },
     parts: [
-      { id: 1, paths: 1, outside: false, whole: false, muted: false, active: false, contributes: true, mask: "" },
-      { id: 2, paths: 0, outside: false, whole: false, muted: true, active: true, contributes: false, mask: "" },
+      { id: 1, regions: 1, outside: false, whole: false, muted: false, active: false, contributes: true, mask: "" },
+      { id: 2, regions: 0, outside: false, whole: false, muted: true, active: true, contributes: false, mask: "" },
     ],
     announcement: "412,000 nodes. Slow to edit.",
   };
   for (const advancedOpen of [false, true]) {
     const html = await barHtml({ ...notices, advancedOpen });
-    assert.doesNotMatch(html, /data-trace-(state|line|reason|muted|analysis-failed|mask-refused|part-label)/, "no notice row, no part label");
+    assert.doesNotMatch(html, /data-trace-(state|line|reason|muted|analysis-failed|part-label)/, "no notice row, no part label");
     const visible = html.replace(/<div data-trace-hidden-status=""[^>]*>[^<]*<\/div>/, "").replace(/<span id="[^"]*" hidden="">[^<]*<\/span>/g, "").replace(/<[^>]*>/g, " ");
     for (const text of ["Slow to edit", "reduced copy", "No colours found", "Analysis failed", "Tracing 1 of 3", "Same as #", "Part 2 of 2", "one image at a time"]) {
       assert.ok(!visible.includes(text), `"${text}" is not drawn`);

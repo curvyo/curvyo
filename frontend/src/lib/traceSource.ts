@@ -81,40 +81,53 @@ export function joinWires(session: WasmSession, id: string, wires: (Float64Array
 }
 
 export interface ViewState {
-  selection: "empty" | "other" | "images" | "mixed";
+  selection: "empty" | "other" | "images";
   images: string[];
   shown: string;
-  /** Mask paths selected with the image (`specs/0094`). */
-  maskPaths: number;
   /** The active part's stored regions (`specs/0114`). */
   maskRegions: number;
-  /** The mask paths cover none of the image (criterion 7). */
+  /** The regions cover none of the image (criterion 7). */
   maskOutsideImage: boolean;
-  /** The mask paths could not be combined (the kernel refused). */
+  /** The regions could not be combined (the kernel refused). */
   maskFailed: boolean;
   /** The region for the worker's settings (`{"outside", "region"}`), empty without one. */
   mask: string;
   /** The parts' chips JSON (`specs/0094` slice 2, `traceParts.readParts`). */
   parts: string;
+  /** The active part's stored settings JSON (`specs/0114` slice 3), empty for an untouched image:
+   * an undo or redo that changes them reshows them. */
+  partSettings: string;
 }
 
-export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskPaths: 0, maskRegions: 0, maskOutsideImage: false, maskFailed: false, mask: "", parts: "" };
+export const NO_VIEW: ViewState = { selection: "empty", images: [], shown: "", maskRegions: 0, maskOutsideImage: false, maskFailed: false, mask: "", parts: "", partSettings: "" };
+
+/** The index of the active chip of the session's parts JSON, -1 when none can be read. */
+function readActiveIndex(json: string): number {
+  try {
+    const parts = JSON.parse(json) as { active?: boolean }[];
+    return Array.isArray(parts) ? parts.findIndex((p) => p.active === true) : -1;
+  } catch {
+    return -1;
+  }
+}
 
 export function readView(session: WasmSession | null): ViewState {
   const raw = session?.trace_view();
   if (!raw) {
     return NO_VIEW;
   }
+  const parts = session ? session.trace_parts() : "";
+  const active = Math.max(0, readActiveIndex(parts));
   const view = {
     selection: raw.selection as ViewState["selection"],
     images: raw.images,
     shown: raw.shown,
-    maskPaths: raw.mask_paths,
     maskRegions: raw.mask_regions,
     maskOutsideImage: raw.mask_outside_image,
     maskFailed: raw.mask_failed,
-    mask: raw.mask_paths + raw.mask_regions > 0 && session ? session.trace_mask_json() : "",
-    parts: session ? session.trace_parts() : "",
+    mask: raw.mask_regions > 0 && session ? session.trace_mask_json() : "",
+    parts,
+    partSettings: session && raw.images.length === 1 ? session.trace_part_settings(active) : "",
   };
   raw.free();
   return view;

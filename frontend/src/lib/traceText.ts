@@ -20,29 +20,24 @@ export const TRACE_IMPORT = "Import image...";
 
 /** The bar with something else selected (criterion 3). */
 export const TRACE_NOT_IMAGE = "The selection is not an image. Click an image to trace it.";
-/** An image with a text, a sketch or a second image next to mask paths (`specs/0094` criterion 14). */
-export const TRACE_MIXED = "Use Object to path for text; one image at a time.";
-/** The mask paths cover none of the image (`specs/0094` criterion 7). */
+/** The regions cover none of the image (`specs/0094` criterion 7). */
 export const MASK_OUTSIDE_IMAGE = "0 paths: the mask is outside the image.";
-/** The mask paths could not be combined into one region (a kernel refusal). */
-export const MASK_FAILED = "0 paths: the mask paths could not be combined. Convert unsupported editable curves to Bézier paths.";
+/** The regions could not be combined into one mask (a kernel refusal; `specs/0114` Behaviour 12). */
+export const MASK_FAILED = "0 paths: the mask paths could not be combined.";
 
-/** The pick button and Clear mask of the Mask group (`specs/0094` slice 1b, UX notes §11). */
-export const PICK_MASK_PATHS = "Pick mask paths";
+/** Clear mask of the Mask group. */
 export const CLEAR_MASK = "Clear mask";
-/** The region tool and the Subtract toggle of the Mask group (`specs/0114` Behaviour 1). */
+/** The region tools and the Subtract toggle of the Mask group (`specs/0114` Behaviour 1). */
 export const MASK_RECTANGLE = "Rectangle";
+export const MASK_LASSO = "Lasso";
 export const MASK_SUBTRACT = "Subtract";
+/** The tooltip of the Mask group's controls on a locked image (`specs/0114` UX notes §8). */
+export const MASK_LOCKED = "Locked";
 
 /** The polite status of a Mask group toggle (`specs/0114` Behaviour 12, not visible):
  * "Rectangle on", "Subtract off". */
 export function maskToggleStatus(name: string, on: boolean): string {
   return `${name} ${on ? "on" : "off"}`;
-}
-
-/** The polite status of the pick mode (UX notes §11, not visible). */
-export function maskPickStatus(armed: boolean): string {
-  return `${PICK_MASK_PATHS} ${armed ? "on" : "off"}`;
 }
 
 /** The status line's mask segment (`specs/0094` UX notes §7): "Inside 2 paths", "Outside 1 path". */
@@ -250,7 +245,7 @@ export const TRACE_INFO_ENTRIES: readonly string[] = [
   "Photo: many shapes, photos trace roughly.",
   "Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.",
   "Engraving: keeps fine lines, drops shapes below 0.1 mm.",
-  "Mask: the paths that limit the trace; Pick mask paths adds or takes them out, Inside traces what lies inside them, Outside what lies outside, Clear mask takes them all out.",
+  "Mask: the regions drawn on the picture that limit the trace; Rectangle drags one, Lasso sets its corners one click at a time and closes them with a right click, a double click, Enter or a click on the first corner (Esc discards it), Subtract takes the next regions out, Inside traces what lies inside them, Outside what lies outside, Clear mask deletes the active part's regions.",
   "Method: how pixels become shapes.",
   "Brightness: pixels darker than the Threshold.",
   "Remove background: everything unlike the background colour.",

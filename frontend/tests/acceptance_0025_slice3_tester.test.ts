@@ -805,7 +805,9 @@ test("0025s3 c57 in Chromium: Tab order, arrows, focus rings, hit targets, roles
       if (name === "body") break;
     }
     console.log("Tab stops in the Trace tool, panel closed:", JSON.stringify(stops));
-    const want = ["About Trace", "Preset", "Pick mask paths", "Inside", "Clear mask", "Threshold", "Smooth", "Ignore below", "More trace options"];
+    // `specs/0114`: the Mask group moved into the Parts row of Advanced; no Pick mask paths.
+    const want = ["About Trace", "Preset", "Threshold", "Smooth", "Ignore below", "More trace options"];
+    assert.ok(!stops.some((n) => /Pick mask paths|Rectangle|Lasso|Subtract|Clear mask/.test(n)), `no Mask stop in the first row: ${JSON.stringify(stops)}`);
     const got = stops.map((n) => n.replace(/^[a-z]+:/, "").replace(/ \d.*$/, ""));
     let at = -1;
     for (const w of want) {
@@ -1022,18 +1024,19 @@ test("0025s3 re c4/c71/c41/c11 in Chromium: row 1, the far-right expander, count
       await sleep(300);
     }
     // Criterion 4 as 0089 criteria 22 and 22a reshape it: the finish button is the blue "Trace" (no
-    // "Create paths" button, no state label), and the flow is i, Preset, the Mask group (UX notes §24.2), Method, Threshold,
+    // "Create paths" button, no state label), and the flow is i, Preset (the Mask group is in the Parts row, `specs/0114`), Method, Threshold,
     // Smooth, Tolerance, Ignore below, the expander, the finish button; no Advanced word.
     assert.ok(!(await hasButton(s, "Create paths")), "there is no Create paths button");
     await atRest(s, "with Advanced closed");
-    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "[data-trace-mask]", "button[aria-label=Method]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=Tolerance]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]", "[data-trace-slot]"];
+    assert.ok(!(await s.evaluate(`document.querySelector('${barQ} [data-trace-row] > [data-trace-mask]') !== null`)), "no Mask group in the first row");
+    const names = ["button[aria-label=\"About Trace\"]", "button[aria-label=Preset]", "button[aria-label=Method]", "[role=spinbutton][aria-label=Threshold]", "[role=spinbutton][aria-label=Smooth]", "[role=spinbutton][aria-label=Tolerance]", "[role=spinbutton][aria-label=\"Ignore below\"]", "button[aria-expanded][aria-controls]", "[data-trace-slot]"];
     const boxes = [];
     for (const n of names) boxes.push((await rectOf(s, `${barQ} ${n}`)) ?? assert.fail(`missing ${n}`));
     const flow = (a: (typeof boxes)[0], b: (typeof boxes)[0]) => b.y > a.bottom - 4 || b.x >= a.right - 1;
     for (let i = 1; i < boxes.length; i++) assert.ok(flow(boxes[i - 1], boxes[i]), `${names[i]} follows ${names[i - 1]} in reading order`);
     assert.ok(!/Advanced/.test(await bar(s)), "the word Advanced is not drawn");
-    const ex = boxes[8];
-    const finish = boxes[9];
+    const ex = boxes[7];
+    const finish = boxes[8];
     const barBox = (await rectOf(s, barQ))!;
     assert.ok(ex.w >= 28 && ex.h >= 28, "the expander is 28 x 28");
     assert.ok(barBox.right - finish.right < 16, `the Trace button is at the far right: gap ${barBox.right - finish.right}`);

@@ -270,9 +270,13 @@ for (const width of [1920, 2400]) {
       await waitFor("the settled trace", async () => ((await s.evaluate(`document.querySelector('${BAR} [data-trace-slot]')?.getAttribute('data-trace-slot')`)) === "none" ? true : null));
       await sleep(1000);
       const box = await barBox(s);
-      // The bar is its first row's content plus its padding (8 px each side) and the gaps the two
-      // full-width rows (notice, Advanced) add to the flow (8 px each), with 4 px of slack.
-      assert.ok(box.width <= box.content + 2 * 8 + 2 * 8 + 4, `the bar is ${box.width} px for ${box.content} px of content`);
+      // `specs/0114` UX notes §2.5: with Advanced open the bar is as wide as the wider of its first
+      // row and the Advanced line's one-line width (the items' widths, their gaps and the padding),
+      // plus its own padding (8 px each side) and 4 px of slack.
+      const line = (await s.evaluate(`(() => { const a = document.querySelector('${BAR} [role=group][aria-label=Advanced]'); const cs = getComputedStyle(a);
+        const kids = [...a.children].filter((c) => getComputedStyle(c).position !== 'absolute' && getComputedStyle(c).display !== 'none');
+        return kids.reduce((n, c) => n + c.getBoundingClientRect().width, 0) + (parseFloat(cs.columnGap) || 0) * Math.max(0, kids.length - 1) + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight); })()`)) as number;
+      assert.ok(box.width <= Math.max(box.content, line) + 2 * 8 + 2 * 8 + 4, `the bar is ${box.width} px for ${box.content} px of first row and ${line} px of Advanced line`);
       assert.ok(box.width < box.innerWidth * 0.8, `the bar (${box.width} px) does not stretch across the ${box.innerWidth} px window`);
       assert.notEqual(await rowState(s), "analysing", "the analysis row does not stay Analysing...");
     } finally {

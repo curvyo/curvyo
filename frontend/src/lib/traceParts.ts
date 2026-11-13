@@ -20,13 +20,14 @@ export const NO_PART_LINE = "0 paths: no part has anything to trace.";
 
 /** One chip as the session reports it. */
 export interface TracePartInfo {
-  /** Stable across renumbering: the part's settings are kept under it. */
+  /** Stable across renumbering: the part's results are kept under it. */
   id: number;
-  paths: number;
+  /** Its stored regions (rectangles and lassos, `specs/0114`). */
+  regions: number;
   outside: boolean;
-  /** The first part without mask paths: the whole image. */
+  /** The first part without regions: the whole image. */
   whole: boolean;
-  /** A later part without mask paths: it adds nothing. */
+  /** A later part without regions: it adds nothing. */
   muted: boolean;
   active: boolean;
   /** Its clip keeps some of the image. */
@@ -45,16 +46,17 @@ export function readParts(json: string): TracePartInfo[] {
   } catch {
     // An older module or no session: one part.
   }
-  return [{ id: 0, paths: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }];
+  return [{ id: 0, regions: 0, outside: false, whole: true, muted: false, active: true, contributes: true, mask: "" }];
 }
 
 function pathsText(paths: number): string {
   return paths === 1 ? "1 path" : `${paths} paths`;
 }
 
-/** A chip's accessible name (criterion 32): "Part 2 of 3, inside, 2 paths, active". */
+/** A chip's accessible name (criterion 32): "Part 2 of 3, inside, 2 paths, active"; the count is
+ * of its regions (`specs/0114` UX notes §4). */
 export function partName(index: number, count: number, part: TracePartInfo): string {
-  const mode = part.whole ? "whole image" : part.paths === 0 ? "no paths" : `${part.outside ? "outside" : "inside"}, ${pathsText(part.paths)}`;
+  const mode = part.whole ? "whole image" : part.regions === 0 ? "no paths" : `${part.outside ? "outside" : "inside"}, ${pathsText(part.regions)}`;
   return [`Part ${index + 1} of ${count}`, mode, ...(part.active ? ["active"] : [])].join(", ");
 }
 
