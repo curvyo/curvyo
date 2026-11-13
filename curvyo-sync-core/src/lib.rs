@@ -16,6 +16,7 @@ mod devices;
 mod entropy;
 mod frame;
 mod invite_link;
+mod library_stream;
 mod membership;
 mod pairing;
 mod relay;
@@ -36,6 +37,10 @@ pub use frame::{
     PROTOCOL_VERSION, PairCloseReason, RecordKind, RefusalReason, RelayFrame, RoomId,
 };
 pub use invite_link::{InviteKind, InviteLink, InviteLinkError};
+pub use library_stream::{
+    DEVICES_STREAM_ID, GroupRecord, LIBRARY_STREAM_ID, encode_group_snapshot,
+    encode_library_record, route_group_record,
+};
 pub use membership::{
     MembershipNotice, admin_remains, admin_set, left_by_own_hand, membership_notices,
 };
