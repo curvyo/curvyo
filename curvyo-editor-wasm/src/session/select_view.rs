@@ -179,9 +179,6 @@ impl Session {
                 ..SelectDecorationInput::default()
             };
         }
-        if self.tool == Tool::Trace && self.trace_mask_pick() {
-            return self.trace_mask_pick_decoration(objects, history_hovered);
-        }
         if !self.select_box_tool() {
             return SelectDecorationInput {
                 history_hovered,
@@ -230,36 +227,6 @@ impl Session {
     ) -> Option<(curvyo_document_core::Point, curvyo_document_core::Point)> {
         self.select
             .skew_guide(self.held.shift, SKEW_GUIDE_EXTEND_PX / self.view().scale())
-    }
-
-    /// Pick mask paths (`specs/0094` UX notes §11.4): only the hover box of what a press would add
-    /// or remove, the group's box for a group.
-    fn trace_mask_pick_decoration(
-        &self,
-        objects: &[ObjectSnapshot],
-        history_hovered: Vec<(
-            curvyo_document_core::NodeId,
-            [curvyo_document_core::Point; 4],
-        )>,
-    ) -> SelectDecorationInput {
-        let hovered = self.hovered_object.and_then(|id| {
-            let units = self.units();
-            let corners: Vec<_> = objects
-                .iter()
-                .filter(|object| units.leaves_with(&id).contains(&object.id()))
-                .filter_map(|object| {
-                    self.cached_oriented_bounds(object)
-                        .map(|bounds| bounds.document_corners())
-                })
-                .collect();
-            merged_corners(&corners).map(|shown| (id, shown))
-        });
-        SelectDecorationInput {
-            hovered,
-            history_hovered,
-            device_pixel_ratio: self.device_pixel_ratio,
-            ..SelectDecorationInput::default()
-        }
     }
 
     /// The handle under the pointer, if any, with its object and box — the

@@ -215,6 +215,7 @@ mod trace_adapter;
 mod trace_fit;
 mod trace_fit_guess;
 mod trace_fit_turn;
+mod trace_lasso_edit;
 mod trace_mask;
 mod trace_part_settings;
 mod trace_parts;
@@ -559,6 +560,12 @@ pub use trace_fit::{
     FIT_PIXEL, FallbackFace, FitLine, FitResult, FitText, STROKE_SCORE, STROKE_SURE_EVERY,
     STROKE_THIN_PX, STROKE_THIN_SHARE, TOLERANCE_PX, TOLERANCE_SHARE, TraceFit, line_tolerance,
 };
+pub use trace_lasso_edit::{
+    LassoDraft, PxCorner, finished as finished_trace_lasso,
+    lasso_corner_at as trace_lasso_corner_at, lasso_from_unit as trace_lasso_from_unit,
+    lasso_hit as trace_lasso_hit, lasso_to_unit as trace_lasso_to_unit,
+    moved_lasso as moved_trace_lasso, with_lasso_corner as with_trace_lasso_corner,
+};
 pub use trace_mask::{part_operands, part_region, region_operand, region_outline_mm, unit_to_mm};
 pub use trace_part_settings::{read_part_settings, without_picked_colours, written_part_settings};
 pub use trace_parts::{TracePartArea, TracePartClip, join_trace_parts, trace_part_clips};
@@ -566,9 +573,7 @@ pub use trace_plan::{
     TraceColour, TracePlan, TraceTarget, plan_trace, trace_colour_name, trace_colour_style,
     trace_group_name, trace_style,
 };
-pub use trace_region::{
-    RegionOperand, TraceRegion, TraceRegionError, mask_operand, unclipped_notice,
-};
+pub use trace_region::{RegionOperand, TraceRegion, TraceRegionError, unclipped_notice};
 pub use trace_region_edit::{
     Handle as TraceRegionHandle, PxRect, drawn as drawn_trace_rect,
     handle_at as trace_rect_handle_at, moved as moved_trace_rect, rect_at as trace_rect_at,

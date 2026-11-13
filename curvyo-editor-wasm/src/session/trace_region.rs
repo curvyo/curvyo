@@ -1,15 +1,14 @@
 //! The mask region of the Trace tool (`specs/0094-masked-composite-trace` slice 1, `adrs.md`
-//! decision 1; `specs/0114-image-trace-mask` slice 1): the active part's stored regions and the
-//! paths selected with the image, their mask made once per change of them, the test that it meets
-//! the image, its numbers for the worker and the Overlay's extra wash.
+//! decision 1; `specs/0114-image-trace-mask`): the active part's stored regions, their mask made
+//! once per change of them, the test that it meets the image, its numbers for the worker and the
+//! Overlay's extra wash.
 
 use curvyo_document_core::{
     AnchorId, AnchorKind, AnchorSnapshot, Angle, Color, Fill, ObjectSnapshot, Opacity,
     PathSnapshot, Point, Stroke, Style, SubpathSnapshot, Vec2,
 };
-use curvyo_ui_core::{TraceRegion, TraceRegionError, mask_operand};
+use curvyo_ui_core::{TraceRegion, TraceRegionError};
 
-use super::trace::TraceSelection;
 use super::trace_parts::SignedOperands;
 use super::{Session, Tool};
 
@@ -22,12 +21,11 @@ const WASH_LEFT: f64 = 0.35;
 /// The region of one set of mask operands over one image.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RegionCache {
-    /// The added operands (mask paths in document order, then added regions) and the
-    /// subtracted ones it was made from.
+    /// The added and the subtracted regions' operands it was made from, in stored order.
     operands: SignedOperands,
     /// The image's corners it was tested against.
     quad: [Point; 4],
-    /// The union (Inside); `None` when no mask path encloses an area.
+    /// The mask (Inside), or why there is none.
     region: Result<TraceRegion, TraceRegionError>,
     /// The union covers some of the image.
     meets: bool,
@@ -36,29 +34,9 @@ pub(crate) struct RegionCache {
     within: Vec<Vec<Point>>,
 }
 
-/// Whether `object` can be a mask path: a path, a compound path, a primitive, or a linked clone
-/// that resolves to path outlines (a group arrives as its leaves). Texts, images, sketches and
-/// dimensions are not (criterion 14).
-pub(super) fn is_mask_path(object: &ObjectSnapshot) -> bool {
-    match object {
-        ObjectSnapshot::Path(_) | ObjectSnapshot::Primitive(_) => true,
-        ObjectSnapshot::Clone(_) => {
-            mask_operand(object).map_or(true, |operand| !operand.is_empty())
-        }
-        ObjectSnapshot::Text(_)
-        | ObjectSnapshot::Image(_)
-        | ObjectSnapshot::Sketch(_)
-        | ObjectSnapshot::Dimension(_) => false,
-    }
-}
-
 impl RegionCache {
     pub(super) fn new(operands: SignedOperands, quad: [Point; 4]) -> Self {
-        let region = operands
-            .0
-            .as_ref()
-            .map_err(Clone::clone)
-            .and_then(|added| TraceRegion::of_signed_operands(added, &operands.1, false));
+        let region = TraceRegion::of_signed_operands(&operands.0, &operands.1, false);
         let [beyond, within] = region.as_ref().ok().map_or_else(
             || [vec![quad.to_vec()], Vec::new()],
             |r| r.quad_parts(&quad),
@@ -90,37 +68,15 @@ impl RegionCache {
 }
 
 impl Session {
-    /// The mask paths of the selection (one image and paths, `specs/0094`), in document order;
-    /// empty for any other selection.
-    pub(super) fn trace_mask_objects(&self) -> Vec<ObjectSnapshot> {
-        let (selection, images) = self.trace_images();
-        if selection != TraceSelection::Images || images.len() != 1 {
-            return Vec::new();
-        }
-        // Selected groups count as their leaves.
-        let selected: Vec<curvyo_document_core::NodeId> = self
-            .selection
-            .ids()
-            .iter()
-            .flat_map(|&id| self.document.leaves_of(id))
-            .collect();
-        self.objects()
-            .iter()
-            .filter(|object| selected.contains(&object.id()) && is_mask_path(object))
-            .cloned()
-            .collect()
-    }
-
-    /// The mask of the active part (its stored regions and the selected mask paths) over the
-    /// selected image, made again only when they or the image changed; `None` without either.
+    /// The mask of the active part's stored regions over the traced image, made again only when
+    /// they or the image changed; `None` without regions.
     fn trace_region_cache(&self) -> Option<RegionCache> {
-        let masks = self.trace_mask_objects();
         let part = self.trace_active_mask_part()?;
-        if masks.is_empty() && part.regions.is_empty() {
+        if part.regions.is_empty() {
             return None;
         }
         let quad = self.trace_mask_image()?.corners();
-        let operands = self.trace_part_operands(&part, &masks);
+        let operands = self.trace_part_operands(&part);
         let mut cache = self.trace.region.borrow_mut();
         if cache.as_ref().is_none_or(|c| !c.made_of(&operands, quad)) {
             *cache = Some(RegionCache::new(operands, quad));
@@ -128,13 +84,13 @@ impl Session {
         cache.clone()
     }
 
-    /// Whether the mask paths cover some of the image (criterion 7).
+    /// Whether the regions cover some of the image (criterion 7).
     pub(super) fn trace_mask_meets_image(&self) -> bool {
         self.trace_region_cache().is_some_and(|c| c.meets)
     }
 
-    /// Why the mask paths make no region, when it is not that none of them encloses an area
-    /// (the kernel refused the union; "0 paths: the mask could not be combined.").
+    /// Why the regions make no mask, when it is not that none of them encloses an area (the
+    /// kernel refused; "0 paths: the mask paths could not be combined.").
     pub(super) fn trace_mask_failure(&self) -> Option<TraceRegionError> {
         self.trace_region_cache()?
             .region
@@ -142,8 +98,8 @@ impl Session {
             .filter(|e| *e != TraceRegionError::NoArea)
     }
 
-    /// The region the trace keeps with the active part's mode, when it has regions or mask
-    /// paths and they cover some of the image.
+    /// The region the trace keeps with the active part's mode, when it has regions and they
+    /// cover some of the image.
     #[must_use]
     pub fn trace_region(&self) -> Option<TraceRegion> {
         let cache = self.trace_region_cache()?;
@@ -173,11 +129,14 @@ impl Session {
             return;
         }
         let stored = self.trace_active_mask_part().and_then(|part| part.stored);
-        match (stored, self.trace_mask_image()) {
-            (Some(part), Some(image)) => {
+        match (stored, self.trace_mask_owner_id()) {
+            (Some(part), Some(owner)) => {
+                if self.trace_mask_locked() {
+                    return;
+                }
                 self.recording(|this| {
                     this.document
-                        .set_trace_part_outside(image.id, &part, outside)
+                        .set_trace_part_outside(owner, &part, outside)
                         .unwrap_or(false)
                 });
             }
@@ -204,14 +163,10 @@ impl Session {
         } else {
             &cache.beyond
         };
-        let (_, images) = self.trace_images();
-        let Some(image) = images.first() else {
+        let Some(image) = self.trace_mask_image() else {
             return;
         };
-        let Some(at) = objects
-            .iter()
-            .position(|object| matches!(object, ObjectSnapshot::Image(i) if i.id == image.id))
-        else {
+        let Some(at) = objects.iter().position(|object| object.id() == image.id) else {
             return;
         };
         if polygons.is_empty() {

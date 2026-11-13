@@ -35,8 +35,9 @@ impl Session {
     pub fn set_trace_pick(&mut self, mode: Option<TracePickMode>) {
         self.trace.pick.mode = if self.tool == Tool::Trace { mode } else { None };
         if self.trace.pick.mode.is_some() {
-            // The pipette and Pick mask paths exclude each other (`specs/0094` plan).
-            self.set_trace_mask_pick(false);
+            // The pipette and the region tools exclude each other (`specs/0114` UX notes §1);
+            // a lasso in progress is closed first.
+            self.release_trace_region_tool();
         }
         self.trace.pick.hover = None;
         if let Some(point) = self.pointer_position {

@@ -202,6 +202,42 @@ impl Document {
         Ok(true)
     }
 
+    /// Writes `mask` onto the image `image` as it is (its parts, settings and regions with their
+    /// ids and orders, every earlier `trace_*` key removed), with no commit of its own: a paste
+    /// writes the copied image's mask in its own step (ADR 0061 §8).
+    ///
+    /// # Errors
+    /// [`TraceMaskError::NotAnImage`]; [`TraceMaskError::InvalidPoints`] for a region whose
+    /// points do not fit its kind (nothing is written then).
+    pub fn write_trace_mask(&self, image: NodeId, mask: &TraceMask) -> Result<(), TraceMaskError> {
+        let meta = self.image_meta(image)?;
+        let regions: Vec<NewTraceRegion> = mask
+            .parts
+            .iter()
+            .flat_map(|part| &part.regions)
+            .map(|region| NewTraceRegion {
+                kind: region.kind,
+                subtract: region.subtract,
+                points: region.points.clone(),
+            })
+            .collect();
+        regions.iter().try_for_each(check_points)?;
+        crate::trace_mask_codec::remove_all(&meta);
+        for part in &mask.parts {
+            write_part(&meta, &part.id, part.order, part.outside);
+            write_settings(&meta, &part.id, &part.settings);
+            for region in &part.regions {
+                let new = NewTraceRegion {
+                    kind: region.kind,
+                    subtract: region.subtract,
+                    points: region.points.clone(),
+                };
+                write_region(&meta, &part.id, &region.id, region.order, &new);
+            }
+        }
+        Ok(())
+    }
+
     /// The meta map of the live image `image`.
     fn image_meta(&self, image: NodeId) -> Result<LoroMap, TraceMaskError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);

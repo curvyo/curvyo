@@ -1,9 +1,13 @@
-//! The Trace tool with mask paths (`specs/0094-masked-composite-trace` slice 1, criteria 1, 5,
-//! 6, 7, 12, 13, 14 and 17).
+//! The Trace tool with stored regions (`specs/0094-masked-composite-trace` slice 1 criteria 2, 5,
+//! 7, 12 and 17 as `specs/0114-image-trace-mask` keeps them; `0114` criteria 15 and 21): the
+//! regions of the image limit the trace, other selected objects are passed over.
 
 #![allow(clippy::many_single_char_names)]
 
-use curvyo_document_core::{Length, NodeId, ObjectSnapshot, Point, RectBounds};
+use curvyo_document_core::{
+    Length, NewTraceRegion, NodeId, ObjectSnapshot, Point, RectBounds, TracePartRef,
+    TraceRegionKind, UnitPoint,
+};
 use curvyo_ui_core::read_trace_wire;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::{PixelMap as TracePixelMap, Raster as TraceRaster, TraceParams};
@@ -48,38 +52,72 @@ fn rect(session: &Session, x: f64, y: f64, w: f64, h: f64) -> NodeId {
     })
 }
 
-/// One image and a rectangle over its left half.
-fn masked() -> (Session, NodeId, NodeId) {
-    let mut session = Session::new(1);
-    let image = import_images(&mut session, 1)[0];
-    let c = corners(&session, image);
-    let (w, h) = (c[2].x - c[0].x, c[2].y - c[0].y);
-    let mask = rect(&session, c[0].x - 1.0, c[0].y - 1.0, w / 2.0 + 1.0, h + 2.0);
-    session.selection.set(&[image, mask]);
-    (session, image, mask)
+/// Stores a region of `kind` on `image` with corners in the image's unit square, in its first
+/// part (the implicit one on an untouched image).
+fn region(session: &Session, image: NodeId, kind: TraceRegionKind, points: &[(f64, f64)]) {
+    let mask = session.document.trace_mask(image).unwrap();
+    let implicit = curvyo_document_core::ImplicitTracePart::default();
+    let part = mask
+        .parts
+        .first()
+        .map_or(TracePartRef::Implicit(&implicit), |p| {
+            TracePartRef::Stored(&p.id)
+        });
+    session
+        .document
+        .draw_trace_region(
+            image,
+            part,
+            &NewTraceRegion {
+                kind,
+                subtract: false,
+                points: points.iter().map(|&(u, v)| UnitPoint::new(u, v)).collect(),
+            },
+        )
+        .unwrap();
 }
 
+/// One image with a rectangle region over its left half, selected in the Trace tool.
+fn masked() -> (Session, NodeId) {
+    let mut session = Session::new(1);
+    let image = import_images(&mut session, 1)[0];
+    region(
+        &session,
+        image,
+        TraceRegionKind::Rect,
+        &[(-0.1, -0.1), (0.5, 1.1)],
+    );
+    session.selection.set(&[image]);
+    (session, image)
+}
+
+/// `0094` criterion 1 as `0114` keeps it: the stored region limits the trace of the image; an
+/// image without regions has no mask.
 #[test]
-fn c1_an_image_and_a_path_are_a_masked_trace() {
-    let (mut session, image, mask) = masked();
+fn c1_the_stored_region_masks_the_image() {
+    let (mut session, image) = masked();
     assert!(session.trace_available(), "the Select bar's Trace button");
     session.set_tool(Tool::Trace);
     let view = session.trace_view();
     assert_eq!(view.selection, TraceSelection::Images);
     assert_eq!((view.images, view.shown), (vec![image], Some(image)));
-    assert_eq!(view.mask, [mask]);
+    assert_eq!(view.regions, 1);
     assert!(!view.mask_outside_image);
     assert!(session.trace_source(image, false).is_some());
     let json: serde_json::Value = serde_json::from_str(&session.trace_mask_json()).unwrap();
     assert_eq!(json["outside"], false);
-    // Only images: no mask, the settings as before.
-    session.selection.set(&[image]);
-    assert_eq!(session.trace_view().mask, []);
-    assert_eq!(session.trace_mask_json(), "");
+    let mut plain = Session::new(1);
+    let other = import_images(&mut plain, 1)[0];
+    plain.selection.set(&[other]);
+    plain.set_tool(Tool::Trace);
+    assert_eq!(plain.trace_view().regions, 0);
+    assert_eq!(plain.trace_mask_json(), "");
 }
 
+/// `0114` criterion 21: an image with a text, a path or a second image traces the images as
+/// for the images alone; no mask is read from the other objects and nothing is refused.
 #[test]
-fn c14_text_or_a_second_image_with_mask_paths_is_refused() {
+fn c21_other_objects_beside_the_images_are_passed_over() {
     let mut session = super::text_tests::with_text("Name");
     let images = import_images(&mut session, 2);
     let text = session
@@ -87,82 +125,78 @@ fn c14_text_or_a_second_image_with_mask_paths_is_refused() {
         .iter()
         .find_map(|o| matches!(o, ObjectSnapshot::Text(_)).then(|| o.id()))
         .unwrap();
-    let mask = rect(&session, 0.0, 0.0, 5.0, 5.0);
+    let path = rect(&session, 0.0, 0.0, 5.0, 5.0);
     session.set_tool(Tool::Trace);
     session.selection.set(&[images[0], text]);
-    assert_eq!(session.trace_view().selection, TraceSelection::Mixed);
-    session.selection.set(&[images[0], images[1], mask]);
     let view = session.trace_view();
-    assert_eq!(view.selection, TraceSelection::Mixed);
-    assert_eq!(view.images, []);
-    assert_eq!(
-        session.create_traced_paths(),
-        TraceCreateOutcome::Ignored,
-        "the Trace button is dimmed and creates nothing"
-    );
-    // The images alone still trace (0025 criterion 46).
-    session.selection.set(&images);
-    assert_eq!(session.trace_view().selection, TraceSelection::Images);
-    session.selection.set(&[mask]);
+    assert_eq!(view.selection, TraceSelection::Images);
+    assert_eq!(view.images, [images[0]]);
+    assert_eq!(session.trace_mask_json(), "", "the text is no mask");
+    session.selection.set(&[images[0], images[1], path]);
+    let view = session.trace_view();
+    assert_eq!(view.selection, TraceSelection::Images);
+    assert_eq!(view.images, images);
+    assert_eq!(session.trace_mask_json(), "", "the path is no mask");
+    session.selection.set(&[path]);
     assert_eq!(session.trace_view().selection, TraceSelection::Other);
+    session.set_tool(Tool::Select);
+    session.selection.set(&[images[0], text]);
+    assert!(session.trace_available(), "an image in the selection");
 }
 
+/// `0094` criterion 7 with a region: a region away from the image meets nothing, no job starts.
 #[test]
-fn c7_a_mask_away_from_the_image_meets_nothing() {
+fn c7_a_region_away_from_the_image_meets_nothing() {
     let mut session = Session::new(1);
     let image = import_images(&mut session, 1)[0];
-    let c = corners(&session, image);
-    let away = rect(&session, c[2].x + 10.0, c[2].y + 10.0, 5.0, 5.0);
+    region(
+        &session,
+        image,
+        TraceRegionKind::Rect,
+        &[(1.5, 1.5), (2.0, 2.0)],
+    );
     session.set_tool(Tool::Trace);
-    session.selection.set(&[image, away]);
+    session.selection.set(&[image]);
     let view = session.trace_view();
     assert!(view.mask_outside_image);
     assert_eq!(session.trace_mask_json(), "", "no job is started");
 }
 
+/// `0094` criterion 17 with ADR 0061 §3: Outside on an untouched image is tool state, Inside again
+/// on entry; on a stored part it is the part's and comes back.
 #[test]
-fn c17_outside_is_tool_state_and_inside_again_on_entry() {
-    let (mut session, _, _) = masked();
+fn c17_outside_is_tool_state_until_a_part_is_stored() {
+    let mut session = Session::new(1);
+    let image = import_images(&mut session, 1)[0];
+    session.selection.set(&[image]);
     session.set_tool(Tool::Trace);
     session.set_trace_mask_outside(true);
     assert!(session.trace_mask_outside());
+    session.set_tool(Tool::Select);
+    session.set_tool(Tool::Trace);
+    assert!(!session.trace_mask_outside());
+    region(
+        &session,
+        image,
+        TraceRegionKind::Rect,
+        &[(0.0, 0.0), (0.5, 1.0)],
+    );
+    session.set_trace_mask_outside(true);
     let json: serde_json::Value = serde_json::from_str(&session.trace_mask_json()).unwrap();
     assert_eq!(json["outside"], true);
     session.set_tool(Tool::Select);
     session.set_tool(Tool::Trace);
-    assert!(!session.trace_mask_outside());
-}
-
-#[test]
-fn c13_shift_click_adds_and_removes_a_mask_path() {
-    let mut session = Session::new(1);
-    let image = import_images(&mut session, 1)[0];
-    let c = corners(&session, image);
-    let mask = rect(&session, c[0].x - 20.0, c[0].y, 10.0, 10.0);
-    session.set_tool(Tool::Trace);
-    session.selection.set(&[image]);
-    // The rectangle's edge, outside the image.
-    let on_edge = Point::new(c[0].x - 20.0, c[0].y + 5.0);
-    session.pointer_down(on_edge, true);
-    session.pointer_up(on_edge, true, false);
-    assert_eq!(session.trace_view().mask, [mask]);
-    let nowhere = Point::new(c[0].x - 200.0, c[0].y - 200.0);
-    session.pointer_down(nowhere, true);
-    session.pointer_up(nowhere, true, false);
-    assert_eq!(
-        session.trace_view().mask,
-        [mask],
-        "empty canvas changes nothing"
+    assert!(
+        session.trace_mask_outside(),
+        "the stored part keeps Outside"
     );
-    session.pointer_down(on_edge, true);
-    session.pointer_up(on_edge, true, false);
-    assert_eq!(session.trace_view().mask, []);
-    assert_eq!(session.trace_view().images, [image]);
 }
 
+/// `0094` criterion 12 and `0114` criterion 19: Create paths cuts to the region, leaves it on
+/// the image and undoes in one step.
 #[test]
-fn c12_create_paths_leaves_the_mask_paths_and_undoes_in_one_step() {
-    let (mut session, image, mask) = masked();
+fn c12_create_paths_leaves_the_regions_and_undoes_in_one_step() {
+    let (mut session, image) = masked();
     session.set_tool(Tool::Trace);
     let source = session.trace_source(image, false).unwrap();
     let region = session.trace_region().unwrap();
@@ -213,51 +247,67 @@ fn c12_create_paths_leaves_the_mask_paths_and_undoes_in_one_step() {
         assert!(b.x1 <= half + 0.01, "the result lies in the mask");
     }
     let before = session.objects();
-    let mask_before = before.iter().find(|o| o.id() == mask).cloned();
+    let mask_before = session.document.trace_mask(image);
     assert!(session.set_trace_result(image, &wire));
     assert!(matches!(
         session.create_traced_paths(),
         TraceCreateOutcome::Created { images: 1, .. }
     ));
-    let after = session.objects();
-    assert_eq!(after.iter().find(|o| o.id() == mask).cloned(), mask_before);
-    assert!(!session.selection.ids().contains(&mask));
+    assert_eq!(
+        session.document.trace_mask(image),
+        mask_before,
+        "the regions stay"
+    );
     session.undo();
     assert_eq!(session.objects().len(), before.len());
 }
 
+/// `0094` criteria 5 and 6 with regions: overlapping regions make one region; a flat lasso
+/// encloses nothing and is dropped, the other region stays the mask.
 #[test]
-fn c5_c6_overlapping_and_open_paths_make_one_region() {
+fn c5_c6_overlapping_regions_make_one_region_and_a_flat_lasso_is_dropped() {
     let mut session = Session::new(1);
     let image = import_images(&mut session, 1)[0];
-    let c = corners(&session, image);
-    let (w, h) = (c[2].x - c[0].x, c[2].y - c[0].y);
-    let a = rect(&session, c[0].x, c[0].y, w * 0.6, h);
-    let b = rect(&session, c[0].x + w * 0.4, c[0].y, w * 0.6, h);
-    session.set_tool(Tool::Trace);
-    session.selection.set(&[image, a, b]);
-    assert_eq!(session.trace_region().unwrap().polygons().len(), 1);
-    // A straight open path encloses nothing: it is dropped, the rectangle stays the region.
-    let line = session.document.create_path(
-        &[c[0], c[2]].map(|point| curvyo_document_core::NewAnchor {
-            id: curvyo_document_core::AnchorId::new(9, 1),
-            point,
-            handle_in: curvyo_document_core::Vec2::ZERO,
-            handle_out: curvyo_document_core::Vec2::ZERO,
-            kind: curvyo_document_core::AnchorKind::Corner,
-        }),
-        false,
+    region(
+        &session,
+        image,
+        TraceRegionKind::Rect,
+        &[(0.0, 0.0), (0.6, 1.0)],
     );
-    session.selection.set(&[image, a, line]);
-    assert_eq!(session.trace_view().mask.len(), 2);
-    assert!(session.trace_region().is_some());
-    session.selection.set(&[image, line]);
-    assert!(session.trace_view().mask_outside_image);
+    region(
+        &session,
+        image,
+        TraceRegionKind::Rect,
+        &[(0.4, 0.0), (1.0, 1.0)],
+    );
+    session.set_tool(Tool::Trace);
+    session.selection.set(&[image]);
+    assert_eq!(session.trace_region().unwrap().polygons().len(), 1);
+    let mut flat = Session::new(1);
+    let alone = import_images(&mut flat, 1)[0];
+    region(
+        &flat,
+        alone,
+        TraceRegionKind::Lasso,
+        &[(0.0, 0.0), (0.5, 0.5), (1.0, 1.0)],
+    );
+    flat.set_tool(Tool::Trace);
+    flat.selection.set(&[alone]);
+    assert!(flat.trace_view().mask_outside_image, "nothing to keep");
+    region(
+        &flat,
+        alone,
+        TraceRegionKind::Rect,
+        &[(0.0, 0.0), (0.5, 1.0)],
+    );
+    assert_eq!(flat.trace_view().regions, 2);
+    assert!(flat.trace_region().is_some());
 }
 
+/// `0094` criterion 2 with a region: Overlay washes the image outside the region.
 #[test]
 fn c2_overlay_washes_the_image_outside_the_region() {
-    let (mut session, image, _) = masked();
+    let (mut session, image) = masked();
     session.set_tool(Tool::Trace);
     let mut objects: Vec<ObjectSnapshot> = session.objects().to_vec();
     session.trace_artwork(&mut objects);
@@ -266,86 +316,46 @@ fn c2_overlay_washes_the_image_outside_the_region() {
         carrying, 3,
         "the image, its wash and the wash outside the region"
     );
-    session.selection.set(&[image]);
-    let mut objects: Vec<ObjectSnapshot> = session.objects().to_vec();
-    session.trace_artwork(&mut objects);
-    assert_eq!(objects.iter().filter(|o| o.id() == image).count(), 2);
+    let mut plain = Session::new(1);
+    let other = import_images(&mut plain, 1)[0];
+    plain.selection.set(&[other]);
+    plain.set_tool(Tool::Trace);
+    let mut objects: Vec<ObjectSnapshot> = plain.objects().to_vec();
+    plain.trace_artwork(&mut objects);
+    assert_eq!(objects.iter().filter(|o| o.id() == other).count(), 2);
 }
 
-/// Criterion 14 and Terms ("Mask path"): a linked clone of an image or a text does not exist (Linked
-/// clone refuses both, `specs/0058` criterion 38; a text clone of `0080` is a text, refused with
-/// the criterion 14 row); a linked clone of a path is a mask path.
+/// `0114` criterion 15 (CLONE-MASK A): a linked clone of an image is traceable and shows its
+/// root's regions under its own placement; a clone of a path is not traced.
 #[test]
-fn c14_only_a_clone_of_a_path_is_a_mask_path() {
-    let mut session = super::text_tests::with_text("Name");
-    let image = import_images(&mut session, 1)[0];
-    let text = session
-        .objects()
-        .iter()
-        .find_map(|o| matches!(o, ObjectSnapshot::Text(_)).then(|| o.id()))
-        .unwrap();
+fn c15_an_image_clone_is_traced_with_its_root_s_mask() {
+    let (mut session, image) = masked();
     let path = rect(&session, 0.0, 0.0, 5.0, 5.0);
     let clone = |session: &mut Session, id: NodeId| {
         session.set_tool(Tool::Select);
         session.selection.set(&[id]);
         let kind = session.linked_clone().kind;
-        (kind, session.selection.ids()[0])
+        assert_eq!(kind, super::clones::CloneKind::Done);
+        session.selection.ids()[0]
     };
-    // Since `specs/0100` an image and a text are originals too; their clones are no mask path.
-    let (kind, image_clone) = clone(&mut session, image);
-    assert_eq!(kind, super::clones::CloneKind::Done);
-    let (kind, _) = clone(&mut session, text);
-    assert_eq!(kind, super::clones::CloneKind::Done);
-    let (kind, path_clone) = clone(&mut session, path);
-    assert_eq!(kind, super::clones::CloneKind::Done);
-    assert!(matches!(
-        session.objects().iter().find(|o| o.id() == path_clone),
-        Some(ObjectSnapshot::Clone(_))
-    ));
+    let image_clone = clone(&mut session, image);
+    let path_clone = clone(&mut session, path);
     session.set_tool(Tool::Trace);
-    session.selection.set(&[image, text]);
-    assert_eq!(session.trace_view().selection, TraceSelection::Mixed);
-    session.selection.set(&[image, path_clone]);
+    session.selection.set(&[image_clone]);
     let view = session.trace_view();
     assert_eq!(view.selection, TraceSelection::Images);
-    assert_eq!(view.mask, [path_clone]);
-    session.selection.set(&[image, image_clone]);
-    assert!(!session.trace_view().mask.contains(&image_clone));
-}
-
-/// Terms ("Mask path"): a group counts as the paths in it (architect review 2026-11-04).
-#[test]
-fn a_grouped_mask_path_counts_as_its_paths() {
-    let mut session = Session::new(1);
-    let image = import_images(&mut session, 1)[0];
-    let c = corners(&session, image);
-    let (w, h) = (c[2].x - c[0].x, c[2].y - c[0].y);
-    // `a` reaches 5 mm left of the picture, so its left edge is hit outside the image.
-    let a = rect(&session, c[0].x - 5.0, c[0].y, w * 0.3 + 5.0, h);
-    let b = rect(&session, c[0].x + w * 0.6, c[0].y, w * 0.3, h);
-    session.selection.set(&[a, b]);
-    assert_eq!(
-        session.group_selection().kind,
-        super::grouping::GroupingKind::Grouped
-    );
-    let leaves = session.selection.ids().to_vec();
-    assert_eq!(leaves.len(), 2);
-    session.set_tool(Tool::Trace);
-    // A Shift+click on the group in the Trace tool adds its leaves.
-    session.selection.set(&[image]);
-    let on_edge = Point::new(c[0].x - 5.0, f64::midpoint(c[0].y, c[2].y));
-    session.pointer_down(on_edge, true);
-    session.pointer_up(on_edge, true, false);
-    let view = session.trace_view();
-    assert_eq!(view.selection, TraceSelection::Images);
-    assert_eq!(view.mask.len(), 2, "both paths of the group");
-    assert_eq!(session.trace_region().unwrap().polygons().len(), 2);
+    assert_eq!(view.images, [image_clone]);
+    assert_eq!(view.regions, 1, "the root's region");
+    assert!(session.trace_source(image_clone, false).is_some());
+    assert!(session.trace_region().is_some());
+    session.selection.set(&[path_clone]);
+    assert_eq!(session.trace_view().selection, TraceSelection::Other);
 }
 
 /// A preview whose clip the kernel refused names the shapes kept whole (tester 2026-11-04).
 #[test]
 fn a_refused_clip_shows_its_muted_notice() {
-    let (mut session, image, _) = masked();
+    let (mut session, image) = masked();
     session.set_tool(Tool::Trace);
     let mut wire = vec![0.0; vectrace::wire::HEADER];
     assert!(session.set_trace_preview(image, &wire));
@@ -356,27 +366,4 @@ fn a_refused_clip_shows_its_muted_notice() {
         session.trace_unclipped_notice(),
         "2 shapes cross the mask edge unclipped."
     );
-}
-
-#[test]
-fn unsupported_mask_stops_single_trace_before_output() {
-    use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
-    let (mut session, image, _) = masked();
-    // A Spiro too far out to be drawn at any tolerance has no curve: it cannot be a mask (every
-    // Spiro of ordinary controls has one since `specs/0115`, even through one point).
-    let nodes = [
-        NewAnchor::corner(AnchorId::new(180, 1), Point::new(1e300, 5.)),
-        NewAnchor::corner(AnchorId::new(180, 2), Point::new(5., 1e300)),
-        NewAnchor::corner(AnchorId::new(180, 3), Point::new(-1e300, 5.)),
-    ];
-    let bad = session
-        .document
-        .create_editable_curve(&nodes, true, CurveKind::Spiro)
-        .unwrap();
-    session.set_tool(Tool::Trace);
-    session.selection.set(&[image, bad]);
-    assert!(session.trace_view().mask_failed);
-    assert!(session.trace_source(image, false).is_none());
-    assert!(!session.set_trace_result(image, &[0.; 7]));
-    assert_eq!(session.create_traced_paths(), TraceCreateOutcome::Ignored);
 }

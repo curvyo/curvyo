@@ -350,7 +350,7 @@ impl Session {
         let Some(id) = parse_id(id) else {
             return PanelReply::Quiet;
         };
-        self.panel_action(|this| {
+        let reply = self.panel_action(|this| {
             this.panel.fresh_layer = None;
             if this.document.is_layer(id) {
                 this.press_layer(id);
@@ -374,7 +374,10 @@ impl Session {
             let rows = this.layer_rows();
             this.press_object(id, press, &rows);
             PanelReply::Quiet
-        })
+        });
+        // Another image chosen closes a lasso in progress on the one before (`specs/0114`).
+        self.close_trace_lasso_of_other_image();
+        reply
     }
 
     /// A press on a layer row: the layer becomes the active layer and the panel target, and

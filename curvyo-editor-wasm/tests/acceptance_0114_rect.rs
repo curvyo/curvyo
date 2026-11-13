@@ -211,20 +211,29 @@ fn c3_a_selected_rectangle_moves_resizes_nudges_and_goes() {
     assert_eq!(s.tool(), Tool::Trace, "Delete keeps the tool");
 }
 
-/// Escape: the selection goes first, then the tool, then the Trace tool is left.
+/// Escape (UX notes §7, steps 5 to 7; reverses slice 1): a pressed region tool is released
+/// before a selected region is deselected, then the Trace tool is left.
 #[test]
-fn escape_drops_the_region_selection_then_the_tool() {
+fn escape_releases_the_tool_then_drops_the_region_selection() {
     let (mut s, _) = traced("");
     s.set_trace_region_tool(TraceRegionTool::Rect);
     drag(&mut s, (10.0, 10.0), (40.0, 40.0), false, false);
-    key(&mut s, "Escape", false);
-    assert_eq!(s.trace_region_tool(), TraceRegionTool::None);
-    assert_eq!(s.tool(), Tool::Trace);
+    s.set_trace_region_tool(TraceRegionTool::None);
     drag(&mut s, (20.0, 20.0), (20.0, 20.0), false, false);
     assert!(s.trace_selected_region().is_some());
+    s.set_trace_region_tool(TraceRegionTool::Rect);
+    key(&mut s, "Escape", false);
+    assert_eq!(
+        s.trace_region_tool(),
+        TraceRegionTool::None,
+        "the tool first"
+    );
+    assert!(s.trace_selected_region().is_some(), "the selection stays");
     key(&mut s, "Escape", false);
     assert!(s.trace_selected_region().is_none());
     assert_eq!(s.tool(), Tool::Trace);
+    key(&mut s, "Escape", false);
+    assert_eq!(s.tool(), Tool::Select, "then the tool is left");
 }
 
 /// Criterion 8: a rectangle drawn with Subtract is taken out, whichever was drawn first.
@@ -289,38 +298,40 @@ fn trace_wire(s: &mut Session, image: NodeId, settings: &str) -> Vec<f64> {
     )
 }
 
-/// R1 of the spec: x 0 to 50 mm, the full height.
-const R1_PATH: &str =
-    r#"<rect id="r1" x="0" y="0" width="50" height="100" fill="none" stroke="black"/>"#;
-
-/// Criterion 9: R1 stored as a region gives the worker exactly the mask the R1 mask path of
-/// `0094` gives, so the trace is exactly `0094` criterion 2's (and with Outside, criterion 3's).
+/// Criterion 9: R1 stored as a region gives the worker exactly the mask `0094` made of the R1
+/// mask path (the kernel union of its outline in document mm), so the trace is exactly `0094`
+/// criterion 2's (and with Outside, criterion 3's).
 #[test]
-fn c9_a_stored_r1_is_the_mask_of_the_r1_mask_path() {
+fn c9_a_stored_r1_is_the_mask_of_the_r1_outline() {
     for outside in [false, true] {
         let (mut stored, image) = traced("");
         stored.set_trace_region_tool(TraceRegionTool::Rect);
         drag(&mut stored, (0.0, 0.0), (50.0, 100.0), false, false);
         stored.set_trace_mask_outside(outside);
-        let (mut path, image_b) = traced(R1_PATH);
-        let r1 = doc(&path)
-            .object_ids()
-            .into_iter()
-            .find(|&id| id != image_b)
-            .unwrap();
-        select(&mut path, &[image_b, r1]);
-        path.set_trace_mask_outside(outside);
-        assert_eq!(path.trace_view().mask, vec![r1]);
-        assert_eq!(
-            stored.trace_mask_json(),
-            path.trace_mask_json(),
-            "outside {outside}"
-        );
+        let corner = |p: Point| {
+            (
+                p,
+                curvyo_document_core::Vec2::ZERO,
+                curvyo_document_core::Vec2::ZERO,
+            )
+        };
+        let r1 = vec![
+            corner(pt(&stored, (0.0, 0.0))),
+            corner(pt(&stored, (50.0, 0.0))),
+            corner(pt(&stored, (50.0, 100.0))),
+            corner(pt(&stored, (0.0, 100.0))),
+        ];
+        let path_region =
+            curvyo_ui_core::TraceRegion::of_operands(&[vec![(r1, true)]], outside).unwrap();
+        let want = serde_json::json!({
+            "outside": outside,
+            "region": path_region.to_numbers(),
+        });
+        let got: serde_json::Value = serde_json::from_str(&stored.trace_mask_json()).unwrap();
+        assert_eq!(got, want, "outside {outside}");
         let settings = r#"{"threshold":50}"#;
-        assert_eq!(
-            trace_wire(&mut stored, image, settings),
-            trace_wire(&mut path, image_b, settings)
-        );
+        let wire = trace_wire(&mut stored, image, settings);
+        assert!(curvyo_ui_core::read_trace_wire(&wire).unwrap().paths > 0);
     }
 }
 

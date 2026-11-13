@@ -17,6 +17,12 @@ pub struct ImageCopyJs {
     /// Straight-alpha RGBA8, top row first.
     #[wasm_bindgen(getter_with_clone)]
     pub rgba: Vec<u8>,
+    /// The picture's fingerprint (`specs/0114` criterion 14): the page keeps it with `mask`.
+    #[wasm_bindgen(getter_with_clone)]
+    pub fingerprint: String,
+    /// The image's trace mask as JSON, empty for none.
+    #[wasm_bindgen(getter_with_clone)]
+    pub mask: String,
 }
 
 #[wasm_bindgen]
@@ -37,7 +43,15 @@ impl WasmSession {
             width: copy.width,
             height: copy.height,
             rgba: copy.rgba,
+            fingerprint: copy.fingerprint,
+            mask: copy.mask,
         })
+    }
+
+    /// The page's memo of the last Ctrl+C for the paste begun now (`specs/0114` criterion 14): a
+    /// pasted picture that decodes to `fingerprint` gets `mask`.
+    pub fn set_import_trace_mask(&mut self, fingerprint: &str, mask: &str) {
+        self.session.set_import_trace_mask(fingerprint, mask);
     }
 }
 

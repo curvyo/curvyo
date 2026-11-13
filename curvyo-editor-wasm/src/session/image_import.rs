@@ -89,6 +89,9 @@ pub(super) struct ImportBatch {
     failed: Vec<(String, String)>,
     /// How many files were offered, the skipped ones included.
     chosen: usize,
+    /// The page's memo of the last Ctrl+C (`specs/0114` criterion 14, ADR 0061 §8): the copied
+    /// picture's fingerprint and its trace mask, for a paste of one image.
+    paste_mask: Option<(String, curvyo_document_core::TraceMask)>,
 }
 
 /// What an import did.
@@ -131,6 +134,19 @@ impl Session {
             target: Some(target),
             ..ImportBatch::default()
         });
+    }
+
+    /// The page's memo of the last Ctrl+C for this paste (`specs/0114` criterion 14, ADR 0061 §8):
+    /// when the import's one picture decodes to `fingerprint`, the image gets `mask` (the copied
+    /// image's trace mask as JSON) in the paste's step. Anything that is not a mask is ignored.
+    pub fn set_import_trace_mask(&mut self, fingerprint: &str, mask: &str) {
+        let Some(batch) = self.import.as_mut() else {
+            return;
+        };
+        batch.paste_mask = serde_json::from_str(mask)
+            .ok()
+            .and_then(|value| curvyo_document_core::TraceMask::from_json(&value))
+            .map(|mask| (fingerprint.to_owned(), mask));
     }
 
     /// Remembers a file of the import that the host did not read because it is `bytes` long, over
@@ -248,7 +264,7 @@ impl Session {
                 Planned::Svg { .. } => true,
             });
         }
-        let ids = self.commit_import(&batch.planned, batch.origin);
+        let ids = self.commit_import(&batch.planned, batch.origin, batch.paste_mask.as_ref());
         let notice = batch_notice(&batch, ids.len());
         ImportOutcome {
             imported: ids.len(),
@@ -284,11 +300,13 @@ impl Session {
         batch.failed.extend(failed);
     }
 
-    /// Writes the planned files in one step and selects them; returns the new top-level ids.
+    /// Writes the planned files in one step and selects them; a pasted picture that decodes to the
+    /// copied one gets its trace mask in that step (`paste_mask`). Returns the new top-level ids.
     fn commit_import(
         &mut self,
         planned: &[(String, Planned)],
         origin: ImportOrigin,
+        paste_mask: Option<&(String, curvyo_document_core::TraceMask)>,
     ) -> Vec<NodeId> {
         if planned.is_empty() {
             return Vec::new();
@@ -345,7 +363,21 @@ impl Session {
                 for ((_, p), anchors) in planned.iter().zip(&anchor_ids) {
                     match p {
                         Planned::Image(image) => {
-                            ids.extend(document.write_images(std::slice::from_ref(&image.image)));
+                            let written = document.write_images(std::slice::from_ref(&image.image));
+                            let same = paste_mask.filter(|(fingerprint, _)| {
+                                planned.len() == 1
+                                    && *fingerprint
+                                        == super::image_clipboard::picture_fingerprint(
+                                            image.working.width,
+                                            image.working.height,
+                                            &image.working.pixels,
+                                        )
+                            });
+                            if let (Some((_, mask)), [id]) = (same, written.as_slice()) {
+                                // A mask that does not fit is left out; the picture comes in.
+                                let _ = document.write_trace_mask(*id, mask);
+                            }
+                            ids.extend(written);
                         }
                         Planned::Svg {
                             layer_name,

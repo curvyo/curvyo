@@ -1,9 +1,11 @@
 //! Tester cases for `specs/0094-masked-composite-trace` slice 1 at the session (criteria 1, 2, 5
-//! to 8, 12 to 15, 17): an SVG with the tester's M1 picture (`curvyo-ui-core/tests/support_0094`)
-//! and mask paths is imported, so image and paths come in selected, as the maker selects them;
-//! the trace runs as the worker runs it, from the session's own settings JSON
-//! (`trace_settings`, `trace_mask_region`) over the pixels the session decoded. Written from the
-//! specification before the implementation was read.
+//! to 8, 12, 15, 17), as `specs/0114-image-trace-mask` keeps them: the mask is no longer a set of
+//! selected paths but the regions drawn on the picture with the Trace tool's Rectangle and Lasso
+//! (`0114` Behaviour 1 to 3), here drawn by the session's own pointer and keys; the trace runs as
+//! the worker runs it, from the session's own settings JSON (`trace_settings`,
+//! `trace_mask_region`) over the pixels the session decoded. The cases that existed only for mask
+//! paths (groups as mask paths, the mixed-selection row, Shift+click) went with them (`0114`
+//! criterion 21).
 
 #![allow(
     clippy::unwrap_used,
@@ -17,7 +19,9 @@
 mod support;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
-use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
+use curvyo_editor_wasm::{
+    KeyInput, Session, Tool, TraceCreateOutcome, TraceRegionTool, trace_mask_region, trace_settings,
+};
 use curvyo_ui_core::read_trace_wire;
 use image::ImageEncoder;
 use kurbo::PathEl;
@@ -150,54 +154,83 @@ fn convex_distance(poly: &[Point], p: Point) -> f64 {
     worst
 }
 
-/// R1 over the left half of the picture.
-const R1: &str =
-    r#"<rect id="r1" x="0" y="0" width="50" height="100" fill="none" stroke="black"/>"#;
+/// The picture alone, imported and selected, in the Trace tool.
+fn picture(image_attrs: &str, extra: &str) -> (Session, NodeId, [Point; 4]) {
+    let mut s = import(&svg(image_attrs, extra));
+    let (image, corners) = image_of(&doc(&s));
+    s.set_tool(Tool::Trace);
+    (s, image, corners)
+}
+
+/// A rectangle region dragged with the Rectangle tool from picture pixel `a` to `b`; with
+/// `subtract` taken out.
+fn rectangle(s: &mut Session, corners: &[Point; 4], a: (f64, f64), b: (f64, f64), subtract: bool) {
+    s.set_trace_region_tool(TraceRegionTool::Rect);
+    s.set_trace_subtract(subtract);
+    let (from, to) = (at(corners, a.0, a.1), at(corners, b.0, b.1));
+    s.pointer_down(from, false);
+    s.pointer_hover(to, false, false);
+    s.pointer_up(to, false, false);
+    s.set_trace_subtract(false);
+    s.set_trace_region_tool(TraceRegionTool::None);
+}
+
+fn key(s: &mut Session, key: &str) {
+    s.key_down(KeyInput {
+        key,
+        shift: false,
+        ctrl: false,
+        alt: false,
+        repeat: false,
+        dom_blocked: false,
+        mac: false,
+        time_ms: 0.0,
+    });
+}
+
+/// A lasso clicked corner by corner with the Lasso tool at picture pixels `points`, finished by
+/// Enter.
+fn lasso(s: &mut Session, corners: &[Point; 4], points: &[(f64, f64)]) {
+    s.set_trace_region_tool(TraceRegionTool::Lasso);
+    for &(x, y) in points {
+        let p = at(corners, x, y);
+        s.pointer_down(p, false);
+        s.pointer_up(p, false, false);
+    }
+    key(s, "Enter");
+    s.set_trace_region_tool(TraceRegionTool::None);
+}
+
+/// R1 over the left half of the picture: picture pixels 0..100 by 0..200.
+fn r1(s: &mut Session, corners: &[Point; 4]) {
+    rectangle(s, corners, (0.0, 0.0), (100.0, 200.0), false);
+}
 
 // ---------------------------------------------------------------------------------------------
 
 #[test]
-fn c1_image_and_path_are_masked_inside_by_default_image_alone_is_not() {
-    let mut s = import(&svg("", R1));
-    assert_eq!(
-        s.selected_object_count(),
-        2,
-        "image and path come in selected"
-    );
-    assert!(
-        s.trace_available(),
-        "the Select bar offers Trace for one image plus a path"
-    );
-    s.set_tool(Tool::Trace);
+fn c1_a_region_masks_inside_by_default_the_image_alone_is_not() {
+    let (mut s, _, corners) = picture("", "");
+    assert!(s.trace_region().is_none());
+    assert_eq!(s.trace_mask_json(), "", "the settings carry no mask");
+    r1(&mut s, &corners);
     let view = s.trace_view();
-    assert_eq!(view.mask.len(), 1, "one mask path");
+    assert_eq!(view.regions, 1, "one region");
     assert!(!view.mask_outside_image && !view.mask_failed);
     assert!(!s.trace_mask_outside(), "Inside is selected");
     let json: serde_json::Value = serde_json::from_str(&s.trace_mask_json()).unwrap();
     assert_eq!(json["outside"], false);
     assert!(s.trace_region().is_some());
-
-    let mut plain = import(&svg("", ""));
-    plain.set_tool(Tool::Trace);
-    assert!(plain.trace_view().mask.is_empty(), "no mask row");
-    assert_eq!(plain.trace_mask_json(), "", "the settings carry no mask");
-    assert!(plain.trace_region().is_none());
 }
 
 #[test]
-fn c2_c12_create_paths_inside_r1_keeps_the_mask_path_and_is_one_undo() {
-    let mut s = import(&svg("", R1));
+fn c2_c12_create_paths_inside_r1_keeps_the_region_and_is_one_undo() {
+    let (mut s, image, corners) = picture("", "");
+    r1(&mut s, &corners);
     let before = doc(&s);
-    let (image, corners) = image_of(&before);
-    let mask_id = before
-        .object_ids()
-        .into_iter()
-        .find(|&id| id != image)
-        .unwrap();
-    let mask_before = before.object(mask_id).unwrap();
-    s.set_tool(Tool::Trace);
+    let mask_before = before.trace_mask(image);
     let wire = traced(&mut s, image, 50);
-    let r1 = [
+    let r1q = [
         at(&corners, 0.0, 0.0),
         at(&corners, 100.0, 0.0),
         at(&corners, 100.0, 200.0),
@@ -206,7 +239,10 @@ fn c2_c12_create_paths_inside_r1_keeps_the_mask_path_and_is_one_undo() {
     let all = nodes(&wire);
     assert_ne!(all.len(), 0);
     for p in &all {
-        assert!(convex_distance(&r1, *p) <= EDGE_MM, "node {p:?} outside R1");
+        assert!(
+            convex_distance(&r1q, *p) <= EDGE_MM,
+            "node {p:?} outside R1"
+        );
     }
     assert!(s.set_trace_preview(image, &wire));
     assert!(s.set_trace_result(image, &wire));
@@ -219,20 +255,14 @@ fn c2_c12_create_paths_inside_r1_keeps_the_mask_path_and_is_one_undo() {
     assert_eq!(s.undo_len(), undo_before + 1, "one history step");
     let after = doc(&s);
     assert_eq!(
-        after.object(mask_id),
-        Some(mask_before),
-        "the mask path is unchanged"
-    );
-    assert_eq!(
-        after.parent_group(mask_id),
-        before.parent_group(mask_id),
-        "not moved into the group"
+        after.trace_mask(image),
+        mask_before,
+        "the region is unchanged"
     );
     let groups: Vec<NodeId> = after
         .object_ids()
         .into_iter()
         .filter_map(|id| after.parent_group(id))
-        .filter(|g| before.parent_group(mask_id) != Some(*g))
         .collect();
     let group = *groups.first().expect("a trace group");
     let name = after
@@ -251,20 +281,18 @@ fn c2_c12_create_paths_inside_r1_keeps_the_mask_path_and_is_one_undo() {
         before.object_ids(),
         "one undo restores the document"
     );
-    assert_eq!(undone.object(mask_id), before.object(mask_id));
+    assert_eq!(undone.trace_mask(image), mask_before);
 }
 
 #[test]
 fn c15_the_session_flow_twice_is_identical() {
-    let mut s = import(&svg("", R1));
-    let (image, _) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
+    let (mut s, image, corners) = picture("", "");
+    r1(&mut s, &corners);
     let a = traced(&mut s, image, 50);
     let b = traced(&mut s, image, 50);
     assert_eq!(a, b);
-    let mut t = import(&svg("", R1));
-    let (image_t, _) = image_of(&doc(&t));
-    t.set_tool(Tool::Trace);
+    let (mut t, image_t, corners_t) = picture("", "");
+    r1(&mut t, &corners_t);
     assert_eq!(
         traced(&mut t, image_t, 50),
         a,
@@ -272,31 +300,45 @@ fn c15_the_session_flow_twice_is_identical() {
     );
 }
 
+/// `0094` criterion 5 with regions: a subtracted region is a hole of the added one, and two
+/// overlapping regions are one union.
 #[test]
-fn c5_a_compound_ring_is_a_region_with_a_hole_and_overlaps_are_one_union() {
-    // A ring around the disc's centre (25, 50), even-odd, outer 20 mm, hole 6 mm.
-    let ring = r#"<path fill-rule="evenodd" d="M 5 50 A 20 20 0 1 0 45 50 A 20 20 0 1 0 5 50 Z M 19 50 A 6 6 0 1 0 31 50 A 6 6 0 1 0 19 50 Z"/>"#;
-    let mut s = import(&svg("", ring));
-    let (image, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
+fn c5_a_subtracted_region_is_a_hole_and_overlaps_are_one_union() {
+    let (mut s, image, corners) = picture("", "");
+    // Around the disc's centre (50, 100) px: outer 40 px each way, hole 12 px each way.
+    rectangle(&mut s, &corners, (10.0, 60.0), (90.0, 140.0), false);
+    rectangle(&mut s, &corners, (38.0, 88.0), (62.0, 112.0), true);
     let region = s.trace_region().expect("a region");
     let centre = at(&corners, 50.0, 100.0);
     assert!(!region.keeps(centre), "the hole is no part of the region");
     assert!(region.keeps(at(&corners, 50.0, 70.0)), "the ring is");
-    let wire = traced(&mut s, image, 50);
-    for p in nodes(&wire) {
-        let r = (p.x - centre.x).hypot(p.y - centre.y);
+    let outer = [
+        at(&corners, 10.0, 60.0),
+        at(&corners, 90.0, 60.0),
+        at(&corners, 90.0, 140.0),
+        at(&corners, 10.0, 140.0),
+    ];
+    let hole = [
+        at(&corners, 38.0, 88.0),
+        at(&corners, 62.0, 88.0),
+        at(&corners, 62.0, 112.0),
+        at(&corners, 38.0, 112.0),
+    ];
+    for p in nodes(&traced(&mut s, image, 50)) {
         assert!(
-            (6.0 - EDGE_MM..=20.0 + EDGE_MM).contains(&r),
-            "node {p:?} at {r} mm"
+            convex_distance(&outer, p) <= EDGE_MM,
+            "node {p:?} off the ring"
+        );
+        assert!(
+            convex_distance(&hole, p) >= -EDGE_MM,
+            "node {p:?} in the hole"
         );
     }
 
-    let two = r#"<rect x="10" y="30" width="30" height="40"/><rect x="30" y="40" width="40" height="20"/>"#;
-    let mut s = import(&svg("", two));
-    let (_, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
-    assert_eq!(s.trace_view().mask.len(), 2);
+    let (mut s, _, corners) = picture("", "");
+    rectangle(&mut s, &corners, (20.0, 60.0), (80.0, 140.0), false);
+    rectangle(&mut s, &corners, (60.0, 80.0), (140.0, 120.0), false);
+    assert_eq!(s.trace_view().regions, 2);
     let region = s.trace_region().unwrap();
     for (x, y) in [(30.0, 70.0), (70.0, 100.0), (130.0, 110.0)] {
         assert!(
@@ -307,14 +349,18 @@ fn c5_a_compound_ring_is_a_region_with_a_hole_and_overlaps_are_one_union() {
     assert!(!region.keeps(at(&corners, 30.0, 150.0)));
 }
 
+/// `0094` criterion 6 as the lasso keeps it (`0114` Behaviour 3): corners set and finished are
+/// closed by a straight line.
 #[test]
-fn c6_an_open_path_is_closed_by_a_straight_line() {
-    let open = r#"<path fill="none" stroke="black" d="M 0 0 L 50 0 L 50 100"/>"#;
-    let mut s = import(&svg("", open));
-    let (image, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
+fn c6_a_lasso_is_closed_by_a_straight_line() {
+    let (mut s, image, corners) = picture("", "");
+    lasso(
+        &mut s,
+        &corners,
+        &[(0.0, 0.0), (100.0, 0.0), (100.0, 200.0)],
+    );
     let view = s.trace_view();
-    assert_eq!(view.mask.len(), 1, "the open path is a mask path");
+    assert_eq!(view.regions, 1, "the lasso is a region");
     assert!(!view.mask_failed && !view.mask_outside_image, "no refusal");
     let region = s.trace_region().expect("a region");
     assert!(
@@ -336,11 +382,9 @@ fn c6_an_open_path_is_closed_by_a_straight_line() {
 }
 
 #[test]
-fn c7_a_mask_beyond_the_image_is_clipped_to_it() {
-    let big = r#"<rect x="-40" y="-40" width="90" height="180"/>"#;
-    let mut s = import(&svg("", big));
-    let (image, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
+fn c7_a_region_beyond_the_image_is_clipped_to_it() {
+    let (mut s, image, corners) = picture("", "");
+    rectangle(&mut s, &corners, (-80.0, -80.0), (100.0, 280.0), false);
     assert!(!s.trace_view().mask_outside_image);
     let quad = [corners[0], corners[1], corners[2], corners[3]];
     for p in nodes(&traced(&mut s, image, 50)) {
@@ -352,12 +396,11 @@ fn c7_a_mask_beyond_the_image_is_clipped_to_it() {
 }
 
 #[test]
-fn c7_a_mask_outside_the_image_is_flagged_and_sends_no_region() {
-    let far = r#"<rect x="150" y="150" width="30" height="30"/>"#;
-    let mut s = import(&svg("", far));
-    s.set_tool(Tool::Trace);
+fn c7_a_region_outside_the_image_is_flagged_and_sends_no_region() {
+    let (mut s, _, corners) = picture("", "");
+    rectangle(&mut s, &corners, (300.0, 300.0), (360.0, 360.0), false);
     let view = s.trace_view();
-    assert_eq!(view.mask.len(), 1);
+    assert_eq!(view.regions, 1);
     assert!(
         view.mask_outside_image,
         "\"0 paths: the mask is outside the image.\""
@@ -372,13 +415,9 @@ fn c7_a_mask_outside_the_image_is_flagged_and_sends_no_region() {
 }
 
 fn c8_case(transform: &str) {
-    let r1 = format!(
-        r#"<rect x="0" y="0" width="50" height="100" fill="none" stroke="black" transform="{transform}"/>"#
-    );
-    let mut s = import(&svg(&format!(r#"transform="{transform}""#), &r1));
-    let (image, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
-    assert_eq!(s.trace_view().mask.len(), 1);
+    let (mut s, image, corners) = picture(&format!(r#"transform="{transform}""#), "");
+    r1(&mut s, &corners);
+    assert_eq!(s.trace_view().regions, 1);
     let r1q = [
         at(&corners, 0.0, 0.0),
         at(&corners, 100.0, 0.0),
@@ -402,157 +441,48 @@ fn c8_case(transform: &str) {
     }
 }
 
+/// `0094` criterion 8 and `0114` criterion 13: on a rotated, scaled and skewed image the region
+/// lies in the picture's frame.
 #[test]
-fn c8_rotated_scaled_and_skewed_image_with_the_same_mask_transform() {
+fn c8_rotated_scaled_and_skewed_image_keeps_the_region_on_the_picture() {
     c8_case("translate(10 20) rotate(30) scale(0.6)");
     c8_case("translate(10 20) rotate(30) skewX(12) scale(0.6)");
 }
 
-/// Terms ("Mask path"): "A group counts as the paths in it", and Frage 130 A: the image and the
-/// paths are selected together with the Select tool (re-test 2026-11-05: fixed, no longer ignored).
+/// `0114` criterion 21 (was `0094` criterion 14): a second image and a path beside the image are
+/// no refusal; the images trace, the path is no mask.
 #[test]
-fn grouped_mask_paths_count_as_the_paths_in_the_group() {
-    let group = r#"<g><rect x="5" y="5" width="20" height="20"/><rect x="60" y="60" width="20" height="20"/></g>"#;
-    let mut s = import(&svg("", group));
-    let (_, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
-    let view = s.trace_view();
-    assert!(!view.mask.is_empty(), "a group gives mask paths");
-    assert!(!view.mask_failed && !view.mask_outside_image);
-    let region = s.trace_region().expect("a region");
-    assert!(
-        region.keeps(at(&corners, 30.0, 30.0)),
-        "the first rectangle"
-    );
-    assert!(
-        region.keeps(at(&corners, 140.0, 140.0)),
-        "the second rectangle"
-    );
-    assert!(!region.keeps(at(&corners, 100.0, 100.0)), "between them");
-}
-
-/// Re-test 2026-11-05: a group inside a group still counts as its paths, at any depth.
-#[test]
-fn a_nested_group_counts_as_its_leaf_paths() {
-    let group = r#"<g><rect x="5" y="5" width="20" height="20"/><g><rect x="60" y="60" width="20" height="20"/></g></g>"#;
-    let mut s = import(&svg("", group));
-    let (image, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
-    let view = s.trace_view();
-    assert_eq!(format!("{:?}", view.selection), "Images");
-    assert_eq!(view.mask.len(), 2, "both leaves, the nested one too");
-    let region = s.trace_region().expect("a region");
-    assert!(region.keeps(at(&corners, 30.0, 30.0)));
-    assert!(
-        region.keeps(at(&corners, 140.0, 140.0)),
-        "the nested rectangle"
-    );
-    assert!(!region.keeps(at(&corners, 100.0, 100.0)));
-    // Every node of the masked trace lies in one of the two rectangles.
-    let wire = traced(&mut s, image, 50);
-    let boxes = [
-        [
-            at(&corners, 10.0, 10.0),
-            at(&corners, 50.0, 10.0),
-            at(&corners, 50.0, 50.0),
-            at(&corners, 10.0, 50.0),
-        ],
-        [
-            at(&corners, 120.0, 120.0),
-            at(&corners, 160.0, 120.0),
-            at(&corners, 160.0, 160.0),
-            at(&corners, 120.0, 160.0),
-        ],
-    ];
-    for p in nodes(&wire) {
-        let d = boxes
-            .iter()
-            .map(|b| convex_distance(b, p))
-            .fold(f64::INFINITY, f64::min);
-        assert!(
-            d <= EDGE_MM,
-            "node {p:?} lies {d} mm outside both rectangles"
-        );
-    }
-}
-
-/// Criterion 14 with groups (re-test item 1): a group holding an image next to its paths is
-/// not a group of mask paths (a text takes the same leaf rule); the image with it is the mixed row, no region.
-#[test]
-fn a_group_holding_an_image_is_the_mixed_row() {
-    let group = format!(
-        r#"<g><rect x="5" y="5" width="20" height="20"/><image x="110" y="0" width="20" height="20" xlink:href="data:image/png;base64,{}"/></g>"#,
-        base64(&png())
-    );
-    let mut s = import(&svg("", &group));
-    s.set_tool(Tool::Trace);
-    let view = s.trace_view();
-    assert_eq!(format!("{:?}", view.selection), "Mixed");
-    assert_eq!(view.mask.len(), 0, "no mask paths");
-    assert!(s.trace_mask_json().is_empty(), "no region is sent");
-}
-
-#[test]
-fn c14_a_second_image_with_a_mask_path_is_refused() {
+fn c21_a_second_image_and_a_path_trace_as_the_images() {
     let second = format!(
-        r#"<image x="110" y="0" width="20" height="20" xlink:href="data:image/png;base64,{}"/>{R1}"#,
+        r#"<image x="110" y="0" width="20" height="20" xlink:href="data:image/png;base64,{}"/><rect x="0" y="0" width="50" height="100"/>"#,
         base64(&png())
     );
     let mut s = import(&svg("", &second));
     assert_eq!(s.selected_object_count(), 3);
     s.set_tool(Tool::Trace);
     let view = s.trace_view();
-    assert_eq!(
-        format!("{:?}", view.selection),
-        "Mixed",
-        "two images and a path: \"Use Object to path for text; one image at a time.\""
-    );
+    assert_eq!(format!("{:?}", view.selection), "Images");
+    assert_eq!(view.images.len(), 2);
     assert!(s.trace_mask_json().is_empty(), "no region is sent");
 }
 
+/// `0094` criterion 17 with ADR 0061 §3: on an untouched image Outside is tool state and Inside
+/// again on entry; once a region stores the part, its mode is the part's and comes back.
 #[test]
-fn c13_shift_click_adds_and_removes_a_mask_path_empty_canvas_changes_nothing() {
-    // The path lies over the image's right part and reaches beyond it, filled, so a click
-    // inside it hits the path, not the image.
-    let path = r#"<rect x="60" y="10" width="60" height="30" fill="black"/>"#;
-    let mut s = import(&svg("", path));
-    let (_, corners) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
-    assert_eq!(s.trace_view().mask.len(), 1);
-    let on_path = at(&corners, 220.0, 50.0);
-    let empty = at(&corners, 400.0, 380.0);
-    let shift_click = |s: &mut Session, p: Point| {
-        s.pointer_down(p, true);
-        s.pointer_up(p, true, false);
-    };
-    shift_click(&mut s, on_path);
-    assert!(
-        s.trace_view().mask.is_empty(),
-        "Shift+click removes the mask path"
-    );
-    assert_eq!(s.trace_mask_json(), "");
-    shift_click(&mut s, on_path);
-    assert_eq!(s.trace_view().mask.len(), 1, "Shift+click adds it again");
-    let images = s.trace_view().images;
-    shift_click(&mut s, empty);
-    let view = s.trace_view();
-    assert_eq!(view.mask.len(), 1, "empty canvas changes nothing");
-    assert_eq!(view.images, images, "the image stays chosen");
-}
-
-#[test]
-fn c17_outside_is_forgotten_when_the_tool_is_left() {
-    let mut s = import(&svg("", R1));
-    s.set_tool(Tool::Trace);
+fn c17_outside_is_tool_state_until_the_part_is_stored() {
+    let (mut s, _, corners) = picture("", "");
     s.set_trace_mask_outside(true);
     assert!(s.trace_mask_outside());
+    s.set_tool(Tool::Select);
+    s.set_tool(Tool::Trace);
+    assert!(!s.trace_mask_outside(), "Inside again on entry");
+    r1(&mut s, &corners);
+    s.set_trace_mask_outside(true);
     let json: serde_json::Value = serde_json::from_str(&s.trace_mask_json()).unwrap();
     assert_eq!(json["outside"], true);
     s.set_tool(Tool::Select);
     s.set_tool(Tool::Trace);
-    assert!(!s.trace_mask_outside(), "Inside again on entry");
-    let json: serde_json::Value = serde_json::from_str(&s.trace_mask_json()).unwrap();
-    assert_eq!(json["outside"], false);
+    assert!(s.trace_mask_outside(), "the stored part keeps Outside");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -610,12 +540,10 @@ fn worker_job(rgba: &[u8], n: u32, map: [f64; 6], settings: &str) -> Vec<f64> {
 
 #[test]
 fn c15_native_record_for_the_editor_wasm() {
-    // R1 on an image rotated by 30 degrees and skewed, as the session makes its region.
+    // R1 drawn on an image rotated by 30 degrees and skewed, as the session makes its region.
     let transform = "translate(10 20) rotate(30) skewX(12) scale(0.6)";
-    let r1 = format!(r#"<rect x="0" y="0" width="50" height="100" transform="{transform}"/>"#);
-    let mut s = import(&svg(&format!(r#"transform="{transform}""#), &r1));
-    let (image, _) = image_of(&doc(&s));
-    s.set_tool(Tool::Trace);
+    let (mut s, image, corners) = picture(&format!(r#"transform="{transform}""#), "");
+    r1(&mut s, &corners);
     let source = s.trace_source(image, false).unwrap();
     assert_eq!(
         source.rgba,

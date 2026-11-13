@@ -56,6 +56,14 @@ impl Session {
                 ..none
             };
         }
+        if self.tool == Tool::Trace {
+            // The minus badge while a subtracted region is drawn: a rectangle from its press, a
+            // lasso from its first corner (`specs/0114` criterion 8, UX notes §5).
+            return MoveIndicators {
+                remove_badge: self.trace_mask_drawing_subtracted(),
+                ..none
+            };
+        }
         if self.tool == Tool::Offset {
             // A drag that makes a new object shows the copy's plus (`specs/0038-path-offset`
             // criterion 15).

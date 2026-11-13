@@ -121,6 +121,8 @@ impl Session {
     /// the Object scope to the selected object, as one step "Go to version" that Ctrl+Z takes
     /// back (criterion 10). A preview that shows ends.
     pub fn apply_history_item(&mut self, object: bool, index: usize) -> GoToOutcome {
+        // A History row click discards a lasso in progress, then acts (`specs/0114` UX notes §6).
+        self.discard_trace_lasso();
         if self.operation_in_flight() || self.select.has_entry() || self.pen_path_open() {
             return GoToOutcome::Ignored;
         }

@@ -251,12 +251,8 @@ mod trace_colours;
 mod trace_colours_tests;
 mod trace_draw;
 mod trace_mask_input;
+mod trace_mask_lasso;
 mod trace_mask_overlay;
-mod trace_mask_pick;
-#[cfg(test)]
-mod trace_mask_pick_hit_tests;
-#[cfg(test)]
-mod trace_mask_pick_tests;
 mod trace_mask_tool;
 mod trace_mesh;
 mod trace_parts;
@@ -1236,9 +1232,7 @@ impl Session {
                 self.pen_snap_hover(point);
             }
             Tool::Trace => {
-                if !self.trace_mask_drag_move(point) {
-                    self.trace_mask_pick_hover(point);
-                }
+                self.trace_mask_drag_move(point);
             }
             Tool::TestGrid => self.test_grid_hover(Some(point)),
         }

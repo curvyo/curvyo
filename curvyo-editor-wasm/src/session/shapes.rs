@@ -266,6 +266,9 @@ impl Session {
         if self.tool == Tool::Node {
             return self.node_marquee_readout().or_else(|| self.bend_readout());
         }
+        if self.tool == Tool::Trace {
+            return self.trace_mask_readout();
+        }
         // The placement chip replaces the readout (`0052` criterion 11).
         if self.placement().is_some() {
             return None;

@@ -31,47 +31,24 @@ pub struct TraceRegion {
     max: Point,
 }
 
-/// Why the mask paths make no region.
+/// Why the regions make no mask.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TraceRegionError {
-    /// A mask contains an editable curve that cannot be evaluated.
-    #[error("a mask curve cannot be evaluated")]
-    UnsupportedCurve,
-    /// No mask path encloses an area: the trace has nothing to keep.
-    #[error("no mask path encloses an area")]
+    /// No region encloses an area: the trace has nothing to keep.
+    #[error("no region encloses an area")]
     NoArea,
     /// The kernel refused the union for another reason.
-    #[error("the mask paths could not be combined: {0}")]
+    #[error("the regions could not be combined: {0}")]
     Kernel(BooleanError),
 }
 
-/// The operands of a region: per mask path its outlines as the kernel reads them (anchors and
-/// whether the outline is closed).
+/// The operands of a mask: per region its outlines as the kernel reads them (anchors and whether
+/// the outline is closed).
 pub type RegionOperand = Vec<(Vec<OutlineTriple>, bool)>;
 
-/// The outlines of a mask path as the region's union reads them: the collector of the Boolean
-/// commands (a path's outlines, a clone's resolved ones, a primitive's rotated outline; text,
-/// images, sketches and dimensions have none).
-/// # Errors
-/// Returns an error when an editable mask curve cannot be evaluated.
-pub fn mask_operand(
-    object: &curvyo_document_core::ObjectSnapshot,
-) -> Result<RegionOperand, TraceRegionError> {
-    if object
-        .drawn_path()
-        .is_some_and(|path| !path.curve_kind.is_bezier())
-    {
-        let evaluated =
-            crate::evaluate_object(object).map_err(|_| TraceRegionError::UnsupportedCurve)?;
-        Ok(crate::boolean::outlines_of(&evaluated))
-    } else {
-        Ok(crate::boolean::outlines_of(object))
-    }
-}
-
 impl TraceRegion {
-    /// The union of `operands` (one per mask path, in document z-order), Inside or `outside`.
-    /// An operand without area (a straight open path) is dropped and the union is made of the
+    /// The union of `operands` (one per region, in stored order), Inside or `outside`.
+    /// An operand without area (a flat lasso) is dropped and the union is made of the
     /// others.
     ///
     /// # Errors

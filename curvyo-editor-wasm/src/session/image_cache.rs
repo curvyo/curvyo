@@ -36,6 +36,13 @@ impl ImageCache {
     }
 
     /// The working image of `hash`, decoded from `document`'s asset when it is not cached.
+    fn size_of(&self, hash: &AssetHash) -> Option<(u32, u32)> {
+        match self.entries.get(hash) {
+            Some(Entry::Ready(working)) => Some((working.width, working.height)),
+            _ => None,
+        }
+    }
+
     fn working(&mut self, document: &Document, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
         let entry = self.entries.entry(hash.clone()).or_insert_with(|| {
             document
@@ -65,6 +72,11 @@ impl ImageCache {
 pub type FrameImages = Vec<(AssetHash, Arc<WorkingImage>)>;
 
 impl Session {
+    /// The size of the working image of `hash` when it is decoded already; no decode.
+    pub(super) fn working_image_size(&self, hash: &AssetHash) -> Option<(u32, u32)> {
+        self.images.size_of(hash)
+    }
+
     /// The working image of `hash`, decoded when it is not cached (the Trace tool's pixels).
     pub(super) fn working_image(&mut self, hash: &AssetHash) -> Option<Arc<WorkingImage>> {
         self.images.working(&self.document, hash)
