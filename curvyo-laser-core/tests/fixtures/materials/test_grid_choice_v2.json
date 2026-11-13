@@ -1,0 +1,46 @@
+{
+  "format_version": 2,
+  "by_machine": {
+    "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f": {
+      "kind": "cut",
+      "columns": {
+        "param": "power",
+        "min": 20.0,
+        "max": 100.0,
+        "count": 6
+      },
+      "rows": {
+        "param": "passes",
+        "min": 1,
+        "max": 4,
+        "count": 4
+      },
+      "fixed": {
+        "speed_mm_min": 300
+      },
+      "cell_mm": 12.0,
+      "crosshatch": false
+    },
+    "generic-laser": {
+      "kind": "engrave",
+      "columns": {
+        "param": "speed",
+        "min": 1000,
+        "max": 6000,
+        "count": 5
+      },
+      "rows": {
+        "param": "interval",
+        "min": 0.05,
+        "max": 0.25,
+        "count": 5
+      },
+      "fixed": {
+        "power_pct": 40.0,
+        "passes": 1
+      },
+      "cell_mm": 8.0,
+      "crosshatch": true
+    }
+  }
+}

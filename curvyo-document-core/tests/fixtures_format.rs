@@ -294,7 +294,8 @@ fn the_round_trip_golden_reads_back_every_value_state_slot_and_place() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+    // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
     let opened = open_unchanged(&bytes);
     let read = fixtures(&opened);
     assert_eq!(read, fixtures(&golden_document()));

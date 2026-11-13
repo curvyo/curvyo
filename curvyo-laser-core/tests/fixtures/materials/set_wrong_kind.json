@@ -1,0 +1,183 @@
+{
+  "format_version": 2,
+  "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+  "kind": "laser",
+  "modified": 1762948805000,
+  "name": "Birch plywood",
+  "thickness_mm": 3.0,
+  "lasers": [
+    {
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "sets": {
+        "cut": {
+          "power_pct": 60.0,
+          "speed_mm_min": 1950,
+          "passes": 1,
+          "source": {
+            "test": "7K2QX"
+          }
+        },
+        "engrave": {
+          "power_pct": 30.0,
+          "speed_mm_min": 6000,
+          "passes": 1,
+          "interval_mm": 0.08,
+          "source": "typed"
+        }
+      }
+    },
+    {
+      "machine": {
+        "id": "generic-laser",
+        "name": "Generic laser"
+      },
+      "sets": {
+        "cut_out": {
+          "power_pct": 12.5,
+          "speed_mm_min": 3000,
+          "passes": 2,
+          "source": "typed"
+        }
+      }
+    }
+  ],
+  "tests": [
+    {
+      "id": "7K2QX",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": 1762948801000,
+      "best": {
+        "column": 2,
+        "row": 1
+      },
+      "note": "Clean edge at 60 %.",
+      "photo": "jpg"
+    },
+    {
+      "id": "8PL4D",
+      "created": 1762948802000,
+      "machine": {
+        "id": "generic-laser",
+        "name": "Generic laser"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 3
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 3
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "4H8ZP",
+      "created": 1762948803000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "engrave",
+        "columns": {
+          "param": "power",
+          "min": 10.0,
+          "max": 50.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "interval",
+          "min": 0.05,
+          "max": 0.25,
+          "count": 5
+        },
+        "fixed": {
+          "speed_mm_min": 3000,
+          "passes": 1
+        },
+        "cell_mm": 8.0,
+        "crosshatch": true
+      },
+      "lasered": null,
+      "note": "Crosshatch, dark."
+    }
+  ],
+  "history": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "date": 1762948801000,
+      "event": "set",
+      "machine": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+      "kind": "cut",
+      "set": {
+        "power_pct": 60.0,
+        "speed_mm_min": 1950,
+        "passes": 1
+      },
+      "source": {
+        "test": "7K2QX"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "date": 1762948804000,
+      "event": "set",
+      "machine": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+      "kind": "engrave",
+      "set": {
+        "power_pct": 30.0,
+        "speed_mm_min": 6000,
+        "passes": 1,
+        "interval_mm": 0.08
+      },
+      "source": "typed"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "date": 1762948804500,
+      "event": "removed",
+      "machine": "generic-laser",
+      "kind": "cut"
+    }
+  ]
+}

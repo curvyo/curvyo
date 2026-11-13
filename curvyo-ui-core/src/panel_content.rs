@@ -10,6 +10,8 @@ use crate::panel_tabs::PanelTab;
 pub enum PanelContent {
     /// The Operations tab of a laser page (`specs/0101-laser-operations`).
     Operations,
+    /// The Materials tab of a laser page (`specs/0112-test-grid-and-materials`).
+    Materials,
     /// The File tab: the project and the file commands (`specs/0051-sidebar-and-no-menu`).
     File,
     /// The Document section.
@@ -66,6 +68,7 @@ pub fn panel_body(
         PanelTab::Share => PanelContent::Share,
         PanelTab::Workbench => PanelContent::Workbench,
         PanelTab::Operations => PanelContent::Operations,
+        PanelTab::Materials => PanelContent::Materials,
     }
 }
 

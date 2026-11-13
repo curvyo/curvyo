@@ -1,0 +1,26 @@
+{
+  "format_version": 2,
+  "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+  "kind": "laser",
+  "modified": 1762948800000,
+  "name": "Acrylic 3 mm",
+  "thickness_mm": 3.0,
+  "lasers": [
+    {
+      "machine": {
+        "id": "generic-laser",
+        "name": "Generic laser"
+      },
+      "sets": {
+        "cut": {
+          "power_pct": 90.0,
+          "speed_mm_min": 300,
+          "passes": 2,
+          "source": "typed"
+        }
+      }
+    }
+  ],
+  "tests": [],
+  "history": []
+}

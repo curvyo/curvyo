@@ -19,14 +19,30 @@ pub const EDIT_OPERATION_SETTINGS_COMMIT_LABEL: &str = "edit_operation_settings"
 pub const RESET_TO_MATERIAL_COMMIT_LABEL: &str = "reset_to_material";
 /// The label of Own numbers in the pick (criterion 25).
 pub const USE_OWN_NUMBERS_COMMIT_LABEL: &str = "use_own_numbers";
-/// The label of Save as material (criterion 15; ADR 0055 §9).
-pub const SAVE_AS_MATERIAL_COMMIT_LABEL: &str = "save_as_material";
 /// The label of a set edit, a set removal or a thickness change of a material (criterion 22).
 pub const EDIT_MATERIAL_COMMIT_LABEL: &str = "edit_material";
 /// The label of a material rename (criterion 20).
 pub const RENAME_MATERIAL_COMMIT_LABEL: &str = "rename_material";
 /// The label of a material delete (criterion 21).
 pub const DELETE_MATERIAL_COMMIT_LABEL: &str = "delete_material";
+/// The label of Add material in the Materials tab (`specs/0112` criterion 17).
+pub const ADD_MATERIAL_COMMIT_LABEL: &str = "add_material";
+/// The label of adding a set (`specs/0112` criteria 20, 21).
+pub const ADD_MATERIAL_SET_COMMIT_LABEL: &str = "add_material_set";
+/// The label of deleting a set (`specs/0112` UX G11).
+pub const DELETE_MATERIAL_SET_COMMIT_LABEL: &str = "delete_material_set";
+/// The label of tapping the best cell of a test (`specs/0112` criterion 24).
+pub const JUDGE_TEST_COMMIT_LABEL: &str = "judge_test";
+/// The label of a test's note (`specs/0112` criterion 26).
+pub const EDIT_TEST_NOTE_COMMIT_LABEL: &str = "edit_test_note";
+/// The label of adding a test's photo (`specs/0112` criterion 27).
+pub const SET_TEST_PHOTO_COMMIT_LABEL: &str = "set_test_photo";
+/// The label of cropping a test's photo (`specs/0112` criterion 27).
+pub const CROP_TEST_PHOTO_COMMIT_LABEL: &str = "crop_test_photo";
+/// The label of removing a test's photo (`specs/0112` criterion 27).
+pub const REMOVE_TEST_PHOTO_COMMIT_LABEL: &str = "remove_test_photo";
+/// The label of deleting a test (`specs/0112` criterion 25).
+pub const DELETE_TEST_COMMIT_LABEL: &str = "delete_test";
 
 /// The root register a material edit writes so its step exists also when no operation points to
 /// the material (ADR 0054 §3): `{ id, modified }`. Nothing reads it; every build keeps it.
@@ -59,23 +75,47 @@ impl SettingsStep {
 /// A material edit made in this project (ADR 0055 §9).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaterialStep {
-    /// Save as material.
-    SaveAsMaterial,
     /// Edit material.
     EditMaterial,
     /// Rename material.
     RenameMaterial,
     /// Delete material.
     DeleteMaterial,
+    /// Add material.
+    AddMaterial,
+    /// Add set.
+    AddSet,
+    /// Delete set.
+    DeleteSet,
+    /// Choose best cell.
+    JudgeTest,
+    /// Edit note.
+    EditTestNote,
+    /// Add photo.
+    SetTestPhoto,
+    /// Crop photo.
+    CropTestPhoto,
+    /// Remove photo.
+    RemoveTestPhoto,
+    /// Delete test.
+    DeleteTest,
 }
 
 impl MaterialStep {
     const fn label(self) -> &'static str {
         match self {
-            Self::SaveAsMaterial => SAVE_AS_MATERIAL_COMMIT_LABEL,
             Self::EditMaterial => EDIT_MATERIAL_COMMIT_LABEL,
             Self::RenameMaterial => RENAME_MATERIAL_COMMIT_LABEL,
             Self::DeleteMaterial => DELETE_MATERIAL_COMMIT_LABEL,
+            Self::AddMaterial => ADD_MATERIAL_COMMIT_LABEL,
+            Self::AddSet => ADD_MATERIAL_SET_COMMIT_LABEL,
+            Self::DeleteSet => DELETE_MATERIAL_SET_COMMIT_LABEL,
+            Self::JudgeTest => JUDGE_TEST_COMMIT_LABEL,
+            Self::EditTestNote => EDIT_TEST_NOTE_COMMIT_LABEL,
+            Self::SetTestPhoto => SET_TEST_PHOTO_COMMIT_LABEL,
+            Self::CropTestPhoto => CROP_TEST_PHOTO_COMMIT_LABEL,
+            Self::RemoveTestPhoto => REMOVE_TEST_PHOTO_COMMIT_LABEL,
+            Self::DeleteTest => DELETE_TEST_COMMIT_LABEL,
         }
     }
 }

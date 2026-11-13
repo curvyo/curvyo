@@ -80,20 +80,27 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // operation and the material edits of the open project.
     ("add_test_grid", "Add test grid"),
     ("edit_test_grid", "Edit test grid"),
-    ("rebuild_test_grid", "Rebuild test grid"),
-    ("mark_test_cell", "Mark cell"),
-    ("unmark_test_cell", "Unmark cell"),
-    ("rename_test_grid", "Rename test grid"),
-    ("delete_test_grid_row", "Delete test grid row"),
     ("use_material", "Use material"),
     ("use_own_numbers", "Use own numbers"),
     ("edit_operation_settings", "Edit settings"),
     ("reset_to_material", "Reset to material"),
-    ("save_as_material", "Save as material"),
     ("edit_material", "Edit material"),
     ("rename_material", "Rename material"),
     ("delete_material", "Delete material"),
     ("remove_missing_items", "Remove missing items"),
+    // `specs/0112-test-grid-and-materials` plan.md (UX section 11): the grid object, the
+    // Materials tab and its tests.
+    ("place_test_grid", "Place test grid"),
+    ("mark_test_grid_lasered", "Mark lasered"),
+    ("add_material", "Add material"),
+    ("add_material_set", "Add set"),
+    ("delete_material_set", "Delete set"),
+    ("judge_test", "Choose best cell"),
+    ("edit_test_note", "Edit note"),
+    ("set_test_photo", "Add photo"),
+    ("crop_test_photo", "Crop photo"),
+    ("remove_test_photo", "Remove photo"),
+    ("delete_test", "Delete test"),
     // `specs/0026-machine-profile` criteria 3, 5 and 7 (UX notes §2).
     ("pick_profile", "Pick profile"),
     ("reset_profile", "Reset from profile"),
@@ -411,24 +418,46 @@ mod tests {
     }
 
     #[test]
+    fn the_test_grid_and_materials_steps_are_named_and_free() {
+        use curvyo_document_core as dc;
+        for (label, name) in [
+            (dc::ADD_TEST_GRID_COMMIT_LABEL, "Add test grid"),
+            (dc::EDIT_TEST_GRID_COMMIT_LABEL, "Edit test grid"),
+            (dc::PLACE_TEST_GRID_COMMIT_LABEL, "Place test grid"),
+            (dc::USE_MATERIAL_COMMIT_LABEL, "Use material"),
+            (dc::ADD_MATERIAL_COMMIT_LABEL, "Add material"),
+            (dc::ADD_MATERIAL_SET_COMMIT_LABEL, "Add set"),
+            (dc::DELETE_MATERIAL_SET_COMMIT_LABEL, "Delete set"),
+            (dc::JUDGE_TEST_COMMIT_LABEL, "Choose best cell"),
+            (dc::EDIT_TEST_NOTE_COMMIT_LABEL, "Edit note"),
+            (dc::SET_TEST_PHOTO_COMMIT_LABEL, "Add photo"),
+            (dc::CROP_TEST_PHOTO_COMMIT_LABEL, "Crop photo"),
+            (dc::REMOVE_TEST_PHOTO_COMMIT_LABEL, "Remove photo"),
+            (dc::DELETE_TEST_COMMIT_LABEL, "Delete test"),
+        ] {
+            assert_eq!(operation_name(label), name, "{label}");
+            assert!(
+                crate::step_scope::FREE_STEPS.contains(&label),
+                "{label} is in one step-scope list"
+            );
+        }
+        assert_eq!(
+            operation_name(dc::MARK_TEST_GRID_LASERED_COMMIT_LABEL),
+            "Mark lasered",
+            "the step of `0029`'s output and of the test hook"
+        );
+    }
+
+    #[test]
     fn the_material_test_library_steps_are_named_and_the_save_refresh_is_reserved() {
         use curvyo_document_core as dc;
         for (label, name) in [
             (dc::ADD_TEST_GRID_COMMIT_LABEL, "Add test grid"),
             (dc::EDIT_TEST_GRID_COMMIT_LABEL, "Edit test grid"),
-            (dc::REBUILD_TEST_GRID_COMMIT_LABEL, "Rebuild test grid"),
-            (dc::MARK_TEST_CELL_COMMIT_LABEL, "Mark cell"),
-            (dc::UNMARK_TEST_CELL_COMMIT_LABEL, "Unmark cell"),
-            (dc::RENAME_TEST_GRID_COMMIT_LABEL, "Rename test grid"),
-            (
-                dc::DELETE_TEST_GRID_ROW_COMMIT_LABEL,
-                "Delete test grid row",
-            ),
             (dc::USE_MATERIAL_COMMIT_LABEL, "Use material"),
             (dc::USE_OWN_NUMBERS_COMMIT_LABEL, "Use own numbers"),
             (dc::EDIT_OPERATION_SETTINGS_COMMIT_LABEL, "Edit settings"),
             (dc::RESET_TO_MATERIAL_COMMIT_LABEL, "Reset to material"),
-            (dc::SAVE_AS_MATERIAL_COMMIT_LABEL, "Save as material"),
             (dc::EDIT_MATERIAL_COMMIT_LABEL, "Edit material"),
             (dc::RENAME_MATERIAL_COMMIT_LABEL, "Rename material"),
             (dc::DELETE_MATERIAL_COMMIT_LABEL, "Delete material"),

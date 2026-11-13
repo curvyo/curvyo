@@ -105,7 +105,8 @@ fn ac31_the_format_is_40_and_a_new_file_says_so() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+    // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
     let d = Document::new(1);
     let bytes = pack(&d, "0.1.0").unwrap();
     let mut zin = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
@@ -117,7 +118,7 @@ fn ac31_the_format_is_40_and_a_new_file_says_so() {
             f.read_to_string(&mut t).unwrap();
             if t.contains("\"format_version\"") {
                 assert!(
-                    t.contains("\"format_version\": 45") || t.contains("\"format_version\":45")
+                    t.contains("\"format_version\": 46") || t.contains("\"format_version\":46")
                 );
                 found = true;
             }
@@ -387,11 +388,11 @@ fn ac31_a_format_41_file_is_refused() {
     let d = Document::new(8);
     let bytes = pack(&d, "0.1.0").unwrap();
     // Superseded by `0103` (format 41), `0110` (format 42), `0028` (format 43) and `0111`
-    // (format 44): the next number is refused.
-    let too_new = with_format(&bytes, 46);
+    // (format 44), `0114` (format 45) and `0112` (format 46): the next number is refused.
+    let too_new = with_format(&bytes, 47);
     assert!(
         matches!(unpack(9, &too_new), Err(OpenError::FormatTooNew { .. })),
-        "a format 46 file is refused by a format 45 build"
+        "a format 47 file is refused by a format 46 build"
     );
     // The rewrite itself is sound: the same bytes at 43 open.
     assert!(unpack(9, &with_format(&bytes, 43)).is_ok());

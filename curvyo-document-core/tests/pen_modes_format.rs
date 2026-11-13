@@ -130,7 +130,8 @@ fn the_golden_reads_back_every_curve_control_placement_and_width_point() {
     let bytes = read_golden();
     assert_eq!(manifest_version(&bytes), 42);
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+    // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let (a, b) = (expected.read_objects(), opened.read_objects());
@@ -170,8 +171,8 @@ fn a_build_of_format_40_refuses_the_golden_as_saved_by_a_newer_version() {
     assert!(matches!(
         unpack(2, &newer),
         Err(OpenError::FormatTooNew {
-            found: 46,
-            supported: 45
+            found: 47,
+            supported: 46
         })
     ));
 }
