@@ -3,9 +3,8 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboard
 
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
-import { KIND_WORDS, focusAfterRename, nameKeyAction, rowLine2, rowName, tickPressAdds } from "@/lib/operationRows";
+import { focusAfterRename, nameKeyAction, rowLine2, rowName, tickPressAdds } from "@/lib/operationRows";
 import { canUnfold } from "@/lib/operationUnfold";
-import { gridRowLine } from "@/lib/testGridFields";
 import type { OperationRow as Row } from "@/lib/operationsView";
 import type { PressMods } from "@/lib/rowSelection";
 
@@ -129,7 +128,7 @@ export function OperationRowView(props: RowProps) {
       <div className="flex h-[26px] shrink-0 items-center gap-1" onPointerDown={(event) => {
         if (!renaming && (event.target as HTMLElement).closest("button:not([data-row-name]), input") === null) actions.dragStart(row, event);
       }}>
-        {props.selecting && !unknown && !row.grid ? (
+        {props.selecting && !unknown ? (
           <TickBox row={row} actions={actions} />
         ) : (
           <span
@@ -221,7 +220,7 @@ function pressRow(event: ReactMouseEvent, row: Row, actions: RowActions) {
 
 /** The tooltip of line 2: the whole line, which an ellipsis may cut (`specs/0111` UX 4.1). */
 function line2Title(row: Row, digit: number | null): string | undefined {
-  if (row.kind === "unknown" || row.grid) return undefined;
+  if (row.kind === "unknown") return undefined;
   const line = rowLine2(row, digit);
   return `${line.text}${line.part}${line.tail}`;
 }
@@ -230,7 +229,6 @@ function line2Title(row: Row, digit: number | null): string | undefined {
  * semibold ink (`specs/0111` `ux-notes.md` 4.1). */
 function Line2({ row, digit }: { row: Row; digit: number | null }) {
   if (row.kind === "unknown") return <>{`${digit} · Unknown operation`}</>;
-  if (row.grid) return <>{gridRowLine(KIND_WORDS[row.kind], row.grid.columns, row.grid.rows, row.output)}</>;
   const line = rowLine2(row, digit);
   return (
     <>

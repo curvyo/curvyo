@@ -3,7 +3,7 @@ import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { OperationsSection } from "@/components/panel/OperationsSection";
 import { FixtureJobsSection } from "@/components/panel/FixtureJobsSection";
 import type { FixtureJobsApi } from "@/hooks/useFixtureJobs";
-import { MaterialsSection } from "@/components/panel/MaterialsSection";
+import { MaterialsTab } from "@/components/panel/MaterialsTab";
 import type { MaterialsApi } from "@/hooks/useMaterials";
 import type { OperationSettingsApi } from "@/hooks/useOperationSettings";
 import type { OperationToolsApi } from "@/hooks/useOperationTools";
@@ -53,7 +53,6 @@ import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
 import { useGrid } from "@/hooks/useGrid";
-import { useTestGrid } from "@/hooks/useTestGrid";
 import { useSnapping } from "@/hooks/useSnapping";
 import { useStylePanel } from "@/hooks/useStylePanel";
 import { appVersion, fileCommandTooltip } from "@/lib/editorSession";
@@ -168,8 +167,6 @@ export function PropertiesPanel({
   const formats = useFormats(getSession, doc);
   const snapping = useSnapping({ getSession, syncRevision: editor.syncRevision, sync:editor.sync });
   const grid = useGrid({ getSession, syncRevision: editor.syncRevision, sync: editor.sync });
-  // The test grid of the Operations tab (`specs/0028-material-test-library`).
-  const testGrid = useTestGrid({ getSession, syncRevision: editor.syncRevision, sync: editor.sync });
   const { shortcut } = doc;
   // In text edit mode the keyboard goes back to the text being edited, so typing goes on after a
   // click on a control (customer 2026-10-26), as after the Text bar's controls.
@@ -279,7 +276,7 @@ export function PropertiesPanel({
   const contribution = contributionOf(workbenches.list, manufacturing?.process);
   const page = workbenches.list.page;
   // The kind chip sits in the header of the page-scoped tabs only (`specs/0098` criterion 6).
-  const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters"].includes(
+  const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters", "materials"].includes(
     doc.view.content,
   );
   const subject =
@@ -316,6 +313,11 @@ export function PropertiesPanel({
     traceInfo.dismiss();
     setOpen(true);
     doc.pressTab(name);
+  };
+  /** "Edit material" in an operation's Settings: the Materials tab opens with that material unfolded. */
+  const editMaterial = (id: string) => {
+    materials.unfold(id);
+    activate("materials");
   };
   return (
     <div className="flex h-full shrink-0 flex-col">
@@ -571,12 +573,11 @@ export function PropertiesPanel({
                 fixtureRunning={fixtureJobs.view?.running ?? 0}
                 settings={operationSettings}
                 tools={operationTools}
-                onEditMaterial={materials.edit}
-                materials={<MaterialsSection api={materials} onReturnFocus={returnFocus} />}
-                grid={testGrid}
-                materialsApi={materials}
+                onEditMaterial={editMaterial}
                 fixtureJobs={<FixtureJobsSection api={fixtureJobs} selectFixture={fixtures.select} />}
               />
+            ) : doc.view.content === "materials" ? (
+              <MaterialsTab api={materials} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (
               <LayersTab
                 getSession={getSession}

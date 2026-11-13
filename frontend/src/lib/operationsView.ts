@@ -49,15 +49,16 @@ export interface OperationRow {
   unfolded: boolean;
   /** The Settings block (`specs/0028`); `null` for a test grid row and an unknown operation. */
   settings: OperationSettings | null;
-  /** A test grid row's grid (`specs/0028` criterion 6); `null` for any other row. */
-  grid: GridRow | null;
+  /** The source line of a row a test grid made (`specs/0112` UX 6); `null` for any other row. */
+  source: RowSource | null;
 }
 
-/** What a test grid row shows: its top group (`null`: "no grid") and the grid's size in cells. */
-export interface GridRow {
-  group: OperationId | null;
-  columns: number;
-  rows: number;
+/** Which grid and cell a derived row runs: "Birch 3 mm · K7Q2M column 3, row 2". */
+export interface RowSource {
+  grid: OperationId;
+  /** A cell row has no material pick (G10); the label row has the ordinary one. */
+  cell: boolean;
+  text: string;
 }
 
 /** The summary counts (criterion 17). Nothing here counts a missing object (Frage 169 A). */
@@ -122,7 +123,7 @@ function isObject(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function asId(value: unknown): OperationId | null {
+export function asId(value: unknown): OperationId | null {
   if (!isObject(value)) return null;
   if (typeof value.peer !== "string") return null;
   if (!Number.isSafeInteger(value.counter) || (value.counter as number) < 0) return null;
@@ -170,14 +171,12 @@ function asTick(value: unknown): TickState | null {
   return value === "none" || value === "some" || value === "all" ? value : null;
 }
 
-function asGrid(value: unknown): GridRow | null | undefined {
+function asSource(value: unknown): RowSource | null | undefined {
   if (value === null) return null;
   if (!isObject(value)) return undefined;
-  const group = value.group === null ? null : asId(value.group);
-  const columns = asCount(value.columns);
-  const rows = asCount(value.rows);
-  if ((value.group !== null && group === null) || columns === null || rows === null) return undefined;
-  return { group, columns, rows };
+  const grid = asId(value.grid);
+  if (grid === null || typeof value.cell !== "boolean" || typeof value.text !== "string") return undefined;
+  return { grid, cell: value.cell, text: value.text };
 }
 
 function asRow(value: unknown): OperationRow | null {
@@ -188,13 +187,13 @@ function asRow(value: unknown): OperationRow | null {
   const items = asCount(value.items);
   const tick = asTick(value.tick);
   const settings = decodeSettings(value.settings);
-  const grid = asGrid(value.grid);
+  const source = asSource(value.source);
   const groupInPart = value.group_in_part === null ? null : typeof value.group_in_part === "string" ? value.group_in_part : undefined;
   if (
     groupInPart === undefined ||
     typeof value.unfolded !== "boolean" ||
     settings === undefined ||
-    grid === undefined ||
+    source === undefined ||
     id === null ||
     typeof value.name !== "string" ||
     section === undefined ||
@@ -224,7 +223,7 @@ function asRow(value: unknown): OperationRow | null {
     groupInPart,
     unfolded: value.unfolded,
     settings,
-    grid,
+    source,
   };
 }
 

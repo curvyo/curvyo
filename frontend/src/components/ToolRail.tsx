@@ -14,6 +14,7 @@ import { BooleanCommands } from "@/components/BooleanCommands";
 import { BooleanNotice } from "@/components/BooleanNotice";
 import { GroupCommands } from "@/components/GroupCommands";
 import { ImportCard } from "@/components/ImportCard";
+import { TestGridGlyph } from "@/components/panel/OperationGlyphs";
 import { PathCommands } from "@/components/PathCommands";
 import {
   COLUMN_A_TOOLTIP_OFFSET_PX,
@@ -49,6 +50,9 @@ interface ToolRailProps {
   paused?: boolean;
   /** The Import button below the Path tools card (`specs/0058-bitmap-import` criterion 1). */
   onImport: () => void;
+  /** The Test grid tool is offered: a laser page (`specs/0112` criterion 1). Off it, the button
+   * stays in the card, dimmed. */
+  testGridAvailable?: boolean;
 }
 
 /** The muted last tooltip line of the creation tools (`specs/0052-click-to-create-shapes/`
@@ -58,7 +62,10 @@ interface ToolButtonProps {
   tool: Tool;
   active: boolean;
   label: string;
-  shortcut: string;
+  shortcut?: string;
+  /** The tool cannot be chosen here: the button is dimmed and `aria-disabled`, and this is the
+   * tooltip's second line ("Laser pages only."). */
+  unavailable?: string;
   /** An optional second tooltip line (the modifiers of the tool). */
   hint?: string;
   /** An optional muted last line (the keys that act on the tool's selection). */
@@ -86,15 +93,18 @@ function ToolButton({
   onSelect,
   onReturnFocus,
   name,
+  unavailable,
 }: ToolButtonProps) {
   return (
     <Tooltip.Root delayDuration={400}>
       <Tooltip.Trigger asChild>
         <button
           type="button"
-          aria-label={name ?? `${label} (${shortcut})`}
+          aria-label={name ?? (shortcut ? `${label} (${shortcut})` : label)}
           aria-pressed={active}
+          aria-disabled={unavailable ? true : undefined}
           onClick={(event) => {
+            if (unavailable) return;
             onSelect(tool);
             // `detail` is 0 for keyboard activation, 1 or more for a mouse click.
             if (event.detail > 0) {
@@ -105,6 +115,7 @@ function ToolButton({
           style={{
             background: active ? "var(--toolbar-icon-active-bg)" : "transparent",
             color: active ? "var(--toolbar-icon-active-fg)" : "var(--toolbar-icon)",
+            opacity: unavailable ? 0.4 : undefined,
           }}
         >
           {icon}
@@ -116,9 +127,8 @@ function ToolButton({
           sideOffset={COLUMN_A_TOOLTIP_OFFSET_PX}
           className="z-50 rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground ring-1 ring-foreground/10"
         >
-          <div>
-            {label} ({shortcut})
-          </div>
+          <div>{shortcut ? `${label} (${shortcut})` : label}</div>
+          {unavailable && <div className="text-muted-foreground">{unavailable}</div>}
           {hint && <div>{hint}</div>}
           {keys && <div className="text-muted-foreground">{keys}</div>}
         </Tooltip.Content>
@@ -172,6 +182,7 @@ export function ToolRail({
   grouping,
   paused = false,
   onImport,
+  testGridAvailable = false,
 }: ToolRailProps) {
   // The one state that changes a letter: the Select tool with a selection.
   const letterActsOnSelection = tool === "select" && selectionCount > 0;
@@ -288,6 +299,18 @@ export function ToolRail({
               name={`Measure tool (${letterActsOnSelection ? "Esc, M" : "M"})`}
               shortcut={letterActsOnSelection ? "Esc, M" : "M"}
               icon={<RulerDimensionLine size={20} />}
+              onSelect={onSelect}
+              onReturnFocus={onReturnFocus}
+            />
+            {/* The Test grid tool (`specs/0112` criterion 1, UX 3.1): no letter key; off laser pages
+                the button stays, dimmed. */}
+            <ToolButton
+              tool="test-grid"
+              active={tool === "test-grid"}
+              label="Test grid tool"
+              name="Test grid tool"
+              unavailable={testGridAvailable ? undefined : "Laser pages only."}
+              icon={<TestGridGlyph size={20} />}
               onSelect={onSelect}
               onReturnFocus={onReturnFocus}
             />

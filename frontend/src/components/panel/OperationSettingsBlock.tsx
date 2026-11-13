@@ -34,6 +34,8 @@ interface OperationSettingsBlockProps {
   /** The Interval field, beside Passes of the first set (Engrave and Engrave + Outline,
    * `specs/0111` criterion 19). */
   interval?: ReactNode;
+  /** A cell row of a test grid has no material pick: its numbers are the cell's own (`specs/0112` G10). */
+  noPick?: boolean;
 }
 
 const GLYPHS: Record<StateGlyph, typeof Link2Off> = {
@@ -62,7 +64,7 @@ function SetHeading({ set }: { set: SetView }) {
  * buttons Reset to material and Edit material, each only where it applies. With several
  * operations selected only the pick shows.
  */
-export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onReturnFocus, embedded = false, interval }: OperationSettingsBlockProps) {
+export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onReturnFocus, embedded = false, interval, noPick = false }: OperationSettingsBlockProps) {
   const withSettings = rows.filter((row): row is OperationRow & { settings: OperationSettings } => row.settings !== null);
   const [status, setStatus] = useState("");
   const fieldsRef = useRef<HTMLDivElement>(null);
@@ -124,7 +126,7 @@ export function OperationSettingsBlock({ rows, pick, api, onEditMaterial, onRetu
           </span>
         </div>
       )}
-      {picker}
+      {noPick ? null : picker}
       {skip}
       {settings.state === "no_settings" ? (
         <p className="text-xs text-[var(--panel-muted-fg)]">No settings</p>

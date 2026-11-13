@@ -133,7 +133,8 @@ export function Canvas({
               : editor.tool === "rectangle" ||
                   editor.tool === "ellipse" ||
                   editor.tool === "polygon-star" ||
-                  editor.tool === "measure"
+                  editor.tool === "measure" ||
+                  editor.tool === "test-grid"
                 ? // The creation tools and Measure show their crosshair everywhere, over
                   // existing objects too (`unified-object-editing` criterion 25, customer
                   // feedback on PR #243).

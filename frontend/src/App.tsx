@@ -18,6 +18,7 @@ import { SelectToolbar } from "@/components/SelectToolbar";
 import { WidthEditToggle } from "@/components/WidthEditToggle";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
+import { TestGridBar } from "@/components/TestGridBar";
 import { TraceBar } from "@/components/TraceBar";
 import { TilingBar } from "@/components/TilingBar";
 import { RecogniseBar } from "@/components/RecogniseBar";
@@ -47,6 +48,7 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 import { useFixtures } from "@/hooks/useFixtures";
 import { useFixtureJobs } from "@/hooks/useFixtureJobs";
 import { useMaterials } from "@/hooks/useMaterials";
+import { useTestGridTool } from "@/hooks/useTestGridTool";
 import { useOperations } from "@/hooks/useOperations";
 import { useOperationSettings } from "@/hooks/useOperationSettings";
 import { useOperationTools } from "@/hooks/useOperationTools";
@@ -162,6 +164,9 @@ function Editor() {
   // The Settings block and the Materials section (`specs/0028-material-test-library`).
   const operationSettings = useOperationSettings(editor);
   const materials = useMaterials(editor);
+  // The Test grid tool and its bar (`specs/0112`); the bar also edits one selected grid.
+  const testGrid = useTestGridTool(editor, editor.tool === "test-grid", editor.containerRef);
+  const gridBar = testGrid.view !== null && (editor.tool === "test-grid" || (editor.tool === "select" && testGrid.view.group !== null));
   // The workspace outlives the File tab: its scan and open document stay while other tabs show.
   const workspace = useWorkspace(editor, project);
   // Its sharing, joining and reconnecting (`specs/0095-workspace` criteria 25 to 33).
@@ -189,7 +194,7 @@ function Editor() {
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").
-            editor.tool === "select" || editor.tool === "trace" ? "justify-start" : editor.tool === "pen" ? PEN_BAR_PLACE : "justify-center"
+            editor.tool === "select" || editor.tool === "trace" || editor.tool === "test-grid" ? "justify-start" : editor.tool === "pen" ? PEN_BAR_PLACE : "justify-center"
           } ${
             // The Select bar's chips (Curve to Bézier, Width) go to a second row when they do
             // not fit beside it, so they never squeeze it (`specs/0110` UX review U4).
@@ -202,7 +207,7 @@ function Editor() {
           {editor.tool === "select" && editor.tiling.open ? <TilingBar tiling={editor.tiling} /> : null}
           {/* A selected fixture has no Select bar: its handles and chips size and place it
               (`specs/0102-laser-fixtures` criterion 14, UX notes §6.4). */}
-          {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open && !fixtures.view?.selected ? (
+          {editor.tool === "select" && !gridBar && !editor.recognise.open && !editor.tiling.open && !fixtures.view?.selected ? (
             <SelectToolbar
               moveOnly={editor.getSession()?.selection_move_only() ?? false}
               scaleStrokeWidth={editor.scaleStrokeWidth}
@@ -270,6 +275,18 @@ function Editor() {
           ) : null}
           {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open ? <CurveToBezierButton editor={editor} /> : null}
           {editor.tool !== "node" && editor.tool !== "select" ? <WidthEditToggle editor={editor} /> : null}
+          {gridBar && testGrid.view ? (
+            <TestGridBar
+              tool={testGrid}
+              view={testGrid.view}
+              onNewMaterial={(grid) => {
+                materials.openForm(grid);
+                panelOpen.setOpen(true);
+                documentPanel.pressTab("materials");
+              }}
+              onReturnFocus={() => editor.containerRef.current?.focus()}
+            />
+          ) : null}
           {editor.tool === "trace" ? (
             <TraceBar
               trace={editor.trace}

@@ -34,6 +34,7 @@ function vectorRail(ctx: WorkbenchContext) {
       grouping={ctx.editor.grouping.commands}
       paused={ctx.paused}
       onImport={ctx.onImport}
+      testGridAvailable={ctx.editor.getSession()?.test_grid_tool_available() ?? false}
     />
   );
 }
