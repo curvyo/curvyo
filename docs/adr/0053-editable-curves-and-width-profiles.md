@@ -215,14 +215,15 @@ merged snapshot.
   wasm against the libspiro reference fixtures, including corners, endpoints,
   closed paths and degenerate input.
 - The session calls it synchronously and memoises the result on the complete
-  key (controls, kinds, closure, placement, solver version, tolerance), compared
+  key (controls, kinds, closure, placement, tolerance), compared
   by value, not by hash alone. The cache is disposable and starts empty on open.
   There is no worker, job API, request generation, pending state or Retry;
   draw, hit testing, bounds, conversion and export all see the same result for
   the current snapshot. Export, Stroke to path and machine output evaluate the
   frozen snapshot they captured, synchronously.
 - Stability rule (customer decision 2026-11-11, replaces the straight-line
-  fallback and the notice): the solver is warm-started from the previous
+  fallback and the notice; superseded by the amendment of 2026-11-12, "Pure function of the
+  controls"): the solver is warm-started from the previous
   solution, a segment turns by at most 90 degrees and the sweep changes by at
   most 270 degrees when a point is added or removed (Proposals). A control
   change with no solution within these limits keeps the last solvable result;
@@ -230,7 +231,7 @@ merged snapshot.
   older build without a stored solution is drawn as straight lines, stays
   editable, and operations that need its evaluated geometry refuse with "This
   Spiro curve comes from an older build..." and change nothing.
-- Amendment (lead decision 2026-11-11, Proposal): every Pen click places a
+- Amendment (lead decision 2026-11-11, Proposal; superseded on 2026-11-12): every Pen click places a
   control, solved from scratch where it has no near solution. While controls
   only move, a curve without a loop (no segment sweeping more than 180 degrees)
   never gets one (an added or removed control keeps the 270 degree limit); a moved
@@ -245,7 +246,7 @@ merged snapshot.
   one (`import_updates_checked`); this doubles the log's memory for a live-shared
   document (`docs/technical-debt.md`).
 
-Required tests: libspiro references on native and wasm, the stability rule (last solvable result kept),
+Required tests: libspiro references on native and wasm (replaced by the G2 reference test in the amendment of 2026-11-12), the stability rule (replaced on 2026-11-12 by the Pen walks: no stalls, shown = stored = reopened),
 reopen with an empty cache, clones sharing one evaluation under different
 transforms and styles, undo and remote merge, and the CPU budget in
 `spiro_cpu_budget.rs` (thread CPU time).
@@ -300,7 +301,7 @@ amendment preserves both properties. The customer approved SPIRO-TRANSFORM A on
    file, and the separate older-peer sync restrictions above remain in force.
    Validate all coefficients on read, including invertibility; damaged or
    unknown placement must be reported rather than silently treated as identity.
-   Cache keys include local controls, closure, placement, solver version and
+   Cache keys include local controls, closure, placement and
    tolerance; for a clone, tolerance accounts for the total composed map.
 
 Required verification includes nonuniform scale and skew with preview versus
@@ -386,3 +387,83 @@ outline is derived and never stored. Method details are a Proposal.
 Consequence: Stroke to path and SVG export of a varying profile give line
 segments within 0.01 mm instead of Bézier pieces (more nodes); tracked in
 `docs/technical-debt.md`.
+
+### Amendment 2026-11-12: the curvature-continuous Spiro (`0114`, customer decisions SPIRO-G2 A and SPIRO-WINDING A; details Proposal)
+
+The customer found the Spiro of 2026-11-11 sticky and named Inkscape as the reference. The
+measurement (`curvyo-editor-wasm/src/session/spiro_cache/measure.rs`) showed that the G4 curve
+(libspiro `o` points) itself has loops or no solution over large regions of ordinary pointer
+positions (a four-point wave with its last point 30 mm above loops in its first segment), so the
+hold rules could only stall there.
+
+- **Curve.** A Spiro is solved as libspiro's `c` points, as Inkscape's Spiro mode does:
+  clothoid segments (two coefficients) between smooth controls, a circular arc (one) at an open
+  end or beside a corner, a straight segment between two ends; angle and curvature continuous at
+  every smooth control. `SpiroShape` keeps four coefficients per segment, the last two zero.
+  (The G4 fallback of the first `0114` build for runs without a G2 curve is gone with the hold,
+  see below: one parametrisation, one procedure.)
+- **Pure function of the controls (amended 2026-11-12, after the customer tried the PR: "the
+  mouse is far from the last solution, it feels very slow").** The hold of the first `0114` build
+  (the 9.5 mm jump limit, 4× the pointer's move + 2 mm, the 270° loop limit, the stepwise
+  catch-up with side steps of 35° and 70°, the click that stored the held point) is removed. Every
+  Spiro, the Pen's live point and every Node drag included, is drawn as its controls solved by one
+  function of the controls, so what is shown is what is stored and what a reopen draws, and the
+  point is under the pointer at every event. The procedure is Levien's `solve_spiro` as Inkscape
+  runs it: start from straight segments (all coefficients zero) with each knot's bend taken from
+  the chords; at most ten full Newton steps, each knot's angle error reduced to one turn and each
+  segment's turn to two after every step; stop when the squared step is below 1e-12 (applies once the iteration has switched to the accurate integral,
+  `clothoid.rs:399`); the last
+  iterate is the curve, converged or not, with no convergence check, no refusal and no notice.
+  Why: a solver that refuses or follows an earlier branch makes the shown curve depend on the
+  history of the pointer, which needs a hold, which is what felt slow; a fixed procedure from a
+  fixed start answers at once and the same on one platform; across platforms within floating-point
+  except near the discrete decisions (`floor` in `wrap_turns`, the `drawable_step` bisection, the
+  `POLISH` switch, the `CONVERGED` break). Two Proposals keep the last iterate
+  sensible: an iterate whose segment sweeps more than 270° or bends more than four turns (an end
+  arc nearly a whole turn is a circle metres wide when the pointer is just behind the last
+  control's tangent) is not taken; the step is cut by bisection to its longest part that stays
+  within, and when there is none the iterate before it is the curve, back to the control polygon
+  (iterate zero). Coincident neighbours are one point to the solve (Inkscape offsets them by a
+  hair). A shape whose segment cannot be approximated by cubics is drawn as its control polygon.
+  The answer depends on the controls only through their shape (about their centroid, in units of
+  their spread), so a moved, turned or scaled curve solves the same. Measured
+  (`specs/0114-spiro-smoothing-and-width-handles/plan.md`): G2 converges for 91 % of random open
+  and 93 % of random closed control sets and 99.9 % of a wave with the pointer anywhere, G4 with
+  the same procedure for 59 %, 46 % and 83 %, so the curve stays G2.
+- **Shape change (customer-approved exception to `0110` criterion 8, SPIRO-G2 A, 2026-11-12).**
+  Spiro paths written by the build of 2026-11-11 (format 42) are drawn as G2 curves now; the
+  controls and the format version are unchanged, so no format bump. What changes for a stored
+  Spiro: the drawing, SVG export, Stroke to path and machine/cut output (all evaluate the same
+  controls). Width points are arc-length fractions of the centre line, so a stored profile keeps
+  its widths at its fractions and slides with the new shape. Tight zigzags change a second time: with no G2 curve they are drawn as the
+  last iterate, not the G4 fallback of the first `0114` build.
+- **Solver version.** The format does not record which solver drew a path, and the cache key of
+  "Spiro evaluation in the session" contains no solver version (it is a disposable in-process
+  cache, emptied on open; the earlier text naming one was wrong). Stored curves therefore depend
+  on the solver version. A format-42 file opened on a `0110` build draws the G4 curve for the same
+  controls without warning. Live peers cannot diverge today because documents with editable curves
+  are not shared (share block, "Compatibility with older sync peers"). Before that block is lifted
+  peers must agree on the solver version or it must be stored per path
+  (`docs/technical-debt.md`).
+- **Tests.** This amendment replaces "libspiro references on native and wasm" with the G2
+  reference test. The `spiro-inner` port of libspiro returns NaN for open `c` paths, so the G4
+  reference fixtures are removed and `spiro_g2_reference_0114.rs` checks properties (three
+  controls give their circle, closed controls on a circle give it, angle and curvature continuous,
+  end arcs, the curve through its controls). It runs native only; a wasm run of it is debt
+  (`docs/technical-debt.md`). The SVG export of Spiro paths has a golden
+  (`curvyo-editor-wasm/tests/spiro_0114.rs`).
+- **Source of the formulation.** Levien's permissive original (Apache-2.0 or MIT), not the GPL
+  `libspiro` fork (`docs/third-party/spiro-inner.md`).
+- **Not solved (SPIRO-WINDING A, customer, 2026-11-12).** A point circling its neighbour crosses
+  the line behind it, where every curve that is a function of the controls turns to the other
+  side: the curve turns over at once there (12 mm with the point 15 mm from its neighbour, more
+  for a longer last segment), and so where a point is dragged across its neighbour. Keeping the
+  winding would need it in the document (a format change); the customer chose not to.
+- **Source of the procedure.** Implemented from the procedure as described above and from
+  Levien's permissive original (`ppedit/spiro.c`, Apache-2.0 or MIT, and its `spiro-inner` port);
+  Inkscape's `spiro.cpp` (GPL-2.0-or-later) and `libspiro` (GPL-3) were read for the procedure
+  only, no code is taken from them (customer preference, 2026-11-12). The per-step reductions of each
+  segment's turn and of the angle errors come from the GPL forks' procedure; the ten steps and the
+  `1e-12` stop are in the permissive original
+  (`docs/third-party/spiro-inner.md`).
+

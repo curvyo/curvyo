@@ -1705,6 +1705,15 @@ Decisions and reasoning: `specs/0100-bring-content-in/ux-notes.md`; sketches b, 
 | Guides left out of a clone | Action notice (status, 3s, canvas notice slot) "2 guides were not cloned. Guides never run." A partial result, so it is kept despite "no notice after a success" |
 
 
+## Width editing (`0110`, revised by `0114`, 2026-11-12)
+
+| Element | Value | Note |
+|---|---|---|
+| Edit width | Last control of the Select and Node bars, a 28 px text button at least 96 px wide (so the bar does not move when it turns into Done) in 14 px type with the border of Close path's Sharp and Smooth, on the line of its row's neighbours: the Taper both glyph and "Edit width"; while editing filled (`--toolbar-icon-active-bg` / `--toolbar-icon-active-fg`) and reading "Done". Shown when one stroked path is selected; in other tools a chip of its own while editing. A refused start shows the reason below it | The Style panel keeps Profile and Point only |
+| Width diamond | 16 px corner to corner, white fill (`--accent` when selected) in a 1.5 px `--node-stroke` ring and a 1.5 px white casing, so it reads on dark and light strokes and on the canvas; the ghost under the pointer has the same ring and casing with its fill at half opacity, so it reads on a light page. Hit radius 11 px | |
+| Typed width | Double-click on a diamond: the entry chip look (toolbar ground, panel shadow) 14 px below the diamond's centre (above it without room), its left edge 14 px left of the centre (its right edge 14 px right of it without room), kept inside the canvas; "Width [field] mm", the value selected; Enter sets it as one step, Escape or leaving cancels; an invalid value outlines the field and says "Must be 0 or more." on one line under it | Never up and right over the stroke |
+| Wheel over a diamond | 0.5 mm of full width per notch (Shift 0.1 mm), live; "Width 2.5 mm" in the entry chip look above the diamond (below without room), gone 800 ms after the last notch; a pause of 500 ms or a press ends the burst as one undo step; the canvas does not zoom | |
+
 ## Keyboard shortcuts established so far
 
 | Action | Shortcut | Notes |
