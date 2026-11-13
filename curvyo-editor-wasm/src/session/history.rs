@@ -134,6 +134,16 @@ impl Session {
         let before = self.selection_snapshot();
         self.document.set_step_time((self.history.clock)());
         let result = body(self);
+        // A grid moved off its laser page loses its rows, a duplicated grid gets its own, in the
+        // same step (`specs/0112` criteria 8, 13).
+        if self.has_unrecorded_steps() {
+            let duplicated = self
+                .document
+                .own_steps_from(self.history.recorded)
+                .iter()
+                .any(|step| step.label == "duplicate_objects");
+            self.reconcile_test_grids(duplicated);
+        }
         // A placed page kept on its laser page says so (`specs/0100` criterion 18).
         if self.document.take_placement_refusal() {
             self.transform_notice = Some(super::manufacturing::OFF_PAGE_NOTICE);

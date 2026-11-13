@@ -1,13 +1,11 @@
-//! The look of test grids on the output page (`specs/0028` criterion 12; UX notes §7.3, §11):
-//! cells in their grid's kind look, labels in their label kind's, one chip row per grid instead
-//! of one per cell, and the Worked chip on the marked cell in both views.
+//! The chip row of test grids on the output page (`specs/0112` UX 3.3, the `0028` 11 rule kept):
+//! one chip row on each grid's box with its kinds instead of one per cell or label.
 
 use std::collections::HashMap;
 
-use curvyo_document_core::{NodeId, OperationSnapshot, Point, ViewTransform};
+use curvyo_document_core::{NodeId, OperationSnapshot, Point};
 use curvyo_laser_core::settings::SetKind;
-use curvyo_laser_core::test_grids::CellTag;
-use curvyo_render_core::{ChipItem, DrawList, Glyph, OperationLook, worked_chip_list};
+use curvyo_render_core::{ChipItem, Glyph, OperationLook};
 
 use super::super::Session;
 
@@ -15,18 +13,17 @@ use super::super::Session;
 pub(in crate::session) struct GridChip {
     /// Its tagged items.
     leaves: Vec<NodeId>,
-    /// The kinds of its chip row: the grid's kind, then the labels' when they are on.
+    /// The kinds of its chip row: the cells' kind, then Engrave for the labels.
     glyphs: Vec<Glyph>,
-    /// The marked cell's item.
-    worked: Option<NodeId>,
-    /// Whether its row has Show on.
+    /// Whether one of its rows has Show on.
     shown: bool,
 }
 
-/// The grids of the active laser page: the look of each tagged item and the chips.
+/// The grids of the active laser page: the tagged items (no chip of their own) and the chips.
 #[derive(Default)]
 pub(in crate::session) struct GridLooks {
-    /// The look of each tagged item of a grid with a readable recipe.
+    /// The tagged items of a grid with a readable recipe, which take no chip of their own; an
+    /// old folded grid row (format 43/44, inert) runs nothing here.
     pub(in crate::session) parts: HashMap<NodeId, OperationLook>,
     grids: Vec<GridChip>,
 }
@@ -49,44 +46,45 @@ const fn glyph_of_set(kind: SetKind) -> Glyph {
 }
 
 impl Session {
-    /// The grids whose rows are among `operations`.
+    /// The grids whose derived rows are among `operations`.
     pub(in crate::session) fn grid_looks(&self, operations: &[OperationSnapshot]) -> GridLooks {
         let mut looks = GridLooks::default();
-        for row in operations.iter().filter(|op| op.grid) {
-            let Some(group) = self.document.test_grid_of_row(row.id) else {
+        let mut seen: Vec<NodeId> = Vec::new();
+        for row in operations.iter().filter(|op| op.grid_part.is_some()) {
+            let Some(group) = self.document.test_grid_of_derived_row(row.id) else {
                 continue;
             };
-            let Some(grid) = self.read_test_grid(group) else {
+            let shown = operations.iter().any(|op| {
+                op.show
+                    && op.grid_part.is_some()
+                    && self.document.test_grid_of_derived_row(op.id) == Some(group)
+            });
+            if seen.contains(&group) {
                 continue;
-            };
-            let Some(recipe) = grid.recipe else {
-                continue;
-            };
-            let mut leaves = Vec::new();
-            let mut worked = None;
-            for item in &grid.snapshot.cells {
-                if let Some(tag) = CellTag::from_value(&item.tag) {
-                    looks.parts.insert(item.id, look_of_set(recipe.kind));
-                    leaves.push(item.id);
-                    if grid.mark == Some(tag.cell) {
-                        worked = Some(item.id);
-                    }
-                }
             }
-            for item in &grid.snapshot.labels {
-                looks.parts.insert(item.id, look_of_set(recipe.labels.kind));
+            seen.push(group);
+            let Some(grid) = self.grid_object(group) else {
+                continue;
+            };
+            let kind = grid.recipe.test.kind();
+            let mut leaves = Vec::new();
+            for item in &grid.cells {
+                looks.parts.insert(item.id, look_of_set(kind));
                 leaves.push(item.id);
             }
-            let mut glyphs = vec![glyph_of_set(recipe.kind)];
-            if recipe.labels.on && !grid.snapshot.labels.is_empty() {
-                glyphs.push(glyph_of_set(recipe.labels.kind));
+            for item in &grid.labels {
+                looks.parts.insert(item.id, look_of_set(SetKind::Engrave));
+                leaves.push(item.id);
+            }
+            let mut glyphs = vec![glyph_of_set(kind)];
+            if !grid.labels.is_empty() {
+                glyphs.push(glyph_of_set(SetKind::Engrave));
             }
             glyphs.dedup();
             looks.grids.push(GridChip {
                 leaves,
                 glyphs,
-                worked,
-                shown: row.show,
+                shown,
             });
         }
         looks
@@ -119,21 +117,5 @@ impl GridLooks {
                 })
             })
             .collect()
-    }
-
-    /// The Worked chip of each shown grid with a mark, centred on the marked cell's square.
-    pub(in crate::session) fn worked_chips(
-        &self,
-        bounds: &dyn Fn(NodeId) -> Option<(Point, Point)>,
-        view: ViewTransform,
-    ) -> DrawList {
-        let mut list = DrawList::default();
-        for grid in self.grids.iter().filter(|grid| grid.shown) {
-            if let Some((min, max)) = grid.worked.and_then(bounds) {
-                let centre = Point::new(f64::midpoint(min.x, max.x), f64::midpoint(min.y, max.y));
-                list.extend(worked_chip_list(centre, view));
-            }
-        }
-        list
     }
 }

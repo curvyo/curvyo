@@ -1,7 +1,0 @@
-[
-  {
-    "id": "09090909-0909-4909-8909-090909090909",
-    "op": "write",
-    "text": "{\n  \"format_version\": 1,\n  \"id\": \"09090909-0909-4909-8909-090909090909\",\n  \"kind\": \"laser\",\n  \"modified\": 1762948800000,\n  \"name\": \"Birch 3 mm\",\n  \"thickness_mm\": 3.0,\n  \"machine\": {\n    \"id\": \"generic-laser\",\n    \"name\": \"Generic laser\"\n  },\n  \"sets\": {\n    \"cut\": {\n      \"power_pct\": 40.0,\n      \"speed_mm_min\": 1950,\n      \"passes\": 1,\n      \"source\": {\n        \"test\": \"09090909-0909-4909-8909-090909090909\"\n      }\n    }\n  },\n  \"history\": [\n    {\n      \"id\": \"09090909-0909-4909-8909-090909090909\",\n      \"date\": 1762948800000,\n      \"event\": \"tested\",\n      \"kind\": \"cut\",\n      \"set\": {\n        \"power_pct\": 40.0,\n        \"speed_mm_min\": 1950,\n        \"passes\": 1\n      },\n      \"grid\": {\n        \"columns\": 5,\n        \"rows\": 5,\n        \"power_from_pct\": 20.0,\n        \"power_to_pct\": 100.0,\n        \"speed_from_mm_min\": 600,\n        \"speed_to_mm_min\": 6000,\n        \"cell_mm\": 10.0,\n        \"gap_mm\": 3.0\n      },\n      \"cell\": {\n        \"column\": 1,\n        \"row\": 1\n      }\n    }\n  ]\n}\n"
-  }
-]

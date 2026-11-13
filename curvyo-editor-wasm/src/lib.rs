@@ -196,7 +196,7 @@ pub use session::{
     FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
 };
 pub use session::{LayoutOutcome, ObjectToPathOutcome, StyleOutcome, TextBarView, TextSizeOutcome};
-pub use session::{MaterialWrite, MaterialsView, SaveAsMaterial, TestGridView};
+pub use session::{MaterialWrite, MaterialsView, TestGridView};
 pub use session::{RecogniseOutcome, RecognisedLine};
 pub use session::{TextPathPress, TextPathView};
 pub use session::{TilingStatus, circle_handle};

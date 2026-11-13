@@ -20,7 +20,7 @@
   "pick": [],
   "rows": [
     {
-      "grid": null,
+      "source": null,
       "group_in_part": "Group vyl1en",
       "id": {
         "counter": 39,
@@ -70,7 +70,7 @@
       "unfolded": false
     },
     {
-      "grid": null,
+      "source": null,
       "group_in_part": null,
       "id": {
         "counter": 44,

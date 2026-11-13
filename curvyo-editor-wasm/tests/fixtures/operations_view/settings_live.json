@@ -21,7 +21,7 @@
   ],
   "rows": [
     {
-      "grid": null,
+      "source": null,
       "kind": "engrave_outline",
       "name": "engrave_outline 2",
       "settings": {
@@ -87,7 +87,7 @@
       }
     },
     {
-      "grid": null,
+      "source": null,
       "kind": "score",
       "name": "score 3",
       "settings": {
@@ -125,7 +125,7 @@
       }
     },
     {
-      "grid": null,
+      "source": null,
       "kind": "cut",
       "name": "cut 1",
       "settings": {

@@ -1,335 +1,298 @@
-//! Session tests of the material library (`specs/0028` criteria 15 to 26, 32): Save as material,
-//! the record edits as steps with their refresh, the journal's undo and redo, the save refresh.
+//! Session tests of the Materials tab (`specs/0112` criteria 16 to 27): materials and sets per
+//! laser as steps, the test record that follows a grid, judging, note, photo bytes, deleting with
+//! retired ids, the journal's undo and redo with photo bytes, the per-laser tie.
 
-use curvyo_document_core::{Direction, NodeId};
-use curvyo_laser_core::settings::{SettingsRead, read_settings};
+use curvyo_laser_core::grids::TestId;
+use curvyo_laser_core::library::{MAX_RECORD_TEXT, MaterialRead};
 
 use super::super::Session;
-use super::super::test_grid::tests::{add_grid, laser_with_fonts};
-use super::SaveAsMaterial;
+use super::super::test_grid::tests::{laser_with_fonts, place_grid, recipe_of, undo_label};
 
-const RANDOM: [u8; 32] = [7; 32];
+pub(in crate::session) const RANDOM: [u8; 16] = [7; 16];
 
-fn random(n: u8) -> [u8; 32] {
+fn random(n: u8) -> [u8; 16] {
     let mut bytes = RANDOM;
     bytes[0] = n;
-    bytes[16] = n.wrapping_add(100);
     bytes
 }
 
-fn undo_label(s: &mut Session) -> String {
-    s.history_target_name(Direction::Undo).unwrap_or_default()
+/// A PNG header of `width` x `height` (no pixels: core reads the header only).
+pub(in crate::session) fn png(width: u32, height: u32) -> Vec<u8> {
+    let mut bytes = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+    bytes.extend_from_slice(&width.to_be_bytes());
+    bytes.extend_from_slice(&height.to_be_bytes());
+    bytes.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    bytes
 }
 
-/// A laser page with a marked default grid saved as "Birch 3 mm".
-fn saved_birch() -> (Session, String) {
+fn writes(s: &mut Session) -> Vec<serde_json::Value> {
+    serde_json::from_str(&s.take_material_writes_json()).unwrap()
+}
+
+/// A laser page with "Birch 3 mm" and a grid that uses it.
+pub(in crate::session) fn birch_grid() -> (Session, String, curvyo_document_core::NodeId) {
     let mut s = laser_with_fonts();
-    add_grid(&mut s);
-    assert!(s.press_test_cell(2, 1));
-    let id = s
-        .save_as_material(
-            &SaveAsMaterial {
-                existing: None,
-                name: "Birch 3 mm".to_owned(),
-                thickness_mm: 3.0,
-                passes: 1.0,
-            },
-            &random(1),
-        )
-        .unwrap();
-    (s, id)
-}
-
-fn cut_with_birch() -> (Session, String, NodeId) {
-    let (mut s, id) = saved_birch();
-    let cut = s.add_test_operation("cut").unwrap();
-    assert!(s.use_material_on(&[cut], &id));
-    (s, id, cut)
-}
-
-fn row_settings(s: &Session, id: NodeId) -> super::super::operations::SettingsView {
-    s.operations_view()
-        .unwrap()
-        .rows
-        .into_iter()
-        .find(|row| row.id == id)
-        .and_then(|row| row.settings)
-        .unwrap()
+    let birch = s.add_material("Birch 3 mm", 3.0, &random(1)).unwrap();
+    let group = place_grid(&mut s);
+    assert_eq!(s.pick_test_grid_material(Some(&birch)), Ok(true));
+    (s, birch, group)
 }
 
 #[test]
-fn criterion_15_save_as_material_makes_a_record_in_one_step_with_its_write() {
-    let (mut s, id) = saved_birch();
-    assert_eq!(undo_label(&mut s), "Save as material");
-    let material = s.materials().find(&id).unwrap();
-    assert_eq!(material.name, "Birch 3 mm");
-    assert_eq!(material.history.len(), 1);
-    assert_eq!(material.machine.id, "generic-laser");
-    let writes = s.take_material_writes_json();
-    assert!(writes.contains("\"op\":\"write\""), "{writes}");
-    assert!(writes.contains(&id));
+fn criterion_17_add_material_is_one_step_and_undo_takes_the_record_back() {
+    let mut s = laser_with_fonts();
+    let steps = s.undo_len();
+    let id = s.add_material("Birch 3 mm", 3.0, &random(1)).unwrap();
+    assert_eq!(s.undo_len(), steps + 1);
+    assert_eq!(undo_label(&mut s), "Add material");
+    let w = writes(&mut s);
+    assert_eq!(w[0]["op"], "write");
     let view = s.materials_view().unwrap();
-    assert_eq!(view.rows.len(), 1);
-    assert_eq!(view.next_name, "Material 1");
-}
-
-#[test]
-fn criterion_15_the_form_names_its_first_invalid_field() {
-    let mut s = laser_with_fonts();
-    add_grid(&mut s);
-    let mut form = SaveAsMaterial {
-        existing: None,
-        name: " ".to_owned(),
-        thickness_mm: 3.0,
-        passes: 1.0,
-    };
+    assert_eq!(view.unfolded.as_ref().unwrap().id, id);
     assert_eq!(
-        s.save_as_material(&form, &RANDOM),
-        Err("No cell marked".to_owned())
-    );
-    assert!(s.press_test_cell(0, 0));
-    assert_eq!(
-        s.save_as_material(&form, &RANDOM),
+        s.add_material(" ", 3.0, &random(2)),
         Err("Enter a name.".to_owned())
     );
-    form.name = "Oak".to_owned();
-    form.thickness_mm = f64::NAN;
     assert_eq!(
-        s.save_as_material(&form, &RANDOM),
-        Err("Enter a thickness.".to_owned())
-    );
-    form.thickness_mm = 100.1;
-    assert_eq!(
-        s.save_as_material(&form, &RANDOM),
+        s.add_material("x", 0.0, &random(2)),
         Err("Thickness is 0.1 to 100 mm.".to_owned())
     );
-    form.thickness_mm = 4.0;
-    form.passes = 21.0;
-    assert_eq!(
-        s.save_as_material(&form, &RANDOM),
-        Err("Passes are 1 to 20.".to_owned())
-    );
-}
-
-#[test]
-fn criterion_32_undo_of_save_as_material_removes_the_record_and_redo_brings_it_back() {
-    let (mut s, id) = saved_birch();
-    let _ = s.take_material_writes_json();
-    let result = s.undo();
-    assert!(result.changed);
+    let _ = s.undo();
     assert!(s.materials().find(&id).is_none());
-    assert!(s.take_material_writes_json().contains("\"op\":\"remove\""));
-    s.redo();
-    let material = s.materials().find(&id).unwrap();
-    assert_eq!(
-        material.history.len(),
-        1,
-        "redo adds the entry again (Frage 190 A)"
-    );
+    assert_eq!(writes(&mut s)[0]["op"], "remove");
 }
 
 #[test]
-fn criteria_22_26_a_set_edit_changes_every_linked_operation_in_its_step() {
-    let (mut s, id, cut) = cut_with_birch();
-    assert_eq!(row_settings(&s, cut).sets[0].run.power_pct, Some(60.0));
+fn criteria_18_to_21_sets_per_laser_a_set_adds_its_laser() {
+    let mut s = laser_with_fonts();
+    let id = s.add_material("Birch", 3.0, &random(1)).unwrap();
+    let laser = s.active_profile_id().unwrap();
+    s.add_material_set(&id, &laser, "cut", &random(2)).unwrap();
+    assert_eq!(undo_label(&mut s), "Add set");
     assert_eq!(
-        s.edit_material_set(&id, "cut", "power", 65.0, &random(2)),
+        s.edit_material_set(&id, &laser, "cut", "power", 60.0, &random(3)),
         Ok(true)
     );
     assert_eq!(undo_label(&mut s), "Edit material");
-    assert_eq!(row_settings(&s, cut).sets[0].run.power_pct, Some(65.0));
-    // The stored numbers were refreshed in the same step.
-    let stored = stored_power(&s, cut);
-    assert_eq!(stored, 65.0);
-    s.undo();
-    assert_eq!(row_settings(&s, cut).sets[0].run.power_pct, Some(60.0));
-    assert_eq!(stored_power(&s, cut), 60.0);
-    assert_eq!(s.materials().find(&id).unwrap().history.len(), 1);
-    s.redo();
-    assert_eq!(row_settings(&s, cut).sets[0].run.power_pct, Some(65.0));
-}
-
-fn stored_power(s: &Session, op: NodeId) -> f64 {
-    let manufacturing = s.active_manufacturing().unwrap();
-    let snapshot = s
-        .document
-        .operations(manufacturing.id)
-        .unwrap()
-        .into_iter()
-        .find(|o| o.id == op)
+    assert_eq!(
+        s.edit_material_set(&id, &laser, "cut", "interval", 0.1, &random(4)),
+        Err("Enter a number.".to_owned()),
+        "no interval on Cut"
+    );
+    s.add_material_set(&id, &laser, "engrave", &random(5))
         .unwrap();
-    let kind = curvyo_laser_core::operations::OperationKind::Cut;
-    match read_settings(snapshot.settings.as_ref(), kind) {
-        SettingsRead::Stored(stored) => stored.main.power.percent(),
+    assert_eq!(
+        s.edit_material_set(&id, &laser, "engrave", "interval", 0.08, &random(6)),
+        Ok(true)
+    );
+    let m = s.materials().find(&id).unwrap();
+    assert_eq!(m.lasers.len(), 1);
+    assert_eq!(m.set_count(), 2);
+    s.unfold_material(Some(&id));
+    let view = s.materials_view().unwrap();
+    let body = view.unfolded.unwrap();
+    assert!(body.lasers[0].this_page);
+    assert_eq!(body.lasers[0].sets[0].source, "Typed");
+    assert_eq!(body.lasers[0].missing.len(), 1, "Score is missing");
+    s.delete_material_set(&id, &laser, "cut", &random(7))
+        .unwrap();
+    assert_eq!(undo_label(&mut s), "Delete set");
+    let line = match &s.materials_view().unwrap().rows[0] {
+        super::view_types::MaterialRowView::Loaded { line, .. } => line.clone(),
         other => panic!("{other:?}"),
-    }
+    };
+    assert_eq!(line, "1 laser · 1 set");
 }
 
 #[test]
-fn criterion_32_undo_leaves_a_record_that_changed_since_and_says_so() {
-    let (mut s, id, _) = cut_with_birch();
-    assert_eq!(
-        s.edit_material_set(&id, "cut", "power", 65.0, &random(2)),
-        Ok(true)
-    );
-    // Another computer's sync: the record on disk is loaded with other numbers.
-    let text = s.materials().text(&id).unwrap().replace("65.0", "70.0");
-    s.load_materials(&[(format!("{id}.json"), text)], None);
-    let result = s.undo();
-    assert_eq!(
-        result.notice,
-        "Birch 3 mm changed since; the material was not undone."
-    );
-    assert_eq!(
-        s.materials()
-            .find(&id)
-            .unwrap()
-            .set(curvyo_laser_core::settings::SetKind::Cut)
-            .unwrap()
-            .power
-            .percent(),
-        70.0
-    );
-}
-
-#[test]
-fn criterion_32_a_dropped_journal_entry_undoes_only_the_project() {
-    let (mut s, id, _) = cut_with_birch();
-    s.material_journal().set_limit(10);
-    assert_eq!(s.rename_material(&id, "Birch plywood"), Ok(true));
-    assert_eq!(s.material_journal().bytes(), 0);
-    let result = s.undo();
-    assert_eq!(
-        result.notice,
-        "Only the project was undone; Birch plywood is too old."
-    );
-    assert_eq!(s.materials().find(&id).unwrap().name, "Birch plywood");
-}
-
-#[test]
-fn criteria_21_26_delete_leaves_stored_numbers_and_undo_brings_the_record_back() {
-    let (mut s, id, cut) = cut_with_birch();
-    assert!(s.delete_material(&id).is_ok());
-    assert_eq!(undo_label(&mut s), "Delete material");
-    let settings = row_settings(&s, cut);
-    assert_eq!(
-        settings.reason.as_deref(),
-        Some("Material not found, using stored numbers")
-    );
-    assert_eq!(settings.sets[0].run.power_pct, Some(60.0));
-    s.undo();
-    assert!(s.materials().find(&id).is_some());
-    assert_eq!(row_settings(&s, cut).reason, None);
-}
-
-#[test]
-fn criteria_20_22_rename_thickness_and_order() {
-    let (mut s, id) = saved_birch();
-    assert_eq!(s.rename_material(&id, ""), Ok(false), "empty reverts");
-    assert_eq!(s.rename_material(&id, "Oak"), Ok(true));
-    assert_eq!(undo_label(&mut s), "Rename material");
-    assert_eq!(s.set_material_thickness(&id, 4.0), Ok(true));
-    assert_eq!(undo_label(&mut s), "Edit material");
-    assert_eq!(
-        s.set_material_thickness(&id, 0.0),
-        Err("Thickness is 0.1 to 100 mm.".to_owned())
-    );
-    let steps = s.undo_len();
-    let _ = s.take_material_writes_json();
-    assert!(s.move_material(&id, 0), "the order list gets its first id");
-    assert_eq!(s.undo_len(), steps, "the order is no step");
-    assert!(s.take_material_writes_json().contains("\"op\":\"order\""));
-    s.select_material(Some(&id));
-    let fields = s.materials_view().unwrap().selected.unwrap();
-    assert_eq!(fields.thickness_mm, 4.0);
-    assert!(
-        fields.sets[0].source.starts_with("Tested "),
-        "{}",
-        fields.sets[0].source
-    );
-}
-
-#[test]
-fn criterion_26_save_refreshes_stored_numbers_without_a_step() {
-    let (mut s, id, cut) = cut_with_birch();
-    // A newer record from another computer: live numbers 70, stored 60.
-    let mut material = s.materials().find(&id).unwrap().clone();
-    material.modified += 10;
-    let set = material
-        .sets
-        .get_mut(&curvyo_laser_core::settings::SetKind::Cut)
+fn criterion_21_an_operation_uses_the_set_of_its_page_laser() {
+    let mut s = laser_with_fonts();
+    let id = s.add_material("Birch", 3.0, &random(1)).unwrap();
+    // A set for another laser only.
+    let other = curvyo_laser_core::settings::MachineTie {
+        id: "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f".to_owned(),
+        name: "Diode 20 W".to_owned(),
+    };
+    s.materials
+        .tab
+        .picked_lasers
+        .insert(id.clone(), vec![other.clone()]);
+    s.add_material_set(&id, &other.id, "cut", &random(2))
         .unwrap();
-    set.settings.power = curvyo_laser_core::settings::PowerPercent::from_tenths(700).unwrap();
-    let text = curvyo_laser_core::material_library::write_material(&material);
-    s.load_materials(&[(format!("{id}.json"), text)], None);
-    assert_eq!(row_settings(&s, cut).sets[0].run.power_pct, Some(70.0));
-    assert_eq!(stored_power(&s, cut), 60.0);
-    let steps = s.undo_len();
-    s.pack_for_save().unwrap();
-    assert_eq!(stored_power(&s, cut), 70.0);
-    assert_eq!(s.undo_len(), steps, "the save refresh is no step");
-}
-
-#[test]
-fn criterion_24_a_typed_number_keeps_the_link_and_reset_removes_it() {
-    let (mut s, _, cut) = cut_with_birch();
-    assert_eq!(
-        s.edit_operation_setting(cut, "main", "power", 70.0),
-        Ok(true)
-    );
-    assert_eq!(undo_label(&mut s), "Edit settings");
-    let settings = row_settings(&s, cut);
-    assert_eq!(settings.differs.as_deref(), Some("Differs from Birch 3 mm"));
-    assert_eq!(settings.sets[0].run.power_pct, Some(70.0));
-    assert_eq!(settings.sets[0].material.unwrap().power_pct, 60.0);
-    assert!(settings.reset);
-    assert!(s.reset_operation_to_material(cut));
-    assert_eq!(undo_label(&mut s), "Reset to material");
-    assert!(!row_settings(&s, cut).reset);
-    assert_eq!(
-        s.edit_operation_setting(cut, "main", "power", 70.0),
-        Ok(true)
-    );
-    assert!(s.use_own_numbers_on(&[cut]));
-    let own = row_settings(&s, cut);
-    assert_eq!(own.material, None);
-    assert_eq!(own.sets[0].run.power_pct, Some(70.0));
-}
-
-#[test]
-fn criterion_27_a_pick_for_several_skips_a_kind_without_a_set_and_says_so() {
-    let (mut s, id) = saved_birch();
+    s.add_material_set(&id, &s.active_profile_id().unwrap(), "engrave", &random(3))
+        .unwrap();
     let cut = s.add_test_operation("cut").unwrap();
-    let score = s.add_test_operation("score").unwrap();
-    assert!(s.use_material_on(&[cut, score], &id));
+    assert!(
+        !s.use_material_on(&[cut], &id),
+        "no Cut set for this laser: skipped"
+    );
+    let engrave = s.add_test_operation("engrave").unwrap();
+    assert!(s.use_material_on(&[engrave], &id));
+}
+
+#[test]
+fn criterion_22_a_pick_makes_the_test_a_commit_rewrites_it_another_pick_moves_it() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id;
     assert_eq!(undo_label(&mut s), "Use material");
+    let test = s
+        .materials()
+        .find(&birch)
+        .unwrap()
+        .test(id)
+        .unwrap()
+        .clone();
+    assert!(test.lasered.is_none());
+    assert_eq!(s.set_test_grid_field("columns_count", "4"), Ok(true));
+    let rewritten = s
+        .materials()
+        .find(&birch)
+        .unwrap()
+        .test(id)
+        .unwrap()
+        .clone();
     assert_eq!(
-        s.operations_notice().as_deref(),
-        Some("Score 1 skipped: Birch 3 mm has no Score set.")
+        rewritten
+            .recipe
+            .axis(curvyo_laser_core::grids::Side::Columns)
+            .count(),
+        4
     );
-    let disabled = row_settings(&s, score).disabled;
-    assert_eq!(disabled[0].reason, "No Score set");
+    let walnut = s.add_material("Walnut", 4.0, &random(9)).unwrap();
+    s.select_grid(group);
+    assert_eq!(s.pick_test_grid_material(Some(&walnut)), Ok(true));
+    assert!(s.materials().find(&birch).unwrap().test(id).is_none());
+    assert!(s.materials().find(&walnut).unwrap().test(id).is_some());
+    assert!(!s.materials.id_taken(TestId::parse("ZZZZZ").unwrap()));
+    // Undo takes both records back in one step.
+    let _ = s.undo();
+    assert!(s.materials().find(&birch).unwrap().test(id).is_some());
+    assert!(s.materials().find(&walnut).unwrap().test(id).is_none());
 }
 
 #[test]
-fn criterion_24_no_settings_waits_for_power_and_speed() {
-    let (mut s, _) = saved_birch();
-    let cut = s.add_test_operation("cut").unwrap();
-    let steps = s.undo_len();
+fn criterion_24_one_tap_makes_the_best_cell_and_the_set() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id.to_string();
+    s.unfold_material(Some(&birch));
+    s.open_material_test(Some(&id));
+    s.judge_test(&birch, &id, 2, 1, &random(3)).unwrap();
+    assert_eq!(undo_label(&mut s), "Choose best cell");
+    let laser = s.active_profile_id().unwrap();
+    let m = s.materials().find(&birch).unwrap();
+    let set = m
+        .set_for(&laser, curvyo_laser_core::settings::SetKind::Cut)
+        .unwrap();
+    assert_eq!(set.numbers.settings.power.percent(), 60.0);
+    let detail = s.materials_view().unwrap().unfolded.unwrap().test.unwrap();
+    assert_eq!(detail.best.unwrap().column, 2);
+    assert!(detail.set_line.unwrap().starts_with("Cut set of "));
+    assert!(detail.place.on_page);
     assert_eq!(
-        s.edit_operation_setting(cut, "main", "power", 50.0),
-        Ok(false)
+        s.judge_test(&birch, &id, 2, 1, &random(4)),
+        Err("Nothing changed.".to_owned()),
+        "a tap on the best cell (G14)"
     );
-    assert_eq!(s.undo_len(), steps);
-    assert_eq!(row_settings(&s, cut).sets[0].run.power_pct, Some(50.0));
+}
+
+#[test]
+fn criteria_25_to_27_note_photo_and_delete_with_its_retired_id() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id.to_string();
+    let _ = writes(&mut s);
+    assert_eq!(s.set_test_note(&birch, &id, "Clean edge."), Ok(true));
+    assert_eq!(undo_label(&mut s), "Edit note");
+    assert_eq!(s.set_test_note(&birch, &id, "Clean edge."), Ok(false));
+    assert!(s.set_test_note(&birch, &id, &"x".repeat(501)).is_err());
     assert_eq!(
-        s.edit_operation_setting(cut, "main", "speed", 1200.0),
-        Ok(true)
+        s.set_test_photo(&birch, &id, b"GIF89a", false),
+        Err("Use a JPEG or PNG image.".to_owned())
     );
-    let own = row_settings(&s, cut);
-    assert_eq!(own.sets[0].run.passes, Some(1));
+    s.set_test_photo(&birch, &id, &png(600, 400), false)
+        .unwrap();
+    assert_eq!(undo_label(&mut s), "Add photo");
+    let w = writes(&mut s);
+    let photo = w.iter().find(|w| w["op"] == "write_photo").unwrap();
+    let name = photo["name"].as_str().unwrap().to_owned();
+    assert_eq!(name, format!("{birch}.{id}.png"));
+    let handle = u32::try_from(photo["handle"].as_u64().unwrap()).unwrap();
+    assert_eq!(s.take_material_photo_bytes(handle), Some(png(600, 400)));
+    assert_eq!(s.take_material_photo_bytes(handle), None, "once");
+    s.set_test_photo(&birch, &id, &png(500, 400), true).unwrap();
+    assert_eq!(undo_label(&mut s), "Crop photo");
+    // Undo of the crop writes the earlier bytes back.
+    let _ = writes(&mut s);
+    let _ = s.undo();
+    let w = writes(&mut s);
+    let back = w.iter().find(|w| w["op"] == "write_photo").unwrap();
+    let handle = u32::try_from(back["handle"].as_u64().unwrap()).unwrap();
+    assert_eq!(s.take_material_photo_bytes(handle), Some(png(600, 400)));
+    s.remove_test_photo(&birch, &id).unwrap();
+    assert!(writes(&mut s).iter().any(|w| w["op"] == "remove_photo"));
+    s.set_test_photo(&birch, &id, &png(600, 400), false)
+        .unwrap();
+    let _ = writes(&mut s);
+    s.delete_test(&birch, &id).unwrap();
+    assert_eq!(undo_label(&mut s), "Delete test");
+    let w = writes(&mut s);
+    assert!(w.iter().any(|w| w["op"] == "remove_photo"));
+    let retired = w.iter().find(|w| w["op"] == "retired").unwrap();
+    assert!(retired["text"].as_str().unwrap().contains(&id));
+    assert!(s.materials.id_taken(TestId::parse(&id).unwrap()));
+}
+
+#[test]
+fn criterion_17_deleting_a_material_retires_its_tests_and_removes_photos() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id.to_string();
+    s.set_test_photo(&birch, &id, &png(10, 10), false).unwrap();
+    let _ = writes(&mut s);
+    s.delete_material(&birch).unwrap();
+    assert_eq!(undo_label(&mut s), "Delete material");
+    let w = writes(&mut s);
+    let ops: Vec<&str> = w.iter().map(|w| w["op"].as_str().unwrap()).collect();
+    assert!(ops.contains(&"remove") && ops.contains(&"remove_photo") && ops.contains(&"retired"));
+    let _ = s.undo();
+    assert!(s.materials().find(&birch).is_some());
+    assert!(
+        s.materials.id_taken(TestId::parse(&id).unwrap()),
+        "undo leaves the id retired"
+    );
+}
+
+#[test]
+fn the_journal_counts_photo_bytes_and_drops_the_oldest_past_its_limit() {
+    let (mut s, birch, group) = birch_grid();
+    let id = recipe_of(&s, group).id.to_string();
+    s.material_journal().set_limit(4_000);
+    s.set_test_photo(&birch, &id, &png(600, 400), false)
+        .unwrap();
+    s.set_test_note(&birch, &id, "a").unwrap();
+    assert!(s.material_journal().bytes() <= 4_000);
+}
+
+#[test]
+fn a_material_record_over_512_kib_is_refused_with_its_notice() {
+    let mut s = laser_with_fonts();
+    let id = s.add_material("Birch", 3.0, &random(1)).unwrap();
+    let mut change = super::LibraryChange::default();
+    let refused = s.change_record(&mut change, &id, |m| {
+        m.name = "Birch".to_owned();
+        for i in 0..5_000 {
+            m.history.push(curvyo_laser_core::library::HistoryEntry {
+                id: format!("{i:0>36}"),
+                date: 1,
+                machine: "generic-laser".to_owned(),
+                kind: curvyo_laser_core::settings::SetKind::Cut,
+                event: curvyo_laser_core::library::HistoryEvent::Removed,
+            });
+        }
+        Ok(())
+    });
     assert_eq!(
-        s.edit_operation_setting(cut, "main", "speed", 999_999.0),
-        Err("Speed is 1 to 6000 mm/min.".to_owned())
+        refused,
+        Err("Could not save Birch: it is over 512 KiB.".to_owned())
     );
+    assert!(s.materials().text(&id).unwrap().len() < MAX_RECORD_TEXT);
+    assert!(matches!(s.materials().reads()[0], MaterialRead::Loaded(_)));
 }

@@ -1,9 +1,14 @@
-//! The test grids of the active laser page in a session (`specs/0028-material-test-library`
-//! criteria 1 to 14; ADR 0054 §4, §5): which grid the Grid block shows, its reading and the
-//! remembered values per machine. The rules are `curvyo-laser-core`'s; each write is one step.
+//! The Test grid tool of a session (`specs/0112-test-grid-and-materials` criteria 1 to 15, 28;
+//! ADR 0057; `adrs.md` finding 1): one owned state, the reading of grid objects, their ids and
+//! where they lie. The rules are `curvyo-laser-core`'s; each write is one step.
 
-mod build;
-mod commands;
+mod bar;
+mod canvas;
+mod items;
+mod place;
+mod prepared;
+#[cfg(test)]
+mod review_tests;
 #[cfg(test)]
 pub(in crate::session) mod tests;
 mod view_json;
@@ -11,81 +16,108 @@ mod view_json;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 
-use curvyo_document_core::{NodeId, TestGridSnapshot};
-use curvyo_laser_core::material_library::{RememberedGrid, read_grid_choice};
-use curvyo_laser_core::settings::CellIndex;
-use curvyo_laser_core::test_grids::{GridRecipe, read_mark};
+use curvyo_document_core::{GridItem, NodeId, Point};
+use curvyo_laser_core::PROCESS_ID;
+use curvyo_laser_core::grids::{Recipe, TestId, TestRecipe, read_test_grid_choice};
 
 use super::Session;
 
 pub use view_json::TestGridView;
 
-/// A typed value the grid did not take: kept in its field with the chip (criterion 2).
+/// A typed value the grid did not take: kept in its field with the cause (criterion 5).
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Invalid {
-    group: NodeId,
+    /// The grid it was typed for, `None` for the tool's draft.
+    group: Option<NodeId>,
     field: String,
     typed: String,
-    chip: String,
+    cause: String,
 }
 
-/// What the session keeps for test grids.
+/// The Test grid tool's state (finding 1): the remembered recipes, the kept invalid value, the
+/// spoken status, the label widths and the caller's random bytes for ids.
 #[derive(Debug, Default)]
-pub(in crate::session) struct TestGridState {
-    /// The remembered grid values per profile id (`test-grid-choice.json`, this computer).
-    choice: BTreeMap<String, RememberedGrid>,
-    /// The grid row pressed in the list.
-    row: Option<NodeId>,
-    /// The field value the grid did not take, with its chip.
+pub(in crate::session) struct TestGridTool {
+    /// The last recipe per profile id (`test-grid-choice.json`, this computer).
+    choice: BTreeMap<String, TestRecipe>,
+    /// The field value the grid did not take, with its cause.
     invalid: Option<Invalid>,
-    /// The refusal of the last Add test grid, shown under the button.
+    /// The sr-only status ("New test id 8PL4D."), taken once.
+    status: Option<String>,
+    /// The refusal of the last press, shown as the Action notice.
     notice: Option<String>,
-    /// Label widths in mm by face hash, height and text: each distinct text is shaped once.
-    widths: RefCell<HashMap<(String, u64, String), f64>>,
-    /// The grid the canvas selection held at the last panel read (UX notes §6.1, M3).
-    seen: Cell<Option<NodeId>>,
+    /// Label widths in mm at the text height, by face hash and text: shaped once each.
+    widths: RefCell<HashMap<(String, String), f64>>,
+    /// The pointer over the page while the tool is active: the outline preview.
+    hover: Option<Point>,
+    /// The material the bar picked while no grid is selected: the next grid uses it.
+    draft_material: Option<curvyo_laser_core::grids::MaterialRef>,
+    /// Random bytes from the host for new test ids.
+    random: Vec<u8>,
+    /// A counter mixed into the fallback bytes when the host gave none.
+    drawn: Cell<u64>,
 }
 
-/// A grid as read: its stored data, its recipe and mark when they read.
-pub(in crate::session) struct GridRead {
-    pub(in crate::session) snapshot: TestGridSnapshot,
-    pub(in crate::session) recipe: Option<GridRecipe>,
-    pub(in crate::session) mark: Option<CellIndex>,
+/// A grid object as read: its group, its readable recipe, its Lasered register and items.
+#[derive(Debug, Clone, PartialEq)]
+pub(in crate::session) struct GridObject {
+    pub(in crate::session) group: NodeId,
+    pub(in crate::session) recipe: Recipe,
+    pub(in crate::session) lasered: Option<u64>,
+    pub(in crate::session) cells: Vec<GridItem>,
+    pub(in crate::session) labels: Vec<GridItem>,
+    pub(in crate::session) derived: Vec<NodeId>,
+}
+
+/// A grid whose derived operations lie on a laser page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::session) struct PlacedGrid {
+    pub(in crate::session) group: NodeId,
+    pub(in crate::session) id: TestId,
+    pub(in crate::session) page_id: String,
+    pub(in crate::session) page_name: String,
 }
 
 impl Session {
-    /// Reads the kept `test-grid-choice.json` (criterion 2); a damaged text reads as empty.
+    /// Reads the kept `test-grid-choice.json` (criterion 2); a damaged or format-1 text reads as
+    /// empty.
     pub fn load_test_grid_choice(&mut self, text: &str) {
-        self.test_grids.choice = read_grid_choice(text);
+        self.test_grid.choice = read_test_grid_choice(text);
     }
 
-    /// The test grid whose top group is `group`.
-    pub(in crate::session) fn read_test_grid(&self, group: NodeId) -> Option<GridRead> {
+    /// Random bytes from the host (`crypto.getRandomValues`) that new test ids are drawn from
+    /// (criterion 9); 64 at a time is plenty.
+    pub fn feed_test_grid_random(&mut self, bytes: &[u8]) {
+        self.test_grid.random.extend_from_slice(bytes);
+    }
+
+    /// The sr-only status of the last commit ("New test id 8PL4D."), once.
+    pub fn take_test_grid_status(&mut self) -> Option<String> {
+        self.test_grid.status.take()
+    }
+
+    /// The refusal of the last press or commit, `None` when it wrote.
+    #[must_use]
+    pub fn test_grid_notice(&self) -> Option<String> {
+        self.test_grid.notice.clone()
+    }
+
+    /// The grid object whose group is `group`, `None` when it is no grid or its recipe does not
+    /// read (it is then a plain group, ADR 0057 §6).
+    pub(in crate::session) fn grid_object(&self, group: NodeId) -> Option<GridObject> {
         let snapshot = self.document.test_grid(group)?;
-        let recipe = GridRecipe::from_value(&snapshot.recipe);
-        let mark = recipe.as_ref().and_then(|recipe| {
-            snapshot
-                .worked
-                .as_ref()
-                .and_then(|value| read_mark(value, recipe))
-        });
-        Some(GridRead {
-            snapshot,
+        let recipe = Recipe::from_value(&snapshot.recipe)?;
+        Some(GridObject {
+            group,
             recipe,
-            mark,
+            lasered: snapshot.lasered,
+            cells: snapshot.cells,
+            labels: snapshot.labels,
+            derived: snapshot.derived,
         })
     }
 
-    /// The grid the canvas selection is or lies in: a selected top group, or the nearest grid
-    /// group above a selected item.
-    pub(in crate::session) fn selected_test_grid(&self) -> Option<NodeId> {
-        self.selection
-            .ids()
-            .iter()
-            .find_map(|&id| self.test_grid_above(id))
-    }
-
-    /// The grid whose top group is `id` or lies above it.
+    /// The grid whose group is `id` or lies above it.
     fn test_grid_above(&self, id: NodeId) -> Option<NodeId> {
         let mut at = Some(id);
         while let Some(node) = at {
@@ -97,75 +129,127 @@ impl Session {
         None
     }
 
-    /// Whether `id` is a test grid's top group or an item in one: it runs with its grid row only
-    /// and is never assigned to another operation (criterion 6).
+    /// The grid the canvas selection is or lies in.
+    pub(in crate::session) fn selected_test_grid(&self) -> Option<NodeId> {
+        self.selection
+            .ids()
+            .iter()
+            .find_map(|&id| self.test_grid_above(id))
+    }
+
+    /// Whether `id` is a grid's group or an item in one: it is never assigned to another
+    /// operation.
     pub(in crate::session) fn in_test_grid(&self, id: NodeId) -> bool {
         self.test_grid_above(id).is_some()
     }
 
-    /// Whether the selection is one test grid as a whole (all its cells and labels): such a selection is moved, never resized, rotated or skewed (UX notes §6.5). One
-    /// item or a part of the grid, entered by a double-click, is edited like any item.
-    pub(in crate::session) fn whole_test_grid_selected(&self) -> bool {
+    /// The one grid selected as a whole (all its items), with a readable recipe: the Select bar
+    /// is its bar then (UX G3).
+    pub(in crate::session) fn whole_selected_grid(&self) -> Option<NodeId> {
         let ids = self.selection.ids();
-        if ids.is_empty() || !self.operations_available() {
-            return false;
+        if ids.is_empty() {
+            return None;
         }
-        let Some(group) = self.selected_test_grid() else {
-            return false;
-        };
-        let Some(grid) = self.document.test_grid(group) else {
-            return false;
-        };
-        let items = || grid.cells.iter().chain(&grid.labels);
-        ids.len() == items().count() && ids.iter().all(|id| items().any(|item| item.id == *id))
+        let group = self.selected_test_grid()?;
+        let leaves = self.document.leaves_of(group);
+        let whole = ids.len() == leaves.len() && ids.iter().all(|id| leaves.contains(id));
+        (whole && self.grid_object(group).is_some()).then_some(group)
     }
 
-    /// Whether the Select bar hides Flip, Guide, Object to path and Linked clone: the selection is
-    /// one whole test grid, whose shape comes from its fields (UX notes §6.5).
+    /// Whether the selection is one test grid as a whole: it is moved, never resized, rotated or
+    /// skewed (criterion 7).
+    pub(in crate::session) fn whole_test_grid_selected(&self) -> bool {
+        self.whole_selected_grid().is_some()
+    }
+
+    /// Whether the Select bar hides Flip, Guide, Object to path and Linked clone and shows the
+    /// Test grid bar: the selection is one whole test grid (UX G3, G4).
     #[must_use]
     pub fn select_bar_hides_grid_commands(&self) -> bool {
         self.tool == super::Tool::Select && self.whole_test_grid_selected()
     }
 
-    /// The grid the Grid block shows: the canvas selection's, else the pressed row's.
-    pub(in crate::session) fn focused_test_grid(&self) -> Option<NodeId> {
-        if !self.operations_available() {
-            return None;
+    /// Every grid whose derived operations lie on a laser page, with its id and page.
+    pub(in crate::session) fn placed_test_grids(&self) -> Vec<PlacedGrid> {
+        let pages = self.document.pages();
+        let mut out: Vec<PlacedGrid> = Vec::new();
+        for manufacturing in self.document.manufacturings() {
+            if manufacturing.process != PROCESS_ID {
+                continue;
+            }
+            let Some(page) = pages
+                .iter()
+                .find(|p| p.kind.manufacturing() == Some(manufacturing.id))
+            else {
+                continue;
+            };
+            let Ok(operations) = self.document.operations(manufacturing.id) else {
+                continue;
+            };
+            for op in operations.iter().filter(|op| op.grid_part.is_some()) {
+                let Some(group) = self.document.test_grid_of_derived_row(op.id) else {
+                    continue;
+                };
+                if out.iter().any(|grid| grid.group == group) {
+                    continue;
+                }
+                if let Some(grid) = self.grid_object(group) {
+                    out.push(PlacedGrid {
+                        group,
+                        id: grid.recipe.id,
+                        page_id: page.id.clone(),
+                        page_name: page.name.clone(),
+                    });
+                }
+            }
         }
-        self.selected_test_grid().or_else(|| {
-            let row = self.test_grids.row?;
-            self.document.test_grid_of_row(row)
-        })
+        out
     }
 
-    /// The grid row pressed in the list (UX notes §5): the Grid block shows its grid. `None`, or
-    /// a row that is no grid row, closes it.
-    pub fn select_test_grid_row(&mut self, row: Option<NodeId>) {
-        self.test_grids.row = row;
-        self.test_grids.invalid = None;
+    /// The test ids of every grid of the open project (ADR 0058 §4).
+    fn project_grid_ids(&self) -> Vec<TestId> {
+        self.document
+            .child_groups(None)
+            .into_iter()
+            .filter_map(|(group, _)| self.grid_object(group).map(|grid| grid.recipe.id))
+            .collect()
     }
 
-    /// The marked cell of the grid in the Grid block, with its recipe (criterion 14).
-    pub(in crate::session) fn worked_test_cell(&self) -> Option<(GridRecipe, CellIndex)> {
-        let grid = self.read_test_grid(self.focused_test_grid()?)?;
-        Some((grid.recipe?, grid.mark?))
+    /// The next 64 random bytes: the host's, else a fallback stream from the peer id (tests and
+    /// a host that gave none).
+    fn random_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(64);
+        let mut state = self.peer
+            ^ self
+                .test_grid
+                .drawn
+                .get()
+                .wrapping_mul(0x9e37_79b9_7f4a_7c15);
+        self.test_grid.drawn.set(self.test_grid.drawn.get() + 1);
+        while out.len() < 64 {
+            // xorshift64*: only a fallback, the host's bytes come first.
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            out.extend_from_slice(&state.wrapping_mul(0x2545_f491_4f6c_dd1d).to_le_bytes());
+        }
+        out
     }
 
-    /// Whether the canvas selection has just come to hold another grid: the panel then shows the
-    /// Operations tab instead of Style or Document (UX notes §6.1, M3).
-    pub(in crate::session) fn grid_selection_edge(&self) -> bool {
-        let now = if self.operations_available() {
-            self.selected_test_grid()
-        } else {
-            None
-        };
-        let before = self.test_grids.seen.replace(now);
-        now.is_some() && now != before
-    }
-
-    /// The refusal of the last Add test grid, `None` when it added one.
-    #[must_use]
-    pub fn test_grid_notice(&self) -> Option<String> {
-        self.test_grids.notice.clone()
+    /// A new test id, unique against the library's live and retired ids and the project's grid
+    /// ids (criterion 9).
+    pub(in crate::session) fn next_test_id(&mut self) -> TestId {
+        let project = self.project_grid_ids();
+        loop {
+            let bytes = if self.test_grid.random.len() >= 64 {
+                self.test_grid.random.drain(..64).collect()
+            } else {
+                self.random_bytes()
+            };
+            let taken = |id: &TestId| project.contains(id) || self.materials.id_taken(*id);
+            if let Some(id) = TestId::make(&bytes, &taken) {
+                return id;
+            }
+        }
     }
 }

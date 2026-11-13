@@ -57,7 +57,10 @@ const PER_OBJECT_BOX_LIMIT: usize = 500;
 impl Session {
     /// The group of the selection over `objects`, in the Select tool only.
     fn group_in(&self, objects: &[ObjectSnapshot]) -> Option<GroupSelection> {
-        if !self.select_box_tool() {
+        // The Test grid tool keeps the dashed box of the grid it placed or edits (`specs/0112`
+        // criterion 7); it draws no handles.
+        let grid_tool = self.tool == Tool::TestGrid && self.whole_test_grid_selected();
+        if !self.select_box_tool() && !grid_tool {
             return None;
         }
         SelectTool::group_of_with_artwork(objects, &self.selection, &|path| {

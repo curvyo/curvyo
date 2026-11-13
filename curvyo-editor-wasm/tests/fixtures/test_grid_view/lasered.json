@@ -1,0 +1,56 @@
+{
+  "cell_mm": 10.0,
+  "columns": {
+    "count": 5,
+    "max": 100.0,
+    "min": 20.0,
+    "offered": [
+      "power",
+      "speed",
+      "passes"
+    ],
+    "param": "power"
+  },
+  "crosshatch": null,
+  "fit": null,
+  "group": {
+    "counter": 1,
+    "peer": "5"
+  },
+  "height_mm": 66.0,
+  "id": "M8W1O",
+  "invalid": null,
+  "kind": "cut",
+  "lasered": true,
+  "material": {
+    "id": "03030303-0303-4303-8303-030303030303",
+    "name": "Birch 3 mm",
+    "thickness_mm": 3.0
+  },
+  "materials": [
+    {
+      "id": "03030303-0303-4303-8303-030303030303",
+      "name": "Birch 3 mm",
+      "thickness_mm": 3.0
+    }
+  ],
+  "max_feed_mm_min": 6000,
+  "rows": {
+    "count": 5,
+    "max": 6000.0,
+    "min": 600.0,
+    "offered": [
+      "power",
+      "speed",
+      "passes"
+    ],
+    "param": "speed"
+  },
+  "shared": [
+    {
+      "param": "passes",
+      "value": 1.0
+    }
+  ],
+  "width_mm": 75.60060975609755
+}

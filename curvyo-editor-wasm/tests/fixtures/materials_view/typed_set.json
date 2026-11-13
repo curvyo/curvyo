@@ -1,0 +1,54 @@
+{
+  "form_open": false,
+  "load_notices": [],
+  "next_name": "Material 1",
+  "page_laser": {
+    "id": "generic-laser",
+    "name": "Generic laser"
+  },
+  "rows": [
+    {
+      "id": "04040404-0404-4404-8404-040404040404",
+      "line": "1 laser · 1 set",
+      "name": "Walnut",
+      "state": "loaded",
+      "tests": 0,
+      "thickness_mm": 4.0
+    }
+  ],
+  "unfolded": {
+    "id": "04040404-0404-4404-8404-040404040404",
+    "laser_pick_open": false,
+    "lasers": [
+      {
+        "laser": {
+          "id": "generic-laser",
+          "name": "Generic laser"
+        },
+        "missing": [
+          "score",
+          "engrave"
+        ],
+        "open": true,
+        "sets": [
+          {
+            "interval_mm": null,
+            "kind": "cut",
+            "numbers": {
+              "passes": 1,
+              "power_pct": 70.0,
+              "speed_mm_min": 3000
+            },
+            "source": "Typed"
+          }
+        ],
+        "this_page": true
+      }
+    ],
+    "name": "Walnut",
+    "other_lasers": [],
+    "test": null,
+    "tests": [],
+    "thickness_mm": 4.0
+  }
+}

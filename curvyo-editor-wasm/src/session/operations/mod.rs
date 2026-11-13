@@ -24,8 +24,6 @@ mod tools_tests;
 mod view_json;
 
 pub(in crate::session) use settings::typed_number;
-#[cfg(test)]
-pub(in crate::session) use settings_view::SettingsView;
 
 use curvyo_document_core::{NodeId, OperationSnapshot};
 use curvyo_laser_core::operations::KindRead;

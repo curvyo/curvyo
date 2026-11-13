@@ -18,7 +18,7 @@ use super::index::IndexedLeaf;
 use super::items::{ItemLists, item_lists};
 use super::kind_press::KindButtonView;
 use super::settings_view::{
-    GridRowView, PickView, SettingsView, grid_row_view, pick_views, settings_view,
+    PickView, SettingsView, SourceView, pick_views, settings_view, source_view,
 };
 
 /// The whole Operations tab of the active laser page.
@@ -76,8 +76,9 @@ pub struct RowView {
     /// Its Settings block (`specs/0028` criteria 24 to 26); `None` for a grid row and an
     /// unknown operation.
     pub settings: Option<SettingsView>,
-    /// The grid of a test grid row (`specs/0028` criterion 6); `None` for any other row.
-    pub grid: Option<GridRowView>,
+    /// The source line of a test grid's derived row (`specs/0112` criterion 12); `None` for any
+    /// other row.
+    pub source: Option<SourceView>,
 }
 
 /// The kinds of the rows; the five known ones and the unknown one.
@@ -218,6 +219,8 @@ impl Session {
         let selection = self.selection_targets();
         let pick = pick_views(self);
         let unfolded = self.operations.tools.unfolded();
+        let mut sources = super::settings_view::SourceCache::new();
+        let page = super::settings_view::PageFacts::of(self);
         let rows = list
             .sequence()
             .iter()
@@ -237,8 +240,8 @@ impl Session {
                     tick,
                     group_in_part,
                     unfolded: unfolded == Some(op.id),
-                    settings: settings_view(self, op, &pick),
-                    grid: grid_row_view(self, op),
+                    settings: settings_view(self, op, &pick, &page),
+                    source: source_view(self, op, &mut sources),
                 }
             })
             .collect();

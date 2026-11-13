@@ -1,262 +1,222 @@
-//! The Grid block's view as JSON (`specs/0028` criteria 1, 2, 7 to 14; UX notes §6, §7;
-//! `adrs.md` §6): the one producer of `test_grid_view`, pinned by the shared fixtures in
+//! The Test grid bar's view as JSON (`specs/0112` criteria 3 to 6, 11; UX notes 4; `adrs.md`
+//! finding 3): the one producer of `test_grid_view`, pinned by the shared fixtures in
 //! `curvyo-editor-wasm/tests/fixtures/test_grid_view/`.
 
 use curvyo_document_core::NodeId;
-use curvyo_laser_core::settings::CellIndex;
-use curvyo_laser_core::test_grids::{CellTag, GridRecipe, fit_bed};
+use curvyo_laser_core::grids::{Param, Recipe, Side, fit_bed};
+use curvyo_laser_core::library::MaterialRead;
 use serde::Serialize;
 
 use super::super::Session;
 use super::super::materials::SetKindView;
-use super::GridRead;
-use super::build::is_hand_edited;
 
-/// The Grid block of the grid the canvas selection or the pressed row names.
+/// The bar of the selected grid, or of the tool's draft.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TestGridView {
-    /// The grid's top group.
-    pub group: NodeId,
-    /// Its row, `None` when it has none (the row was deleted).
-    pub row: Option<NodeId>,
-    /// The top group's name ("Test grid 1").
-    pub name: String,
-    /// The page's machine ("for `<profile name>`").
-    pub machine: String,
-    /// The grid's size with labels, mm.
+    /// The grid's group, `None` for the tool's draft (no grid selected).
+    pub group: Option<NodeId>,
+    /// The test id, `None` for the draft.
+    pub id: Option<String>,
+    /// Whether the grid is Lasered.
+    pub lasered: bool,
+    /// The Kind segments.
+    pub kind: SetKindView,
+    /// The picked material.
+    pub material: Option<MaterialPickView>,
+    /// The dropdown's materials in the tab's order (readable only).
+    pub materials: Vec<MaterialPickView>,
+    /// The shared values of row 1, in the order Power, Speed, Passes, Interval.
+    pub shared: Vec<ValueView>,
+    /// Crosshatch, Engrave only.
+    pub crosshatch: Option<bool>,
+    /// Cell size in mm.
+    pub cell_mm: f64,
+    /// The Columns unit.
+    pub columns: AxisFieldsView,
+    /// The Rows unit.
+    pub rows: AxisFieldsView,
+    /// The grid's size in mm.
     pub width_mm: f64,
-    /// The grid's size with labels, mm.
+    /// The grid's size in mm.
     pub height_mm: f64,
     /// The machine's maximum feed, the top of the speed fields.
-    pub max_feed_mm_min: u64,
-    /// The Kind field.
-    pub kind: SetKindView,
-    /// The cell fields.
-    pub fields: FieldsView,
-    /// The label fields.
-    pub labels: LabelsView,
-    /// The field value the grid did not take, kept with its chip.
+    pub max_feed_mm_min: u32,
+    /// The value the grid did not take, kept with its cause.
     pub invalid: Option<InvalidView>,
-    /// Why the fields' grid does not fit the bed ("Grid is 260 mm wide, the bed is 200 mm.").
+    /// Why the grid does not fit the bed ("Grid is 260 mm wide, the bed is 200 mm.").
     pub fit: Option<String>,
-    /// Whether an item was changed by hand (criterion 10): "Edited by hand" with Rebuild.
-    pub hand_edited: bool,
-    /// The result table (criterion 12).
-    pub result: ResultView,
-    /// The Worked line, `None` without a mark ("No cell marked").
-    pub worked: Option<WorkedView>,
-    /// The table cell whose square is the canvas selection.
-    pub selected_cell: Option<CellView>,
 }
 
-/// The cell fields of the Grid block.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct FieldsView {
-    /// Columns.
-    pub columns: u8,
-    /// Rows.
-    pub rows: u8,
-    /// Power from, percent.
-    pub power_from_pct: f64,
-    /// Power to, percent.
-    pub power_to_pct: f64,
-    /// Speed from, mm/min.
-    pub speed_from_mm_min: u64,
-    /// Speed to, mm/min.
-    pub speed_to_mm_min: u64,
-    /// Cell size, mm.
-    pub cell_mm: f64,
-    /// Gap, mm.
-    pub gap_mm: f64,
+/// A material of the dropdown.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MaterialPickView {
+    /// Its id.
+    pub id: String,
+    /// Its name.
+    pub name: String,
+    /// Its thickness in mm, `None` for the picked material's stored name only.
+    pub thickness_mm: Option<f64>,
 }
 
-/// The label fields of the Grid block.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct LabelsView {
-    /// The Labels switch.
-    pub on: bool,
-    /// Engrave or Score.
-    pub kind: SetKindView,
-    /// Height, mm.
-    pub height_mm: f64,
-    /// Power, percent.
-    pub power_pct: f64,
-    /// Speed, mm/min.
-    pub speed_mm_min: u64,
-    /// Passes.
-    pub passes: u8,
+/// One value of a parameter.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ValueView {
+    /// `power`, `speed`, `passes` or `interval`.
+    pub param: &'static str,
+    /// The number in the field.
+    pub value: f64,
+}
+
+/// One axis unit of row 2.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AxisFieldsView {
+    /// Its parameter.
+    pub param: &'static str,
+    /// The parameters its switch offers.
+    pub offered: Vec<&'static str>,
+    /// Min.
+    pub min: f64,
+    /// Max.
+    pub max: f64,
+    /// Count.
+    pub count: u8,
 }
 
 /// A typed value the grid did not take.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct InvalidView {
-    /// The field's name (`columns`, `power_from`, ...).
+    /// The field's name (`columns_count`, `cell`, `passes`, ...).
     pub field: String,
     /// The text as typed.
     pub typed: String,
-    /// The chip text.
-    pub chip: String,
+    /// The cause.
+    pub cause: String,
 }
 
-/// One cell's place.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct CellView {
-    /// Its column, from 0 at the left.
-    pub column: u8,
-    /// Its row, from 0 at the top.
-    pub row: u8,
-}
-
-/// The result table: power across, speed down.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ResultView {
-    /// The column heads, percent.
-    pub powers: Vec<f64>,
-    /// The row heads, mm/min.
-    pub speeds: Vec<u64>,
-}
-
-/// The Worked line (criterion 14).
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct WorkedView {
-    /// The marked cell.
-    pub cell: CellView,
-    /// Its power, percent.
-    pub power_pct: f64,
-    /// Its speed, mm/min.
-    pub speed_mm_min: u64,
-    /// "Worked: 60 % power, 3000 mm/min".
-    pub text: String,
-}
-
-fn fields_view(recipe: &GridRecipe) -> FieldsView {
-    let range = &recipe.range;
-    FieldsView {
-        columns: range.columns,
-        rows: range.rows,
-        power_from_pct: range.power_from.percent(),
-        power_to_pct: range.power_to.percent(),
-        speed_from_mm_min: u64::from(range.speed_from.get()),
-        speed_to_mm_min: u64::from(range.speed_to.get()),
-        cell_mm: range.cell.as_mm(),
-        gap_mm: range.gap.as_mm(),
-    }
-}
-
-fn labels_view(recipe: &GridRecipe) -> LabelsView {
-    let labels = &recipe.labels;
-    LabelsView {
-        on: labels.on,
-        kind: labels.kind.into(),
-        height_mm: labels.height.as_mm(),
-        power_pct: labels.settings.power.percent(),
-        speed_mm_min: u64::from(labels.settings.speed.get()),
-        passes: labels.settings.passes.get(),
-    }
-}
-
-/// The worked cell with the numbers it was cut with.
-fn worked_view(recipe: &GridRecipe, cell: CellIndex) -> WorkedView {
-    let set = recipe.cell_settings(cell);
-    WorkedView {
-        cell: CellView {
-            column: cell.column,
-            row: cell.row,
-        },
-        power_pct: set.power.percent(),
-        speed_mm_min: u64::from(set.speed.get()),
-        text: format!("Worked: {} % power, {} mm/min", set.power, set.speed.get()),
+fn axis_view(recipe: &Recipe, side: Side) -> AxisFieldsView {
+    let axis = recipe.test.axis(side);
+    AxisFieldsView {
+        param: axis.param().as_str(),
+        offered: Param::of_kind(recipe.test.kind())
+            .map(Param::as_str)
+            .collect(),
+        min: axis.min().number(),
+        max: axis.max().number(),
+        count: axis.count(),
     }
 }
 
 impl Session {
-    /// The grid's row name, else its group name, else "Test grid".
-    fn grid_name(&self, group: NodeId, row: Option<NodeId>) -> String {
-        let row_name = self.active_operations().and_then(|active| {
-            active
-                .operations
-                .into_iter()
-                .find(|op| Some(op.id) == row)
-                .map(|op| op.name)
-        });
-        row_name
-            .or_else(|| self.document.node_registers(group).and_then(|r| r.name))
-            .unwrap_or_else(|| "Test grid".to_owned())
-    }
-
-    /// The cell of `grid` that the one selected item is, if any.
-    fn selected_grid_cell(&self, grid: &GridRead) -> Option<CellView> {
-        match self.selection.ids() {
-            [one] => grid
-                .snapshot
-                .cells
-                .iter()
-                .find(|item| item.id == *one)
-                .and_then(|item| CellTag::from_value(&item.tag))
-                .map(|tag| CellView {
-                    column: tag.cell.column,
-                    row: tag.cell.row,
-                }),
-            _ => None,
+    /// The bar's recipe: the selected grid's, else the tool's draft with a placeholder id.
+    fn bar_view_recipe(&self) -> Option<(Option<NodeId>, Recipe, bool)> {
+        if let Some(group) = self.whole_selected_grid() {
+            let grid = self.grid_object(group)?;
+            return Some((Some(group), grid.recipe, grid.lasered.is_some()));
         }
+        if self.tool != super::super::Tool::TestGrid {
+            return None;
+        }
+        let recipe = Recipe {
+            id: curvyo_laser_core::grids::TestId::parse("00000")?,
+            test: self.draft_recipe(),
+            material: self.test_grid.draft_material.clone(),
+        };
+        Some((None, recipe, false))
     }
 
-    /// The rejected field entry of the grid `group`, if one is held.
-    fn invalid_view(&self, group: NodeId) -> Option<InvalidView> {
-        self.test_grids
+    /// The Test grid bar: the selected grid's (also with the Select tool, G3), or the draft
+    /// with the tool active; `None` otherwise or off a laser page.
+    #[must_use]
+    pub fn test_grid_view(&self) -> Option<TestGridView> {
+        if !self.test_grid_tool_available() {
+            return None;
+        }
+        let (group, recipe, lasered) = self.bar_view_recipe()?;
+        let manufacturing = self.active_manufacturing()?;
+        let font = self.grid_label_font();
+        let laid = font.as_ref().map(|font| self.grid_layout(&recipe, font));
+        let (width_mm, height_mm) = laid
+            .as_ref()
+            .map_or((0.0, 0.0), |l| (l.width.as_mm(), l.height.as_mm()));
+        let fit = laid
+            .as_ref()
+            .and_then(|l| fit_bed(l.width, l.height, manufacturing.work_area()).err());
+        let materials = self.material_picks();
+        let material = self.picked_material(&recipe);
+        let invalid = self.invalid_view(group);
+        let kind = recipe.test.kind();
+        Some(TestGridView {
+            group,
+            id: group.map(|_| recipe.id.to_string()),
+            lasered,
+            kind: kind.into(),
+            material,
+            materials,
+            shared: recipe
+                .test
+                .fixed_values()
+                .into_iter()
+                .map(|v| ValueView {
+                    param: v.param.as_str(),
+                    value: v.number(),
+                })
+                .collect(),
+            crosshatch: (kind == curvyo_laser_core::settings::SetKind::Engrave)
+                .then(|| recipe.test.crosshatch()),
+            cell_mm: recipe.test.cell().as_mm(),
+            columns: axis_view(&recipe, Side::Columns),
+            rows: axis_view(&recipe, Side::Rows),
+            width_mm,
+            height_mm,
+            max_feed_mm_min: self.active_max_feed().get(),
+            invalid,
+            fit,
+        })
+    }
+
+    /// Every readable material of the library, for the bar's picker.
+    fn material_picks(&self) -> Vec<MaterialPickView> {
+        self.materials
+            .library()
+            .listed()
+            .into_iter()
+            .filter_map(|read| match read {
+                MaterialRead::Loaded(m) => Some(MaterialPickView {
+                    id: m.id.clone(),
+                    name: m.name.clone(),
+                    thickness_mm: Some(m.thickness.mm()),
+                }),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The material `recipe` links to; the recipe's own name when the library no longer has it.
+    fn picked_material(&self, recipe: &Recipe) -> Option<MaterialPickView> {
+        recipe.material.as_ref().map(|m| {
+            let found = self.materials.library().find(&m.id);
+            MaterialPickView {
+                id: m.id.clone(),
+                name: found.map_or_else(|| m.name.clone(), |f| f.name.clone()),
+                thickness_mm: found.map(|f| f.thickness.mm()),
+            }
+        })
+    }
+
+    /// The kept field of a refused commit, when it is on `group`.
+    fn invalid_view(&self, group: Option<NodeId>) -> Option<InvalidView> {
+        self.test_grid
             .invalid
             .as_ref()
             .filter(|invalid| invalid.group == group)
             .map(|invalid| InvalidView {
                 field: invalid.field.clone(),
                 typed: invalid.typed.clone(),
-                chip: invalid.chip.clone(),
+                cause: invalid.cause.clone(),
             })
     }
 
-    /// The Grid block, `None` when no grid is selected on the canvas or in the list, or its
-    /// recipe does not read (its tags are inert then).
-    #[must_use]
-    pub fn test_grid_view(&self) -> Option<TestGridView> {
-        let group = self.focused_test_grid()?;
-        let grid = self.read_test_grid(group)?;
-        let recipe = grid.recipe?;
-        let laid = self.grid_layout(&recipe);
-        let bed = self.active_manufacturing()?.work_area();
-        let copy = self.active_copy()?;
-        let row = grid.snapshot.rows.first().copied();
-        let name = self.grid_name(group, row);
-        let selected_cell = self.selected_grid_cell(&grid);
-        let worked = grid.mark.map(|cell| worked_view(&recipe, cell));
-        let invalid = self.invalid_view(group);
-        Some(TestGridView {
-            group,
-            row,
-            name,
-            machine: copy.read.copy.values.name,
-            width_mm: laid.width.as_mm(),
-            height_mm: laid.height.as_mm(),
-            max_feed_mm_min: u64::from(self.active_max_feed().get()),
-            kind: recipe.kind.into(),
-            fields: fields_view(&recipe),
-            labels: labels_view(&recipe),
-            invalid,
-            fit: fit_bed(laid.width, laid.height, bed).err(),
-            hand_edited: is_hand_edited(self, &grid, &recipe, &laid),
-            result: ResultView {
-                powers: (0..recipe.range.columns)
-                    .map(|c| recipe.column_power(c).percent())
-                    .collect(),
-                speeds: (0..recipe.range.rows)
-                    .map(|r| u64::from(recipe.row_speed(r).get()))
-                    .collect(),
-            },
-            worked,
-            selected_cell,
-        })
-    }
-
-    /// The Grid block as JSON, `null` when none shows.
+    /// The bar as JSON, `null` when none shows.
     #[must_use]
     pub fn test_grid_view_json(&self) -> String {
         serde_json::to_string(&self.test_grid_view()).unwrap_or_else(|_| "null".to_owned())

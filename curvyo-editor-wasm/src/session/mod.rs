@@ -118,7 +118,7 @@ pub use fixtures::{
     AddTarget, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow, FixturesView,
     GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
 };
-pub use materials::{MaterialWrite, MaterialsView, SaveAsMaterial};
+pub use materials::{MaterialWrite, MaterialsView};
 pub use test_grid::TestGridView;
 mod page_drag;
 mod page_tree_panel;
@@ -440,6 +440,9 @@ pub enum Tool {
     /// The Measure tool (`specs/0070-measure-and-dimension` criteria 1 to 6): key `M`, measures
     /// on the canvas and with Shift leaves a dimension.
     Measure,
+    /// The Test grid tool (`specs/0112-test-grid-and-materials` criteria 1, 2): on a laser page
+    /// a press places a test grid with the bar's values.
+    TestGrid,
 }
 
 /// One open document's whole editing session.
@@ -670,11 +673,11 @@ pub struct Session {
     operations: operations::OperationsState,
     /// The laser fixtures of the active laser page (`fixtures/`, `specs/0102-laser-fixtures`).
     fixtures: fixtures::FixtureState,
-    /// The maker's materials and the journal of this session's material steps (`materials/`,
-    /// `specs/0028-material-test-library`).
+    /// The maker's materials, the journal of this session's material steps and the Materials
+    /// tab's view state (`materials/`, `specs/0112-test-grid-and-materials`).
     materials: materials::MaterialsState,
-    /// The test grids of the active laser page (`test_grid/`, `specs/0028`).
-    test_grids: test_grid::TestGridState,
+    /// The Test grid tool (`test_grid/`, `specs/0112`).
+    test_grid: test_grid::TestGridTool,
 }
 
 impl Session {
@@ -791,7 +794,7 @@ impl Session {
             operations: operations::OperationsState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
-            test_grids: test_grid::TestGridState::default(),
+            test_grid: test_grid::TestGridTool::default(),
         }
     }
 
@@ -903,7 +906,7 @@ impl Session {
             operations: operations::OperationsState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
-            test_grids: test_grid::TestGridState::default(),
+            test_grid: test_grid::TestGridTool::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
         session.remove_orphans_after_open();
@@ -1139,6 +1142,7 @@ impl Session {
                 }
                 Tool::Text => this.text_pointer_down(point, shift),
                 Tool::Trace => this.trace_pointer_down(point, shift),
+                Tool::TestGrid => this.test_grid_pointer_down(point),
             }
         });
     }
@@ -1236,6 +1240,7 @@ impl Session {
                     self.trace_mask_pick_hover(point);
                 }
             }
+            Tool::TestGrid => self.test_grid_hover(Some(point)),
         }
     }
 
@@ -1349,6 +1354,7 @@ impl Session {
                 Tool::Trace => {
                     this.trace_mask_release(point, shift, constrain);
                 }
+                Tool::TestGrid => {}
             }
         });
     }
@@ -1425,7 +1431,11 @@ impl Session {
                 Tool::Offset => return this.offset_double_click(point, shift, ctrl),
                 Tool::Text => this.text_double_click(point),
                 Tool::Trace => return this.trace_double_click(point),
-                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar | Tool::Measure => {}
+                Tool::Rectangle
+                | Tool::Ellipse
+                | Tool::PolygonStar
+                | Tool::Measure
+                | Tool::TestGrid => {}
             }
             DoubleClickHint::None
         })

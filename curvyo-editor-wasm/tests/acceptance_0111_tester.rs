@@ -475,7 +475,10 @@ fn with_fonts(s: &mut Session) {
         })
         .collect();
     s.set_font_list(FontBlock::Included, faces, Vec::new());
-    let _ = s.press_add_test_grid();
+    // `0112`: the Test grid tool replaces the Add test grid button; a press asks for the faces.
+    s.set_tool(Tool::TestGrid);
+    let _ = s.test_grid_press(None);
+    s.set_tool(Tool::Select);
     for file in s.wanted_font_files() {
         let bytes = std::fs::read(fonts_dir().join(&file)).unwrap();
         assert!(s.add_font_file(&file, &bytes));
@@ -488,14 +491,16 @@ fn c6_a_test_grid_row_is_never_the_last_of_its_kind() {
     with_fonts(&mut f.s);
     let grid_rows: Vec<Value> = rows(&f.s)
         .into_iter()
-        .filter(|r| !r["grid"].is_null())
+        .filter(|r| !r["source"].is_null())
         .collect();
     if grid_rows.is_empty() {
-        f.s.press_add_test_grid().unwrap();
+        f.s.set_tool(Tool::TestGrid);
+        f.s.test_grid_press(None).unwrap();
+        f.s.set_tool(Tool::Select);
     }
     let grid = rows(&f.s)
         .into_iter()
-        .find(|r| !r["grid"].is_null())
+        .find(|r| !r["source"].is_null() && r["kind"] != "engrave")
         .expect("a grid row");
     let kind = grid["kind"].as_str().unwrap().to_owned();
     let grid_id = id_of(&grid);

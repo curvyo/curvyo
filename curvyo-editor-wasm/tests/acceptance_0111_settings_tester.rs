@@ -34,23 +34,24 @@ struct Fx {
     ops: Vec<NodeId>,
 }
 
+/// A material record of format 2 (`specs/0112`, ADR 0058) with `sets` for Generic laser; an
+/// Engrave set carries the default interval, which format 2 requires.
 fn record_text(id: &str, name: &str, sets: Value) -> String {
-    let mut history = Vec::new();
     let mut with_sources = serde_json::Map::new();
-    for (i, (kind, set)) in sets.as_object().unwrap().iter().enumerate() {
-        let entry = format!("aaaaaaaa-0000-4000-8000-00000000000{i}");
-        history.push(json!({
-            "id": entry, "date": 1_762_948_800_000_u64, "event": "edited", "kind": kind,
-            "set": set
-        }));
+    for (kind, set) in sets.as_object().unwrap() {
         let mut s = set.as_object().unwrap().clone();
-        s.insert("source".into(), json!("edited"));
+        if kind == "engrave" {
+            s.insert("interval_mm".into(), json!(0.1));
+        }
+        s.insert("source".into(), json!("typed"));
         with_sources.insert(kind.clone(), Value::Object(s));
     }
     serde_json::to_string_pretty(&json!({
-        "format_version": 1, "id": id, "kind": "laser", "modified": 1_762_948_800_000_u64,
-        "name": name, "thickness_mm": 3.0, "machine": {"id": "generic-laser", "name": "Generic laser"},
-        "sets": with_sources, "history": history
+        "format_version": 2, "id": id, "kind": "laser", "modified": 1_762_948_800_000_u64,
+        "name": name, "thickness_mm": 3.0,
+        "lasers": [{"machine": {"id": "generic-laser", "name": "Generic laser"},
+            "sets": with_sources}],
+        "tests": [], "history": []
     }))
     .unwrap()
 }
@@ -293,7 +294,7 @@ fn c19_c23_a_linked_interval_is_written_to_main_and_kept_by_every_material_path(
     let _ = f.s.use_material_on(&[a], BIRCH);
     assert_eq!(f.settings(a)["interval_mm"], 0.3, "after Use material");
     assert_eq!(
-        f.s.edit_material_set(BIRCH, "engrave", "power", 50.0, &[7; 16]),
+        f.s.edit_material_set(BIRCH, "generic-laser", "engrave", "power", 50.0, &[7; 16]),
         Ok(true),
         "the material edit"
     );
@@ -543,7 +544,7 @@ fn c23_pick_and_edit_a_material_keep_crosshatch_and_scan_angle() {
     let _ = f.s.reset_operation_to_material(a);
     assert_eq!(f.stored(a).1, options, "Reset to material");
     assert_eq!(
-        f.s.edit_material_set(BIRCH, "engrave", "power", 50.0, &[7; 16]),
+        f.s.edit_material_set(BIRCH, "generic-laser", "engrave", "power", 50.0, &[7; 16]),
         Ok(true),
         "the material edit"
     );
@@ -626,7 +627,8 @@ fn c25_the_tools_golden_reads_its_interval_options_and_z() {
 #[test]
 fn c25_a_format_43_file_shows_the_defaults() {
     let rows = all_rows(&golden("laser_settings_v43.curvyo"));
-    for r in rows.iter().filter(|r| r["grid"].is_null()) {
+    // `0112` without Part F: the inert format-43 grid row has no Settings block.
+    for r in rows.iter().filter(|r| !r["settings"].is_null()) {
         let st = &r["settings"];
         if st["state"] == "damaged" {
             continue;
