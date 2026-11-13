@@ -69,48 +69,63 @@ pub(super) fn approximate_spiro_segment(
             return Err(Failure::NoConvergence);
         }
     };
-    let integrate = |lo: f64, hi: f64| integrate_spiral(&theta, lo, hi, n);
     let scale = chord.0.hypot(chord.1) / norm;
     let rot = chord.1.atan2(chord.0) - base.1.atan2(base.0);
-    let position = |s: f64| {
-        let p = integrate(-0.5, s);
+    let (sin, cos) = rot.sin_cos();
+    let place = |p: (f64, f64)| {
         (
-            start.0 + scale * (rot.cos() * p.0 - rot.sin() * p.1),
-            start.1 + scale * (rot.sin() * p.0 + rot.cos() * p.1),
+            start.0 + scale * (cos * p.0 - sin * p.1),
+            start.1 + scale * (sin * p.0 + cos * p.1),
         )
     };
-    let mut stack = vec![(-0.5_f64, 0.5_f64)];
-    let mut spans = Vec::new();
-    while let Some((lo, hi)) = stack.pop() {
-        let p0 = position(lo);
-        let p3 = position(hi);
+    let depth = span_depth(scale * fourth_curve, tolerance)?;
+    let pieces = 1_usize << depth;
+    let width = 1.0 / pieces as f64;
+    // Each piece is integrated on its own at the base step (an even count of at least two
+    // Simpson intervals) and the pieces summed, so every span end is integrated once.
+    let steps = (n / pieces).max(2);
+    let mut spans = Vec::with_capacity(pieces.min(1 << 16));
+    let mut sum = (0.0, 0.0);
+    let mut p0 = place((0.0, 0.0));
+    for i in 0..pieces {
+        let lo = -0.5 + i as f64 * width;
+        let hi = if i + 1 == pieces { 0.5 } else { lo + width };
+        let piece = integrate_spiral(&theta, lo, hi, steps);
+        sum = (sum.0 + piece.0, sum.1 + piece.1);
+        let p3 = place(sum);
         let h = (hi - lo) * scale / 3.0;
-        let a = theta(lo) + rot;
-        let b = theta(hi) + rot;
+        let (a_sin, a_cos) = (theta(lo) + rot).sin_cos();
+        let (b_sin, b_cos) = (theta(hi) + rot).sin_cos();
         let span = [
             p0,
-            (p0.0 + h * a.cos(), p0.1 + h * a.sin()),
-            (p3.0 - h * b.cos(), p3.1 - h * b.sin()),
+            (p0.0 + h * a_cos, p0.1 + h * a_sin),
+            (p3.0 - h * b_cos, p3.1 - h * b_sin),
             p3,
         ];
-        // Cubic Hermite interpolation remainder in exact arithmetic.
-        let error = 2.0 * scale * fourth_curve * (hi - lo).powi(4) / 384.0;
+        spans.push((span, (lo, hi)));
+        p0 = p3;
+    }
+    Ok(spans)
+}
+
+/// The most halvings of a segment into spans: past them a piece is narrower than the f64
+/// spacing near the segment's ends.
+const MAX_DEPTH: i32 = 52;
+
+/// How often a segment is halved into spans for `tolerance`: the cubic Hermite remainder of a
+/// span (in exact arithmetic, `bound` the segment's scale times its fourth-derivative bound)
+/// depends on its width alone, so the spans are 2^depth equal pieces.
+fn span_depth(bound: f64, tolerance: f64) -> Result<i32, Failure> {
+    for depth in 0..=MAX_DEPTH {
+        let error = 2.0 * bound * 0.5_f64.powi(4 * depth) / 384.0;
         if !error.is_finite() {
             return Err(Failure::NoConvergence);
         }
         if error <= tolerance * 0.5 {
-            spans.push((span, (lo, hi)));
-        } else {
-            let mid = f64::midpoint(lo, hi);
-            #[allow(clippy::float_cmp)] // Detect subdivision that cannot advance in f64.
-            if mid == lo || mid == hi {
-                return Err(Failure::NoConvergence);
-            }
-            stack.push((mid, hi));
-            stack.push((lo, mid));
+            return Ok(depth);
         }
     }
-    Ok(spans)
+    Err(Failure::NoConvergence)
 }
 
 fn integrate_spiral(theta: &impl Fn(f64) -> f64, lo: f64, hi: f64, n: usize) -> (f64, f64) {
