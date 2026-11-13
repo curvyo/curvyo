@@ -68,8 +68,8 @@ As a maker with a new sheet of material I want to place a test grid from one too
 
 ### Files, failures, budgets
 
-29. Given a project with test grids and operations, when saved and reopened, then all is as before (golden project in `tests/fixtures/`). A project of format 43 or 44 with the old folded grid row (`op_grid`) is converted when the file opens, in one step that is not an undo step and is not saved until the maker saves: the grid becomes an object with a new id and its operations resolved, nothing lost; cells are not re-laid out, so hand-moved cells keep their place and numbers; the burned id label appears at the first bar change; the old mark becomes the best cell of the grid's first test when that test is made.
-30. Given a material record of record format 1 (one machine, `0028`), then it opens: the record is read as a material with one laser, its tests keep their history, and it is written back in the new record format when the maker changes it (Proposal; reads never write, the rule of ADR 0038). A record of a newer format is left untouched. Golden files for the old and the new record format in `curvyo-laser-core/tests/fixtures/materials/`.
+29. Given a project with test grids and operations, when saved and reopened, then all is as before (golden project in `tests/fixtures/`). A project of format 43 to 45 is not converted (the customer has no deployed files, Frage 214): its old folded grid row (`op_grid`) opens as an ordinary operation without a grid object, kept and written back unchanged.
+30. Given a material record of record format 1 (one machine, `0028`), then it is read as "older format" and skipped with the notice "Material <name> has an older format.", never converted and never written (Proposal; Frage 214, no deployed files). A record of a newer format is left untouched. Golden files for the new record format in `curvyo-laser-core/tests/fixtures/materials/`.
 31. Given photos and ids, then they sync with the record by the folder mechanism of ADR 0038 (no new sync); a photo that is missing or damaged shows "Photo not found" and the test stays usable.
 32. Given a 12 x 12 grid, then placing it takes within 50 ms and a bar edit within 30 ms; the Materials list with 200 materials opens within 50 ms (thread CPU time, `curvyo-editor-wasm/tests/cpu_time/`; the architect confirms).
 33. Given the whole slice, then no network access, no device I/O, no G-code and no telemetry; the camera stays inside the browser and an image never leaves the machine.
@@ -101,7 +101,7 @@ As a maker with a new sheet of material I want to place a test grid from one too
 
 ## Format and ADR
 
-- `format_version` 45 (ADR 0057; the number is taken at merge, after `0111` 44): the project file changes for the grid object and derived operations; material record format 2, `test-grid-choice.json` format 2, new `retired-test-ids.json` format 1 (ADR 0058).
+- `format_version` 46 (ADR 0057; the number is taken at merge, after `0111` 44 and `0114` 45): the project file changes for the grid object and derived operations; material record format 2, `test-grid-choice.json` format 2, new `retired-test-ids.json` format 1 (ADR 0058).
 - **Architect:** done in ADR 0057 (grid object, derived operations, migration) and ADR 0058 (material records shared across lasers, photos, retired ids); both `needs-customer`, accepted with the story PR.
 
 ## Open customer questions

@@ -1,6 +1,6 @@
 # ADRs for test grid and materials
 
-Status: Proposed (architect, 2026-11-12). Builds second, after `0111` (needs its `op_options`, `interval_mm` and format 44). File shapes: [ADR 0057](../../docs/adr/0057-test-grid-object-with-derived-operations.md) (project file, format 45) and [ADR 0058](../../docs/adr/0058-material-records-shared-across-lasers.md) (material record format 2), both `needs-customer`, accepted with the story PR. Decisions marked **(Proposal)** are the architect's and vetoable at the demo.
+Status: Proposed (architect, 2026-11-12). Builds second, after `0111` (needs its `op_options`, `interval_mm` and format 44). File shapes: [ADR 0057](../../docs/adr/0057-test-grid-object-with-derived-operations.md) (project file, format 46) and [ADR 0058](../../docs/adr/0058-material-records-shared-across-lasers.md) (material record format 2), both `needs-customer`, accepted with the story PR. Decisions marked **(Proposal)** are the architect's and vetoable at the demo.
 
 - [ADR 0057](../../docs/adr/0057-test-grid-object-with-derived-operations.md): the grid is one tagged group with its recipe and test id in one atomic map, a Lasered register, derived ordinary operations with `op_grid_part`, regeneration in place, delete and off-page removal, copy with a new id, recreate from Materials, the Lasered test hook, migration of format-43 grids; replaces ADR 0054 §4 and §5.
 - [ADR 0058](../../docs/adr/0058-material-records-shared-across-lasers.md): record format 2 (lasers with sets, tests with recipe, best cell, note, photo, state), retired ids file, photo files and the host boundary, format-1 read path, the per-laser link rule.
@@ -13,18 +13,22 @@ Status: Proposed (architect, 2026-11-12). Builds second, after `0111` (needs its
 
 ## Feature-local decisions
 
-- 2026-11-12: **Format.** Project `format_version` 45, material record format 2, `test-grid-choice.json` format 2, new `retired-test-ids.json` format 1. Numbers taken at merge.
+- 2026-11-12: **Format.** Project `format_version` 46, material record format 2, `test-grid-choice.json` format 2, new `retired-test-ids.json` format 1. Numbers taken at merge.
 - 2026-11-12: **Which hand edits of a derived row give a Lasered grid a new id**: settings, material, options and membership; not rename, Show, Output or order (what was burned does not change) **(Proposal)**.
 - 2026-11-12: **Regeneration overwrites everything of a derived row** (name, Show, Output, settings, options, membership; Frage 204 A), keeps its node id and place; new rows go after the grid's last row **(Proposal)**.
 - 2026-11-12: **The test record follows the grid** while not Lasered (each bar commit rewrites its recipe in the same step); a material pick moves it between materials without retiring the id **(Proposal)**.
-- 2026-11-12: **Old grids** (format 43 and 44) migrate at open with a new id; items are not re-laid out, so hand-moved cells keep their place and numbers; the `id` label appears at the first bar change; the old mark becomes the best cell of the grid's first test (`0112` criterion 29).
+- 2026-11-13: **Legacy conversion dropped** (Frage 214 B, nothing is deployed; `0112` criteria 29, 30): format 43/44 grids open as ordinary operations without a grid object; a format-1 material record is skipped as "older format"; ADR 0057 §7 and ADR 0058 §6 amended. (Replaces the 2026-11-12 migration entry.)
 - 2026-11-12: **Lasered hook**: a Rust-only `#[doc(hidden)]` session method, not bound to wasm; Rust acceptance tests call it; no UI, flag or cargo feature.
 - 2026-11-12: **Photos**: the frontend crops and encodes (JPEG 0.85, PNG kept), core checks signature and header size (no decoding), the host writes `materials/<uuid>.<test id>.jpg|png` (desktop) or IndexedDB `curvyo-material-photos` (browser). The camera stays in the browser; nothing leaves the machine.
-- 2026-11-12: **Undo labels** (constants in document-core, names in `curvyo-ui-core/src/history_names.rs`): `add_test_grid` "Add test grid", `edit_test_grid` "Edit test grid" (also the material pick and the test record write), `place_test_grid` "Place test grid", `judge_test` "Judge test", `edit_test_note` "Edit note", `set_test_photo` "Set photo", `remove_test_photo` "Remove photo", `delete_test` "Delete test", `add_material_set` "Add set", plus the material steps of ADR 0055 §9. Removed with the folded row: `rebuild_test_grid`, `mark_test_cell`, `unmark_test_cell`, `rename_test_grid`, `delete_test_grid_row`, `save_as_material`.
+- 2026-11-12, amended 2026-11-13: **Undo labels** (constants in document-core, names in `curvyo-ui-core/src/history_names.rs`) are the words of UX notes section 11: `add_test_grid` "Add test grid", `edit_test_grid` "Edit test grid" (bar commits), `use_material` "Use material" (a material pick on a grid, UX G8), `place_test_grid` "Place test grid", `judge_test` "Choose best cell", `edit_test_note` "Edit note", `set_test_photo` "Add photo", `crop_test_photo` "Crop photo", `remove_test_photo` "Remove photo", `delete_test` "Delete test", `add_material` "Add material", `add_material_set` "Add set", `delete_material_set` "Delete set", plus the material steps of ADR 0055 §9 and the test hook's `mark_test_grid_lasered` "Mark lasered" (ADR 0057 notes). Removed with the folded row: `rebuild_test_grid`, `mark_test_cell`, `unmark_test_cell`, `rename_test_grid`, `delete_test_grid_row`, `save_as_material`; old histories show the raw key.
+
+- 2026-11-13: **Recipe `crosshatch`** is present in every stored recipe (`false` for Cut and Score); ADR 0057 §1 amended.
+- 2026-11-13: **Lifetime joins** (delete sweep in document-core by the `test_grid` register; off-page removal and Duplicate's copy joined by the session after the command's step; a copy's test record at its next commit): ADR 0057 notes **(Proposal)**.
+- 2026-11-13: **Random bytes for ids** come from the host (`feed_test_grid_random`, `crypto.getRandomValues`); the session's xorshift stream from the peer id is only a fallback for tests and a host that gave none, never a second source in the product.
 
 ## Crate placement (no new crate)
 
-- `curvyo-laser-core`: `test_grid.rs` (recipe v2, one serde type for the grid and the test record), `test_grid_layout.rs` (gap 2 mm, labels with the id), `test_grid_ops.rs` (derived rows), `test_id.rs`, `material.rs` and `material_file.rs` (format 2; the format-1 reader moves to `material_file_v1.rs` to keep each under 500 lines), `material_photo.rs`, `material_retired.rs` ("reads and writes the retired test ids"), `operation_settings_rule.rs` (the per-laser tie). `test_grid_run.rs` and the `grid_cell` numbers go.
+- `curvyo-laser-core` (as built, amended 2026-11-13): public modules `grids` (`test_id.rs`, `test_param.rs`, `test_recipe.rs` with its stored form `test_recipe_json.rs`, `test_recipe_layout.rs`, `test_grid_fit.rs`, `test_grid_ops.rs`, `test_grid_choice.rs`) and `library` (`material_record.rs`, `material_record_edits.rs`, `material_record_file.rs`, `material_test_file.rs`, `material_store.rs`, `material_retired.rs`, `material_photo.rs`); `operation_settings_rule.rs` (the per-laser tie). `test_grid_run.rs`, the format-1 store and the `grid_cell` numbers are gone.
 - `curvyo-document-core`: `test_grid_codec.rs` and `test_grid_commands.rs` for the new registers, the derived-row sweep in the delete and off-page paths, the migration (called by the session, which supplies ids).
 - `curvyo-editor-wasm`: `session/test_grid/` (tool, bar, regeneration, place), `session/materials/` (tab, tests, judge, note, photo bytes, journal).
 - `curvyo-app`: `materials.rs` gains `read_material_photo`, `write_material_photo`, `remove_material_photo`, and the retired file, over `curvyo-storage-io` (`read_optional`, `write_atomic`, `remove_file`); `frontend/src/platform/host.ts` the browser side.
@@ -42,7 +46,7 @@ Status: Proposed (architect, 2026-11-12). Builds second, after `0111` (needs its
 
 ## Spec changes for the product owner
 
-- S1. Criterion 15: shape and format 45 as ADR 0057.
+- S1. Criterion 15: shape and format 46 as ADR 0057.
 - S2. Criterion 22: the test is written into the material at the pick and follows the grid until Lasered; a pick of another material moves it.
 - S3. Criterion 29: old grids migrate at open (not an undo step); their burned id appears at the first bar change; the old mark becomes the best cell when the grid's first test is made.
 - S4. Criterion 27: the camera image and any file are encoded as JPEG unless the file is PNG; at most 1 MiB after encoding.
