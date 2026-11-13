@@ -31,8 +31,6 @@ pub(super) fn control_view(path: &PathSnapshot) -> PathSnapshot {
 
 impl Session {
     pub(super) fn capture_node_spiro_sources(&mut self, paths: &[PathSnapshot], point: Point) {
-        self.node_spiro_pointer = Some(point);
-        self.spiro_hold_pointer = Some(point);
         let moved = self.node.snapping_points(paths, point);
         self.node_spiro_sources = moved
             .into_iter()

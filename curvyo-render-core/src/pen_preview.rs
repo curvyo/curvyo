@@ -87,7 +87,7 @@ pub fn build_pen_preview(
 /// The live curve of a Spiro or B-spline in progress, evaluated by the caller.
 #[derive(Debug, Clone, Copy)]
 pub struct CurvePreview<'a> {
-    /// The evaluated curve, or the controls joined straight when it has no solution.
+    /// The evaluated curve, or the controls joined straight when there is none.
     pub curve: &'a [AnchorSnapshot],
     /// Spiro or B-spline: decides the node glyphs and whether the control polygon shows.
     pub kind: CurveKind,

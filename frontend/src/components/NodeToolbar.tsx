@@ -152,6 +152,8 @@ interface NodeToolbarProps {
   selectionCount: number;
   /** The Close path group (`0034-pen-path-extension`); the bar has none without it. */
   closePath?: React.ComponentProps<typeof ClosePathGroup>;
+  /** Edit width (`specs/0114` criterion 4), last in the bar; renders nothing when not offered. */
+  widthEdit?: React.ReactNode;
 }
 
 /**
@@ -169,6 +171,7 @@ export function NodeToolbar({
   closePath,
   tool,
   selectionCount,
+  widthEdit,
 }: NodeToolbarProps) {
   const { notice, show } = useActionNotice(tool, selectionCount, () => {});
   // Join and Split say what they did to a compound path (`specs/0055-compound-path-node-
@@ -284,6 +287,7 @@ export function NodeToolbar({
           <ClosePathGroup {...closePath} />
         </>
       )}
+      {widthEdit}
     </div>
   );
 }

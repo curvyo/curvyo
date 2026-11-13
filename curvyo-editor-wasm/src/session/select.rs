@@ -34,11 +34,14 @@ pub enum DoubleClickHint {
     /// A double-click on a traced image in the Trace tool: the host creates the paths
     /// (`specs/0025-raster-trace` criterion 12).
     CreateTrace,
+    /// A double-click on a width point in width editing selected it: the host opens the typed
+    /// width field (`specs/0114` criterion 6).
+    WidthEntry,
 }
 
 impl DoubleClickHint {
     /// The code the host keys its text or action on: `""`, `"edit_hint"`, `"offset_chip"`,
-    /// `"clone"` or `"create_trace"`.
+    /// `"clone"`, `"create_trace"` or `"width_entry"`.
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
@@ -47,6 +50,7 @@ impl DoubleClickHint {
             Self::OffsetChip => "offset_chip",
             Self::Clone => "clone",
             Self::CreateTrace => "create_trace",
+            Self::WidthEntry => "width_entry",
         }
     }
 }
@@ -306,7 +310,7 @@ impl Session {
                 Some("The Spiro path changed during the drag; the transformation was cancelled.");
             return None;
         }
-        // A Spiro without solution may be clicked, but a transform of it is refused.
+        // A Spiro without a curve may be clicked, but a transform of it is refused.
         if self.selection_contains_spiro()
             && let Some(live) = self.select_live_edit_in(objects)
             && self

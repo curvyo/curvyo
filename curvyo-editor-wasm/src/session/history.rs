@@ -298,11 +298,14 @@ impl Session {
 
     /// Takes the maker's latest step back (Ctrl+Z, the Undo button).
     pub fn undo(&mut self) -> HistoryResult {
+        // A wheel burst still open is a step of its own first (`specs/0114` criterion 7).
+        self.end_width_wheel();
         self.press_history(Direction::Undo)
     }
 
     /// Applies the maker's latest undone step again (Ctrl+Shift+Z, the Redo button).
     pub fn redo(&mut self) -> HistoryResult {
+        self.end_width_wheel();
         self.press_history(Direction::Redo)
     }
 

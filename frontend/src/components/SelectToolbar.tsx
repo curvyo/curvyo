@@ -122,6 +122,8 @@ export interface SelectToolbarProps {
     onEnter: (byKeyboard: boolean) => void;
     notice: RecogniseBarNotice | null;
   };
+  /** Edit width (`specs/0114` criterion 4), last in the bar; renders nothing when not offered. */
+  widthEdit?: React.ReactNode;
   /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
    * criterion 1). */
   flipEnabled: boolean;
@@ -669,6 +671,7 @@ export function SelectToolbar({
   traceShown = false,
   onTrace,
   recognise,
+  widthEdit,
   tile,
   flipEnabled,
   gridCommandsHidden = false,
@@ -891,6 +894,10 @@ export function SelectToolbar({
         notice={recognise.notice}
       />,
     );
+  }
+  if (widthEdit) {
+    // Last, in a group of its own, so no earlier control moves.
+    groups.push(<div key="width-edit">{widthEdit}</div>);
   }
   const kindButtons = operationKinds && enteredBarShown(operationKinds.buttons) ? operationKinds.buttons : null;
   // Inside an entered laser group the bar holds only the Operation group, and is absent with no

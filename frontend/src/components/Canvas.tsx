@@ -1,3 +1,4 @@
+import { WidthPointEntry, WidthWheelReadout } from "@/components/WidthPointEntry";
 import type { FitCue } from "@/lib/fixtureRows";
 import { MeasureOverlay } from "@/components/MeasureOverlay";
 import type { SketchApi } from "@/hooks/useSketch";
@@ -309,6 +310,13 @@ export function Canvas({
         containerRef={editor.containerRef}
         onDismiss={editor.dismissEditHint}
       />
+      <WidthPointEntry
+        entry={editor.widthEntry}
+        onCommit={editor.commitWidthEntry}
+        onClose={editor.closeWidthEntry}
+        containerRef={editor.containerRef}
+      />
+      <WidthWheelReadout readout={editor.widthWheelReadout} containerRef={editor.containerRef} />
       <PenHintChip cue={penCue} containerRef={editor.containerRef} />
       <MoveBadges badges={editor.moveBadges} containerRef={editor.containerRef} fit={fitCue} />
       <PickSetBadge at={editor.text.pickBadge} />

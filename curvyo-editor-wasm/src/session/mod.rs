@@ -133,7 +133,6 @@ mod row_drag;
 mod sketch_moves;
 mod sketch_use;
 mod spiro_cache;
-mod spiro_hold;
 mod spiro_objects;
 mod width_edit;
 mod width_outlines;
@@ -548,13 +547,6 @@ pub struct Session {
     /// keeps its first read for its whole life (`specs/0009-unified-object-editing` criterion 15).
     object_cache: object_cache::ObjectCache,
     spiro_cache: std::cell::RefCell<spiro_cache::SpiroCache>,
-    /// The last pointer of a Node drag at which every dragged Spiro had a solution near its
-    /// earlier shape; the drag stays there while the pointer is beyond (customer 2026-11-11).
-    node_spiro_pointer: Option<Point>,
-    /// The pointer of the last event a Spiro point followed (Pen or Node drag): a held point
-    /// catches up with the pointer only a little faster than the pointer moves, so a curve never
-    /// jumps when its point is released (lead decision 2026-11-11, Proposal).
-    spiro_hold_pointer: Option<Point>,
     /// The variable-width outlines, memoised on their exact sources (`width_outlines.rs`).
     width_outlines: std::cell::RefCell<width_outlines::WidthOutlines>,
     /// `window.devicePixelRatio` as of the last attach or resize, so the
@@ -748,8 +740,6 @@ impl Session {
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
             spiro_cache: std::cell::RefCell::default(),
-            node_spiro_pointer: None,
-            spiro_hold_pointer: None,
             width_outlines: std::cell::RefCell::default(),
             device_pixel_ratio: 1.0,
             button_down: false,
@@ -862,8 +852,6 @@ impl Session {
             held: Modifiers::NONE,
             object_cache: object_cache::ObjectCache::default(),
             spiro_cache: std::cell::RefCell::default(),
-            node_spiro_pointer: None,
-            spiro_hold_pointer: None,
             width_outlines: std::cell::RefCell::default(),
             device_pixel_ratio: 1.0,
             button_down: false,
@@ -952,6 +940,7 @@ impl Session {
     /// no acceptance criterion exercises switching tools mid-drag, so
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
+        self.end_width_wheel();
         self.width_edit = None;
         self.end_snapping_drag();
         self.recording_unguarded(|this| {
@@ -1219,7 +1208,6 @@ impl Session {
                 let threshold = self.hit_tolerances().drag_threshold;
                 self.node.pointer_moved(&paths, point, shift, threshold);
                 self.resolve_node_snapping(point);
-                self.node_spiro_hold(&paths, point, shift, threshold);
                 self.node_hover_on_nothing = false;
                 if !self.node.drag_in_flight() {
                     self.node_hover_on_nothing = self.node_hit_is_nothing(&paths, point);
@@ -1242,13 +1230,6 @@ impl Session {
                     self.pen.freehand_move(&mut self.minter, point);
                 }
                 self.pen_snap_hover(point);
-                if !self.button_down
-                    && self.pen.mode() == curvyo_ui_core::PenMode::Spiro
-                    && self.pen_entry().is_none()
-                    && let Some(end) = self.pen_segment_end()
-                {
-                    self.spiro_pen_hold(end);
-                }
             }
             Tool::Trace => {
                 if !self.trace_mask_drag_move(point) {
@@ -1391,6 +1372,11 @@ impl Session {
 
     /// [`Session::double_click`], telling the host which hint to show, if any.
     pub fn double_click_hint(&mut self, point: Point, shift: bool, ctrl: bool) -> DoubleClickHint {
+        if let Some(point) = sanitized_point(point)
+            && self.width_select_under(point)
+        {
+            return DoubleClickHint::WidthEntry;
+        }
         if self.tiling.is_some() {
             // On a circle handle: its entry box (`0069` criterion 14).
             if let Some(point) = sanitized_point(point) {

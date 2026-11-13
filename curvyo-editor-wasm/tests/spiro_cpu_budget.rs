@@ -1,7 +1,7 @@
 //! The CPU cost of solving a Spiro curve (`specs/0110-pen-modes-variable-stroke` criterion 2):
 //! the session solves a drawn path synchronously while points are placed, so one solve of a
-//! realistic path fits well inside a 16 ms frame, and a curve that cannot be solved is given up
-//! just as fast. Native thread CPU time is a lower bound for wasm, hence the 4 ms margin.
+//! realistic path fits well inside a 16 ms frame, and a curve whose iteration does not converge
+//! stops just as fast (ten iterations at most, `specs/0114`). Native thread CPU time is a lower bound for wasm, hence the 4 ms margin.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -75,30 +75,57 @@ fn a_hard_zigzag_answers_within_a_quarter_frame_either_way() {
     assert!(spent < BUDGET, "zigzag took {spent:?}");
 }
 
-/// Customer 2026-11-11: a Pen hover whose Spiro has no near solution goes back toward the last
-/// place in a few solves from the shown shape; the worst hover of a sweep around the end of a
-/// 24-point wave stays within a quarter frame.
+/// The rebuild of the Pen's live Spiro at one pointer event (`specs/0114` criterion 3): the hover
+/// and the frame drawn after it solve the curve from its controls, within 2 ms in an optimised
+/// build for waves of 3, 8 and 20 controls with the pointer circling the last one, and for the
+/// hairpin (three controls nearly on a line) with the pointer circling its end.
 #[test]
-fn a_held_pen_hover_answers_within_a_quarter_frame() {
+fn a_live_spiro_rebuild_per_pointer_event_fits_two_milliseconds() {
     use curvyo_editor_wasm::{Session, Tool};
     use curvyo_ui_core::PenMode;
-    let mut session = Session::new(61);
-    session.set_tool(Tool::Pen);
-    assert!(session.set_pen_mode(PenMode::Spiro));
-    let mut last = Point::new(0.0, 0.0);
-    for i in 0..24 {
-        let x = 5.0 * f64::from(i);
-        last = Point::new(10.0 + x, 100.0 + 15.0 * (x / 15.0).sin());
-        session.pointer_hover(last, false, false);
-        session.pointer_down(last, false);
-        session.pointer_up(last, false, false);
+    let budget = Duration::from_millis(if cfg!(debug_assertions) { 20 } else { 2 });
+    let wave = |n: u32| -> Vec<Point> {
+        (0..n)
+            .map(|i| {
+                let x = 5.0 * f64::from(i);
+                Point::new(10.0 + x, 100.0 + 15.0 * (x / 15.0).sin())
+            })
+            .collect()
+    };
+    let hairpin = vec![
+        Point::new(10.0, 10.0),
+        Point::new(50.0, 10.0),
+        Point::new(20.0, 10.5),
+    ];
+    for (placed, radius) in [
+        (wave(3), 12.0),
+        (wave(8), 12.0),
+        (wave(20), 12.0),
+        (hairpin, 20.0),
+    ] {
+        let mut session = Session::new(61);
+        session.set_tool(Tool::Pen);
+        assert!(session.set_pen_mode(PenMode::Spiro));
+        for &p in &placed {
+            session.pointer_hover(p, false, false);
+            session.pointer_down(p, false);
+            session.pointer_up(p, false, false);
+        }
+        let last = *placed.last().unwrap();
+        let mut worst = Duration::ZERO;
+        for step in 0..64 {
+            let angle = std::f64::consts::TAU * f64::from(step) / 64.0;
+            let at = Point::new(last.x + radius * angle.cos(), last.y + radius * angle.sin());
+            let (_, spent) = cpu_time::cpu_time_of(|| {
+                session.pointer_hover(at, false, false);
+                session.draw_list()
+            });
+            worst = worst.max(spent);
+        }
+        assert!(
+            worst < budget,
+            "{} controls: worst rebuild took {worst:?}",
+            placed.len()
+        );
     }
-    let mut worst = Duration::ZERO;
-    for step in 0..32 {
-        let angle = std::f64::consts::TAU * f64::from(step) / 32.0;
-        let at = Point::new(last.x + 12.0 * angle.cos(), last.y + 12.0 * angle.sin());
-        let ((), spent) = cpu_time::cpu_time_of(|| session.pointer_hover(at, false, false));
-        worst = worst.max(spent);
-    }
-    assert!(worst < BUDGET, "worst held hover took {worst:?}");
 }

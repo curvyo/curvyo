@@ -6,7 +6,7 @@
 
 use curvyo_document_core::{AnchorId, Length, NodeId, PathSnapshot, Point, WidthPoint};
 use curvyo_geometry_core::PathMeasure;
-use curvyo_ui_core::{WidthGesture, WidthGesturePart, width_hit, width_position_at};
+use curvyo_ui_core::{WidthGesture, width_hit, width_position_at};
 
 use super::Session;
 
@@ -19,6 +19,8 @@ struct WidthDrag {
     gesture: WidthGesture,
     /// The press added a new point: the release writes it even without movement.
     added: bool,
+    /// A wheel burst, written by `end_width_wheel` (`specs/0114` criterion 7).
+    wheel: bool,
     source: Option<PathSnapshot>,
     /// The latest pointer, where the live readout sits.
     pointer: Point,
@@ -118,6 +120,20 @@ impl Session {
         true
     }
 
+    /// Whether the tool bar offers Edit width: one path is selected and it has a stroke
+    /// (`specs/0114` criterion 4). Starting may still be refused with a notice.
+    #[must_use]
+    pub fn width_edit_offered(&self) -> bool {
+        let [id] = self.selection.ids() else {
+            return false;
+        };
+        self.document.path(*id).is_some_and(|path| {
+            !path.is_compound()
+                && path.style.stroke.enabled
+                && path.style.stroke.width.as_mm() > 0.0
+        })
+    }
+
     /// Whether width editing is active.
     #[must_use]
     pub const fn width_edit_active(&self) -> bool {
@@ -126,6 +142,7 @@ impl Session {
 
     /// Leaves width editing (Done) and discards any uncommitted drag.
     pub fn end_width_edit(&mut self) {
+        self.end_width_wheel();
         self.width_edit = None;
     }
 
@@ -242,6 +259,7 @@ impl Session {
     }
 
     pub(super) fn width_pointer_down(&mut self, pointer: Point) -> bool {
+        self.end_width_wheel();
         let Some(mut state) = self.width_edit.take() else {
             return false;
         };
@@ -249,13 +267,14 @@ impl Session {
         if let Some(path) = width_path(&self.document, &self.spiro_cache, state.path)
             && let Some(measure) = measure(&path)
         {
-            let tolerance = self.point_tolerance_as_length();
+            let tolerance = self.width_hit_tolerance();
             if let Some(id) = width_hit(&measure, &path.width_points, pointer, tolerance) {
                 if let Some(point) = path.width_points.iter().find(|p| p.id == id) {
                     state.selected = Some(id);
                     state.drag = Some(WidthDrag {
                         gesture: WidthGesture::existing(*point, pointer),
                         added: false,
+                        wheel: false,
                         source: self.document.path(state.path),
                         pointer,
                     });
@@ -268,6 +287,7 @@ impl Session {
                     state.drag = Some(WidthDrag {
                         gesture,
                         added: true,
+                        wheel: false,
                         source: self.document.path(state.path),
                         pointer,
                     });
@@ -295,13 +315,25 @@ impl Session {
         let Some(mut state) = self.width_edit.take() else {
             return false;
         };
-        let hit = self.point_tolerance_as_length();
+        let hit = self.width_hit_tolerance();
         // A drag chooses its axis once it has moved a few screen pixels.
         let threshold = Length::from_mm(LATCH_PX / self.view().scale());
         if let Some(path) = width_path(&self.document, &self.spiro_cache, state.path)
             && let Some(measure) = measure(&path)
         {
-            if let Some(drag) = &mut state.drag {
+            let wheel_left = state.drag.as_ref().is_some_and(|drag| drag.wheel)
+                && width_hit(&measure, &path.width_points, pointer, hit).is_none();
+            if wheel_left {
+                self.width_edit = Some(state);
+                self.end_width_wheel();
+                let Some(next) = self.width_edit.take() else {
+                    return true;
+                };
+                state = next;
+            }
+            if let Some(drag) = state.drag.as_mut().filter(|drag| drag.wheel) {
+                drag.pointer = pointer;
+            } else if let Some(drag) = &mut state.drag {
                 drag.pointer = pointer;
                 let _ = drag
                     .gesture
@@ -401,89 +433,12 @@ impl Session {
         }
         Some((state.path, points))
     }
-
-    /// "Width 3.25 mm" at the pointer while a drag sets a width, in the display unit.
-    pub(super) fn width_live_readout(&self) -> Option<super::shapes::LiveReadout> {
-        let state = self.width_edit.as_ref()?;
-        let drag = state.drag.as_ref()?;
-        if drag.gesture.axis() != Some(WidthGesturePart::Width) {
-            return None;
-        }
-        let path = width_path(&self.document, &self.spiro_cache, state.path)?;
-        let width =
-            Length::from_mm(path.style.stroke.width.as_mm() * drag.gesture.preview().multiplier);
-        let unit = self.display_unit();
-        Some(super::shapes::LiveReadout {
-            text: format!(
-                "Width {} {}",
-                curvyo_ui_core::format_field_length(width, unit),
-                unit.symbol()
-            ),
-            anchor: drag.pointer,
-        })
-    }
-
-    /// The diamonds on the centre line, the selected one filled, and the ghost under the pointer.
-    pub(super) fn width_handle_overlay(&self) -> curvyo_render_core::DrawList {
-        let Some((id, points)) = self.width_points_for_display() else {
-            return curvyo_render_core::DrawList::default();
-        };
-        let Some(path) = width_path(&self.document, &self.spiro_cache, id) else {
-            return curvyo_render_core::DrawList::default();
-        };
-        let Some(measure) = measure(&path) else {
-            return curvyo_render_core::DrawList::default();
-        };
-        let state = self.width_edit.as_ref();
-        let selected = state.and_then(|state| state.selected);
-        let mut diamonds: Vec<_> = points
-            .iter()
-            .filter_map(|point| {
-                let at = curvyo_ui_core::width_handle(
-                    &measure,
-                    point.position,
-                    Length::from_mm(0.0),
-                    0.0,
-                )?;
-                Some(curvyo_render_core::WidthDiamond {
-                    at,
-                    selected: selected == Some(point.id),
-                    ghost: false,
-                })
-            })
-            .collect();
-        if let Some(at) = state.and_then(|state| state.ghost) {
-            diamonds.push(curvyo_render_core::WidthDiamond {
-                at,
-                selected: false,
-                ghost: true,
-            });
-        }
-        curvyo_render_core::build_width_diamonds(&diamonds, self.view())
-    }
-
-    /// `objects` with the path in width editing drawn with the drag's preview profile.
-    pub(super) fn width_preview_artwork(
-        &self,
-        objects: &[curvyo_document_core::ObjectSnapshot],
-    ) -> Option<Vec<curvyo_document_core::ObjectSnapshot>> {
-        self.width_edit.as_ref()?.drag.as_ref()?;
-        let (id, points) = self.width_points_for_display()?;
-        Some(
-            objects
-                .iter()
-                .map(|object| match object {
-                    curvyo_document_core::ObjectSnapshot::Path(path) if path.id == id => {
-                        let mut preview = path.clone();
-                        preview.width_points.clone_from(&points);
-                        curvyo_document_core::ObjectSnapshot::Path(preview)
-                    }
-                    _ => object.clone(),
-                })
-                .collect(),
-        )
-    }
 }
+
+mod display;
+mod wheel;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wheel_tests;

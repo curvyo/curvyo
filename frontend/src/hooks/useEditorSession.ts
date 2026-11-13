@@ -44,6 +44,7 @@ import { moveWorkspaceLink } from "@/lib/workspaceLink";
 import type { WasmSession } from "@/lib/editorSession";
 import { freeCanvasArea, type GuideState, readGuideState } from "@/lib/guideText";
 import type { EditHint } from "@/components/EditHintChip";
+import type { WidthChipAt, WidthEntry } from "@/components/WidthPointEntry";
 import type { BooleanOp, BooleanResult } from "@/lib/booleanText";
 import type { BreakApartResult, CombineResult, CutResult, SplitResult } from "@/lib/pathText";
 import type { StackCommand, StackResult } from "@/lib/stackText";
@@ -251,6 +252,19 @@ const MARK_TOUCH_SLOP_PX = 8;
  * reason about pixels (`adrs.md`'s frontend requirement: "normalize
  * `deltaMode` to pixels"). */
 const WHEEL_LINE_HEIGHT_PX = 16;
+/** One wheel notch in pixels (Chrome and Firefox send about 100 per notch). */
+const WHEEL_NOTCH_PX = 100;
+/** A pause this long ends a wheel burst over a width point (`specs/0114` criterion 7). */
+const WIDTH_WHEEL_BURST_MS = 500;
+/** How long the wheel readout of a width point stays after the last notch (UX review
+ * 2026-11-12). */
+const WIDTH_WHEEL_READOUT_MS = 800;
+
+/** Where the selected width point's diamond sits, canvas px; `fallback` without one. */
+function widthPointAt(session: WasmSession, fallback: { x: number; y: number }): { x: number; y: number } {
+  const [x, y] = session.width_point_screen();
+  return x === undefined || y === undefined ? fallback : { x, y };
+}
 const WHEEL_PAGE_HEIGHT_PX = 800;
 
 function normalizedWheelDelta(event: WheelEvent): { deltaX: number; deltaY: number } {
@@ -638,6 +652,13 @@ export interface EditorSession {
   editHint: EditHint | null;
   /** Closes the edit hint (3 s, a press, a key, the pointer leaving). */
   dismissEditHint: () => void;
+  /** The typed width field of a width point, or `null` (`specs/0114` criterion 6). */
+  widthEntry: WidthEntry | null;
+  /** The live width beside a width point while the wheel turns it, or `null`. */
+  widthWheelReadout: WidthChipAt | null;
+  /** Sets the entry's width in millimetres (one undo step); `false` when refused. */
+  commitWidthEntry: (mm: number) => boolean;
+  closeWidthEntry: () => void;
   /** `curvyo-editor-wasm`'s `cursor_hint()` — `"default"`, `"rotate"`
    * or `"resize:<degrees>"` (`object-transform`'s transform-handle
    * cursors); `Canvas` turns it into a CSS cursor via `lib/cursors`. */
@@ -1022,6 +1043,13 @@ export function useEditorSession(
   const [cursorHint, setCursorHint] = useState("default");
   const [editHint, setEditHint] = useState<EditHint | null>(null);
   const editHintCounter = useRef(0);
+  /** The typed width a double-click on a width point opened (`specs/0114` criterion 6). */
+  const [widthEntry, setWidthEntry] = useState<WidthEntry | null>(null);
+  const widthEntryCounter = useRef(0);
+  /** The pending end of a wheel burst over a width point (criterion 7). */
+  const widthWheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [widthWheelReadout, setWidthWheelReadout] = useState<WidthChipAt | null>(null);
+  const widthReadoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [handleHint, setHandleHint] = useState("");
   const [cornerHintLines, setCornerHintLines] = useState<string[]>([]);
   const limitNoticeTimer = useRef<number | undefined>(undefined);
@@ -1514,6 +1542,34 @@ export function useEditorSession(
       const x = event.clientX - bounds.left;
       const y = event.clientY - bounds.top;
       const { deltaX, deltaY } = normalizedWheelDelta(event);
+      // Over a width point in width editing every wheel event, Ctrl or Meta and a trackpad
+      // pinch too, sets its width and never zooms or pans, one undo step per burst
+      // (`specs/0114` criterion 7); Shift is the fine step and often turns the wheel into a
+      // horizontal one.
+      const overWidthPoint = session.width_edit_active() && session.width_point_under(x, y);
+      if (overWidthPoint || (widthWheelTimer.current !== null && session.width_edit_active())) {
+        const raw = Math.abs(deltaY) >= Math.abs(deltaX) ? deltaY : deltaX;
+        if (session.width_wheel(x, y, -raw / WHEEL_NOTCH_PX, event.shiftKey)) {
+          if (widthWheelTimer.current !== null) clearTimeout(widthWheelTimer.current);
+          widthWheelTimer.current = setTimeout(() => {
+            widthWheelTimer.current = null;
+            sessionRef.current?.end_width_wheel();
+            syncFromSessionRef.current();
+          }, WIDTH_WHEEL_BURST_MS);
+          const mm = session.width_point_mm();
+          if (Number.isFinite(mm)) {
+            setWidthWheelReadout({ ...widthPointAt(session, { x, y }), mm, id: 0 });
+            if (widthReadoutTimer.current !== null) clearTimeout(widthReadoutTimer.current);
+            widthReadoutTimer.current = setTimeout(() => {
+              widthReadoutTimer.current = null;
+              setWidthWheelReadout(null);
+            }, WIDTH_WHEEL_READOUT_MS);
+          }
+          syncFromSessionRef.current();
+          return;
+        }
+        if (overWidthPoint) return;
+      }
       session.wheel(deltaX, deltaY, x, y, event.shiftKey, event.ctrlKey || event.metaKey);
       setZoomPercent(session.zoom_percent());
       // A pan or zoom moves the document under a still pointer.
@@ -2467,6 +2523,13 @@ export function useEditorSession(
         showTransformNotice(session);
         if (hintCode === "offset_chip") {
           // The chip mounts with the next sync and takes the focus (`0038` criterion 53).
+        } else if (hintCode === "width_entry") {
+          widthEntryCounter.current += 1;
+          setWidthEntry({
+            ...widthPointAt(session, press),
+            mm: session.width_point_mm(),
+            id: widthEntryCounter.current,
+          });
         } else if (hintCode === "create_trace") {
           traceCreateRef.current();
         } else if (hintCode) {
@@ -2556,6 +2619,21 @@ export function useEditorSession(
   }, [syncFromSession]);
 
   const dismissEditHint = useCallback(() => setEditHint(null), []);
+  const closeWidthEntry = useCallback(() => {
+    setWidthEntry(null);
+    containerRef.current?.focus();
+  }, []);
+  const commitWidthEntry = useCallback(
+    (mm: number) => {
+      const session = sessionRef.current;
+      if (!session || !Number.isFinite(mm) || mm < 0 || !session.set_width_point_mm(mm)) return false;
+      setWidthEntry(null);
+      syncFromSessionRef.current();
+      containerRef.current?.focus();
+      return true;
+    },
+    [],
+  );
 
   const onPointerLeave = useCallback(() => {
     // A double-click is two presses with the pointer on the canvas between them: a press after
@@ -2976,6 +3054,10 @@ export function useEditorSession(
     cancelTextPathPick,
     editHint,
     dismissEditHint,
+    widthEntry,
+    widthWheelReadout,
+    commitWidthEntry,
+    closeWidthEntry,
     handleHint,
     cornerHintLines,
     transformEntry,
