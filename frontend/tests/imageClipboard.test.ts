@@ -8,8 +8,10 @@ import {
   type ClipboardFile,
   copyFailureReason,
   isCopyChord,
+  memoForImport,
   pastedName,
   pickPasted,
+  rememberCopy,
 } from "../src/lib/imageClipboard.ts";
 
 const press = (key: string, extra: Partial<Parameters<typeof isCopyChord>[0]> = {}) => ({
@@ -53,4 +55,16 @@ test("a failed copy names the error's message, else its name", () => {
   assert.equal(copyFailureReason(new Error("Write permission denied.")), "Write permission denied.");
   assert.equal(copyFailureReason({ name: "NotAllowedError", message: "" }), "NotAllowedError");
   assert.equal(copyFailureReason("refused"), "refused");
+});
+
+// `specs/0114` criterion 14: the page keeps the last Ctrl+C's fingerprint and mask and hands them
+// to a paste only (not to a picker or a drop), so a pasted copy carries the trace mask.
+test("the copy memo goes to a paste only", () => {
+  assert.equal(memoForImport("paste"), null, "nothing copied yet");
+  rememberCopy("00ff", '{"parts":[]}');
+  assert.deepEqual(memoForImport("paste"), { fingerprint: "00ff", mask: '{"parts":[]}' });
+  assert.equal(memoForImport("drop"), null);
+  assert.equal(memoForImport("picker"), null);
+  rememberCopy("0a0a", "");
+  assert.equal(memoForImport("paste"), null, "a copy without a mask leaves no memo");
 });

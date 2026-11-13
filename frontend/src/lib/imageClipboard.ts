@@ -76,3 +76,17 @@ export function copyFailureReason(error: unknown): string {
   }
   return String(error) || "unknown error";
 }
+
+/** The last Ctrl+C's picture fingerprint and trace mask (`specs/0114` criterion 14); `null` when
+ * that copy had no mask. */
+let copyMemo: { fingerprint: string; mask: string } | null = null;
+
+/** Remembers a Ctrl+C: its fingerprint and mask, nothing when the image had no mask. */
+export function rememberCopy(fingerprint: string, mask: string): void {
+  copyMemo = mask ? { fingerprint, mask } : null;
+}
+
+/** The memo a paste hands to the session; other import origins get none. */
+export function memoForImport(origin: string): { fingerprint: string; mask: string } | null {
+  return origin === "paste" ? copyMemo : null;
+}
