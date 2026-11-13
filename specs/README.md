@@ -333,8 +333,9 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | 42 | 0110 `pen-modes-variable-stroke` (a path's `curve_kind` with Spiro or B-spline control points as its anchors, a Spiro placement register, independent width points; ADR 0053) | In progress. Golden: `pen_modes_v42.curvyo` |
 | 43 | 0028 `material-test-library` (`op_settings` and `op_grid` on operations, the test grid keys on groups and their items, the root marker `x.curvyo.laser.material_edit`; ADR 0054; material record format 1, ADR 0055) | Done (PR #333). Goldens: `laser_settings_v43.curvyo`, `laser_settings_damaged_v43.curvyo`, `test_grid_hand_edited_v43.curvyo`, `test_grid_orphan_row_v43.curvyo` |
 | 44 | 0111 `laser-operation-tools` (group assignment on the existing member keys, `op_options` register, Interval in `op_settings.main`; ADR 0056; profile record 4 `motorised_z`) | Done (PR #350). Golden: `operation_tools_v44.curvyo` |
-| 45 | 0112 `test-grid-and-materials` (the test grid object with derived operations; ADR 0057; material record 2, ADR 0058) | Draft |
-| 46 | 0113 `fixture-sets-and-pins` (fixture sets, job fixtures, pin kind; ADR 0059; profile record 5, ADR 0060) | Draft |
+| 45 | 0114 `image-trace-mask` (an image node's trace mask as keyed registers `trace_part`, `trace_settings`, `trace_region`; ADR 0061) | In progress. Goldens: `trace_mask_v45.curvyo`, `trace_mask_damaged_v45.curvyo` |
+| 46 | 0112 `test-grid-and-materials` (the test grid object with derived operations; ADR 0057; material record 2, ADR 0058) | Draft. Goldens: `test_grid_v46.curvyo`, `test_grid_damaged_v46.curvyo`, `test_grid_orphan_rows_v46.curvyo` |
+| 47 | 0113 `fixture-sets-and-pins` (fixture sets, job fixtures, pin kind; ADR 0059; profile record 5, ADR 0060) | Draft |
 | none | 0099 `sketch-pages` (writes only existing registers: `kind` by Convert to paths, the sketch claim, `clone_link`, `own_placement`; membership is read, not stored) | Done (PR #287). Golden: `sketch_pages_v37.curvyo` |
 | 27 | 0060 `snapping` (seven document-root registers: enabled, the four target flags, capture and release px) | In progress (2026-10-30). Golden: `snapping_v27.curvyo`; old-file compatibility waived by the customer. |
 

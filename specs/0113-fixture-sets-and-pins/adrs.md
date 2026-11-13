@@ -1,6 +1,6 @@
 # ADRs for fixture sets and pins
 
-Status: Proposed (architect, 2026-11-12). Builds third, after `0111` and `0112` (needs the profile record format 4 of ADR 0056 and the Materials tab before Fixtures). File shapes: [ADR 0059](../../docs/adr/0059-fixture-sets-job-fixtures-and-pins-in-the-project-file.md) (project file, format 46) and [ADR 0060](../../docs/adr/0060-fixture-sets-in-the-machine-profile-record.md) (profile record format 5), both `needs-customer`, accepted with the story PR. Decisions marked **(Proposal)** are the architect's and vetoable at the demo.
+Status: Proposed (architect, 2026-11-12). Builds third, after `0111` and `0112` (needs the profile record format 4 of ADR 0056 and the Materials tab before Fixtures). File shapes: [ADR 0059](../../docs/adr/0059-fixture-sets-job-fixtures-and-pins-in-the-project-file.md) (project file, format 47) and [ADR 0060](../../docs/adr/0060-fixture-sets-in-the-machine-profile-record.md) (profile record format 5), both `needs-customer`, accepted with the story PR. Decisions marked **(Proposal)** are the architect's and vetoable at the demo.
 
 - [ADR 0059](../../docs/adr/0059-fixture-sets-job-fixtures-and-pins-in-the-project-file.md): set nodes with `set_on_page`, job fixtures as direct children with `fixture_locked`, the on-the-bed rule, the `pin` kind and pin and screw grids, `job_role` jobs with `.marks` and `.circle`, Apply fixtures from page, migration into "Set 1", limits.
 - [ADR 0060](../../docs/adr/0060-fixture-sets-in-the-machine-profile-record.md): `fixture_sets` in record format 5, pins and roles in entries, reading of formats 1 to 4, copy into a page keeping job fixtures, Differs.
@@ -13,7 +13,7 @@ Status: Proposed (architect, 2026-11-12). Builds third, after `0111` and `0112` 
 
 ## Feature-local decisions
 
-- 2026-11-12: **Format.** Project `format_version` 46, profile record format 5. Numbers taken at merge.
+- 2026-11-12: **Format.** Project `format_version` 47, profile record format 5. Numbers taken at merge.
 - 2026-11-12: **Old files migrate at open** into one set "Set 1" (one `migrate_format` commit, not an undo step), and every screw gets its two role jobs; this changes the spec's "nothing written on open" (S1). A virtual legacy set was rejected (ADR 0059 options).
 - 2026-11-12: **Lock** is `fixture_locked`, not the drawing `locked`, because a locked fixture stays selectable and listed. Enforced in the session's drag, nudge, handle and chip paths; a pure check `is_locked` in `curvyo-laser-core/src/fixture_sets.rs` so the hit and drag code ask one place.
 - 2026-11-12: **Centre mark Size** is the fixture parameter `mark_mm`, since jobs carry no settings (ADR 0052 §1).
@@ -24,7 +24,7 @@ Status: Proposed (architect, 2026-11-12). Builds third, after `0111` and `0112` 
 ## Crate placement (no new crate)
 
 - `curvyo-laser-core`: `fixture_kind.rs` (pin), `fixture_grid.rs`, `fixture_marks.rs`, `fixture_sets.rs`, `fixture_part.rs` (`.circle`, `.marks`), `machine_profile_sets.rs` (record format 5 set layer and the format-2-to-4 read path), `machine_profile_fixtures.rs` (entries with pins and roles).
-- `curvyo-document-core`: set node codec and commands (`manufacturing_fixture_set_commands.rs`), `fixture_locked`, `job_role` in `fixture_job_codec.rs`, the migration (`fixture_set_migration.rs`), Apply, validator; `CURRENT_FORMAT_VERSION` 46.
+- `curvyo-document-core`: set node codec and commands (`manufacturing_fixture_set_commands.rs`), `fixture_locked`, `job_role` in `fixture_job_codec.rs`, the migration (`fixture_set_migration.rs`), Apply, validator; `CURRENT_FORMAT_VERSION` 47.
 - `curvyo-editor-wasm`: `session/fixtures/` gains `sets.rs`, `placement.rs` (armed placement and centre snapping), `lock.rs`, `apply.rs`.
 - `curvyo-ui-core` snapping: one query for centres only, no new target.
 
