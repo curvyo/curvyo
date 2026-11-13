@@ -57,7 +57,7 @@ impl SpiroShape {
 }
 
 /// Solves an open or closed Spiro curve: a function of the controls alone, so what is shown
-/// while they move is what is stored and what a reopen draws (`specs/0114`). A run whose
+/// while they move is what is stored and what a reopen draws (`specs/0115`). A run whose
 /// iteration does not converge is drawn as its last iterate, as Inkscape does.
 ///
 /// # Errors

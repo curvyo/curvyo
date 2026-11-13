@@ -18,12 +18,12 @@ pub(super) const CONVERT_FAILED_NOTICE: &str =
 
 /// The refusal of a transformation, width edit or conversion of a Spiro path without a curve:
 /// one with too few points, several subpaths or coordinates too large to draw at the tolerance,
-/// which only a file from outside can hold (every other Spiro has a curve since `specs/0114`).
+/// which only a file from outside can hold (every other Spiro has a curve since `specs/0115`).
 pub(super) const SPIRO_UNSOLVED_NOTICE: &str = "This Spiro path has no curve to transform.";
 
 /// The last solve of each Spiro path, of the Pen's path in progress and of each path in a Node
 /// drag. A solve runs only when the controls change, and the curve is a function of the controls
-/// alone (`specs/0114` criterion 2): what a moving point shows is what is stored and what a
+/// alone (`specs/0115` criterion 2): what a moving point shows is what is stored and what a
 /// reopen draws.
 #[derive(Debug, Default)]
 pub(super) struct SpiroCache {
@@ -219,7 +219,7 @@ mod tests {
         assert!(cache.preview(&controls[..1], false).is_none());
     }
 
-    /// `specs/0114` criterion 2 (customer 2026-11-12): the preview is a function of its controls
+    /// `specs/0115` criterion 2 (customer 2026-11-12): the preview is a function of its controls
     /// alone. Wherever the point circling its neighbour has been, it shows the curve of the
     /// controls it has now, the one a stored path of those controls draws.
     #[test]
@@ -289,7 +289,7 @@ mod tests {
 
     /// A closed Spiro through three points on one line (no curvature-continuous curve exists)
     /// is drawn as the solver's last iterate and moves like any other path (it was refused with
-    /// a notice before `specs/0114` dropped the convergence check).
+    /// a notice before `specs/0115` dropped the convergence check).
     #[test]
     fn a_curve_whose_iteration_does_not_converge_can_be_clicked_and_moved() {
         let mut session = super::super::Session::new(7);

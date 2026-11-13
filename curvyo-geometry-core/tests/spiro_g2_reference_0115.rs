@@ -1,4 +1,4 @@
-//! `specs/0114` criteria 1 and 2: a Spiro is the curvature-continuous curve of Inkscape's Spiro mode
+//! `specs/0115` criteria 1 and 2: a Spiro is the curvature-continuous curve of Inkscape's Spiro mode
 //! (libspiro's `c` points): clothoid segments between smooth controls, circular arcs at open
 //! ends and beside corners, always drawn and a function of its controls. The `spiro-inner` port of libspiro returns NaN for open `c` paths
 //! (even three points), so these are property tests instead of reference curves (ADR 0053,
@@ -178,7 +178,7 @@ fn finite(spans: &[curvyo_geometry_core::SpiroCubic]) -> bool {
     })
 }
 
-/// `specs/0114` criterion 2: the curve is a function of the controls alone and always drawn. A
+/// `specs/0115` criterion 2: the curve is a function of the controls alone and always drawn. A
 /// tight zigzag (whose iteration does not converge in ten steps), three controls nearly on a line
 /// and a hairpin each give a finite curve through every control, the same every time.
 #[test]

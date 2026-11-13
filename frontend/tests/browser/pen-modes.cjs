@@ -5,7 +5,7 @@
 // desktop size. Also the UX review of 2026-11-10: U1 an unsolvable Spiro commits straight lines
 // and its notice ends, U4 the Select bar keeps its width beside the Width chip, U6 Pen bar buttons
 // of 32 px with tooltips below, U7 the Pen bar clears the page label, U8 refusals beside the
-// pointer, U9 the active profile is marked. Since `specs/0114`: no Spiro notice (the point
+// pointer, U9 the active profile is marked. Since `specs/0115`: no Spiro notice (the point
 // follows the pointer at every event), Edit width in the tool bar and its Done, bigger diamonds, a double-click types a
 // point's width, the wheel over a point sets its width without zooming; UX review 2026-11-12: the
 // field and a wheel readout beside the diamond inside the canvas, the short refusal, the toggle's
@@ -19,7 +19,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '../../..');
-const shots = path.join(root, 'target/0114-browser');
+const shots = path.join(root, 'target/0115-browser');
 fs.mkdirSync(shots, { recursive: true });
 const PORT = 5181;
 
@@ -86,7 +86,7 @@ async function journey(browser, url, viewport, tag) {
     tipBelow: !!tip && tip.y >= penBar.y + penBar.height - 1,
     overLabel: overlaps(penBar, await p.locator('[data-page-label]').first().boundingBox()),
   };
-  // 0114 (customer 2026-11-12): circling the last of three Spiro points, the live end is at the
+  // 0115 (customer 2026-11-12): circling the last of three Spiro points, the live end is at the
   // pointer at every event (ink right at the pointer): the curve is a function of the points.
   await p.getByRole('radio', { name: 'Spiro', exact: true }).click(); await settle();
   const R = { x0: w * 0.2, x1: w * 0.75, y0: h * 0.25, y1: h * 0.8 };
@@ -118,7 +118,7 @@ async function journey(browser, url, viewport, tag) {
     await shot(`${mode}-done`);
     results[mode] = { live, done };
   }
-  // 0114: the Spiro zigzag with the pointer as a sixth point shows its curve and no notice.
+  // 0115: the Spiro zigzag with the pointer as a sixth point shows its curve and no notice.
   await p.getByRole('radio', { name: 'Spiro', exact: true }).click(); await settle();
   const k = Math.min(w, h) / 320;
   const zig = [[10, 60], [50, 30], [85, 65], [120, 35], [143, 70]].map(([x, y]) => [w * 0.12 + x * k, h * 0.05 + y * k]);
@@ -150,7 +150,7 @@ async function journey(browser, url, viewport, tag) {
   const plain = await inkIn(p, lineBand);
   await p.getByRole('button', { name: 'Taper both', exact: true }).click(); await settle(); await settle();
   const tapered = await inkIn(p, lineBand);
-  // U9: the profile the path has is marked; 0114: Edit width is in the tool bar, not the panel.
+  // U9: the profile the path has is marked; 0115: Edit width is in the tool bar, not the panel.
   results.marked = {
     taper: await p.getByRole('button', { name: 'Taper both', exact: true }).getAttribute('aria-pressed'),
     panelEdit: await p.getByRole('tabpanel').getByRole('button', { name: 'Edit width', exact: true }).count(),
@@ -209,7 +209,7 @@ async function journey(browser, url, viewport, tag) {
   await p.mouse.up(); await settle();
   const wide = await inkIn(p, spot);
   await shot('width-dragged');
-  // 0114 criterion 6: a double-click on the diamond types its width; Enter sets it.
+  // 0115 criterion 6: a double-click on the diamond types its width; Enter sets it.
   const dia = at(mid[0], mid[1]);
   await p.mouse.dblclick(dia.x, dia.y); await settle();
   const entry = p.locator('[data-width-entry] input');
@@ -375,7 +375,7 @@ async function journey(browser, url, viewport, tag) {
       const { results, errors } = await journey(browser, url, viewport, tag);
       console.log(tag, JSON.stringify(results), errors.length ? `errors: ${errors.join(' | ')}` : '');
       const { preset, width, laser, penBar, spiroNotice, modeRefusal, marked, selectBar, panelRefusal, toggle, toggleLook, spiroCircling, ...modes } = results;
-      // Before 0114 the end froze after 4 of 27 events (desktop); the hold of the first 0114
+      // Before 0115 the end froze after 4 of 27 events (desktop); the hold of the first 0115
       // build let it rejoin at 15 of 27; without the hold it is at the pointer at every event.
       assert.ok(spiroCircling.atPointer === spiroCircling.frames, `${tag}: a Spiro end circling its last point follows the pointer (${JSON.stringify(spiroCircling)})`);
       assert.ok(panelRefusal >= 0 && panelRefusal < 80, `${tag}: a panel refusal shows beside the button (${panelRefusal})`);

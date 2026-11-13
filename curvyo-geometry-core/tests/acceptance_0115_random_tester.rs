@@ -1,4 +1,4 @@
-//! Tester acceptance for `specs/0114-spiro-smoothing-and-width-handles` criteria 1 and 2 on
+//! Tester acceptance for `specs/0115-spiro-smoothing-and-width-handles` criteria 1 and 2 on
 //! random controls: the Spiro is a pure function of its controls (the same controls give the
 //! same curve, whatever was solved before), and any finite controls, open or closed, 2 to 20
 //! points, coincident, collinear or far from the origin, give a finite curve through every
@@ -176,7 +176,7 @@ impl Lcg {
 /// control polygon, printed for the report, and every one finite.
 #[test]
 fn random_smooth_controls_rarely_fall_back_to_the_polygon() {
-    let mut rng = Lcg(0x0114);
+    let mut rng = Lcg(0x0115);
     let (mut total, mut polygon) = (0, 0);
     let mut examples = Vec::new();
     for _ in 0..3000 {

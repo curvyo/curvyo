@@ -1,4 +1,4 @@
-//! Tester acceptance for `specs/0114-spiro-smoothing-and-width-handles` criterion 1: a Spiro is
+//! Tester acceptance for `specs/0115-spiro-smoothing-and-width-handles` criterion 1: a Spiro is
 //! the curvature-continuous curve of Inkscape's Spiro mode, clothoid segments between smooth
 //! points and circular arcs at open ends and beside corners; three points give their circle.
 //! Written from the specification, with properties of the curve itself (not of its coefficients).

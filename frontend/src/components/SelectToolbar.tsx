@@ -122,7 +122,7 @@ export interface SelectToolbarProps {
     onEnter: (byKeyboard: boolean) => void;
     notice: RecogniseBarNotice | null;
   };
-  /** Edit width (`specs/0114` criterion 4), last in the bar; renders nothing when not offered. */
+  /** Edit width (`specs/0115` criterion 4), last in the bar; renders nothing when not offered. */
   widthEdit?: React.ReactNode;
   /** The flip buttons act: something is selected (`specs/0056-mirror-and-negative-scale/`
    * criterion 1). */

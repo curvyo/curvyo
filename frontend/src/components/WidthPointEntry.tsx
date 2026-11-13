@@ -63,7 +63,7 @@ function formatMm(mm: number): string {
 }
 
 /**
- * The typed width of a width point (`specs/0114` criterion 6): a small field below the
+ * The typed width of a width point (`specs/0115` criterion 6): a small field below the
  * double-clicked diamond (above it without room, UX review 2026-11-12), in the entry chip look,
  * with the width in mm selected. Enter sets it (one undo step), Escape or leaving the field
  * cancels; a value that is not a width of 0 mm or more stays open and says so under the field.
@@ -130,7 +130,7 @@ function EntryField({ entry, onCommit, onClose, containerRef }: EntryProps & { e
 }
 
 /**
- * The live width while the wheel turns over a width point (`specs/0114` criterion 7, UX review
+ * The live width while the wheel turns over a width point (`specs/0115` criterion 7, UX review
  * 2026-11-12): "Width 2.5 mm" above its diamond in the entry chip look; the host drops it shortly
  * after the last notch.
  */

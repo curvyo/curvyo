@@ -814,7 +814,7 @@ fn a_solvable_spiro_is_committed_as_a_spiro() {
     );
 }
 
-/// `specs/0114` criterion 1: the drag that stopped at a fold of the G4 curve (at 31 mm) follows
+/// `specs/0115` criterion 1: the drag that stopped at a fold of the G4 curve (at 31 mm) follows
 /// the pointer to its end with the curvature-continuous curve; the release writes the pointer's
 /// place, and the stored curve is the one shown.
 #[test]

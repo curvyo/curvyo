@@ -5,7 +5,7 @@ use super::constraints::{Layout, maximum, segment_ends};
 use super::linear::solve_linear;
 
 /// Newton iterations of one solve: Levien's `solve_spiro` stops after ten, whatever the residual,
-/// and its last iterate is the curve (`specs/0114`, customer 2026-11-12).
+/// and its last iterate is the curve (`specs/0115`, customer 2026-11-12).
 const ITERATIONS: usize = 10;
 /// Bisections of a Newton step that leaves the drawable iterates, for the part of it that stays.
 const BISECTIONS: usize = 40;

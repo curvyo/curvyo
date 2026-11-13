@@ -35,7 +35,7 @@ pub enum DoubleClickHint {
     /// (`specs/0025-raster-trace` criterion 12).
     CreateTrace,
     /// A double-click on a width point in width editing selected it: the host opens the typed
-    /// width field (`specs/0114` criterion 6).
+    /// width field (`specs/0115` criterion 6).
     WidthEntry,
 }
 

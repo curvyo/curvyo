@@ -197,7 +197,7 @@ mod tests {
         assert!(curvyo_ui_core::read_svg_drawing(text.as_bytes()).is_ok());
     }
 
-    /// Every Spiro of finite controls has a curve since `specs/0114`, even one whose controls
+    /// Every Spiro of finite controls has a curve since `specs/0115`, even one whose controls
     /// lie on one spot (it was refused as unsolvable before): it exports beside an ordinary path.
     #[test]
     fn a_spiro_on_one_spot_exports_like_any_path() {

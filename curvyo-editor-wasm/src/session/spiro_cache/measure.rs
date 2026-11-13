@@ -1,4 +1,4 @@
-//! Measures how a Spiro point follows the pointer (`specs/0114` criterion 2): the share of
+//! Measures how a Spiro point follows the pointer (`specs/0115` criterion 2): the share of
 //! pointer events at which the shown point is not under the pointer, the largest move of the
 //! curve between two events, the events at which the curve moves much more than the pointer (not
 //! a smooth function of it), curves drawn as their control polygon, curves a reopen would draw
@@ -333,11 +333,11 @@ fn print_spiro_follow_figures() {
     }
 }
 
-/// `specs/0114` criterion 2 (customer 2026-11-12): on every walk at 0.5 mm steps the Pen's live
+/// `specs/0115` criterion 2 (customer 2026-11-12): on every walk at 0.5 mm steps the Pen's live
 /// Spiro point is under the pointer at every event, its curve is never the control polygon,
 /// moves much more than the pointer at no more than 1 % of the events (where it turns over
 /// behind a neighbour), and what is shown is what a reopen draws. Before (the hold of the first
-/// `0114` build): 4.6 % to 69.8 % of the events stalled.
+/// `0115` build): 4.6 % to 69.8 % of the events stalled.
 #[test]
 fn the_live_spiro_point_follows_the_pointer_and_its_curve_rarely_jumps() {
     for (name, placed, path) in walks() {

@@ -1,5 +1,5 @@
 //! Width points under the pointer in width editing: their hit area, the typed width a
-//! double-click opens and the mouse wheel over them (`specs/0114` criteria 5 to 7).
+//! double-click opens and the mouse wheel over them (`specs/0115` criteria 5 to 7).
 
 use curvyo_document_core::{Length, Point};
 use curvyo_ui_core::{WidthGesture, width_hit};
@@ -14,7 +14,7 @@ const WHEEL_FINE_STEP_MM: f64 = 0.1;
 const HIT_MARGIN_PX: f64 = 3.0;
 
 impl Session {
-    /// The hit radius of a width diamond: its half size and a margin, 11 px (`specs/0114`
+    /// The hit radius of a width diamond: its half size and a margin, 11 px (`specs/0115`
     /// criterion 5).
     pub(in crate::session) fn width_hit_tolerance(&self) -> Length {
         Length::from_mm(
