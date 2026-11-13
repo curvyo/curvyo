@@ -1,7 +1,11 @@
 //! The parts of a composite trace in the Trace tool (`specs/0094-masked-composite-trace` slice 2,
-//! criteria 18, 19, 24, 27 to 29 and 42).
+//! criteria 18, 19, 24, 27, 28, 31 and 42 as `specs/0114-image-trace-mask` keeps them: the parts
+//! are the image's, their masks its stored regions; `0114` criteria 19 and 20).
 
-use curvyo_document_core::{Affine, Length, NodeId, ObjectSnapshot, Point, RectBounds};
+use curvyo_document_core::{
+    Affine, Length, NewTraceRegion, NodeId, ObjectSnapshot, Point, RectBounds, TraceRegionKind,
+    UnitPoint,
+};
 use curvyo_ui_core::{TracePartClip, read_trace_wire};
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
 use vectrace::mask::Mask;
@@ -46,38 +50,40 @@ fn rect(session: &Session, x: f64, y: f64, w: f64, h: f64) -> NodeId {
     })
 }
 
-/// One image in the Trace tool, a rectangle over its left half (`left`) and one over its right
-/// half (`right`), the image alone selected.
-fn halves() -> (Session, NodeId, NodeId, NodeId) {
+/// The left half of the picture in its unit square, reaching well past its edges (the whole
+/// image's clip is its box grown by 1 mm).
+const LEFT: [(f64, f64); 2] = [(-10.0, -10.0), (0.5, 11.0)];
+/// The right half.
+const RIGHT: [(f64, f64); 2] = [(0.5, -10.0), (11.0, 11.0)];
+
+/// One image in the Trace tool, alone selected.
+fn halves() -> (Session, NodeId) {
     let mut session = Session::new(1);
     let image = image_of(&mut session);
-    let c = corners(&session, image);
-    let (w, h) = (c[2].x - c[0].x, c[2].y - c[0].y);
-    let left = rect(&session, c[0].x - 1.0, c[0].y - 1.0, w / 2.0 + 1.0, h + 2.0);
-    let right = rect(
-        &session,
-        c[0].x + w / 2.0,
-        c[0].y - 1.0,
-        w / 2.0 + 1.0,
-        h + 2.0,
-    );
     session.set_tool(Tool::Trace);
     session.selection.set(&[image]);
-    (session, image, left, right)
+    (session, image)
 }
 
-fn ids(session: &Session) -> Vec<NodeId> {
-    sorted(session.selection.ids().to_vec())
-}
-
-fn sorted(mut ids: Vec<NodeId>) -> Vec<NodeId> {
-    ids.sort_by_key(|id| format!("{id:?}"));
-    ids
+/// Draws a rectangle region over `corners` (unit square) into the active part, as a gesture of the
+/// Rectangle tool stores it.
+fn draw(session: &mut Session, image: NodeId, corners: [(f64, f64); 2]) {
+    let part = session.trace_active_mask_part().and_then(|p| p.stored);
+    let region = NewTraceRegion {
+        kind: TraceRegionKind::Rect,
+        subtract: false,
+        points: corners.iter().map(|&(u, v)| UnitPoint::new(u, v)).collect(),
+    };
+    let s = &*session;
+    s.with_part_ref(part.as_deref(), |p| {
+        s.document.draw_trace_region(image, p, &region)
+    })
+    .unwrap();
 }
 
 #[test]
 fn c18_one_part_whole_image_and_add_stops_at_eight() {
-    let (mut session, _, _, _) = halves();
+    let (mut session, _) = halves();
     let parts = session.trace_parts();
     assert_eq!(parts.len(), 1);
     assert!(parts[0].active && parts[0].whole && !parts[0].muted);
@@ -90,10 +96,12 @@ fn c18_one_part_whole_image_and_add_stops_at_eight() {
     assert_eq!(session.trace_part_count(), TRACE_PARTS_MAX);
 }
 
+/// Criterion 19 with stored parts: a new part is active, Inside and without regions; a region
+/// drawn then is the active part's; a chip pick loads its mode; the selection stays the image.
 #[test]
-fn c19_a_new_part_is_active_without_paths_and_takes_the_selected_paths() {
-    let (mut session, image, left, right) = halves();
-    session.selection.set(&[image, left]);
+fn c19_a_new_part_is_active_without_regions_and_takes_the_drawn_ones() {
+    let (mut session, image) = halves();
+    draw(&mut session, image, LEFT);
     session.set_trace_mask_outside(true);
     let first = session.trace_parts()[0].id;
     let second = session.add_trace_part().unwrap();
@@ -101,40 +109,33 @@ fn c19_a_new_part_is_active_without_paths_and_takes_the_selected_paths() {
     let parts = session.trace_parts();
     assert_eq!(parts.len(), 2);
     assert!(parts[1].active && parts[1].muted && !parts[1].contributes);
-    assert_eq!(parts[1].paths, 0);
+    assert_eq!(parts[1].regions, 0);
     assert!(!parts[1].outside, "a new part is Inside");
     assert!(!session.trace_mask_outside());
-    assert_eq!(
-        session.selection.ids(),
-        [image],
-        "only the image stays selected"
-    );
-    // Selecting image plus paths assigns them to the active part.
-    session.selection.set(&[image, right]);
+    assert_eq!(session.selection.ids(), [image], "the image stays selected");
+    draw(&mut session, image, RIGHT);
     let parts = session.trace_parts();
-    assert_eq!((parts[0].paths, parts[1].paths), (1, 1));
+    assert_eq!((parts[0].regions, parts[1].regions), (1, 1));
     assert!(parts[1].contributes && !parts[1].muted);
-    // A chip pick loads its mode and selects its paths with the image.
     assert!(session.set_trace_active_part(0));
-    assert_eq!(ids(&session), sorted(vec![image, left]));
     assert!(session.trace_mask_outside());
     assert!(session.trace_parts()[0].active);
     assert!(session.set_trace_active_part(1));
-    assert_eq!(ids(&session), sorted(vec![image, right]));
     assert!(!session.trace_mask_outside());
     assert!(!session.set_trace_active_part(5));
+    assert_eq!(session.selection.ids(), [image]);
 }
 
 /// Criterion 21 in the session: the earlier part's clip is cut by the later part.
 #[test]
 fn the_parts_clips_take_out_the_later_parts() {
-    let (mut session, image, left, right) = halves();
+    let (mut session, image) = halves();
     let c = corners(&session, image);
     let mid = Point::new(f64::midpoint(c[0].x, c[2].x), f64::midpoint(c[0].y, c[2].y));
     let quarter = Point::new(c[0].x + (c[2].x - c[0].x) * 0.25, mid.y);
     let three = Point::new(c[0].x + (c[2].x - c[0].x) * 0.75, mid.y);
     session.add_trace_part();
-    session.selection.set(&[image, left]);
+    draw(&mut session, image, LEFT);
     let clips = session.trace_part_clip_list();
     let TracePartClip::Region(rest) = &clips[0] else {
         panic!("{clips:?}")
@@ -144,127 +145,99 @@ fn the_parts_clips_take_out_the_later_parts() {
     assert_ne!(session.trace_part_mask_json(0), "");
     // A third part over the right half: the whole image keeps nothing.
     session.add_trace_part();
-    session.selection.set(&[image, right]);
+    draw(&mut session, image, RIGHT);
     let clips = session.trace_part_clip_list();
     assert_eq!(clips[0], TracePartClip::Nothing);
     assert!(!session.trace_parts()[0].contributes);
     assert_eq!(session.trace_part_mask_json(0), "");
 }
 
-/// Criterion 27 by the routes the Trace tool has: the Layers row's Delete (an inactive part's
-/// path, not selected) and Undo (the active part's path, selected).
+/// Criterion 27 with regions: the undo of a region drawn while the tool is open leaves its part
+/// without it (muted), and no error appears.
 #[test]
-fn c27_a_deleted_mask_path_leaves_its_part() {
-    let (mut session, image, left, _) = halves();
-    session.selection.set(&[image, left]);
+fn c27_an_undone_region_leaves_its_part() {
+    let (mut session, image) = halves();
     session.add_trace_part();
-    let c = corners(&session, image);
-    let (w, h) = (c[2].x - c[0].x, c[2].y - c[0].y);
-    // A path drawn while the tool is open, then undone: the active part loses it.
-    let drawn = session.document.batch("create_rect", |document| {
-        Some(document.create_rect(RectBounds {
-            origin: Point::new(c[0].x + w / 2.0, c[0].y - 1.0),
-            width: Length::from_mm(w / 2.0 + 1.0),
-            height: Length::from_mm(h + 2.0),
-        }))
-    });
-    let drawn = drawn.unwrap();
-    session.selection.set(&[image, drawn]);
-    assert_eq!(session.trace_parts()[1].paths, 1);
+    session.recording(|s| draw(s, image, RIGHT));
+    assert_eq!(session.trace_parts()[1].regions, 1);
     session.undo();
-    assert!(
-        session.objects().iter().all(|o| o.id() != drawn),
-        "the undo took the path"
-    );
     let parts = session.trace_parts();
+    assert_eq!(parts.len(), 2, "the part stays");
     assert!(parts[1].muted && !parts[1].contributes, "{parts:?}");
     assert_eq!(
         session.trace_view().selection,
         super::TraceSelection::Images,
         "no error row"
     );
-    let key = |id: NodeId| serde_json::to_string(&id).unwrap();
-    session.delete_layer_row(&key(left));
-    let parts = session.trace_parts();
-    assert_eq!(parts[0].paths, 0);
-    assert!(
-        parts[0].whole,
-        "the first part covers the whole image again"
-    );
-    assert_eq!(
-        session.trace_view().selection,
-        super::TraceSelection::Images,
-        "no error row"
-    );
-    assert!(session.set_trace_active_part(0));
-    assert_eq!(session.selection.ids(), [image]);
 }
 
 /// A selected id whose node is gone (a deletion that did not prune the selection) is passed
-/// over: the image with its other mask paths still traces (criterion 27, no error appears).
+/// over: the image still traces with its regions (criterion 27, no error appears).
 #[test]
 fn a_gone_selected_id_is_passed_over() {
-    let (mut session, image, left, right) = halves();
-    session.selection.set(&[image, left, right]);
-    session.document.delete_objects(&[left]).unwrap();
+    let (mut session, image) = halves();
+    draw(&mut session, image, LEFT);
+    let path = rect(&session, 0.0, 0.0, 5.0, 5.0);
+    session.selection.set(&[image, path]);
+    session.document.delete_objects(&[path]).unwrap();
     let view = session.trace_view();
     assert_eq!(view.selection, super::TraceSelection::Images);
-    assert_eq!(view.mask, [right]);
+    assert_eq!((view.images, view.regions), (vec![image], 1));
 }
 
 #[test]
 fn c28_removing_a_part_renumbers_and_activates_the_one_before() {
-    let (mut session, image, left, right) = halves();
+    let (mut session, image) = halves();
     assert!(!session.remove_trace_part(0), "one part stays");
     session.add_trace_part();
-    session.selection.set(&[image, left]);
+    draw(&mut session, image, LEFT);
     let third = session.add_trace_part().unwrap();
-    session.selection.set(&[image, right]);
+    draw(&mut session, image, RIGHT);
     assert!(session.remove_trace_part(1));
     let parts = session.trace_parts();
     assert_eq!(parts.len(), 2);
     assert_eq!(parts[1].id, third, "the parts renumber, their ids stay");
-    assert!(parts[1].active && parts[1].paths == 1);
-    // Removing the active part activates the one before it with its selection.
+    assert!(parts[1].active && parts[1].regions == 1);
+    // Removing the active part activates the one before it.
     assert!(session.remove_trace_part(1));
     assert_eq!(session.trace_part_count(), 1);
     assert!(session.trace_parts()[0].active);
     assert_eq!(session.selection.ids(), [image]);
 }
 
-/// Replaced by `specs/0114-image-trace-mask` criterion 19: the parts are the image's, so
-/// leaving the tool keeps them; on entry part 1 is active and the selected paths are its mask.
+/// `specs/0114-image-trace-mask` criterion 19: the parts are the image's, so leaving the tool
+/// keeps them; on entry part 1 is active.
 #[test]
 fn c29_leaving_the_tool_keeps_the_parts() {
-    let (mut session, image, left, _) = halves();
+    let (mut session, image) = halves();
+    draw(&mut session, image, LEFT);
     session.add_trace_part();
-    session.selection.set(&[image, left]);
     session.set_tool(Tool::Select);
     session.set_tool(Tool::Trace);
     assert_eq!(session.trace_part_count(), 2);
     let parts = session.trace_parts();
-    assert_eq!(parts[0].paths, 1, "the selected paths are part 1's mask");
+    assert_eq!(parts[0].regions, 1);
     assert!(parts[0].active);
 }
 
+/// Criterion 42 with regions (`0114` criterion 20, UX notes §9): Clear mask clears the active
+/// part's regions only; a chip pick and Add part keep the pressed region tool and Subtract.
 #[test]
 fn c42_clear_mask_and_picks_change_the_active_part_only() {
-    let (mut session, image, left, right) = halves();
-    session.selection.set(&[image, left]);
+    let (mut session, image) = halves();
+    draw(&mut session, image, LEFT);
     session.add_trace_part();
-    session.set_trace_mask_pick(true);
-    session.selection.set(&[image, right]);
+    draw(&mut session, image, RIGHT);
+    session.set_trace_region_tool(super::TraceRegionTool::Rect);
+    session.set_trace_subtract(true);
     session.clear_trace_mask();
     let parts = session.trace_parts();
-    assert_eq!((parts[0].paths, parts[1].paths), (1, 0));
-    assert!(session.trace_mask_pick(), "the mode stays armed");
+    assert_eq!((parts[0].regions, parts[1].regions), (1, 0));
+    assert_eq!(session.trace_part_count(), 2, "the part stays");
     session.set_trace_active_part(0);
-    assert!(
-        session.trace_mask_pick(),
-        "a chip pick leaves the mode armed"
-    );
     session.add_trace_part();
-    assert!(session.trace_mask_pick(), "Add part leaves the mode armed");
+    assert_eq!(session.trace_region_tool(), super::TraceRegionTool::Rect);
+    assert!(session.trace_subtract());
 }
 
 /// A 16 x 16 px picture over the image's frame: a black square in the middle.
@@ -286,9 +259,9 @@ fn square_picture() -> Vec<u8> {
 /// Create paths writes one group in one step, one undo restores the document.
 #[test]
 fn c24_the_joined_parts_are_one_group_in_one_step() {
-    let (mut session, image, left, _) = halves();
+    let (mut session, image) = halves();
     session.add_trace_part();
-    session.selection.set(&[image, left]);
+    draw(&mut session, image, LEFT);
     let source = session.trace_source(image, false).unwrap();
     let map = Affine::from_array(source.map)
         .compose(Affine::scale(
@@ -343,7 +316,7 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
     .unwrap();
     assert_eq!(whole.paths, 1);
     let before = session.objects().len();
-    let left_before = session.objects().iter().find(|o| o.id() == left).cloned();
+    let mask_before = session.document.trace_mask(image);
     assert!(matches!(
         session.create_traced_paths(),
         TraceCreateOutcome::Created {
@@ -354,9 +327,9 @@ fn c24_the_joined_parts_are_one_group_in_one_step() {
     ));
     assert_eq!(session.objects().len(), before + 1, "one group's path");
     assert_eq!(
-        session.objects().iter().find(|o| o.id() == left).cloned(),
-        left_before,
-        "the mask path is unchanged"
+        session.document.trace_mask(image),
+        mask_before,
+        "the regions are unchanged"
     );
     session.undo();
     assert_eq!(session.objects().len(), before);
@@ -411,10 +384,10 @@ fn c31_a_part_inside_the_picture_is_cropped() {
         source
     );
     // In the session: the whole image minus a later part is the whole picture.
-    let (mut session, image, left, _) = halves();
+    let (mut session, image) = halves();
     let whole = session.trace_source(image, false).unwrap();
     session.add_trace_part();
-    session.selection.set(&[image, left]);
+    draw(&mut session, image, LEFT);
     assert_eq!(
         session
             .trace_part_source(image, 0, false, 0.1, false)
@@ -529,64 +502,13 @@ fn c31_a_cropped_part_traces_as_the_whole_picture_does() {
         "the thin bar is kept"
     );
     // Upscale Auto: the cut-out and the picture fall on the same side of 1 Mpx.
-    let (mut session, image, left, _) = halves();
+    let (mut session, image) = halves();
     session.add_trace_part();
-    session.selection.set(&[image, left]);
+    draw(&mut session, image, LEFT);
     let whole_source = session.trace_source(image, false).unwrap();
     let auto = session
         .trace_part_source(image, 1, false, 0.1, true)
         .unwrap();
     let upscaled = |s: &super::TraceSource| TraceUpscale::Auto.applies(s.width, s.height);
     assert_eq!(upscaled(&auto), upscaled(&whole_source));
-}
-
-/// The Layers row's Delete on a selected mask path while Trace is open deletes that path: the
-/// image stays selected and the part loses the path (coordinator 2026-11-06, point 4).
-#[test]
-fn deleting_a_selected_mask_path_from_its_row_removes_it() {
-    let (mut session, image, left, right) = halves();
-    session.selection.set(&[image, left, right]);
-    let key = |id: NodeId| serde_json::to_string(&id).unwrap();
-    session.delete_layer_row(&key(left));
-    assert!(
-        session.objects().iter().all(|o| o.id() != left),
-        "the path is deleted"
-    );
-    assert!(
-        session.objects().iter().any(|o| o.id() == image),
-        "the image stays"
-    );
-    assert_eq!(ids(&session), sorted(vec![image, right]));
-    assert_eq!(session.trace_parts()[0].paths, 1);
-    assert_eq!(session.tool, Tool::Trace);
-}
-
-#[test]
-fn unsupported_mask_in_inactive_part_stops_entire_composite() {
-    use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
-    let (mut session, image, _, right) = halves();
-    // A Spiro too far out to be drawn at any tolerance has no curve: it cannot be a mask (every
-    // Spiro of ordinary controls has one since `specs/0115`, even through one point).
-    let nodes = [
-        NewAnchor::corner(AnchorId::new(181, 1), Point::new(1e300, 5.)),
-        NewAnchor::corner(AnchorId::new(181, 2), Point::new(5., 1e300)),
-        NewAnchor::corner(AnchorId::new(181, 3), Point::new(-1e300, 5.)),
-    ];
-    let bad = session
-        .document
-        .create_editable_curve(&nodes, true, CurveKind::Spiro)
-        .unwrap();
-    session.selection.set(&[image, bad]);
-    session.add_trace_part().unwrap();
-    session.selection.set(&[image, right]);
-    assert!(session.trace_view().mask_failed);
-    assert!(
-        session
-            .trace_part_clip_list()
-            .iter()
-            .all(|clip| !clip.contributes())
-    );
-    assert!(session.set_trace_joined(image, &[], true).is_none());
-    assert!(session.trace_source(image, false).is_none());
-    assert_eq!(session.create_traced_paths(), TraceCreateOutcome::Ignored);
 }

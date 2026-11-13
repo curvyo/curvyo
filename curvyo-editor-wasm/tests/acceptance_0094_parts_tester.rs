@@ -1,10 +1,10 @@
 //! Tester cases for `specs/0094-masked-composite-trace` slice 2 at the session (criteria 18, 19,
-//! 21, 22, 24, 27 to 29, 31 to 33 and 42; the cut-out Proposal): an SVG with the tester's M1
-//! picture (`curvyo-ui-core/tests/support_0094`) and mask rectangles is imported, the parts are
-//! built with Add part, chip picks, Shift+click and the pick mode, and each part is traced as the
+//! 21, 22, 24, 27 to 29, 31 to 33 and 42; the cut-out Proposal), as `specs/0114-image-trace-mask`
+//! keeps them: the tester's M1 picture (`curvyo-ui-core/tests/support_0094`) is imported, the
+//! parts are built with Add part, chip picks and rectangles drawn with the Trace tool's Rectangle
+//! (they replaced the mask paths, Shift+click and the pick mode), and each part is traced as the
 //! worker traces it, from the session's part pixels (`trace_part_source`) and its clip
-//! (`trace_parts` mask JSON), then joined by `set_trace_joined`. Written from the specification
-//! and the public API before the implementation was read.
+//! (`trace_parts` mask JSON), then joined by `set_trace_joined`.
 
 #![allow(
     clippy::unwrap_used,
@@ -22,7 +22,9 @@ mod support;
 mod cpu_time;
 
 use curvyo_document_core::{Document, NodeId, ObjectSnapshot, Point, unpack};
-use curvyo_editor_wasm::{Session, Tool, TraceCreateOutcome, trace_mask_region, trace_settings};
+use curvyo_editor_wasm::{
+    Session, Tool, TraceCreateOutcome, TraceRegionTool, trace_mask_region, trace_settings,
+};
 use curvyo_ui_core::{TraceRegion, read_trace_wire};
 use image::ImageEncoder;
 use kurbo::{BezPath, PathEl};
@@ -76,14 +78,6 @@ fn image_of(d: &Document) -> NodeId {
         .expect("an image")
 }
 
-/// The non-image objects in document order (the rectangles of the SVG).
-fn paths_of(d: &Document) -> Vec<NodeId> {
-    d.object_ids()
-        .into_iter()
-        .filter(|&id| !matches!(d.object(id), Some(ObjectSnapshot::Image(_))))
-        .collect()
-}
-
 fn parts(s: &Session) -> serde_json::Value {
     let v: Vec<serde_json::Value> = s
         .trace_parts()
@@ -91,7 +85,7 @@ fn parts(s: &Session) -> serde_json::Value {
         .enumerate()
         .map(|(i, p)| {
             serde_json::json!({
-                "i": i, "id": p.id, "paths": p.paths, "outside": p.outside, "whole": p.whole,
+                "i": i, "id": p.id, "regions": p.regions, "outside": p.outside, "whole": p.whole,
                 "muted": p.muted, "active": p.active, "contributes": p.contributes,
             })
         })
@@ -99,26 +93,15 @@ fn parts(s: &Session) -> serde_json::Value {
     serde_json::Value::Array(v)
 }
 
-fn shift_click(s: &mut Session, at: (f64, f64)) {
-    let p = pt(s, at);
-    s.pointer_down(p, true);
-    s.pointer_up(p, true, false);
-}
-
-fn click(s: &mut Session, at: (f64, f64)) {
-    let p = pt(s, at);
-    s.pointer_down(p, false);
-    s.pointer_up(p, false, false);
-}
-
-/// Filled rectangles that reach beyond the picture so a click outside the picture hits them:
-/// A over the left half (x -20..50), B over the right half (x 50..120), C over the top band.
-const A: &str = r#"<rect id="a" x="-20" y="0" width="70" height="100" fill="black"/>"#;
-const B: &str = r#"<rect id="b" x="50" y="0" width="70" height="100" fill="black"/>"#;
-const C: &str = r#"<rect id="c" x="0" y="-20" width="100" height="45" fill="black"/>"#;
-/// Points on B and C outside the picture, in the SVG's mm.
-const ON_B: (f64, f64) = (110.0, 50.0);
-const ON_C: (f64, f64) = (50.0, -10.0);
+/// Rectangles in the picture's mm (its first corner at 0, 0): A over the left half (x -20..50),
+/// B over the right half (x 50..120), C over the top band.
+type MmBox = ((f64, f64), (f64, f64));
+const A: MmBox = ((-20.0, 0.0), (50.0, 100.0));
+const B: MmBox = ((50.0, 0.0), (120.0, 100.0));
+const C: MmBox = ((0.0, -20.0), (100.0, 25.0));
+/// D and E inside the picture, away from its edges.
+const D: MmBox = ((12.0, 14.0), (42.0, 54.0));
+const E: MmBox = ((55.0, 40.0), (88.0, 85.0));
 
 /// The document point of the SVG's mm `(x, y)`: the picture's first corner is the SVG's origin
 /// (the import may move the drawing).
@@ -132,19 +115,24 @@ fn pt(s: &Session, (x, y): (f64, f64)) -> Point {
     Point::new(c[0].x + x, c[0].y + y)
 }
 
-/// Imports M1 with A, B and C, the image and A selected, Trace tool on.
-fn three_paths() -> (Session, NodeId, Vec<NodeId>) {
-    let mut s = import(&svg(&format!("{A}{B}{C}")));
-    let d = doc(&s);
-    let image = image_of(&d);
-    let paths = paths_of(&d);
-    assert_eq!(paths.len(), 3);
-    // Only A with the image: Shift+click B and C off before the tool... in the tool.
+/// Draws the rectangle `area` (the picture's mm) into the active part with the Rectangle tool.
+fn region(s: &mut Session, area: MmBox) {
+    s.set_trace_region_tool(TraceRegionTool::Rect);
+    let (from, to) = (pt(s, area.0), pt(s, area.1));
+    s.pointer_down(from, false);
+    s.pointer_hover(to, false, false);
+    s.pointer_up(to, false, false);
+    s.set_trace_region_tool(TraceRegionTool::None);
+}
+
+/// Imports M1, Trace tool on, region A in part 1.
+fn part_a() -> (Session, NodeId) {
+    let mut s = import(&svg(""));
+    let image = image_of(&doc(&s));
     s.set_tool(Tool::Trace);
-    shift_click(&mut s, ON_B);
-    shift_click(&mut s, ON_C);
-    assert_eq!(s.trace_view().mask, vec![paths[0]], "A alone is the mask");
-    (s, image, paths)
+    region(&mut s, A);
+    assert_eq!(s.trace_view().regions, 1, "A is the mask");
+    (s, image)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -294,11 +282,11 @@ fn outlines(wire: &[f64]) -> Vec<BezPath> {
 
 #[test]
 fn c18_one_masked_image_has_chip_1_active_and_add_part_stops_at_8() {
-    let (mut s, _, _) = three_paths();
+    let (mut s, _) = part_a();
     let p = parts(&s);
     assert_eq!(p.as_array().unwrap().len(), 1, "{p}");
     assert_eq!(p[0]["active"], true);
-    assert_eq!(p[0]["paths"], 1);
+    assert_eq!(p[0]["regions"], 1);
     assert_eq!(p[0]["whole"], false);
     for n in 2..=8 {
         assert!(s.add_trace_part().is_some(), "part {n} is added");
@@ -325,41 +313,47 @@ fn c18_an_image_alone_has_one_whole_part() {
 
 #[test]
 fn c19_add_part_is_active_muted_and_takes_the_next_paths_a_chip_pick_loads_its_mask() {
-    let (mut s, image, paths) = three_paths();
+    let (mut s, image) = part_a();
     assert!(s.add_trace_part().is_some());
     let p = parts(&s);
     assert_eq!(p[1]["active"], true, "{p}");
     assert_eq!(p[0]["active"], false);
-    assert_eq!(p[1]["paths"], 0);
+    assert_eq!(p[1]["regions"], 0);
     assert_eq!(p[1]["muted"], true, "a new part without paths is muted");
     assert_eq!(p[1]["contributes"], false);
     assert_eq!(s.selected_object_count(), 1, "the image alone is selected");
-    assert_eq!(s.trace_view().mask, Vec::<NodeId>::new());
-    // Shift+click assigns B to part 2.
-    shift_click(&mut s, ON_B);
+    assert_eq!(s.trace_view().regions, 0);
+    // A rectangle drawn now is part 2's.
+    region(&mut s, B);
     let p = parts(&s);
-    assert_eq!(p[1]["paths"], 1, "{p}");
+    assert_eq!(p[1]["regions"], 1, "{p}");
     assert_eq!(p[1]["muted"], false);
-    assert_eq!(p[0]["paths"], 1, "part 1 keeps A");
-    assert_eq!(s.trace_view().mask, vec![paths[1]]);
-    // A chip pick: part 1 active, its mask selected with the image.
+    assert_eq!(p[0]["regions"], 1, "part 1 keeps A");
+    assert_eq!(s.trace_view().regions, 1);
+    // A chip pick: part 1 active with its region; the selection stays the image.
     assert!(s.set_trace_active_part(0));
     assert_eq!(s.trace_active_part(), 0);
-    assert_eq!(s.trace_view().mask, vec![paths[0]]);
-    assert_eq!(s.selected_object_count(), 2, "the image and A");
+    assert_eq!(s.selected_object_count(), 1, "the image alone");
     assert_eq!(s.trace_view().images, vec![image]);
+    assert!(
+        s.trace_region()
+            .is_some_and(|r| r.keeps(pt(&s, (10.0, 50.0))))
+    );
     assert!(s.set_trace_active_part(1));
-    assert_eq!(s.trace_view().mask, vec![paths[1]]);
+    assert!(
+        s.trace_region()
+            .is_some_and(|r| r.keeps(pt(&s, (90.0, 50.0))))
+    );
     assert!(!s.set_trace_active_part(5), "no such part");
 }
 
 #[test]
 fn c19_mask_mode_is_per_part() {
-    let (mut s, _, _) = three_paths();
+    let (mut s, _) = part_a();
     s.set_trace_mask_outside(true);
     assert!(s.add_trace_part().is_some());
     assert!(!s.trace_mask_outside(), "a new part starts Inside");
-    shift_click(&mut s, ON_B);
+    region(&mut s, B);
     let p = parts(&s);
     assert_eq!(p[0]["outside"], true, "{p}");
     assert_eq!(p[1]["outside"], false);
@@ -370,51 +364,70 @@ fn c19_mask_mode_is_per_part() {
     );
 }
 
+/// Criterion 42 with regions: drawing and Clear mask touch the active part only; Add part and a
+/// chip pick keep the pressed region tool (`0114` UX notes §9).
 #[test]
-fn c42_picks_and_clear_mask_touch_the_active_part_only_and_keep_the_mode_armed() {
-    let (mut s, _, paths) = three_paths();
-    s.set_trace_mask_pick(true);
+fn c42_drawing_and_clear_mask_touch_the_active_part_only_and_keep_the_tool() {
+    let (mut s, image) = part_a();
     assert!(s.add_trace_part().is_some());
-    assert!(s.trace_mask_pick(), "Add part leaves the mode armed");
-    click(&mut s, ON_B);
-    click(&mut s, ON_C);
+    region(&mut s, B);
+    region(&mut s, C);
     let p = parts(&s);
-    assert_eq!(p[1]["paths"], 2, "the picks go to part 2: {p}");
-    assert_eq!(p[0]["paths"], 1, "part 1 keeps A only");
+    assert_eq!(p[1]["regions"], 2, "the rectangles go to part 2: {p}");
+    assert_eq!(p[0]["regions"], 1, "part 1 keeps A only");
+    s.set_trace_region_tool(TraceRegionTool::Rect);
     assert!(s.set_trace_active_part(0));
-    assert!(s.trace_mask_pick(), "a chip pick leaves the mode armed");
-    click(&mut s, ON_C);
+    assert_eq!(
+        s.trace_region_tool(),
+        TraceRegionTool::Rect,
+        "a chip pick keeps the tool"
+    );
+    s.set_trace_region_tool(TraceRegionTool::None);
+    region(&mut s, C);
     let p = parts(&s);
-    assert_eq!(p[0]["paths"], 2, "C picked into part 1: {p}");
-    assert_eq!(p[1]["paths"], 2, "part 2 unchanged");
-    click(&mut s, ON_C);
-    assert_eq!(parts(&s)[0]["paths"], 1, "a second pick removes it again");
+    assert_eq!(p[0]["regions"], 2, "C drawn into part 1: {p}");
+    assert_eq!(p[1]["regions"], 2, "part 2 unchanged");
     assert!(s.set_trace_active_part(1));
     s.clear_trace_mask();
     let p = parts(&s);
-    assert_eq!(p[1]["paths"], 0, "Clear mask empties part 2: {p}");
-    assert_eq!(p[0]["paths"], 1, "part 1 untouched");
-    assert!(s.trace_mask_pick());
-    assert_eq!(paths_of(&doc(&s)), paths, "the paths stay in the document");
+    assert_eq!(p[1]["regions"], 0, "Clear mask empties part 2: {p}");
+    assert_eq!(p[0]["regions"], 2, "part 1 untouched");
+    assert_eq!(
+        doc(&s).trace_mask(image).unwrap().parts.len(),
+        2,
+        "the part stays"
+    );
 }
 
 // ---------------------------------------------------------------------------------------------
 // Criteria 27, 28, 29.
 
+/// Criterion 27 with regions: a part's region deleted while the tool is open (selected and Delete)
+/// leaves the part without an error; part 1 without regions is the whole image again.
 #[test]
-fn c27_a_mask_path_deleted_while_the_tool_is_open_leaves_its_part_without_an_error() {
-    let (mut s, image, paths) = three_paths();
+fn c27_a_region_deleted_while_the_tool_is_open_leaves_its_part_without_an_error() {
+    let (mut s, image) = part_a();
     assert!(s.add_trace_part().is_some());
-    shift_click(&mut s, ON_B);
-    // B (part 2's only path) is deleted from the Layers row while part 1 is active (a row's
-    // Delete of a selected object follows the canvas Delete, which the Trace tool does not do).
-    assert!(s.set_trace_active_part(0));
-    let key = |id: NodeId| serde_json::to_string(&id).unwrap();
-    s.delete_layer_row(&key(paths[1]));
-    assert!(!doc(&s).object_ids().contains(&paths[1]), "B is gone");
+    region(&mut s, B);
+    let delete_at = |s: &mut Session, at: (f64, f64)| {
+        let p = pt(s, at);
+        s.pointer_down(p, false);
+        s.pointer_up(p, false, false);
+        s.key_down(curvyo_editor_wasm::KeyInput {
+            key: "Delete",
+            shift: false,
+            ctrl: false,
+            alt: false,
+            repeat: false,
+            dom_blocked: false,
+            mac: false,
+            time_ms: 0.0,
+        });
+    };
+    delete_at(&mut s, (110.0, 50.0));
     assert_eq!(s.trace_part_count(), 2, "the part stays");
     let p = parts(&s);
-    assert_eq!(p[1]["paths"], 0, "{p}");
+    assert_eq!(p[1]["regions"], 0, "{p}");
     assert_eq!(p[1]["muted"], true);
     assert_eq!(p[1]["contributes"], false);
     let view = s.trace_view();
@@ -428,12 +441,11 @@ fn c27_a_mask_path_deleted_while_the_tool_is_open_leaves_its_part_without_an_err
         false,
     );
     assert!(read_trace_wire(&head).is_some() || !head.is_empty());
-    // Part 1's A deleted while part 2 is active: the first part covers the whole image again.
-    assert!(s.set_trace_active_part(1));
-    s.delete_layer_row(&key(paths[0]));
-    assert!(!doc(&s).object_ids().contains(&paths[0]), "A is gone");
+    // Part 1's A deleted: the first part covers the whole image again.
+    assert!(s.set_trace_active_part(0));
+    delete_at(&mut s, (-10.0, 50.0));
     let p = parts(&s);
-    assert_eq!(p[0]["paths"], 0, "{p}");
+    assert_eq!(p[0]["regions"], 0, "{p}");
     assert_eq!(
         p[0]["whole"], true,
         "the first part is the whole image again"
@@ -443,19 +455,19 @@ fn c27_a_mask_path_deleted_while_the_tool_is_open_leaves_its_part_without_an_err
 
 #[test]
 fn c28_removing_a_part_renumbers_and_one_part_cannot_be_removed() {
-    let (mut s, _, _) = three_paths();
+    let (mut s, _) = part_a();
     assert!(!s.remove_trace_part(0), "one part cannot be removed");
     let first = s.add_trace_part().unwrap();
-    shift_click(&mut s, ON_B);
+    region(&mut s, B);
     let third = s.add_trace_part().unwrap();
-    shift_click(&mut s, ON_C);
+    region(&mut s, C);
     let ids: Vec<u32> = s.trace_parts().iter().map(|p| p.id).collect();
     assert_eq!(ids[1..], [first, third]);
     assert!(s.remove_trace_part(1), "part 2 goes");
     let views = s.trace_parts();
     assert_eq!(views.len(), 2);
     assert_eq!(views[1].id, third, "part 3 is now part 2");
-    assert_eq!(views[1].paths, 1);
+    assert_eq!(views[1].regions, 1);
     assert!(
         views.iter().filter(|v| v.active).count() == 1,
         "one active part"
@@ -468,10 +480,10 @@ fn c28_removing_a_part_renumbers_and_one_part_cannot_be_removed() {
 /// them and entering it again shows them with part 1 active; Add part is one step each.
 #[test]
 fn c29_leaving_the_tool_keeps_the_stored_parts_with_part_one_active() {
-    let (mut s, _, _) = three_paths();
+    let (mut s, _) = part_a();
     let before = s.pack("t").unwrap();
     assert!(s.add_trace_part().is_some());
-    shift_click(&mut s, ON_B);
+    region(&mut s, B);
     assert!(s.add_trace_part().is_some());
     assert_eq!(s.trace_part_count(), 3);
     assert_ne!(
@@ -493,9 +505,9 @@ fn c29_leaving_the_tool_keeps_the_stored_parts_with_part_one_active() {
 
 #[test]
 fn c24_create_paths_with_parts_is_one_group_one_step_and_one_undo() {
-    let (mut s, image, paths) = three_paths();
+    let (mut s, image) = part_a();
     assert!(s.add_trace_part().is_some());
-    shift_click(&mut s, ON_B);
+    region(&mut s, B);
     let before = doc(&s);
     let undo_before = s.undo_len();
     join(
@@ -514,10 +526,11 @@ fn c24_create_paths_with_parts_is_one_group_one_step_and_one_undo() {
     );
     assert_eq!(s.undo_len(), undo_before + 1, "one history step");
     let after = doc(&s);
-    for &id in &paths {
-        assert_eq!(after.object(id), before.object(id), "mask path unchanged");
-        assert_eq!(after.parent_group(id), before.parent_group(id));
-    }
+    assert_eq!(
+        after.trace_mask(image),
+        before.trace_mask(image),
+        "the regions are unchanged"
+    );
     let groups: Vec<NodeId> = after
         .object_ids()
         .into_iter()
@@ -562,7 +575,7 @@ fn c24_create_paths_with_parts_is_one_group_one_step_and_one_undo() {
 
 #[test]
 fn c21_c33_session_join_matches_the_clip_rules_and_one_part_is_slice_1() {
-    let (mut s, image, _) = three_paths();
+    let (mut s, image) = part_a();
     // One part: the joined preview is the slice 1 masked trace.
     let one = part_wire(&mut s, image, 0, r#"{"threshold":50}"#, false);
     let mask = s.trace_mask_json();
@@ -598,7 +611,7 @@ fn c21_c33_session_join_matches_the_clip_rules_and_one_part_is_slice_1() {
     // the grey square at 90, 10) at 50: part 2 decides the grey (paper at 50), and part 1 is cut
     // at C's edge.
     assert!(s.add_trace_part().is_some());
-    shift_click(&mut s, ON_C);
+    region(&mut s, C);
     let views = s.trace_parts();
     assert!(views.iter().all(|v| v.contributes), "{views:?}");
     let a = part_wire(&mut s, image, 0, r#"{"threshold":150}"#, true);
@@ -622,9 +635,9 @@ fn c21_c33_session_join_matches_the_clip_rules_and_one_part_is_slice_1() {
 #[test]
 fn the_session_join_is_deterministic() {
     let run = || {
-        let (mut s, image, _) = three_paths();
+        let (mut s, image) = part_a();
         assert!(s.add_trace_part().is_some());
-        shift_click(&mut s, ON_C);
+        region(&mut s, C);
         let head = join(
             &mut s,
             image,
@@ -679,27 +692,18 @@ fn busy(n: u32) -> Vec<u8> {
 #[test]
 fn a_cut_out_part_traces_as_the_whole_picture_within_0_1_percent() {
     let n = 400;
-    // D inside the picture, E an inner ring-like frame; both away from the edges.
-    let d = r#"<rect x="12" y="14" width="30" height="40" fill="black"/>"#;
-    let e = r#"<rect x="55" y="40" width="33" height="45" fill="none" stroke="black"/>"#;
-    let mut s = import(&svg_of(&busy(n), n, &format!("{d}{e}")));
-    let dd = doc(&s);
-    let image = image_of(&dd);
-    let ids = paths_of(&dd);
+    // D and E inside the picture, both away from the edges.
+    let mut s = import(&svg_of(&busy(n), n, ""));
+    let image = image_of(&doc(&s));
     s.set_tool(Tool::Trace);
-    // Both come in selected with the image: a pick on E's interior takes it off part 1, then
-    // part 2 gets E by a pick (the closed outline counts by its interior, unfilled).
-    s.set_trace_mask_pick(true);
-    click(&mut s, (70.0, 60.0));
-    assert_eq!(s.trace_view().mask, vec![ids[0]], "part 1 is D");
+    region(&mut s, D);
     assert!(s.add_trace_part().is_some());
-    click(&mut s, (70.0, 60.0));
-    assert_eq!(
-        s.trace_view().mask,
-        vec![ids[1]],
-        "part 2 is E by its interior"
+    region(&mut s, E);
+    let p = parts(&s);
+    assert!(
+        p[0]["regions"] == 1 && p[1]["regions"] == 1,
+        "part 1 is D, part 2 is E: {p}"
     );
-    s.set_trace_mask_pick(false);
     let whole_px = s.trace_source(image, false).unwrap();
     let mut cut_any = false;
     for outside in [false, true] {
@@ -780,15 +784,13 @@ fn a_cut_out_multicolour_part_with_colours_auto_traces_as_the_whole_picture() {
             rgba.extend([c[0], c[1], c[2], 255]);
         }
     }
-    let d = r#"<rect x="20" y="20" width="40" height="40" fill="none" stroke="black"/>"#;
-    let mut s = import(&svg_of(&rgba, n, d));
+    let mut s = import(&svg_of(&rgba, n, ""));
     let image = image_of(&doc(&s));
     s.set_tool(Tool::Trace);
-    s.clear_trace_mask();
     assert!(s.add_trace_part().is_some());
-    shift_click(&mut s, (40.0, 20.0));
+    region(&mut s, ((20.0, 20.0), (60.0, 60.0)));
     let p = parts(&s);
-    assert_eq!(p[1]["paths"], 1, "part 2 is D: {p}");
+    assert_eq!(p[1]["regions"], 1, "part 2 is D: {p}");
     let cut = s.trace_part_source(image, 1, false, 0.0, false).unwrap();
     assert!(cut.width < n, "part 2 is cut out: {} px", cut.width);
     for settings in [
@@ -830,12 +832,8 @@ fn big() -> Vec<u8> {
 
 /// The four quarter parts of a 2000 px picture in the session, Trace tool open.
 fn quarters() -> (Session, NodeId) {
-    let rect = |x: u32, y: u32| {
-        format!(r#"<rect x="{x}" y="{y}" width="100" height="100" fill="none" stroke="black"/>"#)
-    };
-    let rects = [rect(0, 0), rect(100, 0), rect(0, 100), rect(100, 100)].concat();
     let svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400mm" height="400mm" viewBox="-100 -100 400 400"><image x="0" y="0" width="200" height="200" preserveAspectRatio="none" xlink:href="data:image/png;base64,{}"/>{rects}</svg>"#,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400mm" height="400mm" viewBox="-100 -100 400 400"><image x="0" y="0" width="200" height="200" preserveAspectRatio="none" xlink:href="data:image/png;base64,{}"/></svg>"#,
         base64(&png_of(&big(), 2000))
     );
     let mut s = Session::new(1);
@@ -844,23 +842,19 @@ fn quarters() -> (Session, NodeId) {
     let d = doc(&s);
     let image = image_of(&d);
     s.set_tool(Tool::Trace);
-    // Part 1 = quarter 1 (pick off the others), then one part per quarter.
-    s.set_trace_mask_pick(true);
-    let centres = [(50.0, 50.0), (150.0, 50.0), (50.0, 150.0), (150.0, 150.0)];
-    for c in &centres[1..] {
-        click(&mut s, (c.0, c.1));
+    // One part per quarter, drawn with the Rectangle tool.
+    let corners = [(0.0, 0.0), (100.0, 0.0), (0.0, 100.0), (100.0, 100.0)];
+    for (n, &(x, y)) in corners.iter().enumerate() {
+        if n > 0 {
+            assert!(s.add_trace_part().is_some());
+        }
+        region(&mut s, ((x, y), (x + 100.0, y + 100.0)));
     }
-    assert_eq!(s.trace_view().mask.len(), 1, "part 1 is the first quarter");
-    for c in &centres[1..] {
-        assert!(s.add_trace_part().is_some());
-        click(&mut s, (c.0, c.1));
-    }
-    s.set_trace_mask_pick(false);
     assert_eq!(s.trace_part_count(), 4);
     assert!(
         s.trace_parts()
             .iter()
-            .all(|p| p.paths == 1 && p.contributes)
+            .all(|p| p.regions == 1 && p.contributes)
     );
     (s, image)
 }
@@ -949,7 +943,7 @@ const RECORD_SETTINGS: [&str; 3] = [
 
 #[test]
 fn determinism_native_record_for_the_editor_wasm() {
-    let svg = svg(&format!("{A}{B}{C}"));
+    let svg = svg("");
     // As `WasmSession::new` and the page's `resize(1200, 800, 1)` make it.
     let mut s = Session::new(1);
     s.show_default_view();
@@ -969,30 +963,33 @@ fn determinism_native_record_for_the_editor_wasm() {
             ),
         )
     };
-    // Steps: Shift+click B and C off part 1; Add part, Shift+click C; Add part, Shift+click B.
+    // Steps: A drawn with Rectangle into part 1; Add part, C; Add part, B. A drag runs from its
+    // first corner to its second, in screen pixels.
     let mut steps: Vec<serde_json::Value> = Vec::new();
-    let mut step = |s: &mut Session, what: &str, spot: Option<(f64, f64)>| {
-        if let Some(spot) = spot {
-            let (x, y) = at(s, spot);
-            let p = s.screen_to_document(x, y);
-            s.pointer_down(p, true);
-            s.pointer_up(p, true, false);
-            steps.push(serde_json::json!({ "do": what, "x": x, "y": y }));
+    let mut step = |s: &mut Session, what: &str, area: Option<MmBox>| {
+        if let Some((a, b)) = area {
+            let ((x0, y0), (x1, y1)) = (at(s, a), at(s, b));
+            s.set_trace_region_tool(TraceRegionTool::Rect);
+            let (from, to) = (s.screen_to_document(x0, y0), s.screen_to_document(x1, y1));
+            s.pointer_down(from, false);
+            s.pointer_hover(to, false, false);
+            s.pointer_up(to, false, false);
+            s.set_trace_region_tool(TraceRegionTool::None);
+            steps.push(serde_json::json!({ "do": what, "x0": x0, "y0": y0, "x1": x1, "y1": y1 }));
         } else {
             assert!(s.add_trace_part().is_some());
             steps.push(serde_json::json!({ "do": what }));
         }
     };
-    step(&mut s, "shift_click", Some(ON_B));
-    step(&mut s, "shift_click", Some(ON_C));
+    step(&mut s, "rectangle", Some(A));
     step(&mut s, "add_part", None);
-    step(&mut s, "shift_click", Some(ON_C));
+    step(&mut s, "rectangle", Some(C));
     step(&mut s, "add_part", None);
-    step(&mut s, "shift_click", Some(ON_B));
+    step(&mut s, "rectangle", Some(B));
     let views = s.trace_parts();
     assert_eq!(views.len(), 3);
     assert!(
-        views.iter().all(|v| v.paths == 1 && v.contributes),
+        views.iter().all(|v| v.regions == 1 && v.contributes),
         "{views:?}"
     );
     let mut parts_out = Vec::new();
@@ -1042,10 +1039,10 @@ fn a_cut_out_part_with_upscale_auto_traces_as_the_whole_picture() {
     // Engraving's Upscale Auto on a picture under 1 Mpx: the whole picture and its cut-out are
     // both traced from a 2x copy.
     let n = 400;
-    let d = r#"<rect x="12" y="14" width="30" height="40" fill="black"/>"#;
-    let mut s = import(&svg_of(&busy(n), n, d));
+    let mut s = import(&svg_of(&busy(n), n, ""));
     let image = image_of(&doc(&s));
     s.set_tool(Tool::Trace);
+    region(&mut s, D);
     assert!(s.add_trace_part().is_some());
     assert!(s.set_trace_active_part(0));
     let settings = r#"{"threshold":128,"upscale":0}"#;
@@ -1106,12 +1103,12 @@ fn a_cut_out_part_with_upscale_auto_traces_as_the_whole_picture() {
 #[test]
 fn a_part_with_denoise_low_is_traced_from_the_whole_picture_and_equals_its_whole_picture_trace() {
     let n = 400;
-    let e = r#"<rect x="55" y="40" width="33" height="45" fill="none" stroke="black"/>"#;
     let settings = r#"{"threshold":128,"denoise":1}"#;
-    // Two parts: part 1 is E, part 2 has no paths yet.
-    let mut two = import(&svg_of(&busy(n), n, e));
+    // Two parts: part 1 is E, part 2 has no regions yet.
+    let mut two = import(&svg_of(&busy(n), n, ""));
     let image = image_of(&doc(&two));
     two.set_tool(Tool::Trace);
+    region(&mut two, E);
     assert!(two.add_trace_part().is_some());
     assert!(two.set_trace_active_part(0));
     let views = two.trace_parts();
@@ -1121,9 +1118,10 @@ fn a_part_with_denoise_low_is_traced_from_the_whole_picture_and_equals_its_whole
         parts(&two)
     );
     // One part with E (slice 1).
-    let mut one = import(&svg_of(&busy(n), n, e));
+    let mut one = import(&svg_of(&busy(n), n, ""));
     let image_one = image_of(&doc(&one));
     one.set_tool(Tool::Trace);
+    region(&mut one, E);
     assert_eq!(one.trace_parts().len(), 1);
     assert_eq!(
         two.trace_part_mask_json(0),

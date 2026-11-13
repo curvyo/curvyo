@@ -60,15 +60,14 @@ pub(super) struct TraceState {
     pub(super) moving: bool,
     /// The pipette (`trace_pick.rs`).
     pub(super) pick: super::trace_pick::TracePick,
-    /// Pick mask paths (`trace_mask_pick.rs`, `specs/0094` slice 1b).
-    pub(super) mask_pick: super::trace_mask_pick::MaskPick,
     /// The reduced copy of the last picture asked for: every preview of a large image traces it
     /// (criteria 10 and 52), and making it costs the main thread tens of milliseconds
     /// (criterion 58).
     reduced: Option<(AssetHash, Arc<WorkingImage>)>,
-    /// Outside is chosen in the Mask item (`specs/0094` criterion 17: Inside on every entry).
+    /// Outside is chosen in the Mask item for the implicit part of an untouched image (`specs/0094`
+    /// criterion 17: Inside on every entry; ADR 0061 §3).
     pub(super) mask_outside: bool,
-    /// The region of the mask paths, made once per change of them (`trace_region.rs`).
+    /// The region of the active part, made once per change of its regions (`trace_region.rs`).
     pub(super) region: std::cell::RefCell<Option<super::trace_region::RegionCache>>,
     /// The parts of a composite trace (`trace_parts.rs`, `specs/0094` slice 2).
     pub(super) parts: super::trace_parts::TraceParts,
@@ -88,11 +87,9 @@ pub enum TraceSelection {
     Empty,
     /// Something that is not an image is selected.
     Other,
-    /// Only images are selected, or one image and mask paths (`specs/0094`).
+    /// The selection holds images or image-root clones; every other object in it is passed
+    /// over (`specs/0114` criterion 21).
     Images,
-    /// An image with a text, a sketch or a second image next to mask paths: "Use Object to path
-    /// for text; one image at a time." (`specs/0094` criterion 14).
-    Mixed,
 }
 
 /// What the Trace bar and the Select bar's Trace button read.
@@ -100,18 +97,17 @@ pub enum TraceSelection {
 pub struct TraceView {
     /// What is selected.
     pub selection: TraceSelection,
-    /// The selected images, in selection order.
+    /// The selected images and image-root clones, in selection order.
     pub images: Vec<NodeId>,
     /// The image the preview shows: the one clicked last, else the last selected.
     pub shown: Option<NodeId>,
-    /// The mask paths selected with the image, in document order (`specs/0094`).
-    pub mask: Vec<NodeId>,
     /// The active part's stored regions (`specs/0114`).
     pub regions: usize,
-    /// The mask paths enclose no area of the image: "0 paths: the mask is outside the image."
-    /// (criterion 7).
+    /// The regions enclose no area of the image: "0 paths: the mask is outside the image."
+    /// (`specs/0094` criterion 7).
     pub mask_outside_image: bool,
-    /// The kernel refused to combine the mask paths: "0 paths: the mask could not be combined."
+    /// The kernel refused to combine the regions: "0 paths: the mask paths could not be
+    /// combined."
     pub mask_failed: bool,
 }
 
@@ -148,56 +144,40 @@ pub enum TraceCreateOutcome {
 }
 
 impl Session {
-    /// The selected images when only images are selected, or the one image of an image with
-    /// mask paths (`specs/0094` criterion 14: an image with text, a sketch or a second image
-    /// next to mask paths is [`TraceSelection::Mixed`]).
+    /// The images of the selection and the image-root clones in it (ADR 0061 §8, CLONE-MASK A),
+    /// in selection order; a clone stands as its picture under its composed matrix, with the
+    /// clone's id. Every other selected object is passed over (`specs/0114` criterion 21).
     pub(super) fn trace_images(&self) -> (TraceSelection, Vec<ImageSnapshot>) {
         let ids = self.selection.ids();
         if ids.is_empty() {
             return (TraceSelection::Empty, Vec::new());
         }
         let objects = self.objects();
-        let mut images = Vec::with_capacity(ids.len());
         let placed = self.placement_ids();
-        let (mut masks, mut refused) = (0, 0);
-        for id in ids {
-            match objects.iter().find(|object| object.id() == *id) {
-                // A placed page's frame object is no picture (`specs/0100` criterion 17).
-                Some(ObjectSnapshot::Image(_)) if placed.contains(id) => refused += 1,
-                Some(ObjectSnapshot::Image(image)) => images.push(image.clone()),
-                Some(object) if super::trace_region::is_mask_path(object) => masks += 1,
-                Some(_) => refused += 1,
-                // A selected group (`specs/0094` Terms: a group counts as the paths in it): its
-                // leaves, at any depth, are mask paths when every one is path-like.
-                None => {
-                    let leaves = self.document.leaves_of(*id);
-                    // A node deleted while selected (`specs/0094` criterion 27): passed over.
-                    if leaves.is_empty() && !self.document.is_group(*id) {
-                        continue;
-                    }
-                    let paths = leaves
-                        .iter()
-                        .filter(|leaf| {
-                            objects.iter().any(|object| {
-                                object.id() == **leaf && super::trace_region::is_mask_path(object)
-                            })
-                        })
-                        .count();
-                    if paths > 0 && paths == leaves.len() {
-                        masks += paths;
-                    } else {
-                        refused += 1;
-                    }
-                }
-            }
-        }
+        let images: Vec<ImageSnapshot> = ids
+            .iter()
+            // A placed page's frame object is no picture (`specs/0100` criterion 17).
+            .filter(|id| !placed.contains(id))
+            .filter_map(|id| objects.iter().find(|object| object.id() == *id))
+            .filter_map(traced_picture)
+            .collect();
         if images.is_empty() {
-            return (TraceSelection::Other, Vec::new());
+            (TraceSelection::Other, Vec::new())
+        } else {
+            (TraceSelection::Images, images)
         }
-        match (masks, refused, images.len()) {
-            (0, 0, _) | (1.., 0, 1) => (TraceSelection::Images, images),
-            _ => (TraceSelection::Mixed, Vec::new()),
-        }
+    }
+
+    /// The node whose registers hold the trace mask of the traced picture `image`: the root
+    /// image of an image-root clone, else the image itself (ADR 0061 §8).
+    pub(super) fn trace_mask_owner(&self, image: NodeId) -> NodeId {
+        self.objects()
+            .iter()
+            .find_map(|object| match object {
+                ObjectSnapshot::Clone(clone) if clone.id() == image => Some(clone.chain.root),
+                _ => None,
+            })
+            .unwrap_or(image)
     }
 
     /// What the Trace bar shows (criteria 1 to 4, 46).
@@ -210,32 +190,25 @@ impl Session {
             .last_clicked
             .filter(|id| images.contains(id))
             .or_else(|| images.last().copied());
-        let mask: Vec<NodeId> = self
-            .trace_mask_objects()
-            .iter()
-            .map(ObjectSnapshot::id)
-            .collect();
         let regions = self
             .trace_active_mask_part()
             .filter(|_| selection == TraceSelection::Images && images.len() == 1)
             .map_or(0, |part| part.regions.len());
-        let masked = !mask.is_empty() || regions > 0;
-        let mask_failed =
-            (masked && self.trace_mask_failure().is_some()) || self.trace_has_unsupported_mask();
+        let masked = regions > 0;
+        let mask_failed = masked && self.trace_mask_failure().is_some();
         let mask_outside_image = masked && !mask_failed && !self.trace_mask_meets_image();
         TraceView {
             selection,
             images,
             shown,
-            mask,
             regions,
             mask_outside_image,
             mask_failed,
         }
     }
 
-    /// Whether the Select bar shows the Trace button: the Select tool with only images selected
-    /// (criterion 1).
+    /// Whether the Select bar shows the Trace button: the Select tool with an image or an
+    /// image-root clone in the selection (criterion 1, `specs/0114` UX notes §8).
     #[must_use]
     pub fn trace_available(&self) -> bool {
         self.tool == Tool::Select && self.trace_images().0 == TraceSelection::Images
@@ -244,9 +217,6 @@ impl Session {
     /// The working image of `image` (a reduced copy with `reduced`, criterion 10) and its pixel
     /// map, for the worker; `None` when it is not a selected image or its picture is unreadable.
     pub fn trace_source(&mut self, image: NodeId, reduced: bool) -> Option<TraceSource> {
-        if self.trace_has_unsupported_mask() {
-            return None;
-        }
         let (_, images) = self.trace_images();
         let snapshot = images.into_iter().find(|candidate| candidate.id == image)?;
         let working = self.working_image(&snapshot.asset)?;
@@ -274,9 +244,6 @@ impl Session {
     /// Shows the worker's result `wire` for `image` as the preview (criterion 8); `false` when the
     /// numbers are not a result.
     pub fn set_trace_preview(&mut self, image: NodeId, wire: &[f64]) -> bool {
-        if self.trace_has_unsupported_mask() {
-            return false;
-        }
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
@@ -351,9 +318,6 @@ impl Session {
     /// Keeps the worker's full-size result `wire` for `image` for Create paths; `false` when the
     /// numbers are not a result.
     pub fn set_trace_result(&mut self, image: NodeId, wire: &[f64]) -> bool {
-        if self.trace_has_unsupported_mask() {
-            return false;
-        }
         let Some(read) = read_trace_wire(wire) else {
             return false;
         };
@@ -398,6 +362,8 @@ impl Session {
 
     /// Drops everything the tool keeps (leaving it, criterion 7).
     pub(super) fn leave_trace_tool(&mut self) {
+        // A lasso in progress is closed, not lost (customer decision 4 of 2026-11-13).
+        self.close_trace_lasso();
         self.trace = TraceState::default();
         self.drop_trace_fit();
     }
@@ -407,8 +373,11 @@ impl Session {
     /// path (or one filled compound path per colour) directly above it, all in one step
     /// "Trace image"; the groups are selected and the Select tool is chosen. The images stay.
     pub fn create_traced_paths(&mut self) -> TraceCreateOutcome {
+        // The Trace button closes a lasso in progress first (UX notes §6); the host traced
+        // after it closed.
+        self.close_trace_lasso();
         self.recording(|this| -> TraceCreateOutcome {
-            if this.tool != Tool::Trace || this.trace_has_unsupported_mask() {
+            if this.tool != Tool::Trace {
                 return TraceCreateOutcome::Ignored;
             }
             let (_, images) = this.trace_images();
@@ -506,23 +475,12 @@ impl Session {
         })
     }
 
-    /// A press in the Trace tool selects what it hits, as a click of the Select tool does, and
-    /// nothing else; on empty canvas it clears the selection (criterion 3). Armed, Pick mask
-    /// paths takes it (`specs/0094` slice 1b).
+    /// A press in the Trace tool: the mask takes it (`specs/0114`), else it selects what it hits,
+    /// as a click of the Select tool does, and nothing else; on empty canvas it clears the
+    /// selection (criterion 3).
     pub(super) fn trace_pointer_down(&mut self, point: Point, shift: bool) {
-        if self.trace_mask_pick_press(point) || self.trace_mask_press(point) {
+        if self.trace_mask_press(point) {
             return;
-        }
-        // Shift+click builds the mask by the pick's hit rule, the traced image skipped, so a path
-        // inside the image's frame is toggled and not the image (criteria 13 and 41).
-        if shift {
-            let images = self.trace_view().images;
-            if !images.is_empty()
-                && let Some(hit) = self.trace_mask_pick_eligible(point, &images)
-            {
-                self.trace_select_hit(hit, true);
-                return;
-            }
         }
         // An object out of context is no operand (`specs/0106` criterion 10).
         let pickable = self.edit_targets();
@@ -536,8 +494,7 @@ impl Session {
         self.trace_select_hit(hit, shift);
     }
 
-    /// Selects `hit` with its group, or with `toggle` adds or removes them (Shift+click, and
-    /// every pick of Pick mask paths: `specs/0094` criteria 13 and 41).
+    /// Selects `hit` with its group, or with `toggle` (Shift+click) adds or removes them.
     pub(super) fn trace_select_hit(&mut self, hit: NodeId, toggle: bool) {
         let units = self.units();
         let members = units.leaves_with(&hit);
@@ -551,10 +508,11 @@ impl Session {
         }
     }
 
-    /// A double-click on a traced image asks the host to create the paths (criterion 12); not
-    /// while Pick mask paths is armed (`specs/0094` criterion 38).
+    /// A double-click on a traced image asks the host to create the paths (criterion 12); with
+    /// a region tool pressed it never does: it finishes a lasso in progress (`specs/0114`
+    /// criterion 4, UX notes §6).
     pub(super) fn trace_double_click(&mut self, point: Point) -> DoubleClickHint {
-        if self.trace_mask_pick() {
+        if self.trace_mask_double_click() {
             return DoubleClickHint::None;
         }
         // An object out of context is no operand (`specs/0106` criterion 10).
@@ -578,6 +536,23 @@ impl Session {
             .iter()
             .find(|(id, _, _)| *id == group)
             .map(|&(_, paths, nodes)| (paths, nodes))
+    }
+}
+
+/// The picture `object` stands for in the Trace tool: an image, or an image-root clone's picture
+/// under its composed matrix with the clone's id.
+pub(super) fn traced_picture(object: &ObjectSnapshot) -> Option<ImageSnapshot> {
+    match object {
+        ObjectSnapshot::Image(image) => Some(image.clone()),
+        ObjectSnapshot::Clone(clone) => match clone.chain.picture.as_deref() {
+            Some([ObjectSnapshot::Image(image)]) if image.id == clone.chain.root => {
+                let mut shown = image.clone();
+                shown.id = clone.id();
+                Some(shown)
+            }
+            _ => None,
+        },
+        _ => None,
     }
 }
 

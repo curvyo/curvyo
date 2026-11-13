@@ -147,6 +147,100 @@ mod tests {
         assert!((area(&region) - det).abs() < 0.05, "{}", area(&region));
     }
 
+    fn lasso(id: &str, order: i64, subtract: bool, corners: &[(f64, f64)]) -> TraceMaskRegion {
+        TraceMaskRegion {
+            id: id.into(),
+            order,
+            kind: TraceRegionKind::Lasso,
+            subtract,
+            points: corners.iter().map(|&(u, v)| UnitPoint::new(u, v)).collect(),
+        }
+    }
+
+    /// Criterion 10's premise: L1 (corners (0, 0), (60, 0), (0, 100) mm on M1) is the triangle
+    /// closed by its slanted side; Inside keeps its area and Outside the rest.
+    #[test]
+    fn a_lasso_is_its_corners_closed_by_a_straight_side() {
+        let l1 = lasso("a", 0, false, &[(0.0, 0.0), (0.6, 0.0), (0.0, 1.0)]);
+        let region = part_region(&part(vec![l1]), M1).unwrap();
+        assert!(
+            (area(&region) - 60.0 * 100.0 / 2.0).abs() < 0.01,
+            "{}",
+            area(&region)
+        );
+        assert!(region.keeps(Point::new(10.0, 50.0)));
+        assert!(
+            !region.keeps(Point::new(40.0, 50.0)),
+            "beyond the slanted side"
+        );
+        let mut outside = part(vec![lasso(
+            "a",
+            0,
+            false,
+            &[(0.0, 0.0), (0.6, 0.0), (0.0, 1.0)],
+        )]);
+        outside.outside = true;
+        let out = part_region(&outside, M1).unwrap();
+        assert!(out.outside() && !out.keeps(Point::new(10.0, 50.0)));
+        assert!(out.keeps(Point::new(40.0, 50.0)));
+    }
+
+    /// Criterion 23: a lasso that crosses itself paints by non-zero winding: a figure 8 covers
+    /// both lobes, a pentagram its centre too (wound twice), and the result is the same bits each
+    /// time.
+    #[test]
+    fn a_self_crossing_lasso_paints_by_non_zero_winding() {
+        let eight = lasso(
+            "a",
+            0,
+            false,
+            &[(0.0, 0.0), (1.0, 1.0), (1.0, 0.0), (0.0, 1.0)],
+        );
+        let region = part_region(&part(vec![eight.clone()]), M1).unwrap();
+        assert!(region.keeps(Point::new(10.0, 50.0)) && region.keeps(Point::new(90.0, 50.0)));
+        assert!(!region.keeps(Point::new(50.0, 10.0)));
+        assert!(
+            (area(&region) - 2.0 * 2500.0).abs() < 0.01,
+            "{}",
+            area(&region)
+        );
+        let star = lasso(
+            "b",
+            1,
+            false,
+            &[(0.5, 0.0), (0.8, 1.0), (0.0, 0.35), (1.0, 0.35), (0.2, 1.0)],
+        );
+        let filled = part_region(&part(vec![star.clone()]), M1).unwrap();
+        assert!(
+            filled.keeps(Point::new(50.0, 50.0)),
+            "non-zero, not even-odd"
+        );
+        let again = part_region(&part(vec![star]), M1).unwrap();
+        assert_eq!(filled.to_numbers(), again.to_numbers());
+        // A subtracted figure 8 takes out both lobes and nothing above the crossing.
+        let whole = rect("c", 2, false, (0.0, 0.0), (1.0, 1.0));
+        let cut = TraceMaskRegion {
+            subtract: true,
+            ..eight
+        };
+        let left = part_region(&part(vec![whole, cut]), M1).unwrap();
+        assert!(left.keeps(Point::new(50.0, 10.0)) && !left.keeps(Point::new(10.0, 50.0)));
+    }
+
+    /// ADR 0061 §2: a lasso whose corners lie on one line has no area and is dropped; nothing
+    /// left is an empty mask.
+    #[test]
+    fn a_flat_lasso_is_dropped() {
+        let flat = lasso("a", 0, false, &[(0.0, 0.0), (0.5, 0.5), (1.0, 1.0)]);
+        assert_eq!(
+            part_region(&part(vec![flat.clone()]), M1),
+            Err(TraceRegionError::NoArea)
+        );
+        let r = rect("b", 1, false, (0.0, 0.0), (0.5, 1.0));
+        let kept = part_region(&part(vec![flat, r]), M1).unwrap();
+        assert!((area(&kept) - 5000.0).abs() < 0.01);
+    }
+
     /// Criterion 11: the same stored regions give the same polygons, bit for bit.
     #[test]
     fn the_same_regions_give_the_same_bits() {

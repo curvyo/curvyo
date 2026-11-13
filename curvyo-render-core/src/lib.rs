@@ -102,7 +102,10 @@ pub use theme::{
     OP_LANE_LINE, PASTEBOARD_BG,
 };
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
-pub use trace_mask_overlay::{TraceMaskOutline, TraceMaskOverlay, build_trace_mask_overlay};
+pub use trace_mask_overlay::{
+    TraceLassoDraft, TraceMaskOutline, TraceMaskOverlay, TraceMaskSelection,
+    build_trace_mask_overlay,
+};
 pub use width_handles::{WIDTH_DIAMOND_PX, WidthDiamond, build_width_diamonds};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};

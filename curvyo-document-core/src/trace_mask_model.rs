@@ -210,6 +210,70 @@ impl TraceMask {
     }
 }
 
+impl TraceMask {
+    /// The mask its own serialisation (`serde_json::to_value`) describes, as the page's paste
+    /// memo carries it (ADR 0061 §8); `None` when anything in it is not a mask: a part or region
+    /// without its fields, a kind that is unknown, points that do not fit the kind or are not
+    /// storable.
+    #[must_use]
+    pub fn from_json(value: &serde_json::Value) -> Option<Self> {
+        let parts = value.get("parts")?.as_array()?;
+        let parts = parts
+            .iter()
+            .map(|part| {
+                let regions = part.get("regions")?.as_array()?;
+                Some(TraceMaskPart {
+                    id: part.get("id")?.as_str()?.to_owned(),
+                    order: part.get("order")?.as_i64()?,
+                    outside: part.get("outside")?.as_bool()?,
+                    settings: part.get("settings")?.as_object()?.clone(),
+                    regions: regions
+                        .iter()
+                        .map(region_from_json)
+                        .collect::<Option<_>>()?,
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self { parts })
+    }
+}
+
+fn region_from_json(value: &serde_json::Value) -> Option<TraceMaskRegion> {
+    let kind = TraceRegionKind::from_tag(value.get("kind")?.as_str()?)?;
+    let flat = value.get("points")?.as_array()?;
+    let numbers: Vec<f64> = flat
+        .iter()
+        .map(serde_json::Value::as_f64)
+        .collect::<Option<_>>()?;
+    let points: Vec<UnitPoint> = numbers
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|[u, v]| UnitPoint::new(*u, *v))
+        .collect();
+    let fits = numbers.len().is_multiple_of(2)
+        && kind.accepts(points.len())
+        && points.iter().all(|p| p.is_storable());
+    fits.then(|| TraceMaskRegion {
+        id: value
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        order: value
+            .get("order")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        kind,
+        subtract: value
+            .get("subtract")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        points,
+    })
+    .filter(|region| !region.id.is_empty())
+}
+
 /// A region to draw.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewTraceRegion {

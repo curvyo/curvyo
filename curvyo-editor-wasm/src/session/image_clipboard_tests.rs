@@ -265,3 +265,63 @@ fn ac8_a_local_file_over_the_limit_is_refused_by_its_length() {
     );
     assert_eq!(s.document.own_steps().len(), 0);
 }
+
+/// `specs/0114` criterion 14 (ADR 0061 §8): Ctrl+C gives the picture's fingerprint and the image's
+/// trace mask; a paste whose picture decodes to it gets the mask in the paste's one step, also in
+/// a second document (session) of the same page; another picture comes in without it.
+#[test]
+fn c14_a_paste_of_the_copied_picture_carries_its_trace_mask() {
+    let mut first = session();
+    let bytes = marker_png();
+    paste(&mut first, None, &bytes, "logo.png");
+    let image = images(&first)[0].id;
+    first.set_tool(Tool::Trace);
+    first.set_trace_region_tool(super::TraceRegionTool::Rect);
+    let c = images(&first)[0].corners();
+    let (a, b) = (c[0], Point::new(f64::midpoint(c[0].x, c[2].x), c[2].y));
+    first.pointer_down(a, false);
+    first.pointer_hover(b, false, false);
+    first.pointer_up(b, false, false);
+    first.set_tool(Tool::Select);
+    first.selection.set(&[image]);
+    let copy = first.image_copy().unwrap();
+    assert_eq!(copy.fingerprint.len(), 16);
+    assert_ne!(copy.mask, "", "the mask goes with the copy");
+    let png = encode_png(&WorkingImage {
+        width: copy.width,
+        height: copy.height,
+        pixels: copy.rgba.clone(),
+        original_size: (copy.width, copy.height),
+        truncated: false,
+        animated: false,
+    })
+    .unwrap();
+    // A second document of the same page: the page hands its memo to the paste.
+    let mut second = session();
+    let steps = second.undo_len();
+    second.import_begin_from(ImportOrigin::Paste, None);
+    second.set_import_trace_mask(&copy.fingerprint, &copy.mask);
+    second.import_add(&png, "image.png");
+    second.import_finish(false);
+    assert_eq!(second.undo_len(), steps + 1, "one step");
+    let pasted = images(&second)[0].id;
+    assert_eq!(
+        second.document.trace_mask(pasted),
+        first.document.trace_mask(image),
+        "the same regions and parts"
+    );
+    // Another picture with the same memo: the picture alone.
+    let mut third = session();
+    third.import_begin_from(ImportOrigin::Paste, None);
+    third.set_import_trace_mask(&copy.fingerprint, &copy.mask);
+    third.import_add(PNG, "image.png");
+    third.import_finish(false);
+    let other = images(&third)[0].id;
+    assert!(third.document.trace_mask(other).unwrap().is_empty());
+    // An image without a mask copies none.
+    let mut plain = session();
+    paste(&mut plain, None, PNG, "plain.png");
+    let id = images(&plain)[0].id;
+    plain.selection.set(&[id]);
+    assert_eq!(plain.image_copy().unwrap().mask, "");
+}

@@ -852,6 +852,7 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
         let explicit_steps = matches!(
             name,
             "sketch_plate_v28.curvyo"
+                | "trace_mask_clone_v45.curvyo"
                 | "operations_clone_member_v39.curvyo"
                 | "operations_v39.curvyo"
                 | "operations_unknown_kind_v39.curvyo"
@@ -883,9 +884,12 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
                 | "test_grid_orphan_rows_v46.curvyo"
                 | "test_grid_v46.curvyo"
         );
+        // `trace_mask_clone_v45` (0114) holds a linked clone and a second clone made by its own command.
         if matches!(
             name,
-            "sketch_dangling_v28.curvyo" | "sketch_dangling_v29.curvyo"
+            "sketch_dangling_v28.curvyo"
+                | "sketch_dangling_v29.curvyo"
+                | "trace_mask_clone_v45.curvyo"
         ) {
             let clones: Vec<_> = rows
                 .iter()

@@ -291,16 +291,14 @@ pub fn trace_params() -> String {
 #[wasm_bindgen]
 #[derive(Debug, Clone, Default)]
 pub struct TraceViewJs {
-    /// `"empty"`, `"other"`, `"images"` or `"mixed"` (`specs/0094` criterion 14).
+    /// `"empty"`, `"other"` or `"images"` (`specs/0114` criterion 21).
     #[wasm_bindgen(getter_with_clone)]
     pub selection: String,
-    /// Mask paths selected with the image (`specs/0094`).
-    pub mask_paths: u32,
     /// The active part's stored regions (`specs/0114`).
     pub mask_regions: u32,
-    /// The mask paths cover none of the image (criterion 7).
+    /// The regions cover none of the image (`specs/0094` criterion 7).
     pub mask_outside_image: bool,
-    /// The mask paths could not be combined (the kernel refused).
+    /// The regions could not be combined (the kernel refused).
     pub mask_failed: bool,
     /// The selected images' ids, in selection order.
     #[wasm_bindgen(getter_with_clone)]
@@ -355,10 +353,8 @@ impl WasmSession {
                 TraceSelection::Empty => "empty",
                 TraceSelection::Other => "other",
                 TraceSelection::Images => "images",
-                TraceSelection::Mixed => "mixed",
             }
             .to_string(),
-            mask_paths: count(view.mask.len()),
             mask_regions: count(view.regions),
             mask_outside_image: view.mask_outside_image,
             mask_failed: view.mask_failed,
@@ -391,24 +387,7 @@ impl WasmSession {
         self.session.trace_mask_outside()
     }
 
-    /// Arms (`true`) or disarms Pick mask paths (`specs/0094` slice 1b).
-    pub fn set_trace_mask_pick(&mut self, armed: bool) {
-        self.session.set_trace_mask_pick(armed);
-    }
-
-    /// Whether Pick mask paths is armed.
-    #[must_use]
-    pub fn trace_mask_pick(&self) -> bool {
-        self.session.trace_mask_pick()
-    }
-
-    /// Whether the last pick hit a text, a sketch or a second image (`specs/0094` criterion 38).
-    #[must_use]
-    pub fn trace_mask_pick_refused(&self) -> bool {
-        self.session.trace_mask_pick_refused()
-    }
-
-    /// Clear mask: only the traced image stays selected (`specs/0094` criterion 40).
+    /// Clear mask: the active part's regions go in one step (`specs/0114` criterion 20).
     pub fn clear_trace_mask(&mut self) {
         self.session.clear_trace_mask();
     }

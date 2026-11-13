@@ -2,7 +2,8 @@
 //! `trace_mask_v45.curvyo` and `trace_mask_damaged_v45.curvyo` read back every part, region and
 //! setting, the damaged one as decision 7 says, and both save back with equal content; every older
 //! golden opens with no mask; a format 47 file is refused. `CURVYO_WRITE_FIXTURES=1` rewrites the
-//! two goldens of this file only.
+//! goldens of this file only; `trace_mask_clone_v45.curvyo` holds a linked clone and an unlinked
+//! copy of a masked image (criterion 15).
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -388,4 +389,84 @@ fn c22_a_file_of_format_47_is_refused() {
             supported: 46
         })
     ));
+}
+
+/// ADR 0061 §8 and §12, `0114` criterion 15: a linked clone of a masked image stores no mask of
+/// its own (it shows its root's); a clone unlinked becomes a copy of the root image with a copy of
+/// the mask (ADR 0045 §5 via `copy_subtree`); deleting a clone leaves the root's mask.
+fn clone_document() -> Document {
+    let d = Document::new(1);
+    let m1 = d
+        .add_images(&[NewImage {
+            bytes: Arc::from(&b"m1 picture"[..]),
+            placement: Affine::new(100.0, 0.0, 0.0, 100.0, 0.0, 0.0),
+            name: "M1".into(),
+        }])
+        .unwrap()[0];
+    let first = ImplicitTracePart {
+        outside: false,
+        settings: settings(json!({"threshold": 50})),
+    };
+    d.draw_trace_region(
+        m1,
+        TracePartRef::Implicit(&first),
+        &region(
+            TraceRegionKind::Lasso,
+            false,
+            &[(0.0, 0.0), (0.6, 0.0), (0.0, 1.0)],
+        ),
+    )
+    .unwrap();
+    d.linked_clone(&[m1], &[]).unwrap();
+    let unlinked = d.linked_clone(&[m1], &[]).unwrap()[0];
+    d.unlink_clones(&[curvyo_document_core::CopySource {
+        id: unlinked,
+        anchor_ids: Vec::new(),
+    }])
+    .unwrap();
+    d
+}
+
+#[test]
+fn c15_the_clone_golden_keeps_the_mask_on_the_root_and_on_the_unlinked_copy() {
+    let bytes = read_or_write("trace_mask_clone_v45.curvyo", || {
+        pack(&clone_document(), "0.1.0").unwrap()
+    });
+    let d = unpack(2, &bytes).unwrap();
+    let images: Vec<NodeId> = d
+        .read_objects()
+        .objects
+        .iter()
+        .filter_map(|o| match o {
+            ObjectSnapshot::Image(image) => Some(image.id),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(images.len(), 2, "the root and the unlinked copy");
+    let masks: Vec<_> = images.iter().map(|&id| d.trace_mask(id).unwrap()).collect();
+    assert_eq!(
+        masks[0], masks[1],
+        "the unlinked copy keeps a copy of the mask"
+    );
+    assert_eq!(masks[0].parts[0].regions.len(), 1);
+    let clone = d
+        .read_objects()
+        .objects
+        .iter()
+        .find_map(|o| match o {
+            ObjectSnapshot::Clone(c) => Some(c.id()),
+            _ => None,
+        })
+        .expect("the linked clone");
+    assert_eq!(
+        d.trace_mask(clone),
+        None,
+        "a clone stores no mask of its own"
+    );
+    // Saved back with equal content.
+    let again = pack(&d, "0.1.0").unwrap();
+    assert_eq!(image_metas(&again), image_metas(&bytes));
+    // Deleting the clone leaves the root's mask.
+    d.delete_objects(&[clone]).unwrap();
+    assert_eq!(d.trace_mask(images[0]).unwrap(), masks[0]);
 }

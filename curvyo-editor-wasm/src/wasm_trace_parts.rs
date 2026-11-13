@@ -4,40 +4,55 @@
 
 use wasm_bindgen::prelude::*;
 
+use crate::Session;
 use crate::wasm_api::WasmSession;
 use crate::wasm_trace::{TraceSourceJs, id_of};
 
+/// The chips of the parts the session reads now, as JSON.
+fn parts_json(session: &Session) -> String {
+    let count = session.trace_part_count();
+    let parts: Vec<serde_json::Value> = session
+        .trace_parts()
+        .iter()
+        .enumerate()
+        .map(|(index, part)| {
+            serde_json::json!({
+                "id": part.id,
+                "regions": part.regions,
+                "outside": part.outside,
+                "whole": part.whole,
+                "muted": part.muted,
+                "active": part.active,
+                "contributes": part.contributes,
+                "mask": if count > 1 || part.regions > 0 {
+                    session.trace_part_mask_json(index)
+                } else {
+                    String::new()
+                },
+            })
+        })
+        .collect();
+    serde_json::Value::Array(parts).to_string()
+}
+
 #[wasm_bindgen]
 impl WasmSession {
-    /// The chips of the Parts row as JSON, in order: `[{id, paths, outside, whole, muted,
+    /// The chips of the Parts row as JSON, in order: `[{id, regions, outside, whole, muted,
     /// active, contributes, mask}]`, `mask` the part's clip for the worker's settings (empty for
-    /// the whole image or a part that adds nothing).
+    /// the whole image, a part that adds nothing, and the one part of an image without regions).
     #[must_use]
     pub fn trace_parts(&self) -> String {
-        let parts: Vec<serde_json::Value> = self
-            .session
-            .trace_parts()
-            .iter()
-            .enumerate()
-            .map(|(index, part)| {
-                serde_json::json!({
-                    "id": part.id,
-                    "paths": part.paths,
-                    "regions": part.regions,
-                    "outside": part.outside,
-                    "whole": part.whole,
-                    "muted": part.muted,
-                    "active": part.active,
-                    "contributes": part.contributes,
-                    "mask": if self.session.trace_part_count() > 1 {
-                        self.session.trace_part_mask_json(index)
-                    } else {
-                        String::new()
-                    },
-                })
-            })
-            .collect();
-        serde_json::Value::Array(parts).to_string()
+        parts_json(&self.session)
+    }
+
+    /// The parts of the selected picture `id` as [`Self::trace_parts`] gives them (several
+    /// images selected: each traced with its own stored mask, Frage 11 A); `[]` for an unknown id.
+    #[must_use]
+    pub fn trace_image_parts(&self, id: &str) -> String {
+        let Some(image) = id_of(id) else {
+            return "[]".to_owned();
+        };
+        self.session.for_trace_image(image, parts_json)
     }
 
     /// Add part: the new part's id, or -1 at 8 parts or without one traced image.
@@ -48,7 +63,7 @@ impl WasmSession {
             .unwrap_or(-1)
     }
 
-    /// A chip pick: part `index` becomes active with its mask paths selected.
+    /// A chip pick: part `index` becomes active.
     pub fn set_trace_active_part(&mut self, index: usize) -> bool {
         self.session.set_trace_active_part(index)
     }

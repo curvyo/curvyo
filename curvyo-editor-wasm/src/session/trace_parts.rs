@@ -1,21 +1,19 @@
-//! The parts of a composite trace in the Trace tool (`specs/0094-masked-composite-trace` slice 2,
-//! criteria 18, 19, 24, 27 to 30 and 42; `specs/0114-image-trace-mask` slice 1): the parts as the
-//! image stores them (ADR 0061), each part's mask of its stored regions and, until `0114` slice 4,
-//! its mask paths (the selection for the active part), the active part, and the join of the
-//! parts' results into the preview and the result Create paths writes.
+//! The parts of a composite trace in the Trace tool (`specs/0094-masked-composite-trace` slice 2;
+//! `specs/0114-image-trace-mask`): the parts as the image stores them (ADR 0061), each part's
+//! clip of its stored regions, the active part, and the join of the parts' results into the
+//! preview and the result Create paths writes.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{Cell, RefCell};
 
-use curvyo_document_core::{NodeId, ObjectSnapshot, Point, TracePartSettings};
+use curvyo_document_core::{NodeId, Point, TracePartSettings};
 use curvyo_ui_core::{
-    RegionOperand, TracePartArea, TracePartClip, join_trace_parts, mask_operand, read_trace_wire,
-    region_operand, trace_part_clips,
+    RegionOperand, TracePartArea, TracePartClip, join_trace_parts, read_trace_wire, region_operand,
+    trace_part_clips,
 };
 use vectrace::Output;
 
 use super::trace_mask_tool::MaskPart;
-use super::trace_region::{RegionCache, is_mask_path};
+use super::trace_region::RegionCache;
 use super::{Session, Tool, TraceSource};
 
 /// At most this many parts (spec, Proposals).
@@ -26,12 +24,14 @@ pub const TRACE_PARTS_MAX: usize = 8;
 /// (Proposal).
 const CROP_MARGIN_PX: f64 = 16.0;
 
-/// The tool state of the parts: the active one and the mask paths of the others (`0094`, until
-/// `0114` slice 4), keyed by chip id. The parts themselves are the document's.
+/// The tool state of the parts: the active one, and which image the parts are read for. The
+/// parts themselves are the document's.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(super) struct TraceParts {
-    masks: HashMap<u32, Vec<NodeId>>,
     active: usize,
+    /// While a multi-image trace reads one image's parts (Frage 11 A: each image with its own
+    /// mask): that image, else the one traced image.
+    pub(super) for_image: Cell<Option<NodeId>>,
     /// The regions of recent operand sets over the image, so a slider move unites nothing.
     regions: RefCell<Vec<RegionCache>>,
     /// The clips of the last parts' areas over the image.
@@ -42,26 +42,21 @@ pub(super) struct TraceParts {
 type ClipCache = (Vec<TracePartArea>, [Point; 4], Vec<TracePartClip>);
 
 /// The added and the subtracted operands of a part's mask.
-pub(super) type SignedOperands = (
-    Result<Vec<RegionOperand>, curvyo_ui_core::TraceRegionError>,
-    Vec<RegionOperand>,
-);
+pub(super) type SignedOperands = (Vec<RegionOperand>, Vec<RegionOperand>);
 
 /// One chip of the Parts row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::struct_excessive_bools)] // the chip's independent states, as the host reads them
 pub struct TracePartView {
-    /// Stable across renumbering: the host keeps the part's settings under it.
+    /// Stable across renumbering: the host keeps the part's results under it.
     pub id: u32,
-    /// Mask paths that still exist.
-    pub paths: usize,
     /// Stored regions.
     pub regions: usize,
     /// Outside is chosen.
     pub outside: bool,
-    /// The first part without mask paths or regions: the whole image.
+    /// The first part without regions: the whole image.
     pub whole: bool,
-    /// A later part without mask paths or regions: it adds nothing.
+    /// A later part without regions: it adds nothing.
     pub muted: bool,
     pub active: bool,
     /// Its clip keeps some of the image.
@@ -84,53 +79,21 @@ impl Session {
             .min(self.trace_mask_parts().len().saturating_sub(1))
     }
 
-    /// The mask paths of part `index` that still exist, in document order (criterion 27): the
-    /// selection's for the active part.
-    fn trace_part_masks(&self, index: usize) -> Vec<ObjectSnapshot> {
-        if index == self.trace_active_part() {
-            return self.trace_mask_objects();
-        }
-        let Some(part) = self.trace_mask_parts().into_iter().nth(index) else {
-            return Vec::new();
+    /// The added and the subtracted operands of `part`'s regions over the traced image.
+    pub(super) fn trace_part_operands(&self, part: &MaskPart) -> SignedOperands {
+        let Some(map) = self.trace_mask_image().map(|image| image.placement) else {
+            return (Vec::new(), Vec::new());
         };
-        let Some(mask) = self.trace.parts.masks.get(&part.chip) else {
-            return Vec::new();
-        };
-        self.objects()
-            .iter()
-            .filter(|object| mask.contains(&object.id()) && is_mask_path(object))
-            .cloned()
-            .collect()
-    }
-
-    /// The added operands (mask paths, then added regions) and the subtracted ones of `part`,
-    /// whose mask paths are `masks`.
-    pub(super) fn trace_part_operands(
-        &self,
-        part: &MaskPart,
-        masks: &[ObjectSnapshot],
-    ) -> SignedOperands {
-        let map = self.trace_mask_image().map(|image| image.placement);
         let (mut added, mut subtracted) = (Vec::new(), Vec::new());
-        if let Some(map) = map {
-            for region in &part.regions {
-                let operand = region_operand(region, map);
-                if region.subtract {
-                    subtracted.push(operand);
-                } else {
-                    added.push(operand);
-                }
+        for region in &part.regions {
+            let operand = region_operand(region, map);
+            if region.subtract {
+                subtracted.push(operand);
+            } else {
+                added.push(operand);
             }
         }
-        let paths: Result<Vec<RegionOperand>, curvyo_ui_core::TraceRegionError> =
-            masks.iter().map(mask_operand).collect();
-        (
-            paths.map(|mut paths| {
-                paths.extend(added);
-                paths
-            }),
-            subtracted,
-        )
+        (added, subtracted)
     }
 
     /// What part `index` asks to keep over the image with the corners `quad`.
@@ -138,15 +101,14 @@ impl Session {
         let Some(part) = self.trace_mask_parts().into_iter().nth(index) else {
             return TracePartArea::Nothing;
         };
-        let masks = self.trace_part_masks(index);
-        if masks.is_empty() && part.regions.is_empty() {
+        if part.regions.is_empty() {
             return if index == 0 {
                 TracePartArea::Whole
             } else {
                 TracePartArea::Nothing
             };
         }
-        let cache = self.trace_part_region(self.trace_part_operands(&part, &masks), quad);
+        let cache = self.trace_part_region(self.trace_part_operands(&part), quad);
         match cache.region() {
             Ok(region) if cache.meets() => {
                 TracePartArea::Mask(region.clone().with_outside(part.outside))
@@ -169,23 +131,11 @@ impl Session {
         made
     }
 
-    /// Whether any selected or saved part has an unsupported mask curve.
-    pub(super) fn trace_has_unsupported_mask(&self) -> bool {
-        (0..self.trace_part_count()).any(|index| {
-            self.trace_part_masks(index)
-                .iter()
-                .any(|object| mask_operand(object).is_err())
-        })
-    }
-
     /// Each part's clip once the later parts are taken out (`curvyo_ui_core::trace_part_clips`);
     /// all nothing without one traced image.
     #[must_use]
     pub fn trace_part_clip_list(&self) -> Vec<TracePartClip> {
         let count = self.trace_part_count();
-        if self.trace_has_unsupported_mask() {
-            return vec![TracePartClip::Nothing; count];
-        }
         let Some(image) = self.trace_mask_image() else {
             return vec![TracePartClip::Nothing; count];
         };
@@ -229,11 +179,9 @@ impl Session {
             .iter()
             .enumerate()
             .map(|(index, part)| {
-                let paths = self.trace_part_masks(index).len();
-                let empty = paths == 0 && part.regions.is_empty();
+                let empty = part.regions.is_empty();
                 TracePartView {
                     id: part.chip,
-                    paths,
                     regions: part.regions.len(),
                     outside: part.outside,
                     whole: index == 0 && empty,
@@ -245,46 +193,26 @@ impl Session {
             .collect()
     }
 
-    /// Keeps the active part's mask paths (the selection's) under its chip.
-    fn store_active_part(&mut self) {
-        let mask: Vec<NodeId> = self
-            .trace_mask_objects()
-            .iter()
-            .map(ObjectSnapshot::id)
-            .collect();
-        if let Some(part) = self.trace_active_mask_part() {
-            self.trace.parts.masks.insert(part.chip, mask);
-        }
-    }
-
-    /// Makes part `index` active: the image with the part's mask paths that still exist as the
-    /// selection; no region is selected.
-    fn load_part(&mut self, index: usize, image: NodeId) {
-        let chip = self.trace_mask_parts().get(index).map(|p| p.chip);
-        let mut selected = vec![image];
-        if let Some(mask) = chip.and_then(|chip| self.trace.parts.masks.get(&chip)) {
-            selected.extend(
-                self.objects()
-                    .iter()
-                    .filter(|object| mask.contains(&object.id()) && is_mask_path(object))
-                    .map(ObjectSnapshot::id),
-            );
-        }
+    /// Makes part `index` active; no region is selected.
+    fn load_part(&mut self, index: usize) {
         self.trace.parts.active = index;
         self.trace.mask.selected = None;
-        self.selection.set(&selected);
     }
 
     /// Add part (criterion 19, `0114` ADR 0061 §3): a new last part, active, Inside, with the
     /// bar's settings without the picked colours, in one step "Add part"; an untouched image
-    /// stores its first part in the same step. Only the image stays selected. The new chip's id,
-    /// or `None` at 8 parts (`TRACE_PARTS_MAX`) or without one traced image.
+    /// stores its first part in the same step. A lasso in progress is closed first. The new
+    /// chip's id, or `None` at 8 parts (`TRACE_PARTS_MAX`), on a locked image or without one
+    /// traced image.
     pub fn add_trace_part(&mut self) -> Option<u32> {
-        if self.tool != Tool::Trace || self.trace_part_count() >= TRACE_PARTS_MAX {
+        if self.tool != Tool::Trace
+            || self.trace_part_count() >= TRACE_PARTS_MAX
+            || self.trace_mask_locked()
+        {
             return None;
         }
-        let image = self.trace_mask_image()?.id;
-        self.store_active_part();
+        self.close_trace_lasso();
+        let image = self.trace_mask_owner_id()?;
         let implicit = self.trace_implicit_part();
         let settings: TracePartSettings =
             curvyo_ui_core::without_picked_colours(&self.trace.mask.settings);
@@ -298,61 +226,55 @@ impl Session {
             .iter()
             .position(|p| p.stored.as_deref() == Some(&id))?;
         let chip = parts[index].chip;
-        self.load_part(index, image);
+        self.load_part(index);
         Some(chip)
     }
 
-    /// A chip pick (criterion 19): part `index` becomes active and its mask paths are selected
-    /// with the image; `false` when there is no such part or no traced image.
+    /// A chip pick (criterion 19): part `index` becomes active, a lasso in progress is closed
+    /// into the part before; `false` when there is no such part or no traced image.
     pub fn set_trace_active_part(&mut self, index: usize) -> bool {
-        if self.tool != Tool::Trace || index >= self.trace_part_count() {
+        if self.tool != Tool::Trace
+            || index >= self.trace_part_count()
+            || self.trace_mask_image().is_none()
+        {
             return false;
         }
-        let Some(image) = self.trace_mask_image() else {
-            return false;
-        };
         if index != self.trace_active_part() {
-            self.store_active_part();
-            self.load_part(index, image.id);
+            self.close_trace_lasso();
+            self.load_part(index);
         }
         true
     }
 
     /// Remove part (criterion 28, `0114` criterion 20): part `index` with its regions and settings
-    /// in one step "Remove part"; the part before it (or the new first) becomes active with its
-    /// selection; `false` with one part.
+    /// in one step "Remove part"; the part before it (or the new first) becomes active; a lasso
+    /// in progress is closed first. `false` with one part or on a locked image.
     pub fn remove_trace_part(&mut self, index: usize) -> bool {
-        if self.tool != Tool::Trace || self.trace_part_count() < 2 {
+        if self.tool != Tool::Trace || self.trace_part_count() < 2 || self.trace_mask_locked() {
             return false;
         }
-        let Some(image) = self.trace_mask_image() else {
+        self.close_trace_lasso();
+        let Some(image) = self.trace_mask_owner_id() else {
             return false;
         };
         let parts = self.trace_mask_parts();
         let Some(MaskPart {
-            stored: Some(id),
-            chip,
-            ..
+            stored: Some(id), ..
         }) = parts.get(index).cloned()
         else {
             return false;
         };
         let active = self.trace_active_part();
-        if index != active {
-            self.store_active_part();
-        }
-        let removed = self.recording(|this| this.document.remove_trace_part(image.id, &id).is_ok());
+        let removed = self.recording(|this| this.document.remove_trace_part(image, &id).is_ok());
         if !removed {
             return false;
         }
-        self.trace.parts.masks.remove(&chip);
         let next = match index.cmp(&active) {
             std::cmp::Ordering::Equal => index.saturating_sub(1),
             std::cmp::Ordering::Less => active - 1,
             std::cmp::Ordering::Greater => active,
         };
-        // The removed part's selection is not kept: the next one's loads.
-        self.load_part(next, image.id);
+        self.load_part(next);
         true
     }
 
@@ -365,10 +287,7 @@ impl Session {
         wires: &[Option<&[f64]>],
         full: bool,
     ) -> Option<Vec<f64>> {
-        if self.trace_has_unsupported_mask() {
-            return None;
-        }
-        let clips = self.trace_part_clip_list();
+        let clips = self.for_trace_image(image, Self::trace_part_clip_list);
         let empty = Output {
             status: vectrace::wire::Status::Traced,
             paths: 0,
@@ -393,7 +312,12 @@ impl Session {
             }
         }
         let pairs: Vec<(&Output, &TracePartClip)> = read.iter().map(|(w, c)| (w, c)).collect();
-        let joined = join_trace_parts(&pairs, self.trace_active_part());
+        let active = if self.trace_mask_image().is_some_and(|i| i.id == image) {
+            self.trace_active_part()
+        } else {
+            0
+        };
+        let joined = join_trace_parts(&pairs, active);
         #[allow(clippy::cast_precision_loss)] // counts far below 2^52
         let header = vec![
             match joined.status {
@@ -430,12 +354,17 @@ impl Session {
         specks_mm: f64,
         upscale_auto: bool,
     ) -> Option<TraceSource> {
-        let clip = self.trace_part_clip_list().get(index).cloned();
+        let (clip, count) = self.for_trace_image(image, |s| {
+            (
+                s.trace_part_clip_list().get(index).cloned(),
+                s.trace_part_count(),
+            )
+        });
         let source = self.trace_source(image, reduced)?;
         let Some(TracePartClip::Region(region)) = clip else {
             return Some(source);
         };
-        if region.outside() || self.trace_part_count() < 2 {
+        if region.outside() || count < 2 {
             return Some(source);
         }
         let pixel_mm2 = curvyo_document_core::Affine::from_array(source.map)
@@ -458,6 +387,17 @@ impl Session {
             return Some(source);
         }
         Some(cut)
+    }
+}
+
+impl Session {
+    /// `read` with the parts of the traced picture `image` (one of several selected, Frage 11 A:
+    /// each image with its own stored mask) standing for the traced image's.
+    pub fn for_trace_image<R>(&self, image: NodeId, read: impl FnOnce(&Self) -> R) -> R {
+        let before = self.trace.parts.for_image.replace(Some(image));
+        let out = read(self);
+        self.trace.parts.for_image.set(before);
+        out
     }
 }
 

@@ -541,44 +541,6 @@ fn recognition_does_not_replace_editable_spline_controls() {
 }
 
 #[test]
-fn trace_mask_evaluates_splines_and_refuses_unsupported_curves() {
-    use curvyo_document_core::ObjectSnapshot;
-    let d = Document::new(59);
-    let controls = [(0., 0.), (10., 0.), (10., 10.), (0., 10.)]
-        .into_iter()
-        .enumerate()
-        .map(|(i, (x, y))| {
-            let mut a = NewAnchor::corner(AnchorId::new(59, i as u64), Point::new(x, y));
-            a.kind = curvyo_document_core::AnchorKind::Symmetric;
-            a
-        })
-        .collect::<Vec<_>>();
-    let id = d
-        .create_editable_curve(&controls, true, CurveKind::BSpline)
-        .unwrap();
-    let raw = ObjectSnapshot::Path(d.path(id).unwrap());
-    let evaluated = curvyo_ui_core::evaluate_object(&raw).unwrap();
-    assert_eq!(
-        curvyo_ui_core::mask_operand(&raw).unwrap(),
-        curvyo_ui_core::mask_operand(&evaluated).unwrap()
-    );
-    let mut spiro = d.path(id).unwrap();
-    spiro.curve_kind = CurveKind::Spiro;
-    assert!(curvyo_ui_core::mask_operand(&ObjectSnapshot::Path(spiro.clone())).is_ok());
-    // Controls too far out to be drawn at any tolerance have no curve: refused, not masked as
-    // their polygon (since `specs/0115` controls on one point are that point).
-    let mut unsupported = spiro;
-    for (anchor, sign) in unsupported
-        .anchors
-        .iter_mut()
-        .zip([1.0, -1.0].iter().cycle())
-    {
-        anchor.point = Point::new(sign * 1e300, anchor.point.y);
-    }
-    assert!(curvyo_ui_core::mask_operand(&ObjectSnapshot::Path(unsupported)).is_err());
-}
-
-#[test]
 fn variable_stroke_follows_bspline_corner_artwork() {
     let doc = Document::new(76);
     let controls = [

@@ -35,10 +35,10 @@ impl Session {
         let view = self.trace_view();
         let mut at = 0;
         while at < objects.len() {
-            if let ObjectSnapshot::Image(image) = &objects[at]
-                && view.images.contains(&image.id)
+            if view.images.contains(&objects[at].id())
+                && let Some(image) = super::trace::traced_picture(&objects[at])
             {
-                let wash = ObjectSnapshot::Path(wash_over(image));
+                let wash = ObjectSnapshot::Path(wash_over(&image));
                 objects.insert(at + 1, wash);
                 at += 1;
             }

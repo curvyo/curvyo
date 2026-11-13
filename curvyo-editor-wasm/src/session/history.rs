@@ -320,6 +320,14 @@ impl Session {
     }
 
     fn press_history(&mut self, direction: Direction) -> HistoryResult {
+        // A lasso in progress: Undo discards it and undoes nothing else, Redo discards it and
+        // runs (`specs/0114` adrs.md, UX notes §6).
+        if self.discard_trace_lasso() && direction == Direction::Undo {
+            return HistoryResult {
+                notice: String::new(),
+                changed: true,
+            };
+        }
         // The gate of the keys (criterion 6) holds for every entry point: the History buttons come
         // here too. A document preview pauses editing (`0042` criterion 19).
         if self.operation_in_flight() || self.select.has_entry() || self.document_preview_active() {

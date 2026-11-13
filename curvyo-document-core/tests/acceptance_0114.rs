@@ -411,3 +411,71 @@ fn points_that_do_not_fit_their_kind_are_refused() {
     assert_eq!(d.own_step_count(), steps);
     assert!(mask(&d, m1).is_empty());
 }
+
+/// Criterion 14, Ctrl+C / Ctrl+V (ADR 0061 §8): a copied image's mask goes through its JSON (the
+/// page's memo) and is written whole onto the pasted image inside the paste's own step; the copy's
+/// mask is its own afterwards.
+#[test]
+fn c14_a_pasted_image_gets_the_copied_mask_in_the_paste_step() {
+    let d = Document::new(1);
+    let a = image(&d, b"pixels-a");
+    d.draw_trace_region(
+        a,
+        TracePartRef::Implicit(&implicit()),
+        &rect(false, (0.0, 0.0), (0.5, 1.0)),
+    )
+    .unwrap();
+    d.add_trace_part(a, &implicit(), &settings(json!({"smooth": 20})))
+        .unwrap();
+    let lasso = NewTraceRegion {
+        kind: TraceRegionKind::Lasso,
+        subtract: true,
+        points: vec![
+            UnitPoint::new(0.1, 0.1),
+            UnitPoint::new(0.6, 0.1),
+            UnitPoint::new(0.1, 0.9),
+        ],
+    };
+    let part = d.trace_mask(a).unwrap().parts[1].id.clone();
+    d.draw_trace_region(a, TracePartRef::Stored(&part), &lasso)
+        .unwrap();
+    let copied = d.trace_mask(a).unwrap();
+    let json = serde_json::to_value(&copied).unwrap();
+    let back = TraceMask::from_json(&json).expect("the memo reads back");
+    assert_eq!(back, copied);
+    let steps = d.history_page(0, 1000).len();
+    let b = d
+        .batch("paste_image", |document| {
+            let b = document
+                .write_images(&[NewImage {
+                    bytes: Arc::from(&b"pixels-b"[..]),
+                    placement: Affine::new(50.0, 0.0, 0.0, 50.0, 200.0, 0.0),
+                    name: "pasted".into(),
+                }])
+                .into_iter()
+                .next()?;
+            document.write_trace_mask(b, &back).ok()?;
+            Some(b)
+        })
+        .unwrap();
+    assert_eq!(
+        d.history_page(0, 1000).len(),
+        steps + 1,
+        "the paste is one step"
+    );
+    assert_eq!(
+        d.trace_mask(b).unwrap(),
+        copied,
+        "the same parts, settings and regions"
+    );
+    // Editing the paste's mask leaves the copied image's alone.
+    d.clear_trace_mask(b, "0").unwrap();
+    assert_eq!(d.trace_mask(a).unwrap(), copied);
+    // A damaged memo writes nothing.
+    assert_eq!(TraceMask::from_json(&json!({"parts": [{"id": "x"}]})), None);
+    d.delete_objects(&[b]).unwrap();
+    assert_eq!(
+        d.write_trace_mask(b, &copied),
+        Err(TraceMaskError::NotAnImage)
+    );
+}
