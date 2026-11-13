@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
 use super::*;
-use crate::material::{Interval, MachineTie, MaterialSet, SetSource, Thickness};
+use crate::material::{Interval, MachineTie, Passes, PowerPercent, SetNumbers, Thickness};
+use crate::material_record::{LaserSets, Set, SetSource};
 use crate::operation_settings::SetOverride;
+use crate::operation_settings_edit::{TypedNumber, edit_interval, edit_number};
 
 const PROFILE: &str = "generic-laser";
 
@@ -20,22 +22,28 @@ fn material(id: &str, modified: u64, sets: &[(SetKind, Settings)]) -> Material {
         modified,
         name: "Birch 3 mm".to_owned(),
         thickness: Thickness::from_mm(3.0).unwrap(),
-        machine: MachineTie {
-            id: PROFILE.to_owned(),
-            name: "Generic laser".to_owned(),
-        },
-        sets: sets
-            .iter()
-            .map(|&(kind, settings)| {
-                (
-                    kind,
-                    MaterialSet {
-                        settings,
-                        source: SetSource::Edited,
-                    },
-                )
-            })
-            .collect::<BTreeMap<_, _>>(),
+        lasers: vec![LaserSets {
+            machine: MachineTie {
+                id: PROFILE.to_owned(),
+                name: "Generic laser".to_owned(),
+            },
+            sets: sets
+                .iter()
+                .map(|&(kind, settings)| {
+                    (
+                        kind,
+                        Set {
+                            numbers: SetNumbers {
+                                settings,
+                                interval: None,
+                            },
+                            source: SetSource::Typed,
+                        },
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
+        }],
+        tests: Vec::new(),
         history: Vec::new(),
     }
 }
@@ -77,7 +85,13 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
             (SetKind::Score, set(15.0, 9000, 1)),
         ],
     );
-    let stored = use_material(&both, OperationKind::EngraveOutline, &SettingsRead::None).unwrap();
+    let stored = use_material(
+        &both,
+        PROFILE,
+        OperationKind::EngraveOutline,
+        &SettingsRead::None,
+    )
+    .unwrap();
     assert_eq!(stored.outline, Some(set(15.0, 9000, 1)));
     let link = stored.material.unwrap();
     assert_eq!(
@@ -88,6 +102,7 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
     let engrave_only = material("m2", 1, &[(SetKind::Engrave, set(30.0, 6000, 1))]);
     let stored = use_material(
         &engrave_only,
+        PROFILE,
         OperationKind::EngraveOutline,
         &SettingsRead::None,
     )
@@ -98,12 +113,18 @@ fn the_sets_follow_the_kind_and_the_outline_falls_back_to_engrave() {
         Some(SetKind::Engrave)
     );
     assert_eq!(
-        use_material(&engrave_only, OperationKind::Cut, &SettingsRead::None),
+        use_material(
+            &engrave_only,
+            PROFILE,
+            OperationKind::Cut,
+            &SettingsRead::None
+        ),
         Err(SetKind::Cut),
         "skipped and named"
     );
     let cut = use_material(
         &material("m3", 1, &[(SetKind::Cut, set(60.0, 300, 2))]),
+        PROFILE,
         OperationKind::CutOut,
         &SettingsRead::None,
     )
@@ -198,7 +219,15 @@ fn a_link_runs_its_stored_numbers_with_the_reason_and_the_typed_numbers() {
     );
     assert_eq!(
         reason(&library, "other", OperationKind::Cut),
-        Some(StoredReason::OtherMachine)
+        Some(StoredReason::NoSet(SetKind::Cut)),
+        "a laser without sets in a shared material (ADR 0058 §7)"
+    );
+    let older = [MaterialRead::Older {
+        id: "m1".to_owned(),
+    }];
+    assert_eq!(
+        reason(&older, PROFILE, OperationKind::Cut),
+        Some(StoredReason::Older)
     );
     assert_eq!(
         reason(&library, PROFILE, OperationKind::Score),
@@ -206,7 +235,7 @@ fn a_link_runs_its_stored_numbers_with_the_reason_and_the_typed_numbers() {
     );
     assert_eq!(
         StoredReason::NoSet(SetKind::Score).text(),
-        "Material has no Score set, using stored numbers"
+        "Material has no Score set for this laser, using stored numbers"
     );
     assert_eq!(
         StoredReason::Missing.text(),
@@ -394,7 +423,7 @@ fn material_paths_keep_the_stored_interval_and_a_typed_interval_writes_main() {
     assert_eq!(state.run().unwrap().interval, eight);
     assert_eq!(state.material().unwrap().interval, eight);
 
-    let picked = use_material(&birch, kind, &read).unwrap();
+    let picked = use_material(&birch, PROFILE, kind, &read).unwrap();
     assert_eq!(picked.interval, eight, "a pick keeps the interval");
     let refreshed = refresh(&read, kind, &library, PROFILE, false).unwrap();
     assert_eq!(refreshed.interval, eight, "a refresh keeps it");
@@ -457,4 +486,34 @@ fn read_overrides_of(read: &SettingsRead) -> Overrides {
         panic!("stored");
     };
     stored.overrides
+}
+
+#[test]
+fn a_linked_engrave_without_an_interval_takes_the_one_of_its_laser_set() {
+    let mut m = material("m1", 7, &[(SetKind::Engrave, set(30.0, 6000, 1))]);
+    let interval = Interval::from_mm(0.08).unwrap();
+    m.lasers[0]
+        .sets
+        .get_mut(&SetKind::Engrave)
+        .unwrap()
+        .numbers
+        .interval = Some(interval);
+    let stored = use_material(&m, PROFILE, OperationKind::Engrave, &SettingsRead::None).unwrap();
+    assert_eq!(stored.interval, Some(interval));
+    let own = SettingsRead::Stored(StoredSettings {
+        interval: Interval::from_mm(0.3),
+        ..stored.clone()
+    });
+    let kept = use_material(&m, PROFILE, OperationKind::Engrave, &own).unwrap();
+    assert_eq!(
+        kept.interval,
+        Interval::from_mm(0.3),
+        "an own interval stays (0111 c23)"
+    );
+    let other = use_material(&m, "other", OperationKind::Engrave, &SettingsRead::None);
+    assert_eq!(
+        other,
+        Err(SetKind::Engrave),
+        "the set of another laser never runs"
+    );
 }

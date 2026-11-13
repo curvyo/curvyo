@@ -85,6 +85,11 @@ pub fn record_id(file_name: &str) -> Option<&str> {
         .filter(|id| is_record_id(id))
 }
 
+/// Whether `id` may name the machine of a material: a profile UUID or the built-in.
+pub(crate) fn is_machine_id(id: &str) -> bool {
+    id == crate::machine_profile::GENERIC_LASER_ID || is_record_id(id)
+}
+
 /// The file name of the record `id`.
 #[must_use]
 pub fn record_file_name(id: &str) -> String {

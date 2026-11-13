@@ -1,11 +1,9 @@
-//! The material record with its sets, history and limits (ADR 0055 §2, `specs/0028` criteria
-//! 15 to 18), in memory; its file format comes with the library (Part B of the plan).
+//! The numbers and limits a material record and an operation share (ADR 0055 §2, ADR 0058 §2):
+//! power, passes, thickness, interval, the set kinds and the `modified` rule.
 
-use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::machine_profile::FeedRate;
-use crate::test_grid::GridRange;
 
 /// The longest material name, in characters.
 pub const MAX_MATERIAL_NAME_CHARS: usize = 60;
@@ -266,22 +264,14 @@ pub struct Settings {
     pub passes: Passes,
 }
 
-/// Where a set's numbers came from (ADR 0055 §2).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SetSource {
-    /// The `tested` history entry with this id.
-    Test(String),
-    /// Typed in the material's fields.
-    Edited,
-}
-
-/// One kind's set of a material.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MaterialSet {
-    /// The numbers.
+/// The four numbers of a set (ADR 0058 §2): power, speed, passes and, for Engrave, the interval;
+/// also the numbers of one test grid cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SetNumbers {
+    /// Power, speed and passes.
     pub settings: Settings,
-    /// Their source.
-    pub source: SetSource,
+    /// The hatch interval, `Some` exactly for Engrave.
+    pub interval: Option<Interval>,
 }
 
 /// The cell of a grid, by column (power) and row (speed), from the top left.
@@ -293,40 +283,6 @@ pub struct CellIndex {
     pub row: u8,
 }
 
-/// What one history entry records.
-#[derive(Debug, Clone, PartialEq)]
-pub enum HistoryEvent {
-    /// A test saved into the record.
-    Tested {
-        /// The grid's fields (without kind and labels).
-        grid: GridRange,
-        /// The marked cell.
-        cell: CellIndex,
-        /// The numbers of the set it made.
-        set: Settings,
-    },
-    /// A set typed in the material's fields.
-    Edited {
-        /// The new numbers.
-        set: Settings,
-    },
-    /// A set removed.
-    Removed,
-}
-
-/// One entry of the append-only test history (spec criterion 18).
-#[derive(Debug, Clone, PartialEq)]
-pub struct HistoryEntry {
-    /// A lowercase UUID v4.
-    pub id: String,
-    /// Unix milliseconds, passed in by the caller.
-    pub date: u64,
-    /// The set's kind.
-    pub kind: SetKind,
-    /// What happened.
-    pub event: HistoryEvent,
-}
-
 /// The machine a record was tested on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineTie {
@@ -336,70 +292,12 @@ pub struct MachineTie {
     pub name: String,
 }
 
-/// One material of the maker's library (spec criterion 16).
-#[derive(Debug, Clone, PartialEq)]
-pub struct Material {
-    /// A lowercase UUID v4, also its file's name.
-    pub id: String,
-    /// The last change in Unix milliseconds; it rises with every write ([`next_modified`]), so an
-    /// operation's link tells a newer record from an older one (ADR 0054 §1, ADR 0055 §2).
-    pub modified: u64,
-    /// 1 to 60 characters, not unique.
-    pub name: String,
-    /// The thickness.
-    pub thickness: Thickness,
-    /// The machine it is for.
-    pub machine: MachineTie,
-    /// At most one set per kind.
-    pub sets: BTreeMap<SetKind, MaterialSet>,
-    /// The test history, oldest first.
-    pub history: Vec<HistoryEntry>,
-}
-
-impl Material {
-    /// The set of `kind`, if the record has one.
-    #[must_use]
-    pub fn set(&self, kind: SetKind) -> Option<&Settings> {
-        self.sets.get(&kind).map(|set| &set.settings)
-    }
-}
-
 /// The `modified` of a record written at `now` whose last change was `previous`:
 /// `max(now, previous + 1)`, also for an undo or redo (ADR 0055 §2), so it always rises.
 #[must_use]
 pub const fn next_modified(previous: u64, now: u64) -> u64 {
     let after = previous.saturating_add(1);
     if now > after { now } else { after }
-}
-
-/// One record of the library as loaded: readable, damaged, or of a newer format (ADR 0055 §3).
-#[derive(Debug, Clone, PartialEq)]
-pub enum MaterialRead {
-    /// A record this build reads.
-    Loaded(Material),
-    /// A damaged record, never used and never rewritten.
-    Damaged {
-        /// The id its file name carries.
-        id: String,
-        /// The reason shown in the Materials section.
-        reason: String,
-    },
-    /// A record of a newer `format_version`, left untouched.
-    Newer {
-        /// The id its file name carries.
-        id: String,
-    },
-}
-
-impl MaterialRead {
-    /// The record's id.
-    #[must_use]
-    pub fn id(&self) -> &str {
-        match self {
-            Self::Loaded(material) => &material.id,
-            Self::Damaged { id, .. } | Self::Newer { id } => id,
-        }
-    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 //! The stored shape of a laser operation node (ADR 0046 §1, §2, §5; ADR 0054 §1, §4; ADR 0056
-//! §6): its keys and how one record is read back.
+//! §6; ADR 0057 §2): its keys and how one record is read back.
 
 use loro::{LoroMap, LoroTree, LoroValue, TreeID, ValueOrContainer};
 
@@ -30,6 +30,10 @@ pub(crate) const KEY_OP_SETTINGS: &str = "op_settings";
 pub(crate) const KEY_OP_OPTIONS: &str = "op_options";
 /// The grid row switch (ADR 0054 §4); absent reads as off.
 pub(crate) const KEY_OP_GRID: &str = "op_grid";
+/// The atomic map naming the test grid a derived operation belongs to and the part it runs
+/// (ADR 0057 §2): `{ grid, part: "labels" }` or `{ grid, part: "cell", column, row }`; absent is an
+/// ordinary operation.
+pub(crate) const KEY_OP_GRID_PART: &str = "op_grid_part";
 /// The prefix of a membership key, `member.<path>` = `true`.
 pub(crate) const MEMBER_PREFIX: &str = "member.";
 /// The separator of the node ids of a clone member's path; it never occurs in an encoded id.
@@ -65,6 +69,10 @@ pub struct OperationSnapshot {
     pub options: Option<serde_json::Value>,
     /// Whether it is the row of a test grid (`op_grid`, ADR 0054 §4).
     pub grid: bool,
+    /// The `op_grid_part` register of a derived operation (ADR 0057 §2) as plain values, `None`
+    /// when absent; a register that holds no plain value reads as `null`. The laser extension
+    /// decides whether it reads; one that does not leaves the row ordinary (§6).
+    pub grid_part: Option<serde_json::Value>,
 }
 
 /// The membership key of the target `path`.
@@ -161,6 +169,7 @@ pub(crate) fn read_operation(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> O
         settings: plain_register(meta, KEY_OP_SETTINGS),
         options: plain_register(meta, KEY_OP_OPTIONS),
         grid: grid.unwrap_or(false),
+        grid_part: plain_register(meta, KEY_OP_GRID_PART),
     }
 }
 

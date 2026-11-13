@@ -900,15 +900,16 @@ fn adr0042_a_claim_of_a_sketch_on_a_drawing_page_reads_as_no_owner() {
 // Bumped to 38 by `specs/0100-bring-content-in` (ADR 0045 §9), to 39 by
 // `specs/0101-laser-operations` (ADR 0046 §4), to 40 by `specs/0102-laser-fixtures` (ADR 0049),
 // to 42 by `specs/0110-pen-modes-variable-stroke` (ADR 0053), to 43 by
-// `specs/0028-material-test-library` (ADR 0054), to 44 by `specs/0111-laser-operation-tools`
+// `specs/0028-material-test-library` (ADR 0054), to 44 by `specs/0111-laser-operation-tools`, to 45 by `specs/0112-test-grid-and-materials`
 // (ADR 0056).
 fn ac20_save_writes_format_38() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+    // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 45);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 46);
 }
 
 #[test]

@@ -7,15 +7,18 @@ use curvyo_document_core::OperationSnapshot;
 use crate::operation_kind::{KindRead, OperationKind};
 use crate::operation_options::read_options;
 use crate::operation_settings::{SettingsRead, read_settings};
+use crate::test_grid_ops::GridPart;
 
 /// The last operation of `kind` (`specs/0111` "Words"): the position in the stored list of the
 /// operation of that kind lowest in the list that is not Unknown, has no damaged settings or
-/// options and is no test grid row. `None` when there is none, so a press creates one.
+/// options and is no test grid row, nor a derived operation of a grid (a readable `op_grid_part`,
+/// ADR 0056 §3, ADR 0057 §2). `None` when there is none, so a press creates one.
 #[must_use]
 pub fn last_of_kind(operations: &[OperationSnapshot], kind: OperationKind) -> Option<usize> {
     operations.iter().rposition(|op| {
         KindRead::of(op.kind.as_deref()) == KindRead::Known(kind)
             && !op.grid
+            && op.grid_part.as_ref().and_then(GridPart::read).is_none()
             && !matches!(
                 read_settings(op.settings.as_ref(), kind),
                 SettingsRead::Damaged(_)
@@ -81,11 +84,21 @@ mod tests {
         let mut bad_options = engrave(5);
         bad_options.options = Some(json!({"overscan_pct": 51}));
         let unknown = op(6, None, true, &[]);
-        let only_unusable = [grid, damaged, bad_options, unknown];
+        let mut derived = engrave(7);
+        derived.grid_part = Some(json!({"grid": "1:4", "part": "labels"}));
+        let only_unusable = [grid, damaged, bad_options, unknown, derived];
         assert_eq!(
             last_of_kind(&only_unusable, OperationKind::Engrave),
             None,
-            "a grid row, damaged settings or options, an Unknown operation are never reused"
+            "a grid row, damaged settings or options, an Unknown operation, a derived row are never \
+             reused"
+        );
+        let mut unreadable = engrave(8);
+        unreadable.grid_part = Some(json!("labels"));
+        assert_eq!(
+            last_of_kind(&[unreadable], OperationKind::Engrave),
+            Some(0),
+            "an op_grid_part that does not read leaves the row ordinary (ADR 0057 §6)"
         );
         let mut with_first = vec![engrave(0)];
         with_first.extend(only_unusable);

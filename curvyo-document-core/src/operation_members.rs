@@ -43,6 +43,10 @@ impl Document {
             return;
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
+        // ADR 0057 §3: the derived operations of a grid deleted, cut or ungrouped in this step,
+        // or removed by a merge, go too. Every derived operation holds a membership key when it
+        // is written, so the flag above covers them.
+        crate::test_grid_rows::sweep_orphan_derived_rows(&tree);
         let entries = self.member_entries();
         if entries.is_empty() {
             // Every key is gone: the next commits pay nothing again until a key is written.

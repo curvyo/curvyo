@@ -225,12 +225,12 @@ impl Document {
         if string(&meta, KEY_NAME).as_deref() == Some(name.as_str()) {
             return Ok(false);
         }
-        let label = if crate::operation_codec::grid_switch(&meta) == Some(true) {
-            crate::test_grid_commands::RENAME_TEST_GRID_COMMIT_LABEL
-        } else {
-            RENAME_OPERATION_COMMIT_LABEL
-        };
-        self.write_and_commit(&meta, KEY_NAME, name.as_str(), label)
+        self.write_and_commit(
+            &meta,
+            KEY_NAME,
+            name.as_str(),
+            RENAME_OPERATION_COMMIT_LABEL,
+        )
     }
 
     /// Sets the colour text of the operation `id`. `Ok(false)` when it already is.
@@ -286,17 +286,12 @@ impl Document {
     /// # Errors
     /// [`OperationError::NoSuchOperation`].
     pub fn delete_operation(&self, id: NodeId) -> Result<(), OperationError> {
-        let meta = self.operation_meta(id)?;
-        let label = if crate::operation_codec::grid_switch(&meta) == Some(true) {
-            crate::test_grid_commands::DELETE_TEST_GRID_ROW_COMMIT_LABEL
-        } else {
-            DELETE_OPERATION_COMMIT_LABEL
-        };
+        self.operation_meta(id)?;
         self.loro()
             .get_tree(OBJECTS_TREE)
             .delete(tree_id_of(id))
             .map_err(|_| OperationError::NoSuchOperation)?;
-        self.commit_with_label(label);
+        self.commit_with_label(DELETE_OPERATION_COMMIT_LABEL);
         Ok(())
     }
 

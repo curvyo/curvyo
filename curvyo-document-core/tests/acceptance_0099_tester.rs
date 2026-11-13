@@ -846,7 +846,8 @@ fn ac19_the_format_stays_37_until_0100_bumps_it_to_38() {
     // Format 41 since `specs/0103-fixture-jobs` (ADR 0052 §6).
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+    // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
 }
 
 fn criterion_19_project() -> (Document, Vec<NodeId>) {

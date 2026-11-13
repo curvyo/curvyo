@@ -1,0 +1,6115 @@
+{
+  "format_version": 2,
+  "id": "0b6c3f1e-2a4d-4b8e-9c7f-1d2e3f4a5b6c",
+  "kind": "laser",
+  "modified": 1762948805000,
+  "name": "Birch plywood",
+  "thickness_mm": 3.0,
+  "lasers": [
+    {
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "sets": {
+        "cut": {
+          "power_pct": 60.0,
+          "speed_mm_min": 1950,
+          "passes": 1,
+          "source": "typed"
+        },
+        "engrave": {
+          "power_pct": 30.0,
+          "speed_mm_min": 6000,
+          "passes": 1,
+          "interval_mm": 0.08,
+          "source": "typed"
+        }
+      }
+    },
+    {
+      "machine": {
+        "id": "generic-laser",
+        "name": "Generic laser"
+      },
+      "sets": {
+        "score": {
+          "power_pct": 12.5,
+          "speed_mm_min": 3000,
+          "passes": 2,
+          "source": "typed"
+        }
+      }
+    }
+  ],
+  "tests": [
+    {
+      "id": "00000",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00001",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00002",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00003",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00004",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00005",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00006",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00007",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00008",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00009",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00010",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00011",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00012",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00013",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00014",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00015",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00016",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00017",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00018",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00019",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00020",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00021",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00022",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00023",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00024",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00025",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00026",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00027",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00028",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00029",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00030",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00031",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00032",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00033",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00034",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00035",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00036",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00037",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00038",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00039",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00040",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00041",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00042",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00043",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00044",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00045",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00046",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00047",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00048",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00049",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00050",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00051",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00052",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00053",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00054",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00055",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00056",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00057",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00058",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00059",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00060",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00061",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00062",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00063",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00064",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00065",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00066",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00067",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00068",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00069",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00070",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00071",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00072",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00073",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00074",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00075",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00076",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00077",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00078",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00079",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00080",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00081",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00082",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00083",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00084",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00085",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00086",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00087",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00088",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00089",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00090",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00091",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00092",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00093",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00094",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00095",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00096",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00097",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00098",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00099",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00100",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00101",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00102",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00103",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00104",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00105",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00106",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00107",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00108",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00109",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00110",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00111",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00112",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00113",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00114",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00115",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00116",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00117",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00118",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00119",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00120",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00121",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00122",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00123",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00124",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00125",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00126",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00127",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00128",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00129",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00130",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00131",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00132",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00133",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00134",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00135",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00136",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00137",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00138",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00139",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00140",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00141",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00142",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00143",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00144",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00145",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00146",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00147",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00148",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00149",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00150",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00151",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00152",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00153",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00154",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00155",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00156",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00157",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00158",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00159",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00160",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00161",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00162",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00163",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00164",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00165",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00166",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00167",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00168",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00169",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00170",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00171",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00172",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00173",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00174",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00175",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00176",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00177",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00178",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00179",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00180",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00181",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00182",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00183",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00184",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00185",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00186",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00187",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00188",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00189",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00190",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00191",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00192",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00193",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00194",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00195",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00196",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00197",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00198",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00199",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    },
+    {
+      "id": "00200",
+      "created": 1762948800000,
+      "machine": {
+        "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+        "name": "Diode 20 W"
+      },
+      "recipe": {
+        "kind": "cut",
+        "columns": {
+          "param": "power",
+          "min": 20.0,
+          "max": 100.0,
+          "count": 5
+        },
+        "rows": {
+          "param": "speed",
+          "min": 600,
+          "max": 6000,
+          "count": 5
+        },
+        "fixed": {
+          "passes": 1
+        },
+        "cell_mm": 10.0,
+        "crosshatch": false
+      },
+      "lasered": null,
+      "note": ""
+    }
+  ],
+  "history": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "date": 1762948801000,
+      "event": "set",
+      "machine": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+      "kind": "cut",
+      "set": {
+        "power_pct": 60.0,
+        "speed_mm_min": 1950,
+        "passes": 1
+      },
+      "source": {
+        "test": "7K2QX"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "date": 1762948804000,
+      "event": "set",
+      "machine": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+      "kind": "engrave",
+      "set": {
+        "power_pct": 30.0,
+        "speed_mm_min": 6000,
+        "passes": 1,
+        "interval_mm": 0.08
+      },
+      "source": "typed"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "date": 1762948804500,
+      "event": "removed",
+      "machine": "generic-laser",
+      "kind": "cut"
+    }
+  ]
+}

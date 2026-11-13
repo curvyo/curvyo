@@ -3,7 +3,7 @@
 //! `op_options` map, `interval_mm`, profile copy `motorised_z` and group key as plain values and
 //! save back unchanged; format-43 files open with no options and are not rewritten; the
 //! clone-member keys of `operations_v39.curvyo` and `operations_clone_member_v39.curvyo` are kept;
-//! a format 45 file is refused. The laser extension's reading of the same goldens is in
+//! a file of the next format is refused. The laser extension's reading of the same goldens is in
 //! `curvyo-laser-core/tests/operation_tools_goldens.rs`. `CURVYO_WRITE_FIXTURES=1` rewrites the
 //! two goldens of this file only.
 
@@ -273,7 +273,8 @@ fn the_operation_tools_golden_reads_back_every_option_interval_copy_and_group_ke
         pack(&golden_document(), "0.1.0").unwrap()
     });
     assert_eq!(format_of(&bytes), 44);
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+    // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7); a 44 file opens as it is.
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
     let d = open_unchanged(&bytes);
     let mfgs = d.manufacturings();
     assert_eq!(mfgs.len(), 2);
@@ -376,7 +377,7 @@ fn clone_member_keys_of_old_files_are_kept_and_saved_back() {
 }
 
 #[test]
-fn a_file_of_format_45_is_refused() {
+fn a_file_of_a_newer_format_is_refused() {
     let bytes = pack(&golden_document(), "0.1.0").unwrap();
     let mut files = members(&bytes);
     let mut manifest: Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
@@ -388,8 +389,8 @@ fn a_file_of_format_45_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 46,
-            supported: 45
+            found: 47,
+            supported: 46
         })
     ));
 }

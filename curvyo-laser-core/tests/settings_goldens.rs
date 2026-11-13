@@ -1,7 +1,6 @@
 //! The laser extension reads the format 43 goldens of `curvyo-document-core/tests/fixtures/`
-//! (`specs/0028-material-test-library` criteria 26, 28; ADR 0054 §1, §2, §4, §6): every operation's
-//! settings state, every damage, the grid's recipe, mark and tags, the run of a grid row, and the
-//! orphan row's "no grid".
+//! (`specs/0028-material-test-library` criteria 26, 28; ADR 0054 §1, §2, §6): every operation's
+//! settings state and every damage. Reading old grids is `specs/0112` Part F.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -11,9 +10,6 @@ use curvyo_document_core::{Document, OperationSnapshot, unpack};
 use curvyo_laser_core::operations::{KindRead, OperationKind};
 use curvyo_laser_core::settings::{
     Field, Role, SettingsDamage, SettingsRead, SettingsState, StoredReason, read_settings, resolve,
-};
-use curvyo_laser_core::test_grids::{
-    GridLeafRun, GridRecipe, GridTag, LabelTag, grid_leaf_run, grid_run_order, read_mark,
 };
 
 fn golden(name: &str) -> Document {
@@ -94,66 +90,5 @@ fn every_damaged_register_reads_as_damaged_settings_with_its_reason() {
             BadOverride,
             BadOverride
         ]
-    );
-}
-
-#[test]
-fn the_golden_grid_reads_its_recipe_mark_and_tags_and_runs_labels_first() {
-    let d = golden("laser_settings_v43.curvyo");
-    let row = operations(&d).pop().unwrap();
-    assert!(row.grid);
-    let grid = d.test_grid(d.test_grid_of_row(row.id).unwrap()).unwrap();
-    let recipe = GridRecipe::from_value(&grid.recipe).unwrap();
-    assert_eq!((recipe.range.columns, recipe.range.rows), (3, 2));
-    assert_eq!(recipe.column_power(1).to_string(), "60");
-    let mark = read_mark(grid.worked.as_ref().unwrap(), &recipe).unwrap();
-    assert_eq!((mark.column, mark.row), (1, 0));
-    let mut runs = Vec::new();
-    for item in grid.cells.iter().chain(&grid.labels) {
-        let (cell, label) = d.grid_item_tags(item.id);
-        runs.push(grid_leaf_run(
-            Some(&recipe),
-            GridTag::of(cell.as_ref(), label.as_ref()),
-        ));
-    }
-    let GridLeafRun::Cell { settings, .. } = runs[4] else {
-        panic!("a cell");
-    };
-    assert_eq!(
-        (settings.power.to_string(), settings.speed.get()),
-        ("60".to_owned(), 6000)
-    );
-    let order = grid_run_order(&runs);
-    assert_eq!(order.len(), 12);
-    assert!(
-        order[..6]
-            .iter()
-            .all(|&at| matches!(runs[at], GridLeafRun::Label { .. })),
-        "labels before cells"
-    );
-    assert_eq!(
-        GridTag::of(None, d.grid_item_tags(grid.labels[0].id).1.as_ref()),
-        GridTag::Label(LabelTag::Unit)
-    );
-}
-
-#[test]
-fn the_hand_edited_grid_misses_a_label_and_the_orphan_row_has_no_grid() {
-    let d = golden("test_grid_hand_edited_v43.curvyo");
-    let row = operations(&d).remove(0);
-    let grid = d.test_grid(d.test_grid_of_row(row.id).unwrap()).unwrap();
-    let recipe = GridRecipe::from_value(&grid.recipe).unwrap();
-    assert_eq!(
-        grid.labels.len() + 1,
-        1 + usize::from(recipe.range.columns) + usize::from(recipe.range.rows),
-        "a deleted label"
-    );
-    let orphan = golden("test_grid_orphan_row_v43.curvyo");
-    let row = operations(&orphan).remove(0);
-    assert_eq!(orphan.test_grid_of_row(row.id), None);
-    assert_eq!(
-        grid_leaf_run(None, GridTag::None),
-        GridLeafRun::Nothing,
-        "no grid runs nothing"
     );
 }

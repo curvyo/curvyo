@@ -1098,7 +1098,10 @@ fn covers(tris: &[Vertex], p: Point, r: f64) -> bool {
 
 #[test]
 fn old_0110_spiro_document_opens_and_draws_through_its_controls() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 45, "no format bump in 0115");
+    assert_eq!(
+        CURRENT_FORMAT_VERSION, 46,
+        "no format bump in 0115 (46 is 0112)"
+    );
     let (doc, paths) = old_spiro_doc();
     let bytes = pack(&doc, "old").unwrap();
     let mut s = Session::open(6, &bytes).unwrap();

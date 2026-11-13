@@ -1,7 +1,7 @@
 //! Format 45 (`specs/0114-image-trace-mask` criterion 22, ADR 0061 §7, §11, §12): the goldens
 //! `trace_mask_v45.curvyo` and `trace_mask_damaged_v45.curvyo` read back every part, region and
 //! setting, the damaged one as decision 7 says, and both save back with equal content; every older
-//! golden opens with no mask; a format 46 file is refused. `CURVYO_WRITE_FIXTURES=1` rewrites the
+//! golden opens with no mask; a format 47 file is refused. `CURVYO_WRITE_FIXTURES=1` rewrites the
 //! two goldens of this file only.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -302,7 +302,7 @@ fn c22_the_golden_reads_back_every_part_region_and_setting() {
         image_metas(&bytes)
     );
     let json: Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
-    assert_eq!(json["format_version"], json!(45));
+    assert_eq!(json["format_version"], json!(46));
     let listed = find_named(&json["objects"], "M1").unwrap();
     assert_eq!(
         listed["trace_mask"]["parts"][0]["regions"][0]["points"],
@@ -370,12 +370,12 @@ fn c22_every_older_golden_opens_with_no_mask() {
 }
 
 #[test]
-fn c22_a_file_of_format_46_is_refused() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 45);
+fn c22_a_file_of_format_47_is_refused() {
+    assert_eq!(CURRENT_FORMAT_VERSION, 46);
     let bytes = pack(&golden_document(), "0.1.0").unwrap();
     let mut files = members(&bytes);
     let mut manifest: Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
-    assert_eq!(manifest["format_version"], json!(45));
+    assert_eq!(manifest["format_version"], json!(46));
     manifest["format_version"] = json!(CURRENT_FORMAT_VERSION + 1);
     files.insert(
         "manifest.json".to_owned(),
@@ -384,8 +384,8 @@ fn c22_a_file_of_format_46_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 46,
-            supported: 45
+            found: 47,
+            supported: 46
         })
     ));
 }

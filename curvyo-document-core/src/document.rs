@@ -502,7 +502,26 @@ impl DocumentVersion {
 /// rewritten. Damage is read as ADR 0061 §7 says and never repaired on read. The number was the
 /// next free one at merge. Goldens: `trace_mask_v45.curvyo`, `trace_mask_damaged_v45.curvyo`;
 /// the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 45;
+///
+/// Bumped to 46 in `test-grid-and-materials` (ADR 0057, `specs/0112-test-grid-and-materials`):
+/// a test grid is a group whose `x.curvyo.laser.test_grid` is the recipe v2 (one atomic map with
+/// the test `id`, `kind`, the `columns` and `rows` axes, `fixed`, `cell_mm`, `crosshatch` and the
+/// picked `material`), with `x.curvyo.laser.test_grid_lasered` (Unix milliseconds) once Lasered;
+/// its cells are tagged `grid_cell` = `{ column, row }` and its labels `grid_label` = `id`,
+/// `column_title`, `row_title`, `column_value` or `row_value`. It resolves into ordinary derived
+/// operations that carry `op_grid_part` (one atomic map `{ grid, part: "labels" }` or `{ grid,
+/// part: "cell", column, row }`); they are rewritten in place by every grid change and deleted
+/// with the grid (delete, cut, ungroup, a move off the laser page; an orphan of a merge at the
+/// next local step). A build that stops at 45 would read the new recipe as damaged and keep
+/// rows that its copy shares and its delete leaves behind, silently, so it must refuse every
+/// file of this build as too new. Migration from 43, 44 and 45 is the session's (ADR 0057 §7,
+/// plan Part F); until then such a file opens unchanged, its `op_grid` row inert and written back.
+/// Damage (§6): a recipe that does not read makes the group plain (the extension decides), a
+/// Lasered register that is not a non-negative integer reads Not lasered, an `op_grid_part` that
+/// does not read leaves the row ordinary; nothing is repaired on read. The number is provisional
+/// by the rule above. Goldens: `test_grid_v46.curvyo`, `test_grid_damaged_v46.curvyo`,
+/// `test_grid_orphan_rows_v46.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 46;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

@@ -23,10 +23,14 @@ mod machine_profile_fixtures;
 mod machine_profiles;
 mod manifest;
 mod material;
-mod material_edits;
-mod material_file;
+mod material_photo;
 mod material_preferences;
-mod materials;
+mod material_record;
+mod material_record_edits;
+mod material_record_file;
+mod material_retired;
+mod material_store;
+mod material_test_file;
 mod operation_cut_out;
 mod operation_group;
 mod operation_kind;
@@ -36,14 +40,20 @@ mod operation_nearest;
 mod operation_options;
 mod operation_sequence;
 mod operation_settings;
+mod operation_settings_edit;
 mod operation_settings_rule;
 mod operation_summary;
 mod overhang;
 mod record_envelope;
 mod steps;
-mod test_grid;
-mod test_grid_layout;
-mod test_grid_run;
+mod test_grid_choice;
+mod test_grid_fit;
+mod test_grid_ops;
+mod test_id;
+mod test_param;
+mod test_recipe;
+mod test_recipe_json;
+mod test_recipe_layout;
 
 /// The laser operations of `specs/0101-laser-operations` as pure rules over stored records
 /// (ADR 0046 §5).
@@ -62,14 +72,13 @@ pub mod operations {
     pub use crate::operation_summary::{Hidden, Leaf, LeafStatus, Summary, leaf_status, summarize};
 }
 
-/// The settings of operations and the in-memory material model of
-/// `specs/0028-material-test-library` (ADR 0054 §1 to §3; ADR 0055 §2), with the operation-only
-/// settings of `specs/0111-laser-operation-tools` (ADR 0056 §5, §6).
+/// The settings of operations and the numbers they share with material records (ADR 0054 §1 to
+/// §3; ADR 0055 §2; ADR 0058 §2), with the operation-only settings of
+/// `specs/0111-laser-operation-tools` (ADR 0056 §5, §6).
 pub mod settings {
     pub use crate::material::{
-        CellIndex, HistoryEntry, HistoryEvent, Interval, MAX_HISTORY_ENTRIES,
-        MAX_MATERIAL_NAME_CHARS, MachineTie, Material, MaterialRead, MaterialSet, Passes,
-        PowerPercent, SetKind, SetSource, Settings, Thickness, next_modified,
+        CellIndex, Interval, MAX_HISTORY_ENTRIES, MAX_MATERIAL_NAME_CHARS, MachineTie, Passes,
+        PowerPercent, SetKind, SetNumbers, Settings, Thickness, next_modified,
     };
     pub use crate::operation_options::{
         ENTER_NUMBER, ENTER_WHOLE_NUMBER, OperationOptions, OptionEdit, OptionsDamage, Overscan,
@@ -79,43 +88,60 @@ pub mod settings {
         Field, MaterialLink, Overrides, Role, SetOverride, SettingsDamage, SettingsRead,
         StoredSettings, read_settings, set_value,
     };
+    pub use crate::operation_settings_edit::{TypedNumber, edit_interval, edit_number};
     pub use crate::operation_settings_rule::{
-        RunSettings, SettingsState, StoredReason, TypedNumber, edit_interval, edit_number,
-        main_set, refresh, reset_to_material, resolve, use_material, use_own_numbers,
+        RunSettings, SettingsState, StoredReason, main_set, refresh, reset_to_material, resolve,
+        use_material, use_own_numbers,
     };
 }
 
-/// The maker's material library of `specs/0028-material-test-library`: its files and the list
-/// (ADR 0055).
-pub mod material_library {
-    pub use crate::material_edits::{
-        LibraryRefusal, NewMaterial, RevertRefused, Reverted, SaveTarget, TestResult,
+/// The test grid object of `specs/0112-test-grid-and-materials`: test ids, the recipe, its layout
+/// and the derived operations it resolves into (ADR 0057).
+pub mod grids {
+    pub use crate::test_grid_choice::{
+        GRID_CHOICE_FORMAT_VERSION, read_test_grid_choice, remember_test_grid,
+        write_test_grid_choice,
     };
-    pub use crate::material_file::{
-        MATERIAL_FORMAT_VERSION, MAX_MATERIAL_BYTES, MaterialFileError, read_material,
-        write_material,
+    pub use crate::test_grid_fit::{
+        GRID_TOLERANCE_MM, fit_bed, fit_bed_at, free_spot, no_free_spot_text,
     };
-    pub use crate::material_preferences::{
-        MAX_GRID_CHOICE_MACHINES, RememberedGrid, read_grid_choice, read_order, remember_grid,
-        write_grid_choice, write_order,
+    pub use crate::test_grid_ops::{DerivedOperation, GridPart, LabelSet, derived_operations};
+    pub use crate::test_id::{TEST_ID_CHARS, TestId};
+    pub use crate::test_param::{Param, ParamValue};
+    pub use crate::test_recipe::{
+        Axis, MAX_CELL, MAX_COUNT, MIN_CELL, MIN_COUNT, MaterialRef, Recipe, RecipeDefaults,
+        RecipeField, Side, TestRecipe,
     };
-    pub use crate::materials::{MAX_MATERIALS, Materials};
+    pub use crate::test_recipe_layout::{
+        GAP_MM, LabelPart, LaidCell, LaidLabel, TEXT_MM, TestLayout, layout,
+    };
 }
 
-/// The test grid of `specs/0028-material-test-library`: recipe, layout and run rule (ADR 0054
-/// §4).
-pub mod test_grids {
-    pub use crate::test_grid::{
-        GridField, GridLabels, GridRange, GridRecipe, MAX_CELL_MM, MAX_CELLS, MAX_GAP_MM,
-        MAX_LABEL_MM, MIN_CELL_MM, MIN_CELLS, MIN_LABEL_MM, mark_value, range_of, range_value,
-        read_mark,
+/// The maker's material library of `specs/0112-test-grid-and-materials`: record format 2 shared
+/// by all lasers, its tests, retired ids, photos and the list with its order (ADR 0055, ADR 0058).
+pub mod library {
+    pub use crate::material_photo::{
+        MAX_PHOTO_BYTES, MAX_PHOTO_SIDE, PhotoHeader, PhotoRefusal, PhotoWrite, check_photo,
+        remove_photo, write_photo,
     };
-    pub use crate::test_grid_layout::{
-        BuiltCell, BuiltLabel, CellPlace, GRID_TOLERANCE_MM, LabelLanes, LabelPlace, LabelTag,
-        TestGridLayout, UNIT_TEXT, fit_bed, free_spot, hand_edited, kept_mark, layout,
-        no_free_spot_text, speed_texts,
+    pub use crate::material_preferences::{read_order, write_order};
+    pub use crate::material_record::{
+        HistoryEntry, HistoryEvent, LaserSets, MAX_LASERS, MAX_NOTE_CHARS, MAX_TESTS, Material,
+        MaterialRead, PhotoKind, Set, SetSource, TestRecord, live_test_ids, no_laser_set_text,
+        photo_file_name,
     };
-    pub use crate::test_grid_run::{CellTag, GridLeafRun, GridTag, grid_leaf_run, grid_run_order};
+    pub use crate::material_record_edits::{RecordRefusal, Stamp};
+    pub use crate::material_record_file::{
+        MAX_RECORD_TEXT, RECORD_FORMAT_VERSION, RecordFileError, load_record, read_record,
+        write_record,
+    };
+    pub use crate::material_retired::{
+        MAX_RETIRED, RETIRED_DAMAGED_NOTICE, RETIRED_FORMAT_VERSION, RetireRefused, RetiredIds,
+        read_retired, write_retired,
+    };
+    pub use crate::material_store::{
+        Library, MAX_MATERIALS, RevertRefused, Reverted, StoreRefusal,
+    };
 }
 
 pub use fixture_fit::{FitMatch, fit_slot};
