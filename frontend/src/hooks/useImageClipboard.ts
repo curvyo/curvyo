@@ -10,6 +10,7 @@ import {
   keepsClipboard,
   pastedName,
   pickPasted,
+  rememberCopy,
 } from "@/lib/imageClipboard";
 import { type TraceRunner, createTraceRunner } from "@/lib/traceJobs";
 import { resolveLocalFiles } from "@/platform/localFiles";
@@ -114,6 +115,7 @@ export function useImageClipboard(
       event.preventDefault();
       const { width, height } = copy;
       const rgba = copy.rgba;
+      rememberCopy(copy.fingerprint, copy.mask);
       copy.free();
       if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
         notice(clipboard_notice("newer-browser", ""), true);
