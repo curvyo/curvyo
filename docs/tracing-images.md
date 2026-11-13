@@ -2,8 +2,8 @@
 
 The **Trace** tool turns an image object into smooth, closed paths you can cut, engrave, plot or
 edit. Select one or several images and press **Trace**, the last button of the Select bar (it is
-there only while nothing but images is selected, or one image with mask paths, see "Mask"), or
-press **I**. Ctrl+I stays Import. The bar
+there while the selection holds an image or a linked clone of an image; anything else selected
+with them is passed over), or press **I**. Ctrl+I stays Import. The bar
 above the canvas becomes the Trace bar; the right panel gets one more tab, **About Trace**, which
 opens only when you ask for it (see "About Trace" below).
 (`specs/0025-raster-trace`, slices 1 to 3: black and white, presets and Advanced settings, large
@@ -63,7 +63,7 @@ method starts as Brightness.
 
 ## Method
 
-The **Method** button after the Mask group chooses how pixels become shapes; only the method's own fields
+The **Method** button after Preset chooses how pixels become shapes; only the method's own fields
 change with it (it is remembered, like each method's Colour tolerance):
 
 - **Brightness** ("Dark and light pixels by a cut-off."): pixels darker than the Threshold.
@@ -162,9 +162,15 @@ shown only when it has something to say:
    the palette's pipette, and the palette's swatches; see "Multicolour" below. Four icon buttons
    follow (pressed means on, the tooltip names each).
 2. The options: Denoise, Upscale and Corners.
-3. **Parts**, the numbered chips of the parts with **Add part** and the trash (see "Parts"), and at
-   the far right the blue **Analyse** button (see Analysis). Each moves to a line of its own as a
-   whole when the block is too narrow.
+3. **Parts**, the numbered chips of the parts with **Add part** and the trash (see "Parts"), and
+   behind them the **Mask** group (see "Mask"), then at the far right the blue **Analyse** button
+   (see Analysis).
+
+The block is one flowing line: on a wide window everything stands on one line, and with the block
+open the bar is as wide as that line needs (at most the window). When the width does not suffice,
+whole items wrap; the Parts and Mask controls wrap as one unit first, then the Mask group goes to a
+line of its own, then Add part and the trash go below the chips. (`specs/0114-image-trace-mask`
+UX notes §2.)
 
 - **Invert**: traces what the method leaves out (with Brightness the light parts: pixels at or
   above the Threshold); transparent pixels stay empty.
@@ -186,113 +192,121 @@ Invert and Drop border shapes start off with each start of the app.
 
 ## Mask
 
-To trace only a part of a picture, draw one or more ordinary paths over it (rectangles, ellipses,
-polygons, stars, pen paths, compound paths or linked clones; a group counts as the paths in it),
-select the image together with them and press **Trace**. In the Trace tool, Shift+click on a path
-adds it to the mask paths or takes it out again; Shift+click on empty canvas changes nothing.
-(`specs/0094-masked-composite-trace` slice 1.)
+To trace only a piece of a picture, draw that piece on the picture itself. The **Mask** group in
+the Parts row of Advanced holds **Rectangle**, **Lasso**, **Subtract**, **Inside | Outside** and
+**Clear mask**. The regions you draw belong to the image: they are saved with it, come back when
+you trace it again (also after reopening the file or on another device), move, scale, rotate and
+mirror with it, go with a copy of it, and are deleted with it (one undo brings both back).
+(`specs/0114-image-trace-mask`, ADR 0061.)
 
-**Pick mask paths**, the third button of the Mask group, does the same without Shift: press it, then click each
-path or group on the canvas to add it to the mask or take it out again; the button stays pressed
-until you press it again, press Escape (the first Escape only ends picking and keeps the mask), or
-leave the tool. A click on a text, a sketch or a second image adds nothing and the bar says "Use
-Object to path for text; one image at a time."; a click on the traced image or on empty canvas does
-nothing, and a double-click on the image does not create paths while picking. **Clear mask** (the
-x after Inside and Outside) takes all mask paths out of the mask at once and leaves the image
-selected; the paths stay in the document. It also deletes the active part's rectangles, in one
-History step "Clear mask"; the part stays. Without mask paths or rectangles it does nothing.
-(Slice 1b; `specs/0114-image-trace-mask` slice 1.)
+- **Rectangle**: while it is pressed, a drag on the canvas draws a rectangle on the picture; its
+  corners land on whole pixels of the picture, Shift draws it from the centre, Ctrl a square, a
+  drag under 2 px draws nothing. A chip by the pointer shows its size in mm while you drag.
+- **Lasso**: while it is pressed, each click sets a corner on a whole pixel, and a line follows the
+  pointer to the next one. A right click, a double click (its second click adds no corner), Enter
+  or a click on the first corner finishes it, closed by a straight side from the last corner to the
+  first. Backspace removes the last corner; Escape discards the lasso (nothing is added; a second
+  Escape releases Lasso). Pressing Rectangle, picking another part, Add part, Remove part, the
+  pipette, the Trace button, choosing another image in Layers or leaving the tool closes an
+  unfinished lasso the same way. A lasso needs 3 corners not on one line; with fewer it is
+  dropped. A lasso that crosses itself covers every area it winds around (non-zero winding). There
+  is no context menu while you draw, and Shift, Ctrl and Alt mean nothing while drawing.
+- A tool stays pressed until you press it again, press Escape or leave the tool; Rectangle and
+  Lasso exclude each other and the pipette.
+- **Subtract**: the regions finished while it is pressed are taken out of the mask; they are
+  drawn dashed, and a minus badge by the pointer shows while you draw one. The mask is the
+  regions drawn without Subtract minus those drawn with it, whatever the order; overlaps count
+  once.
+- With no tool pressed, a click on a region of the active part selects it (a box around it shows
+  under the pointer first). A drag moves it; a rectangle's 8 handles resize it (Shift about the
+  centre, Ctrl keeps the proportions at a corner); a lasso shows its corners, and a drag on one
+  moves that corner alone. The arrow keys move the selected region 1 px (Shift 10 px), Delete or
+  Backspace removes it. Escape cancels a drag, then discards a lasso in progress, stops a running
+  trace, disarms the pipette, releases the pressed tool, drops the selected region and last leaves
+  the tool, one step per press.
+- **Inside** traces only what lies inside the mask, **Outside** only what lies outside it. Without
+  regions the whole image is traced either way. On an untouched picture the choice is not
+  remembered (Inside on every entry); once the picture has a region or a second part, its mode is
+  stored with it.
+- **Clear mask** (the x) deletes the regions of the active part in one step; the part and its
+  settings stay. Without regions it does nothing.
 
-**Rectangle**, the first button of the Mask group, draws the mask on the picture instead
-(`specs/0114-image-trace-mask` slice 1). While it is pressed, a drag on the picture draws a
-rectangle; its corners land on whole pixels of the picture, Shift draws it from the centre, Ctrl
-draws a square, and a drag under 2 px draws nothing. It stays pressed until you press it again or
-press Escape. With Rectangle not pressed, a click on a rectangle of the active part selects it
-(the topmost one, last drawn): drag inside it to move it, drag one of its eight handles to resize
-it (Shift about the centre, Ctrl keeps the proportions at a corner), the arrow keys move it 1 px
-(Shift 10 px), Delete or Backspace removes it, Escape drops the selection (a second Escape
-releases Rectangle). **Subtract**, the second button, takes the rectangles drawn while it is
-pressed out of the mask; they are drawn dashed. The rectangles drawn with Subtract are taken out
-of the others whatever order they were drawn in.
+Every finished edit is one History step: "Draw rectangle", "Draw lasso", "Move region", "Resize
+region", "Move lasso corner", "Delete region", "Clear mask", "Mask: Inside" or "Mask: Outside"; a
+drag is one step. Undo and redo work while the tool is open. The regions are no objects: they are
+not in Layers, not exported and not snapped to; every part's regions are drawn as thin black lines
+above the drawing while the Trace tool shows the image, only the active part's can be clicked.
 
-The rectangles belong to the picture: they are saved in the file, come back when the picture is
-traced again (also after reopening the file or on another device through sync), move, scale and
-turn with the picture, are copied with Duplicate, and go when the picture is deleted (undo brings
-both back). Each change is one History step: "Draw rectangle", "Move region", "Resize region",
-"Delete region", "Clear mask", "Mask: Inside" or "Mask: Outside". Until the old way of selecting
-mask paths goes (`0114` slice 4), the rectangles and the selected mask paths together make the
-mask.
-
-The paths together are the mask: where they overlap they count once, the hole of a compound path is
-a hole in the mask, and an open path is closed by a straight line. Their fill and stroke do not
-matter. **Inside** and **Outside**, after Pick mask paths, are always in the bar: **Inside** (the
-default on every entry into the tool) traces only what lies inside the mask, **Outside** only what
-lies outside it. Without mask paths the whole image is traced either way; the choice applies once
-the first path is added. Once a picture has a rectangle (or a second part) its mode is stored with
-it and comes back on the next entry; before that the mode is not remembered. It is not part of a
-preset.
-
-The trace ends exactly on the mask path: a shape that crosses it is cut there, so Inside and Outside
-of the same mask fit together without a gap or an overlap. A cut shape comes back as straight
-segments over its whole outline (fine, 0.005 mm), not as curves; shapes wholly inside keep their
-curves. The automatic Threshold, the background of Remove background's Auto and the analysis read
-only the pixels inside the mask. With Recognise text, a line becomes text when the centre of its box
-lies inside the mask (the text is kept whole); a line outside it is neither text nor traced.
-Recognise shapes looks only at the cut result.
+The trace ends exactly on the edge of the mask: a shape that crosses it is cut there, so Inside and
+Outside of the same mask fit together without a gap or an overlap. A cut shape comes back as
+straight segments along the cut; shapes away from the edge keep their curves. The automatic
+Threshold, the suggested background and the analysis then read only the pixels inside the mask.
+With Recognise text, a line becomes text when the centre of its box lies inside the mask (the text
+is kept whole); a line outside it is neither text nor traced.
 
 In the preview the image outside the mask is washed further (to 12 %), and the outline is drawn
-only inside it. A screen reader hears "Inside 2 paths" or "Outside 1 path". Mask paths that cover
-none of the image give "0 paths: the mask is outside the image." and nothing to create; mask paths
-that cannot be combined into one area give "0 paths: the mask paths could not be combined." An image
-selected together with a text, a sketch or a second image and mask paths turns the bar into one row
-that says "Use Object to path for text; one image at a time.", with no Mask group and no Trace button.
+only inside it. A screen reader hears "Inside 2 paths" or "Outside 1 path" (the count is of the
+regions). Regions that cover none of the image give "0 paths: the mask is outside the image." and
+nothing to create; regions that cannot be combined into one area give "0 paths: the mask paths
+could not be combined."
 
-Create paths makes the same group "Trace of ..." as without a mask, in one History step; the mask
-paths stay exactly as they are (same objects, nodes and style), so a path drawn as a cut outline
-stays in the job.
+A **linked clone** of an image shows the original's regions and parts on the clone, and what you
+draw there changes the original's (one mask per picture); deleting the clone keeps them, and
+**Unlink** gives the clone a copy. **Ctrl+C** and **Ctrl+V** carry the regions to the pasted
+picture within one Curvyo window (also into another document there); from another program only
+the picture arrives. On a locked image the regions are shown and traced, but the Mask group, Add
+part and the trash are unavailable ("Locked"). With two or more images selected the Parts and Mask
+controls are not shown; Create paths traces each image with its own stored parts and regions (an
+image without any whole, with the bar's settings).
+
+Create paths makes the same group "Trace of ..." as without a mask, in one History step; the
+regions stay on the image.
 
 ## Parts
 
-A part is a piece of the picture with its own mask (Inside or Outside) and its own settings
-(Method, Threshold, Smooth and everything else). The last row of Advanced, after Corners and
-before Analyse, holds the muted label "Parts", a chip per part, numbered 1, 2, 3 in the order they
-were made, then **Add part** (+) and the trash. Part 1 starts
-as the whole image; with mask paths it is limited to them like any other part.
-(`specs/0094-masked-composite-trace` slice 2.)
+A part is a piece of the picture with its own mask (its regions, Inside or Outside) and its own
+settings (Method, Threshold, Smooth and everything else). The Parts row of Advanced holds the muted
+label "Parts", a chip per part, numbered 1, 2, 3 in the order they were made, then **Add part** (+)
+and the trash, and behind them the Mask group. Part 1 starts as the whole image; with regions it
+is limited to them like any other part. (`specs/0094-masked-composite-trace` slice 2,
+`specs/0114-image-trace-mask`.)
 
 - **Add part** makes the next part active: it starts with a copy of the settings of the part
-  before, no mask paths and Inside, and only the image stays selected. Select (or pick) its mask
-  paths; until it has some its chip is muted (dashed) and it adds nothing. At most 8 parts.
+  before (without its picked colours), no regions and Inside. Until it has regions its chip is
+  muted (dashed) and it adds nothing. At most 8 parts.
 - A **click on a chip** (or the arrows, Home and End on the focused chips) makes that part active:
-  its settings load into the bar and its mask paths are selected with the image. Everything the bar
-  and Advanced show then belongs to the active part (the active chip is the only mark of it).
-  Pick mask paths, Shift+click, Clear mask and Inside / Outside work on the active part only.
-- The **trash** removes the active part (Delete on a chip arms it too): the first press turns the
-  row soft red, the second press after a short pause removes it; the parts renumber and the part
-  before becomes active. With one part the trash is dimmed.
+  its settings load into the bar and its regions can be clicked. Everything the bar and Advanced
+  show then belongs to the active part (the active chip is the only mark of it). Drawing, Clear
+  mask and Inside / Outside work on the active part only; the pressed tool and Subtract stay.
+- The **trash** removes the active part with its regions and settings (Delete on a chip arms it
+  too): the first press turns the Parts group soft red, the second press after a short pause
+  removes it; the parts renumber and the part before becomes active. With one part the trash is
+  dimmed.
 - **Order**: left to right is also bottom to top. Where parts overlap, the later one wins: inside
   its mask only its shapes exist, and the earlier parts are cut exactly at its edge, so no area is
   traced twice.
 - **Create paths** (the Trace button) joins all parts into one group "Trace of ...", in one History
-  step: shapes that cross from one part into another are joined into one path along the seam,
-  same colours merge in Multicolour, and the mask paths stay as they are. The preview shows the
-  joined result; changing a setting traces only the active part again (with a mask change the
-  parts below it follow, since their area changes).
+  step: shapes that cross from one part into another are joined into one path along the seam, and
+  same colours merge in Multicolour. The preview shows the joined result; changing a setting traces
+  only the active part again (with a mask change the parts below it follow, since their area
+  changes).
 - Recognise text and Recognise shapes are settings of each part: a text line or a shape belongs to
   the part that holds its centre.
-- The parts are stored with the picture (`specs/0114-image-trace-mask` slice 1): Add part and
-  the trash are History steps ("Add part", "Remove part"), and leaving the tool or Create paths
-  no longer ends them; on the next entry the same parts are there with part 1 active. A part's
-  mask paths are still a selection and are not stored. The settings of a part are stored when the
-  part is made, but the bar does not read them back yet: on entry it shows the remembered
+- The parts are stored with the picture, each with its settings: Add part, the trash and a settings
+  change of a stored part are History steps ("Add part", "Remove part", "Change trace settings";
+  a slider drag is one step at its end), and undo and redo show the values again. Leaving the tool
+  and Create paths keep the parts; on the next entry the same parts are there with part 1 active
+  and the bar shows its settings. The automatic values (an Auto Threshold, Remove background's
+  Auto) are read from the picture again, so the preview and Create paths give what they gave
+  before. A picture with no region and one part stores nothing: its bar shows the remembered
   settings, as before.
 
-With two or more parts a screen reader hears "3 parts", and for an active later part without mask
-paths "Part 3 has no paths". When no part has anything to trace, the bar says "0 paths: no part has
-anything to trace." A part inside the picture is traced from its own cut-out (with a margin, so the result is the
-same) unless it reads text, drops border shapes, uses Denoise or is upscaled, so several parts
-cost about as much as one trace of the whole picture. Each part reads its automatic Threshold,
-background and analysis from its own area; what you set for a part stays with it.
+With two or more parts a screen reader hears "3 parts", and for an active later part without
+regions "Part 3 has no paths". When no part has anything to trace, the bar says "0 paths: no part
+has anything to trace." A part inside the picture is traced from its own cut-out (with a margin, so
+the result is the same) unless it reads text, drops border shapes, uses Denoise or is upscaled, so
+several parts cost about as much as one trace of the whole picture. Each part reads its automatic
+Threshold, background and analysis from its own area; what you set for a part stays with it.
 
 ## Recognise text
 
@@ -383,8 +397,8 @@ number.
 The **palette** is the row of swatches right after the palette pipette, one per colour of the
 result, largest area first, colours picked with the palette pipette first. A picked colour takes
 one of the Colours; the others go to the other colours of the image. A part that traces nothing
-yet (no mask paths, or covered by another part) shows its own picked colours: the palette pipette
-adds to them, the x removes one, and they apply when the part gets paths. The swatches are the picked colours of
+yet (no regions, or covered by another part) shows its own picked colours: the palette pipette
+adds to them, the x removes one, and they apply when the part gets regions. The swatches are the picked colours of
 Pick colours: 20 px squares 4 px apart, the row as wide as its colours, so the bar does not grow a
 row for them (with Pick colours there is no palette row; the picked colours sit beside the pipette
 in the bar). Pointing at a swatch fades it and shows an x; its tooltip gives its colour code and
@@ -448,7 +462,7 @@ Trace turns the selected image into paths. The method decides which parts become
 - Photo: many shapes, photos trace roughly.
 - Silhouette for cutting/carving: closed, simple, few nodes; drops shapes and holes below 2 mm.
 - Engraving: keeps fine lines, drops shapes below 0.1 mm.
-- Mask: the paths that limit the trace; Pick mask paths adds or takes them out, Inside traces what lies inside them, Outside what lies outside, Clear mask takes them all out.
+- Mask: the regions drawn on the picture that limit the trace; Rectangle drags one, Lasso sets its corners one click at a time and closes them with a right click, a double click, Enter or a click on the first corner (Esc discards it), Subtract takes the next regions out, Inside traces what lies inside them, Outside what lies outside, Clear mask deletes the active part's regions.
 - Method: how pixels become shapes.
 - Brightness: pixels darker than the Threshold.
 - Remove background: everything unlike the background colour.
@@ -484,7 +498,8 @@ under it; hide or move it as usual. The new groups are selected and the Select t
 notice appears, the selected group is the feedback. The tooltip of the group's row in the Layers
 tab says "Traced: 7 paths, 412 nodes." (until the app is closed). It is one step "Trace image" in the History: Ctrl+Z removes every group of it. With
 several images selected the preview shows the image you clicked last (a screen reader hears
-"Tracing 1 of 3 images"); every image is traced with the same settings. If only the reduced copy has been
+"Tracing 1 of 3 images"); every image is traced with the same settings, except that an image with
+stored regions or parts is traced with its own (see "Mask"). If only the reduced copy has been
 traced, Create paths waits for the full picture; Escape stops before anything is added.
 
 The result is ordinary paths: they move, scale, rotate and edit like any group, take part in

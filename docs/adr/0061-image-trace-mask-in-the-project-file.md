@@ -86,3 +86,7 @@ So the mask stops being a set of selected document paths and becomes data of the
 - A cross-app or cross-instance paste brings the picture without its mask (decision 8, Proposal).
 - Clones of images become traceable (new, CLONE-MASK A); clones of groups stay untraceable.
 - Rejected and why: child nodes (B, leaves stop being leaves), one atomic mask (C, loses a peer's regions), nested containers (D, mixed shapes), pixel or mm coordinates (resolution and transform dependence), settings left out (criterion 12 would fail).
+
+## Notes
+
+- 2026-11-13 (implementation, customer decisions of the UX notes): the Lasso is finished by a right click, a double click, Enter or a click on the first corner and closed by a straight side; Esc **discards** the lasso in progress and adds no step; another tool, a part pick, Add part, Remove part, the pipette, the Trace button, another image or leaving the tool closes it. This changes only the tool state of decision 9 (input of Esc and the secondary press), not the stored shape or the format. Several images selected (Frage 11 A): the region tools are not offered and each image is traced with its own stored mask. A selection that mixes images with other objects traces the images; `TRACE_MIXED` and its row are removed.

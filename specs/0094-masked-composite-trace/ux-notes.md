@@ -1,5 +1,7 @@
 # UX notes: masked and composite trace (0094)
 
+> **Replaced by 0114 (2026-11-13), see [`0114` ux-notes](../0114-image-trace-mask/ux-notes.md):** §1 (the Mask group in row 1, Pick mask paths), §2 (mask paths as artwork), §4 (the refused-pick and mixed notices), §11 (the pick button and the `pick-mask` cursor) no longer apply; the Mask group sits in the Parts row and the regions are a tool overlay stored with the image.
+
 Written 2026-11-04 by the ux-engineer against the Draft `specification.md`. Every item marked
 **(Proposal)** is mine and vetoable at the demo. It assumes the spec's defaults for Fragen 131 to
 134 (all A); Frage 130 was answered C by the customer on 2026-11-05 (§11); sections that depend on an answer say so. Widths are arithmetic from the merged Trace

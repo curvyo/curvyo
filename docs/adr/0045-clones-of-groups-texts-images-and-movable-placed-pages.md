@@ -1,6 +1,6 @@
 # ADR 0045: Clones of groups, texts and images, and movable placed pages
 
-**Status:** Accepted 2026-11-09 (customer accepted PR #296; document model and file format). Amends, by notes on their Status lines:
+**Status:** (2026-11-13 note: clones of images become traceable and share their root's trace mask, ADR 0061.) Accepted 2026-11-09 (customer accepted PR #296; document model and file format). Amends, by notes on their Status lines:
 [ADR 0015](0015-node-references-and-ancestor-resolved-state.md) §1, §3, §5, §6 (wider origins,
 no cycle through containment, repair as a copy, the read of a drawn subtree);
 [ADR 0016](0016-clone-overrides.md) §1 to §4 (own placement for every root, own style only for

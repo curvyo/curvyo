@@ -70,53 +70,61 @@ Implementer refinements for slice 1 (2026-11-12, **Proposal**):
 
 ## Slice 2: Lasso
 
-1. `trace_region_edit.rs` lasso half: corners, rubber band, close on first point, double click
+1. [x] `trace_region_edit.rs` lasso half: corners, rubber band, close on first point, double click
    (no extra corner), Enter, auto-close on Esc, tool change, leaving Trace, opening another image;
    under 3 points dropped; Backspace removes the last point; corner drag; hit by nonzero
    containment. Criteria 4, 5, 6, 7.
-2. Commands `draw_trace_lasso`, `move_trace_lasso_corner`; the lasso in `trace_mask.rs`
+2. [x] Commands `draw_trace_lasso`, `move_trace_lasso_corner`; the lasso in `trace_mask.rs`
    (self-crossing by nonzero). Criteria 10, 17, 23.
-3. Session input and overlay for the lasso (handles per corner, close target); Ctrl+Z drops an
+3. [x] Session input and overlay for the lasso (handles per corner, close target); Ctrl+Z drops an
    unfinished lasso (Proposal). Frontend Lasso toggle and icon from the UX notes.
-4. Tests with L1 and L1c on M1: equal stored geometry and trace; Inside within 0.005 mm of the
+4. [x] Tests with L1 and L1c on M1: equal stored geometry and trace; Inside within 0.005 mm of the
    slanted side; Inside plus Outside gap and overlap under 0.01 mm². Criteria 5, 10.
+
+Slice 2 done (2026-11-13): `curvyo-ui-core/src/trace_lasso_edit.rs`, `trace_mask.rs` (non-zero winding), `curvyo-editor-wasm/src/session/trace_mask_lasso.rs`, `tests/acceptance_0114_lasso.rs` (criteria 4 to 8, 17, 23) and `curvyo-ui-core/tests/acceptance_0114_lasso.rs` (5, 10, 23). Customer decisions of 2026-11-13 replace the auto-close on Esc: a right click finishes, Esc discards (UX notes, customer 1 to 5).
 
 ## Slice 3: parts persist with their settings
 
-1. Parts from the document in the session: Add part and Remove part write the document; chips
+1. [x] Parts from the document in the session: Add part and Remove part write the document; chips
    from stored parts; the first part active on entry; leaving the tool and Create paths no longer
    end parts. Criteria 12, 19, 20.
-2. Frontend reads `trace_part_settings(index)` and writes `set_trace_part_settings` at the end of
+2. [x] Frontend reads `trace_part_settings(index)` and writes `set_trace_part_settings` at the end of
    a field edit or slider drag (`edit_trace_settings`); re-reads on document version change so
    undo/redo while the tool is open reshows values. Ranges read from Rust. Criteria 12, 17.
-3. Reopen test: two parts, different settings, preview and Create paths equal before and after;
+3. [x] Reopen test: two parts, different settings, preview and Create paths equal before and after;
    sync of the same. Criteria 11, 12, 18.
+
+Slice 3 done (2026-11-13): `session/trace_parts.rs`, `tests/acceptance_0114_parts.rs` (12, 13, 15, 17, several images), the golden `trace_mask_clone_v45`; the browser cases of `acceptance_0094_parts_*` on the new workflow.
 
 ## Slice 4: old pick workflow removed, Mask group in the Parts row, clones and clipboard
 
-1. Delete `trace_mask_pick*.rs`, Shift+click, mask paths as trace input, `TraceSelection::Mixed`,
+1. [x] Delete `trace_mask_pick*.rs`, Shift+click, mask paths as trace input, `TraceSelection::Mixed`,
    `TRACE_MIXED`; `trace_images` takes images and image-root clones, ignores others. Rewrite or
    delete `traceMaskPick.test.ts`, `acceptance_0094_pick_*`, the Shift+click and `TRACE_MIXED`
    cases of `acceptance_0094_tester`, `acceptance_0089_*`, `acceptance_0025_slice3_tester`,
    `traceBar.test.ts`; the `pick-mask` cursor. Criteria 1, 21.
-2. Layout: Mask group (Rectangle, Lasso, Subtract, Inside | Outside, Clear mask) into the Parts row
+2. [x] Layout: Mask group (Rectangle, Lasso, Subtract, Inside | Outside, Clear mask) into the Parts row
    after the chips, Add part and trash; first row without it (narrower). Test that fails when the
    Mask group is in row 1; re-captured reference screenshots. Criteria 1, 25.
-3. Clones: Trace on an image-root clone shows and edits the root's mask through the composed
+3. [x] Clones: Trace on an image-root clone shows and edits the root's mask through the composed
    matrix; locked root or clone disables the region tools; Unlink keeps a copy (golden
    `trace_mask_clone_v45`). Criterion 15.
-4. Ctrl+C / Ctrl+V memo with the fingerprint; paste into a second document of the same instance.
+4. [x] Ctrl+C / Ctrl+V memo with the fingerprint; paste into a second document of the same instance.
    Criterion 14.
+
+Slice 4 done (2026-11-13): `trace_mask_pick*.rs`, Shift+click, `TraceSelection::Mixed` and `TRACE_MIXED` removed; the Mask group in the Parts row (`TraceBar.tsx` `PartsAndMask`, `TraceAdvanced.tsx` one flowing line, the bar's width rule of UX notes section 2.5); frontend tests rewritten to the 0114 criteria (none weakened, `traceMaskPick.test.ts`, `acceptance_0094_pick_*` deleted with their reason in the commit); Chromium cases B1 to B12, C1 to C14 and the file cases in `frontend/tests/acceptance_0114_*_browser.test.ts`.
 
 ## Slice 5: limits, docs and the full gate
 
-1. Budget test: 8 parts of 20 mixed regions, edit and retrace without a panic, no frame over
+1. [x] Budget test: 8 parts of 20 mixed regions, edit and retrace without a panic, no frame over
    50 ms (thread CPU time, `tests/cpu_time/`); invalid geometry gives the notices. Criterion 24.
-2. Determinism: Create paths twice and after reopen, byte-identical serialisation. Criterion 11.
-3. Docs: `docs/tracing-images.md` Mask, Parts, Create paths and the bar text; `docs/design-system.md`
+2. [x] Determinism: Create paths twice and after reopen, byte-identical serialisation. Criterion 11.
+3. [x] Docs: `docs/tracing-images.md` Mask, Parts, Create paths and the bar text; `docs/design-system.md`
    rows; "Replaced by 0114" notes in the 0094 spec and ux-notes; `specs/README.md` row; ADR 0017
    and 0045 notes pointing to ADR 0061; the dated note on `0094` adrs.md.
-4. Full gate (`CLAUDE.md` §7), tester pass (format and document model: full pass, Opus).
+4. [x] Full gate (`CLAUDE.md` §7), tester pass (format and document model: full pass, Opus).
+
+Slice 5 done (2026-11-13): `curvyo-editor-wasm/tests/trace_mask_budget.rs` (criterion 24, thread CPU), `docs/tracing-images.md`, `docs/design-system.md` rows, ADR 0061 notes, the 0094 "Replaced by 0114" notes, `specs/README.md`, the spec edits listed at the end of the UX notes applied to `specification.md`, reference pictures 06 to 10 re-captured (`reference/capture-real.ts`). Found and fixed on the way: a dash walk that stood still on a float sliver froze the page when a rectangle was selected (`curvyo-render-core`, regression test). C15 (turned image) has no browser case: the rotate handle and the angle chip did not turn the image under DevTools input; criterion 13 is covered by `acceptance_0114_parts.rs` c13 and the ui-core tests.
 
 ## Risks
 
