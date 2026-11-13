@@ -103,7 +103,7 @@ pub use theme::{
 };
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
 pub use trace_mask_overlay::{TraceMaskOutline, TraceMaskOverlay, build_trace_mask_overlay};
-pub use width_handles::{WidthDiamond, build_width_diamonds};
+pub use width_handles::{WIDTH_DIAMOND_PX, WidthDiamond, build_width_diamonds};
 pub use worked_chip::{WORKED_CHIP_PX, worked_chip_list};
 
 use curvyo_document_core::{PathSnapshot, ViewTransform};

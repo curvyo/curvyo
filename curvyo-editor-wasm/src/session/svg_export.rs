@@ -197,8 +197,10 @@ mod tests {
         assert!(curvyo_ui_core::read_svg_drawing(text.as_bytes()).is_ok());
     }
 
+    /// Every Spiro of finite controls has a curve since `specs/0114`, even one whose controls
+    /// lie on one spot (it was refused as unsolvable before): it exports beside an ordinary path.
     #[test]
-    fn unsolvable_spiro_refuses_only_the_affected_svg_scope() {
+    fn a_spiro_on_one_spot_exports_like_any_path() {
         let mut session = Session::new(1);
         let back_and_forth = [(5.0, 5.0), (5.0, 5.0), (5.0, 5.0)].map(|(x, y)| {
             let mut anchor = NewAnchor::corner(AnchorId::new(1, 10), Point::new(x, y));
@@ -227,10 +229,10 @@ mod tests {
             ..Default::default()
         };
         session.selection.set(&[id]);
-        assert_eq!(
+        assert!(matches!(
             session.export_svg(options),
-            SvgExportResult::UnsupportedExtendedPath
-        );
+            SvgExportResult::Written { objects: 1, .. }
+        ));
         session.selection.set(&[ordinary]);
         assert!(matches!(
             session.export_svg(options),

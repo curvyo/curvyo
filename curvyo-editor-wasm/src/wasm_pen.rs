@@ -96,6 +96,12 @@ impl WasmSession {
         self.session.begin_width_edit()
     }
 
+    /// Whether the tool bar offers Edit width (one stroked path selected).
+    #[must_use]
+    pub fn width_edit_offered(&self) -> bool {
+        self.session.width_edit_offered()
+    }
+
     /// Whether width profile editing is active.
     #[must_use]
     pub fn width_edit_active(&self) -> bool {
@@ -175,6 +181,35 @@ impl WasmSession {
     /// Sets the full width of the selected width point, as one undo step.
     pub fn set_width_point_mm(&mut self, mm: f64) -> bool {
         self.session.set_width_point_mm(mm)
+    }
+
+    /// Where the selected width point's diamond sits, canvas px as `[x, y]`; empty without one.
+    #[must_use]
+    pub fn width_point_screen(&self) -> Vec<f64> {
+        self.session
+            .width_point_screen()
+            .map_or_else(Vec::new, |(x, y)| vec![x, y])
+    }
+
+    /// Whether the screen point (`x`, `y`) is over a width point in width editing: the host's
+    /// wheel goes to [`WasmSession::width_wheel`] there instead of zooming (`specs/0114`).
+    #[must_use]
+    pub fn width_point_under(&self, x: f64, y: f64) -> bool {
+        self.session
+            .width_point_under(self.session.screen_to_document(x, y))
+    }
+
+    /// The wheel turned `notches` (positive widens) over the screen point (`x`, `y`): a width
+    /// point there changes live, 0.5 mm per notch (0.1 mm with `fine`). `false` when the wheel
+    /// is not the width's: the host zooms.
+    pub fn width_wheel(&mut self, x: f64, y: f64, notches: f64, fine: bool) -> bool {
+        let point = self.session.screen_to_document(x, y);
+        self.session.width_wheel(point, notches, fine)
+    }
+
+    /// Ends a wheel burst over a width point: its width is written as one undo step.
+    pub fn end_width_wheel(&mut self) -> bool {
+        self.session.end_width_wheel()
     }
 
     /// Sets the freehand simplification tolerance in millimetres.

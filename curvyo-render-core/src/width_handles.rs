@@ -3,8 +3,11 @@
 use crate::{DrawList, glyphs, theme};
 use curvyo_document_core::{Point, ViewTransform};
 
-/// The size of a width diamond, screen pixels.
-const DIAMOND_PX: f64 = 11.0;
+/// The size of a width diamond, screen pixels (`specs/0114` criterion 5).
+pub const WIDTH_DIAMOND_PX: f64 = 16.0;
+/// The dark ring around a diamond and the light casing around that, screen pixels each side.
+const RING_PX: f64 = 1.5;
+const CASING_PX: f64 = 1.5;
 
 /// One diamond on the centre line.
 #[derive(Debug, Clone, Copy)]
@@ -17,26 +20,33 @@ pub struct WidthDiamond {
     pub ghost: bool,
 }
 
-/// Draws the diamonds at a constant screen size: outlined, filled in the accent when selected,
-/// faint for the ghost.
+/// Draws the diamonds at a constant screen size: a white fill (the accent when selected) in a
+/// dark node-stroke ring and a light casing, so a diamond reads on dark and light strokes and on
+/// the canvas; the ghost is the same shape and ring with a faint fill, so it reads on a light page
+/// too (UX review 2026-11-12).
 #[must_use]
 pub fn build_width_diamonds(diamonds: &[WidthDiamond], view: ViewTransform) -> DrawList {
     let mut list = DrawList::default();
     let scale = view.scale();
     for diamond in diamonds {
-        let (outline, fill) = if diamond.ghost {
-            (theme::ACCENT_HOVER, theme::ACCENT_HOVER)
-        } else if diamond.selected {
-            (theme::NODE_STROKE, theme::ACCENT)
+        let fill = if diamond.selected {
+            theme::ACCENT
         } else {
-            (theme::NODE_STROKE, theme::CHECKER_A)
+            theme::CHECKER_A
         };
-        list.extend(glyphs::diamond(
-            diamond.at,
-            (DIAMOND_PX + 2.0) / scale,
-            outline,
-        ));
-        list.extend(glyphs::diamond(diamond.at, DIAMOND_PX / scale, fill));
+        let fill = if diamond.ghost {
+            fill.with_alpha(fill.a / 2)
+        } else {
+            fill
+        };
+        let size = WIDTH_DIAMOND_PX;
+        for (px, color) in [
+            (size + 2.0 * (RING_PX + CASING_PX), theme::SELECTION_CASING),
+            (size + 2.0 * RING_PX, theme::NODE_STROKE),
+            (size, fill),
+        ] {
+            list.extend(glyphs::diamond(diamond.at, px / scale, color));
+        }
     }
     list
 }
@@ -66,5 +76,19 @@ mod tests {
         );
         assert!(one.triangle_count() > 0);
         assert_eq!(one.triangle_count(), ghost.triangle_count());
+        // UX review 2026-11-12: on a light page the ghost reads by its full dark ring; only
+        // its fill is faint.
+        assert!(
+            ghost
+                .triangles
+                .iter()
+                .any(|vertex| vertex.color == theme::NODE_STROKE)
+        );
+        assert!(
+            ghost
+                .triangles
+                .iter()
+                .any(|vertex| vertex.color.a < theme::CHECKER_A.a)
+        );
     }
 }

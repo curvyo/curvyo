@@ -15,7 +15,7 @@ import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
 import { CurveToBezierButton } from "@/components/CurveToBezierButton";
 import { SelectToolbar } from "@/components/SelectToolbar";
-import { WidthDoneButton } from "@/components/WidthDoneButton";
+import { WidthEditToggle } from "@/components/WidthEditToggle";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
 import { TextBar } from "@/components/TextBar";
 import { TraceBar } from "@/components/TraceBar";
@@ -264,11 +264,12 @@ function Editor() {
                 onLeaveGroup: operationTools.leaveGroup,
               }}
               tile={{ slot: editor.tiling.slot, onEnter: editor.tiling.enter, onRelease: editor.tiling.release }}
+              widthEdit={<WidthEditToggle editor={editor} inBar />}
               onReturnFocus={() => editor.containerRef.current?.focus()}
             />
           ) : null}
           {editor.tool === "select" && !editor.recognise.open && !editor.tiling.open ? <CurveToBezierButton editor={editor} /> : null}
-          {editor.tool === "select" || editor.tool === "pen" ? <WidthDoneButton editor={editor} /> : null}
+          {editor.tool !== "node" && editor.tool !== "select" ? <WidthEditToggle editor={editor} /> : null}
           {editor.tool === "trace" ? (
             <TraceBar
               trace={editor.trace}
@@ -299,6 +300,7 @@ function Editor() {
                 joinSelected: editor.joinSelected,
                 splitSelected: editor.splitSelected,
               }}
+              widthEdit={<WidthEditToggle editor={editor} inBar />}
             />
           ) : null}
           {editor.tool === "text" ? (

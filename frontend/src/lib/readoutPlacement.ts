@@ -430,3 +430,32 @@ export function placeSketchChip(
   }
   return first;
 }
+
+/** Clear space from a width diamond's centre to its chip, CSS pixels: half the 16 px diamond,
+ * its 3 px ring and casing and 3 px of air. */
+export const WIDTH_CHIP_CLEAR_PX = 14;
+
+/**
+ * The typed-width field and the wheel readout of a width point (`specs/0114` criteria 6 and 7, UX
+ * review 2026-11-12): below the diamond (`above` for the readout, which the hand on the wheel
+ * would cover below), on the other side when there is no room, so the stroke beside the diamond
+ * stays visible. Its left edge starts just left of the diamond, or its right edge ends just
+ * right of it when the chip would cross the canvas's right edge; then clamped inside the canvas.
+ */
+export function placeWidthChip(
+  diamond: { x: number; y: number },
+  chip: Size,
+  canvas: Size,
+  side: "below" | "above",
+): Placement {
+  const clear = WIDTH_CHIP_CLEAR_PX;
+  const below = diamond.y + clear;
+  const above = diamond.y - clear - chip.height;
+  const top =
+    side === "below"
+      ? below + chip.height <= canvas.height ? below : above
+      : above >= 0 ? above : below;
+  const rightward = diamond.x - clear;
+  const left = rightward + chip.width <= canvas.width ? rightward : diamond.x + clear - chip.width;
+  return clampInside(left, top, chip, canvas);
+}

@@ -814,11 +814,11 @@ fn a_solvable_spiro_is_committed_as_a_spiro() {
     );
 }
 
-/// Customer 2026-11-11: a Node drag of a Spiro point past the place where its curve has no
-/// solution near the shown one stops there; the release writes that place, and the stored curve
-/// is the one shown.
+/// `specs/0114` criterion 1: the drag that stopped at a fold of the G4 curve (at 31 mm) follows
+/// the pointer to its end with the curvature-continuous curve; the release writes the pointer's
+/// place, and the stored curve is the one shown.
 #[test]
-fn a_node_drag_of_a_spiro_point_stops_where_its_curve_would_jump() {
+fn a_node_drag_of_a_spiro_point_follows_past_the_old_fold() {
     use curvyo_document_core::{AnchorId, AnchorKind, CurveKind, Document, NewAnchor, pack};
     let doc = Document::new(121);
     let controls: Vec<_> = [(10.0, 40.0), (30.0, 50.0), (50.0, 31.0), (70.0, 50.0)]
@@ -845,12 +845,9 @@ fn a_node_drag_of_a_spiro_point_stops_where_its_curve_would_jump() {
     session.pointer_up(Point::new(50.0, 11.0), false, false);
     let stored = unpack(123, &session.pack("test").unwrap()).unwrap();
     let moved = stored.path(id).unwrap().anchors[2].point;
-    assert!((moved.x - 50.0).abs() < 1e-9, "{moved:?}");
-    // The hold search stops at 0.5 mm (lead decision 2026-11-11, Proposal): the point stays
-    // within that of the fold, never past it.
     assert!(
-        moved.y <= 31.0 && moved.y > 30.0,
-        "held before the fold: {moved:?}"
+        (moved.x - 50.0).abs() < 1e-9 && (moved.y - 11.0).abs() < 1e-9,
+        "{moved:?}"
     );
     draw_once(&mut session);
 }

@@ -65,7 +65,7 @@ impl super::Session {
 
 impl super::Session {
     /// `objects` with each Spiro path and each clone of one replaced by the Bézier path it
-    /// draws, for hit tests, bounds and transforms; a Spiro without solution stays as it is.
+    /// draws, for hit tests, bounds and transforms; a Spiro without a curve stays as it is.
     pub(super) fn spiro_selection_objects(
         &self,
         objects: &[curvyo_document_core::ObjectSnapshot],
@@ -110,7 +110,7 @@ impl super::Session {
             .collect()
     }
     /// `objects` as a press or hover picks them: as [`Session::spiro_selection_objects`], and a
-    /// Spiro without solution as its control polygon, so it can be clicked and selected. A
+    /// Spiro without a curve as its control polygon, so it can be clicked and selected. A
     /// transform of it is still refused on release.
     pub(super) fn spiro_pick_objects(
         &self,

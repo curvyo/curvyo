@@ -565,11 +565,12 @@ fn deleting_a_selected_mask_path_from_its_row_removes_it() {
 fn unsupported_mask_in_inactive_part_stops_entire_composite() {
     use curvyo_document_core::{AnchorId, CurveKind, NewAnchor};
     let (mut session, image, _, right) = halves();
-    // A Spiro through one point has no curve: it cannot be a mask.
+    // A Spiro too far out to be drawn at any tolerance has no curve: it cannot be a mask (every
+    // Spiro of ordinary controls has one since `specs/0114`, even through one point).
     let nodes = [
-        NewAnchor::corner(AnchorId::new(181, 1), Point::new(5., 5.)),
-        NewAnchor::corner(AnchorId::new(181, 2), Point::new(5., 5.)),
-        NewAnchor::corner(AnchorId::new(181, 3), Point::new(5., 5.)),
+        NewAnchor::corner(AnchorId::new(181, 1), Point::new(1e300, 5.)),
+        NewAnchor::corner(AnchorId::new(181, 2), Point::new(5., 1e300)),
+        NewAnchor::corner(AnchorId::new(181, 3), Point::new(-1e300, 5.)),
     ];
     let bad = session
         .document

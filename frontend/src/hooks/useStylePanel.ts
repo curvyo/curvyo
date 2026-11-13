@@ -339,8 +339,6 @@ export interface StylePanelApi {
   widthEditActive: boolean;
   /** The preset the selected path's width profile is, `""` for none (UX review U9). */
   widthPreset: string;
-  beginWidthEdit: () => boolean;
-  endWidthEdit: () => void;
   /** The full width of the width point selected on the canvas, millimetres; `null` when none
    * is (`specs/0110` criterion 5). */
   widthPointMm: number | null;
@@ -516,16 +514,6 @@ export function useStylePanel(editor: EditorHandle): StylePanelApi {
     view,
     widthEditActive: getSession()?.width_edit_active() ?? false,
     widthPreset: getSession()?.selected_width_preset() ?? "",
-    // The bar's Done button follows the mode, so the whole editor re-reads it.
-    beginWidthEdit: () => {
-      const begun = act((s) => s.begin_width_edit(), false);
-      sync();
-      return begun;
-    },
-    endWidthEdit: () => {
-      run((s) => s.end_width_edit());
-      sync();
-    },
     widthPointMm: (() => {
       const mm = getSession()?.width_point_mm() ?? Number.NaN;
       return Number.isFinite(mm) ? mm : null;

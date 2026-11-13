@@ -155,27 +155,6 @@ export function StrokeSection({ panel, onReturnFocus }: StrokeSectionProps) {
               ))}
             </div>
           </StyleRow>
-          <StyleRow label="Edit">
-            {/* One Done only, in the canvas bar: here the button stays "Edit width", pressed
-             * while the mode is on (UX review U4, U9). */}
-            <div className={SEGMENTS}>
-              <button
-                type="button"
-                aria-pressed={panel.widthEditActive}
-                className={`${SEGMENT} px-3 text-xs whitespace-nowrap`}
-                onClick={() => {
-                  if (panel.widthEditActive) {
-                    panel.endWidthEdit();
-                  } else {
-                    panel.beginWidthEdit();
-                  }
-                  onReturnFocus();
-                }}
-              >
-                Edit width
-              </button>
-            </div>
-          </StyleRow>
           {panel.widthEditActive && panel.widthPointMm !== null ? (
             <StyleRow label="Point">
               <EntryField

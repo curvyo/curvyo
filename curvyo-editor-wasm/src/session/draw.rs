@@ -323,7 +323,7 @@ impl Session {
                 .drawn_path()
                 .is_some_and(|path| path.curve_kind == curvyo_document_core::CurveKind::Spiro)
         }) {
-            // A Spiro without solution shows its box around its control polygon.
+            // A Spiro without a curve shows its box around its control polygon.
             Cow::Owned(self.spiro_pick_objects(&live_objects))
         } else {
             Cow::Borrowed(&live_objects[..])
@@ -419,13 +419,7 @@ impl Session {
                     controls.push(next);
                 }
                 let curve = if self.pen.mode() == curvyo_ui_core::PenMode::Spiro {
-                    // Controls without a solution near the last curve keep that curve and the
-                    // points it goes through (customer 2026-11-11).
-                    let shown = self.spiro_cache.borrow_mut().preview(&controls, closed);
-                    shown.map(|(curve, through)| {
-                        controls = through;
-                        curve
-                    })
+                    self.spiro_cache.borrow_mut().preview(&controls, closed)
                 } else {
                     curvyo_ui_core::evaluate_bspline_nodes(&controls, false).ok()
                 };

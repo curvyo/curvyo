@@ -507,7 +507,6 @@ impl Session {
             }
             Tool::Node => {
                 self.node_spiro_sources.clear();
-                self.node_spiro_pointer = None;
                 self.spiro_cache.borrow_mut().clear_node_previews();
                 self.node.cancel_drag()
             }

@@ -113,17 +113,6 @@ impl Session {
         }
         // A finish closes an open entry chip without adding (`0072` criterion 22).
         self.cancel_pen_entry();
-        // A Spiro's placed points always solve: each was taken only where the curve has a
-        // solution near the one shown (customer 2026-11-11). The stored curve starts from the
-        // shape the Pen showed.
-        if self.pen.mode() == curvyo_ui_core::PenMode::Spiro
-            && let Some(nodes) = self.pen.in_progress_nodes()
-        {
-            let nodes = nodes.to_vec();
-            self.spiro_cache
-                .borrow_mut()
-                .try_preview(&nodes, false, true);
-        }
         self.recording_unguarded(|this| {
             this.pen.finish(&this.document);
         });
@@ -261,23 +250,10 @@ impl Session {
             let result =
                 self.resolve_snapping_direction(&curvyo_ui_core::SnapProbe::point(raw), direction);
             let node = raw.translated(result.offset);
-            // Every Spiro click places a control (lead decision 2026-11-11, Proposal).
-            let node = if self.pen.mode() == curvyo_ui_core::PenMode::Spiro && self.pen.is_placing()
-            {
-                self.spiro_pen_place(node)
-            } else {
-                node
-            };
             self.pen_cue.snap_press_offset = Some(point.vector_to(node));
             self.pen_cue.node = Some(node);
             node
         } else {
-            if self.pen.mode() == curvyo_ui_core::PenMode::Spiro
-                && matches!(action, PressAction::Close(_))
-                && !self.spiro_pen_may_close()
-            {
-                return;
-            }
             point
         };
         self.pen_cue.press = Some(target);

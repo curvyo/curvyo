@@ -12,9 +12,12 @@ test("criterion 5: Uniform, Taper start, Taper end and Taper both, each with a g
   }
 });
 
-test("criterion 5: the Style panel offers the presets beside Edit width", () => {
+test("criterion 5 and 0114 criterion 4: the Style panel offers the presets, the tool bar Edit width", () => {
   const section = readFileSync(new URL("../src/components/panel/StrokeSection.tsx", import.meta.url), "utf8");
   assert.match(section, /WIDTH_PRESETS\.map/);
   assert.match(section, /applyWidthPreset/);
-  assert.match(section, /Edit width/);
+  assert.doesNotMatch(section, /Edit width/);
+  const toggle = readFileSync(new URL("../src/components/WidthEditToggle.tsx", import.meta.url), "utf8");
+  assert.match(toggle, /Edit width/);
+  assert.match(toggle, /aria-pressed=\{active\}/);
 });
