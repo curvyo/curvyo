@@ -585,15 +585,13 @@ impl Document {
                     .map(|_| ())
             });
         }
-        if matches!(rotated, ObjectSnapshot::Path(path) if path.curve_kind == crate::CurveKind::Spiro)
-        {
-            return self.transform_objects(std::slice::from_ref(rotated), false);
-        }
-        // An image's placement and a dimension's points are written by the one transform writer.
+        // A spiro path, an image's placement and a dimension's points go through the one
+        // transform writer.
         if matches!(
             rotated,
             ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_)
-        ) {
+        ) || matches!(rotated, ObjectSnapshot::Path(path) if path.curve_kind == crate::CurveKind::Spiro)
+        {
             return self.transform_objects(std::slice::from_ref(rotated), false);
         }
         let tree = self.loro().get_tree(OBJECTS_TREE);
