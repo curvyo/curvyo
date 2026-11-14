@@ -86,7 +86,8 @@ export function rememberCopy(fingerprint: string, mask: string): void {
   copyMemo = mask ? { fingerprint, mask } : null;
 }
 
-/** The memo a paste hands to the session; other import origins get none. */
+/** The memo a paste hands to the session; other import origins get none. `paste-files` (files the
+ * OS clipboard names) gets none on purpose: the app copies image data, which pastes as "paste". */
 export function memoForImport(origin: string): { fingerprint: string; mask: string } | null {
   return origin === "paste" ? copyMemo : null;
 }

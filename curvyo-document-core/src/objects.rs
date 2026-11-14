@@ -589,6 +589,13 @@ impl Document {
         {
             return self.transform_objects(std::slice::from_ref(rotated), false);
         }
+        // An image's placement and a dimension's points are written by the one transform writer.
+        if matches!(
+            rotated,
+            ObjectSnapshot::Image(_) | ObjectSnapshot::Dimension(_)
+        ) {
+            return self.transform_objects(std::slice::from_ref(rotated), false);
+        }
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let tree_id = tree_id_of(rotated.id());
         if !leaf_exists(&tree, tree_id) {

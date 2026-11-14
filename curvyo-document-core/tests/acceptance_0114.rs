@@ -479,3 +479,38 @@ fn c14_a_pasted_image_gets_the_copied_mask_in_the_paste_step() {
         Err(TraceMaskError::NotAnImage)
     );
 }
+
+/// Criterion 13 (and `0058` criterion 32): the Select tool's rotate drag commits through
+/// `rotate_object`; for an image it turns the placement, in one step, and the stored mask stays
+/// on the picture content (it is stored in the image's unit square).
+#[test]
+fn c13_rotating_an_image_turns_its_placement_and_keeps_its_mask() {
+    let d = Document::new(1);
+    let m1 = image(&d, b"pixels-m1");
+    d.draw_trace_region(
+        m1,
+        TracePartRef::Implicit(&implicit()),
+        &rect(false, (0.0, 0.0), (0.5, 1.0)),
+    )
+    .unwrap();
+    let before = mask(&d, m1);
+    let steps = d.history_page(0, 1000).len();
+    let object = d.object(m1).unwrap();
+    let pivot = curvyo_document_core::Point::new(50.0, 50.0);
+    let turned = object.rotated(
+        pivot,
+        curvyo_document_core::Angle::from_radians(std::f64::consts::FRAC_PI_2),
+    );
+    d.rotate_object(&turned).unwrap();
+    assert_eq!(d.history_page(0, 1000).len(), steps + 1, "one step");
+    let Some(curvyo_document_core::ObjectSnapshot::Image(image)) = d.object(m1) else {
+        panic!("still an image");
+    };
+    let c = image.corners();
+    // The top-left corner of the unrotated picture (0, 0) goes to (100, 0) about (50, 50).
+    assert!(
+        (c[0].x - 100.0).abs() < 1e-9 && c[0].y.abs() < 1e-9,
+        "{c:?}"
+    );
+    assert_eq!(mask(&d, m1), before);
+}
