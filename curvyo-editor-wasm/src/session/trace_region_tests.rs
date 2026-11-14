@@ -5,8 +5,8 @@
 #![allow(clippy::many_single_char_names)]
 
 use curvyo_document_core::{
-    Length, NewTraceRegion, NodeId, ObjectSnapshot, Point, RectBounds, TracePartRef,
-    TraceRegionKind, UnitPoint,
+    Affine, Angle, Length, NewTraceRegion, NodeId, ObjectSnapshot, Point, RectBounds, TracePartRef,
+    TraceRegionKind, UnitPoint, Vec2,
 };
 use curvyo_ui_core::read_trace_wire;
 use vectrace::job::{Job as TraceJob, Mode as TraceMode, run as run_trace_job};
@@ -325,6 +325,81 @@ fn c2_overlay_washes_the_image_outside_the_region() {
     assert_eq!(objects.iter().filter(|o| o.id() == other).count(), 2);
 }
 
+/// `0114` criterion 13: after a move, a rotation and a skew of the image (one map, committed
+/// as the Select tool commits a gesture) the stored region still lies on the same picture
+/// content: the region keeps the picture points at the same fractions of the frame.
+#[test]
+fn c13_a_moved_rotated_and_skewed_image_keeps_its_mask() {
+    let (mut session, image) = masked();
+    session.set_tool(Tool::Trace);
+    let at = |session: &Session, u: f64, v: f64| {
+        let c = corners(session, image);
+        Point::new(
+            c[0].x + (c[1].x - c[0].x) * u + (c[3].x - c[0].x) * v,
+            c[0].y + (c[1].y - c[0].y) * u + (c[3].y - c[0].y) * v,
+        )
+    };
+    let probes = [
+        (0.25, 0.5, true),
+        (0.1, 0.9, true),
+        (0.75, 0.5, false),
+        (0.9, 0.1, false),
+    ];
+    let before = session.trace_region().unwrap();
+    for (u, v, kept) in probes {
+        assert_eq!(before.keeps(at(&session, u, v)), kept, "before ({u}, {v})");
+    }
+    let moves = [
+        Affine::translation(Vec2::new(31.5, -12.25)),
+        Affine::rotation_about(
+            Point::new(40.0, 20.0),
+            Angle::from_radians(30f64.to_radians()),
+        ),
+        // A skew along x (tan 25 degrees) about the line y = 20, then a non-uniform stretch.
+        Affine::new(
+            1.0,
+            0.0,
+            25f64.to_radians().tan(),
+            1.0,
+            -20.0 * 25f64.to_radians().tan(),
+            0.0,
+        ),
+        Affine::scale(1.7, 0.6),
+    ];
+    let mut sheared = 0.0_f64;
+    for map in moves {
+        let object = session
+            .objects()
+            .iter()
+            .find(|o| o.id() == image)
+            .cloned()
+            .unwrap();
+        let ObjectSnapshot::Image(placed) = object else {
+            unreachable!()
+        };
+        let result = ObjectSnapshot::Image(placed.mapped_by(map));
+        session
+            .document
+            .transform_objects(&[result], false)
+            .unwrap();
+        let region = session.trace_region().unwrap();
+        for (u, v, kept) in probes {
+            assert_eq!(
+                region.keeps(at(&session, u, v)),
+                kept,
+                "after {map:?} at ({u}, {v})"
+            );
+        }
+        let c = corners(&session, image);
+        let (e, f) = (
+            (c[1].x - c[0].x, c[1].y - c[0].y),
+            (c[3].x - c[0].x, c[3].y - c[0].y),
+        );
+        sheared = sheared.max((e.0 * f.0 + e.1 * f.1).abs() / (e.0.hypot(e.1) * f.0.hypot(f.1)));
+    }
+    assert!(sheared > 0.1, "the frame was skewed, no rectangle");
+}
+
 /// `0114` criterion 15 (CLONE-MASK A): a linked clone of an image is traceable and shows its
 /// root's regions under its own placement; a clone of a path is not traced.
 #[test]
@@ -366,4 +441,47 @@ fn a_refused_clip_shows_its_muted_notice() {
         session.trace_unclipped_notice(),
         "2 shapes cross the mask edge unclipped."
     );
+}
+
+/// `0114` criterion 13 through the Select tool: a rotate drag on the image's corner handle turns
+/// it (it was silently refused for images) and the region keeps the same picture content.
+#[test]
+fn c13_a_rotate_drag_turns_the_image_and_its_mask_with_it() {
+    use curvyo_ui_core::{EditHandle, ResizeDirection, SelectTool};
+    let (mut session, image) = masked();
+    session.set_tool(Tool::Select);
+    session.selection.set(&[image]);
+    let before = corners(&session, image);
+    let handle = SelectTool::transform_handles(
+        &session.objects(),
+        &session.selection,
+        session.transform_handle_tolerances(),
+        false,
+    )
+    .into_iter()
+    .find(|(h, _)| *h == EditHandle::Rotate(ResizeDirection::Ne))
+    .unwrap()
+    .1;
+    let centre = Point::new(
+        f64::midpoint(before[0].x, before[2].x),
+        f64::midpoint(before[0].y, before[2].y),
+    );
+    let end = Point::new(centre.x + 20.0, centre.y);
+    session.pointer_hover(handle, false, false);
+    session.pointer_down(handle, false);
+    session.pointer_hover(Point::new(handle.x + 5.0, handle.y + 5.0), false, false);
+    session.pointer_hover(end, false, false);
+    session.pointer_up(end, false, false);
+    assert_ne!(corners(&session, image), before, "the image turned");
+    session.set_tool(Tool::Trace);
+    let region = session.trace_region().unwrap();
+    let c = corners(&session, image);
+    let at = |u: f64, v: f64| {
+        Point::new(
+            c[0].x + (c[1].x - c[0].x) * u + (c[3].x - c[0].x) * v,
+            c[0].y + (c[1].y - c[0].y) * u + (c[3].y - c[0].y) * v,
+        )
+    };
+    assert!(region.keeps(at(0.25, 0.5)));
+    assert!(!region.keeps(at(0.75, 0.5)));
 }

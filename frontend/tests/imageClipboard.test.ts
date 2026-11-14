@@ -65,6 +65,10 @@ test("the copy memo goes to a paste only", () => {
   assert.deepEqual(memoForImport("paste"), { fingerprint: "00ff", mask: '{"parts":[]}' });
   assert.equal(memoForImport("drop"), null);
   assert.equal(memoForImport("picker"), null);
+  // `paste-files` is files the OS clipboard names (copied in a file manager). The app's own Ctrl+C
+  // writes `image/png` data, which comes back as a "paste", so a copy made here never returns
+  // through `paste-files`; a file from outside is a new image without a mask.
+  assert.equal(memoForImport("paste-files"), null);
   rememberCopy("0a0a", "");
   assert.equal(memoForImport("paste"), null, "a copy without a mask leaves no memo");
 });
