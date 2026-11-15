@@ -1,6 +1,6 @@
 # Test grid and materials: a Test grid tool that resolves into ordinary operations, a Materials tab with one material shared by all lasers, tests judged and kept by id
 
-Status: Draft (Ready after the customer merges this PR)
+Status: Done (PR #353)
 Priority: Must
 Origin: Customer (laser redesign after the demo of PR #333, answers to Fragen 192 to 211, 2026-11-12; decisions in `docs/design-drafts/2026-11-laser-redesign/README.md`). Everything marked **(Proposal)** is the product owner's and vetoable at the demo.
 
