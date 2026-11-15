@@ -66,6 +66,22 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
 - **P7 (duplicated guards).** `library_list` repeats the private format-guard helpers of
   `devices_list` (bound doc, newer-format scan, hex) instead of refactoring that module open
   mid-story; noted for the refactorer.
+- **P8 (arrival notice wording).** The arrival notice cannot name the device the record came
+  from: a room record carries no sender identity the glue could map to a device label (the
+  Loro peer of the inner header is not a member id). The notice says "… arrived from your
+  devices."; the UX dispatch (task 7) owns the final sentence.
+- **P9 (a damaged `library.loro`).** A damaged or newer-format `library.loro` fails the group's
+  `resume` like a damaged `devices.loro` does (the group shows as unreadable); a missing file
+  (pre-0116 group) starts a fresh list, which re-converges through the room's records.
+- **P10 (where the conflict copy lands).** ADR 0062 decision 5 keeps the loser "locally as a
+  conflict copy": the losing device always writes it; when the register order already favours
+  the winner, the winner's device never sees the loser's text and writes no copy. Criterion 9's
+  "both devices end with the same two records" holds whenever the loser's entry update reaches
+  the other device (the normal offline case, where the write-back carries it); the demo decides
+  whether that reading stands.
+- **P11 (notices before the UX texts).** The arrival, conflict, switch-off, skip and delete
+  notices are module constants in `session/library_sync.rs` (as the machine block's notices are
+  today); task 7 moves them into `curvyo-ui-core` with the final wording.
 
 ## Tasks
 
@@ -91,20 +107,26 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
 4. [x] `curvyo-storage-io`: `library.loro` beside the devices files — `read_library_list`
    (`None` while absent: a pre-0116 group), `write_library_list` (temp-then-rename),
    `remove_device_group` already forgets it with `devices/`; tests (criteria 2, 21, 22).
+   (Completed in the session-glue dispatch: an interrupted run had pre-checked this task.)
 5. [x] Gate of the four crates (`fmt`, `clippy`, `nextest` per crate, wasm32 check of the core
    crates), commits after each green task.
 
 ### Later dispatches on this branch (slice 1, unchecked)
 
-6. [ ] `curvyo-editor-wasm` session glue: route library records in the group room (bare =
-   devices list, inner header = library), export/push library updates, apply entries against the
+6. [x] `curvyo-editor-wasm` session glue: route library records in the group room (bare =
+      devices list, inner header = library), export/push library updates, apply entries against the
    local records through `library_merge` with conflict-copy host writes and notices, first sync
    writes all local items on, off keeps local copies with the notice, deletion removes local
    copies, arrivals, the framed room snapshot upload (parts when large), `library.loro` in the
-   host files (criteria 3 to 15, 21 to 27).
-7. [ ] `curvyo-app` commands for `library.loro` bytes; `curvyo-ui-core` texts (arrival, conflict,
-   switch-off notices); `frontend` row toggles, `S` key, greyed states per the UX notes
-   (criteria 1 to 4, 13).
+   host files (criteria 3 to 15, 21 to 27). Built as `device_group_library.rs` beside the group
+   glue and `session/library_sync.rs`; the wasm commands (`library_first_sync`, `library_switch`,
+   `library_sync_pump`, `library_view_json`, `library_delete`) and the app's `library.loro` byte
+   commands (they ride `read_device_group`/`write_device_group`, P5's write order kept) are in;
+   the page's slow poll runs the pump. Left for task 7: the first-sync confirm's call, the row
+   toggles and greyed states that read `library_view_json`.
+7. [ ] `curvyo-ui-core` texts (arrival, conflict, switch-off notices, P11); `frontend` row
+    toggles, `S` key, greyed states per the UX notes, the confirm of criterion 3 calling
+    `library_first_sync` (criteria 1 to 4, 13).
 8. [ ] Tester acceptance run from the spec; the three-device journey (A, B, browser R) with the
    relay data scan; UX and architect reviews; docs (design-system rows, technical debt).
 9. [ ] Slice-2 placeholders (fonts, criteria 16 to 20): `fonts.<sha-256> = {sync, file_name,
