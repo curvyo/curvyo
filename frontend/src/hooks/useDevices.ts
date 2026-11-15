@@ -86,6 +86,7 @@ interface GroupPayload {
   folders: Record<string, string>;
   keyring_log: number[];
   list: number[];
+  library: number[];
 }
 
 function transport(isLive: (session: SyncSessionPort) => boolean): SyncTransport {
@@ -228,7 +229,7 @@ export function useDevices(
       return;
     }
     foldersDirtyRef.current = false;
-    const parsed = JSON.parse(files) as { keyring_log: number[]; list: number[]; server_seq: number; synced_version: string };
+    const parsed = JSON.parse(files) as { keyring_log: number[]; list: number[]; library: number[]; server_seq: number; synced_version: string };
     const record = recordRef.current;
     const payload: GroupPayload = {
       server: record.server,
@@ -239,6 +240,7 @@ export function useDevices(
       folders: record.folders,
       keyring_log: parsed.keyring_log,
       list: parsed.list,
+      library: parsed.library,
     };
     await invoke("write_device_group", { group: payload }).catch(() => undefined);
   }, []);
@@ -328,6 +330,7 @@ export function useDevices(
         saved.room,
         new Uint8Array(saved.keyring_log),
         new Uint8Array(saved.list),
+        new Uint8Array(saved.library ?? []),
         saved.server_seq,
         JSON.stringify(keys.keys),
         fromHex(keys.identity),
@@ -514,6 +517,15 @@ export function useDevices(
           delete folders[ended];
           recordRef.current.folders = folders;
           foldersDirtyRef.current = true;
+        }
+        const session = getSession();
+        if (session) {
+          // The library sync's pump: the session's local library edits go to the group's list,
+          // the entries that arrived are applied to the session's libraries (`specs/0116`).
+          const notice = session.library_sync_pump(group);
+          if (notice !== "") {
+            showNotice(notice, 5000, "canvas", "status");
+          }
         }
         void persist(group);
         reconcileOpen();
