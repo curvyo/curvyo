@@ -1,7 +1,9 @@
 //! The commands of the maker's device group (`specs/0096-own-devices-sync` criteria 2, 10, 24,
 //! 27 and 31, ADR 0040 decision 2): its files in `devices/` of the app data directory, the
-//! default device name, the Synced workspaces folder, and the folder a synced workspace arrives
-//! in. The page builds the keyring and list bytes; `curvyo-storage-io` checks and writes.
+//! library list's file beside them (`specs/0116-library-sync`, ADR 0062 decision 1), the
+//! default device name, the Synced workspaces folder, and the folder a synced workspace
+//! arrives in. The page builds the keyring, list and library bytes; `curvyo-storage-io` checks
+//! and writes.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -16,7 +18,8 @@ use crate::state::AppState;
 use crate::workspace::{read_recents, recents_file, update_recents};
 use crate::workspace_share::{JoinFolderAnswer, unhex};
 
-/// The device group's files as the page reads and writes them.
+/// The device group's files as the page reads and writes them; `library` is `library.loro`,
+/// empty while a pre-0116 group holds none (ADR 0062 decision 1).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct GroupPayload {
     server: String,
@@ -28,6 +31,7 @@ pub(crate) struct GroupPayload {
     folders: BTreeMap<String, String>,
     keyring_log: Vec<u8>,
     list: Vec<u8>,
+    library: Vec<u8>,
 }
 
 /// How choosing the Synced workspaces folder ended.
@@ -56,7 +60,7 @@ fn hex(bytes: &[u8]) -> String {
     })
 }
 
-fn to_payload(files: DeviceGroupFiles) -> GroupPayload {
+fn to_payload(files: DeviceGroupFiles, library: Vec<u8>) -> GroupPayload {
     GroupPayload {
         server: files.group.server,
         room: hex(&files.group.room),
@@ -71,6 +75,7 @@ fn to_payload(files: DeviceGroupFiles) -> GroupPayload {
             .collect(),
         keyring_log: files.keyring_log,
         list: files.list,
+        library,
     }
 }
 
@@ -96,13 +101,17 @@ fn from_payload(payload: GroupPayload) -> Result<DeviceGroupFiles, String> {
 
 /// Reads the group's files under `dir`; `None` without a group.
 pub(crate) fn read_group(dir: &Path) -> Result<Option<GroupPayload>, String> {
+    let library = curvyo_storage_io::read_library_list(dir).map_err(|error| error.to_string())?;
     curvyo_storage_io::read_device_group(dir)
-        .map(|found| found.map(to_payload))
+        .map(|found| found.map(|files| to_payload(files, library.unwrap_or_default())))
         .map_err(|error| error.to_string())
 }
 
-/// Writes the group's files under `dir`.
+/// Writes the group's files under `dir`: `library.loro` first, then the group's files, so
+/// `group.json` stays the commit point (plan P5).
 pub(crate) fn write_group(dir: &Path, payload: GroupPayload) -> Result<(), String> {
+    curvyo_storage_io::write_library_list(dir, &payload.library)
+        .map_err(|error| error.to_string())?;
     let files = from_payload(payload)?;
     curvyo_storage_io::write_device_group(dir, &files).map_err(|error| error.to_string())
 }
@@ -355,10 +364,12 @@ mod tests {
             folders: BTreeMap::from([("77".repeat(16), "/home/maker/Curvyo/Box job".to_owned())]),
             keyring_log: vec![1],
             list: vec![2],
+            library: vec![3],
         }
     }
 
-    /// Criterion 31: the files go to `devices/` of the data directory and read back.
+    /// Criterion 31: the files go to `devices/` of the data directory and read back,
+    /// `library.loro` written before them.
     #[test]
     fn the_group_files_round_trip() {
         let dir = tempfile::tempdir().unwrap();
@@ -368,6 +379,24 @@ mod tests {
         let mut bad = payload();
         bad.room = "zz".to_owned();
         assert!(write_group(dir.path(), bad).is_err());
+    }
+
+    /// `library.loro` (ADR 0062 decision 1): a payload without library bytes writes an empty
+    /// file beside the devices files, and the group reads back.
+    #[test]
+    fn a_group_without_library_bytes_writes_an_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut without = payload();
+        without.library = Vec::new();
+        write_group(dir.path(), without).unwrap();
+        assert_eq!(
+            curvyo_storage_io::read_library_list(dir.path()).unwrap(),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            read_group(dir.path()).unwrap().map(|group| group.list),
+            Some(vec![2])
+        );
     }
 
     /// Criteria 10, 11 and 14: an arriving workspace's folder is made without opening it,
