@@ -173,6 +173,16 @@ impl ClientSession {
         self.workspace_snapshot.get_or_insert(0);
     }
 
+    /// A fresh 16-byte id for a snapshot the caller cuts with
+    /// [`split_snapshot`](crate::split_snapshot) (ADR 0062 decision 1).
+    #[must_use]
+    pub fn fresh_snapshot_id(&mut self) -> [u8; 16] {
+        let secret = self.entropy.secret();
+        let mut id = [0; 16];
+        id.copy_from_slice(&secret[..16]);
+        id
+    }
+
     /// The room.
     #[must_use]
     pub fn room(&self) -> RoomId {
