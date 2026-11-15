@@ -1,6 +1,6 @@
 # Image trace mask: draw the mask on the picture with Rectangle and Lasso, keep it with the image
 
-Status: Draft (Ready after the architect's ADR and the UX notes; the behaviour below is decided by the customer, 2026-11-12)
+Status: Done (PRs #352, #358, #359, #360)
 Priority: Must
 Origin: Customer (2026-11-12, German, verbatim): "ich möchte zusätzlich zum rectangle einen lasso haben, dass man mit mehreren mausclicks eine form mit geraden stücken bauen kann. wenn man sie nicht zu macht wird sie automatisch geschlossen. ich möchte, dass du das mask genau so auch in curvyo einbaust, also das select object kommt weg. ist vom workflow eher hakelig. die mask hängt an dem bild, wenn man das nochmal mit trace anclickt, ist die maske wieder da. wenn man das bild löscht wird auch die mask mit gelöscht". Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 Model: the sister app Tracyo (`~/tracyo`, `specs/0002-trace-parts/`, read-only): regions drawn on the picture with Rectangle and Lasso and a Subtract toggle; the Mask group sits in the Parts row of Advanced. Where Tracyo and Curvyo differ, this spec says so.
