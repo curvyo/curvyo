@@ -92,6 +92,7 @@ mod image_placement;
 pub mod key_backup_text;
 mod layer_move;
 mod layer_rows;
+pub mod library_text;
 mod page_tree_rows;
 pub use page_tree_rows::{FixtureTreeRow, PageTree, PlacedPageRow};
 mod layer_text;
