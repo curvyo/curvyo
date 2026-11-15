@@ -1,9 +1,13 @@
 //! What the group room's session reports, applied to the device group (ADR 0040 decisions 5
-//! and 8): transport actions out, admission, keyring changes, removal and refusals in.
+//! and 8; ADR 0062 decision 1): transport actions out, admission, keyring changes, removal and
+//! refusals in, the room's records routed to its two streams.
 
 use curvyo_crypto_core::MemberId;
 use curvyo_document_core::DevicesListError;
-use curvyo_sync_core::{ClientOutput, RecordKind, RefusalReason, SessionEvent};
+use curvyo_sync_core::{
+    ClientOutput, GroupRecord, RecordKind, RefusalReason, SessionEvent, SnapshotAssembler,
+    route_group_record,
+};
 use curvyo_ui_core::devices_text as texts;
 
 use super::{DeviceGroupGlue, JOIN_RETRY_MS};
@@ -40,44 +44,39 @@ impl DeviceGroupGlue {
                 self.bump();
                 self.write_pending();
                 self.write_own_label();
+                self.export_library();
             }
             SessionEvent::Offline => {
                 self.online = false;
                 self.bump();
             }
-            SessionEvent::Remote { kind, bytes, .. } => {
+            SessionEvent::Remote {
+                seq, kind, bytes, ..
+            } => {
                 if kind == RecordKind::Asset {
                     return;
                 }
-                match self.list.import_updates(&bytes) {
-                    Ok(()) => {
-                        self.files_changed = true;
-                        self.bump();
-                        self.write_own_label();
-                    }
-                    // ADR 0040 decision 11: the list stays as it is; reported once.
-                    Err(DevicesListError::FormatTooNew) => {
-                        if !self.newer_list {
-                            self.newer_list = true;
-                            self.notices.push_back(texts::newer_devices_list_notice());
-                            self.bump();
-                        }
-                    }
-                    Err(_) => {}
+                if kind == RecordKind::Snapshot {
+                    self.snapshot_part(seq, &bytes);
+                } else {
+                    self.update_record(&bytes);
                 }
             }
             SessionEvent::Acked { client_id, .. } => {
+                if let Some(version) = self.library_pushed.remove(&client_id) {
+                    self.library_synced = version;
+                    self.files_changed = true;
+                }
                 if let Some(version) = self.pushed.remove(&client_id) {
                     self.synced = version;
                     self.files_changed = true;
                 }
             }
             SessionEvent::KeyringChanged | SessionEvent::Admitted => self.keyring_changed(),
-            // A replica that refused a newer list does not hold every record it would cover.
-            SessionEvent::SnapshotDue { covers_seq } if !self.newer_list => {
-                if let Ok(bytes) = self.list.snapshot() {
-                    let _ = self.client.upload_snapshot(&bytes, covers_seq);
-                }
+            // A replica that refused a newer list or library does not hold every record it
+            // would cover.
+            SessionEvent::SnapshotDue { covers_seq } if !self.newer_list && !self.newer_library => {
+                self.upload_group_snapshot(covers_seq);
             }
             SessionEvent::Removed => {
                 self.removed = true;
@@ -101,6 +100,63 @@ impl DeviceGroupGlue {
             | SessionEvent::UpdateRejected
             | SessionEvent::SnapshotDue { .. }
             | SessionEvent::Resyncing => {}
+        }
+    }
+
+    /// One update record of the room, routed to its stream (ADR 0062 decision 1): a bare update
+    /// is the devices list's as every pre-0116 build writes it; a record with the inner header
+    /// is the library's.
+    fn update_record(&mut self, bytes: &[u8]) {
+        match route_group_record(bytes) {
+            Ok(GroupRecord::Devices(bare)) => self.import_devices(bare),
+            Ok(GroupRecord::Library { payload, .. }) => self.import_library(payload),
+            Err(_) => {}
+        }
+    }
+
+    /// One snapshot record of the room: a part of the framed snapshot of both streams (ADR
+    /// 0062 decision 1), or a pre-0116 build's plain snapshot of the devices list.
+    fn snapshot_part(&mut self, seq: u64, bytes: &[u8]) {
+        let starts_new = self.assembling.as_ref().is_none_or(|(at, _)| *at != seq);
+        if starts_new {
+            self.assembling = Some((seq, SnapshotAssembler::default()));
+        }
+        let outcome = match self.assembling.as_mut() {
+            Some((_, assembler)) => assembler
+                .push_part(bytes)
+                .map(|entries| (entries, assembler.is_complete())),
+            None => return,
+        };
+        if let Ok((entries, complete)) = outcome {
+            for entry in &entries {
+                self.snapshot_stream(entry);
+            }
+            if complete {
+                self.assembling = None;
+            }
+        } else {
+            self.assembling = None;
+            self.import_devices(bytes);
+        }
+    }
+
+    /// A bare update or plain snapshot of the devices list, as every pre-0116 build writes it.
+    pub(super) fn import_devices(&mut self, bytes: &[u8]) {
+        match self.list.import_updates(bytes) {
+            Ok(()) => {
+                self.files_changed = true;
+                self.bump();
+                self.write_own_label();
+            }
+            // ADR 0040 decision 11: the list stays as it is; reported once.
+            Err(DevicesListError::FormatTooNew) => {
+                if !self.newer_list {
+                    self.newer_list = true;
+                    self.notices.push_back(texts::newer_devices_list_notice());
+                    self.bump();
+                }
+            }
+            Err(_) => {}
         }
     }
 

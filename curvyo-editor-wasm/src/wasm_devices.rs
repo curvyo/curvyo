@@ -234,7 +234,8 @@ impl WasmDeviceGroup {
             .map(|glue| Self { glue })
     }
 
-    /// The group as saved: `devices/` files and the keys (`[[epoch, hex]]` JSON).
+    /// The group as saved: `devices/` files and the keys (`[[epoch, hex]]` JSON); `library` is
+    /// `library.loro`, empty while a pre-0116 group holds none.
     #[must_use]
     #[allow(clippy::too_many_arguments)] // The host's bytes cross as flat arguments (ADR 0001 §5).
     pub fn resume(
@@ -242,6 +243,7 @@ impl WasmDeviceGroup {
         room: &str,
         keyring_log: &[u8],
         list: &[u8],
+        library: &[u8],
         server_seq: f64,
         keys_json: &str,
         identity: &[u8],
@@ -263,6 +265,7 @@ impl WasmDeviceGroup {
             unhex(room)?,
             keyring_log,
             list,
+            library,
             server_seq,
             keys,
             &seeds,
@@ -412,8 +415,8 @@ impl WasmDeviceGroup {
     }
 
     /// The files to write when changed, or when `host_changed` (the host's part of `group.json`
-    /// changed): `{keyring_log, list, server_seq, synced_version}` (byte arrays as arrays), or
-    /// empty.
+    /// changed): `{keyring_log, list, library, server_seq, synced_version}` (byte arrays as
+    /// arrays), or empty.
     pub fn take_files_json(&mut self, host_changed: bool) -> String {
         self.glue
             .take_files_when(host_changed)
@@ -421,6 +424,7 @@ impl WasmDeviceGroup {
                 serde_json::json!({
                     "keyring_log": files.keyring_log,
                     "list": files.list,
+                    "library": files.library,
                     "server_seq": files.server_seq,
                     "synced_version": files.synced_version,
                 })
@@ -441,6 +445,30 @@ impl WasmDeviceGroup {
     /// The next notice, or empty.
     pub fn take_notice(&mut self) -> String {
         self.glue.take_notice().unwrap_or_default()
+    }
+
+    /// The per-item library toggles as `{"machines": [{"id", "sync"}], "materials": [...]}`
+    /// (`specs/0116-library-sync` criterion 1; the rows of task 7 read this).
+    #[must_use]
+    pub fn library_view_json(&self) -> String {
+        self.glue.library_view_json()
+    }
+
+    /// Deletes the library item `id` of `kind` (`machine` or `material`) from the stream
+    /// (criterion 11); an unknown kind changes nothing.
+    pub fn library_delete(&mut self, kind: &str, id: &str) {
+        if let Some(kind) = library_kind(kind) {
+            self.glue.library_delete(kind, id);
+        }
+    }
+}
+
+/// The library of a `kind` word, `None` for another.
+fn library_kind(kind: &str) -> Option<curvyo_document_core::LibraryKind> {
+    match kind {
+        "machine" => Some(curvyo_document_core::LibraryKind::Machine),
+        "material" => Some(curvyo_document_core::LibraryKind::Material),
+        _ => None,
     }
 }
 
@@ -500,5 +528,33 @@ impl WasmSession {
         };
         self.session
             .join_synced_workspace(server, room, name, label, &seeds, millis(now))
+    }
+
+    /// The first library sync (criterion 3): writes every local machine and material of this
+    /// device on. How many items were written.
+    pub fn library_first_sync(&mut self, group: &mut WasmDeviceGroup) -> u32 {
+        u32::try_from(self.session.library_first_sync(&mut group.glue)).unwrap_or(u32::MAX)
+    }
+
+    /// The per-item library toggle (criteria 3, 4, 10) of the item `id` of `kind` (`machine` or
+    /// `material`): whether it is on now.
+    pub fn library_switch(
+        &mut self,
+        group: &mut WasmDeviceGroup,
+        kind: &str,
+        id: &str,
+        on: bool,
+    ) -> bool {
+        match library_kind(kind) {
+            Some(kind) => self.session.library_switch(&mut group.glue, kind, id, on),
+            None => false,
+        }
+    }
+
+    /// Feeds this session's local library edits to the group's list, then applies the entries
+    /// that arrived (criteria 7 to 15); the notice of the last arrival, empty when there was
+    /// none.
+    pub fn library_sync_pump(&mut self, group: &mut WasmDeviceGroup) -> String {
+        self.session.library_sync_pump(&mut group.glue)
     }
 }

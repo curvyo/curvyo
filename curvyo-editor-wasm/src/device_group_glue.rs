@@ -9,10 +9,10 @@ use std::collections::{BTreeMap, VecDeque};
 
 use curvyo_crypto_core::keyring::{Keyring, Role, decode_log, encode_log};
 use curvyo_crypto_core::{EpochKey, Identity, IdentityKeys, MemberId};
-use curvyo_document_core::{DevicesList, DocumentVersion};
+use curvyo_document_core::{DevicesList, DocumentVersion, LibraryKind, LibraryList};
 use curvyo_sync_core::{
     ClientSession, ConnectionId, DeviceAction, Millis, RecordKind, RoomId, SessionConfig,
-    SessionError, SessionStart, Target, reconcile,
+    SessionError, SessionStart, SnapshotAssembler, Target, reconcile,
 };
 
 use crate::session::{SyncSeeds, TransportAction};
@@ -29,10 +29,40 @@ pub struct GroupFiles {
     pub keyring_log: Vec<u8>,
     /// `devices.loro`.
     pub list: Vec<u8>,
+    /// `library.loro` (ADR 0062 decision 1), written before the group's files.
+    pub library: Vec<u8>,
     /// The relay sequence the list holds.
     pub server_seq: u64,
     /// The list's version the room acknowledged last.
     pub synced_version: String,
+}
+
+/// One library entry that changed in the group room's library stream and waits for the page's
+/// session to apply it (`specs/0116-library-sync`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryArrival {
+    /// Which library the item belongs to.
+    pub kind: LibraryKind,
+    /// The record id.
+    pub id: String,
+    /// What changed.
+    pub change: ArrivalChange,
+}
+
+/// What changed in one library entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArrivalChange {
+    /// The entry is new, or its text changed: `sync` and the record text after the change.
+    Arrived {
+        /// Whether the item's sync is on.
+        sync: bool,
+        /// The record text, absent in a marker.
+        text: Option<String>,
+    },
+    /// A synced item was switched off elsewhere: every device keeps its local copy.
+    SwitchedOff,
+    /// The entry went: a synced item was deleted elsewhere.
+    Removed,
 }
 
 /// How the group session was started, kept for a retry of a fresh join.
@@ -57,6 +87,14 @@ pub struct DeviceGroupGlue {
     exported: DocumentVersion,
     synced: DocumentVersion,
     pushed: BTreeMap<u64, DocumentVersion>,
+    library: LibraryList,
+    library_exported: DocumentVersion,
+    library_synced: DocumentVersion,
+    library_pushed: BTreeMap<u64, DocumentVersion>,
+    /// Library entries that changed and wait for the page's session to apply them.
+    library_arrivals: VecDeque<LibraryArrival>,
+    /// The framed room snapshot being assembled, with the sequence of its first part.
+    assembling: Option<(u64, SnapshotAssembler)>,
     actions: VecDeque<TransportAction>,
     online: bool,
     removed: bool,
@@ -79,6 +117,8 @@ pub struct DeviceGroupGlue {
     /// A list update of a newer build was refused (ADR 0040 decision 11): reported once, and no
     /// snapshot is uploaded since this replica lacks that update.
     newer_list: bool,
+    /// The same for a library update (ADR 0040 decision 11 for `library.loro`).
+    newer_library: bool,
     notices: VecDeque<String>,
     now: Millis,
     revision: u32,
@@ -129,13 +169,14 @@ impl DeviceGroupGlue {
     /// The group as this device saved it (`devices/` and the credential store).
     ///
     /// # Errors
-    /// `Crypto` for a damaged keyring; `Ended` for a damaged list.
+    /// `Crypto` for a damaged keyring; `Ended` for a damaged list or library.
     #[allow(clippy::too_many_arguments)] // The saved files, the keys and the seeds.
     pub fn resume(
         server: &str,
         room: [u8; 16],
         keyring_log: &[u8],
         list: &[u8],
+        library: &[u8],
         server_seq: u64,
         epoch_keys: Vec<(u32, [u8; 32])>,
         seeds: &SyncSeeds,
@@ -155,6 +196,14 @@ impl DeviceGroupGlue {
         glue.list = DevicesList::from_snapshot(peer, list).map_err(|_| SessionError::Ended)?;
         glue.exported = glue.list.version();
         glue.synced = glue.exported.clone();
+        if library.is_empty() {
+            glue.library = LibraryList::new(peer);
+        } else {
+            glue.library =
+                LibraryList::from_snapshot(peer, library).map_err(|_| SessionError::Ended)?;
+        }
+        glue.library_exported = glue.library.version();
+        glue.library_synced = glue.library_exported.clone();
         glue.keys_changed = false;
         Ok(glue)
     }
@@ -173,8 +222,10 @@ impl DeviceGroupGlue {
             nonce: seeds.nonce,
             entropy: seeds.entropy,
         };
-        let client = new_client(room, start, since_seq, saved, peer, now)?;
+        let mut client = new_client(room, start, since_seq, saved, peer, now)?;
+        client.use_workspace_snapshots();
         let list = DevicesList::new(peer);
+        let library = LibraryList::new(peer);
         let mut glue = Self {
             client,
             server: server.to_owned(),
@@ -186,6 +237,12 @@ impl DeviceGroupGlue {
             exported: DocumentVersion::never(),
             synced: DocumentVersion::never(),
             list,
+            library,
+            library_exported: DocumentVersion::never(),
+            library_synced: DocumentVersion::never(),
+            library_pushed: BTreeMap::new(),
+            library_arrivals: VecDeque::new(),
+            assembling: None,
             pushed: BTreeMap::new(),
             actions: VecDeque::new(),
             online: false,
@@ -201,6 +258,7 @@ impl DeviceGroupGlue {
             files_changed: true,
             keys_changed: true,
             newer_list: false,
+            newer_library: false,
             notices: VecDeque::new(),
             now,
             revision: 1,
@@ -294,6 +352,7 @@ impl DeviceGroupGlue {
         }
         self.client.tick(now);
         self.export_list();
+        self.export_library();
         self.reconcile_group();
         self.pump();
     }
@@ -424,6 +483,7 @@ impl DeviceGroupGlue {
         Some(GroupFiles {
             keyring_log: encode_log(&self.client.keyring_entries()).ok()?,
             list: self.list.snapshot().ok()?,
+            library: self.library.snapshot().ok()?,
             server_seq: self.client.cursor(),
             synced_version: self.synced.to_text(),
         })
@@ -599,9 +659,15 @@ fn new_client(
 
 #[path = "device_group_events.rs"]
 mod events;
+#[path = "device_group_library.rs"]
+mod library;
 #[path = "device_group_view.rs"]
 mod view;
 
 #[cfg(test)]
 #[path = "device_group_glue_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "device_group_library_tests.rs"]
+mod library_tests;

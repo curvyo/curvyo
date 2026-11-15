@@ -1,0 +1,368 @@
+//! The device group's library stream as this session's libraries see it (ADR 0062 decision 5,
+//! `specs/0116-library-sync` criteria 3, 7 to 15, 21 to 27): arrivals applied through the
+//! record merge, host writes queued, local edits tapped for the group's list.
+
+use curvyo_document_core::LibraryKind;
+use curvyo_laser_core::library::{Material, MaterialRead, PhotoWrite, remove_photo};
+use curvyo_laser_core::{
+    LibraryWrite, MergeReason, RecordMerge, conflict_id, merge_machine_record,
+    merge_material_record, read_record as read_machine, record_file_name,
+    write_record as write_machine,
+};
+
+use crate::device_group_glue::{ArrivalChange, DeviceGroupGlue};
+
+use super::Session;
+use super::materials::MaterialWrite;
+
+/// Criterion 10: the item stays as a local record.
+const SYNC_OFF_NOTICE: &str = "Sync is off. This copy stays here.";
+/// Criterion 9: the loser is kept as the conflict copy, named in the notice.
+const MACHINE_CONFLICT_NOTICE: &str =
+    "A machine differed between your devices. Both copies are kept.";
+const MATERIAL_CONFLICT_NOTICE: &str =
+    "A material differed between your devices. Both copies are kept.";
+/// ADR 0004 §9 through the merge: a local record of a newer build is never rewritten.
+const LOCAL_NEWER_NOTICE: &str = "A record here is from a newer Curvyo. Both copies are kept.";
+const DAMAGED_NOTICE: &str = "A library record could not be read. It was left as it is.";
+const NEWER_NOTICE: &str = "A library record needs a newer Curvyo. It was left as it is.";
+const OLDER_NOTICE: &str = "A material has an older format. It was left as it is.";
+
+/// One local library edit, tapped from the host write lists for the group's list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LibraryEdit {
+    /// The record `id` was written with `text` (a new item or an edit).
+    Write {
+        /// Which library.
+        kind: LibraryKind,
+        /// The record id.
+        id: String,
+        /// The record text.
+        text: String,
+    },
+    /// The record `id` was deleted.
+    Remove {
+        /// Which library.
+        kind: LibraryKind,
+        /// The record id.
+        id: String,
+    },
+}
+
+/// What the session keeps for the library sync: the local edits not yet handed to the group's
+/// list, and the notices of the arrivals not yet shown.
+#[derive(Debug, Default)]
+pub(in crate::session) struct LibrarySyncState {
+    pub(in crate::session) edits: Vec<LibraryEdit>,
+    notices: std::collections::VecDeque<String>,
+}
+
+impl LibrarySyncState {
+    /// Taps a library write the host write list produced.
+    pub(in crate::session) fn tap_write(&mut self, kind: LibraryKind, id: &str, text: &str) {
+        self.edits.push(LibraryEdit::Write {
+            kind,
+            id: id.to_owned(),
+            text: text.to_owned(),
+        });
+    }
+
+    /// Taps a library removal the host write list produced.
+    pub(in crate::session) fn tap_remove(&mut self, kind: LibraryKind, id: &str) {
+        self.edits.push(LibraryEdit::Remove {
+            kind,
+            id: id.to_owned(),
+        });
+    }
+}
+
+/// Criterion 5: what arrived, as one line.
+fn arrived_notice(machines: usize, materials: usize) -> String {
+    let mut parts = Vec::new();
+    for (count, what) in [(machines, "machine"), (materials, "material")] {
+        if count > 0 {
+            parts.push(format!(
+                "{count} {what}{}",
+                if count == 1 { "" } else { "s" }
+            ));
+        }
+    }
+    format!("{} arrived from your devices.", parts.join(" and "))
+}
+
+/// The photo removals deleted with `material` (ADR 0058 §4).
+fn photo_removals(material: &Material) -> Vec<PhotoWrite> {
+    material
+        .tests
+        .iter()
+        .filter_map(|test| {
+            test.photo
+                .map(|kind| remove_photo(&material.id, test.id, kind))
+        })
+        .collect()
+}
+
+impl Session {
+    /// Every local machine and material record as `(kind, id, text)`, for the first sync
+    /// (criterion 3) and the rows of task 7.
+    #[must_use]
+    pub fn library_items(&self) -> Vec<(LibraryKind, String, String)> {
+        let mut items = Vec::new();
+        for profile in self.manufacturing.machine.profiles.listed() {
+            if self.manufacturing.machine.profiles.is_user(&profile.id) {
+                items.push((
+                    LibraryKind::Machine,
+                    profile.id.clone(),
+                    write_machine(profile),
+                ));
+            }
+        }
+        for read in self.materials.library().listed() {
+            if matches!(read, MaterialRead::Loaded(_))
+                && let Some(text) = self.materials.library().text(read.id())
+            {
+                items.push((LibraryKind::Material, read.id().to_owned(), text.to_owned()));
+            }
+        }
+        items
+    }
+
+    /// The first sync (criterion 3): writes every local item of this device on. How many were
+    /// written.
+    pub fn library_first_sync(&mut self, group: &mut DeviceGroupGlue) -> usize {
+        let items = self.library_items();
+        group.library_first_sync(&items)
+    }
+
+    /// The per-item toggle (criteria 3, 4, 10): on writes the local record's text, off keeps
+    /// the marker entry. Whether the item is on or off now.
+    pub fn library_switch(
+        &mut self,
+        group: &mut DeviceGroupGlue,
+        kind: LibraryKind,
+        id: &str,
+        on: bool,
+    ) -> bool {
+        if !on {
+            group.library_switch_off(kind, id);
+            return false;
+        }
+        let text = match kind {
+            LibraryKind::Machine => self.machine_record_text(id),
+            LibraryKind::Material => self.materials.library().text(id).map(str::to_owned),
+        };
+        match text {
+            Some(text) => {
+                group.library_set(kind, id, &text);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Feeds this session's local library edits to the group's list, then applies the entries
+    /// that arrived; the next notice, empty when there was none.
+    pub fn library_sync_pump(&mut self, group: &mut DeviceGroupGlue) -> String {
+        let edits = std::mem::take(&mut self.library.edits);
+        group.library_local_edits(edits);
+        self.apply_library_arrivals(group);
+        self.take_library_notice().unwrap_or_default()
+    }
+
+    /// The library entries that arrived in the group, applied against the local records
+    /// through the merge (ADR 0062 decision 5).
+    pub fn apply_library_arrivals(&mut self, group: &mut DeviceGroupGlue) {
+        let arrivals = group.take_library_arrivals();
+        let mut machines = 0;
+        let mut materials = 0;
+        for arrival in arrivals {
+            match arrival.change {
+                ArrivalChange::Arrived {
+                    sync: true,
+                    text: Some(text),
+                } => {
+                    if self.library_arrived(group, arrival.kind, &arrival.id, &text) {
+                        match arrival.kind {
+                            LibraryKind::Machine => machines += 1,
+                            LibraryKind::Material => materials += 1,
+                        }
+                    }
+                }
+                ArrivalChange::SwitchedOff => {
+                    self.library.notices.push_back(SYNC_OFF_NOTICE.to_owned());
+                }
+                ArrivalChange::Removed => {
+                    self.library_removed(arrival.kind, &arrival.id);
+                }
+                ArrivalChange::Arrived { sync: false, .. }
+                | ArrivalChange::Arrived {
+                    sync: true,
+                    text: None,
+                } => {}
+            }
+        }
+        if machines + materials > 0 {
+            self.library
+                .notices
+                .push_back(arrived_notice(machines, materials));
+        }
+    }
+
+    /// The next notice of a library arrival, once.
+    pub fn take_library_notice(&mut self) -> Option<String> {
+        self.library.notices.pop_front()
+    }
+
+    fn machine_record_text(&self, id: &str) -> Option<String> {
+        self.manufacturing
+            .machine
+            .profiles
+            .find(id)
+            .map(write_machine)
+    }
+
+    /// One arrived record text against the local record of the same id: the merge decides
+    /// (ADR 0062 decision 5); the loser becomes the conflict copy, a local winner is written
+    /// back to the stream. Whether the local library took the text.
+    fn library_arrived(
+        &mut self,
+        group: &mut DeviceGroupGlue,
+        kind: LibraryKind,
+        id: &str,
+        text: &str,
+    ) -> bool {
+        let local = match kind {
+            LibraryKind::Machine => self.machine_record_text(id),
+            LibraryKind::Material => self.materials.library().text(id).map(str::to_owned),
+        };
+        let merge = match kind {
+            LibraryKind::Machine => merge_machine_record(id, text, local.as_deref()),
+            LibraryKind::Material => merge_material_record(id, text, local.as_deref()),
+        };
+        match merge {
+            RecordMerge::Same => false,
+            RecordMerge::IncomingWins { loser } => {
+                self.library_write_local(kind, id, text);
+                if let Some(loser) = loser {
+                    self.library_conflict(kind, id, &loser);
+                }
+                true
+            }
+            RecordMerge::LocalWins { conflict } => {
+                self.library_conflict(kind, id, &conflict);
+                if let Some(winner) = local {
+                    group.library_set(kind, id, &winner);
+                }
+                false
+            }
+            RecordMerge::SkipIncoming { reason } => {
+                let notice = match reason {
+                    MergeReason::Damaged => DAMAGED_NOTICE,
+                    MergeReason::Newer => NEWER_NOTICE,
+                    MergeReason::Older => OLDER_NOTICE,
+                };
+                self.library.notices.push_back(notice.to_owned());
+                false
+            }
+            RecordMerge::LocalNewer { conflict } => {
+                self.library_conflict(kind, id, &conflict);
+                self.library
+                    .notices
+                    .push_back(LOCAL_NEWER_NOTICE.to_owned());
+                false
+            }
+        }
+    }
+
+    /// The winner becomes the local record, written through the existing host write paths with
+    /// the exact text that travelled (criterion 7).
+    fn library_write_local(&mut self, kind: LibraryKind, id: &str, text: &str) {
+        match kind {
+            LibraryKind::Machine => {
+                if let Ok(profile) = read_machine(&record_file_name(id), text) {
+                    let _ = self.manufacturing.machine.profiles.add(profile);
+                }
+                self.manufacturing.machine.queue(LibraryWrite::Write {
+                    id: id.to_owned(),
+                    text: text.to_owned(),
+                });
+            }
+            LibraryKind::Material => {
+                self.materials.library_mut().restore(id, Some(text));
+                self.materials.queue(MaterialWrite::Write {
+                    id: id.to_owned(),
+                    text: text.to_owned(),
+                });
+            }
+        }
+    }
+
+    /// The loser of a merge becomes the conflict copy `<uuid>.conflict` (ADR 0062 decision 5),
+    /// a host write beside the record.
+    fn library_conflict(&mut self, kind: LibraryKind, id: &str, loser: &str) {
+        let copy = conflict_id(id);
+        match kind {
+            LibraryKind::Machine => {
+                self.manufacturing.machine.queue(LibraryWrite::Write {
+                    id: copy,
+                    text: loser.to_owned(),
+                });
+            }
+            LibraryKind::Material => {
+                self.materials.queue(MaterialWrite::Write {
+                    id: copy,
+                    text: loser.to_owned(),
+                });
+            }
+        }
+        self.library.notices.push_back(
+            match kind {
+                LibraryKind::Machine => MACHINE_CONFLICT_NOTICE,
+                LibraryKind::Material => MATERIAL_CONFLICT_NOTICE,
+            }
+            .to_owned(),
+        );
+    }
+
+    /// A deleted synced item (criterion 11): the local record goes with its photos and retired
+    /// test ids, through the existing host write paths.
+    fn library_removed(&mut self, kind: LibraryKind, id: &str) {
+        let name = match kind {
+            LibraryKind::Machine => self
+                .manufacturing
+                .machine
+                .profiles
+                .find(id)
+                .map(|profile| profile.values.name.clone()),
+            LibraryKind::Material => self.materials.library().name_of(id).map(str::to_owned),
+        };
+        let gone = match kind {
+            LibraryKind::Machine => {
+                let Some(write) = self.manufacturing.machine.profiles.delete(id) else {
+                    return;
+                };
+                self.manufacturing.machine.queue(write);
+                true
+            }
+            LibraryKind::Material => {
+                let Ok((write, material)) = self.materials.library_mut().delete(id) else {
+                    return;
+                };
+                self.materials.queue(write.into());
+                if let Some(material) = material {
+                    for photo in photo_removals(&material) {
+                        self.materials.queue_photo(photo);
+                    }
+                    self.retire_test_ids(material.tests.iter().map(|test| test.id).collect());
+                }
+                true
+            }
+        };
+        if gone {
+            self.library.notices.push_back(match name {
+                Some(name) => format!("{name} was deleted on another device."),
+                None => "A library item was deleted on another device.".to_owned(),
+            });
+        }
+    }
+}
