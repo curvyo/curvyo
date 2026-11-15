@@ -1,6 +1,6 @@
 # Pen modes and variable-width paths
 
-Status: Revised 2026-11-10 after the first demo, waiting for go (customer approved the concept and ADR 0053 on 2026-11-07)
+Status: Done (PR #290; follow-ups in 0115)
 Priority: Should
 Origin: Customer, 2026-11-07 (renumbered from 0106 and ADR 0045: both were taken on `main`)
 
