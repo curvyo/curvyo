@@ -1,7 +1,7 @@
 //! The disk side of the maker's device group (ADR 0040 decision 2, `specs/0096-own-devices-sync`
 //! criteria 2, 10 and 31): `devices/` in the app data directory with `group.json`,
-//! `keyring.log` and `devices.loro`, and the Synced workspaces folder a synced workspace arrives
-//! in.
+//! `keyring.log`, `devices.loro` and `library.loro` (ADR 0062 decision 1), and the Synced
+//! workspaces folder a synced workspace arrives in.
 //!
 //! The page builds `keyring.log` and `devices.loro`; `group.json` is encoded here. Every file is
 //! written temp-then-rename. The group's epoch keys are not here: they live in the credential
@@ -25,6 +25,8 @@ pub const GROUP_FILE: &str = "group.json";
 pub const GROUP_KEYRING_FILE: &str = "keyring.log";
 /// The devices list's snapshot.
 pub const DEVICES_LIST_FILE: &str = "devices.loro";
+/// The library list's snapshot (ADR 0062 decision 1), beside the devices list's.
+pub const LIBRARY_LIST_FILE: &str = "library.loro";
 /// The `format_version` of `group.json` this build writes.
 pub const GROUP_FORMAT_VERSION: u32 = 1;
 /// The default Synced workspaces folder, under the home folder (Proposal).
@@ -223,8 +225,34 @@ pub fn write_device_group(app_data: &Path, files: &DeviceGroupFiles) -> Result<(
     Ok(())
 }
 
+/// The library list's file under `app_data`, `None` while this device is in no group or a
+/// pre-0116 group holds none (ADR 0062 decision 1).
+///
+/// # Errors
+/// `Io`.
+pub fn read_library_list(app_data: &Path) -> Result<Option<Vec<u8>>, DevicesError> {
+    let path = app_data.join(DEVICES_DIR).join(LIBRARY_LIST_FILE);
+    match fs::read(&path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(io(&path, &error)),
+    }
+}
+
+/// Writes the library list's file under `app_data` temp-then-rename, before the group's files:
+/// `group.json` stays the commit point (ADR 0062 decision 1, plan P5).
+///
+/// # Errors
+/// `Io`.
+pub fn write_library_list(app_data: &Path, bytes: &[u8]) -> Result<(), DevicesError> {
+    let dir = app_data.join(DEVICES_DIR);
+    fs::create_dir_all(&dir).map_err(|error| io(&dir, &error))?;
+    let path = dir.join(LIBRARY_LIST_FILE);
+    write_atomic(&path, bytes).map_err(|error| io(&path, &error))
+}
+
 /// Forgets the device group (Leave my devices, or this device was removed): `devices/` is
-/// deleted; the workspaces' files stay (criteria 24 and 27).
+/// deleted, `library.loro` with it; the workspaces' files stay (criteria 24 and 27).
 ///
 /// # Errors
 /// `Io`.
