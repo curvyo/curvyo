@@ -17,6 +17,7 @@ import {
   devices_removed_alert,
   devices_text,
   key_backup_text,
+  library_word,
   sharing_word,
 } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
@@ -351,6 +352,8 @@ export function MyDevicesBlock({ devices: given, server, reason, onReturnFocus, 
           frozenWarning={frozenWarning}
           offered={devices.offered}
           synced={view ? view.workspaces.filter((w) => w.on).map((w) => w.id) : []}
+          libraryConfirm={library_word("first-sync-confirm")}
+          onLibrarySync={devices.library.firstSync}
           onDone={(chosen) => {
             devices.clearJustPaired();
             if (chosen.length > 0) {

@@ -18,6 +18,7 @@ import { MachineProfileList } from "@/components/workbench/MachineProfileList";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { MachineView, WorkbenchesApi } from "@/hooks/useWorkbenches";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
 import { typedNumber } from "@/lib/machineBlockKeys";
 import { setMachineWriteFailureHandler } from "@/lib/machineProfilesFile";
 import { formatWorkArea } from "@/lib/workAreaText";
@@ -43,6 +44,9 @@ interface MachineBlockProps {
   workbenches: WorkbenchesApi;
   /** The document's display unit, for the read-only work area line. */
   unit?: UnitSymbol;
+  /** The library sync's toggles (`specs/0116-library-sync`); absent where the sync is not
+   * wired, `view` null while this device is in no group. */
+  library?: LibrarySyncApi;
   /** After a mouse click on a switch the keyboard goes back to the canvas. */
   onReturnFocus?: () => void;
 }
@@ -53,7 +57,7 @@ interface MachineBlockProps {
  * (each edit one undo step) and the connection of the chosen saved profile (library, no undo).
  * Host-drawn from the session's view; the extension only places it (`adrs.md` note 4).
  */
-export function MachineBlock({ label, machine, workbenches, unit = "mm", onReturnFocus = () => {} }: MachineBlockProps) {
+export function MachineBlock({ label, machine, workbenches, unit = "mm", library, onReturnFocus = () => {} }: MachineBlockProps) {
   const api = workbenches.machine;
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -204,6 +208,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
       {open ? (
         <MachineProfileList
           rows={machine.profiles}
+          library={library}
           onPick={(id) => {
             if (!machine.profiles.find((row) => row.id === id)?.chosen) {
               api.pick(id);

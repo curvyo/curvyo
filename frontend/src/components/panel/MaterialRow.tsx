@@ -8,7 +8,10 @@ import {
   type ReactNode,
 } from "react";
 
+import { LibrarySyncToggle } from "@/components/LibrarySyncToggle";
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
+import { librarySyncOn } from "@/lib/librarySyncView";
 import { hasTrash, line2Text, materialKeyAction, materialRowName, rowTitle } from "@/lib/materialRows";
 import type { MaterialRow as Row } from "@/lib/materialsView";
 import { thicknessText } from "@/lib/operationSettingsRows";
@@ -21,6 +24,8 @@ export interface MaterialRowActions {
   rename: (row: Row, name: string) => void;
   endRename: (row: Row, refocus: boolean) => void;
   trash: (row: Row) => void;
+  /** S switches the row's library sync (`specs/0116-library-sync` UX notes §2). */
+  sync: (row: Row) => void;
   /** The arrow buttons and Alt+arrows, Home and End: the key (or "ArrowUp" and "ArrowDown" for the buttons). */
   moveKey: (row: Row, key: string) => void;
   dragStart: (row: Row, event: ReactPointerEvent<HTMLElement>) => void;
@@ -40,6 +45,9 @@ interface MaterialRowProps {
   dropping: "top" | "bottom" | null;
   dragSource: boolean;
   actions: MaterialRowActions;
+  /** The library sync's toggles (`specs/0116-library-sync`); absent where the sync is not
+   * wired, `view` null while this device is in no group. */
+  library?: LibrarySyncApi;
   onFocusRow: () => void;
   /** The selected material's fields, under the row, inside the same item. */
   children?: ReactNode;
@@ -53,12 +61,13 @@ export const MATERIAL_ROW = "data-material-id";
 
 /**
  * One row of the Materials tab (`specs/0112` `ux-notes.md` 7.3): line 1 the name (in place
- * rename), the thickness, the armed trash and the arrows; line 2 the counts. A damaged row shows
- * the warning symbol and its reason, a newer or older one its words and no trash. The unfolded
- * material's body sits under the row.
+ * rename), the thickness, the library sync toggle (`specs/0116-library-sync` UX notes §1, a
+ * readable row only, immediately before the trash), the armed trash and the arrows; line 2 the
+ * counts. A damaged row shows the warning symbol and its reason, a newer or older one its words
+ * and no trash. The unfolded material's body sits under the row.
  */
 export function MaterialRowView(props: MaterialRowProps) {
-  const { row, index, total, selected, renaming, armed, actions } = props;
+  const { row, index, total, selected, renaming, armed, actions, library } = props;
   const readable = row.state === "loaded";
   return (
     <li
@@ -113,6 +122,15 @@ export function MaterialRowView(props: MaterialRowProps) {
           )}
           {renaming ? null : (
             <>
+              {library && readable ? (
+                <LibrarySyncToggle
+                  name={rowTitle(row)}
+                  on={librarySyncOn(library.view, "materials", row.id)}
+                  view={library.view}
+                  onToggle={() => actions.sync(row)}
+                  slot="flex h-6 w-6"
+                />
+              ) : null}
               {hasTrash(row) ? <TrashButton row={row} armed={armed} actions={actions} /> : <span className="h-6 w-6 shrink-0" aria-hidden />}
               <span className="w-2 shrink-0" />
               {props.canUp ? <ArrowButton row={row} up actions={actions} /> : <span className="h-6 w-6 shrink-0" aria-hidden />}
@@ -216,5 +234,7 @@ function onNameKey(event: ReactKeyboardEvent, row: Row, armed: boolean, actions:
   if (action === "move") actions.moveKey(row, event.key);
   else if (action === "rename") {
     if (row.state === "loaded") actions.select(row, true);
+  } else if (action === "sync") {
+    if (row.state === "loaded") actions.sync(row);
   } else if (hasTrash(row)) actions.trash(row);
 }

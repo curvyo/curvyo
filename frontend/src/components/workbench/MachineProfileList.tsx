@@ -1,9 +1,12 @@
 import { Check, Copy, Pencil, Ruler, Trash2 } from "lucide-react";
 import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
+import { LibrarySyncToggle } from "@/components/LibrarySyncToggle";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ARM_TRASH, ARM_ZONE, useDeleteArm } from "@/hooks/useDeleteArm";
 import type { MachineProfileRow } from "@/hooks/useWorkbenches";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
+import { librarySyncOn } from "@/lib/librarySyncView";
 import { areaText, profileRowKey } from "@/lib/machineBlockKeys";
 
 const ROW_BUTTON =
@@ -21,13 +24,17 @@ interface MachineProfileListProps {
   /** Edit work area of a user profile (`specs/0098` criterion 15): a library write; the notice. */
   onWorkArea: (id: string, width: number, height: number) => string;
   onClose: () => void;
+  /** The library sync's toggles (`specs/0116-library-sync`); absent where the sync is not
+   * wired, `view` null while this device is in no group. */
+  library?: LibrarySyncApi;
 }
 
 /**
  * The inline profile list of the Machine block (`specs/0026-machine-profile` UX notes §3): one
  * listbox, at most five rows visible, one Tab stop (the chosen row). A row picks on Enter, Space
  * or a press; Duplicate, Rename and Delete are mouse buttons with keys (Ctrl+D, F2, Delete).
- * Delete uses the armed press of `0081`; the library has no undo.
+ * Delete uses the armed press of `0081`; the library has no undo. A user profile's row carries
+ * the library sync toggle (S) immediately before Delete (`specs/0116-library-sync` UX notes §1).
  */
 export function MachineProfileList({
   rows,
@@ -37,6 +44,7 @@ export function MachineProfileList({
   onDelete,
   onWorkArea,
   onClose,
+  library,
 }: MachineProfileListProps) {
   const [sizing, setSizing] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -111,6 +119,11 @@ export function MachineProfileList({
       case "duplicate":
         duplicate(row.id);
         break;
+      case "sync":
+        if (!row.builtin) {
+          library?.switch("machine", row.id, !librarySyncOn(library.view, "machines", row.id));
+        }
+        break;
       case "delete":
         remove(index);
         break;
@@ -121,13 +134,19 @@ export function MachineProfileList({
   };
 
   return (
-    <div
-      ref={listRef}
-      role="listbox"
-      aria-label="Machine profiles"
-      className="flex max-h-[220px] flex-col overflow-y-auto overflow-x-hidden rounded-md"
-      style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
-    >
+    <>
+      {library !== undefined && library.view === null ? (
+        <p role="status" className="mb-1 text-xs text-[var(--panel-muted-fg)]">
+          Pair a device to sync machine profiles.
+        </p>
+      ) : null}
+      <div
+        ref={listRef}
+        role="listbox"
+        aria-label="Machine profiles"
+        className="flex max-h-[220px] flex-col overflow-y-auto overflow-x-hidden rounded-md"
+        style={{ border: "1px solid color-mix(in srgb, var(--toolbar-icon) 25%, transparent)" }}
+      >
       {rows.map((row, index) => {
         const armed = arm.armed === row.id;
         return (
@@ -183,6 +202,17 @@ export function MachineProfileList({
                 >
                   <Ruler size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
                 </RowButton>
+                {library ? (
+                  <LibrarySyncToggle
+                    name={row.name}
+                    on={librarySyncOn(library.view, "machines", row.id)}
+                    view={library.view}
+                    onToggle={() =>
+                      library.switch("machine", row.id, !librarySyncOn(library.view, "machines", row.id))
+                    }
+                    slot="inline-flex h-7 w-6"
+                  />
+                ) : null}
                 <RowButton
                   label={armed ? ARMED_DELETE : `Delete ${row.name}`}
                   armTarget={row.id}
@@ -210,7 +240,8 @@ export function MachineProfileList({
       <span role="status" className="sr-only">
         {arm.status}
       </span>
-    </div>
+      </div>
+    </>
   );
 }
 

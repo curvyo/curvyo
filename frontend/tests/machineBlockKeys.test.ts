@@ -29,6 +29,12 @@ test("profile rows move without wrapping and name their actions", () => {
   assert.equal(profileRowKey("x", false, 1, 3), null);
 });
 
+test("S switches the focused row's library sync (`0116` UX notes §2)", () => {
+  assert.deepEqual(profileRowKey("s", false, 1, 3), { kind: "sync" });
+  assert.deepEqual(profileRowKey("S", false, 1, 3), { kind: "sync" });
+  assert.equal(profileRowKey("s", true, 1, 3), null, "Ctrl+S stays the host's save");
+});
+
 test("typed numbers accept a comma and revert on nonsense", () => {
   assert.equal(typedNumber("1250,5"), 1250.5);
   assert.equal(typedNumber("  "), null);

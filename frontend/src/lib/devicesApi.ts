@@ -2,6 +2,7 @@
 // block's view as the group session describes it, the pairing view, and the actions.
 
 import type { CopyDecision, OfferedWorkspace } from "@/hooks/useSyncedWorkspaces";
+import type { LibrarySyncView } from "@/lib/librarySyncView";
 import { devices_synced_header } from "@/wasm-bindings/curvyo_editor_wasm.js";
 
 /** One synced workspace's line under a row (ux-notes 2.1, criterion 22). */
@@ -31,6 +32,17 @@ export interface GroupWorkspace {
   on: boolean;
   /** The maker left it from every device (`specs/0097` criterion 16). */
   left: boolean;
+}
+
+/** The library sync of the per-user libraries (`specs/0116-library-sync`): the rows' stored
+ * on/off state and the stream's state from `library_view_json` (`null` while this device is in
+ * no group: the toggles grey), and the two actions of the rows and the first-sync confirm. */
+export interface LibrarySyncApi {
+  view: LibrarySyncView | null;
+  /** Switches one item on or off (criterion 4). */
+  switch: (kind: "machine" | "material", id: string, on: boolean) => void;
+  /** The first sync: every item on behind the one confirm (criterion 3). */
+  firstSync: () => void;
 }
 
 /** The My devices block as the group session describes it. */
@@ -145,6 +157,8 @@ export interface DevicesApi {
   pairReason: string;
   /** The browser's own-row lines: the loss sentence, persistence, the storage it holds. */
   browserLines: string[];
+  /** The per-user libraries' sync (`specs/0116-library-sync`). */
+  library: LibrarySyncApi;
   /** Joins the group a passkey backup named, with the restored identity (ADR 0040 decision 13):
    * the joiner's path of pairing, without a pairing. */
   restoreGroup: (server: string, room: string, label: string) => Promise<void>;

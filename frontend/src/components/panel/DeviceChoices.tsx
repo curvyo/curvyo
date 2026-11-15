@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { APPLY, BUTTON, MUTED, OUTLINE } from "@/components/panel/devicesUi";
 import type { DevicesApi } from "@/hooks/useDevices";
 import type { OfferedWorkspace } from "@/hooks/useSyncedWorkspaces";
+import { firstSyncAnswer } from "@/lib/librarySyncView";
 import {
   devices_already_synced,
   devices_documents_text,
@@ -30,13 +31,36 @@ export function DecisionRow({ devices, id, name, text }: { devices: DevicesApi; 
   );
 }
 
+/** The libraries' first-sync confirm (`specs/0116-library-sync` criterion 3): the spec's
+ * sentence with the choice to confirm (every item on) or decline (nothing, can be done later
+ * from the rows). */
+export function LibrarySyncConfirm({ sentence, onSync }: { sentence: string; onSync: () => void }) {
+  return (
+    <div role="group" aria-label="Sync to my devices" className="flex flex-col gap-2">
+      <p className="text-xs text-[var(--toolbar-icon)]">{sentence}</p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={`${BUTTON} ${APPLY} px-3`} onClick={() => firstSyncAnswer(true, onSync)}>
+          Sync libraries
+        </button>
+        <button type="button" className={`${BUTTON} ${OUTLINE} px-3`} onClick={() => firstSyncAnswer(false, onSync)}>
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Choosing workspaces right after Pair (ux-notes 3.1, criterion 8): the open and recent
- * workspaces that are not synced yet, all checked; the synced ones are named above the list. */
+ * workspaces that are not synced yet, all checked; the synced ones are named above the list.
+ * The libraries' first-sync confirm sits under the list, where the workspaces' own confirm
+ * sentence sits. */
 export function PickWorkspaces({
   label,
   frozenWarning,
   offered,
   synced,
+  libraryConfirm,
+  onLibrarySync,
   onDone,
 }: {
   label: string;
@@ -45,6 +69,10 @@ export function PickWorkspaces({
   offered: OfferedWorkspace[];
   /** Ids of workspaces synced already. */
   synced: string[];
+  /** The libraries' confirm sentence (criterion 3), or "" while the ask does not apply. */
+  libraryConfirm: string;
+  /** Confirms the libraries' first sync. */
+  onLibrarySync: () => void;
   onDone: (chosen: OfferedWorkspace[]) => void;
 }) {
   const rows = offered.filter((o) => !synced.includes(o.id));
@@ -102,6 +130,7 @@ export function PickWorkspaces({
           ))}
         </ul>
       ) : null}
+      {libraryConfirm ? <LibrarySyncConfirm sentence={libraryConfirm} onSync={onLibrarySync} /> : null}
       {frozenWarning ? <p className="text-xs text-[var(--toolbar-icon)]">{frozenWarning}</p> : null}
       <div className="flex flex-wrap gap-2">
         <button ref={notNow} type="button" className={`${BUTTON} ${OUTLINE} w-[90px]`} onClick={() => onDone([])}>

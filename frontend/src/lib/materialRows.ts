@@ -125,7 +125,7 @@ export function deletedText(name: string): string {
 }
 
 /** What a key on a material row does. */
-export type MaterialKeyAction = "move" | "rename" | "arm" | "remove" | "open" | "none";
+export type MaterialKeyAction = "move" | "rename" | "sync" | "arm" | "remove" | "open" | "none";
 
 /** The target index of a move key, `null` for a key that does not move. */
 export function moveTarget(count: number, index: number, key: string): number | null {
@@ -144,12 +144,14 @@ export function moveTarget(count: number, index: number, key: string): number | 
   }
 }
 
-/** The key action on a row's name button: Alt+arrows move, F2 renames, Delete arms (and removes when armed), Enter or Space open. */
+/** The key action on a row's name button: Alt+arrows move, F2 renames, Delete arms (and removes when armed), Enter or Space open, S
+ * switches the row's library sync (`specs/0116` UX notes §2, a readable row only). */
 export function materialKeyAction(key: string, alt: boolean, armed: boolean): MaterialKeyAction {
   if (alt && (key === "ArrowUp" || key === "ArrowDown" || key === "Home" || key === "End")) return "move";
   if (key === "F2") return "rename";
   if (key === "Delete") return armed ? "remove" : "arm";
   if (key === "Enter" || key === " ") return armed ? "remove" : "open";
+  if (key === "s" || key === "S") return "sync";
   return "none";
 }
 

@@ -6,8 +6,10 @@ import { MaterialRowView, MATERIAL_ROW, type MaterialRowActions } from "@/compon
 import { NewMaterialForm } from "@/components/panel/NewMaterialForm";
 import { useDeleteArm } from "@/hooks/useDeleteArm";
 import type { MaterialsApi } from "@/hooks/useMaterials";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
 import { useMaterialDrag } from "@/hooks/useMaterialDrag";
 import { useScrollWindow } from "@/hooks/useScrollWindow";
+import { librarySyncOn } from "@/lib/librarySyncView";
 import { MATERIAL_WINDOW_ABOVE, armText, deletedText, materialHeights, moveTarget, rowTitle } from "@/lib/materialRows";
 import { insertionEdge, nextFocusIndex } from "@/lib/operationRows";
 import { visibleRange } from "@/lib/operationWindow";
@@ -16,6 +18,9 @@ const OVERSCAN = 160;
 
 interface MaterialsTabProps {
   api: MaterialsApi;
+  /** The library sync's toggles (`specs/0116-library-sync`); absent where the sync is not
+   * wired, `view` null while this device is in no group. */
+  library?: LibrarySyncApi;
   onReturnFocus: () => void;
 }
 
@@ -25,7 +30,7 @@ interface MaterialsTabProps {
  * a row unfolds its body (one at a time); the body holds the lasers' sets and the tests. Nothing
  * here decides a rule; the session does.
  */
-export function MaterialsTab({ api, onReturnFocus }: MaterialsTabProps) {
+export function MaterialsTab({ api, library, onReturnFocus }: MaterialsTabProps) {
   const { view } = api;
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [stop, setStop] = useState(0);
@@ -117,6 +122,9 @@ export function MaterialsTab({ api, onReturnFocus }: MaterialsTabProps) {
         return deletedText(name);
       });
     },
+    sync: (row) => {
+      library?.switch("material", row.id, !librarySyncOn(library.view, "materials", row.id));
+    },
     moveKey: (row, key) => {
       const at = rows.findIndex((candidate) => candidate.id === row.id);
       const to = moveTarget(rows.length, at, key);
@@ -149,6 +157,11 @@ export function MaterialsTab({ api, onReturnFocus }: MaterialsTabProps) {
 
   return (
     <section ref={rootRef} aria-label="Materials" className="flex flex-col gap-2">
+      {library !== undefined && library.view === null ? (
+        <p role="status" className="text-xs text-[var(--panel-muted-fg)]">
+          Pair a device to sync materials.
+        </p>
+      ) : null}
       {view.formOpen ? (
         <NewMaterialForm
           api={api}
@@ -189,6 +202,7 @@ export function MaterialsTab({ api, onReturnFocus }: MaterialsTabProps) {
                 dropping={drag.from !== null && drag.dropAt === index ? insertionEdge(drag.from, drag.dropAt) : null}
                 dragSource={drag.from === index}
                 actions={actions}
+                library={library}
                 onFocusRow={() => setStop(index)}
               >
                 {row.state === "loaded" && view.unfolded?.id === row.id && pressedId === null ? (

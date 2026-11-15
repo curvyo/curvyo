@@ -551,6 +551,8 @@ export function PropertiesPanel({
                       view={manufacturing}
                       workbenches={workbenches}
                       unit={doc.view.unit}
+                      fixtures={fixtures}
+                      library={devicesForTabs.library}
                       onReturnFocus={returnFocus}
                     />
                   ) : page.off ? (
@@ -631,7 +633,7 @@ export function PropertiesPanel({
             ) : doc.view.content === "fixtures" ? (
               <FixturesTab api={fixtures} />
             ) : doc.view.content === "materials" ? (
-              <MaterialsTab api={materials} onReturnFocus={returnFocus} />
+              <MaterialsTab api={materials} library={devicesForTabs.library} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (
               <LayersTab
                 getSession={getSession}
