@@ -11,8 +11,11 @@ import type { EditorSession } from "@/hooks/useEditorSession";
 import type { WorkspaceApi } from "@/hooks/useWorkspace";
 import { type OfferedWorkspace, useSyncedWorkspaces } from "@/hooks/useSyncedWorkspaces";
 import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
-import type { DevicesApi, DevicesView, PairingView, SyncedFolder } from "@/lib/devicesApi";
+import type { DevicesApi, DevicesView, LibrarySyncApi, PairingView, SyncedFolder } from "@/lib/devicesApi";
+import { decodeLibrarySync, type LibrarySyncView } from "@/lib/librarySyncView";
 import { openRoomNow, setGroupWorkspaces } from "@/lib/backgroundWorkspace";
+import { flushMaterialWrites } from "@/lib/materialsFile";
+import { flushMachineWrites } from "@/lib/machineProfilesFile";
 import { type StallWatch, lookAt, startWatch } from "@/lib/stallWatch";
 import { mintPeerId, wasmLoaded, wasmReady } from "@/lib/editorSession";
 import { SyncTransport, type SocketLike, type SyncSessionPort } from "@/lib/syncTransport";
@@ -105,6 +108,11 @@ export function useDevices(
   useEffect(() => {
     refs.current = { collab, workspace, workspaceSync };
   });
+  /** The editor's re-read, reached through a ref so the timer's interval is not rebuilt. */
+  const syncRef = useRef(editor.sync);
+  useEffect(() => {
+    syncRef.current = editor.sync;
+  });
   const groupRef = useRef<WasmDeviceGroup | null>(null);
   const pairingRef = useRef<WasmPairing | null>(null);
   const groupTransport = useRef<SyncTransport | null>(null);
@@ -122,6 +130,9 @@ export function useDevices(
   const pendingSwitchRef = useRef<"" | "on" | "off">("");
   const [view, setView] = useState<DevicesView | null>(null);
   const viewRef = useRef<DevicesView | null>(null);
+  /** The per-user libraries' view (`specs/0116-library-sync`): the rows' toggles and the
+   * stream's state, `null` while this device is in no group (the rows grey). */
+  const [libraryView, setLibraryView] = useState<LibrarySyncView | null>(null);
   useEffect(() => {
     viewRef.current = view;
     // A workspace the maker left ends as a leave with its record, not as a switch-off.
@@ -209,7 +220,14 @@ export function useDevices(
     }
     if (!group) {
       setView(null);
+      setLibraryView(null);
     }
+  }, []);
+
+  /** Re-reads the group's library view (the rows of `specs/0116-library-sync`). */
+  const readLibrary = useCallback(() => {
+    const group = groupRef.current;
+    setLibraryView(group ? decodeLibrarySync(group.library_view_json()) : null);
   }, []);
 
   /** Writes the group's files and keys when they changed. */
@@ -495,6 +513,7 @@ export function useDevices(
           const facts = lastFacts === "" ? "[]" : lastFacts;
           groupRevision = group.revision();
           setView(JSON.parse(group.view_json(-new Date().getTimezoneOffset(), facts)) as DevicesView);
+          readLibrary();
           if (group.removed()) {
             setRemovedShown(true);
           }
@@ -525,6 +544,11 @@ export function useDevices(
           const notice = session.library_sync_pump(group);
           if (notice !== "") {
             showNotice(notice, 5000, "canvas", "status");
+            // An arrival changed the session's libraries: the rows re-read, and the host
+            // writes the arrival queued (their flush also taps them for the group's list).
+            syncRef.current();
+            void flushMachineWrites(session, syncRef.current);
+            void flushMaterialWrites(session, syncRef.current);
           }
         }
         void persist(group);
@@ -543,7 +567,7 @@ export function useDevices(
       window.clearInterval(timer);
       window.removeEventListener("online", onOnline);
     };
-  }, [attachGroup, getSession, persist, reconcileOpen, retryNow, showNotice]);
+  }, [attachGroup, getSession, persist, readLibrary, reconcileOpen, retryNow, showNotice]);
 
   const setDeviceName = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -824,6 +848,40 @@ export function useDevices(
     });
   }, []);
 
+  /** The per-item library toggle (criteria 3, 4, 10): on writes the local record's text, off
+   * keeps the local copy with its marker entry (`specs/0116-library-sync`). */
+  const librarySwitch = useCallback(
+    (kind: "machine" | "material", id: string, on: boolean) => {
+      const group = groupRef.current;
+      const session = getSession();
+      if (!group || !session) {
+        return;
+      }
+      session.library_switch(group, kind, id, on);
+      groupTransport.current?.drain();
+      readLibrary();
+      void persist(group);
+    },
+    [getSession, persist, readLibrary],
+  );
+
+  /** The first sync (criterion 3): every local machine and material on, behind the confirm the
+   * pairing block shows (`specs/0116-library-sync`). */
+  const libraryFirstSync = useCallback(() => {
+    const group = groupRef.current;
+    const session = getSession();
+    if (!group || !session) {
+      return;
+    }
+    session.library_first_sync(group);
+    groupTransport.current?.drain();
+    readLibrary();
+    void persist(group);
+  }, [getSession, persist, readLibrary]);
+
+  /** The per-user libraries' rows and actions (`specs/0116-library-sync`). */
+  const library: LibrarySyncApi = { view: libraryView, switch: librarySwitch, firstSync: libraryFirstSync };
+
   const switchOn = useCallback(() => {
     pendingSwitchRef.current = "on";
     switchWatchRef.current = startWatch("", Date.now());
@@ -947,6 +1005,7 @@ export function useDevices(
     browser: !isTauri,
     pairReason,
     browserLines,
+    library,
     restoreGroup,
   };
 }

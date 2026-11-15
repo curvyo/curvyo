@@ -4,6 +4,7 @@ import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
+import type { LibrarySyncApi } from "@/lib/devicesApi";
 import type { PageRow } from "@/lib/pages";
 import type { ManifestBlock, ManifestWorkbenchContribution } from "@/workbenches/registry";
 
@@ -15,6 +16,10 @@ interface ManifestTabProps {
   workbenches: WorkbenchesApi;
   /** The document's display unit (the Machine block's work area line). */
   unit: UnitSymbol;
+  /** The Fixtures block's API (`specs/0102-laser-fixtures`). */
+  fixtures: FixturesApi;
+  /** The library sync's toggles (`specs/0116-library-sync`). */
+  library?: LibrarySyncApi;
   onReturnFocus: () => void;
 }
 
@@ -25,6 +30,7 @@ interface ManifestTabProps {
  * process.
  */
 export function ManifestTab({ contribution, pages, view, workbenches, unit, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, pages, view, workbenches, unit, fixtures, library, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
   return (
     <div className="flex flex-col gap-4">
@@ -37,6 +43,8 @@ export function ManifestTab({ contribution, pages, view, workbenches, unit, onRe
           view={view}
           workbenches={workbenches}
           unit={unit}
+          fixtures={fixtures}
+          library={library}
           onReturnFocus={onReturnFocus}
         />
       ))}
@@ -50,6 +58,8 @@ function Block({
   view,
   workbenches,
   unit,
+  fixtures,
+  library,
   onReturnFocus,
 }: ManifestTabProps & { block: ManifestBlock }) {
   switch (block.kind) {
@@ -58,7 +68,7 @@ function Block({
     case "machine_profile":
       return view.machine ? (
         <>
-          <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} onReturnFocus={onReturnFocus} />
+          <MachineBlock label={block.label} machine={view.machine} workbenches={workbenches} unit={unit} library={library} onReturnFocus={onReturnFocus} />
           <PlacePage pages={pages} workbenches={workbenches} onReturnFocus={onReturnFocus} />
         </>
       ) : null;

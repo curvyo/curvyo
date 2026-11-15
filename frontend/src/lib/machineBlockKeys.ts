@@ -47,12 +47,14 @@ export type ProfileRowAction =
   | { kind: "pick" }
   | { kind: "rename" }
   | { kind: "duplicate" }
+  | { kind: "sync" }
   | { kind: "delete" }
   | { kind: "close" };
 
 /** The action of `key` on the row `index` of `count` rows (UX notes §3): Up/Down move, Home/End
- * jump, no wrap; Enter/Space pick; F2 rename; Ctrl+D duplicate; Delete arms or removes; Escape
- * closes the list. `null` for any other key. */
+ * jump, no wrap; Enter/Space pick; F2 rename; Ctrl+D duplicate; Delete arms or removes; S
+ * switches the row's library sync (`specs/0116` UX notes §2); Escape closes the list. `null` for
+ * any other key. */
 export function profileRowKey(
   key: string,
   ctrl: boolean,
@@ -78,6 +80,9 @@ export function profileRowKey(
       return { kind: "rename" };
     case "Delete":
       return { kind: "delete" };
+    case "s":
+    case "S":
+      return { kind: "sync" };
     case "Escape":
       return { kind: "close" };
     default:

@@ -168,6 +168,12 @@ test("keys: Alt+arrows move, F2 renames, Delete arms then removes, Enter opens",
   assert.equal(moveTarget(1, 0, "End"), null);
 });
 
+test("keys: S switches the focused row's library sync (`0116` UX notes §2)", () => {
+  assert.equal(materialKeyAction("s", false, false), "sync");
+  assert.equal(materialKeyAction("S", true, false), "sync");
+  assert.equal(materialKeyAction("S", false, true), "sync");
+});
+
 test("the window gives the unfolded row its body and every other row 40 px", () => {
   const view = decodeMaterialsText(raw("two_lasers"));
   assert.ok(view);
