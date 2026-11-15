@@ -1,32 +1,24 @@
 //! The device group's library stream as this session's libraries see it (ADR 0062 decision 5,
 //! `specs/0116-library-sync` criteria 3, 7 to 15, 21 to 27): arrivals applied through the
-//! record merge, host writes queued, local edits tapped for the group's list.
+//! record merge, host writes queued, local edits tapped for the group's list. Every notice is
+//! `curvyo-ui-core::library_text`'s.
 
 use curvyo_document_core::LibraryKind;
-use curvyo_laser_core::library::{Material, MaterialRead, PhotoWrite, remove_photo};
+use curvyo_laser_core::library::{
+    Material, MaterialRead, PhotoWrite, read_record as read_material, remove_photo,
+    write_record as write_material,
+};
 use curvyo_laser_core::{
     LibraryWrite, MergeReason, RecordMerge, conflict_id, merge_machine_record,
     merge_material_record, read_record as read_machine, record_file_name,
     write_record as write_machine,
 };
+use curvyo_ui_core::library_text as texts;
 
 use crate::device_group_glue::{ArrivalChange, DeviceGroupGlue};
 
 use super::Session;
 use super::materials::MaterialWrite;
-
-/// Criterion 10: the item stays as a local record.
-const SYNC_OFF_NOTICE: &str = "Sync is off. This copy stays here.";
-/// Criterion 9: the loser is kept as the conflict copy, named in the notice.
-const MACHINE_CONFLICT_NOTICE: &str =
-    "A machine differed between your devices. Both copies are kept.";
-const MATERIAL_CONFLICT_NOTICE: &str =
-    "A material differed between your devices. Both copies are kept.";
-/// ADR 0004 §9 through the merge: a local record of a newer build is never rewritten.
-const LOCAL_NEWER_NOTICE: &str = "A record here is from a newer Curvyo. Both copies are kept.";
-const DAMAGED_NOTICE: &str = "A library record could not be read. It was left as it is.";
-const NEWER_NOTICE: &str = "A library record needs a newer Curvyo. It was left as it is.";
-const OLDER_NOTICE: &str = "A material has an older format. It was left as it is.";
 
 /// One local library edit, tapped from the host write lists for the group's list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,20 +66,6 @@ impl LibrarySyncState {
             id: id.to_owned(),
         });
     }
-}
-
-/// Criterion 5: what arrived, as one line.
-fn arrived_notice(machines: usize, materials: usize) -> String {
-    let mut parts = Vec::new();
-    for (count, what) in [(machines, "machine"), (materials, "material")] {
-        if count > 0 {
-            parts.push(format!(
-                "{count} {what}{}",
-                if count == 1 { "" } else { "s" }
-            ));
-        }
-    }
-    format!("{} arrived from your devices.", parts.join(" and "))
 }
 
 /// The photo removals deleted with `material` (ADR 0058 §4).
@@ -189,7 +167,9 @@ impl Session {
                     }
                 }
                 ArrivalChange::SwitchedOff => {
-                    self.library.notices.push_back(SYNC_OFF_NOTICE.to_owned());
+                    self.library
+                        .notices
+                        .push_back(texts::SYNC_OFF_NOTICE.to_owned());
                 }
                 ArrivalChange::Removed => {
                     self.library_removed(arrival.kind, &arrival.id);
@@ -204,7 +184,7 @@ impl Session {
         if machines + materials > 0 {
             self.library
                 .notices
-                .push_back(arrived_notice(machines, materials));
+                .push_back(texts::arrived_notice(machines, materials));
         }
     }
 
@@ -257,9 +237,9 @@ impl Session {
             }
             RecordMerge::SkipIncoming { reason } => {
                 let notice = match reason {
-                    MergeReason::Damaged => DAMAGED_NOTICE,
-                    MergeReason::Newer => NEWER_NOTICE,
-                    MergeReason::Older => OLDER_NOTICE,
+                    MergeReason::Damaged => texts::DAMAGED_NOTICE,
+                    MergeReason::Newer => texts::NEWER_NOTICE,
+                    MergeReason::Older => texts::OLDER_NOTICE,
                 };
                 self.library.notices.push_back(notice.to_owned());
                 false
@@ -268,7 +248,7 @@ impl Session {
                 self.library_conflict(kind, id, &conflict);
                 self.library
                     .notices
-                    .push_back(LOCAL_NEWER_NOTICE.to_owned());
+                    .push_back(texts::LOCAL_NEWER_NOTICE.to_owned());
                 false
             }
         }
@@ -298,30 +278,53 @@ impl Session {
     }
 
     /// The loser of a merge becomes the conflict copy `<uuid>.conflict` (ADR 0062 decision 5),
-    /// a host write beside the record.
+    /// a host write beside the record, renamed "<name> (from your devices)" (criterion 9) when
+    /// its text parses; the notice names the copy.
     fn library_conflict(&mut self, kind: LibraryKind, id: &str, loser: &str) {
         let copy = conflict_id(id);
+        let (text, name) = Self::conflict_copy(kind, id, loser);
         match kind {
             LibraryKind::Machine => {
-                self.manufacturing.machine.queue(LibraryWrite::Write {
-                    id: copy,
-                    text: loser.to_owned(),
-                });
+                self.manufacturing
+                    .machine
+                    .queue(LibraryWrite::Write { id: copy, text });
             }
             LibraryKind::Material => {
-                self.materials.queue(MaterialWrite::Write {
-                    id: copy,
-                    text: loser.to_owned(),
-                });
+                self.materials
+                    .queue(MaterialWrite::Write { id: copy, text });
             }
         }
-        self.library.notices.push_back(
-            match kind {
-                LibraryKind::Machine => MACHINE_CONFLICT_NOTICE,
-                LibraryKind::Material => MATERIAL_CONFLICT_NOTICE,
-            }
-            .to_owned(),
-        );
+        let notice = match name {
+            Some(name) => texts::conflict_notice(&name),
+            None => texts::CONFLICT_UNNAMED_NOTICE.to_owned(),
+        };
+        self.library.notices.push_back(notice);
+    }
+
+    /// The conflict copy's record text (criterion 9): the loser renamed
+    /// "<name> (from your devices)" when its text parses — everything else of the record stays
+    /// as it travelled — else the loser's bytes as they are; with the name for the notice, or
+    /// `None` when the text did not parse.
+    fn conflict_copy(kind: LibraryKind, id: &str, loser: &str) -> (String, Option<String>) {
+        let file = record_file_name(id);
+        match kind {
+            LibraryKind::Machine => match read_machine(&file, loser) {
+                Ok(mut profile) => {
+                    let name = texts::conflict_copy_name(&profile.values.name);
+                    profile.values.name.clone_from(&name);
+                    (write_machine(&profile), Some(name))
+                }
+                Err(_) => (loser.to_owned(), None),
+            },
+            LibraryKind::Material => match read_material(&file, loser) {
+                Ok(mut material) => {
+                    let name = texts::conflict_copy_name(&material.name);
+                    material.name.clone_from(&name);
+                    (write_material(&material), Some(name))
+                }
+                Err(_) => (loser.to_owned(), None),
+            },
+        }
     }
 
     /// A deleted synced item (criterion 11): the local record goes with its photos and retired
@@ -360,8 +363,8 @@ impl Session {
         };
         if gone {
             self.library.notices.push_back(match name {
-                Some(name) => format!("{name} was deleted on another device."),
-                None => "A library item was deleted on another device.".to_owned(),
+                Some(name) => texts::deleted_notice(&name),
+                None => texts::DELETED_UNNAMED_NOTICE.to_owned(),
             });
         }
     }

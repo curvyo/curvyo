@@ -12,6 +12,19 @@ pub fn devices_removed_alert() -> String {
     texts::REMOVED_ALERT.to_owned()
 }
 
+/// A fixed word of the synced per-user libraries (`specs/0116-library-sync`) by key; empty for
+/// an unknown key.
+#[wasm_bindgen]
+#[must_use]
+pub fn library_word(key: &str) -> String {
+    use curvyo_ui_core::library_text as library;
+    match key {
+        "first-sync-confirm" => library::FIRST_SYNC_CONFIRM,
+        _ => "",
+    }
+    .to_owned()
+}
+
 /// The switch's line while on.
 #[wasm_bindgen]
 #[must_use]
