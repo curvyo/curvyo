@@ -9,14 +9,10 @@ use curvyo_sync_core::{
     DEVICES_STREAM_ID, GroupRecord, RecordKind, StreamEntry, encode_group_snapshot,
     encode_library_record, route_group_record, split_snapshot,
 };
+use curvyo_ui_core::library_text as texts;
 
 use super::{ArrivalChange, DeviceGroupGlue, LibraryArrival};
 use crate::session::LibraryEdit;
-
-/// ADR 0040 decision 11 for `library.loro`: a library update of a newer build is refused,
-/// reported once, and no snapshot is uploaded since this replica lacks that update.
-const NEWER_LIBRARY_NOTICE: &str =
-    "Another device uses a newer Curvyo. Update this one to see changes to your library.";
 
 /// Every entry of the list as `(sync, text)`, keyed by kind and id.
 type LibraryState = BTreeMap<(LibraryKind, String), (bool, Option<String>)>;
@@ -38,8 +34,11 @@ impl DeviceGroupGlue {
         &self.library
     }
 
-    /// The per-item toggles as `{"machines": [{"id", "sync"}], "materials": [...]}`, sorted by
-    /// id (the rows of task 7 read this).
+    /// The per-item toggles and the library stream's state as
+    /// `{"machines": [{"id", "sync"}], "materials": [...], "online", "acked", "state"}` (the
+    /// rows of task 7 read this): `online` is the group's connection, `acked` whether every
+    /// library change went out and the relay acknowledged it, `state` the toggle tooltip's
+    /// second line, formatted in `curvyo-ui-core`.
     #[must_use]
     pub fn library_view_json(&self) -> String {
         let rows = |kind| {
@@ -48,11 +47,33 @@ impl DeviceGroupGlue {
                 .into_iter()
                 .map(|entry| serde_json::json!({"id": entry.id, "sync": entry.sync}))
         };
+        let others = self
+            .device_ids()
+            .iter()
+            .filter(|member| **member != self.client.me())
+            .count();
+        let state = if !self.online {
+            texts::OFFLINE_LINE.to_owned()
+        } else if !self.library_acked() {
+            texts::SYNCING_LINE.to_owned()
+        } else {
+            texts::in_sync_line(others)
+        };
         serde_json::json!({
             "machines": rows(LibraryKind::Machine).collect::<Vec<_>>(),
             "materials": rows(LibraryKind::Material).collect::<Vec<_>>(),
+            "online": self.online,
+            "acked": self.library_acked(),
+            "state": state,
         })
         .to_string()
+    }
+
+    /// Whether every library change went out and the relay acknowledged it: the stream's
+    /// "this item transfers" state of the toggle (UX notes section 1).
+    #[must_use]
+    pub fn library_acked(&self) -> bool {
+        self.library_pushed.is_empty() && self.library_exported == self.library.version()
     }
 
     /// Switches the item `id` of `kind` on with `text`, the exact record text (criterion 3);
@@ -182,7 +203,7 @@ impl DeviceGroupGlue {
             Err(LibraryListError::FormatTooNew) => {
                 if !self.newer_library {
                     self.newer_library = true;
-                    self.notices.push_back(NEWER_LIBRARY_NOTICE.to_owned());
+                    self.notices.push_back(texts::newer_library_list_notice());
                     self.bump();
                 }
             }

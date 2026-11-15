@@ -238,7 +238,7 @@ fn the_first_sync_arrives_on_the_other_device() {
         net.devices[b]
             .notices
             .iter()
-            .any(|notice| notice == "1 machine and 1 material arrived from your devices.")
+            .any(|notice| notice == "1 machine profile and 1 material arrived from your devices.")
     );
     let toggles: serde_json::Value =
         serde_json::from_str(&net.devices[b].glue.library_view_json()).unwrap();
@@ -309,7 +309,14 @@ fn offline_edits_converge_with_a_conflict_copy() {
         conflicts[0]["text"]
             .as_str()
             .unwrap()
-            .contains("Desktop edit")
+            .contains("Desktop edit (from your devices)"),
+        "the conflict copy is renamed (criterion 9)"
+    );
+    assert!(
+        net.devices[a]
+            .notices
+            .iter()
+            .any(|notice| notice == "Both copies are kept: Desktop edit (from your devices).")
     );
     assert_eq!(net.devices[a].wrote(P1).len(), 2);
 }
@@ -358,7 +365,7 @@ fn switching_off_keeps_the_local_copy() {
         net.devices[b]
             .notices
             .iter()
-            .any(|notice| notice == "Sync is off. This copy stays here.")
+            .any(|notice| notice == "Sync off, this copy stays here.")
     );
     assert!(
         net.devices[b]
