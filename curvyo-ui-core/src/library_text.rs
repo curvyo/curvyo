@@ -44,8 +44,9 @@ pub fn arrived_notice(machines: usize, materials: usize) -> String {
 /// Criterion 10's notice on the other devices: the copy stays.
 pub const SYNC_OFF_NOTICE: &str = "Sync off, this copy stays here.";
 
-/// The conflict copy's name (criterion 9; P8: no device name travels with a record): "<name>
-/// (from your devices)", the name cut so the whole stays within a record's 60 name characters.
+/// The conflict copy's name (criterion 9; P8: no device name travels with a record):
+/// "`<name>` (from your devices)", the name cut so the whole stays within a record's 60 name
+/// characters.
 #[must_use]
 pub fn conflict_copy_name(name: &str) -> String {
     const SUFFIX: &str = " (from your devices)";
