@@ -1,6 +1,6 @@
 # Smoother Spiro and better width handles
 
-Status: In progress (go 2026-11-11; criterion 2 amended 2026-11-12)
+Status: Done (PR #349)
 Priority: Should
 Origin: Customer, 2026-11-11, after trying `0110`
 
