@@ -159,6 +159,9 @@ impl MaterialsState {
     /// A number that changes with every change of the library (ADR 0064 §9).
     pub(in crate::session) const fn library_generation(&self) -> u64 {
         self.library.generation
+    /// The library, mutable for a library sync arrival (`specs/0116-library-sync`).
+    pub(in crate::session) fn library_mut(&mut self) -> &mut Library {
+        &mut self.library
     }
 
     /// Whether `id` is taken: a live test id of the library or a retired one (ADR 0058 §4).
@@ -167,7 +170,7 @@ impl MaterialsState {
     }
 
     /// Queues the host side of a photo write.
-    fn queue_photo(&mut self, write: PhotoWrite) {
+    pub(in crate::session) fn queue_photo(&mut self, write: PhotoWrite) {
         match write {
             PhotoWrite::Write { name, bytes } => {
                 let handle = self.next_handle;
@@ -240,9 +243,23 @@ impl Session {
             .insert(name.to_owned(), bytes.to_vec());
     }
 
-    /// The host writes made since the last call, in order, as JSON.
+    /// The host writes made since the last call, in order, as JSON. The record writes are
+    /// tapped for the device group's library list (`specs/0116-library-sync`).
     pub fn take_material_writes_json(&mut self) -> String {
         let writes = std::mem::take(&mut self.materials.outbox);
+        for write in &writes {
+            match write {
+                MaterialWrite::Write { id, text } => {
+                    self.library
+                        .tap_write(curvyo_document_core::LibraryKind::Material, id, text);
+                }
+                MaterialWrite::Remove { id } => {
+                    self.library
+                        .tap_remove(curvyo_document_core::LibraryKind::Material, id);
+                }
+                _ => {}
+            }
+        }
         serde_json::to_string(&writes).unwrap_or_else(|_| "[]".to_owned())
     }
 

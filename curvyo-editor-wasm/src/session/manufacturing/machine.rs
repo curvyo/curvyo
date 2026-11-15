@@ -67,6 +67,13 @@ pub(in crate::session) struct ActiveCopy {
     pub(in crate::session) page: DocumentSize,
 }
 
+impl MachineState {
+    /// Queues a library write from outside this module (a library sync arrival).
+    pub(in crate::session) fn queue(&mut self, write: LibraryWrite) {
+        self.outbox.push(HostWrite::Library(write));
+    }
+}
+
 impl Session {
     /// Reads the records the host listed: `(file name, text)` pairs (criteria 4, 13). Every laser
     /// page whose profile record is now newer than its set mirror, and differs from it, takes the
@@ -98,11 +105,28 @@ impl Session {
     }
 
     /// The host writes made since the last call, in order, as JSON: `{"kind": "write", "id",
-    /// "text"}`, `{"kind": "remove", "id"}` or `{"kind": "choice", "text"}`.
+    /// "text"}`, `{"kind": "remove", "id"}` or `{"kind": "choice", "text"}`. The library
+    /// writes are tapped for the device group's library list (`specs/0116-library-sync`).
     pub fn take_machine_writes_json(&mut self) -> String {
-        let writes: Vec<serde_json::Value> = std::mem::take(&mut self.manufacturing.machine.outbox)
-            .into_iter()
-            .map(|write| match write {
+        let writes = std::mem::take(&mut self.manufacturing.machine.outbox);
+        let mut out = Vec::with_capacity(writes.len());
+        for write in writes {
+            if let HostWrite::Library(library) = &write {
+                match library {
+                    LibraryWrite::Write { id, text } => {
+                        self.library.tap_write(
+                            curvyo_document_core::LibraryKind::Machine,
+                            id,
+                            text,
+                        );
+                    }
+                    LibraryWrite::Remove { id } => {
+                        self.library
+                            .tap_remove(curvyo_document_core::LibraryKind::Machine, id);
+                    }
+                }
+            }
+            out.push(match write {
                 HostWrite::Library(LibraryWrite::Write { id, text }) => {
                     serde_json::json!({"kind": "write", "id": id, "text": text})
                 }
@@ -110,9 +134,9 @@ impl Session {
                     serde_json::json!({"kind": "remove", "id": id})
                 }
                 HostWrite::Choice(text) => serde_json::json!({"kind": "choice", "text": text}),
-            })
-            .collect();
-        serde_json::Value::from(writes).to_string()
+            });
+        }
+        serde_json::Value::from(out).to_string()
     }
 
     /// The library.

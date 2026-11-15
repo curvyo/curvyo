@@ -98,6 +98,7 @@ mod layers_panel_tests;
 mod layers_tests;
 mod layers_toolbar;
 mod library_journal;
+mod library_sync;
 mod manufacturing;
 mod materials;
 mod measure;
@@ -122,6 +123,7 @@ pub use fixtures::{
     FixturesView, GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
     RoleToggle, RoundValues, SetView, SlotRow, TapesView,
 };
+pub use library_sync::LibraryEdit;
 pub use materials::{MaterialWrite, MaterialsView};
 pub use output::{ExportedJob, OutputGroupView, PlayView, SendView, SentJobFile, send_notice};
 pub use test_grid::TestGridView;
@@ -702,6 +704,8 @@ pub struct Session {
     /// The record part of this session's material and machine-set steps (ADR 0055 §9, ADR 0060
     /// §5a), one budget for both.
     library_journal: library_journal::Journal,
+    /// The device group's library sync (`library_sync.rs`, `specs/0116-library-sync`).
+    library: library_sync::LibrarySyncState,
     /// The Test grid tool (`test_grid/`, `specs/0112`).
     test_grid: test_grid::TestGridTool,
 }
@@ -826,6 +830,7 @@ impl Session {
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),
+            library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
         }
     }
@@ -944,6 +949,7 @@ impl Session {
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),
+            library: library_sync::LibrarySyncState::default(),
             test_grid: test_grid::TestGridTool::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
