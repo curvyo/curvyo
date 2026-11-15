@@ -32,9 +32,9 @@ pub use container_thumbnail::{ThumbnailError, with_thumbnail};
 pub use credentials::{CredentialError, CredentialStore, KEY_FILE, credential_slot};
 pub use devices::{
     DEFAULT_SYNCED_FOLDER, DEVICES_DIR, DEVICES_LIST_FILE, DeviceGroupFiles, DevicesError,
-    GROUP_FILE, GROUP_FORMAT_VERSION, GROUP_KEYRING_FILE, GroupRecord, SyncedFolderError,
-    arrival_folder, prepare_synced_folder, read_device_group, remove_device_group,
-    safe_folder_name, write_device_group,
+    GROUP_FILE, GROUP_FORMAT_VERSION, GROUP_KEYRING_FILE, GroupRecord, LIBRARY_LIST_FILE,
+    SyncedFolderError, arrival_folder, prepare_synced_folder, read_device_group, read_library_list,
+    remove_device_group, safe_folder_name, write_device_group, write_library_list,
 };
 pub use filesystem::{
     FsError, ensure_parent_dir, read_optional, read_to_vec, rename_replacing, write_atomic,
