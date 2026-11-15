@@ -82,6 +82,24 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
 - **P11 (notices before the UX texts).** The arrival, conflict, switch-off, skip and delete
   notices are module constants in `session/library_sync.rs` (as the machine block's notices are
   today); task 7 moves them into `curvyo-ui-core` with the final wording.
+- **P12 (task 7: the machine block's pair line).** The UX notes place "Pair a device to sync
+  machine profiles." above the profile list; it renders inside `MachineProfileList`, above the
+  listbox, so it shows exactly while the list is open (a closed Machine block shows no list and
+  no line), and the SSR tests reach it without opening the block.
+- **P13 (task 7: the first-sync confirm).** Its own group inside the `0096` workspace pick block
+  (under the list, where that flow's confirm sentence sits): the spec's sentence, "Sync
+  libraries" (Apply) and "Not now" (outline). It asks on every completed pairing (the opener's
+  block appears then), not only the group's first: `library_first_sync` writes every local item
+  on, which is idempotent, and a later pairing's new items are on by Frage 214 anyway.
+- **P14 (task 7: notice wordings).** The switch-off notice keeps the closing period the other
+  notices carry ("Sync off, this copy stays here." — criterion 10 quotes it without); the
+  arrival counts "machine profiles" as the UX notes' batch sentence does ("1 machine profile
+  and 1 material arrived from your devices."); the conflict notice names the copy ("Both copies
+  are kept: <name> (from your devices).", criterion 9 with P8's "your devices").
+- **P15 (task 7: the toggle's transfer state).** The library stream is one Loro list, so
+  "this item transfers" is the stream's state: `library_view_json` carries `online`, `acked`
+  (no push waiting, the exported version current) and the formatted `state` line; every
+  pressed toggle swaps its glyph with it, off and greyed toggles always keep the cloud.
 
 ## Tasks
 
@@ -124,9 +142,17 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
    commands (they ride `read_device_group`/`write_device_group`, P5's write order kept) are in;
    the page's slow poll runs the pump. Left for task 7: the first-sync confirm's call, the row
    toggles and greyed states that read `library_view_json`.
-7. [ ] `curvyo-ui-core` texts (arrival, conflict, switch-off notices, P11); `frontend` row
-    toggles, `S` key, greyed states per the UX notes, the confirm of criterion 3 calling
-    `library_first_sync` (criteria 1 to 4, 13).
+7. [x] `curvyo-ui-core` texts (arrival, conflict, switch-off notices, P11); `frontend` row
+     toggles, `S` key, greyed states per the UX notes, the confirm of criterion 3 calling
+     `library_first_sync` (criteria 1 to 4, 13). Built as `curvyo-ui-core::library_text`
+     (every notice and the tooltip's state lines), the `library_view_json` state fields
+     (`online`, `acked`, `state`) in the glue, `LibrarySyncToggle` in the machine and material
+     rows (`S`, greyed with the reason line, glyph states from the view), the first-sync
+     confirm in the pairing block (its own group, "Sync libraries" / "Not now"), the pump
+     refreshing the rows and flushing the arrival's host writes, and the docs rows
+     (`docs/design-system.md` "Library sync toggle", "Materials tab rows, sync placement", the
+     Machine block note; `docs/technical-debt.md` P1 and P7). See P12 to P15.
+
 8. [ ] Tester acceptance run from the spec; the three-device journey (A, B, browser R) with the
    relay data scan; UX and architect reviews; docs (design-system rows, technical debt).
 9. [ ] Slice-2 placeholders (fonts, criteria 16 to 20): `fonts.<sha-256> = {sync, file_name,

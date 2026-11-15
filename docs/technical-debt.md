@@ -349,10 +349,17 @@ profiles in `curvyo-laser-core`; the shared envelope (`id`, `kind`, `format_vers
 the id and size checks) becomes the module `record_envelope` there. Both records are laser-only
 and no merge exists, so a crate is still not justified.
 
+**Update 2026-11-15 (ADR 0062, spec `0116-library-sync`):** the record merge now exists, as
+`library_merge` in `curvyo-laser-core`. ADR 0062 decision 10 names `curvyo-sync-core` as its
+home, but ADR 0031 decision 1 keeps that crate dependent only on `curvyo-crypto-core`, and the
+merge must parse `modified` with the existing record readers of `curvyo-laser-core` (the
+dispatch rule: never a second field), so the plan's P1 put it beside those readers. The
+Resolution below now moves built code, not a design.
+
 **Resolution:** when a second machine family or the record merge of ADR 0004 §8 arrives, a
 `curvyo-library-core` ADR moves `record_envelope` and the merge into that crate, and
-`curvyo-laser-core` keeps only the laser fields. The file formats of ADR 0038 and ADR 0055 do not
-change by the move.
+`curvyo-laser-core` keeps only the laser fields. The file formats of ADR 0038 and ADR 0055 do
+not change by the move.
 
 ## One 0020 tester test takes about five minutes in a debug build (2026-11-03)
 
@@ -2703,3 +2710,13 @@ for satin stitch (embroidery family) rather than here.
   must be kept alive for the AI tools to download on demand (models are never bundled); the app
   does not work around a lost host except through stored results. **Resolution:** a documented
   runbook with the model upload and CDN settings; bundling was rejected by the customer.
+## `library_list` duplicates the format guards of `devices_list` (`0116`, 2026-11-15)
+
+`curvyo-document-core`'s `library_list` (ADR 0062 decision 2) repeats the private format-guard
+helpers of `devices_list` — the bound document, the newer-format scan and the hex id check —
+instead of sharing them: the plan's P7 kept `devices_list` untouched mid-story rather than
+refactoring a module every group file reads. The copies can drift apart when either list's
+guards change.
+
+**Resolution:** the refactorer unifies the guards behind one private helper module of
+`curvyo-document-core`, with the goldens of both lists as the behaviour proof.
