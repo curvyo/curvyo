@@ -94,6 +94,8 @@ mod drawing_content;
 mod drawing_insert;
 mod ellipse_arc;
 mod error;
+mod fixture_apply;
+pub use fixture_apply::APPLY_PAGE_FIXTURES_COMMIT_LABEL;
 mod fixture_job;
 mod fixture_job_codec;
 mod font_assets;
@@ -120,11 +122,26 @@ pub use fixture_job::{
     SET_FIXTURE_JOB_SHOW_ON_COMMIT_LABEL,
 };
 pub use fixture_job_codec::{
-    FixtureJobSnapshot, FixturePartKey, JobRecord, JobTarget, PART_SUFFIXES, TargetRead,
+    FixtureJobSnapshot, FixturePartKey, JobRecord, JobRole, JobTarget, PART_SUFFIXES, TargetRead,
 };
+mod job_fixture_commands;
 mod manufacturing;
 mod manufacturing_codec;
 mod manufacturing_fixture_commands;
+pub use job_fixture_commands::{
+    ADD_JOB_FIXTURE_COMMIT_LABEL, LOCK_FIXTURE_COMMIT_LABEL, UNLOCK_FIXTURE_COMMIT_LABEL,
+};
+mod manufacturing_fixture_set_commands;
+pub use manufacturing_fixture_set_commands::{
+    ADD_FIXTURE_COMMIT_LABEL, ADD_FIXTURE_SET_COMMIT_LABEL, LOCK_FIXTURE_SET_COMMIT_LABEL,
+    MOVE_FIXTURE_SET_COMMIT_LABEL, REMOVE_FIXTURE_SET_COMMIT_LABEL,
+    RENAME_FIXTURE_SET_COMMIT_LABEL, SET_FIXTURE_SET_OFF_PAGE_COMMIT_LABEL,
+    SET_FIXTURE_SET_ON_PAGE_COMMIT_LABEL, UNLOCK_FIXTURE_SET_COMMIT_LABEL,
+};
+mod manufacturing_fixture_align;
+pub use manufacturing_fixture_align::AlignCommit;
+mod manufacturing_fixture_sets;
+pub use manufacturing_fixture_sets::{FixtureSetSnapshot, MAX_FIXTURE_SETS, MAX_JOB_FIXTURES};
 mod manufacturing_fixtures;
 mod manufacturing_slot_commands;
 pub use manufacturing::{
@@ -132,7 +149,7 @@ pub use manufacturing::{
     EDIT_MAX_FEED_COMMIT_LABEL, EDIT_MAX_POWER_COMMIT_LABEL, EDIT_ORIGIN_CORNER_COMMIT_LABEL,
     EDIT_PROFILE_NAME_COMMIT_LABEL, FixtureParams, MOTORISED_Z_OFF_COMMIT_LABEL,
     MOTORISED_Z_ON_COMMIT_LABEL, ManufacturingError, ManufacturingSnapshot, NewOutputPage,
-    PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot, ProfileChange,
+    PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot, ProfileChange, ProfileSets,
     RESET_PROFILE_COMMIT_LABEL, SAVE_AS_PROFILE_COMMIT_LABEL,
 };
 pub use manufacturing_fixture_commands::{
@@ -145,8 +162,8 @@ pub use manufacturing_fixture_commands::{
     SET_GRID_SPACING_COMMIT_LABEL, SET_TAPE_EDGE_COMMIT_LABEL,
 };
 pub use manufacturing_fixtures::{
-    FixtureRecord, FixtureSnapshot, MAX_FIXTURE_NAME_CHARS, MAX_SLOTS_PER_FIXTURE, SlotRecord,
-    SlotSnapshot,
+    FixtureRecord, FixtureSetRecord, FixtureSnapshot, MAX_FIXTURE_NAME_CHARS,
+    MAX_SLOTS_PER_FIXTURE, SlotRecord, SlotSnapshot,
 };
 pub use manufacturing_slot_commands::{
     ADD_SLOT_COMMIT_LABEL, REMOVE_SLOT_COMMIT_LABEL, RENAME_SLOT_COMMIT_LABEL,
@@ -310,13 +327,13 @@ pub use groups::{GROUP_COMMIT_LABEL, UNGROUP_COMMIT_LABEL};
 pub use guides::{GuideMarking, SET_GUIDE_COMMIT_LABEL};
 pub use history::{
     Author, BranchMark, Direction, Event, FAR_STEP_OPS, GoToReport, HistoricalDocument,
-    HistoryBranch, HistoryError, HistoryRow, LABEL_CLONE_VERSION, LABEL_GO_TO_VERSION,
-    LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO,
-    LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE_OBJECT, MIN_SHOWN_ID_LEN, ObjectReport,
-    ObjectRestore, ObjectResult, ObjectRow, ObjectRowClass, ObjectShape, ObjectStatus,
-    ObjectTarget, ObjectTargets, OwnStep, RestoreReport, Role, RowRevert, RowVersion,
-    SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind, StepRef, SyncError,
-    TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
+    HistoryBranch, HistoryError, HistoryRow, LABEL_ALIGN_FIXTURE_SETS, LABEL_CLONE_VERSION,
+    LABEL_GO_TO_VERSION, LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO,
+    LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE_OBJECT,
+    MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult, ObjectRow, ObjectRowClass,
+    ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep, RestoreReport, Role,
+    RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind,
+    StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,

@@ -5,18 +5,17 @@ use loro::{LoroMap, LoroTree, TreeID, TreeParentId};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::fixture_job_codec::{
-    FixtureJobSnapshot, FixturePartKey, JobRecord, PART_SUFFIXES, is_job_meta, parse_target_key,
-    target_key, write_job_registers,
+    FixtureJobSnapshot, FixturePartKey, JobRecord, PART_SUFFIXES, has_roles, is_job_meta,
+    parse_target_key, target_key, write_job_registers,
 };
 use crate::group_tree::node_id;
-use crate::manufacturing_codec::{SHAPE_FIXTURE, is_manufacturing_node, string};
+use crate::manufacturing_codec::{KEY_FIXTURE_KIND, fixture_home, parent_node, string};
 use crate::manufacturing_fixtures::fixture_name;
 use crate::node_registers::{KEY_NAME, read_registers};
 use crate::operation_codec::{KEY_OP_OUTPUT, KEY_OP_SHOW};
 use crate::path_codec::node_exists;
 use crate::path_model::NodeId;
 use crate::paths::tree_id_of;
-use crate::shape_codec::KEY_SHAPE;
 
 /// The label of Add fixture job.
 pub const ADD_FIXTURE_JOB_COMMIT_LABEL: &str = "add_fixture_job";
@@ -51,6 +50,13 @@ pub enum FixtureJobError {
     /// A part is not the job's fixture or one of its slots, or its suffix is not a part suffix.
     #[error("no such fixture part")]
     NoSuchPart,
+    /// The job is a pin's or a screw's Centre mark or Diameters: it is not deleted, renamed or
+    /// re-ticked (ADR 0059 §5).
+    #[error("a role job keeps its name and parts")]
+    RoleJob,
+    /// A pin or a screw takes no further job (ADR 0059 §5).
+    #[error("a pin or a screw takes no further job")]
+    FixedJobs,
 }
 
 /// The two switches of a job row.
@@ -62,21 +68,9 @@ pub enum FixtureJobSwitch {
     Output,
 }
 
-/// The parent node of `node`, when it has one.
-fn parent_of(tree: &LoroTree, node: TreeID) -> Option<TreeID> {
-    match tree.parent(node) {
-        Some(TreeParentId::Node(parent)) => Some(parent),
-        _ => None,
-    }
-}
-
-/// Whether `node` is a live fixture node of a manufacturing.
+/// Whether `node` is a live fixture node of a manufacturing, a job fixture or in a set.
 fn is_fixture_node(tree: &LoroTree, node: TreeID) -> bool {
-    node_exists(tree, node)
-        && parent_of(tree, node).is_some_and(|parent| is_manufacturing_node(tree, parent))
-        && tree
-            .get_meta(node)
-            .is_ok_and(|meta| string(&meta, KEY_SHAPE).as_deref() == Some(SHAPE_FIXTURE))
+    fixture_home(tree, node).is_some()
 }
 
 /// The job children of the fixture `fixture`, in tree order.
@@ -93,12 +87,21 @@ impl Document {
     fn job_meta(&self, id: NodeId) -> Result<(LoroMap, TreeID), FixtureJobError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let node = tree_id_of(id);
-        let fixture = parent_of(&tree, node).filter(|&f| is_fixture_node(&tree, f));
+        let fixture = parent_node(&tree, node).filter(|&f| is_fixture_node(&tree, f));
         let meta = tree.get_meta(node).ok().filter(is_job_meta);
         match (node_exists(&tree, node), fixture, meta) {
             (true, Some(fixture), Some(meta)) => Ok((meta, fixture)),
             _ => Err(FixtureJobError::NoSuchJob),
         }
+    }
+
+    /// The job `id` as an ordinary job: its meta map and its fixture node, refused for a role job.
+    fn ordinary_job_meta(&self, id: NodeId) -> Result<(LoroMap, TreeID), FixtureJobError> {
+        let found = self.job_meta(id)?;
+        if self.fixture_job(id).is_some_and(|job| job.role.is_some()) {
+            return Err(FixtureJobError::RoleJob);
+        }
+        Ok(found)
     }
 
     /// The job `id` as read, `None` when it is not a live fixture job.
@@ -115,7 +118,8 @@ impl Document {
     /// of the fixture's jobs: Show on, Output off, no tick, in one step (criteria 2, 5).
     ///
     /// # Errors
-    /// [`FixtureJobError::NoSuchFixture`] when `fixture` is not a live fixture.
+    /// [`FixtureJobError::NoSuchFixture`] when `fixture` is not a live fixture;
+    /// [`FixtureJobError::FixedJobs`] for a pin or a screw (ADR 0059 §5).
     pub fn add_fixture_job(
         &self,
         fixture: NodeId,
@@ -127,11 +131,20 @@ impl Document {
         if !is_fixture_node(&tree, parent) {
             return Err(FixtureJobError::NoSuchFixture);
         }
+        let kind_text = tree
+            .get_meta(parent)
+            .ok()
+            .and_then(|meta| string(&meta, KEY_FIXTURE_KIND));
+        if kind_text.as_deref().is_some_and(has_roles) {
+            return Err(FixtureJobError::FixedJobs);
+        }
         let record = JobRecord {
+            id: String::new(),
             kind: kind.to_owned(),
             name: fixture_name(name).unwrap_or_else(|| kind.to_owned()),
             show: true,
             targets: Vec::new(),
+            role: None,
         };
         let node = insert_job(&tree, parent, &record, &[])?;
         self.commit_with_label(ADD_FIXTURE_JOB_COMMIT_LABEL);
@@ -142,9 +155,9 @@ impl Document {
     /// unchanged or nothing is left of it (criterion 4).
     ///
     /// # Errors
-    /// [`FixtureJobError::NoSuchJob`].
+    /// [`FixtureJobError::NoSuchJob`]; [`FixtureJobError::RoleJob`] for a role job.
     pub fn rename_fixture_job(&self, id: NodeId, name: &str) -> Result<bool, FixtureJobError> {
-        let (meta, _) = self.job_meta(id)?;
+        let (meta, _) = self.ordinary_job_meta(id)?;
         let Some(name) = fixture_name(name) else {
             return Ok(false);
         };
@@ -160,9 +173,10 @@ impl Document {
     /// Deletes the job `id` with its ticks in one step; undo revives both (criteria 4, 11).
     ///
     /// # Errors
-    /// [`FixtureJobError::NoSuchJob`].
+    /// [`FixtureJobError::NoSuchJob`]; [`FixtureJobError::RoleJob`] for a role job, which is
+    /// deleted with its fixture only.
     pub fn delete_fixture_job(&self, id: NodeId) -> Result<(), FixtureJobError> {
-        self.job_meta(id)?;
+        self.ordinary_job_meta(id)?;
         self.loro()
             .get_tree(OBJECTS_TREE)
             .delete(tree_id_of(id))
@@ -240,14 +254,15 @@ impl Document {
     ///
     /// # Errors
     /// [`FixtureJobError::NoSuchJob`]; [`FixtureJobError::NoSuchPart`] when a part is not the
-    /// job's fixture or one of its slots, or its suffix is not one of [`PART_SUFFIXES`].
+    /// job's fixture or one of its slots, or its suffix is not one of [`PART_SUFFIXES`];
+    /// [`FixtureJobError::RoleJob`] for a role job, whose parts are fixed.
     pub fn set_fixture_job_targets(
         &self,
         id: NodeId,
         parts: &[FixturePartKey],
         ticked: bool,
     ) -> Result<bool, FixtureJobError> {
-        let (meta, fixture) = self.job_meta(id)?;
+        let (meta, fixture) = self.ordinary_job_meta(id)?;
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let part_ok = |part: &FixturePartKey| {
             let node = tree_id_of(part.node);
@@ -257,7 +272,7 @@ impl Document {
                 .is_none_or(|s| PART_SUFFIXES.contains(&s));
             let node_ok = node == fixture
                 || (node_exists(&tree, node)
-                    && parent_of(&tree, node) == Some(fixture)
+                    && parent_node(&tree, node) == Some(fixture)
                     && !tree.get_meta(node).is_ok_and(|m| is_job_meta(&m)));
             suffix_ok && node_ok
         };

@@ -10,8 +10,11 @@
 )]
 
 mod fixture_fit;
+mod fixture_grid;
 mod fixture_kind;
+mod fixture_marks;
 mod fixture_part;
+mod fixture_sets;
 mod fixture_slot;
 mod fixture_snap;
 mod fixture_stored;
@@ -20,6 +23,7 @@ mod machine_profile;
 mod machine_profile_copy;
 mod machine_profile_file;
 mod machine_profile_fixtures;
+mod machine_profile_sets;
 mod machine_profiles;
 mod manifest;
 mod material;
@@ -145,15 +149,24 @@ pub mod library {
 }
 
 pub use fixture_fit::{FitMatch, fit_slot};
+pub use fixture_grid::{
+    GridCounts, MAX_GRID_CENTRES, MAX_GRID_COUNT, centres, clamp_count, mark_range, spacing_range,
+};
 pub use fixture_kind::{
     FixtureKind, KIND_PREFIX, MAJOR_EVERY_RANGE, MmRange, ScrewPart, SlotShape, StopPart,
-    board_side_range, grid_spacing_range, origin_offset_range, screw_diameters, screw_head_range,
-    screw_thread_range, slot_size_range, stop_leg_range, stop_legs, stop_thickness_range,
+    board_side_range, grid_spacing_range, origin_offset_range, pin_diameter_range, screw_diameters,
+    screw_head_range, screw_thread_range, slot_size_range, stop_leg_range, stop_legs,
+    stop_thickness_range,
 };
+pub use fixture_marks::{Circle, Line, MarkLines, centre_marks};
 pub use fixture_part::{FixturePart, job_parts};
+pub use fixture_sets::{FixtureHome, is_locked, on_bed};
 pub use fixture_slot::Slot;
 pub use fixture_snap::{Placement, board_points, stop_points};
-pub use fixture_stored::{SLOT_CIRCLE, SLOT_RECT, grid_spec, params_damage, read_slot, screw_spec};
+pub use fixture_stored::{
+    CentreGrid, SLOT_CIRCLE, SLOT_RECT, centre_grid, grid_spec, params_damage, pin_spec, read_slot,
+    screw_spec, translation_part,
+};
 pub use grid_layout::{
     GridLayout, GridSpec, Lattice, Number, Tape, TapeEdge, TapeEdges, Tick, layout,
 };
@@ -164,13 +177,14 @@ pub use machine_profile::{
     clamp_power, clamp_work_area, clamp_work_side, grouped, save_as_name,
 };
 pub use machine_profile_copy::{
-    CopyRead, DAMAGED_NAME_NOTICE, ProfileCopy, differs, read_copy, write_copy,
+    CopyRead, DAMAGED_NAME_NOTICE, ProfileCopy, align_due, differs, read_copy, sets_differ,
+    write_copy,
 };
 pub use machine_profile_file::{
     MAX_RECORD_BYTES, RecordError, read_choice, read_record, write_choice, write_record,
 };
-pub use machine_profile_fixtures::{
-    MAX_SET_FIXTURES, MAX_SET_JOBS, MAX_SET_SLOTS, MAX_SET_TARGETS,
+pub use machine_profile_sets::{
+    MAX_RECORD_FIXTURES, MAX_RECORD_JOBS, MAX_RECORD_SETS, MAX_RECORD_SLOTS, MAX_RECORD_TARGETS,
 };
 pub use machine_profiles::{MAX_RECORDS, MachineProfiles};
 pub use manifest::{ENGRAVED_GRID, PROCESS_ID, manifest};

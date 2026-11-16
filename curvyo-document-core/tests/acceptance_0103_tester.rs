@@ -84,7 +84,8 @@ fn ac20_the_current_format_is_41() {
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 46);
+    // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 47);
 }
 
 #[test]
@@ -143,7 +144,7 @@ fn ac20_golden_v41_saves_as_format_41() {
                 // since `specs/0028-material-test-library`, 44 since `specs/0111`, 45 since `specs/0114`,
                 // 46 since `specs/0112`.
                 assert!(
-                    t.contains("\"format_version\": 46") || t.contains("\"format_version\":46"),
+                    t.contains("\"format_version\": 47") || t.contains("\"format_version\":47"),
                     "the manifest says 46"
                 );
                 seen = true;
@@ -212,8 +213,8 @@ fn ac20_a_format_42_file_is_refused() {
     )
     .unwrap();
     // Superseded by `0110` (format 42), `0028` (format 43), `0111` (format 44), `0114` (format
-    // 45) and `0112` (format 46): the next number is refused.
-    let future = with_format(&bytes, 47);
+    // 45), `0112` (format 46) and `0113` (format 47): the next number is refused.
+    let future = with_format(&bytes, 48);
     assert!(
         unpack(8, &future).is_err(),
         "a file of a later format is refused, not read"

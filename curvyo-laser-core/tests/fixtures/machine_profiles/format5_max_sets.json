@@ -1,0 +1,5503 @@
+{
+  "format_version": 5,
+  "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
+  "kind": "laser",
+  "modified": 1762171200000,
+  "name": "K40 in the garage",
+  "work_area_mm": {
+    "width": 600.0,
+    "height": 400.0
+  },
+  "origin": "top_left",
+  "max_feed_mm_per_min": 12000,
+  "max_power": 255,
+  "laser_mode": false,
+  "motorised_z": true,
+  "connection": {
+    "connector_address": "192.168.1.40:8080",
+    "controller_port": "/dev/ttyUSB0",
+    "baud_rate": 115200
+  },
+  "fixture_sets": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "name": "Set 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000002",
+          "kind": "holder",
+          "name": "Holder 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000003",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5",
+                "slot:6",
+                "slot:7",
+                "slot:8",
+                "slot:9",
+                "slot:10",
+                "slot:11",
+                "slot:12"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000004",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5",
+                "slot:6",
+                "slot:7",
+                "slot:8",
+                "slot:9",
+                "slot:10",
+                "slot:11",
+                "slot:12"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000005",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5",
+                "slot:6",
+                "slot:7",
+                "slot:8",
+                "slot:9",
+                "slot:10",
+                "slot:11",
+                "slot:12"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000006",
+          "kind": "pin",
+          "name": "Pin 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000007",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000008",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000009",
+          "kind": "screw",
+          "name": "Screw 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            2.0,
+            2.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000000a",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000000b",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000000c",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000000d",
+          "kind": "clamp",
+          "name": "Clamp 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            3.0,
+            3.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000000e",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000000f",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000010",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000011",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000012",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000013",
+      "name": "Set 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000014",
+          "kind": "holder",
+          "name": "Holder 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            4.0,
+            4.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000015",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5",
+                "slot:6",
+                "slot:7",
+                "slot:8",
+                "slot:9",
+                "slot:10",
+                "slot:11",
+                "slot:12"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000016",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5",
+                "slot:6",
+                "slot:7",
+                "slot:8",
+                "slot:9",
+                "slot:10",
+                "slot:11",
+                "slot:12"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000017",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5",
+                "slot:6",
+                "slot:7",
+                "slot:8",
+                "slot:9",
+                "slot:10",
+                "slot:11",
+                "slot:12"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000018",
+          "kind": "pin",
+          "name": "Pin 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            5.0,
+            5.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000019",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000001a",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000001b",
+          "kind": "screw",
+          "name": "Screw 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            6.0,
+            6.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000001c",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000001d",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000001e",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000001f",
+          "kind": "clamp",
+          "name": "Clamp 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            7.0,
+            7.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000020",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000021",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000022",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000023",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000024",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000025",
+      "name": "Set 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000026",
+          "kind": "holder",
+          "name": "Holder 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            8.0,
+            8.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000027",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3",
+                "slot:4",
+                "slot:5"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000028",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000029",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000002a",
+          "kind": "pin",
+          "name": "Pin 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            9.0,
+            9.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000002b",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000002c",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000002d",
+          "kind": "screw",
+          "name": "Screw 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            10.0,
+            10.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000002e",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000002f",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000030",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000031",
+          "kind": "clamp",
+          "name": "Clamp 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            11.0,
+            11.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000032",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000033",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000034",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000035",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000036",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000037",
+      "name": "Set 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000038",
+          "kind": "holder",
+          "name": "Holder 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            12.0,
+            12.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000039",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000003a",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000003b",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000003c",
+          "kind": "pin",
+          "name": "Pin 13xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            13.0,
+            13.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000003d",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000003e",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000003f",
+          "kind": "screw",
+          "name": "Screw 14xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            14.0,
+            14.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000040",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000041",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000042",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000043",
+          "kind": "clamp",
+          "name": "Clamp 15xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            15.0,
+            15.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000044",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000045",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000046",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000047",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000048",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000049",
+      "name": "Set 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-00000000004a",
+          "kind": "holder",
+          "name": "Holder 16xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            16.0,
+            16.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000004b",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000004c",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000004d",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000004e",
+          "kind": "pin",
+          "name": "Pin 17xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            17.0,
+            17.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000004f",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000050",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000051",
+          "kind": "screw",
+          "name": "Screw 18xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            18.0,
+            18.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000052",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000053",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000054",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000055",
+          "kind": "clamp",
+          "name": "Clamp 19xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            19.0,
+            19.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000056",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000057",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000058",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000059",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000005a",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-00000000005b",
+      "name": "Set 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-00000000005c",
+          "kind": "holder",
+          "name": "Holder 20xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            20.0,
+            20.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000005d",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000005e",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000005f",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000060",
+          "kind": "pin",
+          "name": "Pin 21xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            21.0,
+            21.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000061",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000062",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000063",
+          "kind": "screw",
+          "name": "Screw 22xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            22.0,
+            22.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000064",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000065",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000066",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000067",
+          "kind": "clamp",
+          "name": "Clamp 23xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            23.0,
+            23.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000068",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000069",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000006a",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000006b",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000006c",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-00000000006d",
+      "name": "Set 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-00000000006e",
+          "kind": "holder",
+          "name": "Holder 24xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            24.0,
+            24.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000006f",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000070",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000071",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000072",
+          "kind": "pin",
+          "name": "Pin 25xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            25.0,
+            25.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000073",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000074",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000075",
+          "kind": "screw",
+          "name": "Screw 26xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            26.0,
+            26.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000076",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000077",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000078",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000079",
+          "kind": "clamp",
+          "name": "Clamp 27xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            27.0,
+            27.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000007a",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000007b",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000007c",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000007d",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000007e",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-00000000007f",
+      "name": "Set 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000080",
+          "kind": "holder",
+          "name": "Holder 28xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            28.0,
+            28.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000081",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000082",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000083",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000084",
+          "kind": "pin",
+          "name": "Pin 29xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            29.0,
+            29.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000085",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000086",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000087",
+          "kind": "screw",
+          "name": "Screw 30xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            30.0,
+            30.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000088",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000089",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000008a",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000008b",
+          "kind": "clamp",
+          "name": "Clamp 31xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            31.0,
+            31.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000008c",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000008d",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000008e",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000008f",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000090",
+              "kind": "cut",
+              "name": "Cut 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000091",
+      "name": "Set 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000092",
+          "kind": "holder",
+          "name": "Holder 32xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            32.0,
+            32.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000093",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000094",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000095",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000096",
+          "kind": "pin",
+          "name": "Pin 33xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            33.0,
+            33.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000097",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000098",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000099",
+          "kind": "screw",
+          "name": "Screw 34xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            34.0,
+            34.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000009a",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000009b",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000009c",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000009d",
+          "kind": "clamp",
+          "name": "Clamp 35xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            35.0,
+            35.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000009e",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000009f",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a0",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a1",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000a2",
+      "name": "Set 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000a3",
+          "kind": "holder",
+          "name": "Holder 36xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            36.0,
+            36.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a4",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a5",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a6",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000a7",
+          "kind": "pin",
+          "name": "Pin 37xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            37.0,
+            37.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a8",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000a9",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000aa",
+          "kind": "screw",
+          "name": "Screw 38xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            38.0,
+            38.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ab",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ac",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ad",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000ae",
+          "kind": "clamp",
+          "name": "Clamp 39xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            39.0,
+            39.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000af",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b0",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b1",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b2",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000b3",
+      "name": "Set 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000b4",
+          "kind": "holder",
+          "name": "Holder 40xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            40.0,
+            40.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b5",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b6",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b7",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000b8",
+          "kind": "pin",
+          "name": "Pin 41xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            41.0,
+            41.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000b9",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ba",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000bb",
+          "kind": "screw",
+          "name": "Screw 42xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            42.0,
+            42.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000bc",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000bd",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000be",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000bf",
+          "kind": "clamp",
+          "name": "Clamp 43xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            43.0,
+            43.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c0",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c1",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c2",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c3",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000c4",
+      "name": "Set 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000c5",
+          "kind": "holder",
+          "name": "Holder 44xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            44.0,
+            44.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c6",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c7",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000c8",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000c9",
+          "kind": "pin",
+          "name": "Pin 45xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            45.0,
+            45.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ca",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000cb",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000cc",
+          "kind": "screw",
+          "name": "Screw 46xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            46.0,
+            46.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000cd",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ce",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000cf",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000d0",
+          "kind": "clamp",
+          "name": "Clamp 47xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            47.0,
+            47.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d1",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d2",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d3",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d4",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000d5",
+      "name": "Set 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000d6",
+          "kind": "holder",
+          "name": "Holder 48xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            48.0,
+            48.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d7",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d8",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000d9",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000da",
+          "kind": "pin",
+          "name": "Pin 49xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            49.0,
+            49.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000db",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000dc",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000dd",
+          "kind": "screw",
+          "name": "Screw 50xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            50.0,
+            50.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000de",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000df",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e0",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000e1",
+          "kind": "clamp",
+          "name": "Clamp 51xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            51.0,
+            51.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e2",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e3",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e4",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e5",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000e6",
+      "name": "Set 13xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000e7",
+          "kind": "holder",
+          "name": "Holder 52xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            52.0,
+            52.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e8",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000e9",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ea",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000eb",
+          "kind": "pin",
+          "name": "Pin 53xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            53.0,
+            53.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ec",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ed",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000ee",
+          "kind": "screw",
+          "name": "Screw 54xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            54.0,
+            54.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000ef",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f0",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f1",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000f2",
+          "kind": "clamp",
+          "name": "Clamp 55xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            55.0,
+            55.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f3",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f4",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f5",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f6",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-0000000000f7",
+      "name": "Set 14xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000f8",
+          "kind": "holder",
+          "name": "Holder 56xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            56.0,
+            56.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 15.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 16.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 7xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 17.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 8xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 18.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 9xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 19.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 10xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 20.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 11xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 21.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 12xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 22.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000f9",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000fa",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000fb",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000fc",
+          "kind": "pin",
+          "name": "Pin 57xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            57.0,
+            57.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000fd",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-0000000000fe",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-0000000000ff",
+          "kind": "screw",
+          "name": "Screw 58xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            58.0,
+            58.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000100",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000101",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000102",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000103",
+          "kind": "clamp",
+          "name": "Clamp 59xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            59.0,
+            59.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000104",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000105",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000106",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000107",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000108",
+      "name": "Set 15xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "locked": false,
+      "fixtures": [
+        {
+          "id": "b0a00000-0000-4000-8000-000000000109",
+          "kind": "holder",
+          "name": "Holder 60xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 1000.0,
+            "width_mm": 1000.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            60.0,
+            60.0
+          ],
+          "slots": [
+            {
+              "name": "Slot 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 10.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 11.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 12.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 13.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            },
+            {
+              "name": "Slot 4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "shape": "rect",
+              "cx_mm": 14.0,
+              "cy_mm": 10.0,
+              "w_mm": 5.0,
+              "h_mm": 5.0,
+              "d_mm": 0.0
+            }
+          ],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000010a",
+              "kind": "engrave_outline",
+              "name": "Engrave 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000010b",
+              "kind": "engrave_outline",
+              "name": "Engrave 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000010c",
+              "kind": "engrave_outline",
+              "name": "Engrave 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "board",
+                "slot:0",
+                "slot:1",
+                "slot:2",
+                "slot:3"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-00000000010d",
+          "kind": "pin",
+          "name": "Pin 61xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 2,
+            "diameter_mm": 6.0,
+            "mark_mm": 4.0,
+            "row_spacing_mm": 30.0,
+            "rows": 2
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            61.0,
+            61.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000010e",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "pin.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-00000000010f",
+              "kind": "score",
+              "name": "Diameters",
+              "show": true,
+              "targets": [
+                "pin.circle"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000110",
+          "kind": "screw",
+          "name": "Screw 62xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "column_spacing_mm": 30.0,
+            "columns": 4,
+            "head_diameter_mm": 10.0,
+            "mark_mm": 3.0,
+            "row_spacing_mm": 20.0,
+            "rows": 1,
+            "thread_diameter_mm": 6.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            62.0,
+            62.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000111",
+              "kind": "score",
+              "name": "Score 1",
+              "show": true,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000112",
+              "kind": "score",
+              "name": "Centre mark",
+              "show": true,
+              "targets": [
+                "screw.marks"
+              ],
+              "role": "centre_mark"
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000113",
+              "kind": "score",
+              "name": "Diameters",
+              "show": false,
+              "targets": [
+                "screw.head",
+                "screw.thread"
+              ],
+              "role": "diameters"
+            }
+          ]
+        },
+        {
+          "id": "b0a00000-0000-4000-8000-000000000114",
+          "kind": "clamp",
+          "name": "Clamp 63xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "locked": false,
+          "params": {
+            "height_mm": 40.0,
+            "width_mm": 40.0
+          },
+          "matrix": [
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            63.0,
+            63.0
+          ],
+          "slots": [],
+          "jobs": [
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000115",
+              "kind": "cut",
+              "name": "Cut 0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000116",
+              "kind": "cut",
+              "name": "Cut 1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000117",
+              "kind": "cut",
+              "name": "Cut 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            },
+            {
+              "id": "c0b0a000-0000-4000-8000-000000000118",
+              "kind": "cut",
+              "name": "Cut 3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "show": true,
+              "targets": [
+                "clamp"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

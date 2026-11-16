@@ -1,6 +1,8 @@
 //! Over-limit profile records of `specs/0103-fixture-jobs` (criteria 23, 24, ADR 0052 §7): a set
 //! of 101 jobs or 201 part tokens is damaged, as the maximum set of 100 and 200 reads. Written
 //! from the spec; the maximum is the golden `format3_max_set.json`, edited by one job or token.
+//! Superseded by `0113` (ADR 0060 §2, §3): the maximum is `format5_max_sets.json` with 200 jobs
+//! and 400 part tokens in all sets; format 3 is skipped as older.
 
 #![allow(clippy::unwrap_used, missing_docs)]
 
@@ -14,7 +16,7 @@ const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
 fn max_set() -> Value {
     let text = std::fs::read_to_string(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/machine_profiles/format3_max_set.json"),
+            .join("tests/fixtures/machine_profiles/format5_max_sets.json"),
     )
     .unwrap();
     serde_json::from_str(&text).unwrap()
@@ -29,18 +31,22 @@ fn read(value: &Value) -> Result<(), RecordError> {
 fn the_maximum_set_reads_and_one_job_more_is_damaged() {
     let mut value = max_set();
     assert_eq!(read(&value), Ok(()), "the maximum reads");
-    let fixtures = value["fixtures"].as_array_mut().unwrap();
+    let fixtures = value["fixture_sets"][0]["fixtures"].as_array_mut().unwrap();
     let first = fixtures[0]["jobs"][0].clone();
     fixtures[0]["jobs"].as_array_mut().unwrap().push(first);
-    assert_eq!(read(&value), Err(RecordError::Damaged), "101 jobs");
+    assert_eq!(read(&value), Err(RecordError::Damaged), "201 jobs");
 }
 
 #[test]
 fn the_maximum_set_reads_and_one_token_more_is_damaged() {
     let mut value = max_set();
-    let fixtures = value["fixtures"].as_array_mut().unwrap();
     let mut added = false;
-    'search: for fixture in fixtures.iter_mut() {
+    let fixtures = value["fixture_sets"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .flat_map(|set| set["fixtures"].as_array_mut().unwrap().iter_mut());
+    'search: for fixture in fixtures {
         let slots = fixture["slots"].as_array().map_or(0, Vec::len);
         let Some(jobs) = fixture["jobs"].as_array_mut() else {
             continue;
@@ -58,5 +64,5 @@ fn the_maximum_set_reads_and_one_token_more_is_damaged() {
         }
     }
     assert!(added, "the golden has a job with a free slot token");
-    assert_eq!(read(&value), Err(RecordError::Damaged), "201 part tokens");
+    assert_eq!(read(&value), Err(RecordError::Damaged), "401 part tokens");
 }

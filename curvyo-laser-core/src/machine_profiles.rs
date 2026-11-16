@@ -17,6 +17,8 @@ pub struct MachineProfiles {
     user: Vec<MachineProfile>,
     damaged: usize,
     newer: usize,
+    /// Records of formats 1 to 4, left as they are (ADR 0060 §3).
+    older: usize,
     /// The ids of the records that did not load; they are never written (ADR 0004 §9).
     skipped: Vec<String>,
 }
@@ -28,6 +30,7 @@ impl Default for MachineProfiles {
             user: Vec::new(),
             damaged: 0,
             newer: 0,
+            older: 0,
             skipped: Vec::new(),
         }
     }
@@ -35,7 +38,8 @@ impl Default for MachineProfiles {
 
 impl MachineProfiles {
     /// The library from `(file name, text)` pairs: names that are not `<uuid>.json` are ignored,
-    /// a damaged or newer record is skipped and counted (criterion 13), every other one loads.
+    /// a damaged, newer or older record is skipped and counted (criterion 13; `0113` criterion
+    /// 39), every other one loads.
     /// The ids of skipped records and of records past [`MAX_RECORDS`] are kept so that no later
     /// write replaces them.
     #[must_use]
@@ -57,6 +61,7 @@ impl MachineProfiles {
                     match error {
                         RecordError::Damaged => library.damaged += 1,
                         RecordError::Newer => library.newer += 1,
+                        RecordError::Older => library.older += 1,
                     }
                     library.skipped.push(id.to_owned());
                 }
@@ -65,7 +70,7 @@ impl MachineProfiles {
         library
     }
 
-    /// Whether `id` names a record that was left as it is at load (damaged, newer or past the
+    /// Whether `id` names a record that was left as it is at load (damaged, newer, older or past the
     /// limit): it is never written, so Save as profile takes a new id instead.
     #[must_use]
     pub fn is_skipped(&self, id: &str) -> bool {
@@ -93,6 +98,14 @@ impl MachineProfiles {
                 "are from a newer version"
             };
             notices.push(line(self.newer, what));
+        }
+        if self.older > 0 {
+            let what = if self.older == 1 {
+                "has an older format"
+            } else {
+                "have an older format"
+            };
+            notices.push(line(self.older, what));
         }
         notices
     }
@@ -162,7 +175,7 @@ impl MachineProfiles {
             },
             work_area: source.work_area,
             connection: source.connection,
-            fixtures: source.fixtures,
+            fixture_sets: source.fixture_sets,
         };
         self.add(profile)
     }
@@ -195,18 +208,41 @@ impl MachineProfiles {
         Some(write_of(profile))
     }
 
-    /// Update profile with the page's fixtures (`specs/0102-laser-fixtures` criterion 28): as
-    /// [`MachineProfiles::update`], and the set becomes `fixtures`.
-    pub fn update_with_fixtures(
+    /// A set edit made on a page (ADR 0060 §5a): the user profile `id` takes `sets` with a
+    /// `modified` above its own (at least `modified`), so every page aligned to the old one sees
+    /// it as newer (ADR 0059 §10). `None` for the built-in, an unknown profile or unchanged sets.
+    pub fn set_fixture_sets(
         &mut self,
         id: &str,
-        values: ProfileValues,
-        work_area: curvyo_document_core::DocumentSize,
-        fixtures: Vec<curvyo_document_core::FixtureRecord>,
+        sets: Vec<curvyo_document_core::FixtureSetRecord>,
         modified: i64,
     ) -> Option<LibraryWrite> {
-        self.user_mut(id)?.fixtures = fixtures;
-        self.update(id, values, work_area, modified)
+        let profile = self.user_mut(id)?;
+        if profile.fixture_sets == sets {
+            return None;
+        }
+        profile.fixture_sets = sets;
+        profile.modified = modified.max(profile.modified.saturating_add(1));
+        Some(write_of(profile))
+    }
+
+    /// The canonical text of the user profile `id` as this library holds it: what an undo of a
+    /// set edit compares and writes back (ADR 0060 §5a). `None` for the built-in or an unknown
+    /// profile.
+    #[must_use]
+    pub fn text(&self, id: &str) -> Option<String> {
+        self.user.iter().find(|p| p.id == id).map(write_record)
+    }
+
+    /// Writes the record text `text` back as the user profile `id` (undo or redo of a set edit,
+    /// ADR 0060 §5a) with a `modified` above its own, so other instances align to it. `None` for
+    /// the built-in, an unknown profile, or a text that does not read as that profile.
+    pub fn restore(&mut self, id: &str, text: &str, modified: i64) -> Option<LibraryWrite> {
+        let mut restored = read_record(&format!("{id}.json"), text).ok()?;
+        let profile = self.user_mut(id)?;
+        restored.modified = modified.max(profile.modified.saturating_add(1));
+        *profile = restored;
+        Some(write_of(profile))
     }
 
     /// Sets the connection of the user profile `id` (criterion 9). `None` for the built-in, an
@@ -265,7 +301,7 @@ mod tests {
         let (name, text) = record(4, "newer");
         entries.push((
             name,
-            text.replace("\"format_version\": 4", "\"format_version\": 7"),
+            text.replace("\"format_version\": 5", "\"format_version\": 7"),
         ));
         entries.push(("notes.txt".to_owned(), "{".to_owned()));
         let library = MachineProfiles::load(&entries);
@@ -283,6 +319,37 @@ mod tests {
             ]
         );
         assert!(library.load_notices().iter().all(|n| n.len() <= 70));
+    }
+
+    #[test]
+    fn older_records_are_counted_left_as_they_are_and_their_ids_skipped() {
+        let (first, text) = record(1, "K40");
+        let older = text.replace("\"format_version\": 5", "\"format_version\": 4");
+        let one = MachineProfiles::load(&[(first.clone(), older.clone())]);
+        assert_eq!(
+            one.load_notices(),
+            vec!["1 profile has an older format. It was left as it is.".to_owned()]
+        );
+        let id = new_profile_id([1; 16]);
+        assert!(one.is_skipped(&id));
+        assert!(one.find(&id).is_none());
+        let mut library = one.clone();
+        let mut profile = MachineProfile::generic_laser();
+        profile.id.clone_from(&id);
+        assert_eq!(library.add(profile), None, "never overwritten");
+        let (second, text) = record(2, "Ortur");
+        let two = MachineProfiles::load(&[
+            (first, older),
+            (
+                second,
+                text.replace("\"format_version\": 5", "\"format_version\": 2"),
+            ),
+        ]);
+        assert_eq!(
+            two.load_notices(),
+            vec!["2 profiles have an older format. They were left as they are.".to_owned()]
+        );
+        assert!(two.load_notices().iter().all(|n| n.len() <= 70));
     }
 
     #[test]
@@ -340,5 +407,41 @@ mod tests {
             Some(LibraryWrite::Remove { id: id.clone() })
         );
         assert!(library.find(&id).is_none());
+    }
+
+    #[test]
+    fn a_set_edit_writes_the_sets_with_a_newer_modified_and_restore_writes_a_text_back() {
+        let mut library = MachineProfiles::load(&[record(1, "K40")]);
+        let id = new_profile_id([1; 16]);
+        let before = library.text(&id).unwrap();
+        let old = library.find(&id).unwrap().modified;
+        let sets = vec![curvyo_document_core::FixtureSetRecord {
+            id: new_profile_id([2; 16]),
+            name: "Bed".to_owned(),
+            locked: true,
+            fixtures: Vec::new(),
+        }];
+        let LibraryWrite::Write { text, .. } =
+            library.set_fixture_sets(&id, sets.clone(), old).unwrap()
+        else {
+            panic!("a set edit writes");
+        };
+        assert!(text.contains("\"locked\": true"));
+        assert_eq!(library.find(&id).unwrap().modified, old + 1, "always newer");
+        assert!(
+            library.set_fixture_sets(&id, sets, old + 5).is_none(),
+            "unchanged"
+        );
+        assert!(library.text(GENERIC_LASER_ID).is_none());
+        let restored = library.restore(&id, &before, old).unwrap();
+        assert!(matches!(restored, LibraryWrite::Write { .. }));
+        let profile = library.find(&id).unwrap();
+        assert_eq!(profile.fixture_sets, []);
+        assert_eq!(
+            profile.modified,
+            old + 2,
+            "newer again, so others align back"
+        );
+        assert!(library.restore(&id, "{", 1).is_none());
     }
 }

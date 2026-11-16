@@ -24,6 +24,7 @@ mod decorations;
 mod document_area;
 mod fill;
 mod fixture_look;
+mod fixture_overlay;
 mod glyphs;
 mod grid_lines;
 mod group_box;
@@ -68,8 +69,11 @@ pub use document_area::{
     checker_grid, checker_tone,
 };
 pub use fixture_look::{
-    BoardLook, FixtureLook, GridLook, ScrewLook, SlotLook, SlotOutline, StopLook, TapeLook,
-    TickLook, build_fixture_box, build_fixture_ghost, build_fixture_look, build_slot_cue,
+    BoardLook, FixtureLook, GridLook, PinLook, ScrewLook, SlotLook, SlotOutline, StopLook,
+    TapeLook, TickLook, build_fixture_look,
+};
+pub use fixture_overlay::{
+    build_fixture_box, build_fixture_ghost, build_fixture_preview, build_slot_cue,
 };
 pub use glyphs::{DrawList, Vertex};
 pub use grid_lines::{GridStroke, build_grid_lines, grid_ink};

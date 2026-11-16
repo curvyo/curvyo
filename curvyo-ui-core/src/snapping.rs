@@ -441,6 +441,7 @@ impl SnapResult {
     }
 }
 
+mod centres;
 mod collection;
 mod compose;
 mod constrained;

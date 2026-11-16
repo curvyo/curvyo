@@ -94,6 +94,21 @@ pub const FREE_STEPS: &[&str] = &[
     "add_slot",
     "remove_slot",
     "set_slot",
+    // `specs/0113-fixture-sets-and-pins`: set, job fixture and Apply commands write only the
+    // manufacturing's set and fixture nodes.
+    "add_fixture_set",
+    "rename_fixture_set",
+    "remove_fixture_set",
+    "move_fixture_set",
+    "set_fixture_set_on_page",
+    "set_fixture_set_off_page",
+    "add_fixture",
+    "add_job_fixture",
+    "lock_fixture",
+    "unlock_fixture",
+    "lock_fixture_set",
+    "unlock_fixture_set",
+    "apply_page_fixtures",
     // `specs/0103-fixture-jobs` adrs.md section 7: job commands write only fixture job nodes.
     "add_fixture_job",
     "rename_fixture_job",

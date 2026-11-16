@@ -274,7 +274,8 @@ fn the_operation_tools_golden_reads_back_every_option_interval_copy_and_group_ke
     });
     assert_eq!(format_of(&bytes), 44);
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7); a 44 file opens as it is.
-    assert_eq!(CURRENT_FORMAT_VERSION, 46);
+    // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 47);
     let d = open_unchanged(&bytes);
     let mfgs = d.manufacturings();
     assert_eq!(mfgs.len(), 2);
@@ -389,8 +390,8 @@ fn a_file_of_a_newer_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 47,
-            supported: 46
+            found: 48,
+            supported: 47
         })
     ));
 }

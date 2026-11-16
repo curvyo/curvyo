@@ -11,18 +11,15 @@ use crate::fixture_job_codec::FixturePartKey;
 use crate::group_tree::node_id;
 use crate::manufacturing::{FixtureParams, ManufacturingError, next_numbered};
 use crate::manufacturing_codec::{
-    KEY_FIXTURE_ACTIVE, KEY_FIXTURE_PARAMS, KEY_SLOT_PARAMS, SHAPE_FIXTURE, is_manufacturing_node,
-    string, write_plain_map,
+    KEY_FIXTURE_ACTIVE, KEY_FIXTURE_PARAMS, KEY_SLOT_PARAMS, fixture_home, write_plain_map,
 };
 use crate::manufacturing_fixtures::{
     FixtureRecord, fixture_name, read_active, read_whole_map, write_fixture_registers,
     write_matrix, write_visible,
 };
 use crate::node_registers::{KEY_NAME, read_registers};
-use crate::path_codec::node_exists;
 use crate::path_model::NodeId;
 use crate::paths::tree_id_of;
-use crate::shape_codec::KEY_SHAPE;
 
 /// The label of Add grid.
 pub const ADD_GRID_COMMIT_LABEL: &str = "add_grid";
@@ -118,7 +115,9 @@ const SCREW_HEAD_KEY: &str = "head_diameter_mm";
 
 /// `params` with a screw's thread diameter set to its head where it is larger, so no writer stores
 /// a thread above its head (adrs.md §6a.6). Other values are kept as they are.
-fn with_thread_within_head(params: &FixtureParams) -> std::borrow::Cow<'_, FixtureParams> {
+pub(crate) fn with_thread_within_head(
+    params: &FixtureParams,
+) -> std::borrow::Cow<'_, FixtureParams> {
     let number = |key: &str| params.get(key).and_then(serde_json::Value::as_f64);
     match (number(SCREW_THREAD_KEY), number(SCREW_HEAD_KEY)) {
         (Some(thread), Some(head)) if thread > head => {
@@ -145,9 +144,38 @@ pub struct NewFixture<'a> {
     pub matrix: Option<Affine>,
 }
 
+impl NewFixture<'_> {
+    /// The fixture to write, named `name`, Active, with the two role jobs of a pin or a screw
+    /// (ADR 0059 §5): what Add fixture (into a set) and Add job fixture create.
+    ///
+    /// # Errors
+    /// [`ManufacturingError::OutOfRange`] for a matrix that is not finite or passes ±1e7.
+    pub(crate) fn record(&self, name: String) -> Result<FixtureRecord, ManufacturingError> {
+        if self
+            .matrix
+            .is_some_and(|m| !m.is_finite() || !m.is_within_limit())
+        {
+            return Err(ManufacturingError::OutOfRange);
+        }
+        Ok(FixtureRecord {
+            id: String::new(),
+            kind: self.kind.to_owned(),
+            name,
+            locked: false,
+            params: with_thread_within_head(self.params).into_owned(),
+            matrix: self.matrix,
+            slots: Vec::new(),
+            jobs: crate::fixture_job_codec::role_job_records(self.kind),
+        })
+    }
+}
+
 impl Document {
-    /// Adds a fixture "`label` N" (N the smallest number no fixture of the same kind on this page
-    /// uses), Active, at the end of the setup, in one step labelled by its button (criterion 2).
+    /// Adds a job fixture "`label` N" (N the smallest number no fixture of the same kind on this
+    /// page uses), Active, without role jobs, in one step labelled by its `0102` button
+    /// (criterion 2). `0113` adds through [`Document::add_set_fixture`] and
+    /// [`Document::add_job_fixture`]; this stays for the `0102` Fixtures block until the session
+    /// moves to the Fixtures tab (`0113` Part C).
     ///
     /// # Errors
     /// [`ManufacturingError::NotFound`] for an unknown manufacturing;
@@ -173,9 +201,10 @@ impl Document {
             .map(|fixture| fixture.name)
             .collect();
         let record = FixtureRecord {
+            id: String::new(),
             kind: new.kind.to_owned(),
             name: next_numbered(new.label, &taken, false),
-            active: true,
+            locked: false,
             params: with_thread_within_head(new.params).into_owned(),
             matrix: new.matrix,
             slots: Vec::new(),
@@ -370,32 +399,9 @@ impl Document {
         Ok(true)
     }
 
-    /// Replaces, uncommitted, every fixture of the manufacturing `manufacturing` by one new node
-    /// per record, in order, with fresh ids: the fixture part of Pick and Reset from profile
-    /// (ADR 0050 §4). Orphan slots are left as they are.
-    pub(crate) fn replace_fixtures(
-        &self,
-        manufacturing: NodeId,
-        records: &[FixtureRecord],
-    ) -> Result<(), ManufacturingError> {
-        let snapshot = self
-            .manufacturing(manufacturing)
-            .ok_or(ManufacturingError::NotFound)?;
-        let tree = self.loro().get_tree(OBJECTS_TREE);
-        for fixture in &snapshot.fixtures {
-            tree.delete(tree_id_of(fixture.id))
-                .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        }
-        crate::groups::remove_emptied_groups(&tree, &[None]);
-        for record in records {
-            self.insert_fixture(tree_id_of(manufacturing), record)?;
-        }
-        Ok(())
-    }
-
     /// Creates, uncommitted, a fixture node from `record` with its slots and its jobs (Output
     /// off, ticks mapped to the new slots by index, ADR 0052 §7) at the end of `parent`.
-    fn insert_fixture(
+    pub(crate) fn insert_fixture(
         &self,
         parent: TreeID,
         record: &FixtureRecord,
@@ -433,34 +439,25 @@ impl Document {
         Ok(node)
     }
 
-    /// The fixture `id` as read, `None` when it is not a live fixture.
+    /// The fixture `id` as read, a job fixture or a set fixture; `None` when it is not a live
+    /// fixture.
     #[must_use]
     pub fn fixture(&self, id: NodeId) -> Option<crate::FixtureSnapshot> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
-        let Some(TreeParentId::Node(parent)) = tree.parent(tree_id_of(id)) else {
-            return None;
-        };
-        self.manufacturing(node_id(parent))?
+        let home = fixture_home(&tree, tree_id_of(id))?;
+        self.manufacturing(node_id(home.manufacturing))?
             .fixtures
             .into_iter()
             .find(|fixture| fixture.id == id)
     }
 
+    /// The meta map of the live fixture `id` (a job fixture or a set fixture); a set, a slot or
+    /// any other node is refused (ADR 0059 §6).
     pub(crate) fn fixture_meta(&self, id: NodeId) -> Result<LoroMap, ManufacturingError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let node = tree_id_of(id);
-        let parent = match tree.parent(node) {
-            Some(TreeParentId::Node(parent)) if node_exists(&tree, node) => parent,
-            _ => return Err(ManufacturingError::NoSuchFixture),
-        };
-        let meta = tree
-            .get_meta(node)
-            .map_err(|_| ManufacturingError::NoSuchFixture)?;
-        if !is_manufacturing_node(&tree, parent)
-            || string(&meta, KEY_SHAPE).as_deref() != Some(SHAPE_FIXTURE)
-        {
-            return Err(ManufacturingError::NoSuchFixture);
-        }
-        Ok(meta)
+        fixture_home(&tree, node).ok_or(ManufacturingError::NoSuchFixture)?;
+        tree.get_meta(node)
+            .map_err(|_| ManufacturingError::NoSuchFixture)
     }
 }

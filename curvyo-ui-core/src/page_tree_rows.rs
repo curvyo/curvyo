@@ -33,6 +33,7 @@ pub struct PlacedPageRow<'a> {
 
 /// A fixture of the page as its row under the Fixtures row reads it (`specs/0102` criterion 12).
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)] // independent row states: on the bed, set on, eye, mark
 pub struct FixtureTreeRow<'a> {
     /// The fixture's node id.
     pub id: NodeId,
@@ -42,6 +43,9 @@ pub struct FixtureTreeRow<'a> {
     pub word: &'static str,
     /// Its Active state: on the bed.
     pub active: bool,
+    /// Whether its set is on this page (always for a job fixture): a row of a set that is off is
+    /// listed muted and not pressed (`specs/0113` criterion 2, UX notes 8).
+    pub on_page: bool,
     /// Its eye: shown.
     pub visible: bool,
     /// Whether it is the canvas selection: its row is marked selected (criterion 12).
@@ -126,7 +130,8 @@ fn plain_row(id: NodeId, kind: RowKind, name: &str, depth: usize, shown: bool) -
     }
 }
 
-/// The fixture rows under the Fixtures row, in creation order (`specs/0102` criterion 12).
+/// The fixture rows under the Fixtures row, in listing order (`specs/0102` criterion 12, `0113`
+/// criterion 16).
 fn fixture_rows(fixtures: &[FixtureTreeRow<'_>]) -> Vec<LayerRow> {
     fixtures
         .iter()
@@ -141,6 +146,7 @@ fn fixture_rows(fixtures: &[FixtureTreeRow<'_>]) -> Vec<LayerRow> {
             row.fixture = Some(FixtureLine {
                 word: fixture.word,
                 active: fixture.active,
+                on_page: fixture.on_page,
             });
             if fixture.selected {
                 row.mark = RowMark::Selected;
@@ -500,6 +506,7 @@ mod tests {
                 name: "Grid 1",
                 word: "Grid",
                 active: true,
+                on_page: true,
                 visible: true,
                 selected: false,
             },
@@ -508,6 +515,7 @@ mod tests {
                 name: "Clamp 1",
                 word: "Clamp",
                 active: false,
+                on_page: true,
                 visible: false,
                 selected: false,
             },
@@ -552,7 +560,8 @@ mod tests {
             grid.fixture,
             Some(FixtureLine {
                 word: "Grid",
-                active: true
+                active: true,
+                on_page: true
             })
         );
         let clamp = window.last().unwrap();
@@ -560,7 +569,8 @@ mod tests {
             clamp.fixture,
             Some(FixtureLine {
                 word: "Clamp",
-                active: false
+                active: false,
+                on_page: true
             })
         );
         assert!(!clamp.is_own(), "a fixture row is no own object row");

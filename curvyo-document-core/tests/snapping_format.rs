@@ -30,6 +30,11 @@ const DAMAGED: [&str; 7] = [
     "snapping_y_type_v27.curvyo",
 ];
 
+/// The damaged file of the centres register `snapping_centres` (`specs/0113-fixture-sets-and-pins`
+/// criterion 30), written at the format that added it.
+const CENTRES_VERSION: u32 = 47;
+const CENTRES_DAMAGED: &str = "snapping_centres_type_v47.curvyo";
+
 fn fixture_path(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures")
@@ -522,7 +527,24 @@ fn write_fixtures_on_request() {
         for (name, bytes) in damaged_files() {
             std::fs::write(fixture_path(name), bytes).unwrap();
         }
+        std::fs::write(fixture_path(CENTRES_DAMAGED), centres_damaged()).unwrap();
     }
+}
+
+fn centres_damaged() -> Vec<u8> {
+    file_with_root(&[("snapping_centres", LoroValue::from("true"))])
+}
+
+#[test]
+fn a_centres_register_that_is_no_bool_is_refused_as_damaged() {
+    write_fixtures_on_request();
+    assert!(matches!(
+        unpack(2, &centres_damaged()),
+        Err(OpenError::Damaged)
+    ));
+    let bytes = std::fs::read(fixture_path(CENTRES_DAMAGED)).unwrap();
+    assert_eq!(manifest_version(&bytes), CENTRES_VERSION);
+    assert!(matches!(unpack(2, &bytes), Err(OpenError::Damaged)));
 }
 
 #[test]

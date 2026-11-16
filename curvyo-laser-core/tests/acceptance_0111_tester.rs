@@ -268,7 +268,14 @@ fn file_name_of(text: &str) -> String {
 
 #[test]
 fn c22_a_format_4_record_reads_the_capability_and_writes_back_byte_for_byte() {
+    // Superseded by `0113` (ADR 0060 §1, §3): format 4 is skipped as older; a format 5 record
+    // carries the capability and writes back byte for byte.
     let text = profile_fixture("format4_motorised_z.json");
+    assert_eq!(
+        read_record(&file_name_of(&text), &text).unwrap_err(),
+        RecordError::Older
+    );
+    let text = profile_fixture("format5_fixture_sets.json");
     let p = read_record(&file_name_of(&text), &text).unwrap();
     assert!(p.values.motorised_z);
     assert_eq!(write_record(&p), text);
@@ -276,42 +283,53 @@ fn c22_a_format_4_record_reads_the_capability_and_writes_back_byte_for_byte() {
 
 #[test]
 fn c22_an_older_record_reads_off_and_a_write_upgrades_to_4() {
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): records of formats 1 to 4 are skipped as
+    // older, never read and never upgraded; a write is format 5 with `motorised_z` always written.
     let text = profile_fixture("format4_motorised_z.json");
     let mut v: Value = serde_json::from_str(&text).unwrap();
     v.as_object_mut().unwrap().remove("motorised_z");
     v["format_version"] = json!(3);
     let old = serde_json::to_string_pretty(&v).unwrap();
-    let p = read_record(&file_name_of(&old), &old).unwrap();
-    assert!(!p.values.motorised_z, "a format 3 record reads off");
-    let written: Value = serde_json::from_str(&write_record(&p)).unwrap();
-    assert_eq!(written["format_version"], 4);
-    assert_eq!(written["motorised_z"], false, "always written");
-
+    assert_eq!(
+        read_record(&file_name_of(&old), &old).unwrap_err(),
+        RecordError::Older
+    );
     let one = profile_fixture("format1_full_record.json");
-    let p = read_record(&file_name_of(&one), &one).unwrap();
-    assert!(!p.values.motorised_z, "a format 1 record reads off");
+    assert_eq!(
+        read_record(&file_name_of(&one), &one).unwrap_err(),
+        RecordError::Older
+    );
+    let mut p = MachineProfile::generic_laser();
+    p.id = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f".to_owned();
+    let written: Value = serde_json::from_str(&write_record(&p)).unwrap();
+    assert_eq!(written["format_version"], 5);
+    assert_eq!(written["motorised_z"], false, "always written");
 }
 
 #[test]
 fn c22_the_key_in_a_format_3_record_damages_it_and_format_5_is_newer() {
+    // Superseded by `0113` (ADR 0060 §3): a format 3 record is older whatever it holds; format 6
+    // is newer; a non-boolean in a format 5 record is damage.
     let text = profile_fixture("format3_motorised_z_key.json");
     assert_eq!(
         read_record(&file_name_of(&text), &text).unwrap_err(),
-        RecordError::Damaged
+        RecordError::Older
     );
     let text = profile_fixture("newer_format.json");
     let v: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(v["format_version"], 5);
+    assert_eq!(v["format_version"], 6);
     assert_eq!(
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Newer
     );
-    // A non-boolean in a format 4 record is damage.
-    let good = profile_fixture("format4_motorised_z.json");
+    let good = profile_fixture("format5_fixture_sets.json");
     let mut v: Value = serde_json::from_str(&good).unwrap();
     v["motorised_z"] = json!("yes");
     let bad = serde_json::to_string_pretty(&v).unwrap();
-    assert!(read_record(&file_name_of(&bad), &bad).is_err());
+    assert_eq!(
+        read_record(&file_name_of(&bad), &bad).unwrap_err(),
+        RecordError::Damaged
+    );
 }
 
 #[test]
@@ -321,7 +339,8 @@ fn c22_the_generic_laser_has_no_motorised_z() {
 
 #[test]
 fn c22_the_page_copy_carries_the_capability() {
-    let text = profile_fixture("format4_motorised_z.json");
+    // Superseded by `0113` (ADR 0060 §3): the capability of a format 5 record.
+    let text = profile_fixture("format5_fixture_sets.json");
     let p = read_record(&file_name_of(&text), &text).unwrap();
     let copy = ProfileCopy::of(&p);
     let stored = write_copy(&copy);

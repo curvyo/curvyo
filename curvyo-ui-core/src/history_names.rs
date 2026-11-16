@@ -51,6 +51,21 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("remove_slot", "Remove slot"),
     ("set_slot", "Change slot"),
     ("move_to_slot", "Move to slot"),
+    // `specs/0113-fixture-sets-and-pins` UX section 11; the per-kind `add_<kind>` names above stay
+    // so old history rows read.
+    ("add_fixture_set", "Add fixture set"),
+    ("rename_fixture_set", "Rename fixture set"),
+    ("remove_fixture_set", "Remove fixture set"),
+    ("move_fixture_set", "Move fixture set"),
+    ("set_fixture_set_on_page", "Set fixture set on page"),
+    ("set_fixture_set_off_page", "Set fixture set off page"),
+    ("add_fixture", "Add fixture"),
+    ("add_job_fixture", "Add job fixture"),
+    ("lock_fixture", "Lock fixture"),
+    ("unlock_fixture", "Unlock fixture"),
+    ("lock_fixture_set", "Lock fixture set"),
+    ("unlock_fixture_set", "Unlock fixture set"),
+    ("apply_page_fixtures", "Apply fixtures from page"),
     // `specs/0103-fixture-jobs` criteria 2, 4 and 9 (adrs.md section 7): fixed per label, no job
     // name.
     ("add_fixture_job", "Add fixture job"),
@@ -350,6 +365,7 @@ pub const RESERVED_LABELS: &[&str] = &[
     curvyo_document_core::LABEL_NEW_DOCUMENT,
     curvyo_document_core::LABEL_MIGRATE_FORMAT,
     curvyo_document_core::LABEL_REFRESH_MATERIAL_NUMBERS,
+    curvyo_document_core::LABEL_ALIGN_FIXTURE_SETS,
     curvyo_document_core::LABEL_UNDO,
     curvyo_document_core::LABEL_REDO,
     curvyo_document_core::WIPE_LABEL,
@@ -471,6 +487,16 @@ mod tests {
         assert!(RESERVED_LABELS.contains(&dc::LABEL_REFRESH_MATERIAL_NUMBERS));
         assert_eq!(
             known_operation_name(dc::LABEL_REFRESH_MATERIAL_NUMBERS),
+            None
+        );
+    }
+
+    #[test]
+    fn the_fixture_set_alignment_is_reserved_and_unnamed() {
+        // `specs/0113-fixture-sets-and-pins` criterion 47: no step of the maker's.
+        assert!(RESERVED_LABELS.contains(&curvyo_document_core::LABEL_ALIGN_FIXTURE_SETS));
+        assert_eq!(
+            known_operation_name(curvyo_document_core::LABEL_ALIGN_FIXTURE_SETS),
             None
         );
     }

@@ -8,9 +8,10 @@ use loro::{LoroDoc, VersionVector};
 
 use super::stack_machine::{BranchMark, Event, StackMachine, Status};
 use super::step_header::{
-    KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE, LABEL_MIGRATE_FORMAT,
-    LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO,
-    LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE, LABEL_WIPE_OBJECT, StepHeader,
+    KEY_OBJECT, KEY_OBJECT_REDONE, KEY_OBJECT_UNDONE, KEY_REDONE, KEY_UNDONE,
+    LABEL_ALIGN_FIXTURE_SETS, LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO,
+    LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE,
+    LABEL_WIPE_OBJECT, StepHeader,
 };
 use super::step_id::{StepRef, shown_ids};
 use super::step_log::LogStep;
@@ -268,6 +269,7 @@ fn event_of(header: Option<&StepHeader>, step: StepRef) -> Option<Event> {
         LABEL_NEW_DOCUMENT
         | LABEL_MIGRATE_FORMAT
         | LABEL_REFRESH_MATERIAL_NUMBERS
+        | LABEL_ALIGN_FIXTURE_SETS
         | LABEL_WIPE
         | LABEL_WIPE_OBJECT => None,
         LABEL_UNDO => target(KEY_UNDONE).map(Event::Undo),
@@ -284,6 +286,7 @@ pub(crate) fn is_row(step: &LogStep) -> bool {
         LABEL_NEW_DOCUMENT
             | LABEL_MIGRATE_FORMAT
             | LABEL_REFRESH_MATERIAL_NUMBERS
+            | LABEL_ALIGN_FIXTURE_SETS
             | LABEL_UNDO
             | LABEL_REDO
     ) || step.header.is_none()

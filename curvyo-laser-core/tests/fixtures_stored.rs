@@ -120,3 +120,23 @@ fn the_unknown_and_damaged_goldens_run_nothing_and_count_the_bad_suffix() {
     assert_eq!(read[0].damaged + damaged[0].1, 4, "the four damaged values");
     assert!(!damaged[0].0.runs(), "a text Output reads off");
 }
+
+/// `specs/0113` criterion 40: the kind's damaged values of the format-47 damaged golden, which
+/// the document reader leaves to the extension.
+#[test]
+fn the_damaged_sets_golden_counts_each_pin_value_the_laser_reads() {
+    use curvyo_laser_core::translation_part;
+    let read = fixtures("fixture_sets_damaged_v47.curvyo");
+    let damage = |name: &str| {
+        let pin = read.iter().find(|f| f.name == name).unwrap();
+        assert_eq!(FixtureKind::from_stored(&pin.kind), FixtureKind::Pin);
+        params_damage(FixtureKind::Pin, &pin.params)
+            + pin.matrix.map_or(0, |matrix| translation_part(matrix).1)
+    };
+    assert_eq!(damage("text"), 1, "text in the diameter");
+    assert_eq!(damage("bare"), 1, "a pin without a diameter");
+    assert_eq!(damage("zero"), 1, "a count of 0");
+    assert_eq!(damage("product"), 1, "a product above 400");
+    assert_eq!(damage("turned"), 1, "a turned pin reads its translation");
+    assert_eq!(damage("nan"), 0, "the document counted the NaN");
+}

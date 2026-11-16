@@ -194,9 +194,9 @@ pub struct MachineProfile {
     pub work_area: DocumentSize,
     /// The connection.
     pub connection: Connection,
-    /// The fixture set (record format 2, ADR 0050): the page fixtures a pick or a reset copies
-    /// in, in order; empty for the built-in and for a format 1 record.
-    pub fixtures: Vec<curvyo_document_core::FixtureRecord>,
+    /// The named fixture sets (record format 5, ADR 0060): the sets a pick or a reset copies
+    /// into the page, in order; empty for the built-in.
+    pub fixture_sets: Vec<curvyo_document_core::FixtureSetRecord>,
 }
 
 impl MachineProfile {
@@ -209,7 +209,7 @@ impl MachineProfile {
             values: ProfileValues::default(),
             work_area: DocumentSize::from_mm(DEFAULT_WORK_MM.0, DEFAULT_WORK_MM.1),
             connection: Connection::default(),
-            fixtures: Vec::new(),
+            fixture_sets: Vec::new(),
         }
     }
 

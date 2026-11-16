@@ -9,7 +9,7 @@
 use curvyo_document_core::{Point, ViewTransform};
 
 use crate::color::RgbaColor;
-use crate::glyphs::{DrawList, Vertex, dashed_line, thick_line};
+use crate::glyphs::{DrawList, Vertex, dashed_line, push_thick_line, thick_line};
 use crate::theme;
 
 /// Fixture ink, `--toolbar-icon`.
@@ -35,13 +35,13 @@ const HATCH_GAP_PX: f64 = 6.0;
 /// At most this many hatch lines per clamp; a denser hatch is spread out.
 const MAX_HATCH_LINES: f64 = 2_000.0;
 /// The slot cue's outline and a selected slot's outline, in screen px.
-const CUE_PX: f64 = 2.0;
+pub(crate) const CUE_PX: f64 = 2.0;
 /// A stop bar is never thinner than this, in screen px.
 const MIN_STOP_PX: f64 = 2.0;
 /// Segments of a circle slot.
 const CIRCLE_SEGMENTS: usize = 48;
 /// The dash of an outside slot and of the selection box, in screen px.
-const DASH_PX: (f64, f64) = (4.0, 3.0);
+pub(crate) const DASH_PX: (f64, f64) = (4.0, 3.0);
 
 /// One tick of a tape: from the edge into the band; long every 10 mm.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -94,7 +94,7 @@ pub enum SlotOutline {
 
 impl SlotOutline {
     /// The outline as a closed polygon.
-    fn polygon(&self) -> Vec<Point> {
+    pub(crate) fn polygon(&self) -> Vec<Point> {
         match *self {
             Self::Rect(corners) => corners.to_vec(),
             Self::Circle {
@@ -154,6 +154,16 @@ pub struct ScrewLook {
     pub thread_mm: f64,
 }
 
+/// A pin: a solid dowel, an opaque ground inside a 1.5 px ink ring over its casing
+/// (`specs/0113-fixture-sets-and-pins` UX notes F1).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PinLook {
+    /// Its centre.
+    pub centre: Point,
+    /// Its diameter in mm.
+    pub diameter_mm: f64,
+}
+
 /// Everything the drawn fixtures of one page show.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FixtureLook {
@@ -167,6 +177,10 @@ pub struct FixtureLook {
     pub stops: Vec<StopLook>,
     /// The screws.
     pub screws: Vec<ScrewLook>,
+    /// The pins (`0113` criterion 18).
+    pub pins: Vec<PinLook>,
+    /// The centre marks of pins and screws in the fixture ink, 1 px (`0113` UX notes 6.2).
+    pub marks: Vec<(Point, Point)>,
 }
 
 /// The triangles of `look` in the reverse draw order of UX notes §5.5.
@@ -174,6 +188,12 @@ pub struct FixtureLook {
 pub fn build_fixture_look(look: &FixtureLook, view: ViewTransform, dpr: f64) -> DrawList {
     let px = 1.0 / view.scale();
     let mut list = DrawList::default();
+    for &(a, b) in &look.marks {
+        push_thick_line(&mut list, a, b, THIN_PX * px, INK);
+    }
+    for pin in &look.pins {
+        pin_triangles(&mut list, pin, px);
+    }
     for screw in &look.screws {
         screw_triangles(&mut list, screw, px, dpr);
     }
@@ -192,59 +212,6 @@ pub fn build_fixture_look(look: &FixtureLook, view: ViewTransform, dpr: f64) -> 
     list
 }
 
-/// The selected fixture's box (the accent, dashed); its handles are the rectangle's
-/// (`build_transform_handles`).
-#[must_use]
-pub fn build_fixture_box(corners: [Point; 4], view: ViewTransform) -> DrawList {
-    let px = 1.0 / view.scale();
-    let mut list = DrawList::default();
-    let dash = (DASH_PX.0 * px, DASH_PX.1 * px);
-    for i in 0..4 {
-        let (a, b) = (corners[i], corners[(i + 1) % 4]);
-        list.extend(dashed_line(a, b, 3.0 * px, dash, theme::SELECTION_CASING));
-        list.extend(dashed_line(a, b, px, dash, theme::ACCENT));
-    }
-    list
-}
-
-/// The outline a fixture had when its drag began, as the rectangle's drag ghost: a 1.5 px line in
-/// `--drag-ghost` over its casing (`specs/0102-laser-fixtures` UX notes §7.1).
-#[must_use]
-pub fn build_fixture_ghost(segments: &[(Point, Point)], view: ViewTransform) -> DrawList {
-    let px = 1.0 / view.scale();
-    let width = theme::LIVE_PREVIEW_STROKE_PX * px;
-    let mut list = DrawList::default();
-    for &(a, b) in segments {
-        list.triangles
-            .extend(thick_line(a, b, width, theme::DRAG_GHOST).triangles);
-    }
-    for &(a, b) in segments {
-        list.triangles
-            .extend(thick_line(a, b, width + 2.0 * px, theme::SELECTION_CASING).triangles);
-    }
-    list
-}
-
-/// A slot lit as the fit target (`--accent-hover` fill, a 2 px accent outline over its casing),
-/// or with `fill` false a selected slot's outline only.
-#[must_use]
-pub fn build_slot_cue(outline: &SlotOutline, fill: bool, view: ViewTransform) -> DrawList {
-    let px = 1.0 / view.scale();
-    let polygon = outline.polygon();
-    let mut list = DrawList::default();
-    if fill {
-        fan(&mut list, &polygon, theme::ACCENT_HOVER);
-    }
-    ring_of(
-        &mut list,
-        &polygon,
-        CUE_PX * 3.0 * px,
-        theme::SELECTION_CASING,
-    );
-    ring_of(&mut list, &polygon, CUE_PX * px, theme::ACCENT);
-    list
-}
-
 fn grid_triangles(list: &mut DrawList, grid: &GridLook, px: f64, dpr: f64) {
     let device = px / if dpr > 0.0 { dpr } else { 1.0 };
     for tape in &grid.tapes {
@@ -252,14 +219,12 @@ fn grid_triangles(list: &mut DrawList, grid: &GridLook, px: f64, dpr: f64) {
         list.triangles.extend(edge.triangles);
         for tick in &tape.ticks {
             let colour = if tick.long { INK } else { RULER_TICK_MINOR };
-            list.triangles
-                .extend(thick_line(tick.start, tick.end, THIN_PX * px, colour).triangles);
+            push_thick_line(list, tick.start, tick.end, THIN_PX * px, colour);
         }
         fan(list, &tape.band, RULER_BG);
     }
     for &(a, b) in &grid.major {
-        list.triangles
-            .extend(thick_line(a, b, 2.0 * device, MAJOR).triangles);
+        push_thick_line(list, a, b, 2.0 * device, MAJOR);
     }
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 0..=51 by the clamp.
     let alpha = (f32::from(MINOR.a) * grid.minor_alpha.clamp(0.0, 1.0)).round() as u8;
@@ -267,8 +232,7 @@ fn grid_triangles(list: &mut DrawList, grid: &GridLook, px: f64, dpr: f64) {
         return;
     }
     for &(a, b) in &grid.minor {
-        list.triangles
-            .extend(thick_line(a, b, device, MINOR.with_alpha(alpha)).triangles);
+        push_thick_line(list, a, b, device, MINOR.with_alpha(alpha));
     }
 }
 
@@ -311,8 +275,7 @@ fn clamp_triangles(list: &mut DrawList, corners: [Point; 4], px: f64) {
         theme::SELECTION_CASING,
     );
     for (a, b) in hatch(corners, HATCH_GAP_PX * px) {
-        list.triangles
-            .extend(thick_line(a, b, THIN_PX * px, INK).triangles);
+        push_thick_line(list, a, b, THIN_PX * px, INK);
     }
 }
 
@@ -370,6 +333,22 @@ fn screw_triangles(list: &mut DrawList, screw: &ScrewLook, px: f64, dpr: f64) {
     ring_of(list, &head, OUTLINE_PX * 3.0 * px, theme::SELECTION_CASING);
 }
 
+fn pin_triangles(list: &mut DrawList, pin: &PinLook, px: f64) {
+    let circle = SlotOutline::Circle {
+        centre: pin.centre,
+        diameter_mm: pin.diameter_mm,
+    }
+    .polygon();
+    ring_of(list, &circle, OUTLINE_PX * px, INK);
+    ring_of(
+        list,
+        &circle,
+        OUTLINE_PX * 3.0 * px,
+        theme::SELECTION_CASING,
+    );
+    fan(list, &circle, BOARD);
+}
+
 fn stop_triangles(list: &mut DrawList, stop: &StopLook, px: f64) {
     for leg in &stop.legs {
         let leg = widened(*leg, MIN_STOP_PX * px);
@@ -397,7 +376,7 @@ fn widened(leg: [Point; 4], min_mm: f64) -> [Point; 4] {
 }
 
 /// A convex polygon filled as a triangle fan.
-fn fan(list: &mut DrawList, polygon: &[Point], color: RgbaColor) {
+pub(crate) fn fan(list: &mut DrawList, polygon: &[Point], color: RgbaColor) {
     for i in 1..polygon.len().saturating_sub(1) {
         for p in [polygon[0], polygon[i], polygon[i + 1]] {
             list.triangles.push(Vertex { position: p, color });
@@ -406,123 +385,13 @@ fn fan(list: &mut DrawList, polygon: &[Point], color: RgbaColor) {
 }
 
 /// A closed outline `width_mm` wide.
-fn ring_of(list: &mut DrawList, polygon: &[Point], width_mm: f64, color: RgbaColor) {
+pub(crate) fn ring_of(list: &mut DrawList, polygon: &[Point], width_mm: f64, color: RgbaColor) {
     for i in 0..polygon.len() {
         let (a, b) = (polygon[i], polygon[(i + 1) % polygon.len()]);
-        list.triangles
-            .extend(thick_line(a, b, width_mm, color).triangles);
+        push_thick_line(list, a, b, width_mm, color);
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn view() -> ViewTransform {
-        ViewTransform::identity()
-    }
-
-    fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> [Point; 4] {
-        [
-            Point::new(x0, y0),
-            Point::new(x1, y0),
-            Point::new(x1, y1),
-            Point::new(x0, y1),
-        ]
-    }
-
-    #[test]
-    fn a_clamp_hatch_stays_inside_its_rectangle() {
-        let lines = hatch(rect(10.0, 10.0, 50.0, 30.0), 3.0);
-        assert_eq!(lines.len(), 14);
-        for (a, b) in lines {
-            for p in [a, b] {
-                assert!((10.0 - 1e-9..=50.0 + 1e-9).contains(&p.x), "{p:?}");
-                assert!((10.0 - 1e-9..=30.0 + 1e-9).contains(&p.y), "{p:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn faded_minor_lines_draw_nothing_and_major_lines_stay() {
-        let grid = GridLook {
-            minor: vec![(Point::new(0.0, 0.0), Point::new(0.0, 10.0))],
-            major: vec![(Point::new(5.0, 0.0), Point::new(5.0, 10.0))],
-            minor_alpha: 0.0,
-            tapes: Vec::new(),
-        };
-        let look = FixtureLook {
-            grid: Some(grid),
-            ..FixtureLook::default()
-        };
-        assert_eq!(build_fixture_look(&look, view(), 1.0).triangles.len(), 6);
-    }
-
-    #[test]
-    fn a_board_draws_its_outline_before_its_casing_and_fill() {
-        let look = FixtureLook {
-            boards: vec![BoardLook {
-                corners: rect(0.0, 0.0, 100.0, 60.0),
-                slots: Vec::new(),
-                engraved: false,
-            }],
-            ..FixtureLook::default()
-        };
-        let list = build_fixture_look(&look, view(), 1.0);
-        assert_eq!(list.triangles.first().unwrap().color, INK);
-        assert_eq!(list.triangles.last().unwrap().color, BOARD);
-    }
-
-    #[test]
-    fn an_engraved_board_takes_the_canvas_ground() {
-        let look = FixtureLook {
-            boards: vec![BoardLook {
-                corners: rect(0.0, 0.0, 100.0, 60.0),
-                slots: Vec::new(),
-                engraved: true,
-            }],
-            ..FixtureLook::default()
-        };
-        let list = build_fixture_look(&look, view(), 1.0);
-        assert_eq!(list.triangles.first().unwrap().color, INK);
-        assert_eq!(list.triangles.last().unwrap().color, theme::CANVAS_BG);
-    }
-
-    #[test]
-    fn a_screw_draws_two_ink_rings_with_no_fill_and_drops_a_tiny_thread() {
-        let screw = ScrewLook {
-            centre: Point::new(50.0, 50.0),
-            head_mm: 10.0,
-            thread_mm: 6.0,
-        };
-        let look = FixtureLook {
-            screws: vec![screw],
-            ..FixtureLook::default()
-        };
-        let list = build_fixture_look(&look, view(), 1.0);
-        assert_eq!(list.triangles.first().unwrap().color, INK);
-        assert!(
-            list.triangles
-                .iter()
-                .all(|v| v.color == INK || v.color == theme::SELECTION_CASING)
-        );
-        let tiny = FixtureLook {
-            screws: vec![ScrewLook {
-                thread_mm: 2.0,
-                ..screw
-            }],
-            ..FixtureLook::default()
-        };
-        let both = list.triangles.len();
-        assert_eq!(
-            build_fixture_look(&tiny, view(), 1.0).triangles.len(),
-            both / 2
-        );
-    }
-
-    #[test]
-    fn a_thin_stop_leg_is_widened_to_two_pixels() {
-        let leg = widened(rect(0.0, 0.0, 60.0, 0.5), 2.0);
-        assert!((leg[1].vector_to(leg[2]).length() - 2.0).abs() < 1e-9);
-    }
-}
+#[path = "fixture_look_tests.rs"]
+mod tests;

@@ -14,7 +14,8 @@ use crate::manufacturing_codec::{
     PlacementLink, SHAPE_PLACEMENT, is_manufacturing_node, manufacturing_nodes, owner_text,
     read_placement_link, string, write_placement_link, write_plain_map,
 };
-use crate::manufacturing_fixtures::{FixtureRecord, FixtureSnapshot};
+use crate::manufacturing_fixture_sets::FixtureSetSnapshot;
+use crate::manufacturing_fixtures::{FixtureSetRecord, FixtureSnapshot};
 use crate::node_registers::read_registers;
 use crate::page_frame::{Frame, write_frame};
 use crate::pages::{Page, owned_page, write};
@@ -118,8 +119,15 @@ pub struct ManufacturingSnapshot {
     pub page: Option<Page>,
     /// The placements, in tree order.
     pub placements: Vec<PlacementSnapshot>,
-    /// The installed fixtures, in tree order.
+    /// The named machine sets, in child order (ADR 0059 §1).
+    pub sets: Vec<FixtureSetSnapshot>,
+    /// Every fixture in listing order (ADR 0059 §3): the sets' fixtures, set by set in child
+    /// order, then the job fixtures in child order. A fixture's `set` names its set.
     pub fixtures: Vec<FixtureSnapshot>,
+    /// The profile record's `modified` (Unix ms) the set mirror was last aligned to or written
+    /// with (`mfg_fixture_sets_modified`, ADR 0059 §7 amended 2026-11-16); 0 when absent or not
+    /// a whole number.
+    pub sets_modified: i64,
     /// The raw process registers `x.<process id>.<key>`, opaque here (ADR 0033 §3).
     #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
     pub process_values: FixtureParams,
@@ -133,6 +141,54 @@ impl ManufacturingSnapshot {
             .as_ref()
             .map_or_else(DocumentSize::default, |page| page.size)
     }
+
+    /// The job fixtures (in no set), in child order.
+    pub fn job_fixtures(&self) -> impl Iterator<Item = &FixtureSnapshot> {
+        self.fixtures.iter().filter(|fixture| fixture.set.is_none())
+    }
+
+    /// The fixtures of the set `set`, in child order.
+    pub fn set_fixtures(&self, set: NodeId) -> impl Iterator<Item = &FixtureSnapshot> {
+        self.fixtures
+            .iter()
+            .filter(move |fixture| fixture.set == Some(set))
+    }
+
+    /// The On this page check of the set that holds `fixture`; `None` for a job fixture.
+    #[must_use]
+    pub fn set_on_page(&self, fixture: &FixtureSnapshot) -> Option<bool> {
+        let set = fixture.set?;
+        self.sets.iter().find(|s| s.id == set).map(|s| s.on_page)
+    }
+
+    /// The sets as a profile record stores them: ids, names, locks and fixtures, no On this
+    /// page, no On the bed, no Output and no job fixture (ADR 0060 §1, `0113` criterion 10). A
+    /// node without a profile id gives an empty id.
+    #[must_use]
+    pub fn set_records(&self) -> Vec<FixtureSetRecord> {
+        self.sets
+            .iter()
+            .map(|set| FixtureSetRecord {
+                id: set.uid.clone().unwrap_or_default(),
+                name: set.name.clone(),
+                locked: set.locked,
+                fixtures: self
+                    .set_fixtures(set.id)
+                    .map(FixtureSnapshot::record)
+                    .collect(),
+            })
+            .collect()
+    }
+}
+
+/// The sets Pick profile writes as the page's fresh mirror, and the record `modified` they come
+/// with (ADR 0059 §6, §7 amended 2026-11-16).
+#[derive(Debug, Clone, Copy)]
+pub struct ProfileSets<'a> {
+    /// The record's sets, in order; none deletes the mirror (Generic laser).
+    pub sets: &'a [FixtureSetRecord],
+    /// The record's `modified`, written as `mfg_fixture_sets_modified`.
+    pub modified: i64,
 }
 
 /// A live reference to a drawing page (ADR 0032 §6).
@@ -184,6 +240,16 @@ pub enum ManufacturingError {
     /// The holder holds 50 slots already (`specs/0102-laser-fixtures` criterion 19).
     #[error("a holder holds up to 50 slots")]
     TooManySlots,
+    /// The id names no live fixture set of a manufacturing.
+    #[error("no such fixture set")]
+    NoSuchSet,
+    /// The page holds 16 sets already (`0113` criterion 17).
+    #[error("a laser page holds up to 16 fixture sets")]
+    TooManySets,
+    /// The page holds 64 job fixtures already, or an Apply would pass 64 (`0113` criterion 17,
+    /// ADR 0059 §8).
+    #[error("a laser page holds up to 64 job fixtures")]
+    TooManyJobFixtures,
     /// The work area is not a valid page size.
     #[error(transparent)]
     Size(#[from] DocumentSizeError),
@@ -268,6 +334,8 @@ impl Document {
                 });
             }
         }
+        let (sets, fixtures) =
+            crate::manufacturing_fixture_sets::read_sets_and_fixtures(&tree, &children);
         Some(ManufacturingSnapshot {
             id: node_id(node),
             name: read_registers(&meta).name.unwrap_or_default(),
@@ -276,7 +344,9 @@ impl Document {
             legacy_machine_name: string(&meta, KEY_MACHINE_NAME),
             page: owned_page(&self.loro().get_map(ROOT_MAP), &tree, &page_id),
             placements,
-            fixtures: crate::manufacturing_fixtures::read_fixtures(&tree, &children),
+            sets,
+            fixtures,
+            sets_modified: crate::manufacturing_codec::read_sets_modified(&meta),
             process_values: crate::manufacturing_codec::process_values(&meta),
         })
     }
@@ -403,8 +473,8 @@ impl Document {
     /// beside the frame's moving edges move with them, carrying what `contents` says they own,
     /// in the same step (ADR 0051 §2, `specs/0109` criterion 32).
     /// `Ok(false)` and nothing written when the copy, the size and the old key are unchanged.
-    /// The page's fixtures are not written; [`Document::set_manufacturing_profile_and_fixtures`]
-    /// writes them too.
+    /// The page's fixtures are not written; [`Document::set_manufacturing_profile_and_sets`]
+    /// writes its sets too.
     ///
     /// # Errors
     /// [`ManufacturingError::NotFound`] for an unknown manufacturing or one without its page;
@@ -422,36 +492,31 @@ impl Document {
         self.write_profile(id, profile, work_area, anchor, change, None, contents)
     }
 
-    /// As [`Document::set_manufacturing_profile`], and in the same step the page's fixtures are
-    /// replaced by one new node per record of the profile's set, with fresh ids (Pick profile and
-    /// Reset from profile, ADR 0050 §4); an empty set removes them (Generic laser, §6). The
-    /// fixtures are not written when they already equal the set.
+    /// As [`Document::set_manufacturing_profile`], and in the same step the page's sets are
+    /// replaced by a fresh mirror of the profile's (Pick profile, ADR 0059 §6 amended 2026-11-16,
+    /// `0113` criteria 9 and 14): one new set node per record, in its order, with the record's
+    /// ids and locks, every set On this page, every fixture On the bed, every job Output off;
+    /// no set deletes the mirror (Generic laser). `mfg_fixture_sets_modified` takes the record's
+    /// `modified`. The job fixtures are never written. The sets are not written when they already
+    /// equal the records and every set and fixture is on.
     ///
     /// # Errors
     /// As [`Document::set_manufacturing_profile`].
-    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, set and owned contents
-    pub fn set_manufacturing_profile_and_fixtures(
+    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, sets and owned contents
+    pub fn set_manufacturing_profile_and_sets(
         &self,
         id: NodeId,
         profile: &FixtureParams,
         work_area: DocumentSize,
         anchor: PageCorner,
         change: ProfileChange,
-        fixtures: &[FixtureRecord],
+        sets: ProfileSets<'_>,
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
-        self.write_profile(
-            id,
-            profile,
-            work_area,
-            anchor,
-            change,
-            Some(fixtures),
-            contents,
-        )
+        self.write_profile(id, profile, work_area, anchor, change, Some(sets), contents)
     }
 
-    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, set and owned contents
+    #[allow(clippy::too_many_arguments)] // a pick carries the copy, page, corner, change, sets and owned contents
     fn write_profile(
         &self,
         id: NodeId,
@@ -459,7 +524,7 @@ impl Document {
         work_area: DocumentSize,
         anchor: PageCorner,
         change: ProfileChange,
-        fixtures: Option<&[FixtureRecord]>,
+        sets: Option<ProfileSets<'_>>,
         contents: &crate::PageContents,
     ) -> Result<bool, ManufacturingError> {
         let manufacturing = self.manufacturing(id).ok_or(ManufacturingError::NotFound)?;
@@ -475,15 +540,18 @@ impl Document {
         let same_size = page.size.width.as_mm() == size.width.as_mm()
             && page.size.height.as_mm() == size.height.as_mm();
         let same_profile = manufacturing.profile.as_ref() == Some(profile);
-        let current: Vec<FixtureRecord> = manufacturing
-            .fixtures
-            .iter()
-            .map(FixtureSnapshot::record)
-            .collect();
-        let fixtures = fixtures.filter(|set| *set != current.as_slice());
+        let current = manufacturing.set_records();
+        let all_on = manufacturing.sets.iter().all(|set| set.on_page)
+            && manufacturing
+                .fixtures
+                .iter()
+                .all(|fixture| fixture.set.is_none() || fixture.active);
+        let sets = sets.filter(|new| {
+            !all_on || new.sets != current.as_slice() || new.modified != manufacturing.sets_modified
+        });
         if same_size
             && same_profile
-            && fixtures.is_none()
+            && sets.is_none()
             && manufacturing.legacy_machine_name.is_none()
         {
             return Ok(false);
@@ -543,8 +611,12 @@ impl Document {
                     }
                 }
             }
-            if let Some(set) = fixtures {
-                doc.replace_fixtures(id, set)?;
+            if let Some(new) = sets {
+                doc.replace_sets(id, new.sets)?;
+                // invariant: a plain value under a known key on an attached map cannot fail.
+                #[allow(clippy::unwrap_used)]
+                meta.insert(crate::manufacturing_codec::KEY_SETS_MODIFIED, new.modified)
+                    .unwrap();
             }
             Ok(true)
         })

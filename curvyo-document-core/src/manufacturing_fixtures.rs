@@ -1,16 +1,18 @@
-//! The stored fixtures of a manufacturing (ADR 0049 §2, §3, §6, ADR 0052 §3): the fixture, slot
-//! and job nodes as read field by field, with a count of the values that did not read.
+//! The stored fixtures of a manufacturing (ADR 0049 §2, §3, §6, ADR 0052 §3, ADR 0059 §2): the
+//! fixture, slot and job nodes as read field by field, with a count of the values that did not
+//! read.
 
 use loro::{LoroMap, LoroTree, LoroValue, TreeID, TreeParentId, ValueOrContainer};
 use serde::Serialize;
 
 use crate::affine::{Affine, MATRIX_ENTRY_LIMIT};
-use crate::fixture_job_codec::{FixtureJobSnapshot, JobRecord, is_job_meta, read_job};
+use crate::fixture_job_codec::{FixtureJobSnapshot, JobRecord, check_roles, is_job_meta, read_job};
 use crate::group_tree::node_id;
 use crate::manufacturing::FixtureParams;
 use crate::manufacturing_codec::{
-    KEY_FIXTURE_ACTIVE, KEY_FIXTURE_KIND, KEY_FIXTURE_MATRIX, KEY_FIXTURE_PARAMS, KEY_SLOT_PARAMS,
-    SHAPE_FIXTURE, SHAPE_FIXTURE_SLOT, json_of, string, write_plain_map,
+    KEY_FIXTURE_ACTIVE, KEY_FIXTURE_KIND, KEY_FIXTURE_LOCKED, KEY_FIXTURE_MATRIX,
+    KEY_FIXTURE_PARAMS, KEY_FIXTURE_UID, KEY_SLOT_PARAMS, SHAPE_FIXTURE, SHAPE_FIXTURE_SLOT,
+    json_of, string, write_plain_map,
 };
 use crate::node_registers::{KEY_NAME, KEY_VISIBLE, read_registers};
 use crate::path_codec::as_f64;
@@ -36,10 +38,20 @@ pub struct FixtureSnapshot {
     pub params: FixtureParams,
     /// The map from the kind's local frame into the page; `None` when absent or damaged.
     pub matrix: Option<Affine>,
-    /// Whether the fixture is on the bed (absent reads as on).
+    /// Its own On the bed check (absent reads as on); a set fixture lies on the bed only while its
+    /// set is on this page too (ADR 0059 §3).
     pub active: bool,
     /// The eye: whether it is shown.
     pub visible: bool,
+    /// The set that holds it; `None` for a job fixture, a direct child of the manufacturing
+    /// (ADR 0059 §2).
+    pub set: Option<NodeId>,
+    /// The profile id of a set fixture (`fixture_uid`, ADR 0059 §1 amended 2026-11-16); `None`
+    /// when absent or not a text, and for a job fixture.
+    pub uid: Option<String>,
+    /// Its own stored Lock (`fixture_locked`, absent or damaged reads off). A set fixture is
+    /// locked by its own Lock or its set's (ADR 0059 §2 amended 2026-11-16).
+    pub locked: bool,
     /// The slots that read, in tree order.
     pub slots: Vec<SlotSnapshot>,
     /// Its fixture jobs, in tree order (ADR 0052 §1).
@@ -50,14 +62,16 @@ pub struct FixtureSnapshot {
 }
 
 impl FixtureSnapshot {
-    /// The values of the fixture without its node ids and its eye: what a profile set holds
-    /// (ADR 0050 §1).
+    /// The values of the fixture without its node ids and the page's choices (On the bed, the
+    /// eye, Output): what a profile set holds (ADR 0060 §1), with its profile id (empty without
+    /// one).
     #[must_use]
     pub fn record(&self) -> FixtureRecord {
         FixtureRecord {
+            id: self.uid.clone().unwrap_or_default(),
             kind: self.kind.clone(),
             name: self.name.clone(),
-            active: self.active,
+            locked: self.locked,
             params: self.params.clone(),
             matrix: self.matrix,
             slots: self
@@ -88,16 +102,20 @@ pub struct SlotSnapshot {
     pub params: FixtureParams,
 }
 
-/// A fixture's values without a node: what Pick profile and Reset from profile write as a new node
-/// (ADR 0050 §4), and what a profile's set stores.
+/// A fixture's values without a node: what Pick profile writes as a new node (ADR 0059 §6) and
+/// what a profile's set stores (ADR 0060 §1). On the bed is a choice of each page, never part of
+/// it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FixtureRecord {
+    /// The record entry's id (lowercase UUID v4); empty for a fixture without one (a job
+    /// fixture, a new fixture before its id is given).
+    pub id: String,
     /// The stored kind.
     pub kind: String,
     /// The name.
     pub name: String,
-    /// The Active state.
-    pub active: bool,
+    /// Its own Lock.
+    pub locked: bool,
     /// The parameter values.
     pub params: FixtureParams,
     /// The matrix; `None` writes none (the grid).
@@ -106,6 +124,20 @@ pub struct FixtureRecord {
     pub slots: Vec<SlotRecord>,
     /// The fixture jobs, in order, without Output (ADR 0052 §7).
     pub jobs: Vec<JobRecord>,
+}
+
+/// A named fixture set's values without a node: what a profile record stores and Pick profile
+/// copies in (ADR 0060 §1, §5).
+#[derive(Debug, Clone, PartialEq)]
+pub struct FixtureSetRecord {
+    /// The record set's id (lowercase UUID v4); empty for a set without one.
+    pub id: String,
+    /// The set's name.
+    pub name: String,
+    /// The set's Lock: it locks every fixture in it.
+    pub locked: bool,
+    /// Its fixtures, in order.
+    pub fixtures: Vec<FixtureRecord>,
 }
 
 /// A slot's values without a node.
@@ -117,29 +149,59 @@ pub struct SlotRecord {
     pub params: FixtureParams,
 }
 
-/// The fixture nodes among `children`, read in tree order.
-pub(crate) fn read_fixtures(tree: &LoroTree, children: &[TreeID]) -> Vec<FixtureSnapshot> {
+/// The fixture nodes among `children` of the set `set` (`None`: of the manufacturing, the job
+/// fixtures), read in tree order. In a set, a second fixture with the profile id of an earlier
+/// one is kept and never read (ADR 0059 §1 amended 2026-11-16).
+pub(crate) fn read_fixtures(
+    tree: &LoroTree,
+    children: &[TreeID],
+    set: Option<TreeID>,
+) -> Vec<FixtureSnapshot> {
+    let mut uids: Vec<String> = Vec::new();
     children
         .iter()
         .filter_map(|&child| {
             let meta = tree.get_meta(child).ok()?;
-            (string(&meta, KEY_SHAPE).as_deref() == Some(SHAPE_FIXTURE))
-                .then(|| read_fixture(tree, child, &meta))
+            if string(&meta, KEY_SHAPE).as_deref() != Some(SHAPE_FIXTURE) {
+                return None;
+            }
+            if set.is_some()
+                && let Some(uid) = string(&meta, KEY_FIXTURE_UID)
+            {
+                if uids.contains(&uid) {
+                    return None;
+                }
+                uids.push(uid);
+            }
+            Some(read_fixture(tree, child, &meta, set))
         })
         .collect()
 }
 
-fn read_fixture(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> FixtureSnapshot {
+/// A flag register: absent reads `absent`, a value that is not a boolean reads `absent` and
+/// counts one damaged value.
+pub(crate) fn read_flag(meta: &LoroMap, key: &str, absent: bool) -> (bool, usize) {
+    match meta.get(key) {
+        None => (absent, 0),
+        Some(ValueOrContainer::Value(LoroValue::Bool(flag))) => (flag, 0),
+        Some(_) => (absent, 1),
+    }
+}
+
+fn read_fixture(
+    tree: &LoroTree,
+    node: TreeID,
+    meta: &LoroMap,
+    set: Option<TreeID>,
+) -> FixtureSnapshot {
     let registers = read_registers(meta);
+    let kind = string(meta, KEY_FIXTURE_KIND).unwrap_or_default();
     let (mut params, mut damaged) = read_counted_map(meta, KEY_FIXTURE_PARAMS);
     damaged += screw_diameters_read(&mut params);
     let (matrix, matrix_damage) = read_matrix(meta);
-    let (active, active_damage) = match meta.get(KEY_FIXTURE_ACTIVE) {
-        None => (true, 0),
-        Some(ValueOrContainer::Value(LoroValue::Bool(flag))) => (flag, 0),
-        Some(_) => (true, 1),
-    };
-    damaged += matrix_damage + active_damage;
+    let (active, active_damage) = read_flag(meta, KEY_FIXTURE_ACTIVE, true);
+    let (locked, locked_damage) = read_flag(meta, KEY_FIXTURE_LOCKED, false);
+    damaged += matrix_damage + active_damage + locked_damage;
     let mut slots = Vec::new();
     let mut job_nodes = Vec::new();
     for child in tree.children(TreeParentId::Node(node)).unwrap_or_default() {
@@ -156,19 +218,33 @@ fn read_fixture(tree: &LoroTree, node: TreeID, meta: &LoroMap) -> FixtureSnapsho
             None => damaged += 1,
         }
     }
-    let jobs: Vec<FixtureJobSnapshot> = job_nodes
+    let mut job_uids: Vec<String> = Vec::new();
+    let mut jobs: Vec<FixtureJobSnapshot> = job_nodes
         .iter()
         .map(|(job, job_meta)| read_job(*job, job_meta, node, &slots))
+        .filter(|job| match &job.uid {
+            // A second job with the profile id of an earlier one is kept and never read.
+            Some(uid) if set.is_some() => {
+                let first = !job_uids.contains(uid);
+                job_uids.push(uid.clone());
+                first
+            }
+            _ => true,
+        })
         .collect();
+    check_roles(&kind, &mut jobs);
     damaged += jobs.iter().map(|job| job.damaged).sum::<usize>();
     FixtureSnapshot {
         id: node_id(node),
         name: registers.name.unwrap_or_default(),
-        kind: string(meta, KEY_FIXTURE_KIND).unwrap_or_default(),
+        kind,
         params,
         matrix,
         active,
         visible: registers.visible,
+        set: set.map(node_id),
+        uid: string(meta, KEY_FIXTURE_UID),
+        locked,
         slots,
         jobs,
         damaged,
@@ -251,7 +327,7 @@ const RIGID_TOLERANCE: f64 = 1e-6;
 
 /// The `fixture_matrix` register: `None` with no damage when absent, `None` and one damaged value
 /// when it is not six finite numbers within ±1e7 or not rigid (a scale, a shear or a mirror).
-fn read_matrix(meta: &LoroMap) -> (Option<Affine>, usize) {
+pub(crate) fn read_matrix(meta: &LoroMap) -> (Option<Affine>, usize) {
     let entries = match meta.get(KEY_FIXTURE_MATRIX) {
         None => return (None, 0),
         Some(ValueOrContainer::Value(LoroValue::List(entries))) if entries.len() == 6 => entries,
@@ -285,7 +361,8 @@ pub(crate) fn write_matrix(meta: &LoroMap, matrix: Affine) {
         .unwrap();
 }
 
-/// Writes a new fixture node's registers from `record`, without its slots.
+/// Writes a new fixture node's registers from `record`, without its slots: On the bed, its
+/// profile id when it has one and its Lock when it is on.
 pub(crate) fn write_fixture_registers(meta: &LoroMap, record: &FixtureRecord) {
     // invariant: plain values under known keys on an attached map cannot fail.
     #[allow(clippy::unwrap_used)]
@@ -293,7 +370,13 @@ pub(crate) fn write_fixture_registers(meta: &LoroMap, record: &FixtureRecord) {
         meta.insert(KEY_SHAPE, SHAPE_FIXTURE).unwrap();
         meta.insert(KEY_FIXTURE_KIND, record.kind.as_str()).unwrap();
         meta.insert(KEY_NAME, record.name.as_str()).unwrap();
-        meta.insert(KEY_FIXTURE_ACTIVE, record.active).unwrap();
+        meta.insert(KEY_FIXTURE_ACTIVE, true).unwrap();
+        if !record.id.is_empty() {
+            meta.insert(KEY_FIXTURE_UID, record.id.as_str()).unwrap();
+        }
+        if record.locked {
+            meta.insert(KEY_FIXTURE_LOCKED, true).unwrap();
+        }
     }
     write_plain_map(meta, KEY_FIXTURE_PARAMS, &record.params);
     if let Some(matrix) = record.matrix {
