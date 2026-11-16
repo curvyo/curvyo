@@ -14,7 +14,7 @@ Screens 06 and 07 B are superseded in two places: set fixture rows carry the 010
 | Kind glyphs | `FixtureGlyph` (`FixtureGlyphs.tsx`, `0102` 4.0) | a Pin glyph |
 | Handles, chips, readouts | the rectangle model of `0102` section 0 (`TransformEntryChip.tsx`, `MoveEntryChip.tsx`), Parameter handle | pin and screw grids: Diameter, Columns and Rows knobs |
 | Fixture jobs | `FixtureJobsSection.tsx`, `FixtureJobRow.tsx`, `FixtureJobParts.tsx`, `useFixtureJobs` | two fixed jobs per pin and screw; "not on this page" |
-| Snapping | `useSnapping` (`0060` Objects target and marker) | centres for job fixtures |
+| Snapping | `useSnapping` (`0060` marker; the Centres target) | centres for job fixtures |
 | Armed trash, windowing | `useDeleteArm`, `useScrollWindow` | set rows |
 | Tab strip | `PanelStrip.tsx` (`GLYPHS`) | `fixtures`: the Holder glyph, wrapped to the strip's `Glyph` props |
 | Machine block | `MachineBlock.tsx` (`0102` 9.1) | "Fixture sets in profile: N" |
@@ -104,6 +104,14 @@ Symbols (16px, 1.5px stroke, `currentColor`):
 ### 4.4 Profile (criteria 9, 10)
 
 - Machine block (`0102` 9.1): "Fixture sets in profile: N" 12px muted; Save as profile, Update profile (armed), Reset from profile as built; Differs compares the sets (criterion 10). Picking a profile copies its sets, all On this page, in the pick's step; job fixtures stay.
+- **Amended 2026-11-16 (architect; sets live in the profile, criteria 9, 10, 44 to 47):** Differs, Update profile and Reset from profile concern the machine fields only; the Differs line never names sets. Picking a profile shows its sets, all On this page; Generic laser shows none and no notice. Save as profile keeps the sets and makes a read-only page editable.
+
+### 4.5 Sets in the profile (2026-11-16, architect draft for the ux-engineer's review)
+
+- **Set row Lock:** a 24px `Lock` / `LockOpen` toggle between the name and On this page (name "Lock <set>", `aria-pressed`, tooltip "Lock" / "Unlock"); the name column shrinks by 24px. Locked: line 2 gains " · locked" after the count; the add bar of the unfolded set leaves the tree; rename, order, On this page and the trash stay. Step "Lock fixture set" / "Unlock fixture set".
+- **Set fixture row Lock:** the 5.2 Lock slot between name and eye. While its set is locked it shows `Lock` muted, not pressable, tooltip "Locked with <set>". Line 2 " · locked" as 5.2. Canvas: lock badge and Lock cursor as section 7, for each locked set fixture on the bed.
+- **Section heading line:** under "Machine sets", 11px muted, one line, only when it applies: Generic laser: "Fixture sets are kept in a machine profile. Save this machine as a profile to add sets." ("+ Set" hidden); read only (criterion 46): "From the project file. <profile> is not on this computer." (every content control hidden: + Set, rename, trash, arrows, drag, Lock, add bars, fields, knobs, handles; check boxes, eye and Output stay).
+- **No "edits the profile" cue in the rows** (Proposal): the section name "Machine sets" and the Machine block's "Fixture sets in profile: N" carry it; a change shows on the other pages at once.
 
 ## 5. Job fixtures (criteria 12 to 17)
 
@@ -125,20 +133,22 @@ Symbols (16px, 1.5px stroke, `currentColor`):
 
 ### 5.3 Apply fixtures from page (criteria 33 to 37)
 
-- Outline text button 244 x 28px under the last job fixture: `CopyPlus` and "Apply fixtures from page…". Hidden while no other laser page has a job fixture.
-- A press unfolds in place, under the button (which shows the pressed look, `aria-expanded`): a `role="radiogroup"` "From page", rows 28px (page name 13px, "4 job fixtures" 12px muted tabular at the right), then a button row: **Apply <n> fixtures** (Primary, 140px, only once a page is picked, hidden before) and **Cancel** (outline, 96px).
+- Outline text button 244 x 28px under the last job fixture: `CopyPlus` and "Apply fixtures from page…". Hidden while no other laser page qualifies. Left out of the list: pages without job fixtures. *(2026-11-16, customer: Apply replaces this page's job fixtures, so this page's count never hides a page.)*
+- A press unfolds in place, under the button (which shows the pressed look, `aria-expanded`): a `role="radiogroup"` "From page", rows 28px (page name 13px, "4 job fixtures" 12px muted tabular at the right), then, once a page is picked and this page has job fixtures, the line "Replaces <m> job fixtures on this page." (12px muted), then a button row: **Apply <n> fixtures** (Primary, 140px, only once a page is picked, hidden before) and **Cancel** (outline, 96px).
 - Picking a page draws its job fixtures on this page as the preview (`--preview-new` dashed, no fill, no handles, not hit). Cancel, Escape or a second press on the button folds the list and drops the preview; no step.
-- Apply: one step "Apply fixtures from page"; the copies keep positions, names, kinds, sizes, grids, Lock and eye; their jobs Output off; they are added after the page's own; the list folds, the copies are not selected (F7), focus returns to the button.
+- Apply: one step "Apply fixtures from page"; the copies keep positions, names, kinds, sizes, grids, Lock and eye; their jobs Output off; they **replace** this page's job fixtures (its sets stay; one undo brings them back); the list folds, the copies are not selected (F7), focus returns to the button.
 - Copies partly outside the work area: notice (section 10). Never mirrored.
 
 ## 6. Pin and screw (criteria 18 to 24)
 
 ### 6.1 Unfolded row body (indented 16px)
 
+*(2026-11-16, customer; overrides hidden-not-disabled here)* A pin's or screw's Spacing is always shown and only greyed out at 1; every field of a row body fills the row's width, so nothing leaves the 280px panel; the engraved grid's Origin X stands over Origin Y and its fields sit 6px apart.
+
 | Row | Pin | Screw |
 |---|---|---|
 | Size | **Diameter** field 104px, "mm", 0.5 to 1,000 | none (Head and Thread stay on the canvas knobs, `0102` 4.3) |
-| Columns unit | **Columns** 104px (1 to 50) and **Spacing** 104px ("mm", 1 to 1,000); Spacing absent at 1 | same |
+| Columns unit | **Columns** 84px (1 to 50) and **Spacing** filling the rest of the line ("mm", 1 to 1,000); Spacing greyed out (disabled look) at 1 | same |
 | Rows unit | **Rows** and **Spacing** as above | same |
 | Jobs heading | "Jobs" 12px semibold muted | same |
 | Centre mark unit | toggle 28px high: `Crosshair` and "Centre mark" 13px; while on, **Size** 88px ("mm", 0.5 to 50, default 4) beside it | same |
@@ -166,10 +176,11 @@ Symbols (16px, 1.5px stroke, `currentColor`):
 
 ## 7. Centre snapping and Lock (criteria 30 to 32)
 
-- **Snapping:** while a job fixture hangs at the pointer or is dragged, each of its centres snaps to the Objects target's centres of `0060` (circle, ellipse, polygon, box of any other shape) with its capture, release, hysteresis and Alt rules; the marker shows (red lines along the matched axes, a cross at the point, no text). Only while the Objects target is on. Set fixtures do not centre-snap.
-- **Select bar of one selected job fixture:** one group, the **Lock** toggle: 28px high text toggle, `Lock` 16px and "Lock" 13px; pressed look while locked; name "Lock", `aria-pressed`. Nothing else in the bar: the settings switches, Flip and every other group leave the tree (criterion 31, section 14 M7). Set fixtures keep no Select bar (`0102` 6.4).
+- **Snapping:** while a job fixture hangs at the pointer or is dragged, each of its centres snaps to the centres of the drawing and of the placed pages (circle, ellipse, polygon, box of any other shape) with its capture, release, hysteresis and Alt rules; the marker shows (red lines along the matched axes, a cross at the point, no text). Only while the **Centres** target is on. Set fixtures do not centre-snap.
+- *(2026-11-16, customer)* **Centres** is an ordinary snap target toggle in the Snapping tab's "Snap targets" grid (same button as Objects, Guides, Nodes, Page, Grid; tooltip "Snap job fixtures to the centres of circles and shapes."), on by default; the laser page's **Fixtures** switch becomes the same toggle in that grid.
+- **Select bar of one selected job fixture:** one group, the **Lock** toggle: 28px high text toggle, `Lock` 16px and "Lock" 13px; pressed look while locked; name "Lock", `aria-pressed`. Nothing else in the bar: the settings switches, Flip and every other group leave the tree (criterion 31, section 14 M7). Set fixtures keep no Select bar (`0102` 6.4). *(Amended 2026-11-16, criterion 32: a selected set fixture gets the same Lock-only bar; while its set is locked the toggle reads pressed and is not pressable, tooltip "Locked with <set>"; hidden on a read-only page.)*
 - **Locked:** no drag from the outline or the box, no nudge, no squircles, knobs, centre move, Move chip or S chip; the box is drawn dashed without handles; a drag on it does nothing and starts no marquee; the pointer over it shows the "Lock cursor" (arrow with padlock). Still selectable, shown, listed, switched by eye and check, runs its jobs, removable by the trash.
-- **Lock badge:** a 16px chip at the upper right of the fixture's box (4px outside, screen-constant), `aria-hidden`, `pointer-events: none`; drawn whether selected or not; one per fixture (a grid of pins: one badge on its box).
+- **Lock badge:** a 16px chip at the upper right of the fixture's box (4px outside, screen-constant), `aria-hidden`, `pointer-events: none`; drawn whether selected or not; one per fixture (a grid of pins: one badge on its box). *(2026-11-16, UX review (Proposal): at the upper **left** of the box, 4px outside, since the job chips of `0103` stand at its upper right; criterion 32 amended.)*
 - Lock and Unlock: one step each; row and bar show the same state.
 
 ## 8. Layers tree and Operations tab
@@ -203,16 +214,21 @@ Symbols (16px, 1.5px stroke, `currentColor`):
 | "2 values damaged in Set 1." / "2 values damaged in Job fixtures." | canvas notice slot, on opening the file | status, 5 s |
 | "Press again to delete Coaster jig. Its 2 fixtures go with it." | sr-only status on arming | polite |
 | "Press again to delete Pins 1." / "Pins 1 removed." | sr-only status | polite |
+| "<profile> changed since, its sets were not undone." | canvas notice slot, on Ctrl+Z or Redo (2026-11-16) | status, 5 s |
+| "<profile> sets can no longer be undone." | same (2026-11-16) | status, 5 s |
+| "Could not save <profile>. The change was undone." | same (2026-11-16) | alert, 5 s |
 
-No notice after an add, a drop, a lock, an Apply inside the work area, a check or a rename. No notice when a limit hides an add control (criterion 17).
+The three 2026-11-16 notices cut the profile name with an ellipsis to stay within 70 characters. No notice when another page or project shows a set change made elsewhere. No notice after an add, a drop, a lock, an Apply inside the work area, a check or a rename. No notice when a limit hides an add control (criterion 17).
 
 ## 11. Undo steps
 
-"Add fixture set", "Rename fixture set", "Remove fixture set", "Move fixture set", "Set fixture set on page", "Set fixture set off page", "Add fixture" (in a set), "Add job fixture", "Rename fixture", "Remove fixture", "Set fixture active", "Set fixture inactive", "Show or hide fixture", "Move fixture", "Resize fixture", "Lock fixture", "Unlock fixture", "Output on", "Output off", "Edit fixture job" (Centre mark Size), "Apply fixtures from page", and the profile steps of `0102`. No step for folding, arming placement, picking a page in the Apply list, or a selection.
+"Add fixture set", "Rename fixture set", "Remove fixture set", "Move fixture set", "Set fixture set on page", "Set fixture set off page", "Add fixture" (in a set), "Add job fixture", "Rename fixture", "Remove fixture", "Set fixture active", "Set fixture inactive", "Show or hide fixture", "Move fixture", "Resize fixture", "Lock fixture", "Unlock fixture", "Lock fixture set", "Unlock fixture set" (2026-11-16), "Output on", "Output off", "Edit fixture job" (Centre mark Size), "Apply fixtures from page", and the profile steps of `0102`. No step for folding, arming placement, picking a page in the Apply list, or a selection.
 
 ## 12. Empty, error, locked, mixed and large states
 
-- **Generic laser, no set:** "Machine sets" with "+ Set" only; no count.
+- **Generic laser, no set:** "Machine sets" with "+ Set" only; no count. *(Superseded 2026-11-16, 4.5: no "+ Set", the profile hint line.)*
+- **Read only (2026-11-16):** the stored sets of a page whose profile is not on this computer, with the 4.5 line; content controls hidden, choices work.
+- **Locked set (2026-11-16):** 4.5; its fixtures as section 7.
 - **Set with no fixture:** line 2 "No fixtures"; unfolded, its add bar alone.
 - **No job fixture:** the add bar; Apply hidden unless another page has job fixtures.
 - **Set off:** muted row, "not on this page", nothing on the canvas, its fixture rows listed muted with the same words, its jobs "not on this page".
@@ -220,7 +236,7 @@ No notice after an add, a drop, a lock, an Apply inside the work area, a check o
 - **Locked:** section 7.
 - **Mixed:** a fixture cannot be multi-selected (`0102` 6.1); no mixed state.
 - **Errors:** damaged values read as defaults with one notice per set (criterion 40); a damaged profile record is skipped with its notice (`0102`); a newer record as `0026`.
-- **Old files:** page fixtures read as "Set 1", on; nothing shown, nothing written.
+- **Old files:** page fixtures read as job fixtures (no set), unlocked; a screw without role jobs shows no Jobs toggles; nothing shown, nothing written. Older profile records are skipped with the counted "older format" notice of the profile library (2026-11-15, lead, Proposal: no legacy conversion, criterion 39).
 - **Large:** 16 sets and 64 job fixtures: set rows and job rows are windowed (fixed rows, the unfolded set and the unfolded fixture are variable items, at most 60 row elements); first rows within 100 ms; a 400-pin grid with both jobs draws as one batch per kind; hit within 2 ms, draw list within 16 ms, a snapping drag move within 16 ms, Apply of 64 within 100 ms (criterion 42).
 
 ## 13. Decisions for veto (Proposal)
@@ -261,7 +277,7 @@ No notice after an add, a drop, a lock, an Apply inside the work area, a check o
 - Tab: Holder glyph after Operations and Materials, laser pages only; Document tab without the Fixtures block; two sections with the count heading.
 - Sets: folded rows with chevron, name, line 2, On this page, armed trash, arrows, drag with the insertion line; rename in place; + Set; unfolded add bar (Grid hidden when present) and `0102` rows with their own On the bed check; the both-switches rule on canvas, hit, snap and jobs.
 - Job fixtures: symbol add bar that arms placement, hanging dashed outline, click drops, stays armed, Escape ends, keyboard placement; rows with check, Lock, eye, trash, line 2; limits hide the add controls silently.
-- Pin and screw: Diameter (pin only), Columns and Rows units with Spacing hidden at 1, clamping notices, 400 limit; Jobs toggles as the jobs' Output with Size; canvas look, knobs, chips, readouts, no rotate.
+- Pin and screw: Diameter (pin only), Columns and Rows units with Spacing greyed out at 1, clamping notices, 400 limit; Jobs toggles as the jobs' Output with Size; canvas look, knobs, chips, readouts, no rotate.
 - Fixed jobs in the Operations tab: no trash, no rename, static part ticks, "not on this page" first in line 2.
 - Centre snapping with the `0060` marker; Lock in row and bar, locked look, Lock cursor, badge, trash still works.
 - Apply: in place list, preview, Apply <n>, Cancel and Escape, one step, Output off on copies, outside notice, never mirrored.
