@@ -32,11 +32,27 @@ export function partCountText(ticked: number): string {
   return ticked === 1 ? "1 part" : `${ticked} parts`;
 }
 
-/** The job's second line: the kind word, then the first of not on the bed, Output off, the parts. */
+/** The state word of line 2 and the accessible name, in the priority of criterion 28; `null` when none applies. */
+function stateWord(row: JobRow): string | null {
+  if (!row.onThisPage) return "not on this page";
+  if (!row.fixtureActive) return "not on the bed";
+  return !row.output ? "Output off" : null;
+}
+
+/** The job's second line: the kind word, then the first of not on this page, not on the bed, Output off, the parts. */
 export function jobLine2(row: JobRow): string {
   if (row.kind === null) return "Unknown fixture job";
-  const rest = !row.fixtureActive ? "not on the bed" : !row.output ? "Output off" : partCountText(row.partsTicked);
-  return `${row.kind.word} · ${rest}`;
+  return `${row.kind.word} · ${stateWord(row) ?? partCountText(row.partsTicked)}`;
+}
+
+/** The fixed jobs of a pin or screw (criterion 27) live and die with it: no trash, no rename (F10). */
+export function isFixedJob(row: JobRow): boolean {
+  return row.role !== null;
+}
+
+/** The fixed parts of a role job show a static tick, not a check box (UX notes 6.3). */
+export function partsAreStatic(job: JobRow): boolean {
+  return isFixedJob(job);
 }
 
 /** The row's accessible name: "<name>, <kind>, <n> parts" plus the state words (section 13). */
@@ -44,8 +60,8 @@ export function jobAccessibleName(row: JobRow): string {
   if (row.kind === null) return `${row.name}, unknown fixture job`;
   const n = row.partsTicked;
   const parts = n === 1 ? "1 part" : `${n} parts`;
-  const state = !row.fixtureActive ? ", not on the bed" : !row.output ? ", Output off" : "";
-  return `${row.name}, ${row.kind.word}, ${parts}${state}`;
+  const word = stateWord(row);
+  return `${row.name}, ${row.kind.word}, ${parts}${word === null ? "" : `, ${word}`}`;
 }
 
 /** The Parts list's count: "2 of 5", ticked of the readable parts (section 5.1). */

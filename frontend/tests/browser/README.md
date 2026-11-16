@@ -255,3 +255,10 @@ as it is (Ben left, Anna changes the keys), and a workspace on the faked desktop
 choice. It ends by checking that the relay's data holds no label, name or content. Run it with
 the Playwright environment above and `CURVYO_BROWSER_URL` of a production preview; screenshots go
 to `target/0097-browser/`.
+
+`fixture-sets-read-only.cjs` checks `specs/0113-fixture-sets-and-pins` criteria 32 and 46 after
+the UX review of 2026-11-16: a locked set holder offers no Add slot, and a laser page whose
+profile is deleted in the library shows "From the project file. <profile> is not on this
+computer." with no "+ Set", no set add bar, no Lock in the rows and no Lock bar. It starts its
+own dev server; set `CURVYO_E2E_BROWSER` to a Chromium when Playwright's own is not installed.
+Screenshots go to `target/fixture-sets-read-only-browser/`.

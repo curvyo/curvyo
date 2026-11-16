@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as Reac
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
 import { ARM_TRASH, ARM_ZONE } from "@/hooks/useDeleteArm";
 import type { JobRow } from "@/lib/fixtureJobsView";
-import { armKey, jobAccessibleName, jobLine2 } from "@/lib/fixtureJobRows";
+import { armKey, isFixedJob, jobAccessibleName, jobLine2 } from "@/lib/fixtureJobRows";
 import { focusAfterRename, nameKeyAction } from "@/lib/operationRows";
 
 /** What a job row asks of the section: the session calls and the row's own states. */
@@ -60,6 +60,8 @@ const CONTROL =
 export function FixtureJobRowView(props: JobRowProps) {
   const { row, index, renaming, armed, actions } = props;
   const unknown = row.kind === null;
+  // A pin's or screw's fixed jobs live and die with the fixture: no trash, no rename (F10).
+  const fixed = isFixedJob(row);
   const key = armKey(row.id);
   return (
     <li
@@ -101,7 +103,7 @@ export function FixtureJobRowView(props: JobRowProps) {
             title={row.name}
             onFocus={props.onFocusRow}
             onClick={() => actions.select(row)}
-            onDoubleClick={() => actions.select(row, true)}
+            onDoubleClick={() => actions.select(row, !fixed)}
             onKeyDown={(event) => onNameKey(event, row, armed, actions)}
             className={`min-w-0 flex-1 truncate text-left text-[13px] focus-visible:outline-none ${row.show && row.output && !unknown ? "text-[var(--toolbar-icon)]" : "text-[var(--panel-muted-fg)]"}`}
           >
@@ -132,7 +134,7 @@ export function FixtureJobRowView(props: JobRowProps) {
             </button>
           </>
         )}
-        {renaming ? null : <TrashButton row={row} armed={armed} actions={actions} />}
+        {renaming || fixed ? null : <TrashButton row={row} armed={armed} actions={actions} />}
         {renaming || unknown ? null : (
           <>
             <span className="w-1 shrink-0" />
@@ -235,6 +237,8 @@ function onNameKey(event: ReactKeyboardEvent, row: JobRow, armed: boolean, actio
   const action = nameKeyAction(event.key, event.altKey, armed);
   if (action === "none") return;
   event.preventDefault();
+  // The fixed jobs of a pin or screw have no rename and no trash (F10).
+  if (isFixedJob(row) && (action === "rename" || action === "arm" || action === "remove")) return;
   if (action === "step-up") actions.step(row, -1);
   else if (action === "step-down") actions.step(row, 1);
   else if (action === "rename") actions.select(row, true);

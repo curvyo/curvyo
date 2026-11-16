@@ -146,7 +146,7 @@ export function MachineBlock({ label, machine, workbenches, unit = "mm", onRetur
         </Tooltip>
         {noticeAt("save")}
       </div>
-      <p className="text-xs text-[var(--panel-muted-fg)]">Fixtures in profile: {machine.fixtures_in_profile}</p>
+      <p className="text-xs text-[var(--panel-muted-fg)]">Fixture sets in profile: {machine.fixture_sets_in_profile}</p>
       {machine.name_notice ? (
         <p role="status" className="text-xs text-[var(--toolbar-icon)]">
           {machine.name_notice}

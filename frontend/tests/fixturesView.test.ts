@@ -1,11 +1,13 @@
-// The Fixtures block's decoder against the Rust fixtures of `curvyo-editor-wasm/tests/fixtures/
-// fixtures_view/` (`specs/0102-laser-fixtures` `adrs.md` section 7). The Rust contract test
-// `tests/fixtures_view_contract.rs` builds the same states and compares them with these files, so
-// a drift fails on both sides.
+// The Fixtures tab's decoder against the Rust fixtures of `curvyo-editor-wasm/tests/fixtures/
+// fixtures_view/` (`specs/0102-laser-fixtures` `adrs.md` section 7, `specs/0113-fixture-sets-and-pins`
+// criteria 1 to 43). The Rust contract test `tests/fixture_sets_view_contract.rs` builds the same
+// states and compares them with these files, so a drift fails on both sides.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { decodeFixturesText, decodeFixturesView } from "../src/lib/fixturesView.ts";
+import { lockTooltip } from "../src/lib/fixtureSets.ts";
+import { allRows, decodeFixturesText, decodeFixturesView, selectedLockBar } from "../src/lib/fixturesView.ts";
+import { breakEveryField } from "./contractWalk.ts";
 
 const DIR = new URL("../../curvyo-editor-wasm/tests/fixtures/fixtures_view/", import.meta.url);
 
@@ -18,132 +20,194 @@ const NAMES = readdirSync(DIR)
   .map((file) => file.slice(0, -".json".length))
   .sort();
 
-test("the Rust states decode, and nothing else is in the folder", () => {
-  assert.deepEqual(NAMES, ["empty", "every_kind", "selected_holder"]);
+function decoded(name: string) {
+  const view = decodeFixturesView(fixture(name));
+  assert.ok(view, name);
+  return view;
+}
+
+test("the twelve Rust states decode, and nothing else is in the folder", () => {
+  assert.deepEqual(NAMES, [
+    "apply_candidates",
+    "damaged_set",
+    "empty_page",
+    "every_kind",
+    "generic_laser_hint",
+    "locked_pin_grid",
+    "locked_set",
+    "old_file_job_fixtures",
+    "read_only_sets",
+    "screw_grid_centre_mark",
+    "selected_holder",
+    "two_sets_one_off",
+  ]);
+  for (const name of NAMES) decoded(name);
+});
+
+test("every field of every shared fixture is required and typed: a missing or mistyped one is refused", () => {
   for (const name of NAMES) {
-    assert.ok(decodeFixturesView(fixture(name)), name);
+    for (const broken of breakEveryField(fixture(name))) {
+      assert.equal(decodeFixturesView(broken.value), null, `${name}: ${broken.how} ${broken.path} must be refused`);
+    }
   }
 });
 
-test("the selection's announcement decodes for a selected holder and is null without one", () => {
-  const selected = decodeFixturesView(fixture("selected_holder"));
-  assert.ok(selected);
-  assert.equal(selected.selected, selected.rows[1].id);
-  assert.equal(selected.selectionAnnouncement, "Holder 1 selected, 120.0 by 80.0 mm.");
-  assert.equal(decodeFixturesView(fixture("every_kind"))?.selectionAnnouncement, null);
-  assert.equal(decodeFixturesView(fixture("empty"))?.selectionAnnouncement, null);
-  const good = fixture("selected_holder") as Record<string, unknown>;
-  assert.equal(decodeFixturesView({ ...good, selection_announcement: 7 }), null, "a number is refused");
-  assert.ok(!("selected_pose" in good), "no pose: the Select bar shows nothing for a fixture");
-});
-
-test("the empty page has no rows and may add a grid", () => {
-  const view = decodeFixturesView(fixture("empty"));
-  assert.ok(view);
-  assert.deepEqual(view.rows, []);
-  assert.equal(view.canAddGrid, true);
+test("the empty page has no set and no job fixture, and may add both", () => {
+  const view = decoded("empty_page");
+  assert.deepEqual(view.sets, []);
+  assert.deepEqual(view.jobFixtures, []);
+  assert.equal(view.setsOnPage, 0);
+  assert.equal(view.canAddSet, true);
+  assert.equal(view.canAddJobFixture, true);
+  assert.equal(view.armedKind, null);
   assert.equal(view.selected, null);
   assert.equal(view.snappingFixtures, true);
 });
 
-test("every kind decodes with its own values, and an unknown kind stays a row", () => {
-  const view = decodeFixturesView(fixture("every_kind"));
-  assert.ok(view);
+test("two sets: one on the page and unfolded with its fixtures, one off with its screw", () => {
+  const view = decoded("two_sets_one_off");
+  assert.equal(view.setsOnPage, 1);
   assert.deepEqual(
-    view.rows.map((row) => row.kind),
+    view.sets.map((set) => [set.name, set.onPage, set.unfolded, set.canAddGrid, set.line2]),
+    [
+      ["Set 1", true, true, false, "Grid, Holder · 2 fixtures"],
+      ["Coaster jig", false, false, true, "Screw · not on this page"],
+    ],
+  );
+  const [grid, holder] = view.sets[0].fixtures;
+  assert.equal(grid.grid?.spacingMm, 10);
+  assert.deepEqual([grid.locked, grid.lockedBySet], [false, false], "a set fixture has its own Lock (criterion 32)");
+  assert.equal(holder.active, false);
+  assert.equal(holder.onBed, false);
+  assert.equal(holder.slots.length, 2);
+  const screw = view.sets[1].fixtures[0];
+  assert.equal(screw.active, true);
+  assert.equal(screw.onBed, false, "its own check is on, its set is off: not on the bed");
+  assert.equal(screw.round?.diameterMm, null, "a screw has no Diameter field");
+});
+
+test("a locked set locks its fixtures, a locked fixture alone does not lock its set (criterion 32)", () => {
+  const view = decoded("locked_set");
+  assert.deepEqual(
+    view.sets.map((set) => [set.locked, set.canAdd]),
+    [
+      [true, false],
+      [false, true],
+    ],
+  );
+  const [holder] = view.sets[0].fixtures;
+  assert.deepEqual([holder.locked, holder.lockedBySet], [false, true]);
+  const [clamp] = view.sets[1].fixtures;
+  assert.deepEqual([clamp.locked, clamp.lockedBySet], [true, false]);
+  assert.equal(view.selected, clamp.id);
+});
+
+test("a read only page carries its line and no add; Generic laser carries its hint (criteria 3, 46)", () => {
+  const readOnly = decoded("read_only_sets");
+  assert.equal(readOnly.readOnly, "From the project file. Generic laser copy is not on this computer.");
+  assert.equal(readOnly.profileHint, null);
+  assert.equal(readOnly.canAddSet, false);
+  assert.ok(readOnly.sets.every((set) => !set.canAdd));
+  const generic = decoded("generic_laser_hint");
+  assert.equal(generic.readOnly, null);
+  assert.match(generic.profileHint ?? "", /^Fixture sets are kept in a machine profile\./);
+  assert.equal(generic.canAddSet, false);
+});
+
+test("a locked pin grid carries its counts, spacings and the toggle states", () => {
+  const view = decoded("locked_pin_grid");
+  const pin = view.jobFixtures[0];
+  assert.equal(pin.kind, "pin");
+  assert.equal(pin.locked, true);
+  assert.equal(pin.line2, "Pin · 2 × 2 · ⌀ 6 mm · locked · Diameters");
+  assert.equal(pin.round?.diameterMm, 6);
+  assert.deepEqual([pin.round?.columns, pin.round?.rows], [2, 2]);
+  assert.deepEqual([pin.round?.columnSpacingMm, pin.round?.rowSpacingMm], [30, 20]);
+  assert.equal(pin.round?.centreMark?.on, false);
+  assert.equal(pin.round?.diameters?.on, true);
+  assert.equal(view.selected, pin.id);
+  assert.equal(view.selectionAnnouncement, "Pin 1 selected, diameter 6.0 mm.");
+});
+
+test("a screw grid with its Centre mark on", () => {
+  const screw = decoded("screw_grid_centre_mark").jobFixtures[0];
+  assert.equal(screw.kind, "screw");
+  assert.equal(screw.round?.columns, 4);
+  assert.equal(screw.round?.centreMark?.on, true);
+  assert.equal(screw.round?.markMm, 3);
+});
+
+test("an old file's job fixtures: a screw has no role jobs, so no toggles (criterion 39)", () => {
+  const view = decoded("old_file_job_fixtures");
+  assert.deepEqual(view.sets, []);
+  const screw = view.jobFixtures.find((row) => row.kind === "screw");
+  assert.ok(screw);
+  assert.equal(screw.round?.centreMark, null);
+  assert.equal(screw.round?.diameters, null);
+  assert.ok(view.jobFixtures.every((row) => row.locked === false));
+});
+
+test("Apply candidates and the picked page decode", () => {
+  const view = decoded("apply_candidates");
+  assert.deepEqual(view.applyCandidates, [{ id: "v9n291gl1jnw2", name: "Laser 1", count: 2 }]);
+  assert.equal(view.applyPicked, "v9n291gl1jnw2");
+});
+
+test("damage notices come per set and for the job fixtures (criterion 40)", () => {
+  assert.deepEqual(decoded("damaged_set").damageNotices, [
+    "3 values damaged in Set 1.",
+    "3 values damaged in Set 2.",
+    "1 value damaged in No id.",
+    "5 values damaged in Job fixtures.",
+  ]);
+});
+
+test("every kind decodes, an unknown kind stays a row, and rows list sets before job fixtures", () => {
+  const view = decoded("every_kind");
+  assert.deepEqual(
+    view.jobFixtures.map((row) => row.kind),
     ["grid", "holder", "clamp", "stop", "screw", "unknown"],
   );
-  const grid = view.rows[0];
-  assert.equal(grid.grid?.spacingMm, 5);
-  assert.equal(grid.grid?.majorEvery, 4);
-  assert.deepEqual(grid.grid?.tapes, { bottom: true, left: true, top: false, right: true });
-  assert.equal(grid.grid?.originXMm, 2);
-  assert.equal(view.canAddGrid, false);
-  const holder = view.rows[1];
-  assert.ok(!("size" in holder), "no size field: the handles size a holder");
-  assert.equal(holder.canAddSlot, true);
-  assert.equal(holder.slots[0].shape, "rect");
-  assert.equal(holder.slots[1].shape, "circle");
-  assert.equal(holder.slots[2].outside, true);
-  assert.equal(view.rows[3].visible, false);
-  assert.equal(view.rows[2].active, false);
-  assert.equal(view.rows[4].name, "Screw 1");
-  assert.equal(view.rows[4].grid, null, "a screw's row has no field");
-  assert.equal(view.rows[5].name, "Pocket 1");
-  assert.deepEqual(view.damageNotices, ["1 value damaged on Stop 1."]);
+  assert.deepEqual(allRows(decoded("two_sets_one_off")).map((row) => row.name), ["Grid 1", "Holder 1", "Screw 1"]);
 });
 
-test("ids are the full id text the calls take back", () => {
-  const view = decodeFixturesView(fixture("every_kind"));
-  assert.ok(view);
-  assert.equal(view.rows[0].id, "hhpykmt2rhhv3");
-  assert.equal(view.rows[1].slots[0].id, "jmwbnf98nodw2");
+test("a selected holder's announcement decodes, and a number is refused", () => {
+  const view = decoded("selected_holder");
+  assert.equal(view.selected, view.jobFixtures[1].id);
+  assert.equal(view.selectionAnnouncement, "Holder 1 selected, 120.0 by 80.0 mm.");
+  assert.equal(decoded("every_kind").selectionAnnouncement, null);
+  const bad = { ...(fixture("selected_holder") as Record<string, unknown>), selection_announcement: 7 };
+  assert.equal(decodeFixturesView(bad), null);
 });
 
-test("a wrong enum value or a missing field is refused, not guessed (checked decode)", () => {
-  const good = fixture("every_kind") as Record<string, unknown>;
-  const rows = () => structuredClone(good) as { rows: Array<Record<string, unknown>> };
-
-  // A kind this build does not know is `unknown` (criterion 32), never a failed decode.
-  const teleport = rows();
-  teleport.rows[0].kind = "teleport";
-  assert.equal(decodeFixturesView(teleport)?.rows[0]?.kind, "unknown");
-
-  const badShape = rows() as { rows: Array<{ slots: Array<Record<string, unknown>> }> };
-  badShape.rows[1].slots[0].shape = "hexagon";
-  assert.equal(decodeFixturesView(badShape), null);
-
-  const badTape = rows() as { rows: Array<{ grid: { tapes: Record<string, unknown> } }> };
-  badTape.rows[0].grid.tapes.left = "yes";
-  assert.equal(decodeFixturesView(badTape), null);
-
-  const negativeMajor = rows();
-  (negativeMajor.rows[0].grid as Record<string, unknown>).major_every = -1;
-  assert.equal(decodeFixturesView(negativeMajor), null);
-
-  const noSwitch = structuredClone(good) as Record<string, unknown>;
-  delete noSwitch.snapping_fixtures;
-  assert.equal(decodeFixturesView(noSwitch), null);
-
-  assert.equal(decodeFixturesView(null), null);
-  assert.equal(decodeFixturesView("null"), null);
+test("a kind text this build does not know is 'unknown', never a failed decode", () => {
+  const good = fixture("every_kind") as { job_fixtures: Array<Record<string, unknown>> };
+  const teleport = structuredClone(good);
+  teleport.job_fixtures[0].kind = "teleport";
+  assert.equal(decodeFixturesView(teleport)?.jobFixtures[0].kind, "unknown");
 });
 
-test("the text form decodes, and the JSON null of a page without fixtures is null", () => {
+test("the text form decodes; the JSON null of a page without fixtures, bad JSON and other values are null", () => {
   assert.equal(decodeFixturesText("null"), null);
   assert.equal(decodeFixturesText("not json"), null);
-  const view = decodeFixturesText(JSON.stringify(fixture("empty")));
-  assert.ok(view);
-  assert.equal(view.rows.length, 0);
-});
-
-test("hostile JSON of the wrong shape is refused as a whole, never partly read", () => {
-  const good = fixture("every_kind") as Record<string, unknown>;
-  const withRows = (rows: unknown) => ({ ...good, rows });
-  const cases: Array<[string, unknown]> = [
-    ["rows as a string", withRows("holder")],
-    ["rows as an object", withRows({ 0: good })],
-    ["a row that is a number", withRows([1])],
-    ["an id as a number", withRows([{ ...(good.rows as Array<Record<string, unknown>>)[1], id: 7 }])],
-    ["spacing as a string", withRows([{ ...(good.rows as Array<Record<string, unknown>>)[0], grid: { ...((good.rows as Array<{ grid: object }>)[0].grid), spacing_mm: "5" } }])],
-    ["damage notices with a number", { ...good, damage_notices: [3] }],
-    ["damage notices as a string", { ...good, damage_notices: "1 value damaged" }],
-    ["selected as a number", { ...good, selected: 4 }],
-    ["snapping as a string", { ...good, snapping_fixtures: "yes" }],
-    ["a bare array", [good]],
-  ];
-  for (const [name, value] of cases) {
-    assert.equal(decodeFixturesView(value), null, name);
-  }
-});
-
-test("an empty view decodes with no rows, and a text that is not JSON is null", () => {
-  const view = decodeFixturesView(fixture("empty"));
-  assert.ok(view);
-  assert.deepEqual(view.rows, []);
-  assert.deepEqual(view.damageNotices, []);
-  assert.equal(view.selected, null);
-  assert.equal(view.armed, null);
-  assert.equal(decodeFixturesText("{"), null);
   assert.equal(decodeFixturesText(""), null);
+  assert.equal(decodeFixturesView([fixture("empty_page")]), null);
+  assert.equal(decodeFixturesView("null"), null);
+  assert.equal(decodeFixturesText(JSON.stringify(fixture("empty_page")))?.sets.length, 0);
+});
+
+test("the Select bar's Lock follows the selected fixture, job or set, and hides on a read only page (criterion 32)", () => {
+  const bar = selectedLockBar(decoded("locked_set"));
+  assert.equal(bar?.row.name, "Clamp 1");
+  assert.equal(bar?.setName, "Set 2");
+  assert.equal(selectedLockBar(decoded("locked_pin_grid"))?.setName, null);
+  assert.equal(selectedLockBar(decoded("empty_page")), null);
+  const readOnly = decoded("read_only_sets");
+  assert.equal(selectedLockBar({ ...readOnly, selected: readOnly.sets[0].fixtures[0].id }), null);
+});
+
+test("the Lock tooltip names the set while it holds the fixture still", () => {
+  assert.equal(lockTooltip(false, null), "Lock");
+  assert.equal(lockTooltip(true, null), "Unlock");
+  assert.equal(lockTooltip(true, "Set 1"), "Locked with Set 1");
 });

@@ -1,9 +1,11 @@
+import { Lock } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import type { WasmSession } from "@/lib/editorSession";
 
 /** One text over the canvas as the session places it (canvas CSS px). */
 interface FixtureLabel {
-  kind: "tape" | "fixture" | "slot" | "tag";
+  kind: "tape" | "fixture" | "slot" | "tag" | "lock";
   text: string;
   x: number;
   y: number;
@@ -11,7 +13,7 @@ interface FixtureLabel {
   edge?: "bottom" | "left" | "top" | "right";
 }
 
-const KINDS = new Set(["tape", "fixture", "slot", "tag"]);
+const KINDS = new Set(["tape", "fixture", "slot", "tag", "lock"]);
 const EDGES = new Set(["bottom", "left", "top", "right"]);
 
 function isLabel(value: unknown): value is FixtureLabel {
@@ -89,6 +91,28 @@ export function FixtureLabels({ getSession }: { getSession: () => WasmSession | 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" data-fixture-labels="">
       {labels.map((label, index) => {
+        // The lock badge of a locked job fixture (`specs/0113-fixture-sets-and-pins` UX notes 7):
+        // a 16 px chip 4 px outside its box's upper left corner, on every locked fixture. It
+        // yields the upper right to the job chips and stands left of the tag.
+        if (label.kind === "lock") {
+          return (
+            <span
+              key={`lock-${index}`}
+              data-lock-badge=""
+              className="absolute flex h-4 w-4 items-center justify-center rounded-[4px] border"
+              style={{
+                left: label.x,
+                top: label.y,
+                transform: "translate(calc(-100% - 4px), calc(-100% - 4px))",
+                color: "var(--toolbar-icon)",
+                background: "var(--toolbar-bg)",
+                borderColor: "var(--lane-line)",
+              }}
+            >
+              <Lock size={12} strokeWidth={1.5} absoluteStrokeWidth />
+            </span>
+          );
+        }
         const { transform, color } = placement(label);
         // The tag is a chip: 20 px high, toolbar ground, a 25 % border (`ux-notes.md` section 6.3).
         const chip = label.kind === "tag";

@@ -13,6 +13,8 @@ export interface SnappingToolbarView {
   page: boolean;
   /** Whether shown page grids pull (`specs/0090-grid` criterion 10). */
   grid: boolean;
+  /** Whether a job fixture snaps to the centres of circles and shapes (`specs/0113` criterion 30). */
+  centres: boolean;
   /** Which part of a moved selection snaps to a grid (criterion 11). */
   gridPoint: GridSnapPoint;
   x: boolean;
@@ -36,6 +38,8 @@ export interface SnappingApi {
   setZones: (capturePx: number, releasePx: number) => boolean;
   /** Sets the Grid target switch. */
   setGrid: (grid: boolean) => boolean;
+  /** Sets the Centres target switch. */
+  setCentres: (centres: boolean) => boolean;
   /** Sets the grid snap point. */
   setGridPoint: (point: GridSnapPoint) => boolean;
 }
@@ -52,6 +56,7 @@ function readToolbar(session: WasmSession | null): SnappingToolbarView {
       nodes: true,
       page: true,
       grid: true,
+      centres: true,
       gridPoint: "centre",
       x: true,
       y: true,
@@ -69,6 +74,7 @@ function readToolbar(session: WasmSession | null): SnappingToolbarView {
     nodes: raw.nodes,
     page: raw.page,
     grid: raw.grid,
+    centres: raw.centres,
     gridPoint: raw.grid_point === "box" || raw.grid_point === "nodes" ? raw.grid_point : "centre",
     x: raw.x,
     y: raw.y,
@@ -168,6 +174,14 @@ export function useSnapping(editor: EditorHandle): SnappingApi {
     return changed;
   }, [getSession, sync]);
 
+  const setCentres = useCallback((centres: boolean): boolean => {
+    const session = getSession();
+    if (!session) return false;
+    const changed = session.set_snapping_centres(centres);
+    sync();
+    return changed;
+  }, [getSession, sync]);
+
   const setGridPoint = useCallback((point: GridSnapPoint): boolean => {
     const session = getSession();
     if (!session) return false;
@@ -183,6 +197,7 @@ export function useSnapping(editor: EditorHandle): SnappingApi {
     setAxes,
     setZones,
     setGrid,
+    setCentres,
     setGridPoint,
   };
 }

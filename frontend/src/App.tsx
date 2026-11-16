@@ -14,6 +14,8 @@ import { PenModeBar } from "@/components/PenModeBar";
 import { PropertiesPanel } from "@/components/panel/PropertiesPanel";
 import { Rulers } from "@/components/Rulers";
 import { CurveToBezierButton } from "@/components/CurveToBezierButton";
+import { FixtureLockBar } from "@/components/FixtureLockBar";
+import { selectedLockBar } from "@/lib/fixturesView";
 import { SelectToolbar } from "@/components/SelectToolbar";
 import { WidthEditToggle } from "@/components/WidthEditToggle";
 import { ShapeToolbar } from "@/components/ShapeToolbar";
@@ -46,6 +48,7 @@ import { useDevices } from "@/hooks/useDevices";
 import { useImageClipboard } from "@/hooks/useImageClipboard";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useFixtures } from "@/hooks/useFixtures";
+import { useMachineRecords } from "@/hooks/useMachineRecords";
 import { useFixtureJobs } from "@/hooks/useFixtureJobs";
 import { useMaterials } from "@/hooks/useMaterials";
 import { useTestGridTool } from "@/hooks/useTestGridTool";
@@ -159,6 +162,10 @@ function Editor() {
   const operationTools = useOperationTools(editor);
   // The laser fixtures of the active laser page (`specs/0102-laser-fixtures`).
   const fixtures = useFixtures(editor);
+  // The profile records: queued writes, their failure notice, a reload on focus and storage.
+  useMachineRecords(editor);
+  // The selected fixture: the Select bar shows its Lock alone (criteria 31, 32); not on a read only page.
+  const selectedLock = selectedLockBar(fixtures.view);
   // The fixture jobs of the active laser page (`specs/0103-fixture-jobs`).
   const fixtureJobs = useFixtureJobs(editor);
   // The Settings block and the Materials section (`specs/0028-material-test-library`).
@@ -205,8 +212,10 @@ function Editor() {
             <RecogniseBar recognise={editor.recognise} onReturnFocus={() => editor.containerRef.current?.focus()} />
           ) : null}
           {editor.tool === "select" && editor.tiling.open ? <TilingBar tiling={editor.tiling} /> : null}
-          {/* A selected fixture has no Select bar: its handles and chips size and place it
-              (`specs/0102-laser-fixtures` criterion 14, UX notes §6.4). */}
+          {/* A selected fixture, job or set, has the Lock bar (`specs/0113` criteria 31, 32). */}
+          {editor.tool === "select" && !gridBar && !editor.recognise.open && !editor.tiling.open && selectedLock ? (
+            <FixtureLockBar row={selectedLock.row} setName={selectedLock.setName} api={fixtures} onReturnFocus={() => editor.containerRef.current?.focus()} />
+          ) : null}
           {editor.tool === "select" && !gridBar && !editor.recognise.open && !editor.tiling.open && !fixtures.view?.selected ? (
             <SelectToolbar
               moveOnly={editor.getSession()?.selection_move_only() ?? false}

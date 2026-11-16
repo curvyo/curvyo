@@ -1,4 +1,6 @@
 import { Frame, TriangleAlert } from "lucide-react";
+import { selectedRow } from "@/lib/fixturesView";
+import { FixturesTab } from "@/components/workbench/FixturesTab";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { OperationsSection } from "@/components/panel/OperationsSection";
 import { FixtureJobsSection } from "@/components/panel/FixtureJobsSection";
@@ -276,7 +278,7 @@ export function PropertiesPanel({
   const contribution = contributionOf(workbenches.list, manufacturing?.process);
   const page = workbenches.list.page;
   // The kind chip sits in the header of the page-scoped tabs only (`specs/0098` criterion 6).
-  const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters", "materials"].includes(
+  const pageScoped = ["document", "style", "layers", "snapping", "grid", "sketches", "parameters", "materials", "fixtures"].includes(
     doc.view.content,
   );
   const subject =
@@ -296,7 +298,9 @@ export function PropertiesPanel({
           ? fontsSubject(editor.text.fonts)
           : doc.view.content === "share"
             ? collab.view.subject
-            : "";
+            : doc.view.content === "fixtures"
+              ? ((fixtures.view && selectedRow(fixtures.view)?.name) ?? "")
+              : "";
   const activeLabel = doc.view.tabs.find((tab) => tab.name === doc.view.activeTab)?.label ?? "";
   // The About Trace tab is the frontend's, appended last so no other tab moves (UX notes 21.1).
   const tabs = traceInfo.available
@@ -531,7 +535,6 @@ export function PropertiesPanel({
                       view={manufacturing}
                       workbenches={workbenches}
                       unit={doc.view.unit}
-                      fixtures={fixtures}
                       onReturnFocus={returnFocus}
                     />
                   ) : page.off ? (
@@ -576,6 +579,8 @@ export function PropertiesPanel({
                 onEditMaterial={editMaterial}
                 fixtureJobs={<FixtureJobsSection api={fixtureJobs} selectFixture={fixtures.select} />}
               />
+            ) : doc.view.content === "fixtures" ? (
+              <FixturesTab api={fixtures} />
             ) : doc.view.content === "materials" ? (
               <MaterialsTab api={materials} onReturnFocus={returnFocus} />
             ) : doc.view.content === "layers" ? (

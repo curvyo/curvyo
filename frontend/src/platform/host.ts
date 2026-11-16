@@ -128,7 +128,7 @@ const FORMATS_KEY = "curvyo.document-formats";
 const EXTENSIONS_KEY = "curvyo.extensions";
 /** The machine profile records, one entry per profile (`curvyo.machines/<id>`), and the last
  * pick of this browser (ADR 0038 §1, §6). */
-const MACHINES_PREFIX = "curvyo.machines/";
+export const MACHINES_PREFIX = "curvyo.machines/";
 const MACHINE_CHOICE_KEY = "curvyo.machine-choice";
 /** The material records, one entry per material (`curvyo.materials/<id>`), their list order and
  * the remembered test grid values of this browser (ADR 0055 §1, §5, §6). */

@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { decodeFixtureJobsText, type FixtureJobsView, type JobRow } from "../src/lib/fixtureJobsView.ts";
 import {
   ADD_KINDS,
+  isFixedJob,
+  partsAreStatic,
   addLabel,
   armKey,
   flatJobs,
@@ -43,6 +45,8 @@ function job(overrides: Partial<JobRow> = {}): JobRow {
     partsTotal: 2,
     position: 0,
     of: 1,
+    role: null,
+    onThisPage: true,
     ...overrides,
   };
 }
@@ -76,6 +80,9 @@ test("line 2 says not on the bed, then Output off, then the part count", () => {
     "Engrave + Outline · 3 parts",
   );
   assert.equal(jobLine2(job({ kind: null })), "Unknown fixture job");
+  // Criterion 28: "not on this page" wins over "not on the bed" over "Output off" over the count.
+  assert.equal(jobLine2(job({ onThisPage: false, fixtureActive: false, output: false })), "Cut · not on this page");
+  assert.equal(jobLine2(job({ fixtureActive: false, output: false })), "Cut · not on the bed");
 });
 
 test("the accessible name carries the kind, the count and the state words", () => {
@@ -163,4 +170,22 @@ test("criterion 17 (J7): the work line is dropped when no operation runs; 'Nothi
   assert.deepEqual(texts(summaryWithFixtures(idle, 1)), ["1 fixture job runs.", "2 items not assigned."]);
   const running = [{ text: "Runs 3 operations, 5 items.", count: null }];
   assert.deepEqual(texts(summaryWithFixtures(running, 0)), ["Runs 3 operations, 5 items."]);
+});
+
+test("a pin's or screw's fixed jobs have no trash and no rename, and static part ticks (F10)", () => {
+  const fixed = job({ role: "centre_mark" });
+  assert.equal(isFixedJob(fixed), true);
+  assert.equal(partsAreStatic(fixed), true);
+  assert.equal(isFixedJob(job()), false);
+  assert.equal(partsAreStatic(job()), false);
+  assert.equal(jobAccessibleName(job({ onThisPage: false })), "Cut 1, Cut, 0 parts, not on this page");
+});
+
+test("the role jobs of the shared fixtures carry their role and the set rule", () => {
+  const roles = view("role_jobs").groups[0].jobs;
+  assert.deepEqual(roles.map((row) => row.role), ["centre_mark", "diameters"]);
+  assert.deepEqual(view("set_off").groups[0].jobs.map((row) => jobLine2(row)), [
+    "Score · not on this page",
+    "Score · not on this page",
+  ]);
 });

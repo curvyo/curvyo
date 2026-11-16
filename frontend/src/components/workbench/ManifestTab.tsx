@@ -1,9 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 
-import { FixtureList } from "@/components/workbench/FixturesBlock";
 import { InlinePickList } from "@/components/InlinePickList";
 import { MachineBlock } from "@/components/workbench/MachineBlock";
-import type { FixturesApi } from "@/hooks/useFixtures";
 import type { UnitSymbol } from "@/hooks/useDocumentPanel";
 import type { ManufacturingView, WorkbenchesApi } from "@/hooks/useWorkbenches";
 import type { PageRow } from "@/lib/pages";
@@ -17,18 +15,16 @@ interface ManifestTabProps {
   workbenches: WorkbenchesApi;
   /** The document's display unit (the Machine block's work area line). */
   unit: UnitSymbol;
-  /** The Fixtures block's API (`specs/0102-laser-fixtures`). */
-  fixtures: FixturesApi;
   onReturnFocus: () => void;
 }
 
 /**
  * A manufacturing workbench's tab, drawn from its extension's manifest (ADR 0034 §4,
  * `specs/0093-laser-workbench-shell` UX notes §4): the block kinds `Notice`, `MachineProfile`
- * (`specs/0026-machine-profile`) and `FixtureList` (`specs/0102-laser-fixtures`) in the manifest's order. Nothing here names a
+ * (`specs/0026-machine-profile`) in the manifest's order; a `FixtureList` block draws nothing here (the Fixtures tab, `specs/0113`). Nothing here names a
  * process.
  */
-export function ManifestTab({ contribution, pages, view, workbenches, unit, fixtures, onReturnFocus }: ManifestTabProps) {
+export function ManifestTab({ contribution, pages, view, workbenches, unit, onReturnFocus }: ManifestTabProps) {
   const blocks = contribution.tabs[0]?.blocks ?? [];
   return (
     <div className="flex flex-col gap-4">
@@ -41,7 +37,6 @@ export function ManifestTab({ contribution, pages, view, workbenches, unit, fixt
           view={view}
           workbenches={workbenches}
           unit={unit}
-          fixtures={fixtures}
           onReturnFocus={onReturnFocus}
         />
       ))}
@@ -55,7 +50,6 @@ function Block({
   view,
   workbenches,
   unit,
-  fixtures,
   onReturnFocus,
 }: ManifestTabProps & { block: ManifestBlock }) {
   switch (block.kind) {
@@ -69,7 +63,8 @@ function Block({
         </>
       ) : null;
     case "fixture_list":
-      return <FixtureList api={fixtures} />;
+      // The Fixtures tab has them since `0113`; the Document tab keeps no Fixtures block.
+      return null;
   }
 }
 

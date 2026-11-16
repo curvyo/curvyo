@@ -1,7 +1,8 @@
+import { Check } from "lucide-react";
 import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import type { JobRow, PartRow, PartsView } from "@/lib/fixtureJobsView";
-import { partsHeader, tickTitle } from "@/lib/fixtureJobRows";
+import { partsAreStatic, partsHeader, tickTitle } from "@/lib/fixtureJobRows";
 import { nextFocusIndex } from "@/lib/operationRows";
 
 export interface PartsActions {
@@ -90,6 +91,22 @@ function PartLine({
 }) {
   return (
     <li data-part-index={index} className="flex h-7 items-center gap-2 text-[13px] text-[var(--toolbar-icon)]">
+      {partsAreStatic(job) ? (
+        // A fixed job's parts are fixed: a static tick, not a check box (`0113` UX notes 6.3).
+        <span
+          role="checkbox"
+          data-part-control="check"
+          aria-checked={part.ticked}
+          aria-readonly
+          aria-label={part.name}
+          aria-description={`Part of ${job.name}`}
+          tabIndex={stop ? 0 : -1}
+          onFocus={onFocusRow}
+          className="flex h-4 w-4 shrink-0 items-center justify-center text-[var(--toolbar-icon)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
+        >
+          <Check size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+        </span>
+      ) : (
       <button
         type="button"
         role="checkbox"
@@ -105,6 +122,7 @@ function PartLine({
       >
         {part.ticked ? <span className="h-2 w-2 bg-[var(--toolbar-icon)]" /> : null}
       </button>
+      )}
       <span className="min-w-0 flex-1 truncate">{part.name}</span>
       <button
         type="button"

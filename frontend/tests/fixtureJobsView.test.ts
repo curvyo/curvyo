@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { decodeFixtureJobsText, decodeFixtureJobsView } from "../src/lib/fixtureJobsView.ts";
+import { breakEveryField } from "./contractWalk.ts";
 
 const DIR = new URL("../../curvyo-editor-wasm/tests/fixtures/fixture_jobs_view/", import.meta.url);
 
@@ -23,7 +24,7 @@ const NAMES = readdirSync(DIR)
   .sort();
 
 test("the Rust states decode, and nothing else is in the folder", () => {
-  assert.deepEqual(NAMES, ["empty", "two_fixtures", "unknown_and_show_off"]);
+  assert.deepEqual(NAMES, ["empty", "role_jobs", "set_off", "two_fixtures", "unknown_and_show_off"]);
   for (const name of NAMES) {
     assert.ok(decodeFixtureJobsView(fixture(name)), name);
   }
@@ -154,4 +155,30 @@ test("the text form decodes, and bad JSON or the text null is no view", () => {
   assert.equal(decodeFixtureJobsText("null"), null);
   assert.equal(decodeFixtureJobsText("{not json"), null);
   assert.equal(decodeFixtureJobsText(JSON.stringify(fixture("empty")))?.count, 0);
+});
+
+test("the role jobs decode with their role and the set rule", () => {
+  const view = decodeFixtureJobsView(fixture("role_jobs"));
+  assert.ok(view);
+  assert.equal(view.groups[0].kind, "pin");
+  assert.deepEqual(view.groups[0].jobs.map((job) => [job.name, job.role, job.onThisPage]), [
+    ["Centre mark", "centre_mark", true],
+    ["Diameters", "diameters", true],
+  ]);
+  const off = decodeFixtureJobsView(fixture("set_off"));
+  assert.ok(off);
+  assert.deepEqual(off.groups[0].jobs.map((job) => job.onThisPage), [false, false]);
+});
+
+test("every field of every shared fixture is required and typed: a missing or mistyped one is refused", () => {
+  for (const name of NAMES) {
+    const good = fixture(name);
+    for (const broken of breakEveryField(good)) {
+      assert.equal(
+        decodeFixtureJobsView(broken.value),
+        null,
+        `${name}: ${broken.how} ${broken.path} must be refused`,
+      );
+    }
+  }
 });

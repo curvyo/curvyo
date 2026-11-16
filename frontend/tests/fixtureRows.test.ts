@@ -6,14 +6,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { decodeFixturesView, type FixtureRow, type FixturesView } from "../src/lib/fixturesView.ts";
 import {
-  ADD_KINDS,
+  JOB_ADD_KINDS,
+  KIND_WORDS,
   MAX_SLOTS,
-  addKinds,
+  SET_ADD_KINDS,
+  setAddKinds,
   decodeFitCue,
   fitWord,
   rowKey,
   rowKeyAction,
-  rowLine,
   rowName,
   slotCountText,
   slotName,
@@ -29,45 +30,42 @@ function view(name: string): FixturesView {
   return decoded;
 }
 
-function slot(name: string): FixtureRow["slots"][number] {
-  return { id: name, name, shape: "rect", cxMm: 0, cyMm: 0, wMm: 20, hMm: 20, outside: false };
-}
-
 function row(patch: Partial<FixtureRow>): FixtureRow {
   return {
     id: "id",
     name: "Holder 1",
     kind: "holder",
     active: true,
+    onBed: true,
     visible: true,
+    locked: false,
+    lockedBySet: false,
+    line2: "Holder",
     grid: null,
+    round: null,
     slots: [],
     canAddSlot: true,
     ...patch,
   };
 }
 
-test("the five add buttons are in the order of the spec, Grid hidden while the page has one", () => {
-  assert.deepEqual(ADD_KINDS, ["grid", "holder", "clamp", "stop", "screw"]);
-  assert.deepEqual(addKinds(view("empty")), ["grid", "holder", "clamp", "stop", "screw"]);
-  assert.deepEqual(addKinds(view("every_kind")), ["holder", "clamp", "stop", "screw"]);
+test("a set's add bar has six kinds in the order of the notes, Grid hidden while the set has one", () => {
+  assert.deepEqual(SET_ADD_KINDS, ["grid", "holder", "clamp", "stop", "screw", "pin"]);
+  const [first, second] = view("two_sets_one_off").sets;
+  assert.deepEqual(setAddKinds(first), ["holder", "clamp", "stop", "screw", "pin"]);
+  assert.deepEqual(setAddKinds(second), ["grid", "holder", "clamp", "stop", "screw", "pin"]);
 });
 
-test("the accessible name says the kind and whether the fixture is on the bed", () => {
+test("the job fixtures' add bar has five kinds, Pin first", () => {
+  assert.deepEqual(JOB_ADD_KINDS, ["pin", "screw", "holder", "clamp", "stop"]);
+  assert.equal(KIND_WORDS.pin, "Pin");
+});
+
+test("the accessible name says the kind and whether the fixture is on the bed (its set counts)", () => {
   assert.equal(rowName(row({ name: "Holder 1" })), "Holder 1, Holder, on the bed");
-  assert.equal(rowName(row({ name: "Clamp 1", kind: "clamp", active: false })), "Clamp 1, Clamp, not on the bed");
-  assert.equal(rowName(row({ name: "Pocket 1", kind: "unknown", size: null })), "Pocket 1, unknown fixture");
-});
-
-test("the second line names the kind, the slot count and 'not on the bed', never a colour", () => {
-  assert.equal(rowLine(row({ kind: "holder", slots: [] })), "Holder · 0 slots");
-  assert.equal(rowLine(row({ kind: "holder", slots: [slot("Slot 1"), slot("Slot 2")] })), "Holder · 2 slots");
-  assert.equal(rowLine(row({ kind: "clamp", active: false, size: { widthMm: 40, heightMm: 20 } })), "Clamp · not on the bed");
-  assert.equal(
-    rowLine(row({ name: "Grid 1", kind: "grid", size: null, grid: { spacingMm: 10, majorEvery: 5, tapes: { bottom: true, left: true, top: true, right: true }, originXMm: 0, originYMm: 0 } })),
-    "Grid",
-  );
-  assert.equal(rowLine(row({ name: "Pocket 1", kind: "unknown", size: null })), "Unknown fixture");
+  assert.equal(rowName(row({ name: "Clamp 1", kind: "clamp", active: false, onBed: false })), "Clamp 1, Clamp, not on the bed");
+  assert.equal(rowName(row({ name: "Pin 1", kind: "pin", active: true, onBed: false })), "Pin 1, Pin, not on the bed");
+  assert.equal(rowName(row({ name: "Pocket 1", kind: "unknown" })), "Pocket 1, unknown fixture");
 });
 
 test("a row key is the id, so a rename or a reorder keeps the same React key", () => {

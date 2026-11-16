@@ -177,15 +177,19 @@ test("the Snapping pane has a Grid target and the Grid snaps with choice", async
   const snapping = {
     view: {
       enabled: false, suspended: false, hasDrag: false, objects: true, guides: true, nodes: true,
-      page: true, grid: true, gridPoint: "centre", x: true, y: true, capturePx: 8, releasePx: 14,
+      page: true, grid: true, centres: true, gridPoint: "centre", x: true, y: true, capturePx: 8, releasePx: 14,
     },
     toggle: () => false, setTargets: () => false, setAxes: () => false, setZones: () => false,
-    setGrid: () => false, setGridPoint: () => false,
+    setGrid: () => false, setCentres: () => false, setGridPoint: () => false,
   };
   const html = await render((react) =>
     react.createElement(section.SnappingSection as never, { snapping, onReturnFocus: noop }),
   );
   assert.match(html, /aria-pressed="true"[^>]*>Grid</);
+  // Centres is an ordinary target toggle with the same look as Grid (`specs/0113` criterion 30).
+  const look = (label: string) => html.match(new RegExp(`<button type="button" aria-pressed="true" class="([^"]*)"[^>]*>${label}<`))?.[1];
+  assert.ok(look("Centres"), "a Centres toggle");
+  assert.equal(look("Centres"), look("Grid"), "the same look as the other targets");
   assert.match(html, /role="radiogroup" aria-label="Grid snaps with"/);
   assert.match(html, /aria-checked="true"[^>]*>Centre</);
   for (const option of ["Box corners and edges", "Nodes"]) {

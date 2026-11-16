@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { WasmSession } from "@/lib/editorSession";
 import { decodeFitCue, type FitCue } from "@/lib/fixtureRows";
+import { type FieldNotice, noticeMs } from "@/lib/fixtureSets";
 import { decodeFixturesText, type FixturesView } from "@/lib/fixturesView";
+import { type FixtureRun, type FixtureSetCommands, useFixtureSetCommands } from "@/hooks/useFixtureSets";
 
 /** What the Fixtures block reads from the editor: the session and its re-read signal. */
 export interface FixturesEditor {
@@ -12,18 +14,19 @@ export interface FixturesEditor {
 }
 
 /**
- * The Fixtures block's state and commands (`specs/0102-laser-fixtures` `adrs.md` section 7; the
- * session holds the rules, this hook only calls them and re-reads the view). Every command is one
- * session call, then one re-read. The block does not grow `useEditorSession` (architecture review
- * finding 2).
+ * The Fixtures tab's state and commands (`specs/0102-laser-fixtures` `adrs.md` section 7,
+ * `specs/0113-fixture-sets-and-pins`; the session holds the rules, this hook only calls them and
+ * re-reads the view). Every command is one session call, then one re-read; the set, add,
+ * placement, Lock, pin field and Apply commands are in `useFixtureSets`. The tab does not grow
+ * `useEditorSession` (architecture review finding 2).
  */
-export interface FixturesApi {
+export interface FixturesApi extends FixtureSetCommands {
   /** The decoded view of the active laser page; `null` on any other page. */
   view: FixturesView | null;
-  /** The notice of the last command (a clamped value), `null` when it had none. */
-  notice: string | null;
-  /** Adds a fixture of `kind` (`grid`, `holder`, `clamp` or `stop`). */
-  add: (kind: string) => boolean;
+  /** The notice of the last command and the field that gave it, `null` when it had none. */
+  notice: FieldNotice | null;
+  /** Names the field `id` as the one committing next, so its clamp notice shows under it. */
+  claimField: (id: string) => void;
   /** Selects the fixture `id` alone (its row press). */
   select: (id: string) => boolean;
   /** Selects the slot `id` of its holder. */
@@ -67,7 +70,12 @@ export function useFixtures(editor: FixturesEditor): FixturesApi {
     void syncRevision; // The session's state changed: read the view again.
     return readSnapshot(getSession());
   }, [getSession, syncRevision]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<FieldNotice | null>(null);
+  // The field whose commit runs the next command; read and cleared by that command.
+  const committing = useRef<string | null>(null);
+  const claimField = useCallback((id: string) => {
+    committing.current = id;
+  }, []);
 
   // The fit cue lives only while a drag is in flight, and a drag changes no re-read signal, so
   // it is read once per frame and a state change follows only a change of its text.
@@ -88,27 +96,29 @@ export function useFixtures(editor: FixturesEditor): FixturesApi {
   }, [getSession]);
   const fitCue = useMemo(() => decodeFitCue(cueText), [cueText]);
 
-  // A clamped value's notice shows for 3 s (`ux-notes.md` section 4.1), then clears.
+  // A clamped value's notice shows for 3 s, the Apply notice for 5 s (`ux-notes.md` section 10).
   useEffect(() => {
     if (notice === null) return;
-    const timer = window.setTimeout(() => setNotice(null), 3000);
+    const timer = window.setTimeout(() => setNotice(null), noticeMs(notice.text));
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const run = useCallback(
+  const run: FixtureRun = useCallback(
     <T,>(fallback: T, call: (session: WasmSession) => T): T => {
+      const field = committing.current;
+      committing.current = null;
       const session = getSession();
       if (!session) return fallback;
       const result = call(session);
       const text = session.take_fixture_notice();
-      if (text) setNotice(text);
+      if (text) setNotice({ text, field });
       sync();
       return result;
     },
     [getSession, sync],
   );
 
-  const add = useCallback((kind: string) => run(false, (s) => s.add_fixture(kind)), [run]);
+  const commands = useFixtureSetCommands(run);
   const select = useCallback((id: string) => run(false, (s) => s.select_fixture(id)), [run]);
   const selectSlot = useCallback((id: string) => run(false, (s) => s.select_slot(id)), [run]);
   const rename = useCallback((id: string, name: string) => run(false, (s) => s.rename_fixture(id, name)), [run]);
@@ -146,7 +156,8 @@ export function useFixtures(editor: FixturesEditor): FixturesApi {
   return {
     view: snapshot.view,
     notice,
-    add,
+    claimField,
+    ...commands,
     select,
     selectSlot,
     rename,
