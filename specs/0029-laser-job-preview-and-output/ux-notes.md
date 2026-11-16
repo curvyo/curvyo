@@ -1,6 +1,6 @@
 # 0029 Laser job preview and output: UX notes
 
-ux-engineer, 2026-11-16. Written from `specification.md` (criteria 1 to 38; Fragen 219 C, 220 A, 221 B, 222 B, 223 A, 224 B with the homing request, 225 A, 226 A changed), `docs/design-system.md` ("Interaction conventions": no operating tips, no success notice except the export notice `0024` already has, hidden not disabled, no popups in the panel; rows "Kind chip places", "Canvas notice slot", "Inline delete confirm") and the built notes `specs/0101-laser-operations/ux-notes.md` (kind looks, `--cut`, `--engrave-hatch`), `specs/0111-laser-operation-tools/ux-notes.md` (Operations view toggle, unfolded row, Motorised Z axis row), `specs/0028-material-test-library/ux-notes.md` 8.4 (live, stored, typed), `specs/0113-fixture-sets-and-pins/ux-notes.md`. Drafts: `docs/design-drafts/2026-11-laser-output/` screens 01 to 03. Customer rules applied: no invented colour (symbols and text; ink, the existing red and pale orange only), symbol-only buttons with the name as tooltip, units inside fields, no number field in the tab, the one slider is the scrub slider, the bar is the Toolpath view's own, nothing like LightBurn's layer table or preview window, no machine settings in operations. Items marked (Proposal) are vetoable at the demo; section 14 lists them as P1 to P22.
+ux-engineer, 2026-11-16. Written from `specification.md` (criteria 1 to 39; Fragen 219 C, 220 A, 221 B, 222 B, 223 A, 224 B with the homing request, 225 A, 226 A changed), `docs/design-system.md` ("Interaction conventions": no operating tips, no success notice except the export notice `0024` already has, hidden not disabled, no popups in the panel; rows "Kind chip places", "Canvas notice slot", "Inline delete confirm") and the built notes `specs/0101-laser-operations/ux-notes.md` (kind looks, `--cut`, `--engrave-hatch`), `specs/0111-laser-operation-tools/ux-notes.md` (Operations view toggle, unfolded row, Motorised Z axis row), `specs/0028-material-test-library/ux-notes.md` 8.4 (live, stored, typed), `specs/0113-fixture-sets-and-pins/ux-notes.md`. Drafts: `docs/design-drafts/2026-11-laser-output/` screens 01 to 03. Customer rules applied: no invented colour (symbols and text; ink, the existing red and pale orange only), symbol-only buttons with the name as tooltip, units inside fields, no number field in the tab, the one slider is the scrub slider, the bar is the Toolpath view's own, nothing like LightBurn's layer table or preview window, no machine settings in operations. Items marked (Proposal) are vetoable at the demo; section 14 lists them as P1 to P23. Amended 2026-11-16 after the customer's review of PR #370 (other output formats later): "job file" where every format is meant, "GRBL" or "G-code" where GRBL is meant.
 
 Terminology: "run" is one line of the Runs list (an operation, or the fixture jobs of one kind), "check" a block or warn line, "ink" `--toolbar-icon`, "head" the drawn laser position of the play bar.
 
@@ -13,8 +13,8 @@ Terminology: "run" is one line of the Runs list (an operation, or the fixture jo
 | Tab strip | `PanelStrip.tsx` | `output` after `fixtures`, `FileOutput` |
 | Material pick | `MaterialPick.tsx` (inline list, `0028` 8.2) | "Fixture jobs run with", a kind filter (Score, Cut) |
 | Segmented control | `SegmentGroup.tsx` | Start from |
-| Switch rows | `PanelSwitch`, `MachineBlock.tsx` | Home first; Air assist in the Machine block |
-| Notices | `CanvasNotice.tsx`, `useActionNotice`, the export notice and error dialog of `0024` criterion 4 | the G-code texts of section 10 |
+| Switch rows | `PanelSwitch`, `MachineBlock.tsx` | Home first; Air assist and the Output line in the Machine block |
+| Notices | `CanvasNotice.tsx`, `useActionNotice`, the export notice and error dialog of `0024` criterion 4 | the export texts of section 10 |
 | Windowing | `useScrollWindow` | the Runs list above 20 runs |
 
 ## 1. Principle
@@ -84,7 +84,7 @@ Strip: after Fixtures, `FileOutput`, name and tooltip "Output", laser pages with
 
 ### 6.1 Order (P13)
 
-1. **Machine:** line 1 12px ink, the profile name semibold: "Diode 10 W · 400 × 300 mm · origin bottom-left · GRBL" (wraps); line 2 muted: "Dynamic power (M4) · S 0 to 1000", plus " · air assist" when Air assist is on (P18). Text, no stop.
+1. **Machine:** line 1 12px ink, the profile name semibold: "Diode 10 W · 400 × 300 mm · origin bottom-left · GRBL" (wraps; the last part is the output format's name); line 2 muted, the format's own line, for GRBL "Dynamic power (M4) · S 0 to 1000", plus " · air assist" when Air assist is on (P18). Text, no stop.
 2. **Start:** the Start from `SegmentGroup` full width, "Machine origin" | "Head position" (`role="radiogroup"` "Start from", one Tab stop, arrows move and pick); under it the **Home first** row: `House` 16px and "Home first" 13px at the left, `PanelSwitch` at the right. With Home first on, Start from shows Machine origin, greyed (`aria-disabled`), tooltip "Home first starts from the machine origin." (the spec asks for disabled here; M5).
 3. **Runs:** heading "Runs" with "4 in this order" at the right (muted, tabular). The pick **Fixture jobs run with** (`MaterialPick`, 244 x 28, `SwatchBook`, label inside left, the material at the right, inline list under it, no popup), shown only while a fixture job has Output on (P17; a stored pick stays). Its list shows the library; a material without a set of a needed kind for this laser is listed muted with "No Score set" and is not pickable (as `0028` 8.2). Then one **run row** per run (6.2).
 4. **Checks** (after a 1px divider): blocks, then warns, in the order of criteria 4 and 5 (6.3). Absent when there is none.
@@ -109,19 +109,20 @@ The numbers are the effective ones, the same as the operation's unfolded row (cr
 
 ### 6.4 Export (criteria 1, 4, 27)
 
-- A Primary button, full width, 32px high: `Download` 16px and "Export G-code" 13px (P16: the one action of the tab gets its words). No tooltip while enabled (the words name it); the name is "Export G-code".
+- A Primary button, full width, 32px high: `Download` 16px and "Export job file" 13px (P16: the one action of the tab gets its words, the same for every output format). No tooltip while enabled (the words name it); the name is "Export job file".
 - Blocked: the disabled look, `aria-disabled="true"` (it stays a Tab stop), tooltip and accessible description the first block's text. A press does nothing.
-- Press: the OS save dialog (browser: a download) with "<project> - <page>.gcode"; after a write, section 7.
+- Press: the OS save dialog (browser: a download) with "<project> - <page>.<extension>", the extension and the dialog's file type from the output format (GRBL: `.gcode`, "GRBL G-code"); after a write, section 7.
 
 ## 7. After Export (criteria 27 to 30)
 
 - One canvas notice, `role="status"`: "Exported Coasters - Laser 1.gcode." (browser "Downloaded …"), 3 s; when fixture jobs were switched off a second line "Output turned off on 2 fixture jobs." and 5 s (P19). Name cut with an ellipsis to keep each line at 70 characters.
-- One history step "Export G-code" (fixture jobs off, stored numbers refreshed, Lasered). The fixture jobs leave the Runs list and the toolpath; the numbers of the other runs move up.
+- One history step "Export job file" (fixture jobs off, stored numbers refreshed, Lasered). The fixture jobs leave the Runs list and the toolpath; the numbers of the other runs move up.
 - Cancel: nothing, no step, no notice. Write failure: the existing error dialog with the system's reason.
 
-## 8. Air assist in the Machine block (criteria 25, 32)
+## 8. Air assist and Output in the Machine block (criteria 25, 32, 39)
 
 - A row in the Machine block of the Document tab after "Motorised Z axis" (`0111` 6.3): label "Air assist", `PanelSwitch` at the right (`role="switch"`, no on/off text), default off. One undo step "Air assist on" / "Air assist off" on the page's profile copy; Differs, Save as profile and Update profile include it like Laser mode. Nothing in the operations (P21).
+- **Output** (P23): the row after Air assist, read-only while there is one output format: "Output" 13px at the left, "GRBL" 13px muted at the right, plain text, no control, no Tab stop, no step. With a second format it becomes a `SegmentGroup` (up to three formats, else the `MaterialPick`-style inline list) in the same row, one undo step "Set output format", included in Differs, Save as profile and Update profile; that pick is built with the second format, not now. A damaged or unknown value reads "Output: unknown" and the gate blocks (criterion 4 c).
 
 ## 9. Keyboard routes
 
@@ -167,11 +168,12 @@ The numbers are the effective ones, the same as the operation's unfolded row (cr
 | Home first, Air assist | "Home first", "Air assist" (switch) | `aria-checked` |
 | Fixture pick | "Fixture jobs run with" | value the material |
 | Checks | "Checks" (list); lines with the sr-only "Blocks:" / "Warning:" | |
-| Export | "Export G-code" | `aria-disabled`, description the first block |
+| Export | "Export job file" | `aria-disabled`, description the first block |
+| Output line | "Output: GRBL" (plain text) | |
 
 ## 12. Undo steps
 
-"Export G-code", "Pick fixture material", "Start from machine origin" / "Start from head position", "Home first on" / "Home first off", "Air assist on" / "Air assist off". No step for the Toolpath view, the slider, Play, a check button, opening the pick or the save dialog cancelled.
+"Export job file", "Pick fixture material", "Start from machine origin" / "Start from head position", "Home first on" / "Home first off", "Air assist on" / "Air assist off". No step for the Toolpath view, the slider, Play, a check button, opening the pick or the save dialog cancelled.
 
 ## 13. Empty, error, mixed and large states
 
@@ -205,6 +207,7 @@ The numbers are the effective ones, the same as the operation's unfolded row (cr
 - **P20** Nothing runs: the bar's controls are disabled, not hidden (the bar keeps its place).
 - **P21** Air assist is a switch row after Motorised Z axis, one undo step.
 - **P22** The Head position warn reads "Starts where the head stands; the bed is not checked." (the spec's text is 74 characters).
+- **P23** The output format is a read-only "Output: GRBL" row after Air assist; it becomes a pick only when a second format exists.
 
 ## 15. Mismatches for the product owner and design-system changes
 
@@ -215,7 +218,8 @@ The numbers are the effective ones, the same as the operation's unfolded row (cr
 - **M5** Export (criterion 4) and Start from (criterion 38) are disabled, not hidden, as the spec asks; both keep their place and name the reason in a tooltip. Design-system exceptions to "Hidden, not disabled".
 - **M6** Criterion 2 does not state Air assist in the gate (P18).
 - **M7** Criterion 27 has two notices for one export; one notice with two lines (P19).
-- Design-system rows to add at acceptance: "Toolpath view toggle (`0029`)" in "Kind chip places", "Toolpath look (`0029`)", "Play bar (`0029`)" (the one slider of the app), "Output tab (`0029`)", "Check line (`0029`)", "Air assist row" in the Machine block. No token.
+- **M8** Drafts 01 to 03 still show "Export G-code" and no Output row; the words and rows of these notes win (section 6.4, 8).
+- Design-system rows to add at acceptance: "Toolpath view toggle (`0029`)" in "Kind chip places", "Toolpath look (`0029`)", "Play bar (`0029`)" (the one slider of the app), "Output tab (`0029`)", "Check line (`0029`)", "Air assist row" and "Output row" in the Machine block. No token.
 
 ## 16. Implementer checklist
 
@@ -223,8 +227,8 @@ The numbers are the effective ones, the same as the operation's unfolded row (cr
 - Toolpath drawing from the export's move builder: kind looks, thinning, travel, rings, arrowheads, pale after the head, head ring; redraw live.
 - Play bar: placement and sticky rule, Play/Pause, time-axis slider with keys, readout and its wrap.
 - Output tab: strip entry; Machine lines; Start from and Home first (disabled rule); fixture pick (visibility, unpickable rows); run rows (three lines, source, typed, time); checks (order, glyphs, buttons, sr prefixes); total; Export (aria-disabled, tooltip, description).
-- Export flow: file name, dialog, notice texts, one step "Export G-code", error dialog, cancel without step.
-- Machine block: Air assist switch row and its step.
+- Export flow: file name and file type from the output format, dialog, notice texts, one step "Export job file", error dialog, cancel without step.
+- Machine block: Air assist switch row and its step; the read-only Output row.
 - Texts of section 10 at 70 characters at most; no new colour, no popup, no operating tip; budgets of criterion 36.
 
 ## Links
