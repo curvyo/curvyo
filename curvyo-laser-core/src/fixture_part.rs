@@ -1,7 +1,8 @@
 //! The parts of a fixture that a fixture job can tick (`specs/0103-fixture-jobs` criteria 8, 11,
-//! 22 and 23; ADR 0052 §2, §7): the list per kind, the stored key form and the profile tokens.
+//! 22 and 23; ADR 0052 §2, §7; the pin and the marks of `specs/0113-fixture-sets-and-pins`
+//! criterion 27, ADR 0059 §5): the list per kind, the stored key form and the profile tokens.
 
-use curvyo_document_core::JobTarget;
+use curvyo_document_core::{JobRole, JobTarget};
 
 use crate::fixture_kind::FixtureKind;
 use crate::operation_kind_run::LeafShape;
@@ -25,12 +26,20 @@ pub enum FixturePart {
     ScrewHead,
     /// A screw's thread circle.
     ScrewThread,
+    /// The Centre marks of a screw, one key for every centre of its grid.
+    ScrewMarks,
+    /// A pin's circle, at every centre of its grid.
+    PinCircle,
+    /// The Centre marks of a pin, one key for every centre of its grid.
+    PinMarks,
 }
 
 const LINES: &str = "lines";
 const TAPES: &str = "tapes";
 const HEAD: &str = "head";
 const THREAD: &str = "thread";
+const CIRCLE: &str = "circle";
+const MARKS: &str = "marks";
 const SLOT_TOKEN: &str = "slot:";
 
 impl FixturePart {
@@ -45,8 +54,23 @@ impl FixturePart {
                 .collect(),
             FixtureKind::Clamp => vec![Self::Clamp],
             FixtureKind::Stop => vec![Self::Stop],
-            FixtureKind::Screw => vec![Self::ScrewHead, Self::ScrewThread],
+            FixtureKind::Screw => vec![Self::ScrewHead, Self::ScrewThread, Self::ScrewMarks],
+            FixtureKind::Pin => vec![Self::PinCircle, Self::PinMarks],
             FixtureKind::Unknown => Vec::new(),
+        }
+    }
+
+    /// The fixed parts the job of `role` ticks on a fixture of `kind` (ADR 0059 §5): the marks for
+    /// Centre mark, the pin's circle or the screw's head and thread for Diameters; none for a kind
+    /// that has no role jobs.
+    #[must_use]
+    pub fn of_role(kind: FixtureKind, role: JobRole) -> Vec<Self> {
+        match (kind, role) {
+            (FixtureKind::Pin, JobRole::CentreMark) => vec![Self::PinMarks],
+            (FixtureKind::Pin, JobRole::Diameters) => vec![Self::PinCircle],
+            (FixtureKind::Screw, JobRole::CentreMark) => vec![Self::ScrewMarks],
+            (FixtureKind::Screw, JobRole::Diameters) => vec![Self::ScrewHead, Self::ScrewThread],
+            _ => Vec::new(),
         }
     }
 
@@ -63,6 +87,9 @@ impl FixturePart {
             (None, Some(TAPES)) => Self::GridTapes,
             (None, Some(HEAD)) => Self::ScrewHead,
             (None, Some(THREAD)) => Self::ScrewThread,
+            (None, Some(CIRCLE)) => Self::PinCircle,
+            (None, Some(MARKS)) if kind == FixtureKind::Pin => Self::PinMarks,
+            (None, Some(MARKS)) => Self::ScrewMarks,
             _ => return None,
         };
         Self::of_kind(kind, slots).contains(&part).then_some(part)
@@ -78,6 +105,8 @@ impl FixturePart {
             Self::GridTapes => (None, Some(TAPES)),
             Self::ScrewHead => (None, Some(HEAD)),
             Self::ScrewThread => (None, Some(THREAD)),
+            Self::PinCircle => (None, Some(CIRCLE)),
+            Self::ScrewMarks | Self::PinMarks => (None, Some(MARKS)),
         };
         JobTarget {
             slot,
@@ -97,6 +126,9 @@ impl FixturePart {
             Self::GridTapes => "grid.tapes".to_owned(),
             Self::ScrewHead => "screw.head".to_owned(),
             Self::ScrewThread => "screw.thread".to_owned(),
+            Self::ScrewMarks => "screw.marks".to_owned(),
+            Self::PinCircle => "pin.circle".to_owned(),
+            Self::PinMarks => "pin.marks".to_owned(),
         }
     }
 
@@ -112,6 +144,9 @@ impl FixturePart {
             "grid.tapes" => Self::GridTapes,
             "screw.head" => Self::ScrewHead,
             "screw.thread" => Self::ScrewThread,
+            "screw.marks" => Self::ScrewMarks,
+            "pin.circle" => Self::PinCircle,
+            "pin.marks" => Self::PinMarks,
             other => {
                 let digits = other.strip_prefix(SLOT_TOKEN)?;
                 // A canonical index only: "slot:01" and "slot:+1" are no tokens.
@@ -128,11 +163,13 @@ impl FixturePart {
     }
 
     /// The outline topology of the part, for `kind_run`: a closed outline for the board, a slot,
-    /// a clamp, a stop and each screw circle; open lines for the grid's lines and tapes.
+    /// a clamp, a stop, each screw circle and a pin's circle; open lines for the grid's lines and
+    /// tapes; a closed circle and open cross lines for the marks.
     #[must_use]
     pub const fn shape(self) -> LeafShape {
         match self {
             Self::GridLines | Self::GridTapes => LeafShape::Outlines { closed: 0, open: 1 },
+            Self::ScrewMarks | Self::PinMarks => LeafShape::Outlines { closed: 1, open: 1 },
             _ => LeafShape::Outlines { closed: 1, open: 0 },
         }
     }
@@ -165,7 +202,7 @@ pub fn job_parts<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use FixtureKind::{Clamp, EngravedGrid, Holder, Screw, Stop, Unknown};
+    use FixtureKind::{Clamp, EngravedGrid, Holder, Pin, Screw, Stop, Unknown};
 
     fn target(slot: Option<usize>, suffix: Option<&str>) -> JobTarget {
         JobTarget {
@@ -192,7 +229,15 @@ mod tests {
         assert_eq!(FixturePart::of_kind(Stop, 0), [FixturePart::Stop]);
         assert_eq!(
             FixturePart::of_kind(Screw, 0),
-            [FixturePart::ScrewHead, FixturePart::ScrewThread]
+            [
+                FixturePart::ScrewHead,
+                FixturePart::ScrewThread,
+                FixturePart::ScrewMarks
+            ]
+        );
+        assert_eq!(
+            FixturePart::of_kind(Pin, 0),
+            [FixturePart::PinCircle, FixturePart::PinMarks]
         );
         assert_eq!(FixturePart::of_kind(Unknown, 4), []);
     }
@@ -229,9 +274,13 @@ mod tests {
             .into_iter()
             .chain(FixturePart::of_kind(Screw, 0))
             .chain(FixturePart::of_kind(EngravedGrid, 0))
+            .chain(FixturePart::of_kind(Pin, 0))
         {
             let kind = match part {
-                FixturePart::ScrewHead | FixturePart::ScrewThread => Screw,
+                FixturePart::ScrewHead | FixturePart::ScrewThread | FixturePart::ScrewMarks => {
+                    Screw
+                }
+                FixturePart::PinCircle | FixturePart::PinMarks => Pin,
                 FixturePart::GridLines | FixturePart::GridTapes => EngravedGrid,
                 _ => Holder,
             };
@@ -254,6 +303,9 @@ mod tests {
             (Screw, "screw.head"),
             (Screw, "screw.thread"),
             (Holder, "slot:1"),
+            (Screw, "screw.marks"),
+            (Pin, "pin.circle"),
+            (Pin, "pin.marks"),
         ];
         for (kind, token) in tokens {
             let part = FixturePart::from_token(kind, 2, token).unwrap();
@@ -266,6 +318,63 @@ mod tests {
         assert_eq!(FixturePart::from_token(Holder, 2, "slot:-1"), None);
         assert_eq!(FixturePart::from_token(Clamp, 0, "board"), None);
         assert_eq!(FixturePart::from_token(Unknown, 0, "board"), None);
+        assert_eq!(FixturePart::from_token(Screw, 0, "pin.marks"), None);
+        assert_eq!(FixturePart::from_token(Pin, 0, "screw.head"), None);
+    }
+
+    #[test]
+    fn the_role_jobs_tick_fixed_parts_of_a_pin_or_a_screw_only() {
+        assert_eq!(
+            FixturePart::of_role(Pin, JobRole::CentreMark),
+            [FixturePart::PinMarks]
+        );
+        assert_eq!(
+            FixturePart::of_role(Pin, JobRole::Diameters),
+            [FixturePart::PinCircle]
+        );
+        assert_eq!(
+            FixturePart::of_role(Screw, JobRole::CentreMark),
+            [FixturePart::ScrewMarks]
+        );
+        assert_eq!(
+            FixturePart::of_role(Screw, JobRole::Diameters),
+            [FixturePart::ScrewHead, FixturePart::ScrewThread]
+        );
+        assert_eq!(FixturePart::of_role(Holder, JobRole::Diameters), []);
+    }
+
+    #[test]
+    fn a_pin_and_a_screw_name_their_circle_and_marks_by_the_new_suffixes() {
+        assert_eq!(
+            FixturePart::from_target(Pin, 0, &target(None, Some("circle"))),
+            Some(FixturePart::PinCircle)
+        );
+        assert_eq!(
+            FixturePart::from_target(Pin, 0, &target(None, Some("marks"))),
+            Some(FixturePart::PinMarks)
+        );
+        assert_eq!(
+            FixturePart::from_target(Screw, 0, &target(None, Some("marks"))),
+            Some(FixturePart::ScrewMarks)
+        );
+        assert_eq!(
+            FixturePart::from_target(Screw, 0, &target(None, Some("circle"))),
+            None,
+            "a screw has no pin circle"
+        );
+        assert_eq!(
+            FixturePart::from_target(Holder, 1, &target(None, Some("marks"))),
+            None
+        );
+        assert_eq!(FixturePart::PinMarks.target(), target(None, Some("marks")));
+        assert_eq!(
+            FixturePart::PinMarks.shape(),
+            LeafShape::Outlines { closed: 1, open: 1 }
+        );
+        assert_eq!(
+            FixturePart::PinCircle.shape(),
+            LeafShape::Outlines { closed: 1, open: 0 }
+        );
     }
 
     #[test]

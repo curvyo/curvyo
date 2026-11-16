@@ -466,10 +466,23 @@ pub(crate) fn filled_triangle(a: Point, b: Point, c: Point, color: RgbaColor) ->
 /// division by zero).
 #[must_use]
 pub fn thick_line(a: Point, b: Point, width_mm: f64, color: RgbaColor) -> DrawList {
-    let direction = a.vector_to(b);
     let mut list = DrawList::default();
+    push_thick_line(&mut list, a, b, width_mm, color);
+    list
+}
+
+/// [`thick_line`] appended to `list` in place: the same triangles without a list of its own
+/// (the fixture layer draws tens of thousands of them per frame, `0113` criterion 42a).
+pub(crate) fn push_thick_line(
+    list: &mut DrawList,
+    a: Point,
+    b: Point,
+    width_mm: f64,
+    color: RgbaColor,
+) {
+    let direction = a.vector_to(b);
     if direction.length() <= f64::EPSILON {
-        return list;
+        return;
     }
     let normal = Vec2::new(-direction.y, direction.x).normalized_to(width_mm / 2.0);
     list.push_quad(
@@ -479,7 +492,6 @@ pub fn thick_line(a: Point, b: Point, width_mm: f64, color: RgbaColor) -> DrawLi
         a.translated(normal.negated()),
         color,
     );
-    list
 }
 
 /// A dashed line from `from` to `to`: dashes `on_mm` long with `off_mm` gaps, `width_mm` wide.
@@ -501,12 +513,13 @@ pub(crate) fn dashed_line(
     let mut at = 0.0;
     while at < length {
         let end = (at + on_mm).min(length);
-        list.extend(thick_line(
+        push_thick_line(
+            &mut list,
             from.translated(step.scaled(at)),
             from.translated(step.scaled(end)),
             width_mm,
             color,
-        ));
+        );
         at += on_mm + off_mm;
     }
     list

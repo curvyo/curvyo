@@ -427,8 +427,8 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
     assert!(text.ends_with("}\n"), "trailing newline");
     assert!(!text.ends_with("\n\n"));
     assert!(
-        // Record format 4 since `specs/0111-laser-operation-tools` (ADR 0056 §7).
-        text.starts_with("{\n  \"format_version\": 4,\n  \"id\": "),
+        // Record format 5 since `specs/0113-fixture-sets-and-pins` (ADR 0060 §1).
+        text.starts_with("{\n  \"format_version\": 5,\n  \"id\": "),
         "{text}"
     );
     let order = [
@@ -444,7 +444,8 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
         "\"laser_mode\"",
         "\"motorised_z\"",
         "\"connection\"",
-        "\"fixtures\"",
+        // `fixture_sets` replaces `fixtures` in record format 5 (`0113`, ADR 0060 §1).
+        "\"fixture_sets\"",
     ];
     let mut at = 0;
     for key in order {
@@ -471,8 +472,9 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
 
 #[test]
 fn adr0036_the_adr_example_record_reads() {
+    // Superseded by `0113` (ADR 0060 §1, §3): the example in record format 5; format 1 is older.
     let text = r#"{
-  "format_version": 1,
+  "format_version": 5,
   "id": "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f",
   "kind": "laser",
   "modified": 1762171200000,
@@ -482,7 +484,9 @@ fn adr0036_the_adr_example_record_reads() {
   "max_feed_mm_per_min": 6000,
   "max_power": 1000,
   "laser_mode": true,
-  "connection": { "connector_address": "", "controller_port": "", "baud_rate": 115200 }
+  "motorised_z": false,
+  "connection": { "connector_address": "", "controller_port": "", "baud_rate": 115200 },
+  "fixture_sets": []
 }
 "#;
     let p = read_record("6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f.json", text).unwrap();
@@ -983,8 +987,8 @@ fn ac13_one_damaged_record_uses_the_singular_notice() {
 fn ac13_a_newer_record_is_skipped_with_its_own_count() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
-        // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
-        m.insert("format_version".into(), json!(5));
+        // Format 5 is current since `0113` (ADR 0060 §1); 6 is newer.
+        m.insert("format_version".into(), json!(6));
         m.insert("new_thing".into(), json!(true));
     });
     assert_eq!(
@@ -1027,15 +1031,15 @@ fn ac13_format_version_zero_or_missing_is_damage_not_newer() {
 #[test]
 fn ac13_the_size_limit_is_16_kib_inclusive() {
     // Raised to 64 KiB with the fixture set (`0102`, ADR 0050 §1), to 128 KiB with the fixture
-    // jobs (`0103`, ADR 0052 §7).
+    // jobs (`0103`, ADR 0052 §7), to 256 KiB with the fixture sets (`0113`, ADR 0060 §2).
     let p = user(1, "Padded");
     let text = write_record(&p);
-    assert_eq!(MAX_RECORD_BYTES, 128 * 1024);
+    assert_eq!(MAX_RECORD_BYTES, 256 * 1024);
     let at_limit = format!("{text}{}", " ".repeat(MAX_RECORD_BYTES - text.len()));
     assert_eq!(at_limit.len(), MAX_RECORD_BYTES);
     assert!(
         read_record(&record_file_name(&p.id), &at_limit).is_ok(),
-        "exactly 128 KiB reads"
+        "exactly 256 KiB reads"
     );
     let over = format!("{at_limit} ");
     assert_eq!(
@@ -1091,8 +1095,8 @@ fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
     // copy "under the same id" (criterion 8) -- which must not overwrite the newer file.
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
-        // Format 3 is current since `0103` (ADR 0052 §7); 4 is newer.
-        m.insert("format_version".into(), json!(5));
+        // Format 5 is current since `0113` (ADR 0060 §1); 6 is newer.
+        m.insert("format_version".into(), json!(6));
     });
     let mut lib = MachineProfiles::load(&[(record_file_name(&p.id), newer)]);
     let write = lib.add(p.clone());
@@ -1157,8 +1161,8 @@ fn ac15_a_record_holds_no_project_content() {
         keys,
         vec![
             "connection",
-            // The fixture set of record format 2 (`0102`, ADR 0050): the bed, not project content.
-            "fixtures",
+            // The fixture sets of record format 5 (`0113`, ADR 0060): the bed, not project content.
+            "fixture_sets",
             "format_version",
             "id",
             "kind",

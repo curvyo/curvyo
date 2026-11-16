@@ -1,7 +1,11 @@
 //! Reads and writes the machine profile copy of a manufacturing (ADR 0039 §1 to §3, §5, §6;
-//! ADR 0056 §7): the `mfg_profile` map, every field read on its own with its default on damage.
+//! ADR 0056 §7): the `mfg_profile` map, every field read on its own with its default on damage,
+//! how the page's copy differs from its record (ADR 0039 §5) and whether a page's set mirror
+//! differs from its profile's sets (ADR 0059 §10).
 
-use curvyo_document_core::{DocumentSize, PRESET_MATCH_TOLERANCE};
+use curvyo_document_core::{
+    DocumentSize, FixtureRecord, FixtureSetRecord, PRESET_MATCH_TOLERANCE, SlotRecord,
+};
 use curvyo_extension_core::StoredParams;
 use serde_json::Value;
 
@@ -147,6 +151,94 @@ pub fn differs(copy: &ProfileCopy, page: DocumentSize, record: &MachineProfile) 
         || (page.height.as_mm() - record.work_area.height.as_mm()).abs() > tolerance
 }
 
+/// Whether the page's set mirror `page` differs in content from the record's sets `record`: the
+/// alignment's test (ADR 0059 §10; "Differs from profile" no longer compares sets, ADR 0060 §7
+/// amended 2026-11-16). Compared in order: set ids, names and locks, and their fixtures (id,
+/// kind, name, Lock, parameters, matrix, slots, jobs with their id, Show, role and ticks),
+/// lengths within [`PRESET_MATCH_TOLERANCE`]. The page's choices (On this page, On the bed, the
+/// eye, Output) and its job fixtures are no part of either side.
+#[must_use]
+pub fn sets_differ(page: &[FixtureSetRecord], record: &[FixtureSetRecord]) -> bool {
+    page.len() != record.len()
+        || page.iter().zip(record).any(|(page, record)| {
+            page.id != record.id
+                || page.name != record.name
+                || page.locked != record.locked
+                || page.fixtures.len() != record.fixtures.len()
+                || page
+                    .fixtures
+                    .iter()
+                    .zip(&record.fixtures)
+                    .any(|(a, b)| !fixtures_match(a, b))
+        })
+}
+
+/// Whether a page's set mirror `page`, last aligned to or written with the record time
+/// `page_modified`, is to be aligned with `record` (ADR 0059 §10 a): the record is newer and its
+/// sets differ in content. A record that is not newer never overwrites the mirror.
+#[must_use]
+pub fn align_due(page: &[FixtureSetRecord], page_modified: i64, record: &MachineProfile) -> bool {
+    record.modified > page_modified && sets_differ(page, &record.fixture_sets)
+}
+
+fn fixtures_match(a: &FixtureRecord, b: &FixtureRecord) -> bool {
+    let tolerance = PRESET_MATCH_TOLERANCE.as_mm();
+    let matrix = match (a.matrix, b.matrix) {
+        (None, None) => true,
+        (Some(a), Some(b)) => a.approx_eq(b, tolerance),
+        _ => false,
+    };
+    a.id == b.id
+        && a.kind == b.kind
+        && a.name == b.name
+        && a.locked == b.locked
+        && matrix
+        && maps_match(&a.params, &b.params)
+        && a.slots.len() == b.slots.len()
+        && a.slots.iter().zip(&b.slots).all(slots_match)
+        && a.jobs == b.jobs
+}
+
+/// Two slots are the same as the record stores them (`machine_profile_fixtures`): the name, the
+/// shape and the five lengths, an absent length as 0, within [`PRESET_MATCH_TOLERANCE`].
+fn slots_match((a, b): (&SlotRecord, &SlotRecord)) -> bool {
+    let number =
+        |slot: &SlotRecord, key: &str| slot.params.get(key).and_then(Value::as_f64).unwrap_or(0.0);
+    a.name == b.name
+        && a.params.get("shape") == b.params.get("shape")
+        && SLOT_LENGTHS
+            .iter()
+            .all(|key| (number(a, key) - number(b, key)).abs() <= PRESET_MATCH_TOLERANCE.as_mm())
+}
+
+/// The lengths a record keeps of a slot (`machine_profile_fixtures`' slot entry).
+const SLOT_LENGTHS: [&str; 5] = ["cx_mm", "cy_mm", "w_mm", "h_mm", "d_mm"];
+
+fn maps_match(a: &StoredParams, b: &StoredParams) -> bool {
+    a.len() == b.len()
+        && a.iter()
+            .all(|(key, value)| b.get(key).is_some_and(|other| values_match(value, other)))
+}
+
+/// Two stored values are the same, numbers within [`PRESET_MATCH_TOLERANCE`].
+fn values_match(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(_), Value::Number(_)) => match (a.as_f64(), b.as_f64()) {
+            (Some(x), Some(y)) => (x - y).abs() <= PRESET_MATCH_TOLERANCE.as_mm(),
+            _ => a == b,
+        },
+        (Value::Array(a), Value::Array(b)) => {
+            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| values_match(a, b))
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|(key, value)| b.get(key).is_some_and(|other| values_match(value, other)))
+        }
+        _ => a == b,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,6 +322,88 @@ mod tests {
         let mut motorised = copy.clone();
         motorised.values.motorised_z = true;
         assert!(differs(&motorised, area, &record));
+    }
+
+    fn set(name: &str, width: f64) -> FixtureSetRecord {
+        FixtureSetRecord {
+            id: format!("{name}-id"),
+            name: name.to_owned(),
+            locked: false,
+            fixtures: vec![FixtureRecord {
+                id: format!("{name}-clamp"),
+                kind: "curvyo.laser/clamp".to_owned(),
+                name: "Clamp 1".to_owned(),
+                locked: false,
+                params: stored(json!({"width_mm": width, "height_mm": 40.0})),
+                matrix: Some(curvyo_document_core::Affine::new(
+                    1.0, 0.0, 0.0, 1.0, 10.0, 10.0,
+                )),
+                slots: Vec::new(),
+                jobs: Vec::new(),
+            }],
+        }
+    }
+
+    #[test]
+    fn sets_differ_in_order_by_id_name_lock_and_fixtures_with_lengths_in_tolerance() {
+        let record = [set("Bed", 40.0), set("Jig", 40.0)];
+        assert!(!sets_differ(&record, &record));
+        assert!(!sets_differ(
+            &[set("Bed", 40.005), set("Jig", 40.0)],
+            &record
+        ));
+        assert!(sets_differ(&[set("Bed", 40.1), set("Jig", 40.0)], &record));
+        assert!(
+            sets_differ(&[set("Jig", 40.0), set("Bed", 40.0)], &record),
+            "order"
+        );
+        assert!(sets_differ(&[set("Bed", 40.0)], &record));
+        let mut locked = set("Bed", 40.0);
+        locked.fixtures[0].locked = true;
+        assert!(sets_differ(&[locked, set("Jig", 40.0)], &record), "a Lock");
+        let mut set_lock = set("Bed", 40.0);
+        set_lock.locked = true;
+        assert!(
+            sets_differ(&[set_lock, set("Jig", 40.0)], &record),
+            "a set Lock"
+        );
+        let mut other = set("Bed", 40.0);
+        other.id = "x".to_owned();
+        assert!(sets_differ(&[other, set("Jig", 40.0)], &record), "an id");
+        let mut moved = set("Bed", 40.0);
+        moved.fixtures[0].matrix = Some(curvyo_document_core::Affine::new(
+            1.0, 0.0, 0.0, 1.0, 10.004, 10.0,
+        ));
+        assert!(!sets_differ(&[moved, set("Jig", 40.0)], &record));
+        assert!(!sets_differ(&[], &[]));
+    }
+
+    #[test]
+    fn a_slot_reads_as_the_record_stores_it_absent_numbers_as_zero() {
+        // A rectangle slot made on the page has no `d_mm`; its record, read back, holds 0.
+        let with_slot = |params: Value| {
+            let mut bed = set("Bed", 40.0);
+            bed.fixtures[0].slots.push(SlotRecord {
+                name: "Slot 1".to_owned(),
+                params: stored(params),
+            });
+            [bed]
+        };
+        let page = with_slot(
+            json!({"shape": "rect", "cx_mm": 5.0, "cy_mm": 5.0, "w_mm": 4.0, "h_mm": 4.0}),
+        );
+        let record = with_slot(
+            json!({"shape": "rect", "cx_mm": 5.0, "cy_mm": 5.0, "w_mm": 4.0, "h_mm": 4.0, "d_mm": 0.0}),
+        );
+        assert!(!sets_differ(&page, &record));
+        let wider = with_slot(
+            json!({"shape": "rect", "cx_mm": 5.0, "cy_mm": 5.0, "w_mm": 4.5, "h_mm": 4.0, "d_mm": 0.0}),
+        );
+        assert!(sets_differ(&page, &wider));
+        let round = with_slot(
+            json!({"shape": "circle", "cx_mm": 5.0, "cy_mm": 5.0, "w_mm": 4.0, "h_mm": 4.0, "d_mm": 0.0}),
+        );
+        assert!(sets_differ(&page, &round), "the shape");
     }
 
     #[test]

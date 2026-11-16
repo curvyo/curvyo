@@ -1,5 +1,6 @@
 //! The kinds of laser fixtures and the limits of their parameters (`specs/0102-laser-fixtures`
-//! criteria 2, 15, 19, 20, 22, 23, 32 and 37; ADR 0049 §1 and §2).
+//! criteria 2, 15, 19, 20, 22, 23, 32 and 37; ADR 0049 §1 and §2; the pin of
+//! `specs/0113-fixture-sets-and-pins` criteria 18 and 22, ADR 0059 §4).
 
 use curvyo_document_core::Length;
 
@@ -19,12 +20,14 @@ pub enum FixtureKind {
     Stop,
     /// A round screw or bolt: a thread circle inside a head circle, on one centre.
     Screw,
+    /// A round dowel pin of one diameter, single or gridded.
+    Pin,
     /// A kind this build does not know: kept with its values, drawn never.
     Unknown,
 }
 
 impl FixtureKind {
-    /// Reads a stored kind; every value that is not one of the five known kinds is unknown.
+    /// Reads a stored kind; every value that is not one of the six known kinds is unknown.
     #[must_use]
     pub fn from_stored(stored: &str) -> Self {
         match stored.strip_prefix(KIND_PREFIX) {
@@ -33,6 +36,7 @@ impl FixtureKind {
             Some("clamp") => Self::Clamp,
             Some("stop") => Self::Stop,
             Some("screw") => Self::Screw,
+            Some("pin") => Self::Pin,
             _ => Self::Unknown,
         }
     }
@@ -47,6 +51,7 @@ impl FixtureKind {
             Self::Clamp => Some("curvyo.laser/clamp"),
             Self::Stop => Some("curvyo.laser/stop"),
             Self::Screw => Some("curvyo.laser/screw"),
+            Self::Pin => Some("curvyo.laser/pin"),
             Self::Unknown => None,
         }
     }
@@ -60,6 +65,7 @@ impl FixtureKind {
             Self::Clamp => "Clamp",
             Self::Stop => "Stop",
             Self::Screw => "Screw",
+            Self::Pin => "Pin",
             Self::Unknown => "Unknown fixture",
         }
     }
@@ -246,6 +252,12 @@ pub fn screw_diameters(
     }
 }
 
+/// A pin's diameter: 0.5 to 1,000 mm, 6 mm by default (`0113` criterion 18, Proposal).
+#[must_use]
+pub fn pin_diameter_range() -> MmRange {
+    MmRange::new(0.5, 1000.0, 6.0)
+}
+
 /// A slot's width, height or diameter: 0.5 to 1,000 mm, 20 mm by default (criteria 19 and 20).
 #[must_use]
 pub fn slot_size_range() -> MmRange {
@@ -283,6 +295,34 @@ mod tests {
             FixtureKind::Unknown
         );
         assert_eq!(FixtureKind::from_stored("holder"), FixtureKind::Unknown);
+    }
+
+    #[test]
+    fn a_pin_is_a_known_kind_with_its_diameter_range() {
+        assert_eq!(
+            FixtureKind::from_stored("curvyo.laser/pin"),
+            FixtureKind::Pin
+        );
+        assert_eq!(FixtureKind::Pin.stored(), Some("curvyo.laser/pin"));
+        assert_eq!(FixtureKind::Pin.word(), "Pin");
+        let range = pin_diameter_range();
+        assert_eq!(
+            (range.min, range.max, range.default),
+            (
+                Length::from_mm(0.5),
+                Length::from_mm(1000.0),
+                Length::from_mm(6.0)
+            )
+        );
+        assert_eq!(
+            range.clamp(Length::from_mm(2000.0)),
+            (Length::from_mm(1000.0), true)
+        );
+        assert_eq!(
+            FixtureKind::from_stored("curvyo.laser/pins"),
+            FixtureKind::Unknown,
+            "an unknown kind stays unknown"
+        );
     }
 
     #[test]

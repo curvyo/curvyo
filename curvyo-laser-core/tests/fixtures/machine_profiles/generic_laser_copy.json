@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 5,
   "id": "0f0e0d0c-0b0a-4908-8706-050403020100",
   "kind": "laser",
   "modified": 1762171200000,
@@ -12,9 +12,11 @@
   "max_feed_mm_per_min": 6000,
   "max_power": 1000,
   "laser_mode": true,
+  "motorised_z": false,
   "connection": {
     "connector_address": "",
     "controller_port": "",
     "baud_rate": 115200
-  }
+  },
+  "fixture_sets": []
 }

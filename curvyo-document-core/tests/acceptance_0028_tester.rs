@@ -147,7 +147,8 @@ fn settings_survive_a_pack_round_trip_and_reopen_writes_no_step() {
     );
     assert_eq!(format_of(&bytes), u64::from(CURRENT_FORMAT_VERSION));
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 46);
+    // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 47);
 }
 
 // ---- format 41 ----------------------------------------------------------------------------------

@@ -521,7 +521,30 @@ impl DocumentVersion {
 /// does not read leaves the row ordinary; nothing is repaired on read. The number is provisional
 /// by the rule above. Goldens: `test_grid_v46.curvyo`, `test_grid_damaged_v46.curvyo`,
 /// `test_grid_orphan_rows_v46.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 46;
+///
+/// Bumped to 47 in `fixture-sets-and-pins` (ADR 0059, `specs/0113-fixture-sets-and-pins`): a
+/// manufacturing may hold set nodes (`shape = "fixture_set"`, `name`, `set_on_page`) whose
+/// children are fixtures; a fixture directly under the manufacturing is a job fixture and may
+/// carry `fixture_locked`; a new kind `curvyo.laser/pin`; pin and screw grid parameters
+/// (`columns`, `rows`, `column_spacing_mm`, `row_spacing_mm`, `mark_mm`); a fixture job may carry
+/// `job_role` (`centre_mark`, `diameters`) and the part suffixes `.circle` and `.marks`. A build
+/// that stops at 46 refuses a `fixture_set` child of a manufacturing as damage, so this build's
+/// files must be refused by version (ADR 0033 §7). No migration (2026-11-15, lead, Proposal): a
+/// file of 46 or lower opens unchanged, its fixtures are job fixtures, nothing is written.
+/// Damage (ADR 0059 §4, §5): a set without a name reads "Set n", a `set_on_page` or
+/// `fixture_locked` that is not a boolean reads its default, a `job_role` that does not read, is
+/// on another kind or repeats on one fixture reads as an ordinary job; each counts one value and
+/// nothing is repaired on read. Amended 2026-11-16 (sets in the profile, ADR 0059 §10, ADR 0060
+/// §5a): the set nodes are the page's mirror of its profile record and carry the record's ids
+/// (`set_uid` on a set, `fixture_uid` on a set fixture, `job_uid` on its jobs) and `set_locked`;
+/// a set fixture's lock is `fixture_locked`; the manufacturing carries
+/// `mfg_fixture_sets_modified` (the record's `modified` the mirror was last aligned to); the root
+/// may carry the switch `snapping_centres`; the label `align_fixture_sets` is reserved (no step,
+/// no history row). A uid that is no text reads absent (the next set edit fills it) and a
+/// `set_locked` that is no boolean reads unlocked; each counts one value. Goldens: `fixture_sets_v47.curvyo`,
+/// `fixture_sets_damaged_v47.curvyo`, `fixture_sets_align_v47.curvyo`,
+/// `snapping_centres_type_v47.curvyo`, `fixtures_pre_sets_v46.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 47;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

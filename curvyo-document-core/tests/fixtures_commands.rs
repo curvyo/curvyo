@@ -11,8 +11,8 @@
 
 use curvyo_document_core::{
     Affine, Angle, Document, DocumentSize, FixtureAdd, FixtureParams, FixtureRecord, FixtureResize,
-    FixtureTurn, ManufacturingError, NewFixture, NewOutputPage, NodeId, PageCorner, Point,
-    ProfileChange, SlotRecord, StepRef, Vec2,
+    FixtureSetRecord, FixtureTurn, ManufacturingError, NewFixture, NewOutputPage, NodeId,
+    PageCorner, Point, ProfileChange, SlotRecord, StepRef, Vec2,
 };
 
 const HOLDER: &str = "curvyo.laser/holder";
@@ -239,11 +239,21 @@ fn remove_fixture_takes_its_slots_and_undo_restores_them_exactly() {
     assert_eq!(d.fixture(id).unwrap(), before);
 }
 
-fn set(name: &str) -> Vec<FixtureRecord> {
+fn set(name: &str) -> Vec<FixtureSetRecord> {
+    vec![FixtureSetRecord {
+        id: "00000000-0000-4000-8000-000000000001".to_owned(),
+        name: "Set 1".to_owned(),
+        locked: false,
+        fixtures: fixture_records(name),
+    }]
+}
+
+fn fixture_records(name: &str) -> Vec<FixtureRecord> {
     vec![FixtureRecord {
+        id: "00000000-0000-4000-8000-000000000002".to_owned(),
         kind: HOLDER.to_owned(),
         name: name.to_owned(),
-        active: true,
+        locked: false,
         params: board(),
         matrix: Some(Affine::translation(Vec2::new(40.0, 25.0))),
         slots: vec![SlotRecord {
@@ -254,49 +264,72 @@ fn set(name: &str) -> Vec<FixtureRecord> {
     }]
 }
 
-fn pick(d: &Document, mfg: NodeId, records: &[FixtureRecord]) -> bool {
+fn pick(d: &Document, mfg: NodeId, records: &[FixtureSetRecord]) -> bool {
     let copy = params(serde_json::json!({"id": "generic-laser", "name": "Generic laser"}));
-    d.set_manufacturing_profile_and_fixtures(
+    d.set_manufacturing_profile_and_sets(
         mfg,
         &copy,
         DocumentSize::from_mm(600.0, 400.0),
         PageCorner::default(),
         ProfileChange::Pick,
-        records,
+        curvyo_document_core::ProfileSets {
+            sets: records,
+            modified: 0,
+        },
         &curvyo_document_core::PageContents::new(),
     )
     .unwrap()
 }
 
+// Superseded by `0113` criteria 9 and 14: a pick replaces the page's sets only; the page's job
+// fixtures (here the holder added directly) stay.
 #[test]
-fn pick_replaces_the_fixtures_in_its_one_step_with_fresh_ids() {
+fn pick_replaces_the_sets_in_its_one_step_with_fresh_ids_and_keeps_job_fixtures() {
     let d = Document::new(1);
     let mfg = laser(&d);
-    let old = holder(&d, mfg);
+    let job_fixture = holder(&d, mfg);
+    assert!(pick(&d, mfg, &set("Old")));
+    let old_set = d.manufacturing(mfg).unwrap().sets[0].id;
     let steps = d.own_step_count();
     assert!(pick(&d, mfg, &set("Board")));
     assert_eq!(d.own_step_count(), steps + 1);
     assert_eq!(last_label(&d), "pick_profile");
-    let fixtures = d.manufacturing(mfg).unwrap().fixtures;
-    assert_eq!(fixtures.len(), 1);
-    assert_ne!(fixtures[0].id, old, "a fresh id");
-    assert_eq!(fixtures[0].record(), set("Board")[0]);
-    assert!(!pick(&d, mfg, &set("Board")), "the same set writes nothing");
+    let read = d.manufacturing(mfg).unwrap();
+    assert_eq!(read.sets.len(), 1);
+    assert_ne!(read.sets[0].id, old_set, "a fresh id");
+    assert!(read.sets[0].on_page);
+    assert_eq!(read.set_records(), set("Board"));
+    assert_eq!(read.fixtures.len(), 2);
+    assert_eq!(read.fixtures[1].id, job_fixture, "the job fixture stays");
+    assert!(!pick(&d, mfg, &set("Board")), "the same sets write nothing");
     d.undo_step(last_step(&d)).unwrap();
-    let restored = d.manufacturing(mfg).unwrap().fixtures;
-    assert_eq!(restored.len(), 1);
-    assert_eq!(restored[0].id, old, "undo restores the old node");
+    let restored = d.manufacturing(mfg).unwrap();
+    assert_eq!(restored.sets[0].id, old_set, "undo restores the old node");
 }
 
 #[test]
-fn an_empty_set_removes_the_fixtures_and_undo_brings_them_back() {
+fn no_set_removes_the_sets_keeps_job_fixtures_and_undo_brings_them_back() {
     let d = Document::new(1);
     let mfg = laser(&d);
     holder(&d, mfg);
+    pick(&d, mfg, &set("Board"));
     assert!(pick(&d, mfg, &[]));
-    assert!(d.manufacturing(mfg).unwrap().fixtures.is_empty());
+    let read = d.manufacturing(mfg).unwrap();
+    assert!(read.sets.is_empty());
+    assert_eq!(read.fixtures.len(), 1, "the job fixture stays");
     d.undo_step(last_step(&d)).unwrap();
-    assert_eq!(d.manufacturing(mfg).unwrap().fixtures.len(), 1);
+    assert_eq!(d.manufacturing(mfg).unwrap().fixtures.len(), 2);
+}
+
+#[test]
+fn a_pick_turns_every_set_on_this_page_again() {
+    let d = Document::new(1);
+    let mfg = laser(&d);
+    pick(&d, mfg, &set("Board"));
+    let id = d.manufacturing(mfg).unwrap().sets[0].id;
+    d.set_fixture_set_on_page(id, false).unwrap();
+    assert!(pick(&d, mfg, &set("Board")), "a set that is off is written");
+    assert!(d.manufacturing(mfg).unwrap().sets[0].on_page);
 }
 
 #[test]

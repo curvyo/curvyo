@@ -12,6 +12,8 @@ pub enum PanelContent {
     Operations,
     /// The Materials tab of a laser page (`specs/0112-test-grid-and-materials`).
     Materials,
+    /// The Fixtures tab of a laser page (`specs/0113-fixture-sets-and-pins`).
+    Fixtures,
     /// The File tab: the project and the file commands (`specs/0051-sidebar-and-no-menu`).
     File,
     /// The Document section.
@@ -69,6 +71,7 @@ pub fn panel_body(
         PanelTab::Workbench => PanelContent::Workbench,
         PanelTab::Operations => PanelContent::Operations,
         PanelTab::Materials => PanelContent::Materials,
+        PanelTab::Fixtures => PanelContent::Fixtures,
     }
 }
 

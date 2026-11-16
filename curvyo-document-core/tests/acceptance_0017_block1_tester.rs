@@ -606,6 +606,8 @@ fn every_older_fixture_still_opens_with_the_styles_it_stored() {
         "page_frame_nan_v34.curvyo",
         "page_frame_too_large_v34.curvyo",
         "mfg_profile_not_a_map_v36.curvyo",
+        // The malformed `0113` centres register.
+        "snapping_centres_type_v47.curvyo",
     ];
     let mut opened = 0;
     for entry in std::fs::read_dir(dir).unwrap() {

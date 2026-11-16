@@ -126,66 +126,79 @@ pub struct RowRevert {
     pub redo: bool,
 }
 
+/// The labels of the commands about the document and not about its objects.
+const DOCUMENT_LEVEL_LABELS: &[&str] = &[
+    "resize_document",
+    "fit_document_to_content",
+    "add_page",
+    "add_sketch_page",
+    "add_output_page",
+    "delete_placement",
+    "place_page",
+    "delete_page",
+    "delete_sketch_page",
+    "convert_sketch_page",
+    "rename_page",
+    "resize_page",
+    "move_page",
+    "reorder_pages",
+    "add_manufacturing",
+    "delete_manufacturing",
+    "set_work_area",
+    "add_grid",
+    "add_holder",
+    "add_clamp",
+    "add_stop",
+    "add_screw",
+    "add_fixture_set",
+    "rename_fixture_set",
+    "remove_fixture_set",
+    "move_fixture_set",
+    "set_fixture_set_on_page",
+    "set_fixture_set_off_page",
+    "add_fixture",
+    "add_job_fixture",
+    "lock_fixture",
+    "unlock_fixture",
+    "apply_page_fixtures",
+    "resize_fixture",
+    "set_grid_spacing",
+    "set_grid_major",
+    "set_tape_edge",
+    "set_grid_origin",
+    "rename_slot",
+    "set_slot_shape",
+    "set_slot_position",
+    "set_slot_size",
+    "delete_fixture",
+    "rename_fixture",
+    "set_fixture_visible",
+    "set_fixture_active",
+    "set_fixture_inactive",
+    "set_fixture_params",
+    "move_fixture",
+    "rotate_fixture",
+    "add_slot",
+    "remove_slot",
+    "set_slot",
+    "pick_profile",
+    "reset_profile",
+    "save_as_profile",
+    "edit_profile_name",
+    "edit_origin_corner",
+    "edit_max_feed",
+    "edit_max_power",
+    "edit_laser_mode",
+    "motorised_z_on",
+    "motorised_z_off",
+];
+
 /// Whether a command is about the document and not about its objects: the objects only follow the
 /// page (a resize or a fit moves them to keep their place on it), so the maker sees no object
 /// changed, and a row lists none.
 #[must_use]
 pub fn is_document_level_label(label: &str) -> bool {
-    matches!(
-        label,
-        "resize_document"
-            | "fit_document_to_content"
-            | "add_page"
-            | "add_sketch_page"
-            | "add_output_page"
-            | "delete_placement"
-            | "place_page"
-            | "delete_page"
-            | "delete_sketch_page"
-            | "convert_sketch_page"
-            | "rename_page"
-            | "resize_page"
-            | "move_page"
-            | "reorder_pages"
-            | "add_manufacturing"
-            | "delete_manufacturing"
-            | "set_work_area"
-            | "add_grid"
-            | "add_holder"
-            | "add_clamp"
-            | "add_stop"
-            | "add_screw"
-            | "resize_fixture"
-            | "set_grid_spacing"
-            | "set_grid_major"
-            | "set_tape_edge"
-            | "set_grid_origin"
-            | "rename_slot"
-            | "set_slot_shape"
-            | "set_slot_position"
-            | "set_slot_size"
-            | "delete_fixture"
-            | "rename_fixture"
-            | "set_fixture_visible"
-            | "set_fixture_active"
-            | "set_fixture_inactive"
-            | "set_fixture_params"
-            | "move_fixture"
-            | "rotate_fixture"
-            | "add_slot"
-            | "remove_slot"
-            | "set_slot"
-            | "pick_profile"
-            | "reset_profile"
-            | "save_as_profile"
-            | "edit_profile_name"
-            | "edit_origin_corner"
-            | "edit_max_feed"
-            | "edit_max_power"
-            | "edit_laser_mode"
-            | "motorised_z_on"
-            | "motorised_z_off"
-    )
+    DOCUMENT_LEVEL_LABELS.contains(&label)
 }
 
 /// Who took the step back as a whole with an object undo, if anybody did. A Replace step is taken

@@ -31,6 +31,18 @@ const EXEMPT: &[(&str, &str)] = &[
         "a fixture holds slots only, never an object a clone follows (moved from manufacturing.rs)",
     ),
     (
+        "manufacturing_fixture_set_commands.rs",
+        "a fixture set holds fixtures only, never an object a clone follows (`0113`)",
+    ),
+    (
+        "manufacturing_fixture_align.rs",
+        "aligning removes sets, fixtures and jobs only, never an object a clone follows (`0113`)",
+    ),
+    (
+        "fixture_apply.rs",
+        "Apply replaces job fixtures only, never an object a clone follows (`0113`)",
+    ),
+    (
         "manufacturing_slot_commands.rs",
         "a slot is no object a clone follows (moved from manufacturing_fixture_commands.rs)",
     ),

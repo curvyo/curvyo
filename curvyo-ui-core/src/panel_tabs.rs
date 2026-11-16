@@ -40,6 +40,9 @@ pub enum PanelTab {
     /// The materials of a laser page (`specs/0112-test-grid-and-materials` criterion 16): after
     /// Operations, on a laser page only; never active by itself.
     Materials,
+    /// The fixtures of a laser page (`specs/0113-fixture-sets-and-pins` criterion 1): after
+    /// Operations and Materials, on a laser page only; never active by itself.
+    Fixtures,
 }
 
 impl PanelTab {
@@ -61,6 +64,7 @@ impl PanelTab {
             Self::Workbench => "workbench",
             Self::Operations => "operations",
             Self::Materials => "materials",
+            Self::Fixtures => "fixtures",
         }
     }
 
@@ -69,7 +73,12 @@ impl PanelTab {
     pub fn from_name(name: &str) -> Option<Self> {
         TABS.iter()
             .copied()
-            .chain([Self::Workbench, Self::Operations, Self::Materials])
+            .chain([
+                Self::Workbench,
+                Self::Operations,
+                Self::Materials,
+                Self::Fixtures,
+            ])
             .find(|tab| tab.name() == name)
     }
 
@@ -104,6 +113,7 @@ impl PanelTab {
             Self::Workbench => "Workbench",
             Self::Operations => "Operations",
             Self::Materials => "Materials",
+            Self::Fixtures => "Fixtures",
         }
     }
 
@@ -126,6 +136,7 @@ impl PanelTab {
             (Self::Workbench, _) => "Workbench",
             (Self::Operations, _) => "Operations",
             (Self::Materials, _) => "Materials",
+            (Self::Fixtures, _) => "Fixtures",
         }
     }
 }

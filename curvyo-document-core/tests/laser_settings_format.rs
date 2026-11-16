@@ -119,7 +119,8 @@ fn the_settings_golden_reads_back_every_register_link_override_and_grid() {
     assert_eq!(format_of(&bytes), 43);
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 46);
+    // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 47);
     let d = open_unchanged(&bytes);
     let ops = operations(&d);
     assert_eq!(ops.len(), 5, "four operations and the grid row");
@@ -225,8 +226,8 @@ fn a_file_of_a_newer_format_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 47,
-            supported: 46
+            found: 48,
+            supported: 47
         })
     ));
 }

@@ -10,6 +10,9 @@ pub const LABEL_MIGRATE_FORMAT: &str = "migrate_format";
 /// The reserved label of the save refresh of the numbers stored beside material links (ADR 0054
 /// §3): as [`LABEL_MIGRATE_FORMAT`], not an undo step, not a row of the history list.
 pub const LABEL_REFRESH_MATERIAL_NUMBERS: &str = "refresh_material_numbers";
+/// The reserved label of the alignment of a page's set mirror with a newer profile record (ADR
+/// 0059 §10): as [`LABEL_MIGRATE_FORMAT`], not an undo step, not a row of the history list.
+pub const LABEL_ALIGN_FIXTURE_SETS: &str = "align_fixture_sets";
 /// The reserved label of an undo (`u` names the step it takes back).
 pub const LABEL_UNDO: &str = "undo";
 /// The reserved label of a redo (`d` names the step it applies again).

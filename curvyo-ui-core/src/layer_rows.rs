@@ -231,6 +231,8 @@ pub struct FixtureLine {
     pub word: &'static str,
     /// The Active check box: on the bed.
     pub active: bool,
+    /// Whether its set is on this page (`specs/0113` criterion 2): muted and not pressed when not.
+    pub on_page: bool,
 }
 
 impl LayerRow {

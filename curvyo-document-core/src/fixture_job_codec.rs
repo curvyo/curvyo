@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::group_tree::node_id;
 use crate::history::lineage::{decode_node, encode_node};
-use crate::manufacturing_codec::string;
+use crate::manufacturing_codec::{KEY_JOB_UID, string};
 use crate::manufacturing_fixtures::SlotSnapshot;
 use crate::node_registers::{KEY_NAME, read_registers};
 use crate::operation_codec::{KEY_OP_KIND, KEY_OP_OUTPUT, KEY_OP_SHOW};
@@ -20,9 +20,18 @@ pub(crate) const SHAPE_FIXTURE_JOB: &str = "fixture_job";
 pub(crate) const TARGET_PREFIX: &str = "target.";
 /// The separator between a node id and its part suffix; it never occurs in an encoded id.
 const SUFFIX_SEPARATOR: char = '.';
-/// The part suffixes a key may carry (ADR 0052 §2): the grid's lines and tapes, the screw's head
-/// and thread. Which of them a fixture has is the extension's rule.
-pub const PART_SUFFIXES: [&str; 4] = ["lines", "tapes", "head", "thread"];
+/// The part suffixes a key may carry (ADR 0052 §2, ADR 0059 §5): the grid's lines and tapes, the
+/// screw's head and thread, the pin's circle and the marks of a pin or a screw. Which of them a
+/// fixture has is the extension's rule.
+pub const PART_SUFFIXES: [&str; 6] = ["lines", "tapes", "head", "thread", "circle", "marks"];
+/// The register of a role job's fixed role (ADR 0059 §5).
+pub(crate) const KEY_JOB_ROLE: &str = "job_role";
+/// The stored kind of a pin (ADR 0059 §4).
+pub(crate) const PIN_KIND: &str = "curvyo.laser/pin";
+/// The stored kind of a screw (ADR 0049 §2).
+pub(crate) const SCREW_KIND: &str = "curvyo.laser/screw";
+/// The kind text of the two role jobs: both run as Score (`0113` criterion 26).
+const ROLE_JOB_KIND: &str = "score";
 
 /// A fixture part by place, without node ids: what a profile set stores and a copy maps back.
 /// The derived order is the Parts-list order: the fixture's own parts (no suffix, then the
@@ -71,6 +80,11 @@ pub struct FixtureJobSnapshot {
     /// The keys that name the fixture or one of its readable slots, in Parts-list order. Keys of
     /// other nodes are left out and are not damage.
     pub targets: Vec<TargetRead>,
+    /// Its fixed role; `None` for an ordinary job and for a role that does not read (ADR 0059 §5).
+    pub role: Option<JobRole>,
+    /// The profile id of a set fixture's job (`job_uid`, ADR 0059 §1 amended 2026-11-16); `None`
+    /// when absent or not a text.
+    pub uid: Option<String>,
     /// How many stored values did not read.
     pub damaged: usize,
 }
@@ -78,6 +92,8 @@ pub struct FixtureJobSnapshot {
 /// A job's values without a node: what a profile set stores and a copy writes (ADR 0052 §7).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JobRecord {
+    /// The record job's id (lowercase UUID v4); empty for a job without one.
+    pub id: String,
     /// The kind text.
     pub kind: String,
     /// The name.
@@ -86,6 +102,91 @@ pub struct JobRecord {
     pub show: bool,
     /// The ticked parts, sorted, without duplicates.
     pub targets: Vec<JobTarget>,
+    /// The fixed role of a pin's or a screw's job (ADR 0059 §5); `None` for an ordinary job.
+    pub role: Option<JobRole>,
+}
+
+/// The fixed role of one of the two jobs a pin or a screw owns (ADR 0059 §5, `job_role`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JobRole {
+    /// The cross in a circle at every centre.
+    CentreMark,
+    /// The pin's circle, or the screw's head and thread circles, at every centre.
+    Diameters,
+}
+
+impl JobRole {
+    /// The stored text of the role.
+    #[must_use]
+    pub const fn stored(self) -> &'static str {
+        match self {
+            Self::CentreMark => "centre_mark",
+            Self::Diameters => "diameters",
+        }
+    }
+
+    /// The role a stored text names; `None` for any other text.
+    #[must_use]
+    pub fn from_stored(stored: &str) -> Option<Self> {
+        match stored {
+            "centre_mark" => Some(Self::CentreMark),
+            "diameters" => Some(Self::Diameters),
+            _ => None,
+        }
+    }
+
+    /// The word a role job is created with (`0113` criterion 27).
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::CentreMark => "Centre mark",
+            Self::Diameters => "Diameters",
+        }
+    }
+
+    /// The part suffixes the job of this role ticks on a fixture of the stored kind `kind`
+    /// (ADR 0059 §5); none for a kind without role jobs.
+    #[must_use]
+    pub fn suffixes(self, kind: &str) -> &'static [&'static str] {
+        match (kind, self) {
+            (PIN_KIND | SCREW_KIND, Self::CentreMark) => &["marks"],
+            (PIN_KIND, Self::Diameters) => &["circle"],
+            (SCREW_KIND, Self::Diameters) => &["head", "thread"],
+            _ => &[],
+        }
+    }
+}
+
+/// Whether a fixture of the stored kind `kind` owns the two role jobs: a pin or a screw.
+pub(crate) fn has_roles(kind: &str) -> bool {
+    matches!(kind, PIN_KIND | SCREW_KIND)
+}
+
+/// The two role jobs a new pin or screw of the stored kind `kind` is created with (Score, Show on,
+/// their fixed parts); none for another kind (ADR 0059 §5).
+pub(crate) fn role_job_records(kind: &str) -> Vec<JobRecord> {
+    if !has_roles(kind) {
+        return Vec::new();
+    }
+    [JobRole::CentreMark, JobRole::Diameters]
+        .into_iter()
+        .map(|role| JobRecord {
+            id: String::new(),
+            kind: ROLE_JOB_KIND.to_owned(),
+            name: role.name().to_owned(),
+            show: true,
+            targets: role
+                .suffixes(kind)
+                .iter()
+                .map(|suffix| JobTarget {
+                    slot: None,
+                    suffix: Some((*suffix).to_owned()),
+                })
+                .collect(),
+            role: Some(role),
+        })
+        .collect()
 }
 
 impl FixtureJobSnapshot {
@@ -101,10 +202,12 @@ impl FixtureJobSnapshot {
         targets.sort_unstable();
         targets.dedup();
         Some(JobRecord {
+            id: self.uid.clone().unwrap_or_default(),
             kind: self.kind.clone()?,
             name: self.name.clone(),
             show: self.show,
             targets,
+            role: self.role,
         })
     }
 }
@@ -153,7 +256,14 @@ pub(crate) fn read_job(
     let kind = string(meta, KEY_OP_KIND);
     let (show, show_damage) = switch(meta, KEY_OP_SHOW, true);
     let (output, output_damage) = switch(meta, KEY_OP_OUTPUT, false);
-    let mut damaged = show_damage + output_damage + usize::from(kind.is_none());
+    let (role, role_damage) = match meta.get(KEY_JOB_ROLE) {
+        None => (None, 0),
+        Some(ValueOrContainer::Value(LoroValue::String(text))) => {
+            JobRole::from_stored(&text).map_or((None, 1), |role| (Some(role), 0))
+        }
+        Some(_) => (None, 1),
+    };
+    let mut damaged = show_damage + output_damage + role_damage + usize::from(kind.is_none());
     let mut targets = Vec::new();
     meta.for_each(|key, value| {
         let Some((part, suffix)) = parse_target_key(key) else {
@@ -187,7 +297,27 @@ pub(crate) fn read_job(
         show,
         output,
         targets,
+        role,
+        uid: string(meta, KEY_JOB_UID),
         damaged,
+    }
+}
+
+/// Applies the role rules of a fixture of the stored kind `kind` to its jobs as read (ADR 0059
+/// §5): a role on a kind without role jobs, or the second job of the same role, reads as an
+/// ordinary job and counts one damaged value of that job.
+pub(crate) fn check_roles(kind: &str, jobs: &mut [FixtureJobSnapshot]) {
+    let mut seen: Vec<JobRole> = Vec::new();
+    for job in jobs {
+        let Some(role) = job.role else {
+            continue;
+        };
+        if !has_roles(kind) || seen.contains(&role) {
+            job.role = None;
+            job.damaged += 1;
+        } else {
+            seen.push(role);
+        }
     }
 }
 
@@ -201,6 +331,12 @@ pub(crate) fn write_job_registers(meta: &LoroMap, record: &JobRecord, ticks: &[F
         meta.insert(KEY_NAME, record.name.as_str()).unwrap();
         meta.insert(KEY_OP_SHOW, record.show).unwrap();
         meta.insert(KEY_OP_OUTPUT, false).unwrap();
+        if let Some(role) = record.role {
+            meta.insert(KEY_JOB_ROLE, role.stored()).unwrap();
+        }
+        if !record.id.is_empty() {
+            meta.insert(KEY_JOB_UID, record.id.as_str()).unwrap();
+        }
         for tick in ticks {
             meta.insert(&target_key(tick), true).unwrap();
         }

@@ -22,7 +22,7 @@
 
 use curvyo_document_core::{DocumentSize, Length, Point};
 use curvyo_laser_core::{
-    FixtureKind, GridSpec, MAX_RECORD_BYTES, MAX_SET_FIXTURES, MAX_SET_SLOTS, MachineProfile,
+    FixtureKind, GridSpec, MAX_RECORD_BYTES, MAX_RECORD_FIXTURES, MAX_RECORD_SLOTS, MachineProfile,
     Placement, Slot, SlotShape, TapeEdge, TapeEdges, board_points, fit_slot, grid_spacing_range,
     layout, read_record, record_file_name, stop_points, write_record,
 };
@@ -387,48 +387,80 @@ fn holder_entry(name: &str) -> Value {
     })
 }
 
-fn format2_with(fixtures: Value) -> Value {
+/// Superseded by `0113` (ADR 0060 §1, §3): the set of a record is the first of its named
+/// `fixture_sets` in record format 5, each entry with its `jobs`; format 2 is skipped as older.
+fn format2_with(fixtures: &Value) -> Value {
     let mut v = format1();
-    v["format_version"] = json!(2);
-    v["fixtures"] = fixtures;
+    v["format_version"] = json!(5);
+    v["motorised_z"] = json!(false);
+    let entries: Vec<Value> = fixtures
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .map(|(n, entry)| {
+            // Superseded by `0113` rework (ADR 0060 §1 amended 2026-11-16): an entry carries its
+            // id and Lock and no Active.
+            let mut entry = entry.clone();
+            entry["jobs"] = json!([]);
+            entry["id"] = json!(format!("00000000-0000-4000-8000-{:012}", n + 1));
+            entry["locked"] = json!(false);
+            if let Some(map) = entry.as_object_mut() {
+                map.remove("active");
+            }
+            entry
+        })
+        .collect();
+    v["fixture_sets"] =
+        json!([{ "id": SET_ID, "name": "Set 1", "locked": false, "fixtures": entries }]);
     v
 }
 
+/// The id of the one set of [`format2_with`].
+const SET_ID: &str = "00000000-0000-4000-8000-100000000000";
+
 #[test]
 fn ac28_30_a_format_1_record_reads_as_the_empty_set() {
-    let p = record(&format1()).expect("format 1 reads");
-    assert!(p.fixtures.is_empty(), "no set in format 1");
-    assert_eq!(p.values.name, "K40 in the garage");
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): a format 1 record is skipped as older.
+    assert_eq!(
+        record(&format1()),
+        Err(curvyo_laser_core::RecordError::Older)
+    );
 }
 
 #[test]
 fn ac30_any_write_writes_format_2_with_a_fixtures_array_even_when_empty() {
-    // Superseded by `0103` (ADR 0052 §7) and `0111` (ADR 0056 §7): any write is record format 4.
-    let p = record(&format1()).unwrap();
+    // Superseded by `0103` (ADR 0052 §7), `0111` (ADR 0056 §7) and `0113` (ADR 0060 §1): any
+    // write is record format 5 with its `fixture_sets`.
+    let p = record(&format2_with(&json!([]))).unwrap();
     let text = write_record(&p);
     let back: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(back["format_version"], 4, "a write upgrades format 1");
+    assert_eq!(back["format_version"], 5);
     assert_eq!(
-        back["fixtures"],
-        json!([]),
+        back["fixture_sets"],
+        json!([{ "id": SET_ID, "name": "Set 1", "locked": false, "fixtures": [] }]),
         "the key is written, possibly empty"
     );
 }
 
 #[test]
 fn ac30_format_2_reads_its_set_in_order_and_writes_it_back() {
-    let v = format2_with(json!([grid_entry(), holder_entry("Holder 1")]));
+    let v = format2_with(&json!([grid_entry(), holder_entry("Holder 1")]));
     let p = record(&v).expect("format 2 reads");
-    assert_eq!(p.fixtures.len(), 2);
-    assert_eq!(p.fixtures[0].kind, "curvyo.laser/engraved_grid");
-    assert_eq!(p.fixtures[1].name, "Holder 1");
-    assert_eq!(p.fixtures[1].slots.len(), 2);
+    let set = &p.fixture_sets[0].fixtures;
+    assert_eq!(set.len(), 2);
+    assert_eq!(set[0].kind, "curvyo.laser/engraved_grid");
+    assert_eq!(set[1].name, "Holder 1");
+    assert_eq!(set[1].slots.len(), 2);
     let text = write_record(&p);
     let again = read_record(&record_file_name(ID), &text).expect("own write reads");
-    assert_eq!(again.fixtures, p.fixtures, "round trip keeps the set");
+    assert_eq!(
+        again.fixture_sets, p.fixture_sets,
+        "round trip keeps the set"
+    );
     let back: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(
-        back["fixtures"][1]["matrix"],
+        back["fixture_sets"][0]["fixtures"][1]["matrix"],
         json!([1.0, 0.0, 0.0, 1.0, 40.0, 25.0])
     );
 }
@@ -437,12 +469,12 @@ fn ac30_format_2_reads_its_set_in_order_and_writes_it_back() {
 fn ac30_a_string_in_a_slot_size_damages_the_whole_record() {
     let mut holder = holder_entry("Holder 1");
     holder["slots"][0]["d_mm"] = json!("twelve");
-    assert!(record(&format2_with(json!([holder]))).is_err());
+    assert!(record(&format2_with(&json!([holder]))).is_err());
 }
 
 #[test]
 fn ac30_an_unknown_kind_damages_the_whole_record() {
-    let v = format2_with(json!([{
+    let v = format2_with(&json!([{
         "kind": "turntable", "name": "T", "active": true, "params": {},
         "matrix": null, "slots": []
     }]));
@@ -451,9 +483,10 @@ fn ac30_an_unknown_kind_damages_the_whole_record() {
 
 #[test]
 fn ac30_33_fixtures_are_over_the_limit_and_32_are_not() {
-    assert_eq!(MAX_SET_FIXTURES, 32);
-    assert_eq!(MAX_SET_SLOTS, 200);
-    let thirty_two: Vec<Value> = (0..32)
+    // Superseded by `0113` (ADR 0060 §2): 64 fixtures in all sets of a record are the limit.
+    assert_eq!(MAX_RECORD_FIXTURES, 64);
+    assert_eq!(MAX_RECORD_SLOTS, 200);
+    let thirty_two: Vec<Value> = (0..64)
         .map(|i| {
             let mut g = grid_entry();
             g["kind"] = json!("clamp");
@@ -464,14 +497,14 @@ fn ac30_33_fixtures_are_over_the_limit_and_32_are_not() {
         })
         .collect();
     assert!(
-        record(&format2_with(json!(thirty_two))).is_ok(),
-        "32 fixtures are the limit"
+        record(&format2_with(&json!(thirty_two))).is_ok(),
+        "64 fixtures are the limit"
     );
     let mut thirty_three = thirty_two.clone();
     thirty_three.push(thirty_two[0].clone());
     assert!(
-        record(&format2_with(json!(thirty_three))).is_err(),
-        "33 is over the limit"
+        record(&format2_with(&json!(thirty_three))).is_err(),
+        "65 is over the limit"
     );
 }
 
@@ -485,7 +518,7 @@ fn ac30_201_slots_in_the_set_are_over_the_limit() {
         h["slots"] = Value::Array(vec![slot.clone(); slots]);
         h
     };
-    let ok = format2_with(json!([
+    let ok = format2_with(&json!([
         holder(25),
         holder(25),
         holder(25),
@@ -496,7 +529,7 @@ fn ac30_201_slots_in_the_set_are_over_the_limit() {
         holder(25)
     ]));
     assert!(record(&ok).is_ok(), "200 slots are the limit");
-    let over = format2_with(json!([
+    let over = format2_with(&json!([
         holder(25),
         holder(25),
         holder(25),
@@ -511,33 +544,35 @@ fn ac30_201_slots_in_the_set_are_over_the_limit() {
 
 #[test]
 fn ac30_a_newer_record_format_is_skipped() {
-    let mut v = format2_with(json!([]));
-    // Format 4 is current since `0111` (ADR 0056 §7); 5 is newer.
-    v["format_version"] = json!(5);
+    let mut v = format2_with(&json!([]));
+    // Format 5 is current since `0113` (ADR 0060 §1); 6 is newer.
+    v["format_version"] = json!(6);
     assert!(record(&v).is_err());
 }
 
 #[test]
 fn ac30_a_fixtures_key_in_a_format_1_record_is_an_unknown_key_and_damages_it() {
-    let mut v = format1();
+    // Superseded by `0113` (ADR 0060 §3): `fixtures` in a format 5 record is damage.
+    let mut v = format2_with(&json!([]));
     v["fixtures"] = json!([]);
-    assert!(
-        record(&v).is_err(),
-        "ADR 0050 section 2: a format 1 record has no such key"
+    assert_eq!(
+        record(&v),
+        Err(curvyo_laser_core::RecordError::Damaged),
+        "ADR 0060 section 3: a format 5 record has no such key"
     );
 }
 
 #[test]
 fn ac30_the_record_text_limit_is_64_kib() {
-    // Raised to 128 KiB by `0103` (ADR 0052 §7).
-    assert_eq!(MAX_RECORD_BYTES, 128 * 1024);
+    // Raised to 128 KiB by `0103` (ADR 0052 §7) and to 256 KiB by `0113` (ADR 0060 §2).
+    assert_eq!(MAX_RECORD_BYTES, 256 * 1024);
 }
 
 #[test]
 fn ac28_generic_laser_holds_an_empty_set() {
     let g = MachineProfile::generic_laser();
     assert!(
-        g.fixtures.is_empty(),
+        g.fixture_sets.is_empty(),
         "a new laser with Generic laser starts with no fixture"
     );
     let _ = grid_spacing_range();

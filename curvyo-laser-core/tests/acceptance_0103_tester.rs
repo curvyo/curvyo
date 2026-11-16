@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use curvyo_laser_core::{read_record, record_file_name, write_record};
+use curvyo_laser_core::{RecordError, read_record, record_file_name, write_record};
 use serde_json::Value;
 
 const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
@@ -34,27 +34,23 @@ fn read(name: &str) -> Result<(), ()> {
 
 #[test]
 fn ac24_a_format_3_fixture_jobs_record_reads_and_writes_back_equal() {
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): a format 3 record is skipped as older.
     let text = golden("format3_fixture_jobs.json");
-    let profile = read_record(&record_file_name(ID), &text).expect("format 3 reads");
-    let written = write_record(&profile);
-    let before: Value = serde_json::from_str(&text).unwrap();
-    let after: Value = serde_json::from_str(&written).unwrap();
-    // Superseded by `0111` (ADR 0056 §7): the write is record format 4 with `motorised_z` off.
-    let mut before = before;
-    before["format_version"] = serde_json::json!(4);
-    before["motorised_z"] = serde_json::json!(false);
-    assert_eq!(after, before, "reads, and the write is equal to the file");
-    assert_eq!(after["format_version"], 4);
+    assert_eq!(
+        read_record(&record_file_name(ID), &text),
+        Err(RecordError::Older)
+    );
 }
 
 #[test]
 fn ac24_the_maximum_set_reads_and_its_write_fits_128_kib() {
-    let text = golden("format3_max_set.json");
+    // Superseded by `0113` (ADR 0060 §2): the maximal sets of format 5 fit 256 KiB.
+    let text = golden("format5_max_sets.json");
     let profile = read_record(&record_file_name(ID), &text).expect("the maximum reads");
     let written = write_record(&profile);
     assert!(
-        written.len() <= 128 * 1024,
-        "the maximal set fits the 128 KiB record limit: {} bytes",
+        written.len() <= 256 * 1024,
+        "the maximal sets fit the 256 KiB record limit: {} bytes",
         written.len()
     );
     let back = read_record(&record_file_name(ID), &written).expect("the write reads again");
@@ -63,20 +59,21 @@ fn ac24_the_maximum_set_reads_and_its_write_fits_128_kib() {
 
 #[test]
 fn ac24_a_format_2_record_reads_and_any_write_is_format_3_with_empty_jobs() {
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): a format 2 record is skipped as older,
+    // and every entry of a format 5 write carries its `jobs`.
     let text = golden("format2_fixtures.json");
-    let profile = read_record(&record_file_name(ID), &text).expect("format 2 reads");
+    assert_eq!(
+        read_record(&record_file_name(ID), &text),
+        Err(RecordError::Older)
+    );
+    let profile = read_record(&record_file_name(ID), &golden("format5_fixture_sets.json"))
+        .expect("format 5 reads");
     let written: Value = serde_json::from_str(&write_record(&profile)).unwrap();
-    assert_eq!(written["format_version"], 4, "a write is format 4 (`0111`)");
-    let entries = written["fixtures"]
-        .as_array()
-        .expect("the fixtures are written");
-    assert!(!entries.is_empty(), "the golden has fixtures");
-    for entry in entries {
-        assert_eq!(
-            entry["jobs"],
-            serde_json::json!([]),
-            "jobs written, possibly empty"
-        );
+    assert_eq!(written["format_version"], 5);
+    for set in written["fixture_sets"].as_array().unwrap() {
+        for entry in set["fixtures"].as_array().unwrap() {
+            assert!(entry["jobs"].is_array(), "jobs written, possibly empty");
+        }
     }
 }
 
@@ -111,9 +108,10 @@ fn ac24_a_format_4_record_is_skipped_with_its_notice() {
 
 #[test]
 fn ac24_a_format_1_record_reads_with_no_fixtures() {
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): a format 1 record is skipped as older.
     let text = golden("format1_full_record.json");
     let profile = read_record(&record_file_name(ID), &text);
-    assert!(profile.is_ok(), "format 1 reads (no fixtures, ADR 0050)");
+    assert_eq!(profile, Err(RecordError::Older));
 }
 
 // ---- criteria 13, 14 and 17: the run rule, the run order and the count (laser core) -----------

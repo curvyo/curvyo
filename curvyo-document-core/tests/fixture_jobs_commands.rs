@@ -234,6 +234,7 @@ fn pick_copies_the_jobs_with_output_off_fresh_ids_and_ticks_by_slot_index() {
     assert_eq!(
         record.jobs,
         [JobRecord {
+            id: String::new(),
             kind: "engrave_outline".to_owned(),
             name: "E 1".to_owned(),
             show: true,
@@ -247,6 +248,7 @@ fn pick_copies_the_jobs_with_output_off_fresh_ids_and_ticks_by_slot_index() {
                     suffix: None
                 }
             ],
+            role: None,
         }],
         "no Output in a record"
     );
@@ -254,13 +256,21 @@ fn pick_copies_the_jobs_with_output_off_fresh_ids_and_ticks_by_slot_index() {
     let copy = params(serde_json::json!({"id": "generic-laser", "name": "Generic laser"}));
     let steps = d.own_step_count();
     assert!(
-        d.set_manufacturing_profile_and_fixtures(
+        d.set_manufacturing_profile_and_sets(
             mfg,
             &copy,
             DocumentSize::from_mm(600.0, 400.0),
             PageCorner::default(),
             ProfileChange::Pick,
-            std::slice::from_ref(&record),
+            curvyo_document_core::ProfileSets {
+                sets: &[curvyo_document_core::FixtureSetRecord {
+                    id: String::new(),
+                    name: "Set 1".to_owned(),
+                    locked: false,
+                    fixtures: vec![record.clone()],
+                }],
+                modified: 0,
+            },
             &curvyo_document_core::PageContents::new(),
         )
         .unwrap()

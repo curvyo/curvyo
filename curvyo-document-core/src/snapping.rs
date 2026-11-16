@@ -29,6 +29,9 @@ const KEY_GRID: &str = "snapping_grid";
 /// The root register for the laser fixtures (`specs/0102-laser-fixtures` criterion 24, ADR 0049
 /// §5). Absent means on.
 const KEY_FIXTURES: &str = "snapping_fixtures";
+/// The root register for the centres a job fixture snaps to (`specs/0113-fixture-sets-and-pins`
+/// criterion 30). Absent means on.
+const KEY_CENTRES: &str = "snapping_centres";
 /// The root register for the grid snap point (criterion 11). Absent means centre.
 const KEY_GRID_POINT: &str = "snapping_grid_point";
 const KEY_X: &str = "snapping_x";
@@ -97,6 +100,9 @@ pub struct DocumentSnapping {
     pub grid: bool,
     /// Snap to the Active fixtures of a laser page (`specs/0102-laser-fixtures` criterion 24).
     pub fixtures: bool,
+    /// Snap a job fixture's centres to the centres of circles, ellipses, polygons and the boxes
+    /// of other shapes (`specs/0113-fixture-sets-and-pins` criterion 30).
+    pub centres: bool,
     /// Which part of a moved selection snaps to a grid.
     pub grid_point: GridSnapPoint,
     /// Allow correction of the horizontal coordinate.
@@ -126,6 +132,7 @@ impl DocumentSnapping {
         page: true,
         grid: true,
         fixtures: true,
+        centres: true,
         grid_point: GridSnapPoint::Centre,
         x: true,
         y: true,
@@ -174,6 +181,9 @@ pub(crate) struct SnappingJson {
     /// Left out at its default (on), as `grid`.
     #[serde(skip_serializing_if = "is_true")]
     fixtures: bool,
+    /// Left out at its default (on), as `grid`.
+    #[serde(skip_serializing_if = "is_true")]
+    centres: bool,
     #[serde(skip_serializing_if = "is_centre")]
     grid_point: GridSnapPoint,
     x: bool,
@@ -202,6 +212,7 @@ impl From<DocumentSnapping> for SnappingJson {
             page: snapping.page,
             grid: snapping.grid,
             fixtures: snapping.fixtures,
+            centres: snapping.centres,
             grid_point: snapping.grid_point,
             x: snapping.x,
             y: snapping.y,
@@ -266,6 +277,7 @@ pub(crate) fn snapping_of_root(root: &LoroMap) -> DocumentSnapping {
         page: boolean(KEY_PAGE, true),
         grid: boolean(KEY_GRID, true),
         fixtures: boolean(KEY_FIXTURES, true),
+        centres: boolean(KEY_CENTRES, true),
         grid_point: plain(root, KEY_GRID_POINT)
             .ok()
             .flatten()
@@ -295,6 +307,7 @@ pub(crate) fn validate(loro: &LoroDoc) -> bool {
         && ok(KEY_PAGE, |value| bool_of(value).is_some())
         && ok(KEY_GRID, |value| bool_of(value).is_some())
         && ok(KEY_FIXTURES, |value| bool_of(value).is_some())
+        && ok(KEY_CENTRES, |value| bool_of(value).is_some())
         && ok(KEY_GRID_POINT, |value| grid_point_of(value).is_some())
         && ok(KEY_X, |value| bool_of(value).is_some())
         && ok(KEY_Y, |value| bool_of(value).is_some())
@@ -353,6 +366,9 @@ impl Document {
         }
         if value.fixtures != current.fixtures {
             set(KEY_FIXTURES, LoroValue::Bool(value.fixtures));
+        }
+        if value.centres != current.centres {
+            set(KEY_CENTRES, LoroValue::Bool(value.centres));
         }
         if value.grid_point != current.grid_point {
             set(KEY_GRID_POINT, LoroValue::from(value.grid_point.as_str()));

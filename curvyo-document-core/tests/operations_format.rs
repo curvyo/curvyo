@@ -287,7 +287,8 @@ fn the_golden_reads_back_every_operation_switch_membership_and_cuts_last() {
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 46);
+    // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 47);
     let opened = unpack(2, &bytes).unwrap();
     assert_eq!(opened.own_step_count(), 0, "opening writes no step");
     let lists = all_operations(&opened);
