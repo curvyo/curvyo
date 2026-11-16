@@ -7,7 +7,7 @@ use curvyo_laser_core::grids::TestId;
 use curvyo_laser_core::library::{Material, PhotoWrite, RecordRefusal, StoreRefusal};
 
 use super::super::Session;
-use super::undo::{PhotoBytes, RecordTexts};
+use super::super::library_journal::{PhotoBytes, RecordKind, RecordTexts};
 use super::{MaterialWrite, now_ms};
 
 /// A library change being prepared: what each record and photo was before it, and the writes.
@@ -193,8 +193,9 @@ impl Session {
         if let Some(target) = self.history.stack.undo_target()
             && !change.is_empty()
         {
-            self.materials.journal.record(
+            self.library_journal.record(
                 target.step,
+                RecordKind::Material,
                 change.records.clone(),
                 change.photos.clone(),
             );

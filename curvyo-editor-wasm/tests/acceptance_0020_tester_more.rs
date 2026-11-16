@@ -883,6 +883,9 @@ fn c36_old_files_have_no_adjacent_rows_with_the_same_legacy_label() {
                 | "test_grid_damaged_v46.curvyo"
                 | "test_grid_orphan_rows_v46.curvyo"
                 | "test_grid_v46.curvyo"
+                // `specs/0113` Part B: two sets added one after the other, two steps.
+                | "fixture_sets_v47.curvyo"
+                | "fixture_sets_damaged_v47.curvyo"
         );
         // `trace_mask_clone_v45` (0114) holds a linked clone and a second clone made by its own command.
         if matches!(

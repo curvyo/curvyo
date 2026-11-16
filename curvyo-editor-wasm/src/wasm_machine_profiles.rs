@@ -33,6 +33,12 @@ impl WasmSession {
         self.session.load_machine_choice(text);
     }
 
+    /// The host could not write the profile record `id`: a set edit that wrote it is undone
+    /// (`0113` criterion 45). The notice, or `undefined`.
+    pub fn machine_record_write_failed(&mut self, id: &str) -> Option<String> {
+        self.session.machine_record_write_failed(id)
+    }
+
     /// The host writes made since the last call, as a JSON array.
     pub fn take_machine_writes(&mut self) -> String {
         self.session.take_machine_writes_json()

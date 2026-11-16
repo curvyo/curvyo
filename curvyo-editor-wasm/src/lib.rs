@@ -183,8 +183,9 @@ pub use session::{
     StackOutcome, Tool, WipeOutcome, WipeState,
 };
 pub use session::{
-    AddTarget, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow, FixturesView,
-    GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
+    AddTarget, ApplyCandidate, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow,
+    FixturesView, GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
+    RoleToggle, RoundValues, SetView, SlotRow, TapesView,
 };
 pub use session::{
     BackgroundItem, BackgroundKind, DiskAnswer, DiskScan, DiskStep, DocumentPlace, ListEdit,
@@ -224,6 +225,8 @@ pub use workspace_tree_glue::{deleted_json, disk_answer_json, disk_scan, list_ed
 
 #[cfg(target_arch = "wasm32")]
 mod wasm_fixture_jobs;
+#[cfg(target_arch = "wasm32")]
+mod wasm_fixture_sets;
 #[cfg(target_arch = "wasm32")]
 mod wasm_fixtures;
 #[cfg(target_arch = "wasm32")]

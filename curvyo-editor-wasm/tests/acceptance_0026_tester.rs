@@ -609,10 +609,10 @@ fn ac15_a_record_holds_no_project_content() {
     let _ = s.save_machine_profile([7; 16], 1);
     let ws = writes(&mut s);
     let text = library_writes(&ws)[0]["text"].as_str().unwrap().to_owned();
-    // Since record format 2 (`0102`, ADR 0050) the record holds the bed's fixture set, here
-    // the empty one; no other project content.
-    assert!(text.contains("\"fixtures\": []"), "{text}");
-    let text = text.replace("\"fixtures\": []", "");
+    // Since record format 2 (`0102`, ADR 0050) the record holds the bed's fixture set, since
+    // format 5 (`0113`, ADR 0060) its named sets, here none; no other project content.
+    assert!(text.contains("\"fixture_sets\": []"), "{text}");
+    let text = text.replace("\"fixture_sets\": []", "");
     for word in ["Laser 1", "placement", "page", "fixture", "manufacturing"] {
         assert!(!text.contains(word), "{word} in the record: {text}");
     }
@@ -772,8 +772,8 @@ fn ac8_save_as_of_an_unknown_id_does_not_overwrite_a_skipped_newer_record() {
     let p = k40(1);
     let bytes = foreign_file(&p);
     let mut newer: Value = serde_json::from_str(&write_record(&p)).unwrap();
-    // Format 4 is current since `0111` (ADR 0056 §7); 5 is newer.
-    newer["format_version"] = json!(5);
+    // Format 5 is current since `0113` (ADR 0060 §1); 6 is newer.
+    newer["format_version"] = json!(6);
     let mut disk = Disk::new();
     disk.insert(record_file_name(&p.id), newer.to_string());
     let mut s = open_laser(&bytes, &disk);

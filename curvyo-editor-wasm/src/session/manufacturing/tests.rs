@@ -4,6 +4,7 @@
 //! the page switch keys and the profile's work area.
 #![allow(clippy::assert_is_empty)]
 
+use super::super::fixtures::add_fixture;
 use curvyo_document_core::{Length, Point, RectBounds};
 use serde_json::Value;
 
@@ -110,7 +111,7 @@ fn ac8_the_tabs_follow_the_page_kind() {
     assert_eq!(
         laser
             .iter()
-            .filter(|n| **n != "operations" && **n != "materials")
+            .filter(|n| **n != "operations" && **n != "materials" && **n != "fixtures")
             .copied()
             .collect::<Vec<_>>(),
         drawing,
@@ -205,7 +206,7 @@ fn ac9_ac10_an_engraved_grid_is_drawn_on_the_page_and_its_eye_hides_it() {
     let mut session = session_with_drawing();
     add_laser(&mut session);
     let bare = triangles(&session);
-    assert!(session.add_fixture("engraved_grid").is_some());
+    assert!(add_fixture(&mut session, "engraved_grid").is_some());
     let with_grid = triangles(&session);
     assert!(with_grid > bare);
     let fixture = view(&session)["fixtures"][0].clone();
@@ -280,7 +281,7 @@ fn ac18_a_switched_off_extension_keeps_the_page_listed_as_laser_off_with_vector_
 fn ac16_delete_page_removes_the_laser_page_and_undo_brings_its_tools_back() {
     let mut session = session_with_drawing();
     let page = add_laser(&mut session);
-    session.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut session, "engraved_grid").unwrap();
     let drawing = session.document.read_objects().objects;
     assert!(session.delete_page(&page));
     assert_eq!(session.workbench(), Workbench::Vector);
@@ -354,7 +355,7 @@ fn picking_generic_laser_removes_the_fixtures_and_undo_restores_them() {
     // page's fixtures by the profile's set, empty for the built-in, in the pick's one step.
     let mut session = session_with_drawing();
     add_laser(&mut session);
-    session.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut session, "engraved_grid").unwrap();
     assert!(session.pick_machine_profile(curvyo_laser_core::GENERIC_LASER_ID));
     assert!(view(&session)["fixtures"].as_array().unwrap().is_empty());
     session.undo();

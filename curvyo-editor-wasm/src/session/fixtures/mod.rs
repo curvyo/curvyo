@@ -2,20 +2,30 @@
 //! ADR 0049, feature `adrs.md` §6): the one feature-owned field the session holds for fixtures.
 //! Other session modules reach it only through the methods of this module and its children.
 
+mod apply;
 mod chips;
 mod commands;
 mod drag;
 mod draw;
 mod edit;
 mod entry;
+mod entry_fields;
 mod feedback;
 mod fit;
+mod grid_handles;
 mod handles;
 mod hit;
 mod jobs;
 mod keys;
+mod labels;
+mod lock;
 mod params;
 mod placed;
+mod placement;
+mod profile_sets;
+mod row_lines;
+mod sets;
+mod shape;
 mod slots;
 mod snap;
 #[cfg(test)]
@@ -27,24 +37,34 @@ mod tests_fit;
 #[cfg(test)]
 mod tests_handles;
 #[cfg(test)]
+mod tests_pins;
+#[cfg(test)]
+mod tests_profile;
+#[cfg(test)]
 mod tests_refusal;
 #[cfg(test)]
 mod tests_select;
+#[cfg(test)]
+mod tests_sets;
 mod view_json;
 
 use curvyo_document_core::NodeId;
 use curvyo_laser_core::FixtureKind;
 
+pub use apply::ApplyCandidate;
 pub use fit::FitCue;
 pub use jobs::{
     AddTarget, FixtureJobsView, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
 };
+pub use labels::FixtureLabel;
 pub use view_json::{
-    FixtureKindView, FixtureLabel, FixtureRow, FixturesView, GridValues, SlotRow, TapesView,
+    FixtureKindView, FixtureRow, FixturesView, GridValues, RoleToggle, RoundValues, SetView,
+    SlotRow, TapesView,
 };
 
 use super::Session;
 use placed::PageFixtures;
+use profile_sets::SetsHome;
 
 /// What a selection of a fixture holds: the fixture, and the slot pressed in its row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,22 +90,59 @@ pub(in crate::session) struct FixtureState {
     fit: fit::FitState,
     /// The grid's layout for the parameters it was built from (criterion 35 d).
     grid_cache: draw::GridCache,
+    /// The page lists of the last frame for the inputs they were built from.
+    lists_cache: draw::ListsCache,
     /// The last notice of a fixture command, until the host takes it.
     notice: Option<String>,
     /// A coarse pointer: the hit tolerance is 12 px instead of 4 (UX notes D12).
     coarse: bool,
     /// The fixture job whose Parts list is open (`specs/0103` criterion 8, ADR 0052).
     job: Option<NodeId>,
+    /// The unfolded machine sets (`specs/0113` criterion 7).
+    sets: sets::SetFolds,
+    /// Armed placement of a job fixture and the Apply preview (`specs/0113` finding 1).
+    placement: placement::Placement,
+    /// The profile ids new sets, set fixtures and their jobs get (ADR 0060 §1).
+    ids: profile_sets::RecordIds,
+}
+
+/// The set add bar for the unit tests written against the `0102` per-kind add buttons
+/// (superseded by `0113` criterion 7): a fixture of `kind` into the first set, "Set 1" made when
+/// the page has none.
+#[cfg(test)]
+pub(in crate::session) fn add_fixture(s: &mut Session, kind: &str) -> Option<NodeId> {
+    editable_sets(s);
+    let set = match s.active_fixtures()?.sets.first() {
+        Some(set) => set.id,
+        None => s.add_fixture_set()?,
+    };
+    s.add_set_fixture(set, kind)
+}
+
+/// Makes the active laser page's sets editable for a unit test: a page on Generic laser is saved
+/// as a profile first (`0113` criterion 3: sets live in a machine profile).
+#[cfg(test)]
+pub(in crate::session) fn editable_sets(s: &mut Session) {
+    if !s.fixture_sets_editable() {
+        s.save_machine_profile([7; 16], 1_000);
+    }
 }
 
 impl Session {
-    /// The fixtures of the active page while it is a laser page with its extension on.
+    /// The fixtures of the active page while it is a laser page with its extension on; its set
+    /// fixtures keep their place while the profile is not editable here (criterion 46).
     fn active_fixtures(&self) -> Option<PageFixtures> {
         let manufacturing = self.active_manufacturing()?;
-        if !self.manufacturing_available(manufacturing.id) {
+        if !self.process_enabled(&manufacturing.process) {
             return None;
         }
-        PageFixtures::read(&manufacturing)
+        let mut fixtures = PageFixtures::read(&manufacturing)?;
+        if !matches!(self.sets_home(&manufacturing), SetsHome::Editable(_)) {
+            for fixture in fixtures.fixtures.iter_mut().filter(|f| f.set.is_some()) {
+                fixture.read_only = true;
+            }
+        }
+        Some(fixtures)
     }
 
     /// The selected fixture, `None` when it is gone, off the bed, hidden, on a page that is not
@@ -116,11 +173,13 @@ impl Session {
             .then_some(slot)
     }
 
-    /// The active laser page's fixtures as its Layers tree lists them, in creation order: id,
-    /// name, kind, Active and eye (`specs/0102` criterion 12).
+    /// The active laser page's fixtures as its Layers tree lists them, in listing order (sets,
+    /// then job fixtures, `0113` criterion 16): id, name, kind, Active, its set on this page, eye
+    /// and selected (`specs/0102` criterion 12).
+    #[allow(clippy::type_complexity)] // one tuple per row, read once by the page tree
     pub(in crate::session) fn fixture_tree(
         &self,
-    ) -> Vec<(NodeId, String, FixtureKind, bool, bool, bool)> {
+    ) -> Vec<(NodeId, String, FixtureKind, bool, bool, bool, bool)> {
         let selected = self.selected_fixture();
         self.active_fixtures().map_or_else(Vec::new, |page| {
             page.fixtures
@@ -131,6 +190,10 @@ impl Session {
                         f.name.clone(),
                         f.kind,
                         f.active,
+                        !matches!(
+                            f.home,
+                            curvyo_laser_core::FixtureHome::Set { on_page: false }
+                        ),
                         f.visible,
                         selected == Some(f.id),
                     )

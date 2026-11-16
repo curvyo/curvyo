@@ -952,7 +952,8 @@ fn ac21_format_stays_38_and_a_session_with_context_state_writes_nothing_new() {
     // Format 42 since `specs/0110-pen-modes-variable-stroke` (ADR 0053).
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 46);
+    // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
+    assert_eq!(CURRENT_FORMAT_VERSION, 47);
     let mut f = fixture();
     let before = doc(&f.s).read_objects().objects.len();
     select_by_clicks(&mut f.s, &[f.ra, f.rb]);

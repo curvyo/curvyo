@@ -2,7 +2,10 @@
 //! the last pick, the commands of the Machine block, and the outbox of writes the host performs.
 //! Library edits are no history step; edits of the manufacturing's copy are one step each.
 
-use curvyo_document_core::{DocumentSize, FixtureRecord, Length, PageCorner, ProfileChange};
+use curvyo_document_core::{
+    DocumentSize, FixtureRecord, Length, PageCorner, ProfileChange, ProfileSets,
+};
+
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::{
     Connection, CopyRead, LibraryWrite, MachineProfile, MachineProfiles, OriginCorner, ProfileCopy,
@@ -16,7 +19,7 @@ use super::commands::workbench_of;
 
 /// `record` with its jobs as a profile write keeps them: known kinds only, each tick a part of
 /// the fixture's kind, in Parts-list order (ADR 0052 §7).
-fn saved_jobs(mut record: FixtureRecord) -> FixtureRecord {
+pub(in crate::session) fn saved_jobs(mut record: FixtureRecord) -> FixtureRecord {
     let kind = FixtureKind::from_stored(&record.kind);
     let slots = record.slots.len();
     record
@@ -29,10 +32,6 @@ fn saved_jobs(mut record: FixtureRecord) -> FixtureRecord {
     }
     record
 }
-
-/// The notice of a pick or reset that removed fixtures (criterion 29, ADR 0050 section 6): it
-/// informs about a removal, so it is not a success notice.
-const FIXTURES_REMOVED_NOTICE: &str = "Fixtures removed (undo restores them).";
 
 /// One write the host must perform for the library or the last pick (ADR 0038 §1, §6).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +53,13 @@ pub(in crate::session) struct MachineState {
     outbox: Vec<HostWrite>,
 }
 
+impl MachineState {
+    /// Queues a record write for the host.
+    pub(in crate::session) fn push_library_write(&mut self, write: LibraryWrite) {
+        self.outbox.push(HostWrite::Library(write));
+    }
+}
+
 /// The active manufacturing's copy as read, with its id and page.
 pub(in crate::session) struct ActiveCopy {
     pub(in crate::session) id: curvyo_document_core::NodeId,
@@ -62,9 +68,12 @@ pub(in crate::session) struct ActiveCopy {
 }
 
 impl Session {
-    /// Reads the records the host listed: `(file name, text)` pairs (criteria 4, 13).
+    /// Reads the records the host listed: `(file name, text)` pairs (criteria 4, 13). Every laser
+    /// page whose profile record is now newer than its set mirror, and differs from it, takes the
+    /// record's sets without an undo step (`0113` criteria 44, 47; ADR 0059 §10).
     pub fn load_machine_profiles(&mut self, entries: &[(String, String)]) {
         self.manufacturing.machine.profiles = MachineProfiles::load(entries);
+        self.align_fixture_pages(None);
     }
 
     /// Reads the records the host listed as the JSON array `[{"name", "text"}]`; a text that is
@@ -148,15 +157,16 @@ impl Session {
         })
     }
 
-    /// Writes `copy` and the page size `page` as one step labelled `change`; with `fixtures`
-    /// the page's fixtures are replaced by that set in the same step (ADR 0050 §4).
+    /// Writes `copy` and the page size `page` as one step labelled `change`; with `sets` the
+    /// page's set mirror is replaced by a fresh one of those in the same step, its job fixtures
+    /// kept (ADR 0059 §6 amended 2026-11-16).
     fn write_active_copy(
         &mut self,
         id: curvyo_document_core::NodeId,
         copy: &ProfileCopy,
         page: DocumentSize,
         change: ProfileChange,
-        fixtures: Option<&[FixtureRecord]>,
+        sets: Option<ProfileSets<'_>>,
     ) -> bool {
         let map = write_copy(copy);
         let origin = copy.values.origin;
@@ -168,16 +178,10 @@ impl Session {
         let Some(contents) = self.page_contents() else {
             return false;
         };
-        // The fixtures a pick or reset removes say so, with the undo that brings them back
-        // (criterion 29, ADR 0050 section 6). Nothing is posted when none went.
-        let before = match fixtures {
-            Some(_) => self.active_fixture_set(),
-            None => Vec::new(),
-        };
         let changed = self.recording_unguarded(|this| {
-            match fixtures {
-                Some(set) => this.document.set_manufacturing_profile_and_fixtures(
-                    id, &map, page, anchor, change, set, &contents,
+            match sets {
+                Some(sets) => this.document.set_manufacturing_profile_and_sets(
+                    id, &map, page, anchor, change, sets, &contents,
                 ),
                 None => this
                     .document
@@ -188,27 +192,13 @@ impl Session {
         if let Some(output) = self.document.manufacturing(id).and_then(|m| m.page) {
             self.note_moved_pages(&pages, &output.id);
         }
-        if let Some(set) = fixtures
-            && changed
-            && before.iter().any(|fixture| !set.contains(fixture))
-        {
-            self.post_fixture_notice(FIXTURES_REMOVED_NOTICE);
-        }
         changed
     }
 
-    /// The fixtures of the active page as a profile set (`specs/0102` criterion 28), its jobs as
-    /// a profile write keeps them, so "Differs from profile" compares like with like (ADR 0052
-    /// §7): a job of an unknown kind and a tick of no part of the kind are left out.
-    pub(super) fn active_fixture_set(&self) -> Vec<FixtureRecord> {
-        self.active_manufacturing()
-            .map(|m| m.fixtures.iter().map(|f| saved_jobs(f.record())).collect())
-            .unwrap_or_default()
-    }
-
     /// Picks the library profile `id` (criterion 5): the copy takes its values, the output page
-    /// its work area and the page's fixtures its set (Generic laser: none; `0102` criterion 29)
-    /// in one step; remembered as this computer's last pick.
+    /// its work area and the page's set mirror a fresh mirror of its sets, every set on (Generic
+    /// laser: none, no notice; `0113` criterion 9) in one step; remembered as this computer's
+    /// last pick.
     pub fn pick_machine_profile(&mut self, id: &str) -> bool {
         let Some(active) = self.active_copy() else {
             return false;
@@ -221,7 +211,10 @@ impl Session {
             &ProfileCopy::of(&profile),
             profile.work_area,
             ProfileChange::Pick,
-            Some(&profile.fixtures),
+            Some(ProfileSets {
+                sets: &profile.fixture_sets,
+                modified: profile.modified,
+            }),
         );
         self.remember_machine_pick(&profile.id);
         changed
@@ -320,8 +313,8 @@ impl Session {
         Some(area.notice)
     }
 
-    /// Reset from profile (criterion 7): the copy, the page and the page's fixtures take the
-    /// library record's values and set in one step (`0102` criterion 28).
+    /// Reset from profile (criterion 7): the copy and the page take the library record's values
+    /// in one step; the sets are the profile's already and stay (`0113` criterion 9).
     pub fn reset_machine_profile(&mut self) -> bool {
         let Some(active) = self.active_copy() else {
             return false;
@@ -341,7 +334,7 @@ impl Session {
             &ProfileCopy::of(&record),
             record.work_area,
             ProfileChange::Reset,
-            Some(&record.fixtures),
+            None,
         )
     }
 
@@ -363,7 +356,7 @@ impl Session {
             .unwrap_or_else(|| new_profile_id(random));
         let name = save_as_name(&copy.values.name, |name| profiles.name_taken(name));
         let area = clamp_work_area(active.page);
-        let profile = MachineProfile {
+        let mut profile = MachineProfile {
             id,
             modified: now_ms,
             values: curvyo_laser_core::ProfileValues {
@@ -372,36 +365,37 @@ impl Session {
             },
             work_area: area.value,
             connection: Connection::default(),
-            fixtures: self.active_fixture_set(),
+            fixture_sets: Vec::new(),
         };
-        let write = self.manufacturing.machine.profiles.add(profile.clone())?;
-        self.manufacturing
-            .machine
-            .outbox
-            .push(HostWrite::Library(write));
-        self.write_active_copy(
+        if profile.is_builtin() || profiles.is_skipped(&profile.id) {
+            return None;
+        }
+        let pointed = self.write_active_copy(
             active.id,
             &ProfileCopy::of(&profile),
             active.page,
             ProfileChange::SaveAs,
             None,
         );
+        // The page's set mirror goes into the new record with its profile ids (every node gets
+        // one) and the page is aligned to it, in the same step (ADR 0060 §6 amended 2026-11-16).
+        profile.fixture_sets = self.save_set_mirror(active.id, now_ms, pointed);
+        let write = self.manufacturing.machine.profiles.add(profile)?;
+        self.manufacturing.machine.push_library_write(write);
         area.notice
     }
 
-    /// Update profile (criterion 7): the user record the copy came from takes the copy's values,
-    /// the page size (cut into the profile range) and the page's fixtures (`0102` criterion 28);
-    /// no history step. Returns the notice.
+    /// Update profile (criterion 7): the user record the copy came from takes the copy's values
+    /// and the page size (cut into the profile range); its sets stay as they are, they are live
+    /// (`0113` criterion 10). No history step. Returns the notice.
     pub fn update_machine_profile(&mut self, now_ms: i64) -> Option<String> {
         let active = self.active_copy()?;
         let id = active.read.copy.id?;
         let area = clamp_work_area(active.page);
-        let fixtures = self.active_fixture_set();
-        let write = self.manufacturing.machine.profiles.update_with_fixtures(
+        let write = self.manufacturing.machine.profiles.update(
             &id,
             active.read.copy.values,
             area.value,
-            fixtures,
             now_ms,
         )?;
         self.manufacturing

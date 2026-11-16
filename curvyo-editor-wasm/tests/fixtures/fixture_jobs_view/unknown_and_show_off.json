@@ -13,10 +13,12 @@
           "kind": null,
           "name": "Burn 1",
           "of": 2,
+          "on_this_page": true,
           "output": false,
           "parts_ticked": 0,
           "parts_total": 2,
           "position": 0,
+          "role": null,
           "runs": false,
           "show": true
         },
@@ -29,10 +31,12 @@
           },
           "name": "Cut 1",
           "of": 2,
+          "on_this_page": true,
           "output": false,
           "parts_ticked": 1,
           "parts_total": 2,
           "position": 1,
+          "role": null,
           "runs": false,
           "show": false
         }

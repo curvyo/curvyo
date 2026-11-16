@@ -16,6 +16,8 @@
     clippy::assert_is_empty
 )]
 
+mod fixture_support;
+use fixture_support::add_fixture;
 use std::io::{Cursor, Read};
 
 use curvyo_document_core::{
@@ -105,8 +107,12 @@ fn ac9_a_new_setup_has_no_fixture_and_the_grid_is_added_with_its_defaults() {
     let mut s = one_page();
     add_laser(&mut s);
     assert!(view(&s)["fixtures"].as_array().unwrap().is_empty());
+    // Superseded by `0113` criterion 7: a fixture is added into a set ("+ Set" is its own step).
+    // Superseded by `0113` rework (2026-11-16, criterion 3): the set needs a saved profile.
+    fixture_support::editable_sets(&mut s);
+    assert!(s.add_fixture_set().is_some());
     let steps = s.undo_len();
-    assert!(s.add_fixture("engraved_grid").is_some());
+    assert!(add_fixture(&mut s, "engraved_grid").is_some());
     assert_eq!(s.undo_len(), steps + 1);
     let f = &view(&s)["fixtures"][0];
     // Named "<Kind> N" since `specs/0102-laser-fixtures` criterion 2; the row's grid fields are
@@ -116,16 +122,19 @@ fn ac9_a_new_setup_has_no_fixture_and_the_grid_is_added_with_its_defaults() {
     assert_eq!(f["grid"]["spacing_mm"], 10.0);
     assert_eq!(f["grid"]["origin_x_mm"], 0.0);
     assert_eq!(f["grid"]["origin_y_mm"], 0.0);
-    assert!(s.add_fixture("pocket").is_none(), "only the declared kind");
-    // One grid per page since `0102` criterion 2.
-    assert!(s.add_fixture("engraved_grid").is_none());
+    assert!(
+        add_fixture(&mut s, "pocket").is_none(),
+        "only the declared kind"
+    );
+    // One grid per set since `0113` criterion 7 (one per page in `0102` criterion 2).
+    assert!(add_fixture(&mut s, "engraved_grid").is_none());
 }
 
 #[test]
 fn ac9_a_spacing_edit_redraws_and_is_one_step_and_clamped() {
     let mut s = one_page();
     add_laser(&mut s);
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     let id = s.fixture_named(&fixture_ids(&s)[0]).unwrap();
     let n10 = s.frame_draw_list().triangles.len();
     let steps = s.undo_len();
@@ -147,7 +156,7 @@ fn ac10_fixtures_are_never_selectable_and_hide_is_view_state_of_one_step() {
     let mut s = one_page();
     add_laser(&mut s);
     let o = s.active_page().origin;
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     let id = s.fixture_named(&fixture_ids(&s)[0]).unwrap();
     // `0102` criterion 2: a new fixture is selected; its box is not the grid's drawing.
     s.escape();
@@ -178,7 +187,7 @@ fn ac10_fixtures_are_never_selectable_and_hide_is_view_state_of_one_step() {
 fn ac10_select_all_marquee_and_click_reach_only_the_drawing() {
     let mut s = one_page();
     add_laser(&mut s);
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     first_page(&mut s);
     s.set_tool(Tool::Select);
     s.pointer_down(Point::new(100.0, 100.0), false);
@@ -202,7 +211,7 @@ fn ac10_layers_show_no_manufacturing_fixture_or_placement() {
     let mut s = one_page();
     let layers = s.layers_view_json(0, 100);
     add_laser(&mut s);
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     first_page(&mut s);
     assert_eq!(s.layers_view_json(0, 100), layers);
 }
@@ -213,7 +222,7 @@ fn ac10_layers_show_no_manufacturing_fixture_or_placement() {
 fn ac11b_switched_off_the_laser_kind_goes_and_the_page_stays_with_its_data() {
     let mut s = one_page();
     let page = add_laser(&mut s);
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     let ext = workbenches(&s)["extensions"].clone();
     let laser = ext
         .as_array()
@@ -288,9 +297,9 @@ fn ac11b_a_disabled_laser_page_can_still_be_deleted_and_undone() {
 fn ac12_save_and_reopen_keep_the_laser_page_and_its_fixtures() {
     let mut s = one_page();
     let page = add_laser(&mut s);
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     // One grid per page since `0102` criterion 2: the second fixture is a holder.
-    s.add_fixture("holder").unwrap();
+    add_fixture(&mut s, "holder").unwrap();
     let hidden = s.fixture_named(&fixture_ids(&s)[1]).unwrap();
     assert!(s.set_fixture_visible(hidden, false));
     let before = opened(&s).manufacturings();

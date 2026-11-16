@@ -1,41 +1,101 @@
-//! The Fixtures block's view (`specs/0102-laser-fixtures` criteria 1 to 6, 15, 19, 20, 32, 33;
-//! feature `adrs.md` §6a.7 and §7): one serde type, the only place that builds this JSON. The shared
-//! fixtures in `curvyo-editor-wasm/tests/fixtures/fixtures_view/` pin its shape.
+//! The Fixtures tab's view (`specs/0102-laser-fixtures` criteria 1 to 6, 15, 19, 20, 32, 33;
+//! `specs/0113-fixture-sets-and-pins` criteria 1 to 20, 25, 31, 33, 40; `adrs.md` finding 3): one
+//! serde type, the only place that builds this JSON. The shared fixtures in
+//! `curvyo-editor-wasm/tests/fixtures/fixtures_view/` pin its shape.
 
-use curvyo_document_core::{Length, MAX_SLOTS_PER_FIXTURE, NodeId};
+use curvyo_document_core::{JobRole, Length, MAX_SLOTS_PER_FIXTURE, NodeId};
 use curvyo_laser_core::{FixtureKind, SlotShape, TapeEdge};
 use serde::Serialize;
 
 use super::super::Session;
-use super::draw::slot_label_fits;
-use super::placed::{PageFixtures, PlacedFixture, Shape};
-
+use super::placed::{PageFixtures, PlacedFixture};
+use super::row_lines::{line2, role_toggle, set_line2};
+use super::shape::Shape;
 use super::slots::slot_outside;
 
-/// The whole Fixtures block of the active laser page.
+/// The Fixtures tab of the active laser page (`specs/0113-fixture-sets-and-pins` criteria 1 to
+/// 17, 33; `adrs.md` finding 3): its Machine sets, its Job fixtures and the Apply list.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FixturesView {
-    /// One row per fixture in creation order.
-    pub rows: Vec<FixtureRow>,
-    /// Whether the Grid button shows: hidden while the page has a grid (criterion 2).
-    pub can_add_grid: bool,
+    /// The machine sets in their order (criterion 2).
+    pub sets: Vec<SetView>,
+    /// How many sets are on this page: the heading's "`<n>` of `<m>` on this page".
+    pub sets_on_page: usize,
+    /// Whether "+ Set" shows: hidden at 16 sets and while the sets are not editable here
+    /// (criteria 3, 17, 46).
+    pub can_add_set: bool,
+    /// The line of a page whose sets are read only here (criterion 46): "From the project file.
+    /// `<profile>` is not on this computer."; every content control of the sets is hidden then.
+    pub read_only: Option<String>,
+    /// The line of a page on Generic laser (criterion 3): sets are kept in a machine profile.
+    pub profile_hint: Option<String>,
+    /// The job fixtures in creation order (criterion 12).
+    pub job_fixtures: Vec<FixtureRow>,
+    /// Whether the Job fixtures add bar shows: hidden at 64 job fixtures (criterion 17).
+    pub can_add_job_fixture: bool,
+    /// The kind whose placement is armed: its button is pressed (criterion 13).
+    pub armed_kind: Option<FixtureKindView>,
+    /// The other laser pages with job fixtures; empty hides "Apply fixtures from page…"
+    /// (criterion 33).
+    pub apply_candidates: Vec<super::ApplyCandidate>,
+    /// The picked page of the Apply list, as its candidate id (criterion 34).
+    pub apply_picked: Option<String>,
     /// The selected fixture's id.
     pub selected: Option<String>,
     /// The selected slot's id.
     pub selected_slot: Option<String>,
     /// The fixture whose trash a Delete on the canvas armed.
     pub armed: Option<String>,
-    /// One notice per fixture with damaged values (criterion 33).
+    /// One notice per set and one for the job fixtures with damaged values (criterion 40).
     pub damage_notices: Vec<String>,
-    /// The Fixtures snap switch (criterion 24).
+    /// The Fixtures snap switch (`0102` criterion 24).
     pub snapping_fixtures: bool,
     /// What a screen reader says of the selected fixture, with its sizes ("Holder 1 selected,
     /// 100.0 by 60.0 mm."; UX notes §11); `None` without a selection.
     pub selection_announcement: Option<String>,
 }
 
+impl FixturesView {
+    /// Every fixture row in listing order: the sets' fixtures, then the job fixtures (criterion
+    /// 16).
+    #[must_use]
+    pub fn rows(&self) -> Vec<FixtureRow> {
+        self.sets
+            .iter()
+            .flat_map(|set| set.fixtures.iter().cloned())
+            .chain(self.job_fixtures.iter().cloned())
+            .collect()
+    }
+}
+
+/// One machine set's row and, unfolded, its body (criteria 2, 7).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[allow(clippy::struct_excessive_bools)] // the row's check, Lock, fold and add bar, one each
+pub struct SetView {
+    /// The set node as its full id text.
+    pub id: String,
+    /// Its name.
+    pub name: String,
+    /// The On this page check.
+    pub on_page: bool,
+    /// Its Lock (criterion 32): every fixture in it keeps its place.
+    pub locked: bool,
+    /// Whether its add bar shows: hidden while it is locked, read only, or the profile holds 64
+    /// set fixtures (criteria 17, 32).
+    pub can_add: bool,
+    /// Whether its body shows (session only).
+    pub unfolded: bool,
+    /// Line 2: "Holder, Screw · 2 fixtures", "... · not on this page", or "No fixtures".
+    pub line2: String,
+    /// Whether its add bar offers Grid: hidden while the set has one (criterion 7).
+    pub can_add_grid: bool,
+    /// Its fixtures in creation order.
+    pub fixtures: Vec<FixtureRow>,
+}
+
 /// One fixture's row and its fields.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[allow(clippy::struct_excessive_bools)] // the row's checks and states, one each
 pub struct FixtureRow {
     /// The node id as its full id text.
     pub id: String,
@@ -43,16 +103,58 @@ pub struct FixtureRow {
     pub name: String,
     /// The kind; `unknown` for a kind this build does not know (criterion 32).
     pub kind: FixtureKindView,
-    /// The Active check box (criterion 5).
+    /// Its own On the bed check (`0102` criterion 5).
     pub active: bool,
+    /// Whether it lies on the bed: its own check and its set on this page (criterion 8).
+    pub on_bed: bool,
     /// The eye (criterion 6).
     pub visible: bool,
+    /// Its own Lock (criteria 31, 32; a set fixture's is the profile's).
+    pub locked: bool,
+    /// Whether its set's Lock is on: the fixture is locked and its own Lock is not pressable
+    /// (criterion 32); `false` for a job fixture.
+    pub locked_by_set: bool,
+    /// Line 2 of the row (UX notes 4.3, 5.2).
+    pub line2: String,
     /// The grid's fields; holder, clamp, stop and screw have none (D27).
     pub grid: Option<GridValues>,
+    /// The fields and Jobs toggles of a pin or a screw (criteria 18 to 20, 25).
+    pub round: Option<RoundValues>,
     /// A holder's readable slots in creation order.
     pub slots: Vec<SlotRow>,
     /// Whether Add slot shows: a holder under 50 slots (criterion 19).
     pub can_add_slot: bool,
+}
+
+/// The unfolded body of a pin or a screw (criteria 18 to 20, 25; UX notes 6.1).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RoundValues {
+    /// A pin's Diameter; `None` for a screw, which keeps its knobs (criterion 20).
+    pub diameter_mm: Option<f64>,
+    /// The columns.
+    pub columns: u32,
+    /// The rows.
+    pub rows: u32,
+    /// The spacing of the columns; its field hides while `columns` is 1.
+    pub column_spacing_mm: f64,
+    /// The spacing of the rows; its field hides while `rows` is 1.
+    pub row_spacing_mm: f64,
+    /// The Centre mark's Size.
+    pub mark_mm: f64,
+    /// The Centre mark toggle: its job's Output; `None` hides the toggles (an old screw, no role
+    /// jobs, criterion 39).
+    pub centre_mark: Option<RoleToggle>,
+    /// The Diameters toggle: its job's Output.
+    pub diameters: Option<RoleToggle>,
+}
+
+/// One Jobs toggle: the role job it switches and whether its Output is on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RoleToggle {
+    /// The role job's full id text, for the Output switch.
+    pub job: String,
+    /// Its Output.
+    pub on: bool,
 }
 
 /// The kinds of the rows.
@@ -69,6 +171,8 @@ pub enum FixtureKindView {
     Stop,
     /// A screw.
     Screw,
+    /// A pin (`0113` criterion 18).
+    Pin,
     /// A kind this build does not know.
     Unknown,
 }
@@ -123,34 +227,6 @@ pub struct SlotRow {
     pub outside: bool,
 }
 
-/// A text over the canvas the host places in the DOM: a tape number, a fixture's or a slot's
-/// name, or the tag of the selected fixture, at screen coordinates in CSS px.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct FixtureLabel {
-    /// `tape`, `fixture`, `slot` or `tag` (the selected fixture's name chip).
-    pub kind: &'static str,
-    /// The text.
-    pub text: String,
-    /// Screen x.
-    pub x: f64,
-    /// Screen y.
-    pub y: f64,
-    /// For a tape number, the edge its band lies on: `bottom`, `left`, `top` or `right`. Absent
-    /// for every other label.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub edge: Option<&'static str>,
-}
-
-/// The stored name of a tape's edge (the tape switches' names).
-const fn edge_name(edge: TapeEdge) -> &'static str {
-    match edge {
-        TapeEdge::Bottom => "bottom",
-        TapeEdge::Left => "left",
-        TapeEdge::Top => "top",
-        TapeEdge::Right => "right",
-    }
-}
-
 pub(super) fn kind_view(kind: FixtureKind) -> FixtureKindView {
     match kind {
         FixtureKind::EngravedGrid => FixtureKindView::Grid,
@@ -158,6 +234,7 @@ pub(super) fn kind_view(kind: FixtureKind) -> FixtureKindView {
         FixtureKind::Clamp => FixtureKindView::Clamp,
         FixtureKind::Stop => FixtureKindView::Stop,
         FixtureKind::Screw => FixtureKindView::Screw,
+        FixtureKind::Pin => FixtureKindView::Pin,
         FixtureKind::Unknown => FixtureKindView::Unknown,
     }
 }
@@ -168,8 +245,13 @@ fn row(fixture: &PlacedFixture) -> FixtureRow {
         name: fixture.name.clone(),
         kind: kind_view(fixture.kind),
         active: fixture.active,
+        on_bed: fixture.on_bed(),
         visible: fixture.visible,
+        locked: fixture.stored_locked,
+        locked_by_set: fixture.set_locked,
+        line2: line2(fixture),
         grid: None,
+        round: None,
         slots: Vec::new(),
         can_add_slot: false,
     };
@@ -192,8 +274,24 @@ fn row(fixture: &PlacedFixture) -> FixtureRow {
             out.slots = slot_rows(fixture, *width, *height);
             out.can_add_slot = fixture.slots.len() + fixture.damaged_slots < MAX_SLOTS_PER_FIXTURE;
         }
-        // Clamp, stop and screw have no field in the block (D27).
-        Shape::Clamp { .. } | Shape::Stop { .. } | Shape::Screw { .. } | Shape::Unknown => {}
+        Shape::Pin { grid, .. } | Shape::Screw { grid, .. } => {
+            let diameter_mm = match &fixture.shape {
+                Shape::Pin { diameter, .. } => Some(diameter.as_mm()),
+                _ => None,
+            };
+            out.round = Some(RoundValues {
+                diameter_mm,
+                columns: grid.counts.columns(),
+                rows: grid.counts.rows(),
+                column_spacing_mm: grid.column_spacing.as_mm(),
+                row_spacing_mm: grid.row_spacing.as_mm(),
+                mark_mm: grid.mark.as_mm(),
+                centre_mark: role_toggle(fixture, JobRole::CentreMark),
+                diameters: role_toggle(fixture, JobRole::Diameters),
+            });
+        }
+        // Clamp and stop have no field in the block (D27).
+        Shape::Clamp { .. } | Shape::Stop { .. } | Shape::Unknown => {}
     }
     out
 }
@@ -222,13 +320,18 @@ fn slot_rows(holder: &PlacedFixture, width: Length, height: Length) -> Vec<SlotR
         .collect()
 }
 
-/// "1 value damaged on Holder 1." or "<n> values damaged on <name>." (criterion 33).
-fn damage_notice(fixture: &PlacedFixture) -> Option<String> {
-    let n = fixture.damaged + fixture.damaged_slots;
+/// "1 value damaged in Set 1." or "`<n>` values damaged in `<where>`." (criterion 40): the damaged
+/// values of one set (`own`, its name or check) and its fixtures, or of the job fixtures.
+fn damage_notice<'a>(
+    place: &str,
+    own: usize,
+    fixtures: impl Iterator<Item = &'a PlacedFixture>,
+) -> Option<String> {
+    let n: usize = own + fixtures.map(|f| f.damaged + f.damaged_slots).sum::<usize>();
     match n {
         0 => None,
-        1 => Some(format!("1 value damaged on {}.", fixture.name)),
-        _ => Some(format!("{n} values damaged on {}.", fixture.name)),
+        1 => Some(format!("1 value damaged in {place}.")),
+        _ => Some(format!("{n} values damaged in {place}.")),
     }
 }
 
@@ -256,60 +359,136 @@ pub(super) fn announcement(fixture: &PlacedFixture) -> String {
             spoken(*leg_b),
             spoken(*thickness)
         ),
-        Shape::Screw { thread, head } => format!(
+        Shape::Screw { thread, head, .. } => format!(
             "{name} selected, thread {} mm, head {} mm.",
             spoken(*thread),
             spoken(*head)
         ),
+        Shape::Pin { diameter, .. } => {
+            format!("{name} selected, diameter {} mm.", spoken(*diameter))
+        }
         Shape::Grid(spec) => format!("{name} selected, spacing {} mm.", spoken(spec.spacing)),
         Shape::Unknown => format!("{name} selected."),
     }
 }
 
-/// The view of `fixtures` with the session's selection, armed trash and switch.
-pub(super) fn view_of(
-    fixtures: &PageFixtures,
-    selected: Option<NodeId>,
-    selected_slot: Option<String>,
-    armed: Option<String>,
-    snapping_fixtures: bool,
-) -> FixturesView {
-    FixturesView {
-        rows: fixtures.fixtures.iter().map(row).collect(),
-        can_add_grid: !fixtures.has_grid(),
-        selection_announcement: selected.and_then(|id| fixtures.get(id)).map(announcement),
-        selected: selected.map(NodeId::full_id),
-        selected_slot,
-        armed,
-        damage_notices: fixtures.fixtures.iter().filter_map(damage_notice).collect(),
-        snapping_fixtures,
-    }
+/// The notice line of a page on Generic laser (criterion 3, UX notes 4.5).
+pub(super) const PROFILE_HINT: &str =
+    "Fixture sets are kept in a machine profile. Save this machine as a profile to add sets.";
+
+/// The line of a page whose sets are read only here (criterion 46, UX notes 4.5).
+pub(super) fn read_only_line(profile: &str) -> String {
+    format!(
+        "From the project file. {} is not on this computer.",
+        crate::session::library_journal::short_name(profile)
+    )
 }
 
-/// The step between two tape numbers at `device_px_per_mm`: 50 mm, or the next of 100, 200,
-/// 500, 1,000 mm ... that leaves 40 device px between them (UX notes D16).
-pub(super) fn number_step(device_px_per_mm: f64) -> i64 {
-    let mut step = 50;
-    let mut k = 0;
-    #[allow(clippy::cast_precision_loss)] // steps stay far below 2^52
-    while (step as f64) * device_px_per_mm < 40.0 && step < 1_000_000 {
-        step = [100, 200, 500][k % 3] * 10_i64.pow(u32::try_from(k / 3).unwrap_or(0));
-        k += 1;
+/// What the session adds to a view of the page's fixtures.
+pub(super) struct ViewState {
+    /// Where the page's sets live on this computer.
+    pub home: super::profile_sets::SetsHome,
+    pub selected: Option<NodeId>,
+    pub selected_slot: Option<String>,
+    pub armed: Option<String>,
+    pub snapping_fixtures: bool,
+    pub armed_kind: Option<FixtureKind>,
+    pub apply_candidates: Vec<super::ApplyCandidate>,
+    pub apply_picked: Option<String>,
+}
+
+/// The view of `fixtures` with the session's state; `unfolded` says which sets show their body.
+pub(super) fn view_of(
+    fixtures: &PageFixtures,
+    unfolded: impl Fn(NodeId) -> bool,
+    state: ViewState,
+) -> FixturesView {
+    let editable = matches!(state.home, super::profile_sets::SetsHome::Editable(_));
+    let set_fixtures = fixtures.fixtures.iter().filter(|f| f.set.is_some()).count();
+    let sets: Vec<SetView> = fixtures
+        .sets
+        .iter()
+        .map(|set| {
+            let members: Vec<&PlacedFixture> = fixtures
+                .fixtures
+                .iter()
+                .filter(|f| f.set == Some(set.id))
+                .collect();
+            SetView {
+                id: set.id.full_id(),
+                name: set.name.clone(),
+                on_page: set.on_page,
+                locked: set.locked,
+                can_add: editable
+                    && !set.locked
+                    && set_fixtures < curvyo_laser_core::MAX_RECORD_FIXTURES,
+                unfolded: unfolded(set.id),
+                line2: set_line2(set.on_page, set.locked, &members),
+                can_add_grid: !fixtures.set_has_grid(set.id),
+                fixtures: members.into_iter().map(row).collect(),
+            }
+        })
+        .collect();
+    let job_fixtures: Vec<FixtureRow> = fixtures.job_fixtures().map(row).collect();
+    let mut damage_notices: Vec<String> = fixtures
+        .sets
+        .iter()
+        .filter_map(|set| {
+            damage_notice(
+                &set.name,
+                set.damaged,
+                fixtures.fixtures.iter().filter(|f| f.set == Some(set.id)),
+            )
+        })
+        .collect();
+    damage_notices.extend(damage_notice("Job fixtures", 0, fixtures.job_fixtures()));
+    FixturesView {
+        sets_on_page: fixtures.sets.iter().filter(|s| s.on_page).count(),
+        can_add_set: editable && fixtures.sets.len() < curvyo_document_core::MAX_FIXTURE_SETS,
+        read_only: match &state.home {
+            super::profile_sets::SetsHome::ReadOnly(name) => Some(read_only_line(name)),
+            _ => None,
+        },
+        profile_hint: matches!(state.home, super::profile_sets::SetsHome::Generic)
+            .then(|| PROFILE_HINT.to_owned()),
+        can_add_job_fixture: job_fixtures.len() < curvyo_document_core::MAX_JOB_FIXTURES,
+        sets,
+        job_fixtures,
+        armed_kind: state.armed_kind.map(kind_view),
+        apply_candidates: state.apply_candidates,
+        apply_picked: state.apply_picked,
+        selection_announcement: state
+            .selected
+            .and_then(|id| fixtures.get(id))
+            .map(announcement),
+        selected: state.selected.map(NodeId::full_id),
+        selected_slot: state.selected_slot,
+        armed: state.armed,
+        damage_notices,
+        snapping_fixtures: state.snapping_fixtures,
     }
-    step
 }
 
 impl Session {
-    /// The Fixtures block of the active laser page; `None` on any other page.
+    /// The Fixtures tab of the active laser page; `None` on any other page.
     #[must_use]
     pub fn fixtures_view(&self) -> Option<FixturesView> {
         let fixtures = self.active_fixtures()?;
+        let home = self.sets_home(&self.active_manufacturing()?);
+        let state = ViewState {
+            home,
+            selected: self.selected_fixture(),
+            selected_slot: self.selected_slot().map(NodeId::full_id),
+            armed: self.armed_fixture().map(NodeId::full_id),
+            snapping_fixtures: self.document.snapping().fixtures,
+            armed_kind: self.armed_job_fixture(),
+            apply_candidates: self.apply_fixture_candidates(),
+            apply_picked: self.apply_preview_source().map(NodeId::full_id),
+        };
         Some(view_of(
             &fixtures,
-            self.selected_fixture(),
-            self.selected_slot().map(NodeId::full_id),
-            self.armed_fixture().map(NodeId::full_id),
-            self.document.snapping().fixtures,
+            |id| self.fixtures.sets.is_unfolded(id),
+            state,
         ))
     }
 
@@ -317,107 +496,5 @@ impl Session {
     #[must_use]
     pub fn fixtures_view_json(&self) -> String {
         serde_json::to_string(&self.fixtures_view()).unwrap_or_else(|_| "null".to_owned())
-    }
-
-    /// The texts over the canvas: the tape numbers of the active laser page's shown grid at
-    /// their 1-2-5 step, the names of boards and clamps 80 device px wide and of slots 40 device
-    /// px across (UX notes §5.1, §5.2).
-    #[must_use]
-    pub fn fixture_labels(&self) -> Vec<FixtureLabel> {
-        let Some(fixtures) = self.active_fixtures() else {
-            return Vec::new();
-        };
-        let view = self.view();
-        let device = view.scale() * self.device_pixel_ratio.max(f64::MIN_POSITIVE);
-        let step = number_step(device);
-        let origin = fixtures.page.origin;
-        let screen = |p: curvyo_document_core::Point| view.document_to_screen(p);
-        let mut out = Vec::new();
-        let selected = self.selected_fixture();
-        for fixture in fixtures.fixtures.iter().filter(|f| f.shown()) {
-            let is_selected = selected == Some(fixture.id);
-            if let Shape::Grid(spec) = fixture.shape {
-                let grid = self.fixtures.grid_cache.layout(spec, fixtures.page.size);
-                for tape in &grid.tapes {
-                    for number in &tape.numbers {
-                        if number.mm.rem_euclid(step) == 0 {
-                            let (x, y) =
-                                screen(number.at.translated(curvyo_document_core::Vec2::new(
-                                    origin.x, origin.y,
-                                )));
-                            out.push(FixtureLabel {
-                                kind: "tape",
-                                text: number.mm.to_string(),
-                                x,
-                                y,
-                                edge: Some(edge_name(tape.edge)),
-                            });
-                        }
-                    }
-                }
-                if is_selected {
-                    let (x, y) = screen(origin);
-                    out.push(tag(fixture, x, y));
-                }
-                continue;
-            }
-            let (w, _) = fixture.local_size(&fixtures.page);
-            let named = matches!(fixture.shape, Shape::Board { .. } | Shape::Clamp { .. })
-                && w * device >= 80.0;
-            if is_selected || named {
-                let (x, y) = screen(fixture.corners(&fixtures.page)[0]);
-                out.push(if is_selected {
-                    tag(fixture, x, y)
-                } else {
-                    FixtureLabel {
-                        kind: "fixture",
-                        text: fixture.name.clone(),
-                        x,
-                        y,
-                        edge: None,
-                    }
-                });
-            }
-            for slot in fixture
-                .slots
-                .iter()
-                .filter(|s| slot_label_fits(&s.slot, device))
-            {
-                let (x, y) = screen(fixture.global.apply_point(slot.slot.centre));
-                out.push(FixtureLabel {
-                    kind: "slot",
-                    text: slot.name.clone(),
-                    x,
-                    y,
-                    edge: None,
-                });
-            }
-        }
-        out
-    }
-}
-
-/// The tag chip of the selected fixture: its name at its box's corner (criterion 8).
-fn tag(fixture: &PlacedFixture, x: f64, y: f64) -> FixtureLabel {
-    FixtureLabel {
-        kind: "tag",
-        text: fixture.name.clone(),
-        x,
-        y,
-        edge: None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::number_step;
-
-    #[test]
-    fn tape_numbers_thin_out_in_one_two_five_steps() {
-        assert_eq!(number_step(4.0), 50);
-        assert_eq!(number_step(0.5), 100);
-        assert_eq!(number_step(0.3), 200);
-        assert_eq!(number_step(0.1), 500);
-        assert_eq!(number_step(0.05), 1000);
     }
 }

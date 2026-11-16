@@ -3,6 +3,7 @@
 //! targets.
 #![allow(clippy::assert_is_empty)]
 
+use super::add_fixture;
 use curvyo_document_core::Point;
 
 use super::super::{KeyInput, KeyOutcome, Session, Tool};
@@ -31,7 +32,7 @@ fn drag(s: &mut Session, from: Point, to: Point) {
 /// A holder on a fresh laser page and the document point of the middle of its top edge.
 fn holder() -> (Session, curvyo_document_core::NodeId, Point) {
     let mut s = laser();
-    let id = s.add_fixture("holder").unwrap();
+    let id = add_fixture(&mut s, "holder").unwrap();
     s.clear_fixture_selection();
     let o = s.active_page().origin;
     let c = corner(&s, id);
@@ -132,11 +133,11 @@ fn a_drag_moves_the_holder_in_one_step_and_a_corner_rotate_glyph_turns_it() {
 #[test]
 fn the_grid_never_moves_and_delete_on_it_only_says_how() {
     let mut s = laser();
-    let grid = s.add_fixture("grid").unwrap();
+    let grid = add_fixture(&mut s, "grid").unwrap();
     assert_eq!(key(&mut s, "ArrowRight", false), KeyOutcome::Consumed);
     assert_eq!(key(&mut s, "Delete", false), KeyOutcome::Consumed);
     assert_eq!(s.take_fixture_notice().as_deref(), Some(GRID_DELETE_NOTICE));
-    assert_eq!(view(&s).rows.len(), 1);
+    assert_eq!(view(&s).rows().len(), 1);
     assert_eq!(s.selected_fixture(), Some(grid));
 }
 
@@ -153,7 +154,7 @@ fn arrows_nudge_and_delete_arms_then_removes() {
     assert_eq!(s.armed_fixture(), Some(id));
     assert_eq!(view(&s).armed, Some(id.full_id()));
     assert_eq!(key(&mut s, "Delete", false), KeyOutcome::Deleted);
-    assert!(view(&s).rows.is_empty());
+    assert!(view(&s).rows().is_empty());
 }
 
 #[test]
@@ -171,7 +172,7 @@ fn escape_ends_the_fixture_selection() {
 fn fixtures_draw_until_off_the_bed_or_hidden_and_the_selection_adds_a_box() {
     let mut s = laser();
     let bare = s.frame_draw_list().triangles.len();
-    let id = s.add_fixture("clamp").unwrap();
+    let id = add_fixture(&mut s, "clamp").unwrap();
     s.clear_fixture_selection();
     let drawn = s.frame_draw_list().triangles.len();
     assert!(drawn > bare);
@@ -191,7 +192,7 @@ fn fixtures_draw_until_off_the_bed_or_hidden_and_the_selection_adds_a_box() {
 fn the_grid_draws_major_lines_tapes_and_its_numbers() {
     let mut s = laser();
     let bare = s.frame_draw_list().triangles.len();
-    let grid = s.add_fixture("grid").unwrap();
+    let grid = add_fixture(&mut s, "grid").unwrap();
     let with_tapes = s.frame_draw_list().triangles.len();
     assert!(with_tapes > bare);
     let tapes = s
@@ -211,10 +212,10 @@ fn the_grid_draws_major_lines_tapes_and_its_numbers() {
 #[test]
 fn snap_targets_come_from_active_fixtures_while_the_switch_is_on() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     s.add_slot(holder).unwrap();
-    let stop = s.add_fixture("stop").unwrap();
-    s.add_fixture("clamp").unwrap();
+    let stop = add_fixture(&mut s, "stop").unwrap();
+    add_fixture(&mut s, "clamp").unwrap();
     assert_eq!(
         s.fixture_snap_targets(false).len(),
         8 + 9 + 5,

@@ -5,7 +5,7 @@
 //! Unknown job keeps the fixture ink. An engraved board takes the canvas ground (J6).
 
 use curvyo_document_core::{
-    AnchorId, Angle, NewAnchor, NodeId, ObjectSnapshot, PathSnapshot, Point, ViewTransform,
+    AnchorId, Angle, NewAnchor, NodeId, ObjectSnapshot, PathSnapshot, Point, Vec2, ViewTransform,
 };
 use curvyo_laser_core::operations::OperationKind;
 use curvyo_laser_core::{FixturePart, GridSpec};
@@ -16,7 +16,8 @@ use curvyo_render_core::{
 
 use super::super::super::Session;
 use super::super::draw::band;
-use super::super::placed::{PageFixtures, PlacedFixture, Shape, circle, slot_outline};
+use super::super::placed::{PageFixtures, PlacedFixture, circle, slot_outline};
+use super::super::shape::Shape;
 
 /// The outlines of one part in document space and whether they enclose an area.
 pub(super) struct PartGeometry {
@@ -54,13 +55,19 @@ fn hatched(look: OperationLook) -> bool {
 }
 
 /// The looks of each ticked part of `fixture`'s jobs with Show on and a known kind, in job
-/// order: the kind's look while Output is on, the Not assigned look while it is off.
+/// order: the kind's look while Output is on, the Not assigned look while it is off (none for a
+/// pin's or screw's role job, whose Output-off look is the fixture ink).
 pub(super) fn part_looks(fixture: &PlacedFixture) -> Vec<(FixturePart, Vec<OperationLook>)> {
     let mut out: Vec<(FixturePart, Vec<OperationLook>)> = Vec::new();
     for job in fixture.jobs.iter().filter(|job| job.show) {
         let Some(kind) = job.kind.known() else {
             continue;
         };
+        if !job.output && job.role.is_some() {
+            // An Output-off role job keeps the fixture ink alone: the Centre mark in 1 px ink,
+            // the Diameters not drawn twice (`0113` UX notes 6.2).
+            continue;
+        }
         let look = if job.output {
             kind_look(kind)
         } else {
@@ -74,6 +81,42 @@ pub(super) fn part_looks(fixture: &PlacedFixture) -> Vec<(FixturePart, Vec<Opera
         }
     }
     out
+}
+
+/// A circle of `diameter` at every centre of a pin or screw grid, placed by `to`.
+fn rings(shape: &Shape, diameter: f64, to: impl Fn(Point) -> Point) -> Vec<Vec<Point>> {
+    shape
+        .local_centres()
+        .into_iter()
+        .map(|centre| polygon(&circle(centre, diameter / 2.0), &to))
+        .collect()
+}
+
+/// The centre marks of a pin or screw grid `shape`, mapped by `to`: its circles and crosses at
+/// every centre (`0113` criterion 26) as open lines, the circles closed by their first point;
+/// none for any other shape.
+fn marks_geometry(shape: &Shape, to: impl Fn(Point) -> Point) -> PartGeometry {
+    let Some(grid) = shape.centre_grid() else {
+        return PartGeometry {
+            outlines: Vec::new(),
+            closed: true,
+        };
+    };
+    let marks = curvyo_laser_core::centre_marks(&shape.local_centres(), grid.mark);
+    let mut outlines: Vec<Vec<Point>> = marks
+        .circles
+        .iter()
+        .map(|c| {
+            let mut ring = polygon(&circle(c.centre, c.diameter.as_mm() / 2.0), &to);
+            ring.push(ring[0]);
+            ring
+        })
+        .collect();
+    outlines.extend(marks.lines.iter().map(|l| vec![to(l.from), to(l.to)]));
+    PartGeometry {
+        outlines,
+        closed: false,
+    }
 }
 
 /// The outline of `segments` as a polygon: each segment's start.
@@ -115,15 +158,21 @@ impl Session {
                 let l = [(0.0, 0.0), (a, 0.0), (a, t), (t, t), (t, b), (0.0, b)];
                 closed(vec![l.iter().map(|&(x, y)| to(Point::new(x, y))).collect()])
             }
-            (FixturePart::ScrewHead | FixturePart::ScrewThread, Shape::Screw { thread, head }) => {
+            (
+                FixturePart::ScrewHead | FixturePart::ScrewThread,
+                Shape::Screw { thread, head, .. },
+            ) => {
                 let d = if part == FixturePart::ScrewHead {
                     head
                 } else {
                     thread
                 };
-                let ring = circle(Point::new(0.0, 0.0), d.as_mm() / 2.0);
-                closed(vec![polygon(&ring, to)])
+                closed(rings(&fixture.shape, d.as_mm(), to))
             }
+            (FixturePart::PinCircle, Shape::Pin { diameter, .. }) => {
+                closed(rings(&fixture.shape, diameter.as_mm(), to))
+            }
+            (FixturePart::PinMarks | FixturePart::ScrewMarks, shape) => marks_geometry(shape, to),
             (FixturePart::GridLines | FixturePart::GridTapes, Shape::Grid(spec)) => {
                 self.grid_geometry(fixtures, *spec, part)
             }
@@ -190,7 +239,7 @@ impl Session {
     }
 
     /// Whether the parts' looks are drawn: the active laser page under "View: Operations".
-    fn job_looks_drawn(&self, fixtures: &PageFixtures) -> bool {
+    pub(in crate::session::fixtures) fn job_looks_drawn(&self, fixtures: &PageFixtures) -> bool {
         self.operations_view_on()
             && self
                 .active_manufacturing()
@@ -252,17 +301,83 @@ fn part_list(
         if look == OperationLook::AreaFill {
             continue;
         }
-        let objects: Vec<ObjectSnapshot> = geometry
-            .outlines
-            .iter()
-            .filter_map(|outline| {
-                let path = ObjectSnapshot::Path(outline_path(fixture.id, outline, geometry.closed));
-                restyled(&path, look, view)
-            })
-            .collect();
-        list.extend(build_artwork(&objects, view));
+        list.extend(outline_lines(fixture.id, geometry, look, view));
     }
     list
+}
+
+/// The most dashes one `build_artwork` call draws before the rest turn solid; mirrors
+/// `curvyo-render-core`'s per-frame dash budget.
+const DASHES_PER_CALL: usize = 50_000;
+
+/// Two points closer than this, in mm, are the same: an outline repeats another moved.
+const SAME_MM: f64 = 1e-9;
+
+/// The lines of `look` on every outline of `geometry`, as one `build_artwork` call over them
+/// draws them. An outline that repeats an earlier one moved (the rings and marks of a pin
+/// grid) takes that one's triangles moved, which is the same while the dash budget cannot run
+/// out: every dash is at least one quad of 6 vertices (`0113` criterion 42a).
+fn outline_lines(
+    id: NodeId,
+    geometry: &PartGeometry,
+    look: OperationLook,
+    view: ViewTransform,
+) -> DrawList {
+    let object = |outline: &Vec<Point>| {
+        restyled(
+            &ObjectSnapshot::Path(outline_path(id, outline, geometry.closed)),
+            look,
+            view,
+        )
+    };
+    let mut templates: Vec<(&[Point], Vec<Vertex>)> = Vec::new();
+    let mut picks: Vec<(usize, Vec2)> = Vec::with_capacity(geometry.outlines.len());
+    let mut vertices = 0;
+    for outline in &geometry.outlines {
+        let index = templates
+            .iter()
+            .position(|(t, _)| repeats(t, outline))
+            .unwrap_or_else(|| {
+                let drawn = object(outline)
+                    .map(|o| build_artwork(&[o], view).triangles)
+                    .unwrap_or_default();
+                templates.push((outline, drawn));
+                templates.len() - 1
+            });
+        let (template, drawn) = &templates[index];
+        vertices += drawn.len();
+        let shift = match (template.first(), outline.first()) {
+            (Some(&a), Some(&b)) => a.vector_to(b),
+            _ => Vec2::new(0.0, 0.0),
+        };
+        picks.push((index, shift));
+    }
+    if vertices / 6 > DASHES_PER_CALL {
+        let objects: Vec<ObjectSnapshot> = geometry.outlines.iter().filter_map(object).collect();
+        return build_artwork(&objects, view);
+    }
+    let mut list = DrawList::default();
+    list.triangles.reserve(vertices);
+    for (index, shift) in picks {
+        list.triangles
+            .extend(templates[index].1.iter().map(|v| Vertex {
+                position: v.position.translated(shift),
+                color: v.color,
+            }));
+    }
+    list
+}
+
+/// Whether `outline` is `template` moved: as many points, each the same step from the first.
+fn repeats(template: &[Point], outline: &[Point]) -> bool {
+    let (Some(&t0), Some(&o0)) = (template.first(), outline.first()) else {
+        return template.is_empty() && outline.is_empty();
+    };
+    template.len() == outline.len()
+        && template.iter().zip(outline).all(|(t, o)| {
+            let (a, b) = (t0.vector_to(*t), o0.vector_to(*o));
+            (a.x - b.x).abs() <= SAME_MM && (a.y - b.y).abs() <= SAME_MM
+        })
 }
 
 /// The symbol chip of a part: the symbols of its Output-on looks.

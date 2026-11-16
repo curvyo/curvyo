@@ -12,7 +12,7 @@ use curvyo_laser_core::settings::{
 };
 
 use super::super::Session;
-use super::super::materials::short_name;
+use super::super::library_journal::short_name;
 
 /// The longest skip notice (criterion 27).
 const SKIP_NOTICE_CHARS: usize = 70;

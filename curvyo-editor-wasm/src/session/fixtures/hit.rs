@@ -60,9 +60,11 @@ pub(super) fn hit_outline(fixtures: &PageFixtures, p: Point, tolerance: f64) -> 
         .filter(|f| f.shown())
         .filter(|f| near_box(&f.corners(&fixtures.page), p, tolerance) || !f.slots.is_empty())
         .find(|f| {
-            f.outline(&fixtures.page)
-                .into_iter()
-                .any(|s| distance(p, s) <= tolerance)
+            f.near_rings(p, tolerance).unwrap_or_else(|| {
+                f.outline(&fixtures.page)
+                    .into_iter()
+                    .any(|s| distance(p, s) <= tolerance)
+            })
         })
         .map(|f| f.id)
 }

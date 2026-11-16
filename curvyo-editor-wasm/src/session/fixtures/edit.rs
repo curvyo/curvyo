@@ -6,7 +6,8 @@ use curvyo_document_core::{Affine, Angle, Length, NodeId, Point, Vec2};
 use curvyo_laser_core::{ScrewPart, StopPart, board_side_range, screw_diameters, stop_legs};
 use curvyo_ui_core::{ExtentSigns, ResizeDirection, resize_local_box_with_prior};
 
-use super::placed::{PlacedFixture, Shape};
+use super::placed::PlacedFixture;
+use super::shape::Shape;
 
 /// A fixture's geometry after an edit: what a drag shows and what its release writes.
 #[derive(Debug, Clone, PartialEq)]
@@ -213,7 +214,7 @@ pub(super) fn stop_set(
 /// A screw's `(thread, head)`; `None` for every other kind.
 pub(super) fn screw_sizes(start: &PlacedFixture) -> Option<(Length, Length)> {
     match start.shape {
-        Shape::Screw { thread, head } => Some((thread, head)),
+        Shape::Screw { thread, head, .. } => Some((thread, head)),
         _ => None,
     }
 }
@@ -229,8 +230,11 @@ pub(super) fn screw_set(
         return (same(start), false);
     };
     let (thread, head, moved) = screw_diameters(part, value, thread, head);
+    let Some(grid) = start.shape.centre_grid() else {
+        return (same(start), false);
+    };
     let edit = FixtureEdit {
-        shape: Shape::Screw { thread, head },
+        shape: Shape::Screw { thread, head, grid },
         ..same(start)
     };
     (edit, moved)
@@ -263,6 +267,9 @@ pub(super) fn knob(
     match handle {
         FixtureHandle::Head => screw_set(start, ScrewPart::Head, mm(2.0 * local.x)).0,
         FixtureHandle::Thread => screw_set(start, ScrewPart::Thread, mm(-2.0 * local.x)).0,
+        FixtureHandle::Diameter | FixtureHandle::Columns | FixtureHandle::Rows => {
+            super::grid_handles::knob_edit(start, handle, local)
+        }
         _ => same(start),
     }
 }

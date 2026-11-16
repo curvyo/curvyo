@@ -7,7 +7,8 @@ use curvyo_laser_core::{Placement, board_points, layout, stop_points};
 use curvyo_ui_core::{SnapTarget, TargetKind};
 
 use super::super::Session;
-use super::placed::{PageFixtures, PlacedFixture, Shape};
+use super::placed::{PageFixtures, PlacedFixture};
+use super::shape::Shape;
 
 /// The point targets of one fixture, in document space; the eye plays no part (criterion 6).
 fn fixture_points(fixture: &PlacedFixture) -> Vec<Point> {
@@ -29,8 +30,13 @@ fn fixture_points(fixture: &PlacedFixture) -> Vec<Point> {
             points
         }
         Shape::Stop { leg_a, leg_b, .. } => stop_points(*leg_a, *leg_b, placement),
-        // A screw is no snap target, not even its centre (criterion 40).
-        Shape::Grid(_) | Shape::Clamp { .. } | Shape::Screw { .. } | Shape::Unknown => Vec::new(),
+        // A screw is no snap target, not even its centre (criterion 40), nor a pin (`0113`
+        // criterion 23).
+        Shape::Grid(_)
+        | Shape::Clamp { .. }
+        | Shape::Screw { .. }
+        | Shape::Pin { .. }
+        | Shape::Unknown => Vec::new(),
     }
 }
 
@@ -65,7 +71,7 @@ fn grid_lines(fixture: &PlacedFixture, page: &Page, out: &mut Vec<SnapTarget>) {
 /// The targets of every Active fixture of `fixtures`.
 pub(super) fn targets_of(fixtures: &PageFixtures) -> Vec<SnapTarget> {
     let mut out = Vec::new();
-    for fixture in fixtures.fixtures.iter().filter(|f| f.active) {
+    for fixture in fixtures.fixtures.iter().filter(|f| f.on_bed()) {
         grid_lines(fixture, &fixtures.page, &mut out);
         out.extend(
             fixture_points(fixture)
@@ -101,7 +107,7 @@ impl Session {
         self.document
             .manufacturings()
             .iter()
-            .filter(|m| self.manufacturing_available(m.id))
+            .filter(|m| self.process_enabled(&m.process))
             .filter_map(PageFixtures::read)
             .collect()
     }

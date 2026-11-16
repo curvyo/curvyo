@@ -15,9 +15,11 @@
     clippy::cast_precision_loss
 )]
 
+mod fixture_support;
 use curvyo_document_core::{Color, Document, Length, NodeId, Point, RectBounds, StyleEdit, pack};
 use curvyo_editor_wasm::{KeyInput, KeyOutcome, Session, Tool};
 use curvyo_ui_core::EntryOutcome;
+use fixture_support::add_fixture;
 use serde_json::Value;
 
 // ---- helpers (as in acceptance_0102_tester.rs) ---------------------------------------------------
@@ -46,7 +48,16 @@ fn block(s: &Session) -> Value {
 }
 
 fn rows(s: &Session) -> Vec<Value> {
-    block(s)["rows"].as_array().cloned().unwrap_or_default()
+    // Superseded by `0113` criterion 16: the rows of the sets, then the job fixtures.
+    let view = block(s);
+    let mut out: Vec<Value> = view["sets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|set| set["fixtures"].as_array().cloned().unwrap_or_default())
+        .collect();
+    out.extend(view["job_fixtures"].as_array().cloned().unwrap_or_default());
+    out
 }
 
 fn row(s: &Session, name: &str) -> Value {
@@ -140,9 +151,13 @@ fn has_key(v: &Value, name: &str) -> bool {
 fn ac2_37_a_screw_is_added_with_a_6_mm_thread_and_a_10_mm_head() {
     let mut s = one_page();
     laser(&mut s);
+    // Superseded by `0113` criterion 7: a fixture is added into a set ("+ Set" is its own step).
+    // Superseded by `0113` rework (2026-11-16, criterion 3): the set needs a saved profile.
+    fixture_support::editable_sets(&mut s);
+    assert!(s.add_fixture_set().is_some());
     let steps = s.undo_len();
     assert!(
-        s.add_fixture("screw").is_some(),
+        add_fixture(&mut s, "screw").is_some(),
         "the Screw button adds one"
     );
     assert_eq!(s.undo_len(), steps + 1, "one undo step 'Add screw'");
@@ -168,8 +183,8 @@ fn ac2_37_a_screw_is_added_with_a_6_mm_thread_and_a_10_mm_head() {
 fn ac2_37_the_screw_is_listed_with_the_other_four_kinds_and_the_name_is_the_lowest_free_number() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("screw");
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
+    add_fixture(&mut s, "screw");
     let names: Vec<String> = rows(&s)
         .iter()
         .map(|r| r["name"].as_str().unwrap().to_owned())
@@ -181,7 +196,7 @@ fn ac2_37_the_screw_is_listed_with_the_other_four_kinds_and_the_name_is_the_lowe
 fn ac37_the_diameters_have_the_range_0_5_to_1000_mm() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     // Head 1000 is allowed; thread 0.2 is set to its minimum 0.5 with the Action notice.
     assert_eq!(
@@ -198,7 +213,7 @@ fn ac37_the_diameters_have_the_range_0_5_to_1000_mm() {
 fn ac37_a_typed_thread_above_the_head_is_set_to_the_head_and_the_head_stays() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     let steps = s.undo_len();
     // Head 10 (kept), thread typed 20: the thread gives way to the head.
@@ -216,7 +231,7 @@ fn ac37_a_typed_thread_above_the_head_is_set_to_the_head_and_the_head_stays() {
 fn ac37_a_typed_head_below_the_thread_is_set_to_the_thread() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     // Thread 6 (default, kept), head typed 3: the head gives way to the thread.
     assert_eq!(chip(&mut s, id, "s", &["3", "6"]), EntryOutcome::Committed);
@@ -235,7 +250,7 @@ fn ac38_the_head_knob_drag_stops_at_the_thread_without_moving_past_it() {
     let mut s = one_page();
     laser(&mut s);
     zoom_to_pct(&mut s, 800);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     // Select by its outline (the head circle at 5 mm from the centre), then drag the Head knob at
     // 0 degrees (east) to the centre: the head stops at the thread's 6 mm.
@@ -261,7 +276,7 @@ fn ac38_the_thread_knob_drag_stops_at_the_head() {
     let mut s = one_page();
     laser(&mut s);
     zoom_to_pct(&mut s, 800);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     let p0 = at(&s, 205.0, 150.0);
     click(&mut s, p0);
@@ -281,7 +296,7 @@ fn ac38_the_thread_knob_drag_stops_at_the_head() {
 fn ac38_the_screw_has_no_rotate_no_r_and_no_size_squircle_entry() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     assert!(s.select_fixture(id));
     assert_ne!(
@@ -300,7 +315,7 @@ fn ac38_a_double_click_on_the_head_knob_opens_one_field_chip_that_takes_a_value(
     let mut s = one_page();
     laser(&mut s);
     zoom_to_pct(&mut s, 800);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let id = part(&s, "Screw 1");
     let p0 = at(&s, 205.0, 150.0);
     click(&mut s, p0);
@@ -321,10 +336,10 @@ fn ac38_a_double_click_on_the_head_knob_opens_one_field_chip_that_takes_a_value(
 fn d31_no_fixture_has_a_typed_size_pose_or_stop_field_in_the_view() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("clamp");
-    s.add_fixture("stop");
-    s.add_fixture("screw");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "clamp");
+    add_fixture(&mut s, "stop");
+    add_fixture(&mut s, "screw");
     for name in ["Holder 1", "Clamp 1", "Stop 1", "Screw 1"] {
         let id = part(&s, name);
         assert!(s.select_fixture(id));
@@ -358,7 +373,7 @@ fn d31_no_fixture_has_a_typed_size_pose_or_stop_field_in_the_view() {
 fn d31_a_selected_holder_resize_is_one_step_and_a_slot_keeps_its_world_place() {
     let mut s = one_page();
     laser(&mut s);
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let slot = s.add_slot(holder).expect("Add slot");
     let _ = slot;
     // Holder 100 x 60 centred at (200, 150): top-left (150, 120); the new 20 x 20 slot is centred
@@ -385,7 +400,7 @@ fn d31_a_selected_holder_resize_is_one_step_and_a_slot_keeps_its_world_place() {
 fn d31_a_typed_holder_size_outside_1_to_1000_gives_way_with_a_notice_and_one_step() {
     let mut s = one_page();
     laser(&mut s);
-    let h = s.add_fixture("holder").unwrap();
+    let h = add_fixture(&mut s, "holder").unwrap();
     let steps = s.undo_len();
     assert_eq!(
         chip(&mut s, h, "s", &["0.2", "5000"]),
@@ -403,7 +418,7 @@ fn d31_a_typed_holder_size_outside_1_to_1000_gives_way_with_a_notice_and_one_ste
 fn d31_a_holder_and_clamp_are_turned_and_moved_by_their_chips_as_one_object() {
     let mut s = one_page();
     laser(&mut s);
-    let c = s.add_fixture("clamp").unwrap();
+    let c = add_fixture(&mut s, "clamp").unwrap();
     let steps = s.undo_len();
     assert_eq!(chip(&mut s, c, "m", &["50", "50"]), EntryOutcome::Committed);
     assert_eq!(s.undo_len(), steps + 1, "Move fixture is one step");
@@ -418,7 +433,7 @@ fn d31_a_holder_and_clamp_are_turned_and_moved_by_their_chips_as_one_object() {
 fn d24_a_stop_leg_below_the_thickness_is_set_to_the_thickness() {
     let mut s = one_page();
     laser(&mut s);
-    let st = s.add_fixture("stop").unwrap();
+    let st = add_fixture(&mut s, "stop").unwrap();
     // Thickness 5 (default); leg 1 typed 3 gives way to 5; leg 2 stays 60.
     assert_eq!(
         chip(&mut s, st, "s", &["3", "60", "5"]),
@@ -435,7 +450,7 @@ fn d24_a_stop_leg_below_the_thickness_is_set_to_the_thickness() {
 fn d24_a_stop_thickness_above_the_shorter_leg_is_set_to_that_leg_or_50() {
     let mut s = one_page();
     laser(&mut s);
-    let st = s.add_fixture("stop").unwrap();
+    let st = add_fixture(&mut s, "stop").unwrap();
     // Legs 20 and 60: the thickness is at most the shorter leg (20).
     assert_eq!(
         chip(&mut s, st, "s", &["20", "60", "40"]),
@@ -457,7 +472,7 @@ fn d23_a_stop_has_leg_and_thickness_knobs_and_no_corner_or_edge_resize() {
     let mut s = one_page();
     laser(&mut s);
     zoom_to_pct(&mut s, 800);
-    let st = s.add_fixture("stop").unwrap();
+    let st = add_fixture(&mut s, "stop").unwrap();
     assert!(s.select_fixture(st));
     // A double-click on the middle of the top edge of leg 1 is the Thickness knob (its chip).
     // The stop's bounding box is centred on (200, 150), 60 x 60 mm: its top-left is (170, 120).
@@ -479,11 +494,11 @@ fn d23_a_stop_has_leg_and_thickness_knobs_and_no_corner_or_edge_resize() {
 fn ac6_each_eye_switch_is_one_undo_step_for_every_kind() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
-    s.add_fixture("holder");
-    s.add_fixture("clamp");
-    s.add_fixture("stop");
-    s.add_fixture("screw");
+    add_fixture(&mut s, "grid");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "clamp");
+    add_fixture(&mut s, "stop");
+    add_fixture(&mut s, "screw");
     for name in ["Grid 1", "Holder 1", "Clamp 1", "Stop 1", "Screw 1"] {
         let id = part(&s, name);
         let steps = s.undo_len();
@@ -504,7 +519,7 @@ fn ac40_an_inactive_screw_is_not_drawn_and_an_active_one_is() {
     let mut s = one_page();
     laser(&mut s);
     let base = s.frame_draw_list().triangles.len();
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let on = s.frame_draw_list().triangles.len();
     assert!(on > base, "an active screw is drawn");
     let id = part(&s, "Screw 1");
@@ -522,7 +537,7 @@ fn ac40_an_inactive_screw_is_not_drawn_and_an_active_one_is() {
 fn ac8_the_selected_holder_north_handle_is_hit_before_its_outline() {
     let mut s = one_page();
     laser(&mut s);
-    let h = s.add_fixture("holder").unwrap();
+    let h = add_fixture(&mut s, "holder").unwrap();
     let p0 = at(&s, 150.0, 150.0);
     click(&mut s, p0);
     assert_eq!(s.selected_fixture(), Some(h));
@@ -546,7 +561,7 @@ fn ac8_the_selected_holder_north_handle_is_hit_before_its_outline() {
 fn ac28_a_screw_is_stored_in_the_profile_set() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("screw");
+    add_fixture(&mut s, "screw");
     let _ = s.save_machine_profile([9; 16], 51);
     let machine =
         serde_json::from_str::<Value>(&s.manufacturing_view_json()).unwrap()["machine"].clone();

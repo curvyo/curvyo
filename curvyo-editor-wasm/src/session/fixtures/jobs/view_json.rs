@@ -90,6 +90,12 @@ pub struct JobRowView {
     pub output: bool,
     /// Whether its fixture is Active; `false` reads "not on the bed".
     pub fixture_active: bool,
+    /// Whether its fixture's set is on this page (always for a job fixture); `false` reads "not
+    /// on this page", first in line 2 (`0113` criterion 28).
+    pub on_this_page: bool,
+    /// The fixed role of a pin's or a screw's job, `centre_mark` or `diameters`: no trash, no
+    /// rename, its ticks read-only (`0113` criterion 27, UX notes F10). `None` for any other job.
+    pub role: Option<&'static str>,
     /// Whether it runs (the run rule's answer, criterion 13).
     pub runs: bool,
     /// Its ticked readable parts.
@@ -155,7 +161,7 @@ fn part_state(fixture: &PlacedFixture, job: &PlacedJob, part: FixturePart) -> &'
         "unticked"
     } else if !job.show || job.read_only() {
         "show_off"
-    } else if !fixture.active {
+    } else if !fixture.on_bed() {
         "not_on_bed"
     } else if !job.output {
         "output_off"
@@ -211,6 +217,11 @@ fn groups(fixtures: &PageFixtures, runs: &[bool]) -> Vec<JobGroupView> {
                     show: job.show,
                     output: job.output,
                     fixture_active: fixture.active,
+                    on_this_page: !matches!(
+                        fixture.home,
+                        curvyo_laser_core::FixtureHome::Set { on_page: false }
+                    ),
+                    role: job.role.map(curvyo_document_core::JobRole::stored),
                     runs: runs[at + position],
                     parts_ticked: job.parts.len(),
                     parts_total: total,
@@ -251,9 +262,11 @@ impl Session {
                 .find(|(_, job)| job.id == id)
                 .map(|(fixture, job)| parts_view(fixture, job))
         });
+        // A pin or a screw takes no further job: the add buttons hide (`0113` criterion 27).
         let add_to = self
             .selected_fixture()
             .and_then(|id| fixtures.get(id))
+            .filter(|f| f.shape.centre_grid().is_none())
             .map(|f| AddTarget {
                 fixture: f.id.full_id(),
                 name: f.name.clone(),

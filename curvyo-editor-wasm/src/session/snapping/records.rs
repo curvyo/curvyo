@@ -25,6 +25,8 @@ pub struct SnappingSettingsRecord {
     pub page: bool,
     /// Whether shown page grids pull (`specs/0090-grid` criterion 10).
     pub grid: bool,
+    /// Whether a job fixture snaps to centres (`specs/0113-fixture-sets-and-pins` criterion 30).
+    pub centres: bool,
     /// Which part of a moved selection snaps to a grid: `"centre"`, `"box"` or `"nodes"`.
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
     pub grid_point: String,
@@ -49,6 +51,7 @@ impl SnappingSettingsRecord {
             nodes: snapping.nodes,
             page: snapping.page,
             grid: snapping.grid,
+            centres: snapping.centres,
             grid_point: grid_point_name(snapping.grid_point).to_owned(),
             x: snapping.x,
             y: snapping.y,
@@ -79,6 +82,8 @@ pub struct SnappingToolbarRecord {
     pub page: bool,
     /// Whether shown page grids pull (`specs/0090-grid` criterion 10).
     pub grid: bool,
+    /// Whether a job fixture snaps to centres (`specs/0113-fixture-sets-and-pins` criterion 30).
+    pub centres: bool,
     /// Which part of a moved selection snaps to a grid: `"centre"`, `"box"` or `"nodes"`.
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
     pub grid_point: String,
@@ -109,6 +114,7 @@ impl SnappingToolbarRecord {
             nodes: stored.nodes,
             page: stored.page,
             grid: stored.grid,
+            centres: stored.centres,
             grid_point: grid_point_name(stored.grid_point).to_owned(),
             x: stored.x,
             y: stored.y,

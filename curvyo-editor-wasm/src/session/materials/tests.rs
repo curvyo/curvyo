@@ -264,11 +264,11 @@ fn criterion_17_deleting_a_material_retires_its_tests_and_removes_photos() {
 fn the_journal_counts_photo_bytes_and_drops_the_oldest_past_its_limit() {
     let (mut s, birch, group) = birch_grid();
     let id = recipe_of(&s, group).id.to_string();
-    s.material_journal().set_limit(4_000);
+    s.library_journal().set_limit(4_000);
     s.set_test_photo(&birch, &id, &png(600, 400), false)
         .unwrap();
     s.set_test_note(&birch, &id, "a").unwrap();
-    assert!(s.material_journal().bytes() <= 4_000);
+    assert!(s.library_journal().bytes() <= 4_000);
 }
 
 #[test]

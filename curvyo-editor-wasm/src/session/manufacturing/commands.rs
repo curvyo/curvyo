@@ -41,20 +41,23 @@ impl Session {
                         work_area: profile.work_area,
                     })
                     .ok()?;
-                if let (Some(id), false) = (page.kind.manufacturing(), profile.fixtures.is_empty())
-                {
+                let sets = &profile.fixture_sets;
+                if let (Some(id), false) = (page.kind.manufacturing(), sets.is_empty()) {
                     let origin = profile.values.origin;
                     let anchor = PageCorner {
                         right: origin.is_right(),
                         bottom: origin.is_bottom(),
                     };
-                    d.set_manufacturing_profile_and_fixtures(
+                    d.set_manufacturing_profile_and_sets(
                         id,
                         &copy,
                         profile.work_area,
                         anchor,
                         ProfileChange::Pick,
-                        &profile.fixtures,
+                        curvyo_document_core::ProfileSets {
+                            sets,
+                            modified: profile.modified,
+                        },
                         // A page that has just been added owns no objects to carry.
                         &curvyo_document_core::PageContents::new(),
                     )

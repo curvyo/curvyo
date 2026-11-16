@@ -265,6 +265,11 @@ impl WasmSession {
         self.session.set_snapping_grid(grid)
     }
 
+    /// Sets the Centres snapping target (`specs/0113-fixture-sets-and-pins` criterion 30).
+    pub fn set_snapping_centres(&mut self, centres: bool) -> bool {
+        self.session.set_snapping_centres(centres)
+    }
+
     /// Sets the grid snap point: `"centre"`, `"box"` or `"nodes"` (criterion 11).
     pub fn set_snapping_grid_point(&mut self, name: &str) -> bool {
         self.session.set_snapping_grid_point(name)

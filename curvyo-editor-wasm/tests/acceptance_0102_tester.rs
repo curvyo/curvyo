@@ -21,6 +21,8 @@
     clippy::too_many_lines
 )]
 
+mod fixture_support;
+use fixture_support::add_fixture;
 use std::path::PathBuf;
 
 #[path = "cpu_time/mod.rs"]
@@ -61,7 +63,16 @@ fn block(s: &Session) -> Value {
 }
 
 fn rows(s: &Session) -> Vec<Value> {
-    block(s)["rows"].as_array().cloned().unwrap_or_default()
+    // Superseded by `0113` criterion 16: the rows of the sets, then the job fixtures.
+    let view = block(s);
+    let mut out: Vec<Value> = view["sets"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|set| set["fixtures"].as_array().cloned().unwrap_or_default())
+        .collect();
+    out.extend(view["job_fixtures"].as_array().cloned().unwrap_or_default());
+    out
 }
 
 fn row(s: &Session, name: &str) -> Value {
@@ -144,7 +155,7 @@ fn opened(s: &Session) -> Document {
 }
 
 fn holder_with_two_slots(s: &mut Session) -> NodeId {
-    let holder = s.add_fixture("holder").expect("a holder");
+    let holder = add_fixture(s, "holder").expect("a holder");
     let a = s.add_slot(holder).expect("slot 1");
     s.set_slot_shape(a, "circle");
     s.set_slot_length(a, "d_mm", Length::from_mm(12.0));
@@ -196,10 +207,16 @@ fn ac1_a_new_laser_page_shows_an_empty_block_and_the_five_kinds_can_be_added() {
     let mut s = one_page();
     laser(&mut s);
     assert!(rows(&s).is_empty(), "no fixture on a new laser page");
-    assert_eq!(block(&s)["can_add_grid"], true);
+    // Superseded by `0113` criteria 3, 11: a new page offers "+ Set" and the job bar.
+    // Superseded by `0113` rework (2026-11-16, criterion 3): on Generic laser it offers no
+    // "+ Set" but the profile hint; once saved as a profile it does.
+    assert_eq!(block(&s)["can_add_set"], false);
+    assert!(block(&s)["profile_hint"].is_string());
+    fixture_support::editable_sets(&mut s);
+    assert_eq!(block(&s)["can_add_set"], true);
     for kind in ["grid", "holder", "clamp", "stop", "screw"] {
         assert!(
-            s.add_fixture(kind).is_some(),
+            add_fixture(&mut s, kind).is_some(),
             "{kind} is one of the five buttons"
         );
     }
@@ -235,8 +252,12 @@ fn ac1_the_fixtures_block_is_on_a_laser_page_only() {
 fn ac2_each_add_is_one_undo_step_and_selects_the_new_fixture() {
     let mut s = one_page();
     laser(&mut s);
+    // Superseded by `0113` criterion 7: a fixture is added into a set ("+ Set" is its own step).
+    // Superseded by `0113` rework (2026-11-16, criterion 3): the set needs a saved profile.
+    fixture_support::editable_sets(&mut s);
+    assert!(s.add_fixture_set().is_some());
     let steps = s.undo_len();
-    assert!(s.add_fixture("holder").is_some());
+    assert!(add_fixture(&mut s, "holder").is_some());
     assert_eq!(s.undo_len(), steps + 1, "one undo step per add");
     let id = s.selected_fixture().expect("the new fixture is selected");
     assert_eq!(
@@ -249,10 +270,10 @@ fn ac2_each_add_is_one_undo_step_and_selects_the_new_fixture() {
 fn ac2_the_proposal_sizes_of_a_new_fixture() {
     let mut s = one_page();
     laser(&mut s);
-    let holder = s.add_fixture("holder").unwrap();
-    let clamp = s.add_fixture("clamp").unwrap();
-    let stop = s.add_fixture("stop").unwrap();
-    let screw = s.add_fixture("screw").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
+    let clamp = add_fixture(&mut s, "clamp").unwrap();
+    let stop = add_fixture(&mut s, "stop").unwrap();
+    let screw = add_fixture(&mut s, "screw").unwrap();
     assert_eq!(
         announced(&mut s, holder),
         "Holder 1 selected, 100.0 by 60.0 mm."
@@ -275,14 +296,18 @@ fn ac2_the_proposal_sizes_of_a_new_fixture() {
 fn ac2_one_grid_per_page_hides_the_grid_button_and_offers_no_second_one() {
     let mut s = one_page();
     laser(&mut s);
-    assert!(s.add_fixture("grid").is_some());
+    assert!(add_fixture(&mut s, "grid").is_some());
+    // Superseded by `0113` criterion 7: one grid per set; the set's Grid button hides.
     assert_eq!(
-        block(&s)["can_add_grid"],
+        block(&s)["sets"][0]["can_add_grid"],
         false,
         "the Grid button is hidden"
     );
     let steps = s.undo_len();
-    assert!(s.add_fixture("grid").is_none(), "a second grid is refused");
+    assert!(
+        add_fixture(&mut s, "grid").is_none(),
+        "a second grid is refused"
+    );
     assert_eq!(s.undo_len(), steps, "a refused add is not a step");
 }
 
@@ -290,11 +315,11 @@ fn ac2_one_grid_per_page_hides_the_grid_button_and_offers_no_second_one() {
 fn ac2_a_new_name_takes_the_lowest_free_number_of_its_kind() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "holder");
     let first = part(&s, "Holder 1");
     assert!(s.delete_fixture(first));
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     let names: Vec<String> = rows(&s)
         .iter()
         .map(|r| r["name"].as_str().unwrap().to_owned())
@@ -312,8 +337,8 @@ fn ac2_a_new_name_takes_the_lowest_free_number_of_its_kind() {
 fn ac3_rename_is_one_undo_step_and_names_may_repeat() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("clamp");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "clamp");
     let clamp = part(&s, "Clamp 1");
     let steps = s.undo_len();
     assert!(
@@ -337,7 +362,7 @@ fn ac3_rename_is_one_undo_step_and_names_may_repeat() {
 fn ac3_a_name_is_up_to_40_characters() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     let h = part(&s, "Holder 1");
     let long = "x".repeat(41);
     s.rename_fixture(h, &long);
@@ -354,7 +379,7 @@ fn ac3_a_name_is_up_to_40_characters() {
 fn ac4_delete_removes_the_fixture_and_its_slots_and_one_undo_restores_them() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("engraved_grid");
+    add_fixture(&mut s, "engraved_grid");
     let holder = holder_with_two_slots(&mut s);
     let before = rows(&s);
     let steps = s.undo_len();
@@ -383,8 +408,8 @@ fn ac4_delete_removes_the_fixture_and_its_slots_and_one_undo_restores_them() {
 fn ac5_several_fixtures_can_be_active_at_once_and_switching_off_hides_them_from_the_bed() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("clamp");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "clamp");
     let on = triangles(&s);
     let holder = part(&s, "Holder 1");
     let steps = s.undo_len();
@@ -405,7 +430,7 @@ fn ac5_several_fixtures_can_be_active_at_once_and_switching_off_hides_them_from_
 fn ac6_the_eye_hides_a_fixture_without_changing_its_active_state_in_one_step() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     let shown = triangles(&s);
     let h = part(&s, "Holder 1");
     let steps = s.undo_len();
@@ -428,7 +453,7 @@ fn ac6_the_eye_hides_a_fixture_without_changing_its_active_state_in_one_step() {
 fn ac8_a_press_on_the_outline_of_an_active_holder_selects_it_alone() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     let h = part(&s, "Holder 1");
     s.escape();
     // The holder is centred on the 400 x 300 mm work area: its left edge lies at x = 150 mm.
@@ -450,7 +475,7 @@ fn ac8_a_press_on_the_outline_of_an_active_holder_selects_it_alone() {
 fn ac9_a_press_inside_a_holder_does_not_select_it() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     s.escape();
     let inside = at(&s, 200.0, 150.0);
     click(&mut s, inside);
@@ -461,8 +486,8 @@ fn ac9_a_press_inside_a_holder_does_not_select_it() {
 fn ac10_select_all_and_marquee_never_select_a_fixture() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("clamp");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "clamp");
     s.escape();
     key(&mut s, "a", true);
     assert_eq!(s.selected_fixture(), None, "Select All selects no fixture");
@@ -484,7 +509,7 @@ fn ac10_select_all_and_marquee_never_select_a_fixture() {
 fn ac11_a_fixture_of_a_laser_page_that_is_not_active_is_not_hit() {
     let mut s = one_page();
     let first = laser(&mut s);
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     let outline = at(&s, 150.0, 150.0);
     let second = laser(&mut s);
     assert_ne!(first, second);
@@ -506,8 +531,8 @@ fn ac11_a_fixture_of_a_laser_page_that_is_not_active_is_not_hit() {
 fn ac12_a_layers_row_selects_its_fixture_and_the_fixture_row_has_an_eye() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("clamp");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "clamp");
     let clamp = part(&s, "Clamp 1");
     let holder = part(&s, "Holder 1");
     let tree = serde_json::from_str::<Value>(&s.layers_view_json(0, 50)).unwrap();
@@ -542,7 +567,7 @@ fn ac12_a_layers_row_selects_its_fixture_and_the_fixture_row_has_an_eye() {
 fn ac13_the_delete_key_does_not_remove_a_grid_and_says_why() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     let grid = part(&s, "Grid 1");
     assert!(s.select_fixture(grid));
     key(&mut s, "Delete", false);
@@ -558,7 +583,7 @@ fn ac13_the_delete_key_does_not_remove_a_grid_and_says_why() {
 fn ac13_a_grid_has_no_position_to_type() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     let grid = part(&s, "Grid 1");
     assert!(s.select_fixture(grid));
     assert_ne!(
@@ -601,7 +626,7 @@ fn ac14_a_holder_moves_and_turns_as_one_object_with_its_slots_in_place() {
 fn ac14_a_clamp_moves_and_turns_by_its_chips() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("clamp");
+    add_fixture(&mut s, "clamp");
     let c = part(&s, "Clamp 1");
     assert_eq!(
         chip(&mut s, c, "m", &["100", "50"]),
@@ -616,7 +641,7 @@ fn ac14_a_clamp_moves_and_turns_by_its_chips() {
 fn ac15_the_grid_parameters_clamp_to_their_ranges_with_a_short_notice() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     let g = part(&s, "Grid 1");
     assert!(s.set_fixture_length(g, "spacing_mm", Length::from_mm(0.0)));
     assert_eq!(
@@ -646,7 +671,7 @@ fn ac15_the_grid_parameters_clamp_to_their_ranges_with_a_short_notice() {
 fn ac15_the_grid_defaults_and_tape_switches_are_one_step_each() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     let g = part(&s, "Grid 1");
     let grid = row(&s, "Grid 1")["grid"].clone();
     assert_eq!(grid["spacing_mm"], 10.0);
@@ -673,7 +698,7 @@ fn ac15_the_grid_defaults_and_tape_switches_are_one_step_each() {
 fn ac17_only_the_bottom_tape_gives_its_numbers_every_50_mm() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     let g = part(&s, "Grid 1");
     for edge in ["top", "left", "right"] {
         assert!(s.set_grid_tape(g, edge, false));
@@ -697,7 +722,7 @@ fn ac17_only_the_bottom_tape_gives_its_numbers_every_50_mm() {
 fn ac18_the_holder_size_is_1_to_1000_mm_and_each_edit_is_one_step() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
+    add_fixture(&mut s, "holder");
     let h = part(&s, "Holder 1");
     assert!(
         !s.set_fixture_length(h, "width_mm", Length::from_mm(50.0)),
@@ -716,7 +741,7 @@ fn ac18_the_holder_size_is_1_to_1000_mm_and_each_edit_is_one_step() {
 fn ac19_a_slot_has_a_name_a_shape_and_its_centre_and_size_each_editable() {
     let mut s = one_page();
     laser(&mut s);
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let steps = s.undo_len();
     let slot = s.add_slot(holder).expect("Add slot");
     assert_eq!(s.undo_len(), steps + 1, "one undo step per add");
@@ -747,7 +772,7 @@ fn ac19_a_slot_has_a_name_a_shape_and_its_centre_and_size_each_editable() {
 fn ac19_a_holder_holds_at_most_50_slots_and_the_51st_is_never_offered() {
     let mut s = one_page();
     laser(&mut s);
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     for _ in 0..50 {
         assert!(s.add_slot(holder).is_some());
     }
@@ -764,7 +789,7 @@ fn ac19_a_holder_holds_at_most_50_slots_and_the_51st_is_never_offered() {
 fn ac20_a_slot_outside_its_board_is_allowed_with_a_notice_and_sizes_clamp() {
     let mut s = one_page();
     laser(&mut s);
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let slot = s.add_slot(holder).unwrap();
     assert!(s.set_slot_length(slot, "cx_mm", Length::from_mm(500.0)));
     assert_eq!(
@@ -791,8 +816,8 @@ fn ac20_a_slot_outside_its_board_is_allowed_with_a_notice_and_sizes_clamp() {
 fn ac22_23_a_clamp_and_a_stop_have_their_sizes_in_range() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("clamp");
-    s.add_fixture("stop");
+    add_fixture(&mut s, "clamp");
+    add_fixture(&mut s, "stop");
     let c = part(&s, "Clamp 1");
     assert_eq!(
         chip(&mut s, c, "s", &["0", "20.0"]),
@@ -841,7 +866,7 @@ fn ac24_the_fixtures_snap_switch_is_one_step_and_reads_on_by_default() {
 fn ac28_save_as_profile_stores_the_set_and_writes_format_2() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     holder_with_two_slots(&mut s);
     let _ = s.save_machine_profile([7; 16], 50);
     let id = machine(&s)["profiles"]
@@ -858,14 +883,21 @@ fn ac28_save_as_profile_stores_the_set_and_writes_format_2() {
         2,
         "Fixtures in profile: 2"
     );
+    assert_eq!(
+        machine(&s)["fixture_sets_in_profile"],
+        1,
+        "`0113` criterion 10: Fixture sets in profile: 1"
+    );
     let writes = s.take_machine_writes_json();
     let texts = record_texts(&writes);
     let record: Value = serde_json::from_str(texts.last().expect("a record was written")).unwrap();
-    // Record format 3 since `0103` (ADR 0052 §7), 4 since `0111` (ADR 0056 §7).
-    assert_eq!(record["format_version"], 4, "any write is format 4");
-    assert_eq!(record["fixtures"].as_array().unwrap().len(), 2);
+    // Record format 3 since `0103` (ADR 0052 §7), 4 since `0111` (ADR 0056 §7), 5 with the
+    // named sets since `0113` (ADR 0060 §1).
+    assert_eq!(record["format_version"], 5, "any write is format 5");
+    let set = &record["fixture_sets"][0]["fixtures"];
+    assert_eq!(set.as_array().unwrap().len(), 2);
     assert_eq!(record["id"], id);
-    assert_eq!(record["fixtures"][1]["slots"].as_array().unwrap().len(), 2);
+    assert_eq!(set[1]["slots"].as_array().unwrap().len(), 2);
 }
 
 #[test]
@@ -895,18 +927,12 @@ fn ac28_30_a_format_1_profile_reads_as_an_empty_set_and_is_not_rewritten_on_read
 fn ac29_a_new_laser_page_from_a_profile_starts_with_its_set() {
     let mut a = one_page();
     laser(&mut a);
-    a.add_fixture("grid");
+    add_fixture(&mut a, "grid");
     holder_with_two_slots(&mut a);
     let _ = a.save_machine_profile([8; 16], 50);
-    let id = machine(&a)["profiles"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|p| p["builtin"] == false)
-        .unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    // Superseded by `0113` rework (2026-11-16): the page is on a user profile before Save as
+    // profile (its sets need one), so the saved profile is the page's own, not the first one.
+    let id = machine(&a)["copy"]["id"].as_str().unwrap().to_owned();
     let record = record_texts(&a.take_machine_writes_json())
         .last()
         .unwrap()
@@ -928,18 +954,12 @@ fn ac29_a_new_laser_page_from_a_profile_starts_with_its_set() {
 fn ac29_picking_a_profile_replaces_the_fixtures_in_one_undo_step_and_generic_removes_them() {
     let mut a = one_page();
     laser(&mut a);
-    a.add_fixture("grid");
+    add_fixture(&mut a, "grid");
     holder_with_two_slots(&mut a);
     let _ = a.save_machine_profile([9; 16], 50);
-    let id = machine(&a)["profiles"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|p| p["builtin"] == false)
-        .unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    // Superseded by `0113` rework (2026-11-16): the page is on a user profile before Save as
+    // profile (its sets need one), so the saved profile is the page's own, not the first one.
+    let id = machine(&a)["copy"]["id"].as_str().unwrap().to_owned();
     let record = record_texts(&a.take_machine_writes_json())
         .last()
         .unwrap()
@@ -949,7 +969,7 @@ fn ac29_picking_a_profile_replaces_the_fixtures_in_one_undo_step_and_generic_rem
         &json!([{ "name": curvyo_laser_core::record_file_name(&id), "text": record }]).to_string(),
     );
     laser(&mut b);
-    b.add_fixture("clamp");
+    add_fixture(&mut b, "clamp");
     let steps = b.undo_len();
     assert!(b.pick_machine_profile(&id));
     assert_eq!(b.undo_len(), steps + 1, "the pick is one undo step");
@@ -962,12 +982,14 @@ fn ac29_picking_a_profile_replaces_the_fixtures_in_one_undo_step_and_generic_rem
     assert_eq!(rows(&b).len(), 1, "undo restores the old fixture");
     assert!(b.pick_machine_profile(&id));
     assert!(b.pick_machine_profile("generic-laser"));
-    assert!(rows(&b).is_empty(), "Generic laser holds an empty set");
+    assert!(rows(&b).is_empty(), "Generic laser holds no set");
+    // Superseded by `0113` rework (2026-11-16, criterion 9): picking Generic laser leaves no set
+    // and shows no notice (the sets stay in their profile); it used to say "undo restores".
     assert!(
-        b.take_fixture_notice()
+        !b.take_fixture_notice()
             .is_some_and(|n| n.contains("undo restores"))
-            || manufacturing(&b).to_string().contains("undo restores"),
-        "the pick says the fixtures were removed"
+            && !manufacturing(&b).to_string().contains("undo restores"),
+        "no notice that the fixtures were removed"
     );
     b.undo();
     assert_eq!(rows(&b).len(), 2, "undo restores them");
@@ -1002,11 +1024,11 @@ fn ac30_a_damaged_profile_record_is_skipped_with_its_notice() {
 fn ac31_save_and_reopen_keep_every_value_of_the_fixtures() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("grid");
+    add_fixture(&mut s, "grid");
     let holder = holder_with_two_slots(&mut s);
-    s.add_fixture("clamp");
-    s.add_fixture("stop");
-    s.add_fixture("screw");
+    add_fixture(&mut s, "clamp");
+    add_fixture(&mut s, "stop");
+    add_fixture(&mut s, "screw");
     assert!(s.set_fixture_active(part(&s, "Grid 1"), false));
     assert!(s.set_fixture_visible(part(&s, "Clamp 1"), false));
     assert_eq!(
@@ -1102,8 +1124,9 @@ fn ac33_a_damaged_golden_shows_one_notice_of_at_most_70_characters() {
         notice.chars().count() <= 70,
         "at most 70 characters: {notice}"
     );
+    // Superseded by `0113` criterion 40: one notice per set or for the job fixtures.
     assert!(
-        notice.contains("damaged on"),
+        notice.contains("damaged in"),
         "it counts the values: {notice}"
     );
 }
@@ -1131,8 +1154,8 @@ fn ac34_a_v39_grid_opens_active_with_four_tapes() {
 fn ac36_fixtures_add_nothing_to_an_output_and_are_in_no_svg() {
     let mut s = one_page();
     laser(&mut s);
-    s.add_fixture("holder");
-    s.add_fixture("grid");
+    add_fixture(&mut s, "holder");
+    add_fixture(&mut s, "grid");
     let d = opened(&s);
     assert_eq!(
         d.object_ids().len(),
@@ -1155,7 +1178,7 @@ mod budgets {
         laser(&mut s);
         for i in 0..50 {
             let kind = ["holder", "clamp", "stop"][i % 3];
-            s.add_fixture(kind).expect("a fixture");
+            add_fixture(&mut s, kind).expect("a fixture");
             s.escape();
         }
         s

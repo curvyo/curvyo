@@ -16,10 +16,12 @@
           },
           "name": "Cut 1",
           "of": 1,
+          "on_this_page": true,
           "output": false,
           "parts_ticked": 1,
           "parts_total": 2,
           "position": 0,
+          "role": null,
           "runs": false,
           "show": true
         }
@@ -39,10 +41,12 @@
           },
           "name": "Engrave + Outline 1",
           "of": 1,
+          "on_this_page": true,
           "output": true,
           "parts_ticked": 2,
           "parts_total": 2,
           "position": 0,
+          "role": null,
           "runs": true,
           "show": true
         }
@@ -62,10 +66,12 @@
           },
           "name": "Score 1",
           "of": 1,
+          "on_this_page": true,
           "output": true,
           "parts_ticked": 1,
           "parts_total": 2,
           "position": 0,
+          "role": null,
           "runs": false,
           "show": true
         }

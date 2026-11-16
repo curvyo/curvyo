@@ -137,7 +137,8 @@ fn state_every_kind() -> Document {
 /// announcement; the Select bar shows nothing for a fixture, criterion 14).
 fn states() -> Vec<(&'static str, Document, bool)> {
     vec![
-        ("empty", document().0, false),
+        // Superseded by `0113`: the empty page is `empty_page.json` of
+        // `fixture_sets_view_contract.rs`; these fixtures are job fixtures (no set).
         ("every_kind", state_every_kind(), false),
         ("selected_holder", state_every_kind(), true),
     ]
@@ -155,7 +156,7 @@ fn view_of(d: &Document, select_holder: bool) -> Value {
     assert!(s.activate_page(&laser));
     if select_holder {
         let view: Value = serde_json::from_str(&s.fixtures_view_json()).unwrap();
-        let holder = view["rows"]
+        let holder = view["job_fixtures"]
             .as_array()
             .unwrap()
             .iter()
@@ -192,7 +193,7 @@ fn every_state_matches_its_fixture() {
 #[test]
 fn the_every_kind_state_holds_what_the_decoder_must_read() {
     let json = view_of(&state_every_kind(), false);
-    let kinds: Vec<&str> = json["rows"]
+    let kinds: Vec<&str> = json["job_fixtures"]
         .as_array()
         .unwrap()
         .iter()
@@ -203,19 +204,27 @@ fn the_every_kind_state_holds_what_the_decoder_must_read() {
         ["grid", "holder", "clamp", "stop", "screw", "unknown"]
     );
     assert!(
-        json["rows"][4]["grid"].is_null() && json["rows"][4].get("size").is_none(),
-        "a screw's row has no field"
+        json["job_fixtures"][4]["grid"].is_null() && json["job_fixtures"][4].get("size").is_none(),
+        "a screw's row has no grid field"
     );
-    let slots = &json["rows"][1]["slots"];
+    assert!(
+        json["job_fixtures"][4]["round"]["diameter_mm"].is_null(),
+        "nor a Head or Thread field (`0113` criterion 20)"
+    );
+    assert!(
+        json["job_fixtures"][4]["round"]["centre_mark"].is_null(),
+        "an old screw has no role jobs: no Jobs toggles (`0113` criterion 39)"
+    );
+    let slots = &json["job_fixtures"][1]["slots"];
     assert_eq!(slots[1]["shape"], "circle");
     assert_eq!(slots[2]["outside"], true);
-    assert_eq!(json["rows"][2]["active"], false);
-    assert_eq!(json["rows"][3]["visible"], false);
+    assert_eq!(json["job_fixtures"][2]["active"], false);
+    assert_eq!(json["job_fixtures"][3]["visible"], false);
     assert_eq!(
         json["damage_notices"],
-        json!(["1 value damaged on Stop 1."])
+        json!(["1 value damaged in Job fixtures."])
     );
-    assert_eq!(json["can_add_grid"], false);
+    assert_eq!(json["sets"], json!([]));
     assert!(json["selected"].is_null());
     assert!(json["selection_announcement"].is_null());
     assert!(
@@ -227,13 +236,13 @@ fn the_every_kind_state_holds_what_the_decoder_must_read() {
 #[test]
 fn the_selected_holder_state_carries_its_announcement() {
     let json = view_of(&state_every_kind(), true);
-    assert_eq!(json["selected"], json["rows"][1]["id"]);
+    assert_eq!(json["selected"], json["job_fixtures"][1]["id"]);
     assert_eq!(
         json["selection_announcement"],
         "Holder 1 selected, 120.0 by 80.0 mm."
     );
     assert!(
-        json["rows"][1].get("size").is_none(),
+        json["job_fixtures"][1].get("size").is_none(),
         "no size field in the row"
     );
 }

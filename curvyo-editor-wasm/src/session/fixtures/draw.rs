@@ -1,21 +1,23 @@
 //! What the fixtures draw (`specs/0102-laser-fixtures` criteria 5 to 7, 16 to 18, 20 to 23, 35 d
 //! and 37; UX notes §5 and §6): each laser page's fixtures as one look for `curvyo-render-core`,
-//! the selection box and cues over everything, and the grid layout cached by its inputs.
+//! the selection box and cues over everything, and the grid layout and page lists cached by their
+//! inputs.
 
 use std::cell::RefCell;
 use std::sync::Arc;
 
-use curvyo_document_core::{DocumentSize, Point};
+use curvyo_document_core::{DocumentSize, DocumentVersion, Page, Point, ViewTransform};
 use curvyo_laser_core::{GridLayout, GridSpec, Slot, TapeEdge, layout};
 use curvyo_render_core::{
-    BoardLook, DrawList, FixtureLook, GridLook, ScrewLook, SlotLook, StopLook, TapeLook, TickLook,
-    TransformDecorationInput,
+    BoardLook, DrawList, FixtureLook, GridLook, PinLook, ScrewLook, SlotLook, StopLook, TapeLook,
+    TickLook, TransformDecorationInput,
 };
 
 use super::super::Session;
 use super::fit::outline_of;
 use super::handles::handle_glyphs;
-use super::placed::{PageFixtures, PlacedFixture, Shape};
+use super::placed::{PageFixtures, PlacedFixture};
+use super::shape::Shape;
 use super::slots::slot_outside;
 
 /// Minor lines fade in between these spacings, in device px (UX notes §5.1).
@@ -42,6 +44,33 @@ impl GridCache {
     }
 }
 
+/// Everything the fixtures' page lists are built from besides a drag in flight: equal keys give
+/// equal lists.
+#[derive(Debug, Clone, PartialEq)]
+struct ListsKey {
+    version: DocumentVersion,
+    pages: Vec<Page>,
+    view: ViewTransform,
+    device_pixel_ratio: f64,
+    canvas: (f64, f64),
+    workbench: super::super::Workbench,
+    operations_view: bool,
+    extensions: curvyo_ui_core::ExtensionSettings,
+}
+
+/// Each laser page's fixture list by the index of its page.
+type PageLists = Vec<(usize, DrawList)>;
+
+/// The fixtures' page lists of the last frame and what they were built from: an idle frame, a
+/// selection or a hover rebuilds none of the fixture triangles (`0113` UX review).
+#[derive(Debug, Default)]
+pub(super) struct ListsCache {
+    held: RefCell<Option<(ListsKey, PageLists)>>,
+    /// How often the lists were built, for the tests.
+    #[cfg(test)]
+    pub(super) builds: std::cell::Cell<usize>,
+}
+
 /// The four corners of the rectangle `x0, y0` to `x1, y1` moved by `o`.
 fn rect(o: Point, (x0, y0): (f64, f64), (x1, y1): (f64, f64)) -> [Point; 4] {
     [(x0, y0), (x1, y0), (x1, y1), (x0, y1)].map(|(x, y)| Point::new(o.x + x, o.y + y))
@@ -66,6 +95,7 @@ impl Session {
         let mut look = FixtureLook::default();
         let page = &fixtures.page;
         let engraved = self.engraved_boards(fixtures);
+        let scored = self.job_looks_drawn(fixtures);
         for fixture in fixtures.fixtures.iter().filter(|f| f.shown()) {
             let fixture = self
                 .fixture_live_edit(fixture.id)
@@ -91,13 +121,26 @@ impl Session {
                     leg_b.as_mm(),
                     thickness.as_mm(),
                 )),
-                Shape::Screw { thread, head } => look.screws.push(ScrewLook {
-                    centre: fixture.global.apply_point(Point::new(0.0, 0.0)),
-                    head_mm: head.as_mm(),
-                    thread_mm: thread.as_mm(),
-                }),
+                Shape::Screw { thread, head, .. } => {
+                    for centre in fixture.centres() {
+                        look.screws.push(ScrewLook {
+                            centre,
+                            head_mm: head.as_mm(),
+                            thread_mm: thread.as_mm(),
+                        });
+                    }
+                }
+                Shape::Pin { diameter, .. } => {
+                    for centre in fixture.centres() {
+                        look.pins.push(PinLook {
+                            centre,
+                            diameter_mm: diameter.as_mm(),
+                        });
+                    }
+                }
                 Shape::Unknown => {}
             }
+            centre_marks(&fixture, scored, &mut look.marks);
         }
         look
     }
@@ -155,6 +198,46 @@ impl Session {
         &self,
         pages: &[curvyo_document_core::Page],
     ) -> Vec<(usize, DrawList)> {
+        // A drag draws its fixture at its live place, which no key holds.
+        if self
+            .fixtures
+            .drag
+            .as_ref()
+            .is_some_and(|d| d.live.is_some())
+        {
+            return self.built_page_lists(pages);
+        }
+        let key = ListsKey {
+            version: self.document.version(),
+            pages: pages.to_vec(),
+            view: self.view(),
+            device_pixel_ratio: self.device_pixel_ratio,
+            canvas: self.viewport.canvas_size(),
+            workbench: self.workbench(),
+            operations_view: self.operations_view_on(),
+            extensions: self.manufacturing.extensions.clone(),
+        };
+        let cache = &self.fixtures.lists_cache;
+        if let Some((held, lists)) = cache.held.borrow().as_ref()
+            && *held == key
+        {
+            #[cfg(test)]
+            assert_eq!(
+                *lists,
+                self.built_page_lists(pages),
+                "the cached fixture lists differ: an input is missing from their key"
+            );
+            return lists.clone();
+        }
+        #[cfg(test)]
+        cache.builds.set(cache.builds.get() + 1);
+        let lists = self.built_page_lists(pages);
+        *cache.held.borrow_mut() = Some((key, lists.clone()));
+        lists
+    }
+
+    /// [`Session::fixture_page_lists`] built anew.
+    fn built_page_lists(&self, pages: &[curvyo_document_core::Page]) -> Vec<(usize, DrawList)> {
         let view = self.view();
         self.available_page_fixtures()
             .iter()
@@ -202,7 +285,11 @@ impl Session {
     /// §7.2).
     pub(in crate::session) fn fixture_overlay(&self) -> DrawList {
         let view = self.view();
-        let mut list = DrawList::default();
+        let mut list = self.fixture_placement_overlay();
+        list.extend(self.apply_preview_overlay());
+        if let Some(result) = self.fixture_drag_snap() {
+            list.extend(self.snap_marker_of(result));
+        }
         if let Some((slot, fit)) = self.current_fit() {
             if slot.drawn {
                 list.extend(curvyo_render_core::build_slot_cue(
@@ -257,6 +344,34 @@ impl Session {
         }
         list
     }
+}
+
+/// The Centre mark of a pin or a screw that owns one, at every centre in the fixture ink, 1 px
+/// (`0113` criterion 25, UX notes 6.2): its circle as chords and its cross. While the job's Score
+/// look is drawn (`scored`: "View: Operations"; Show and Output on) that look alone shows it, so
+/// no solid line lies under its dashes.
+fn centre_marks(fixture: &PlacedFixture, scored: bool, out: &mut Vec<(Point, Point)>) {
+    let Some(grid) = fixture.shape.centre_grid() else {
+        return;
+    };
+    let Some(job) = fixture
+        .jobs
+        .iter()
+        .find(|job| job.role == Some(curvyo_document_core::JobRole::CentreMark))
+    else {
+        return;
+    };
+    if scored && job.show && job.output && job.kind.known().is_some() {
+        return;
+    }
+    let marks = curvyo_laser_core::centre_marks(&fixture.centres(), grid.mark);
+    for circle in &marks.circles {
+        out.extend(super::placed::circle(
+            circle.centre,
+            circle.diameter.as_mm() / 2.0,
+        ));
+    }
+    out.extend(marks.lines.iter().map(|line| (line.from, line.to)));
 }
 
 /// A stop's two legs from its outer corner, `leg_a` along +x and `leg_b` along +y, `thickness`

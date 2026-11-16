@@ -20,6 +20,8 @@ pub(super) fn part_name(fixture: &PlacedFixture, part: FixturePart) -> String {
         FixturePart::GridTapes => "Tapes".to_owned(),
         FixturePart::ScrewHead => "Head".to_owned(),
         FixturePart::ScrewThread => "Thread".to_owned(),
+        FixturePart::ScrewMarks | FixturePart::PinMarks => "Marks".to_owned(),
+        FixturePart::PinCircle => "Circle".to_owned(),
     }
 }
 

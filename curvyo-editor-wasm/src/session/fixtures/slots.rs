@@ -11,7 +11,8 @@ use serde_json::{Value, json};
 
 use super::super::Session;
 use super::params::{slot_field, with_number};
-use super::placed::{PlacedFixture, Shape};
+use super::placed::PlacedFixture;
+use super::shape::Shape;
 
 /// The side of a new slot, in mm (criterion 19, Proposal).
 const NEW_SLOT_MM: f64 = 20.0;
@@ -47,8 +48,9 @@ impl Session {
             NEW_SLOT_MM,
             NEW_SLOT_MM,
         );
-        let slot =
-            self.recording_unguarded(|this| this.document.add_slot(holder, "Slot", &params).ok())?;
+        let slot = self.set_content(holder, |this| {
+            this.document.add_slot(holder, "Slot", &params).ok()
+        })?;
         self.select_slot(slot);
         Some(slot)
     }
@@ -58,7 +60,7 @@ impl Session {
         if self.slot_holder(slot).is_none() {
             return false;
         }
-        self.recording_unguarded(|this| this.document.remove_slot(slot).is_ok())
+        self.set_content(slot, |this| this.document.remove_slot(slot).is_ok())
     }
 
     /// Renames the slot `slot`, up to 40 characters; one step "Rename slot".
@@ -66,7 +68,7 @@ impl Session {
         let Some(params) = self.slot_params(slot) else {
             return false;
         };
-        self.recording_unguarded(|this| {
+        self.set_content(slot, |this| {
             this.document
                 .set_slot_labelled(slot, name, &params, RENAME_SLOT_COMMIT_LABEL)
                 .unwrap_or(false)
@@ -119,7 +121,7 @@ impl Session {
         let Some((holder, name)) = self.slot_holder(slot) else {
             return false;
         };
-        let written = self.recording_unguarded(|this| {
+        let written = self.set_content(slot, |this| {
             this.document
                 .set_slot_labelled(slot, &name, params, label)
                 .unwrap_or(false)

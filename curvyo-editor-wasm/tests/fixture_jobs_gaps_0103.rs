@@ -4,6 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
 
+mod fixture_support;
+use fixture_support::add_fixture;
 mod operation_shims;
 use operation_shims::add_operation;
 use std::path::PathBuf;
@@ -43,7 +45,7 @@ fn one_page() -> Session {
 }
 
 fn holder(s: &mut Session, slots: usize) -> NodeId {
-    let h = s.add_fixture("holder").expect("a holder");
+    let h = add_fixture(s, "holder").expect("a holder");
     for _ in 0..slots {
         s.add_slot(h).expect("a slot");
     }

@@ -11,6 +11,8 @@
     missing_docs
 )]
 
+mod fixture_support;
+use fixture_support::add_fixture;
 #[path = "cpu_time/mod.rs"]
 mod cpu_time;
 
@@ -58,7 +60,7 @@ fn page(items: usize) -> (Session, Vec<NodeId>) {
     s.wipe_history();
     let mut jobs = Vec::new();
     for _ in 0..25 {
-        let h = s.add_fixture("holder").expect("a holder");
+        let h = add_fixture(&mut s, "holder").expect("a holder");
         for _ in 0..4 {
             s.add_slot(h).expect("a slot");
         }

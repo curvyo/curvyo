@@ -233,7 +233,7 @@ impl Session {
     /// Each placement whose drawing page exists: its id, the map to the output page's local mm
     /// and the indexes of its members in the drawn leaves. A placement of a deleted page draws
     /// nothing (ADR 0032 §7).
-    fn placements_of(
+    pub(in crate::session) fn placements_of(
         &self,
         manufacturing: &ManufacturingSnapshot,
     ) -> Vec<(NodeId, Affine, Arc<[usize]>)> {

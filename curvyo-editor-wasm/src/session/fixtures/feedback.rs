@@ -12,7 +12,7 @@ use super::super::move_indicators::move_readout_text;
 use super::super::shapes::LiveReadout;
 use super::handles::{FixtureHandle, fixture_box, hit_fixture_handle};
 use super::hit::inside;
-use super::placed::Shape;
+use super::shape::Shape;
 
 /// The cursor of `handle` on a box turned by `angle`: the rectangle's names.
 fn cursor_of(handle: FixtureHandle, angle: Angle) -> Option<String> {
@@ -28,9 +28,12 @@ fn cursor_of(handle: FixtureHandle, angle: Angle) -> Option<String> {
         FixtureHandle::Leg(_) => resize(ResizeDirection::S),
         FixtureHandle::Rotate(_) => "rotate".to_owned(),
         FixtureHandle::Move => "move".to_owned(),
-        FixtureHandle::Thickness | FixtureHandle::Head | FixtureHandle::Thread => {
-            "pointer".to_owned()
-        }
+        FixtureHandle::Thickness
+        | FixtureHandle::Head
+        | FixtureHandle::Thread
+        | FixtureHandle::Diameter
+        | FixtureHandle::Columns
+        | FixtureHandle::Rows => "pointer".to_owned(),
         FixtureHandle::Hold => return None,
     })
 }
@@ -49,6 +52,10 @@ impl Session {
             .and_then(|id| self.page_fixture(id))?;
         if !super::commands::movable(&fixture) {
             return None;
+        }
+        // Over a locked job fixture's box: the Lock cursor (`0113` UX notes 7).
+        if fixture.locked() {
+            return inside(&fixture.corners(&fixtures.page), pointer).then(|| "lock".to_owned());
         }
         let box_ = fixture_box(&fixture, &fixtures.page);
         let tolerances = self.transform_handle_tolerances();
@@ -87,7 +94,13 @@ impl Session {
             (_, Shape::Stop { leg_a, leg_b, .. }) => {
                 format!("{:.1} × {:.1} mm", leg_a.as_mm(), leg_b.as_mm())
             }
-            (handle, Shape::Screw { thread, head }) => {
+            (FixtureHandle::Columns | FixtureHandle::Rows, shape) => {
+                super::grid_handles::spacing_readout(drag.handle, shape)?
+            }
+            (FixtureHandle::Diameter, Shape::Pin { diameter, .. }) => {
+                format!("⌀ {:.1} mm", diameter.as_mm())
+            }
+            (handle, Shape::Screw { thread, head, .. }) => {
                 let at_limit = (thread.as_mm() - head.as_mm()).abs() < 1e-9;
                 let (value, limit) = match handle {
                     FixtureHandle::Thread => (thread, " max"),

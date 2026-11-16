@@ -96,6 +96,7 @@ mod layers_panel_tests;
 #[cfg(test)]
 mod layers_tests;
 mod layers_toolbar;
+mod library_journal;
 mod manufacturing;
 mod materials;
 mod measure;
@@ -115,8 +116,9 @@ mod open_error;
 mod operations;
 #[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
 pub use fixtures::{
-    AddTarget, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow, FixturesView,
-    GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView, SlotRow, TapesView,
+    AddTarget, ApplyCandidate, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow,
+    FixturesView, GridValues, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
+    RoleToggle, RoundValues, SetView, SlotRow, TapesView,
 };
 pub use materials::{MaterialWrite, MaterialsView};
 pub use test_grid::TestGridView;
@@ -672,6 +674,9 @@ pub struct Session {
     /// The maker's materials, the journal of this session's material steps and the Materials
     /// tab's view state (`materials/`, `specs/0112-test-grid-and-materials`).
     materials: materials::MaterialsState,
+    /// The record part of this session's material and machine-set steps (ADR 0055 §9, ADR 0060
+    /// §5a), one budget for both.
+    library_journal: library_journal::Journal,
     /// The Test grid tool (`test_grid/`, `specs/0112`).
     test_grid: test_grid::TestGridTool,
 }
@@ -790,6 +795,7 @@ impl Session {
             operations: operations::OperationsState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
+            library_journal: library_journal::Journal::default(),
             test_grid: test_grid::TestGridTool::default(),
         }
     }
@@ -902,6 +908,7 @@ impl Session {
             operations: operations::OperationsState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
+            library_journal: library_journal::Journal::default(),
             test_grid: test_grid::TestGridTool::default(),
         };
         // A file another tool wrote can hold clones whose original is gone (`0049` criterion 35).
@@ -956,8 +963,10 @@ impl Session {
             this.select.cancel_entry();
             this.select.forget_press();
             this.select.cancel_gesture();
-            // Any tool switch, by any route, cancels a placement (`0052` criterion 7).
+            // Any tool switch, by any route, cancels a placement (`0052` criterion 7), and the
+            // armed placement of a job fixture (`0113` criterion 13).
             this.cancel_placement();
+            this.end_fixture_placement();
             // And the Pen entry chip (`0072` criterion 22).
             this.cancel_pen_entry();
             // A tool switch ends pick mode without a change (`0080` UX notes §2) and text
@@ -1022,7 +1031,8 @@ impl Session {
             .collect()
     }
 
-    /// The pointer went down at `point` (document space).
+    /// The pointer went down at `point` (document space): one dispatch of a press in its order
+    /// of precedence, the active tool last.
     pub fn pointer_down(&mut self, point: Point, shift: bool) {
         self.recording_unguarded(|this| {
             let Some(point) = sanitized_point(point) else {
@@ -1050,97 +1060,117 @@ impl Session {
                 }
                 return;
             }
-            // A press on another laser page's fixture only activates that page (`0102` crit. 11).
-            let page_before = if this.tool == Tool::Select {
-                this.active_page().id
-            } else {
-                String::new()
-            };
-            this.press_page_view(point);
-            this.sync_workbench();
-
-            // Same flush as `set_tool`'s own doc comment explains: a canvas
-            // click can change the selection (e.g. selecting a different
-            // star) before a pending ratio-slider preview ever gets a
-            // chance to commit against the selection it was previewed
-            // against, if the mouse was released outside the slider itself.
-            this.flush_select_bar_preview();
-            this.flush_style_preview();
-            if this.colour_pick_press(point) || this.trace_pick_press(point, shift) {
-                return;
-            }
-            // During a placement a press places or is ignored; it starts no drag (`0052`
-            // criteria 4, 5, 22).
-            if this.placement().is_some() {
-                this.button_down = true;
-                let modifiers = Modifiers { shift, ..this.held };
-                this.placement_press(point, modifiers);
-                return;
-            }
-            // Pick mode and the drags of a selected text on path take the press (`0080`).
-            if this.text_path_pointer_down(point, shift) {
-                this.button_down = true;
-                return;
-            }
-            if this.page_drag_start(point) {
-                return;
-            }
-            // The outline of a fixture of the active laser page (`specs/0102` criteria 8 to 11).
-            if this.fixture_press(point, &page_before) {
-                this.button_down = true;
-                return;
-            }
-            if this.refuse_drawing_into_layer() {
-                this.end_snapping_drag();
-                return;
-            }
-            if this.width_pointer_down(point) {
-                this.button_down = true;
+            if this.press_taken_before_tool(point, shift) {
                 return;
             }
             this.button_down = true;
-            match this.tool {
-                Tool::Select => {
-                    if !this.dimension_pointer_down(point, shift) {
-                        this.select_pointer_down(point, shift);
-                    }
-                }
-                Tool::Measure => this.measure_pointer_down(point),
-                Tool::Pen => {
-                    // A frozen entry chip takes the press (`0072` criterion 20).
-                    if !this.pen_entry_press() {
-                        this.pen_pointer_down(point, shift);
-                    }
-                }
-                Tool::Node => {
-                    // A press on an object out of context, or on a move-only selection's box,
-                    // is the Select tool's (`specs/0106` criterion 10).
-                    if this.node_press_as_select(point) {
-                        this.button_down = false;
-                        return;
-                    }
-                    if this.kept_point_pointer_down(point) {
-                        return;
-                    }
-                    let paths = this.node_paths();
-                    let tolerances = this.hit_tolerances();
-                    this.node_announcement = None;
-                    this.node.pointer_down(&paths, point, tolerances, shift);
-                    this.capture_node_spiro_sources(&paths, point);
-                    this.begin_node_snapping(point);
-                }
-                Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
-                    this.note_shape_press(point);
-                    this.shape_pointer_down(point);
-                }
-                Tool::Offset => {
-                    this.offset_pointer_down(point, shift);
-                }
-                Tool::Text => this.text_pointer_down(point, shift),
-                Tool::Trace => this.trace_pointer_down(point, shift),
-                Tool::TestGrid => this.test_grid_pointer_down(point),
-            }
+            this.tool_pointer_down(point, shift);
         });
+    }
+
+    /// Whether a press at `point` was taken before the active tool (after the page it hits is
+    /// activated and the bar previews are flushed): by a colour or trace pick, a fixture
+    /// placement, a placement, a text on a path, a page drag, a fixture, a refused layer or a
+    /// width handle, in that order.
+    fn press_taken_before_tool(&mut self, point: Point, shift: bool) -> bool {
+        // A press on another laser page's fixture only activates that page (`0102` crit. 11).
+        let page_before = if self.tool == Tool::Select {
+            self.active_page().id
+        } else {
+            String::new()
+        };
+        self.press_page_view(point);
+        self.sync_workbench();
+
+        // Same flush as `set_tool`'s own doc comment explains: a canvas
+        // click can change the selection (e.g. selecting a different
+        // star) before a pending ratio-slider preview ever gets a
+        // chance to commit against the selection it was previewed
+        // against, if the mouse was released outside the slider itself.
+        self.flush_select_bar_preview();
+        self.flush_style_preview();
+        // Armed placement of a job fixture drops it and selects nothing (`0113` crit. 13).
+        if self.colour_pick_press(point)
+            || self.trace_pick_press(point, shift)
+            || self.fixture_placement_press(point)
+        {
+            return true;
+        }
+        // During a placement a press places or is ignored; it starts no drag (`0052`
+        // criteria 4, 5, 22).
+        if self.placement().is_some() {
+            self.button_down = true;
+            let modifiers = Modifiers { shift, ..self.held };
+            self.placement_press(point, modifiers);
+            return true;
+        }
+        // Pick mode and the drags of a selected text on path take the press (`0080`).
+        if self.text_path_pointer_down(point, shift) {
+            self.button_down = true;
+            return true;
+        }
+        if self.page_drag_start(point) {
+            return true;
+        }
+        // The outline of a fixture of the active laser page (`specs/0102` criteria 8 to 11).
+        if self.fixture_press(point, &page_before) {
+            self.button_down = true;
+            return true;
+        }
+        if self.refuse_drawing_into_layer() {
+            self.end_snapping_drag();
+            return true;
+        }
+        if self.width_pointer_down(point) {
+            self.button_down = true;
+            return true;
+        }
+        false
+    }
+
+    /// The press of the active tool at `point`.
+    fn tool_pointer_down(&mut self, point: Point, shift: bool) {
+        match self.tool {
+            Tool::Select => {
+                if !self.dimension_pointer_down(point, shift) {
+                    self.select_pointer_down(point, shift);
+                }
+            }
+            Tool::Measure => self.measure_pointer_down(point),
+            Tool::Pen => {
+                // A frozen entry chip takes the press (`0072` criterion 20).
+                if !self.pen_entry_press() {
+                    self.pen_pointer_down(point, shift);
+                }
+            }
+            Tool::Node => {
+                // A press on an object out of context, or on a move-only selection's box,
+                // is the Select tool's (`specs/0106` criterion 10).
+                if self.node_press_as_select(point) {
+                    self.button_down = false;
+                    return;
+                }
+                if self.kept_point_pointer_down(point) {
+                    return;
+                }
+                let paths = self.node_paths();
+                let tolerances = self.hit_tolerances();
+                self.node_announcement = None;
+                self.node.pointer_down(&paths, point, tolerances, shift);
+                self.capture_node_spiro_sources(&paths, point);
+                self.begin_node_snapping(point);
+            }
+            Tool::Rectangle | Tool::Ellipse | Tool::PolygonStar => {
+                self.note_shape_press(point);
+                self.shape_pointer_down(point);
+            }
+            Tool::Offset => {
+                self.offset_pointer_down(point, shift);
+            }
+            Tool::Text => self.text_pointer_down(point, shift),
+            Tool::Trace => self.trace_pointer_down(point, shift),
+            Tool::TestGrid => self.test_grid_pointer_down(point),
+        }
     }
 
     /// The pointer moved to `point`. Always records `point` as the live
@@ -1184,6 +1214,9 @@ impl Session {
             return;
         }
         if self.text_path_pointer_move(point) {
+            return;
+        }
+        if self.fixture_placement_hover(point) {
             return;
         }
         if (self.tool == Tool::Select && self.fixture_drag_move(point))
@@ -1246,6 +1279,7 @@ impl Session {
             self.end_snapping_drag();
         }
         self.pointer_position = None;
+        self.fixture_placement_leave();
         self.sketch.hover = None;
         if !self.button_down {
             self.sketch.preview = None;
@@ -1316,6 +1350,9 @@ impl Session {
             this.held.shift = shift;
             // The release of a drag Escape cancelled does nothing at all.
             if std::mem::take(&mut this.clone_drops.escaped) {
+                return;
+            }
+            if this.fixture_placement_release() {
                 return;
             }
             if this.tool == Tool::Select && this.fixture_drag_release(point) {

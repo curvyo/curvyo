@@ -1,0 +1,73 @@
+{
+  "apply_candidates": [],
+  "apply_picked": null,
+  "armed": null,
+  "armed_kind": null,
+  "can_add_job_fixture": true,
+  "can_add_set": false,
+  "damage_notices": [],
+  "job_fixtures": [],
+  "profile_hint": null,
+  "read_only": "From the project file. Generic laser copy is not on this computer.",
+  "selected": null,
+  "selected_slot": null,
+  "selection_announcement": null,
+  "sets": [
+    {
+      "can_add": false,
+      "can_add_grid": true,
+      "fixtures": [
+        {
+          "active": true,
+          "can_add_slot": true,
+          "grid": null,
+          "id": "27ii6cza3ste2",
+          "kind": "holder",
+          "line2": "Holder · 0 slots · locked",
+          "locked": false,
+          "locked_by_set": true,
+          "name": "Holder 1",
+          "on_bed": true,
+          "round": null,
+          "slots": [],
+          "visible": true
+        }
+      ],
+      "id": "sx7ebqxxbv0e3",
+      "line2": "Holder · 1 fixture · locked",
+      "locked": true,
+      "name": "Set 1",
+      "on_page": true,
+      "unfolded": false
+    },
+    {
+      "can_add": false,
+      "can_add_grid": true,
+      "fixtures": [
+        {
+          "active": true,
+          "can_add_slot": false,
+          "grid": null,
+          "id": "33ps6gw1d1ty0",
+          "kind": "clamp",
+          "line2": "Clamp · locked",
+          "locked": true,
+          "locked_by_set": false,
+          "name": "Clamp 1",
+          "on_bed": true,
+          "round": null,
+          "slots": [],
+          "visible": true
+        }
+      ],
+      "id": "tteobuuol40y1",
+      "line2": "Clamp · 1 fixture",
+      "locked": false,
+      "name": "Set 2",
+      "on_page": true,
+      "unfolded": false
+    }
+  ],
+  "sets_on_page": 2,
+  "snapping_fixtures": true
+}

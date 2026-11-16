@@ -31,6 +31,8 @@ pub(in crate::session) struct PlacedJob {
     pub output: bool,
     /// The ticked parts that read, in Parts-list order (criteria 8, 12).
     pub parts: Vec<FixturePart>,
+    /// The fixed role of a pin's or a screw's job (`0113` criterion 27); `None` for any other.
+    pub role: Option<curvyo_document_core::JobRole>,
 }
 
 impl PlacedJob {
@@ -81,6 +83,7 @@ pub(super) fn read_jobs(
                 show: job.show,
                 output: job.output,
                 parts,
+                role: job.role,
             }
         })
         .collect();
@@ -103,7 +106,9 @@ pub(super) fn running(jobs: &[(&PlacedFixture, &PlacedJob)], cuts_last: bool) ->
         .map(|(fixture, job)| FixtureJobRead {
             kind: job.kind,
             output: job.output,
-            fixture_active: fixture.active,
+            // A job runs only while its fixture lies on the bed: its set on this page too
+            // (`0113` criterion 28).
+            fixture_active: fixture.on_bed(),
             parts: job.parts.clone(),
         })
         .collect();

@@ -442,6 +442,16 @@ impl super::Session {
         })
     }
 
+    /// Sets the Centres target switch (`specs/0113-fixture-sets-and-pins` criterion 30): the
+    /// register `snapping_centres`, one step. Returns whether anything changed.
+    pub fn set_snapping_centres(&mut self, centres: bool) -> bool {
+        let settings = self.document.snapping();
+        self.set_snapping(curvyo_document_core::DocumentSnapping {
+            centres,
+            ..settings
+        })
+    }
+
     /// Sets the grid snap point, `"centre"`, `"box"` or `"nodes"` (criterion 11). Returns
     /// whether anything changed; an unknown name changes nothing.
     pub fn set_snapping_grid_point(&mut self, name: &str) -> bool {
@@ -481,15 +491,24 @@ impl super::Session {
 }
 impl super::Session {
     pub(super) fn snap_marker_list(&self) -> curvyo_render_core::DrawList {
-        use curvyo_document_core::Vec2;
-        use curvyo_render_core::SnapMarkerSegment;
-        use curvyo_ui_core::MarkerLine;
         if !self.snapping_effective_enabled() {
             return curvyo_render_core::DrawList::default();
         }
         let Some(result) = self.snap_result() else {
             return curvyo_render_core::DrawList::default();
         };
+        self.snap_marker_of(result)
+    }
+
+    /// The `0060` marker of `result`: one line per held axis extended by 8 screen px, and the
+    /// cross (a job fixture's centre snap draws it too, `specs/0113` criterion 30).
+    pub(super) fn snap_marker_of(
+        &self,
+        result: &curvyo_ui_core::SnapResult,
+    ) -> curvyo_render_core::DrawList {
+        use curvyo_document_core::Vec2;
+        use curvyo_render_core::SnapMarkerSegment;
+        use curvyo_ui_core::MarkerLine;
         let extra = 8.0 / self.view().scale();
         let segments: Vec<_> = result
             .marker
