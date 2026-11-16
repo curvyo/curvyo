@@ -2502,3 +2502,63 @@ device that holds the room's newest snapshot, or derive the clone's identity fro
 - **Embedding follows OS/2 `fsType`** value 2 (restricted licence) as not embedded
   (FONT-LICENCE default A); other restrictions (preview and print only) are treated as allowed.
 - **Fonts count against the 512 MiB asset budget** shared with pictures; no limit of our own.
+
+## Find centre lines freezes the main thread at Apply and while previewing large results (`0117`, 2026-11-18, measured 2026-11-19)
+
+Since round B the kernel and the preview run in the worker (ADR 0063 amendment 2026-11-18, W)
+and Apply prepares its drawings in slices of 20,000 result nodes (under 1 ms native each), but
+the write itself is one `document.batch`, so it stays one undo step. Measured on 537 traced
+whales (93,438 nodes, about 10,000 result paths; native release, thread CPU,
+`criterion_18_the_preview_and_apply_of_100000_nodes`, 2026-11-19; wasm is slower):
+
+| Main thread at 93,438 nodes | Time | Budget (ADR 0063 C, native) |
+|---|---|---|
+| A frame of the subjects before the bar opens | 78 ms | |
+| The first frame with the preview (`frame_draw_list`, its mesh built) | 1.0 s | 50 ms |
+| Each next frame with the preview (the preview mesh is cached; the rest is not yet profiled) | 0.43 s | 50 ms |
+| The batch of Apply | 0.78 s (1.03 s before the delete skipped its full read) | 50 ms |
+| The first frame after Apply (the new paths' variable-width artwork) | 1.24 s | 50 ms |
+| The next frame after Apply (about 10,000 profiled paths; not yet profiled whether it is general rendering of profiled paths) | 0.63 s | |
+
+The worker's linear memory (wasm in Node, the same 537 whales): 76 MB after the subjects,
+**306 MB after the first painted preview** (the preview message 35 MB, Optimise 50 % with inner
+areas 45 MB), above ADR 0063 W's first 256 MB (now 320 MB, a Proposal, asserted in
+`frontend/tests/centreLinesWorkerMemory.test.ts`); it does not shrink, and the worker is
+terminated when the bar closes. **Resolution:** drop the painted-outline memo for large results or send the
+outlines in parts.
+
+The batch grows about linearly (75 ms at 54 whales, 0.2 s at 135, 0.53 s at 270): insert about
+0.47 s, width points 0.28 s, delete the rest. A whale or the dolphin commits and draws in under
+0.1 s. Accepted for now (Frage 227 CENTRE-COMMIT-FREEZE, default A: the PR states the freeze in
+"What changes in the demo"). **Resolution:** a `document-core` transaction open across slices
+(an API change, its own ADR 0063 amendment and architect review) or a cheaper bulk insert;
+seeding the `width_outlines` memo from the worker's painted outlines; and a preview drawn from
+the worker's polygons without a per-frame rebuild.
+
+## kurbo 0.13.1 curve fitting hangs or panics on unbounded candidates (`0117`, 2026-11-16, root cause 2026-11-19)
+
+`kurbo::fit::cubic_fit` puts no upper bound on a candidate's arm lengths `d0`, `d1` (its own
+comment: "We could implement a maximum d value here"). Near a zero denominator a finite candidate
+gets arms of millions of chords. When it passes the ray test on a "spicy" range,
+`CurveDist::eval_arc` calls `inv_arclen` with `epsilon = 1e-9 / arclen`: above about 1e7 units of
+arc length the bracket of `solve_itp` cannot shrink below one ulp and it loops for ever (release
+and debug), above about 2e10 `1u64 << nmax` overflows (a panic in debug). In the app that stalls
+the centre lines worker. Found by the proptest `noisy_pieces_far_from_the_origin_fit` (seeds in
+`curvyo-geometry-core/proptest-regressions/centre_line/fit.txt`). **Workaround:**
+`centre_line/safe_fit.rs` recomputes kurbo's candidates and ray test for each range before kurbo
+fits it (via `ParamCurveFit::break_cusp`, which `fit_to_bezpath_rec` asks first) and splits a
+range that would measure a candidate longer than 10 m; the anchor merge skips such a range;
+pieces still fit in local coordinates. No issue is filed yet (the lead files it upstream; the
+link goes here). **Resolution:** drop `safe_fit.rs` once kurbo bounds the arms. Draft issue for
+`linebender/kurbo`:
+
+> **`fit_to_bezpath` / `simplify_bezpath` can hang (release) or overflow `1u64 << nmax` (debug)
+> on a candidate with unbounded arms.** kurbo 0.13.1. `cubic_fit` returns candidates whose `d0`
+> or `d1` is finite but huge when `0.5 * d0 * s01 - s1` is near zero. If such a candidate passes
+> `eval_ray` and the range is spicy, `eval_arc` calls `c.inv_arclen(c_arclen * s, 1e-9)`; with
+> `arclen` above about 1e7, `solve_itp`'s `epsilon = 1e-9 / arclen` is below one ulp of `t`, so
+> the loop never ends; above about 2e10, `nmax >= 64` and `1u64 << nmax` overflows. Repro:
+> `simplify_bezpath` of the Catmull-Rom curve through the points of a random walk of 8 steps of
+> 0.01 to 0.5 units with turns up to ±3.2 rad and accuracy 0.15 (the seeds in our proptest file).
+> Suggested fix: the maximum `d` value the comment in `cubic_fit` proposes (for example
+> `d0, d1 <= 1e3`), and an `epsilon` floor in `inv_arclen` relative to `t`'s ulp.
