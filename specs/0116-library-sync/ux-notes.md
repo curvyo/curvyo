@@ -136,11 +136,11 @@ and 400 ms guard are untouched.
   done, `CloudOff` while the server cannot be reached or the item was refused. The
   tooltip's second line states the same in words.
 - **Failures.** No success notice (customer rule 2026-10-31) — the pressed look is the
-  feedback. A toggle press that the group could not carry out does not flip the switch and
-  shows one refusal line under the row (Action notice, `--field-invalid`, 8 s, the `0081`
-  notice slot under the font row; the material and machine rows use the same anchored
-  line): "Could not sync `<name>`: cannot reach the server." Retries are the group's
-  (at once when the network returns, else every 30 s), no Try-again button on a row.
+  feedback. A toggle press flips the local switch at once and retries through the group;
+  the glyph swap carrying the state (section 1) and the group's retries (at once when the
+  network returns, else every 30 s) replace the anchored refusal line under the row (built
+  2026-11-13, lead-approved) — skips and refusals of records are told by the canvas
+  notices of this section. No Try-again button on a row.
 
 ## 6. The Share tab
 

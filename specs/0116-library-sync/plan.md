@@ -94,12 +94,19 @@ One PR per slice at the end. **(Proposal)** marks my own choices, vetoable at th
 - **P14 (task 7: notice wordings).** The switch-off notice keeps the closing period the other
   notices carry ("Sync off, this copy stays here." — criterion 10 quotes it without); the
   arrival counts "machine profiles" as the UX notes' batch sentence does ("1 machine profile
-  and 1 material arrived from your devices."); the conflict notice names the copy ("Both copies
-  are kept: <name> (from your devices).", criterion 9 with P8's "your devices").
+  and 1 material arrived from your devices."), while a batch of exactly one item of one kind
+  names it ("Machine profile K40 arrived from your devices.", the name cut to 24 — UX notes
+  section 5, UX review 2026-11-16); the conflict notice names the copy ("Both copies are
+  kept: <name> (from your devices).", criterion 9 with P8's "your devices").
 - **P15 (task 7: the toggle's transfer state).** The library stream is one Loro list, so
   "this item transfers" is the stream's state: `library_view_json` carries `online`, `acked`
   (no push waiting, the exported version current) and the formatted `state` line; every
   pressed toggle swaps its glyph with it, off and greyed toggles always keep the cloud.
+- **P16 (the failures model).** UX notes section 5 promised an anchored refusal line under
+  the row for a press the group could not carry out; the built model (UX review 2026-11-16,
+  lead-approved) flips the local switch first and retries through the group — P15's glyph
+  swap carries the state and the canvas notices tell skips and refusals — so no anchored
+  line exists and section 5 was amended to say so (built 2026-11-13, lead-approved).
 
 ## Tasks
 
