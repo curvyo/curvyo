@@ -518,6 +518,7 @@ jobs:
           cargo test --release -p curvyo-geometry-core --test stroke_to_path_golden -- --nocapture
           cargo test --release -p curvyo-geometry-core --test pattern_cpu_time -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test stroke_to_path_budget -- --nocapture
+          cargo test --release -p curvyo-editor-wasm --test centre_lines_cpu_time -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test weld_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test trace_mask_budget -- --nocapture
           cargo test --release -p curvyo-editor-wasm --test tiling_budget -- --nocapture
@@ -582,7 +583,8 @@ jobs:
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
         run: |
-          cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden --test weld_golden --test stroke_to_path_golden --test pattern_golden
+          cargo test --target wasm32-unknown-unknown -p curvyo-geometry-core --test boolean_golden_wasm --test offset_golden --test weld_golden --test stroke_to_path_golden --test pattern_golden --test centre_lines_golden
+          cargo test --release --target wasm32-unknown-unknown -p curvyo-geometry-core --test centre_lines_wasm_cpu -- --nocapture
           cargo test --target wasm32-unknown-unknown -p curvyo-ui-core --test tiling_golden
 
   # Dependency-graph/license check, not compiled code — one run sees every
