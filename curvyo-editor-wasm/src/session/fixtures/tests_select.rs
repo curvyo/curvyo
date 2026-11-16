@@ -2,6 +2,7 @@
 //! the hit of a fixture of another laser page (`specs/0102-laser-fixtures` criteria 8, 11, 12, 14).
 #![allow(clippy::unwrap_used, clippy::float_cmp)]
 
+use super::add_fixture;
 use curvyo_document_core::Point;
 use serde_json::Value;
 
@@ -16,17 +17,17 @@ fn layers(s: &mut Session) -> Vec<Value> {
 #[test]
 fn ux_11_the_selected_fixture_is_announced_with_its_sizes() {
     let mut s = laser();
-    s.add_fixture("holder").unwrap();
+    add_fixture(&mut s, "holder").unwrap();
     assert_eq!(
         view(&s).selection_announcement.as_deref(),
         Some("Holder 1 selected, 100.0 by 60.0 mm.")
     );
-    s.add_fixture("stop").unwrap();
+    add_fixture(&mut s, "stop").unwrap();
     assert_eq!(
         view(&s).selection_announcement.as_deref(),
         Some("Stop 1 selected, legs 60.0 and 60.0 mm, thickness 5.0 mm.")
     );
-    s.add_fixture("screw").unwrap();
+    add_fixture(&mut s, "screw").unwrap();
     assert_eq!(
         view(&s).selection_announcement.as_deref(),
         Some("Screw 1 selected, thread 6.0 mm, head 10.0 mm.")
@@ -38,7 +39,7 @@ fn ux_11_the_selected_fixture_is_announced_with_its_sizes() {
 #[test]
 fn criterion_8_the_selected_fixture_has_one_tag_at_its_corner_and_no_name_label() {
     let mut s = laser();
-    s.add_fixture("holder").unwrap();
+    add_fixture(&mut s, "holder").unwrap();
     let labels = s.fixture_labels();
     let tags: Vec<_> = labels.iter().filter(|l| l.kind == "tag").collect();
     assert_eq!(tags.len(), 1, "one tag for the selected fixture");
@@ -54,7 +55,7 @@ fn criterion_8_the_selected_fixture_has_one_tag_at_its_corner_and_no_name_label(
 #[test]
 fn criterion_8_tape_numbers_name_the_edge_they_sit_on() {
     let mut s = laser();
-    s.add_fixture("grid").unwrap();
+    add_fixture(&mut s, "grid").unwrap();
     let labels = s.fixture_labels();
     let tapes: Vec<_> = labels.iter().filter(|l| l.kind == "tape").collect();
     assert!(!tapes.is_empty(), "the grid has tape numbers");
@@ -71,8 +72,8 @@ fn criterion_8_tape_numbers_name_the_edge_they_sit_on() {
 #[test]
 fn criterion_12_the_layers_row_of_the_selected_fixture_is_marked_selected() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
-    let clamp = s.add_fixture("clamp").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
+    let clamp = add_fixture(&mut s, "clamp").unwrap();
     assert!(s.select_fixture(holder));
     let rows = layers(&mut s);
     let mark = |id: &str| {
@@ -90,7 +91,7 @@ fn criterion_11_a_press_on_a_fixture_of_another_laser_page_activates_that_page_a
 {
     let mut s = laser();
     let page_a = s.active_page();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     assert!(super::tests::place(&mut s, holder, 20.0, 30.0));
     // A second laser page becomes the active one.
     s.add_page_of_kind("curvyo.laser", None).unwrap();

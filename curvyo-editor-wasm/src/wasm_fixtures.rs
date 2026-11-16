@@ -24,11 +24,6 @@ impl WasmSession {
         serde_json::to_string(&self.session.fixture_fit_cue()).unwrap_or_else(|_| "null".to_owned())
     }
 
-    /// One of the five add buttons: `grid`, `holder`, `clamp`, `stop`, `screw` (criterion 2).
-    pub fn add_fixture(&mut self, kind: &str) -> bool {
-        self.session.add_fixture(kind).is_some()
-    }
-
     /// Selects the fixture `id` (its row in the Fixtures block or Layers, criterion 10).
     pub fn select_fixture(&mut self, id: &str) -> bool {
         self.part(id)
@@ -129,7 +124,7 @@ impl WasmSession {
         self.session.set_coarse_pointer(coarse);
     }
 
-    fn part(&self, id: &str) -> Option<NodeId> {
+    pub(crate) fn part(&self, id: &str) -> Option<NodeId> {
         self.session.fixture_part_named(id)
     }
 }

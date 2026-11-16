@@ -10,7 +10,8 @@ use curvyo_ui_core::{
     hit_transform_handle, is_drawn_handle, transform_handles,
 };
 
-use super::placed::{PlacedFixture, Shape};
+use super::placed::PlacedFixture;
+use super::shape::Shape;
 
 /// A handle of a fixture, or what a press on its body starts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +30,12 @@ pub(super) enum FixtureHandle {
     Head,
     /// A screw's thread knob.
     Thread,
+    /// A pin's diameter knob on the first pin (`0113` criterion 21).
+    Diameter,
+    /// The knob at the last centre of row 1: a drag changes the column spacing.
+    Columns,
+    /// The knob at the last centre of column 1: a drag changes the row spacing.
+    Rows,
     /// A press on a grid: nothing moves.
     Hold,
 }
@@ -47,7 +54,7 @@ pub(super) fn fixture_box(fixture: &PlacedFixture, page: &Page) -> OrientedBox {
 }
 
 /// The point `local` of the fixture's frame in document space, through its box.
-fn at(box_: &OrientedBox, local: (f64, f64)) -> Point {
+pub(super) fn at(box_: &OrientedBox, local: (f64, f64)) -> Point {
     box_.to_document(Point::new(box_.pivot.x + local.0, box_.pivot.y + local.1))
 }
 
@@ -67,7 +74,8 @@ fn layout_handles(
         resize_directions: resize,
         side_rotate,
     };
-    let screw = matches!(fixture.shape, Shape::Screw { .. });
+    // A pin and a screw never turn (`0113` criterion 21).
+    let screw = matches!(fixture.shape, Shape::Screw { .. } | Shape::Pin { .. });
     transform_handles(box_, spec, tolerances)
         .into_iter()
         .filter(|(handle, _)| match handle {
@@ -104,15 +112,22 @@ fn own_handles(
                 out.push((FixtureHandle::Thickness, at(box_, (a / 2.0, 0.0))));
             }
         }
-        Shape::Screw { thread, head } if head.as_mm() >= tolerances.param_min_side_mm => {
+        Shape::Screw { thread, head, .. } if head.as_mm() >= tolerances.param_min_side_mm => {
             out.push((FixtureHandle::Head, at(box_, (head.as_mm() / 2.0, 0.0))));
             out.push((
                 FixtureHandle::Thread,
                 at(box_, (-thread.as_mm() / 2.0, 0.0)),
             ));
         }
+        Shape::Pin { diameter, .. } if diameter.as_mm() >= tolerances.param_min_side_mm => {
+            out.push((
+                FixtureHandle::Diameter,
+                at(box_, (diameter.as_mm() / 2.0, 0.0)),
+            ));
+        }
         _ => {}
     }
+    out.extend(super::grid_handles::grid_knobs(fixture, box_));
     out
 }
 
@@ -124,7 +139,8 @@ pub(super) fn fixture_handles(
     tolerances: &TransformHandleTolerances,
     side_rotate: bool,
 ) -> Vec<(FixtureHandle, Point)> {
-    if !super::commands::movable(fixture) {
+    // A locked job fixture shows no handle and no knob (`0113` criterion 32).
+    if !super::commands::movable(fixture) || fixture.keeps_place() {
         return Vec::new();
     }
     let box_ = fixture_box(fixture, page);
@@ -233,9 +249,12 @@ pub(super) fn handle_glyphs(
                 FixtureHandle::Resize(_) | FixtureHandle::Leg(_) => TransformGlyphKind::Resize,
                 FixtureHandle::Rotate(_) => TransformGlyphKind::Rotate,
                 FixtureHandle::Move | FixtureHandle::Hold => TransformGlyphKind::Move,
-                FixtureHandle::Thickness | FixtureHandle::Head | FixtureHandle::Thread => {
-                    TransformGlyphKind::Parameter
-                }
+                FixtureHandle::Thickness
+                | FixtureHandle::Head
+                | FixtureHandle::Thread
+                | FixtureHandle::Diameter
+                | FixtureHandle::Columns
+                | FixtureHandle::Rows => TransformGlyphKind::Parameter,
             },
             dragging: active == Some(handle),
             hovered: false,

@@ -560,6 +560,7 @@ fn row_json(row: &LayerRow, index: usize) -> Value {
             "id": row.id.full_id(),
             "kind": f.word,
             "active": f.active,
+            "onPage": f.on_page,
         })),
         "rowAction": match row.kind {
             RowKind::Layer => "select-contents",

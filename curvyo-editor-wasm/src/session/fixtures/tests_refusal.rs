@@ -2,6 +2,7 @@
 //! (criterion 29, ADR 0050 section 6), at session level.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use super::add_fixture;
 use curvyo_document_core::NodeId;
 
 use super::super::Session;
@@ -23,7 +24,7 @@ fn unknown_page() -> (Session, NodeId) {
         }
     }
     let row = view(&s)
-        .rows
+        .rows()
         .into_iter()
         .find(|r| r.kind == FixtureKindView::Unknown)
         .expect("the golden has an unknown fixture");
@@ -53,17 +54,15 @@ fn criterion_29_a_pick_or_reset_posts_the_notice_only_when_fixtures_go() {
     let mut s = laser();
     // The library as the app loads it at start: empty, the built-in Generic laser only.
     s.load_machine_profiles_json("[]");
-    // Nothing to remove (the page already holds Generic laser): no notice.
+    // Superseded by `0113` rework (criterion 9 rewritten 2026-11-16): picking Generic laser
+    // leaves no set on the page and posts no notice; undo brings the mirror back.
     let _ = s.pick_machine_profile("generic-laser");
     assert_eq!(s.take_fixture_notice(), None);
-    // A grid goes with the pick: the removal is named, with its undo.
-    s.add_fixture("grid").unwrap();
+    let mut s = super::tests::laser();
+    add_fixture(&mut s, "grid").unwrap();
     assert!(s.pick_machine_profile("generic-laser"));
-    assert_eq!(
-        s.take_fixture_notice().as_deref(),
-        Some("Fixtures removed (undo restores them).")
-    );
-    // The set is empty now: picking again removes nothing.
-    let _ = s.pick_machine_profile("generic-laser");
     assert_eq!(s.take_fixture_notice(), None);
+    assert_eq!(s.fixtures_view().unwrap().sets, []);
+    s.undo();
+    assert_eq!(s.fixtures_view().unwrap().sets.len(), 1);
 }

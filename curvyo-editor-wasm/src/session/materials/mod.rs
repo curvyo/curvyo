@@ -103,15 +103,14 @@ pub(in crate::session) struct TabState {
     form_for_grid: Option<curvyo_document_core::NodeId>,
 }
 
-/// What the session keeps of the maker's materials: the library, the retired ids, the journal of
-/// this session's record edits, the writes the host has not taken, the photo bytes it knows and
-/// the tab's view state.
+/// What the session keeps of the maker's materials: the library, the retired ids, the writes the
+/// host has not taken, the photo bytes it knows and the tab's view state (the journal of this
+/// session's record edits is the session's library journal).
 #[derive(Debug, Default)]
 pub(in crate::session) struct MaterialsState {
     library: Library,
     retired: RetiredIds,
     retired_notice: Option<&'static str>,
-    journal: undo::Journal,
     outbox: Vec<MaterialWrite>,
     /// Bytes of the photo writes the host has not taken, by handle.
     handles: BTreeMap<u32, Vec<u8>>,
@@ -170,16 +169,6 @@ pub(in crate::session) fn sixteen(random: &[u8], offset: usize) -> [u8; 16] {
         *slot = *byte;
     }
     bytes
-}
-
-/// A material name as the undo notices write it: at most 24 characters, else cut with "…" (UX
-/// notes §13 of `0028`).
-pub(in crate::session) fn short_name(name: &str) -> String {
-    if name.chars().count() <= 24 {
-        return name.to_owned();
-    }
-    let cut: String = name.chars().take(23).collect();
-    format!("{cut}…")
 }
 
 impl Session {

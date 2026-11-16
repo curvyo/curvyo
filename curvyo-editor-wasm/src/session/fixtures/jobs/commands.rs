@@ -23,7 +23,7 @@ impl Session {
             .flat_map(|f| f.jobs.iter().map(|job| job.name.as_str()))
             .collect();
         let name = next_operation_name(kind, names);
-        let id = self.recording_unguarded(|this| {
+        let id = self.set_content(fixture, |this| {
             this.document
                 .add_fixture_job(fixture, kind.as_str(), &name)
                 .ok()
@@ -35,7 +35,7 @@ impl Session {
     /// Renames the job `id`; an empty name reverts (criterion 4). Allowed on an Unknown job.
     pub fn rename_fixture_job(&mut self, id: NodeId, name: &str) -> bool {
         self.page_job(id).is_some()
-            && self.recording_unguarded(|this| {
+            && self.set_content(id, |this| {
                 this.document.rename_fixture_job(id, name).unwrap_or(false)
             })
     }
@@ -45,7 +45,7 @@ impl Session {
         if self.page_job(id).is_none() {
             return false;
         }
-        let deleted = self.recording_unguarded(|this| this.document.delete_fixture_job(id).is_ok());
+        let deleted = self.set_content(id, |this| this.document.delete_fixture_job(id).is_ok());
         if deleted && self.fixtures.job == Some(id) {
             self.fixtures.job = None;
         }
@@ -53,27 +53,33 @@ impl Session {
     }
 
     /// The Show or Output switch of the job `id` (criteria 4, 5). `false` when it already reads
-    /// so or the job is Unknown.
+    /// so or the job is Unknown. Output is a choice of the page; Show is the job's content and,
+    /// on a set fixture, the profile's (`0113` criterion 7).
     pub fn set_fixture_job_switch(
         &mut self,
         id: NodeId,
         which: FixtureJobSwitch,
         on: bool,
     ) -> bool {
+        let write = |this: &mut Self| {
+            this.document
+                .set_fixture_job_switch(id, which, on)
+                .unwrap_or(false)
+        };
         self.editable_job(id)
-            && self.recording_unguarded(|this| {
-                this.document
-                    .set_fixture_job_switch(id, which, on)
-                    .unwrap_or(false)
-            })
+            && match which {
+                FixtureJobSwitch::Output => self.recording_unguarded(write),
+                FixtureJobSwitch::Show => self.set_content(id, write),
+            }
     }
 
     /// Moves the job `id` to `to` among its fixture's jobs (criterion 3: arrows and drag, inside
     /// its group only). `false` when it already sits there or the job is Unknown.
     pub fn move_fixture_job(&mut self, id: NodeId, to: usize) -> bool {
         self.editable_job(id)
-            && self
-                .recording_unguarded(|this| this.document.move_fixture_job(id, to).unwrap_or(false))
+            && self.set_content(id, |this| {
+                this.document.move_fixture_job(id, to).unwrap_or(false)
+            })
     }
 
     /// Ticks (`ticked` true) or unticks the part `token` (`board`, `slot:0`, `grid.lines`, ...)
@@ -90,7 +96,7 @@ impl Session {
         else {
             return false;
         };
-        self.recording_unguarded(|this| {
+        self.set_content(id, |this| {
             this.document
                 .set_fixture_job_targets(id, &[key], ticked)
                 .unwrap_or(false)

@@ -38,6 +38,9 @@ impl Session {
         if input.dom_blocked || input.ctrl || input.alt {
             return None;
         }
+        if let Some(outcome) = self.fixture_placement_key(input) {
+            return Some(outcome);
+        }
         let id = self.selected_fixture()?;
         let (_, fixture) = self.page_fixture(id)?;
         if matches!(input.key, "Delete" | "Backspace") {
@@ -53,7 +56,8 @@ impl Session {
             return Some(KeyOutcome::Consumed);
         }
         if let Some(key @ ('m' | 'r' | 's')) = single_letter(input.key) {
-            if !movable(&fixture) || input.shift {
+            // A locked job fixture opens no Move or S chip (`0113` criterion 32).
+            if !super::lock::may_move(&fixture) || input.shift {
                 return Some(KeyOutcome::Consumed);
             }
             return Some(if self.open_fixture_entry_for_key(key) {
@@ -63,7 +67,8 @@ impl Session {
             });
         }
         let offset = nudge(input.key, input.shift)?;
-        if !movable(&fixture) {
+        // A locked job fixture takes no nudge (`0113` criterion 32).
+        if !super::lock::may_move(&fixture) {
             return Some(KeyOutcome::Consumed);
         }
         self.fixtures.armed = None;

@@ -8,7 +8,7 @@ use curvyo_laser_core::{
 };
 use serde_json::Value;
 
-use super::placed::{CLAMP_SIZE_MM, HOLDER_SIZE_MM};
+use super::shape::{CLAMP_SIZE_MM, HOLDER_SIZE_MM};
 
 /// One length field: its stored key, the word the notice names and its range.
 #[derive(Debug, Clone, Copy)]
@@ -169,12 +169,36 @@ pub(super) fn new_params(kind: FixtureKind) -> FixtureParams {
                 Value::from(screw_head_range().default.as_mm()),
             ),
         ],
+        FixtureKind::Pin => vec![(
+            "diameter_mm",
+            Value::from(curvyo_laser_core::pin_diameter_range().default.as_mm()),
+        )],
         FixtureKind::Unknown => Vec::new(),
     };
     pairs
         .into_iter()
+        .chain(new_grid_params(kind))
         .map(|(key, value)| (key.to_owned(), value))
         .collect()
+}
+
+/// The grid keys of a new pin or screw: a 1 x 1 grid with the default spacings and Size (`0113`
+/// criteria 19, 25; ADR 0059 §4); none for any other kind.
+fn new_grid_params(kind: FixtureKind) -> Vec<(&'static str, Value)> {
+    if !matches!(kind, FixtureKind::Pin | FixtureKind::Screw) {
+        return Vec::new();
+    }
+    let spacing = curvyo_laser_core::spacing_range().default.as_mm();
+    vec![
+        ("columns", Value::from(1)),
+        ("rows", Value::from(1)),
+        ("column_spacing_mm", Value::from(spacing)),
+        ("row_spacing_mm", Value::from(spacing)),
+        (
+            "mark_mm",
+            Value::from(curvyo_laser_core::mark_range().default.as_mm()),
+        ),
+    ]
 }
 
 #[cfg(test)]

@@ -16,6 +16,7 @@ use curvyo_ui_core::ExtensionSettings;
 
 use super::{Session, Workbench};
 
+pub(super) use machine::saved_jobs;
 pub(super) use placed_drag::{NOT_GROUPED_NOTICE, OFF_PAGE_NOTICE};
 
 /// What the session keeps for laser pages.

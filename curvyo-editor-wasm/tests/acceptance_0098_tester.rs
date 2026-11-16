@@ -15,6 +15,8 @@
     missing_docs
 )]
 
+mod fixture_support;
+use fixture_support::add_fixture;
 mod cpu_time;
 mod operation_shims;
 use operation_shims::{OperationsViewMode, set_view};
@@ -259,7 +261,8 @@ fn ac8_tools_and_tabs_follow_the_kind_and_activation_is_no_step() {
     // Document; the other tabs are the drawing tabs.
     let laser_tabs: Vec<_> = tabs(&s)
         .into_iter()
-        .filter(|n| *n != "operations" && *n != "materials")
+        // The Fixtures tab of `0113` criterion 1 joins Operations and Materials.
+        .filter(|n| *n != "operations" && *n != "materials" && *n != "fixtures")
         .collect();
     assert_eq!(
         laser_tabs, VECTOR_TABS,
@@ -682,7 +685,7 @@ fn ac15_a_work_area_edit_clamps_to_the_profile_range() {
 fn ac16_delete_page_on_a_laser_page_and_undo() {
     let mut s = session();
     let l = s.add_page_of_kind(LASER, None).unwrap();
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     let o = origin(&row(&s, &l));
     s.set_tool(Tool::Rectangle);
     s.pointer_down(Point::new(o.x + 10.0, o.y + 10.0), false);
@@ -712,7 +715,7 @@ fn ac16_delete_page_on_a_laser_page_and_undo() {
 fn ac17_the_laser_page_is_a_page_of_the_svg_export_without_fixture_or_marker() {
     let mut s = session();
     let l = s.add_page_of_kind(LASER, None).unwrap();
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     let o = origin(&row(&s, &l));
     s.set_tool(Tool::Rectangle);
     s.pointer_down(Point::new(o.x + 10.0, o.y + 10.0), false);
@@ -759,7 +762,7 @@ fn ac17_active_page_export_of_a_laser_page_has_its_rectangle() {
 fn ac18b_laser_switched_off_keeps_pages_shown_and_data_unchanged() {
     let mut s = session();
     let l = s.add_page_of_kind(LASER, None).unwrap();
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     let before = opened(&s).manufacturings();
     s.set_extension_enabled(LASER, false);
     let kinds: Vec<String> = wb(&s)["kinds"]
@@ -782,7 +785,7 @@ fn ac18b_laser_switched_off_keeps_pages_shown_and_data_unchanged() {
     assert_eq!(tabs(&s), VECTOR_TABS);
     let steps = s.undo_len();
     assert!(
-        s.add_fixture("engraved_grid").is_none(),
+        add_fixture(&mut s, "engraved_grid").is_none(),
         "no manufacturing write"
     );
     assert!(!s.reset_machine_profile());
@@ -1155,9 +1158,12 @@ fn ac12_0093_9_grid_lines_are_drawn_below_the_placed_drawing() {
             .position(|v| is_red(v) && v.position.x >= o.x - 0.5)
             .unwrap()
     };
+    // Superseded by `0113` rework (2026-11-16, criterion 3): a set needs a saved profile; the
+    // page is saved before the plain draw list is measured, so only the grid is added below.
+    fixture_support::editable_sets(&mut s);
     let plain = s.frame_draw_list().triangles.len();
     let red_plain = first_red(&s);
-    s.add_fixture("engraved_grid").unwrap();
+    add_fixture(&mut s, "engraved_grid").unwrap();
     // `0102` criterion 2: a new fixture is selected; its box is drawn over everything.
     s.escape();
     let extra = s.frame_draw_list().triangles.len() - plain;

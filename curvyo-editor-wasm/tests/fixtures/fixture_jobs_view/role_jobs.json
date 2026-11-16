@@ -1,0 +1,57 @@
+{
+  "add_to": null,
+  "count": 2,
+  "damage_notices": [],
+  "damaged": 0,
+  "groups": [
+    {
+      "fixture": "sx7ebqxxbv0e3",
+      "jobs": [
+        {
+          "fixture_active": true,
+          "id": "fs7bz8jbkc9y0",
+          "kind": {
+            "text": "score",
+            "word": "Score"
+          },
+          "name": "Centre mark",
+          "of": 2,
+          "on_this_page": true,
+          "output": true,
+          "parts_ticked": 1,
+          "parts_total": 2,
+          "position": 0,
+          "role": "centre_mark",
+          "runs": true,
+          "show": true
+        },
+        {
+          "fixture_active": true,
+          "id": "vyl1enauhbwy0",
+          "kind": {
+            "text": "score",
+            "word": "Score"
+          },
+          "name": "Diameters",
+          "of": 2,
+          "on_this_page": true,
+          "output": false,
+          "parts_ticked": 1,
+          "parts_total": 2,
+          "position": 1,
+          "role": "diameters",
+          "runs": false,
+          "show": true
+        }
+      ],
+      "kind": "pin",
+      "name": "Pin 1"
+    }
+  ],
+  "parts": null,
+  "running": 1,
+  "running_fixtures": [
+    "sx7ebqxxbv0e3"
+  ],
+  "selected": null
+}

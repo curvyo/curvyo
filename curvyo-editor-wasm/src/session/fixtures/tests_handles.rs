@@ -3,6 +3,7 @@
 //! double-click chips, the slots of a resized holder and the screw.
 #![allow(clippy::float_cmp, clippy::assert_is_empty)]
 
+use super::add_fixture;
 use curvyo_document_core::{NodeId, Point};
 use curvyo_laser_core::StopPart;
 use curvyo_ui_core::{EntryOutcome, ResizeDirection};
@@ -53,7 +54,7 @@ fn on_page(s: &Session, x: f64, y: f64) -> Point {
 #[test]
 fn each_kind_keeps_the_handles_of_its_set_and_none_skews() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let set = handles_of(&s, holder);
     let resize = set
         .iter()
@@ -65,13 +66,13 @@ fn each_kind_keeps_the_handles_of_its_set_and_none_skews() {
         .count();
     assert_eq!((resize, rotate), (8, 4), "{set:?}");
     assert!(set.contains(&FixtureHandle::Move));
-    let stop = s.add_fixture("stop").unwrap();
+    let stop = add_fixture(&mut s, "stop").unwrap();
     let set = handles_of(&s, stop);
     assert!(set.contains(&FixtureHandle::Leg(StopPart::LegA)));
     assert!(set.contains(&FixtureHandle::Leg(StopPart::LegB)));
     assert!(set.contains(&FixtureHandle::Thickness), "{set:?}");
     assert!(!set.iter().any(|h| matches!(h, FixtureHandle::Resize(_))));
-    let screw = s.add_fixture("screw").unwrap();
+    let screw = add_fixture(&mut s, "screw").unwrap();
     // Knobs are drawn from a head of 72 px on screen.
     super::tests::chip(&mut s, screw, 's', &["100", "20"]);
     let set = handles_of(&s, screw);
@@ -87,14 +88,14 @@ fn each_kind_keeps_the_handles_of_its_set_and_none_skews() {
         head.x > thread.x,
         "the head at 0 degrees, the thread at 180"
     );
-    let grid = s.add_fixture("grid").unwrap();
+    let grid = add_fixture(&mut s, "grid").unwrap();
     assert!(handles_of(&s, grid).is_empty());
 }
 
 #[test]
 fn an_n_resize_is_one_step_and_its_slots_keep_their_place_on_the_sheet() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     place(&mut s, holder, 100.0, 100.0);
     let slot = s.add_slot(holder).unwrap();
     s.select_fixture(holder);
@@ -121,7 +122,7 @@ fn an_n_resize_is_one_step_and_its_slots_keep_their_place_on_the_sheet() {
 #[test]
 fn the_selected_fixtures_handles_are_hit_before_its_outline() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let e = handle_at(&s, holder, FixtureHandle::Resize(ResizeDirection::E));
     drag(&mut s, e, Point::new(e.x + 10.0, e.y));
     assert_eq!(
@@ -144,7 +145,7 @@ fn the_selected_fixtures_handles_are_hit_before_its_outline() {
 #[test]
 fn a_stop_thickness_drag_moves_the_outer_edges_and_keeps_the_inner_corner() {
     let mut s = laser();
-    let stop = s.add_fixture("stop").unwrap();
+    let stop = add_fixture(&mut s, "stop").unwrap();
     let origin = corner(&s, stop);
     let knob = handle_at(&s, stop, FixtureHandle::Thickness);
     assert!(
@@ -173,7 +174,7 @@ fn a_stop_thickness_drag_moves_the_outer_edges_and_keeps_the_inner_corner() {
 #[test]
 fn a_screw_knob_drag_stops_at_the_other_circle_and_its_centre_stays() {
     let mut s = laser();
-    let screw = s.add_fixture("screw").unwrap();
+    let screw = add_fixture(&mut s, "screw").unwrap();
     // Knobs are drawn from a head of 72 px on screen.
     super::tests::chip(&mut s, screw, 's', &["100", "20"]);
     let centre = corner(&s, screw);
@@ -205,7 +206,7 @@ fn a_screw_knob_drag_stops_at_the_other_circle_and_its_centre_stays() {
 #[test]
 fn a_double_click_on_the_w_squircle_opens_the_width_chip_and_enter_is_one_step() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let w = handle_at(&s, holder, FixtureHandle::Resize(ResizeDirection::W));
     s.pointer_down(w, false);
     s.pointer_up(w, false, false);
@@ -238,7 +239,7 @@ fn a_double_click_on_the_w_squircle_opens_the_width_chip_and_enter_is_one_step()
 #[test]
 fn a_screw_is_drawn_as_two_rings_and_is_no_snap_target() {
     let mut s = laser();
-    s.add_fixture("screw").unwrap();
+    add_fixture(&mut s, "screw").unwrap();
     let fixtures = s.active_fixtures().unwrap();
     let look = s.fixture_look(&fixtures);
     assert_eq!(look.screws.len(), 1);
@@ -252,7 +253,7 @@ fn a_screw_is_drawn_as_two_rings_and_is_no_snap_target() {
 #[test]
 fn a_double_click_on_a_stop_knob_opens_its_one_field_chip_and_enter_commits_it() {
     let mut s = laser();
-    let stop = s.add_fixture("stop").unwrap();
+    let stop = add_fixture(&mut s, "stop").unwrap();
     for (handle, name, text, key, want) in [
         (
             FixtureHandle::Thickness,
@@ -291,7 +292,7 @@ fn a_double_click_on_a_stop_knob_opens_its_one_field_chip_and_enter_commits_it()
 fn an_edge_squircle_opens_its_one_axis_and_a_corner_both() {
     use ResizeDirection::{E, N, S, Se, W};
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let names = |s: &mut Session, handle: FixtureHandle| -> Vec<&'static str> {
         let at = handle_at(s, holder, handle);
         for _ in 0..2 {
@@ -334,7 +335,7 @@ fn an_edge_squircle_opens_its_one_axis_and_a_corner_both() {
 #[test]
 fn the_angle_chip_prefill_has_no_degree_sign_of_its_own() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     assert!(s.select_fixture(holder) && s.open_fixture_entry_for_key('r'));
     assert_eq!(s.transform_entry().unwrap().fields[0].prefill, "0");
 }
@@ -342,7 +343,7 @@ fn the_angle_chip_prefill_has_no_degree_sign_of_its_own() {
 #[test]
 fn a_typed_width_and_height_both_past_their_limits_are_named_in_one_notice() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     assert_eq!(
         super::tests::chip(&mut s, holder, 's', &["5000", "0"]),
         EntryOutcome::Committed
@@ -358,7 +359,7 @@ fn a_typed_width_and_height_both_past_their_limits_are_named_in_one_notice() {
 #[test]
 fn the_cursor_over_a_fixture_handle_is_the_rectangles() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let hover = |s: &mut Session, p: Point| {
         s.pointer_hover(p, false, false);
         s.cursor_hint()
@@ -378,7 +379,7 @@ fn the_cursor_over_a_fixture_handle_is_the_rectangles() {
     );
     let e = handle_at(&s, holder, FixtureHandle::Resize(ResizeDirection::E));
     assert_eq!(hover(&mut s, e), "resize:30.0");
-    let stop = s.add_fixture("stop").unwrap();
+    let stop = add_fixture(&mut s, "stop").unwrap();
     let knob = handle_at(&s, stop, FixtureHandle::Thickness);
     assert_eq!(hover(&mut s, knob), "pointer");
     let leg = handle_at(&s, stop, FixtureHandle::Leg(StopPart::LegA));
@@ -388,7 +389,7 @@ fn the_cursor_over_a_fixture_handle_is_the_rectangles() {
 #[test]
 fn a_fixture_drag_shows_the_rectangles_readouts_and_a_ghost_of_its_start() {
     let mut s = laser();
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut s, "holder").unwrap();
     let readout_during = |s: &mut Session, from: Point, to: Point| -> (String, bool) {
         s.pointer_down(from, false);
         s.pointer_hover(to, false, false);

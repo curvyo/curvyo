@@ -2,65 +2,14 @@
 //! and the map from each fixture's frame into document space (ADR 0049 §2 and §3).
 
 use curvyo_document_core::{
-    Affine, FixtureSnapshot, Length, ManufacturingSnapshot, NodeId, OriginCorner, Page, Point, Vec2,
+    Affine, FixtureSnapshot, ManufacturingSnapshot, NodeId, Page, Point, Vec2,
 };
 use curvyo_extension_core::StoredParams;
 use curvyo_laser_core::{
-    FixtureKind, GridSpec, MmRange, Slot, board_side_range, grid_spec, read_slot, screw_spec,
-    stop_leg_range, stop_thickness_range,
+    FixtureHome, FixtureKind, Slot, is_locked, on_bed, read_slot, translation_part,
 };
 
-/// The default width and height of a new holder (criterion 2, Proposal).
-pub(super) const HOLDER_SIZE_MM: (f64, f64) = (100.0, 60.0);
-/// The default width and height of a new clamp (criterion 2, Proposal).
-pub(super) const CLAMP_SIZE_MM: (f64, f64) = (40.0, 20.0);
-
-/// The shape and the typed values of one fixture.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum Shape {
-    /// The engraved grid over the work area.
-    Grid(GridSpec),
-    /// A holder's board.
-    Board { width: Length, height: Length },
-    /// A clamp's keep-out rectangle.
-    Clamp { width: Length, height: Length },
-    /// An L-stop: two legs from the outer corner along +x and +y, and the thickness.
-    Stop {
-        leg_a: Length,
-        leg_b: Length,
-        thickness: Length,
-    },
-    /// A screw: two concentric circles about the frame's origin (criterion 37).
-    Screw { thread: Length, head: Length },
-    /// A kind this build does not know: drawn never, hit never (criterion 32).
-    Unknown,
-}
-
-impl Shape {
-    /// The stored parameter keys and values of this shape (ADR 0049 §2); none for the grid and an
-    /// unknown kind, whose values are written by their own fields.
-    pub(super) fn params(&self) -> Vec<(&'static str, f64)> {
-        match self {
-            Self::Board { width, height } | Self::Clamp { width, height } => {
-                vec![("width_mm", width.as_mm()), ("height_mm", height.as_mm())]
-            }
-            Self::Stop {
-                leg_a,
-                leg_b,
-                thickness,
-            } => vec![
-                ("leg_a_mm", leg_a.as_mm()),
-                ("leg_b_mm", leg_b.as_mm()),
-                ("thickness_mm", thickness.as_mm()),
-            ],
-            Self::Screw { thread, head } => vec![
-                ("thread_diameter_mm", thread.as_mm()),
-                ("head_diameter_mm", head.as_mm()),
-            ],
-            Self::Grid(_) | Self::Unknown => Vec::new(),
-        }
-    }
-}
+use super::shape::{Shape, shape_of};
 
 /// One readable slot of a holder.
 #[derive(Debug, Clone, PartialEq)]
@@ -72,12 +21,24 @@ pub(super) struct PlacedSlot {
 
 /// One fixture of a laser page.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::struct_excessive_bools)] // its checks, eye and locks, one each
 pub(super) struct PlacedFixture {
     pub id: NodeId,
     pub name: String,
     pub kind: FixtureKind,
+    /// Its own On the bed check (`0102` criterion 5).
     pub active: bool,
     pub visible: bool,
+    /// Its set, `None` for a job fixture (`0113` criterion 14).
+    pub set: Option<NodeId>,
+    /// Where it lives: a set on or off this page, or the page's job fixtures.
+    pub home: FixtureHome,
+    /// Its own stored Lock ([`Self::locked`]).
+    pub stored_locked: bool,
+    /// Its set's Lock; off for a job fixture (`0113` criterion 32, amended 2026-11-16).
+    pub set_locked: bool,
+    /// A set fixture whose profile is not editable here: it keeps its place (criterion 46).
+    pub read_only: bool,
     /// The stored matrix, local frame to page-local mm (identity for the grid).
     pub matrix: Affine,
     /// The local frame to document space.
@@ -102,6 +63,9 @@ pub(super) struct PlacedFixture {
 pub(super) struct PageFixtures {
     pub manufacturing: NodeId,
     pub page: Page,
+    /// The sets in their order (`0113` criterion 6).
+    pub sets: Vec<curvyo_document_core::FixtureSetSnapshot>,
+    /// Every fixture in listing order: the sets' fixtures, then the job fixtures (criterion 16).
     pub fixtures: Vec<PlacedFixture>,
 }
 
@@ -112,11 +76,22 @@ impl PageFixtures {
         let fixtures = manufacturing
             .fixtures
             .iter()
-            .map(|f| PlacedFixture::read(&page, f))
+            .map(|f| {
+                let home = manufacturing
+                    .set_on_page(f)
+                    .map_or(FixtureHome::Job, |on_page| FixtureHome::Set { on_page });
+                let mut placed = PlacedFixture::read(&page, f, home);
+                placed.set_locked = f
+                    .set
+                    .and_then(|set| manufacturing.sets.iter().find(|s| s.id == set))
+                    .is_some_and(|set| set.locked);
+                placed
+            })
             .collect();
         Some(Self {
             manufacturing: manufacturing.id,
             page,
+            sets: manufacturing.sets.clone(),
             fixtures,
         })
     }
@@ -126,56 +101,63 @@ impl PageFixtures {
         self.fixtures.iter().find(|f| f.id == id)
     }
 
-    /// Whether the page holds a grid (one per page, criterion 2).
-    pub(super) fn has_grid(&self) -> bool {
+    /// Whether the set `set` holds a grid (one per set, `0113` criterion 7).
+    pub(super) fn set_has_grid(&self, set: NodeId) -> bool {
         self.fixtures
             .iter()
-            .any(|f| f.kind == FixtureKind::EngravedGrid)
+            .any(|f| f.set == Some(set) && f.kind == FixtureKind::EngravedGrid)
+    }
+
+    /// The job fixtures in creation order (`0113` criterion 16).
+    pub(super) fn job_fixtures(&self) -> impl Iterator<Item = &PlacedFixture> {
+        self.fixtures.iter().filter(|f| f.set.is_none())
     }
 }
 
-/// A length parameter inside its range, or the range's default (criterion 33).
-fn mm(params: &StoredParams, key: &str, range: MmRange) -> Length {
-    params
-        .get(key)
-        .and_then(serde_json::Value::as_f64)
-        .filter(|v| (range.min.as_mm()..=range.max.as_mm()).contains(v))
-        .map_or(range.default, Length::from_mm)
-}
-
-/// The typed shape of a fixture of `kind` with the stored `params`; the grid counts from the
-/// page grid's origin corner `corner` (Frage 174 B).
-fn shape_of(kind: FixtureKind, params: &StoredParams, corner: OriginCorner) -> Shape {
-    let side = |key, default| mm(params, key, board_side_range(default));
-    match kind {
-        FixtureKind::EngravedGrid => Shape::Grid(grid_spec(params, corner).0),
-        FixtureKind::Holder => Shape::Board {
-            width: side("width_mm", HOLDER_SIZE_MM.0),
-            height: side("height_mm", HOLDER_SIZE_MM.1),
-        },
-        FixtureKind::Clamp => Shape::Clamp {
-            width: side("width_mm", CLAMP_SIZE_MM.0),
-            height: side("height_mm", CLAMP_SIZE_MM.1),
-        },
-        FixtureKind::Stop => Shape::Stop {
-            leg_a: mm(params, "leg_a_mm", stop_leg_range()),
-            leg_b: mm(params, "leg_b_mm", stop_leg_range()),
-            thickness: mm(params, "thickness_mm", stop_thickness_range()),
-        },
-        FixtureKind::Screw => {
-            let (thread, head, _) = screw_spec(params);
-            Shape::Screw { thread, head }
-        }
-        FixtureKind::Unknown => Shape::Unknown,
+/// A fixture of `kind` that is not in the document yet, at `matrix` on `page`: the hanging job
+/// fixture of a placement (`0113` criterion 13). `id` stands in for its node (it has none).
+pub(super) fn preview_fixture(
+    id: NodeId,
+    page: &Page,
+    kind: FixtureKind,
+    params: &StoredParams,
+    matrix: Affine,
+) -> PlacedFixture {
+    let to_document = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
+    PlacedFixture {
+        id,
+        name: String::new(),
+        kind,
+        active: true,
+        visible: true,
+        set: None,
+        home: FixtureHome::Job,
+        stored_locked: false,
+        set_locked: false,
+        read_only: false,
+        matrix,
+        global: to_document.compose(matrix),
+        shape: shape_of(kind, params, page.grid.origin),
+        slots: Vec::new(),
+        damaged_slots: 0,
+        damaged: 0,
+        job_damaged: 0,
+        jobs: Vec::new(),
     }
 }
 
 impl PlacedFixture {
-    fn read(page: &Page, snapshot: &FixtureSnapshot) -> Self {
+    fn read(page: &Page, snapshot: &FixtureSnapshot, home: FixtureHome) -> Self {
         let kind = FixtureKind::from_stored(&snapshot.kind);
         let params = &snapshot.params;
         let shape = shape_of(kind, params, page.grid.origin);
-        let matrix = snapshot.matrix.unwrap_or(Affine::IDENTITY);
+        let stored = snapshot.matrix.unwrap_or(Affine::IDENTITY);
+        // A pin or a screw never turns: its matrix reads as its translation part (ADR 0059 §4).
+        let (matrix, turned) = if shape.centre_grid().is_some() {
+            translation_part(stored)
+        } else {
+            (stored, 0)
+        };
         let to_document = Affine::translation(Vec2::new(page.origin.x, page.origin.y));
         let mut slots = Vec::new();
         let mut damaged_slots = 0;
@@ -199,12 +181,20 @@ impl PlacedFixture {
             kind,
             active: snapshot.active,
             visible: snapshot.visible,
+            set: snapshot.set,
+            home,
+            stored_locked: snapshot.locked,
+            set_locked: false,
+            read_only: false,
             matrix,
             global: to_document.compose(matrix),
             shape,
             slots,
             damaged_slots,
-            damaged: snapshot.damaged + curvyo_laser_core::params_damage(kind, params) + job_damage,
+            damaged: snapshot.damaged
+                + curvyo_laser_core::params_damage(kind, params)
+                + job_damage
+                + turned,
             job_damaged: snapshot_job_damage + job_damage,
             jobs,
         }
@@ -229,9 +219,61 @@ impl PlacedFixture {
         }
     }
 
+    /// Whether it lies on the bed: its own check and, for a set fixture, its set on this page
+    /// (`0113` criterion 8). Only then is it a snap or fit target and runs its jobs.
+    pub(super) fn on_bed(&self) -> bool {
+        on_bed(self.home, self.active)
+    }
+
     /// Whether it lies on the bed and is drawn: only then is it hit (criteria 5, 6).
     pub(super) fn shown(&self) -> bool {
-        self.active && self.visible && self.kind != FixtureKind::Unknown
+        self.on_bed() && self.visible && self.kind != FixtureKind::Unknown
+    }
+
+    /// Whether it keeps its place: its own Lock or its set's is on (`0113` criterion 32).
+    pub(super) fn locked(&self) -> bool {
+        is_locked(self.stored_locked, self.set_locked)
+    }
+
+    /// Whether no handle, knob, drag, nudge or chip changes its place or size: it is locked, or
+    /// it is a set fixture that is read only here (criteria 32, 46).
+    pub(super) fn keeps_place(&self) -> bool {
+        self.locked() || self.read_only
+    }
+
+    /// Whether it is a job fixture, in no set (`0113` criterion 14).
+    pub(super) fn is_job_fixture(&self) -> bool {
+        matches!(self.home, FixtureHome::Job)
+    }
+
+    /// The centres of a pin or screw grid in document space; the frame origin for any other kind.
+    pub(super) fn centres(&self) -> Vec<Point> {
+        self.shape
+            .local_centres()
+            .into_iter()
+            .map(|p| self.global.apply_point(p))
+            .collect()
+    }
+
+    /// Whether `p` lies within `tolerance` of a ring of a pin or screw grid, or inside a pin;
+    /// `None` for any other shape. Each centre is tried by distance, not by chords (budget `0113`
+    /// criterion 42a).
+    pub(super) fn near_rings(&self, p: Point, tolerance: f64) -> Option<bool> {
+        self.shape.centre_grid()?;
+        let radii: Vec<f64> = self
+            .shape
+            .centre_diameters()
+            .iter()
+            .map(|d| d.as_mm() / 2.0)
+            .collect();
+        // A pin is a solid dowel: inside its circle hits too (UX review 2026-11-16).
+        let solid = matches!(self.shape, Shape::Pin { .. });
+        Some(self.centres().into_iter().any(|c| {
+            let d = c.vector_to(p).length();
+            radii
+                .iter()
+                .any(|r| (d - r).abs() <= tolerance || (solid && d <= *r))
+        }))
     }
 
     /// The size of its box in its own frame; the stop's is the box of its two legs, the
@@ -252,9 +294,11 @@ impl PlacedFixture {
                 to(width.as_mm(), height.as_mm())
             }
             Shape::Stop { leg_a, leg_b, .. } => to(leg_a.as_mm(), leg_b.as_mm()),
-            Shape::Screw { head, .. } => {
-                let r = head.as_mm() / 2.0;
-                (Point::new(-r, -r), Point::new(r, r))
+            Shape::Screw { grid, .. } | Shape::Pin { grid, .. } => {
+                let r = self.shape.centre_radius();
+                let w = f64::from(grid.counts.columns() - 1) * grid.column_spacing.as_mm();
+                let h = f64::from(grid.counts.rows() - 1) * grid.row_spacing.as_mm();
+                (Point::new(-r, -r), Point::new(w + r, h + r))
             }
             Shape::Unknown => (origin, origin),
         }
@@ -284,9 +328,13 @@ impl PlacedFixture {
                 let (a, b, t) = (leg_a.as_mm(), leg_b.as_mm(), thickness.as_mm());
                 closed(&[(0.0, 0.0), (a, 0.0), (a, t), (t, t), (t, b), (0.0, b)])
             }
-            Shape::Screw { thread, head } => {
-                let mut rings = circle(Point::new(0.0, 0.0), head.as_mm() / 2.0);
-                rings.extend(circle(Point::new(0.0, 0.0), thread.as_mm() / 2.0));
+            Shape::Screw { .. } | Shape::Pin { .. } => {
+                let mut rings = Vec::new();
+                for centre in self.shape.local_centres() {
+                    for d in self.shape.centre_diameters() {
+                        rings.extend(circle(centre, d.as_mm() / 2.0));
+                    }
+                }
                 rings
             }
             Shape::Unknown => Vec::new(),

@@ -1,0 +1,18 @@
+{
+  "apply_candidates": [],
+  "apply_picked": null,
+  "armed": null,
+  "armed_kind": null,
+  "can_add_job_fixture": true,
+  "can_add_set": true,
+  "damage_notices": [],
+  "job_fixtures": [],
+  "profile_hint": null,
+  "read_only": null,
+  "selected": null,
+  "selected_slot": null,
+  "selection_announcement": null,
+  "sets": [],
+  "sets_on_page": 0,
+  "snapping_fixtures": true
+}

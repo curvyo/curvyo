@@ -55,7 +55,8 @@ impl Session {
             Chip::Angle => "angle",
             Chip::Stop(parts) if parts.len() == 1 => "fixture-length",
             Chip::Screw(parts) if parts.len() == 1 => "fixture-length",
-            Chip::Stop(_) | Chip::Screw(_) => "fixture-size",
+            Chip::Grid(parts) if parts.len() == 1 => "fixture-length",
+            Chip::Stop(_) | Chip::Screw(_) | Chip::Grid(_) => "fixture-size",
             Chip::Move(_) => return None,
         };
         let (centre, handle) = entry.anchor(&self.transform_handle_tolerances());

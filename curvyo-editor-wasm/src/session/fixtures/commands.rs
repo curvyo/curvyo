@@ -13,16 +13,45 @@ use super::edit::FixtureEdit;
 use super::params::{accept_major_every, fixture_field, new_params, with_number};
 use super::placed::{PageFixtures, PlacedFixture};
 
-/// The kind a button or the `0093` manifest names: `grid` or `engraved_grid`, `holder`, `clamp`,
-/// `stop`, `screw`.
-fn kind_named(name: &str) -> Option<(FixtureKind, FixtureAdd)> {
+/// The kind an add button or the `0093` manifest names: `grid` or `engraved_grid`, `holder`,
+/// `clamp`, `stop`, `screw`, `pin`.
+pub(super) fn kind_named(name: &str) -> Option<FixtureKind> {
     match name {
-        "grid" | "engraved_grid" => Some((FixtureKind::EngravedGrid, FixtureAdd::Grid)),
-        "holder" => Some((FixtureKind::Holder, FixtureAdd::Holder)),
-        "clamp" => Some((FixtureKind::Clamp, FixtureAdd::Clamp)),
-        "stop" => Some((FixtureKind::Stop, FixtureAdd::Stop)),
-        "screw" => Some((FixtureKind::Screw, FixtureAdd::Screw)),
+        "grid" | "engraved_grid" => Some(FixtureKind::EngravedGrid),
+        "holder" => Some(FixtureKind::Holder),
+        "clamp" => Some(FixtureKind::Clamp),
+        "stop" => Some(FixtureKind::Stop),
+        "screw" => Some(FixtureKind::Screw),
+        "pin" => Some(FixtureKind::Pin),
         _ => None,
+    }
+}
+
+/// The `0102` button of `kind`; the two adds of `0113` name their own step, so it only carries
+/// the kind into [`NewFixture`].
+const fn button_of(kind: FixtureKind) -> FixtureAdd {
+    match kind {
+        FixtureKind::EngravedGrid => FixtureAdd::Grid,
+        FixtureKind::Clamp => FixtureAdd::Clamp,
+        FixtureKind::Stop => FixtureAdd::Stop,
+        FixtureKind::Screw | FixtureKind::Pin => FixtureAdd::Screw,
+        FixtureKind::Holder | FixtureKind::Unknown => FixtureAdd::Holder,
+    }
+}
+
+/// A new fixture of `kind` with its Proposal values at `matrix` (none for the grid).
+pub(super) fn new_fixture<'a>(
+    kind: FixtureKind,
+    stored: &'a str,
+    params: &'a FixtureParams,
+    matrix: Option<Affine>,
+) -> NewFixture<'a> {
+    NewFixture {
+        add: button_of(kind),
+        kind: stored,
+        label: kind.word(),
+        params,
+        matrix,
     }
 }
 
@@ -34,32 +63,26 @@ pub(crate) const READ_ONLY_NOTICE: &str =
     "Read-only: an unknown fixture can only be renamed or removed.";
 
 impl Session {
-    /// One of the five add buttons (criterion 2): a fixture "`Kind` N", Active, centred on the
-    /// work area at its Proposal size, selected, in one step "Add `kind`". `None` for an unknown
-    /// kind, off a laser page, or for a second grid (the Grid button is hidden then).
-    pub fn add_fixture(&mut self, kind: &str) -> Option<NodeId> {
-        let (kind, add) = kind_named(kind)?;
+    /// A kind of the add bar of the set `set` (`0113` criterion 7): a fixture "`Kind` N", Active,
+    /// centred on the work area at its Proposal size, selected, in one step "Add fixture". `None`
+    /// for an unknown kind or set, off a laser page, for a second grid in the set, a locked set,
+    /// 64 fixtures in the profile's sets, or a set that is read only here (its button is hidden
+    /// then; `0113` criteria 17, 32, 46).
+    pub fn add_set_fixture(&mut self, set: NodeId, kind: &str) -> Option<NodeId> {
+        let kind = kind_named(kind)?;
         let fixtures = self.active_fixtures()?;
-        if kind == FixtureKind::EngravedGrid && fixtures.has_grid() {
+        let in_sets = fixtures.fixtures.iter().filter(|f| f.set.is_some()).count();
+        if !fixtures.sets.iter().any(|s| s.id == set && !s.locked)
+            || (kind == FixtureKind::EngravedGrid && fixtures.set_has_grid(set))
+            || in_sets >= curvyo_laser_core::MAX_RECORD_FIXTURES
+        {
             return None;
         }
         let stored = kind.stored()?;
         let params = new_params(kind);
         let matrix = (kind != FixtureKind::EngravedGrid).then(|| centred(&fixtures, kind));
-        let id = self.recording_unguarded(|this| {
-            this.document
-                .add_fixture(
-                    fixtures.manufacturing,
-                    &NewFixture {
-                        add,
-                        kind: stored,
-                        label: kind.word(),
-                        params: &params,
-                        matrix,
-                    },
-                )
-                .ok()
-        })?;
+        let new = new_fixture(kind, stored, &params, matrix);
+        let id = self.set_content(set, |this| this.document.add_set_fixture(set, &new).ok())?;
         self.select_fixture(id);
         Some(id)
     }
@@ -69,7 +92,9 @@ impl Session {
         if self.page_fixture(id).is_none() {
             return false;
         }
-        self.recording_unguarded(|this| this.document.rename_fixture(id, name).unwrap_or(false))
+        self.set_content(id, |this| {
+            this.document.rename_fixture(id, name).unwrap_or(false)
+        })
     }
 
     /// Removes the fixture `id` with its slots (criterion 4): one step "Remove fixture".
@@ -77,7 +102,7 @@ impl Session {
         if self.page_fixture(id).is_none() {
             return false;
         }
-        let deleted = self.recording_unguarded(|this| this.document.delete_fixture(id).is_ok());
+        let deleted = self.set_content(id, |this| this.document.delete_fixture(id).is_ok());
         if deleted && self.fixtures.selected.is_some_and(|s| s.fixture == id) {
             self.clear_fixture_selection();
         }
@@ -154,7 +179,7 @@ impl Session {
         let Some((_, fixture)) = self.page_fixture(id) else {
             return false;
         };
-        let super::placed::Shape::Grid(spec) = fixture.shape else {
+        let super::shape::Shape::Grid(spec) = fixture.shape else {
             return false;
         };
         let tapes = spec.tapes;
@@ -214,7 +239,7 @@ impl Session {
         };
         let mut params = stored.params.clone();
         for (key, value) in edit.shape.params() {
-            params.insert(key.to_owned(), Value::from(value));
+            params.insert(key.to_owned(), value);
         }
         let slots: Vec<(NodeId, FixtureParams)> = edit
             .slots
@@ -232,7 +257,9 @@ impl Session {
             matrix,
             slots: &slots,
         };
-        self.recording_unguarded(|this| this.document.resize_fixture(id, &resize).unwrap_or(false))
+        self.set_content(id, |this| {
+            this.document.resize_fixture(id, &resize).unwrap_or(false)
+        })
     }
 
     pub(super) fn write_fixture_matrix(
@@ -241,7 +268,7 @@ impl Session {
         m: Affine,
         turn: FixtureTurn,
     ) -> bool {
-        self.recording_unguarded(|this| {
+        self.set_content(id, |this| {
             this.document
                 .set_fixture_matrix(id, m, turn)
                 .unwrap_or(false)
@@ -261,7 +288,7 @@ impl Session {
     }
 
     fn write_fixture_params(&mut self, id: NodeId, params: &FixtureParams, label: &str) -> bool {
-        self.recording_unguarded(|this| {
+        self.set_content(id, |this| {
             this.document
                 .set_fixture_params_labelled(id, params, label)
                 .unwrap_or(false)
@@ -269,29 +296,39 @@ impl Session {
     }
 }
 
-/// Whether the fixture moves: holders, clamps, stops and screws (criteria 13, 14).
+/// Whether the fixture moves: holders, clamps, stops, screws and pins (criteria 13, 14; `0113`
+/// criterion 21).
 pub(super) fn movable(fixture: &PlacedFixture) -> bool {
     matches!(
         fixture.kind,
-        FixtureKind::Holder | FixtureKind::Clamp | FixtureKind::Stop | FixtureKind::Screw
+        FixtureKind::Holder
+            | FixtureKind::Clamp
+            | FixtureKind::Stop
+            | FixtureKind::Screw
+            | FixtureKind::Pin
     )
 }
 
-/// The matrix that centres a new fixture of `kind` on the work area (a screw's frame origin is
-/// its centre).
+/// The matrix that centres a new fixture of `kind` on the work area.
 fn centred(fixtures: &PageFixtures, kind: FixtureKind) -> Affine {
     let size = fixtures.page.size;
+    centred_at(
+        kind,
+        curvyo_document_core::Point::new(size.width.as_mm() / 2.0, size.height.as_mm() / 2.0),
+    )
+}
+
+/// The matrix that puts the centre of a new fixture of `kind` at `centre` (page-local mm): a
+/// screw's and a pin's frame origin is its centre, the others' their box's corner.
+pub(super) fn centred_at(kind: FixtureKind, centre: curvyo_document_core::Point) -> Affine {
     let (w, h) = match kind {
-        FixtureKind::Screw => (0.0, 0.0),
-        FixtureKind::Holder => super::placed::HOLDER_SIZE_MM,
-        FixtureKind::Clamp => super::placed::CLAMP_SIZE_MM,
+        FixtureKind::Screw | FixtureKind::Pin => (0.0, 0.0),
+        FixtureKind::Holder => super::shape::HOLDER_SIZE_MM,
+        FixtureKind::Clamp => super::shape::CLAMP_SIZE_MM,
         _ => {
             let leg = curvyo_laser_core::stop_leg_range().default.as_mm();
             (leg, leg)
         }
     };
-    Affine::translation(Vec2::new(
-        (size.width.as_mm() - w) / 2.0,
-        (size.height.as_mm() - h) / 2.0,
-    ))
+    Affine::translation(Vec2::new(centre.x - w / 2.0, centre.y - h / 2.0))
 }

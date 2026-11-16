@@ -1,6 +1,6 @@
 //! The typed entry of the selected fixture (`specs/0102-laser-fixtures` criteria 14, 18, 22, 23,
 //! 38; feature `adrs.md` §6a.4): the chip a double-click on a handle or the keys M, R and S open,
-//! its fields for the rectangle's chips, and its commit through the one resolver of `edit.rs`.
+//! committed through the one resolver of `edit.rs` (its fields: `entry_fields.rs`).
 
 use curvyo_document_core::{Angle, Length, NodeId, Page, Point};
 use curvyo_laser_core::{
@@ -8,14 +8,16 @@ use curvyo_laser_core::{
 };
 use curvyo_laser_core::{stop_leg_range, stop_thickness_range};
 use curvyo_ui_core::{
-    EntryField, EntryOutcome, InvalidReason, MoveEntry, ResizeDirection, format_degrees, format_mm,
-    parse_entry_number,
+    EntryField, EntryOutcome, InvalidReason, MoveEntry, ResizeDirection, parse_entry_number,
 };
 
 use super::edit::{self, FixtureEdit};
+use super::entry_fields::{fields_of, stop_index};
+use super::grid_handles::GridValue;
 use super::handles::{FixtureHandle, fixture_box, fixture_handles};
 use super::params::{clamp_notice, number};
-use super::placed::{PlacedFixture, Shape};
+use super::placed::PlacedFixture;
+use super::shape::Shape;
 
 /// The S chip of a stop: both legs and the thickness.
 const STOP_ALL: &[StopPart] = &[StopPart::LegA, StopPart::LegB, StopPart::Thickness];
@@ -35,6 +37,8 @@ pub(super) enum Chip {
     Screw(&'static [ScrewPart]),
     /// The rectangle's Move chip, over the fixture's box.
     Move(Box<MoveEntry>),
+    /// A pin's Diameter, or a grid's count and spacing (`0113` criterion 21).
+    Grid(&'static [GridValue]),
 }
 
 /// An open typed entry of a fixture: the fixture as it was when it opened, the chip and its
@@ -63,19 +67,28 @@ fn chip_of_handle(handle: FixtureHandle, fixture: &PlacedFixture, page: &Page) -
         }
         FixtureHandle::Head => Chip::Screw(&[ScrewPart::Head]),
         FixtureHandle::Thread => Chip::Screw(&[ScrewPart::Thread]),
+        FixtureHandle::Diameter => Chip::Grid(&[GridValue::Diameter]),
+        FixtureHandle::Columns => Chip::Grid(&[GridValue::Columns, GridValue::ColumnSpacing]),
+        FixtureHandle::Rows => Chip::Grid(&[GridValue::Rows, GridValue::RowSpacing]),
         FixtureHandle::Hold => return None,
     })
 }
 
 /// The chip the key `key` (`m`, `r` or `s`) opens on `fixture`; no R on a screw (D27).
 fn chip_of_key(key: char, fixture: &PlacedFixture, page: &Page) -> Option<Chip> {
-    let screw = matches!(fixture.shape, Shape::Screw { .. });
+    // A pin and a screw never turn; S opens nothing for a pin or a grid of screws, which have
+    // no single size to type (`0113` criterion 21, UX notes F11).
+    let round = matches!(fixture.shape, Shape::Screw { .. } | Shape::Pin { .. });
+    let single = fixture
+        .shape
+        .centre_grid()
+        .is_none_or(|grid| grid.counts.centres() == 1);
     match (key, &fixture.shape) {
         ('m', _) => Some(Chip::Move(Box::new(move_entry(fixture, page)))),
-        ('r', _) if !screw => Some(Chip::Angle),
+        ('r', _) if !round => Some(Chip::Angle),
         ('s', Shape::Board { .. } | Shape::Clamp { .. }) => Some(Chip::Board(None)),
         ('s', Shape::Stop { .. }) => Some(Chip::Stop(STOP_ALL)),
-        ('s', Shape::Screw { .. }) => Some(Chip::Screw(SCREW_BOTH)),
+        ('s', Shape::Screw { .. }) if single => Some(Chip::Screw(SCREW_BOTH)),
         _ => None,
     }
 }
@@ -91,75 +104,6 @@ fn move_entry(fixture: &PlacedFixture, page: &Page) -> MoveEntry {
     let mut entry = MoveEntry::for_box(fixture_box(fixture, page), (min, max));
     entry.measure_from(page);
     entry
-}
-
-fn stop_field(part: StopPart, value: Length) -> EntryField {
-    let (label, name) = match part {
-        StopPart::LegA => ("Leg 1", "Leg 1 (mm)"),
-        StopPart::LegB => ("Leg 2", "Leg 2 (mm)"),
-        StopPart::Thickness => ("Thickness", "Thickness (mm)"),
-    };
-    EntryField::for_param(label, name, format_mm(value.as_mm()))
-}
-
-fn screw_field(part: ScrewPart, value: Length) -> EntryField {
-    let (label, name) = match part {
-        ScrewPart::Head => ("Head", "Head diameter (mm)"),
-        ScrewPart::Thread => ("Thread", "Thread diameter (mm)"),
-    };
-    EntryField::for_param(label, name, format_mm(value.as_mm()))
-}
-
-/// The fields of `chip` on `fixture`, prefilled with the values as they are.
-fn fields_of(chip: &Chip, fixture: &PlacedFixture) -> Vec<EntryField> {
-    match chip {
-        Chip::Board(direction) => match fixture.shape {
-            Shape::Board { width, height } | Shape::Clamp { width, height } => {
-                let w = EntryField::for_param("W", "Width (mm)", format_mm(width.as_mm()));
-                let h = EntryField::for_param("H", "Height (mm)", format_mm(height.as_mm()));
-                // An edge squircle opens its one axis, a corner and S both (the rectangle's).
-                match direction {
-                    Some(ResizeDirection::N | ResizeDirection::S) => vec![h],
-                    Some(ResizeDirection::E | ResizeDirection::W) => vec![w],
-                    _ => vec![w, h],
-                }
-            }
-            _ => Vec::new(),
-        },
-        // The chip shows the "°" as its unit: the prefill is the number alone, as the
-        // rectangle's.
-        Chip::Angle => vec![EntryField::for_param(
-            "",
-            "Angle (°)",
-            format_degrees(fixture.matrix.b.atan2(fixture.matrix.a).to_degrees())
-                .trim_end_matches('°')
-                .to_owned(),
-        )],
-        Chip::Stop(parts) => edit::stop_sizes(fixture).map_or_else(Vec::new, |sizes| {
-            parts
-                .iter()
-                .map(|part| stop_field(*part, sizes[stop_index(*part)]))
-                .collect()
-        }),
-        Chip::Screw(parts) => edit::screw_sizes(fixture).map_or_else(Vec::new, |(thread, head)| {
-            parts
-                .iter()
-                .map(|part| match part {
-                    ScrewPart::Head => screw_field(*part, head),
-                    ScrewPart::Thread => screw_field(*part, thread),
-                })
-                .collect()
-        }),
-        Chip::Move(entry) => entry.fields().to_vec(),
-    }
-}
-
-const fn stop_index(part: StopPart) -> usize {
-    match part {
-        StopPart::LegA => 0,
-        StopPart::LegB => 1,
-        StopPart::Thickness => 2,
-    }
 }
 
 /// The typed values of `texts` against `fields`: `None` for an untouched field (its text is the
@@ -207,13 +151,16 @@ impl FixtureEntry {
         page: &Page,
         handle: FixtureHandle,
     ) -> Option<Self> {
+        if fixture.keeps_place() {
+            return None;
+        }
         let chip = chip_of_handle(handle, fixture, page)?;
         Some(Self::new(fixture, page, chip, Some(handle)))
     }
 
     /// The entry the key `key` opens on `fixture`, if any.
     pub(super) fn for_key(fixture: &PlacedFixture, page: &Page, key: char) -> Option<Self> {
-        if !super::commands::movable(fixture) {
+        if !super::lock::may_move(fixture) {
             return None;
         }
         let chip = chip_of_key(key, fixture, page)?;
@@ -283,6 +230,7 @@ impl FixtureEntry {
             Chip::Angle => values[0].map(|degrees| (self.angle(degrees), None)),
             Chip::Stop(parts) => self.stop(parts, &values),
             Chip::Screw(parts) => self.screw(parts, &values),
+            Chip::Grid(parts) => self.grid(parts, &values),
             Chip::Move(_) => None,
         };
         let (edit, notice) = resolved.ok_or(EntryOutcome::Unchanged)?;
@@ -385,6 +333,35 @@ impl FixtureEntry {
             out = Some(edit);
         }
         out.map(|edit| (edit, notice))
+    }
+
+    /// The typed grid values in order: a count first, then its spacing, so the spacing is set
+    /// beside the new count; the first value that moved names the notice.
+    fn grid(
+        &self,
+        parts: &[GridValue],
+        values: &[Option<f64>],
+    ) -> Option<(FixtureEdit, Option<String>)> {
+        let mut current = self.start.clone();
+        let mut notice = None;
+        let mut changed = false;
+        for (part, value) in parts.iter().zip(values) {
+            let Some(value) = value else { continue };
+            let (shape, moved) = super::grid_handles::set_value(&current, *part, *value)?;
+            notice = notice.or(moved);
+            current.shape = shape;
+            changed = true;
+        }
+        changed.then(|| {
+            (
+                FixtureEdit {
+                    shape: current.shape,
+                    matrix: self.start.matrix,
+                    slots: Vec::new(),
+                },
+                notice,
+            )
+        })
     }
 
     fn screw(

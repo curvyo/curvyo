@@ -21,6 +21,7 @@ const fn fixture_word(kind: FixtureKind) -> &'static str {
         FixtureKind::Clamp => "Clamp",
         FixtureKind::Stop => "Stop",
         FixtureKind::Screw => "Screw",
+        FixtureKind::Pin => "Pin",
         FixtureKind::Unknown => "Unknown fixture",
     }
 }
@@ -112,11 +113,12 @@ impl Session {
         let fixture_rows: Vec<FixtureTreeRow<'_>> = page_fixtures
             .iter()
             .map(
-                |(id, name, kind, active, visible, selected)| FixtureTreeRow {
+                |(id, name, kind, active, on_page, visible, selected)| FixtureTreeRow {
                     id: *id,
                     name,
                     word: fixture_word(*kind),
                     active: *active,
+                    on_page: *on_page,
                     visible: *visible,
                     selected: *selected,
                 },

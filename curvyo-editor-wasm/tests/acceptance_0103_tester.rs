@@ -15,6 +15,8 @@
     missing_docs
 )]
 
+mod fixture_support;
+use fixture_support::add_fixture;
 use std::path::PathBuf;
 
 use curvyo_document_core::{
@@ -145,7 +147,7 @@ fn ticked_count(s: &Session) -> usize {
 }
 
 fn holder(s: &mut Session, slots: usize) -> NodeId {
-    let h = s.add_fixture("holder").expect("a holder");
+    let h = add_fixture(s, "holder").expect("a holder");
     for _ in 0..slots {
         s.add_slot(h).expect("a slot");
     }
@@ -182,8 +184,14 @@ fn profile_record(json: &str) -> Value {
             _ => None,
         }
     }
+    // Superseded by `0113` rework (2026-11-16): every set edit writes the record, so the newest
+    // write (the last) is the one asked for, not the first.
     let v: Value = serde_json::from_str(json).unwrap_or(Value::Null);
-    serde_json::from_str(&find(&v).expect("a record was written")).unwrap()
+    let newest = match &v {
+        Value::Array(a) => a.iter().rev().find_map(find),
+        other => find(other),
+    };
+    serde_json::from_str(&newest.expect("a record was written")).unwrap()
 }
 
 fn view_profiles(s: &Session) -> Vec<Value> {
@@ -222,7 +230,7 @@ fn ac1_the_section_is_empty_and_counts_zero_on_a_new_laser_page() {
 #[test]
 fn ac1_the_section_counts_its_jobs() {
     let mut s = one_page();
-    let g = s.add_fixture("grid").expect("a grid");
+    let g = add_fixture(&mut s, "grid").expect("a grid");
     s.select_fixture(g);
     s.add_fixture_job("cut").expect("a cut job");
     assert_eq!(fj(&s)["count"], 1);
@@ -397,14 +405,15 @@ fn ac8_the_parts_of_a_holder_are_the_board_and_one_row_per_slot_in_creation_orde
 #[test]
 fn ac8_a_grid_lists_grid_lines_and_tapes_and_a_screw_head_and_thread() {
     let mut s = one_page();
-    let g = s.add_fixture("grid").expect("a grid");
+    let g = add_fixture(&mut s, "grid").expect("a grid");
     s.select_fixture(g);
     s.add_fixture_job("cut").unwrap();
     assert_eq!(part_names(&s), ["Grid lines", "Tapes"]);
-    let sc = s.add_fixture("screw").expect("a screw");
+    let sc = add_fixture(&mut s, "screw").expect("a screw");
     s.select_fixture(sc);
-    s.add_fixture_job("engrave").unwrap();
-    assert_eq!(part_names(&s), ["Head", "Thread"]);
+    // Superseded by `0113` criterion 27 (ADR 0059 §5): a screw is created with its Centre mark and
+    // Diameters jobs and takes no further job.
+    assert!(s.add_fixture_job("engrave").is_none());
 }
 
 #[test]
@@ -690,9 +699,9 @@ fn ac23_save_as_profile_writes_format_3_with_jobs_tokens_and_no_output_key() {
     assert!(s.set_fixture_job_switch(id, FixtureJobSwitch::Output, true));
     let _ = s.save_machine_profile([7; 16], 50);
     let record = profile_record(&s.take_machine_writes_json());
-    // Record format 4 since `0111` (ADR 0056 §7).
-    assert_eq!(record["format_version"], 4, "any write is format 4");
-    let job = &record["fixtures"][0]["jobs"][0];
+    // Record format 5 since `0113` (ADR 0060 §1): the entries sit inside the named sets.
+    assert_eq!(record["format_version"], 5, "any write is format 5");
+    let job = &record["fixture_sets"][0]["fixtures"][0]["jobs"][0];
     assert_eq!(job["kind"], "engrave_outline");
     assert_eq!(job["show"], true);
     assert_eq!(
@@ -715,21 +724,27 @@ fn ac23_reset_from_profile_copies_the_jobs_with_output_off_and_their_ticks() {
     assert!(s.set_fixture_job_part(id, "slot:1", true));
     assert!(s.set_fixture_job_switch(id, FixtureJobSwitch::Output, true));
     let _ = s.save_machine_profile([8; 16], 50);
-    let profile = view_profiles(&s)
-        .into_iter()
-        .find(|p| p["builtin"] == false)
-        .expect("the saved profile")["id"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    assert!(s.delete_fixture(h), "the holder is gone from the page");
-    assert_eq!(jobs(&s).len(), 0);
-    let before = s.undo_len();
+    let m: Value = serde_json::from_str(&s.manufacturing_view_json()).unwrap();
+    let profile = m["machine"]["copy"]["id"].as_str().unwrap().to_owned();
     assert!(
-        s.reset_machine_profile(),
-        "the copy is taken from the profile"
+        view_profiles(&s)
+            .iter()
+            .any(|p| p["id"] == profile && p["builtin"] == false),
+        "the saved profile"
     );
-    assert_eq!(s.undo_len(), before + 1, "one undo step, as today");
+    // Superseded by `0113` rework (2026-11-16, criterion 9): Reset from profile no longer touches
+    // the sets (they are the profile's); a page made from the profile gets the jobs with Output
+    // off and their ticks instead.
+    let first = s.active_page().id;
+    let _ = s.reset_machine_profile();
+    assert_eq!(
+        job_names(&s),
+        ["Engrave 1"],
+        "Reset keeps the sets as they are"
+    );
+    s.add_output_page_with("curvyo.laser", Some(&profile))
+        .expect("a page from the profile");
+    assert_ne!(s.active_page().id, first);
     assert_eq!(
         job_names(&s),
         ["Engrave 1"],
@@ -766,8 +781,9 @@ fn ac24_a_format_2_record_without_jobs_reads_and_is_listed() {
     s.load_machine_profiles_json(
         &json!([{ "name": name, "text": fixture_file("format2_fixtures.json") }]).to_string(),
     );
-    assert_eq!(view_profiles(&s).len(), 2, "the format 2 set is listed");
-    assert_eq!(view_notices(&s), 0, "no notice");
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): skipped as older, with its notice.
+    assert_eq!(view_profiles(&s).len(), 1, "only Generic laser is listed");
+    assert_eq!(view_notices(&s), 1, "the older-format notice");
 }
 
 #[test]
@@ -799,8 +815,9 @@ fn ac24_a_format_3_fixture_jobs_record_reads_its_jobs_with_no_notice() {
     s.load_machine_profiles_json(
         &json!([{ "name": name, "text": fixture_file("format3_fixture_jobs.json") }]).to_string(),
     );
-    assert_eq!(view_profiles(&s).len(), 2, "the record is listed");
-    assert_eq!(view_notices(&s), 0, "no notice for a valid record");
+    // Superseded by `0113` criterion 39 (ADR 0060 §3): skipped as older, with its notice.
+    assert_eq!(view_profiles(&s).len(), 1, "only Generic laser is listed");
+    assert_eq!(view_notices(&s), 1, "the older-format notice");
 }
 
 // ---- criteria 2, 4, 9: the undo step names of the fixed labels (ADR 0052 §8) -------------------
@@ -919,8 +936,21 @@ fn ac23_switching_output_does_not_make_the_set_differ() {
     assert_ne!(machine_state(&s), "differs", "saved as it is");
     assert!(s.set_fixture_job_switch(id, FixtureJobSwitch::Output, true));
     assert_ne!(machine_state(&s), "differs", "Output is not compared");
+    // Superseded by `0113` rework (2026-11-16, criterion 10): a changed tick writes the profile
+    // at once and never differs (Differs compares the machine fields only).
+    let _ = s.take_machine_writes_json();
     assert!(s.set_fixture_job_part(id, "slot:0", true));
-    assert_eq!(machine_state(&s), "differs", "a changed tick does differ");
+    assert_ne!(
+        machine_state(&s),
+        "differs",
+        "a changed tick does not differ"
+    );
+    let record = profile_record(&s.take_machine_writes_json());
+    assert_eq!(
+        record["fixture_sets"][0]["fixtures"][0]["jobs"][0]["targets"],
+        json!(["board", "slot:0"]),
+        "the tick is in the profile"
+    );
 }
 
 // ---- criterion 22: the damage notice counts the job's damaged values ---------------------------
@@ -931,7 +961,8 @@ fn ac22_the_damage_notice_counts_all_four_damaged_values_of_the_job() {
     let notices = s.fixtures_view().expect("the fixtures view").damage_notices;
     assert_eq!(notices.len(), 1, "one notice per fixture: {notices:?}");
     assert!(
-        notices[0].starts_with("4 values damaged on"),
+        // Superseded by `0113` criterion 40: one notice per set or for the job fixtures.
+        notices[0].starts_with("4 values damaged in"),
         "a text show, a text output, a false target and a .tapes on a holder: {notices:?}"
     );
 }

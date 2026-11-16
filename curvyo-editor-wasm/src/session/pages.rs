@@ -60,10 +60,17 @@ impl Session {
             // selection (`specs/0102` criterion 11).
             self.tiling = None;
             self.clear_fixture_selection();
+            // And the armed placement of a job fixture and the Apply preview (`0113` crit. 13).
+            self.end_fixture_placement();
+            self.end_apply_preview();
             self.note_active_drawing_page();
             // A group entered on a laser page is left with the page (`specs/0111` criterion 13).
             if self.in_read_only_group() {
                 self.leave_read_only_group(false);
+            }
+            // A laser page shows its profile's current sets (`0113` criterion 47).
+            if let Some(manufacturing) = page.kind.manufacturing() {
+                self.align_fixture_pages(Some(manufacturing));
             }
         }
         self.page_view.active = Some(id.to_owned());

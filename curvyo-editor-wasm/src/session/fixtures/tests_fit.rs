@@ -2,6 +2,7 @@
 //! 0.1 mm, centre to centre, turned by 90 degrees only when that is the fit, one step "Move to
 //! slot", the cue in the drag answer, and a placed page dropped from the page list.
 
+use super::add_fixture;
 use curvyo_document_core::{NodeId, Point, RectBounds};
 
 use super::super::Session;
@@ -11,7 +12,7 @@ use super::tests::{corner, laser, last_label, mm};
 /// centre in document space.
 fn slotted(width: f64, height: f64) -> (Session, NodeId, Point) {
     let mut session = laser();
-    let holder = session.add_fixture("holder").unwrap();
+    let holder = add_fixture(&mut session, "holder").unwrap();
     super::tests::chip(&mut session, holder, 's', &["320", "240"]);
     super::tests::place(&mut session, holder, 10.0, 10.0);
     let slot = session.add_slot(holder).unwrap();

@@ -562,6 +562,10 @@ impl Session {
         if self.page_drag.take().is_some() {
             return Some(EscapeStep::ClearedState);
         }
+        // Armed placement of a job fixture, then the Apply list (`specs/0113` criteria 13, 33).
+        if self.end_fixture_placement() || self.end_apply_preview() {
+            return Some(EscapeStep::ClearedState);
+        }
         // A fixture's drag, then its selection (`specs/0102-laser-fixtures` UX notes §10).
         if self.cancel_fixture_drag() {
             return Some(EscapeStep::CancelledDrag);

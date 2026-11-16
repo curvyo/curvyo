@@ -80,7 +80,7 @@ impl super::Session {
     /// switched off (criterion 28).
     pub(in crate::session) fn active_operations(&self) -> Option<ActiveOperations> {
         let manufacturing = self.active_manufacturing()?;
-        if !self.manufacturing_available(manufacturing.id) {
+        if !self.process_enabled(&manufacturing.process) {
             return None;
         }
         let operations = self.document.operations(manufacturing.id).ok()?;

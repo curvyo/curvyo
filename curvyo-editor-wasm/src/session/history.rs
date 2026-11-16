@@ -414,7 +414,7 @@ impl Session {
         // In a shared document an own step whose objects a participant deleted is skipped with
         // who did it (`specs/0092-cooperative-editing` criterion 22, at most 70 characters).
         // A material step takes its record back too, when it can (`specs/0028` criterion 32).
-        let material = self.material_history_followup(direction, target.step);
+        let material = self.library_history_followup(direction, target.step);
         let notice = material.unwrap_or_else(|| {
             self.deleted_by_peer_notice(&report)
                 .unwrap_or_else(|| restore_notice(&name, &report, summary.as_deref(), off_screen))

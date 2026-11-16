@@ -1,0 +1,24 @@
+{
+  "apply_candidates": [
+    {
+      "count": 2,
+      "id": "v9n291gl1jnw2",
+      "name": "Laser 1"
+    }
+  ],
+  "apply_picked": "v9n291gl1jnw2",
+  "armed": null,
+  "armed_kind": null,
+  "can_add_job_fixture": true,
+  "can_add_set": false,
+  "damage_notices": [],
+  "job_fixtures": [],
+  "profile_hint": "Fixture sets are kept in a machine profile. Save this machine as a profile to add sets.",
+  "read_only": null,
+  "selected": null,
+  "selected_slot": null,
+  "selection_announcement": null,
+  "sets": [],
+  "sets_on_page": 0,
+  "snapping_fixtures": true
+}

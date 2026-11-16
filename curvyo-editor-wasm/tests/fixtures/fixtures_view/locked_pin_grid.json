@@ -1,0 +1,49 @@
+{
+  "apply_candidates": [],
+  "apply_picked": null,
+  "armed": null,
+  "armed_kind": null,
+  "can_add_job_fixture": true,
+  "can_add_set": true,
+  "damage_notices": [],
+  "job_fixtures": [
+    {
+      "active": true,
+      "can_add_slot": false,
+      "grid": null,
+      "id": "sx7ebqxxbv0e3",
+      "kind": "pin",
+      "line2": "Pin · 2 × 2 · ⌀ 6 mm · locked · Diameters",
+      "locked": true,
+      "locked_by_set": false,
+      "name": "Pin 1",
+      "on_bed": true,
+      "round": {
+        "centre_mark": {
+          "job": "fs7bz8jbkc9y0",
+          "on": false
+        },
+        "column_spacing_mm": 30.0,
+        "columns": 2,
+        "diameter_mm": 6.0,
+        "diameters": {
+          "job": "vyl1enauhbwy0",
+          "on": true
+        },
+        "mark_mm": 4.0,
+        "row_spacing_mm": 20.0,
+        "rows": 2
+      },
+      "slots": [],
+      "visible": true
+    }
+  ],
+  "profile_hint": null,
+  "read_only": null,
+  "selected": "sx7ebqxxbv0e3",
+  "selected_slot": null,
+  "selection_announcement": "Pin 1 selected, diameter 6.0 mm.",
+  "sets": [],
+  "sets_on_page": 0,
+  "snapping_fixtures": true
+}

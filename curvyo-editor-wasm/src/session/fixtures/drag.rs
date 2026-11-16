@@ -2,12 +2,13 @@
 //! 18, 22, 23, 38; feature `adrs.md` §6a.5): a move, a turn with the 22.5 degree snap under Ctrl,
 //! a resize or a knob; nothing is written before the release, which is one step.
 
-use curvyo_document_core::{NodeId, Page, Point};
+use curvyo_document_core::{NodeId, Page, Point, Vec2};
 
 use super::super::Session;
 use super::edit::{self, FixtureEdit};
 use super::handles::{FixtureHandle, fixture_box};
 use super::placed::{PageFixtures, PlacedFixture};
+use super::placement::CentreSnap;
 
 /// A fixture drag in flight.
 #[derive(Debug, Clone, PartialEq)]
@@ -24,6 +25,9 @@ pub(super) struct FixtureDrag {
     pub live: Option<FixtureEdit>,
     /// The pointer of the last move, in document space: the readout's anchor.
     pub pointer: Point,
+    /// The centre snap of a moved job fixture (`0113` criterion 30); `None` for a set fixture
+    /// and every other handle.
+    snap: Option<CentreSnap>,
 }
 
 impl Session {
@@ -38,6 +42,15 @@ impl Session {
         let Some(fixture) = fixtures.get(id) else {
             return;
         };
+        // A locked job fixture keeps its place: a press on it holds and starts no marquee
+        // (`0113` criterion 32).
+        let handle = if fixture.keeps_place() {
+            FixtureHandle::Hold
+        } else {
+            handle
+        };
+        let snap = (handle == FixtureHandle::Move && fixture.is_job_fixture())
+            .then(|| self.begin_centre_snap());
         self.fixtures.drag = Some(FixtureDrag {
             id,
             handle,
@@ -46,6 +59,7 @@ impl Session {
             page: fixtures.page.clone(),
             live: None,
             pointer: point,
+            snap,
         });
     }
 
@@ -62,9 +76,30 @@ impl Session {
         {
             return true;
         }
-        drag.live = Some(drag_edit(drag, point, modifiers));
+        let mut edit = drag_edit(drag, point, modifiers);
+        if let Some(snap) = drag.snap.as_mut() {
+            // Each centre of the grid is tried; the nearest match moves the whole fixture.
+            let moved = Vec2::new(
+                edit.matrix.e - drag.fixture.matrix.e,
+                edit.matrix.f - drag.fixture.matrix.f,
+            );
+            let centres: Vec<Point> = drag
+                .fixture
+                .centres()
+                .into_iter()
+                .map(|c| c.translated(moved))
+                .collect();
+            let offset = snap.resolve(&centres);
+            edit = edit::translate(&drag.fixture, moved + offset);
+        }
+        drag.live = Some(edit);
         drag.pointer = point;
         true
+    }
+
+    /// The centre snap of the job fixture being dragged, for the `0060` marker.
+    pub(super) fn fixture_drag_snap(&self) -> Option<&curvyo_ui_core::SnapResult> {
+        self.fixtures.drag.as_ref()?.snap.as_ref()?.result()
     }
 
     /// The release of a fixture drag: one step "Move fixture", "Rotate fixture" or "Resize

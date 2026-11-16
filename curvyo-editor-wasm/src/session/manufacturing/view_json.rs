@@ -192,8 +192,9 @@ impl Session {
             ),
             "machine": machine,
             "notices": notices,
-            // The Fixtures block's rows, the one type of `fixtures/view_json.rs`.
-            "fixtures": self.fixtures_view().map(|v| v.rows).unwrap_or_default(),
+            // The fixture rows in listing order (`0113` criterion 16), the one type of
+            // `fixtures/view_json.rs`.
+            "fixtures": self.fixtures_view().map(|v| v.rows()).unwrap_or_default(),
         })
         .to_string()
     }

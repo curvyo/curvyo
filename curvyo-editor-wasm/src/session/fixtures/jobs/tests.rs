@@ -2,6 +2,7 @@
 //! 15, 17, 18, 21 to 23; UX notes J6, J15).
 #![allow(clippy::unwrap_used)]
 
+use super::super::add_fixture;
 use curvyo_document_core::{FixtureJobSwitch, FixturePartKey, NodeId};
 use curvyo_render_core::{OP_CUT, OP_ENGRAVE_HATCH, OP_LANE_LINE};
 
@@ -14,7 +15,7 @@ fn jobs(s: &Session) -> super::FixtureJobsView {
 
 /// A selected holder with two slots; the holder and the slot ids.
 fn holder_with_slots(s: &mut Session) -> (NodeId, [NodeId; 2]) {
-    let holder = s.add_fixture("holder").unwrap();
+    let holder = add_fixture(s, "holder").unwrap();
     let a = s.add_slot(holder).unwrap();
     let b = s.add_slot(holder).unwrap();
     assert!(s.select_fixture(holder));
@@ -198,7 +199,8 @@ fn criterion_22_a_tick_of_no_part_of_the_kind_counts_as_damage() {
             .unwrap()
     );
     let notices = s.fixtures_view().unwrap().damage_notices;
-    assert_eq!(notices, ["1 value damaged on Holder 1."]);
+    // Superseded by `0113` criterion 40: the notice counts per set.
+    assert_eq!(notices, ["1 value damaged in Set 1."]);
     assert_eq!(jobs(&s).groups[0].jobs[0].parts_ticked, 0, "not a target");
 }
 
@@ -222,8 +224,10 @@ fn criterion_23_an_unknown_kind_job_does_not_make_the_profile_differ() {
     );
     assert!(s.set_fixture_job_switch(job, FixtureJobSwitch::Output, true));
     assert!(machine(&s)["state"].is_null(), "Output is not compared");
+    // Superseded by `0113` rework (criterion 10 amended 2026-11-16): a tick of a set fixture's
+    // job writes the profile, so Differs (machine fields only) stays empty.
     assert!(s.set_fixture_job_part(job, "slot:1", true));
-    assert_eq!(machine(&s)["state"], "differs", "the ticks are");
+    assert!(machine(&s)["state"].is_null(), "the sets are the profile's");
 }
 
 #[test]
