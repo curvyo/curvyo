@@ -1,0 +1,26 @@
+# ADRs for laser job preview and output
+
+Status: Proposed (architect, 2026-11-16). Builds after `0113` (Done, PR #365). Two new ADRs: [ADR 0064](../../docs/adr/0064-laser-job-builder-and-grbl-writer.md) (job builder, gate, GRBL writer; architect) and [ADR 0065](../../docs/adr/0065-laser-output-settings-and-air-assist.md) (stored values, `needs-customer`, accepted with the story PR). Decisions marked **(Proposal)** are the architect's and vetoable at the demo.
+
+- [ADR 0064](../../docs/adr/0064-laser-job-builder-and-grbl-writer.md): `pub mod job` in `curvyo-laser-core` (no new crate, no dependency, `-io` untouched); one integer-micrometre move list feeds file, Toolpath view, summary and slider; flattening 0.0095 mm plus µm rounding (≤ 0.01 mm, criterion 17); inner first then nearest, brute-force defined, ties by stacking order; hatch, run-out at 1,000 mm/s²; gate type with one ordered `Cause` enum; per-operation plan cache and the confirmed budgets; preview draw cache and time-based slider; export step, Lasered as a reserved non-step commit that undo keeps.
+- [ADR 0065](../../docs/adr/0065-laser-output-settings-and-air-assist.md): `x.curvyo.laser.fixture_material`, `.start_from`, `.home_first` on the manufacturing node; Home first forces Machine origin without rewriting `start_from`; `air_assist` in `ProfileValues`, the page copy and profile record format 6; project `format_version` 48, no migration.
+- [ADR 0054](../../docs/adr/0054-laser-settings-and-test-grids-in-the-project-file.md) §2, §3: effective numbers are `resolve(..).run()`; the output refresh is `refresh(.., guard: false)` in the export step.
+- [ADR 0056](../../docs/adr/0056-laser-operation-tools-in-the-project-file.md) §5 to §7: `op_options` drive the hatch; Z offset only with `motorised_z` from the page copy.
+- [ADR 0057](../../docs/adr/0057-test-grid-object-with-derived-operations.md) §4, §5: the export writes `test_grid_lasered`; the hidden hook keeps working through the same reserved commit.
+- [ADR 0058](../../docs/adr/0058-material-records-shared-across-lasers.md) §3, §7: the test record's `lasered`; a material's set per laser and kind feeds fixture jobs.
+- [ADR 0046](../../docs/adr/0046-laser-operations-record.md) §3, §7 and [ADR 0052](../../docs/adr/0052-laser-fixture-jobs-in-the-project-file.md) / [ADR 0059](../../docs/adr/0059-fixture-sets-job-fixtures-and-pins-in-the-project-file.md): run order (`run_sequence`, `fixture_block`), the nearest rule, fixture job parts and pins' role jobs; no change.
+- [ADR 0038](../../docs/adr/0038-machine-profile-records.md) §2, [ADR 0039](../../docs/adr/0039-machine-profile-copy-in-the-project-file.md) §1, §5, [ADR 0060](../../docs/adr/0060-fixture-sets-in-the-machine-profile-record.md) §3: amended by ADR 0065 §3 (`air_assist`).
+- [ADR 0062](../../docs/adr/0062-synced-per-user-libraries.md): synced profile records of format 6 are skipped as newer on older builds; no change.
+- [ADR 0035](../../docs/adr/0035-machine-connector-protocol.md): the exported text is the job `0064` will stream; nothing of it is built here.
+
+## Feature-local decisions
+
+- 2026-11-16: **Format.** Project `format_version` 48, profile record format 6, numbers taken at merge; the job itself has no format (criterion 32 confirmed).
+- 2026-11-16: **Start from and Home first are page registers**, as criterion 38 says ("stored on the page"), not machine profile fields; only Air assist is in the profile.
+- 2026-11-16: **Dependencies.** None added. Budget tests (criterion 36) live in `curvyo-editor-wasm/tests/cpu_time/` (it already has the thread clock); `curvyo-laser-core` gets no dev-dependency. `curvyo-geometry-core` exports `flatten_outline` and `direction_of_degrees` (architect review at build).
+- 2026-11-16: **Slider maps time** (Proposal, ADR 0064 §10). Criterion 37's test ("slider at half the total length reads half the total time within 0.5 s") holds only where burn and travel run at one feed; the tester reads it as: at half the total time the drawn lengths up to the head equal the file's up to that move within 0.01 mm. For the product owner to align the test text.
+- 2026-11-16: **Budget 36 (d)** is confirmed for edits that keep every plan valid (numbers, material, Output, switches); a geometry edit is bounded by 36 (a) (ADR 0064 §9). For the product owner to align the criterion text.
+- 2026-11-16: **Head start for ordering** is the machine origin's page point in both Start from modes, so the plan never depends on the switch and both switches off equals the criterion 26 file.
+- 2026-11-16: **Undo labels**: `export_gcode` "Export G-code" (step); `set_fixture_material`, `set_start_from`, `set_home_first_on` / `_off` (steps); `mark_test_grid_lasered` becomes reserved and non-step (no history row); "Mark lasered" leaves `history_names.rs`.
+- 2026-11-16: **Run-out and Z lines**: run-out is `G1 … S0` at the burn feed in both laser modes; the Z move carries the operation's feed (`G1 Z<offset> F<n>`) because GRBL refuses a `G1` with no feed set; neither is in the time estimate beyond its length at that feed (Proposal).
+- 2026-11-16: **New module rule**: each new module stays under 500 lines and its doc names one responsibility; `job_plan.rs` is the likeliest to grow, split by kind (`job_plan_lines.rs`, `job_plan_hatch.rs`) before it passes the limit.
