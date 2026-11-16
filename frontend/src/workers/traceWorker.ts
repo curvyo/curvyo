@@ -5,6 +5,7 @@
 // terminating this worker; a synchronous wasm call cannot be interrupted otherwise.
 
 import {
+  WasmCentreLinesWorker,
   encode_png,
   fit_add_face,
   fit_finish,
@@ -37,6 +38,9 @@ const scope = self as unknown as WorkerScope;
 /** This worker's wasm memory, for the pool's memory report (`specs/0091` round 2). */
 let memory: WebAssembly.Memory | null = null;
 
+/** Find centre lines' skeletons and memo (`specs/0117`), in the second worker that runs them. */
+let centre: WasmCentreLinesWorker | null = null;
+
 scope.onmessage = (event) => {
   const request = event.data;
   try {
@@ -48,6 +52,26 @@ scope.onmessage = (event) => {
       return;
     }
     const started = performance.now();
+    if (request.type === "centre-subjects") {
+      centre ??= new WasmCentreLinesWorker();
+      const sink = { report: (percent: number) => scope.postMessage({ id: request.id, kind: "progress", percent }) };
+      if (!centre.subjects(request.wire, sink)) {
+        scope.postMessage({ id: request.id, kind: "error", message: "malformed centre lines subjects" });
+      }
+      return;
+    }
+    if (request.type === "centre-finish") {
+      centre ??= new WasmCentreLinesWorker();
+      const [overlap, thick, optimise, keep, offset] = request.options;
+      const wire = centre.finish(overlap, thick, optimise, keep !== 0, offset);
+      scope.postMessage({ id: request.id, kind: "centre-preview", wire, ms: performance.now() - started }, [wire.buffer]);
+      return;
+    }
+    if (request.type === "centre-result") {
+      const wire = centre?.result() ?? new Float64Array(0);
+      scope.postMessage({ id: request.id, kind: "centre-result", wire }, [wire.buffer]);
+      return;
+    }
     if (request.type === "threshold" && request.mask && request.map) {
       // `specs/0094` criterion 9: the automatic values of the mask region's pixels only.
       const read = trace_region_defaults(request.rgba, request.width, request.height, new Float64Array(request.map), `{"mask":${request.mask}}`);

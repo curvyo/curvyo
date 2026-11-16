@@ -23,6 +23,8 @@ import { TextBar } from "@/components/TextBar";
 import { TestGridBar } from "@/components/TestGridBar";
 import { TraceBar } from "@/components/TraceBar";
 import { TilingBar } from "@/components/TilingBar";
+import { CentreLinesBar, CentreLinesButton } from "@/components/CentreLinesButton";
+import { CENTRE_INFO_TAB } from "@/lib/centreLinesText";
 import { RecogniseBar } from "@/components/RecogniseBar";
 import { useTraceInfo } from "@/hooks/useTraceInfo";
 import { focusCurrentFont } from "@/lib/textText";
@@ -88,6 +90,8 @@ function Editor() {
     if (sketch.view.workbench === "sketch" && sketch.view.edit_constraint) setPanelOpen(true);
   }, [sketch.view.workbench, sketch.view.edit_constraint, setPanelOpen]);
   const traceInfo = useTraceInfo(panelOpen, sketch.view.workbench === "vector" && editor.tool === "trace");
+  // About centre lines is in the strip only while the Centre lines bar is open (`0117` UX §3.2).
+  const centreInfo = useTraceInfo(panelOpen, sketch.view.workbench === "vector" && editor.tool === "node" && editor.centreLines.open, CENTRE_INFO_TAB);
   const [openError, setOpenError] = useState<{ message: string; title: string } | null>(null);
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(
     null,
@@ -201,7 +205,7 @@ function Editor() {
             // The Select bar is left-aligned so its two switches never move
             // when the selection changes; the Node and Shape bars stay
             // centred (`docs/design-system.md`, "Select bar layout").
-            editor.tool === "select" || editor.tool === "trace" || editor.tool === "test-grid" ? "justify-start" : editor.tool === "pen" ? PEN_BAR_PLACE : "justify-center"
+            editor.tool === "select" || editor.tool === "trace" || editor.tool === "test-grid" || (editor.tool === "node" && editor.centreLines.open) ? "justify-start" : editor.tool === "pen" ? PEN_BAR_PLACE : "justify-center"
           } ${
             // The Select bar's chips (Curve to Bézier, Width) go to a second row when they do
             // not fit beside it, so they never squeeze it (`specs/0110` UX review U4).
@@ -305,7 +309,10 @@ function Editor() {
             />
           ) : null}
           {editor.tool === "pen" ? <PenModeBar editor={editor} /> : null}
-          {editor.tool === "node" ? (
+          {editor.tool === "node" && editor.centreLines.open ? (
+            <CentreLinesBar api={editor.centreLines} info={centreInfo} onReturnFocus={() => editor.containerRef.current?.focus()} />
+          ) : null}
+          {editor.tool === "node" && !editor.centreLines.open ? (
             <NodeToolbar
               closePath={{
                 state: closePathState,
@@ -326,6 +333,15 @@ function Editor() {
                 joinSelected: editor.joinSelected,
                 splitSelected: editor.splitSelected,
               }}
+              centreLines={
+                editor.selectionCount > 0 ? (
+                  <CentreLinesButton
+                    enabled={editor.selectBar.centreLinesEnabled}
+                    refusal={editor.selectBar.centreLinesEnabled ? "none" : editor.centreLines.refusalKind()}
+                    api={editor.centreLines}
+                  />
+                ) : null
+              }
               widthEdit={<WidthEditToggle editor={editor} inBar />}
             />
           ) : null}
@@ -472,7 +488,7 @@ function Editor() {
           document={documentPanel}
           panelOpen={panelOpen}
           project={project}
-          traceInfo={traceInfo}
+          traceInfo={centreInfo.available ? centreInfo : traceInfo}
           collab={collab}
           workspace={workspace}
           workspaceSync={workspaceSync}

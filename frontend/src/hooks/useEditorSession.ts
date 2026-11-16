@@ -11,6 +11,7 @@ import { flushSync } from "react-dom";
 
 import { type CanvasNotice, type HistoryNames, MAC, useHistory } from "@/hooks/useHistory";
 import { type ClonesApi, useClones } from "@/hooks/useClones";
+import { type CentreLinesApi, useCentreLines } from "@/hooks/useCentreLines";
 import { type StrokeToPathApi, useStrokeToPath } from "@/hooks/useStrokeToPath";
 import { type RecogniseApi, useRecognise } from "@/hooks/useRecognise";
 import { type TilingApi, useTiling } from "@/hooks/useTiling";
@@ -158,6 +159,7 @@ export interface SelectBarState {
   scaleSwitchesShown: boolean;
   /** Stroke to path is enabled (`specs/0085-stroke-to-path` criterion 1). */
   strokeToPathEnabled: boolean;
+  centreLinesEnabled: boolean;
   /** Stroke to path is in the bar: not for a selection of dimensions only (`0070` UI review). */
   strokeToPathShown: boolean;
 }
@@ -180,6 +182,7 @@ const EMPTY_SELECT_BAR_STATE: SelectBarState = {
   objectToPathShown: false,
   scaleSwitchesShown: true,
   strokeToPathEnabled: false,
+  centreLinesEnabled: false,
   strokeToPathShown: false,
 };
 
@@ -205,6 +208,7 @@ function readSelectBar(raw: {
   object_to_path_shown: boolean;
   scale_switches_shown: boolean;
   stroke_to_path_enabled: boolean;
+  centre_lines_enabled: boolean;
   stroke_to_path_shown: boolean;
   free(): void;
 }): SelectBarState {
@@ -228,6 +232,7 @@ function readSelectBar(raw: {
     objectToPathShown: raw.object_to_path_shown,
     scaleSwitchesShown: raw.scale_switches_shown,
     strokeToPathEnabled: raw.stroke_to_path_enabled,
+    centreLinesEnabled: raw.centre_lines_enabled,
     strokeToPathShown: raw.stroke_to_path_shown,
   };
   raw.free();
@@ -766,6 +771,7 @@ export interface EditorSession {
   clones: ClonesApi;
   /** Stroke to path: the Select bar button and Ctrl+Alt+C (`specs/0085-stroke-to-path`). */
   strokeToPath: StrokeToPathApi;
+  centreLines: CentreLinesApi;
   /** The Trace tool (`specs/0025-raster-trace`). */
   trace: TraceApi;
   /** Recognise text: the Select bar button, its bar and the run (`specs/0088-trace-recognition`). */
@@ -1156,6 +1162,8 @@ export function useEditorSession(
   const refreshHistoryRef = useRef<() => void>(() => {});
   const refreshGroupingRef = useRef<() => boolean>(() => false);
   const refreshClonesRef = useRef<() => void>(() => {});
+  /** Find centre lines re-reads the session after every change (`specs/0117` UX notes §4). */
+  const refreshCentreLinesRef = useRef<() => void>(() => {});
   const refreshPlacementRef = useRef<() => void>(() => {});
   const refreshPenEntryRef = useRef<() => void>(() => {});
   const placementKeyDownRef = useRef<PlacementApi["keyDown"]>(() => {});
@@ -1167,6 +1175,7 @@ export function useEditorSession(
     refreshHistoryRef.current();
     const contextAnnounced = refreshGroupingRef.current();
     refreshClonesRef.current();
+    refreshCentreLinesRef.current();
     setToolState(session.tool() as Tool);
     const nextSketch = JSON.parse(session.sketch_view_json()) as SketchView;
     // A completed pick in the previous tool must not consume the first pick of
@@ -1223,7 +1232,13 @@ export function useEditorSession(
       syncFromSession();
     }
   }, [syncFromSession]);
-  const history = useHistory(getSession, syncFromSession, containerRef, onNudgeHistory);
+  // An Undo or Redo ends the notice of the Apply it takes back (`specs/0117` UX review).
+  const clearCentreNoticeRef = useRef<() => void>(() => {});
+  const onHistoryStarted = useCallback(() => {
+    clearCentreNoticeRef.current();
+    onNudgeHistory();
+  }, [onNudgeHistory]);
+  const history = useHistory(getSession, syncFromSession, containerRef, onHistoryStarted);
   // `showNotice` is stable (a callback without dependencies), so the render loop may keep it.
   const showNoticeRef = useRef(history.showNotice);
   // Where the maker last pressed anywhere in the window (canvas, panel or bar): a refusal shows
@@ -1281,6 +1296,11 @@ export function useEditorSession(
   }, [refreshGrouping]);
   const clones = useClones(getSession, syncFromSession, history.showNotice, containerRef);
   const strokeToPath = useStrokeToPath(getSession, syncFromSession);
+  const centreLines = useCentreLines(getSession, syncFromSession);
+  useEffect(() => {
+    refreshCentreLinesRef.current = centreLines.refresh;
+    clearCentreNoticeRef.current = centreLines.clearNotice;
+  }, [centreLines.refresh, centreLines.clearNotice]);
   const strokeToPathReady = sketchView.workbench === "vector" && tool === "select" && selectBar.strokeToPathEnabled;
   const focusCanvas = useCallback(() => containerRef.current?.focus(), []);
   const vectorTool = sketchView.workbench === "vector" ? tool : "select";
@@ -3122,6 +3142,7 @@ export function useEditorSession(
     text,
     clones,
     strokeToPath,
+    centreLines,
     recognise,
     tiling,
     trace,

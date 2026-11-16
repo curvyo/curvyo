@@ -418,14 +418,25 @@ function ProgressSlot({
 /** The "i" button (criterion 70, UX notes 21.1): shows the About Trace tab, or returns to the tab
  * and panel state before it; pressed while that tab is shown. A mouse press hands the keyboard
  * back to the canvas, a key keeps it. */
-function InfoButton({ info, onReturnFocus }: { info: TraceInfoApi; onReturnFocus: () => void }) {
+export function InfoButton({
+  info,
+  onReturnFocus,
+  title = TRACE_INFO_TITLE,
+  pageId = TRACE_INFO_PAGE_ID,
+}: {
+  info: TraceInfoApi;
+  onReturnFocus: () => void;
+  /** The tab's name and tooltip ("About centre lines" for `specs/0117`). */
+  title?: string;
+  pageId?: string;
+}) {
   return (
-    <AppTooltip side="bottom" content={TRACE_INFO_TITLE}>
+    <AppTooltip side="bottom" content={title}>
       <button
         type="button"
-        aria-label={TRACE_INFO_TITLE}
+        aria-label={title}
         aria-pressed={info.shown}
-        aria-controls={info.shown ? TRACE_INFO_PAGE_ID : undefined}
+        aria-controls={info.shown ? pageId : undefined}
         onClick={(event) => {
           info.toggle();
           if (event.detail > 0) {

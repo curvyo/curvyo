@@ -53,6 +53,7 @@ const GLYPHS: Record<string, Glyph> = {
   sketches: Shapes,
   parameters: Variable,
   "trace-info": Info,
+  "centre-info": Info,
   share: Users,
 };
 
