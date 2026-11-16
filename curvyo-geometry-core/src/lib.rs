@@ -21,6 +21,7 @@ mod boolean;
 mod boolean_cleanup;
 mod boolean_grid;
 mod bspline;
+mod centre_line;
 mod curve_chords;
 mod curve_contacts;
 mod curve_intersections;
@@ -28,6 +29,7 @@ mod curve_settle;
 mod flatten;
 mod fracture;
 mod interior;
+mod medial_axis;
 mod offset;
 mod offset_finish;
 mod offset_pieces;
@@ -56,10 +58,15 @@ mod width_profile;
 pub use boolean::{BooleanError, BooleanOp, BooleanResult, Outline, boolean, signed_area_mm2};
 pub use boolean_grid::MAX_COORDINATE_MM;
 pub use bspline::{SplineControl, SplineCubic, SplineError, evaluate_bspline};
+pub use centre_line::{
+    CentreLines, CentreOptions, CentrePath, CentreRole, CentreSkeleton, CentreStages,
+    DEFAULT_OPTIMISE, DEFAULT_THICK_PARTS, KeptRegion, StageRuns,
+};
 pub use curve_intersections::{CutParameter, cut_parameters};
 pub use curvyo_document_core::Tolerance;
 pub use fracture::{Fracture, fracture_cells};
 pub use interior::{OutlineTriple, contains_point_in_outlines};
+pub use medial_axis::CentreLineError;
 pub use offset::{
     OffsetAnchor, OffsetError, OffsetJoin, OffsetOutlines, offset, offset_distance_is_zero,
 };

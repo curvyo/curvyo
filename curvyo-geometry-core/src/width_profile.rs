@@ -83,7 +83,7 @@ impl WidthProfile {
     }
 
     /// The positions of the points, in order.
-    pub(crate) fn positions(&self) -> impl Iterator<Item = f64> + '_ {
+    pub fn positions(&self) -> impl Iterator<Item = f64> + '_ {
         self.points.iter().map(|point| point.position)
     }
 

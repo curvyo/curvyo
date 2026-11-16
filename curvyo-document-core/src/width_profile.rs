@@ -118,6 +118,10 @@ pub(crate) fn read(meta: &LoroMap, closed: bool) -> Option<Vec<WidthPoint>> {
     Some(points)
 }
 
+/// One path's width points for [`Document::set_width_profiles`]: the path and its points as
+/// `(id, position, multiplier)`.
+pub type PathWidthPoints = (NodeId, Vec<(AnchorId, f64, f64)>);
+
 impl Document {
     /// Removes the width points currently observed on a path in one undoable change.
     ///
@@ -233,12 +237,91 @@ impl Document {
         self.commit_with_label("set_width_point");
         Ok(())
     }
+
+    /// Writes the width points of many paths in one commit: per path its points as
+    /// `(id, position, multiplier)`. Every path and value is checked before anything is written,
+    /// so an error writes nothing (`specs/0117-centre-lines`, a result of thousands of paths).
+    ///
+    /// # Errors
+    /// Returns an error for a missing or compound path or an invalid value.
+    ///
+    /// # Panics
+    /// Does not panic in practice: writing a value to an attached map cannot fail.
+    pub fn set_width_profiles(&self, profiles: &[PathWidthPoints]) -> Result<(), WidthPointError> {
+        if self.extended_edits_blocked() {
+            return Err(WidthPointError::Shared);
+        }
+        let mut metas = Vec::with_capacity(profiles.len());
+        for (path, points) in profiles {
+            let (meta, _) = self.path_parts(*path)?;
+            if self.path(*path).is_none_or(|path| path.is_compound()) {
+                return Err(WidthPointError::Compound);
+            }
+            let closed = crate::path_codec::read_closed(&meta);
+            if !points.iter().all(|&(_, at, m)| valid(at, m, closed)) {
+                return Err(WidthPointError::Invalid);
+            }
+            metas.push(meta);
+        }
+        if profiles.iter().all(|(_, points)| points.is_empty()) {
+            return Ok(());
+        }
+        let root = self.loro().get_map(crate::document::ROOT_MAP);
+        if root.get(HISTORY_MARK).is_none() {
+            // invariant: writing a plain value to an attached root map cannot fail.
+            #[allow(clippy::unwrap_used)]
+            root.insert(HISTORY_MARK, true).unwrap();
+        }
+        for (meta, (_, points)) in metas.iter().zip(profiles) {
+            for &(id, position, multiplier) in points {
+                // invariant: inserting a plain value into an attached map cannot fail.
+                #[allow(clippy::unwrap_used)]
+                meta.insert(&key(id), vec![position, multiplier]).unwrap();
+            }
+        }
+        self.commit_with_label("set_width_point");
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{NewAnchor, Point};
+
+    #[test]
+    fn many_profiles_are_written_in_one_call() {
+        let document = Document::new(17);
+        let make = |n: u64| {
+            document.create_path(
+                &[
+                    NewAnchor::corner(AnchorId::new(17, n), Point::new(0.0, 0.0)),
+                    NewAnchor::corner(AnchorId::new(17, n + 1), Point::new(10.0, 0.0)),
+                ],
+                false,
+            )
+        };
+        let (a, b) = (make(1), make(3));
+        let profiles = vec![
+            (
+                a,
+                vec![
+                    (AnchorId::new(17, 10), 0.0, 0.5),
+                    (AnchorId::new(17, 11), 1.0, 1.0),
+                ],
+            ),
+            (b, vec![(AnchorId::new(17, 12), 0.5, 0.25)]),
+        ];
+        document.set_width_profiles(&profiles).unwrap();
+        assert_eq!(document.width_points(a).unwrap().len(), 2);
+        assert_eq!(document.width_points(b).unwrap().len(), 1);
+        let bad = vec![(a, vec![(AnchorId::new(17, 13), 2.0, 1.0)])];
+        assert!(matches!(
+            document.set_width_profiles(&bad),
+            Err(WidthPointError::Invalid)
+        ));
+        assert_eq!(document.width_points(a).unwrap().len(), 2);
+    }
 
     #[test]
     fn ordinary_wiped_history_remains_shareable() {
