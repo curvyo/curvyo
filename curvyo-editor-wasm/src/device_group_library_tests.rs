@@ -246,6 +246,69 @@ fn the_first_sync_arrives_on_the_other_device() {
     assert_eq!(toggles["materials"][0]["sync"], true);
 }
 
+/// A single arriving machine profile is named in the notice (criterion 5, UX notes section 5).
+#[test]
+fn a_single_machine_arrival_names_the_item() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+        Session::new(11),
+    );
+    net.run(500);
+    net.devices[a].glue.add_device(identity(2), "Laptop");
+    net.run(200);
+    net.devices[a]
+        .session
+        .load_machine_profiles(&[(record_file_name(P1), machine_text(P1, "ZQX-MACH-7731", 5))]);
+    let device = &mut net.devices[a];
+    let _ = device.session.library_first_sync(&mut device.glue);
+    net.run(500);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+        Session::new(12),
+    );
+    net.run(1_500);
+    assert!(net.devices[b].session.machine_profiles().find(P1).is_some());
+    assert!(
+        net.devices[b]
+            .notices
+            .iter()
+            .any(|notice| notice == "Machine profile ZQX-MACH-7731 arrived from your devices.")
+    );
+}
+
+/// A single arriving material is named in the notice (criterion 5, UX notes section 5).
+#[test]
+fn a_single_material_arrival_names_the_item() {
+    let mut net = Net::new();
+    let a = net.add(
+        DeviceGroupGlue::create(SERVER, ROOM, "Desktop", &seeds(1), 11, Millis(net.now)).unwrap(),
+        Session::new(11),
+    );
+    net.run(500);
+    net.devices[a].glue.add_device(identity(2), "Laptop");
+    net.run(200);
+    net.devices[a].session.load_materials(
+        &[(record_file_name(M1), material_text(M1, "ZQX-MAT-7731", 5))],
+        None,
+    );
+    let device = &mut net.devices[a];
+    let _ = device.session.library_first_sync(&mut device.glue);
+    net.run(500);
+    let b = net.add(
+        DeviceGroupGlue::join(SERVER, ROOM, "Laptop", &seeds(2), 12, Millis(net.now)).unwrap(),
+        Session::new(12),
+    );
+    net.run(1_500);
+    assert!(net.devices[b].session.materials().find(M1).is_some());
+    assert!(
+        net.devices[b]
+            .notices
+            .iter()
+            .any(|notice| notice == "Material ZQX-MAT-7731 arrived from your devices.")
+    );
+}
+
 /// Criteria 8 and 9: two offline edits of the same record converge to the newer `modified` on
 /// both devices, and the loser's version stays as the conflict copy on the device that lost.
 #[test]

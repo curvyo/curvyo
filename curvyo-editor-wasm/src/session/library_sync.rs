@@ -153,6 +153,7 @@ impl Session {
         let arrivals = group.take_library_arrivals();
         let mut machines = 0;
         let mut materials = 0;
+        let mut only: Option<(LibraryKind, String)> = None;
         for arrival in arrivals {
             match arrival.change {
                 ArrivalChange::Arrived {
@@ -160,6 +161,7 @@ impl Session {
                     text: Some(text),
                 } => {
                     if self.library_arrived(group, arrival.kind, &arrival.id, &text) {
+                        only = Some((arrival.kind, arrival.id.clone()));
                         match arrival.kind {
                             LibraryKind::Machine => machines += 1,
                             LibraryKind::Material => materials += 1,
@@ -181,11 +183,20 @@ impl Session {
                 } => {}
             }
         }
-        if machines + materials > 0 {
-            self.library
-                .notices
-                .push_back(texts::arrived_notice(machines, materials));
-        }
+        let notice = if machines + materials == 1
+            && let Some((kind, id)) = only
+            && let Some(name) = self.library_arrival_name(kind, &id)
+        {
+            match kind {
+                LibraryKind::Machine => texts::machine_arrived_notice(&name),
+                LibraryKind::Material => texts::material_arrived_notice(&name),
+            }
+        } else if machines + materials > 0 {
+            texts::arrived_notice(machines, materials)
+        } else {
+            return;
+        };
+        self.library.notices.push_back(notice);
     }
 
     /// The next notice of a library arrival, once.
@@ -199,6 +210,19 @@ impl Session {
             .profiles
             .find(id)
             .map(write_machine)
+    }
+
+    /// A synced item's name from the local record that holds it now, for its notice.
+    fn library_arrival_name(&self, kind: LibraryKind, id: &str) -> Option<String> {
+        match kind {
+            LibraryKind::Machine => self
+                .manufacturing
+                .machine
+                .profiles
+                .find(id)
+                .map(|profile| profile.values.name.clone()),
+            LibraryKind::Material => self.materials.library().name_of(id).map(str::to_owned),
+        }
     }
 
     /// One arrived record text against the local record of the same id: the merge decides
@@ -330,15 +354,7 @@ impl Session {
     /// A deleted synced item (criterion 11): the local record goes with its photos and retired
     /// test ids, through the existing host write paths.
     fn library_removed(&mut self, kind: LibraryKind, id: &str) {
-        let name = match kind {
-            LibraryKind::Machine => self
-                .manufacturing
-                .machine
-                .profiles
-                .find(id)
-                .map(|profile| profile.values.name.clone()),
-            LibraryKind::Material => self.materials.library().name_of(id).map(str::to_owned),
-        };
+        let name = self.library_arrival_name(kind, id);
         let gone = match kind {
             LibraryKind::Machine => {
                 let Some(write) = self.manufacturing.machine.profiles.delete(id) else {
