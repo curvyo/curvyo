@@ -19,7 +19,7 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod width_profile;
-pub use width_profile::{WidthPoint, WidthPointError};
+pub use width_profile::{PathWidthPoints, WidthPoint, WidthPointError};
 
 mod curve_kind;
 mod spiro_transform;

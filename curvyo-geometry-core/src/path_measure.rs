@@ -199,6 +199,30 @@ impl PathMeasure {
         Length::from_mm(best.1)
     }
 
+    /// Like [`Self::nearest`], but only over the segments that overlap the arc lengths
+    /// `from ..= from + reach`: a walk along the outline in order, each step near the last.
+    pub(crate) fn nearest_ahead(&self, query: Point, from: f64, reach: f64) -> f64 {
+        let first = self.ends.partition_point(|end| *end < from);
+        let mut best = (f64::INFINITY, from);
+        for index in first..self.segments.len() {
+            let before = if index == 0 {
+                0.0
+            } else {
+                self.ends[index - 1]
+            };
+            if before > from + reach && best.0.is_finite() {
+                break;
+            }
+            let cubic = &self.segments[index];
+            let nearest = cubic.nearest(kp(query), NEAREST_ACCURACY_MM);
+            if nearest.distance_sq < best.0 {
+                let along = cubic.subsegment(0.0..nearest.t).arclen(ARCLEN_ACCURACY_MM);
+                best = (nearest.distance_sq, before + along);
+            }
+        }
+        best.1
+    }
+
     /// The arc length of the topmost point (least y on screen); of several, the first in carrier
     /// direction, and on a flat top edge its middle.
     #[must_use]

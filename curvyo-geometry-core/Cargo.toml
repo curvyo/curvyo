@@ -20,6 +20,12 @@ libm = { version = "0.2.16", default-features = false }
 thiserror.workspace = true
 # Safe Rust port of Levien’s Spiro reference, Apache-2.0; see ADR 0053.
 spiro-inner = { version = "0.1.0", default-features = false }
+# The constrained Delaunay triangulation under the centre-line medial axis (ADR 0063 §2, ADR 0003
+# §5). Pinned exactly, as the boolean engine: its triangulation fixes the golden centre lines.
+# MIT OR Apache-2.0, pure Rust, `forbid(unsafe_code)`; brings `robust` 1.2
+# (exact orientation predicates, MIT OR Apache-2.0); `hashbrown`, `num-traits`, `smallvec` are
+# already locked. Only the non-panicking `try_*` constraint loader is called.
+spade = { version = "=2.15.1" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # Not built for wasm32 (it needs OS facilities there; the wasm build runs the golden test only).
@@ -39,3 +45,8 @@ rustix = { version = "1.1", features = ["time"] }
 # release train as the `wasm-bindgen` crate the facade uses; MIT OR Apache-2.0.
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3"
+# `tests/centre_lines_wasm_cpu.rs` reads Node's `process.cpuUsage()` for the wasm budgets of
+# `specs/0117-centre-lines` criterion 18 (ADR 0063 §10). Already in the lock file through
+# `wasm-bindgen-test`; MIT OR Apache-2.0.
+js-sys = "0.3"
+wasm-bindgen = "0.2"

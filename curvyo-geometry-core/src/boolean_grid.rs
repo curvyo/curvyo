@@ -96,6 +96,17 @@ pub(crate) fn normalize(paths: &Paths64) -> Paths64 {
     run(OverlayRule::Subject, paths, &Paths64::new())
 }
 
+/// The painted region of a set of outlines under the nonzero rule, as shapes: each one outer
+/// outline (positive area) followed by its holes (negative area).
+pub(crate) fn normalize_shapes(paths: &Paths64) -> Vec<Paths64> {
+    let capacity = paths.iter().map(Vec::len).sum();
+    let mut overlay = Overlay::<i64>::new(capacity);
+    for contour in paths {
+        overlay.add_contour(contour, ShapeType::Subject);
+    }
+    overlay.overlay(OverlayRule::Subject, FillRule::NonZero)
+}
+
 /// An outline rotated to its canonical start, with the area that orders it.
 struct Canonical {
     path: Path64,
@@ -105,7 +116,7 @@ struct Canonical {
 /// Rotates `path` so that it starts at its smallest vertex (x, then y). If the outline touches
 /// itself there, so that the smallest vertex occurs twice, the rotation whose vertex sequence
 /// compares smallest wins.
-fn rotate_to_start(path: &Path64) -> Path64 {
+pub(crate) fn rotate_to_start(path: &Path64) -> Path64 {
     let key = |point: &Point64| (point.x, point.y);
     let smallest = path.iter().map(key).min();
     let mut best: Option<usize> = None;
