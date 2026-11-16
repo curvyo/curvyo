@@ -50,7 +50,9 @@ import type { WorkspaceSyncApi } from "@/hooks/useWorkspaceSync";
 import { useMakeWorkspace } from "@/hooks/useMakeWorkspace";
 import type { DevicesApi } from "@/hooks/useDevices";
 import { syncedHeader } from "@/lib/devicesApi";
-import { TRACE_INFO_TAB, type TraceInfoApi } from "@/hooks/useTraceInfo";
+import type { TraceInfoApi } from "@/hooks/useTraceInfo";
+import { CentreInfoPage } from "@/components/panel/CentreInfoPage";
+import { CENTRE_INFO_TAB, CENTRE_INFO_TITLE } from "@/lib/centreLinesText";
 import { useBackgroundPanel } from "@/hooks/useBackgroundPanel";
 import { useFormats } from "@/hooks/useFormats";
 import { useHistoryScope } from "@/hooks/useHistoryScope";
@@ -303,14 +305,16 @@ export function PropertiesPanel({
               : "";
   const activeLabel = doc.view.tabs.find((tab) => tab.name === doc.view.activeTab)?.label ?? "";
   // The About Trace tab is the frontend's, appended last so no other tab moves (UX notes 21.1).
+  // The About tab of the open bar: About Trace, or About centre lines in the Node tool.
+  const aboutTitle = traceInfo.tab === CENTRE_INFO_TAB ? CENTRE_INFO_TITLE : TRACE_INFO_TITLE;
   const tabs = traceInfo.available
-    ? [...doc.view.tabs, { name: TRACE_INFO_TAB, label: TRACE_INFO_TITLE, tooltip: TRACE_INFO_TITLE, enabled: true }]
+    ? [...doc.view.tabs, { name: traceInfo.tab, label: aboutTitle, tooltip: aboutTitle, enabled: true }]
     : doc.view.tabs;
   const aboutActive = traceInfo.available && traceInfo.active;
-  const activeTab = aboutActive ? TRACE_INFO_TAB : doc.view.activeTab;
+  const activeTab = aboutActive ? traceInfo.tab : doc.view.activeTab;
   /** A press on a tab (or Enter, Space on a focused one) shows the body with that tab. */
   const activate = (name: string) => {
-    if (name === TRACE_INFO_TAB) {
+    if (name === traceInfo.tab) {
       traceInfo.choose();
       return;
     }
@@ -414,7 +418,7 @@ export function PropertiesPanel({
       >
         <div className="box-content flex h-6 shrink-0 items-center justify-between gap-2 px-3 pt-3 pb-2">
           {aboutActive ? (
-            <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{TRACE_INFO_TITLE}</h2>
+            <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{aboutTitle}</h2>
           ) : (
           <>
           <h2 className="shrink-0 text-sm font-normal text-[var(--toolbar-icon)]">{activeLabel}</h2>
@@ -438,8 +442,8 @@ export function PropertiesPanel({
         </div>
         {aboutActive ? (
           <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">
-            <TabsContent value={TRACE_INFO_TAB} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
-              <TraceInfoPage onReturnFocus={returnFocus} />
+            <TabsContent value={traceInfo.tab} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
+              {traceInfo.tab === CENTRE_INFO_TAB ? <CentreInfoPage onReturnFocus={returnFocus} /> : <TraceInfoPage onReturnFocus={returnFocus} />}
             </TabsContent>
           </div>
         ) : (

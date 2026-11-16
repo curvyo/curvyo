@@ -36,6 +36,7 @@ import { clipboard_notice } from "@/wasm-bindings/curvyo_editor_wasm.js";
 import { usePenCue } from "@/hooks/usePenCue";
 import type { DroppedFiles } from "@/hooks/useProject";
 import { cursorForHint } from "@/lib/cursors";
+import { isContextMenuKey } from "@/lib/centreLinesText";
 import { type Rect, placeReadout } from "@/lib/readoutPlacement";
 
 /** The readout's constant screen-space offset from its anchor, up and to
@@ -100,7 +101,45 @@ export function Canvas({
       ref={editor.containerRef}
       {...drop.handlers}
       tabIndex={0}
-      onKeyDown={editor.onKeyDown}
+      onKeyDown={(event) => {
+        // Shift+F10 or the Menu key opens the Select context menu at the centre of the selection
+        // box (`specs/0117-centre-lines` UX notes §1); the canvas itself never receives the key.
+        // The open Centre lines bar: Enter applies, Escape cancels (`0117` UX notes §7).
+        if (event.target === event.currentTarget && editor.centreLines.open && (event.key === "Enter" || event.key === "Escape")) {
+          event.preventDefault();
+          if (event.key === "Enter") {
+            editor.centreLines.apply();
+          } else if (editor.centreLines.applying) {
+            editor.centreLines.stop();
+          } else {
+            editor.centreLines.cancel();
+          }
+          return;
+        }
+        if (event.target === event.currentTarget && isContextMenuKey(event) && (editor.tool === "select" || editor.tool === "node")) {
+          event.preventDefault();
+          const canvas = editor.canvasRef.current;
+          const [left, top, right, bottom] = editor.getSession()?.centre_lines_anchor() ?? [];
+          if (canvas) {
+            const box = canvas.getBoundingClientRect();
+            const [x, y] =
+              right === undefined
+                ? [box.width / 2, box.height / 2]
+                : [(left + right) / 2, (top + bottom) / 2];
+            canvas.dispatchEvent(
+              new MouseEvent("contextmenu", {
+                bubbles: true,
+                cancelable: true,
+                button: 2,
+                clientX: box.left + x,
+                clientY: box.top + y,
+              }),
+            );
+          }
+          return;
+        }
+        editor.onKeyDown(event);
+      }}
       onKeyUp={editor.onKeyUp}
       onBlur={editor.onContainerBlur}
       // Transform-handle cursors (`object-transform`): only the Select
@@ -151,7 +190,22 @@ export function Canvas({
           React would remount it, dropping the WasmSession's attached
           wgpu surface. */}
       <NodeContextMenu
-        disabled={sketch.view.workbench === "sketch" || editor.tool !== "node" || editor.cursorHint === "eyedropper"}
+        disabled={
+          sketch.view.workbench === "sketch" ||
+          (editor.tool !== "node" && editor.tool !== "select") ||
+          editor.cursorHint === "eyedropper" ||
+          editor.cursorHint === "pick-carrier"
+        }
+        select={{
+          shown: editor.tool === "select",
+          centreLinesEnabled: editor.selectBar.centreLinesEnabled,
+          onCentreLines: editor.centreLines.press,
+        }}
+        centreLines={
+          editor.centreLines.open
+            ? undefined
+            : { enabled: editor.selectBar.centreLinesEnabled, onPress: editor.centreLines.press, shown: editor.selectionCount > 0 }
+        }
         state={editor.nodeToolbarState}
         actions={{
           insertSelected: editor.insertSelected,
@@ -179,7 +233,7 @@ export function Canvas({
             // ones); suppress the browser's native menu either way so a
             // right-click never interrupts drawing. `NodeContextMenu`
             // itself prevents default for its own (node-tool-only) menu.
-            if (editor.tool !== "node" || editor.cursorHint === "eyedropper") {
+            if ((editor.tool !== "node" && editor.tool !== "select") || editor.cursorHint === "eyedropper") {
               event.preventDefault();
             }
             // A right click ends pick mode of text on path without a change (`0080` UX notes §2).

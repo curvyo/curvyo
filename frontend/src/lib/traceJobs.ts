@@ -48,7 +48,12 @@ export type TraceRequest =
   /** The text lines of a picture, read once (`specs/0091` decision 1), with the weights. */
   | { type: "ocr"; id: number; rgba: Uint8Array; width: number; height: number; weights: OcrWeights }
   /** The PNG of a copied image (`specs/0087-image-clipboard-and-drop` criterion 14). */
-  | { type: "png"; id: number; rgba: Uint8Array; width: number; height: number };
+  | { type: "png"; id: number; rgba: Uint8Array; width: number; height: number }
+  /** Find centre lines (`specs/0117`, ADR 0063 amendment 2026-11-18): the subjects' outlines,
+   * the preview of the options, and the latest result for Apply; `id` is the generation. */
+  | { type: "centre-subjects"; id: number; wire: Float64Array }
+  | { type: "centre-finish"; id: number; options: [number, number, number, number, number] }
+  | { type: "centre-result"; id: number };
 
 /** A message from the worker. */
 export type TraceResponse =
@@ -71,6 +76,9 @@ export type TraceResponse =
   | { id: number; kind: "ocr-read"; reads: string; memory: number; ms: number }
   /** The OCR lines JSON; empty with `error` set when the reader could not be used. */
   | { id: number; kind: "ocr"; lines: string; error: string; rgba: Uint8Array; ms: number }
+  /** Find centre lines: the preview of a generation, and the result for Apply. */
+  | { id: number; kind: "centre-preview"; wire: Float64Array; ms: number }
+  | { id: number; kind: "centre-result"; wire: Float64Array }
   | { id: number; kind: "error"; message: string }
   /** The answer to `init` (id 0): `error` is empty when the module was instantiated. */
   | { id: 0; kind: "ready"; error: string };

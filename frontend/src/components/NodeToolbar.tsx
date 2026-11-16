@@ -2,6 +2,7 @@ import {
   Diamond,
   Merge,
   Plus,
+  Route,
   Spline,
   Split,
   Square,
@@ -10,12 +11,13 @@ import {
   Minus as MakeLineIcon,
 } from "lucide-react";
 import { ContextMenu } from "radix-ui";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 
 import type { NodeToolbarState } from "@/hooks/useEditorSession";
 import { ClosePathGroup } from "@/components/ClosePathGroup";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useActionNotice } from "@/hooks/useActionNotice";
+import { CENTRE_LINES_LABEL, focusCentreLinesBar } from "@/lib/centreLinesText";
 import { CLONE_NODES_TEXT } from "@/lib/cloneText";
 import { joinNoticeText, joinReasonLines, splitNoticeText } from "@/lib/nodeText";
 import { noticeMs } from "@/lib/pathText";
@@ -152,6 +154,9 @@ interface NodeToolbarProps {
   selectionCount: number;
   /** The Close path group (`0034-pen-path-extension`); the bar has none without it. */
   closePath?: React.ComponentProps<typeof ClosePathGroup>;
+  /** Find centre lines (`specs/0117` criterion 1): its group after Close path, before Edit width;
+   * shown also in the clone-only state. */
+  centreLines?: React.ReactNode;
   /** Edit width (`specs/0115` criterion 4), last in the bar; renders nothing when not offered. */
   widthEdit?: React.ReactNode;
 }
@@ -171,6 +176,7 @@ export function NodeToolbar({
   closePath,
   tool,
   selectionCount,
+  centreLines,
   widthEdit,
 }: NodeToolbarProps) {
   const { notice, show } = useActionNotice(tool, selectionCount, () => {});
@@ -212,6 +218,14 @@ export function NodeToolbar({
         }}
       >
         {CLONE_NODES_TEXT}
+        {centreLines ? (
+          <>
+            <div className="mx-2 h-5 w-px bg-border" aria-hidden />
+            <div role="group" aria-label="Centre lines">
+              {centreLines}
+            </div>
+          </>
+        ) : null}
       </div>
     );
   }
@@ -287,6 +301,12 @@ export function NodeToolbar({
           <ClosePathGroup {...closePath} />
         </>
       )}
+      {centreLines ? (
+        <div role="group" aria-label="Centre lines" className="flex items-center">
+          <div className="mx-1 h-5 w-px bg-border" aria-hidden />
+          {centreLines}
+        </div>
+      ) : null}
       {widthEdit}
     </div>
   );
@@ -353,9 +373,23 @@ function BarTip({ label, children }: { label: string; children?: ReactNode }) {
   );
 }
 
+/** The Select tool's items (`specs/0117-centre-lines` ux-notes §1): shown instead of the Node
+ * tool's when `shown`. */
+export interface SelectMenuItems {
+  shown: boolean;
+  /** Find centre lines has a subject; dimmed otherwise, but still selectable (the press answers
+   * with the refusal, ux-notes §2). */
+  centreLinesEnabled: boolean;
+  onCentreLines: () => void;
+}
+
 interface NodeContextMenuProps {
   state: NodeToolbarState;
   actions: NodeActions;
+  select?: SelectMenuItems;
+  /** The Node tool's last item, Find centre lines (`specs/0117` UX notes §1); none while its
+   * bar is open. */
+  centreLines?: { shown: boolean; enabled: boolean; onPress: () => void };
   children: ReactNode;
   /** The node tool isn't active — the trigger stays mounted (so the
    * canvas it wraps never remounts and loses its attached `wgpu`
@@ -379,39 +413,96 @@ interface NodeContextMenuProps {
  * stable wrapper, toggling only `disabled`, is what keeps the canvas
  * itself unmounted exactly once, for the component's whole lifetime.
  */
-export function NodeContextMenu({ state, actions, children, disabled }: NodeContextMenuProps) {
+export function NodeContextMenu({ state, actions, select, centreLines, children, disabled }: NodeContextMenuProps) {
+  // Set by the Find centre lines item: the menu closes after the bar mounted, and the focus goes
+  // to the bar, not back to the canvas.
+  const barRequested = useRef(false);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild disabled={disabled}>
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="z-50 min-w-40 rounded-md bg-popover p-1 text-popover-foreground ring-1 ring-foreground/10">
-          {KIND_ACTIONS.map((kind) => (
+        <ContextMenu.Content
+          className="z-50 min-w-40 rounded-md bg-popover p-1 text-popover-foreground ring-1 ring-foreground/10"
+          onCloseAutoFocus={(event) => {
+            // Opened from the menu, the centre lines bar takes the focus, not the canvas.
+            const requested = barRequested.current;
+            barRequested.current = false;
+            if (document.querySelector("[data-centre-lines-bar]")) {
+              event.preventDefault();
+            }
+            if (requested || document.querySelector("[data-centre-lines-bar]")) {
+              // After the frame: the bar of a press that just opened it has mounted by then.
+              focusCentreLinesBar();
+            }
+          }}
+        >
+          {select?.shown ? (
             <ContextMenu.Item
-              key={kind.key}
-              disabled={!kind.enabled(state)}
-              onSelect={() => actions.convertSelected(kind.key)}
-              className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
+              aria-disabled={select.centreLinesEnabled ? undefined : true}
+              onSelect={() => {
+                barRequested.current = true;
+                select.onCentreLines();
+              }}
+              className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-muted ${
+                select.centreLinesEnabled ? "" : "opacity-40"
+              }`}
             >
-              {kind.icon}
-              {kind.label}
+              <Route className="size-4" strokeWidth={1.5} aria-hidden />
+              {CENTRE_LINES_LABEL}
             </ContextMenu.Item>
-          ))}
-          <ContextMenu.Separator className="my-1 h-px bg-border" />
-          {OTHER_ACTIONS.map((action) => (
-            <ContextMenu.Item
-              key={action.key}
-              disabled={!action.enabled(state)}
-              onSelect={() => action.run(actions)}
-              className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
-            >
-              {action.icon}
-              {action.label}
-            </ContextMenu.Item>
-          ))}
+          ) : (
+            <>
+              <NodeMenuItems state={state} actions={actions} />
+              {centreLines?.shown ? (
+                <>
+                  <ContextMenu.Separator className="my-1 h-px bg-border" />
+                  <ContextMenu.Item
+                    aria-disabled={centreLines.enabled ? undefined : true}
+                    onSelect={centreLines.onPress}
+                    className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-muted ${centreLines.enabled ? "" : "opacity-40"}`}
+                  >
+                    <Route className="size-4" strokeWidth={1.5} aria-hidden />
+                    {CENTRE_LINES_LABEL}
+                  </ContextMenu.Item>
+                </>
+              ) : null}
+            </>
+          )}
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
+  );
+}
+
+/** The Node tool's items of the context menu. */
+function NodeMenuItems({ state, actions }: { state: NodeToolbarState; actions: NodeActions }) {
+  return (
+    <>
+      {KIND_ACTIONS.map((kind) => (
+        <ContextMenu.Item
+          key={kind.key}
+          disabled={!kind.enabled(state)}
+          onSelect={() => actions.convertSelected(kind.key)}
+          className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
+        >
+          {kind.icon}
+          {kind.label}
+        </ContextMenu.Item>
+      ))}
+      <ContextMenu.Separator className="my-1 h-px bg-border" />
+      {OTHER_ACTIONS.map((action) => (
+        <ContextMenu.Item
+          key={action.key}
+          disabled={!action.enabled(state)}
+          onSelect={() => action.run(actions)}
+          className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-40 data-highlighted:bg-muted"
+        >
+          {action.icon}
+          {action.label}
+        </ContextMenu.Item>
+      ))}
+    </>
   );
 }

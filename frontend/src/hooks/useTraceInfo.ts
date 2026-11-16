@@ -5,8 +5,11 @@ import type { PanelOpenApi } from "@/hooks/usePanelOpen";
 /** The name of the About Trace tab in the Properties panel's strip. */
 export const TRACE_INFO_TAB = "trace-info";
 
-/** The Trace tool's About Trace tab (`specs/0025-raster-trace` criterion 70, UX notes 21.1). */
+/** An About tab of a bar: About Trace (`specs/0025-raster-trace` criterion 70, UX notes 21.1) or
+ * About centre lines (`specs/0117-centre-lines` criterion 15c), by its tab name. */
 export interface TraceInfoApi {
+  /** The tab's name in the strip. */
+  tab: string;
   /** The tab is in the strip: the Trace tool is active, whatever is selected. */
   available: boolean;
   /** The tab is the active one, in place of the session's active tab (also with the body hidden). */
@@ -28,7 +31,7 @@ export interface TraceInfoApi {
  * session's tab with the body as it was. The session's active tab is never changed by it, so
  * leaving shows the tab the "Active tab" rule holds.
  */
-export function useTraceInfo(panelOpen: PanelOpenApi, toolActive: boolean): TraceInfoApi {
+export function useTraceInfo(panelOpen: PanelOpenApi, toolActive: boolean, tab: string = TRACE_INFO_TAB): TraceInfoApi {
   const [active, setActive] = useState(false);
   const activeRef = useRef(false);
   /** Whether the body was shown when the tab was chosen. */
@@ -75,7 +78,7 @@ export function useTraceInfo(panelOpen: PanelOpenApi, toolActive: boolean): Trac
 
   const shown = active && bodyOpen;
   return useMemo(
-    () => ({ available: toolActive, active, shown, choose, toggle, dismiss }),
-    [toolActive, active, shown, choose, toggle, dismiss],
+    () => ({ tab, available: toolActive, active, shown, choose, toggle, dismiss }),
+    [tab, toolActive, active, shown, choose, toggle, dismiss],
   );
 }
