@@ -338,6 +338,7 @@ a reader refuses a file with a higher number ("saved by a newer version").
 | 45 | 0114 `image-trace-mask` (an image node's trace mask as keyed registers `trace_part`, `trace_settings`, `trace_region`; ADR 0061) | Done. Goldens: `trace_mask_v45.curvyo`, `trace_mask_damaged_v45.curvyo` |
 | 46 | 0112 `test-grid-and-materials` (the test grid object with derived operations; ADR 0057; material record 2, ADR 0058) | Done (PR #353). Goldens: `test_grid_v46.curvyo`, `test_grid_damaged_v46.curvyo`, `test_grid_orphan_rows_v46.curvyo` |
 | 47 | 0113 `fixture-sets-and-pins` (fixture sets, job fixtures, pin kind; ADR 0059; profile record 5, ADR 0060) | Done (PR #365) |
+| 48 | 0029 `laser-job-preview-and-output` (page registers `x.curvyo.laser.fixture_material`, `.start_from`, `.home_first`; `air_assist` in the profile record, profile record 6; the job itself has no format; ADR 0065) | Ready; number taken at merge |
 | none | 0099 `sketch-pages` (writes only existing registers: `kind` by Convert to paths, the sketch claim, `clone_link`, `own_placement`; membership is read, not stored) | Done (PR #287). Golden: `sketch_pages_v37.curvyo` |
 | 27 | 0060 `snapping` (seven document-root registers: enabled, the four target flags, capture and release px) | In progress (2026-10-30). Golden: `snapping_v27.curvyo`; old-file compatibility waived by the customer. |
 
