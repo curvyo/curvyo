@@ -15,6 +15,7 @@
 
 mod artwork;
 mod carrier_line;
+mod centre_line_preview;
 mod clone_marks;
 mod color;
 mod context_dim;
@@ -60,6 +61,7 @@ mod width_handles;
 
 pub use artwork::{build_artwork, build_artwork_with_guides};
 pub use carrier_line::{build_carrier_hover, build_carrier_lines, build_carrier_picked};
+pub use centre_line_preview::build_centre_line_preview;
 pub use clone_marks::{CloneTrace, build_clone_marks};
 pub use color::RgbaColor;
 pub use context_dim::{CONTEXT_DIM, dim_outside};

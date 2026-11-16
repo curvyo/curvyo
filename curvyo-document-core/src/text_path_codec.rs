@@ -103,6 +103,11 @@ pub(crate) fn write_carrier(meta: &LoroMap, carrier: CarrierRef) {
     put(meta, KEY_CARRIER, Some(LoroValue::from(value)));
 }
 
+/// Whether `meta` names a carrier at all (a text on a path), without reading it.
+pub(crate) fn has_carrier(meta: &LoroMap) -> bool {
+    meta.get(KEY_CARRIER).is_some()
+}
+
 /// The carrier link as stored, or `None`.
 pub(crate) fn read_carrier(meta: &LoroMap) -> Option<CarrierRef> {
     let Some(ValueOrContainer::Value(LoroValue::Map(map))) = meta.get(KEY_CARRIER) else {

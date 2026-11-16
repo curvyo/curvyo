@@ -450,6 +450,17 @@ pub(super) fn trace_job(
         specks: vectrace::Mm::from_mm(specks_mm),
         ..vectrace::TraceParams::with_threshold(threshold)
     };
+    trace_job_with(rgba, width, height, map, &params)
+}
+
+/// One trace with `params`.
+pub(super) fn trace_job_with(
+    rgba: &[u8],
+    width: u32,
+    height: u32,
+    map: [f64; 6],
+    params: &vectrace::TraceParams,
+) -> Vec<f64> {
     run_trace_job(
         &TraceJob {
             raster: TraceRaster {
@@ -458,7 +469,7 @@ pub(super) fn trace_job(
                 rgba,
             },
             map: TracePixelMap::new(map),
-            mode: TraceMode::Mono(&params),
+            mode: TraceMode::Mono(params),
             lines: &[],
             mask: None,
             shapes: false,

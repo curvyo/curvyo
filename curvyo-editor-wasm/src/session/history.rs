@@ -320,6 +320,8 @@ impl Session {
     }
 
     fn press_history(&mut self, direction: Direction) -> HistoryResult {
+        // Undo and Redo cancel an open Find centre lines bar first (`0117` UX notes §4).
+        self.centre_lines_close();
         // A lasso in progress: Undo discards it and undoes nothing else, Redo discards it and
         // runs (`specs/0114` adrs.md, UX notes §6).
         if self.discard_trace_lasso() && direction == Direction::Undo {

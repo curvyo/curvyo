@@ -88,7 +88,7 @@ pub fn build_preview_outline(
 }
 
 /// `color` with its alpha scaled by `strength`.
-fn at_strength(color: RgbaColor, strength: f64) -> RgbaColor {
+pub(crate) fn at_strength(color: RgbaColor, strength: f64) -> RgbaColor {
     // invariant: the product of an alpha byte and a strength in 0..=1 is a byte.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let alpha = (f64::from(color.a) * strength.clamp(0.0, 1.0)).round() as u8;

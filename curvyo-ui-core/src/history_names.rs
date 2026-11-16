@@ -270,6 +270,8 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     ("weld", "Weld"),
     // `specs/0085-stroke-to-path` criterion 21.
     ("stroke_to_path", "Stroke to path"),
+    // `specs/0117-centre-lines` criterion 2.
+    ("centre_lines", "Find centre lines"),
     // `specs/0071-pattern-fill` criterion 24.
     ("convert_pattern", "Convert pattern to paths"),
     // `specs/0071-pattern-fill` UX notes §6: the pattern edits of the Fill section.

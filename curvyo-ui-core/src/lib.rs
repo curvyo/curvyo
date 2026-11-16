@@ -142,6 +142,7 @@ pub use edit_context_text::{
     out_of_context_suffix,
 };
 pub use step_scope::{EDIT_STEPS, FREE_STEPS, MOVE_STEPS, StepScope, step_scope};
+mod centre_lines_plan;
 mod placement_view;
 mod poly_star_tool;
 pub mod presence;
@@ -258,6 +259,11 @@ pub use boolean::{
 };
 pub use break_apart::{
     BREAK_APART_COMMIT_LABEL, BreakApartPlan, BreakApartRefusal, plan_break_apart,
+};
+pub use centre_lines_plan::{
+    CENTRE_LINES_COMMIT_LABEL, CENTRE_LINES_NODE_LIMIT, CentreDrawing, CentreLinesRefusal,
+    CentreSubject, CentreSubjects, INNER_AREA_COLOR, centre_line_subjects, centre_lines_available,
+    centre_lines_drawing,
 };
 pub use clone_colours::spread_colours;
 pub use clone_marks::{
