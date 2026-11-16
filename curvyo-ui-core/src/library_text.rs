@@ -26,7 +26,8 @@ pub const FIRST_SYNC_CONFIRM: &str =
     "Your fonts, machines and materials leave this computer encrypted, to your own computers only";
 
 /// The arrival notice of a batch (criterion 5, P8): the kinds with none left out, at most 70
-/// characters. Fonts join with slice 2.
+/// characters; a batch of one item of one kind is named by `machine_arrived_notice` or
+/// `material_arrived_notice` instead. Fonts join with slice 2.
 #[must_use]
 pub fn arrived_notice(machines: usize, materials: usize) -> String {
     let mut parts = Vec::new();
@@ -39,6 +40,26 @@ pub fn arrived_notice(machines: usize, materials: usize) -> String {
         }
     }
     format!("{} arrived from your devices.", parts.join(" and "))
+}
+
+/// Criterion 5's notice when exactly one machine profile arrived (UX notes section 5): it
+/// names the item, the name cut to 24 characters, at most 70 in all.
+#[must_use]
+pub fn machine_arrived_notice(name: &str) -> String {
+    format!(
+        "Machine profile {} arrived from your devices.",
+        cut_label(name, 24)
+    )
+}
+
+/// Criterion 5's notice when exactly one material arrived (UX notes section 5): it names the
+/// item, the name cut to 24 characters, at most 70 in all.
+#[must_use]
+pub fn material_arrived_notice(name: &str) -> String {
+    format!(
+        "Material {} arrived from your devices.",
+        cut_label(name, 24)
+    )
 }
 
 /// Criterion 10's notice on the other devices: the copy stays.
@@ -124,6 +145,28 @@ mod tests {
             "3 materials arrived from your devices."
         );
         assert!(arrived_notice(99, 99).chars().count() <= 70);
+    }
+
+    #[test]
+    fn the_one_item_arrival_notice_names_the_item() {
+        assert_eq!(
+            machine_arrived_notice("K40"),
+            "Machine profile K40 arrived from your devices."
+        );
+        assert_eq!(
+            material_arrived_notice("Slate tile"),
+            "Material Slate tile arrived from your devices."
+        );
+        let long = "K".repeat(40);
+        assert_eq!(
+            machine_arrived_notice(&long),
+            format!(
+                "Machine profile {} arrived from your devices.",
+                cut_label(&long, 24)
+            )
+        );
+        assert!(machine_arrived_notice(&long).chars().count() <= 70);
+        assert!(material_arrived_notice(&long).chars().count() <= 70);
     }
 
     #[test]
