@@ -257,6 +257,17 @@ impl Document {
                 gone.insert(NodeId::from_parts(leaf.peer, leaf.counter));
             }
         }
+        // No text sits on a path: nothing to keep, and no full read of the document (a large
+        // delete, `specs/0117-centre-lines` criterion 18).
+        let on_paths = crate::group_tree::leaves_under(tree, None)
+            .into_iter()
+            .any(|leaf| {
+                tree.get_meta(leaf)
+                    .is_ok_and(|meta| crate::text_path_codec::has_carrier(&meta))
+            });
+        if !on_paths {
+            return 0;
+        }
         let read = self.read_objects();
         let mut kept = 0;
         for object in read.objects.iter() {

@@ -278,6 +278,7 @@ pub const EDIT_STEPS: &[&str] = &[
     "flatten",
     "weld",
     "stroke_to_path",
+    "centre_lines",
     "convert_pattern",
     "fill_pattern",
     "pattern_generator_hatch",

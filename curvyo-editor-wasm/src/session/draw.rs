@@ -238,6 +238,10 @@ impl Session {
         if self.tool == Tool::Trace {
             self.trace_artwork(artwork_objects.to_mut());
         }
+        // The Find centre lines preview washes its subjects (`specs/0117-centre-lines` 15b).
+        if self.centre_lines_hides_marks() {
+            self.centre_lines_artwork(artwork_objects.to_mut());
+        }
         // Guides in the marking style (`specs/0046-document-shapes` criterion 5).
         let guides = Arc::clone(&self.document_read().guides);
         // "View: Operations" draws the output page's own items by their operations' looks
@@ -258,7 +262,9 @@ impl Session {
         list.extend(self.bend_preview_list(view, &objects));
         // The Node tool draws the nodes and handles of its editing set only (customer 2026-10-26).
         let control_paths: Vec<_> = paths.iter().map(super::node::control_view).collect();
-        let decorated = if self.tool == Tool::Node {
+        let decorated = if self.centre_lines_hides_marks() {
+            Cow::Owned(Vec::new())
+        } else if self.tool == Tool::Node {
             self.in_node_set(&control_paths)
         } else {
             Cow::Borrowed(&control_paths[..])
@@ -307,6 +313,8 @@ impl Session {
         list.extend(self.tiling_draw_list(view));
         // The Trace tool's hollow preview outline (`specs/0025-raster-trace` criterion 8).
         self.trace_draw_into(view, &mut list);
+        // The Find centre lines preview (`specs/0117-centre-lines` criterion 15b).
+        self.centre_lines_draw_into(view, &mut list);
         // The mask's regions and handles over the picture (`specs/0114-image-trace-mask`).
         list.extend(self.trace_mask_draw_list(view));
         // The Test grid tool's outline of the grid a press would place (`specs/0112` UX 3).
@@ -317,7 +325,11 @@ impl Session {
         let reference = self.reference_decoration();
         list.extend(reference_box_list(view, reference.as_ref()));
         list.extend(self.snap_marker_list());
-        let live_objects = Self::live_objects_in(&objects, live.as_ref());
+        let live_objects = if self.centre_lines_hides_marks() {
+            Cow::Owned(Vec::new())
+        } else {
+            Self::live_objects_in(&objects, live.as_ref())
+        };
         // A selected dimension has no box and no handles (`0070` UX notes §7).
         let live_objects = self.without_selected_dimensions(live_objects);
         let selection_visuals = if live_objects.iter().any(|object| {

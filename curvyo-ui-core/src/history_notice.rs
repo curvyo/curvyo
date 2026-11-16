@@ -12,7 +12,7 @@ pub const FINISH_PEN_FIRST: &str = "Finish the path (Enter) or cancel it (Esc) f
 /// The shapes a summary counts, from the objects a step touched with what it did to each: the
 /// objects as the maker saw them change. A step that deleted objects and created others (a Boolean,
 /// Combine, Break apart) counts the deleted ones, the two squares that were selected and not the
-/// one result; a document command counts none (`is_document_level_label`).
+/// one result (Find centre lines counts the created paths instead); a document command counts none (`is_document_level_label`).
 #[must_use]
 pub fn summary_shapes(label: &str, touched: &[(ObjectShape, Role)]) -> Vec<ObjectShape> {
     if curvyo_document_core::is_document_level_label(label) {
@@ -20,9 +20,15 @@ pub fn summary_shapes(label: &str, touched: &[(ObjectShape, Role)]) -> Vec<Objec
     }
     let replaced = touched.iter().any(|(_, role)| *role == Role::Deleted)
         && touched.iter().any(|(_, role)| *role == Role::Created);
+    // Find centre lines turns one filled shape into many paths: the maker reads the many.
+    let drop = if label == crate::CENTRE_LINES_COMMIT_LABEL {
+        Role::Deleted
+    } else {
+        Role::Created
+    };
     let shapes: Vec<ObjectShape> = touched
         .iter()
-        .filter(|(_, role)| !(replaced && *role == Role::Created))
+        .filter(|(_, role)| !(replaced && *role == drop))
         .map(|(shape, _)| *shape)
         .collect();
     // The group node of a Group or Ungroup is not one of the objects the maker moved: they are
@@ -244,6 +250,18 @@ mod tests {
         let moved = [(Rectangle, Role::Changed), (Path, Role::Changed)];
         assert_eq!(summary_shapes("resize_document", &moved), []);
         assert_eq!(summary_shapes("translate_objects", &moved).len(), 2);
+    }
+
+    #[test]
+    fn find_centre_lines_counts_the_paths_it_created() {
+        use ObjectShape::{Group, Path};
+        let step = [
+            (Path, Role::Deleted),
+            (Group, Role::Created),
+            (Path, Role::Created),
+            (Path, Role::Created),
+        ];
+        assert_eq!(summary_shapes("centre_lines", &step), [Path, Path]);
     }
 
     #[test]

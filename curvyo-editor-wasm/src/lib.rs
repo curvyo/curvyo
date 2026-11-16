@@ -18,6 +18,8 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod background_writer;
+pub mod centre_lines_glue;
+pub mod centre_lines_wire;
 mod clipboard_glue;
 mod device_group_glue;
 mod font_archive_glue;
@@ -51,6 +53,8 @@ mod wasm_background_writer;
 mod wasm_backup;
 #[cfg(target_arch = "wasm32")]
 mod wasm_boolean;
+#[cfg(target_arch = "wasm32")]
+mod wasm_centre_lines;
 #[cfg(target_arch = "wasm32")]
 mod wasm_clone;
 #[cfg(target_arch = "wasm32")]

@@ -65,6 +65,9 @@ pub struct SelectBarView {
     /// "Stroke to path" is enabled: some selected object draws a stroke
     /// (`specs/0085-stroke-to-path` criterion 1). Shown whenever anything is selected.
     pub stroke_to_path_enabled: bool,
+    /// Whether Find centre lines is enabled (`specs/0117-centre-lines` criterion 1); shown with
+    /// any selection, dimmed otherwise.
+    pub centre_lines_enabled: bool,
     /// "Stroke to path" is shown: something is selected and not only dimensions
     /// (`specs/0070-measure-and-dimension` UI review item 3).
     pub stroke_to_path_shown: bool,
@@ -111,6 +114,7 @@ impl From<SelectBarState> for SelectBarView {
             object_to_path_shown: state.object_to_path,
             scale_switches_shown: state.scale_switches_shown,
             stroke_to_path_enabled: false,
+            centre_lines_enabled: false,
             stroke_to_path_shown: false,
         }
     }
@@ -124,6 +128,7 @@ impl WasmSession {
     pub fn select_bar_state(&self) -> SelectBarView {
         let mut view: SelectBarView = self.session.select_bar_state().into();
         view.stroke_to_path_enabled = self.session.stroke_to_path_available();
+        view.centre_lines_enabled = self.session.centre_lines_available();
         view.stroke_to_path_shown = self.session.stroke_to_path_shown();
         view
     }

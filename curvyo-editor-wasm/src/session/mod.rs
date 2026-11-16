@@ -172,6 +172,13 @@ mod tiling_json;
 mod tiling_live_tests;
 mod tiling_view;
 pub use sketch::{SketchTool, Workbench};
+mod centre_lines;
+mod centre_lines_bar;
+mod centre_lines_draw;
+#[cfg(test)]
+mod centre_lines_fixture_tests;
+#[cfg(test)]
+mod centre_lines_tests;
 #[cfg(test)]
 mod confirmation_tests;
 #[cfg(test)]
@@ -306,6 +313,8 @@ pub use align::{align_command_from_code, distribute_from_code};
 #[cfg(target_arch = "wasm32")]
 pub use background_view::BackgroundView;
 pub use boolean::BooleanOutcome;
+#[cfg(any(target_arch = "wasm32", test))]
+pub use centre_lines::CentreLinesOutcome;
 #[cfg(target_arch = "wasm32")]
 pub use clones::CloneResult;
 pub use close_path::{ClosePathOutcome, ClosePathState};
@@ -550,6 +559,8 @@ pub struct Session {
     spiro_cache: std::cell::RefCell<spiro_cache::SpiroCache>,
     /// The variable-width outlines, memoised on their exact sources (`width_outlines.rs`).
     width_outlines: std::cell::RefCell<width_outlines::WidthOutlines>,
+    /// The open Find centre lines bar with its preview (`centre_lines.rs`).
+    centre: Option<centre_lines_bar::CentreBar>,
     /// `window.devicePixelRatio` as of the last attach or resize, so the
     /// selection box can snap to whole device pixels
     /// (`edit-interaction-polish` criterion 65). Always positive and finite.
@@ -745,6 +756,7 @@ impl Session {
             object_cache: object_cache::ObjectCache::default(),
             spiro_cache: std::cell::RefCell::default(),
             width_outlines: std::cell::RefCell::default(),
+            centre: None,
             device_pixel_ratio: 1.0,
             button_down: false,
             limit_notice: None,
@@ -858,6 +870,7 @@ impl Session {
             object_cache: object_cache::ObjectCache::default(),
             spiro_cache: std::cell::RefCell::default(),
             width_outlines: std::cell::RefCell::default(),
+            centre: None,
             device_pixel_ratio: 1.0,
             button_down: false,
             limit_notice: None,
@@ -946,6 +959,10 @@ impl Session {
     /// no acceptance criterion exercises switching tools mid-drag, so
     /// the same conservative stance applies.
     pub fn set_tool(&mut self, tool: Tool) {
+        // Another tool cancels an open Find centre lines bar (`0117` UX notes §4).
+        if tool != self.tool {
+            self.centre_lines_close();
+        }
         self.end_width_wheel();
         self.width_edit = None;
         self.end_snapping_drag();
@@ -1144,6 +1161,12 @@ impl Session {
                 }
             }
             Tool::Node => {
+                // While the Find centre lines bar is open a press does nothing, and a press on
+                // empty canvas deselects, which cancels (`0117` UX notes §4).
+                if self.centre_lines_press(point) {
+                    self.button_down = false;
+                    return;
+                }
                 // A press on an object out of context, or on a move-only selection's box,
                 // is the Select tool's (`specs/0106` criterion 10).
                 if self.node_press_as_select(point) {
