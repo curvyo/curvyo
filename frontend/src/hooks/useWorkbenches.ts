@@ -59,6 +59,8 @@ export interface MachineView {
   can_update: boolean;
   /** The profile's fixture count, "Fixtures in profile: N" (`specs/0102` 9.1). */
   fixtures_in_profile: number;
+  /** How many fixture sets the profile holds (`0113`). */
+  fixture_sets_in_profile: number;
   name_notice: string | null;
   connection: { connector_address: string; controller_port: string; baud_rate: number } | null;
   library_notices: string[];

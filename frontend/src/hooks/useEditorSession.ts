@@ -2286,6 +2286,14 @@ export function useEditorSession(
         return;
       }
 
+      // A right press ends an armed job fixture placement and drops nothing
+      // (`specs/0113-fixture-sets-and-pins` UX notes 5.1).
+      if (event.button === 2 && session.end_fixture_placement()) {
+        event.preventDefault();
+        syncFromSession();
+        return;
+      }
+
       // A right press while the eyedropper is picking ends picking and writes
       // nothing; no tool sees it and no context menu opens
       // (`specs/0017-style-panel-rework` criterion 26).

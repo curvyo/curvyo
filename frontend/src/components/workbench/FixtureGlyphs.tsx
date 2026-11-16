@@ -4,7 +4,8 @@ import type { FixtureKind } from "@/lib/fixturesView";
 /** The kind symbols of the fixtures (`specs/0102-laser-fixtures` UX notes section 4.0): a 16 px
  * grid, 1.5 px stroke, `currentColor`. The grid is `#`, the holder a board with two small
  * holes, the clamp two brackets with a bar between them, the stop a solid L 3 px thick, the screw
- * a head ring with a smaller concentric thread ring inside. */
+ * a head ring with a smaller concentric thread ring inside, the pin a filled circle of radius 4.5
+ * (`specs/0113-fixture-sets-and-pins` UX notes section 2). */
 export function FixtureGlyph({ kind, className }: { kind: FixtureKind; className?: string }) {
   if (kind === "unknown") {
     return <CircleHelp size={16} strokeWidth={1.5} absoluteStrokeWidth aria-hidden className={className} />;
@@ -31,6 +32,7 @@ export function FixtureGlyph({ kind, className }: { kind: FixtureKind; className
       ) : null}
       {kind === "clamp" ? <path d="M5 3H2.75v10H5M11 3h2.25v10H11M5 8h6" /> : null}
       {kind === "stop" ? <path d="M3 2h3v8h7v3H3z" fill="currentColor" stroke="none" /> : null}
+      {kind === "pin" ? <circle cx="8" cy="8" r="4.5" fill="currentColor" stroke="none" /> : null}
       {kind === "screw" ? (
         <>
           <circle cx="8" cy="8" r="5.25" />

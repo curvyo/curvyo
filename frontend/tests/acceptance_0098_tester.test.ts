@@ -164,7 +164,8 @@ test("AC6: the header chip is on the page-scoped tabs only", () => {
   const match = /const pageScoped = \[([^\]]+)\]/.exec(text);
   assert.ok(match, "a page-scoped tab list");
   const names = match[1].split(",").map((s) => s.trim().replace(/"/g, ""));
-  assert.deepEqual(names.sort(), ["document", "grid", "layers", "materials", "parameters", "sketches", "snapping", "style"]);
+  // Superseded by `0113`: the Fixtures tab is page-scoped too.
+  assert.deepEqual(names.sort(), ["document", "fixtures", "grid", "layers", "materials", "parameters", "sketches", "snapping", "style"]);
 });
 
 test("AC6: the chip is in the page row and the canvas label", () => {

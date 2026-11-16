@@ -27,6 +27,9 @@ function job(overrides: Partial<JobRow> = {}): JobRow {
     partsTotal: 2,
     position: 0,
     of: 1,
+    // Superseded by `0113`: the role and the set rule joined the row.
+    role: null,
+    onThisPage: true,
     ...overrides,
   };
 }

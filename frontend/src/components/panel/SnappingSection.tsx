@@ -18,7 +18,7 @@ const TOGGLE_CLASS = "h-7 rounded border border-[color-mix(in_srgb,var(--toolbar
 /** Document-owned snapping controls in their own Properties pane. */
 export function SnappingSection({ snapping, fixtures, onReturnFocus }: {
   snapping: SnappingApi;
-  /** The Fixtures switch shows only on a laser page with the extension on (`specs/0102` 9.2). */
+  /** The Fixtures target shows only on a laser page with the extension on (`specs/0102` 9.2). */
   fixtures?: FixturesApi;
   onReturnFocus: () => void;
 }) {
@@ -41,12 +41,27 @@ export function SnappingSection({ snapping, fixtures, onReturnFocus }: {
             snapping.setGrid(!view.grid);
             if (event.detail > 0) onReturnFocus();
           }}>Grid</button>
+        {/* A job fixture's centres snap to circle and shape centres (`specs/0113` criterion 30). */}
+        <Tooltip side="left" content="Snap job fixtures to the centres of circles and shapes.">
+          <button type="button" aria-pressed={view.centres} className={TOGGLE_CLASS}
+            onClick={(event) => {
+              snapping.setCentres(!view.centres);
+              if (event.detail > 0) onReturnFocus();
+            }}>Centres</button>
+        </Tooltip>
+        {fixtures?.view ? (
+          // One undo step per switch (`specs/0102` 9.2, "Snap to fixtures on" or "off"); an
+          // ordinary target toggle like the others (2026-11-16, customer).
+          <Tooltip side="left" content="Snap to the fixtures of this laser page.">
+            <button type="button" aria-pressed={fixtures.view.snappingFixtures} className={TOGGLE_CLASS}
+              onClick={(event) => {
+                fixtures.setSnapping(!fixtures.view?.snappingFixtures);
+                if (event.detail > 0) onReturnFocus();
+              }}>Fixtures</button>
+          </Tooltip>
+        ) : null}
       </div>
     </fieldset>
-    {fixtures?.view ? (
-      // One undo step per switch (`specs/0102` 9.2, "Snap to fixtures on" or "off").
-      <PanelSwitch label="Fixtures" checked={fixtures.view.snappingFixtures} onCheckedChange={() => fixtures.setSnapping(!fixtures.view?.snappingFixtures)} onReturnFocus={onReturnFocus} />
-    ) : null}
     <PanelRadioGroup legend="Grid snaps with" options={GRID_POINTS} value={view.gridPoint} stacked
       onChange={(point) => snapping.setGridPoint(point)} onReturnFocus={onReturnFocus} />
     <fieldset className="min-w-0">

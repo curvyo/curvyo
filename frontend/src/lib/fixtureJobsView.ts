@@ -6,7 +6,7 @@
  * kind (an Unknown job: rename and delete only). The Rust contract test reads the same fixtures
  * (`curvyo-editor-wasm/tests/fixtures/fixture_jobs_view/`).
  */
-import type { FixtureKind } from "@/lib/fixturesView";
+import { asKind, type FixtureKind } from "./fixturesView.ts";
 
 /** The five kinds a job can have (`0101`'s symbols). */
 export const JOB_KINDS = ["cut", "score", "engrave", "engrave_outline", "cut_out"] as const;
@@ -41,7 +41,14 @@ export interface JobRow {
   position: number;
   /** How many jobs its fixture has. */
   of: number;
+  /** The fixed job of a pin or screw ("centre_mark", "diameters"); `null` for a free job. */
+  role: JobRole | null;
+  /** Whether the fixture's set lies on this page; `false` reads "not on this page" (criterion 28). */
+  onThisPage: boolean;
 }
+
+/** The two fixed jobs of a pin or a screw (criterion 27). */
+export type JobRole = "centre_mark" | "diameters";
 
 /** One fixture's group: its heading and its jobs in order. */
 export interface JobGroup {
@@ -96,8 +103,6 @@ export interface FixtureJobsView {
 
 type Json = Record<string, unknown>;
 
-const FIXTURE_KINDS: readonly FixtureKind[] = ["grid", "holder", "clamp", "stop", "screw"];
-
 function isObject(value: unknown): value is Json {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -114,6 +119,7 @@ function asOptionalText(value: unknown): string | null | undefined {
 function asJobKind(value: unknown): JobKind | null | undefined {
   if (value === null) return null;
   if (!isObject(value) || typeof value.word !== "string") return undefined;
+  if (typeof value.text !== "string") return undefined;
   const text = JOB_KINDS.find((known) => known === value.text);
   // A kind text this build does not know: an Unknown job, not a broken row.
   return text === undefined ? null : { text, word: value.word };
@@ -121,12 +127,13 @@ function asJobKind(value: unknown): JobKind | null | undefined {
 
 function asPartKind(value: unknown): JobKindText | null | undefined {
   if (value === null) return null;
-  const text = JOB_KINDS.find((known) => known === value);
-  return text ?? null;
+  if (typeof value !== "string") return undefined;
+  return JOB_KINDS.find((known) => known === value) ?? null;
 }
 
-function asFixtureKind(value: unknown): FixtureKind {
-  return FIXTURE_KINDS.find((known) => known === value) ?? "unknown";
+function asRole(value: unknown): JobRole | null | undefined {
+  if (value === null) return null;
+  return value === "centre_mark" || value === "diameters" ? value : undefined;
 }
 
 function asJob(value: unknown, position: number): JobRow | null {
@@ -136,8 +143,11 @@ function asJob(value: unknown, position: number): JobRow | null {
   const total = asCount(value.parts_total);
   const of = asCount(value.of);
   const at = asCount(value.position);
+  const role = asRole(value.role);
   if (
     kind === undefined ||
+    role === undefined ||
+    typeof value.on_this_page !== "boolean" ||
     typeof value.id !== "string" ||
     typeof value.name !== "string" ||
     typeof value.show !== "boolean" ||
@@ -163,11 +173,14 @@ function asJob(value: unknown, position: number): JobRow | null {
     partsTotal: total,
     position,
     of,
+    role,
+    onThisPage: value.on_this_page,
   };
 }
 
 function asGroup(value: unknown): JobGroup | null {
-  if (!isObject(value) || typeof value.fixture !== "string" || typeof value.name !== "string") {
+  const kind = isObject(value) ? asKind(value.kind) : undefined;
+  if (!isObject(value) || kind === undefined || typeof value.fixture !== "string" || typeof value.name !== "string") {
     return null;
   }
   if (!Array.isArray(value.jobs)) return null;
@@ -177,7 +190,7 @@ function asGroup(value: unknown): JobGroup | null {
     if (job === null) return null;
     jobs.push(job);
   }
-  return { fixture: value.fixture, name: value.name, kind: asFixtureKind(value.kind), jobs };
+  return { fixture: value.fixture, name: value.name, kind, jobs };
 }
 
 function asAddTarget(value: unknown): AddTarget | null | undefined {

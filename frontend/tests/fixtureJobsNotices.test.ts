@@ -103,5 +103,7 @@ function job(id: string, position: number, of: number) {
     parts_total: 2,
     position,
     of,
+    role: null,
+    on_this_page: true,
   };
 }

@@ -84,12 +84,13 @@ test("criteria 15, 25: the size text reads '125 × 75 mm' and keeps one decimal 
   assert.equal(sizeText(100.25, 50), "100.3 × 50 mm");
 });
 
-test("criterion 15: Place page sits between the Machine block and Fixtures and hides without a drawing page", () => {
+test("criterion 15: Place page follows the Machine block and hides without a drawing page", () => {
   const tab = source("components/workbench/ManifestTab.tsx");
   const machine = tab.indexOf("<MachineBlock");
   const place = tab.indexOf("<PlacePage");
-  const fixtures = tab.indexOf("<FixtureList");
-  assert.ok(machine >= 0 && place > machine && fixtures > place, "Machine, Place page, Fixtures");
+  // Superseded by `0113`: the Fixtures block moved to its own tab, so nothing follows Place page.
+  assert.ok(machine >= 0 && place > machine, "Machine, Place page");
+  assert.ok(!tab.includes("<FixtureList"), "no Fixtures block in the Document tab");
   assert.match(tab, /if \(drawing\.length === 0\) return null;/, "hidden, not disabled");
   assert.match(tab, /label="Place page"/);
 });

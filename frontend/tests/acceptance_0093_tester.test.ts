@@ -29,7 +29,9 @@ type Session = {
   delete_page: (id: string) => boolean;
   activate_page: (id: string) => boolean;
   set_extension_enabled: (id: string, enabled: boolean) => string;
-  add_fixture: (kind: string) => boolean;
+  add_fixture_set: () => string | undefined;
+  add_set_fixture: (set: string, kind: string) => string | undefined;
+  save_machine_profile: (random: Uint8Array, nowMs: number) => string;
   history_press: (direction: string) => string;
 };
 
@@ -104,7 +106,13 @@ test("AC11a: a dummy second kind appears through the same registry beside the re
 test("AC11b: switched off, Laser leaves the Kind switch and the page stays as 'Laser (off)'", skip, async () => {
   const s = await open();
   const id = s.add_page_of_kind(output(s), "");
-  assert.ok(s.add_fixture("engraved_grid"));
+  // Superseded by `0113`: a fixture is added into a machine set (`add_fixture` is gone).
+  // Superseded by the `0113` rework (2026-11-16, criterion 3): sets live in a machine profile, so
+  // the Generic laser page is saved as a profile before "+ Set".
+  s.save_machine_profile(new Uint8Array(16).fill(7), 1_000);
+  const set = s.add_fixture_set();
+  assert.ok(set);
+  assert.ok(s.add_set_fixture(set, "holder"));
   const process = output(s);
   s.set_extension_enabled(process, false);
   const l = list(s);

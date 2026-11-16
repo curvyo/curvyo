@@ -21,6 +21,7 @@ import { type ComponentType, useEffect, useRef, useState } from "react";
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
 import type { PanelTabView } from "@/hooks/useDocumentPanel";
 import { isMac } from "@/lib/historyText";
 import { panelHandlesEscape } from "@/lib/panelEscape";
@@ -33,6 +34,9 @@ export type Glyph = ComponentType<{
   "aria-hidden": boolean;
 }>;
 
+/** The Fixtures tab's glyph: the custom Holder symbol, wrapped to the strip's glyph props. */
+const HolderGlyph: Glyph = () => <FixtureGlyph kind="holder" />;
+
 /** The glyph of each tab (Lucide, 16 px, 1.5 px absolute stroke). */
 const GLYPHS: Record<string, Glyph> = {
   file: FolderOpen,
@@ -41,6 +45,7 @@ const GLYPHS: Record<string, Glyph> = {
   layers: Layers,
   operations: ListTree,
   materials: SwatchBook,
+  fixtures: HolderGlyph,
   history: History,
   fonts: CaseSensitive,
   snapping: Magnet,

@@ -74,7 +74,7 @@ const KIND_GLYPHS: Record<string, Glyph> = {
 /** The kind word of a fixture row as a glyph kind; anything unlisted is the unknown glyph. */
 function fixtureKindOf(word: string): FixtureKind {
   const kind = word.toLowerCase();
-  return kind === "grid" || kind === "holder" || kind === "clamp" || kind === "stop" || kind === "screw"
+  return kind === "grid" || kind === "holder" || kind === "clamp" || kind === "stop" || kind === "screw" || kind === "pin"
     ? kind
     : "unknown";
 }
