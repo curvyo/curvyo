@@ -10,6 +10,29 @@ Most entries are costs an accepted ADR chose to pay; some are shortcuts a featur
 it is accepted for good.
 
 
+## The fixture layer is rebuilt every animation frame (`0113`, 2026-11-16)
+
+On a laser page the session rebuilds the fixture layer (sets, job fixtures, pin and screw grids,
+centre marks) and the host re-uploads the whole frame on every animation frame, also when nothing
+changed. The draw budget of `0113` criterion 42 (a) holds (within 16 ms on 3 sets of 20 fixtures,
+64 job fixtures and a 400-centre grid), but an idle page costs CPU and battery.
+
+**Resolution:** its own `fix/` PR (architect review 2026-11-16): first skip a frame whose
+generation did not change, then cache the fixture list until a fixture, set or page choice changes.
+
+## Two devices aligning one profile's sets at once can leave duplicate set copies (`0113`, ADR 0059 §10, 2026-11-16)
+
+The set mirror of a page is aligned to its profile record by uid, creating a node for each set,
+fixture or job the mirror lacks. In a shared project, two devices that align the same page before
+they have synced each create the missing nodes with their own node ids; the merge keeps both, so
+the page shows the set (or fixture) twice with the same `set_uid`. The alignment deletes a second
+node of a uid, but it runs only on a newer record; until then the duplicate stays, and a set edit
+on that page writes the mirror as it is. Development build, no compatibility promise; the
+duplicate is visible and its trash removes it.
+
+**Resolution:** derive the node ids of aligned nodes from the uid (as the format-36 migration's
+sketch page), or run the alignment after a merge that brings in set nodes.
+
 ## Layout commands on 200 pages take 38 to 66 ms in a debug build (`0109`, 2026-11-11)
 
 One orientation change, drop or delete on 201 pages measured 38 to 66 ms thread CPU (cheapest of 3, debug build, developer machine);
@@ -771,6 +794,12 @@ resolve.
 Material records (ADR 0055) keep their test history inside the record; each history entry has
 its own id, so the merge of two copies of one material is a union of entries by id plus the later
 `sets` (2026-11-11).
+
+Machine profile records hold the fixture sets since `0113` (ADR 0060 §5a, 2026-11-16) and every
+Fixtures tab edit writes the whole record: two instances (windows, tabs, computers) that edit the
+same profile's sets between two reloads lose the earlier write, as material edits do. The record
+journal undoes only this instance's steps and says "<profile> changed since, its sets were not
+undone." when another wrote in between.
 
 **Resolution:** detect and surface conflict copies in the UI with a
 side-by-side resolution view (a story), on top of
