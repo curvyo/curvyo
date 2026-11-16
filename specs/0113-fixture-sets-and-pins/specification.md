@@ -1,6 +1,6 @@
 # Fixture sets and pins: a Fixtures tab with named machine sets a page switches on, job fixtures of one page, the pin kind, centre marks and diameters as jobs, centre snapping, lock and "Apply fixtures from page"
 
-Status: Draft (Ready after the customer merges this PR)
+Status: Done (PR #365)
 Priority: Should
 Origin: Customer (laser redesign after the demo of PR #333, decisions of 2026-11-12: Frage 207 B, 208 A, 209 A, 210, 211 B; screens 06 to 09 of `docs/design-drafts/2026-11-laser-redesign/` accepted: "die screens sehen gut aus"). Third of the three stories of the redesign, after `0111` `laser-operation-tools` and `0112` `test-grid-and-materials`. Details marked **(Proposal)** are the product owner's and vetoable at the demo.
 

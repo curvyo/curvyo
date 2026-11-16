@@ -2,6 +2,8 @@
 
 **Status:** Accepted 2026-11-12 (customer accepted PR #330; document model and file format). Extends [ADR 0049](0049-laser-fixtures-in-the-project-file.md) (a fixture may hold job nodes beside its slots) and [ADR 0050](0050-laser-fixture-set-in-machine-profile.md) (record format 3, a `jobs` key per fixture entry). Follows the child-node precedent of [ADR 0046](0046-laser-operations-record.md) §1 and [ADR 0049](0049-laser-fixtures-in-the-project-file.md) §3. Spec: [`0103`](../../specs/0103-fixture-jobs/specification.md) criteria 3 to 5, 8 to 12, 20 to 24. Feature notes: [`0103` adrs.md](../../specs/0103-fixture-jobs/adrs.md). On acceptance, amendment notes go on ADR 0049 §2, §3 and §7, and on ADR 0050 §1, §2 and §8 (the record text limit, the format 2 reading and the goldens).
 
+**Note (ADRs 0059 and 0060, accepted 2026-11-16, PR #365):** §1 to §3 gain a `job_role` register and the part keys `.circle` and `.marks` for the fixed jobs of a pin and a screw; §7: jobs live in the profile's set entries (record format 5, ADR 0060).
+
 ## Context
 
 A fixture job is an operation of one fixture (`0103`): a kind, a name, Show and Output, and the fixture parts it takes. It lives with its fixture, in the fixture's order, and is removed with it. Its ticks name fixture parts, which are the fixture's own node (a holder's board, a clamp, a stop), its slot nodes, or, for a grid and a screw, one of two named sub-parts of that node. The profile's fixture set (ADR 0050) must carry the jobs too, by place and not by id.

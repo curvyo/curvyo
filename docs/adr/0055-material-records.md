@@ -4,6 +4,8 @@
 
 **Note:** amended by the 0111 redesign: materials shared across lasers.
 
+**Note (ADR 0060, accepted 2026-11-16, PR #365):** §9: the library undo journal also holds machine profile records (`{ record kind, id, before, after }`, one 16 MiB budget) so Fixtures tab edits are undo steps of the open project.
+
 ## Context
 
 A material record is a name, a thickness and, for one machine, the Cut, Score and Engrave sets that a test proved, with every test that fed it (spec criteria 16, 18). It is the maker's data, reused across projects, synced only as the data directory is (ADR 0004 §7), never sent anywhere (R-SYS-002, R-SYS-007). An operation points at it by id (ADR 0054 §1), so its id must be stable and unique across computers.

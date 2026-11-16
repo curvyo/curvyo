@@ -8,6 +8,8 @@ Note 2026-11-05: §4 amended by [ADR 0042](0042-page-kinds.md) (proposed): a pic
 
 **Note (ADR 0056, proposed 2026-11-12):** §1 and §5: the project's copy of a profile carries `motorised_z` (0056 §7); the project format is 44.
 
+**Note (ADRs 0059 and 0060, accepted 2026-11-16, PR #365):** §4 and §5: Pick profile builds the page's fixture-set mirror from the record's `fixture_sets` (ids kept, every set on) and Differs from profile, Update and Reset act on the machine fields only; the project format is 47 (ADR 0060 §5a/§6).
+
 ## Context
 
 ADR 0033 §1 gave the manufacturing a placeholder register `mfg_machine_name` and said it would be
