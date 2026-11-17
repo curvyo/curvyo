@@ -25,13 +25,16 @@ pub struct StageRuns {
     pub branches: usize,
     /// The inner areas (Offset).
     pub inner: usize,
+    /// The chains made for a Join tips setting other than the default.
+    pub tips: usize,
 }
 
 /// A region's rings in mm and their segments of the subject's own outlines.
 type RegionRings = (Vec<Vec<Point>>, Vec<Vec<CubicBez>>);
 
-/// The key of a Thick parts limit (mm, with its tolerance), `None` for no limit.
-type ThickKey = Option<u64>;
+/// The key of the chain stages: Join tips and the Thick parts limit (mm, with its tolerance),
+/// `None` for no limit.
+type ThickKey = (bool, Option<u64>);
 
 /// The paths and kept parts of a region for one set of options.
 #[derive(Debug, Clone, Default)]
@@ -215,19 +218,23 @@ impl RegionInput<'_> {
         let limit = options
             .thick_parts
             .map(|l| l.as_mm() + tolerance(l.as_mm()));
+        if !skeleton.chain_set_ready(options.join_tips) {
+            runs.tips += 1;
+        }
+        let (all_chains, all_fitted) = skeleton.chain_set(options.join_tips);
         let keys = Keys {
-            thick: limit.map(f64::to_bits),
+            thick: (options.join_tips, limit.map(f64::to_bits)),
             optimise: options.optimise.to_bits(),
             overlap: options.overlap.to_bits(),
         };
-        self.run_cut(limit, keys.thick, memo, runs);
+        self.run_cut(all_chains, limit, keys.thick, memo, runs);
         let cut = memo.cut.as_ref().and_then(|(_, cut)| cut.as_ref());
-        let chains: &[Chain] = cut.map_or(&skeleton.chains, |cut| &cut.pieces);
-        if cut.is_none() && skeleton.fitted.iter().all(Option::is_none) {
+        let chains: &[Chain] = cut.map_or(all_chains, |cut| &cut.pieces);
+        if cut.is_none() && all_fitted.iter().all(Option::is_none) {
             lines.filled.push(rings::whole(self.segments));
             return;
         }
-        let cached = cut.is_none().then_some(skeleton.fitted.as_slice());
+        let cached = cut.is_none().then_some(all_fitted);
         run_through(
             chains,
             cached,
@@ -278,6 +285,7 @@ impl RegionInput<'_> {
     /// The cut stage: the chains cut at the Thick parts `limit`, rerun when `key` changed.
     fn run_cut(
         &self,
+        chains: &[Chain],
         limit: Option<f64>,
         key: ThickKey,
         memo: &mut RegionMemo,
@@ -288,9 +296,8 @@ impl RegionInput<'_> {
         }
         runs.cut += 1;
         let skeleton = self.region;
-        let cut = limit.and_then(|limit| {
-            thick::cut(&skeleton.chains, &skeleton.holes, &self.rings[1..], limit)
-        });
+        let cut =
+            limit.and_then(|limit| thick::cut(chains, &skeleton.holes, &self.rings[1..], limit));
         memo.cut = Some((key, cut));
         memo.through = None;
     }

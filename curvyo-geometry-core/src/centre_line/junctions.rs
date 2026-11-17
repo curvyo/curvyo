@@ -190,21 +190,20 @@ pub(super) fn cost(a: &Measure, b: &Measure) -> f64 {
 /// it rather than turning into the other arm of its own width.
 pub(super) const TURN_BAND: f64 = 0.1;
 
-/// A spur this many times longer than the miter of its arms, `r_J / sin(θ/2)`, is no tip.
+/// A spur this many times longer than the miter of its arms, `r_J / sin(θ/2)`, is no tip
+/// unless [`TIP_RADII`] allows it.
 const TIP_MITER: f64 = 1.5;
+/// A spur at most this many junction radii long is a tip whatever its arms' angle (a drop's
+/// tail, a short thorn); the traced fixtures' tips reach 5, their tapering strokes start at 9.
+const TIP_RADII: f64 = 6.0;
 /// A tip's end is at most this share of the junction radius wide (it falls to a point).
 const TIP_END_SHARE: f64 = 0.25;
-/// A tip points at least this close to the arms' outer bisector (30°, as its cosine).
-const TIP_BISECTOR_COS: f64 = 0.866;
-/// Arms closer to a straight line than this (`|d_a + d_b|`, about 150°) form no crest.
-const TIP_CREST_MIN: f64 = 0.5;
-/// Arms closer together than this (15°, as the cosine of their angle) form no crest.
-const TIP_CREST_MAX_COS: f64 = 0.966;
 
-/// The tip of a sharp crest at a junction of three edges (CENTRE-THROUGH A): a free spur that
-/// points out along the bisector of the other two edges, falls to a point and is no longer
-/// than the miter where their outer edges meet. Returns the spur and the two arms, which then
-/// continue as one path through the spur's end.
+/// The tip at a junction of three edges (Join tips, ADR 0063 amendments CENTRE-THROUGH and
+/// CENTRE-TIPS): a free spur that falls to a point, is shorter than both other edges and no
+/// longer than the larger of 1.5 times the miter where their outer edges meet and six junction
+/// radii. Returns the spur and the two arms, which then continue as one path through the
+/// spur's end.
 pub(super) fn crest_tip(
     junction: &Junction,
     sides: &[Side],
@@ -220,24 +219,21 @@ pub(super) fn crest_tip(
         }
         let (a, b) = ((k + 1) % 3, (k + 2) % 3);
         let end = tip(sides[k]);
-        let reach = end.point - junction.centre;
-        let length = reach.hypot();
-        let mean = measures[a].direction + measures[b].direction;
-        let spread = measures[a].direction.dot(measures[b].direction);
+        let length = (end.point - junction.centre).hypot();
         let arms = measures[a].length.min(measures[b].length);
-        if length <= 0.0
-            || mean.hypot() < TIP_CREST_MIN
-            || spread > TIP_CREST_MAX_COS
-            || measures[k].length >= arms
-        {
+        if length <= 0.0 || measures[k].length >= arms {
             return None;
         }
+        let spread = measures[a]
+            .direction
+            .dot(measures[b].direction)
+            .clamp(-1.0, 1.0);
         let half_sine = ((1.0 - spread) / 2.0).max(0.0).sqrt();
         let miter = junction.radius / half_sine.max(1e-9);
         let pointed = end.radius <= TIP_END_SHARE * junction.radius;
-        let along = -reach.dot(mean) / (length * mean.hypot()) >= TIP_BISECTOR_COS;
-        let short = length <= TIP_MITER * miter + super::fit::tolerance(2.0 * junction.radius);
-        (pointed && along && short).then_some((sides[k], sides[a], sides[b]))
+        let reach = (TIP_MITER * miter).max(TIP_RADII * junction.radius)
+            + super::fit::tolerance(2.0 * junction.radius);
+        (pointed && length <= reach).then_some((sides[k], sides[a], sides[b]))
     })
 }
 

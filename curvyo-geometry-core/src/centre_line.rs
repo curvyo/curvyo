@@ -22,8 +22,13 @@ mod stages;
 #[cfg(test)]
 mod tests;
 mod thick;
+#[cfg(test)]
+mod tip_tests;
+mod tips;
 
-use crate::medial_axis::{AxisSample, CentreLineError, HoleMeasure, Region, medial_axis, regions};
+use crate::medial_axis::{
+    AxisSample, CentreLineError, HoleMeasure, MedialAxis, Region, medial_axis, regions,
+};
 use crate::{Outline, OutlineTriple, WidthProfile};
 use branch_trim::{ParentCurve, cut_branch};
 use chains::{Chain, ChainEnd, chains};
@@ -46,6 +51,10 @@ pub struct CentreOptions {
     /// profile stay within a quarter of `T(w)` at 0, half of it at 0.5, `T(w)` at the default
     /// 0.75 and three times `T(w)` at 1.
     pub optimise: f64,
+    /// Join tips: arms that meet at a pointed tip of the shape run into the tip as one path,
+    /// its width falling to 0 there; off, the other arm is a branch whose butt overlaps the
+    /// path it joins (`specs/0117-centre-lines` criterion 9, CENTRE-TIPS).
+    pub join_tips: bool,
 }
 
 impl Default for CentreOptions {
@@ -55,12 +64,16 @@ impl Default for CentreOptions {
             thick_parts: Some(DEFAULT_THICK_PARTS),
             inner_offset: None,
             optimise: DEFAULT_OPTIMISE,
+            join_tips: DEFAULT_JOIN_TIPS,
         }
     }
 }
 
 /// The default of [`CentreOptions::optimise`].
 pub const DEFAULT_OPTIMISE: f64 = 0.75;
+
+/// The default of [`CentreOptions::join_tips`] (customer 2026-11-21, Proposal).
+pub const DEFAULT_JOIN_TIPS: bool = true;
 
 /// The default of [`CentreOptions::thick_parts`] (customer 2026-11-18, Proposal).
 pub const DEFAULT_THICK_PARTS: Length = Length::from_mm(6.0);
@@ -118,9 +131,14 @@ impl CentreLines {
 #[derive(Debug, Clone)]
 struct RegionSkeleton {
     region: Region,
+    /// The chains with Join tips on (the default).
     chains: Vec<Chain>,
     /// Fitted main, through and ring chains, by chain index; branches are fitted in `finish`.
     fitted: Vec<Option<Fitted>>,
+    /// The axis, kept for the chains with Join tips off when a tip was joined.
+    axis: Option<std::sync::Arc<MedialAxis>>,
+    /// The chains with Join tips off and their fit, made on first use.
+    untied: std::sync::OnceLock<(Vec<Chain>, Vec<Option<Fitted>>)>,
     /// `w_max` and the outer ring's diameter.
     blob: blob::BlobMeasure,
     /// The holes' measures, in ring order.
@@ -169,6 +187,8 @@ impl RegionSkeleton {
                 region,
                 chains: Vec::new(),
                 fitted: Vec::new(),
+                axis: None,
+                untied: std::sync::OnceLock::new(),
                 holes: Vec::new(),
                 failed: true,
             };
@@ -178,16 +198,11 @@ impl RegionSkeleton {
             .iter()
             .filter_map(|h| h.filled)
             .fold(2.0 * axis.widest, f64::max);
-        let chains = chains(&axis);
-        let fitted = chains
-            .iter()
-            .map(|chain| {
-                (!is_branch(chain))
-                    .then(|| fit(&chain.samples, chain.closed, Budget::of(DEFAULT_OPTIMISE)))
-                    .flatten()
-            })
-            .collect();
+        let (chains, joined) = chains(&axis, &region.rings_mm(), DEFAULT_JOIN_TIPS);
+        let fitted = fit_default(&chains);
         Self {
+            axis: joined.then(|| std::sync::Arc::new(axis.clone())),
+            untied: std::sync::OnceLock::new(),
             blob: blob::BlobMeasure::of(&region, widest),
             region,
             chains,
@@ -195,6 +210,41 @@ impl RegionSkeleton {
             holes: axis.holes,
             failed: false,
         }
+    }
+}
+
+/// The main, through and ring chains of `chains` fitted at the default Optimise.
+fn fit_default(chains: &[Chain]) -> Vec<Option<Fitted>> {
+    chains
+        .iter()
+        .map(|chain| {
+            (!is_branch(chain))
+                .then(|| fit(&chain.samples, chain.closed, Budget::of(DEFAULT_OPTIMISE)))
+                .flatten()
+        })
+        .collect()
+}
+
+impl RegionSkeleton {
+    /// The chains for Join tips `join` and their fit at the default Optimise; the other
+    /// setting's are made on first use, and only when a tip was joined.
+    fn chain_set(&self, join: bool) -> (&[Chain], &[Option<Fitted>]) {
+        match (&self.axis, join == DEFAULT_JOIN_TIPS) {
+            (Some(axis), false) => {
+                let (chains, fitted) = self.untied.get_or_init(|| {
+                    let (chains, _) = chains(axis, &self.region.rings_mm(), join);
+                    let fitted = fit_default(&chains);
+                    (chains, fitted)
+                });
+                (chains, fitted)
+            }
+            _ => (&self.chains, &self.fitted),
+        }
+    }
+
+    /// Whether the chains for Join tips `join` are made yet.
+    fn chain_set_ready(&self, join: bool) -> bool {
+        self.axis.is_none() || join == DEFAULT_JOIN_TIPS || self.untied.get().is_some()
     }
 }
 

@@ -198,6 +198,17 @@ fn criterion_18_wasm_each_slider_on_the_staged_memo() {
                 thick_parts: Some(Length::from_mm(4.0)),
                 optimise: 0.6,
                 inner_offset: Some(Length::from_mm(0.5)),
+                join_tips: true,
+            },
+        ),
+        (
+            "Join tips",
+            CentreOptions {
+                overlap: 0.1,
+                thick_parts: Some(Length::from_mm(4.0)),
+                optimise: 0.6,
+                inner_offset: Some(Length::from_mm(0.5)),
+                join_tips: false,
             },
         ),
     ];

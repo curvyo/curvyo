@@ -8,12 +8,18 @@ use curvyo_document_core::{Length, Point, Vec2};
 use curvyo_geometry_core::{CentreOptions, CentreSkeleton, CentreStages, Outline, StageRuns};
 
 const WHALE: &str = include_str!("fixtures/centre_lines/whale_traced.txt");
+const DOLPHIN: &str = include_str!("fixtures/centre_lines/dolphin_traced.txt");
 
 type Triple = (Point, Vec2, Vec2);
 
 fn whale() -> Vec<(Vec<Triple>, bool)> {
+    traced(WHALE)
+}
+
+/// The outlines of a traced fixture text, all subjects together.
+fn traced(text: &str) -> Vec<(Vec<Triple>, bool)> {
     let mut outlines: Vec<(Vec<Triple>, bool)> = Vec::new();
-    for line in WHALE.lines().filter(|l| !l.starts_with('#')) {
+    for line in text.lines().filter(|l| !l.starts_with('#')) {
         let words: Vec<&str> = line.split_whitespace().collect();
         match words.first() {
             Some(&"subject") | None => {}
@@ -89,6 +95,7 @@ fn each_slider_reruns_only_its_stages_and_matches_a_fresh_finish() {
                 inner_offset: Some(Length::from_mm(-0.5)),
                 optimise: 0.4,
                 thick_parts: Some(Length::from_mm(9.0)),
+                join_tips: true,
             },
         ),
         (
@@ -122,4 +129,35 @@ fn each_slider_reruns_only_its_stages_and_matches_a_fresh_finish() {
         });
     }
     assert_eq!(got, wanted);
+}
+
+/// Join tips (criterion 9b, CENTRE-TIPS): switching it makes the other chains once, on first
+/// use, reruns the stages after them and matches a fresh finish; switching back and forth makes
+/// them no more.
+#[test]
+fn join_tips_makes_its_chains_once_and_matches_a_fresh_finish() {
+    let outlines = traced(DOLPHIN);
+    let skeleton = skeleton(&outlines);
+    let mut stages = CentreStages::new(skeleton.clone());
+    let on = CentreOptions::default();
+    let off = CentreOptions {
+        join_tips: false,
+        ..on
+    };
+    let mut made = Vec::new();
+    for options in [on, off, on, off] {
+        let before = stages.runs();
+        let memoised = stages.finish(&options, &[]);
+        let fresh = skeleton.finish(&options, &[]);
+        assert_eq!(format!("{memoised:?}"), format!("{fresh:?}"));
+        let after = stages.runs();
+        made.push(after.tips - before.tips);
+        assert!(
+            after.branches > before.branches,
+            "the paths follow the switch"
+        );
+    }
+    assert_eq!(made[0], 0);
+    assert!(made[1] > 0, "the chains with Join tips off are made");
+    assert_eq!(&made[2..], &[0, 0]);
 }
