@@ -114,6 +114,7 @@ ignore = [
     "RUSTSEC-2026-0247", # bitmaps, via loro-internal -> im
     "RUSTSEC-2024-0370", # proc-macro-error, via Tauri's Linux gtk-rs stack
     "RUSTSEC-2024-0436", # paste, via ACS -> nalgebra 0.33 -> simba 0.9; ADR 0025
+    "RUSTSEC-2026-0543", # chrono unmaintained (no patch), via trash -> curvyo-storage-io; re-check 2027-02-17 (trash switching to jiff/time)
 ]
 
 [bans]
