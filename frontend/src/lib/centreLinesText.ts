@@ -235,14 +235,10 @@ export function focusCentreLinesBar() {
 }
 
 /**
- * Whether an Escape key press cancels the bar: always, unless a number entry (a text input) owns
- * it. A slider or a tooltip layer may have prevented the default already (a dismissed tooltip
- * must not cost a second press).
+ * Whether an Escape key press cancels the bar: always, in a number entry too (the entry closes
+ * with it). A slider or a tooltip layer may have prevented the default already (a dismissed
+ * tooltip must not cost a second press).
  */
 export function centreEscapeCancels(event: { key: string; defaultPrevented: boolean; target: EventTarget | { tagName?: string } | null }): boolean {
-  if (event.key !== "Escape") {
-    return false;
-  }
-  const tag = (event.target as { tagName?: string } | null)?.tagName;
-  return !(event.defaultPrevented && (tag === "INPUT" || tag === "TEXTAREA"));
+  return event.key === "Escape";
 }

@@ -215,6 +215,28 @@ export function CentreLinesBar({ api, info, onReturnFocus }: { api: CentreLinesA
     latest.current = api;
   });
   const stop = () => latest.current.stop();
+  // Escape with the focus anywhere else (the body after the bar's button went away, a tool rail
+  // button, a canvas child): the bar's and the canvas's handlers stop what they handle, so only
+  // the rest reaches the window.
+  useEffect(() => {
+    const onWindowKey = (event: globalThis.KeyboardEvent) => {
+      const target = event.target;
+      const entry = target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.closest("[role=dialog],[role=menu]") !== null);
+      // A field or a dialog elsewhere keeps its own Escape.
+      if (event.key !== "Escape" || (entry && event.defaultPrevented)) {
+        return;
+      }
+      event.preventDefault();
+      if (latest.current.applying) {
+        latest.current.stop();
+        return;
+      }
+      latest.current.cancel();
+      onReturnFocus();
+    };
+    window.addEventListener("keydown", onWindowKey);
+    return () => window.removeEventListener("keydown", onWindowKey);
+  }, [onReturnFocus]);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const escape = event.key === "Escape";
     if (escape ? !centreEscapeCancels(event) : event.defaultPrevented) {
