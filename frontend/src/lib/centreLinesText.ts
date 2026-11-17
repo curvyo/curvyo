@@ -79,6 +79,8 @@ export interface CentreLinesOptions {
   keepInner: boolean;
   /** Millimetres, −5 to 5. */
   offset: number;
+  /** Join tips (criterion 9b): arms that meet at a tip run into it as one path. */
+  joinTips: boolean;
 }
 
 export const CENTRE_LINES_DEFAULTS: CentreLinesOptions = {
@@ -87,7 +89,11 @@ export const CENTRE_LINES_DEFAULTS: CentreLinesOptions = {
   optimise: 75,
   keepInner: false,
   offset: 0.3,
+  joinTips: true,
 };
+
+/** The Join tips switch's tooltip (UX notes §3.1). */
+export const CENTRE_JOIN_TIPS_TOOLTIP = "Run lines that meet at a point into it as one path";
 
 /** A typed value clamped to its range, or `null` when it is no number. */
 export function parseOption(text: string, min: number, max: number): number | null {
@@ -199,6 +205,7 @@ export const CENTRE_INFO_ENTRIES: readonly { term: string; text: string }[] = [
   { term: "Overlap", text: "How far a side line reaches into the line it joins, in percent of that line's width. 0\u00a0% touches its edge; a negative value leaves a gap." },
   { term: "Thick parts", text: "A part wider than this stays filled as it is; the rest becomes lines. Raise it to turn broad bands into lines too." },
   { term: "Optimise", text: "Higher gives fewer nodes and a looser fit; lower follows the shape more closely. Corners keep their detail at every setting." },
+  { term: "Join tips", text: "Where two lines meet in a point, one path runs into the point and out again, getting as thin as the shape. Off, one line stops at the other and overlaps it by Overlap." },
   { term: "Keep inner areas", text: "Also turns each hole inside a shape into a grey filled shape of its own. Off leaves the holes empty." },
   { term: "Offset", text: "Moves the edge of each inner area inward, in mm. A negative value moves it outward, under the line." },
 ];

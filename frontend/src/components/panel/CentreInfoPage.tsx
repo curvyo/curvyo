@@ -48,6 +48,18 @@ const PICTURES: Readonly<Record<string, [ReactNode, ReactNode]>> = {
       ))}
     </g>,
   ],
+  "Join tips": [
+    <g key="b" stroke={LINE} strokeWidth={1} fill="none">
+      <path d="M22 36L52 8L82 36" stroke={INK} strokeWidth={6} strokeLinejoin="miter" />
+      <path d="M24 34L50 12" />
+      <path d="M46 14H58" strokeWidth={4} stroke={LINE} />
+      <path d="M52 14L80 34" />
+    </g>,
+    <g key="a">
+      <path d="M22 36L52 8L82 36" stroke={INK} strokeWidth={6} strokeLinejoin="miter" fill="none" />
+      <path d="M24 34L52 6L80 34" stroke={LINE} strokeWidth={1} fill="none" />
+    </g>,
+  ],
   "Keep inner areas": [
     <path key="b" d="M52 4A16 16 0 1 0 52.01 4ZM52 10A10 10 0 1 1 51.99 10Z" fill={INK} fillRule="evenodd" />,
     <g key="a">

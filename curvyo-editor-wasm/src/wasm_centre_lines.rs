@@ -79,7 +79,8 @@ impl WasmSession {
 
     /// Find centre lines on the selection, in one commit (criterion 2). `overlap` is a fraction
     /// (-0.5 to 0.5), `thick_parts_mm` from 0.1 mm to [`THICK_PARTS_MAX_MM`] (which means no
-    /// limit), `optimise` 0 to 1, `inner_offset_mm` is used when `keep_inner`.
+    /// limit), `optimise` 0 to 1, `inner_offset_mm` is used when `keep_inner`, `join_tips` runs
+    /// arms that meet at a tip into it as one path (criterion 9b).
     pub fn apply_centre_lines(
         &mut self,
         overlap: f64,
@@ -87,6 +88,7 @@ impl WasmSession {
         optimise: f64,
         keep_inner: bool,
         inner_offset_mm: f64,
+        join_tips: bool,
     ) -> CentreLinesView {
         let options = centre_options(
             overlap,
@@ -94,6 +96,7 @@ impl WasmSession {
             optimise,
             keep_inner,
             inner_offset_mm,
+            join_tips,
         );
         outcome_view(self.session.apply_centre_lines(options))
     }
@@ -316,6 +319,7 @@ impl WasmCentreLinesWorker {
         optimise: f64,
         keep_inner: bool,
         inner_offset_mm: f64,
+        join_tips: bool,
     ) -> Vec<f64> {
         let options = centre_options(
             overlap,
@@ -323,6 +327,7 @@ impl WasmCentreLinesWorker {
             optimise,
             keep_inner,
             inner_offset_mm,
+            join_tips,
         );
         self.inner.finish(&options, true)
     }

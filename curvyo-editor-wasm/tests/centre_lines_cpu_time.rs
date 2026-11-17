@@ -275,7 +275,7 @@ fn preview_budgets(name: &str, subjects: &[Vec<(Vec<Triple>, bool)>]) -> (Durati
         worker.set_subjects(&wire, &mut |_| {}).unwrap();
         worker.finish(&base, true)
     });
-    let steps: [(&str, CentreOptions); 5] = [
+    let steps: [(&str, CentreOptions); 6] = [
         (
             "Overlap",
             CentreOptions {
@@ -307,6 +307,7 @@ fn preview_budgets(name: &str, subjects: &[Vec<(Vec<Triple>, bool)>]) -> (Durati
                 thick_parts: Some(Length::from_mm(4.0)),
                 optimise: 0.6,
                 inner_offset: Some(Length::from_mm(0.3)),
+                join_tips: true,
             },
         ),
         (
@@ -316,6 +317,17 @@ fn preview_budgets(name: &str, subjects: &[Vec<(Vec<Triple>, bool)>]) -> (Durati
                 thick_parts: Some(Length::from_mm(4.0)),
                 optimise: 0.6,
                 inner_offset: Some(Length::from_mm(0.5)),
+                join_tips: true,
+            },
+        ),
+        (
+            "Join tips",
+            CentreOptions {
+                overlap: 0.1,
+                thick_parts: Some(Length::from_mm(4.0)),
+                optimise: 0.6,
+                inner_offset: Some(Length::from_mm(0.5)),
+                join_tips: false,
             },
         ),
     ];

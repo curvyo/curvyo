@@ -1,6 +1,6 @@
 import { Route, X } from "lucide-react";
 import { Switch, Tooltip } from "radix-ui";
-import { type KeyboardEvent, useEffect, useId, useRef } from "react";
+import { type ComponentProps, type KeyboardEvent, useEffect, useId, useRef } from "react";
 
 import { ValueField } from "@/components/panel/ValueField";
 import { FINISH_CLASS, InfoButton } from "@/components/TraceBar";
@@ -10,6 +10,7 @@ import type { TraceInfoApi } from "@/hooks/useTraceInfo";
 import {
   CENTRE_INFO_PAGE_ID,
   CENTRE_INFO_TITLE,
+  CENTRE_JOIN_TIPS_TOOLTIP,
   CENTRE_LINES_LABEL,
   CENTRE_LINES_NAME,
   CENTRE_NOTHING_TO_CONVERT,
@@ -33,6 +34,37 @@ const BUTTON_CLASS =
 
 /** The width of a slider of the bar, px (UX notes §3.1). */
 const FIELD_WIDTH = 150;
+/** A switch of the bar with its label (UX notes §3.1): Join tips, Keep inner areas. Enter on it
+ * applies; a pointer press hands the keyboard back to the canvas. */
+function CentreSwitch({
+  label,
+  checked,
+  onChange,
+  onReturnFocus,
+  ...rest
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  onReturnFocus: () => void;
+} & Omit<ComponentProps<"label">, "onChange">) {
+  return (
+    <label {...rest} className="flex h-9 cursor-pointer items-center gap-1.5 rounded-md text-sm whitespace-nowrap text-[var(--toolbar-icon)]">
+      <Switch.Root
+        aria-label={label}
+        data-centre-enter=""
+        checked={checked}
+        onCheckedChange={onChange}
+        onPointerUp={() => onReturnFocus()}
+        className="inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border-[1.5px] border-[var(--toolbar-icon)] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)]"
+      >
+        <Switch.Thumb className="block size-3 rounded-full bg-[var(--toolbar-icon)] transition-transform duration-100 ease-out motion-reduce:transition-none data-[state=checked]:translate-x-[15px] data-[state=checked]:bg-[var(--toolbar-icon-active-fg)] data-[state=unchecked]:translate-x-[2px]" />
+      </Switch.Root>
+      {label}
+    </label>
+  );
+}
+
 /** The Offset field is narrower so that Keep inner areas, Offset, Cancel and Apply fit one row at
  * 1440 px. */
 const OFFSET_WIDTH = 130;
@@ -282,19 +314,10 @@ export function CentreLinesBar({ api, info, onReturnFocus }: { api: CentreLinesA
       {(["overlap", "thickParts", "optimise"] as const).map((key) => (
         <CentreField key={key} field={centreField(key)} value={api.options[key]} onValue={(value) => set({ [key]: value })} onReturnFocus={onReturnFocus} />
       ))}
-      <label className="flex h-9 cursor-pointer items-center gap-1.5 rounded-md text-sm whitespace-nowrap text-[var(--toolbar-icon)]">
-        <Switch.Root
-          aria-label="Keep inner areas"
-          data-centre-enter=""
-          checked={api.options.keepInner}
-          onCheckedChange={(keepInner) => set({ keepInner })}
-          onPointerUp={() => onReturnFocus()}
-          className="inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border-[1.5px] border-[var(--toolbar-icon)] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)] data-[state=checked]:border-[var(--toolbar-icon-active-bg)] data-[state=checked]:bg-[var(--toolbar-icon-active-bg)]"
-        >
-          <Switch.Thumb className="block size-3 rounded-full bg-[var(--toolbar-icon)] transition-transform duration-100 ease-out motion-reduce:transition-none data-[state=checked]:translate-x-[15px] data-[state=checked]:bg-[var(--toolbar-icon-active-fg)] data-[state=unchecked]:translate-x-[2px]" />
-        </Switch.Root>
-        Keep inner areas
-      </label>
+      <AppTooltip side="bottom" content={CENTRE_JOIN_TIPS_TOOLTIP}>
+        <CentreSwitch label="Join tips" checked={api.options.joinTips} onChange={(joinTips) => set({ joinTips })} onReturnFocus={onReturnFocus} />
+      </AppTooltip>
+      <CentreSwitch label="Keep inner areas" checked={api.options.keepInner} onChange={(keepInner) => set({ keepInner })} onReturnFocus={onReturnFocus} />
       {api.options.keepInner ? <CentreField field={offset} width={OFFSET_WIDTH} value={api.options.offset} onValue={(value) => set({ offset: value })} onReturnFocus={onReturnFocus} /> : null}
       </div>
       <div className="ml-auto flex h-9 items-center gap-1">

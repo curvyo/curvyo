@@ -1588,20 +1588,32 @@ fn c15b_deselect_tool_change_and_undo_cancel() {
 #[test]
 fn c12_c15_binding_options_thick_parts_maximum_and_non_numbers() {
     let mm = |o: &CentreOptions| o.thick_parts.map(Length::as_mm);
-    assert_eq!(mm(&centre_options(0.2, 100.0, 0.75, false, 0.3)), None);
-    assert_eq!(mm(&centre_options(0.2, 250.0, 0.75, false, 0.3)), None);
-    assert_eq!(mm(&centre_options(0.2, 99.9, 0.75, false, 0.3)), Some(99.9));
-    assert_eq!(mm(&centre_options(0.2, 6.0, 0.75, false, 0.3)), Some(6.0));
+    assert_eq!(
+        mm(&centre_options(0.2, 100.0, 0.75, false, 0.3, true)),
+        None
+    );
+    assert_eq!(
+        mm(&centre_options(0.2, 250.0, 0.75, false, 0.3, true)),
+        None
+    );
+    assert_eq!(
+        mm(&centre_options(0.2, 99.9, 0.75, false, 0.3, true)),
+        Some(99.9)
+    );
+    assert_eq!(
+        mm(&centre_options(0.2, 6.0, 0.75, false, 0.3, true)),
+        Some(6.0)
+    );
     let defaults = CentreOptions::default();
     for x in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        let o = centre_options(x, x, x, true, x);
+        let o = centre_options(x, x, x, true, x, true);
         assert_eq!(o.overlap, defaults.overlap, "overlap {x}");
         let thick = if x == f64::INFINITY { None } else { Some(6.0) };
         assert_eq!(mm(&o), thick, "thick parts {x}");
         assert_eq!(o.optimise, defaults.optimise, "optimise {x}");
         assert_eq!(o.inner_offset.map(Length::as_mm), Some(0.3), "offset {x}");
     }
-    let o = centre_options(0.9, 0.0, 2.0, false, 9.0);
+    let o = centre_options(0.9, 0.0, 2.0, false, 9.0, true);
     assert_eq!(o.overlap, 0.5, "overlap clamped");
     assert_eq!(o.optimise, 1.0, "optimise clamped");
     assert_eq!(o.inner_offset, None, "keep inner areas off");

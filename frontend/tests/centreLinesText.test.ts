@@ -111,6 +111,13 @@ describe("centre lines sliders (0117 UX notes §3.1)", () => {
     }
     assert.ok(!CENTRE_INFO_ENTRIES.some(({ text }) => /ratio/i.test(text)), "no ratio (criterion 15c)");
   });
+  it("opens Join tips on and lists it after Optimise on the info page (criterion 9b)", async () => {
+    const { CENTRE_LINES_DEFAULTS, CENTRE_JOIN_TIPS_TOOLTIP } = await import("../src/lib/centreLinesText.ts");
+    assert.equal(CENTRE_LINES_DEFAULTS.joinTips, true);
+    assert.ok(CENTRE_JOIN_TIPS_TOOLTIP.length > 0);
+    const terms = CENTRE_INFO_ENTRIES.map(({ term }) => term);
+    assert.deepEqual(terms, ["Overlap", "Thick parts", "Optimise", "Join tips", "Keep inner areas", "Offset"]);
+  });
   it("words the Apply notice in paths, as the Apply tooltip does", () => {
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 70)?.text, "Centre lines: 70 paths, 1 kept filled.");
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 1)?.text, "Centre lines: 1 path, 1 kept filled.");

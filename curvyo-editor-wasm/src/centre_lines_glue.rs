@@ -28,7 +28,7 @@ const PAINTED_TOLERANCE_MM: f64 = 0.01;
 
 /// The options from the bar's numbers: `overlap` a fraction (-0.5 to 0.5), `thick_parts_mm` up
 /// to [`THICK_PARTS_MAX_MM`] (no limit), `optimise` 0 to 1, `inner_offset_mm` used when
-/// `keep_inner`. A value that is not a number takes its default (NaN passes `clamp`); an
+/// `keep_inner`, and Join tips. A value that is not a number takes its default (NaN passes `clamp`); an
 /// infinite Thick parts is no limit, a negative infinite one the default.
 #[must_use]
 pub fn centre_options(
@@ -37,6 +37,7 @@ pub fn centre_options(
     optimise: f64,
     keep_inner: bool,
     inner_offset_mm: f64,
+    join_tips: bool,
 ) -> CentreOptions {
     let defaults = CentreOptions::default();
     let finite = |value: f64, default: f64| if value.is_finite() { value } else { default };
@@ -58,6 +59,7 @@ pub fn centre_options(
                     .clamp(-INNER_OFFSET_MAX_MM, INNER_OFFSET_MAX_MM),
             )
         }),
+        join_tips,
     }
 }
 

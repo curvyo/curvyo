@@ -15,8 +15,8 @@ import { type TraceRequest, type TraceResponse, type TraceWorkerLike, editorModu
 export const STAGE_TIMEOUT_MS = 60_000;
 
 /** The bar's values as the worker reads them: overlap (fraction), Thick parts (mm), optimise
- * (fraction), keep inner areas (0 or 1), offset (mm). */
-export type CentreOptionsWire = [number, number, number, number, number];
+ * (fraction), keep inner areas (0 or 1), offset (mm), join tips (0 or 1). */
+export type CentreOptionsWire = [number, number, number, number, number, number];
 
 /** A request of the newest values: the subjects when they changed, and the options. */
 interface Request {

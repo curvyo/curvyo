@@ -90,7 +90,7 @@ function read(raw: {
 
 /** The options as the worker reads them. */
 function wireOf(options: CentreLinesOptions): CentreOptionsWire {
-  return [options.overlap / 100, options.thickParts, options.optimise / 100, options.keepInner ? 1 : 0, options.offset];
+  return [options.overlap / 100, options.thickParts, options.optimise / 100, options.keepInner ? 1 : 0, options.offset, options.joinTips ? 1 : 0];
 }
 
 /**
