@@ -5,6 +5,7 @@ members = [
     "curvyo-sketch-core",
     "curvyo-extension-core",
     "curvyo-laser-core",
+    "curvyo-connector-core",
     "curvyo-geometry-core",
     "curvyo-text-core",
     "curvyo-svg-core",
@@ -51,6 +52,9 @@ i_overlay = { version = "=9.0.1", default-features = false }
 harfrust = { version = "=0.14.0", default-features = false, features = ["std"] }
 skrifa = { version = "=0.48.0", default-features = false, features = ["std"] }
 sha2 = { version = "0.10", default-features = false }
+# Job ids of the machine connector protocol (ADR 0035 §6); parsed and printed only, never generated
+# in core. Apache-2.0 OR MIT, builds for wasm32; already in `Cargo.lock`.
+uuid = { version = "1", default-features = false, features = ["serde"] }
 # Pinned exactly (`specs/0076-single-line-fonts/adrs.md` decision 2): the XML reader of SVG fonts,
 # hostile input in wasm. MIT OR Apache-2.0, no dependencies, no `unsafe`, no I/O; already in
 # `Cargo.lock` through `fontdb`. Without `positions`.

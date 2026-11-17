@@ -1,0 +1,8 @@
+chunk with a gap in the index -> JobRejected HashMismatch, state Idle
+chunk repeating an index -> JobRejected HashMismatch, state Idle
+chunk for another job_id -> Error UnknownJob, state Receiving
+chunk with no job in assembly -> Error UnknownJob, state Idle
+chunk above 262144 bytes -> JobRejected TooLarge, state Idle
+chunks above announced bytes -> JobRejected TooLarge, state Idle
+byte outside printable ASCII -> JobRejected NotAscii, state Idle
+assembled text with another hash -> JobRejected HashMismatch, state Idle
