@@ -4,8 +4,7 @@
 //! Lasered test hook.
 
 use curvyo_document_core::{
-    ADD_TEST_GRID_COMMIT_LABEL, GridStep, MARK_TEST_GRID_LASERED_COMMIT_LABEL, NodeId,
-    PLACE_TEST_GRID_COMMIT_LABEL, Point,
+    ADD_TEST_GRID_COMMIT_LABEL, GridStep, NodeId, PLACE_TEST_GRID_COMMIT_LABEL, Point,
 };
 use curvyo_laser_core::grids::{
     GRID_TOLERANCE_MM, MaterialRef, Recipe, TestId, free_spot, no_free_spot_text,
@@ -304,9 +303,9 @@ impl Session {
         }
     }
 
-    /// The Lasered test hook (ADR 0057 §5): marks the grid `group` Lasered at `at_ms` and its
-    /// test record with it, in one step. Only `0029`'s output and the acceptance tests call it;
-    /// it is not bound to wasm.
+    /// The Lasered test hook (ADR 0057 §5): marks the grid `group` Lasered at `at_ms` with the
+    /// export's reserved commit (no step, ADR 0064 §11) and its test record with it, written
+    /// without a journal entry. Only the acceptance tests call it; it is not bound to wasm.
     ///
     /// # Errors
     /// No such grid.
@@ -316,10 +315,29 @@ impl Session {
         group: NodeId,
         at_ms: u64,
     ) -> Result<(), String> {
+        let mut change = LibraryChange::default();
+        self.lasered_record(&mut change, group, at_ms)?;
+        self.document
+            .mark_test_grid_lasered_for_tests(group, at_ms)
+            .map_err(|e| e.to_string())?;
+        self.write_library_unjournalled(change);
+        Ok(())
+    }
+
+    /// Lasered at `at_ms` on the test record of grid `group` in its material, as part of
+    /// `change` (`specs/0029` criterion 28 c); nothing when the record is not in the library.
+    ///
+    /// # Errors
+    /// No such grid, or the record's refusal.
+    pub(in crate::session) fn lasered_record(
+        &mut self,
+        change: &mut LibraryChange,
+        group: NodeId,
+        at_ms: u64,
+    ) -> Result<(), String> {
         let grid = self
             .grid_object(group)
             .ok_or_else(|| "No such grid.".to_owned())?;
-        let mut change = LibraryChange::default();
         if let Some(material) = &grid.recipe.material
             && self
                 .materials
@@ -329,7 +347,7 @@ impl Session {
         {
             let id = grid.recipe.id;
             let now = now_ms(self);
-            self.change_record(&mut change, &material.id, |m| {
+            self.change_record(change, &material.id, |m| {
                 if let Some(test) = m.tests.iter_mut().find(|t| t.id == id) {
                     test.lasered = Some(at_ms);
                 }
@@ -337,9 +355,6 @@ impl Session {
                 Ok(())
             })?;
         }
-        self.commit_library_change(MARK_TEST_GRID_LASERED_COMMIT_LABEL, change, |d| {
-            d.mark_test_grid_lasered_for_tests(group, at_ms)
-                .map_err(|e| e.to_string())
-        })
+        Ok(())
     }
 }

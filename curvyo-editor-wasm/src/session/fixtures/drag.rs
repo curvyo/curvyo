@@ -25,8 +25,10 @@ pub(super) struct FixtureDrag {
     pub live: Option<FixtureEdit>,
     /// The pointer of the last move, in document space: the readout's anchor.
     pub pointer: Point,
-    /// The centre snap of a moved job fixture (`0113` criterion 30); `None` for a set fixture
-    /// and every other handle.
+    /// Whether the drag snaps the fixture's centres: a moved job fixture (`0113` criterion 30).
+    wants_snap: bool,
+    /// The centre snap, gathered on the first move out of the dead zone, so a press pays nothing
+    /// for it (`0113` criterion 42 a); `None` before that and for every drag that does not snap.
     snap: Option<CentreSnap>,
 }
 
@@ -49,8 +51,7 @@ impl Session {
         } else {
             handle
         };
-        let snap = (handle == FixtureHandle::Move && fixture.is_job_fixture())
-            .then(|| self.begin_centre_snap());
+        let wants_snap = handle == FixtureHandle::Move && fixture.is_job_fixture();
         self.fixtures.drag = Some(FixtureDrag {
             id,
             handle,
@@ -59,7 +60,8 @@ impl Session {
             page: fixtures.page.clone(),
             live: None,
             pointer: point,
-            snap,
+            wants_snap,
+            snap: None,
         });
     }
 
@@ -67,7 +69,7 @@ impl Session {
     pub(in crate::session) fn fixture_drag_move(&mut self, point: Point) -> bool {
         let threshold = self.transform_handle_tolerances().drag_threshold_mm;
         let modifiers = (self.held.shift, self.held.ctrl);
-        let Some(drag) = self.fixtures.drag.as_mut() else {
+        let Some(drag) = self.fixtures.drag.as_ref() else {
             return false;
         };
         let delta = drag.start.vector_to(point);
@@ -76,6 +78,15 @@ impl Session {
         {
             return true;
         }
+        if drag.wants_snap && drag.snap.is_none() {
+            let snap = self.begin_centre_snap();
+            if let Some(drag) = self.fixtures.drag.as_mut() {
+                drag.snap = Some(snap);
+            }
+        }
+        let Some(drag) = self.fixtures.drag.as_mut() else {
+            return false;
+        };
         let mut edit = drag_edit(drag, point, modifiers);
         if let Some(snap) = drag.snap.as_mut() {
             // Each centre of the grid is tried; the nearest match moves the whole fixture.

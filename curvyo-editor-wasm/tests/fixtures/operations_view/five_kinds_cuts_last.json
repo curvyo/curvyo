@@ -42,7 +42,7 @@
   "pick": [],
   "rows": [
     {
-      "source": null,
+      "accessible_name": "Score 1, run 1, –",
       "group_in_part": null,
       "id": {
         "counter": 80,
@@ -52,7 +52,12 @@
       "kind": "score",
       "margin_mm": 0.0,
       "name": "Score 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 1,
+        "time": "–"
+      },
       "section": "marking",
       "settings": {
         "differs": null,
@@ -83,11 +88,12 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     },
     {
-      "source": null,
+      "accessible_name": "Engrave 1, run 2, –",
       "group_in_part": null,
       "id": {
         "counter": 85,
@@ -97,7 +103,12 @@
       "kind": "engrave",
       "margin_mm": 0.0,
       "name": "Engrave 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 2,
+        "time": "–"
+      },
       "section": "marking",
       "settings": {
         "differs": null,
@@ -133,11 +144,12 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     },
     {
-      "source": null,
+      "accessible_name": "Engrave + Outline 1, run 3, –",
       "group_in_part": null,
       "id": {
         "counter": 91,
@@ -147,7 +159,12 @@
       "kind": "engrave_outline",
       "margin_mm": 0.0,
       "name": "Engrave + Outline 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 3,
+        "time": "–"
+      },
       "section": "marking",
       "settings": {
         "differs": null,
@@ -183,11 +200,12 @@
         "z_offset_shown": false
       },
       "show": false,
+      "source": null,
       "tick": "none",
       "unfolded": false
     },
     {
-      "source": null,
+      "accessible_name": "Cut 1, run 4, –",
       "group_in_part": null,
       "id": {
         "counter": 96,
@@ -197,7 +215,12 @@
       "kind": "cut",
       "margin_mm": 0.0,
       "name": "Cut 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 4,
+        "time": "–"
+      },
       "section": "cutting",
       "settings": {
         "differs": null,
@@ -228,11 +251,12 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     },
     {
-      "source": null,
+      "accessible_name": "Cut-out 1, run 5, –",
       "group_in_part": null,
       "id": {
         "counter": 101,
@@ -242,7 +266,12 @@
       "kind": "cut_out",
       "margin_mm": 2.0,
       "name": "Cut-out 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 5,
+        "time": "–"
+      },
       "section": "cutting",
       "settings": {
         "differs": null,
@@ -273,11 +302,12 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     },
     {
-      "source": null,
+      "accessible_name": "Cut 2",
       "group_in_part": null,
       "id": {
         "counter": 108,
@@ -287,7 +317,9 @@
       "kind": "cut",
       "margin_mm": 0.0,
       "name": "Cut 2",
+      "numbers": [],
       "output": false,
+      "run": null,
       "section": "cutting",
       "settings": {
         "differs": null,
@@ -318,16 +350,10 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     }
   ],
-  "select_bar_kinds": null,
-  "summary": {
-    "not_assigned": 1,
-    "operations": 5,
-    "output_off": 1,
-    "running": 5,
-    "runs_while_hidden": 0
-  }
+  "select_bar_kinds": null
 }

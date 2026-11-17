@@ -361,7 +361,9 @@ fn criterion_12_and_17_clone_members_are_the_leaves_of_a_cloned_group() {
     // of the group are own items with no assignment.
     s.selection.set(&[clone]);
     assert!(s.set_selection_in_operation(id, true));
-    let summary = s.operations_view().unwrap().summary;
+    // Superseded by 0029 rework (2026-11-17): the view drops its summary counts; the summary is
+    // the output group's (`operations_summary`).
+    let summary = s.operations_summary().unwrap();
     assert_eq!(
         (summary.running, summary.not_assigned),
         (2, 2),
@@ -381,8 +383,9 @@ fn criterion_17_each_count_lists_its_items_and_a_count_button_selects_them() {
     assert_eq!(view.items.running, vec![a]);
     assert_eq!(view.items.not_assigned, vec![b]);
     assert!(view.items.runs_while_hidden.is_empty());
-    assert_eq!(view.items.running.len(), view.summary.running);
-    assert_eq!(view.items.not_assigned.len(), view.summary.not_assigned);
+    let summary = s.operations_summary().unwrap();
+    assert_eq!(view.items.running.len(), summary.running);
+    assert_eq!(view.items.not_assigned.len(), summary.not_assigned);
     assert!(s.select_operation_items("not_assigned"));
     assert_eq!(s.selection.ids(), &[b]);
     assert!(s.select_operation_items("running"));

@@ -106,7 +106,7 @@ impl Session {
             HIT_PX.0
         };
         if let Some(id) = hit_outline(&fixtures, point, px / scale) {
-            self.select_fixture(id);
+            self.select_fixture_of(&fixtures, id);
             self.edit_context.empty_press = None;
             let handle = if fixtures.get(id).is_some_and(movable) {
                 FixtureHandle::Move

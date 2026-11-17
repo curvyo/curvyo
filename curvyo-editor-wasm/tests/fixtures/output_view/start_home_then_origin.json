@@ -1,0 +1,72 @@
+{
+  "output": {
+    "checks": [
+      {
+        "after": "",
+        "before": "The machine is Generic laser; its limits may not match yours.",
+        "button": "",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "kind": "none"
+        },
+        "text": "The machine is Generic laser; its limits may not match yours."
+      }
+    ],
+    "export": {
+      "enabled": true,
+      "extension": "gcode",
+      "file_type": "GRBL G-code",
+      "tooltip": null
+    },
+    "machine": "Generic laser · GRBL",
+    "start": {
+      "damaged": false,
+      "options": [
+        {
+          "label": "Machine origin",
+          "value": "machine_origin"
+        },
+        {
+          "label": "Head position",
+          "value": "head_position"
+        },
+        {
+          "label": "Home, then machine origin",
+          "value": "home_then_origin"
+        }
+      ],
+      "value": "home_then_origin"
+    },
+    "toolpath_view": false,
+    "total": {
+      "fixtures": null,
+      "lengths": "Burn 80 mm · travel 540 mm",
+      "runs": {
+        "after": ".",
+        "before": "Runs 1 operation, ",
+        "button": "1 item",
+        "text": "Runs 1 operation, 1 item."
+      },
+      "time": "About 13 s"
+    }
+  },
+  "play": null,
+  "ring_labels": [],
+  "rows": [
+    {
+      "accessible_name": "Cut 1, run 1, 11 s",
+      "name": "Cut 1",
+      "numbers": [
+        {
+          "text": "60 %, 600 mm/min, 1 ×",
+          "typed": []
+        }
+      ],
+      "run": {
+        "digit": 1,
+        "time": "11 s"
+      }
+    }
+  ]
+}

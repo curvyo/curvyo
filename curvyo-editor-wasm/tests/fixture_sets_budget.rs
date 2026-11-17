@@ -1,7 +1,8 @@
 //! `specs/0113-fixture-sets-and-pins` criterion 42 in thread CPU time (`adrs.md` "Goldens and
 //! budgets"): (a) a press resolved within 2 ms and the draw list within 16 ms on a page with 3
 //! sets of 20 fixtures, 64 job fixtures and a 400-centre pin grid with both jobs on; (b) one move
-//! of a job fixture drag with centre snapping on 1,000 shapes within 16 ms; (c) Apply of 64 job
+//! of a job fixture drag with centre snapping on 1,000 shapes within 16 ms, the first move (which
+//! gathers the snap targets) included; (c) Apply of 64 job
 //! fixtures within 100 ms; (d) the Fixtures tab of 16 sets and 64 job fixtures within 100 ms;
 //! (e) a field commit on a set fixture of a project with 4 laser pages on one profile of 3 sets of
 //! 20, with the profile write and the update of the other 3 pages, within 50 ms; (f) 8 open laser
@@ -243,6 +244,22 @@ fn criterion_42_b_a_snapping_drag_move_on_a_thousand_shapes() {
     );
     eprintln!("criterion 42 b: a snapping drag move {cost:?} (CPU time)");
     assert!(!TIMED || cost < FRAME_BUDGET, "{cost:?}");
+    // The first move out of the dead zone also gathers the page's centre snap targets (the press
+    // leaves them to it, so the press stays inside 42 a): it is a drag move too.
+    let first = cheapest(
+        || {
+            let mut s = page_clone(&page);
+            let ring = at(&s, 13.0, 400.0);
+            s.pointer_down(ring, false);
+            s
+        },
+        |s| {
+            let p = at(s, 40.0, 300.0);
+            s.pointer_hover(p, false, false);
+        },
+    );
+    eprintln!("criterion 42 b: the first snapping drag move {first:?} (CPU time)");
+    assert!(!TIMED || first < FRAME_BUDGET, "{first:?}");
     // The same drag released: the first centre snapped onto the circle at (50, 269).
     let mut s = page_clone(&page);
     s.pointer_down(at(&s, 13.0, 400.0), false);

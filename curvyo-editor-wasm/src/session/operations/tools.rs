@@ -38,6 +38,11 @@ impl OperationTools {
         self.unfolded
     }
 
+    /// Row `id` is the unfolded one (a check's button of the output group, `specs/0029` UX P15).
+    fn reveal(&mut self, id: NodeId) {
+        self.unfolded = Some(id);
+    }
+
     /// A press on row `id`: it unfolds and any other folds; a press on the unfolded row folds it.
     fn unfold(&mut self, id: NodeId) {
         self.unfolded = if self.unfolded == Some(id) {
@@ -129,6 +134,14 @@ impl Session {
         else {
             return false;
         };
+        // A press while the Toolpath view is pressed releases it and shows the Operations
+        // view pressed (`specs/0029` UX P2).
+        if self.release_toolpath_view(manufacturing) {
+            if !self.operations.tools.view_on(manufacturing) {
+                self.operations.tools.toggle_view(manufacturing);
+            }
+            return true;
+        }
         self.operations.tools.toggle_view(manufacturing);
         true
     }
@@ -136,6 +149,16 @@ impl Session {
     /// Whether the Operations view of laser page `manufacturing` is pressed (criterion 15).
     pub(in crate::session) fn operations_view_pressed(&self, manufacturing: NodeId) -> bool {
         self.operations.tools.view_on(manufacturing)
+    }
+
+    /// Unfolds operation row `id` and keeps it unfolded when it already is (a check's button of
+    /// the output group). `false` for an operation of another page.
+    pub fn reveal_operation_row(&mut self, id: NodeId) -> bool {
+        if !self.is_active_operation(id) {
+            return false;
+        }
+        self.operations.tools.reveal(id);
+        true
     }
 
     /// A press on operation row `id` of the active laser page (criterion 17): it unfolds under

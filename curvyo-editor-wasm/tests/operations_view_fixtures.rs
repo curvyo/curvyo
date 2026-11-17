@@ -341,13 +341,21 @@ fn every_state_matches_its_fixture_and_nothing_is_missing() {
 
 #[test]
 fn the_summary_counts_follow_the_disjoint_rule() {
+    // Superseded by 0029 rework (2026-11-17): the view drops its summary counts (they are the
+    // output group's checks, P28); the item lists behind them and the rows' runs stay.
     let json = view_of(&state_five_kinds(), no_setup);
-    let summary = &json["summary"];
-    let count = |key: &str| summary[key].as_u64().unwrap();
-    assert!(count("runs_while_hidden") <= count("running"), "{summary}");
-    assert_eq!(count("not_assigned"), 1, "{summary}");
-    assert_eq!(count("output_off"), 1, "{summary}");
-    assert_eq!(count("operations"), 5, "{summary}");
+    let items = &json["items"];
+    let count = |key: &str| items[key].as_array().unwrap().len();
+    assert!(count("runs_while_hidden") <= count("running"), "{items}");
+    assert_eq!(count("not_assigned"), 1, "{items}");
+    assert_eq!(count("output_off"), 1, "{items}");
+    let running = json["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| !row["run"].is_null())
+        .count();
+    assert_eq!(running, 5, "{}", json["rows"]);
 }
 
 #[test]

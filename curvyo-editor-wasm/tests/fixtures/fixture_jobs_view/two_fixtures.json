@@ -80,6 +80,21 @@
       "name": "Holder 2"
     }
   ],
+  "output": {
+    "pick": {
+      "material": null,
+      "name": null,
+      "options": []
+    },
+    "runs": [
+      {
+        "kind": "engrave_outline",
+        "numbers": [],
+        "time": "–"
+      }
+    ],
+    "time": "–"
+  },
   "parts": {
     "job": "idw8lqqt0rgf2",
     "rows": [

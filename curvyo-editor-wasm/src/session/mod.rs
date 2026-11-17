@@ -114,6 +114,7 @@ mod offset_chip;
 mod offset_view;
 mod open_error;
 mod operations;
+mod output;
 #[cfg_attr(not(target_arch = "wasm32"), allow(unused_imports))] // the wasm bridge takes it
 pub use fixtures::{
     AddTarget, ApplyCandidate, FitCue, FixtureJobsView, FixtureKindView, FixtureLabel, FixtureRow,
@@ -121,10 +122,12 @@ pub use fixtures::{
     RoleToggle, RoundValues, SetView, SlotRow, TapesView,
 };
 pub use materials::{MaterialWrite, MaterialsView};
+pub use output::{ExportedJob, OutputGroupView, PlayView};
 pub use test_grid::TestGridView;
 mod page_drag;
 mod page_tree_panel;
 mod pages;
+mod pages_json;
 mod panel_tabs;
 mod pattern;
 #[cfg(test)]
@@ -682,6 +685,8 @@ pub struct Session {
     operations: operations::OperationsState,
     /// The laser fixtures of the active laser page (`fixtures/`, `specs/0102-laser-fixtures`).
     fixtures: fixtures::FixtureState,
+    /// The output group, the Toolpath view and the job export (`output/`, `specs/0029`).
+    output: output::OutputState,
     /// The maker's materials, the journal of this session's material steps and the Materials
     /// tab's view state (`materials/`, `specs/0112-test-grid-and-materials`).
     materials: materials::MaterialsState,
@@ -805,6 +810,7 @@ impl Session {
             tiling: None,
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
+            output: output::OutputState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),
@@ -919,6 +925,7 @@ impl Session {
             tiling: None,
             manufacturing: manufacturing::ManufacturingState::default(),
             operations: operations::OperationsState::default(),
+            output: output::OutputState::default(),
             fixtures: fixtures::FixtureState::default(),
             materials: materials::MaterialsState::default(),
             library_journal: library_journal::Journal::default(),

@@ -1,0 +1,58 @@
+{
+  "output": {
+    "checks": [
+      {
+        "after": " is damaged. Pick one above.",
+        "before": "",
+        "button": "Start",
+        "count": 1,
+        "severity": "block",
+        "target": {
+          "kind": "start_pick"
+        },
+        "text": "Start is damaged. Pick one above."
+      },
+      {
+        "after": "",
+        "before": "Nothing runs. Assign items to an operation.",
+        "button": "",
+        "count": 1,
+        "severity": "block",
+        "target": {
+          "kind": "none"
+        },
+        "text": "Nothing runs. Assign items to an operation."
+      }
+    ],
+    "export": {
+      "enabled": false,
+      "extension": "gcode",
+      "file_type": "GRBL G-code",
+      "tooltip": "Start is damaged. Pick one above."
+    },
+    "machine": "Diode 10 W · GRBL",
+    "start": {
+      "damaged": true,
+      "options": [
+        {
+          "label": "Machine origin",
+          "value": "machine_origin"
+        },
+        {
+          "label": "Head position",
+          "value": "head_position"
+        },
+        {
+          "label": "Home, then machine origin",
+          "value": "home_then_origin"
+        }
+      ],
+      "value": null
+    },
+    "toolpath_view": false,
+    "total": null
+  },
+  "play": null,
+  "ring_labels": [],
+  "rows": []
+}

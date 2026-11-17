@@ -233,7 +233,8 @@ fn c15_show_off_takes_the_item_off_the_canvas_and_output_on_still_runs() {
         !has(&colours(&f.s), CUT_RED),
         "Show off: the item is not drawn"
     );
-    let running = view(&f.s)["summary"]["running"].as_u64().unwrap();
+    // Superseded by 0029 rework (2026-11-17): the summary counts are checks; the item list stays.
+    let running = view(&f.s)["items"]["running"].as_array().unwrap().len();
     assert_eq!(running, 1, "Show never changes what runs");
 }
 
@@ -289,7 +290,14 @@ fn c4_delete_is_one_undo_step_and_the_items_become_not_assigned() {
     assert!(f.s.delete_operation(cut));
     assert_eq!(f.s.undo_len(), before + 1, "one step");
     assert_eq!(names(&f.s).len(), 0);
-    assert_eq!(view(&f.s)["summary"]["not_assigned"].as_u64().unwrap(), 3);
+    // Superseded by 0029 rework (2026-11-17): the summary counts are checks; the item list stays.
+    assert_eq!(
+        view(&f.s)["items"]["not_assigned"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
     f.s.undo();
     assert_eq!(names(&f.s), vec!["Cut 1"], "undo restores the operation");
 }

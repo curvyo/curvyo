@@ -227,7 +227,7 @@ impl Session {
     /// Whether it moved.
     pub fn move_material(&mut self, id: &str, index: usize) -> bool {
         let before: Vec<String> = self.materials.library.order().to_vec();
-        let Some(text) = self.materials.library.move_row(id, index) else {
+        let Some(text) = self.materials.library.get_mut().move_row(id, index) else {
             return false;
         };
         if self.materials.library.order() == before.as_slice() {

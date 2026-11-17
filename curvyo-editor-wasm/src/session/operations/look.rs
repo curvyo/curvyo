@@ -269,7 +269,10 @@ impl Session {
     /// toggle is pressed (`specs/0111` criterion 15).
     pub(in crate::session) fn operations_view_on(&self) -> bool {
         match self.workbench() {
-            super::super::Workbench::Manufacturing(id) => self.operations_view_pressed(id),
+            // The Toolpath view releases it while pressed (`specs/0029` UX P2).
+            super::super::Workbench::Manufacturing(id) => {
+                self.operations_view_pressed(id) && !self.toolpath_view_pressed(id)
+            }
             _ => true,
         }
     }
@@ -286,9 +289,10 @@ impl Session {
         let active = self.active_operations()?;
         let grids = self.grid_looks(&active.operations);
         let table = self.look_table_with(&active, &grids)?;
+        if let Some(toolpath) = self.toolpath_overlay() {
+            return Some((without_looked_items(objects, &table), toolpath));
+        }
         let operations_view = self.operations_view_on();
-        let mut out = Vec::with_capacity(objects.len());
-        let mut overlay = DrawList::default();
         let dimming = self.entered_group_dimming();
         let mut rows = ChipRows {
             objects,
@@ -298,18 +302,12 @@ impl Session {
             outside: Vec::new(),
             operations_view,
         };
+        let mut out = Vec::with_capacity(objects.len());
+        let mut overlay = DrawList::default();
         let selected = self.selection.ids();
         for object in objects {
-            if let ObjectSnapshot::Clone(clone) = object
-                && clone.chain.picture.is_some()
-            {
-                out.extend(picture_clone_leaves(
-                    clone,
-                    &table,
-                    view,
-                    operations_view,
-                    &dimming,
-                ));
+            if let Some(leaves) = picture_clone(object, &table, view, operations_view, &dimming) {
+                out.extend(leaves);
                 continue;
             }
             let Some(look) = table.own.get(&object.id()) else {
@@ -326,10 +324,9 @@ impl Session {
                     overlay.extend(hatch);
                 }
                 // A grid's items share one chip row over the grid (UX notes §11).
-                if grids.parts.contains_key(&object.id()) {
-                    continue;
-                }
-                if let Some(chip) = chip_of(object, looks) {
+                if !grids.parts.contains_key(&object.id())
+                    && let Some(chip) = chip_of(object, looks)
+                {
                     rows.add(object.id(), chip, selected.contains(&object.id()), &dimming);
                 }
             }
@@ -398,6 +395,14 @@ impl Session {
         members: &[ObjectSnapshot],
         view: ViewTransform,
     ) -> Vec<ObjectSnapshot> {
+        if self.toolpath_view_on() {
+            // The Toolpath view draws the job instead (`specs/0029` criterion 8).
+            return members
+                .iter()
+                .filter(|object| !table.inner.contains_key(&(object.id(), placement)))
+                .cloned()
+                .collect();
+        }
         let operations_view = self.operations_view_on();
         let mut out = Vec::with_capacity(members.len());
         for object in members {
@@ -426,6 +431,34 @@ impl Dimming {
         } else {
             looked
         }
+    }
+}
+
+/// The objects the Toolpath view keeps: it draws the job instead of the page's items
+/// (`specs/0029` criterion 8), a clone of a group by its members' keys; hit tests still use the
+/// items.
+fn without_looked_items(objects: &[ObjectSnapshot], table: &LookTable) -> Vec<ObjectSnapshot> {
+    let clones: HashSet<NodeId> = table.clone_members.keys().map(|(c, _)| *c).collect();
+    objects
+        .iter()
+        .filter(|object| !table.own.contains_key(&object.id()) && !clones.contains(&object.id()))
+        .cloned()
+        .collect()
+}
+
+/// A picture clone's leaves drawn by its members' looks; `None` for any other object.
+fn picture_clone(
+    object: &ObjectSnapshot,
+    table: &LookTable,
+    view: ViewTransform,
+    operations_view: bool,
+    dimming: &Dimming,
+) -> Option<Vec<ObjectSnapshot>> {
+    match object {
+        ObjectSnapshot::Clone(clone) if clone.chain.picture.is_some() => Some(
+            picture_clone_leaves(clone, table, view, operations_view, dimming),
+        ),
+        _ => None,
     }
 }
 

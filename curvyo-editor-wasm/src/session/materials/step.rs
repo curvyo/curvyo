@@ -65,6 +65,7 @@ impl Session {
         let write = self
             .materials
             .library
+            .get_mut()
             .edit(id, edit)
             .map_err(|r| refusal_text(&r))?;
         change.writes.push(write.into());
@@ -85,6 +86,7 @@ impl Session {
         let write = self
             .materials
             .library
+            .get_mut()
             .add(material)
             .map_err(|r| refusal_text(&r))?;
         change.writes.push(write.into());
@@ -111,6 +113,7 @@ impl Session {
         let (write, material) = self
             .materials
             .library
+            .get_mut()
             .delete(id)
             .map_err(|r| refusal_text(&r))?;
         change.writes.push(write.into());
@@ -141,6 +144,7 @@ impl Session {
         for record in change.records.iter().rev() {
             self.materials
                 .library
+                .get_mut()
                 .restore(&record.id, record.before.as_deref());
         }
     }
@@ -208,6 +212,15 @@ impl Session {
             self.retire_test_ids(change.retire);
         }
         result
+    }
+
+    /// Writes the records of `change` with no step and no journal entry (the test records'
+    /// Lasered, ADR 0064 §11: an undo keeps it).
+    pub(in crate::session) fn write_library_unjournalled(&mut self, mut change: LibraryChange) {
+        self.materials.outbox.append(&mut change.writes);
+        for write in change.photo_writes {
+            self.materials.queue_photo(write);
+        }
     }
 
     /// One library-only step labelled by `step`: `prepare` edits the library through `change`.
