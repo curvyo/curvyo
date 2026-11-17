@@ -115,13 +115,13 @@ describe("centre lines sliders (0117 UX notes §3.1)", () => {
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 70)?.text, "Centre lines: 70 paths, 1 kept filled.");
     assert.equal(centreLinesNotice({ ...base, converted: 1, kept: 1 }, 1)?.text, "Centre lines: 1 path, 1 kept filled.");
   });
-  it("lets Escape cancel the bar unless a number entry owns it", () => {
+  it("lets Escape cancel the bar, also from a number entry", () => {
     const slider = { tagName: "DIV" };
     const entry = { tagName: "INPUT" };
     assert.equal(centreEscapeCancels({ key: "Escape", defaultPrevented: false, target: slider }), true);
     // A tooltip's dismiss layer already prevented the default: still the bar's Escape.
     assert.equal(centreEscapeCancels({ key: "Escape", defaultPrevented: true, target: slider }), true);
-    assert.equal(centreEscapeCancels({ key: "Escape", defaultPrevented: true, target: entry }), false);
+    assert.equal(centreEscapeCancels({ key: "Escape", defaultPrevented: true, target: entry }), true);
     assert.equal(centreEscapeCancels({ key: "Enter", defaultPrevented: false, target: slider }), false);
   });
 });

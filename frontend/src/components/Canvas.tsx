@@ -107,6 +107,7 @@ export function Canvas({
         // The open Centre lines bar: Enter applies, Escape cancels (`0117` UX notes §7).
         if (event.target === event.currentTarget && editor.centreLines.open && (event.key === "Enter" || event.key === "Escape")) {
           event.preventDefault();
+          event.stopPropagation();
           if (event.key === "Enter") {
             editor.centreLines.apply();
           } else if (editor.centreLines.applying) {
