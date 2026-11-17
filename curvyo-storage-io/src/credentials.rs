@@ -283,6 +283,30 @@ impl CredentialStore {
         }
     }
 
+    /// Removes the secret called `name`; nothing happens when none is stored.
+    ///
+    /// # Errors
+    /// `Keychain`, `WrongPassphrase`, `Damaged`, `Fs`, `Random`.
+    pub fn remove(&self, name: &str) -> Result<(), CredentialError> {
+        match self {
+            Self::Keychain { service } => {
+                let entry = keyring::Entry::new(service, name)
+                    .map_err(|e| CredentialError::Keychain(e.to_string()))?;
+                match entry.delete_credential() {
+                    Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+                    Err(e) => Err(CredentialError::Keychain(e.to_string())),
+                }
+            }
+            Self::File { .. } => {
+                let mut all = self.read_file()?;
+                if all.remove(name).is_some() {
+                    self.write_file(&all)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
     /// This device's 64 identity bytes (ADR 0010 §1), drawn from the system's random source and
     /// stored on first use.
     ///
@@ -464,6 +488,22 @@ mod tests {
             CredentialStore::file(dir.path(), "pass"),
             Err(CredentialError::Damaged)
         ));
+    }
+
+    #[test]
+    fn remove_deletes_one_secret_and_is_quiet_about_a_missing_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = CredentialStore::file(dir.path(), "pass").unwrap();
+        store.set("connector/a", b"one").unwrap();
+        store.set("connector/b", b"two").unwrap();
+        store.remove("connector/a").unwrap();
+        store.remove("connector/never-there").unwrap();
+        let again = CredentialStore::file(dir.path(), "pass").unwrap();
+        assert!(again.get("connector/a").unwrap().is_none());
+        assert_eq!(
+            again.get("connector/b").unwrap().unwrap().as_slice(),
+            b"two"
+        );
     }
 
     #[test]

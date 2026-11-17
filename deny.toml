@@ -80,6 +80,15 @@ name = "curvyo-laser-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-connector-core"
 
+# The connector's transport and its thin binary (ADR 0035 §1, spec 0064 second slice).
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-connector-io"
+
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-connector-server"
+
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ui-core"

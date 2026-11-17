@@ -1,0 +1,6 @@
+2023-11-14T22:13:20Z	coaster.gcode	Completed
+2023-11-14T22:14:20Z	coaster.gcode	Stopped
+2023-11-14T22:15:20Z	sign.nc	Failed
+2023-11-14T22:16:20Z	sign.nc	Alarm: Fake alarm at line 3
+2023-11-14T22:17:20Z	big.txt	Rejected: TooLarge
+2023-11-14T22:18:20Z	odd name .gcode	Alarm: a b

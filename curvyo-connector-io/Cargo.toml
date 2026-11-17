@@ -1,0 +1,37 @@
+[package]
+name = "curvyo-connector-io"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The machine connector's transport (ADR 0035): TLS 1.3, key pinning, pairing, the connector server, the app-side client and a fake controller."
+
+[lints]
+workspace = true
+
+[dependencies]
+curvyo-connector-core = { path = "../curvyo-connector-core", version = "0.1.0" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+# TLS 1.3 only (ADR 0035 §2); `ring` provider, no `tls12` feature. Apache-2.0 OR ISC OR MIT.
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+rustls-pki-types = { version = "1.16", features = ["std"] }
+# CSPRNG, HMAC-SHA256, SHA-256, constant-time compare. Apache-2.0 AND ISC.
+ring = "0.17.14"
+# The connector's key and self-signed certificate. MIT OR Apache-2.0.
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "ring", "pem"] }
+# The WebSocket (ADR 0035 §5); 0.29 is what `axum` already locks. MIT OR Apache-2.0.
+tungstenite = { version = "0.29", default-features = false, features = ["handshake"] }
+# The pairing PAKE (ADR 0035 §4). MIT OR Apache-2.0.
+spake2 = "0.4"
+# `rcgen` validity dates and RFC 3339 in `jobs.log`. MIT OR Apache-2.0.
+time = { version = "0.3.55", default-features = false, features = ["std", "formatting"] }
+zeroize = "1"
+
+[dev-dependencies]
+# A fixed random source for the SPAKE2 known-answer test; already in the tree through `spake2`.
+rand_core = "0.6"
+tempfile = "3"
