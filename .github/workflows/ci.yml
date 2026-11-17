@@ -198,6 +198,8 @@ jobs:
             --summary
 
       - name: npm audit
+        # GHSA-fc5q-39xc-vjpf (picomatch ReDoS) is the same shadcn scaffolding
+        # chain, see docs/technical-debt.md; re-check when shadcn updates.
         # --high: fail on high/critical. The one current allowlisted
         # advisory (GHSA-vfj7-8cjw-p6xm, "braces" stack-exhaustion DoS, via
         # shadcn's own fast-glob/micromatch toolchain — a component
@@ -209,7 +211,7 @@ jobs:
         # advisory still fails this step. Version pinned; bump deliberately.
         working-directory: frontend
         run: |
-          npx --yes audit-ci@7.1.0 --high --allowlist GHSA-vfj7-8cjw-p6xm
+          npx --yes audit-ci@7.1.0 --high --allowlist GHSA-vfj7-8cjw-p6xm --allowlist GHSA-fc5q-39xc-vjpf
 
       - uses: actions/upload-artifact@v4
         with:
