@@ -1,4 +1,4 @@
-//! Keeps kurbo's cubic fitter (0.13.1) away from candidate cubics it cannot measure.
+//! Keeps kurbo's cubic fitter (0.13.1) away from candidate cubics it cannot measure or mismeasures.
 //!
 //! `kurbo::fit::cubic_fit` has no upper bound on a candidate's arm lengths (its own comment: "We
 //! could implement a maximum d value here"). Near a zero denominator a candidate's arms grow
@@ -264,4 +264,46 @@ fn candidate_arms(th0: f64, th1: f64, area: f64, mx: f64) -> Vec<(f64, f64)> {
         })
         .filter(|&(d0, d1)| d0 >= 0.0 && d1 >= 0.0)
         .collect()
+}
+
+/// A fitted cubic may stray this many times the accuracy from the piece's polyline.
+pub(super) const STRAY: f64 = 3.0;
+/// Points sampled on each fitted cubic for the stray test.
+const STRAY_SAMPLES: usize = 16;
+
+/// Whether a point of `path` (sampled) lies farther than `limit` from the polyline `points`:
+/// kurbo measures a candidate's error by rays from the source only, so it accepts a cubic that
+/// runs on past the source's end along a straight run.
+pub(super) fn strays(path: &BezPath, points: &[Point], limit: f64) -> bool {
+    use kurbo::ParamCurve;
+    let within = |p: Point, k: usize| {
+        let (a, b) = (points[k], points[k + 1]);
+        let d = b - a;
+        let len2 = d.hypot2();
+        let t = if len2 > 0.0 {
+            ((p - a).dot(d) / len2).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        (a + d * t - p).hypot() <= limit
+    };
+    let steps = points.len() - 1;
+    // The samples run along the points: search outward from the last step that held one.
+    let mut hint: usize = 0;
+    path.segments().any(|segment| {
+        (1..STRAY_SAMPLES).any(|k| {
+            #[allow(clippy::cast_precision_loss)]
+            let p = segment.eval(k as f64 / STRAY_SAMPLES as f64);
+            let found = (0..steps).find_map(|offset| {
+                [hint.checked_add(offset), hint.checked_sub(offset)]
+                    .into_iter()
+                    .flatten()
+                    .find(|&k| k < steps && within(p, k))
+            });
+            if let Some(k) = found {
+                hint = k;
+            }
+            found.is_none()
+        })
+    })
 }

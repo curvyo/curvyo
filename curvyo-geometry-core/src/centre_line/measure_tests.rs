@@ -349,3 +349,129 @@ fn measure_traced() {
         std::fs::write(path, svg(&lines, &subjects)).unwrap();
     }
 }
+
+/// The painted outline of one centre path (as `0085` paints it), as closed rings.
+pub(super) fn painted_rings(path: &super::CentrePath) -> Vec<Vec<OutlineTriple>> {
+    use curvyo_document_core::{DashPattern, LineCap, LineJoin, Markers, Tolerance};
+    let style = crate::StrokeShape {
+        width: path.width,
+        join: LineJoin::Round,
+        cap: match path.role {
+            CentreRole::Main => LineCap::Round,
+            CentreRole::Branch => LineCap::Butt,
+        },
+        dash: DashPattern::default(),
+        markers: Markers::default(),
+    };
+    crate::variable_stroke_outline(
+        Outline::new(&path.anchors, path.closed),
+        &style,
+        &path.profile,
+        Tolerance::from_mm(0.01),
+    )
+    .map(|o| {
+        o.outlines()
+            .iter()
+            .map(|r| {
+                r.iter()
+                    .map(|a| (a.point, a.handle_in, a.handle_out))
+                    .collect()
+            })
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+/// Paints the result over the subject: `CURVYO_CENTRE_SVG` the file, `CURVYO_CENTRE_VIEW`
+/// "x y w h" the view box in mm.
+#[test]
+#[ignore = "a picture, made by hand"]
+fn paint_traced() {
+    let text = std::env::var("CURVYO_CENTRE_INPUT").map_or_else(
+        |_| include_str!("../../tests/fixtures/centre_lines/dolphin_traced.txt").to_owned(),
+        |path| std::fs::read_to_string(path).unwrap(),
+    );
+    let view = std::env::var("CURVYO_CENTRE_VIEW").unwrap_or_else(|_| "0 0 240 300".into());
+    let subjects = traced_subjects(&text);
+    let lines = traced_lines(&text, &CentreOptions::default());
+    let ring = |r: &[OutlineTriple]| {
+        let mut d = String::new();
+        let n = r.len();
+        let _ = write!(d, "M{} {}", r[0].0.x, r[0].0.y);
+        for i in 0..n {
+            let (a, b) = (r[i], r[(i + 1) % n]);
+            let _ = write!(
+                d,
+                " C{} {} {} {} {} {}",
+                a.0.x + a.2.x,
+                a.0.y + a.2.y,
+                b.0.x + b.1.x,
+                b.0.y + b.1.y,
+                b.0.x,
+                b.0.y
+            );
+        }
+        d.push('Z');
+        d
+    };
+    let mut out = format!(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='{view}' width='1600' height='1600'>\
+         <rect x='-1000' y='-1000' width='3000' height='3000' fill='white'/>\n"
+    );
+    for subject in &subjects {
+        let d: String = subject.iter().map(|(a, _)| ring(a)).collect();
+        let _ = writeln!(
+            out,
+            "<path d='{d}' fill='#bbb' stroke='#000' stroke-width='0.03'/>"
+        );
+    }
+    for result in &lines {
+        for region in &result.filled {
+            let d: String = region.iter().map(|r| ring(r)).collect();
+            let _ = writeln!(out, "<path d='{d}' fill='#7c7' fill-opacity='0.5'/>");
+        }
+        for path in &result.paths {
+            let colour = match path.role {
+                CentreRole::Main => "#d22",
+                CentreRole::Branch => "#22d",
+            };
+            let d: String = painted_rings(path).iter().map(|r| ring(r)).collect();
+            let _ = writeln!(
+                out,
+                "<path d='{d}' fill='{colour}' fill-opacity='0.15' stroke='{colour}' stroke-width='0.04'/>"
+            );
+            let mut centre = String::new();
+            let count = path.anchors.len();
+            let _ = write!(centre, "M{} {}", path.anchors[0].0.x, path.anchors[0].0.y);
+            let pieces = if path.closed { count } else { count - 1 };
+            for i in 0..pieces {
+                let (a, b) = (path.anchors[i], path.anchors[(i + 1) % count]);
+                let _ = write!(
+                    centre,
+                    " C{} {} {} {} {} {}",
+                    a.0.x + a.2.x,
+                    a.0.y + a.2.y,
+                    b.0.x + b.1.x,
+                    b.0.y + b.1.y,
+                    b.0.x,
+                    b.0.y
+                );
+            }
+            let _ = writeln!(
+                out,
+                "<path d='{centre}' fill='none' stroke='{colour}' stroke-width='0.05'/>"
+            );
+            if !path.closed {
+                for a in [path.anchors[0], path.anchors[count - 1]] {
+                    let _ = writeln!(
+                        out,
+                        "<circle cx='{}' cy='{}' r='0.12' fill='#000'/>",
+                        a.0.x, a.0.y
+                    );
+                }
+            }
+        }
+    }
+    out.push_str("</svg>\n");
+    std::fs::write(std::env::var("CURVYO_CENTRE_SVG").unwrap(), out).unwrap();
+}

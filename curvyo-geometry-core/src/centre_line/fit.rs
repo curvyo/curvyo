@@ -7,7 +7,7 @@ use kurbo::{BezPath, PathEl, Point};
 
 use super::density::{Merge, merge_anchors, running_median};
 use super::profile::fit_profile;
-use super::safe_fit::simplify;
+use super::safe_fit::{STRAY, simplify, strays};
 use crate::medial_axis::AxisSample;
 use crate::{OutlineTriple, WidthProfile};
 
@@ -207,8 +207,10 @@ fn fit_curve(
     }
     let found = corners(samples);
     let mut cuts = found.clone();
+    cuts.extend(leg_starts(samples, &found, tight));
     cuts.insert(0, 0);
     cuts.push(points.len() - 1);
+    cuts.sort_unstable();
     cuts.dedup();
     let mut path = BezPath::new();
     path.move_to(points[0]);
@@ -312,8 +314,40 @@ fn merge_stretch(points: &[Point], stretch: BezPath, merge: Merge) -> BezPath {
     merged.elements().iter().map(|&e| shift * e).collect()
 }
 
-/// The index in `a..=b` a distance `reach` along the points from `a` (`from_start`) or from `b`.
+/// Where the straight legs into each crest tip (a corner of width 0, CENTRE-THROUGH A) begin:
+/// the farthest samples before and after it that lie within `accuracy` of the leg's line. The
+/// curve is cut there too, so each leg is one straight piece.
+fn leg_starts(samples: &[AxisSample], corners: &[usize], accuracy: f64) -> Vec<usize> {
+    let n = samples.len();
+    let mut out = Vec::new();
+    for &tip in corners.iter().filter(|&&i| samples[i].radius == 0.0) {
+        for step in [-1_isize, 1] {
+            let next = |k: usize| k.checked_add_signed(step).filter(|&k| k < n);
+            let Some(first) = next(tip) else { continue };
+            let mut start = first;
+            while let Some(k) = next(start) {
+                let (from, to) = (samples[tip].point, samples[k].point);
+                let chord = to - from;
+                let straight = (k.min(tip)..=k.max(tip)).all(|m| {
+                    (samples[m].point - from).cross(chord).abs() <= accuracy * chord.hypot()
+                });
+                if !straight {
+                    break;
+                }
+                start = k;
+            }
+            out.push(start);
+        }
+    }
+    out
+}
+
+/// The index in `a..=b` a distance `reach` along the points from `a` (`from_start`) or from `b`;
+/// `a` or `b` itself for no reach (a crest's tip).
 fn reach_index(points: &[Point], a: usize, b: usize, reach: f64, from_start: bool) -> usize {
+    if reach <= 0.0 {
+        return if from_start { a } else { b };
+    }
     let mut travelled = 0.0;
     if from_start {
         for i in a + 1..=b {
@@ -450,6 +484,17 @@ fn fit_kept(piece: &[Point], accuracy: f64) -> BezPath {
         return line;
     }
     let fitted = simplify(&smooth(&local), accuracy);
+    // kurbo's error measure casts rays from the source only, so it misses a candidate that
+    // runs on past the piece's end along a straight run (a crest's leg into its tip): a fit
+    // that strays from the piece's points by more than `STRAY` times the accuracy is split.
+    if local.len() >= 4 && strays(&fitted, &local, STRAY * accuracy) {
+        let mid = piece.len() / 2;
+        let mut out = fit_kept(&piece[..=mid], accuracy);
+        for element in fit_kept(&piece[mid..], accuracy).elements().iter().skip(1) {
+            out.push(*element);
+        }
+        return out;
+    }
     let shift = kurbo::Affine::translate(origin);
     let mut out = BezPath::new();
     for element in fitted.elements() {

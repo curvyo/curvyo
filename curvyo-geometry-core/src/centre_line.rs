@@ -7,11 +7,15 @@ mod chains;
 mod density;
 mod fit;
 mod inner;
+#[cfg(test)]
+mod junction_tests;
 mod junctions;
 mod kept;
 #[cfg(test)]
 mod measure_tests;
 mod profile;
+#[cfg(test)]
+mod quality_tests;
 mod rings;
 mod safe_fit;
 mod stages;
