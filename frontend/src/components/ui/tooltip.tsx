@@ -1,5 +1,5 @@
 import { Tooltip as TooltipPrimitive } from "radix-ui";
-import type { ReactElement, ReactNode } from "react";
+import { type ReactElement, type ReactNode, useRef, useState } from "react";
 
 /** One provider for a group of tooltips (`docs/design-system.md`, "Frontend
  * components to add"). */
@@ -22,13 +22,40 @@ interface TooltipProps {
  * it may cover the canvas but never the panel row it belongs to.
  */
 export function Tooltip({ content, side, offset = 8, children }: TooltipProps) {
+  const [open, setOpen] = useState(false);
+  // A focus that is not from the keyboard (a script moving it after a click) opens no tooltip.
+  const quietFocus = useRef(false);
   // No content, no tooltip: the trigger alone (a row that needs none).
   if (content === undefined || content === null || content === "") {
     return children;
   }
   return (
-    <TooltipPrimitive.Root delayDuration={400}>
-      <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+    <TooltipPrimitive.Root
+      delayDuration={400}
+      open={open}
+      onOpenChange={(next) => {
+        if (next && quietFocus.current) {
+          quietFocus.current = false;
+          return;
+        }
+        setOpen(next);
+      }}
+    >
+      <TooltipPrimitive.Trigger
+        asChild
+        // A tooltip, never a popup: it goes with the pointer, with a press and with the focus.
+        onPointerLeave={() => setOpen(false)}
+        onPointerUp={() => setOpen(false)}
+        onBlur={() => setOpen(false)}
+        onFocus={(event) => {
+          quietFocus.current = !event.currentTarget.matches(":focus-visible");
+          queueMicrotask(() => {
+            quietFocus.current = false;
+          });
+        }}
+      >
+        {children}
+      </TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content
           side={side}
