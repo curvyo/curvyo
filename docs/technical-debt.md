@@ -1494,6 +1494,12 @@ and is why `npm audit --omit=dev` does not exclude it either. The only fix
 npm offers (`npm audit fix --force`) downgrades to `shadcn@1.0.0`, a breaking
 change not evaluated here.
 
+2026-11-17: `npm audit fix` updated `@hono/node-server` and `fast-uri` in the
+lockfile. [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
+(`picomatch` ReDoS) sits in the same scaffolding chain; its only fix is a
+breaking `vite` downgrade, so it is allowlisted next to the `braces` one.
+Re-check when `shadcn` or `picomatch` update.
+
 **Resolution:** acknowledged explicitly in `.github/workflows/ci.yml`'s
 `audit-ci --allowlist` for this one advisory ID, with this rationale,
 mirroring `deny.toml`'s `[advisories]` `ignore` pattern — not silently
