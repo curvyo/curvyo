@@ -1,0 +1,417 @@
+//! The job state machine of one connector: events in, new state and messages out, no clock.
+
+use uuid::Uuid;
+
+use crate::assembly::{Assembly, ChunkError, Job};
+use crate::message::{ErrorCode, JobKind, JobResult, Message, Progress, RejectReason, State};
+use crate::millimetres::Millimetres;
+
+/// Settings of the machine.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Options {
+    /// `Start` waits for the button on the connector's host (CONN-SAFETY, off by default).
+    pub require_local_start: bool,
+}
+
+/// Something that happened: a message from the app or an event from the controller side.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    /// A message from a paired, greeted client.
+    Message(Message),
+    /// A controller was attached.
+    ControllerConnected,
+    /// The controller was lost.
+    ControllerLost,
+    /// The controller got through `line` lines; `elapsed_ms` is counted by the caller.
+    Progress {
+        /// Lines done.
+        line: u32,
+        /// Milliseconds since the start.
+        elapsed_ms: u64,
+    },
+    /// The controller reports its position.
+    Position([Millimetres; 3]),
+    /// The controller ran every line.
+    JobFinished {
+        /// Milliseconds since the start.
+        elapsed_ms: u64,
+    },
+    /// The controller reported an error while running.
+    JobFailed {
+        /// Milliseconds since the start.
+        elapsed_ms: u64,
+    },
+    /// The controller raised an alarm.
+    Alarm {
+        /// Its text.
+        text: String,
+    },
+    /// The alarm was cleared.
+    AlarmCleared,
+    /// The button on the connector's host was pressed.
+    LocalStartPressed,
+    /// A client connection that sent a job ended; a job still being received is dropped
+    /// (back to `Idle`), a job that is `Ready` or further is not affected.
+    ClientDisconnected,
+}
+
+/// What the transport has to tell the controller.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ControllerCommand {
+    /// Stream the held job.
+    Start {
+        /// The job.
+        job_id: Uuid,
+    },
+    /// Hold the stream.
+    Pause,
+    /// Continue the stream.
+    Resume,
+    /// End the stream.
+    Stop,
+}
+
+/// The result of one event.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Output {
+    /// Messages for the app, in order.
+    pub messages: Vec<Message>,
+    /// Commands for the controller, in order.
+    pub commands: Vec<ControllerCommand>,
+}
+
+#[derive(Debug, Clone)]
+struct Held {
+    job: Job,
+    lines: u32,
+    line: u32,
+    elapsed_ms: u64,
+}
+
+/// The state of one connector and the one job it holds.
+#[derive(Debug, Clone)]
+pub struct Machine {
+    options: Options,
+    state: State,
+    assembly: Option<Assembly>,
+    held: Option<Held>,
+    position: Option<[Millimetres; 3]>,
+    alarm: Option<String>,
+}
+
+impl Machine {
+    /// A connector without a controller.
+    #[must_use]
+    pub fn new(options: Options) -> Self {
+        Self {
+            options,
+            state: State::NoController,
+            assembly: None,
+            held: None,
+            position: None,
+            alarm: None,
+        }
+    }
+
+    /// The current state.
+    #[must_use]
+    pub fn state(&self) -> State {
+        self.state
+    }
+
+    /// The assembled job, from `Ready` until it is replaced or discarded.
+    #[must_use]
+    pub fn held_job(&self) -> Option<&Job> {
+        self.held.as_ref().map(|h| &h.job)
+    }
+
+    /// The `Status` message for the current state.
+    #[must_use]
+    pub fn status(&self) -> Message {
+        let carries_job = matches!(
+            self.state,
+            State::Ready
+                | State::Running
+                | State::Paused
+                | State::AwaitingLocalStart
+                | State::Done { .. }
+        );
+        let job = self
+            .held
+            .as_ref()
+            .filter(|_| carries_job)
+            .map(|h| Progress {
+                job_id: h.job.job_id,
+                line: h.line,
+                lines: h.lines,
+                elapsed_ms: h.elapsed_ms,
+            });
+        Message::Status {
+            state: self.state,
+            job,
+            position: self.position,
+            alarm: self.alarm.clone(),
+        }
+    }
+
+    /// Applies one event.
+    pub fn handle(&mut self, event: Event) -> Output {
+        let mut out = Output::default();
+        match event {
+            Event::Message(message) => self.on_message(message, &mut out),
+            Event::ClientDisconnected => {
+                if self.state == State::Receiving {
+                    self.discard();
+                    self.set(State::Idle, &mut out);
+                }
+            }
+            other => self.on_controller(other, &mut out),
+        }
+        out
+    }
+
+    fn set(&mut self, state: State, out: &mut Output) {
+        self.state = state;
+        out.messages.push(self.status());
+    }
+
+    fn error(out: &mut Output, code: ErrorCode, message: &str) {
+        out.messages.push(Message::Error {
+            code,
+            message: message.to_owned(),
+        });
+    }
+
+    fn wrong_state(out: &mut Output) {
+        Self::error(
+            out,
+            ErrorCode::WrongState,
+            "This does not fit the current state.",
+        );
+    }
+
+    fn discard(&mut self) {
+        self.assembly = None;
+        self.held = None;
+    }
+
+    fn reject(out: &mut Output, job_id: Uuid, reason: RejectReason) {
+        out.messages.push(Message::JobRejected { job_id, reason });
+    }
+
+    fn on_message(&mut self, message: Message, out: &mut Output) {
+        match message {
+            Message::GetStatus => out.messages.push(self.status()),
+            Message::SubmitJob {
+                job_id,
+                name,
+                kind,
+                bytes,
+                sha256,
+            } => self.submit(job_id, name, kind, bytes, sha256, out),
+            Message::JobChunk {
+                job_id,
+                index,
+                text,
+            } => self.chunk(job_id, index, &text, out),
+            Message::Start { job_id } => self.start(job_id, out),
+            Message::Pause | Message::Resume | Message::Stop => self.control(&message, out),
+            _ => Self::error(
+                out,
+                ErrorCode::UnexpectedMessage,
+                "The connector does not accept this message.",
+            ),
+        }
+    }
+
+    fn submit(
+        &mut self,
+        job_id: Uuid,
+        name: String,
+        kind: JobKind,
+        bytes: u64,
+        sha256: String,
+        out: &mut Output,
+    ) {
+        match self.state {
+            State::NoController => Self::reject(out, job_id, RejectReason::NoController),
+            State::Idle | State::Done { .. } => {
+                match Assembly::begin(job_id, name, kind, bytes, sha256) {
+                    Err(reason) => Self::reject(out, job_id, reason),
+                    Ok(assembly) => {
+                        self.held = None;
+                        self.set(State::Receiving, out);
+                        if assembly.is_full() {
+                            self.complete(assembly, out);
+                        } else {
+                            self.assembly = Some(assembly);
+                        }
+                    }
+                }
+            }
+            _ => Self::reject(out, job_id, RejectReason::Busy),
+        }
+    }
+
+    fn chunk(&mut self, job_id: Uuid, index: u32, text: &str, out: &mut Output) {
+        let Some(assembly) = self.assembly.as_mut() else {
+            Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
+            return;
+        };
+        match assembly.push(job_id, index, text) {
+            Ok(()) if assembly.is_full() => {
+                if let Some(assembly) = self.assembly.take() {
+                    self.complete(assembly, out);
+                }
+            }
+            Ok(()) => {}
+            Err(ChunkError::UnknownJob) => {
+                Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
+            }
+            Err(ChunkError::Reject(reason)) => {
+                let held_id = assembly.job_id();
+                self.assembly = None;
+                Self::reject(out, held_id, reason);
+                self.set(State::Idle, out);
+            }
+        }
+    }
+
+    fn complete(&mut self, assembly: Assembly, out: &mut Output) {
+        let job_id = assembly.job_id();
+        match assembly.finish() {
+            Ok(job) => {
+                let lines = u32::try_from(job.text.lines().count()).unwrap_or(u32::MAX);
+                self.held = Some(Held {
+                    job,
+                    lines,
+                    line: 0,
+                    elapsed_ms: 0,
+                });
+                out.messages.push(Message::JobAccepted { job_id });
+                self.set(State::Ready, out);
+            }
+            Err(reason) => {
+                Self::reject(out, job_id, reason);
+                self.set(State::Idle, out);
+            }
+        }
+    }
+
+    fn start(&mut self, job_id: Uuid, out: &mut Output) {
+        let held_id = self.held.as_ref().map(|h| h.job.job_id);
+        if self.state != State::Ready {
+            Self::wrong_state(out);
+        } else if held_id != Some(job_id) {
+            Self::error(out, ErrorCode::UnknownJob, "No job with this id is held.");
+        } else if self.options.require_local_start {
+            self.set(State::AwaitingLocalStart, out);
+        } else {
+            out.commands.push(ControllerCommand::Start { job_id });
+            self.set(State::Running, out);
+        }
+    }
+
+    fn control(&mut self, message: &Message, out: &mut Output) {
+        match (message, self.state) {
+            (Message::Pause, State::Running) => {
+                out.commands.push(ControllerCommand::Pause);
+                self.set(State::Paused, out);
+            }
+            (Message::Resume, State::Paused) => {
+                out.commands.push(ControllerCommand::Resume);
+                self.set(State::Running, out);
+            }
+            (Message::Stop, State::Running | State::Paused) => {
+                out.commands.push(ControllerCommand::Stop);
+                self.set(
+                    State::Done {
+                        result: JobResult::Stopped,
+                    },
+                    out,
+                );
+            }
+            (Message::Stop, State::Receiving | State::Ready | State::AwaitingLocalStart) => {
+                self.discard();
+                self.set(State::Idle, out);
+            }
+            (Message::Stop, _)
+            | (Message::Pause, State::Paused)
+            | (Message::Resume, State::Running) => {}
+            _ => Self::wrong_state(out),
+        }
+    }
+
+    fn on_controller(&mut self, event: Event, out: &mut Output) {
+        if self.state == State::NoController {
+            if event == Event::ControllerConnected {
+                self.set(State::Idle, out);
+            }
+            return;
+        }
+        match event {
+            Event::ControllerLost => {
+                self.discard();
+                self.position = None;
+                self.alarm = None;
+                self.set(State::NoController, out);
+            }
+            Event::Alarm { text } => {
+                self.discard();
+                self.alarm = Some(text);
+                self.set(State::Alarm, out);
+            }
+            Event::AlarmCleared if self.state == State::Alarm => {
+                self.alarm = None;
+                self.set(State::Idle, out);
+            }
+            Event::Position(position) => {
+                self.position = Some(position);
+                out.messages.push(self.status());
+            }
+            Event::LocalStartPressed if self.state == State::AwaitingLocalStart => {
+                if let Some(h) = &self.held {
+                    out.commands.push(ControllerCommand::Start {
+                        job_id: h.job.job_id,
+                    });
+                }
+                self.set(State::Running, out);
+            }
+            other => self.on_job_event(&other, out),
+        }
+    }
+
+    fn on_job_event(&mut self, event: &Event, out: &mut Output) {
+        let running = matches!(self.state, State::Running | State::Paused);
+        let Some(held) = self.held.as_mut().filter(|_| running) else {
+            return;
+        };
+        match *event {
+            Event::Progress { line, elapsed_ms } => {
+                held.line = line.min(held.lines);
+                held.elapsed_ms = elapsed_ms;
+                out.messages.push(self.status());
+            }
+            Event::JobFinished { elapsed_ms } if self.state == State::Running => {
+                held.line = held.lines;
+                held.elapsed_ms = elapsed_ms;
+                self.set(
+                    State::Done {
+                        result: JobResult::Completed,
+                    },
+                    out,
+                );
+            }
+            Event::JobFailed { elapsed_ms } if self.state == State::Running => {
+                held.elapsed_ms = elapsed_ms;
+                self.set(
+                    State::Done {
+                        result: JobResult::Failed,
+                    },
+                    out,
+                );
+            }
+            _ => {}
+        }
+    }
+}

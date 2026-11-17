@@ -75,6 +75,11 @@ name = "curvyo-extension-core"
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-laser-core"
 
+# The machine connector protocol (ADR 0035 §1, spec 0064): a first-party crate like the others.
+[[licenses.exceptions]]
+allow = ["AGPL-3.0-or-later"]
+name = "curvyo-connector-core"
+
 [[licenses.exceptions]]
 allow = ["AGPL-3.0-or-later"]
 name = "curvyo-ui-core"
