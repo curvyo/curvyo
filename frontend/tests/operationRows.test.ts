@@ -1,5 +1,5 @@
 // The Operations tab's row logic (`specs/0101-laser-operations` `ux-notes.md` sections 2 to 4,
-// 6.2, 7, 9, 10): sections, accessible names, the summary lines, the reorder limit at the section
+// 6.2, 7, 9, 10): sections, accessible names, the reorder limit at the section
 // line and the digit route. Pure functions over the decoded view (`operationsView.ts`).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -8,6 +8,7 @@ import {
   type OperationRow,
   type OperationsView,
 } from "../src/lib/operationsView.ts";
+import { rowHeight } from "../src/lib/operationUnfold.ts";
 import {
   ROW_JUMP,
   digitRow,
@@ -20,7 +21,6 @@ import {
   nextFocusIndex,
   rowKey,
   rowName,
-  summaryLines,
   tickPressAdds,
   assignWord,
   liveReadoutVisible,
@@ -30,6 +30,7 @@ import {
   ghostTop,
   nameKeyAction,
   rowLine2,
+  rowRunLine2,
 } from "../src/lib/operationRows.ts";
 
 function row(patch: Partial<OperationRow> & Pick<OperationRow, "name">): OperationRow {
@@ -46,6 +47,9 @@ function row(patch: Partial<OperationRow> & Pick<OperationRow, "name">): Operati
     unfolded: false,
     settings: null,
     source: null,
+    run: null,
+    numbers: [],
+    accessibleName: patch.name,
     ...patch,
   };
 }
@@ -54,7 +58,6 @@ function view(rows: OperationRow[], extra: Partial<OperationsView> = {}): Operat
   return {
     cutsLast: true,
     rows,
-    summary: { operations: 0, running: 0, notAssigned: 0, runsWhileHidden: 0, outputOff: 0 },
     ...extra,
   };
 }
@@ -136,29 +139,6 @@ test("an unknown operation stays in the Marking group, in its own place", () => 
   assert.deepEqual(groups[0].rows.map((r) => r.row.name), ["Plasma 1"]);
 });
 
-test("the summary reads the run line, then only the non-zero lines", () => {
-  const texts = (v: OperationsView) => summaryLines(v).map((line) => line.text);
-  assert.deepEqual(texts(view([])), ["Nothing runs. Assign items to an operation."]);
-  const busy = view([row({ name: "Cut 1" }), row({ name: "Cut 2" })], {
-    summary: { operations: 2, running: 9, notAssigned: 3, runsWhileHidden: 1, outputOff: 2 },
-  });
-  assert.deepEqual(texts(busy), [
-    "Runs 2 operations, 9 items.",
-    "3 items not assigned.",
-    "1 item runs while hidden.",
-    "2 items sit in operations with Output off.",
-  ]);
-  const plain = view([row({ name: "Cut 1" })], {
-    summary: { operations: 1, running: 0, notAssigned: 0, runsWhileHidden: 0, outputOff: 0 },
-  });
-  assert.deepEqual(texts(plain), ["Runs 1 operation, 0 items."]);
-  assert.deepEqual(
-    summaryLines(busy).map((line) => line.count),
-    [null, "notAssigned", "runsWhileHidden", "outputOff"],
-    "the run line names no count, the others name theirs",
-  );
-});
-
 test("a press on a mixed or empty tick adds the selection, a full tick removes it", () => {
   assert.equal(tickPressAdds("none"), true);
   assert.equal(tickPressAdds("some"), true);
@@ -234,10 +214,12 @@ test("a decoded Rust state gives the same groups and lines as the fixture reads"
         unfolded: false,
         settings: null,
         source: null,
+        run: { digit: 1, time: "8 s" },
+        numbers: [{ text: "80 %, 600 mm/min, 1 ×", typed: [] }],
+        accessible_name: "Score 1, run 1, 8 s",
       },
     ],
     pick: [],
-    summary: { operations: 1, running: 1, not_assigned: 0, runs_while_hidden: 0, output_off: 0 },
     items: { running: [], not_assigned: [], runs_while_hidden: [], output_off: [] },
     operations_view: true,
     select_bar_kinds: null,
@@ -245,7 +227,6 @@ test("a decoded Rust state gives the same groups and lines as the fixture reads"
   };
   const v = decodeOperationsView(json);
   assert.ok(v);
-  assert.deepEqual(summaryLines(v).map((line) => line.text), ["Runs 1 operation, 1 item."]);
   assert.equal(listGroups(v)[0].rows.length, 1);
 });
 
@@ -313,14 +294,29 @@ test("with Cuts last off there is one run with no section name", () => {
   );
 });
 
-test("every row is one 40 px height, an Output off row included (customer 2026-11-10: no taller row)", () => {
+test("every row is one 56 px height, Engrave + Outline 70 px, coarse 64 and 78 (`0029` P25)", () => {
   const rows = [
     row({ name: "Cut 1", output: true, id: { peer: "1", counter: 1 } }),
     row({ name: "Cut 2", output: false, id: { peer: "1", counter: 2 } }),
   ];
   const heights = listEntries(view(rows), null).map((e) => (e.kind === "row" ? e.height : 0));
   assert.deepEqual(heights.filter((h) => h > 0), [ROW_HEIGHT, ROW_HEIGHT]);
-  assert.equal(ROW_HEIGHT, 40);
+  assert.equal(ROW_HEIGHT, 56);
+  const outline = row({ name: "Engrave + Outline 1", kind: "engrave_outline", section: "marking" });
+  assert.equal(rowHeight(outline, false), 70);
+  assert.equal(rowHeight(outline, true), 78);
+  assert.equal(rowHeight(row({ name: "Cut 1" }), true), 64);
+  assert.deepEqual(
+    listEntries(view([outline]), null, null, true).filter((e) => e.kind === "row").map((e) => e.height),
+    [78],
+  );
+});
+
+test("a row that runs reads the session's name with its run and time; the others read as built (`0029` UX 6.1)", () => {
+  const running = row({ name: "Cut 1", items: 4, run: { digit: 3, time: "3 min 21 s" }, accessibleName: "Cut 1, run 3, 3 min 21 s" });
+  assert.equal(rowName(running), "Cut 1, run 3, 3 min 21 s");
+  assert.equal(rowName(row({ name: "Cut 2", items: 2, output: false })), "Cut 2, Cut, 2 items, Output off");
+  assert.deepEqual(rowRunLine2(row({ name: "Cut 1", items: 6 })), { text: "Cut · 6 items", part: "" });
 });
 
 test("the drop badge of a canvas drag over a row reads Assign to with the row's name", () => {

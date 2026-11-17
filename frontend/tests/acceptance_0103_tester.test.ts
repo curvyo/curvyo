@@ -1,6 +1,6 @@
 // Independent acceptance tests for `specs/0103-fixture-jobs` in the frontend: the section's words
 // (criteria 1, 17), the Parts list count (8), the job's second line and its priority (15, 18, 21),
-// the summary's fixture line (17), and the two texts of criteria 10 and 22 that the view must show.
+// the merged output group's fixture parts (`0029` M11), and the two texts of criteria 10 and 22 that the view must show.
 // Written from the specification before the components were read; the texts are the spec's words.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -9,9 +9,7 @@ import type { JobRow, PartsView } from "../src/lib/fixtureJobsView.ts";
 import {
   jobLine2,
   partsHeader,
-  runningLine,
   sectionTitle,
-  summaryWithFixtures,
 } from "../src/lib/fixtureJobRows.ts";
 
 function job(overrides: Partial<JobRow> = {}): JobRow {
@@ -37,28 +35,6 @@ function job(overrides: Partial<JobRow> = {}): JobRow {
 test("criterion 1: the header reads 'Fixture jobs (N)' with the count of every job", () => {
   assert.equal(sectionTitle(0), "Fixture jobs (0)");
   assert.equal(sectionTitle(4), "Fixture jobs (4)");
-});
-
-test("criterion 17: the fixture line is '1 fixture job runs.' or '<F> fixture jobs run.', and nothing with none", () => {
-  assert.equal(runningLine(1), "1 fixture job runs.");
-  assert.equal(runningLine(5), "5 fixture jobs run.");
-  assert.equal(runningLine(0), null);
-});
-
-test("criterion 17: 'Nothing runs.' drops when a job runs; the fixture line follows the work line", () => {
-  const nothing = [{ text: "Nothing runs. Assign items to an operation.", count: null }];
-  assert.deepEqual(
-    summaryWithFixtures(nothing, 1).map((line) => line.text),
-    ["1 fixture job runs."],
-  );
-  const work = [
-    { text: "Runs 2 operations, 3 items.", count: null },
-    { text: "Cut 1 has 3 items.", count: null },
-  ];
-  assert.deepEqual(
-    summaryWithFixtures(work, 2).map((line) => line.text),
-    ["Runs 2 operations, 3 items.", "2 fixture jobs run.", "Cut 1 has 3 items."],
-  );
 });
 
 test("criterion 8: the Parts list header counts the ticked readable parts, '2 of 5'", () => {

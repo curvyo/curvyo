@@ -34,6 +34,9 @@ export interface PageRow {
   /** A laser page's Operations view toggle: pressed or not (`specs/0111` criterion 15); `null` on
    * any other page. */
   operationsView?: boolean | null;
+  /** The same label's Toolpath view toggle (`specs/0029` criterion 8): pressed or not; `null` on
+   * any other page. Exclusive with the Operations view. */
+  toolpathView?: boolean | null;
   /** A move-only selection's object belongs here: the label is semibold (`specs/0106` UX §2). */
   home?: boolean;
 }
@@ -54,3 +57,11 @@ export function operationsToggle(page: PageRow): { pressed: boolean } | null {
 
 /** The accessible name and tooltip of the toggle; the pressed state is `aria-pressed`. */
 export const OPERATIONS_VIEW_NAME = "Operations view";
+
+/** Whether the page label draws the Toolpath view toggle after the Operations view toggle. */
+export function toolpathToggle(page: PageRow): { pressed: boolean } | null {
+  return typeof page.toolpathView === "boolean" ? { pressed: page.toolpathView } : null;
+}
+
+/** The accessible name and tooltip of the Toolpath view toggle. */
+export const TOOLPATH_VIEW_NAME = "Toolpath view";

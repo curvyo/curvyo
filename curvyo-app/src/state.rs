@@ -99,8 +99,9 @@ pub struct AppState {
     /// The open document is shared (the title's "(shared)").
     shared: AtomicBool,
     quitting: AtomicBool,
-    /// The file Export SVG… chose, until the page hands over the text (`specs/0024` criterion 4).
-    svg_export_path: Mutex<Option<std::path::PathBuf>>,
+    /// The file an export's save dialog chose (Export SVG…, `specs/0024` criterion 4; Export job
+    /// file, `specs/0029` criterion 27), until the page hands over the bytes; one export at a time.
+    export_path: Mutex<Option<std::path::PathBuf>>,
     /// The folder of the open workspace (`specs/0095-workspace`); the page names only paths
     /// inside it.
     workspace: Mutex<Option<PathBuf>>,
@@ -115,15 +116,15 @@ pub struct AppState {
 
 impl AppState {
     /// Keeps the file the export's save dialog chose.
-    pub fn set_svg_export_path(&self, path: Option<std::path::PathBuf>) {
-        if let Ok(mut slot) = self.svg_export_path.lock() {
+    pub fn set_export_path(&self, path: Option<std::path::PathBuf>) {
+        if let Ok(mut slot) = self.export_path.lock() {
             *slot = path;
         }
     }
 
     /// Takes the file the export's save dialog chose.
-    pub fn take_svg_export_path(&self) -> Option<std::path::PathBuf> {
-        self.svg_export_path
+    pub fn take_export_path(&self) -> Option<std::path::PathBuf> {
+        self.export_path
             .lock()
             .ok()
             .and_then(|mut slot| slot.take())

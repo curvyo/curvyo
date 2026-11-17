@@ -3,6 +3,8 @@ import { selectedRow } from "@/lib/fixturesView";
 import { FixturesTab } from "@/components/workbench/FixturesTab";
 import { ManifestTab } from "@/components/workbench/ManifestTab";
 import { OperationsSection } from "@/components/panel/OperationsSection";
+import { OutputGroup } from "@/components/panel/OutputGroup";
+import type { OutputApi } from "@/hooks/useOutput";
 import { FixtureJobsSection } from "@/components/panel/FixtureJobsSection";
 import type { FixtureJobsApi } from "@/hooks/useFixtureJobs";
 import { MaterialsTab } from "@/components/panel/MaterialsTab";
@@ -22,7 +24,7 @@ import { panelHandlesEscape } from "@/lib/panelEscape";
 import { FontsTab } from "@/components/panel/FontsTab";
 import { useTextLayout } from "@/hooks/useTextLayout";
 import { focusCurrentFont, fontsSubject } from "@/lib/textText";
-import { useCallback, useEffect, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { DocumentSection } from "@/components/panel/DocumentSection";
 import { ExportSvgSection } from "@/components/panel/ExportSvgSection";
@@ -97,6 +99,8 @@ interface PropertiesPanelProps {
   operationTools: OperationToolsApi;
   /** The Materials section (`specs/0028-material-test-library`). */
   materials: MaterialsApi;
+  /** The Output tab of the active laser page (`specs/0029-laser-job-preview-and-output`). */
+  output: OutputApi;
 }
 
 /**
@@ -133,8 +137,11 @@ export function PropertiesPanel({
   operationSettings,
   operationTools,
   materials,
+  output,
 }: PropertiesPanelProps) {
   const { open, setOpen } = panelOpen;
+  /** The "Fixture jobs" check: each press expands that section and focuses its pick (`specs/0029` P15). */
+  const [fixturePickRequest, setFixturePickRequest] = useState(0);
   // The Share tab mark clears once its body was shown for 1 s, never by hovering (0097 2.1).
   const shareShown = open && doc.view.content === "share";
   const { unread, markRead } = membership;
@@ -577,11 +584,35 @@ export function PropertiesPanel({
                 api={operations}
                 selectionCount={editor.selectionCount}
                 onReturnFocus={returnFocus}
-                fixtureRunning={fixtureJobs.view?.running ?? 0}
                 settings={operationSettings}
                 tools={operationTools}
                 onEditMaterial={editMaterial}
-                fixtureJobs={<FixtureJobsSection api={fixtureJobs} selectFixture={fixtures.select} />}
+                fixtureJobs={
+                  <FixtureJobsSection
+                    api={fixtureJobs}
+                    selectFixture={fixtures.select}
+                    onPickMaterial={(id) => output.setFixtureMaterial(id)}
+                    onReturnFocus={returnFocus}
+                    pickRequest={fixturePickRequest}
+                  />
+                }
+                outputGroup={
+                  <OutputGroup
+                    api={output}
+                    onReturnFocus={returnFocus}
+                    onFixturePick={() => setFixturePickRequest((count) => count + 1)}
+                    onOpenOperation={(id) => {
+                      // A check's operation: its row selected, unfolded and scrolled into view in the
+                      // list above; the focus goes to its first field once it is drawn.
+                      operationTools.reveal(id);
+                      window.requestAnimationFrame(() =>
+                        window.requestAnimationFrame(() =>
+                          document.querySelector<HTMLElement>("[data-row-body] input")?.focus(),
+                        ),
+                      );
+                    }}
+                  />
+                }
               />
             ) : doc.view.content === "fixtures" ? (
               <FixturesTab api={fixtures} />

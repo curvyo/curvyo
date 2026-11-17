@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { FixtureGlyph } from "@/components/workbench/FixtureGlyphs";
+import { FixtureOutputPart } from "@/components/panel/FixtureOutputPart";
 import { FixtureJobParts } from "@/components/panel/FixtureJobParts";
 import { FixtureJobRowView, type JobRowActions } from "@/components/panel/FixtureJobRow";
 import { OperationGlyph } from "@/components/panel/OperationGlyphs";
@@ -36,6 +37,11 @@ interface FixtureJobsSectionProps {
   api: FixtureJobsApi;
   /** A press on a group's heading selects the fixture on the canvas (the mouse route). */
   selectFixture: (id: string) => boolean;
+  /** The fixture jobs' material pick (`specs/0029` UX 6.2): `""` removes it. */
+  onPickMaterial: (id: string) => void;
+  onReturnFocus: () => void;
+  /** A counter: each increase expands the section and focuses its pick (a check's button, P15). */
+  pickRequest: number;
 }
 
 /**
@@ -63,9 +69,23 @@ interface DragState {
  * jobs grouped under their fixtures, and the open job's Parts list. Nothing here decides a rule;
  * the session does, and the view is re-read after each call.
  */
-export function FixtureJobsSection({ api, selectFixture }: FixtureJobsSectionProps) {
+export function FixtureJobsSection({ api, selectFixture, onPickMaterial, onReturnFocus, pickRequest }: FixtureJobsSectionProps) {
   const { view } = api;
   const [expanded, setExpanded] = useState(rememberedExpanded);
+  const pickButton = useRef<HTMLButtonElement>(null);
+  const [seenRequest, setSeenRequest] = useState(pickRequest);
+  const handledRequest = useRef(pickRequest);
+  if (pickRequest !== seenRequest) {
+    setSeenRequest(pickRequest);
+    setExpanded(true);
+  }
+  // A check's button: the section is open by now, so the pick is drawn and takes the focus.
+  useEffect(() => {
+    if (handledRequest.current === seenRequest) return;
+    handledRequest.current = seenRequest;
+    rememberedExpanded = true;
+    pickButton.current?.focus();
+  }, [seenRequest, expanded]);
   const bodyId = useId();
   const rootRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
@@ -305,6 +325,9 @@ export function FixtureJobsSection({ api, selectFixture }: FixtureJobsSectionPro
           {text}
         </p>
       ))}
+      {view.output ? (
+        <FixtureOutputPart output={view.output} buttonRef={pickButton} onPick={onPickMaterial} onReturnFocus={onReturnFocus} />
+      ) : null}
       <div
         role="toolbar"
         aria-label="Add fixture job"
@@ -380,7 +403,12 @@ export function FixtureJobsSection({ api, selectFixture }: FixtureJobsSectionPro
         className="flex h-7 w-full items-center gap-1 rounded text-left text-sm text-[var(--toolbar-icon)] hover:bg-[var(--editor-accent-hover)] focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]"
       >
         {expanded ? <ChevronDown size={12} aria-hidden /> : <ChevronRight size={12} aria-hidden />}
-        <span>{sectionTitle(view.count)}</span>
+        <span className="flex-1">{sectionTitle(view.count)}</span>
+        {view.output ? (
+          <span data-fixture-time className="pr-1 text-[11px] tabular-nums text-[var(--panel-muted-fg)]">
+            {view.output.time}
+          </span>
+        ) : null}
       </button>
       {expanded ? expandedBody : null}
       {api.refusal ? (

@@ -7,8 +7,17 @@
 import { operationIdKey, type OperationRow } from "./operationsView.ts";
 import type { PressMods } from "./rowSelection.ts";
 
-/** One operation row: 40 px (`0101` ux-notes 4.2); 48 px with a coarse pointer, by CSS. */
-export const ROW_HEIGHT = 40;
+/** One operation row: 56 px, three lines (`specs/0029` UX 6.1, P25); 64 px with a coarse pointer. */
+export const ROW_HEIGHT = 56;
+export const ROW_HEIGHT_COARSE = 64;
+/** The fourth line of Engrave + Outline: "Outline …", 14 px. */
+export const OUTLINE_LINE = 14;
+
+/** The height of a folded row: Engrave + Outline 70 px (78 coarse), the others 56 (64). */
+export function rowHeight(row: OperationRow, coarse: boolean): number {
+  const base = coarse ? ROW_HEIGHT_COARSE : ROW_HEIGHT;
+  return row.kind === "engrave_outline" ? base + OUTLINE_LINE : base;
+}
 
 /** The body's height before it has been measured, px (a Power row, Speed, Passes, the pick, the
  * hairline and the lower part). */
@@ -39,7 +48,7 @@ export function pressUnfolds(row: OperationRow, selectedKeys: readonly string[],
   return bodyOpen(row, selectedKeys);
 }
 
-/** The window item's height: the fixed row, plus the measured body (or its estimate) when open. */
-export function entryHeight(open: boolean, measuredBody: number | null): number {
-  return open ? ROW_HEIGHT + (measuredBody ?? UNFOLDED_BODY_ESTIMATE) : ROW_HEIGHT;
+/** The window item's height: the fixed row (`base`), plus the measured body (or its estimate) when open. */
+export function entryHeight(open: boolean, measuredBody: number | null, base: number = ROW_HEIGHT): number {
+  return open ? base + (measuredBody ?? UNFOLDED_BODY_ESTIMATE) : base;
 }

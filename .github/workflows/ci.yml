@@ -47,7 +47,8 @@
 #                        Fracture, Flatten and Weld (0037, 0068), node editing of compound
 #                        paths (0055), tiling (0069), cooperative editing (0092) and the
 #                        workspace tree (0095), laser operations (0101, criterion 29), the
-#                        trace mask of 8 parts of 20 regions (0114, criterion 24).
+#                        trace mask of 8 parts of 20 regions (0114, criterion 24), the job
+#                        preview and output (0029, criterion 36).
 #   boolean-wasm-golden — the kernel's golden results and the tiling layout goldens (0069) in the
 #                        wasm build, run in Node, ubuntu only.
 #   deny              — `cargo deny check`, once, over the whole workspace
@@ -529,6 +530,9 @@ jobs:
           cargo test --release -p curvyo-editor-wasm --test fixture_jobs_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test test_grid_materials_budget -- --nocapture --test-threads=1
           cargo test --release -p curvyo-editor-wasm --test fixture_sets_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test output_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test job_builder_budget -- --nocapture --test-threads=1
+          cargo test --release -p curvyo-editor-wasm --test acceptance_0029_tester_budgets -- --nocapture --test-threads=1
           cargo test --release -p curvyo-document-core --test compound_write_cost -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_hostile_sizes -- --nocapture
           cargo test --release -p curvyo-document-core --test clone_history ac53 -- --nocapture

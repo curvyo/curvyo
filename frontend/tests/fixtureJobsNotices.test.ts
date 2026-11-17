@@ -21,6 +21,7 @@ test("the damage notice of a job is shown: the decoded notice is drawn by the se
     running_fixtures: [],
     damaged: 4,
     damage_notices: ["4 values damaged on holder 1 job."],
+    output: null,
   });
   assert.ok(view);
   assert.deepEqual(view.damageNotices, ["4 values damaged on holder 1 job."]);
@@ -55,6 +56,7 @@ test("an entry is a heading of 28 px (9 more after the first group) and a row of
     running_fixtures: [],
     damaged: 0,
     damage_notices: [],
+    output: null,
   });
   assert.ok(view);
   const { entries, rowAt } = entriesOf(view.groups, view.parts, view.selected);
@@ -78,6 +80,7 @@ test("above 60 jobs the window holds the viewport and the focused row, and nothi
     running_fixtures: [],
     damaged: 0,
     damage_notices: [],
+    output: null,
   });
   assert.ok(view);
   assert.ok(view.count > WINDOW_ABOVE);

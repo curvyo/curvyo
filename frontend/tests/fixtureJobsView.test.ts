@@ -182,3 +182,12 @@ test("every field of every shared fixture is required and typed: a missing or mi
     }
   }
 });
+
+test("the output part decodes: the pick, one run line per kind and the header time (`0029` UX 6.2)", () => {
+  const view = decodeFixtureJobsView(fixture("role_jobs"));
+  assert.ok(view?.output);
+  assert.equal(view.output.pick.material, null);
+  assert.deepEqual(view.output.runs.map((run) => [run.kind, run.time, run.numbers.length]), [["score", "–", 0]]);
+  assert.equal(view.output.time, "–", "no fixture run has a time: the header shows none");
+  assert.equal(decodeFixtureJobsView(fixture("empty"))?.output, null, "no fixture job runs: no output part");
+});

@@ -13,6 +13,8 @@ export interface OperationToolsEditor {
 export interface PressedRow {
   id: OperationId;
   seq: number;
+  /** A reveal from the Output tab: the Operations tab is drawn after it, so it replays it. */
+  reveal?: boolean;
 }
 
 /**
@@ -35,6 +37,9 @@ export interface OperationToolsApi {
   edit: (id: OperationId, option: string, value: number) => string;
   /** The Operations view toggle in the label of laser page `page`. */
   toggleView: (page: string) => boolean;
+  /** A check's operation button of the Output tab (`specs/0029`): the row is selected and stays
+   * unfolded; whether it exists on the active page. */
+  reveal: (id: OperationId) => boolean;
   /** Escape on a kind button inside an entered group: the session leaves one level, as Escape
    * on the canvas does; whether it left. */
   leaveGroup: () => boolean;
@@ -81,6 +86,14 @@ export function useOperationTools(editor: OperationToolsEditor): OperationToolsA
       run("", (s) => s.edit_operation_option(operationIdText(id), option, value)),
     [run],
   );
+  const reveal = useCallback(
+    (id: OperationId) => {
+      const done = run(false, (s) => s.reveal_operation_row(operationIdText(id)));
+      if (done) setPressed((previous) => ({ id, seq: (previous?.seq ?? 0) + 1, reveal: true }));
+      return done;
+    },
+    [run],
+  );
   const toggleView = useCallback((page: string) => run(false, (s) => s.toggle_operations_view(page)), [run]);
 
   const leaveGroup = useCallback(
@@ -92,5 +105,5 @@ export function useOperationTools(editor: OperationToolsEditor): OperationToolsA
     [run],
   );
 
-  return { press, pressed, status, unfold, edit, toggleView, leaveGroup };
+  return { press, pressed, status, unfold, edit, toggleView, reveal, leaveGroup };
 }

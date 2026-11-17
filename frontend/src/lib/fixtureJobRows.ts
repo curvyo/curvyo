@@ -122,43 +122,6 @@ export function landingPosition(source: number, middles: number[], pointerY: num
   return at;
 }
 
-/** The summary line of the work when nothing runs (`operationRows.ts`). */
-const NOTHING_RUNS = "Nothing runs. Assign items to an operation.";
-
-/** The summary's fixture line, or `null` when no job runs (section 7). */
-export function runningLine(running: number): string | null {
-  if (running <= 0) return null;
-  return running === 1 ? "1 fixture job runs." : `${running} fixture jobs run.`;
-}
-
-/** How many work operations run, read from the work line "Runs N operations, M items.". */
-function workRunsOf(lines: ReadonlyArray<{ text: string }>): number {
-  const match = /^Runs (\d+) operation/.exec(lines.find((line) => line.text.startsWith("Runs "))?.text ?? "");
-  return match ? Number(match[1]) : 0;
-}
-
-/**
- * The summary's lines with the fixture line in place (section 7, criterion 17, J7): the work line
- * only when an operation runs, then the fixture line when a job runs, then the other lines; with
- * neither, "Nothing runs. Assign items to an operation.". `workRunning` defaults to the count the
- * work line reads. The fixture line is not a button (`count` null): its count button needs a
- * multi-select the session does not offer yet.
- */
-export function summaryWithFixtures<T extends { text: string; count: unknown }>(
-  lines: T[],
-  fixtureRunning: number,
-  workRunning: number = workRunsOf(lines),
-): Array<T | { text: string; count: null }> {
-  const others = lines.filter((line) => !line.text.startsWith("Runs ") && line.text !== NOTHING_RUNS);
-  const workLine = lines.find((line) => line.text.startsWith("Runs "));
-  const fixture = runningLine(fixtureRunning);
-  const lead: Array<T | { text: string; count: null }> = [];
-  if (workRunning > 0 && workLine) lead.push(workLine);
-  if (fixture !== null) lead.push({ text: fixture, count: null });
-  if (lead.length === 0) lead.push({ text: NOTHING_RUNS, count: null });
-  return [...lead, ...others];
-}
-
 /** The notice of a work-item drop onto a job row (`specs/0103` criterion 10, Proposal). */
 export const WORK_REFUSED = "Work items do not run in fixture jobs.";
 

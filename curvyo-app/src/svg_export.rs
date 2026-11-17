@@ -44,7 +44,7 @@ pub(crate) async fn pick_svg_export_path(
     }
     let path: PathBuf = dialog.blocking_save_file()?.into_path().ok()?;
     let name = path.file_name()?.to_string_lossy().into_owned();
-    app.state::<AppState>().set_svg_export_path(Some(path));
+    app.state::<AppState>().set_export_path(Some(path));
     Some(name)
 }
 
@@ -56,7 +56,7 @@ pub(crate) async fn pick_svg_export_path(
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn write_svg_export(app: AppHandle, text: String) -> Result<String, String> {
     let state = app.state::<AppState>();
-    let Some(path) = state.take_svg_export_path() else {
+    let Some(path) = state.take_export_path() else {
         return Err(failure_text("No file was chosen"));
     };
     match curvyo_storage_io::write_atomic(&path, text.as_bytes()) {

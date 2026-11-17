@@ -4,11 +4,9 @@ import type { WasmSession } from "@/lib/editorSession";
 import type { DropBadge } from "@/components/DropBadgePill";
 import { assignWord, digitRow } from "@/lib/operationRows";
 import {
-  COUNT_WIRE,
   decodeOperationsText,
   operationIdKey,
   operationIdText,
-  type CountKey,
   type OperationId,
   type OperationsView,
 } from "@/lib/operationsView";
@@ -44,8 +42,6 @@ export interface OperationsApi {
   move: (id: OperationId, to: number) => boolean;
   /** Ticks (`on`) or unticks the selection in the operation. */
   tick: (id: OperationId, on: boolean) => boolean;
-  /** Selects the items of a summary count on the canvas (criterion 17). */
-  selectItems: (count: CountKey) => boolean;
 }
 
 interface Snapshot {
@@ -111,10 +107,6 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
   );
   const tick = useCallback(
     (id: OperationId, on: boolean) => run(false, (s) => s.set_selection_in_operation(operationIdText(id), on)),
-    [run],
-  );
-  const selectItems = useCallback(
-    (count: CountKey) => run(false, (s) => s.select_operation_items(COUNT_WIRE[count])),
     [run],
   );
 
@@ -198,6 +190,5 @@ export function useOperations(editor: OperationsEditor): OperationsApi {
     setCutsLast,
     move,
     tick,
-    selectItems,
   };
 }
