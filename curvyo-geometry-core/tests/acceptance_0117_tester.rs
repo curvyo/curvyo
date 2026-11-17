@@ -2014,6 +2014,14 @@ fn dolphin_bands() -> (Vec<Band>, CentreLines, Rings) {
                     .filter(|&&t| base * path.profile.sample(t).unwrap() < 0.05)
                     .count()
             };
+            // A crest's tip inside the path (CENTRE-THROUGH A, ADR 0063 amendment 2026-11-20)
+            // counts as two pointed ends: a taper into the tip and one out of it.
+            let tips = path
+                .profile
+                .positions()
+                .filter(|&t| t > 0.0 && t < 1.0 && base * path.profile.sample(t).unwrap() < 0.05)
+                .count();
+            let pointed = pointed + 2 * tips;
             bands.push((
                 i,
                 len,
