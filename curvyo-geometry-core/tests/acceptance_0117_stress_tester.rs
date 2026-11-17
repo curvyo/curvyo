@@ -230,6 +230,7 @@ fn trial(seed: u64, index: u64, whale: &Rings, dolphin: &Rings) -> Option<Trial>
             Some(Length::from_mm(rng.range(-1.0, 1.0)))
         },
         optimise: [0.0, 0.25, 0.5, 0.75, 1.0, rng.unit()][(rng.next() % 6) as usize],
+        join_tips: true,
     };
     Some(Trial {
         what: format!(
@@ -367,6 +368,7 @@ fn a_small_axis_loop_at_a_settled_corner_does_not_hang() {
             thick_parts: Some(Length::from_mm(47.082_248_227_493_5)),
             inner_offset: Some(Length::from_mm(0.415_713_456_280_607_3)),
             optimise: 0.75,
+            join_tips: true,
         },
     };
     assert!(
@@ -450,6 +452,7 @@ fn random_rings_with_tiny_loops_and_holes_never_hang_or_panic() {
                 Some(Length::from_mm(rng.range(-1.0, 1.0)))
             },
             optimise: rng.unit(),
+            join_tips: true,
         };
         let t = Trial {
             what: format!("rings seed {seed} trial {index} scale {scale:.2} {options:?}"),

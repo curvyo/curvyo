@@ -61,7 +61,7 @@ pub use boolean_grid::MAX_COORDINATE_MM;
 pub use bspline::{SplineControl, SplineCubic, SplineError, evaluate_bspline};
 pub use centre_line::{
     CentreLines, CentreOptions, CentrePath, CentreRole, CentreSkeleton, CentreStages,
-    DEFAULT_OPTIMISE, DEFAULT_THICK_PARTS, KeptRegion, StageRuns,
+    DEFAULT_JOIN_TIPS, DEFAULT_OPTIMISE, DEFAULT_THICK_PARTS, KeptRegion, StageRuns,
 };
 pub use curve_intersections::{CutParameter, cut_parameters};
 pub use curvyo_document_core::Tolerance;

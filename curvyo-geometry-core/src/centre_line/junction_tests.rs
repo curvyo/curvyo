@@ -32,7 +32,7 @@ fn crest(beta_degrees: f64, w: f64) -> Vec<OutlineTriple> {
 }
 
 /// The union of convex polygons, as the subject's outlines.
-fn union(parts: &[Vec<OutlineTriple>]) -> Vec<Vec<OutlineTriple>> {
+pub(super) fn union(parts: &[Vec<OutlineTriple>]) -> Vec<Vec<OutlineTriple>> {
     let outlines: Vec<Vec<Outline<'_>>> =
         parts.iter().map(|p| vec![Outline::new(p, true)]).collect();
     let operands: Vec<&[Outline<'_>]> = outlines.iter().map(Vec::as_slice).collect();
@@ -45,7 +45,7 @@ fn union(parts: &[Vec<OutlineTriple>]) -> Vec<Vec<OutlineTriple>> {
 }
 
 /// A rectangle `w` wide along the segment from `a` to `b`.
-fn bar(a: (f64, f64), b: (f64, f64), w: f64) -> Vec<OutlineTriple> {
+pub(super) fn bar(a: (f64, f64), b: (f64, f64), w: f64) -> Vec<OutlineTriple> {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
     let l = dx.hypot(dy);
     let (nx, ny) = (-dy / l * w / 2.0, dx / l * w / 2.0);

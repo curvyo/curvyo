@@ -195,8 +195,9 @@ fn dolphin() -> (Vec<(Vec<Triple>, bool)>, CentreLines) {
 
 /// The thick bands of a result: paths at least 10 mm long whose median width is at least
 /// 1.5 mm (the dolphin's strokes and wave bands; its fine lines are under 1.4 mm), as length,
-/// nodes, width points and pointed ends (open ends whose width falls to 0).
-fn bands(lines: &CentreLines) -> Vec<(f64, usize, usize, usize)> {
+/// nodes, width points, pointed ends (open ends whose width falls to 0, a tip inside counting
+/// two) and tips inside.
+fn bands(lines: &CentreLines) -> Vec<(f64, usize, usize, usize, usize)> {
     lines
         .paths
         .iter()
@@ -225,6 +226,7 @@ fn bands(lines: &CentreLines) -> Vec<(f64, usize, usize, usize)> {
                     path.anchors.len(),
                     path.profile.positions().count(),
                     pointed,
+                    tips,
                 )
             })
         })
@@ -232,8 +234,9 @@ fn bands(lines: &CentreLines) -> Vec<(f64, usize, usize, usize)> {
 }
 
 /// Criterion 20 (ADR 0063 amendment 2026-11-18, B): each of the dolphin's thick bands stays
-/// within its own budget of `2 + ceil(0.12 L)` nodes and `6 + 4 p + ceil(0.12 L)` width points
-/// (`p` its pointed ends), and none is kept filled.
+/// within its own budget of `2 + 2 t + ceil(0.12 L)` nodes and `6 + 4 p + ceil(0.12 L)` width
+/// points (`p` its pointed ends, `t` the tips it runs through: a tip's anchor and its legs'
+/// starts, CENTRE-TIPS), and none is kept filled.
 #[test]
 fn criterion_20_the_dolphins_bands_stay_within_the_node_budget() {
     let (_, lines) = dolphin();
@@ -243,7 +246,7 @@ fn criterion_20_the_dolphins_bands_stay_within_the_node_budget() {
     let per = |l: f64| (0.12 * l).ceil() as usize;
     let over: Vec<_> = bands
         .iter()
-        .filter(|b| b.1 > 2 + per(b.0) || b.2 > 6 + 4 * b.3 + per(b.0))
+        .filter(|b| b.1 > 2 + 2 * b.4 + per(b.0) || b.2 > 6 + 4 * b.3 + per(b.0))
         .collect();
     let nodes: usize = bands.iter().map(|b| b.1).sum();
     let points: usize = bands.iter().map(|b| b.2).sum();
