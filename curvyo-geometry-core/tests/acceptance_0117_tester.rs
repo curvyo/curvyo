@@ -1243,6 +1243,7 @@ fn determinism_finish_is_pure_in_the_options() {
             thick_parts: Some(Length::from_mm(0.5)),
             inner_offset: Some(Length::from_mm(-1.0)),
             optimise: curvyo_geometry_core::DEFAULT_OPTIMISE,
+            join_tips: true,
         },
         &[],
     );
@@ -1425,6 +1426,7 @@ fn nonfinite_options_do_not_panic() {
             thick_parts: Some(Length::from_mm(x)),
             inner_offset: Some(Length::from_mm(x)),
             optimise: curvyo_geometry_core::DEFAULT_OPTIMISE,
+            join_tips: true,
         };
         let r = std::panic::catch_unwind(|| run_with(&subject, &options, &[]));
         assert!(r.is_ok(), "options {x} panicked");
@@ -1990,8 +1992,9 @@ fn c15a_dolphin_optimise_never_adds_nodes_in_5_percent_steps() {
     assert!(at[15].1 < at[10].1, "density merge: 75 % below 50 %");
 }
 
-/// One dolphin band: `(index, length mm, median width mm, nodes, width points, pointed ends)`.
-type Band = (usize, f64, f64, usize, usize, usize);
+/// One dolphin band: `(index, length mm, median width mm, nodes, width points, pointed ends,
+/// tips inside)`.
+type Band = (usize, f64, f64, usize, usize, usize, usize);
 
 /// The dolphin's bands at the defaults (ADR 0063 Round A: a path at least 10 mm long whose median
 /// width is at least 1.5 mm) and the whole result.
@@ -2029,6 +2032,7 @@ fn dolphin_bands() -> (Vec<Band>, CentreLines, Rings) {
                 path.anchors.len(),
                 path.profile.positions().count(),
                 pointed,
+                tips,
             ));
         }
     }
@@ -2036,15 +2040,20 @@ fn dolphin_bands() -> (Vec<Band>, CentreLines, Rings) {
 }
 
 /// Criterion 20 with ADR 0063's budget (amendment 2026-11-18, B): each band path has at most
-/// `2 + ceil(0.12 L)` nodes and `6 + 4 p + ceil(0.12 L)` width points, L in mm, p its pointed
-/// ends.
+/// `2 + 2 t + ceil(0.12 L)` nodes and `6 + 4 p + ceil(0.12 L)` width points, L in mm, p its
+/// pointed ends, t the tips it runs through (Join tips, CENTRE-TIPS, Proposal: a tip's anchor
+/// and its legs' starts; needs the tester's re-review).
 #[test]
 fn c20_each_dolphin_band_within_its_own_budget() {
     let (bands, _, _) = dolphin_bands();
     let mut over = Vec::new();
-    for &(i, len, median, nodes, points, pointed) in &bands {
+    for &(i, len, median, nodes, points, pointed, tips) in &bands {
         let extra = (0.12 * len).ceil() as usize;
-        let (nb, wb, proposal) = (2 + extra, 6 + 4 * pointed + extra, 6 + 5 * pointed + extra);
+        let (nb, wb, proposal) = (
+            2 + 2 * tips + extra,
+            6 + 4 * pointed + extra,
+            6 + 5 * pointed + extra,
+        );
         // Criterion 8 fixes four taper support points per pointed end.
         let (c8, c8_no_base) = (6 + 4 * pointed + extra, 4 * pointed + extra);
         eprintln!(
@@ -2076,7 +2085,7 @@ fn c20_dolphin_bands_sum_and_painted_area() {
         bands.len()
     );
     let (mut nodes, mut points, mut nb, mut wb) = (0, 0, 0, 0);
-    for &(_, len, _, n, w, _) in &bands {
+    for &(_, len, _, n, w, _, _) in &bands {
         let extra = (0.12 * len).ceil() as usize;
         nodes += n;
         points += w;
