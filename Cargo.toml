@@ -6,6 +6,8 @@ members = [
     "curvyo-extension-core",
     "curvyo-laser-core",
     "curvyo-connector-core",
+    "curvyo-connector-io",
+    "curvyo-connector-server",
     "curvyo-geometry-core",
     "curvyo-text-core",
     "curvyo-svg-core",

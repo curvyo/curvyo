@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "clients": [
+    {
+      "name": "Studio laptop",
+      "token_sha256": "abababababababababababababababababababababababababababababababab",
+      "paired_at": "2023-11-14T22:13:20Z"
+    },
+    {
+      "name": "Workshop tablet",
+      "token_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "paired_at": "2023-11-14T22:14:20Z"
+    }
+  ]
+}
