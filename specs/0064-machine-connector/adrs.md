@@ -3,7 +3,9 @@
 Architect, 2026-11-02. Customer decisions: CONN-FIRST A (GRBL over serial, 2026-10-17); CONN-SEC B, TLS with key
 pinning or an EST certificate, and CONN-BROWSER A and B (2026-11-02); CONN-PATH
 default A (direct on the LAN first); CONN-SAFETY default A (local start as an option, off). Customer
-input of 2026-11-02: at least the protocol between connector and workbench is next.
+input of 2026-11-02: at least the protocol between connector and workbench is next. Customer
+decisions of 2026-11-17 (ADR 0070): CONN-RELAY A, CONN-SHARE B, CONN-LAN A (with the built-in
+relay), CONN-REMOTE-START C.
 
 - [ADR 0035](../../docs/adr/0035-machine-connector-protocol.md) (new, Accepted by the customer
   2026-11-02): crates `curvyo-connector-core` (messages, version check, job state machine,
@@ -19,12 +21,74 @@ input of 2026-11-02: at least the protocol between connector and workbench is ne
   sees ciphertext only; how the TLS channel is carried end to end through it is the relay story's decision.
 - [ADR 0010](../../docs/adr/0010-document-keyring-admins-and-revocation.md): not reused (ADR 0035
   option D).
-- [ADR 0066](../../docs/adr/0066-connector-through-the-relay.md) (draft, Proposed 2026-11-17,
-  needs-customer, Frage 218 to 221): the relay route after the customer's feedback of
-  2026-11-17; recommends the connector as an enrolled member of its own machine room with an
-  end-to-end channel through the relay; the LAN mode of this branch stays unchanged (PR #375).
+- [ADR 0070](../../docs/adr/0070-connector-through-the-relay.md) (new, Accepted by the customer
+  2026-11-17: Frage 218 A, 219 B, 220 A with "a stand-alone connector would then also include a
+  relay server", 221 C): the connector is an enrolled member of its own machine room, reached by
+  a Noise `KK` channel through the relay (relay protocol 4); shared with the members of an
+  assigned workspace; a start from anyone but the owner's devices (admin role) waits for the
+  press at the machine; `--host-relay` runs the `curvyo-sync-server` library inside the connector
+  binary, so a workshop needs no other service; the LAN mode of this branch stays (PR #375).
+  Covers criteria 7, 8 and the relay part of 2, 3, 4, 9.
+- [ADR 0064](../../docs/adr/0064-laser-job-builder-and-output-writers.md) and
+  [ADR 0065](../../docs/adr/0065-laser-output-settings-and-air-assist.md) (`0029`, accepted
+  2026-11-17): the job text is `job::write(output_format, &job)` of `curvyo-laser-core`; the
+  profile's `output_format` (`grbl` only) says which connector can run it.
 
 ## Feature-local decisions
+
+- 2026-11-17 (after ADR 0070's acceptance, **Proposal**): **slice order for the rest of `0064`.**
+  Each slice is demoable end to end and is one PR from `main` (slices 1 and 2 are this branch's
+  PR #375). Order question: Frage 222 below; the list is its recommended answer A.
+  - **Slice 3, Send to machine (LAN).** A "Send to machine" button beside "Export job file" in the
+    Output group of a laser page whose machine profile has a paired connector sends the bytes of
+    `job::write(output_format, &job)` as the job (name: the page's name), under the same checks
+    as Export (a block disables both); the Connector row then shows Ready, Start and progress as
+    in slice 2, and the fake controller runs the page's own job. Only `grbl` sends (a later format
+    gets a check of its own until a connector speaks it). Whether an accepted send records
+    Lasered like an export (`0029` criterion 28, the same reserved commit) is for the product
+    owner; Proposal: yes, on `JobAccepted`. No crate, dependency, protocol or format change.
+    Needs: `0029` (job, gate, writer; Done), `0026` (connector address; Done), slice 2.
+  - **Slice 4, GRBL over serial** (criterion 5 without the frame). A `Controller` trait arrives
+    with its second implementation (serial GRBL beside the fake controller, `CLAUDE.md` §5):
+    character-counting flow control, `?` status polling with position in `Status`, `!` / `~` for
+    pause and resume, feed hold then soft reset for stop, alarm text, `--serial <port>`. The
+    serial crate (e.g. `serialport`, MPL-2.0, in `deny.toml`'s list) is decided in the story with
+    `cargo deny`. Tests against a scripted GRBL double; the demo runs the exported job on a real
+    laser. Needs: `0029` (Done). `0118` (`machine-control`: Home, jog, frame, focus, the slim
+    panel) builds on this slice and owns its protocol additions.
+  - **Slice 5, Enrol and reach through the relay (own devices).** ADR 0070 decisions 1 and 3 to 9:
+    Noise `KK` in `crypto-core` (published vectors, crypto review), relay protocol 4 channel
+    frames in `sync-core` and `sync-server`, enrolment with `curvyo-enrol-machine-v1`, machine
+    room and record, the connector's relay link, `--relay`, `--enrol`, `--host-relay`; "Add
+    machine" in My devices; the Connector row and Send to machine over the channel, in the desktop
+    app and the browser. Demo: `curvyo-connector-server --fake-controller --relay ws://<lan
+    ip>:8787 --host-relay`, enrol from one computer, run from a second paired computer and from
+    the browser (the browser through a `wss://` relay). Every member is an admin here, so
+    decision 2's rule is trivially met. Needs: `0096` (device group, devices list `machines`,
+    `reconcile`, My devices), `0097` (removal with `NewEpoch`, last admin, leave), ADR 0031's
+    "server before apps" release note; from `0116` nothing (the profile's link to its machine
+    room stays per computer, ADR 0070 Concepts). UX notes: Add machine, machine rows, offline.
+  - **Slice 6, Share with a workspace; remote start rule C.** ADR 0070 decisions 2 and 2a:
+    assign a machine to a workspace, `reconcile` adds and removes its members as `member`, the
+    connector holds every start (Start, Resume) from a non-admin for the press at the machine,
+    revocation by removal from the workspace; `docs/technical-debt.md` gets the reconcile gap and
+    the freshness gap. Demo: a second maker in a shared workspace sends and starts, the connector
+    waits for Enter; the owner's device starts at once; removing the second maker from the
+    workspace cuts their channel. Needs: `0095` (workspace list stream `machines`), `0097`
+    (membership changes trigger `reconcile`), `0105` / ADR 0044.
+  - **Later, each its own slice or spec:** frame, Home, jog and focus as `0118` (after slice 4;
+    from a non-admin they are starts under ADR 0070 decision 2); EST certificates (ADR 0035 §3);
+    the web app served by the connector on the LAN (Frage 121 B, less urgent since the browser
+    reaches it through the relay); the configuration file (criterion 1); the direct channel on
+    the LAN for an enrolled connector (ADR 0070 decision 8c), only if the customer asks.
+
+Frage 222 (CONN-ORDER): Which comes first after "Send to machine", the real laser or the relay?
+- A: The real laser first: slice 4 GRBL over serial, then 5 enrol and relay, then 6 sharing. A
+  Curvyo job cuts on your laser soonest, and `0118` (Home, jog, frame) can start after slice 4.
+- B: The relay first: 4 enrol and relay, 5 sharing, 6 GRBL over serial. Remote and browser use
+  come first, but until slice 6 only the fake controller runs.
+- C: GRBL over serial before "Send to machine" too (serial as slice 3).
+- Recommendation: A. Default if unanswered: A.
 
 - 2026-11-17 (slice review, **Proposal**): `Status` in `Ready` carries `job` (`job_id`, `line` 0,
   `lines`, `elapsed_ms` 0), so `Start` works from any paired app and after an app restart, like

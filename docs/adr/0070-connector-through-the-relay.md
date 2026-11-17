@@ -1,10 +1,13 @@
-# ADR 0066: Reaching a machine connector through the relay
+# ADR 0070: Reaching a machine connector through the relay
 
-**Status:** Proposed (architect draft, 2026-11-17). `needs-customer`: persistence/sync and
-security model (a second kind of room on the relay), data leaving the machine (jobs cross the
-internet, sealed), a reversal of the customer's TLS preference of Frage 120 for the relay path,
-and a possible second unit of sharing beside the workspace (ADR 0044). Questions: Frage 218 to
-221 below. Asked by the customer's feedback on `specs/0064-machine-connector` (2026-11-17,
+**Status:** Accepted (customer, 2026-11-17: Frage 218 CONN-RELAY A, Frage 219 CONN-SHARE B,
+Frage 220 CONN-LAN A with the addition "a stand-alone connector would then also include a relay
+server", Frage 221 CONN-REMOTE-START C; see "Customer answers" at the end). Proposed 2026-11-17
+(architect draft). `needs-customer` (answered): persistence/sync and security model (a second
+kind of room on the relay), data leaving the machine (jobs cross the internet, sealed), a
+reversal of the customer's TLS preference of Frage 120 for the relay path, and sharing (kept to
+the workspace, ADR 0044). The answers changed decisions 1, 2, 7, 8, 9 and the Consequences
+before acceptance; decision 2a is new. Asked by the customer's feedback on `specs/0064-machine-connector` (2026-11-17,
 translated): "Of course one can connect to the connector directly, but it must also work through
 a relay server so one can use one's connector from anywhere; this would be like 'add device' for
 the instance. Full cloud must be possible. For that the connector has to register with the relay
@@ -92,20 +95,56 @@ devices list and the library stream (ADR 0062), and `reconcile` adds every group
 synced workspace. A connector on a Raspberry Pi would hold the keys to all the maker's work.
 Least privilege puts it in a room of its own.
 
-## Decision (proposed, option A)
+## Decision (option A, accepted 2026-11-17)
 
 1. **Machine room.** An ADR 0031 room per connector, keyring per ADR 0010 unchanged (no new
-   payload, roles admin and member, ADR 0010 §12). Admins: the maker's devices; the connector:
-   member. One sealed stream, the machine record (`format_version = 1`, golden file). The devices
-   list (ADR 0040 decision 1) gains `machines.<room id hex> = {label}` (readers ignore unknown
-   fields, no version change), and `reconcile` treats each listed machine room like a switched-on
-   workspace: every group device becomes admin there, a removed or leaving device is removed with
-   `NewEpoch`. A non-group member (the connector, a shared person) is never removed by it.
-2. **Who may command.** Every current member of the machine room may open a channel and send
-   every connector-core command (as on the LAN). Admins may add and remove members. How other
-   makers become members is Frage 219. Revocation: `RemoveMember` + `NewEpoch`; the relay closes
-   that identity's connections (ADR 0031 6a) and the connector closes its open channels on
-   replaying the entry. A job already running keeps running; any member can stop it.
+   payload, roles admin and member, ADR 0010 §12). Admins: the owner's devices (the device group
+   of the device that enrolled it); members: the connector and the persons it is shared with
+   (decision 2a). One sealed stream, the machine record (`format_version = 1`, golden file:
+   name, the connector's identity, the assigned workspace ids). The devices list (ADR 0040
+   decision 1) gains `machines.<room id hex> = {label}` (readers ignore unknown fields, no version
+   change), and `reconcile` treats each listed machine room like a switched-on workspace: every
+   group device becomes admin there, a removed or leaving device is removed with `NewEpoch`. A
+   non-group member (the connector, a shared person) is never removed by the device rule; the
+   workspace rule of decision 2a removes shared persons.
+2. **Who may command (Frage 221 C).** The connector tells two kinds of channel peer apart by the
+   role its own keyring replay gives (no new field, no new payload): **admin = one of the
+   owner's own devices**, **member = anyone else** (a shared person; the connector itself never
+   opens a channel). The two are one because only the owner's `reconcile` writes `admin` in a
+   machine room (decision 1) and the app offers no "make admin" there (Proposal; ADR 0041's
+   last-admin rule and leave still apply). Every member may open a channel, read `Status`, send
+   a job (`SubmitJob`), `Pause` and `Stop`. A **start** is `Start`, `Resume` and every later
+   command that moves the head or fires the laser (`Frame`, and `0118`'s Home, jog and focus):
+   - from an admin it acts as on the LAN: it runs at once, or waits for the local press only when
+     the connector runs with `--require-local-start` (CONN-SAFETY A, Q17);
+   - from a member it always goes to `AwaitingLocalStart` and runs only after the press at the
+     connector, whatever the flag. `Resume` counts as a start because it restarts motion; a job
+     paused and resumed by a member waits at its line (Proposal).
+
+   `Stop` is never held. The rule lives in the connector: the `-io` session passes "local start
+   required = flag or peer is not admin" with each start event to core's `Machine`, instead of
+   one machine-wide option; the wire messages, `Status` and protocol 0 are unchanged. Clients of
+   the LAN mode (ADR 0035 token, paired with a code read at the connector's own terminal) keep the
+   flag-only rule: Frage 221 is about the relay path (Proposal). Admins add and remove members.
+   Revocation: `RemoveMember` + `NewEpoch`; the relay closes that identity's connections (ADR
+   0031 6a) and the connector closes its open channels on replaying the entry. A job already
+   running keeps running; any member can stop it.
+
+   **2a. Sharing through a workspace (Frage 219 B).** The workspace stays the only unit of sharing
+   (ADR 0044). An admin assigns a machine to a workspace it is a member of: the machine record
+   lists the workspace id, and the workspace's list stream (ADR 0037) carries
+   `machines.<room id hex> = {label}` so its members find the room (readers ignore unknown
+   fields; the exact shape and its format check are the sharing slice's, Proposal). `reconcile` on every
+   admin device extends to machine rooms: each member of an assigned workspace that this device
+   can read and that is not in the machine room gets `AddMember{role: member}` (never admin,
+   whatever its role in the workspace); each non-group member that is in no assigned workspace
+   any more (removed, left, or the workspace unassigned) is removed with `NewEpoch`. A workspace
+   admin who is not the owner cannot change the machine room; the removal reaches it through the
+   owner's devices. **Gap:** a removal from the workspace reaches the machine room when one of
+   the owner's devices next runs `reconcile` (on start and on every keyring change of an assigned
+   workspace); until then the removed person can still send, stop and request a start, and a
+   start still needs the press at the machine. Recorded in `docs/technical-debt.md` with the
+   freshness gap (Consequences) when the sharing slice is built.
 3. **Lease.** The connector is the lock: one job at a time, `Busy` otherwise (ADR 0035 §7). The
    relay holds no lease, because it cannot read a command; this amends ADR 0004 §4 for machine
    resources.
@@ -131,22 +170,53 @@ Least privilege puts it in a room of its own.
    no password (ADR 0004 §10, ADR 0007 kept). Cost on the hosted relay: one idle WebSocket per
    connector (pings), job bytes up to 64 MiB per job relayed live; quotas join the debt "Relay
    quotas". No telemetry; the connector still logs jobs only locally. Self-hosting: the same
-   `curvyo-sync-server`; the connector takes `--relay <url>`; a relay on the workshop LAN gives
-   the same channel without internet.
-8. **The LAN mode stays as a second mode; PR #375 needs no change.** It is the offline and
-   fallback transport and is done and reviewed. A later slice (Proposal, Frage 220) lets an
-   enrolled connector be reached on the LAN with the same enrolment: the machine record carries
-   the LAN fingerprint, so a member learns the pin from the room, and the token is replaced by a
-   signed challenge with the device identity (ADR 0035's rejected client option C, now cheap
-   because the identity exists).
-9. **Crates (no new crate, Proposal).** `curvyo-connector-core` unchanged. `curvyo-crypto-core` +
+   `curvyo-sync-server`, or the one built into the connector (decision 8b); the connector takes
+   `--relay <url>`; a relay on the workshop LAN gives the same channel without internet.
+8. **LAN (Frage 220 A, with the customer's addition "a stand-alone connector would then also
+   include a relay server").**
+   - (a) **The LAN mode of ADR 0035 stays as built; PR #375 needs no change.** Pinned TLS, code
+     and token: the path for a connector that is not enrolled and the fallback when no relay is
+     reachable.
+   - (b) **Built-in relay (Proposal for the shape).** `curvyo-connector-server --relay <url>
+     --host-relay` also runs the ADR 0031 relay in its own process: the library of
+     `curvyo-sync-server` with its rules, store and limits unchanged, data in
+     `<state dir>/relay/`, listening on the port of `<url>`. The connector then links to `<url>`
+     exactly as to any relay; nothing in the enrolment, the channel or the app is special. A maker
+     without a hosted or self-hosted service types that address as the app's server address (a
+     `ws://host:port` LAN address, as for a self-hosted relay without a proxy, ADR 0031 decision
+     11), and "Add my computer", workspaces, sharing and "Add machine" all work on the workshop
+     network with the same flows and no internet: one enrolment model for the LAN and for remote
+     use. The connector dials `<url>` itself, never `127.0.0.1`, because the server address text
+     is bound into CPace (ADR 0040 decision 4) and into the channel prologue, so every party must
+     use the same text.
+   - (c) **One relay per maker (Proposal).** A machine room lives on the relay of the enrolling
+     device's device group (the app's one server address); the machine is enrolled once and
+     reached through that relay, whether it is hosted, self-hosted or built into the connector.
+     Moving a machine to another relay is a new enrolment. A maker on a hosted relay whose
+     internet is down uses (a). A direct channel to an enrolled connector on its LAN listener
+     (the same Noise `KK`, no relay hop, pin taken from the machine record) would serve both paths
+     with one enrolment at once; it is not planned until the customer asks for internet-free use
+     with a hosted relay.
+   - Rejected for (b): a one-room relay in `curvyo-connector-io` on `sync-core`'s sans-I/O relay
+     rules (a second relay shell with its own store, and it holds no device group or workspace,
+     so a second computer of the maker could not join without another relay); asking the maker to
+     run `curvyo-sync-server` beside the connector (two programs, against the customer's words);
+     serving the relay on the connector's TLS port 7447 (the relay connection lives in the
+     frontend, ADR 0031 decision 2, and a webview WebSocket cannot pin a self-signed key).
+9. **Crates (no new crate, Proposal).** `curvyo-connector-core`: the start events take "local
+   start required" from the caller (decision 2), no wire change. `curvyo-crypto-core` +
    `channel` (Noise `KK`, vectors). `curvyo-sync-core` + channel frames and a pure
    `relay::Channels` (relay protocol 4; 1 to 3 still admitted; server before apps), enrolment
    messages under the new label. `curvyo-sync-server` + routing. `curvyo-connector-io` + the relay
    link (outbound wss, the room member session, channel mux), its `session` loop made to run over
    a channel as well as a socket; the connector binary gains edges to `crypto-core` and
    `sync-core` (both pure). `curvyo-connector-server` + `--relay`, `--enrol`, the identity and
-   room files in its state directory. `editor-wasm` + channel glue for desktop and browser (the
+   room files in its state directory, `--host-relay` (decision 8b) and an edge to the library of
+   `curvyo-sync-server`. That library gains one blocking entry point for embedding (its own
+   `tokio` runtime on one thread; local address; shutdown), so the connector binary declares no
+   `tokio` itself; `tokio` and `axum` are already in `Cargo.lock` (no new lock entry; the binary
+   grows by them, size measured in the story). `curvyo-sync-server` takes no edge back.
+   `editor-wasm` + channel glue for desktop and browser (the
    relay connection is in the frontend, ADR 0031 decision 2). One new dependency question: the
    connector's root certificates for the relay's `wss://` (`rustls-native-certs` or
    `webpki-roots`; the latter's CDLA-Permissive-2.0 is not in `deny.toml`), decided in the story.
@@ -164,7 +234,18 @@ Least privilege puts it in a room of its own.
   connector keeps a removed member able to command until the connector sees it. Mitigation: the
   relay is the maker's choice, and an admin's app can check the connector's reported keyring head
   in `Welcome` (Proposal for the story).
-- Remote start of a laser from anywhere is a safety question, not a transport one (Frage 221).
+- Remote start (Frage 221 C): the owner's devices start from anywhere; everyone else needs the
+  press at the machine, so a shared machine never fires from outside the workshop on a stranger's
+  command. "Own device" is the admin role, which ties the safety rule to `reconcile` and to the
+  app never writing `admin` in a machine room for anyone but the owner's devices.
+- Sharing (Frage 219 B) adds no second unit of sharing, but a removal from a workspace reaches the
+  machine only when an owner's device runs `reconcile` (decision 2a); the start rule bounds what
+  that gap allows.
+- Built-in relay (decision 8b): one binary serves a workshop without any hosted service. Its
+  outer connection is plain `ws://` on the workshop LAN, like every self-hosted relay without a
+  proxy: jobs travel inside the Noise channel and records are sealed, so the LAN sees the
+  metadata of decision 4, not the content. The browser build needs `wss://` and a proxy in front
+  (ADR 0031). The connector binary carries `tokio` and `axum`.
 
 ## Concepts this touches
 
@@ -172,20 +253,38 @@ Least privilege puts it in a room of its own.
   route), §13 (self-hosting unchanged).
 - ADR 0008 §1, §10 (no plaintext; new metadata listed in decision 4).
 - ADR 0010 (keyring reused unchanged in a new room kind; §10 freshness).
-- ADR 0031 (relay protocol 4, three frames; admission unchanged).
+- ADR 0031 (relay protocol 4, three frames; admission unchanged; decision 11, the relay library
+  embedded in the connector binary, decision 8b).
 - ADR 0035 §3, §4 (pin, code, token stay LAN-only), §8 (browser anywhere decided here), option D
   (its objection does not apply to a machine room).
 - ADR 0040 (pairing slots and CPace reused with a new label; devices list `machines`; `reconcile`
   extended; My devices lists machines; remove and leave reach machine rooms).
 - ADR 0041 (roles, last-admin rule and leave apply to machine rooms).
-- ADR 0044 (workspace as the only unit of sharing; Frage 219 A would add a second one).
-- ADR 0038, ADR 0062, spec `0116` (the profile's `connection` names the machine room and relay;
-  a profile record format bump; the room keys never travel in the library stream).
+- ADR 0044 (workspace as the only unit of sharing, kept by Frage 219 B); ADR 0037 (the
+  workspace list stream carries the assigned machines, decision 2a).
+- ADR 0038, ADR 0062, spec `0116` (the profile's `connection` names the machine room and relay,
+  a profile record format bump, once `0116` is built; until then the link from a profile to its
+  machine room is kept per computer beside the ADR 0035 credential record, Proposal; the room keys
+  never travel in the library stream).
 - ADR 0007 (credential store holds the machine room keys like other room keys; no accounts).
-- Specs `0064` criteria 2, 3, 4, 7, 8; `0095`, `0096`, `0097`, `0116`; `docs/technical-debt.md`
+- Specs `0064` criteria 2, 3, 4, 7, 8, 9; `0095`, `0096`, `0097`, `0116`, `0118` (its Home, jog,
+  frame and focus are starts under decision 2); `docs/technical-debt.md`
   ("Relay quotas", a new entry for the freshness gap).
 
-## Questions for the customer
+## Customer answers (2026-11-17)
+
+- Frage 218 CONN-RELAY: **A**, the connector as an enrolled member of its own machine room with an
+  end-to-end channel through the relay.
+- Frage 219 CONN-SHARE: **B**, every member of a workspace the machine is assigned to (decision
+  2a).
+- Frage 220 CONN-LAN: **A**, with the customer's addition (translated): "a stand-alone connector
+  would then also include a relay server" (decision 8b; read by the architect as: the connector
+  binary can host the full relay, so a maker without a hosted service gets the same enrolment and
+  room model on the LAN).
+- Frage 221 CONN-REMOTE-START: **C**, a local start is required for everyone but the maker's own
+  devices (decision 2).
+
+## Questions for the customer (as asked)
 
 Frage 218 (CONN-RELAY): How does a connector become reachable through the relay?
 - A: As an enrolled member of its own machine room, like adding a device: code and check words
