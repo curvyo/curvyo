@@ -126,7 +126,8 @@ fn criterion_26_a_one_tick_on_a_page_with_50_jobs_and_200_ticked_parts() {
         },
         |(s, job)| {
             assert!(s.set_fixture_job_part(*job, "board", true));
-            assert!(s.operations_view_json().contains("summary"));
+            // Superseded by 0029 rework (2026-11-17): no summary counts in the view (P28).
+            assert!(s.operations_view_json().contains("\"items\""));
             assert!(s.fixture_jobs_view_json().contains("groups"));
         },
     );
@@ -147,7 +148,8 @@ fn criterion_26_b_the_summary_after_a_change_on_50_jobs_and_1000_items() {
         },
         |(s, job)| {
             assert!(s.set_fixture_job_switch(*job, FixtureJobSwitch::Output, false));
-            assert!(s.operations_view_json().contains("summary"));
+            // Superseded by 0029 rework (2026-11-17): no summary counts in the view (P28).
+            assert!(s.operations_view_json().contains("\"items\""));
             assert_eq!(s.fixture_jobs_view().unwrap().running, 49);
         },
     );

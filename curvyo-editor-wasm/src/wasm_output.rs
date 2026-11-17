@@ -1,0 +1,135 @@
+//! Thin host bridge of the output group, the Toolpath view and Export job file
+//! (`specs/0029-laser-job-preview-and-output`): views as JSON, the commands, the play bar and the
+//! job file. Ids are the JSON texts of node ids, as the other bridges take them.
+
+use wasm_bindgen::prelude::*;
+
+use crate::wasm_api::WasmSession;
+
+/// A job file for the save dialog (criterion 27).
+#[wasm_bindgen]
+pub struct WasmJobFile {
+    /// The file's bytes.
+    #[wasm_bindgen(getter_with_clone)]
+    pub bytes: Vec<u8>,
+    /// The default name ("Untitled - Laser 1.gcode").
+    #[wasm_bindgen(getter_with_clone)]
+    pub name: String,
+    /// The dialog's file type ("GRBL G-code").
+    #[wasm_bindgen(getter_with_clone)]
+    pub file_type: String,
+    /// The extension without its dot ("gcode").
+    #[wasm_bindgen(getter_with_clone)]
+    pub extension: String,
+    /// The token [`WasmSession::export_job_done`] takes after a successful write.
+    pub token: u32,
+}
+
+#[wasm_bindgen]
+impl WasmSession {
+    /// The output group of the active laser page's Operations tab as JSON, `null` on another
+    /// page.
+    #[must_use]
+    pub fn output_group_json(&self) -> String {
+        self.session.output_group_json()
+    }
+
+    /// The play bar as JSON (`{"fraction", "playing", "readout", "enabled"}`), `null` while the
+    /// Toolpath view is not pressed.
+    #[must_use]
+    pub fn play_view_json(&self) -> String {
+        serde_json::to_string(&self.session.play_view()).unwrap_or_else(|_| "null".to_owned())
+    }
+
+    /// The rings' labels in canvas CSS px (`[{"digit", "x", "y"}]`, `digit` `null` for the
+    /// fixture glyph).
+    #[must_use]
+    pub fn toolpath_ring_labels_json(&self) -> String {
+        self.session.toolpath_ring_labels_json()
+    }
+
+    /// The Toolpath view toggle in the label of laser page `page` (criterion 8). Whether it is a
+    /// laser page. Session state, no step.
+    pub fn toggle_toolpath_view(&mut self, page: &str) -> bool {
+        self.session.toggle_toolpath_view(page)
+    }
+
+    /// Selects the items of a check line (JSON array of id texts). Whether it selected.
+    pub fn select_output_items(&mut self, ids_json: &str) -> bool {
+        self.session
+            .select_output_items(&crate::wasm_operations::nodes(ids_json))
+    }
+
+    /// Unfolds operation row `id` for a check's button. Whether it did.
+    pub fn reveal_operation_row(&mut self, id: &str) -> bool {
+        crate::wasm_operations::node(id).is_some_and(|id| self.session.reveal_operation_row(id))
+    }
+
+    /// Picks the fixture jobs' material `id` (empty removes the pick). Whether it changed.
+    pub fn set_fixture_material(&mut self, id: &str) -> bool {
+        self.session.set_fixture_material(id)
+    }
+
+    /// Start: `start` is `machine_origin`, `head_position` or `home_then_origin`. Whether it
+    /// changed.
+    pub fn set_start(&mut self, start: &str) -> bool {
+        self.session.set_start(start)
+    }
+
+    /// The Air assist switch of the page's profile copy. Whether it changed.
+    pub fn set_air_assist(&mut self, on: bool) -> bool {
+        self.session.set_machine_air_assist(on)
+    }
+
+    /// Moves the play slider to `fraction` (0 to 1) of the job's time.
+    pub fn set_play_position(&mut self, fraction: f64) {
+        self.session.set_play_position(fraction);
+    }
+
+    /// Steps the play slider by `percent` of the run (the arrow and page keys).
+    pub fn step_play_position(&mut self, percent: f64) {
+        self.session.step_play_position(percent);
+    }
+
+    /// Play or Pause at the clock `now_ms`. Whether it plays now.
+    pub fn toggle_play(&mut self, now_ms: f64) -> bool {
+        self.session.toggle_play(now_ms)
+    }
+
+    /// One animation frame of Play at the clock `now_ms`. Whether it still plays.
+    pub fn play_tick(&mut self, now_ms: f64) -> bool {
+        self.session.play_tick(now_ms)
+    }
+
+    /// The job file of the active laser page (criterion 27); `undefined` while Export is
+    /// disabled. Nothing is written to the project.
+    pub fn export_job(&mut self, project_file: &str) -> Option<WasmJobFile> {
+        let job = self.session.export_job(project_file)?;
+        Some(WasmJobFile {
+            bytes: job.bytes,
+            name: job.name,
+            file_type: job.file_type.to_owned(),
+            extension: job.extension.to_owned(),
+            token: job.token,
+        })
+    }
+
+    /// The job of `token` was written as `name` (criterion 28): the step "Export job file" and
+    /// Lasered at `now_ms`. The notice as `"<ms>:<text>"` (its second line after a `\n`), empty
+    /// for an unknown token. Cancel or a failed write calls nothing.
+    pub fn export_job_done(
+        &mut self,
+        token: u32,
+        name: &str,
+        downloaded: bool,
+        now_ms: f64,
+    ) -> String {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        // invariant: a clock in ms since 1970, positive and far below 2^53
+        let now = now_ms.max(0.0) as u64;
+        self.session
+            .export_job_done(token, name, downloaded, now)
+            .map(|(text, ms)| format!("{ms}:{text}"))
+            .unwrap_or_default()
+    }
+}

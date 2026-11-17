@@ -16,7 +16,7 @@
   "pick": [],
   "rows": [
     {
-      "source": null,
+      "accessible_name": "Engrave 1",
       "group_in_part": null,
       "id": {
         "counter": 26,
@@ -26,7 +26,9 @@
       "kind": "engrave",
       "margin_mm": 0.0,
       "name": "Engrave 1",
+      "numbers": null,
       "output": true,
+      "run": null,
       "section": "marking",
       "settings": {
         "differs": null,
@@ -43,16 +45,10 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": true
     }
   ],
-  "select_bar_kinds": null,
-  "summary": {
-    "not_assigned": 0,
-    "operations": 1,
-    "output_off": 0,
-    "running": 1,
-    "runs_while_hidden": 0
-  }
+  "select_bar_kinds": null
 }

@@ -5,6 +5,7 @@
 mod commands;
 mod look;
 mod parts;
+mod runs;
 #[cfg(test)]
 mod tests;
 mod view_json;
@@ -13,6 +14,7 @@ use curvyo_document_core::{FixtureJobSnapshot, JobTarget, NodeId};
 use curvyo_laser_core::operations::{FixtureJobRead, KindRead, fixture_block};
 use curvyo_laser_core::{FixtureKind, FixturePart, job_parts};
 
+pub(in crate::session) use runs::FixtureRun;
 pub use view_json::{
     AddTarget, FixtureJobsView, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
 };
@@ -171,6 +173,23 @@ impl Session {
         self.active_fixtures().map_or(0, |fixtures| {
             running(&page_jobs(&fixtures), self.fixture_cuts_last(&fixtures)).len()
         })
+    }
+
+    /// The fixtures of the running fixture jobs of the active laser page, each once, in run
+    /// order: the summary's fixture line selects them (criterion 17).
+    pub(in crate::session) fn running_fixture_ids(&self) -> Vec<NodeId> {
+        let Some(fixtures) = self.active_fixtures() else {
+            return Vec::new();
+        };
+        let jobs = page_jobs(&fixtures);
+        let mut ids: Vec<NodeId> = Vec::new();
+        for at in running(&jobs, self.fixture_cuts_last(&fixtures)) {
+            let id = jobs[at].0.id;
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+        ids
     }
 
     /// The Cuts last switch of the page of `fixtures`.

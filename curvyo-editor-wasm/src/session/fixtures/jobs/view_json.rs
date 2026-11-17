@@ -33,6 +33,9 @@ pub struct FixtureJobsView {
     /// One notice per fixture with damaged job values: "1 value damaged on Holder 1 job."
     /// (criterion 22). Shown by the section; the Fixtures block keeps its own notice.
     pub damage_notices: Vec<String>,
+    /// The fixture material pick, the run lines and the header's time while a fixture job runs
+    /// (`specs/0029` criterion 2, UX P32); `None` otherwise.
+    pub output: Option<super::super::super::output::FixtureOutputView>,
 }
 
 /// The job damage notice of one fixture (criterion 22: "<n> values damaged on <name> job.").
@@ -284,6 +287,7 @@ impl Session {
             damage_notices: damaged_by_fixture
                 .map(|f| damage_text(f.job_damaged, &f.name))
                 .collect(),
+            output: self.fixture_output_view(),
         })
     }
 

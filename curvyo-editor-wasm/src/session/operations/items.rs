@@ -50,6 +50,29 @@ impl Bucket {
 
 /// The item lists of the output page's leaves under `list`.
 pub(super) fn item_lists(list: &OperationList, leaves: &[IndexedLeaf]) -> ItemLists {
+    let statuses: Vec<LeafStatus> = leaves
+        .iter()
+        .map(|leaf| {
+            leaf_status(
+                list,
+                &Leaf {
+                    chain: &leaf.chain,
+                    hidden: leaf.hidden,
+                    shape: leaf.shape,
+                },
+            )
+        })
+        .collect();
+    item_lists_of(list, leaves, &statuses)
+}
+
+/// The item lists of `leaves` whose statuses under `list` are `statuses` (the job input has
+/// them already).
+pub(in crate::session) fn item_lists_of(
+    list: &OperationList,
+    leaves: &[IndexedLeaf],
+    statuses: &[LeafStatus],
+) -> ItemLists {
     let (mut running, mut not_assigned, mut hidden, mut off) = (
         Bucket::default(),
         Bucket::default(),
@@ -57,16 +80,8 @@ pub(super) fn item_lists(list: &OperationList, leaves: &[IndexedLeaf]) -> ItemLi
         Bucket::default(),
     );
     let rules = list.rules();
-    for leaf in leaves {
+    for (leaf, status) in leaves.iter().zip(statuses) {
         let id = select_id(leaf);
-        let status = leaf_status(
-            list,
-            &Leaf {
-                chain: &leaf.chain,
-                hidden: leaf.hidden,
-                shape: leaf.shape,
-            },
-        );
         match status {
             LeafStatus::Absent => {}
             LeafStatus::NotAssigned => not_assigned.push(id),

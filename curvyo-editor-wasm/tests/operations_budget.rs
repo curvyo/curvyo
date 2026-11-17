@@ -129,7 +129,8 @@ fn criterion_29_b_the_summary_after_a_change_on_1000_items_and_50_operations() {
             let id = s.operations_view().unwrap().rows[0].id;
             s.set_operation_switch(id, curvyo_document_core::OperationSwitch::Show, false);
             let json = s.operations_view_json();
-            assert!(json.contains("summary"));
+            // Superseded by 0029 rework (2026-11-17): no summary counts in the view (P28).
+            assert!(json.contains("\"items\""));
         },
     );
     eprintln!("criterion 29 b: change and summary {cost:?} (CPU time)");

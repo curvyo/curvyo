@@ -106,7 +106,21 @@ fn names(s: &Session) -> Vec<String> {
 }
 
 fn count(s: &Session, key: &str) -> u64 {
-    view(s)["summary"][key].as_u64().unwrap()
+    // Superseded by 0029 rework (2026-11-17): the view drops its summary counts (they are checks
+    // of the output group, `specs/0029` P28); each count is the length of its item list, and
+    // "operations" the rows that run (line 2's ring).
+    let v = view(s);
+    let n = if key == "operations" {
+        v["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| !row["run"].is_null())
+            .count()
+    } else {
+        v["items"][key].as_array().unwrap().len()
+    };
+    n as u64
 }
 
 fn row_items(s: &Session, name: &str) -> u64 {
@@ -749,11 +763,8 @@ fn c17_the_live_view_json_has_the_fixture_keys() {
         keys(&fixture["rows"][0]),
         "row keys"
     );
-    assert_eq!(
-        keys(&live["summary"]),
-        keys(&fixture["summary"]),
-        "summary keys"
-    );
+    // Superseded by 0029 rework (2026-11-17): no summary counts in the view (P28).
+    assert!(live.get("summary").is_none());
     assert_eq!(keys(&live["items"]), keys(&fixture["items"]), "item lists");
 }
 

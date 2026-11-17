@@ -16,7 +16,7 @@
   "pick": [],
   "rows": [
     {
-      "source": null,
+      "accessible_name": "Cut 1, run 1, –",
       "group_in_part": null,
       "id": {
         "counter": 26,
@@ -26,7 +26,12 @@
       "kind": "cut",
       "margin_mm": 0.0,
       "name": "Cut 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 1,
+        "time": "–"
+      },
       "section": "cutting",
       "settings": {
         "differs": null,
@@ -57,16 +62,10 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": true
     }
   ],
-  "select_bar_kinds": null,
-  "summary": {
-    "not_assigned": 0,
-    "operations": 1,
-    "output_off": 0,
-    "running": 1,
-    "runs_while_hidden": 0
-  }
+  "select_bar_kinds": null
 }

@@ -8,12 +8,12 @@ use wasm_bindgen::prelude::*;
 use crate::wasm_api::WasmSession;
 
 /// The node id a host sends back (its JSON text), `None` for anything else.
-fn node(text: &str) -> Option<NodeId> {
+pub(crate) fn node(text: &str) -> Option<NodeId> {
     serde_json::from_str(text).ok()
 }
 
 /// The node ids of a JSON array of id texts; anything unreadable is left out.
-fn nodes(json: &str) -> Vec<NodeId> {
+pub(crate) fn nodes(json: &str) -> Vec<NodeId> {
     serde_json::from_str::<Vec<String>>(json)
         .unwrap_or_default()
         .iter()

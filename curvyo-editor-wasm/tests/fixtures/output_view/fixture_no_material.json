@@ -1,0 +1,58 @@
+{
+  "output": {
+    "checks": [
+      {
+        "after": " have no material. Pick one above.",
+        "before": "",
+        "button": "Fixture jobs",
+        "count": 1,
+        "severity": "block",
+        "target": {
+          "kind": "fixture_pick"
+        },
+        "text": "Fixture jobs have no material. Pick one above."
+      },
+      {
+        "after": "",
+        "before": "The machine is Generic laser; its limits may not match yours.",
+        "button": "",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "kind": "none"
+        },
+        "text": "The machine is Generic laser; its limits may not match yours."
+      }
+    ],
+    "export": {
+      "enabled": false,
+      "extension": "gcode",
+      "file_type": "GRBL G-code",
+      "tooltip": "Fixture jobs have no material. Pick one above."
+    },
+    "machine": "Generic laser · GRBL",
+    "start": {
+      "damaged": false,
+      "options": [
+        {
+          "label": "Machine origin",
+          "value": "machine_origin"
+        },
+        {
+          "label": "Head position",
+          "value": "head_position"
+        },
+        {
+          "label": "Home, then machine origin",
+          "value": "home_then_origin"
+        }
+      ],
+      "value": "machine_origin"
+    },
+    "toolpath_view": false,
+    "total": null
+  },
+  "play": null,
+  "ring_labels": [],
+  "rows": []
+}

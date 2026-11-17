@@ -48,6 +48,21 @@
       "name": "Pin 1"
     }
   ],
+  "output": {
+    "pick": {
+      "material": null,
+      "name": null,
+      "options": []
+    },
+    "runs": [
+      {
+        "kind": "score",
+        "numbers": [],
+        "time": "–"
+      }
+    ],
+    "time": "–"
+  },
   "parts": null,
   "running": 1,
   "running_fixtures": [

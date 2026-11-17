@@ -43,11 +43,12 @@ impl Session {
             } else {
                 (record.before.clone(), record.after.clone())
             };
-            let Ok(reverted) =
-                state
-                    .library
-                    .revert(&record.id, expected.as_deref(), earlier.as_deref(), now)
-            else {
+            let Ok(reverted) = state.library.get_mut().revert(
+                &record.id,
+                expected.as_deref(),
+                earlier.as_deref(),
+                now,
+            ) else {
                 continue;
             };
             // The text now on disk is what the next undo or redo of this step expects.

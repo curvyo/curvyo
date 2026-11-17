@@ -261,8 +261,9 @@ fn ac8_tools_and_tabs_follow_the_kind_and_activation_is_no_step() {
     // Document; the other tabs are the drawing tabs.
     let laser_tabs: Vec<_> = tabs(&s)
         .into_iter()
-        // The Fixtures tab of `0113` criterion 1 joins Operations and Materials.
-        .filter(|n| *n != "operations" && *n != "materials" && *n != "fixtures")
+        // The Fixtures tab of `0113` criterion 1 joins Operations and Materials, the Output tab
+        // of `0029` follows them.
+        .filter(|n| !["operations", "materials", "fixtures", "output"].contains(n))
         .collect();
     assert_eq!(
         laser_tabs, VECTOR_TABS,

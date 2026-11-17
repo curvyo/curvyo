@@ -197,6 +197,7 @@ pub use session::{
 };
 pub use session::{DragStop, OFFSET_COMMIT_LABEL, OffsetOutcome, OffsetView};
 pub use session::{DropBadge, RowDragAnswer, RowDragSource, SketchRowState, SketchUsage};
+pub use session::{ExportedJob, OutputGroupView, PlayView};
 pub use session::{
     FrameImages, ImageCopy, ImportOrigin, ImportOutcome, StrokeToPathOutcome, WeldOutcome,
 };
@@ -243,6 +244,8 @@ mod wasm_materials;
 mod wasm_measure;
 #[cfg(target_arch = "wasm32")]
 mod wasm_operations;
+#[cfg(target_arch = "wasm32")]
+mod wasm_output;
 #[cfg(target_arch = "wasm32")]
 mod wasm_sketch;
 #[cfg(target_arch = "wasm32")]

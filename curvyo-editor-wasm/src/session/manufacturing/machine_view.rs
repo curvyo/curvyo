@@ -62,6 +62,13 @@ impl Session {
                 "max_power": copy.values.max_power.get(),
                 "laser_mode": copy.values.laser_mode,
                 "motorised_z": copy.values.motorised_z,
+                // `specs/0029` criteria 25 and 39 (UX notes §8): the switch and the read-only line.
+                "air_assist": copy.values.air_assist,
+                "output": if active.read.output_format_damaged {
+                    "unknown"
+                } else {
+                    curvyo_laser_core::job::name(copy.values.output_format)
+                },
                 "width": active.page.width.as_mm(),
                 "height": active.page.height.as_mm(),
             },

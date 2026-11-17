@@ -103,12 +103,36 @@ pub(in crate::session) struct TabState {
     form_for_grid: Option<curvyo_document_core::NodeId>,
 }
 
+/// The library with a generation that changes on every mutable access, so the job cache compares a
+/// number instead of copying the library (ADR 0064 §9). Reads go through `Deref`.
+#[derive(Debug, Default)]
+struct Tracked {
+    library: Library,
+    generation: u64,
+}
+
+impl Tracked {
+    /// The library for a change; the generation moves on.
+    fn get_mut(&mut self) -> &mut Library {
+        self.generation = self.generation.wrapping_add(1);
+        &mut self.library
+    }
+}
+
+impl std::ops::Deref for Tracked {
+    type Target = Library;
+
+    fn deref(&self) -> &Library {
+        &self.library
+    }
+}
+
 /// What the session keeps of the maker's materials: the library, the retired ids, the writes the
 /// host has not taken, the photo bytes it knows and the tab's view state (the journal of this
 /// session's record edits is the session's library journal).
 #[derive(Debug, Default)]
 pub(in crate::session) struct MaterialsState {
-    library: Library,
+    library: Tracked,
     retired: RetiredIds,
     retired_notice: Option<&'static str>,
     outbox: Vec<MaterialWrite>,
@@ -128,8 +152,13 @@ impl MaterialsState {
     }
 
     /// The library as loaded and edited.
-    pub(in crate::session) const fn library(&self) -> &Library {
+    pub(in crate::session) fn library(&self) -> &Library {
         &self.library
+    }
+
+    /// A number that changes with every change of the library (ADR 0064 §9).
+    pub(in crate::session) const fn library_generation(&self) -> u64 {
+        self.library.generation
     }
 
     /// Whether `id` is taken: a live test id of the library or a retired one (ADR 0058 §4).
@@ -176,7 +205,7 @@ impl Session {
     /// `material-order.json` (criterion 17). The journal of this session stays: an undo checks
     /// the record text it finds.
     pub fn load_materials(&mut self, files: &[(String, String)], order: Option<&str>) {
-        self.materials.library = Library::load(files, order);
+        *self.materials.library.get_mut() = Library::load(files, order);
     }
 
     /// Reads the records as the JSON array `[{"name", "text"}]`; a text that is not such an array
@@ -229,7 +258,7 @@ impl Session {
 
     /// The library.
     #[must_use]
-    pub const fn materials(&self) -> &Library {
+    pub fn materials(&self) -> &Library {
         &self.materials.library
     }
 

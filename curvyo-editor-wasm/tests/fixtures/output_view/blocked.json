@@ -1,0 +1,115 @@
+{
+  "output": {
+    "checks": [
+      {
+        "after": " has no power and speed.",
+        "before": "",
+        "button": "Cut 1",
+        "count": 1,
+        "severity": "block",
+        "target": {
+          "ids": [
+            {
+              "counter": 35,
+              "peer": "1"
+            }
+          ],
+          "kind": "operations"
+        },
+        "text": "Cut 1 has no power and speed."
+      },
+      {
+        "after": " lies outside the 400 × 300 mm bed.",
+        "before": "",
+        "button": "1 item",
+        "count": 1,
+        "severity": "block",
+        "target": {
+          "ids": [
+            {
+              "counter": 26,
+              "peer": "1"
+            }
+          ],
+          "kind": "items"
+        },
+        "text": "1 item lies outside the 400 × 300 mm bed."
+      },
+      {
+        "after": "",
+        "before": "The machine is Generic laser; its limits may not match yours.",
+        "button": "",
+        "count": 1,
+        "severity": "warn",
+        "target": {
+          "kind": "none"
+        },
+        "text": "The machine is Generic laser; its limits may not match yours."
+      }
+    ],
+    "export": {
+      "enabled": false,
+      "extension": "gcode",
+      "file_type": "GRBL G-code",
+      "tooltip": "Cut 1 has no power and speed."
+    },
+    "machine": "Generic laser · GRBL",
+    "start": {
+      "damaged": false,
+      "options": [
+        {
+          "label": "Machine origin",
+          "value": "machine_origin"
+        },
+        {
+          "label": "Head position",
+          "value": "head_position"
+        },
+        {
+          "label": "Home, then machine origin",
+          "value": "home_then_origin"
+        }
+      ],
+      "value": "machine_origin"
+    },
+    "toolpath_view": false,
+    "total": {
+      "fixtures": null,
+      "lengths": "Burn 80 mm · travel 949 mm",
+      "runs": {
+        "after": ".",
+        "before": "Runs 2 operations, ",
+        "button": "2 items",
+        "text": "Runs 2 operations, 2 items."
+      },
+      "time": "About 17 s"
+    }
+  },
+  "play": null,
+  "ring_labels": [],
+  "rows": [
+    {
+      "accessible_name": "Cut 1, run 1, –",
+      "name": "Cut 1",
+      "numbers": [],
+      "run": {
+        "digit": 1,
+        "time": "–"
+      }
+    },
+    {
+      "accessible_name": "Cut 2, run 2, 13 s",
+      "name": "Cut 2",
+      "numbers": [
+        {
+          "text": "60 %, 600 mm/min, 1 ×",
+          "typed": []
+        }
+      ],
+      "run": {
+        "digit": 2,
+        "time": "13 s"
+      }
+    }
+  ]
+}

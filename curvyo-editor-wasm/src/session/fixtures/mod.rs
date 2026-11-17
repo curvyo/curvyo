@@ -53,6 +53,7 @@ use curvyo_laser_core::FixtureKind;
 
 pub use apply::ApplyCandidate;
 pub use fit::FitCue;
+pub(in crate::session) use jobs::FixtureRun;
 pub use jobs::{
     AddTarget, FixtureJobsView, JobGroupView, JobKindView, JobRowView, PartRowView, PartsView,
 };
@@ -208,6 +209,12 @@ impl Session {
         let Some(fixtures) = self.active_fixtures() else {
             return false;
         };
+        self.select_fixture_of(&fixtures, id)
+    }
+
+    /// [`Self::select_fixture`] with the active laser page's fixtures `fixtures` already read
+    /// (a canvas press reads them once).
+    fn select_fixture_of(&mut self, fixtures: &PageFixtures, id: NodeId) -> bool {
         if !fixtures.get(id).is_some_and(placed::PlacedFixture::shown) {
             return false;
         }

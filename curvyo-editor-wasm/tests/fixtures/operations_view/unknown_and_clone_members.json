@@ -21,7 +21,7 @@
   "pick": [],
   "rows": [
     {
-      "source": null,
+      "accessible_name": "Plasma 1",
       "group_in_part": null,
       "id": {
         "counter": 47,
@@ -31,15 +31,18 @@
       "kind": "unknown",
       "margin_mm": 0.0,
       "name": "Plasma 1",
+      "numbers": null,
       "output": true,
+      "run": null,
       "section": null,
       "settings": null,
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     },
     {
-      "source": null,
+      "accessible_name": "Cut 1, run 2, –",
       "group_in_part": null,
       "id": {
         "counter": 42,
@@ -49,7 +52,12 @@
       "kind": "cut",
       "margin_mm": 0.0,
       "name": "Cut 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 2,
+        "time": "–"
+      },
       "section": "cutting",
       "settings": {
         "differs": null,
@@ -80,16 +88,10 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     }
   ],
-  "select_bar_kinds": null,
-  "summary": {
-    "not_assigned": 1,
-    "operations": 1,
-    "output_off": 0,
-    "running": 2,
-    "runs_while_hidden": 0
-  }
+  "select_bar_kinds": null
 }

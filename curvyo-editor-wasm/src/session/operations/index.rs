@@ -8,20 +8,35 @@ use std::sync::Arc;
 
 use curvyo_document_core::{ManufacturingSnapshot, NodeId, ObjectSnapshot, PathSnapshot};
 use curvyo_laser_core::operations::{Hidden, LeafShape};
-use curvyo_ui_core::{Reach, object_bounds, placement_members};
+use curvyo_ui_core::{PageMembership, Reach, object_bounds, placement_members};
 
 use super::super::Session;
 use super::super::object_cache::DocumentRead;
 
 /// One output-capable leaf of the output page, as the nearest rule and the summary read it.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct IndexedLeaf {
+pub(in crate::session) struct IndexedLeaf {
     /// The leaf's own node (a placed page is its placement node).
-    pub(super) chain: Vec<Vec<NodeId>>,
+    pub(in crate::session) chain: Vec<Vec<NodeId>>,
     /// Its hidden state (criteria 13, 16).
-    pub(super) hidden: Hidden,
+    pub(in crate::session) hidden: Hidden,
     /// Its topology, which decides what each kind runs.
-    pub(super) shape: LeafShape,
+    pub(in crate::session) shape: LeafShape,
+    /// Where its geometry is read (`0029`'s job input).
+    pub(in crate::session) source: LeafSource,
+}
+
+/// Where an indexed leaf's geometry is read: indexes into the drawing read's `leaves`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::session) enum LeafSource {
+    /// An item of the output page, in document space.
+    Own(usize),
+    /// The member `member` of the clone of a group at `clone`.
+    CloneMember { clone: usize, member: NodeId },
+    /// A placed page's frame, its placement node.
+    PlacedFrame(NodeId),
+    /// The member at `index` of the placed page `placement`.
+    PlacedMember { index: usize, placement: NodeId },
 }
 
 /// The index of one output page, for the drawing read it was built from.
@@ -40,7 +55,7 @@ pub(in crate::session) struct LeafCache(RefCell<Option<Entry>>);
 impl Session {
     /// The leaves of the active laser page's output page, from the cache when the drawing read
     /// and the page are unchanged.
-    pub(super) fn output_leaves(
+    pub(in crate::session) fn output_leaves(
         &self,
         manufacturing: &ManufacturingSnapshot,
     ) -> Arc<[IndexedLeaf]> {
@@ -88,7 +103,10 @@ fn build_leaves(
         read.leaves.iter().map(|o| (o.id(), o)).collect();
     let links = session.document.clone_links();
     let mut out = Vec::new();
-    for object in read.leaves.iter().filter(|o| output_capable(o, read)) {
+    for (at, object) in read.leaves.iter().enumerate() {
+        if !output_capable(object, read) {
+            continue;
+        }
         if !membership.is_member(page, object.id(), object_bounds(object), Reach::Touches) {
             continue;
         }
@@ -101,6 +119,7 @@ fn build_leaves(
                 session,
                 read,
                 &CloneOf {
+                    at,
                     clone: object.id(),
                     origin: *origin,
                     clone_visible: visible.contains(&object.id()),
@@ -110,16 +129,46 @@ fn build_leaves(
             ));
             continue;
         }
-        out.push(IndexedLeaf {
-            chain: session.document.key_chain(&[object.id()]),
-            hidden: if visible.contains(&object.id()) {
-                Hidden::No
-            } else {
-                Hidden::OnOutputPage
-            },
-            shape: shape_of(object),
-        });
+        out.push(own_leaf(session, object, at, &visible));
     }
+    out.extend(placed_leaves(
+        session,
+        read,
+        manufacturing,
+        &membership,
+        &visible,
+    ));
+    out
+}
+
+/// The leaf of the page's own item `object`, at `at` in the drawing read.
+fn own_leaf(
+    session: &Session,
+    object: &ObjectSnapshot,
+    at: usize,
+    visible: &HashSet<NodeId>,
+) -> IndexedLeaf {
+    IndexedLeaf {
+        chain: session.document.key_chain(&[object.id()]),
+        hidden: if visible.contains(&object.id()) {
+            Hidden::No
+        } else {
+            Hidden::OnOutputPage
+        },
+        shape: shape_of(object),
+        source: LeafSource::Own(at),
+    }
+}
+
+/// The leaves of the placed pages: each placement's frame and the members of its source page.
+fn placed_leaves(
+    session: &Session,
+    read: &DocumentRead,
+    manufacturing: &ManufacturingSnapshot,
+    membership: &PageMembership,
+    visible: &HashSet<NodeId>,
+) -> Vec<IndexedLeaf> {
+    let mut out = Vec::new();
     let pages = session.document.pages();
     for placement in &manufacturing.placements {
         let Some(source) = pages.iter().find(|p| p.id == placement.page) else {
@@ -130,8 +179,9 @@ fn build_leaves(
             chain: vec![vec![placement.id]],
             hidden: Hidden::No,
             shape: LeafShape::Outlines { closed: 1, open: 0 },
+            source: LeafSource::PlacedFrame(placement.id),
         });
-        for index in placement_members(&read.leaves, source, &read.guides, &membership) {
+        for index in placement_members(&read.leaves, source, &read.guides, membership) {
             let member = &read.leaves[index];
             if !output_capable(member, read) {
                 continue;
@@ -146,6 +196,10 @@ fn build_leaves(
                     Hidden::InSource
                 },
                 shape: shape_of(member),
+                source: LeafSource::PlacedMember {
+                    index,
+                    placement: placement.id,
+                },
             });
         }
     }
@@ -154,6 +208,7 @@ fn build_leaves(
 
 /// A clone of a group, as the members' leaves need it.
 struct CloneOf {
+    at: usize,
     clone: NodeId,
     origin: NodeId,
     clone_visible: bool,
@@ -187,6 +242,10 @@ fn clone_member_leaves(
                     Hidden::OnOutputPage
                 },
                 shape: shape_of(object),
+                source: LeafSource::CloneMember {
+                    clone: clone.at,
+                    member,
+                },
             })
         })
         .collect()

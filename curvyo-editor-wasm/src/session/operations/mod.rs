@@ -7,8 +7,8 @@
 mod assign;
 mod commands;
 mod grid_look;
-mod index;
-mod items;
+pub(in crate::session) mod index;
+pub(in crate::session) mod items;
 mod kind_press;
 mod look;
 mod options;
@@ -24,6 +24,7 @@ mod tools_tests;
 mod view_json;
 
 pub(in crate::session) use settings::typed_number;
+pub(in crate::session) use view_json::{KindView, kind_view_of};
 
 use curvyo_document_core::{NodeId, OperationSnapshot};
 use curvyo_laser_core::operations::KindRead;

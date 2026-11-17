@@ -1,0 +1,42 @@
+//! The session state of the active laser page's output (`specs/0029-laser-job-preview-and-output`;
+//! ADR 0064 §9 to §11, ADR 0065): the job built from the page, its caches, the Toolpath view, the
+//! play bar, the exports not yet saved.
+
+mod commands;
+mod export;
+mod fixture_pick;
+mod input;
+mod job_cache;
+mod leaf_geometry;
+mod play;
+#[cfg(test)]
+mod tests;
+mod toolpath;
+mod view_json;
+
+use std::collections::HashSet;
+
+use curvyo_document_core::NodeId;
+
+pub use export::ExportedJob;
+pub use fixture_pick::FixtureOutputView;
+pub use play::PlayView;
+pub use view_json::{NumbersLineView, OutputGroupView, RowRunView};
+
+/// What the session keeps for the output group and the Toolpath view: the job and geometry caches,
+/// the pressed Toolpath views, the play position and the exported jobs not yet saved.
+#[derive(Debug, Default)]
+pub(in crate::session) struct OutputState {
+    /// The active laser page's job (`job_cache.rs`).
+    job: job_cache::JobCache,
+    /// The page-mm geometry of the output leaves (`input.rs`).
+    geometry: input::GeometryCache,
+    /// The laser pages whose Toolpath view is pressed: session state, never saved.
+    toolpath: HashSet<NodeId>,
+    /// The toolpath's draw caches (`toolpath.rs`).
+    draw: toolpath::DrawCache,
+    /// The play bar (`play.rs`).
+    play: play::PlayState,
+    /// The jobs handed out for saving, by token (`export.rs`).
+    exports: export::Exports,
+}

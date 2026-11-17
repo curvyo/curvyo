@@ -13,6 +13,7 @@ use curvyo_laser_core::operations::{
 use serde::Serialize;
 
 use super::super::Session;
+use super::ActiveOperations;
 use super::assign::{Selection, target_tick};
 use super::index::IndexedLeaf;
 use super::items::{ItemLists, item_lists};
@@ -28,9 +29,8 @@ pub struct OperationsView {
     pub cuts_last: bool,
     /// The rows in run order (the list order, sections as the switch shows them).
     pub rows: Vec<RowView>,
-    /// The summary counts of criterion 17. Nothing is counted as missing (Frage 169 A).
-    pub summary: SummaryView,
-    /// The items behind each count, for the count buttons (criterion 17).
+    /// The items behind each count of the `0101` summary (criterion 17). The counts themselves
+    /// are checks of the output group since `specs/0029` (UX P28).
     pub items: ItemLists,
     /// Whether the page's Operations view toggle is pressed (`specs/0111` criterion 15).
     #[serde(rename = "operations_view")]
@@ -79,6 +79,16 @@ pub struct RowView {
     /// The source line of a test grid's derived row (`specs/0112` criterion 12); `None` for any
     /// other row.
     pub source: Option<SourceView>,
+    /// Line 2's run ring and time while the row runs (`specs/0029` criterion 2, UX P25, P26);
+    /// `None` for a row that does not run (it keeps its plain digit).
+    pub run: Option<super::super::output::RowRunView>,
+    /// Line 3 (and line 4 of Engrave + Outline): the effective numbers with "typed", on every
+    /// row, Output on or off (`specs/0029` criterion 3); `None` for an Unknown kind or damaged
+    /// settings; empty for "No settings".
+    pub numbers: Option<Vec<super::super::output::NumbersLineView>>,
+    /// The name button's accessible name: "Cut 1, run 3, 3 min 21 s" while it runs, else the
+    /// name (UX notes §6.1, §11).
+    pub accessible_name: String,
 }
 
 /// The kinds of the rows; the five known ones and the unknown one.
@@ -119,21 +129,6 @@ pub enum TickView {
     Some,
     /// All of the selected items are in it.
     All,
-}
-
-/// The summary counts (ADR 0046 §5): the first three are disjoint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct SummaryView {
-    /// Operations that run at least one item.
-    pub operations: usize,
-    /// Items that hold an assignment and run, hidden or not.
-    pub running: usize,
-    /// Items with no assignment at any level.
-    pub not_assigned: usize,
-    /// Items that run while hidden (a part of `running`).
-    pub runs_while_hidden: usize,
-    /// Items in an operation with Output off (may overlap `running`).
-    pub output_off: usize,
 }
 
 /// The crumb of a read-only entered group: "<page> › <group> · Read-only · Esc: leave".
@@ -183,7 +178,12 @@ fn item_count(members: &[Vec<NodeId>], leaves: &[IndexedLeaf]) -> usize {
 
 /// The view kind of a stored kind.
 pub(super) fn kind_view(kind: KindRead) -> KindView {
-    match kind.known() {
+    kind_view_of(kind.known())
+}
+
+/// The view kind of a kind, `None` for an unknown one.
+pub(in crate::session) const fn kind_view_of(kind: Option<OperationKind>) -> KindView {
+    match kind {
         Some(OperationKind::Cut) => KindView::Cut,
         Some(OperationKind::Score) => KindView::Score,
         Some(OperationKind::Engrave) => KindView::Engrave,
@@ -201,6 +201,28 @@ fn section_view(section: Section) -> SectionView {
 }
 
 impl Session {
+    /// The `0101` summary of the active laser page's operations (the output group's "Runs N
+    /// operations, M items."), `None` on another page.
+    #[cfg(test)]
+    pub(in crate::session) fn operations_summary(&self) -> Option<Summary> {
+        self.summary_of(&self.active_operations()?)
+    }
+
+    /// The `0101` summary of `active`, the active laser page's operations.
+    pub(in crate::session) fn summary_of(&self, active: &ActiveOperations) -> Option<Summary> {
+        let manufacturing = self.active_manufacturing()?;
+        let list = OperationList::new(&active.operations, active.cuts_last);
+        let leaves = self.output_leaves(&manufacturing);
+        Some(summarize(
+            &list,
+            leaves.iter().map(|leaf| Leaf {
+                chain: &leaf.chain,
+                hidden: leaf.hidden,
+                shape: leaf.shape,
+            }),
+        ))
+    }
+
     /// The Operations tab of the active laser page, `None` on another page.
     #[must_use]
     pub fn operations_view(&self) -> Option<OperationsView> {
@@ -208,14 +230,8 @@ impl Session {
         let manufacturing = self.active_manufacturing()?;
         let list = OperationList::new(&active.operations, active.cuts_last);
         let leaves = self.output_leaves(&manufacturing);
-        let summary = summarize(
-            &list,
-            leaves.iter().map(|leaf| Leaf {
-                chain: &leaf.chain,
-                hidden: leaf.hidden,
-                shape: leaf.shape,
-            }),
-        );
+        let job = self.job_with_facts(Some(&active));
+        let facts = job.as_ref().and_then(|job| job.tab.get());
         let selection = self.selection_targets();
         let pick = pick_views(self);
         let unfolded = self.operations.tools.unfolded();
@@ -228,6 +244,11 @@ impl Session {
                 let op = &active.operations[at];
                 let kind = KindRead::of(op.kind.as_deref());
                 let (tick, group_in_part) = row_tick(self, &selection, &list, at, &leaves);
+                let run = facts.and_then(|f| f.runs.get(&op.id).cloned());
+                let accessible_name = run.as_ref().map_or_else(
+                    || op.name.clone(),
+                    |run| format!("{}, run {}, {}", op.name, run.digit, run.time),
+                );
                 RowView {
                     id: op.id,
                     name: op.name.clone(),
@@ -242,15 +263,21 @@ impl Session {
                     unfolded: unfolded == Some(op.id),
                     settings: settings_view(self, op, &pick, &page),
                     source: source_view(self, op, &mut sources),
+                    run,
+                    numbers: facts.map_or_else(
+                        || self.row_numbers(op),
+                        |f| f.numbers.get(&op.id).cloned().flatten(),
+                    ),
+                    accessible_name,
                 }
             })
             .collect();
         Some(OperationsView {
             cuts_last: active.cuts_last,
             rows,
-            summary: summary_view(&summary),
             items: item_lists(&list, &leaves),
-            view_pressed: self.operations_view_pressed(manufacturing.id),
+            view_pressed: self.operations_view_pressed(manufacturing.id)
+                && !self.toolpath_view_pressed(manufacturing.id),
             select_bar_kinds: self.select_bar_kinds(&active),
             entered_group: self.entered_group_view(),
             pick,
@@ -319,15 +346,5 @@ impl Session {
             page: self.active_page().name,
             groups,
         })
-    }
-}
-
-fn summary_view(summary: &Summary) -> SummaryView {
-    SummaryView {
-        operations: summary.operations,
-        running: summary.running,
-        not_assigned: summary.not_assigned,
-        runs_while_hidden: summary.runs_while_hidden,
-        output_off: summary.output_off,
     }
 }

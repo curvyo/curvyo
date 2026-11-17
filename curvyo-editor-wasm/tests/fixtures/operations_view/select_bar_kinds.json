@@ -21,7 +21,7 @@
   "pick": [],
   "rows": [
     {
-      "source": null,
+      "accessible_name": "Engrave 1, run 1, –",
       "group_in_part": null,
       "id": {
         "counter": 35,
@@ -31,7 +31,12 @@
       "kind": "engrave",
       "margin_mm": 0.0,
       "name": "Engrave 1",
+      "numbers": [],
       "output": true,
+      "run": {
+        "digit": 1,
+        "time": "–"
+      },
       "section": "marking",
       "settings": {
         "differs": null,
@@ -67,6 +72,7 @@
         "z_offset_shown": false
       },
       "show": true,
+      "source": null,
       "tick": "none",
       "unfolded": false
     }
@@ -92,12 +98,5 @@
       "description": "Creates Cut-out 1",
       "kind": "cut_out"
     }
-  ],
-  "summary": {
-    "not_assigned": 1,
-    "operations": 1,
-    "output_off": 0,
-    "running": 1,
-    "runs_while_hidden": 0
-  }
+  ]
 }

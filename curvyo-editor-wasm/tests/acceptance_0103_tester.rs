@@ -700,7 +700,8 @@ fn ac23_save_as_profile_writes_format_3_with_jobs_tokens_and_no_output_key() {
     let _ = s.save_machine_profile([7; 16], 50);
     let record = profile_record(&s.take_machine_writes_json());
     // Record format 5 since `0113` (ADR 0060 §1): the entries sit inside the named sets.
-    assert_eq!(record["format_version"], 5, "any write is format 5");
+    // Record format 6 since `0029` (ADR 0065 §3).
+    assert_eq!(record["format_version"], 6, "any write is format 6");
     let job = &record["fixture_sets"][0]["fixtures"][0]["jobs"][0];
     assert_eq!(job["kind"], "engrave_outline");
     assert_eq!(job["show"], true);
