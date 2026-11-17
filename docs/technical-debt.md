@@ -239,6 +239,26 @@ connection), and from keyrings merged outside one relay; the browser journey
 
 **Resolution:** none needed while one relay serves a room; revisit if rooms ever federate.
 
+## The Fixture jobs section keeps an empty add toolbar (`0103`, UX review of `0029`, 2026-11-17)
+
+With no fixture selected the add toolbar (`FixtureJobsSection.tsx`) still takes its 28 px row, so a gap stands above "No fixture jobs. Select a fixture to add one." and above the output part's pick. Backlog (U7): hide the row while `addTo` is `null`, keeping its Tab stop rules.
+
+## Laser and document files over 500 lines (`0029`, 2026-11-17)
+
+Already past the module limit of CLAUDE.md §5 before `0029`, each grown a little by it (lines on
+`main` before, then after): `curvyo-laser-core/src/machine_profile.rs` (542, 579: `air_assist`,
+`output_format`), `curvyo-ui-core/src/history_names.rs` (530, 581: the output page labels),
+`curvyo-editor-wasm/src/session/operations/look.rs` (501, 534: the Toolpath view branch),
+`curvyo-document-core/src/manufacturing.rs` (642, 653: the page registers) and
+`curvyo-document-core/src/document.rs` (1,325, 1,344) and `curvyo-document-core/src/history/rows.rs`
+(522, 529: the output page labels). `session/pages.rs` was split under 500 by `0029`
+(`pages_json.rs`), `session/output/tests.rs` by criterion group (`session/output/tests/`). Splitting the others is a refactoring outside the story.
+
+**Resolution:** a `refactorer` pass per file the next time it is touched: `machine_profile.rs`
+into values and record spelling, `history_names.rs` by workbench, `look.rs` into the table and the
+overlay, `manufacturing.rs` by register group, `document.rs` by its command groups, `history/rows.rs`
+by workbench as `history_names.rs`.
+
 ## Sync files over 500 lines (`0096`, `0097`, 2026-11-05)
 
 Grown past the module limit of CLAUDE.md §5 by the membership lifecycle, each by the person
@@ -2272,6 +2292,10 @@ PNG export and laser and plotter jobs do not exist yet, so `specs/0071-pattern-f
 and 27 are tested for SVG only. Each of those outputs must read the pieces from
 `curvyo_geometry_core::pattern::pattern_pieces` (ADR 0029 §8), never expand patterns on its own.
 Resolved by the first story that adds PNG export or a machine job, with a pattern golden.
+
+2026-11-17 (`0029`): pattern fills run as their outline in 0029. The first machine job (GRBL)
+burns a patterned shape's outline only and does not read `pattern_pieces` yet (safe default; no
+pattern golden yet). Still open for laser jobs and PNG export.
 
 ## Pattern fill: previews and edge cases (`0071`, 2026-11-02)
 

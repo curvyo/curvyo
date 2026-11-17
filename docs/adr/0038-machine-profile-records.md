@@ -8,6 +8,8 @@ exists. Spec: `specs/0026-machine-profile` criteria 2, 3, 4, 9, 10, 13, 14, 15.
 
 **Note (ADR 0056, proposed 2026-11-12):** §2: the profile values gain `motorised_z` (default false), and the profile record becomes format 4 (0056 §7).
 
+**Note (ADR 0065, needs-customer, accepted with the `0029` story PR):** §2: the profile values gain `air_assist` (default off) and `output_format` (closed enum, `grbl` only), and the profile record becomes format 6; format 5 reads as off and `grbl` (0065 §3).
+
 ## Context
 
 A machine profile describes one physical laser (bed, origin corner, limits, how to reach it) and
