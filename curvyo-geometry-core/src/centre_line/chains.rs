@@ -5,7 +5,8 @@
 use kurbo::{Point, Vec2};
 
 use super::junctions::{
-    Junction, Measure, Side, best_pair, grid_key, junction_index, measure, merge_junctions, outward,
+    Junction, Measure, Side, best_pair, crest_tip, grid_key, junction_index, measure,
+    merge_junctions, outward,
 };
 
 use crate::medial_axis::{AxisSample, MedialAxis};
@@ -93,16 +94,45 @@ pub(crate) fn chains(axis: &MedialAxis) -> Vec<Chain> {
             });
         }
     }
+    let far = |side: Side| {
+        let edge = &axis.edges[side.edge];
+        if side.at_start { edge.to } else { edge.from }
+    };
     let measures: Vec<Vec<Measure>> = sides
         .iter()
         .zip(&junctions)
-        .map(|(list, junction)| list.iter().map(|&s| measure(axis, junction, s)).collect())
+        .map(|(list, junction)| {
+            list.iter()
+                .map(|&s| measure(axis, junction, s, degree[far(s)] == 1))
+                .collect()
+        })
         .collect();
-    let pairs: Vec<Option<(Side, Side)>> = sides
+    let mut pairs: Vec<Option<(Side, Side)>> = sides
         .iter()
         .zip(&measures)
         .map(|(list, m)| best_pair(list, m))
         .collect();
+    // A sharp crest runs through its tip: its arms pair, its spur is walked as the tip point.
+    let mut used = vec![false; axis.edges.len()];
+    let mut tips: Vec<Option<AxisSample>> = vec![None; junctions.len()];
+    for (j, junction) in junctions.iter().enumerate() {
+        let tip_of = |side: Side| {
+            let samples = &axis.edges[side.edge].samples;
+            if side.at_start {
+                samples[samples.len() - 1]
+            } else {
+                samples[0]
+            }
+        };
+        if let Some((spur, a, b)) = crest_tip(junction, &sides[j], &measures[j], tip_of) {
+            pairs[j] = Some((a, b));
+            used[spur.edge] = true;
+            tips[j] = Some(AxisSample {
+                point: tip_of(spur).point,
+                radius: 0.0,
+            });
+        }
+    }
     let mut walker = Walker {
         axis,
         junctions: &junctions,
@@ -110,7 +140,8 @@ pub(crate) fn chains(axis: &MedialAxis) -> Vec<Chain> {
         sides: &sides,
         measures: &measures,
         pairs: &pairs,
-        used: vec![false; axis.edges.len()],
+        tips: &tips,
+        used,
         chains: Vec::new(),
         through: vec![None; junctions.len()],
     };
@@ -152,6 +183,8 @@ struct Walker<'a> {
     sides: &'a [Vec<Side>],
     measures: &'a [Vec<Measure>],
     pairs: &'a [Option<(Side, Side)>],
+    /// The tip each crest junction's path runs through, radius 0.
+    tips: &'a [Option<AxisSample>],
     used: Vec<bool>,
     chains: Vec<Chain>,
     /// The chain that continues through each junction.
@@ -232,6 +265,8 @@ impl Walker<'_> {
         // The junctions this chain passes, with what they held before, so a chain too short to
         // keep leaves no parent index behind.
         let mut passed: Vec<(usize, Option<usize>)> = Vec::new();
+        // Where a crest's tip was put in.
+        let mut tip_at: Vec<usize> = Vec::new();
         loop {
             self.used[side.edge] = true;
             let piece = outward(self.axis, side);
@@ -253,6 +288,10 @@ impl Walker<'_> {
                 Some(next) if !self.used[next.edge] => {
                     if let Some(j) = self.junction_of[self.vertex_at(exit)] {
                         passed.push((j, self.through[j].replace(index)));
+                        if let Some(tip) = self.tips[j] {
+                            tip_at.push(samples.len());
+                            samples.push(tip);
+                        }
                     }
                     side = next;
                 }
@@ -268,6 +307,9 @@ impl Walker<'_> {
                     break;
                 }
             }
+        }
+        for &at in tip_at.iter().rev() {
+            straight_to_tip(&mut samples, at, closed);
         }
         samples.dedup_by(|a, b| a.point == b.point);
         let start = if closed {
@@ -303,6 +345,48 @@ impl Walker<'_> {
         ends.iter()
             .flatten()
             .any(|&j| self.junctions[j].covers(self.axis, point))
+    }
+}
+
+/// Samples spaced at most this share of the wider arm's radius on a crest's straight legs.
+const TIP_STEP_SHARE: f64 = 0.5;
+/// The most samples on one leg.
+const TIP_STEPS_MAX: usize = 32;
+
+/// Puts samples on the straight legs from the arm before `samples[at]` (a crest's tip, radius 0)
+/// to it and on to the arm after it, their radii falling linearly to 0 at the tip: the path's
+/// edges then run along the crest's straight outer edges into the point.
+fn straight_to_tip(samples: &mut Vec<AxisSample>, at: usize, closed: bool) {
+    let n = samples.len();
+    let neighbour = |k: Option<usize>| k.map(|k| samples[k]);
+    let before = neighbour(at.checked_sub(1).or(closed.then(|| n - 1)));
+    let after = neighbour((at + 1 < n).then_some(at + 1).or(closed.then_some(0)));
+    let tip = samples[at];
+    let leg = |from: AxisSample| -> Vec<AxisSample> {
+        let length = (tip.point - from.point).hypot();
+        let step = (TIP_STEP_SHARE * from.radius).max(1e-3);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let count = ((length / step).ceil() as usize).clamp(1, TIP_STEPS_MAX);
+        (1..count)
+            .map(|k| {
+                #[allow(clippy::cast_precision_loss)]
+                let t = k as f64 / count as f64;
+                AxisSample {
+                    point: from.point.lerp(tip.point, t),
+                    radius: from.radius * (1.0 - t),
+                }
+            })
+            .collect()
+    };
+    if let Some(after) = after {
+        let mut out = leg(after);
+        out.reverse();
+        let tail = samples.split_off(at + 1);
+        samples.extend(out);
+        samples.extend(tail);
+    }
+    if let Some(before) = before {
+        samples.splice(at..at, leg(before));
     }
 }
 

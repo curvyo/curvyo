@@ -125,9 +125,11 @@ pub(super) struct Measure {
     pub(super) width: f64,
     pub(super) length: f64,
     pub(super) start: Point,
+    /// Whether the edge ends free (a spur, a fin, a stroke's end) rather than at a junction.
+    pub(super) leaf: bool,
 }
 
-pub(super) fn measure(axis: &MedialAxis, junction: &Junction, side: Side) -> Measure {
+pub(super) fn measure(axis: &MedialAxis, junction: &Junction, side: Side, leaf: bool) -> Measure {
     let samples = outward(axis, side);
     let attach = samples[0].point;
     let radius = junction.radius;
@@ -168,13 +170,75 @@ pub(super) fn measure(axis: &MedialAxis, junction: &Junction, side: Side) -> Mea
         width: widths[widths.len() / 2],
         length,
         start: outside.first().map_or(attach, |s| s.point),
+        leaf,
     }
+}
+
+/// The direction term `(1 + d_a·d_b) / 2`: 0 straight on, 1 turning back.
+fn turn_cost(a: &Measure, b: &Measure) -> f64 {
+    f64::midpoint(1.0, a.direction.dot(b.direction))
 }
 
 /// `(1 + d_a·d_b) / 2 + |w_a - w_b| / max(w_a, w_b)`.
 pub(super) fn cost(a: &Measure, b: &Measure) -> f64 {
-    f64::midpoint(1.0, a.direction.dot(b.direction))
-        + (a.width - b.width).abs() / a.width.max(b.width).max(1e-12)
+    turn_cost(a, b) + (a.width - b.width).abs() / a.width.max(b.width).max(1e-12)
+}
+
+/// Pairs whose direction terms differ by more than this are decided by direction alone
+/// (CENTRE-THROUGH A, ADR 0063 amendment 2026-11-20): the width only decides between pairs
+/// that continue about equally smoothly, so a stroke runs on into the thin fin that continues
+/// it rather than turning into the other arm of its own width.
+pub(super) const TURN_BAND: f64 = 0.1;
+
+/// A spur this many times longer than the miter of its arms, `r_J / sin(θ/2)`, is no tip.
+const TIP_MITER: f64 = 1.5;
+/// A tip's end is at most this share of the junction radius wide (it falls to a point).
+const TIP_END_SHARE: f64 = 0.25;
+/// A tip points at least this close to the arms' outer bisector (30°, as its cosine).
+const TIP_BISECTOR_COS: f64 = 0.866;
+/// Arms closer to a straight line than this (`|d_a + d_b|`, about 150°) form no crest.
+const TIP_CREST_MIN: f64 = 0.5;
+/// Arms closer together than this (15°, as the cosine of their angle) form no crest.
+const TIP_CREST_MAX_COS: f64 = 0.966;
+
+/// The tip of a sharp crest at a junction of three edges (CENTRE-THROUGH A): a free spur that
+/// points out along the bisector of the other two edges, falls to a point and is no longer
+/// than the miter where their outer edges meet. Returns the spur and the two arms, which then
+/// continue as one path through the spur's end.
+pub(super) fn crest_tip(
+    junction: &Junction,
+    sides: &[Side],
+    measures: &[Measure],
+    tip: impl Fn(Side) -> AxisSample,
+) -> Option<(Side, Side, Side)> {
+    if sides.len() != 3 {
+        return None;
+    }
+    (0..3).find_map(|k| {
+        if !measures[k].leaf {
+            return None;
+        }
+        let (a, b) = ((k + 1) % 3, (k + 2) % 3);
+        let end = tip(sides[k]);
+        let reach = end.point - junction.centre;
+        let length = reach.hypot();
+        let mean = measures[a].direction + measures[b].direction;
+        let spread = measures[a].direction.dot(measures[b].direction);
+        let arms = measures[a].length.min(measures[b].length);
+        if length <= 0.0
+            || mean.hypot() < TIP_CREST_MIN
+            || spread > TIP_CREST_MAX_COS
+            || measures[k].length >= arms
+        {
+            return None;
+        }
+        let half_sine = ((1.0 - spread) / 2.0).max(0.0).sqrt();
+        let miter = junction.radius / half_sine.max(1e-9);
+        let pointed = end.radius <= TIP_END_SHARE * junction.radius;
+        let along = -reach.dot(mean) / (length * mean.hypot()) >= TIP_BISECTOR_COS;
+        let short = length <= TIP_MITER * miter + super::fit::tolerance(2.0 * junction.radius);
+        (pointed && along && short).then_some((sides[k], sides[a], sides[b]))
+    })
 }
 
 /// Grid-position key of a point for tie-breaks.
@@ -195,12 +259,16 @@ pub(super) fn best_pair(sides: &[Side], measures: &[Measure]) -> Option<(Side, S
     for a in 0..sides.len() {
         for b in a + 1..sides.len() {
             let c = cost(&measures[a], &measures[b]);
+            let turn = turn_cost(&measures[a], &measures[b]);
             let length = measures[a].length + measures[b].length;
             let key = grid_key(measures[a].start).min(grid_key(measures[b].start));
             let better = match best {
                 None => true,
-                Some((bc, bl, bk, _, _)) => {
-                    if (c - bc).abs() > COST_TIE {
+                Some((bc, bl, bk, ba, bb)) => {
+                    let best_turn = turn_cost(&measures[ba], &measures[bb]);
+                    if (turn - best_turn).abs() > TURN_BAND {
+                        turn < best_turn
+                    } else if (c - bc).abs() > COST_TIE {
                         c < bc
                     } else if (length - bl).abs() > 1e-9 {
                         length > bl
