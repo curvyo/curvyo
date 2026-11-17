@@ -1,5 +1,5 @@
 //! Reads and writes the machine profile copy of a manufacturing (ADR 0039 §1 to §3, §5, §6;
-//! ADR 0056 §7): the `mfg_profile` map, every field read on its own with its default on damage,
+//! ADR 0056 §7; ADR 0065 §3): the `mfg_profile` map, every field read on its own with its default on damage,
 //! how the page's copy differs from its record (ADR 0039 §5) and whether a page's set mirror
 //! differs from its profile's sets (ADR 0059 §10).
 
@@ -10,8 +10,8 @@ use curvyo_extension_core::StoredParams;
 use serde_json::Value;
 
 use crate::machine_profile::{
-    FeedRate, GENERIC_LASER_ID, MachineProfile, OriginCorner, PowerValue, ProfileValues,
-    is_valid_name,
+    FeedRate, GENERIC_LASER_ID, MachineProfile, OriginCorner, OutputFormat, PowerValue,
+    ProfileValues, is_valid_name,
 };
 
 const ID: &str = "id";
@@ -21,6 +21,8 @@ const MAX_FEED: &str = "max_feed_mm_per_min";
 const MAX_POWER: &str = "max_power";
 const LASER_MODE: &str = "laser_mode";
 const MOTORISED_Z: &str = "motorised_z";
+const AIR_ASSIST: &str = "air_assist";
+const OUTPUT_FORMAT: &str = "output_format";
 
 /// The notice of a copy whose stored name was damaged (criterion 12).
 pub const DAMAGED_NAME_NOTICE: &str = "Name was damaged, showing Generic laser";
@@ -54,6 +56,22 @@ pub struct CopyRead {
     pub copy: ProfileCopy,
     /// The stored name was missing or not a valid name, so it reads as "Generic laser".
     pub name_damaged: bool,
+    /// `air_assist` is present but no boolean, so it reads off (ADR 0065 §3).
+    pub air_assist_damaged: bool,
+    /// `output_format` is present but no spelling this build knows, so the copy cannot be
+    /// written (block 4 c, criterion 39; never written as GRBL).
+    pub output_format_damaged: bool,
+}
+
+impl CopyRead {
+    /// How many of the copy's values are present but unreadable (the name, Air assist, the output
+    /// format).
+    #[must_use]
+    pub fn damaged_values(&self) -> usize {
+        usize::from(self.name_damaged)
+            + usize::from(self.air_assist_damaged)
+            + usize::from(self.output_format_damaged)
+    }
 }
 
 /// The copy `stored` holds (`None`: a format-35 manufacturing, which reads as Generic laser with
@@ -71,9 +89,17 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
                 values,
             },
             name_damaged: false,
+            air_assist_damaged: false,
+            output_format_damaged: false,
         };
     };
     let defaults = ProfileValues::default();
+    let air_assist = stored.get(AIR_ASSIST).map_or(Some(false), Value::as_bool);
+    let output_format = stored
+        .get(OUTPUT_FORMAT)
+        .map_or(Some(OutputFormat::Grbl), |value| {
+            value.as_str().and_then(OutputFormat::parse)
+        });
     let name = stored
         .get(NAME)
         .and_then(Value::as_str)
@@ -99,6 +125,8 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
             .get(MOTORISED_Z)
             .and_then(Value::as_bool)
             .unwrap_or(defaults.motorised_z),
+        air_assist: air_assist.unwrap_or(defaults.air_assist),
+        output_format: output_format.unwrap_or(defaults.output_format),
     };
     CopyRead {
         copy: ProfileCopy {
@@ -106,6 +134,8 @@ pub fn read_copy(stored: Option<&StoredParams>, legacy_name: Option<&str>) -> Co
             values,
         },
         name_damaged: name.is_none(),
+        air_assist_damaged: stored.contains_key(AIR_ASSIST) && air_assist.is_none(),
+        output_format_damaged: stored.contains_key(OUTPUT_FORMAT) && output_format.is_none(),
     }
 }
 
@@ -138,6 +168,11 @@ pub fn write_copy(copy: &ProfileCopy) -> StoredParams {
     );
     map.insert(LASER_MODE.to_owned(), Value::from(copy.values.laser_mode));
     map.insert(MOTORISED_Z.to_owned(), Value::from(copy.values.motorised_z));
+    map.insert(AIR_ASSIST.to_owned(), Value::from(copy.values.air_assist));
+    map.insert(
+        OUTPUT_FORMAT.to_owned(),
+        Value::from(copy.values.output_format.as_str()),
+    );
     map
 }
 
@@ -261,13 +296,15 @@ mod tests {
         assert_eq!(
             keys,
             vec![
+                "air_assist",
                 "id",
                 "laser_mode",
                 "max_feed_mm_per_min",
                 "max_power",
                 "motorised_z",
                 "name",
-                "origin"
+                "origin",
+                "output_format"
             ]
         );
         assert!(!serde_json::to_string(&map).unwrap().contains("ttyUSB0"));
@@ -416,5 +453,42 @@ mod tests {
         assert!(read_copy(Some(&map), None).copy.values.motorised_z);
         let older = stored(json!({"name": "K40", "laser_mode": false}));
         assert!(!read_copy(Some(&older), None).copy.values.motorised_z);
+    }
+
+    #[test]
+    fn air_assist_and_the_output_format_are_copied_absent_reads_off_and_grbl() {
+        let mut profile = MachineProfile::generic_laser();
+        profile.values.air_assist = true;
+        let map = write_copy(&ProfileCopy::of(&profile));
+        assert_eq!(map.get("air_assist"), Some(&json!(true)));
+        assert_eq!(map.get("output_format"), Some(&json!("grbl")));
+        let read = read_copy(Some(&map), None);
+        assert!(read.copy.values.air_assist);
+        assert_eq!(read.damaged_values(), 0);
+        let older = stored(json!({"name": "K40"}));
+        let read = read_copy(Some(&older), None);
+        assert!(!read.copy.values.air_assist);
+        assert_eq!(read.copy.values.output_format, OutputFormat::Grbl);
+        assert!(!read.air_assist_damaged && !read.output_format_damaged);
+    }
+
+    #[test]
+    fn a_damaged_air_assist_reads_off_and_an_unknown_output_format_is_damaged() {
+        let map = stored(json!({"name": "K40", "air_assist": "on", "output_format": "marlin"}));
+        let read = read_copy(Some(&map), None);
+        assert!(!read.copy.values.air_assist);
+        assert!(read.air_assist_damaged);
+        assert!(read.output_format_damaged, "never read as GRBL to write");
+        assert_eq!(read.damaged_values(), 2);
+        let typed = stored(json!({"name": "K40", "output_format": 1}));
+        assert!(read_copy(Some(&typed), None).output_format_damaged);
+    }
+
+    #[test]
+    fn differs_compares_air_assist() {
+        let record = MachineProfile::generic_laser();
+        let mut copy = ProfileCopy::of(&record);
+        copy.values.air_assist = true;
+        assert!(differs(&copy, record.work_area, &record));
     }
 }

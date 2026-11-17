@@ -50,6 +50,10 @@ pub const EDIT_LASER_MODE_COMMIT_LABEL: &str = "edit_laser_mode";
 pub const MOTORISED_Z_ON_COMMIT_LABEL: &str = "motorised_z_on";
 /// The label of the copy's motorised Z axis switched off (`specs/0111` criterion 22).
 pub const MOTORISED_Z_OFF_COMMIT_LABEL: &str = "motorised_z_off";
+/// The label of the copy's Air assist switched on (`specs/0029` criterion 25).
+pub const AIR_ASSIST_ON_COMMIT_LABEL: &str = "air_assist_on";
+/// The label of the copy's Air assist switched off (`specs/0029` criterion 25).
+pub const AIR_ASSIST_OFF_COMMIT_LABEL: &str = "air_assist_off";
 
 /// Which change writes the machine profile copy; each is one history step with its own label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +79,11 @@ pub enum ProfileChange {
         /// The new state.
         on: bool,
     },
+    /// The Air assist switch, to `on` (ADR 0065 §3).
+    AirAssist {
+        /// The new state.
+        on: bool,
+    },
 }
 
 impl ProfileChange {
@@ -92,6 +101,8 @@ impl ProfileChange {
             Self::EditLaserMode => EDIT_LASER_MODE_COMMIT_LABEL,
             Self::MotorisedZ { on: true } => MOTORISED_Z_ON_COMMIT_LABEL,
             Self::MotorisedZ { on: false } => MOTORISED_Z_OFF_COMMIT_LABEL,
+            Self::AirAssist { on: true } => AIR_ASSIST_ON_COMMIT_LABEL,
+            Self::AirAssist { on: false } => AIR_ASSIST_OFF_COMMIT_LABEL,
         }
     }
 }

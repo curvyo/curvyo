@@ -26,6 +26,7 @@ mod curve_chords;
 mod curve_contacts;
 mod curve_intersections;
 mod curve_settle;
+mod direction;
 mod flatten;
 mod fracture;
 mod interior;
@@ -64,6 +65,8 @@ pub use centre_line::{
 };
 pub use curve_intersections::{CutParameter, cut_parameters};
 pub use curvyo_document_core::Tolerance;
+pub use direction::direction_of_degrees;
+pub use flatten::flatten_outline;
 pub use fracture::{Fracture, fracture_cells};
 pub use interior::{OutlineTriple, contains_point_in_outlines};
 pub use medial_axis::CentreLineError;

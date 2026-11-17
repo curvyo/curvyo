@@ -5,17 +5,21 @@ use curvyo_document_core::DocumentSize;
 use serde::{Deserialize, Serialize};
 
 use crate::machine_profile::{
-    BaudRate, Connection, FeedRate, MAX_CONNECTION_CHARS, MachineProfile, OriginCorner, PowerValue,
-    ProfileValues, is_valid_name, is_valid_work_side,
+    BaudRate, Connection, FeedRate, MAX_CONNECTION_CHARS, MachineProfile, OriginCorner,
+    OutputFormat, PowerValue, ProfileValues, is_valid_name, is_valid_work_side,
 };
 use crate::machine_profile_sets::{SetJson, read_sets, write_sets};
 use crate::record_envelope::{EnvelopeError, open, pretty, record_id};
 
-/// The record format this build writes and the only one it reads: 5 holds the named
-/// `fixture_sets` (ADR 0060 §1), the only home of a set: every set, fixture and job carries its
-/// record `id`, sets and fixtures carry `locked`, and a set has no `active` (the page's On this
-/// page stays in the project file). Formats 1 to 4 are older and skipped (ADR 0060 §3).
-pub const RECORD_FORMAT_VERSION: u64 = 5;
+/// The record format this build writes: 6 adds `air_assist` and `output_format` after
+/// `motorised_z` (ADR 0065 §3), both always written. Format 5 holds the named `fixture_sets`
+/// (ADR 0060 §1), the only home of a set: every set, fixture and job carries its record `id`,
+/// sets and fixtures carry `locked`, and a set has no `active`. Format 5 is still read (air
+/// assist off, GRBL) and not rewritten on read; formats 1 to 4 are older and skipped (ADR 0060
+/// §3).
+pub const RECORD_FORMAT_VERSION: u64 = 6;
+/// The oldest record format this build reads: the named sets of format 5.
+const RECORD_FORMAT_SETS: u64 = 5;
 /// The oldest record format there is; formats from it below [`RECORD_FORMAT_VERSION`] are older.
 const RECORD_FORMAT_FIRST: u64 = 1;
 /// The format of `machine-choice.json`, unchanged by the record's formats.
@@ -54,6 +58,12 @@ struct RecordJson {
     max_power: PowerValue,
     laser_mode: bool,
     motorised_z: bool,
+    /// Format 6 only (ADR 0065 §3); in a format 5 record it is an unknown key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    air_assist: Option<bool>,
+    /// Format 6 only, the spelling of an [`OutputFormat`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    output_format: Option<String>,
     connection: ConnectionJson,
     fixture_sets: Vec<SetJson>,
 }
@@ -83,11 +93,12 @@ struct ChoiceJson {
 /// The profile the record file `file_name` holds.
 ///
 /// # Errors
-/// [`RecordError::Newer`] for a `format_version` above 5; [`RecordError::Older`] for formats 1
+/// [`RecordError::Newer`] for a `format_version` above 6; [`RecordError::Older`] for formats 1
 /// to 4; [`RecordError::Damaged`] for a text over 256 KiB, a JSON or type error, a missing or
-/// unknown key (`fixtures` included), a value out of its range, a kind other than `laser`, an id
-/// that differs from the file name, or damaged fixture sets (ADR 0060 §2). Nothing is written on
-/// read.
+/// unknown key (`fixtures` included; `air_assist` or `output_format` in a format 5 record), an
+/// `output_format` this build does not know, a value out of its range, a kind other than
+/// `laser`, an id that differs from the file name, or damaged fixture sets (ADR 0060 §2). A
+/// format 5 record reads air assist off and GRBL (ADR 0065 §3). Nothing is written on read.
 pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, RecordError> {
     let (value, version) = open(
         text,
@@ -101,10 +112,11 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
             RecordError::Damaged
         }
     })?;
-    if version < RECORD_FORMAT_VERSION {
+    if version < RECORD_FORMAT_SETS {
         return Err(RecordError::Older);
     }
     let record: RecordJson = serde_json::from_value(value).map_err(|_| RecordError::Damaged)?;
+    let (air_assist, output_format) = output_values(version, &record)?;
     let fixture_sets = read_sets(record.fixture_sets).ok_or(RecordError::Damaged)?;
     let valid = record_id(file_name) == Some(record.id.as_str())
         && record.kind == KIND_LASER
@@ -126,6 +138,8 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
             max_power: record.max_power,
             laser_mode: record.laser_mode,
             motorised_z: record.motorised_z,
+            air_assist,
+            output_format,
         },
         work_area: DocumentSize::from_mm(record.work_area_mm.width, record.work_area_mm.height),
         connection: Connection {
@@ -137,9 +151,21 @@ pub fn read_record(file_name: &str, text: &str) -> Result<MachineProfile, Record
     })
 }
 
-/// The canonical text of a record, always format 5 with its `fixture_sets` after `connection`
-/// (ADR 0060 §1, §4): fixed key order, two-space indent, trailing newline, so read, write, read is
-/// the identity.
+/// Air assist and the output format of a record of `version` (ADR 0065 §3): format 5 has
+/// neither key and reads off and GRBL; format 6 has both, with a known output format.
+fn output_values(version: u64, record: &RecordJson) -> Result<(bool, OutputFormat), RecordError> {
+    match (version, record.air_assist, record.output_format.as_deref()) {
+        (RECORD_FORMAT_SETS, None, None) => Ok((false, OutputFormat::Grbl)),
+        (RECORD_FORMAT_VERSION, Some(air_assist), Some(format)) => OutputFormat::parse(format)
+            .map(|format| (air_assist, format))
+            .ok_or(RecordError::Damaged),
+        _ => Err(RecordError::Damaged),
+    }
+}
+
+/// The canonical text of a record, always format 6 with `air_assist` and `output_format` after
+/// `motorised_z` and its `fixture_sets` after `connection` (ADR 0060 §1, §4; ADR 0065 §3): fixed
+/// key order, two-space indent, trailing newline, so read, write, read is the identity.
 #[must_use]
 pub fn write_record(profile: &MachineProfile) -> String {
     let record = RecordJson {
@@ -157,6 +183,8 @@ pub fn write_record(profile: &MachineProfile) -> String {
         max_power: profile.values.max_power,
         laser_mode: profile.values.laser_mode,
         motorised_z: profile.values.motorised_z,
+        air_assist: Some(profile.values.air_assist),
+        output_format: Some(profile.values.output_format.as_str().to_owned()),
         connection: ConnectionJson {
             connector_address: profile.connection.connector_address.clone(),
             controller_port: profile.connection.controller_port.clone(),
@@ -194,33 +222,77 @@ mod tests {
     const ID: &str = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f";
 
     #[test]
-    fn a_new_profile_writes_format_5_with_empty_sets_and_reads_back() {
+    fn a_new_profile_writes_format_6_with_empty_sets_and_reads_back() {
         let mut profile = MachineProfile::generic_laser();
         ID.clone_into(&mut profile.id);
         let text = write_record(&profile);
-        assert!(text.starts_with("{\n  \"format_version\": 5,"));
+        assert!(text.starts_with("{\n  \"format_version\": 6,"));
+        assert!(text.contains(
+            "  \"motorised_z\": false,\n  \"air_assist\": false,\n  \"output_format\": \"grbl\",\n  \"connection\""
+        ));
         assert!(text.ends_with("  },\n  \"fixture_sets\": []\n}\n"));
         assert_eq!(read_record(&record_file_name(ID), &text), Ok(profile));
     }
 
     #[test]
-    fn formats_1_to_4_are_older_and_above_5_newer() {
+    fn formats_1_to_4_are_older_and_above_6_newer() {
         let mut profile = MachineProfile::generic_laser();
         ID.clone_into(&mut profile.id);
         let text = write_record(&profile);
         let name = record_file_name(ID);
         for version in 1..=4 {
             let older = text.replacen(
-                "\"format_version\": 5",
+                "\"format_version\": 6",
                 &format!("\"format_version\": {version}"),
                 1,
             );
             assert_eq!(read_record(&name, &older), Err(RecordError::Older));
         }
-        let newer = text.replacen("\"format_version\": 5", "\"format_version\": 6", 1);
+        let newer = text.replacen("\"format_version\": 6", "\"format_version\": 7", 1);
         assert_eq!(read_record(&name, &newer), Err(RecordError::Newer));
-        let zero = text.replacen("\"format_version\": 5", "\"format_version\": 0", 1);
+        let zero = text.replacen("\"format_version\": 6", "\"format_version\": 0", 1);
         assert_eq!(read_record(&name, &zero), Err(RecordError::Damaged));
+    }
+
+    #[test]
+    fn format_5_reads_air_assist_off_and_grbl_and_refuses_either_new_key() {
+        let mut profile = MachineProfile::generic_laser();
+        ID.clone_into(&mut profile.id);
+        profile.values.air_assist = true;
+        let text = write_record(&profile);
+        let name = record_file_name(ID);
+        let five = text
+            .replacen("\"format_version\": 6", "\"format_version\": 5", 1)
+            .replacen(
+                "  \"air_assist\": true,\n  \"output_format\": \"grbl\",\n",
+                "",
+                1,
+            );
+        let read = read_record(&name, &five).unwrap();
+        assert!(!read.values.air_assist);
+        assert_eq!(read.values.output_format, OutputFormat::Grbl);
+        for key in [
+            "  \"air_assist\": true,\n",
+            "  \"output_format\": \"grbl\",\n",
+        ] {
+            let with_key = text
+                .replacen("\"format_version\": 6", "\"format_version\": 5", 1)
+                .replacen(key, "", 1);
+            assert_eq!(
+                read_record(&name, &with_key),
+                Err(RecordError::Damaged),
+                "{key}"
+            );
+            let without = text.replacen(key, "", 1);
+            assert_eq!(
+                read_record(&name, &without),
+                Err(RecordError::Damaged),
+                "{key}"
+            );
+        }
+        let marlin = text.replacen("\"grbl\"", "\"marlin\"", 1);
+        assert_eq!(read_record(&name, &marlin), Err(RecordError::Damaged));
+        assert_eq!(read_record(&name, &text).unwrap().values, profile.values);
     }
 
     #[test]

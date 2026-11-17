@@ -275,7 +275,8 @@ fn c22_a_format_4_record_reads_the_capability_and_writes_back_byte_for_byte() {
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Older
     );
-    let text = profile_fixture("format5_fixture_sets.json");
+    // Superseded by `0029` (ADR 0065 §3): the format 6 record writes back byte for byte.
+    let text = profile_fixture("format6_air_assist.json");
     let p = read_record(&file_name_of(&text), &text).unwrap();
     assert!(p.values.motorised_z);
     assert_eq!(write_record(&p), text);
@@ -302,7 +303,8 @@ fn c22_an_older_record_reads_off_and_a_write_upgrades_to_4() {
     let mut p = MachineProfile::generic_laser();
     p.id = "6f1c2a4e-9b3d-4c1a-8e2f-0a1b2c3d4e5f".to_owned();
     let written: Value = serde_json::from_str(&write_record(&p)).unwrap();
-    assert_eq!(written["format_version"], 5);
+    // Record format 6 since `0029` (ADR 0065 §3).
+    assert_eq!(written["format_version"], 6);
     assert_eq!(written["motorised_z"], false, "always written");
 }
 
@@ -317,7 +319,8 @@ fn c22_the_key_in_a_format_3_record_damages_it_and_format_5_is_newer() {
     );
     let text = profile_fixture("newer_format.json");
     let v: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(v["format_version"], 6);
+    // Format 7 is newer since `0029` (ADR 0065 §6).
+    assert_eq!(v["format_version"], 7);
     assert_eq!(
         read_record(&file_name_of(&text), &text).unwrap_err(),
         RecordError::Newer

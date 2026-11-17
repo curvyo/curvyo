@@ -13,6 +13,10 @@ pub const LABEL_REFRESH_MATERIAL_NUMBERS: &str = "refresh_material_numbers";
 /// The reserved label of the alignment of a page's set mirror with a newer profile record (ADR
 /// 0059 §10): as [`LABEL_MIGRATE_FORMAT`], not an undo step, not a row of the history list.
 pub const LABEL_ALIGN_FIXTURE_SETS: &str = "align_fixture_sets";
+/// The reserved label of Lasered on the test grids of an exported job (ADR 0064 §11, ADR 0057
+/// §5): as [`LABEL_MIGRATE_FORMAT`], not an undo step, not a row of the history list, so an undo
+/// of the export keeps Lasered (`specs/0029` criterion 28 c).
+pub const LABEL_MARK_TEST_GRID_LASERED: &str = "mark_test_grid_lasered";
 /// The reserved label of an undo (`u` names the step it takes back).
 pub const LABEL_UNDO: &str = "undo";
 /// The reserved label of a redo (`d` names the step it applies again).

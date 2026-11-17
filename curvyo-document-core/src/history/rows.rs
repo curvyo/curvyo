@@ -191,6 +191,13 @@ const DOCUMENT_LEVEL_LABELS: &[&str] = &[
     "edit_laser_mode",
     "motorised_z_on",
     "motorised_z_off",
+    // `specs/0029-laser-job-preview-and-output`: the page's machine and its output registers.
+    "air_assist_on",
+    "air_assist_off",
+    "set_fixture_material",
+    "set_start_machine_origin",
+    "set_start_head_position",
+    "set_start_home_then_origin",
 ];
 
 /// Whether a command is about the document and not about its objects: the objects only follow the

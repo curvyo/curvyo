@@ -908,9 +908,10 @@ fn ac20_save_writes_format_38() {
     // Format 44 since `specs/0111-laser-operation-tools` (ADR 0056 §8).
     // Format 46 since `specs/0112-test-grid-and-materials` (ADR 0057 §7).
     // Format 47 since `specs/0113-fixture-sets-and-pins` (ADR 0059 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 47);
+    // Format 48 since `specs/0029-laser-job-preview-and-output` (ADR 0065 §4).
+    assert_eq!(CURRENT_FORMAT_VERSION, 48);
     let d = Document::new(1);
-    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 47);
+    assert_eq!(manifest_version(&pack(&d, "0.1.0").unwrap()), 48);
 }
 
 #[test]

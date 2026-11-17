@@ -7,6 +7,7 @@ use loro::{LoroMap, LoroTree, TreeID, TreeParentId};
 
 use crate::document::{Document, OBJECTS_TREE};
 use crate::group_tree::node_id;
+use crate::history::LABEL_MARK_TEST_GRID_LASERED;
 use crate::manufacturing_codec::{is_manufacturing_node, write_plain_map};
 use crate::node_registers::KEY_NAME;
 use crate::operation::operation_nodes;
@@ -24,8 +25,6 @@ use crate::test_grid_rows::{GridItemNodes, delete_row, fill_row, grid_items, new
 
 /// The label of Place on a page from Materials (criterion 28).
 pub const PLACE_TEST_GRID_COMMIT_LABEL: &str = "place_test_grid";
-/// The label of the Lasered test hook (ADR 0057 §5); no UI writes it.
-pub const MARK_TEST_GRID_LASERED_COMMIT_LABEL: &str = "mark_test_grid_lasered";
 /// The label of a material pick in the bar (UX G8).
 const USE_MATERIAL_LABEL: &str = crate::operation_settings_commands::USE_MATERIAL_COMMIT_LABEL;
 
@@ -289,8 +288,33 @@ impl Document {
         rows.len()
     }
 
-    /// The Lasered test hook (ADR 0057 §5): writes `test_grid_lasered` = `at_ms` on the grid
-    /// `group` in one step. Only `0029`'s output and the acceptance tests write it.
+    /// Lasered (ADR 0064 §11, ADR 0057 §5): writes `test_grid_lasered` = `at_ms` on every grid
+    /// of `grids` in one commit with the reserved label `mark_test_grid_lasered`, which is no step
+    /// of the stacks and no row of the history list, so an undo of the export keeps it
+    /// (`specs/0029` criterion 28 c). An id that names no live grid is skipped. How many grids
+    /// were written.
+    pub fn mark_test_grids_lasered(&self, grids: &[NodeId], at_ms: u64) -> usize {
+        let metas: Vec<LoroMap> = grids
+            .iter()
+            .filter_map(|&group| {
+                let (tree, top) = self.grid_group(group).ok()?;
+                tree.get_meta(top).ok()
+            })
+            .collect();
+        self.commit_reserved(LABEL_MARK_TEST_GRID_LASERED, |_| {
+            for meta in &metas {
+                insert(
+                    meta,
+                    KEY_TEST_GRID_LASERED,
+                    i64::try_from(at_ms).unwrap_or(i64::MAX),
+                );
+            }
+        });
+        metas.len()
+    }
+
+    /// The Lasered test hook (ADR 0057 §5): [`Document::mark_test_grids_lasered`] of the one grid
+    /// `group`. Only the acceptance tests call it.
     ///
     /// # Errors
     /// [`TestGridError::NoSuchGrid`].
@@ -300,14 +324,8 @@ impl Document {
         group: NodeId,
         at_ms: u64,
     ) -> Result<(), TestGridError> {
-        let (tree, top) = self.grid_group(group)?;
-        let meta = tree.get_meta(top).map_err(|_| TestGridError::NoSuchGrid)?;
-        insert(
-            &meta,
-            KEY_TEST_GRID_LASERED,
-            i64::try_from(at_ms).unwrap_or(i64::MAX),
-        );
-        self.commit_with_label(MARK_TEST_GRID_LASERED_COMMIT_LABEL);
+        self.grid_group(group)?;
+        self.mark_test_grids_lasered(&[group], at_ms);
         Ok(())
     }
 }

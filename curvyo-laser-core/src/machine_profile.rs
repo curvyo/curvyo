@@ -73,6 +73,37 @@ impl OriginCorner {
     }
 }
 
+/// The file format the machine reads (ADR 0065 §3): a closed list, GRBL its one value in `0029`.
+/// A new value is a format change (profile record and project `format_version`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum OutputFormat {
+    /// GRBL G-code.
+    #[default]
+    Grbl,
+}
+
+impl OutputFormat {
+    /// Every format this build writes, in the order of the Machine block's pick.
+    pub const ALL: &'static [Self] = &[Self::Grbl];
+
+    /// The stored spelling (`grbl`).
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Grbl => "grbl",
+        }
+    }
+
+    /// The format a stored spelling names, `None` for a spelling this build does not know.
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|format| format.as_str() == text)
+    }
+}
+
 /// Defines an integer newtype with its range and default.
 macro_rules! bounded_integer {
     ($(#[$doc:meta])* $name:ident($int:ty), $min:expr, $max:expr, $default:expr) => {
@@ -155,6 +186,10 @@ pub struct ProfileValues {
     /// Whether the laser moves its focus height by itself (ADR 0056 §7); Z offset runs only with
     /// it.
     pub motorised_z: bool,
+    /// Whether the job switches the air assist on and off (ADR 0065 §3; Frage 222 B).
+    pub air_assist: bool,
+    /// The file format the machine reads (ADR 0065 §3).
+    pub output_format: OutputFormat,
 }
 
 impl Default for ProfileValues {
@@ -166,6 +201,8 @@ impl Default for ProfileValues {
             max_power: PowerValue::DEFAULT,
             laser_mode: true,
             motorised_z: false,
+            air_assist: false,
+            output_format: OutputFormat::Grbl,
         }
     }
 }

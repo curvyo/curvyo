@@ -303,7 +303,7 @@ fn c22_the_golden_reads_back_every_part_region_and_setting() {
         image_metas(&bytes)
     );
     let json: Value = serde_json::from_slice(&d.export_json().unwrap()).unwrap();
-    assert_eq!(json["format_version"], json!(47));
+    assert_eq!(json["format_version"], json!(48));
     let listed = find_named(&json["objects"], "M1").unwrap();
     assert_eq!(
         listed["trace_mask"]["parts"][0]["regions"][0]["points"],
@@ -372,11 +372,11 @@ fn c22_every_older_golden_opens_with_no_mask() {
 
 #[test]
 fn c22_a_file_of_format_47_is_refused() {
-    assert_eq!(CURRENT_FORMAT_VERSION, 47);
+    assert_eq!(CURRENT_FORMAT_VERSION, 48);
     let bytes = pack(&golden_document(), "0.1.0").unwrap();
     let mut files = members(&bytes);
     let mut manifest: Value = serde_json::from_slice(&files["manifest.json"]).unwrap();
-    assert_eq!(manifest["format_version"], json!(47));
+    assert_eq!(manifest["format_version"], json!(48));
     manifest["format_version"] = json!(CURRENT_FORMAT_VERSION + 1);
     files.insert(
         "manifest.json".to_owned(),
@@ -385,8 +385,8 @@ fn c22_a_file_of_format_47_is_refused() {
     assert!(matches!(
         unpack(2, &rezip(&files)),
         Err(OpenError::FormatTooNew {
-            found: 48,
-            supported: 47
+            found: 49,
+            supported: 48
         })
     ));
 }
