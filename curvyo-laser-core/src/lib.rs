@@ -19,6 +19,22 @@ mod fixture_slot;
 mod fixture_snap;
 mod fixture_stored;
 mod grid_layout;
+mod job_build;
+mod job_effects;
+mod job_fingerprint;
+mod job_gate;
+mod job_gate_cause;
+mod job_gate_rows;
+mod job_gate_text;
+mod job_hatch;
+mod job_input;
+mod job_moves;
+mod job_numbers;
+mod job_order;
+mod job_plan;
+mod job_timeline;
+mod job_write;
+mod job_write_grbl;
 mod machine_profile;
 mod machine_profile_copy;
 mod machine_profile_file;
@@ -47,6 +63,7 @@ mod operation_settings;
 mod operation_settings_edit;
 mod operation_settings_rule;
 mod operation_summary;
+mod output_settings;
 mod overhang;
 mod record_envelope;
 mod steps;
@@ -74,6 +91,41 @@ pub mod operations {
         FixtureJobRead, cuts_last, fixture_block, insert_index, may_move, run_sequence,
     };
     pub use crate::operation_summary::{Hidden, Leaf, LeafStatus, Summary, leaf_status, summarize};
+}
+
+/// The laser job of `specs/0029-laser-job-preview-and-output` (ADR 0064): the format-neutral
+/// move list one page runs, its order, time and gate, the output registers of ADR 0065 §1 and the
+/// one entry point to every output format.
+pub mod job {
+    pub use crate::job_build::{Built, build_job};
+    pub use crate::job_effects::{ExportEffects, export_effects};
+    pub use crate::job_gate::{
+        BED_TOLERANCE_UM, Gate, GateFacts, Issue, MachineFacts, Targets, gate,
+    };
+    pub use crate::job_gate_cause::{Cause, Severity};
+    pub use crate::job_gate_rows::{NumbersLine, RunFacts, numbers_lines};
+    pub use crate::job_gate_text::{
+        CheckText, Names, check_text, machine_line, numbers_text, start_text,
+    };
+    pub use crate::job_hatch::{HatchLines, Span, hatch};
+    pub use crate::job_input::{
+        BlockInput, BlockSource, CutOutItem, JobInput, LeafGeometry, LeafInput, LeafOutline,
+        MachineInput, PointUm, Ring, mm_of_um, um_of_mm,
+    };
+    pub use crate::job_moves::{Block, Frame, Job, Move, MoveKind, RUN_OUT_ACCELERATION};
+    pub use crate::job_numbers::{
+        BlockNumbers, NumbersContext, NumbersRead, NumbersSource, RunNumbers, block_numbers,
+    };
+    pub use crate::job_plan::{FLATTEN_MM, Plan, PlanCache, PlannedPath, PlannedRun, plan_block};
+    pub use crate::job_timeline::{
+        Head, Timeline, duration_text, estimate_text, length_text, lengths_text, readout_text,
+    };
+    pub use crate::job_write::{extension, file_type, name, write};
+    pub use crate::job_write_grbl::{coordinate, s_value};
+    pub use crate::output_settings::{
+        FIXTURE_MATERIAL_FIELD, OutputSettings, START_FIELD, Start, read_output_settings,
+        register_key,
+    };
 }
 
 /// The settings of operations and the numbers they share with material records (ADR 0054 §1 to
@@ -173,8 +225,8 @@ pub use grid_layout::{
 pub use machine_profile::{
     BaudRate, Connection, FeedRate, GENERIC_LASER_ID, GENERIC_LASER_NAME, Limited,
     MAX_CONNECTION_CHARS, MAX_NAME_CHARS, MAX_WORK_MM, MIN_WORK_MM, MachineProfile, OriginCorner,
-    PowerValue, ProfileValues, clamp_address, clamp_baud, clamp_feed, clamp_name, clamp_port,
-    clamp_power, clamp_work_area, clamp_work_side, grouped, save_as_name,
+    OutputFormat, PowerValue, ProfileValues, clamp_address, clamp_baud, clamp_feed, clamp_name,
+    clamp_port, clamp_power, clamp_work_area, clamp_work_side, grouped, save_as_name,
 };
 pub use machine_profile_copy::{
     CopyRead, DAMAGED_NAME_NOTICE, ProfileCopy, align_due, differs, read_copy, sets_differ,

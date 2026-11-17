@@ -544,7 +544,26 @@ impl DocumentVersion {
 /// `set_locked` that is no boolean reads unlocked; each counts one value. Goldens: `fixture_sets_v47.curvyo`,
 /// `fixture_sets_damaged_v47.curvyo`, `fixture_sets_align_v47.curvyo`,
 /// `snapping_centres_type_v47.curvyo`, `fixtures_pre_sets_v46.curvyo`; the older goldens stay.
-pub const CURRENT_FORMAT_VERSION: u32 = 47;
+///
+/// Bumped to 48 in `laser-job-preview-and-output` (ADR 0065, `specs/0029`): the manufacturing's
+/// profile copy `mfg_profile` may hold `air_assist` (a boolean) and `output_format` (`"grbl"`);
+/// a laser page may carry the process registers `x.curvyo.laser.fixture_material` (a material
+/// id) and `.start` (`"machine_origin"`, `"head_position"` or `"home_then_origin"`; one register
+/// since 2026-11-17, the first build's `.start_from` and `.home_first` are never read or written);
+/// the labels `export_job`, `set_fixture_material`, `set_start_machine_origin`,
+/// `set_start_head_position`, `set_start_home_then_origin` and `air_assist_on` / `_off` are
+/// steps, `mark_test_grid_lasered` is reserved (no step, no history row, so an undo of the export
+/// keeps Lasered). A build that stops at 47 rewrites the whole `mfg_profile` map from its own
+/// type on a field edit and would drop `air_assist` and `output_format` silently, so this build's
+/// files must be refused by version (ADR 0033 §7); the registers ride on the bump. No migration:
+/// a file of 47 or lower opens unchanged with the defaults (no pick, Machine origin, air assist
+/// off, GRBL), nothing is written. Damage (ADR 0065 §1, §3): a register or `air_assist` of the
+/// wrong type or spelling reads its default and counts one value (a damaged `start` also blocks
+/// the export, never guessed into a file); an
+/// `output_format` this build does not know reads damaged and blocks the export (never written
+/// as GRBL); nothing is repaired on read. The laser extension reads every value. Goldens:
+/// `laser_output_v48.curvyo`, `laser_output_damaged_v48.curvyo`; the older goldens stay.
+pub const CURRENT_FORMAT_VERSION: u32 = 48;
 
 pub(crate) const ROOT_MAP: &str = "root";
 pub(crate) const KEY_FORMAT_VERSION: &str = "format_version";

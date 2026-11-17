@@ -147,7 +147,7 @@ impl Document {
     }
 
     /// The meta map of the live operation `id`, refused for a grid row.
-    fn writable_operation_meta(&self, id: NodeId) -> Result<LoroMap, OperationError> {
+    pub(crate) fn writable_operation_meta(&self, id: NodeId) -> Result<LoroMap, OperationError> {
         let meta = self.operation_meta(id)?;
         if grid_switch(&meta) != Some(false) {
             return Err(OperationError::GridRow);
@@ -156,7 +156,7 @@ impl Document {
     }
 
     /// Writes each value that differs from the stored one, uncommitted; whether any did.
-    fn write_settings(metas: &[LoroMap], writes: &[SettingsWrite]) -> bool {
+    pub(crate) fn write_settings(metas: &[LoroMap], writes: &[SettingsWrite]) -> bool {
         let mut changed = false;
         for (meta, write) in metas.iter().zip(writes) {
             let now = stored_at(meta, KEY_OP_SETTINGS);

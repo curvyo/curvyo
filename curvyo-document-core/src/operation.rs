@@ -78,6 +78,9 @@ pub enum OperationError {
     /// commands (ADR 0054 §4, `specs/0028` criterion 6).
     #[error("a test grid row takes no items and no settings")]
     GridRow,
+    /// A Start value that is none of the three spellings (ADR 0065 §2).
+    #[error("the start is machine_origin, head_position or home_then_origin")]
+    BadStart,
 }
 
 /// The operation nodes under `manufacturing`, in list (tree) order.
@@ -124,7 +127,7 @@ pub(crate) fn place_in_list(tree: &LoroTree, node: TreeID, others: &[TreeID], in
 }
 
 impl Document {
-    fn manufacturing_node(&self, id: NodeId) -> Result<TreeID, OperationError> {
+    pub(crate) fn manufacturing_node(&self, id: NodeId) -> Result<TreeID, OperationError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let node = tree_id_of(id);
         (node_exists(&tree, node) && is_manufacturing_node(&tree, node))

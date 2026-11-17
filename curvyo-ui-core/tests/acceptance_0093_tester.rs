@@ -208,7 +208,9 @@ fn ac15_the_extension_crates_have_no_io_network_or_gcode() {
             );
         }
         for entry in std::fs::read_dir(root.join(krate).join("src")).unwrap() {
-            let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+            let path = entry.unwrap().path();
+            let text = std::fs::read_to_string(&path).unwrap();
+            let file = path.file_name().unwrap().to_str().unwrap().to_owned();
             for banned in [
                 "std::net",
                 "std::fs",
@@ -220,6 +222,14 @@ fn ac15_the_extension_crates_have_no_io_network_or_gcode() {
                 "G1 ",
                 "telemetry",
             ] {
+                // Superseded by `0029` (ADR 0064 §1, §12): the GRBL writers (`job_write*.rs`)
+                // and the profile's output format (`machine_profile.rs`) of `curvyo-laser-core`
+                // may name G-code; every other file, and I/O and network anywhere, still may not.
+                let gcode = matches!(banned, "G-code" | "G0 " | "G1 ");
+                let writer = file.starts_with("job_write") || file == "machine_profile.rs";
+                if gcode && krate == "curvyo-laser-core" && writer {
+                    continue;
+                }
                 assert!(!text.contains(banned), "{krate} contains {banned}");
             }
         }

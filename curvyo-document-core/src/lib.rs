@@ -145,12 +145,12 @@ pub use manufacturing_fixture_sets::{FixtureSetSnapshot, MAX_FIXTURE_SETS, MAX_J
 mod manufacturing_fixtures;
 mod manufacturing_slot_commands;
 pub use manufacturing::{
-    ADD_OUTPUT_PAGE_COMMIT_LABEL, DELETE_PLACEMENT_COMMIT_LABEL, EDIT_LASER_MODE_COMMIT_LABEL,
-    EDIT_MAX_FEED_COMMIT_LABEL, EDIT_MAX_POWER_COMMIT_LABEL, EDIT_ORIGIN_CORNER_COMMIT_LABEL,
-    EDIT_PROFILE_NAME_COMMIT_LABEL, FixtureParams, MOTORISED_Z_OFF_COMMIT_LABEL,
-    MOTORISED_Z_ON_COMMIT_LABEL, ManufacturingError, ManufacturingSnapshot, NewOutputPage,
-    PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot, ProfileChange, ProfileSets,
-    RESET_PROFILE_COMMIT_LABEL, SAVE_AS_PROFILE_COMMIT_LABEL,
+    ADD_OUTPUT_PAGE_COMMIT_LABEL, AIR_ASSIST_OFF_COMMIT_LABEL, AIR_ASSIST_ON_COMMIT_LABEL,
+    DELETE_PLACEMENT_COMMIT_LABEL, EDIT_LASER_MODE_COMMIT_LABEL, EDIT_MAX_FEED_COMMIT_LABEL,
+    EDIT_MAX_POWER_COMMIT_LABEL, EDIT_ORIGIN_CORNER_COMMIT_LABEL, EDIT_PROFILE_NAME_COMMIT_LABEL,
+    FixtureParams, MOTORISED_Z_OFF_COMMIT_LABEL, MOTORISED_Z_ON_COMMIT_LABEL, ManufacturingError,
+    ManufacturingSnapshot, NewOutputPage, PICK_PROFILE_COMMIT_LABEL, PageCorner, PlacementSnapshot,
+    ProfileChange, ProfileSets, RESET_PROFILE_COMMIT_LABEL, SAVE_AS_PROFILE_COMMIT_LABEL,
 };
 pub use manufacturing_fixture_commands::{
     ADD_CLAMP_COMMIT_LABEL, ADD_GRID_COMMIT_LABEL, ADD_HOLDER_COMMIT_LABEL, ADD_SCREW_COMMIT_LABEL,
@@ -170,6 +170,7 @@ pub use manufacturing_slot_commands::{
     SET_SLOT_COMMIT_LABEL, SET_SLOT_POSITION_COMMIT_LABEL, SET_SLOT_SHAPE_COMMIT_LABEL,
     SET_SLOT_SIZE_COMMIT_LABEL,
 };
+mod laser_output_commands;
 mod operation;
 mod operation_codec;
 mod operation_members;
@@ -178,6 +179,11 @@ mod test_grid_codec;
 mod test_grid_commands;
 mod test_grid_object;
 mod test_grid_rows;
+pub use laser_output_commands::{
+    EXPORT_JOB_COMMIT_LABEL, SET_FIXTURE_MATERIAL_COMMIT_LABEL,
+    SET_START_HEAD_POSITION_COMMIT_LABEL, SET_START_HOME_THEN_ORIGIN_COMMIT_LABEL,
+    SET_START_MACHINE_ORIGIN_COMMIT_LABEL,
+};
 pub use operation::{
     ADD_OPERATION_COMMIT_LABEL, ASSIGN_TO_OPERATION_COMMIT_LABEL, CUTS_LAST_OFF_COMMIT_LABEL,
     CUTS_LAST_ON_COMMIT_LABEL, DELETE_OPERATION_COMMIT_LABEL, MOVE_OPERATION_COMMIT_LABEL,
@@ -200,8 +206,7 @@ pub use test_grid_commands::{
     TestGridError,
 };
 pub use test_grid_object::{
-    DerivedPart, DerivedRow, GridStep, MARK_TEST_GRID_LASERED_COMMIT_LABEL, NewGridObject,
-    PLACE_TEST_GRID_COMMIT_LABEL, TestGridWrite,
+    DerivedPart, DerivedRow, GridStep, NewGridObject, PLACE_TEST_GRID_COMMIT_LABEL, TestGridWrite,
 };
 mod node_edit;
 mod node_move;
@@ -328,12 +333,12 @@ pub use guides::{GuideMarking, SET_GUIDE_COMMIT_LABEL};
 pub use history::{
     Author, BranchMark, Direction, Event, FAR_STEP_OPS, GoToReport, HistoricalDocument,
     HistoryBranch, HistoryError, HistoryRow, LABEL_ALIGN_FIXTURE_SETS, LABEL_CLONE_VERSION,
-    LABEL_GO_TO_VERSION, LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT, LABEL_OBJECT_REDO,
-    LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO, LABEL_WIPE_OBJECT,
-    MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult, ObjectRow, ObjectRowClass,
-    ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep, RestoreReport, Role,
-    RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status, StepKind,
-    StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
+    LABEL_GO_TO_VERSION, LABEL_MARK_TEST_GRID_LASERED, LABEL_MIGRATE_FORMAT, LABEL_NEW_DOCUMENT,
+    LABEL_OBJECT_REDO, LABEL_OBJECT_UNDO, LABEL_REDO, LABEL_REFRESH_MATERIAL_NUMBERS, LABEL_UNDO,
+    LABEL_WIPE_OBJECT, MIN_SHOWN_ID_LEN, ObjectReport, ObjectRestore, ObjectResult, ObjectRow,
+    ObjectRowClass, ObjectShape, ObjectStatus, ObjectTarget, ObjectTargets, OwnStep, RestoreReport,
+    Role, RowRevert, RowVersion, SMALL_STEP_OPS, STACK_LIMIT, SkipReason, StackMachine, Status,
+    StepKind, StepRef, SyncError, TouchedObject, WIPE_LABEL, is_document_level_label, shown_ids,
 };
 pub use image_model::{
     IMPORT_COMMIT_LABEL, IMPORT_IMAGE_COMMIT_LABEL, IMPORT_IMAGES_COMMIT_LABEL, ImageSnapshot,

@@ -150,7 +150,6 @@ pub const FREE_STEPS: &[&str] = &[
     // from the tool bar and the Materials tab, never through the selected objects' handles; the
     // material steps write the root marker only.
     "place_test_grid",
-    "mark_test_grid_lasered",
     "add_material",
     "add_material_set",
     "delete_material_set",
@@ -170,6 +169,15 @@ pub const FREE_STEPS: &[&str] = &[
     "edit_laser_mode",
     "motorised_z_on",
     "motorised_z_off",
+    // `specs/0029-laser-job-preview-and-output`: the page's machine copy, its output registers and
+    // the export step write the manufacturing, its fixture jobs and operations only.
+    "air_assist_on",
+    "air_assist_off",
+    "set_fixture_material",
+    "set_start_machine_origin",
+    "set_start_head_position",
+    "set_start_home_then_origin",
+    "export_job",
     "add_sketch",
     "edit_sketch",
     "place_sketch_clone",

@@ -56,6 +56,7 @@ mod stroke;
 mod text_edit_overlay;
 mod theme;
 mod tiling_overlay;
+mod toolpath_look;
 mod trace_mask_overlay;
 mod width_handles;
 
@@ -108,6 +109,10 @@ pub use theme::{
     OP_LANE_LINE, PASTEBOARD_BG,
 };
 pub use tiling_overlay::{KnobState, TilingCircleGuide, build_tiling_circle};
+pub use toolpath_look::{
+    MAX_ARROWS, RING_DIAMETER_PX, RING_OFFSET_PX, ToolpathArrow, ToolpathHead, ToolpathLook,
+    ToolpathSegment, ToolpathStroke, build_toolpath,
+};
 pub use trace_mask_overlay::{
     TraceLassoDraft, TraceMaskOutline, TraceMaskOverlay, TraceMaskSelection,
     build_trace_mask_overlay,

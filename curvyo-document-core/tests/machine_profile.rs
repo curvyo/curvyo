@@ -233,3 +233,36 @@ fn the_motorised_z_switch_writes_the_copy_in_one_step_named_on_or_off() {
         assert_eq!(document.manufacturing(id).unwrap().profile, Some(profile));
     }
 }
+
+/// `specs/0029` criterion 25 (ADR 0065 §3): the Air assist switch writes the copy in one step
+/// labelled by its new state.
+#[test]
+fn the_air_assist_switch_writes_the_copy_in_one_step_named_on_or_off() {
+    let off = copy(USER_ID, "K40", 6000);
+    let (document, id) = with_laser(&off);
+    let area = document.manufacturing(id).unwrap().work_area();
+    for on in [true, false] {
+        let mut profile = off.clone();
+        profile.insert("air_assist".to_owned(), serde_json::json!(on));
+        assert!(
+            document
+                .set_manufacturing_profile(
+                    id,
+                    &profile,
+                    area,
+                    PageCorner::default(),
+                    ProfileChange::AirAssist { on },
+                    &curvyo_document_core::PageContents::new(),
+                )
+                .unwrap()
+        );
+        assert_eq!(
+            document.own_steps().last().unwrap().label,
+            if on {
+                "air_assist_on"
+            } else {
+                "air_assist_off"
+            }
+        );
+    }
+}

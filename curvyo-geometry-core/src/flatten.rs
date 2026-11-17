@@ -7,7 +7,7 @@
 //! same result on Linux, Windows, macOS and in the browser. The price is a few more points than
 //! an adaptive scheme would give (about 6 % more on a circle).
 
-use curvyo_document_core::Point;
+use curvyo_document_core::{Point, Tolerance};
 
 use crate::OutlineTriple;
 
@@ -124,6 +124,23 @@ pub(crate) fn flatten(anchors: &[OutlineTriple], closed: bool, tolerance_mm: f64
         }
     }
     points
+}
+
+/// The polyline of an outline whose chords stay within `tolerance` of its cubics: the public face
+/// of the kernel's own flattening, bit-identical to it on every target. Every anchor is a vertex;
+/// a closed outline does not repeat its first point at the end. A tolerance that is not finite and
+/// above zero gives the anchors alone.
+#[must_use]
+pub fn flatten_outline(
+    anchors: &[OutlineTriple],
+    closed: bool,
+    tolerance: Tolerance,
+) -> Vec<Point> {
+    let mm = tolerance.as_mm();
+    if !(mm.is_finite() && mm > 0.0) {
+        return anchors.iter().map(|anchor| anchor.0).collect();
+    }
+    flatten(anchors, closed, mm)
 }
 
 #[cfg(test)]
@@ -265,6 +282,26 @@ mod tests {
         let one = [(Point::new(1.0, 2.0), Vec2::new(5.0, 5.0), Vec2::ZERO)];
         assert_eq!(flatten(&one, false, 0.008), vec![Point::new(1.0, 2.0)]);
         assert_eq!(flatten(&[], false, 0.008), Vec::<Point>::new());
+    }
+
+    /// ADR 0064 §1: the exported `flatten_outline` is the kernel's `flatten`, bit for bit; a zero
+    /// or NaN tolerance keeps the nodes.
+    #[test]
+    fn the_public_flattening_is_the_kernels_own() {
+        let disc = circle(10.0);
+        assert_eq!(
+            flatten_outline(&disc, true, Tolerance::from_mm(0.0095)),
+            flatten(&disc, true, 0.0095)
+        );
+        let points: Vec<Point> = disc.iter().map(|a| a.0).collect();
+        assert_eq!(
+            flatten_outline(&disc, true, Tolerance::from_mm(0.0)),
+            points
+        );
+        assert_eq!(
+            flatten_outline(&disc, true, Tolerance::from_mm(f64::NAN)),
+            points
+        );
     }
 
     /// 0054 criterion 33: an open outline flattens bit for bit the same every time.

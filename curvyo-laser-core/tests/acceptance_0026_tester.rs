@@ -427,8 +427,8 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
     assert!(text.ends_with("}\n"), "trailing newline");
     assert!(!text.ends_with("\n\n"));
     assert!(
-        // Record format 5 since `specs/0113-fixture-sets-and-pins` (ADR 0060 §1).
-        text.starts_with("{\n  \"format_version\": 5,\n  \"id\": "),
+        // Record format 6 since `specs/0029` (ADR 0065 §3).
+        text.starts_with("{\n  \"format_version\": 6,\n  \"id\": "),
         "{text}"
     );
     let order = [
@@ -443,6 +443,9 @@ fn adr0036_record_round_trips_byte_for_byte_and_follows_the_canonical_shape() {
         "\"max_power\"",
         "\"laser_mode\"",
         "\"motorised_z\"",
+        // Air assist and the output format of record format 6 (`0029`, ADR 0065 §3).
+        "\"air_assist\"",
+        "\"output_format\"",
         "\"connection\"",
         // `fixture_sets` replaces `fixtures` in record format 5 (`0113`, ADR 0060 §1).
         "\"fixture_sets\"",
@@ -537,6 +540,8 @@ fn ac6_the_copy_holds_id_and_copied_values_and_no_connection_or_work_area() {
     assert_eq!(
         keys,
         vec![
+            // Air assist and the output format of `0029` (ADR 0065 §3).
+            "air_assist",
             "id",
             "laser_mode",
             "max_feed_mm_per_min",
@@ -544,7 +549,8 @@ fn ac6_the_copy_holds_id_and_copied_values_and_no_connection_or_work_area() {
             // The motorised Z axis of `0111` (ADR 0056 §7).
             "motorised_z",
             "name",
-            "origin"
+            "origin",
+            "output_format"
         ]
     );
     assert_eq!(map["id"], json!(p.id));
@@ -987,8 +993,8 @@ fn ac13_one_damaged_record_uses_the_singular_notice() {
 fn ac13_a_newer_record_is_skipped_with_its_own_count() {
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
-        // Format 5 is current since `0113` (ADR 0060 §1); 6 is newer.
-        m.insert("format_version".into(), json!(6));
+        // Format 6 is current since `0029` (ADR 0065 §3); 7 is newer.
+        m.insert("format_version".into(), json!(7));
         m.insert("new_thing".into(), json!(true));
     });
     assert_eq!(
@@ -1095,8 +1101,8 @@ fn ac13_a_skipped_newer_record_is_never_overwritten_by_save_as_profile() {
     // copy "under the same id" (criterion 8) -- which must not overwrite the newer file.
     let p = user(1, "From the future");
     let newer = record_with(&p, |m| {
-        // Format 5 is current since `0113` (ADR 0060 §1); 6 is newer.
-        m.insert("format_version".into(), json!(6));
+        // Format 6 is current since `0029` (ADR 0065 §3); 7 is newer.
+        m.insert("format_version".into(), json!(7));
     });
     let mut lib = MachineProfiles::load(&[(record_file_name(&p.id), newer)]);
     let write = lib.add(p.clone());
@@ -1160,6 +1166,8 @@ fn ac15_a_record_holds_no_project_content() {
     assert_eq!(
         keys,
         vec![
+            // Air assist of record format 6 (`0029`, ADR 0065 §3): the machine's.
+            "air_assist",
             "connection",
             // The fixture sets of record format 5 (`0113`, ADR 0060): the bed, not project content.
             "fixture_sets",
@@ -1173,6 +1181,8 @@ fn ac15_a_record_holds_no_project_content() {
             "motorised_z",
             "name",
             "origin",
+            // The output format of record format 6 (`0029`, ADR 0065 §3): the machine's.
+            "output_format",
             "work_area_mm"
         ]
     );

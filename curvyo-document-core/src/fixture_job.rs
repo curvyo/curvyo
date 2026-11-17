@@ -84,7 +84,7 @@ fn job_nodes(tree: &LoroTree, fixture: TreeID) -> Vec<TreeID> {
 
 impl Document {
     /// The job `id` with its meta map and its fixture node.
-    fn job_meta(&self, id: NodeId) -> Result<(LoroMap, TreeID), FixtureJobError> {
+    pub(crate) fn job_meta(&self, id: NodeId) -> Result<(LoroMap, TreeID), FixtureJobError> {
         let tree = self.loro().get_tree(OBJECTS_TREE);
         let node = tree_id_of(id);
         let fixture = parent_node(&tree, node).filter(|&f| is_fixture_node(&tree, f));

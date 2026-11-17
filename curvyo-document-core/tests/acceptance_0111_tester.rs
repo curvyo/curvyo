@@ -121,9 +121,9 @@ fn merge(a: &Document, b: &Document) {
 fn c25_the_format_is_44() {
     // Superseded by `specs/0114-image-trace-mask` (format 45, ADR 0061) and
     // `specs/0112-test-grid-and-materials` (format 46, ADR 0057 §7).
-    assert_eq!(CURRENT_FORMAT_VERSION, 47);
+    assert_eq!(CURRENT_FORMAT_VERSION, 48);
     let (d, _, _) = laser();
-    assert_eq!(format_of(&pack(&d, "t").unwrap()), 47);
+    assert_eq!(format_of(&pack(&d, "t").unwrap()), 48);
 }
 
 #[test]

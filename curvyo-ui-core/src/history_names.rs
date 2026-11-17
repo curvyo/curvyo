@@ -106,7 +106,6 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0112-test-grid-and-materials` plan.md (UX section 11): the grid object, the
     // Materials tab and its tests.
     ("place_test_grid", "Place test grid"),
-    ("mark_test_grid_lasered", "Mark lasered"),
     ("add_material", "Add material"),
     ("add_material_set", "Add set"),
     ("delete_material_set", "Delete set"),
@@ -128,6 +127,17 @@ pub const OPERATION_NAMES: &[(&str, &str)] = &[
     // `specs/0111-laser-operation-tools` criterion 22.
     ("motorised_z_on", "Motorised Z axis on"),
     ("motorised_z_off", "Motorised Z axis off"),
+    // `specs/0029-laser-job-preview-and-output` UX notes §12 (ADR 0065 §1, §3; ADR 0064 §11).
+    ("air_assist_on", "Air assist on"),
+    ("air_assist_off", "Air assist off"),
+    ("set_fixture_material", "Pick fixture material"),
+    ("set_start_machine_origin", "Start: Machine origin"),
+    ("set_start_head_position", "Start: Head position"),
+    (
+        "set_start_home_then_origin",
+        "Start: Home, then machine origin",
+    ),
+    ("export_job", "Export job file"),
     ("add_sketch", "Add sketch"),
     ("edit_sketch", "Edit sketch"),
     ("convert_sketch_to_path", "Sketch to path"),
@@ -368,6 +378,7 @@ pub const RESERVED_LABELS: &[&str] = &[
     curvyo_document_core::LABEL_MIGRATE_FORMAT,
     curvyo_document_core::LABEL_REFRESH_MATERIAL_NUMBERS,
     curvyo_document_core::LABEL_ALIGN_FIXTURE_SETS,
+    curvyo_document_core::LABEL_MARK_TEST_GRID_LASERED,
     curvyo_document_core::LABEL_UNDO,
     curvyo_document_core::LABEL_REDO,
     curvyo_document_core::WIPE_LABEL,
@@ -459,11 +470,9 @@ mod tests {
                 "{label} is in one step-scope list"
             );
         }
-        assert_eq!(
-            operation_name(dc::MARK_TEST_GRID_LASERED_COMMIT_LABEL),
-            "Mark lasered",
-            "the step of `0029`'s output and of the test hook"
-        );
+        // `0029` (ADR 0064 §11): Lasered is a reserved commit of the export, no step.
+        assert!(RESERVED_LABELS.contains(&dc::LABEL_MARK_TEST_GRID_LASERED));
+        assert_eq!(known_operation_name(dc::LABEL_MARK_TEST_GRID_LASERED), None);
     }
 
     #[test]
@@ -528,5 +537,47 @@ mod tests {
                 .iter()
                 .all(|l| known_operation_name(l).is_none())
         );
+    }
+
+    #[test]
+    fn the_laser_output_steps_are_named_and_free() {
+        use curvyo_document_core as dc;
+        for (label, name) in [
+            (dc::EXPORT_JOB_COMMIT_LABEL, "Export job file"),
+            (
+                dc::SET_FIXTURE_MATERIAL_COMMIT_LABEL,
+                "Pick fixture material",
+            ),
+            // Superseded by 0029 rework (2026-11-17): one Start pick, one label per value.
+            (
+                dc::SET_START_MACHINE_ORIGIN_COMMIT_LABEL,
+                "Start: Machine origin",
+            ),
+            (
+                dc::SET_START_HEAD_POSITION_COMMIT_LABEL,
+                "Start: Head position",
+            ),
+            (
+                dc::SET_START_HOME_THEN_ORIGIN_COMMIT_LABEL,
+                "Start: Home, then machine origin",
+            ),
+            (dc::AIR_ASSIST_ON_COMMIT_LABEL, "Air assist on"),
+            (dc::AIR_ASSIST_OFF_COMMIT_LABEL, "Air assist off"),
+        ] {
+            assert_eq!(operation_name(label), name, "{label}");
+            assert!(
+                crate::step_scope::FREE_STEPS.contains(&label),
+                "{label} is in one step-scope list"
+            );
+        }
+        assert_eq!(known_operation_name("mark_test_grid_lasered"), None);
+        for gone in [
+            "set_start_from_machine_origin",
+            "set_start_from_head_position",
+            "set_home_first_on",
+            "set_home_first_off",
+        ] {
+            assert_eq!(known_operation_name(gone), None, "{gone}");
+        }
     }
 }
