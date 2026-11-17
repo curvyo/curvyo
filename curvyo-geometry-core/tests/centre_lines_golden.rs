@@ -212,6 +212,13 @@ fn bands(lines: &CentreLines) -> Vec<(f64, usize, usize, usize)> {
             } else {
                 [0.0, 1.0].iter().filter(|&&t| width(t) < 0.05).count()
             };
+            // A crest's tip inside the path counts as two pointed ends (CENTRE-THROUGH A).
+            let tips = path
+                .profile
+                .positions()
+                .filter(|&t| t > 0.0 && t < 1.0 && width(t) < 0.05)
+                .count();
+            let pointed = pointed + 2 * tips;
             (length >= 10.0 && widths[10] >= 1.5).then(|| {
                 (
                     length,
