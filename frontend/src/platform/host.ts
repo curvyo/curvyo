@@ -205,6 +205,11 @@ function downloadText(name: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
+/** The browser has no machine connector client: only the desktop app talks to one. */
+function notInTheBrowser(command: string): never {
+  throw new Error(`${command} needs the desktop app`);
+}
+
 const browserCommands: Record<string, (args?: Record<string, unknown>) => unknown> = {
   take_pending_open: () => null,
   pick_project: (args) => {
@@ -249,6 +254,16 @@ const browserCommands: Record<string, (args?: Record<string, unknown>) => unknow
   import_formats_file: () => pickTextFile(),
   read_extensions_file: () => readStored(EXTENSIONS_KEY),
   write_extensions_file: (args) => window.localStorage.setItem(EXTENSIONS_KEY, String(args?.text)),
+  // The connector row says "Needs the desktop app" in the browser and never calls these
+  // (`specs/0064-machine-connector`, UX notes §9).
+  connector_pairing: () => notInTheBrowser("connector_pairing"),
+  connector_test: () => notInTheBrowser("connector_test"),
+  connector_pair: () => notInTheBrowser("connector_pair"),
+  connector_forget: () => notInTheBrowser("connector_forget"),
+  connector_send_job: () => notInTheBrowser("connector_send_job"),
+  connector_command: () => notInTheBrowser("connector_command"),
+  connector_watch: () => notInTheBrowser("connector_watch"),
+  connector_unwatch: () => undefined,
   list_machine_profiles: () => listBrowserRecords(MACHINES_PREFIX),
   write_machine_profile: (args) =>
     window.localStorage.setItem(`${MACHINES_PREFIX}${String(args?.id)}`, String(args?.text)),

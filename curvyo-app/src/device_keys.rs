@@ -17,6 +17,42 @@ use tauri::{AppHandle, Manager, State};
 #[derive(Default)]
 pub(crate) struct OpenStore(Mutex<Option<CredentialStore>>);
 
+/// Why the credential store cannot be used for a connector pairing.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum StoreProblem {
+    /// This computer has no keychain and no key file has been opened this run.
+    NoStore,
+    /// Anything else, in words.
+    Failed(String),
+}
+
+impl OpenStore {
+    /// Runs `f` with the store: the one opened this run, or else the system keychain. Never asks
+    /// for a passphrase (the connector row has no place for it).
+    pub(crate) fn with_keychain<R>(
+        &self,
+        app: &AppHandle,
+        f: impl FnOnce(&CredentialStore) -> R,
+    ) -> Result<R, StoreProblem> {
+        let mut guard = self
+            .0
+            .lock()
+            .map_err(|_| StoreProblem::Failed("the credential store is busy".to_owned()))?;
+        if guard.is_none() {
+            let dir = data_dir(app).map_err(StoreProblem::Failed)?;
+            let slot = credential_slot(&dir).map_err(|e| StoreProblem::Failed(e.to_string()))?;
+            *guard = Some(CredentialStore::keychain(&slot).map_err(|e| match e {
+                CredentialError::NoKeychain => StoreProblem::NoStore,
+                other => StoreProblem::Failed(other.to_string()),
+            })?);
+        }
+        guard
+            .as_ref()
+            .map(f)
+            .ok_or_else(|| StoreProblem::Failed("the credential store is not open".to_owned()))
+    }
+}
+
 /// What the frontend gets back.
 #[derive(serde::Serialize)]
 #[serde(tag = "status", rename_all = "kebab-case")]
