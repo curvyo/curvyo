@@ -114,6 +114,20 @@ Round C (architect review rounds A+B, tester findings, 2026-11-19):
   budget `6 + 4 per pointed end + ceil(0.12 L)` width points, worker memory ≤ 320 MB asserted
   (`centreLinesWorkerMemory.test.ts`).
 
+Round D (customer CENTRE-THROUGH A, screenshots 20 to 23, 2026-11-20):
+
+- [x] 33. Measures of junction quality on the output paths (`centre_line/quality_tests.rs`: paint
+  outside the subject, butt corners outside the path joined, paths) and synthetic junctions
+  (`centre_line/junction_tests.rs`: crests at 30 to 50 degrees, an oblique T at 35 to 90 degrees
+  with `p` 20 % and 0, a fin on a crest), failing first (AC 9, 10).
+- [x] 34. Crest tips: the arms pair and run through the tip on straight legs, width 0 at the tip;
+  the fit cuts at the tip and the legs' starts (AC 9, 20).
+- [x] 35. Pairing by direction first, the width only within 0.1 of the turn (AC 9).
+- [x] 36. Branch start: the butt inside the parent's paint, deeper for an oblique branch, narrowed
+  at an acute one (AC 10).
+- [x] 37. Fit guard against cubics straying past their piece; goldens regenerated; the dolphin
+  and whale measures asserted (AC 19, 20).
+
 ## Validation
 
 Golden text fixtures compared within 0.01 mm; strokes generated from known centre lines checked
@@ -131,7 +145,10 @@ parameterisation, its closures share the branch's samples), `Walker::walk` (one 
 exits), `chains` (the pipeline of one axis, step by step), `prune_spurs` (one loop whose passes
 share the radii) and `centre_lines_drawing` (one
 drawing, its children in stacking order). Each reads top to bottom with no branch that would
-stand alone. Round A adds, justified the same way: `fit_curve` (100 lines: the corner cuts,
+stand alone. Round D splits `cut_branch` into `Extension` (the extended branch) and `Butt` (its corners
+against the parent); `fit.rs` (719 lines with its piece tests) gains the legs' cuts and moves the
+new stray test to `safe_fit.rs`; `centre_line/quality_tests.rs` and `junction_tests.rs` are test
+modules. Round A adds, justified the same way: `fit_curve` (100 lines: the corner cuts,
 the tight and loose pieces and the stretch merge of one path), `merge_anchors` (110: one
 closest-first loop with its projection and zone test), `merge_points` (66), `finish_into` (78:
 the region's cases in order), `finish_chains` (67), `kept::parts` (67: one boolean and its
