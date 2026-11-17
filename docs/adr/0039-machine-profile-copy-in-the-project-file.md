@@ -10,7 +10,7 @@ Note 2026-11-05: §4 amended by [ADR 0042](0042-page-kinds.md) (proposed): a pic
 
 **Note (ADRs 0059 and 0060, accepted 2026-11-16, PR #365):** §4 and §5: Pick profile builds the page's fixture-set mirror from the record's `fixture_sets` (ids kept, every set on) and Differs from profile, Update and Reset act on the machine fields only; the project format is 47 (ADR 0060 §5a/§6).
 
-**Note (ADR 0065, needs-customer, accepted with the `0029` story PR):** §1 and §5: the project's copy of a profile carries `air_assist` and `output_format` (`mfg_profile.air_assist`, `.output_format`); an unknown `output_format` makes the copy damaged; the project format is 48 (0065 §3).
+**Note (ADR 0065, needs-customer, accepted 2026-11-17 with the `0029` story PR #371):** §1 and §5: the project's copy of a profile carries `air_assist` and `output_format` (`mfg_profile.air_assist`, `.output_format`); an unknown `output_format` makes the copy damaged; the project format is 48 (0065 §3).
 
 ## Context
 

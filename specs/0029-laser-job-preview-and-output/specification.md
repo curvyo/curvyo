@@ -1,6 +1,6 @@
 # Laser job preview and output: a toolpath and time preview, a machine and material gate, and job file export (GRBL G-code first) from a laser page
 
-Status: Ready (pending the customer's spec PR merge)
+Status: Done (PR #371)
 Priority: Must
 Origin: Customer (R-MFG-003, R-MFG-LASER-001, R-SYS-008; MVP slice 16, the capstone of epic `0063`, "Settings and output"). Everything marked **(Proposal)** is the product owner's and vetoable at the demo. Fragen 219 to 226 were answered by the customer on 2026-11-16 (see "Answered customer questions"); the customer added a homing request to Frage 224. The customer's review of PR #370 (2026-11-16) made the output format a field of the machine profile with GRBL as its first value and the job format-neutral (criterion 39).
 
