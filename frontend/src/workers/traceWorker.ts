@@ -62,8 +62,8 @@ scope.onmessage = (event) => {
     }
     if (request.type === "centre-finish") {
       centre ??= new WasmCentreLinesWorker();
-      const [overlap, thick, optimise, keep, offset] = request.options;
-      const wire = centre.finish(overlap, thick, optimise, keep !== 0, offset);
+      const [overlap, thick, optimise, keep, offset, join] = request.options;
+      const wire = centre.finish(overlap, thick, optimise, keep !== 0, offset, join !== 0);
       scope.postMessage({ id: request.id, kind: "centre-preview", wire, ms: performance.now() - started }, [wire.buffer]);
       return;
     }

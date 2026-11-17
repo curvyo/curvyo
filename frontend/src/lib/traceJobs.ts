@@ -52,7 +52,7 @@ export type TraceRequest =
   /** Find centre lines (`specs/0117`, ADR 0063 amendment 2026-11-18): the subjects' outlines,
    * the preview of the options, and the latest result for Apply; `id` is the generation. */
   | { type: "centre-subjects"; id: number; wire: Float64Array }
-  | { type: "centre-finish"; id: number; options: [number, number, number, number, number] }
+  | { type: "centre-finish"; id: number; options: [number, number, number, number, number, number] }
   | { type: "centre-result"; id: number };
 
 /** A message from the worker. */

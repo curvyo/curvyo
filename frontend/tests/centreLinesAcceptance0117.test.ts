@@ -54,7 +54,7 @@ describe("centre lines options that are not numbers (tester, 0117 criterion 15a)
     session.import_begin("picker", false, 0, 0);
     session.import_add(new TextEncoder().encode(ring), "ring.svg");
     session.import_finish(true);
-    const view = session.apply_centre_lines(...args);
+    const view = session.apply_centre_lines(...args, true);
     const out = { kind: view.kind, converted: view.converted, svg: session.export_svg(false, false, false, false) };
     session.free();
     return out;
@@ -144,7 +144,7 @@ describe("centre lines Thick parts at the binding (tester, 0117 criterion 12)", 
     session.import_begin("picker", false, 0, 0);
     session.import_add(new TextEncoder().encode(ring), "ring.svg");
     session.import_finish(true);
-    const view = session.apply_centre_lines(0.2, thick, 0.75, false, 0.3);
+    const view = session.apply_centre_lines(0.2, thick, 0.75, false, 0.3, true);
     const out = { kind: view.kind, converted: view.converted, kept: view.kept, svg: session.export_svg(false, false, false, false) };
     session.free();
     return out;

@@ -33,7 +33,7 @@ type Session = {
 };
 type Worker = {
   subjects: (wire: Float64Array, sink: { report: (percent: number) => void }) => boolean;
-  finish: (overlap: number, thick: number, optimise: number, keepInner: boolean, offset: number) => Float64Array;
+  finish: (overlap: number, thick: number, optimise: number, keepInner: boolean, offset: number, joinTips: boolean) => Float64Array;
 };
 type Bindings = {
   initSync: (options: { module: BufferSource }) => { memory: WebAssembly.Memory };
@@ -110,9 +110,9 @@ test(
     const mb = () => worker.memory.buffer.byteLength / 1_000_000;
     const subjects = mb();
     // The defaults (NaN reads as the default), then Optimise 50 % with inner areas.
-    const defaults = centre.finish(Number.NaN, Number.NaN, Number.NaN, false, Number.NaN);
+    const defaults = centre.finish(Number.NaN, Number.NaN, Number.NaN, false, Number.NaN, true);
     const first = mb();
-    const inner = centre.finish(Number.NaN, Number.NaN, 0.5, true, Number.NaN);
+    const inner = centre.finish(Number.NaN, Number.NaN, 0.5, true, Number.NaN, true);
     const second = mb();
     console.log(
       `worker memory: ${subjects.toFixed(0)} MB after the subjects, ${first.toFixed(0)} MB after the first preview ` +

@@ -36,7 +36,7 @@ function handWorker() {
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
-const options = (overlap: number): CentreOptionsWire => [overlap, 6, 0.75, 0, 0.3];
+const options = (overlap: number): CentreOptionsWire => [overlap, 6, 0.75, 0, 0.3, 1];
 const module = () => Promise.resolve({} as WebAssembly.Module);
 
 function jobs(timeoutMs = 500) {
